@@ -27,6 +27,9 @@ Agent Red Customer Engagement is a commercial SaaS product built on the open-sou
 | AGNTCY dependency model | ✅ Done | - | Arms-length via public GitHub (no submodule) |
 | Migrate commercial materials | ✅ Done | - | SaaS proposal, product features, website content |
 | Initial commit pushed | ✅ Done | - | 23 files, 5,825 lines |
+| Docker dev environment | ✅ Done | - | Dockerfile, docker-compose.yml, requirements.txt |
+| AGNTCY baseline verification (local) | ✅ Done | - | 15 containers healthy, 97.8% unit / 99.3% integration pass |
+| AGNTCY baseline verification (Azure) | ✅ Done | - | All 53 resources operational, evaluation 94% intent / 100% escalation precision |
 | Set up GitHub Project board | 📋 Todo | - | Launch 1.0 tracking |
 
 ---
@@ -275,6 +278,7 @@ Agent Red Customer Engagement is a commercial SaaS product built on the open-sou
 |---------|------|---------|
 | 1.0.0 | 2026-01-29 | Initial project plan |
 | 1.1.0 | 2026-01-29 | Phase 0 complete: GitHub repo created, initial commit pushed, arms-length dependency model established |
+| 1.2.0 | 2026-01-29 | Docker dev environment added, AGNTCY baseline verified (local Docker + production Azure) |
 
 ---
 

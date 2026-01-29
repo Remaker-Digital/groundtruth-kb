@@ -538,10 +538,17 @@ When you need information about the AGNTCY open-source foundation:
 - [x] Commercial proposal migrated (COMMERCIAL-SAAS-PROPOSAL.md)
 - [x] Product features for RAG migrated (PRODUCT-FEATURES-RAG.md)
 - [x] Website content migrated (5 pages)
+- [x] GitHub private repository created (Remaker-Digital/agent-red-customer-engagement)
+- [x] Initial commit pushed
+- [x] Docker development environment (Dockerfile, docker-compose.yml, requirements.txt)
+- [x] AGNTCY baseline verified - local Docker (15 containers, 97.8% unit tests, 99.3% integration tests)
+- [x] AGNTCY baseline verified - production Azure (53 resources, evaluation framework passed)
+- [x] Verification scripts created (scripts/verify-agntcy-local.ps1, scripts/verify-agntcy-production.ps1)
+
+### Key Finding: Azure OpenAI Endpoint
+The actual Azure OpenAI endpoint is `https://remaker.openai.azure.com/` (not the placeholder in AGNTCY's `.env.azure.example`).
 
 ### Pending
-- [ ] Create GitHub private repository
-- [ ] Initialize git, push initial commit
 - [ ] Set up GitHub Project board for Launch 1.0
 - [ ] Begin brand identity work
 - [ ] Begin legal document generation
