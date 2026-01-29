@@ -1,0 +1,103 @@
+# Agent Red Customer Engagement - Local Development Stack
+# © 2026 Remaker Digital, a DBA of VanDusen & Palmeter, LLC. All rights reserved.
+#
+# Usage:
+#   docker compose up -d          # Start all services
+#   docker compose up api         # Start API service only
+#   docker compose logs -f api    # Follow API logs
+#   docker compose down           # Stop all services
+#   docker compose down -v        # Stop and remove volumes
+
+services:
+  # ---------------------------------------------------------------------------
+  # Agent Red API Service
+  # ---------------------------------------------------------------------------
+  api:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: agent-red-api
+    ports:
+      - "8080:8080"
+    volumes:
+      - ./src:/app/src:ro
+    env_file:
+      - path: .env.local
+        required: false
+    environment:
+      - ENVIRONMENT=development
+      - LOG_LEVEL=DEBUG
+      - USE_AZURE_OPENAI=false
+      - USE_REAL_APIS=false
+    depends_on:
+      nats:
+        condition: service_healthy
+    networks:
+      - agent-red-net
+    restart: unless-stopped
+
+  # ---------------------------------------------------------------------------
+  # NATS JetStream (Event Bus)
+  # Mirrors the production NATS configuration from AGNTCY
+  # ---------------------------------------------------------------------------
+  nats:
+    image: nats:2.10-alpine
+    container_name: agent-red-nats
+    ports:
+      - "4222:4222"   # Client connections
+      - "8222:8222"   # HTTP monitoring
+    command: >
+      -js
+      --store_dir /data
+      --max_payload 1048576
+      --http_port 8222
+    volumes:
+      - nats-data:/data
+    healthcheck:
+      test: ["CMD", "wget", "--spider", "-q", "http://localhost:8222/healthz"]
+      interval: 10s
+      timeout: 5s
+      retries: 3
+      start_period: 5s
+    networks:
+      - agent-red-net
+    restart: unless-stopped
+
+  # ---------------------------------------------------------------------------
+  # Cosmos DB Emulator (Local Development)
+  # Provides a local alternative to Azure Cosmos DB for development/testing
+  # ---------------------------------------------------------------------------
+  # NOTE: The Cosmos DB emulator is Linux-compatible but resource-intensive.
+  #       Uncomment below when you need local database development.
+  #       Alternatively, connect to the Azure Cosmos DB Serverless instance
+  #       for integration testing (requires .env.local with connection string).
+  #
+  # cosmosdb:
+  #   image: mcr.microsoft.com/cosmosdb/linux/azure-cosmos-emulator:latest
+  #   container_name: agent-red-cosmosdb
+  #   ports:
+  #     - "8081:8081"   # Data Explorer
+  #     - "10250:10250"
+  #     - "10251:10251"
+  #     - "10252:10252"
+  #     - "10253:10253"
+  #     - "10254:10254"
+  #   environment:
+  #     - AZURE_COSMOS_EMULATOR_PARTITION_COUNT=10
+  #     - AZURE_COSMOS_EMULATOR_ENABLE_DATA_PERSISTENCE=true
+  #   volumes:
+  #     - cosmos-data:/tmp/cosmos/appdata
+  #   networks:
+  #     - agent-red-net
+  #   restart: unless-stopped
+
+volumes:
+  nats-data:
+    driver: local
+  # cosmos-data:
+  #   driver: local
+
+networks:
+  agent-red-net:
+    driver: bridge
+    name: agent-red-network
