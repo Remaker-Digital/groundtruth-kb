@@ -409,6 +409,9 @@ All prices are 10x cost. Cost basis per tier:
 | **Repository** | agent-red-customer-engagement (private) |
 | **Visibility** | Private |
 | **Branch Protection** | main (require PR, require reviews) |
+| **Project Board** | [Agent Red Launch 1.0](https://github.com/orgs/Remaker-Digital/projects/2) (Project #2) |
+
+**Association Rule:** The repository `Remaker-Digital/agent-red-customer-engagement` is strictly associated with GitHub Project #2 (`Agent Red Launch 1.0`) and vice-versa. All issues, tracking, and project management for this repository use that project board exclusively.
 
 ---
 
@@ -530,6 +533,17 @@ When you need information about the AGNTCY open-source foundation:
 - Reference the SDK documentation for `agntcy-app-sdk`
 - Do **not** reference local AGNTCY files by path
 - The "Upstream Dependency" section of this CLAUDE.md contains transferred architectural knowledge
+
+### Preferred Way of Working
+
+For planning, prioritization, and multi-step decision-making, use an **iterative review process**:
+
+1. Present one work item (or clarification) at a time with relevant context, options, and a recommendation
+2. Pause for the owner's input before proceeding to the next item
+3. Incorporate feedback immediately and adjust subsequent items as needed
+4. Do not batch multiple decisions into a single prompt
+
+This applies to: work priority reviews, architecture decisions, scope changes, milestone planning, and any situation where multiple choices must be made. The goal is collaborative decision-making with full visibility, not fire-and-forget task lists.
 
 ### Adding Commercial Features
 

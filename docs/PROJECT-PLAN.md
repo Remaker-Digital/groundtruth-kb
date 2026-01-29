@@ -30,73 +30,88 @@ Agent Red Customer Engagement is a commercial SaaS product built on the open-sou
 | Docker dev environment | ✅ Done | - | Dockerfile, docker-compose.yml, requirements.txt |
 | AGNTCY baseline verification (local) | ✅ Done | - | 15 containers healthy, 97.8% unit / 99.3% integration pass |
 | AGNTCY baseline verification (Azure) | ✅ Done | - | All 53 resources operational, evaluation 94% intent / 100% escalation precision |
-| Set up GitHub Project board | 📋 Todo | - | Launch 1.0 tracking |
+| Set up GitHub Project board | ✅ Done | - | [Project #2](https://github.com/orgs/Remaker-Digital/projects/2), 8 milestone issues (M1-M8) |
 
 ---
 
 ### Phase 1: Foundation (Weeks 2-4)
 
-#### 1.1 Brand Identity
+#### 1.1 Brand Identity *(can start immediately)*
+**Direction:** Bold/Corporate — dark reds, navy/charcoal accents, strong sans-serif typography
+**Approach:** AI-generated concepts and full brand system drafted in-house
+
 | Task | Effort | Status |
 |------|--------|--------|
-| Logo design (primary, icon, wordmark) | 8 hrs | 📋 Todo |
+| Logo concepts (primary, icon, wordmark) | 8 hrs | 📋 Todo |
 | Color palette selection | 2 hrs | 📋 Todo |
 | Typography selection | 2 hrs | 📋 Todo |
 | Brand guidelines document | 4 hrs | 📋 Todo |
 | Favicon and app icons | 2 hrs | 📋 Todo |
 
-#### 1.2 Legal Documents
+#### 1.2 Legal Documents *(can run parallel with 1.1)*
+**Approach:** AI-draft all documents first. Termly/iubenda deferred until closer to launch.
+
 | Task | Effort | Status |
 |------|--------|--------|
-| Set up Termly account | 1 hr | 📋 Todo |
-| Generate Terms of Service | 4 hrs | 📋 Todo |
-| Generate Privacy Policy | 2 hrs | 📋 Todo |
-| Create SLA document | 4 hrs | 📋 Todo |
-| Set up iubenda for DPA | 2 hrs | 📋 Todo |
+| Draft Terms of Service | 4 hrs | 📋 Todo |
+| Draft Privacy Policy | 2 hrs | 📋 Todo |
+| Draft SLA document | 4 hrs | 📋 Todo |
+| Draft Data Processing Agreement | 2 hrs | 📋 Todo |
+| Validate via Termly/iubenda | 2 hrs | 📋 Deferred to pre-launch |
 
-#### 1.3 Website Content (Rebrand)
+#### 1.3 Website Content *(depends on 1.1 brand identity)*
+**Approach:** Full rewrite for commercial buyer audience. Existing AGNTCY content used as technical reference only.
+**Platform:** Deferred — content written in markdown, hosting platform chosen later.
+
 | Task | Effort | Status |
 |------|--------|--------|
-| Update homepage for Agent Red brand | 4 hrs | 📋 Todo |
-| Update features page | 2 hrs | 📋 Todo |
-| Update pricing page | 2 hrs | 📋 Todo |
-| Update integrations page | 2 hrs | 📋 Todo |
-| Update about page | 2 hrs | 📋 Todo |
-| Create contact page | 2 hrs | 📋 Todo |
+| Write homepage (commercial buyer focus) | 4 hrs | 📋 Todo |
+| Write features page | 3 hrs | 📋 Todo |
+| Write pricing page | 2 hrs | 📋 Todo |
+| Write integrations page | 3 hrs | 📋 Todo |
+| Write about page | 2 hrs | 📋 Todo |
+| Write contact page | 2 hrs | 📋 Todo |
 
-#### 1.4 Public Documentation
+#### 1.4 Public Documentation *(can start alongside 1.3)*
+**Approach:** Scaffold Docusaurus + conceptual guides now. API-specific docs deferred to Phase 2.
+
 | Task | Effort | Status |
 |------|--------|--------|
 | Set up Docusaurus | 4 hrs | 📋 Todo |
 | Write getting-started guide | 4 hrs | 📋 Todo |
 | Write Shopify integration guide | 3 hrs | 📋 Todo |
-| Write API authentication guide | 2 hrs | 📋 Todo |
-| Document API endpoints | 8 hrs | 📋 Todo |
+| Write API authentication guide | 2 hrs | 📋 Deferred to Phase 2 |
+| Document API endpoints | 8 hrs | 📋 Deferred to Phase 2 |
 
 ---
 
 ### Phase 2: Product & Infrastructure (Weeks 5-8)
 
-#### 2.1 Shopify Store
+#### 2.1 E-Commerce Store
+**Platform:** Deferred decision — Shopify vs Stripe to be evaluated alongside multi-tenant architecture design.
+
 | Task | Effort | Status |
 |------|--------|--------|
-| Create Shopify Partner account | 1 hr | 📋 Todo |
-| Set up development store | 2 hrs | 📋 Todo |
-| Create product catalog | 4 hrs | 📋 Todo |
-| Configure subscription app | 8 hrs | 📋 Todo |
-| Build license key system | 12 hrs | 📋 Todo |
+| Evaluate Shopify vs Stripe for SaaS subscriptions | 4 hrs | 📋 Todo |
+| Set up development store/account | 2 hrs | 📋 Todo |
+| Create product catalog (3 tiers + 5 add-ons) | 4 hrs | 📋 Todo |
+| Configure subscription/recurring billing | 8 hrs | 📋 Todo |
+| Build license key / provisioning system | 12 hrs | 📋 Todo |
 | Test checkout flow | 4 hrs | 📋 Todo |
 
 #### 2.2 Multi-Tenant Infrastructure
+**Approach:** Dedicated architecture document required before any implementation. Architecture approach TBD.
+
 | Task | Effort | Status |
 |------|--------|--------|
+| Write multi-tenant architecture document | 8 hrs | 📋 Todo |
 | Design tenant isolation architecture | 8 hrs | 📋 Todo |
 | Implement tenant provisioning | 16 hrs | 📋 Todo |
 | Build usage metering | 12 hrs | 📋 Todo |
 | Create customer portal (basic) | 16 hrs | 📋 Todo |
 | Implement API key management | 8 hrs | 📋 Todo |
 
-#### 2.3 Admin Guides
+#### 2.3 Admin Guides *(deferred — requires working product)*
 | Task | Effort | Status |
 |------|--------|--------|
 | Initial setup guide | 4 hrs | 📋 Todo |
@@ -104,7 +119,7 @@ Agent Red Customer Engagement is a commercial SaaS product built on the open-sou
 | Knowledge base setup guide | 3 hrs | 📋 Todo |
 | Monitoring and alerts guide | 3 hrs | 📋 Todo |
 
-#### 2.4 Demo Videos
+#### 2.4 Demo Videos *(deferred — requires working product)*
 | Task | Effort | Status |
 |------|--------|--------|
 | Platform overview (2-3 min) | 4 hrs | 📋 Todo |
@@ -148,8 +163,8 @@ Agent Red Customer Engagement is a commercial SaaS product built on the open-sou
 | Category | Service | Monthly Cost |
 |----------|---------|--------------|
 | **Infrastructure** | Azure (production) | $300-500 |
-| **E-commerce** | Shopify | $29-79 |
-| **Legal** | Termly + iubenda | $42-52 |
+| **E-commerce** | Shopify or Stripe (TBD) | $0-79 |
+| **Legal** | Termly + iubenda (deferred to pre-launch) | $0-52 |
 | **Marketing** | Buffer (future) | $0-30 |
 | **Documentation** | Docusaurus (Vercel) | $0 |
 | **Domain/DNS** | Cloudflare | $0-20 |
@@ -172,8 +187,8 @@ Agent Red Customer Engagement is a commercial SaaS product built on the open-sou
 | Timeline slip | High | Medium | MVP scope, prioritize core features |
 | Budget overrun | Medium | Low | Aggressive cost monitoring, lean approach |
 | Multi-tenant complexity | High | Medium | Start simple, iterate |
-| Brand confusion with AGNTCY | Medium | Low | Clear differentiation messaging |
-| Integration issues with submodule | Medium | Medium | Pin to stable versions, thorough testing |
+| Brand confusion with AGNTCY | Medium | Low | Clear differentiation messaging, full website rewrite |
+| E-commerce platform fit | Medium | Medium | Evaluate Shopify vs Stripe before committing |
 
 ---
 
@@ -217,9 +232,12 @@ Agent Red Customer Engagement is a commercial SaaS product built on the open-sou
 | Item | Depends On |
 |------|------------|
 | Website launch | Brand identity, content |
-| Shopify store | Pricing finalized, products defined |
-| Multi-tenant infra | Architecture design approved |
-| Documentation | Feature specifications complete |
+| E-commerce store | Pricing finalized, products defined, platform decision (Shopify vs Stripe) |
+| Multi-tenant infra | Architecture design document approved |
+| API documentation | Multi-tenant infrastructure built, API surface defined |
+| Conceptual docs | Product features known (can start Phase 1) |
+| Admin guides | Working product to document |
+| Demo videos | Working product to demonstrate |
 
 ---
 
@@ -261,11 +279,11 @@ Agent Red Customer Engagement is a commercial SaaS product built on the open-sou
 
 | Milestone | Target Date | Deliverables |
 |-----------|-------------|--------------|
-| **M1: Setup Complete** | Week 1 | Repo, submodule, project board |
-| **M2: Brand Ready** | Week 3 | Logo, colors, guidelines |
-| **M3: Legal Ready** | Week 4 | ToS, Privacy, SLA published |
+| **M1: Setup Complete** | Week 1 | Repo, project board ✅ |
+| **M2: Brand Ready** | Week 3 | Logo concepts, color palette, typography, brand guidelines |
+| **M3: Legal Ready** | Week 4 | AI-drafted ToS, Privacy, SLA, DPA (Termly/iubenda deferred) |
 | **M4: Website Live** | Week 5 | Marketing site deployed |
-| **M5: Store Live** | Week 7 | Shopify store operational |
+| **M5: Store Live** | Week 7 | E-commerce store operational (platform TBD) |
 | **M6: Docs Complete** | Week 8 | Documentation published |
 | **M7: Soft Launch** | Week 10 | Beta users invited |
 | **M8: Public Launch** | Week 12 | General availability |
@@ -279,6 +297,7 @@ Agent Red Customer Engagement is a commercial SaaS product built on the open-sou
 | 1.0.0 | 2026-01-29 | Initial project plan |
 | 1.1.0 | 2026-01-29 | Phase 0 complete: GitHub repo created, initial commit pushed, arms-length dependency model established |
 | 1.2.0 | 2026-01-29 | Docker dev environment added, AGNTCY baseline verified (local Docker + production Azure) |
+| 1.3.0 | 2026-01-29 | Work priority review complete: brand direction (Bold/Corporate), legal approach (AI-draft first), website (full rewrite), docs (conceptual now, API later), e-commerce platform deferred, multi-tenant architecture doc required, admin guides/videos deferred |
 
 ---
 
