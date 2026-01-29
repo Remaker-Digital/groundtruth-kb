@@ -1,13 +1,22 @@
 # Agent Red - AGNTCY Local Docker Verification Script
 # © 2026 Remaker Digital, a DBA of VanDusen & Palmeter, LLC. All rights reserved.
 #
+# PURPOSE: One-time baseline verification of the AGNTCY open-source platform.
+# This script clones AGNTCY from GitHub into an isolated temporary directory,
+# builds and runs its Docker stack, and executes its test suite.
+#
+# ISOLATION POLICY: This script creates its own isolated clone and Docker
+# containers. It does NOT interact with any other local AGNTCY clones or
+# containers that may exist on this machine. The -Cleanup flag (recommended)
+# removes all artifacts after verification.
+#
 # Usage:
 #   .\scripts\verify-agntcy-local.ps1
 #   .\scripts\verify-agntcy-local.ps1 -SkipBuild    # Skip Docker build if stack is already running
-#   .\scripts\verify-agntcy-local.ps1 -Cleanup       # Stop stack after verification
+#   .\scripts\verify-agntcy-local.ps1 -Cleanup       # Remove clone and containers after verification
 
 param(
-    [string]$AgntcyPath = "E:\Claude-Playground\AGNTCY-upstream",
+    [string]$AgntcyPath = "$env:TEMP\agntcy-verification",
     [switch]$SkipBuild,
     [switch]$Cleanup
 )

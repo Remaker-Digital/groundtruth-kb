@@ -1,6 +1,15 @@
 # Agent Red - AGNTCY Production Azure Verification Script
 # © 2026 Remaker Digital, a DBA of VanDusen & Palmeter, LLC. All rights reserved.
 #
+# PURPOSE: Verify Agent Red's production Azure resources are healthy.
+# The -RunEvaluation flag also clones AGNTCY from GitHub into a temporary
+# directory to run the evaluation framework against Azure OpenAI.
+#
+# ISOLATION POLICY: This script only accesses Azure resources owned by
+# Agent Red. If -RunEvaluation is used, a fresh AGNTCY clone is created
+# from GitHub into a temp directory and cleaned up afterward. No interaction
+# with local AGNTCY clones or Docker containers.
+#
 # Usage:
 #   .\scripts\verify-agntcy-production.ps1
 #   .\scripts\verify-agntcy-production.ps1 -RunEvaluation    # Also run the evaluation framework
@@ -8,7 +17,7 @@
 param(
     [string]$ResourceGroup = "agntcy-prod-rg",
     [string]$KeyVaultName = "kv-agntcy-cs-prod-rc6vcp",
-    [string]$AgntcyPath = "E:\Claude-Playground\AGNTCY-upstream",
+    [string]$AgntcyPath = "$env:TEMP\agntcy-evaluation",
     [switch]$RunEvaluation
 )
 

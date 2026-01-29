@@ -121,6 +121,21 @@ Agent Red does **not**:
 - Depend on AGNTCY's uncommitted state
 - Require coordination for releases
 
+### Local Development Isolation Rules
+
+**IMPORTANT:** The AGNTCY open-source project and Agent Red may both be active on this desktop simultaneously. They must be strictly isolated:
+
+| Rule | Detail |
+|------|--------|
+| **No local file sharing** | Agent Red must never read, reference, or depend on any local AGNTCY files. No local path references between projects. |
+| **No shared Docker containers** | Agent Red must not interact with, inspect, start, stop, or depend on any Docker containers belonging to the AGNTCY project. Each project manages its own containers independently. |
+| **No shared local artifacts** | No shared virtual environments, no shared build artifacts, no shared volumes, no shared databases or message queues. |
+| **GitHub only** | When Agent Red needs AGNTCY code, documentation, patterns, or artifacts, it must obtain them exclusively via the AGNTCY GitHub repository (repo, project board, wiki, releases, issues, PRs). |
+| **SDK via PyPI** | Agent Red consumes `agntcy-app-sdk` via `pip install` from PyPI, not from a local clone. |
+| **Docker images via registry** | Agent Red builds its own Docker images or pulls published images from a registry. It does not reference or reuse AGNTCY's local Docker images. |
+
+If AGNTCY Docker containers are running on this machine, Agent Red must behave as if they do not exist. Agent Red treats AGNTCY as a remote third-party project at all times.
+
 ### Contributing Changes Back to AGNTCY
 
 If Agent Red development reveals a bug fix or enhancement needed in the AGNTCY core:

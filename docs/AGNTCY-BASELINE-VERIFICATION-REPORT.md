@@ -2,7 +2,9 @@
 
 **Date:** 2026-01-29
 **Verified by:** Agent Red development team
-**Purpose:** Validate that the AGNTCY open-source foundation is operational in both local Docker and production Azure environments before building Agent Red commercial features.
+**Purpose:** One-time baseline validation that the AGNTCY open-source foundation is operational in both local Docker and production Azure environments before building Agent Red commercial features.
+
+> **Note on isolation policy:** This was a one-time verification performed during project setup. Going forward, Agent Red does not interact with local AGNTCY clones or AGNTCY Docker containers. Agent Red accesses AGNTCY exclusively via its GitHub repository and consumes the SDK via PyPI. See CLAUDE.md "Local Development Isolation Rules" for details.
 
 ---
 
