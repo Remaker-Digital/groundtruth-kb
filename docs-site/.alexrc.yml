@@ -1,0 +1,17 @@
+# alex configuration for Agent Red documentation
+# https://alexjs.com/
+#
+# Allow legitimate technical terms that alex would otherwise flag.
+
+allow:
+  - execute       # "execute a query" is standard technical language
+  - host          # "host a service" / "hostname"
+  - invalid       # "invalid input" / "invalid token"
+  - failure       # "failure mode" / "request failure"
+  - abort         # "abort the operation"
+  - kill          # "kill the process" (if used in ops/CLI context)
+  - crash         # "crash recovery" / "application crash"
+  - hook          # "webhook" / "pre-commit hook"
+  - master        # only if referencing external systems that use this term
+  - slave         # only if referencing external systems that use this term
+  - color         # American English spelling, not a bias issue

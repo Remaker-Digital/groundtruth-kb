@@ -1,0 +1,44 @@
+# Agent Red terminology enforcement
+# Ensures consistent capitalization and naming across all documentation.
+#
+# (c) 2026 Remaker Digital, a DBA of VanDusen & Palmeter, LLC. All rights reserved.
+
+extends: substitution
+message: "Use '%s' instead of '%s' for consistent terminology."
+level: error
+ignorecase: false
+
+swap:
+  # Product names
+  agent red: "Agent Red"
+  agentred: "Agent Red"
+  AgentRed: "Agent Red"
+  AGENT RED: "Agent Red"
+
+  # Platform name
+  agntcy: "AGNTCY"
+  Agntcy: "AGNTCY"
+
+  # Company names
+  remaker digital: "Remaker Digital"
+  Remaker digital: "Remaker Digital"
+
+  # Azure services (consistent casing)
+  cosmos db: "Cosmos DB"
+  cosmosdb: "Cosmos DB"
+  CosmosDB: "Cosmos DB"
+  openai: "OpenAI"
+  Openai: "OpenAI"
+
+  # Agent names (consistent casing)
+  intent classifier: "Intent Classification Agent"
+  knowledge retrieval agent: "Knowledge Retrieval Agent"
+  response generation agent: "Response Generation Agent"
+  escalation agent: "Escalation Agent"
+  analytics agent: "Analytics Agent"
+  critic agent: "Critic/Supervisor Agent"
+
+  # Protocols
+  grpc: "gRPC"
+  GRPC: "gRPC"
+  Grpc: "gRPC"

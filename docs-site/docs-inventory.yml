@@ -1,0 +1,373 @@
+# Agent Red Documentation Feature Inventory
+#
+# Tracks documentation coverage against product features using the
+# Diataxis framework (tutorial, how-to, reference, explanation).
+#
+# Status values: complete | partial | placeholder | missing | deferred | n/a
+#
+# Review this file at every release to ensure new features are tracked.
+#
+# (c) 2026 Remaker Digital, a DBA of VanDusen & Palmeter, LLC. All rights reserved.
+
+inventory_version: "1.0.0"
+last_reviewed: "2026-01-29"
+product_version: "1.0.0-pre"
+
+features:
+
+  # --- Core Platform ---
+
+  - name: Platform Overview
+    category: core
+    tutorial:
+      status: missing
+      path: null
+      notes: "Quickstart tutorial planned (Phase 1.4)"
+    how_to:
+      status: n/a
+      path: null
+    reference:
+      status: n/a
+      path: null
+    explanation:
+      status: complete
+      path: docs/getting-started/overview.md
+
+  - name: Six-Agent Pipeline
+    category: core
+    tutorial:
+      status: missing
+      path: null
+      notes: "Part of quickstart tutorial"
+    how_to:
+      status: missing
+      path: null
+      notes: "How to configure agent behavior"
+    reference:
+      status: deferred
+      path: null
+      notes: "Deferred to Phase 2 (API reference)"
+    explanation:
+      status: complete
+      path: docs/getting-started/how-it-works.md
+      notes: "Full pipeline walkthrough with Mermaid diagrams"
+
+  - name: Intent Classification
+    category: agents
+    tutorial:
+      status: missing
+      path: null
+    how_to:
+      status: missing
+      path: null
+      notes: "How to add custom intents"
+    reference:
+      status: deferred
+      path: null
+    explanation:
+      status: complete
+      path: docs/getting-started/how-it-works.md
+      notes: "Covered in how-it-works: 17 intents, GPT-4o-mini, 98% accuracy, mindmap diagram"
+
+  - name: Knowledge Retrieval
+    category: agents
+    tutorial:
+      status: missing
+      path: null
+    how_to:
+      status: missing
+      path: null
+      notes: "How to load knowledge base, manage FAQ content"
+    reference:
+      status: deferred
+      path: null
+    explanation:
+      status: complete
+      path: docs/getting-started/how-it-works.md
+      notes: "Covered in how-it-works: vector search flow, embedding model, knowledge base diagram"
+
+  - name: Response Generation
+    category: agents
+    tutorial:
+      status: missing
+      path: null
+    how_to:
+      status: missing
+      path: null
+      notes: "How to customize tone, brand voice"
+    reference:
+      status: deferred
+      path: null
+    explanation:
+      status: complete
+      path: docs/getting-started/how-it-works.md
+      notes: "Covered in how-it-works: GPT-4o, cost breakdown, brand voice, multi-turn context"
+
+  - name: Escalation Detection
+    category: agents
+    tutorial:
+      status: missing
+      path: null
+    how_to:
+      status: missing
+      path: null
+      notes: "How to configure escalation rules"
+    reference:
+      status: deferred
+      path: null
+    explanation:
+      status: complete
+      path: docs/getting-started/how-it-works.md
+      notes: "Covered in how-it-works: parallel evaluation, 100% precision/recall, routing"
+
+  - name: Analytics
+    category: agents
+    tutorial:
+      status: missing
+      path: null
+    how_to:
+      status: missing
+      path: null
+      notes: "How to view analytics dashboard, export data"
+    reference:
+      status: deferred
+      path: null
+    explanation:
+      status: complete
+      path: docs/getting-started/how-it-works.md
+      notes: "Covered in how-it-works: metrics capture, NATS topics, auto-scaling"
+
+  - name: Critic / Supervisor (Content Safety)
+    category: agents
+    tutorial:
+      status: missing
+      path: null
+    how_to:
+      status: missing
+      path: null
+      notes: "How to configure safety policies"
+    reference:
+      status: deferred
+      path: null
+    explanation:
+      status: complete
+      path: docs/getting-started/how-it-works.md
+      notes: "Covered in how-it-works: safety pipeline diagram, 3-check validation, retry loop"
+
+  # --- Authentication & API ---
+
+  - name: API Authentication
+    category: api
+    tutorial:
+      status: missing
+      path: null
+    how_to:
+      status: deferred
+      path: null
+      notes: "Deferred to Phase 2"
+    reference:
+      status: deferred
+      path: null
+    explanation:
+      status: missing
+      path: null
+
+  - name: API Endpoints
+    category: api
+    tutorial:
+      status: missing
+      path: null
+    how_to:
+      status: deferred
+      path: null
+    reference:
+      status: deferred
+      path: null
+      notes: "Deferred to Phase 2 (8 hrs estimated)"
+    explanation:
+      status: missing
+      path: null
+
+  - name: Webhooks
+    category: api
+    tutorial:
+      status: missing
+      path: null
+    how_to:
+      status: deferred
+      path: null
+    reference:
+      status: deferred
+      path: null
+    explanation:
+      status: missing
+      path: null
+
+  # --- Integrations ---
+
+  - name: Shopify Integration
+    category: integrations
+    tutorial:
+      status: missing
+      path: null
+      notes: "Runnable tutorial requires working product"
+    how_to:
+      status: complete
+      path: docs/integrations/shopify.md
+      notes: "Full guide: OAuth, permissions, sync, testing, troubleshooting, 6 Mermaid diagrams"
+    reference:
+      status: deferred
+      path: null
+    explanation:
+      status: complete
+      path: docs/integrations/shopify.md
+      notes: "Data flow, field mapping, variant handling, order lookup, caching, PII"
+
+  - name: Zendesk Integration
+    category: integrations
+    tutorial:
+      status: missing
+      path: null
+    how_to:
+      status: missing
+      path: null
+    reference:
+      status: deferred
+      path: null
+    explanation:
+      status: missing
+      path: null
+
+  - name: Mailchimp Integration
+    category: integrations
+    tutorial:
+      status: missing
+      path: null
+    how_to:
+      status: missing
+      path: null
+    reference:
+      status: deferred
+      path: null
+    explanation:
+      status: missing
+      path: null
+
+  - name: Google Analytics Integration
+    category: integrations
+    tutorial:
+      status: missing
+      path: null
+    how_to:
+      status: missing
+      path: null
+    reference:
+      status: deferred
+      path: null
+    explanation:
+      status: missing
+      path: null
+
+  # --- Account & Billing ---
+
+  - name: Account Setup / Provisioning
+    category: account
+    tutorial:
+      status: missing
+      path: null
+      notes: "Runnable tutorial requires working product"
+    how_to:
+      status: complete
+      path: docs/getting-started/setup.md
+      notes: "Conceptual walkthrough: provisioning, go-live checklist, deployment modes"
+    reference:
+      status: deferred
+      path: null
+    explanation:
+      status: partial
+      path: docs/getting-started/setup.md
+      notes: "Tenant isolation, what gets created"
+
+  - name: Subscription & Billing
+    category: account
+    tutorial:
+      status: missing
+      path: null
+    how_to:
+      status: missing
+      path: null
+    reference:
+      status: missing
+      path: null
+    explanation:
+      status: missing
+      path: null
+      notes: "Pricing page on website covers this conceptually"
+
+  - name: API Key Management
+    category: account
+    tutorial:
+      status: missing
+      path: null
+    how_to:
+      status: partial
+      path: docs/getting-started/setup.md
+      notes: "API key security and auth format covered in setup guide"
+    reference:
+      status: deferred
+      path: null
+    explanation:
+      status: partial
+      path: docs/getting-started/setup.md
+      notes: "Key Vault storage, tenant scoping, rotation"
+
+  # --- Enterprise Features ---
+
+  - name: Multi-Tenant Infrastructure
+    category: enterprise
+    tutorial:
+      status: deferred
+      path: null
+    how_to:
+      status: deferred
+      path: null
+    reference:
+      status: deferred
+      path: null
+    explanation:
+      status: missing
+      path: null
+      notes: "Architecture doc required (Phase 2.2)"
+
+  - name: White-Label / Custom Branding
+    category: enterprise
+    tutorial:
+      status: deferred
+      path: null
+    how_to:
+      status: deferred
+      path: null
+    reference:
+      status: deferred
+      path: null
+    explanation:
+      status: missing
+      path: null
+
+  - name: Enterprise SSO (SAML/OIDC)
+    category: enterprise
+    tutorial:
+      status: deferred
+      path: null
+    how_to:
+      status: deferred
+      path: null
+    reference:
+      status: deferred
+      path: null
+    explanation:
+      status: missing
+      path: null
+
+# --- Coverage Summary (auto-generated by audit script) ---
+# Run: node scripts/docs-coverage-audit.mjs

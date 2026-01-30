@@ -1,0 +1,27 @@
+# No future tense for product behavior
+# Product behavior should be described in present tense.
+# "The API returns..." not "The API will return..."
+#
+# (c) 2026 Remaker Digital, a DBA of VanDusen & Palmeter, LLC. All rights reserved.
+
+extends: existence
+message: "Use present tense to describe product behavior. Write '%s' without 'will'."
+level: suggestion
+ignorecase: true
+
+tokens:
+  - will return
+  - will send
+  - will create
+  - will display
+  - will show
+  - will generate
+  - will produce
+  - will update
+  - will delete
+  - will respond
+  - will redirect
+  - will trigger
+  - will process
+  - will store
+  - will log

@@ -1,0 +1,26 @@
+# No minimizing language
+# Flags words that assume the reader's experience level.
+# Per Google Developer Documentation Style Guide.
+#
+# (c) 2026 Remaker Digital, a DBA of VanDusen & Palmeter, LLC. All rights reserved.
+
+extends: existence
+message: "Avoid minimizing language ('%s'). It assumes the reader's experience and can feel dismissive when they struggle."
+level: warning
+ignorecase: true
+
+tokens:
+  - simply
+  - simple
+  - just
+  - easy
+  - easily
+  - straightforward
+  - obviously
+  - of course
+  - trivial
+  - trivially
+  - merely
+  - clearly
+  - all you need to do
+  - as everyone knows
