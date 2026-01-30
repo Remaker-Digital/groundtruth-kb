@@ -136,6 +136,15 @@ tmp/
 .claude/
 
 # =============================================================================
+# Research / Scratch Data
+# =============================================================================
+# Azure pricing API response caches
+scripts/*-prices.json
+scripts/*-search*.json
+# Windows null device artifact
+nul
+
+# =============================================================================
 # Commercial Sensitive (Extra Protection)
 # =============================================================================
 # Customer data

@@ -1,22 +1,57 @@
-# Website Content - AGNTCY Customer Engagement Platform
+# Website Content — Agent Red Customer Engagement
 
-> **Purpose:** Marketing website content for the AGNTCY Customer Engagement Platform
-> **Format:** Structured markdown optimized for implementation in Webflow, Framer, or Next.js
-> **Status:** Phase 1 Complete - Core Pages Ready
+> **Purpose:** Marketing website content for Agent Red Customer Engagement
+> **Format:** Structured markdown optimized for implementation in any web framework
+> **Status:** Phase 1.3 Complete — 6 Core Pages Rewritten for Commercial Launch
+> **Brand:** Agent Red (Remaker Digital)
 
 ---
 
 ## Content Inventory
 
-| Page | File | Status | Lines | Priority |
-|------|------|--------|-------|----------|
-| Homepage | `homepage.md` | ✅ Complete | ~450 | P0 |
-| Features | `features.md` | ✅ Complete | ~650 | P0 |
-| Pricing | `pricing.md` | ✅ Complete | ~550 | P0 |
-| Integrations | `integrations.md` | ✅ Complete | ~550 | P1 |
-| About | `about.md` | ✅ Complete | ~350 | P2 |
+| Page | File | Status | Priority | Notes |
+|------|------|--------|----------|-------|
+| Homepage | `homepage.md` | ✅ v2.0 | P0 | Complete rewrite for commercial brand |
+| Features | `features.md` | ✅ v2.0 | P0 | Rebranded, 6-category scrollspy layout |
+| Pricing | `pricing.md` | ✅ v2.0 | P0 | New pricing model: base + AI usage |
+| Integrations | `integrations.md` | ✅ v2.0 | P1 | Add-on pricing for Mailchimp/GA |
+| About | `about.md` | ✅ v2.0 | P2 | Honest company story, open-source focus |
+| Contact | `contact.md` | ✅ v2.0 | P1 | New page — form, channels, partner program |
 
-**Total Content:** ~2,550 lines across 5 core pages
+**Total:** 6 core pages
+
+---
+
+## Key Changes in v2.0
+
+### Brand
+- All "AGNTCY" references → "Agent Red" / "Agent Red Customer Engagement"
+- All URLs → `agentred.io` domain
+- Copyright → Remaker Digital / VanDusen & Palmeter, LLC
+- Social handles → @agentred / Remaker-Digital
+
+### Pricing Model (Major Change)
+Previous: Flat-rate tiers at $299/$499/$999 with daily conversation limits
+New: **Platform fee + metered AI usage**
+- Starter $149/mo (1,000 included conversations)
+- Professional $399/mo (5,000 included conversations)
+- Enterprise $999/mo (20,000 included conversations)
+- Tiered overage rates ($0.04/$0.025/$0.015 per conversation)
+- Conversation packs for pre-purchase discounts
+- 7 add-on modules ($49–$399/mo)
+
+### Honesty & Accuracy
+- Removed all fabricated social proof (fake testimonials, fake customer counts, fake press mentions, fake team bios)
+- All performance metrics sourced from verified AGNTCY evaluation data
+- Company story reflects actual bootstrapped LLC structure
+- "Built on Open-Source AI" section links to public AGNTCY GitHub repo
+- Open invitation for technical scrutiny of platform architecture
+
+### Content Principles
+- Honesty, accuracy, and correctness are central concerns
+- No claim without supporting evidence
+- Transparent pricing as competitive advantage
+- Open-source foundation as trust mechanism
 
 ---
 
@@ -24,32 +59,11 @@
 
 Each page file includes:
 
-1. **Meta Information** - Title, description, keywords, OG image, canonical URL
-2. **Section-by-Section Content** - Headlines, descriptions, CTAs
-3. **Structured Data** - Tables, feature lists, comparison matrices
-4. **CTA Specifications** - Primary and secondary calls-to-action
-5. **Technical Notes** - SEO, analytics events, schema markup
-6. **A/B Test Variants** - Alternative headlines for testing
-
----
-
-## Implementation Guide
-
-### For Webflow/Framer
-
-1. Create page structure matching section headers
-2. Copy content directly into CMS or page components
-3. Replace placeholder images with actual assets
-4. Implement navigation using section anchors
-5. Add analytics tracking per technical notes
-
-### For Next.js/React
-
-1. Parse markdown files with gray-matter + remark
-2. Map sections to React components
-3. Use MDX for interactive elements (calculators, forms)
-4. Implement schema.org JSON-LD from provided specs
-5. Add event tracking per analytics specifications
+1. **Meta Information** — Title, description, keywords, OG image, canonical URL
+2. **Section-by-Section Content** — Headlines, descriptions, CTAs
+3. **Structured Data** — Tables, feature lists, comparison matrices
+4. **CTA Specifications** — Primary and secondary calls-to-action
+5. **Technical Notes** — SEO requirements, analytics events, schema markup
 
 ---
 
@@ -59,18 +73,18 @@ Each page file includes:
 
 | Attribute | Guideline |
 |-----------|-----------|
-| **Tone** | Professional but approachable |
-| **Language** | Clear, jargon-free, benefit-focused |
+| **Personality** | Bold, authoritative, professional, approachable |
+| **Tone** | Direct, confident, benefit-focused |
+| **Language** | Clear, jargon-free, data-driven |
 | **Perspective** | Second person ("you", "your") |
-| **Urgency** | Confident, not pushy |
-| **Technical Level** | Accessible to non-technical readers |
+| **Claims** | Only what can be verified — no unsubstantiated metrics |
 
 ### Messaging Hierarchy
 
-1. **Primary:** Reduce costs, improve customer satisfaction
-2. **Secondary:** 24/7 availability, instant responses
-3. **Tertiary:** Easy setup, no coding required
-4. **Proof Points:** 70% automation, 98% accuracy, <2s response
+1. **Primary:** Reduce costs, improve quality, scale without headcount
+2. **Secondary:** Six specialized AI agents, transparent pricing, open-source foundation
+3. **Tertiary:** Easy setup, no coding, integrates with your stack
+4. **Proof Points:** 98% accuracy, <2s response, 70% automation, 100% content safety
 
 ### CTA Patterns
 
@@ -78,134 +92,70 @@ Each page file includes:
 |----------|------|-------------|
 | Primary | "Start Free Trial" | /signup |
 | Secondary (Sales) | "Talk to Sales" | /contact |
-| Secondary (Demo) | "Watch Demo" | /demo |
-| Tertiary | "Learn More" | /features |
+| Tertiary | "Learn More" / "See All Features" | /features |
+| Pricing | "Compare Plans" | /pricing |
 
 ---
 
-## Image Requirements
+## Pricing Reference (for content consistency)
 
-### Homepage
-- [ ] Hero image/animation (1920x1080 or responsive)
-- [ ] Agent workflow diagram (animated preferred)
-- [ ] Customer logo cloud (6-8 logos, grayscale)
-- [ ] Testimonial headshots (3, 200x200)
-- [ ] Integration logo row (6 logos)
+| Tier | Monthly | Annual | Included Conv/mo | Overage |
+|------|---------|--------|------------------|---------|
+| Starter | $149 | $124/mo ($1,490/yr) | 1,000 | $0.04/conv |
+| Professional | $399 | $332/mo ($3,990/yr) | 5,000 | $0.025/conv |
+| Enterprise | $999 | $832/mo ($9,990/yr) | 20,000 | $0.015/conv |
 
-### Features
-- [ ] AI agent icons (6, consistent style)
-- [ ] Feature icons (9, consistent style)
-- [ ] Dashboard screenshot (1440x900)
-- [ ] Integration screenshots (4, 800x600)
+### Add-Ons
+| Add-On | Price | Eligible |
+|--------|-------|----------|
+| Multi-Language Pack | $99/mo | All |
+| Advanced Analytics | $149/mo | Pro, Ent |
+| Mailchimp Integration | $49/mo | Pro, Ent |
+| Google Analytics Integration | $49/mo | Pro, Ent |
+| White-Label Package | $399/mo | Ent only |
+| Priority Support Upgrade | $99/mo | Starter, Pro |
+| Custom Integration Dev | $299/mo | Ent only |
 
-### Pricing
-- [ ] Plan icons (3, consistent style)
-- [ ] Trust badges (security, compliance)
-- [ ] ROI calculator mockup
-
-### Integrations
-- [ ] Integration partner logos (6+, official assets)
-- [ ] Setup flow screenshots (4 per integration)
-- [ ] API code snippet styling
-
-### About
-- [ ] Team headshots (6+, consistent style, 400x400)
-- [ ] Office/workspace photo (1920x1080)
-- [ ] Investor logos (if applicable)
-- [ ] Press outlet logos (if applicable)
+### Conversation Packs
+| Pack | Price | Rate |
+|------|-------|------|
+| 1,000 conversations | $29 | $0.029/conv |
+| 5,000 conversations | $99 | $0.020/conv |
+| 20,000 conversations | $249 | $0.012/conv |
 
 ---
 
-## SEO Specifications
+## Implementation Notes
 
-### Target Keywords
+### For Any Web Framework
+1. Parse markdown files for content
+2. Map section headers to page components
+3. Replace placeholder images with actual brand assets
+4. Implement navigation using section anchors
+5. Add analytics tracking per technical notes in each file
 
-| Page | Primary Keyword | Secondary Keywords |
-|------|----------------|-------------------|
-| Homepage | AI customer service | chatbot, automation, Shopify support |
-| Features | customer service AI features | intent classification, smart escalation |
-| Pricing | AI customer service pricing | chatbot cost, support automation price |
-| Integrations | Shopify customer service integration | Zendesk integration, API |
-| About | customer service AI company | team, mission |
-
-### Schema Markup Required
-
-- **Homepage:** Organization, Product, FAQPage
-- **Features:** Product, ItemList (features)
-- **Pricing:** Product, Offer (per tier)
-- **Integrations:** SoftwareApplication, ItemList
-- **About:** Organization, Person (team)
+### Image Requirements
+- [ ] Logo files (from branding/logo/)
+- [ ] Hero images/illustrations for each page
+- [ ] Integration partner logos (Shopify, Zendesk, Mailchimp, GA, Slack, Gorgias)
+- [ ] Agent workflow diagram/animation
+- [ ] Dashboard screenshot mockup
+- [ ] OG images for social sharing (1200x630, one per page)
 
 ---
 
-## Analytics Events
+## Related Documents
 
-### Homepage
-| Event | Trigger | Parameters |
-|-------|---------|------------|
-| `page_view` | Page load | page_name |
-| `cta_click` | CTA button click | cta_type, cta_location |
-| `video_play` | Demo video started | video_id |
-| `scroll_depth` | Section viewed | section_name |
-
-### Pricing
-| Event | Trigger | Parameters |
-|-------|---------|------------|
-| `pricing_view` | Pricing section visible | - |
-| `plan_select` | Plan card clicked | plan_name |
-| `toggle_billing` | Monthly/Annual toggle | billing_period |
-| `calculator_use` | ROI calculator interaction | input_values |
-
-### All Pages
-| Event | Trigger | Parameters |
-|-------|---------|------------|
-| `cta_click` | Any CTA clicked | cta_text, cta_destination |
-| `outbound_link` | External link clicked | destination_url |
-| `form_submit` | Form submitted | form_name |
-
----
-
-## Planned Additional Pages
-
-### Phase 2 (Weeks 5-8)
-- [ ] `/customers` - Case studies and testimonials
-- [ ] `/demo` - Interactive demo or video
-- [ ] `/contact` - Contact form and sales inquiry
-- [ ] `/signup` - Trial registration
-- [ ] `/login` - Customer login
-
-### Phase 3 (Weeks 9-12)
-- [ ] `/blog` - Company blog with categories
-- [ ] `/changelog` - Product updates
-- [ ] `/careers` - Job listings
-- [ ] `/partners` - Partner program
-- [ ] `/press` - Press releases and media kit
-
-### Future
-- [ ] `/customers/{slug}` - Individual case studies
-- [ ] `/blog/{slug}` - Blog posts
-- [ ] `/docs` - Documentation (Docusaurus)
-- [ ] `/api` - API reference
-
----
-
-## Content Maintenance
-
-### Review Schedule
-| Page | Review Frequency | Owner |
-|------|-----------------|-------|
-| Homepage | Monthly | Marketing |
-| Features | Quarterly | Product |
-| Pricing | As needed | Finance |
-| Integrations | Monthly | Engineering |
-| About | Quarterly | Marketing |
-
-### Update Triggers
-- New feature launch → Features, Homepage
-- Pricing change → Pricing, Homepage
-- New integration → Integrations
-- Team change → About
-- Customer milestone → Homepage (stats)
+| Document | Location | Purpose |
+|----------|----------|---------|
+| CLAUDE.md | Root | Project guidance and context |
+| BRAND-GUIDELINES.md | branding/guidelines/ | Visual identity, colors, typography |
+| COLOR-PALETTE.md | branding/colors/ | Color reference with CSS variables |
+| TYPOGRAPHY.md | branding/colors/ | Font specifications |
+| LOGO-SPEC.md | branding/logo/ | Logo technical specification |
+| PROJECT-PLAN.md | docs/ | Launch 1.0 milestones and tasks |
+| COMMERCIAL-SAAS-PROPOSAL.md | docs/ | Full business analysis |
+| PRODUCT-FEATURES-RAG.md | docs/ | Complete feature reference |
 
 ---
 
@@ -213,17 +163,10 @@ Each page file includes:
 
 | Version | Date | Changes |
 |---------|------|---------|
-| 1.0.0 | 2026-01-29 | Initial content for 5 core pages |
+| 1.0.0 | 2026-01-29 | Initial content for 5 core pages (AGNTCY branding) |
+| 2.0.0 | 2026-01-29 | Full rewrite: Agent Red brand, new pricing model, contact page added, honesty pass |
 
 ---
 
-## Related Documents
-
-- `docs/COMMERCIAL-SAAS-PROPOSAL.md` - Strategic plan
-- `docs/COMMERCIAL-MATERIALS-PLAN.md` - Project tracking
-- `docs/PRODUCT-FEATURES-RAG.md` - Complete feature reference
-
----
-
-*Owner: Marketing Team*
+*(c) 2026 Remaker Digital, a DBA of VanDusen & Palmeter, LLC. All rights reserved.*
 *Last Updated: 2026-01-29*

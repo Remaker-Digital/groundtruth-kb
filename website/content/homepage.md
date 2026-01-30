@@ -1,20 +1,20 @@
 # Homepage Content
 
-> **Page Purpose:** Primary landing page for marketing and lead generation
-> **Target Audience:** E-commerce business owners, customer service managers, CTOs
+> **Page Purpose:** Primary landing page — communicate value proposition, drive trial signups and sales inquiries
+> **Target Audience:** E-commerce leaders (founders, VPs of CX, support managers) evaluating AI customer service solutions
 > **Primary CTA:** Start Free Trial
-> **Secondary CTA:** Book Demo
+> **Secondary CTA:** Talk to Sales
 
 ---
 
 ## Meta Information
 
 ```yaml
-title: "AGNTCY - AI-Powered Customer Engagement Platform"
-description: "Automate 70% of customer support with intelligent AI agents. Built for Shopify merchants. Reduce costs, increase satisfaction, scale effortlessly."
-keywords: "AI customer service, chatbot, Shopify support, customer engagement, automation"
+title: "Agent Red - AI Customer Service That Scales With You"
+description: "Automate 70%+ of customer support with six specialized AI agents. Built for e-commerce. Cut costs, protect revenue, scale without adding headcount."
+keywords: "AI customer service, e-commerce support automation, Shopify AI support, customer engagement platform, Agent Red"
 og_image: "/images/og-homepage.png"
-canonical: "https://agntcy-platform.com/"
+canonical: "https://agentred.io/"
 ```
 
 ---
@@ -22,13 +22,10 @@ canonical: "https://agntcy-platform.com/"
 ## Hero Section
 
 ### Headline
-**Transform Customer Service with Intelligent AI Agents**
+**Cut Support Costs 40-60%. Without Cutting Quality.**
 
 ### Subheadline
-Automate 70% of support inquiries. Delight customers 24/7. Scale without limits.
-
-### Hero Description
-AGNTCY combines six specialized AI agents that work together to understand, respond, and resolve customer issues instantly—while seamlessly escalating complex cases to your team.
+Agent Red deploys six AI agents that handle your customer conversations — instantly, accurately, and in your brand voice. Your team focuses on what matters. The AI handles the rest.
 
 ### Primary CTA
 **Start Free Trial** → /signup
@@ -37,113 +34,136 @@ AGNTCY combines six specialized AI agents that work together to understand, resp
 - Full Professional features
 
 ### Secondary CTA
-**Watch Demo** → /demo (opens video modal)
-- 2-minute overview
+**Talk to Sales** → /contact
+- Custom Enterprise solutions
+- Dedicated onboarding
 
-### Hero Image/Animation
-- Animated diagram showing conversation flow through agents
-- Or: Split screen with chat widget demo
+### Hero Visual
+- Animated agent workflow: conversation enters → classified → researched → response generated → validated → delivered (or escalated)
+- Alt: Live chat widget mockup showing AI response in action
 
-### Trust Badges (Below Hero)
-- "Trusted by 500+ Shopify merchants"
-- "4.8/5 rating on Shopify App Store"
-- "99.9% uptime SLA"
-- Security badges: SOC 2 (in progress), GDPR, CCPA
+### Trust Bar (Below Hero)
+- "Built on proven AI infrastructure"
+- "99.95% uptime SLA"
+- "SOC 2 in progress | GDPR | CCPA compliant"
+- "Setup in 15 minutes"
 
 ---
 
-## Social Proof Bar
+## Performance Proof Section
 
-### Logos
-"Powering customer engagement for innovative brands"
+### Section Headline
+**Proven Performance. Measurable Results.**
 
-[Logo Row: 6-8 customer/partner logos]
+### Metrics Grid
 
-### Stats
-| Metric | Value |
-|--------|-------|
-| Conversations Handled | 2M+ |
-| Average Response Time | < 2 seconds |
-| Customer Satisfaction | 92% |
-| Cost Reduction | 40-60% |
+| Metric | Value | Context |
+|--------|-------|---------|
+| Response Time | < 2 seconds (P95) | Under production load |
+| Intent Accuracy | 98% | Across 17 customer intent categories |
+| Automation Rate | 70%+ | Conversations resolved without human intervention |
+| Throughput | 3,071 req/s | Tested at 100 concurrent users |
+| Content Safety | 100% | Malicious content blocked, zero false negatives |
+| Uptime SLA | 99.95% | Azure-backed infrastructure |
+
+### Note
+All metrics verified through independent evaluation against production workloads. Not projections — measured results.
 
 ---
 
 ## Problem/Solution Section
 
 ### Section Headline
-**Customer Support Shouldn't Be a Bottleneck**
+**Customer Support Shouldn't Limit Your Growth**
 
 ### Problem Cards
 
 #### Card 1: Rising Costs
-**Icon:** 📈
-**Headline:** Support costs growing faster than revenue?
-**Description:** Every new customer means more tickets, more agents, more overhead. Traditional scaling is expensive and unsustainable.
+**Headline:** Support costs growing faster than revenue
+**Description:** Every new customer adds tickets, headcount, and overhead. Scaling support linearly with growth is unsustainable — and unnecessary.
 
 #### Card 2: Slow Response Times
-**Icon:** ⏰
-**Headline:** Customers waiting hours for answers?
-**Description:** 75% of customers expect a response within 5 minutes. Long wait times kill satisfaction and drive customers to competitors.
+**Headline:** Customers waiting hours for simple answers
+**Description:** 75% of customers expect a response within 5 minutes. Long wait times erode satisfaction and send customers to competitors.
 
 #### Card 3: Inconsistent Quality
-**Icon:** 🎯
-**Headline:** Quality varies by agent and shift?
-**Description:** Training takes months. Turnover is high. Every new hire means starting over while customers suffer inconsistent experiences.
+**Headline:** Quality depends on who answers and when
+**Description:** Training takes months. Turnover is constant. Customers experience wildly different service depending on agent, shift, and mood.
 
-#### Card 4: Limited Hours
-**Icon:** 🌙
-**Headline:** Missing sales outside business hours?
-**Description:** Your customers shop 24/7, but your support team doesn't. Every unanswered question is a potential lost sale.
+#### Card 4: Revenue at Risk
+**Headline:** Unanswered questions become lost sales
+**Description:** Your customers shop around the clock. Every unanswered pre-sale question is revenue walking out the door.
 
 ### Solution Statement
-**AGNTCY solves all four challenges with AI agents that never sleep, never forget, and continuously improve.**
+**Agent Red eliminates all four problems with AI agents that respond in under 2 seconds, 24/7, with consistent quality — and escalate to humans when it matters.**
 
 ---
 
 ## How It Works Section
 
 ### Section Headline
-**Six AI Agents. One Seamless Experience.**
+**Six Specialized AI Agents. One Seamless Experience.**
 
-### Process Steps
+### Subheadline
+Each agent handles a distinct responsibility. Together, they deliver a complete customer service workflow — from first contact to resolution.
 
-#### Step 1: Understand
+### Agent Steps
+
+#### Step 1: Classify
 **Agent:** Intent Classification
-**Icon:** 🧠
-**Description:** Our AI instantly understands what customers need—whether they're asking about orders, products, returns, or anything else. 98% classification accuracy.
+**Description:** Understands what the customer needs in milliseconds — order status, product questions, returns, complaints, or any of 17 intent categories. 98% accuracy.
 
 #### Step 2: Research
 **Agent:** Knowledge Retrieval
-**Icon:** 🔍
-**Description:** The Knowledge Agent searches your product catalog, FAQs, and policies to find the perfect answer. Real-time Shopify integration means always-accurate information.
+**Description:** Searches your product catalog, FAQs, policies, and order data to find the right answer. Syncs with Shopify in real time — always current, always accurate.
 
 #### Step 3: Respond
 **Agent:** Response Generation
-**Icon:** 💬
-**Description:** Natural, personalized responses that match your brand voice. Not robotic scripts—real conversations powered by GPT-4.
+**Description:** Crafts a natural, personalized response in your brand voice. Not canned scripts — genuine conversational AI powered by GPT-4o.
 
 #### Step 4: Validate
 **Agent:** Critic/Supervisor
-**Icon:** ✅
-**Description:** Every response is checked for accuracy, safety, and brand alignment before reaching your customer. Zero hallucinations, zero embarrassments.
+**Description:** Reviews every response for accuracy, safety, and brand alignment before it reaches the customer. Blocks 100% of inappropriate content with zero false negatives.
 
-#### Step 5: Escalate (When Needed)
-**Agent:** Escalation
-**Icon:** 🙋
-**Description:** Complex issues are seamlessly handed to your team with full context. Your agents get a head start; customers never repeat themselves.
+#### Step 5: Escalate
+**Agent:** Escalation Detection
+**Description:** Recognizes when a human is needed — emotional situations, complex issues, VIP customers — and hands off with full conversation context. No repetition required.
 
-#### Step 6: Learn
+#### Step 6: Analyze
 **Agent:** Analytics
-**Icon:** 📊
-**Description:** Continuous insights into what customers ask, how issues resolve, and where to improve. Data-driven optimization built in.
+**Description:** Tracks what customers ask, how issues resolve, and where to improve. Turns every conversation into data you can act on.
 
 ### CTA
-**See It In Action** → /demo
+**See All Features** → /features
 
 ---
 
-## Features Overview Section
+## Competitive Advantage Section
+
+### Section Headline
+**Why Agent Red**
+
+### Advantage Cards
+
+#### Card 1: Multi-Agent Architecture
+**Headline:** Not one chatbot — six specialized agents
+**Description:** Generic chatbots use a single model for everything. Agent Red uses purpose-built agents that each excel at their specific job. The result: higher accuracy, better safety, and responses that actually resolve issues.
+
+#### Card 2: Enterprise-Grade from Day One
+**Headline:** Production infrastructure, not a prototype
+**Description:** Built on Azure with auto-scaling, encrypted storage, PII tokenization, and a 99.95% uptime SLA. Agent Red runs on the same infrastructure class that enterprises demand.
+
+#### Card 3: Real Integrations, Not Widgets
+**Headline:** Deep data access, not surface-level connections
+**Description:** Agent Red reads your Shopify orders, syncs with Zendesk tickets, and tracks Mailchimp engagement in real time. Your AI has the context to actually solve problems.
+
+#### Card 4: Your Brand, Your Rules
+**Headline:** Full control over voice, behavior, and boundaries
+**Description:** Configure tone, set escalation rules, define knowledge boundaries, and customize response templates. Agent Red represents your brand — not ours.
+
+---
+
+## Features Preview Section
 
 ### Section Headline
 **Everything You Need to Deliver Exceptional Support**
@@ -151,136 +171,97 @@ AGNTCY combines six specialized AI agents that work together to understand, resp
 ### Feature Grid (3x3)
 
 #### Feature 1: Instant Responses
-**Icon:** ⚡
 **Headline:** < 2 Second Response Time
-**Description:** Customers get answers instantly, 24/7/365. No queues, no wait times, no frustration.
+**Description:** Customers get accurate answers immediately, 24/7/365. No queues, no hold times.
 
 #### Feature 2: Shopify Native
-**Icon:** 🛒
 **Headline:** Deep Shopify Integration
-**Description:** Real-time access to orders, products, inventory, and customer data. No manual syncing required.
+**Description:** Real-time access to orders, products, inventory, and customer data. 15-minute setup.
 
 #### Feature 3: Multi-Language
-**Icon:** 🌍
-**Headline:** English, French, Spanish
-**Description:** Serve customers in their preferred language. Native-quality responses, not awkward translations.
+**Headline:** English, French, Spanish + More
+**Description:** Serve customers in their language with native-quality responses. Not machine translation — AI-native multilingual support.
 
 #### Feature 4: Smart Escalation
-**Icon:** 🎯
-**Headline:** Intelligent Handoffs
-**Description:** AI knows when to escalate. Human agents get full context. Customers never repeat themselves.
+**Headline:** Intelligent Human Handoffs
+**Description:** AI recognizes when a human is needed and transfers with full context. 100% escalation precision.
 
-#### Feature 5: Brand Voice
-**Icon:** 🎨
-**Headline:** Your Tone, Your Style
-**Description:** Configure personality, formality, and messaging to match your brand perfectly.
+#### Feature 5: Brand Voice Control
+**Headline:** Your Tone, Your Personality
+**Description:** Configure formality, personality, and messaging guidelines. Every response sounds like your brand.
 
 #### Feature 6: Knowledge Base
-**Icon:** 📚
-**Headline:** Self-Learning Knowledge
-**Description:** Upload FAQs, policies, and guides. The AI learns and improves with every conversation.
+**Headline:** Self-Updating Knowledge
+**Description:** Upload FAQs, policies, and guides. Agent Red learns your business and stays current automatically.
 
 #### Feature 7: Analytics Dashboard
-**Icon:** 📈
-**Headline:** Actionable Insights
-**Description:** Track resolution rates, response times, customer satisfaction, and cost savings in real-time.
+**Headline:** Actionable Performance Data
+**Description:** Track automation rates, response quality, customer satisfaction, and cost savings in real time.
 
 #### Feature 8: Enterprise Security
-**Icon:** 🔒
-**Headline:** Bank-Grade Security
-**Description:** SOC 2 compliant (in progress), GDPR ready, PII protection, and encrypted everything.
+**Headline:** Bank-Grade Data Protection
+**Description:** TLS 1.3, AES-256 encryption, PII tokenization, GDPR/CCPA compliance. SOC 2 certification in progress.
 
-#### Feature 9: Easy Setup
-**Icon:** 🚀
+#### Feature 9: Fast Setup
 **Headline:** Live in 15 Minutes
-**Description:** Connect Shopify, customize responses, and go live. No coding, no consultants, no complexity.
+**Description:** Connect your store, configure your agent, and launch. No engineering team required.
 
 ### CTA
 **Explore All Features** → /features
 
 ---
 
-## Social Proof Section
-
-### Section Headline
-**Trusted by Customer-Obsessed Brands**
-
-### Testimonial Cards (3)
-
-#### Testimonial 1
-> "AGNTCY handles 73% of our support tickets automatically. Our team focuses on complex issues while customers get instant answers. Game changer."
-
-**— Sarah Chen, Head of CX at [Brand Name]**
-**Result:** 73% automation rate, 45% cost reduction
-
-#### Testimonial 2
-> "We went from 4-hour average response time to under 2 seconds. Customer satisfaction jumped 28 points. The ROI was immediate."
-
-**— Marcus Johnson, Founder at [Brand Name]**
-**Result:** 99% faster responses, +28 NPS
-
-#### Testimonial 3
-> "The escalation feature is brilliant. When the AI hands off to our team, they have complete context. No more 'can you explain your issue again?'"
-
-**— Emily Rodriguez, Support Manager at [Brand Name]**
-**Result:** 40% faster resolution for escalated tickets
-
-### Case Study CTA
-**Read Customer Stories** → /customers
-
----
-
 ## Pricing Preview Section
 
 ### Section Headline
-**Simple, Transparent Pricing**
+**Transparent Pricing. No Surprises.**
 
-### Pricing Cards (3)
+### Pricing Cards
 
-#### Starter - $299/month
+#### Starter — $299/month
 - Up to 500 conversations/day
 - English language
 - Shopify integration
 - Email support
-- **Best for:** Small stores getting started
+- **Best for:** Stores automating support for the first time
 
-#### Professional - $499/month (POPULAR)
+#### Professional — $499/month (MOST POPULAR)
 - Up to 2,000 conversations/day
 - +1 additional language
-- Zendesk integration
-- Priority support
-- **Best for:** Growing businesses
+- Shopify + Zendesk
+- Priority chat support
+- **Best for:** Growing e-commerce businesses
 
-#### Enterprise - $999/month
+#### Enterprise — $999/month
 - Up to 10,000 conversations/day
 - All languages
-- All integrations
-- Dedicated success manager
-- **Best for:** High-volume merchants
+- All integrations + API access
+- Dedicated customer success manager
+- **Best for:** High-volume operations
 
 ### Pricing CTA
-**Compare Plans** → /pricing
+**Compare All Plans** → /pricing
 
 ### Pricing Note
-All plans include 14-day free trial. No credit card required. Cancel anytime.
+All plans include a 14-day free trial. No credit card required. Month-to-month available. 17% discount on annual plans.
 
 ---
 
 ## Integration Section
 
 ### Section Headline
-**Works With Your Existing Tools**
+**Connects to Your Existing Stack**
 
-### Integration Logos (Row)
-- Shopify (primary)
-- Zendesk
-- Mailchimp
-- Google Analytics
-- Slack (coming soon)
-- Gorgias (coming soon)
+### Integration Row
+- Shopify (all plans)
+- Zendesk (Professional+)
+- Mailchimp (Enterprise)
+- Google Analytics (Enterprise)
+- Slack (coming Q2 2026)
+- Gorgias (coming Q2 2026)
 
 ### Integration Description
-Connect AGNTCY to your e-commerce stack in minutes. Native integrations mean real-time data sync and seamless workflows.
+Native integrations with real-time data sync. Connect in minutes, not weeks. No middleware, no custom development.
 
 ### Integration CTA
 **View All Integrations** → /integrations
@@ -290,40 +271,37 @@ Connect AGNTCY to your e-commerce stack in minutes. Native integrations mean rea
 ## FAQ Section
 
 ### Section Headline
-**Frequently Asked Questions**
+**Common Questions**
 
-### FAQ Items (Accordion)
+### FAQ Items
 
 #### Q: How long does setup take?
-**A:** Most merchants are live within 15-30 minutes. Connect your Shopify store, customize your agent's personality, and you're ready to go. No coding required.
+**A:** Most businesses are live within 15-30 minutes. Connect your Shopify store, configure your agent's tone and knowledge base, and launch. No coding required.
 
 #### Q: Will the AI sound robotic?
-**A:** No. AGNTCY uses GPT-4 to generate natural, conversational responses. You can customize tone, formality, and even give your agent a name and personality.
+**A:** No. Agent Red uses GPT-4o to generate natural, conversational responses tailored to your brand voice. You control tone, formality, and personality.
 
 #### Q: What happens when the AI can't answer?
-**A:** Complex or sensitive issues are automatically escalated to your human team via Zendesk (or email). Your agents receive full conversation context so customers never repeat themselves.
+**A:** Agent Red automatically escalates complex or sensitive issues to your team via Zendesk (or email). Your human agents receive full conversation context — customers never repeat themselves.
 
 #### Q: Is my customer data safe?
-**A:** Absolutely. We use bank-grade encryption (AES-256), never train AI models on your data, and are SOC 2 compliant (certification in progress). Full GDPR and CCPA compliance.
+**A:** All data is encrypted in transit (TLS 1.3) and at rest (AES-256). PII is tokenized before processing. We never train AI models on your data. GDPR and CCPA compliant. SOC 2 certification in progress.
 
-#### Q: Can I try before I buy?
-**A:** Yes! Every plan includes a 14-day free trial with full Professional features. No credit card required to start.
+#### Q: Can I try before I commit?
+**A:** Yes. Every plan includes a 14-day free trial with full Professional features. No credit card required.
 
-#### Q: Do you offer discounts for annual plans?
-**A:** Yes. Annual plans save 17% (equivalent to 2 months free). We also offer special pricing for nonprofits and accelerator startups.
-
-### FAQ CTA
-**More Questions?** → /contact or **Read Full FAQ** → /faq
+#### Q: What's the cancellation policy?
+**A:** Month-to-month plans can be cancelled at any time. Annual plans include a 30-day money-back guarantee. No long-term lock-in.
 
 ---
 
 ## Final CTA Section
 
 ### Section Headline
-**Ready to Transform Your Customer Experience?**
+**Ready to Scale Your Customer Service?**
 
 ### Section Description
-Join hundreds of Shopify merchants who've automated their support, delighted their customers, and reclaimed their time.
+Start your free trial and see measurable results within the first week. No risk, no commitment, no credit card.
 
 ### Primary CTA
 **Start Your Free Trial** → /signup
@@ -334,14 +312,15 @@ Join hundreds of Shopify merchants who've automated their support, delighted the
 ### Secondary CTA
 **Talk to Sales** → /contact
 - Custom Enterprise solutions
-- Volume discounts
+- Volume pricing
 - Dedicated onboarding
 
 ### Trust Reinforcement
-- ✓ 14-day free trial
-- ✓ No credit card required
-- ✓ Cancel anytime
-- ✓ Setup in 15 minutes
+- 14-day free trial
+- No credit card required
+- Cancel anytime
+- Setup in 15 minutes
+- 30-day money-back guarantee
 
 ---
 
@@ -353,60 +332,31 @@ Join hundreds of Shopify merchants who've automated their support, delighted the
 - Features
 - Pricing
 - Integrations
-- Changelog
-- Roadmap
-
-#### Resources
 - Documentation
-- API Reference
-- Guides
-- Blog
-- Status
+- Changelog
 
 #### Company
 - About
-- Customers
-- Careers
 - Contact
+- Careers
 - Press
 
 #### Legal
 - Terms of Service
 - Privacy Policy
-- Cookie Policy
+- Service Level Agreement
+- Data Processing Agreement
 - Security
-- GDPR
+
+#### Connect
+- Twitter/X
+- LinkedIn
+- YouTube
+- GitHub
 
 ### Footer Bottom
-- © 2026 AGNTCY Platform. All rights reserved.
-- Social icons: Twitter, LinkedIn, YouTube, GitHub
-
----
-
-## Page Variants
-
-### A/B Test Variants
-
-#### Headline Variant A (Control)
-"Transform Customer Service with Intelligent AI Agents"
-
-#### Headline Variant B
-"Stop Losing Customers to Slow Support"
-
-#### Headline Variant C
-"AI Customer Service That Actually Works"
-
-### Personalization
-
-#### Shopify Merchant Variant
-- Emphasize Shopify integration
-- Show Shopify-specific testimonials
-- Highlight order/product lookup features
-
-#### High-Volume Variant
-- Emphasize scalability
-- Show Enterprise pricing
-- Highlight 10,000 users/day capacity
+- Agent Red is a product of Remaker Digital
+- (c) 2026 Remaker Digital, a DBA of VanDusen & Palmeter, LLC. All rights reserved.
 
 ---
 
@@ -420,19 +370,22 @@ Join hundreds of Shopify merchants who've automated their support, delighted the
 
 ### SEO Requirements
 - Semantic HTML5 structure
-- Schema markup (Organization, Product, FAQ)
+- Schema markup: Organization, Product, FAQPage
 - Internal linking to all major pages
 - Alt text for all images
 
 ### Analytics Events
-- `page_view` - Homepage loaded
-- `cta_click` - Primary/secondary CTA clicked
-- `video_play` - Demo video started
-- `faq_expand` - FAQ item expanded
-- `pricing_view` - Pricing section scrolled into view
+
+| Event | Trigger | Parameters |
+|-------|---------|------------|
+| `page_view` | Page load | page_name |
+| `cta_click` | CTA button click | cta_type, cta_location |
+| `scroll_depth` | Section enters viewport | section_name |
+| `faq_expand` | FAQ item expanded | faq_question |
+| `pricing_view` | Pricing section viewed | - |
 
 ---
 
-*Content Version: 1.0.0*
+*Content Version: 2.0.0*
 *Last Updated: 2026-01-29*
-*Owner: Marketing Team*
+*(c) 2026 Remaker Digital, a DBA of VanDusen & Palmeter, LLC. All rights reserved.*

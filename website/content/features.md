@@ -1,7 +1,7 @@
 # Features Page Content
 
 > **Page Purpose:** Detailed feature showcase to educate prospects and support sales conversations
-> **Target Audience:** Technical evaluators, customer service managers, business owners
+> **Target Audience:** Technical evaluators, customer service managers, e-commerce leaders
 > **Primary CTA:** Start Free Trial
 > **Secondary CTA:** Compare Plans
 
@@ -10,11 +10,11 @@
 ## Meta Information
 
 ```yaml
-title: "Features - AGNTCY Customer Engagement Platform"
-description: "Explore AGNTCY's AI-powered features: intent classification, knowledge retrieval, response generation, smart escalation, and advanced analytics."
-keywords: "AI features, customer service automation, chatbot features, Shopify integration"
+title: "Features - Agent Red Customer Engagement Platform"
+description: "Six specialized AI agents for customer service: intent classification, knowledge retrieval, response generation, content safety, smart escalation, and analytics. Built for e-commerce."
+keywords: "AI customer service features, e-commerce support automation, Shopify AI chatbot, multi-agent customer service, Agent Red"
 og_image: "/images/og-features.png"
-canonical: "https://agntcy-platform.com/features"
+canonical: "https://agentred.io/features"
 ```
 
 ---
@@ -22,13 +22,10 @@ canonical: "https://agntcy-platform.com/features"
 ## Hero Section
 
 ### Headline
-**Powerful Features. Effortless Experience.**
+**Six AI Agents. One Exceptional Support Experience.**
 
 ### Subheadline
-Six AI agents working in harmony to deliver exceptional customer service at scale.
-
-### Hero Description
-Every feature is designed with one goal: help you serve customers better while reducing operational burden. No complexity, no compromises.
+Every feature is built to do one thing: help you serve customers better while spending less. No complexity, no compromises.
 
 ### CTA
 **Start Free Trial** → /signup
@@ -53,7 +50,7 @@ Every feature is designed with one goal: help you serve customers better while r
 **Six Specialized AI Agents**
 
 ### Section Description
-Unlike simple chatbots, AGNTCY uses a multi-agent architecture where specialized AI agents collaborate to handle different aspects of customer service. The result: higher accuracy, better responses, and smarter escalation.
+Simple chatbots use one model for everything. Agent Red deploys six purpose-built agents that each excel at a specific job — classification, research, response, validation, escalation, and analysis. The result: higher accuracy, better safety, and responses that actually resolve issues.
 
 ---
 
@@ -66,10 +63,10 @@ Agent icon with neural network illustration
 **Understand Every Customer Instantly**
 
 #### Description
-The Intent Classification Agent analyzes incoming messages to understand exactly what customers need. Using advanced natural language processing, it identifies intent with 98% accuracy—whether customers are asking about orders, products, returns, shipping, or anything else.
+The Intent Classification Agent analyzes incoming messages and identifies exactly what customers need — in milliseconds. Order status, product questions, returns, complaints, or any of 17 intent categories. 98% accuracy, every time.
 
 #### Key Capabilities
-- **15+ Intent Categories:** Order status, product info, returns, shipping, account help, and more
+- **17 Intent Categories:** Order status, product info, returns, shipping, account help, billing, complaints, and more
 - **Confidence Scoring:** Each classification includes a confidence score for smart routing
 - **Context Awareness:** Understands follow-up questions in ongoing conversations
 - **Multi-Language:** Classifies intent in English, French (CA), and Spanish
@@ -99,13 +96,13 @@ Agent icon with search/database illustration
 **Find the Right Answer, Every Time**
 
 #### Description
-The Knowledge Retrieval Agent searches your product catalog, FAQs, policies, and custom knowledge base to find exactly the right information. Using semantic search powered by vector embeddings, it understands meaning—not just keywords.
+The Knowledge Retrieval Agent searches your product catalog, FAQs, policies, and order data to find exactly the right information. Semantic search powered by vector embeddings means it understands meaning — not just keywords.
 
 #### Key Capabilities
 - **Real-Time Shopify Sync:** Product details, prices, and inventory always current
-- **Semantic Search:** Finds relevant info even when wording differs
-- **Multi-Source:** Searches products, FAQs, policies, and custom content
-- **Ranked Results:** Returns most relevant documents with confidence scores
+- **Semantic Search:** Finds relevant info even when wording differs from your documentation
+- **Multi-Source:** Searches products, FAQs, policies, and custom content simultaneously
+- **Ranked Results:** Returns the most relevant documents with confidence scores
 
 #### Technical Specs
 | Metric | Value |
@@ -133,13 +130,13 @@ Agent icon with chat bubble/writing illustration
 **Natural Responses That Sound Like You**
 
 #### Description
-The Response Generation Agent crafts personalized, natural responses using the retrieved knowledge and conversation context. Powered by GPT-4, it generates human-quality responses that match your brand voice—never robotic, never off-brand.
+The Response Generation Agent crafts personalized, natural responses using retrieved knowledge and conversation context. Powered by GPT-4o, it generates human-quality responses in your brand voice — never robotic, never off-brand.
 
 #### Key Capabilities
 - **Brand Voice Customization:** Configure tone, formality, and personality
 - **Personalization:** Uses customer name, order history, and preferences
 - **Context Continuity:** Maintains conversation thread across messages
-- **Multi-Language:** Generates native-quality responses in 3 languages
+- **Multi-Language:** Generates native-quality responses in supported languages
 
 #### Customization Options
 | Setting | Options |
@@ -172,13 +169,13 @@ Agent icon with shield/checkmark illustration
 **Quality Control for Every Response**
 
 #### Description
-The Critic/Supervisor Agent validates every response before it reaches your customer. It checks for accuracy, safety, brand alignment, and potential issues—ensuring zero hallucinations, zero embarrassments, and complete brand consistency.
+The Critic/Supervisor Agent validates every response before it reaches your customer. It checks for accuracy, safety, brand alignment, and potential issues — ensuring zero hallucinations, zero embarrassments, and complete brand consistency.
 
 #### Key Capabilities
-- **Accuracy Validation:** Verifies facts against knowledge base
+- **Accuracy Validation:** Verifies facts against your knowledge base
 - **Safety Filtering:** Blocks harmful, offensive, or inappropriate content
-- **Brand Compliance:** Ensures responses match brand guidelines
-- **PII Protection:** Prevents accidental data leakage
+- **Brand Compliance:** Ensures responses match your brand guidelines
+- **PII Protection:** Prevents accidental data leakage in responses
 
 #### Protection Categories
 - Prompt injection detection and blocking
@@ -206,20 +203,20 @@ Agent icon with human handoff illustration
 **Smart Handoffs to Your Team**
 
 #### Description
-The Escalation Agent knows when to involve humans. It automatically routes complex, sensitive, or high-value issues to your team via Zendesk—with complete conversation context so agents can hit the ground running.
+The Escalation Agent knows when to involve humans. It automatically routes complex, sensitive, or high-value issues to your team via Zendesk — with complete conversation context so your agents hit the ground running.
 
 #### Key Capabilities
-- **Intelligent Triggers:** Escalates based on confidence, sentiment, complexity
-- **Full Context Transfer:** Human agents see complete conversation history
+- **Intelligent Triggers:** Escalates based on confidence, sentiment, and complexity
+- **Full Context Transfer:** Human agents see the complete conversation history
 - **Priority Assignment:** Routes based on customer value and urgency
-- **Seamless Handoff:** Customers don't repeat themselves
+- **Seamless Handoff:** Customers never repeat themselves
 
 #### Escalation Triggers
 | Trigger | Description |
 |---------|-------------|
 | Low Confidence | AI confidence below threshold |
 | Negative Sentiment | Frustrated or angry customer detected |
-| Human Request | Customer explicitly asks for human |
+| Human Request | Customer explicitly asks for a person |
 | Complex Issue | Multi-part or unusual request |
 | VIP Customer | High-value customer flag |
 | Compliance Topic | Legal, safety, or sensitive subject |
@@ -246,9 +243,9 @@ Agent icon with chart/graph illustration
 The Analytics Agent continuously tracks performance, identifies trends, and generates actionable insights. Understand what customers ask, how issues resolve, and where to focus improvement efforts.
 
 #### Key Capabilities
-- **Real-Time Dashboard:** Live metrics on volume, resolution, satisfaction
+- **Real-Time Dashboard:** Live metrics on volume, resolution, and satisfaction
 - **Trend Analysis:** Spot patterns in customer inquiries over time
-- **Cost Tracking:** Monitor and optimize support costs
+- **Cost Tracking:** Monitor and optimize support costs per conversation
 - **Custom Reports:** Build reports tailored to your needs (Enterprise)
 
 #### Metrics Tracked
@@ -265,10 +262,10 @@ The Analytics Agent continuously tracks performance, identifies trends, and gene
 | Report | Starter | Professional | Enterprise |
 |--------|---------|--------------|------------|
 | Daily Summary | ✓ | ✓ | ✓ |
-| Weekly Trends | - | ✓ | ✓ |
-| Monthly Executive | - | ✓ | ✓ |
-| Custom Queries | - | - | ✓ |
-| API Export | - | ✓ | ✓ |
+| Weekly Trends | — | ✓ | ✓ |
+| Monthly Executive | — | ✓ | ✓ |
+| Custom Queries | — | — | ✓ |
+| API Export | — | ✓ | ✓ |
 
 ---
 
@@ -278,7 +275,7 @@ The Analytics Agent continuously tracks performance, identifies trends, and gene
 **Connects to Your Entire Stack**
 
 ### Section Description
-AGNTCY integrates natively with the tools you already use. Real-time data sync means your AI always has the latest information.
+Agent Red integrates natively with the tools you already use. Real-time data sync means your AI always has the latest information — no stale answers, no missing context.
 
 ---
 
@@ -291,10 +288,10 @@ Shopify logo
 **Native Shopify Integration**
 
 #### Description
-Deep, real-time integration with your Shopify store. AGNTCY automatically accesses orders, products, customers, and inventory to provide accurate, personalized support.
+Deep, real-time integration with your Shopify store. Agent Red automatically accesses orders, products, customers, and inventory to provide accurate, personalized support.
 
 #### Capabilities
-- **Order Lookup:** Real-time order status, tracking, history
+- **Order Lookup:** Real-time order status, tracking, and history
 - **Product Search:** Catalog search with pricing and availability
 - **Customer Profiles:** Purchase history and preferences
 - **Inventory Check:** Real-time stock availability
@@ -317,14 +314,14 @@ Zendesk logo
 **Seamless Zendesk Escalation**
 
 #### Description
-When issues need human attention, AGNTCY creates Zendesk tickets with full conversation context. Your agents get a head start; customers never repeat themselves.
+When issues need human attention, Agent Red creates Zendesk tickets with full conversation context. Your agents get a head start. Customers never repeat themselves.
 
 #### Capabilities
-- **Automatic Ticket Creation:** Escalated conversations become tickets
+- **Automatic Ticket Creation:** Escalated conversations become tickets instantly
 - **Context Attachment:** Full conversation history included
-- **Priority Assignment:** Smart priority based on issue and customer
-- **Agent Routing:** Route to right team based on issue type
-- **Status Sync:** Ticket updates reflect in AGNTCY
+- **Priority Assignment:** Smart priority based on issue type and customer value
+- **Agent Routing:** Route to the right team based on issue type
+- **Status Sync:** Ticket updates reflect in Agent Red
 
 #### Setup Time
 30 minutes
@@ -349,7 +346,7 @@ Access customer marketing data to provide more personalized support. Know which 
 - **Segment Lookup:** See which customer segments apply
 - **Campaign History:** Know which emails they've received
 - **Subscription Status:** Check email preferences
-- **Preference Updates:** Update marketing preferences
+- **Preference Updates:** Update marketing preferences in real time
 
 #### Setup Time
 20 minutes
@@ -371,9 +368,9 @@ Google Analytics logo
 Track customer service interactions alongside your other analytics. Understand how support impacts conversion and customer lifetime value.
 
 #### Capabilities
-- **Event Tracking:** Conversation events in GA4
+- **Event Tracking:** Conversation events flow into GA4
 - **Goal Completion:** Track support-influenced conversions
-- **Attribution:** Connect support to revenue
+- **Attribution:** Connect support interactions to revenue
 - **Custom Dimensions:** Enrich analytics with support data
 
 #### Setup Time
@@ -390,7 +387,7 @@ Enterprise
 Real-time notifications and team collaboration
 
 #### Gorgias
-Alternative helpdesk integration
+Alternative helpdesk integration for e-commerce
 
 #### Klaviyo
 E-commerce marketing automation
@@ -409,7 +406,7 @@ Enterprise CRM integration
 **Make It Yours**
 
 ### Section Description
-AGNTCY adapts to your brand, not the other way around. Customize everything from tone of voice to escalation rules.
+Agent Red adapts to your brand, not the other way around. Customize everything from tone of voice to escalation rules.
 
 ---
 
@@ -419,7 +416,7 @@ AGNTCY adapts to your brand, not the other way around. Customize everything from
 **Your Tone, Your Style**
 
 #### Description
-Configure your AI agent's personality to match your brand perfectly. From casual and friendly to professional and formal—you're in control.
+Configure your AI agent's personality to match your brand. From casual and friendly to professional and formal — you control exactly how Agent Red speaks to your customers.
 
 #### Options
 | Setting | Choices |
@@ -439,7 +436,7 @@ Configure your AI agent's personality to match your brand perfectly. From casual
 **Teach Your AI**
 
 #### Description
-Upload FAQs, policies, product guides, and any content you want your AI to know. The more you teach it, the smarter it gets.
+Upload FAQs, policies, product guides, and any content you want Agent Red to know. The more you teach it, the better it serves your customers.
 
 #### Supported Formats
 - Markdown (.md)
@@ -469,8 +466,8 @@ Define exactly when conversations should escalate to your team. Set thresholds, 
 | Rule Type | Description |
 |-----------|-------------|
 | Confidence Threshold | Escalate below X% confidence |
-| Sentiment Detection | Escalate negative sentiment |
-| Keyword Triggers | Escalate on specific words |
+| Sentiment Detection | Escalate on negative sentiment |
+| Keyword Triggers | Escalate on specific words or phrases |
 | Topic Categories | Always escalate certain topics |
 | Customer Tags | Auto-escalate VIP customers |
 | Time Limits | Escalate after X exchanges |
@@ -486,7 +483,7 @@ Define exactly when conversations should escalate to your team. Set thresholds, 
 Create templates for frequently asked questions. Ensure consistent, accurate responses while maintaining natural conversation flow.
 
 #### Template Features
-- Variable insertion (customer name, order number)
+- Variable insertion (customer name, order number, product details)
 - A/B testing variants
 - Performance tracking
 - Multi-language versions
@@ -497,17 +494,17 @@ Create templates for frequently asked questions. Ensure consistent, accurate res
 ### Feature: White-Label (Enterprise)
 
 #### Headline
-**Your Brand, Fully**
+**Your Brand, Completely**
 
 #### Description
-Remove all AGNTCY branding for a completely white-label experience. Your customers see only your brand.
+Remove all Agent Red branding for a completely white-label experience. Your customers interact with your brand — and only your brand.
 
 #### Includes
 - Custom domain for chat widget
 - Custom email sender address
 - Branded dashboard
 - Custom favicon and logos
-- CSS styling control
+- Full CSS styling control
 
 ---
 
@@ -542,7 +539,7 @@ Analytics dashboard screenshot showing key metrics
 **See What's Happening Now**
 
 #### Description
-Live dashboard shows current conversation volume, response times, and agent performance. Spot issues before they become problems.
+Live dashboard shows current conversation volume, response times, and performance. Spot issues before they become problems.
 
 #### Metrics
 - Active conversations
@@ -562,7 +559,7 @@ Live dashboard shows current conversation volume, response times, and agent perf
 Weekly and monthly reports reveal trends in customer inquiries. Anticipate busy periods, identify emerging issues, and optimize staffing.
 
 #### Insights
-- Volume trends by day/hour
+- Volume trends by day and hour
 - Seasonal patterns
 - Intent category shifts
 - Satisfaction trends
@@ -576,7 +573,7 @@ Weekly and monthly reports reveal trends in customer inquiries. Anticipate busy 
 **Build Reports That Matter to You**
 
 #### Description
-Create custom reports with the metrics you care about. Export to CSV, schedule automated delivery, or access via API.
+Create custom reports with the metrics you care about. Export to CSV, schedule automated delivery, or access via API for your BI tools.
 
 #### Capabilities
 - Drag-and-drop report builder
@@ -593,7 +590,7 @@ Create custom reports with the metrics you care about. Export to CSV, schedule a
 **Enterprise-Grade Security**
 
 ### Section Description
-Your customer data is precious. We protect it with bank-grade security, strict compliance, and transparent practices.
+Your customer data is precious. Agent Red protects it with bank-grade security, strict compliance, and transparent practices.
 
 ---
 
@@ -603,13 +600,13 @@ Your customer data is precious. We protect it with bank-grade security, strict c
 **Encrypted Everywhere**
 
 #### Description
-All data is encrypted in transit (TLS 1.3) and at rest (AES-256). Your customers' information is protected at every step.
+All data is encrypted in transit and at rest. Your customers' information is protected at every step — no exceptions.
 
 #### Details
 - TLS 1.3 for all connections
 - AES-256 encryption at rest
 - Azure managed encryption keys
-- PII tokenization for AI processing
+- PII tokenization for all AI processing
 
 ---
 
@@ -619,7 +616,7 @@ All data is encrypted in transit (TLS 1.3) and at rest (AES-256). Your customers
 **Built for Compliance**
 
 #### Description
-AGNTCY is designed to meet the strictest compliance requirements. GDPR, CCPA, and SOC 2 (in progress) compliant.
+Agent Red is designed to meet strict compliance requirements from day one. GDPR, CCPA, and SOC 2 (in progress) compliant.
 
 #### Certifications & Compliance
 | Standard | Status |
@@ -671,7 +668,7 @@ Role-based access control ensures team members only see what they need. Full aud
 **We're Here to Help**
 
 ### Section Description
-From self-service documentation to dedicated success managers, we provide the support you need to succeed.
+From self-service documentation to dedicated success managers, Agent Red provides the support you need to succeed.
 
 ---
 
@@ -719,10 +716,10 @@ Latest updates, improvements, and new features
 ## Final CTA Section
 
 ### Headline
-**Ready to See AGNTCY in Action?**
+**Ready to See Agent Red in Action?**
 
 ### Description
-Start your free trial today and experience the future of customer service.
+Start your free trial today. Full Professional features, no credit card required, live in 15 minutes.
 
 ### Primary CTA
 **Start Free Trial** → /signup
@@ -738,6 +735,26 @@ Start your free trial today and experience the future of customer service.
 
 ---
 
-*Content Version: 1.0.0*
+## Technical Notes
+
+### SEO Requirements
+- Semantic HTML5 structure
+- Schema markup: Product, ItemList (features)
+- Scrollspy navigation with smooth scrolling
+- Alt text for all agent icons and screenshots
+
+### Analytics Events
+
+| Event | Trigger | Parameters |
+|-------|---------|------------|
+| `page_view` | Page load | page_name |
+| `feature_section_view` | Section enters viewport | section_name |
+| `agent_card_expand` | Agent detail expanded | agent_name |
+| `cta_click` | CTA button click | cta_type, cta_location |
+| `integration_click` | Integration card clicked | integration_name |
+
+---
+
+*Content Version: 2.0.0*
 *Last Updated: 2026-01-29*
-*Owner: Marketing Team*
+*(c) 2026 Remaker Digital, a DBA of VanDusen & Palmeter, LLC. All rights reserved.*

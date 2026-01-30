@@ -1,7 +1,7 @@
 # Integrations Page Content
 
-> **Page Purpose:** Showcase integration capabilities and drive adoption
-> **Target Audience:** Technical evaluators, IT decision-makers, developers
+> **Page Purpose:** Showcase integration capabilities, demonstrate data access depth, drive adoption
+> **Target Audience:** Technical evaluators, IT decision-makers, e-commerce operators, developers
 > **Primary CTA:** Start Free Trial
 > **Secondary CTA:** Request Integration
 
@@ -10,11 +10,11 @@
 ## Meta Information
 
 ```yaml
-title: "Integrations - AGNTCY Customer Engagement Platform"
-description: "Connect AGNTCY to Shopify, Zendesk, Mailchimp, Google Analytics, and more. Native integrations for seamless customer service automation."
-keywords: "Shopify integration, Zendesk integration, customer service integrations, API"
+title: "Integrations - Agent Red Customer Engagement"
+description: "Connect Agent Red to Shopify, Zendesk, Mailchimp, Google Analytics, and more. Native integrations with real-time data sync for AI customer service."
+keywords: "Shopify AI integration, Zendesk integration, customer service integrations, e-commerce API, Agent Red"
 og_image: "/images/og-integrations.png"
-canonical: "https://agntcy-platform.com/integrations"
+canonical: "https://agentred.io/integrations"
 ```
 
 ---
@@ -25,7 +25,7 @@ canonical: "https://agntcy-platform.com/integrations"
 **Connect Your Entire Stack**
 
 ### Subheadline
-Native integrations with the tools you already use. Real-time data sync. Zero manual work.
+Native integrations with the tools you already use. Real-time data sync. Zero manual work. Your AI has the context to actually solve problems.
 
 ### Integration Logo Cloud
 [Shopify] [Zendesk] [Mailchimp] [Google Analytics] [Slack*] [Gorgias*]
@@ -42,7 +42,7 @@ Native integrations with the tools you already use. Real-time data sync. Zero ma
 **Native Integrations**
 
 ### Section Description
-Deep, bi-directional integrations that keep your systems in sync automatically.
+Deep, bi-directional integrations that keep your systems in sync automatically. Not surface-level widgets — real data access that powers accurate, personalized support.
 
 ---
 
@@ -53,7 +53,7 @@ Deep, bi-directional integrations that keep your systems in sync automatically.
 Shopify logo (large)
 
 #### Status Badge
-**Available** - All Plans
+**Available** — All Plans (included)
 
 #### Setup Time
 15 minutes
@@ -66,13 +66,13 @@ Shopify logo (large)
 **Deep Shopify Integration**
 
 #### Description
-AGNTCY connects directly to your Shopify store for real-time access to orders, products, customers, and inventory. Your AI always has the latest information to help customers accurately.
+Agent Red connects directly to your Shopify store for real-time access to orders, products, customers, and inventory. Your AI always has the latest information to help customers accurately.
 
 #### Key Benefits
-- **Real-time order lookup** - Instant access to order status, tracking, and history
-- **Product information** - Current pricing, availability, descriptions, and images
-- **Customer profiles** - Purchase history, preferences, and account details
-- **Inventory accuracy** - Live stock levels across all locations
+- **Real-time order lookup** — Instant access to order status, tracking, and history
+- **Product information** — Current pricing, availability, descriptions, and images
+- **Customer profiles** — Purchase history, preferences, and account details
+- **Inventory accuracy** — Live stock levels across all locations
 
 ---
 
@@ -148,10 +148,10 @@ Real-time inventory levels across all locations and variants.
 - Store owner or staff account with admin access
 
 #### Steps
-1. Log in to your AGNTCY dashboard
+1. Log in to your Agent Red dashboard
 2. Navigate to Settings → Integrations
 3. Click "Connect Shopify"
-4. Authorize AGNTCY in Shopify
+4. Authorize Agent Red in Shopify
 5. Select data to sync (recommended: all)
 6. Test the connection
 
@@ -185,7 +185,7 @@ Real-time inventory levels across all locations and variants.
 Zendesk logo (large)
 
 #### Status Badge
-**Available** - Professional & Enterprise
+**Available** — Professional & Enterprise (included)
 
 #### Setup Time
 30 minutes
@@ -198,13 +198,13 @@ Zendesk logo (large)
 **Seamless Escalation to Zendesk**
 
 #### Description
-When conversations need human attention, AGNTCY creates Zendesk tickets automatically with full conversation context. Your agents get a head start—customers never repeat themselves.
+When conversations need human attention, Agent Red creates Zendesk tickets automatically with full conversation context. Your agents get a head start. Customers never repeat themselves.
 
 #### Key Benefits
-- **Automatic ticket creation** - Escalated conversations become tickets instantly
-- **Full context transfer** - Complete conversation history attached
-- **Smart routing** - Assign to the right team based on issue type
-- **Bi-directional sync** - Ticket updates reflect in AGNTCY
+- **Automatic ticket creation** — Escalated conversations become tickets instantly
+- **Full context transfer** — Complete conversation history attached
+- **Smart routing** — Assign to the right team based on issue type
+- **Bi-directional sync** — Ticket updates reflect in Agent Red
 
 ---
 
@@ -253,13 +253,13 @@ Routes tickets to the appropriate team or agent based on issue category.
 - Route by intent category (billing, shipping, technical)
 - Route by customer segment (VIP, international)
 - Route by language (English, French, Spanish)
-- Custom routing rules
+- Custom routing rules (Enterprise)
 
 ---
 
 #### Capability 4: Status Sync
 **What It Does:**
-Keeps AGNTCY and Zendesk in sync as tickets progress.
+Keeps Agent Red and Zendesk in sync as tickets progress.
 
 **Synced Data:**
 - Ticket status changes
@@ -276,11 +276,11 @@ Keeps AGNTCY and Zendesk in sync as tickets progress.
 - Admin access to Zendesk
 
 #### Steps
-1. Log in to your AGNTCY dashboard
+1. Log in to your Agent Red dashboard
 2. Navigate to Settings → Integrations
 3. Click "Connect Zendesk"
 4. Enter your Zendesk subdomain
-5. Authorize AGNTCY in Zendesk
+5. Authorize Agent Red in Zendesk
 6. Configure routing rules
 7. Test with a sample escalation
 
@@ -305,7 +305,7 @@ Keeps AGNTCY and Zendesk in sync as tickets progress.
 Mailchimp logo (large)
 
 #### Status Badge
-**Available** - Enterprise Only
+**Available** — Add-on ($49/month, Professional & Enterprise)
 
 #### Setup Time
 20 minutes
@@ -318,13 +318,13 @@ Mailchimp logo (large)
 **Marketing Intelligence for Better Support**
 
 #### Description
-Access customer marketing data to provide more personalized support. Know which campaigns they've engaged with and tailor your responses accordingly.
+Enrich customer interactions with marketing data. Know which campaigns they've engaged with, which segments they belong to, and tailor support accordingly.
 
 #### Key Benefits
-- **Segment awareness** - Know which customer segments apply
-- **Campaign context** - See which emails they've received
-- **Subscription management** - Check and update preferences
-- **Personalized service** - Tailor responses to marketing engagement
+- **Segment awareness** — Know which customer segments apply
+- **Campaign context** — See which emails they've received
+- **Subscription management** — Check and update preferences
+- **Personalized service** — Tailor responses to marketing engagement
 
 ---
 
@@ -373,7 +373,7 @@ Check and update email subscription preferences.
 - API key with appropriate permissions
 
 #### Steps
-1. Log in to your AGNTCY dashboard
+1. Log in to your Agent Red dashboard
 2. Navigate to Settings → Integrations
 3. Click "Connect Mailchimp"
 4. Enter your API key
@@ -383,7 +383,7 @@ Check and update email subscription preferences.
 ---
 
 ### CTA
-**Upgrade to Enterprise** → /pricing
+**Add Mailchimp Integration** → /pricing
 
 ---
 
@@ -394,7 +394,7 @@ Check and update email subscription preferences.
 Google Analytics logo (large)
 
 #### Status Badge
-**Available** - Enterprise Only
+**Available** — Add-on ($49/month, Professional & Enterprise)
 
 #### Setup Time
 15 minutes
@@ -407,13 +407,13 @@ Google Analytics logo (large)
 **Unified Customer Analytics**
 
 #### Description
-Track customer service interactions alongside your other analytics. Understand how support impacts conversion and customer lifetime value.
+Track customer service interactions alongside your existing analytics. Understand how support impacts conversion and customer lifetime value.
 
 #### Key Benefits
-- **Event tracking** - Conversation events in GA4
-- **Conversion attribution** - Connect support to sales
-- **Behavior insights** - Understand support impact on journey
-- **Custom dimensions** - Enrich analytics with support data
+- **Event tracking** — Conversation events flow into GA4
+- **Conversion attribution** — Connect support to sales
+- **Behavior insights** — Understand support impact on customer journey
+- **Custom dimensions** — Enrich analytics with support data
 
 ---
 
@@ -465,7 +465,7 @@ Adds customer service data as custom dimensions for deeper analysis.
 - API access enabled
 
 #### Steps
-1. Log in to your AGNTCY dashboard
+1. Log in to your Agent Red dashboard
 2. Navigate to Settings → Integrations
 3. Click "Connect Google Analytics"
 4. Enter your GA4 Measurement ID
@@ -475,7 +475,7 @@ Adds customer service data as custom dimensions for deeper analysis.
 ---
 
 ### CTA
-**Upgrade to Enterprise** → /pricing
+**Add Google Analytics Integration** → /pricing
 
 ---
 
@@ -517,7 +517,7 @@ Gorgias logo
 Q2 2026
 
 #### Description
-Alternative helpdesk integration for Gorgias users.
+Alternative helpdesk integration for teams already using Gorgias.
 
 #### Planned Features
 - Automatic ticket creation
@@ -578,14 +578,14 @@ Don't see what you need? Let us know.
 **Build Custom Integrations**
 
 ### Section Description
-Connect AGNTCY to any system with our comprehensive REST API.
+Connect Agent Red to any system with our REST API. Full documentation, official SDKs, and webhook support.
 
 ---
 
 ### API Overview
 
 #### Base URL
-`https://api.agntcy-platform.com/v1`
+`https://api.agentred.io/v1`
 
 #### Authentication
 Bearer token (JWT)
@@ -593,9 +593,10 @@ Bearer token (JWT)
 #### Rate Limits
 | Plan | Requests/minute | Burst |
 |------|-----------------|-------|
-| Starter | 60 | 100 |
-| Professional | 300 | 500 |
-| Enterprise | 1,000 | 2,000 |
+| Professional (read-only) | 300 | 500 |
+| Enterprise (full access) | 1,000 | 2,000 |
+
+Note: API access is available on Professional (read-only) and Enterprise (full read + write) plans.
 
 ---
 
@@ -668,15 +669,15 @@ DELETE /webhooks/{id}              Delete webhook
 #### Official SDKs
 | Language | Package | Install |
 |----------|---------|---------|
-| Python | `agntcy-platform-sdk` | `pip install agntcy-platform-sdk` |
-| Node.js | `@agntcy/platform-sdk` | `npm install @agntcy/platform-sdk` |
-| PHP | `agntcy/platform-sdk` | `composer require agntcy/platform-sdk` |
+| Python | `agentred-sdk` | `pip install agentred-sdk` |
+| Node.js | `@agentred/sdk` | `npm install @agentred/sdk` |
+| PHP | `agentred/sdk` | `composer require agentred/sdk` |
 
 #### Python Example
 ```python
-from agntcy import AGNTCYClient
+from agentred import AgentRedClient
 
-client = AGNTCYClient(api_key="your_api_key")
+client = AgentRedClient(api_key="your_api_key")
 
 # Start a conversation
 conversation = client.conversations.create(
@@ -692,7 +693,7 @@ print(response.content)
 ---
 
 ### API Documentation
-Full API documentation with examples and playground.
+Full API documentation with examples and interactive playground.
 
 **View API Docs** → /docs/api
 
@@ -706,16 +707,16 @@ Full API documentation with examples and playground.
 ### Support Options
 
 #### Self-Service
-- Comprehensive documentation
-- Setup guides with screenshots
+- Comprehensive documentation with screenshots
+- Step-by-step setup guides
 - Video tutorials
 - Community forum
 
-#### Professional Support (Enterprise)
-- Dedicated integration engineer
+#### Professional Support
+- Dedicated integration engineering (Custom Integration add-on, Enterprise)
 - Custom connector development
-- Migration assistance
-- Ongoing optimization
+- Migration assistance from other platforms
+- Ongoing optimization and maintenance
 
 ---
 
@@ -725,7 +726,7 @@ Full API documentation with examples and playground.
 **Ready to Connect Your Stack?**
 
 ### Description
-Start your free trial and connect your first integration in minutes.
+Start your free trial and connect your first integration in minutes. Shopify setup takes 15 minutes.
 
 ### Primary CTA
 **Start Free Trial** → /signup
@@ -735,6 +736,27 @@ Start your free trial and connect your first integration in minutes.
 
 ---
 
-*Content Version: 1.0.0*
+## Technical Notes
+
+### SEO Requirements
+- Semantic HTML5 structure
+- Schema markup: SoftwareApplication, ItemList (integrations)
+- Individual integration sections linkable via anchors
+- Alt text for all logos and screenshots
+
+### Analytics Events
+
+| Event | Trigger | Parameters |
+|-------|---------|------------|
+| `page_view` | Page load | page_name |
+| `integration_view` | Integration section enters viewport | integration_name |
+| `integration_cta_click` | Integration CTA clicked | integration_name, cta_type |
+| `api_docs_click` | API docs link clicked | — |
+| `coming_soon_click` | Coming soon integration clicked | integration_name |
+| `request_integration` | Request integration CTA clicked | — |
+
+---
+
+*Content Version: 2.0.0*
 *Last Updated: 2026-01-29*
-*Owner: Marketing Team*
+*(c) 2026 Remaker Digital, a DBA of VanDusen & Palmeter, LLC. All rights reserved.*
