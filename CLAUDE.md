@@ -12,7 +12,7 @@ This document provides context and guidance for AI assistants working on the Age
 | **Brand Name** | Agent Red Customer Engagement |
 | **Release** | Launch 1.0 |
 | **Type** | Commercial SaaS Product |
-| **Status** | Phase 2.5 Planning Complete — Persistent Customer Memory Documented |
+| **Status** | Phase 2.1 E-Commerce ~85% Complete — 10 billing modules, 7 API routers built |
 | **Owner** | Remaker Digital (DBA of VanDusen & Palmeter, LLC) |
 
 ---
@@ -420,7 +420,7 @@ Each tier includes a platform fee (infrastructure, features, support) and an inc
 - Social media automation
 - Compliance certifications (SOC 2, ISO)
 - License management system
-- Affiliate program
+- ~~Affiliate program~~ (Rewardful integration built, deferred live connection to launch)
 
 ---
 
@@ -492,12 +492,29 @@ E:\Claude-Playground\CLAUDE-PROJECTS\Agent Red Customer Engagement\
 ├── CLAUDE.md                       # This file - AI assistant guidance
 ├── README.md                       # Project overview
 ├── .gitignore                      # Git ignore rules
+├── requirements.txt                # Python dependencies
+├── .env.example                    # Environment variable template
+│
+├── config/                         # Configuration files
+│   └── stripe_product_ids.json     # Stripe test-mode product/price IDs (27 objects)
 │
 ├── src/                            # Commercial source code
-│   ├── multi-tenant/               # Tenant management
-│   ├── integrations/               # Enterprise integrations
-│   ├── ai-features/                # Advanced AI
-│   └── white-label/                # Customization
+│   ├── __init__.py
+│   ├── main.py                     # FastAPI app entrypoint (7 routers, health endpoints)
+│   ├── integrations/               # Billing & platform integrations
+│   │   ├── __init__.py
+│   │   ├── provisioning.py         # Channel-agnostic tenant provisioning service
+│   │   ├── stripe_catalog.py       # Typed Pydantic models for Stripe product catalog
+│   │   ├── stripe_checkout.py      # Stripe Checkout session management + Rewardful referral
+│   │   ├── stripe_packs.py         # Conversation pack purchase & FIFO balance tracking
+│   │   ├── stripe_portal.py        # Stripe Customer Portal session management
+│   │   ├── stripe_usage.py         # Metered usage reporting (3-tier: included→packs→overage)
+│   │   ├── stripe_webhooks.py      # Stripe webhook handler (6 events → provisioning)
+│   │   ├── shopify_client.py       # Async Shopify GraphQL API client (httpx)
+│   │   └── shopify_billing.py      # Shopify Billing API (subscriptions + usage charges)
+│   ├── multi-tenant/               # Tenant management (Phase 2.2)
+│   ├── ai-features/                # Advanced AI (Phase 2.5)
+│   └── white-label/                # Customization (future)
 │
 ├── infrastructure/                 # Deployment infrastructure
 │   └── terraform/                  # IaC for Azure
@@ -507,6 +524,10 @@ E:\Claude-Playground\CLAUDE-PROJECTS\Agent Red Customer Engagement\
 │
 ├── docs/                           # Documentation
 │   ├── architecture/               # Technical architecture
+│   │   ├── ECOMMERCE-PLATFORM-EVALUATION.md
+│   │   ├── REWARDFUL-INTEGRATION.md
+│   │   ├── PER-CUSTOMER-AI-PERSONALIZATION-RESEARCH.md
+│   │   └── PERSISTENT-CUSTOMER-MEMORY-METRICS.md
 │   ├── guides/                     # How-to guides
 │   └── api/                        # API reference
 │
@@ -522,6 +543,7 @@ E:\Claude-Playground\CLAUDE-PROJECTS\Agent Red Customer Engagement\
 │
 └── scripts/                        # Automation scripts
     ├── setup/                      # Project setup
+    ├── stripe/                     # Stripe catalog creation script
     ├── build/                      # Build automation
     └── deploy/                     # Deployment scripts
 ```
@@ -537,8 +559,11 @@ E:\Claude-Playground\CLAUDE-PROJECTS\Agent Red Customer Engagement\
 | PROJECT-PLAN.md | docs/ | Launch 1.0 milestones and tasks |
 | COMMERCIAL-SAAS-PROPOSAL.md | docs/ | Full business analysis (A-P deliverables) |
 | PRODUCT-FEATURES-RAG.md | docs/ | Complete feature reference for RAG |
+| ECOMMERCE-PLATFORM-EVALUATION.md | docs/architecture/ | Three-way platform evaluation (Stripe/Shopify/Paddle) |
+| REWARDFUL-INTEGRATION.md | docs/architecture/ | Rewardful affiliate setup guide and checklist |
 | PER-CUSTOMER-AI-PERSONALIZATION-RESEARCH.md | docs/architecture/ | Persistent Customer Memory research foundation |
 | PERSISTENT-CUSTOMER-MEMORY-METRICS.md | docs/architecture/ | Test cases, metrics, and A/B testing framework |
+| stripe_product_ids.json | config/ | Stripe test-mode product/price/coupon IDs (27 objects) |
 
 ---
 
@@ -561,9 +586,10 @@ E:\Claude-Playground\CLAUDE-PROJECTS\Agent Red Customer Engagement\
 Continue work on Agent Red Customer Engagement commercial project.
 Location: E:\Claude-Playground\CLAUDE-PROJECTS\Agent Red Customer Engagement
 Key files: CLAUDE.md, docs/PROJECT-PLAN.md
-Current status: Phases 0-1.4 complete. Phase 2.1 platform decision complete (dual-channel: Shopify App Store + Stripe). Persistent Customer Memory feature fully documented and propagated across all 19 files (Phase 2.5 planning complete). Implementation tasks next.
-Next up: Phase 2.1 implementation — Stripe account setup, product catalog, Checkout integration, webhook handler, Shopify Billing API integration, App Store listing.
-Please review PROJECT-PLAN.md (Phase 2.1 task list) and proceed with the next implementation item, presenting one work item at a time for review per the iterative working style documented in CLAUDE.md.
+Current status: Phases 0-1.4 complete. Phase 2.1 e-commerce implementation ~85% complete — all billing code built (10 modules, 7 API routers). Phase 2.5 Persistent Customer Memory planning complete.
+Completed in Phase 2.1: Stripe product catalog (27 objects), Checkout integration (with Rewardful referral tracking), webhook handler (6 events → provisioning), metered usage reporting (3-tier: included→packs→overage), Shopify Billing API (GraphQL, subscriptions + usage), conversation pack purchase flow (FIFO balance), unified provisioning service (channel-agnostic, Stripe + Shopify), Customer Portal, Rewardful affiliate integration.
+Remaining Phase 2.1: Stripe Tax setup, Shopify App Store listing (content/creative), App Store review submission, test checkout flows (both channels).
+Please review CLAUDE.md status section and proceed with the next work item, presenting one item at a time for review per the iterative working style documented in CLAUDE.md.
 ```
 
 ### Referencing AGNTCY
@@ -657,22 +683,45 @@ This applies to: work priority reviews, architecture decisions, scope changes, m
 - **E-commerce platform decision:** Dual-channel (Shopify App Store + Stripe). Shopify provides discovery among ~5M merchants with 0% commission on first $1M revenue. Stripe provides direct billing for non-Shopify merchants at ~3.5% per transaction. Paddle rejected (no marketplace, higher fees, redundant tax handling). Existing Shopify integration is ~80% of what the App Store requires. Agent Red's price advantage (2–13x cheaper per interaction than Gorgias, Intercom, Zendesk) positions it as a disruptive value entrant in an established ecosystem.
 - **Neither Shopify nor Stripe have formal named partner tiers.** Benefits scale informally with growth. Shopify: "Built for Shopify" badge at ~3-6 months, partner manager at ~10K installs. Stripe: "Verified Partner" badge after production integration review, custom pricing at ~$80K+/mo volume.
 - **Persistent Customer Memory validated as differentiator.** No competitor confirmed doing per-customer vector RAG over historical transcripts. Sierra AI (Agent Data Platform) is closest but not customer-facing. Marginal cost ~$0.005-$0.011/customer/month for Layers 1-2. Research, metrics framework, test cases, and A/B methodology documented. Feature propagated across all 18 project files (business, marketing, docs-site, legal, brand). Privacy reconciliation complete — default "no training" preserved with opt-in carve-out for Layer 4.
+- **Rewardful does not support Stripe test mode.** Trial account created. OAuth connection requires live Stripe with admin permissions. Backend code integration (client_reference_id on Checkout Sessions) works identically in test/live mode. Recommended plan: Starter ($49/mo, $7,500/mo affiliate revenue cap). Setup checklist documented in docs/architecture/REWARDFUL-INTEGRATION.md.
+- **Shopify annual billing limitation discovered.** Shopify's AppSubscription API does not support `appUsagePricingDetails` with `ANNUAL` interval — only `EVERY_30_DAYS`. Annual subscribers get recurring base only; overage must be handled via `appPurchaseOneTimeCreate` or conversation packs (Phase 2.2).
 
-**Phase 2.1: E-Commerce Store (In Progress)**
+**Phase 2.1: E-Commerce Store (In Progress — ~85% Complete)**
 - [x] Three-way platform evaluation (Stripe vs Shopify App Store vs Paddle) — docs/architecture/ECOMMERCE-PLATFORM-EVALUATION.md
 - [x] Decision: Dual-channel (Shopify App Store primary + Stripe direct). Paddle rejected.
 - [x] Approval process and partner growth path documented (Appendices A & B)
-- [ ] Stripe account setup, Products, Prices, Coupons in test mode
-- [ ] Stripe Checkout integration for plan selection
-- [ ] Stripe webhook handler (subscription lifecycle → tenant provisioning)
-- [ ] Metered usage reporting to Stripe
-- [ ] Shopify Billing API integration
+- [x] Stripe account setup, Products, Prices, Coupons in test mode — scripts/stripe/create_product_catalog.py (27 Stripe objects), config/stripe_product_ids.json
+- [x] Stripe Checkout integration for plan selection — src/integrations/stripe_checkout.py (POST /api/checkout/session, success/cancel redirects)
+- [x] Stripe webhook handler (subscription lifecycle → tenant provisioning) — src/integrations/stripe_webhooks.py (6 events: checkout.session.completed, subscription CRUD, invoice payment success/failure)
+- [x] Metered usage reporting to Stripe — src/integrations/stripe_usage.py (3-tier consumption: included → pack balance → Stripe Billing Meter overage)
+- [x] Shopify Billing API integration — src/integrations/shopify_billing.py + shopify_client.py (GraphQL Admin API, appSubscriptionCreate, usage records, Decimal arithmetic)
+- [x] Conversation pack purchase flow — src/integrations/stripe_packs.py (1K/5K/20K packs, 90-day validity, FIFO consumption, Stripe Checkout mode=payment)
+- [x] Unified webhook handler (both channels → provisioning) — src/integrations/provisioning.py (BillingChannel enum, TenantStatus lifecycle, channel-agnostic provision/activate/update/deactivate/flag)
+- [x] Stripe Customer Portal — src/integrations/stripe_portal.py (POST /api/billing/portal, tenant lookup for Stripe customer ID resolution)
+- [x] Rewardful affiliate integration — client_reference_id on Checkout Sessions, docs/architecture/REWARDFUL-INTEGRATION.md (live Stripe connection deferred — Rewardful does not support test mode)
+- [ ] Stripe Tax setup
 - [ ] Shopify App Store listing (description, screenshots, demo)
 - [ ] App Store review submission
-- [ ] Conversation pack purchase flow
-- [ ] Unified webhook handler (both channels → provisioning)
-- [ ] Stripe Tax, Stripe Customer Portal, Rewardful affiliate setup
 - [ ] Test checkout flows (both channels)
+
+**Phase 2.1 API Route Map (7 routers, 15 endpoints):**
+
+| Prefix | Module | Endpoints |
+|--------|--------|-----------|
+| `/api/tenants` | provisioning | GET /lookup, GET /{tenant_id} |
+| `/api/checkout` | stripe_checkout | POST /session, GET /success, GET /cancel |
+| `/api/packs` | stripe_packs | POST /purchase, GET /balance/{customer_id} |
+| `/api/billing` | stripe_portal | POST /portal |
+| `/api/usage` | stripe_usage | POST /record, GET /{customer_id} |
+| `/api/webhooks` | stripe_webhooks | POST /stripe |
+| `/api/shopify/billing` | shopify_billing | POST /subscribe, GET /confirm, GET /status |
+
+**Phase 2.1 Key Technical Decisions:**
+- **Shopify annual billing limitation:** Shopify does not support usage billing with ANNUAL interval. Annual subscriptions get recurring base only; overage deferred to Phase 2.2 (one-time app charges).
+- **Decimal arithmetic for billing:** All Shopify billing amounts use Python `Decimal` to avoid floating-point precision errors.
+- **3-tier conversation consumption:** Included allowance (free) → Pack balance (FIFO, oldest-first, 90-day expiry) → Stripe Billing Meter (overage).
+- **In-memory dev stores:** All state (usage counters, pack balances, tenant records) uses in-memory dicts with DEVELOPMENT ONLY warnings. Production replacement: Cosmos DB with tenant partitioning (Phase 2.2).
+- **Rewardful requires live Stripe:** OAuth connection deferred to launch. Code integration (client_reference_id) works in test mode.
 
 **Phase 2.5: Persistent Customer Memory (Planned)**
 - [ ] Design customer preference profile schema
@@ -711,4 +760,4 @@ This applies to: work priority reviews, architecture decisions, scope changes, m
 
 *© 2026 Remaker Digital, a DBA of VanDusen & Palmeter, LLC. All rights reserved.*
 *Last Updated: 2026-01-30*
-*Version: 4.3.0*
+*Version: 5.0.0*

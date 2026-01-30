@@ -1,0 +1,110 @@
+{
+  "mode": "test",
+  "meter": {
+    "conversation_overage": {
+      "meter_id": "mtr_test_61U4gy0gVOZxh7KHR41KVHgb3tm3u4rQ"
+    }
+  },
+  "tiers": {
+    "starter": {
+      "product_id": "prod_Tt57wZIlzUjU5y",
+      "monthly_price_id": "price_1SvIxZKVHgb3tm3ufsPlhmFY",
+      "annual_price_id": "price_1SvIxaKVHgb3tm3u02nsIr2d",
+      "overage_price_id": "price_1SvJ0gKVHgb3tm3uWcgZ4mCx",
+      "included_conversations": 1000
+    },
+    "professional": {
+      "product_id": "prod_Tt5Ba2E7D8JzLk",
+      "monthly_price_id": "price_1SvJ0gKVHgb3tm3u2Wkb8BlZ",
+      "annual_price_id": "price_1SvJ0hKVHgb3tm3ulJMDLvWt",
+      "overage_price_id": "price_1SvJ0hKVHgb3tm3uOacSPXLJ",
+      "included_conversations": 5000
+    },
+    "enterprise": {
+      "product_id": "prod_Tt5BtOTjLF7yky",
+      "monthly_price_id": "price_1SvJ0iKVHgb3tm3uF07Ne37n",
+      "annual_price_id": "price_1SvJ0jKVHgb3tm3uyqZaNHvD",
+      "overage_price_id": "price_1SvJ0jKVHgb3tm3uH7omxnWo",
+      "included_conversations": 20000
+    }
+  },
+  "packs": {
+    "pack_1k": {
+      "product_id": "prod_Tt5Ba4kHv1JNMi",
+      "price_id": "price_1SvJ0kKVHgb3tm3uqDhRR8BJ",
+      "conversations": 1000
+    },
+    "pack_5k": {
+      "product_id": "prod_Tt5B98xHzBgFMV",
+      "price_id": "price_1SvJ0lKVHgb3tm3uaHe94AdD",
+      "conversations": 5000
+    },
+    "pack_20k": {
+      "product_id": "prod_Tt5BOugBjUC5Gt",
+      "price_id": "price_1SvJ0lKVHgb3tm3uHMxh2g0P",
+      "conversations": 20000
+    }
+  },
+  "addons": {
+    "addon_multi_language": {
+      "product_id": "prod_Tt5B71GpHoi2fo",
+      "price_id": "price_1SvJ0mKVHgb3tm3urWgC1Xdo",
+      "available_on": [
+        "starter",
+        "professional",
+        "enterprise"
+      ]
+    },
+    "addon_advanced_analytics": {
+      "product_id": "prod_Tt5ByJ18ZRmtis",
+      "price_id": "price_1SvJ0nKVHgb3tm3uWHOaEfVP",
+      "available_on": [
+        "professional",
+        "enterprise"
+      ]
+    },
+    "addon_mailchimp": {
+      "product_id": "prod_Tt5BC28y2cUWs9",
+      "price_id": "price_1SvJ0oKVHgb3tm3u5iHA4MKN",
+      "available_on": [
+        "professional",
+        "enterprise"
+      ]
+    },
+    "addon_google_analytics": {
+      "product_id": "prod_Tt5BB5c1KTse67",
+      "price_id": "price_1SvJ0pKVHgb3tm3uQPlpTZUI",
+      "available_on": [
+        "professional",
+        "enterprise"
+      ]
+    },
+    "addon_white_label": {
+      "product_id": "prod_Tt5B9Rigv9VsrG",
+      "price_id": "price_1SvJ0qKVHgb3tm3uthaes9Ep",
+      "available_on": [
+        "enterprise"
+      ]
+    },
+    "addon_priority_support": {
+      "product_id": "prod_Tt5BV6rE2agRLx",
+      "price_id": "price_1SvJ0rKVHgb3tm3ua9m4AyM7",
+      "available_on": [
+        "starter",
+        "professional"
+      ]
+    },
+    "addon_custom_integration": {
+      "product_id": "prod_Tt5ByPZTzuwt2C",
+      "price_id": "price_1SvJ0rKVHgb3tm3uDTlFgZ59",
+      "available_on": [
+        "enterprise"
+      ]
+    }
+  },
+  "coupons": {
+    "annual_17pct_off": {
+      "coupon_id": "annual_17pct_off"
+    }
+  }
+}
