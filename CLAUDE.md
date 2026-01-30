@@ -12,7 +12,7 @@ This document provides context and guidance for AI assistants working on the Age
 | **Brand Name** | Agent Red Customer Engagement |
 | **Release** | Launch 1.0 |
 | **Type** | Commercial SaaS Product |
-| **Status** | Project Setup |
+| **Status** | Phase 1.4 Complete — Public Documentation |
 | **Owner** | Remaker Digital (DBA of VanDusen & Palmeter, LLC) |
 
 ---
@@ -330,28 +330,54 @@ These features are **exclusive to Agent Red** (not in open-source):
 
 ## Pricing Structure
 
-| Tier | Monthly | Annual | Conversations/Day |
-|------|---------|--------|-------------------|
-| **Starter** | $299 | $2,990 | 500 |
-| **Professional** | $499 | $4,990 | 2,000 |
-| **Enterprise** | $999 | $9,990 | 10,000 |
+### Model: Platform Fee + Metered AI Usage
+
+Each tier includes a platform fee (infrastructure, features, support) and an included monthly conversation allowance. Conversations beyond the included allowance are billed at tiered overage rates. This model separates fixed infrastructure costs (shared across tenants) from variable AI costs (per-conversation).
+
+### Tiers
+
+| Tier | Monthly | Annual (17% off) | Included Conv/mo | Overage Rate |
+|------|---------|-------------------|------------------|--------------|
+| **Starter** | $149 | $124/mo ($1,490/yr) | 1,000 | $0.04/conv |
+| **Professional** | $399 | $332/mo ($3,990/yr) | 5,000 | $0.025/conv |
+| **Enterprise** | $999 | $832/mo ($9,990/yr) | 20,000 | $0.015/conv |
+
+### Conversation Packs (pre-purchase, 90-day validity)
+
+| Pack | Price | Effective Rate |
+|------|-------|----------------|
+| 1,000 conversations | $29 | $0.029/conv |
+| 5,000 conversations | $99 | $0.020/conv |
+| 20,000 conversations | $249 | $0.012/conv |
 
 ### Add-On Modules
 
 | Module | Monthly | Available On |
 |--------|---------|--------------|
-| Multi-Language | $149 | Pro, Enterprise |
-| Advanced Analytics | $199 | All |
-| Priority Support | $99 | All |
-| Custom Integrations | $299 | Pro, Enterprise |
-| White-Label | $499 | Enterprise |
+| Multi-Language Pack | $99 | All |
+| Advanced Analytics | $149 | Pro, Enterprise |
+| Mailchimp Integration | $49 | Pro, Enterprise |
+| Google Analytics Integration | $49 | Pro, Enterprise |
+| White-Label Package | $399 | Enterprise only |
+| Priority Support Upgrade | $99 | Starter, Pro |
+| Custom Integration Dev | $299 | Enterprise only |
 
-### Pricing Basis
+### Cost Basis & Margin
 
-All prices are 10x cost. Cost basis per tier:
-- Starter: ~$30/month infrastructure
-- Professional: ~$50/month infrastructure
-- Enterprise: ~$100/month infrastructure
+**Per-conversation AI cost:** ~$0.007 (GPT-4o response generation = 94.5% of total)
+
+**Infrastructure costs (shared, multi-tenant):**
+- Shared platform (Container Apps, Cosmos DB, App Gateway, etc.): ~$200-400/mo total
+- Per-tenant marginal cost at 10+ tenants: ~$13-41/mo
+
+**Gross margin at list price:** 82-93% across all scenarios (base fee + overage)
+
+**Pricing design principles:**
+- Transparent usage pricing as competitive advantage
+- Start granular (add-ons), bundle later — never change list prices
+- 50% below nearest comparable competitor (Gorgias, Tidio Pro)
+- Higher affiliate payouts ($30-37/mo recurring) justify creator content investment
+- Pricing stability for affiliate/promoter confidence
 
 ---
 
@@ -369,13 +395,13 @@ All prices are 10x cost. Cost basis per tier:
 
 | Category | Deliverables | Status |
 |----------|--------------|--------|
-| **Website** | Landing, Features, Pricing, Integrations, About | ✅ Content drafted |
-| **Documentation** | Docusaurus site with getting-started, API reference | 📋 Planned |
-| **Legal** | Terms of Service, Privacy Policy, SLA | 📋 Planned |
-| **E-commerce** | Shopify store with products and checkout | 📋 Planned |
-| **Guides** | Admin how-to guides (core set) | 📋 Planned |
-| **Video** | Platform overview, Quick start tutorial | 📋 Planned |
-| **Branding** | Logo, colors, typography, guidelines | 📋 Planned |
+| **Branding** | Logo, colors, typography, guidelines | ✅ Phase 1.1 complete |
+| **Legal** | Terms of Service, Privacy Policy, SLA, DPA | ✅ Phase 1.2 complete (AI-drafted, pending legal review) |
+| **Website** | Homepage, Features, Pricing, Integrations, About, Contact | ✅ Phase 1.3 complete (6 pages, v2.0) |
+| **Documentation** | Docusaurus site with getting-started, integrations, quality CI | ✅ Phase 1.4 complete (5 pages, 20 Mermaid diagrams, quality framework) |
+| **E-commerce** | Dual-channel: Shopify App Store (primary) + Stripe (direct) | 🔄 Phase 2.1 in progress (platform decision complete, implementation next) |
+| **Guides** | Admin how-to guides (core set) | 📋 Phase 2.3 deferred |
+| **Video** | Platform overview, Quick start tutorial | 📋 Phase 2.4 deferred |
 
 ### Out-of-Scope for Launch 1.0
 
@@ -430,14 +456,14 @@ All prices are 10x cost. Cost basis per tier:
 ## Brand Requirements
 
 ### Status
-**All assets need creation**
+**Core brand system complete** (Phase 1.1)
 
 ### Required Assets
-- [ ] Logo (primary, icon, wordmark)
-- [ ] Color palette
-- [ ] Typography selection
-- [ ] Brand guidelines document
-- [ ] Favicon and app icons
+- [x] Logo (primary, icon, wordmark) — "The Beacon" AR monogram
+- [x] Color palette — 15 colors, WCAG AA/AAA verified
+- [x] Typography selection — Inter + JetBrains Mono
+- [x] Brand guidelines document — branding/guidelines/BRAND-GUIDELINES.md
+- [ ] Favicon and app icons — spec defined in LOGO-SPEC.md
 - [ ] Social media assets
 - [ ] Email templates
 
@@ -522,8 +548,10 @@ E:\Claude-Playground\CLAUDE-PROJECTS\Agent Red Customer Engagement\
 ```
 Continue work on Agent Red Customer Engagement commercial project.
 Location: E:\Claude-Playground\CLAUDE-PROJECTS\Agent Red Customer Engagement
-Key files: CLAUDE.md, docs/PROJECT-PLAN.md
-Current phase: Launch 1.0 preparation
+Key files: CLAUDE.md, docs/PROJECT-PLAN.md, docs/architecture/ECOMMERCE-PLATFORM-EVALUATION.md
+Current status: Phases 0-1.4 complete. Phase 2.1 platform decision complete (dual-channel: Shopify App Store + Stripe). Implementation tasks next.
+Next up: Phase 2.1 implementation — Stripe account setup, product catalog, Checkout integration, webhook handler, Shopify Billing API integration, App Store listing.
+Please review PROJECT-PLAN.md (Phase 2.1 task list) and proceed with the next implementation item, presenting one work item at a time for review per the iterative working style documented in CLAUDE.md.
 ```
 
 ### Referencing AGNTCY
@@ -555,9 +583,11 @@ This applies to: work priority reviews, architecture decisions, scope changes, m
 
 ---
 
-## Current Status (2026-01-29)
+## Current Status (2026-01-30)
 
 ### Completed
+
+**Phase 0: Project Setup**
 - [x] Project requirements gathered (12 questions answered)
 - [x] Directory structure created
 - [x] CLAUDE.md created with full knowledge transfer
@@ -573,14 +603,66 @@ This applies to: work priority reviews, architecture decisions, scope changes, m
 - [x] AGNTCY baseline verified - local Docker (15 containers, 97.8% unit tests, 99.3% integration tests)
 - [x] AGNTCY baseline verified - production Azure (53 resources, evaluation framework passed)
 - [x] Verification scripts created (scripts/verify-agntcy-local.ps1, scripts/verify-agntcy-production.ps1)
+- [x] GitHub Project board set up (#2, 8 milestone issues)
 
-### Key Finding: Azure OpenAI Endpoint
-The actual Azure OpenAI endpoint is `https://remaker.openai.azure.com/` (not the placeholder in AGNTCY's `.env.azure.example`).
+**Phase 1.1: Brand Identity**
+- [x] Logo concepts — "The Beacon" AR monogram approved
+- [x] Color palette — 15 colors, WCAG AA/AAA verified
+- [x] Typography — Inter + JetBrains Mono
+- [x] Brand guidelines document — branding/guidelines/BRAND-GUIDELINES.md
+
+**Phase 1.2: Legal Documents**
+- [x] Terms of Service — legal/terms/TERMS-OF-SERVICE.md
+- [x] Privacy Policy — legal/privacy/PRIVACY-POLICY.md
+- [x] SLA — legal/sla/SERVICE-LEVEL-AGREEMENT.md
+- [x] Data Processing Agreement — legal/dpa/DATA-PROCESSING-AGREEMENT.md
+- [ ] Termly/iubenda validation — deferred to pre-launch
+
+**Phase 1.3: Website Content**
+- [x] Homepage — full rewrite for commercial buyer focus
+- [x] Features — rebranded, 6-category scrollspy layout
+- [x] Pricing — complete redesign: platform fee + metered AI usage model
+- [x] Integrations — rebranded, Mailchimp/GA moved to add-on pricing
+- [x] About — honesty pass, open-source foundation story, verified metrics
+- [x] Contact — new page with form, channels, partner program teaser
+- [x] Content README index updated
+
+**Phase 1.4: Public Documentation**
+- [x] Docusaurus scaffold — docs-site/ with Agent Red branding, Mermaid diagram support
+- [x] Documentation quality framework — Vale, markdownlint, alex, link-check, coverage audit, GitHub Actions CI
+- [x] Diataxis framework adopted — feature inventory YAML with 21 features × 4 content types
+- [x] Getting-started guide — 3 pages (overview, how-it-works, setup) with 14 Mermaid diagrams
+- [x] Shopify integration guide — OAuth, sync, field mapping, order lookups, troubleshooting, 6 Mermaid diagrams
+- [x] "Was this helpful?" feedback widget — stub connected to DocItem footer
+- [x] Eraser.io evaluated — deferred to Phase 2.2 for architecture diagrams (API token available)
+- [x] Coverage baseline: 26% actionable slots documented (52% explanation, 21% how-to, 0% tutorial/reference)
+
+### Key Findings
+- **Azure OpenAI Endpoint:** `https://remaker.openai.azure.com/` (not the placeholder in AGNTCY's `.env.azure.example`)
+- **Per-conversation AI cost:** ~$0.007 (GPT-4o response generation = 94.5% of total)
+- **Original cost basis was wrong:** CLAUDE.md v1 stated $30/$50/$100 per tier. Actual single-tenant costs are $235-520/$777-1,005/$2,733-2,887. Multi-tenant economics (shared infrastructure) make it viable.
+- **Content principles established:** Honesty, accuracy, and correctness are central concerns. Transparent pricing as competitive advantage. Open-source foundation as trust mechanism.
+- **E-commerce platform decision:** Dual-channel (Shopify App Store + Stripe). Shopify provides discovery among ~5M merchants with 0% commission on first $1M revenue. Stripe provides direct billing for non-Shopify merchants at ~3.5% per transaction. Paddle rejected (no marketplace, higher fees, redundant tax handling). Existing Shopify integration is ~80% of what the App Store requires. Agent Red's price advantage (2–13x cheaper per interaction than Gorgias, Intercom, Zendesk) positions it as a disruptive value entrant in an established ecosystem.
+- **Neither Shopify nor Stripe have formal named partner tiers.** Benefits scale informally with growth. Shopify: "Built for Shopify" badge at ~3-6 months, partner manager at ~10K installs. Stripe: "Verified Partner" badge after production integration review, custom pricing at ~$80K+/mo volume.
+
+**Phase 2.1: E-Commerce Store (In Progress)**
+- [x] Three-way platform evaluation (Stripe vs Shopify App Store vs Paddle) — docs/architecture/ECOMMERCE-PLATFORM-EVALUATION.md
+- [x] Decision: Dual-channel (Shopify App Store primary + Stripe direct). Paddle rejected.
+- [x] Approval process and partner growth path documented (Appendices A & B)
+- [ ] Stripe account setup, Products, Prices, Coupons in test mode
+- [ ] Stripe Checkout integration for plan selection
+- [ ] Stripe webhook handler (subscription lifecycle → tenant provisioning)
+- [ ] Metered usage reporting to Stripe
+- [ ] Shopify Billing API integration
+- [ ] Shopify App Store listing (description, screenshots, demo)
+- [ ] App Store review submission
+- [ ] Conversation pack purchase flow
+- [ ] Unified webhook handler (both channels → provisioning)
+- [ ] Stripe Tax, Stripe Customer Portal, Rewardful affiliate setup
+- [ ] Test checkout flows (both channels)
 
 ### Pending
-- [ ] Set up GitHub Project board for Launch 1.0
-- [ ] Begin brand identity work
-- [ ] Begin legal document generation
+- [ ] Phase 2.2: Multi-tenant infrastructure (architecture doc required first)
 
 ---
 
@@ -592,17 +674,17 @@ The actual Azure OpenAI endpoint is `https://remaker.openai.azure.com/` (not the
 | Commercial differentiators | All 4 (multi-tenant, AI, integrations, white-label) |
 | Timeline | Q1 2026 (8-12 weeks) |
 | Budget | $500-1,000/month |
-| Pricing | $299/$499/$999 tiers (10x cost) |
+| Pricing | $149/$399/$999 base + metered AI usage (82-93% gross margin) |
 | Legal entity | VanDusen & Palmeter, LLC (Delaware) |
 | DBA | Remaker Digital |
 | GitHub org | Remaker-Digital (private repo) |
 | Dev environment | Windows 11, VS Code, Docker, Python 3.12+ |
 | Materials scope | Phase 1-2 only (MVP) |
-| Brand assets | Need to create all |
+| Brand assets | Core system complete (Phase 1.1); favicon, social, email templates pending |
 | CI/CD | Hybrid (GitHub Actions + Azure DevOps) |
 
 ---
 
 *© 2026 Remaker Digital, a DBA of VanDusen & Palmeter, LLC. All rights reserved.*
-*Last Updated: 2026-01-29*
-*Version: 2.0.0*
+*Last Updated: 2026-01-30*
+*Version: 4.1.0*

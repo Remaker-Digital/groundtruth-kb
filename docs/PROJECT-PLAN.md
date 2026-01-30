@@ -60,26 +60,31 @@ Agent Red Customer Engagement is a commercial SaaS product built on the open-sou
 | Validate via Termly/iubenda | 2 hrs | 📋 Deferred to pre-launch |
 
 #### 1.3 Website Content *(depends on 1.1 brand identity)*
+**Status:** Complete ✅
 **Approach:** Full rewrite for commercial buyer audience. Existing AGNTCY content used as technical reference only.
 **Platform:** Deferred — content written in markdown, hosting platform chosen later.
+**Key Decisions:** Pricing model redesigned from flat-rate ($299/$499/$999) to platform fee + metered AI usage ($149/$399/$999 base + per-conversation overage). All fabricated social proof removed and replaced with verified AGNTCY evaluation metrics.
 
 | Task | Effort | Status |
 |------|--------|--------|
-| Write homepage (commercial buyer focus) | 4 hrs | 📋 Todo |
-| Write features page | 3 hrs | 📋 Todo |
-| Write pricing page | 2 hrs | 📋 Todo |
-| Write integrations page | 3 hrs | 📋 Todo |
-| Write about page | 2 hrs | 📋 Todo |
-| Write contact page | 2 hrs | 📋 Todo |
+| Write homepage (commercial buyer focus) | 4 hrs | ✅ Done — Outcome-driven hero, verified performance metrics, removed fake social proof |
+| Write features page | 3 hrs | ✅ Done — Rebranded, 6-category scrollspy layout preserved |
+| Write pricing page | 2 hrs | ✅ Done — Complete redesign: base + AI usage model, competitor research, cost modeling |
+| Write integrations page | 3 hrs | ✅ Done — Rebranded, Mailchimp/GA moved to add-on pricing ($49/mo) |
+| Write about page | 2 hrs | ✅ Done — Honesty pass: removed all fabricated content, added open-source foundation story |
+| Write contact page | 2 hrs | ✅ Done — New page: form, channels, partner program teaser, URL parameter support |
 
 #### 1.4 Public Documentation *(can start alongside 1.3)*
-**Approach:** Scaffold Docusaurus + conceptual guides now. API-specific docs deferred to Phase 2.
+**Status:** Complete ✅
+**Approach:** Docusaurus scaffold + conceptual guides + quality framework. API-specific docs deferred to Phase 2.
+**Key Decisions:** Mermaid diagrams adopted as standard for all technical illustrations (Eraser.io evaluated but deferred to Phase 2.2 for architecture diagrams). Documentation quality CI pipeline established (Vale, markdownlint, link-check, coverage audit). Diataxis framework adopted for content classification. Feature inventory system created for coverage tracking.
 
 | Task | Effort | Status |
 |------|--------|--------|
-| Set up Docusaurus | 4 hrs | 📋 Todo |
-| Write getting-started guide | 4 hrs | 📋 Todo |
-| Write Shopify integration guide | 3 hrs | 📋 Todo |
+| Set up Docusaurus | 4 hrs | ✅ Done — docs-site/ with Agent Red branding, Mermaid support, strict build mode |
+| Documentation quality framework | 6 hrs | ✅ Done — Vale, markdownlint, alex, link-check, coverage audit, CI pipeline, feedback widget |
+| Write getting-started guide | 4 hrs | ✅ Done — 3 pages (overview, how-it-works, setup), 14 Mermaid diagrams |
+| Write Shopify integration guide | 3 hrs | ✅ Done — OAuth, sync, field mapping, order lookups, troubleshooting, 6 Mermaid diagrams |
 | Write API authentication guide | 2 hrs | 📋 Deferred to Phase 2 |
 | Document API endpoints | 8 hrs | 📋 Deferred to Phase 2 |
 
@@ -88,16 +93,25 @@ Agent Red Customer Engagement is a commercial SaaS product built on the open-sou
 ### Phase 2: Product & Infrastructure (Weeks 5-8)
 
 #### 2.1 E-Commerce Store
-**Platform:** Deferred decision — Shopify vs Stripe to be evaluated alongside multi-tenant architecture design.
+**Platform:** Dual-channel — Shopify App Store (primary distribution) + Stripe (direct sales). Decision documented in `docs/architecture/ECOMMERCE-PLATFORM-EVALUATION.md`. Paddle evaluated and rejected (no marketplace, higher fees, redundant with Shopify tax handling).
 
 | Task | Effort | Status |
 |------|--------|--------|
-| Evaluate Shopify vs Stripe for SaaS subscriptions | 4 hrs | 📋 Todo |
-| Set up development store/account | 2 hrs | 📋 Todo |
-| Create product catalog (3 tiers + 5 add-ons) | 4 hrs | 📋 Todo |
-| Configure subscription/recurring billing | 8 hrs | 📋 Todo |
-| Build license key / provisioning system | 12 hrs | 📋 Todo |
-| Test checkout flow | 4 hrs | 📋 Todo |
+| Evaluate Shopify vs Stripe vs Paddle for SaaS subscriptions | 4 hrs | ✅ Done — Three-way evaluation complete, dual-channel recommended and approved |
+| Create Stripe account (live + test mode) | 1 hr | 📋 Todo |
+| Create Products, Prices, Coupons in Stripe (test mode) | 2 hrs | 📋 Todo |
+| Implement Stripe Checkout for plan selection | 4 hrs | 📋 Todo |
+| Implement Stripe webhook handler (subscription lifecycle) | 8 hrs | 📋 Todo |
+| Implement metered usage reporting to Stripe | 4 hrs | 📋 Todo |
+| Add Shopify Billing API integration to existing Shopify app code | 8 hrs | 📋 Todo |
+| Create Shopify App Store listing (description, screenshots, demo) | 4 hrs | 📋 Todo |
+| Submit for Shopify App Store review | 1 hr | 📋 Todo |
+| Implement Stripe Customer Portal link | 1 hr | 📋 Todo |
+| Implement conversation pack purchase flow | 4 hrs | 📋 Todo |
+| Build unified webhook handler (both channels → provisioning) | 8 hrs | 📋 Todo |
+| Set up Stripe Tax | 2 hrs | 📋 Todo |
+| Set up Rewardful for affiliate program | 4 hrs | 📋 Todo |
+| Test checkout flows (both channels) | 4 hrs | 📋 Todo |
 
 #### 2.2 Multi-Tenant Infrastructure
 **Approach:** Dedicated architecture document required before any implementation. Architecture approach TBD.
@@ -163,7 +177,7 @@ Agent Red Customer Engagement is a commercial SaaS product built on the open-sou
 | Category | Service | Monthly Cost |
 |----------|---------|--------------|
 | **Infrastructure** | Azure (production) | $300-500 |
-| **E-commerce** | Shopify or Stripe (TBD) | $0-79 |
+| **E-commerce** | Stripe (~3.5% variable) + Shopify App Store ($0 commission < $1M) + Rewardful (~$49-99/mo affiliates) | $49-99 + variable |
 | **Legal** | Termly + iubenda (deferred to pre-launch) | $0-52 |
 | **Marketing** | Buffer (future) | $0-30 |
 | **Documentation** | Docusaurus (Vercel) | $0 |
@@ -224,7 +238,9 @@ Agent Red Customer Engagement is a commercial SaaS product built on the open-sou
 |------------|------|------|
 | AGNTCY open-source stability | Technical | Medium |
 | Azure service availability | Infrastructure | Low |
-| Shopify platform | E-commerce | Low |
+| Shopify App Store | E-commerce (primary distribution) | Low |
+| Stripe | E-commerce (direct billing) | Low |
+| Rewardful | Affiliate program | Low |
 | Termly/iubenda services | Legal | Low |
 
 ### Internal Dependencies
@@ -232,7 +248,7 @@ Agent Red Customer Engagement is a commercial SaaS product built on the open-sou
 | Item | Depends On |
 |------|------------|
 | Website launch | Brand identity, content |
-| E-commerce store | Pricing finalized, products defined, platform decision (Shopify vs Stripe) |
+| E-commerce store | Pricing finalized, products defined, platform decision ✅ (Shopify App Store + Stripe) |
 | Multi-tenant infra | Architecture design document approved |
 | API documentation | Multi-tenant infrastructure built, API surface defined |
 | Conceptual docs | Product features known (can start Phase 1) |
@@ -299,6 +315,9 @@ Agent Red Customer Engagement is a commercial SaaS product built on the open-sou
 | 1.2.0 | 2026-01-29 | Docker dev environment added, AGNTCY baseline verified (local Docker + production Azure) |
 | 1.3.0 | 2026-01-29 | Work priority review complete: brand direction (Bold/Corporate), legal approach (AI-draft first), website (full rewrite), docs (conceptual now, API later), e-commerce platform deferred, multi-tenant architecture doc required, admin guides/videos deferred |
 | 1.4.0 | 2026-01-29 | Phase 1.1 Brand Identity complete (logo, colors, typography, guidelines). Phase 1.2 Legal Documents complete (ToS, Privacy Policy, SLA, DPA — all AI-drafted, pending legal review) |
+| 1.5.0 | 2026-01-29 | Phase 1.3 Website Content complete — 6 pages rewritten for Agent Red commercial brand. Major pricing model redesign: flat-rate → platform fee + metered AI usage ($149/$399/$999 base, included conversations, tiered overage). Honesty pass removed all fabricated social proof. New contact page added. Content principles established: honesty, accuracy, correctness. |
+| 1.6.0 | 2026-01-29 | Phase 1.4 Public Documentation complete — Docusaurus site scaffolded with Agent Red branding and Mermaid diagram support. Documentation quality framework added: Vale prose linting (Google style + custom Agent Red rules), markdownlint, alex (inclusivity), markdown-link-check, coverage audit system (Diataxis-based feature inventory). GitHub Actions CI pipeline for docs quality. 5 content pages written: Platform Overview, How It Works, Initial Setup, Shopify Integration, Welcome. 20 Mermaid diagrams total. Coverage: 26% actionable slots documented (52% explanation, 21% how-to). "Was this helpful?" feedback widget added. Eraser.io evaluated, deferred to Phase 2.2. |
+| 1.7.0 | 2026-01-30 | Phase 2.1 platform decision complete — Three-way evaluation (Stripe vs Shopify App Store vs Paddle) documented in `docs/architecture/ECOMMERCE-PLATFORM-EVALUATION.md`. Decision: Dual-channel (Shopify App Store as primary distribution + Stripe for direct sales). Paddle rejected (no marketplace, higher fees, redundant tax handling). Phase 2.1 task list updated with 15 implementation tasks (~75 hrs). Strategic alignment confirmed: Shopify App Store provides established competitor ecosystem for price disruption strategy. |
 
 ---
 
