@@ -111,12 +111,13 @@ flowchart LR
     TOP --> RG[Response\nGenerator]
 ```
 
-**5. Response Generator composes the reply.** The response generator receives the classified intent, retrieved knowledge, and full conversation history. It uses GPT-4o to compose a natural-language reply that:
+**5. Response Generator composes the reply.** The response generator receives the classified intent, retrieved knowledge, full conversation history, and Persistent Customer Memory context. It uses GPT-4o to compose a natural-language reply that:
 
 - Answers the customer's question using retrieved facts (not hallucinated information)
 - Maintains your brand's tone and voice
 - Follows your configured response policies (greeting style, sign-off, escalation language)
 - Handles multi-turn context (remembers what was discussed earlier in the conversation)
+- Personalizes the response using the customer's profile, prior interactions, and learned preferences
 
 Response generation accounts for approximately 94.5% of per-conversation AI cost because it uses the more capable GPT-4o model.
 
@@ -303,6 +304,101 @@ flowchart LR
 | Analytics | Batch processing, right-sized low | 0.25 CPU, 0.5 GB memory |
 
 Scale-to-zero during off-peak hours saves approximately $20–30/month. The system handles up to 10,000 daily active users and 3,071 requests per second with auto-scaling enabled.
+
+## Persistent Customer Memory
+
+Most support platforms treat every conversation as a blank slate. Agent Red maintains a layered memory system that builds context over the lifetime of each customer relationship. The response generator draws on this memory to personalize every interaction — greeting returning customers by name, referencing prior issues, and adapting to individual communication preferences.
+
+### Memory architecture
+
+```mermaid
+flowchart TB
+    subgraph Layer 1 — Customer Context
+        direction LR
+        L1A[Shopify Profile] --> L1B[Customer Context\nProfile]
+        L1C[Integration Data] --> L1B
+        L1D[Plan & Tier Info] --> L1B
+    end
+
+    subgraph Layer 2 — Conversation Memory
+        direction LR
+        L2A[Conversation\nTranscript] --> L2B[Cleanse PII\n& Transient Data]
+        L2B --> L2C[Chunk &\nEmbed]
+        L2C --> L2D[(Vector Store\nCosmos DB)]
+    end
+
+    subgraph Layer 3 — Cross-Session Learning
+        direction LR
+        L3A[Accumulated\nTranscripts] --> L3B[Memory\nFramework]
+        L3B --> L3C[Extracted\nPreferences]
+        L3B --> L3D[Communication\nStyle]
+        L3B --> L3E[Recurring\nPatterns]
+    end
+
+    subgraph Layer 4 — Dedicated Model Training
+        direction LR
+        L4A["1,000+\nInteractions"] --> L4B[Fine-Tune\nPipeline]
+        L4B --> L4C{Quality\nGate}
+        L4C -- Pass --> L4D[Deploy\nPer-Customer Model]
+        L4C -- Fail --> L4E[Fallback to\nBase Model]
+    end
+
+    L1B --> RG[Response Generator]
+    L2D --> RG
+    L3C & L3D & L3E --> RG
+    L4D --> RG
+```
+
+### How each layer works
+
+```mermaid
+sequenceDiagram
+    participant C as Returning Customer
+    participant API as API Gateway
+    participant MEM as Memory System
+    participant RG as Response Generator
+
+    C->>API: "Any update on my return?"
+    API->>MEM: Retrieve customer context (L1)
+    MEM-->>RG: Profile: Sarah, Professional tier, Shopify + Zendesk
+
+    API->>MEM: Search conversation history (L2)
+    MEM-->>RG: Prior session: return for Order #4521 discussed 3 days ago
+
+    API->>MEM: Load learned preferences (L3)
+    MEM-->>RG: Prefers concise answers, technical detail, no formal salutation
+
+    RG->>RG: Generate personalized response
+    RG-->>C: "Hi Sarah — your return for Order #4521 has been received and a refund of $89 is processing. Should arrive in 3-5 business days."
+```
+
+**Layer 1: Customer Context (all tiers)** — A structured profile assembled from Shopify data, integration sources, and plan metadata. Injected into every conversation automatically. The response generator knows the customer's name, plan tier, active integrations, and communication preferences from the first message.
+
+**Layer 2: Conversation Memory (all tiers)** — After each conversation, the transcript is cleansed of PII and transient data (session tokens, temporary URLs), chunked, and embedded into Cosmos DB's vector store. When a customer returns, the response generator retrieves semantically relevant prior conversations — no need for the customer to repeat themselves.
+
+**Layer 3: Cross-Session Learning (Professional and Enterprise)** — A memory framework analyzes accumulated conversations to extract durable patterns: preferred communication style, recurring issues, escalation triggers, and product preferences. These learned insights are injected alongside the customer profile, enabling the AI to adapt its tone and proactively address known issues.
+
+**Layer 4: Dedicated Model Training (Enterprise add-on, $299/month)** — For high-volume Enterprise customers with 1,000+ historical interactions, Agent Red can fine-tune a per-customer model that deeply internalizes the customer's domain vocabulary, communication style, and common workflows. A quality gate ensures the fine-tuned model meets or exceeds baseline performance before deployment. Requires explicit opt-in consent.
+
+### Memory by tier
+
+| Layer | Starter | Professional | Enterprise |
+|-------|---------|-------------|------------|
+| Customer Context (L1) | Included | Included | Included |
+| Conversation Memory (L2) | Included | Included | Included |
+| Cross-Session Learning (L3) | — | Included | Included |
+| Dedicated Model Training (L4) | — | — | $299/month add-on |
+
+### Privacy and data handling
+
+- Layers 1–3 operate under GDPR/CCPA legitimate interest — no additional consent required
+- Layer 4 requires explicit opt-in consent before any training occurs
+- All memory data is tenant-isolated (customer A's memory never appears in customer B's context)
+- Customers can request deletion of their memory profile and all associated data
+- Conversation transcripts are cleansed of PII before vectorization
+- Fine-tuned models (Layer 4) are per-customer only — one customer's data never trains another customer's model
+
+See the [Privacy Policy](https://agentred.com/privacy) for full details on data handling and retention.
 
 ## Next steps
 

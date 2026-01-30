@@ -19,7 +19,7 @@ This proposal covers 16 requirements spanning 5 distinct domains necessary to la
 | Developer Experience | E, F, G | ~20% |
 | Business Operations | I, J, K, L, M | ~25% |
 | Growth & Monetization | N, O, P | ~10% |
-| Product Infrastructure | C (deployed demo) | ~15% |
+| Product Infrastructure | C (deployed demo), Persistent Customer Memory | ~15% |
 
 **Total Effort Estimate:** 400-600 hours (excluding legal review)
 **Budget Impact:** +$150-500/month operational costs
@@ -119,6 +119,7 @@ This proposal covers 16 requirements spanning 5 distinct domains necessary to la
 | Priority Support | ~$10/mo | $99/mo |
 | Custom Integrations | ~$30/mo | $299/mo |
 | White-Label | ~$50/mo | $499/mo |
+| Dedicated Model Training | ~$5-15/mo | $299/mo |
 
 **Product SKUs:**
 ```
@@ -133,6 +134,7 @@ CEP-ANALYTICS      Advanced Analytics        $199/mo
 CEP-SUPPORT        Priority Support          $99/mo
 CEP-INTEGRATIONS   Custom Integrations       $299/mo
 CEP-WHITELABEL     White-Label Package       $499/mo
+CEP-TRAINING       Dedicated Model Training  $299/mo
 ```
 
 ---
@@ -857,6 +859,7 @@ Day 90:  Data permanently deleted
 | Support capacity | Medium | High | Self-service docs, community forum, tier limits |
 | Brand confusion | Low | Low | Consistent naming, clear positioning |
 | Competitor response | Medium | Medium | Focus on value, not price |
+| AI personalization quality | Medium | Medium | Automated quality gates, A/B testing framework, human-reviewable memory entries |
 
 ---
 

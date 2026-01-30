@@ -125,6 +125,21 @@ Agent Red Customer Engagement is a commercial SaaS product built on the open-sou
 | Create customer portal (basic) | 16 hrs | 📋 Todo |
 | Implement API key management | 8 hrs | 📋 Todo |
 
+#### 2.5 Persistent Customer Memory *(depends on 2.2 multi-tenant infrastructure)*
+**Approach:** Four-layer personalization stack. Architecture research complete (see `docs/architecture/PER-CUSTOMER-AI-PERSONALIZATION-RESEARCH.md`). Metrics framework defined (see `docs/architecture/PERSISTENT-CUSTOMER-MEMORY-METRICS.md`).
+
+| Task | Effort | Status |
+|------|--------|--------|
+| Design customer preference profile schema | 8 hrs | 📋 Todo |
+| Implement dynamic system prompt builder (Layer 1) | 16 hrs | 📋 Todo |
+| Build tenant-partitioned vector index for transcripts (Layer 2) | 40 hrs | 📋 Todo |
+| Integrate memory framework — Mem0 or custom (Layer 3) | 60 hrs | 📋 Todo |
+| Build profile extraction pipeline | 40 hrs | 📋 Todo |
+| Implement few-shot example retrieval | 40 hrs | 📋 Todo |
+| Build fine-tuning pipeline (Layer 4, Enterprise add-on) | 60 hrs | 📋 Todo |
+| Create metrics dashboard | 40 hrs | 📋 Todo |
+| A/B testing framework integration | 40 hrs | 📋 Todo |
+
 #### 2.3 Admin Guides *(deferred — requires working product)*
 | Task | Effort | Status |
 |------|--------|--------|
@@ -250,6 +265,7 @@ Agent Red Customer Engagement is a commercial SaaS product built on the open-sou
 | Website launch | Brand identity, content |
 | E-commerce store | Pricing finalized, products defined, platform decision ✅ (Shopify App Store + Stripe) |
 | Multi-tenant infra | Architecture design document approved |
+| Persistent Customer Memory | Multi-tenant infrastructure (tenant-partitioned data) |
 | API documentation | Multi-tenant infrastructure built, API surface defined |
 | Conceptual docs | Product features known (can start Phase 1) |
 | Admin guides | Working product to document |
@@ -318,6 +334,7 @@ Agent Red Customer Engagement is a commercial SaaS product built on the open-sou
 | 1.5.0 | 2026-01-29 | Phase 1.3 Website Content complete — 6 pages rewritten for Agent Red commercial brand. Major pricing model redesign: flat-rate → platform fee + metered AI usage ($149/$399/$999 base, included conversations, tiered overage). Honesty pass removed all fabricated social proof. New contact page added. Content principles established: honesty, accuracy, correctness. |
 | 1.6.0 | 2026-01-29 | Phase 1.4 Public Documentation complete — Docusaurus site scaffolded with Agent Red branding and Mermaid diagram support. Documentation quality framework added: Vale prose linting (Google style + custom Agent Red rules), markdownlint, alex (inclusivity), markdown-link-check, coverage audit system (Diataxis-based feature inventory). GitHub Actions CI pipeline for docs quality. 5 content pages written: Platform Overview, How It Works, Initial Setup, Shopify Integration, Welcome. 20 Mermaid diagrams total. Coverage: 26% actionable slots documented (52% explanation, 21% how-to). "Was this helpful?" feedback widget added. Eraser.io evaluated, deferred to Phase 2.2. |
 | 1.7.0 | 2026-01-30 | Phase 2.1 platform decision complete — Three-way evaluation (Stripe vs Shopify App Store vs Paddle) documented in `docs/architecture/ECOMMERCE-PLATFORM-EVALUATION.md`. Decision: Dual-channel (Shopify App Store as primary distribution + Stripe for direct sales). Paddle rejected (no marketplace, higher fees, redundant tax handling). Phase 2.1 task list updated with 15 implementation tasks (~75 hrs). Strategic alignment confirmed: Shopify App Store provides established competitor ecosystem for price disruption strategy. |
+| 1.8.0 | 2026-01-30 | Persistent Customer Memory added as 5th commercial differentiator. Phase 2.5 added with 9 implementation tasks (~344 hrs). Metrics framework and test cases documented in `docs/architecture/PERSISTENT-CUSTOMER-MEMORY-METRICS.md`. Research foundation in `docs/architecture/PER-CUSTOMER-AI-PERSONALIZATION-RESEARCH.md`. Feature propagated across all 18 project files (business docs, marketing, docs-site, legal, brand). Dedicated Model Training add-on added ($299/mo, Enterprise only). |
 
 ---
 

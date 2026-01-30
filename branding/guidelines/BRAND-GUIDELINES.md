@@ -37,6 +37,28 @@ Agent Red is **bold, authoritative, and professional** — a commercial SaaS bra
 | Be confident but not arrogant | Make unsubstantiated claims |
 | Use data and metrics as proof points | Use vague superlatives ("best", "ultimate") |
 | Address business decision-makers | Write exclusively for developers |
+| Emphasize that Persistent Customer Memory makes every conversation smarter than the last | Describe memory features as "tracking" or "surveillance" |
+
+### Messaging Pillars
+
+| Pillar | Key Message | Supporting Points |
+|--------|-------------|-------------------|
+| **Best Customer Experience** | Agent Red delivers the most personalized AI support in e-commerce | Six specialized agents, 98% accuracy, <2s response time, Persistent Customer Memory |
+| **Best Price** | Enterprise-quality AI support at a fraction of competitor pricing | 2–13x cheaper per interaction than Gorgias/Intercom/Zendesk, transparent usage-based pricing |
+| **Persistent Customer Memory** | Every conversation builds on the last | Four-layer personalization (context profiles, conversation memory, cross-session learning, dedicated model training), no repeat explanations, preference adaptation, tier-appropriate depth |
+
+**Key phrases to use:**
+- "Conversations that remember"
+- "Every interaction builds on the last"
+- "Your customers never repeat themselves"
+- "Persistent Customer Memory"
+- "Four layers of personalization"
+
+**Phrases to avoid:**
+- "Tracking customers" / "customer tracking"
+- "Surveillance" / "monitoring behavior"
+- "Data harvesting" / "collecting data on customers"
+- "AI watching your customers"
 
 ---
 

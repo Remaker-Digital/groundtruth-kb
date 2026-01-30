@@ -268,6 +268,12 @@ Agent Red's six-agent architecture uses purpose-optimized AI models. Lightweight
 | Dedicated CSM | — | — | ✓ |
 | Quarterly business reviews | — | — | ✓ |
 | | | | |
+| **Personalization** | | | |
+| Customer Context (profile injection) | ✓ | ✓ | ✓ |
+| Conversation Memory (transcript RAG) | ✓ | ✓ | ✓ |
+| Cross-Session Learning (memory framework) | — | ✓ | ✓ |
+| Dedicated Model Training (per-customer fine-tuning) | — | — | Add-on ($299/mo) |
+| | | | |
 | **SLA** | | | |
 | Uptime guarantee | 99.5% | 99.9% | 99.95% |
 | Downtime credit | 10% | 25% | 50% |
@@ -422,6 +428,31 @@ Enterprise only
 
 ---
 
+### Add-On: Dedicated Model Training
+
+#### Price
+**$299/month**
+
+#### Description
+Per-customer AI fine-tuning on 1,000+ historical interactions. Your AI learns each customer's communication style, recurring patterns, and domain vocabulary at a deeper level than memory alone can achieve.
+
+#### Includes
+- Per-customer fine-tuned AI model (trained on their data only)
+- Periodic retraining on accumulated new interactions
+- Automated quality gate (model must match or exceed baseline)
+- Full consent management (opt-in required, revocable anytime)
+- Customer data never shared or used for general model improvement
+
+#### Requirements
+- Enterprise tier
+- Minimum 1,000 historical interactions per customer
+- Explicit customer opt-in
+
+#### Available On
+Enterprise only
+
+---
+
 ## Special Programs Section
 
 ### Section Headline
@@ -559,6 +590,11 @@ Savings assume 70% AI automation rate (consistent with verified platform perform
 
 #### Q: Do you offer refunds?
 **A:** Yes. 30-day money-back guarantee on all plans. If Agent Red isn't right for your business within the first 30 days, you get a full refund — no questions asked.
+
+---
+
+#### Q: What personalization is included in my plan?
+**A:** Every plan includes Customer Context (structured profile injection) and Conversation Memory (semantic search across interaction history) at no additional cost. Professional and Enterprise plans add Cross-Session Learning, which extracts and persists customer preferences and patterns over time. Enterprise customers can optionally add Dedicated Model Training ($299/month) for per-customer AI fine-tuning on 1,000+ interactions.
 
 ---
 

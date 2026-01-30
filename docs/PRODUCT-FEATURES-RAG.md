@@ -16,12 +16,13 @@ This document is organized into the following sections for optimal RAG retrieval
 2. [Product Tiers & Pricing](#product-tiers--pricing)
 3. [Core Features](#core-features)
 4. [Add-On Modules](#add-on-modules)
-5. [Technical Specifications](#technical-specifications)
-6. [Integration Capabilities](#integration-capabilities)
-7. [Security & Compliance](#security--compliance)
-8. [Support & SLA](#support--sla)
-9. [Frequently Asked Questions](#frequently-asked-questions)
-10. [Glossary](#glossary)
+5. [Personalization & Customer Memory](#personalization--customer-memory)
+6. [Technical Specifications](#technical-specifications)
+7. [Integration Capabilities](#integration-capabilities)
+8. [Security & Compliance](#security--compliance)
+9. [Support & SLA](#support--sla)
+10. [Frequently Asked Questions](#frequently-asked-questions)
+11. [Glossary](#glossary)
 
 ---
 
@@ -82,6 +83,10 @@ All prices are based on a 10x cost multiplier to ensure sustainable business ope
 | **Knowledge Base** | 50 articles | 200 articles | Unlimited |
 | **Agent Customization** | Basic tone | Full personality | White-label |
 | **API Access** | Read-only | Full API | Enterprise API + Webhooks |
+| **Personalization: Customer Context** | ✅ Included | ✅ Included | ✅ Included |
+| **Personalization: Conversation Memory** | ✅ Included | ✅ Included | ✅ Included |
+| **Personalization: Cross-Session Learning** | — | ✅ Included | ✅ Included |
+| **Personalization: Dedicated Model Training** | — | — | Add-on ($299/mo) |
 
 ### Starter Tier - $299/month
 
@@ -406,6 +411,108 @@ When conversation limits are exceeded:
 
 ---
 
+### Dedicated Model Training - $299/month
+
+**What It Does:** Per-customer AI fine-tuning on 1,000+ historical interactions for maximum personalization.
+
+**What It Adds:** An AI model trained exclusively on a specific customer's interaction history, capturing their communication style, recurring patterns, and domain vocabulary.
+
+**Includes:**
+- Per-customer fine-tuned model (trained on their data only)
+- Periodic retraining on accumulated new interactions
+- Automated quality gate (model must match or exceed baseline quality)
+- Graceful fallback to base model during retraining
+- Full consent management (opt-in, revocable at any time)
+- Model deletion within 30 days of opt-out or account termination
+
+**Requirements:**
+- Minimum 1,000 historical interactions for meaningful fine-tuning
+- Explicit opt-in consent required (not enabled by default)
+- Customer data is never shared across customers or used for general model improvement
+
+**Available With:** Enterprise tier only
+
+---
+
+## Personalization & Customer Memory
+
+### Overview
+
+Agent Red's Persistent Customer Memory ensures that every conversation builds on the last. Customers never repeat themselves, and every response reflects their full history, preferences, and communication style.
+
+The system uses a four-layer architecture that delivers enterprise-grade personalization at a marginal cost of approximately $0.01 per customer per month — making it the most cost-effective personalization in the market.
+
+**No competitor has confirmed implementing per-customer vector RAG over historical transcripts.** This positions Agent Red ahead of Sierra AI, Intercom, Zendesk, and every other platform in the customer engagement space.
+
+### Four-Layer Architecture
+
+| Layer | Name | Available On | Description |
+|-------|------|-------------|-------------|
+| 1 | **Customer Context** | All tiers | Structured profile (preferences, account state, integration data) injected into every interaction |
+| 2 | **Conversation Memory** | All tiers | Vectorized transcripts enable semantic search across a customer's full interaction history |
+| 3 | **Cross-Session Learning** | Professional, Enterprise | Memory framework extracts and persists patterns, preferences, and communication style over time |
+| 4 | **Dedicated Model Training** | Enterprise add-on ($299/mo) | Per-customer AI fine-tuning on 1,000+ historical interactions |
+
+### Layer 1: Customer Context
+
+**How It Works:** A structured JSON profile is maintained for each customer containing their account configuration, communication preferences, active integrations, plan tier, and summary of past interactions. This profile is injected into the system prompt for every AI interaction, giving the agent immediate awareness of who the customer is and what they need.
+
+**Data Sources:** Shopify (orders, products, customer data), Zendesk (ticket history), Mailchimp (engagement data), Google Analytics (behavior data), and Agent Red's own interaction logs.
+
+**Cost:** Near-zero (profile storage in Cosmos DB).
+
+### Layer 2: Conversation Memory
+
+**How It Works:** Past conversation transcripts are cleansed (ephemeral tokens, PII replaced with placeholders), chunked, and embedded into vector representations stored in Cosmos DB with Sharded DiskANN indexes. When a customer starts a new session, the system performs hybrid search (BM25 + dense vectors) with time-weighted recency boosting to retrieve relevant past interactions and inject them as context.
+
+**Key Capabilities:**
+- Semantic search across full interaction history
+- Time-weighted recency boosting (recent interactions preferred)
+- Tenant isolation via partition-key-per-customer sharding
+- Sub-500ms retrieval latency (warm cache: <50ms)
+
+**Cost:** ~$0.005-$0.011 per customer per month (embedding + storage + retrieval).
+
+### Layer 3: Cross-Session Learning
+
+**How It Works:** A memory framework (Mem0 or equivalent) processes interaction history to extract structured memories — preferences, recurring issues, communication style patterns, escalation triggers, and product usage insights. These memories persist across sessions and are automatically updated as new interactions occur.
+
+**Key Capabilities:**
+- Learns communication preferences (formal vs. casual, verbosity level, technical depth)
+- Recognizes recurring issues and proactively addresses them
+- Detects escalation patterns and adjusts response strategy
+- Updates preferences in real time as customer behavior changes
+
+**Cost:** $5-20 per customer per month (memory framework processing).
+
+### Layer 4: Dedicated Model Training
+
+**How It Works:** For Enterprise customers with 1,000+ historical interactions, a dedicated AI model is fine-tuned exclusively on that customer's interaction data. The model captures nuanced communication style, domain-specific vocabulary, and behavioral patterns that are difficult to achieve with RAG alone. An automated quality gate ensures the fine-tuned model matches or exceeds baseline quality before deployment.
+
+**Key Capabilities:**
+- Style adaptation (matches customer's communication tone and formality)
+- Domain vocabulary adoption (uses customer-specific terminology naturally)
+- Automated quality gate with fallback to base model
+- Periodic retraining on accumulated new interactions
+
+**Requirements:** Minimum 1,000 interactions, explicit opt-in consent, Enterprise tier.
+
+**Cost:** $299/month add-on. Customer data is never shared or used for general model improvement.
+
+### Expected Impact
+
+| Metric | Without Memory | With Full Stack | Improvement |
+|--------|---------------|----------------|-------------|
+| First-contact resolution | 70% | 85-88% | +21-26% |
+| Repeat explanation rate | 40% | 5-8% | -80-88% |
+| Escalation rate | 30% | 18-20% | -33-40% |
+| CSAT score | 4.0/5.0 | 4.4-4.5/5.0 | +10-12% |
+| Customer effort score | 3.5/5.0 | 2.5-2.8/5.0 | -20-29% |
+
+See `docs/architecture/PERSISTENT-CUSTOMER-MEMORY-METRICS.md` for detailed test cases, A/B testing methodology, and benchmark targets.
+
+---
+
 ## Technical Specifications
 
 ### Infrastructure
@@ -464,6 +571,9 @@ POST /webhooks             - Register webhook (Enterprise)
 | Analytics | 30 days | 90 days | 2 years |
 | Audit logs | 30 days | 90 days | 7 years |
 | Knowledge base | Unlimited | Unlimited | Unlimited |
+| Customer profiles | 30 days post-termination | 30 days post-termination | 30 days post-termination |
+| Conversation memory vectors | 30 days | 90 days | 1 year |
+| Fine-tuned models | N/A | N/A | 30 days post opt-out |
 
 ### System Requirements (Self-Hosted)
 
@@ -694,8 +804,14 @@ A: Yes. All tiers support data export via the dashboard. Professional and Enterp
 
 ### Security Questions
 
+**Q: Does Agent Red remember my customers across conversations?**
+A: Yes. Agent Red's Persistent Customer Memory maintains a four-layer personalization stack for each customer. Customer Context and Conversation Memory are included in all tiers. Cross-Session Learning is available on Professional and Enterprise. Dedicated Model Training is an Enterprise add-on ($299/mo) for per-customer AI fine-tuning. Every conversation builds on the last — customers never have to repeat themselves.
+
+**Q: What personalization is included vs. paid?**
+A: Layers 1-2 (Customer Context and Conversation Memory) are included in every plan at no additional cost. Layer 3 (Cross-Session Learning) is included in Professional and Enterprise. Layer 4 (Dedicated Model Training) is an Enterprise-only add-on at $299/month, requiring 1,000+ historical interactions and explicit customer opt-in.
+
 **Q: Is my customer data used to train AI models?**
-A: No. Customer data is never used to train AI models. We use Azure OpenAI Service, which does not use customer data for model training.
+A: Not by default. Customer data is never used to train general AI models. Microsoft Azure OpenAI Service does not use customer data for model training. The optional Dedicated Model Training add-on (Enterprise only, $299/mo) creates a per-customer fine-tuned model trained exclusively on that customer's own data — it is never shared across customers and requires explicit opt-in consent. Customers can revoke consent at any time.
 
 **Q: How do you handle PII?**
 A: PII is tokenized before being sent to AI models. Tokens are stored in Azure Key Vault with encryption at rest. Original PII never leaves the secure Azure perimeter.
@@ -721,6 +837,11 @@ A: SOC 2 Type 2 certification is in progress, expected Q3 2026. We can provide a
 | **RAG** | Retrieval-Augmented Generation - combining search with AI generation |
 | **SLIM** | Secure Low-latency Intelligent Messaging - AGNTCY transport layer |
 | **Token** | Unit of text for AI processing (roughly 4 characters) |
+| **Persistent Customer Memory** | Four-layer personalization system that maintains customer context, conversation history, learned preferences, and optional per-customer fine-tuning across sessions |
+| **Customer Context Profile** | Structured JSON profile containing a customer's preferences, account state, and interaction summary, injected into every AI interaction |
+| **Conversation Memory** | Vectorized representations of past conversation transcripts stored in Cosmos DB for semantic retrieval |
+| **Cross-Session Learning** | Memory framework that extracts and persists patterns, preferences, and communication style across sessions |
+| **Dedicated Model Training** | Enterprise add-on that creates a per-customer fine-tuned AI model trained exclusively on that customer's interaction history |
 | **Vector Search** | Semantic similarity search using embeddings |
 
 ---

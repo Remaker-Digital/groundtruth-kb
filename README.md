@@ -31,6 +31,7 @@ Agent Red Customer Engagement is a commercial SaaS platform that helps e-commerc
 - **Smart Escalation** — Complex issues routed to humans with full context
 - **Multi-Language** — English, French (CA), Spanish support
 - **Shopify Native** — Deep integration with real-time order and product data
+- **Persistent Customer Memory** — Every conversation builds on the last; four-layer personalization from context injection to dedicated model training
 - **Enterprise Ready** — Multi-tenant isolation, usage metering, API key management
 
 ---
@@ -58,6 +59,7 @@ Agent Red is built on the open-source [AGNTCY Customer Engagement Platform](http
 | **Advanced AI** | Premium model access, fine-tuned models, A/B testing |
 | **Enterprise Integrations** | Salesforce, SAP, ServiceNow, custom connectors, SSO |
 | **White-Label** | Complete branding removal, custom domains, CSS theming |
+| **Persistent Customer Memory** | Four-layer personalization: context injection, conversation RAG, cross-session learning, per-customer fine-tuning |
 
 ---
 
@@ -119,6 +121,7 @@ Agent Red Customer Engagement/
 | Priority Support | $99 | All |
 | Custom Integrations | $299 | Pro, Enterprise |
 | White-Label | $499 | Enterprise |
+| Dedicated Model Training | $299 | Enterprise |
 
 ---
 

@@ -47,7 +47,7 @@ Agent Red requests read-only access to four data scopes. It does not request wri
 |---|---|---|
 | `read_products` | Product names, descriptions, prices, images, variants, availability | Answer product questions, recommend products, check pricing |
 | `read_orders` | Order status, tracking numbers, delivery dates, line items | Handle "where is my order?" and order-related queries |
-| `read_customers` | Customer names, email (for matching), order history | Identify returning customers, personalize responses |
+| `read_customers` | Customer names, email (for matching), order history | Identify returning customers, personalize responses, feed Persistent Customer Memory profiles |
 | `read_inventory` | Stock levels by location and variant | Answer availability questions ("is this in stock?") |
 
 :::tip Read-only access
@@ -99,6 +99,8 @@ During the initial sync, the system:
 5. Builds the Cosmos DB vector search index
 
 You can start handling conversations as soon as the initial sync completes. You do not need to wait for any manual step after sync finishes.
+
+All synced customer data — profiles, order history, and product interactions — is automatically indexed into Agent Red's Persistent Customer Memory system, enabling personalized responses from the very first conversation.
 
 ### Ongoing sync (webhooks)
 

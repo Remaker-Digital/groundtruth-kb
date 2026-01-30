@@ -98,7 +98,8 @@ The Service uses artificial intelligence to process customer inquiries. When pro
 - **AI Models:** Customer inquiries are processed by AI language models hosted on Microsoft Azure OpenAI Service
 - **PII Protection:** Before sending data to AI models, we apply PII tokenization — personally identifiable information is replaced with random tokens (format: `TOKEN_[UUID]`) to prevent exposure to third-party AI services
 - **Data Minimization:** Only the content necessary for generating a response is sent to AI models; metadata and Account information are not included
-- **No Model Training:** Customer Data is not used to train, fine-tune, or improve AI models. Microsoft Azure OpenAI Service does not use customer data for model training.
+- **No Model Training (Default):** By default, Customer Data is not used to train, fine-tune, or improve AI models. Microsoft Azure OpenAI Service does not use customer data for model training. This is the standard behavior for all tiers.
+- **Opt-In Dedicated Model Training (Enterprise):** Enterprise Customers may opt in to Dedicated Model Training, which fine-tunes a per-customer AI model using that Customer's own historical conversation data exclusively. This requires explicit written consent. Opted-in data is used only to train that Customer's dedicated model — it is never combined with other Customers' data, shared with third parties, or used to improve general-purpose models. Customers may revoke consent at any time, which halts all future training and deletes the fine-tuned model within 30 days.
 
 #### 3.3 Communication
 
@@ -111,6 +112,17 @@ The Service uses artificial intelligence to process customer inquiries. When pro
 - Analyzing aggregate usage patterns to improve the Service
 - Monitoring system performance and reliability
 - Identifying and fixing technical issues
+
+#### 3.6 Personalization Processing
+
+The Service provides Persistent Customer Memory, which processes Customer Data to personalize support interactions:
+
+- **Customer Context Profiles (All Tiers):** We assemble structured profiles from integration data (e.g., Shopify customer records), account metadata, and communication preferences. These profiles are injected into each conversation to enable personalized responses. Legal basis: legitimate interest in providing the contracted service.
+- **Conversation Memory (All Tiers):** After each conversation, transcripts are cleansed of personally identifiable information and transient data, then converted into vector embeddings stored in Cosmos DB. These embeddings enable semantic search across a customer's prior conversations so they do not need to repeat themselves. Legal basis: legitimate interest in providing the contracted service.
+- **Cross-Session Learning (Professional and Enterprise Tiers):** A memory framework analyzes accumulated conversation transcripts to extract durable patterns such as communication preferences, recurring issues, and product interests. These extracted insights are stored as structured data in the customer's profile. Legal basis: legitimate interest in providing the contracted service.
+- **Dedicated Model Training (Enterprise Tier, Opt-In Only):** As described in Section 3.2, Enterprise Customers may opt in to fine-tuning a dedicated AI model. Legal basis: explicit consent.
+
+All personalization data is tenant-isolated — one Customer's data is never accessible to another Customer. End Users may request deletion of their personalization data through the Customer who deployed the Service (see Section 7).
 
 #### 3.5 Legal and Safety
 
@@ -196,12 +208,19 @@ In the event of a data breach that affects your personal information, we will:
 - Account information is retained for the duration of your Account plus 30 days after termination
 - Billing records may be retained for up to 7 years as required for tax and accounting purposes
 
-#### 6.3 Usage Data
+#### 6.3 Personalization Data
+
+- **Customer Context Profiles:** Retained for the duration of the Subscription; deleted within 30 days of Account termination
+- **Conversation Memory Vectors:** Retained for 24 months from the date of the originating conversation, then automatically purged; all vectors deleted within 30 days of Account termination
+- **Cross-Session Learning Data:** Retained for the duration of the Subscription; deleted within 30 days of Account termination
+- **Fine-Tuned Models (Dedicated Model Training):** Retained for the duration of the add-on Subscription; deleted within 30 days of add-on cancellation or consent revocation
+
+#### 6.4 Usage Data
 
 - Service logs and usage data are retained for 7 days in Application Insights
 - Aggregated, anonymized analytics data may be retained indefinitely
 
-#### 6.4 Marketing Website Data
+#### 6.5 Marketing Website Data
 
 - Website analytics data is retained according to Google Analytics' standard retention settings
 - Cookie data expires according to the cookie types described in Section 2.5
@@ -222,7 +241,7 @@ You have the right to request correction of inaccurate personal information. You
 
 #### 7.3 Deletion
 
-You have the right to request deletion of your personal information. You can delete your Account through your Account settings, or contact us at privacy@remakerdigital.com.
+You have the right to request deletion of your personal information. You can delete your Account through your Account settings, or contact us at privacy@remakerdigital.com. Deletion includes all Persistent Customer Memory data associated with your Account, including customer context profiles, conversation memory vectors, cross-session learning data, and any fine-tuned models created under Dedicated Model Training.
 
 #### 7.4 Restriction and Objection
 

@@ -35,7 +35,7 @@ flowchart LR
 
 ## Architecture
 
-Agent Red runs on Azure Container Apps with auto-scaling. Each agent is a separate container communicating over gRPC with TLS encryption. Customer data is stored in Cosmos DB with tenant-level isolation.
+Agent Red runs on Azure Container Apps with auto-scaling. Each agent is a separate container communicating over gRPC with TLS encryption. Customer data is stored in Cosmos DB with tenant-level isolation. A dedicated Customer Memory layer stores customer profiles, vectorized conversation transcripts, and learned preferences — enabling the response generator to personalize replies based on the full history of each customer relationship.
 
 ```mermaid
 graph TB
@@ -60,6 +60,7 @@ graph TB
         NATS -.-> ESC
         NATS -.-> AN
 
+        MEM[(Customer Memory\nProfiles + Vectors)]
         DB[(Cosmos DB\nServerless)]
         KV[Key Vault]
         AI[Azure OpenAI\nGPT-4o / GPT-4o-mini]
@@ -68,6 +69,7 @@ graph TB
     CU --> AG
     IC & KR & RG & CS & ESC --> AI
     IC & KR & RG & AN --> DB
+    RG --> MEM
     SLIM --> KV
 ```
 
@@ -80,6 +82,7 @@ graph TB
 | AI models | Azure OpenAI Service (GPT-4o, GPT-4o-mini) |
 | Embeddings | text-embedding-3-large |
 | Secrets | Azure Key Vault (Managed Identity) |
+| Customer Memory | Cosmos DB (profiles, vectors, cross-session learning) |
 | Monitoring | Application Insights (OpenTelemetry) |
 
 ## Performance

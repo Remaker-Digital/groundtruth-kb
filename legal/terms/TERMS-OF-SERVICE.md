@@ -33,6 +33,10 @@ By accessing or using the Service, you agree to be bound by these Terms. If you 
 
 **"Service"** means the Agent Red Customer Engagement platform, including the web application, API, documentation, and any related services.
 
+**"Persistent Customer Memory"** means the Service's multi-layer personalization system that builds customer context, conversation history, and learned preferences across support sessions to enable personalized responses.
+
+**"Dedicated Model Training"** means the optional Enterprise add-on that fine-tunes a per-customer AI model using that Customer's own historical conversation data, subject to explicit opt-in consent.
+
 **"Subscription"** means the paid plan you select to access the Service, as described in Section 5.
 
 ---
@@ -93,23 +97,36 @@ By accessing or using the Service, you agree to be bound by these Terms. If you 
 
 4.6. **Data Location.** Customer Data is processed and stored in Microsoft Azure data centers in the United States (East US 2 region).
 
+4.7. **Personalization and Model Training.**
+
+   (a) **Persistent Customer Memory.** The Service includes Persistent Customer Memory, which processes Customer Data to personalize support interactions. Layers 1–3 (Customer Context, Conversation Memory, and Cross-Session Learning) operate automatically as part of the Service's core functionality based on your Subscription tier. No additional consent is required for these layers.
+
+   (b) **Dedicated Model Training (Opt-In).** Enterprise Customers may opt in to Dedicated Model Training by providing explicit written consent through the Service dashboard or a signed order form. Dedicated Model Training uses only that Customer's own historical conversation data to fine-tune a per-customer AI model. Customer data is never combined with other Customers' data for training purposes.
+
+   (c) **Consent Revocation.** You may revoke consent for Dedicated Model Training at any time through the Service dashboard. Upon revocation, all future training is halted and the fine-tuned model is deleted within 30 days. Revocation does not affect the lawfulness of processing performed before revocation.
+
+   (d) **Clarification.** Persistent Customer Memory Layers 1–3 do not constitute "model training" as referenced in the Privacy Policy Section 3.2. These layers store and retrieve customer-specific data at inference time — they do not modify AI model weights. Only Layer 4 (Dedicated Model Training) involves modification of model weights and requires explicit opt-in consent.
+
 ---
 
 ### 5. Subscription Plans and Fees
 
-5.1. **Plans.** The Service is offered through the following Subscription tiers:
+5.1. **Plans.** The Service is offered through the following Subscription tiers with included monthly conversation allowances:
 
-   - **Starter:** $299/month or $2,990/year — up to 500 conversations per day
-   - **Professional:** $499/month or $4,990/year — up to 2,000 conversations per day
-   - **Enterprise:** $999/month or $9,990/year — up to 10,000 conversations per day
+   - **Starter:** $149/month or $1,490/year — 1,000 included conversations per month ($0.04/conversation overage)
+   - **Professional:** $399/month or $3,990/year — 5,000 included conversations per month ($0.025/conversation overage)
+   - **Enterprise:** $999/month or $9,990/year — 20,000 included conversations per month ($0.015/conversation overage)
 
 5.2. **Add-On Modules.** Additional modules may be purchased separately, subject to tier eligibility:
 
-   - Multi-Language Support: $149/month (Professional, Enterprise)
-   - Advanced Analytics: $199/month (All tiers)
-   - Priority Support: $99/month (All tiers)
-   - Custom Integrations: $299/month (Professional, Enterprise)
-   - White-Label: $499/month (Enterprise only)
+   - Multi-Language Pack: $99/month (All tiers)
+   - Advanced Analytics: $149/month (Professional, Enterprise)
+   - Mailchimp Integration: $49/month (Professional, Enterprise)
+   - Google Analytics Integration: $49/month (Professional, Enterprise)
+   - White-Label Package: $399/month (Enterprise only)
+   - Priority Support Upgrade: $99/month (Starter, Professional)
+   - Custom Integration Dev: $299/month (Enterprise only)
+   - Dedicated Model Training: $299/month (Enterprise only; requires opt-in consent per Section 4.7)
 
 5.3. **Billing.** Subscription fees are billed in advance on a monthly or annual basis, depending on the plan selected. All fees are in United States Dollars (USD).
 

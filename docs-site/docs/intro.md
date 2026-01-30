@@ -23,6 +23,7 @@ Agent Red Customer Engagement is an AI-powered customer service platform that au
 | **Escalation Detection** | Identifies conversations requiring human intervention |
 | **Analytics** | Monitors conversation quality, resolution rates, and AI performance |
 | **Content Safety** | Validates every response before delivery to customers |
+| **Persistent Customer Memory** | Builds customer context, conversation history, and learned preferences across sessions |
 
 ## Platform tiers
 

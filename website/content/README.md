@@ -82,7 +82,7 @@ Each page file includes:
 ### Messaging Hierarchy
 
 1. **Primary:** Reduce costs, improve quality, scale without headcount
-2. **Secondary:** Six specialized AI agents, transparent pricing, open-source foundation
+2. **Secondary:** Six specialized AI agents, Persistent Customer Memory, transparent pricing, open-source foundation
 3. **Tertiary:** Easy setup, no coding, integrates with your stack
 4. **Proof Points:** 98% accuracy, <2s response, 70% automation, 100% content safety
 
@@ -165,6 +165,7 @@ Each page file includes:
 |---------|------|---------|
 | 1.0.0 | 2026-01-29 | Initial content for 5 core pages (AGNTCY branding) |
 | 2.0.0 | 2026-01-29 | Full rewrite: Agent Red brand, new pricing model, contact page added, honesty pass |
+| 3.0.0 | 2026-01-30 | Persistent Customer Memory added as core differentiator across all pages. New Personalization section on features page. Feature comparison and add-on updates on pricing page. Competitive advantage card and FAQ on homepage. Memory references on about, integrations pages. |
 
 ---
 

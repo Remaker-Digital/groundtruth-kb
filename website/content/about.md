@@ -62,7 +62,7 @@ Instead of building from scratch, we started with a public, open-source multi-ag
 The evaluation data is real: 98% intent accuracy, sub-2-second response times, 100% content safety, 3,071 requests per second throughput. Not marketing claims — measured results from production workloads.
 
 #### The Commercial Product
-Agent Red is the commercial layer on top of that open-source foundation. We added multi-tenant infrastructure, usage-based billing, enterprise integrations, white-label capability, and professional support — the things a business needs to run this in production with confidence.
+Agent Red is the commercial layer on top of that open-source foundation. We added multi-tenant infrastructure, usage-based billing, enterprise integrations, white-label capability, Persistent Customer Memory, and professional support — the things a business needs to run this in production with confidence.
 
 The open-source core remains public. Anyone can inspect it, learn from it, contribute to it. The commercial product earns its price through the operational layer that makes it turnkey.
 
@@ -102,6 +102,7 @@ Agent Red's core AI engine is built on the AGNTCY open-source platform — a mul
 - **Proven:** Performance metrics come from independent evaluation, not marketing
 - **Community-improved:** Bug fixes and enhancements from the open-source community benefit every Agent Red customer
 - **No lock-in risk:** The core technology isn't proprietary — you're not locked into a black box
+- **Memory-first:** Every conversation builds on previous ones — customer preferences, history, and patterns persist across sessions for increasingly personalized service
 
 ### Open-Source CTA
 **View the AGNTCY Project on GitHub** → https://github.com/Remaker-Digital/AGNTCY-muti-agent-deployment-customer-service

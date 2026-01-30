@@ -161,6 +161,10 @@ Each agent handles a distinct responsibility. Together, they deliver a complete 
 **Headline:** Full control over voice, behavior, and boundaries
 **Description:** Configure tone, set escalation rules, define knowledge boundaries, and customize response templates. Agent Red represents your brand — not ours.
 
+#### Card 5: Conversations That Remember
+**Headline:** Persistent Customer Memory
+**Description:** Every interaction builds on the last. Agent Red remembers customer preferences, past issues, and communication style — so customers never repeat themselves and every response feels personal. No competitor offers this level of per-customer memory.
+
 ---
 
 ## Features Preview Section
@@ -202,9 +206,9 @@ Each agent handles a distinct responsibility. Together, they deliver a complete 
 **Headline:** Bank-Grade Data Protection
 **Description:** TLS 1.3, AES-256 encryption, PII tokenization, GDPR/CCPA compliance. SOC 2 certification in progress.
 
-#### Feature 9: Fast Setup
-**Headline:** Live in 15 Minutes
-**Description:** Connect your store, configure your agent, and launch. No engineering team required.
+#### Feature 9: Persistent Customer Memory
+**Headline:** Every Conversation Builds on the Last
+**Description:** Customer context, preferences, and interaction history persist across sessions. Returning customers get personalized service that improves over time.
 
 ### CTA
 **Explore All Features** → /features
@@ -289,6 +293,9 @@ Native integrations with real-time data sync. Connect in minutes, not weeks. No 
 
 #### Q: Can I try before I commit?
 **A:** Yes. Every plan includes a 14-day free trial with full Professional features. No credit card required.
+
+#### Q: Does Agent Red remember my customers?
+**A:** Yes. Agent Red builds a persistent memory for each customer — their preferences, history, and patterns. Returning customers get personalized service that improves over time, without any manual configuration. Included in every plan.
 
 #### Q: What's the cancellation policy?
 **A:** Month-to-month plans can be cancelled at any time. Annual plans include a 30-day money-back guarantee. No long-term lock-in.

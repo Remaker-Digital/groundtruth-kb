@@ -12,7 +12,7 @@ This document provides context and guidance for AI assistants working on the Age
 | **Brand Name** | Agent Red Customer Engagement |
 | **Release** | Launch 1.0 |
 | **Type** | Commercial SaaS Product |
-| **Status** | Phase 1.4 Complete — Public Documentation |
+| **Status** | Phase 2.5 Planning Complete — Persistent Customer Memory Documented |
 | **Owner** | Remaker Digital (DBA of VanDusen & Palmeter, LLC) |
 
 ---
@@ -326,6 +326,15 @@ These features are **exclusive to Agent Red** (not in open-source):
 - Co-branding options
 - Reseller/agency portal
 
+### 5. Persistent Customer Memory
+Four-layer personalization stack — every conversation builds on the last:
+- **Customer Context (All tiers):** Structured profile (preferences, account state, integration data) injected into every interaction
+- **Conversation Memory (All tiers):** Vectorized transcripts enable semantic search across a customer's full interaction history via Cosmos DB vector search
+- **Cross-Session Learning (Professional+):** Memory framework extracts and persists patterns, preferences, and communication style across sessions
+- **Dedicated Model Training (Enterprise add-on, $299/mo):** Per-customer AI fine-tuning on 1,000+ historical interactions for maximum personalization
+
+No competitor has confirmed implementing per-customer vector RAG over historical transcripts. Marginal cost: ~$0.01/customer/month for Layers 1-2.
+
 ---
 
 ## Pricing Structure
@@ -361,6 +370,7 @@ Each tier includes a platform fee (infrastructure, features, support) and an inc
 | White-Label Package | $399 | Enterprise only |
 | Priority Support Upgrade | $99 | Starter, Pro |
 | Custom Integration Dev | $299 | Enterprise only |
+| Dedicated Model Training | $299 | Enterprise only |
 
 ### Cost Basis & Margin
 
@@ -527,6 +537,8 @@ E:\Claude-Playground\CLAUDE-PROJECTS\Agent Red Customer Engagement\
 | PROJECT-PLAN.md | docs/ | Launch 1.0 milestones and tasks |
 | COMMERCIAL-SAAS-PROPOSAL.md | docs/ | Full business analysis (A-P deliverables) |
 | PRODUCT-FEATURES-RAG.md | docs/ | Complete feature reference for RAG |
+| PER-CUSTOMER-AI-PERSONALIZATION-RESEARCH.md | docs/architecture/ | Persistent Customer Memory research foundation |
+| PERSISTENT-CUSTOMER-MEMORY-METRICS.md | docs/architecture/ | Test cases, metrics, and A/B testing framework |
 
 ---
 
@@ -548,8 +560,8 @@ E:\Claude-Playground\CLAUDE-PROJECTS\Agent Red Customer Engagement\
 ```
 Continue work on Agent Red Customer Engagement commercial project.
 Location: E:\Claude-Playground\CLAUDE-PROJECTS\Agent Red Customer Engagement
-Key files: CLAUDE.md, docs/PROJECT-PLAN.md, docs/architecture/ECOMMERCE-PLATFORM-EVALUATION.md
-Current status: Phases 0-1.4 complete. Phase 2.1 platform decision complete (dual-channel: Shopify App Store + Stripe). Implementation tasks next.
+Key files: CLAUDE.md, docs/PROJECT-PLAN.md
+Current status: Phases 0-1.4 complete. Phase 2.1 platform decision complete (dual-channel: Shopify App Store + Stripe). Persistent Customer Memory feature fully documented and propagated across all 19 files (Phase 2.5 planning complete). Implementation tasks next.
 Next up: Phase 2.1 implementation — Stripe account setup, product catalog, Checkout integration, webhook handler, Shopify Billing API integration, App Store listing.
 Please review PROJECT-PLAN.md (Phase 2.1 task list) and proceed with the next implementation item, presenting one work item at a time for review per the iterative working style documented in CLAUDE.md.
 ```
@@ -644,6 +656,7 @@ This applies to: work priority reviews, architecture decisions, scope changes, m
 - **Content principles established:** Honesty, accuracy, and correctness are central concerns. Transparent pricing as competitive advantage. Open-source foundation as trust mechanism.
 - **E-commerce platform decision:** Dual-channel (Shopify App Store + Stripe). Shopify provides discovery among ~5M merchants with 0% commission on first $1M revenue. Stripe provides direct billing for non-Shopify merchants at ~3.5% per transaction. Paddle rejected (no marketplace, higher fees, redundant tax handling). Existing Shopify integration is ~80% of what the App Store requires. Agent Red's price advantage (2–13x cheaper per interaction than Gorgias, Intercom, Zendesk) positions it as a disruptive value entrant in an established ecosystem.
 - **Neither Shopify nor Stripe have formal named partner tiers.** Benefits scale informally with growth. Shopify: "Built for Shopify" badge at ~3-6 months, partner manager at ~10K installs. Stripe: "Verified Partner" badge after production integration review, custom pricing at ~$80K+/mo volume.
+- **Persistent Customer Memory validated as differentiator.** No competitor confirmed doing per-customer vector RAG over historical transcripts. Sierra AI (Agent Data Platform) is closest but not customer-facing. Marginal cost ~$0.005-$0.011/customer/month for Layers 1-2. Research, metrics framework, test cases, and A/B methodology documented. Feature propagated across all 18 project files (business, marketing, docs-site, legal, brand). Privacy reconciliation complete — default "no training" preserved with opt-in carve-out for Layer 4.
 
 **Phase 2.1: E-Commerce Store (In Progress)**
 - [x] Three-way platform evaluation (Stripe vs Shopify App Store vs Paddle) — docs/architecture/ECOMMERCE-PLATFORM-EVALUATION.md
@@ -661,6 +674,17 @@ This applies to: work priority reviews, architecture decisions, scope changes, m
 - [ ] Stripe Tax, Stripe Customer Portal, Rewardful affiliate setup
 - [ ] Test checkout flows (both channels)
 
+**Phase 2.5: Persistent Customer Memory (Planned)**
+- [ ] Design customer preference profile schema
+- [ ] Implement dynamic system prompt builder (Layer 1)
+- [ ] Build tenant-partitioned vector index for transcripts (Layer 2)
+- [ ] Integrate memory framework — Mem0 or custom (Layer 3)
+- [ ] Build profile extraction pipeline
+- [ ] Implement few-shot example retrieval
+- [ ] Build fine-tuning pipeline (Layer 4, Enterprise add-on)
+- [ ] Create metrics dashboard (KPIs from PERSISTENT-CUSTOMER-MEMORY-METRICS.md)
+- [ ] A/B testing framework integration
+
 ### Pending
 - [ ] Phase 2.2: Multi-tenant infrastructure (architecture doc required first)
 
@@ -671,7 +695,7 @@ This applies to: work priority reviews, architecture decisions, scope changes, m
 | Question | Answer |
 |----------|--------|
 | AGNTCY relationship | Arms-length, third-party consumer |
-| Commercial differentiators | All 4 (multi-tenant, AI, integrations, white-label) |
+| Commercial differentiators | All 5 (multi-tenant, AI, integrations, white-label, persistent customer memory) |
 | Timeline | Q1 2026 (8-12 weeks) |
 | Budget | $500-1,000/month |
 | Pricing | $149/$399/$999 base + metered AI usage (82-93% gross margin) |
@@ -687,4 +711,4 @@ This applies to: work priority reviews, architecture decisions, scope changes, m
 
 *© 2026 Remaker Digital, a DBA of VanDusen & Palmeter, LLC. All rights reserved.*
 *Last Updated: 2026-01-30*
-*Version: 4.1.0*
+*Version: 4.3.0*

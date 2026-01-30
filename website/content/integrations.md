@@ -122,6 +122,8 @@ Access customer account information and purchase history for personalized servic
 - Access saved addresses and preferences
 - Identify VIP or high-value customers
 
+**Memory Integration:** Customer profile data from Shopify feeds into Agent Red's Persistent Customer Memory. Purchase history, preferences, and past interactions enrich every future conversation automatically — building a deeper understanding of each customer over time.
+
 **Example Conversation:**
 > **Customer:** I bought a jacket from you last month but can't remember the name.
 >
@@ -717,6 +719,9 @@ Full API documentation with examples and interactive playground.
 - Custom connector development
 - Migration assistance from other platforms
 - Ongoing optimization and maintenance
+
+#### Memory Note
+All integration data feeds into Agent Red's Persistent Customer Memory, building richer customer profiles over time. The more integrations you connect, the more context Agent Red has to personalize every interaction.
 
 ---
 

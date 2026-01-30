@@ -39,6 +39,7 @@ Every feature is built to do one thing: help you serve customers better while sp
 - [Integrations](#integrations)
 - [Customization](#customization)
 - [Analytics](#analytics)
+- [Personalization](#personalization)
 - [Security](#security)
 - [Support](#support)
 
@@ -136,6 +137,7 @@ The Response Generation Agent crafts personalized, natural responses using retri
 - **Brand Voice Customization:** Configure tone, formality, and personality
 - **Personalization:** Uses customer name, order history, and preferences
 - **Context Continuity:** Maintains conversation thread across messages
+- **Memory-Informed:** Draws from the customer's full interaction history via Persistent Customer Memory to personalize every response
 - **Multi-Language:** Generates native-quality responses in supported languages
 
 #### Customization Options
@@ -581,6 +583,135 @@ Create custom reports with the metrics you care about. Export to CSV, schedule a
 - Metric filtering
 - Scheduled email delivery
 - API access for BI tools
+
+---
+
+## Personalization Section {#personalization}
+
+### Section Headline
+**Persistent Customer Memory**
+
+### Section Description
+Every conversation builds on the last. Agent Red maintains a persistent memory for each customer — their preferences, past issues, communication style, and interaction history — so responses feel personal and customers never have to repeat themselves.
+
+No competitor has confirmed implementing per-customer vector RAG over historical transcripts. Agent Red is the first platform to deliver true persistent customer memory at scale.
+
+---
+
+### Feature: Customer Context (Layer 1)
+
+#### Headline
+**Instant Customer Awareness**
+
+#### Description
+Every AI interaction begins with a complete picture of the customer. A structured profile — preferences, account state, plan tier, active integrations, and interaction summary — is automatically injected into every conversation. The agent knows who the customer is before they say a word.
+
+#### Capabilities
+- Customer name, plan tier, and account state injected automatically
+- Active integrations and configuration visible to the agent
+- Communication preferences (formal vs. casual, detail level) applied
+- Shopify order history, product preferences, and engagement data included
+
+#### Available On
+All tiers (Starter, Professional, Enterprise)
+
+---
+
+### Feature: Conversation Memory (Layer 2)
+
+#### Headline
+**Full Interaction History at the Agent's Fingertips**
+
+#### Description
+Past conversation transcripts are cleansed, vectorized, and stored in a per-customer index. When a customer starts a new session, the system performs semantic search across their entire interaction history to surface relevant context. If a customer asks "any update on my return?" — the agent already knows what product, when it was discussed, and what was promised.
+
+#### Capabilities
+- Semantic search across full interaction history
+- Time-weighted recency boosting (recent interactions preferred)
+- Tenant-isolated vector indexes (no cross-customer data leakage)
+- Sub-500ms retrieval latency
+- PII-safe: transcripts cleansed before vectorization
+
+#### Available On
+All tiers (Starter, Professional, Enterprise)
+
+---
+
+### Feature: Cross-Session Learning (Layer 3)
+
+#### Headline
+**An Agent That Learns Your Customers Over Time**
+
+#### Description
+A memory framework processes interaction history to extract structured insights — communication style preferences, recurring issues, product usage patterns, escalation triggers, and satisfaction signals. These memories persist across sessions and update automatically as new interactions occur.
+
+#### Capabilities
+- Learns communication preferences (technical depth, formality, verbosity)
+- Recognizes recurring issues and proactively addresses them
+- Detects escalation patterns and adjusts response strategy
+- Updates preferences in real time as customer behavior evolves
+- Memory entries are auditable and human-reviewable
+
+#### Available On
+Professional and Enterprise tiers
+
+---
+
+### Feature: Dedicated Model Training (Layer 4)
+
+#### Badge
+Enterprise Add-On — $299/month
+
+#### Headline
+**A Dedicated AI Model for Your Highest-Value Customers**
+
+#### Description
+For Enterprise customers with 1,000+ historical interactions, Agent Red creates a fine-tuned AI model trained exclusively on that customer's data. The model captures nuanced communication style, domain-specific vocabulary, and behavioral patterns beyond what memory and context can achieve. An automated quality gate ensures the fine-tuned model matches or exceeds baseline quality before deployment.
+
+#### Capabilities
+- Per-customer fine-tuned AI model (trained on their data only)
+- Style adaptation (matches customer's tone and formality)
+- Domain vocabulary adoption (uses customer-specific terminology)
+- Automated quality gate with fallback to base model
+- Periodic retraining on accumulated new interactions
+- Full consent management (opt-in, revocable at any time)
+
+#### Requirements
+- Minimum 1,000 historical interactions
+- Explicit customer opt-in (not enabled by default)
+- Enterprise tier only
+
+#### Available On
+Enterprise only (add-on, $299/month)
+
+---
+
+### Tier Availability
+
+| Layer | Starter | Professional | Enterprise |
+|-------|---------|-------------|------------|
+| Customer Context | Included | Included | Included |
+| Conversation Memory | Included | Included | Included |
+| Cross-Session Learning | — | Included | Included |
+| Dedicated Model Training | — | — | Add-on ($299/mo) |
+
+---
+
+### Competitive Advantage
+
+Agent Red's Persistent Customer Memory delivers enterprise-grade personalization at approximately $0.01 per customer per month in marginal cost. No competitor — not Sierra, Intercom, Zendesk, Gorgias, or any other platform — has confirmed implementing per-customer vector RAG over historical transcripts. Most rely on basic CRM data lookup or session-scoped context. Agent Red goes further.
+
+---
+
+### Example Scenario
+
+**Without Persistent Customer Memory:**
+> **Customer:** Hi, I'm having trouble with my Shopify orders not syncing.
+> **Agent:** I'm sorry to hear that. Can you tell me your store name and what integration you're using?
+
+**With Persistent Customer Memory:**
+> **Customer:** Hi, I'm having trouble with my Shopify orders not syncing.
+> **Agent:** Hi Sarah — I can see this has come up before with your Acme Store Shopify integration. Last time (January 15th), it was a webhook configuration issue that we resolved by re-registering the orders/updated webhook. Let me check if the same issue has recurred.
 
 ---
 
