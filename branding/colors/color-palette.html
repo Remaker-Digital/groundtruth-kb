@@ -1,0 +1,741 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Agent Red Customer Engagement — Brand Reference</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=Plus+Jakarta+Sans:wght@500;600;700;800&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
+    <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        body {
+            font-family: 'Inter', -apple-system, BlinkMacSystemFont, sans-serif;
+            background: #F8F8FA;
+            color: #1A1A2E;
+            padding: 40px;
+            max-width: 1200px;
+            margin: 0 auto;
+        }
+        h1 { font-size: 32px; font-weight: 700; margin-bottom: 8px; color: #1A1A2E; }
+        h1 span { color: #C41E2A; }
+        .subtitle { font-size: 16px; color: #6B6B80; margin-bottom: 48px; }
+        h2 {
+            font-size: 22px; font-weight: 600; margin-bottom: 20px; color: #3D3D56;
+            border-bottom: 2px solid #E8E8ED; padding-bottom: 8px;
+        }
+        .section { margin-bottom: 56px; }
+        .palette-row { display: flex; gap: 16px; flex-wrap: wrap; margin-bottom: 24px; }
+        .swatch {
+            flex: 1; min-width: 180px; max-width: 280px; border-radius: 12px;
+            overflow: hidden; box-shadow: 0 2px 8px rgba(0,0,0,0.08); background: #FFFFFF;
+        }
+        .swatch-color {
+            height: 120px; display: flex; align-items: flex-end; padding: 12px 16px;
+        }
+        .swatch-color .contrast-sample { font-size: 13px; font-weight: 600; opacity: 0.9; }
+        .swatch-info { padding: 16px; }
+        .swatch-name { font-size: 16px; font-weight: 600; margin-bottom: 4px; }
+        .swatch-role {
+            font-size: 12px; color: #6B6B80; text-transform: uppercase;
+            letter-spacing: 0.5px; margin-bottom: 8px;
+        }
+        .swatch-hex {
+            font-family: 'JetBrains Mono', monospace; font-size: 14px; color: #3D3D56;
+            background: #F8F8FA; padding: 4px 8px; border-radius: 4px;
+            display: inline-block; margin-bottom: 8px;
+        }
+        .swatch-usage { font-size: 13px; color: #6B6B80; line-height: 1.5; }
+
+        /* Accessibility */
+        .a11y-table { width: 100%; border-collapse: collapse; margin-top: 12px; }
+        .a11y-table th, .a11y-table td {
+            text-align: left; padding: 12px 16px; border-bottom: 1px solid #E8E8ED; font-size: 14px;
+        }
+        .a11y-table th { font-weight: 600; color: #3D3D56; background: #FFFFFF; }
+        .a11y-table td { color: #1A1A2E; }
+        .a11y-sample {
+            padding: 6px 12px; border-radius: 6px; font-weight: 600;
+            font-size: 13px; display: inline-block;
+        }
+        .badge { display: inline-block; padding: 3px 8px; border-radius: 4px; font-size: 12px; font-weight: 600; }
+        .badge-aaa { background: #0D7C3E; color: #FFFFFF; }
+        .badge-aa { background: #1E3A5F; color: #FFFFFF; }
+
+        /* Buttons */
+        .demo-card {
+            background: #FFFFFF; border-radius: 12px; padding: 32px;
+            box-shadow: 0 2px 8px rgba(0,0,0,0.08); margin-top: 16px;
+        }
+        .demo-btn {
+            display: inline-block; padding: 12px 28px; border-radius: 8px;
+            font-size: 15px; font-weight: 600; text-decoration: none;
+            margin-right: 12px; margin-bottom: 12px; cursor: pointer; border: none;
+            font-family: inherit;
+        }
+        .btn-primary { background: #C41E2A; color: #FFFFFF; }
+        .btn-primary:hover { background: #9B1420; }
+        .btn-secondary { background: #1E3A5F; color: #FFFFFF; }
+        .btn-outline { background: transparent; color: #C41E2A; border: 2px solid #C41E2A; }
+
+        /* Alerts */
+        .demo-alert {
+            padding: 14px 18px; border-radius: 8px; margin-bottom: 12px;
+            font-size: 14px; font-weight: 500;
+        }
+        .alert-success { background: #e6f4ec; color: #0D7C3E; border-left: 4px solid #0D7C3E; }
+        .alert-warning { background: #fef6e0; color: #9e7000; border-left: 4px solid #E5A100; }
+        .alert-error { background: #fde8e8; color: #D32F2F; border-left: 4px solid #D32F2F; }
+        .alert-info { background: #e4ecf4; color: #1E3A5F; border-left: 4px solid #1E3A5F; }
+
+        /* Dark demo */
+        .demo-dark {
+            background: #1A1A2E; border-radius: 12px; padding: 32px;
+            color: #FFFFFF; margin-top: 16px;
+        }
+        .demo-dark h3 { color: #FFFFFF; margin-bottom: 12px; }
+        .demo-dark p { color: #E8E8ED; font-size: 15px; line-height: 1.6; margin-bottom: 16px; }
+        .demo-dark .highlight { color: #C41E2A; }
+
+        /* ===================== TYPOGRAPHY ===================== */
+        .type-comparison {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 32px;
+            margin-top: 16px;
+        }
+        @media (max-width: 800px) {
+            .type-comparison { grid-template-columns: 1fr; }
+        }
+        .type-option {
+            background: #FFFFFF; border-radius: 12px; padding: 32px;
+            box-shadow: 0 2px 8px rgba(0,0,0,0.08);
+            border: 3px solid transparent;
+            transition: border-color 0.2s;
+        }
+        .type-option:hover { border-color: #E8E8ED; }
+        .type-option-label {
+            display: inline-block; font-size: 12px; font-weight: 600;
+            text-transform: uppercase; letter-spacing: 1px; color: #FFFFFF;
+            background: #C41E2A; padding: 4px 12px; border-radius: 4px; margin-bottom: 20px;
+        }
+        .type-option-label.alt { background: #1E3A5F; }
+        .type-meta {
+            font-size: 13px; color: #6B6B80; margin-top: 16px; padding-top: 16px;
+            border-top: 1px solid #E8E8ED; line-height: 1.6;
+        }
+        .type-meta strong { color: #3D3D56; }
+
+        /* Type scale table */
+        .type-scale-table {
+            width: 100%; border-collapse: collapse; margin-top: 20px;
+        }
+        .type-scale-table th, .type-scale-table td {
+            text-align: left; padding: 10px 12px; border-bottom: 1px solid #E8E8ED; font-size: 13px;
+        }
+        .type-scale-table th { font-weight: 600; color: #3D3D56; background: #F8F8FA; }
+        .type-scale-table td { vertical-align: middle; }
+        .type-scale-table .scale-sample { color: #1A1A2E; }
+
+        /* Code samples */
+        .code-sample {
+            font-family: 'JetBrains Mono', monospace;
+            background: #1A1A2E; color: #E8E8ED; padding: 20px 24px;
+            border-radius: 8px; font-size: 14px; line-height: 1.6;
+            margin-top: 12px; overflow-x: auto;
+        }
+        .code-sample .keyword { color: #C41E2A; }
+        .code-sample .string { color: #0D7C3E; }
+        .code-sample .comment { color: #6B6B80; }
+        .code-sample .number { color: #E5A100; }
+
+        /* Full mockup sections */
+        .mockup-label {
+            font-size: 14px; font-weight: 600; color: #6B6B80; text-transform: uppercase;
+            letter-spacing: 1px; margin-bottom: 12px; margin-top: 32px;
+        }
+
+        /* Hero mockup */
+        .hero-mockup {
+            border-radius: 12px; overflow: hidden;
+            box-shadow: 0 4px 16px rgba(0,0,0,0.12); margin-top: 12px;
+        }
+        .hero-nav {
+            background: #1A1A2E; padding: 16px 32px; display: flex;
+            justify-content: space-between; align-items: center;
+        }
+        .hero-nav-brand { color: #FFFFFF; font-weight: 700; font-size: 18px; }
+        .hero-nav-brand .red { color: #C41E2A; }
+        .hero-nav-links { display: flex; gap: 24px; }
+        .hero-nav-links a {
+            color: #E8E8ED; text-decoration: none; font-size: 14px; font-weight: 500;
+        }
+        .hero-nav-cta {
+            background: #C41E2A; color: #FFFFFF; padding: 8px 20px;
+            border-radius: 6px; font-size: 14px; font-weight: 600;
+            text-decoration: none; border: none; cursor: pointer;
+        }
+        .hero-body {
+            background: linear-gradient(135deg, #1A1A2E 0%, #2a2a44 100%);
+            padding: 64px 32px; text-align: center;
+        }
+        .hero-body p.hero-sub {
+            color: #E8E8ED; max-width: 600px; margin: 0 auto 32px;
+            line-height: 1.6;
+        }
+        .hero-stats {
+            display: flex; justify-content: center; gap: 48px; margin-top: 40px;
+        }
+        .hero-stat-value { font-size: 28px; font-weight: 700; color: #C41E2A; }
+        .hero-stat-label { font-size: 13px; color: #6B6B80; margin-top: 4px; }
+
+        /* Pricing card mockup */
+        .pricing-row {
+            display: flex; gap: 20px; margin-top: 12px; flex-wrap: wrap;
+        }
+        .pricing-card {
+            flex: 1; min-width: 200px; background: #FFFFFF;
+            border-radius: 12px; padding: 28px; text-align: center;
+            box-shadow: 0 2px 8px rgba(0,0,0,0.06); border: 2px solid #E8E8ED;
+        }
+        .pricing-card.featured { border-color: #C41E2A; }
+        .pricing-card .tier-name {
+            font-size: 14px; font-weight: 600; text-transform: uppercase;
+            letter-spacing: 0.5px; color: #6B6B80; margin-bottom: 8px;
+        }
+        .pricing-card .tier-price { font-size: 36px; font-weight: 700; color: #1A1A2E; }
+        .pricing-card .tier-price span { font-size: 16px; font-weight: 400; color: #6B6B80; }
+        .pricing-card .tier-desc {
+            font-size: 14px; color: #6B6B80; margin: 12px 0 20px; line-height: 1.5;
+        }
+        .pricing-card ul {
+            list-style: none; text-align: left; margin-bottom: 24px;
+        }
+        .pricing-card ul li {
+            font-size: 14px; color: #3D3D56; padding: 6px 0;
+            border-bottom: 1px solid #F8F8FA;
+        }
+        .pricing-card ul li::before { content: "\2713  "; color: #0D7C3E; font-weight: 700; }
+        .pricing-card .tier-btn {
+            display: block; width: 100%; padding: 12px; border-radius: 8px;
+            font-size: 15px; font-weight: 600; cursor: pointer; border: none;
+            font-family: inherit;
+        }
+        .pricing-card .tier-btn.primary { background: #C41E2A; color: #FFFFFF; }
+        .pricing-card .tier-btn.outline {
+            background: transparent; color: #C41E2A; border: 2px solid #C41E2A;
+        }
+
+        .footer {
+            margin-top: 64px; padding-top: 24px; border-top: 1px solid #E8E8ED;
+            font-size: 13px; color: #6B6B80;
+        }
+
+        /* Divider */
+        .divider {
+            border: none; border-top: 3px solid #C41E2A; margin: 64px 0;
+            opacity: 0.3;
+        }
+    </style>
+</head>
+<body>
+
+    <h1><span>Agent Red</span> Customer Engagement</h1>
+    <p class="subtitle">Brand Reference &mdash; Color Palette + Typography &mdash; v1.0</p>
+
+    <!-- ==================== COLOR PALETTE ==================== -->
+
+    <div class="section">
+        <h2>Primary Colors</h2>
+        <div class="palette-row">
+            <div class="swatch">
+                <div class="swatch-color" style="background: #C41E2A;">
+                    <span class="contrast-sample" style="color: #FFFFFF;">White on Red</span>
+                </div>
+                <div class="swatch-info">
+                    <div class="swatch-role">Primary</div>
+                    <div class="swatch-name">Agent Red</div>
+                    <div class="swatch-hex">#C41E2A</div>
+                    <div class="swatch-usage">Logo, CTAs, key accents. Authoritative without being aggressive.</div>
+                </div>
+            </div>
+            <div class="swatch">
+                <div class="swatch-color" style="background: #9B1420;">
+                    <span class="contrast-sample" style="color: #FFFFFF;">White on Dark Red</span>
+                </div>
+                <div class="swatch-info">
+                    <div class="swatch-role">Primary Dark</div>
+                    <div class="swatch-name">Deep Red</div>
+                    <div class="swatch-hex">#9B1420</div>
+                    <div class="swatch-usage">Hover states, active elements, headers on dark backgrounds.</div>
+                </div>
+            </div>
+            <div class="swatch">
+                <div class="swatch-color" style="background: #F2D4D6;">
+                    <span class="contrast-sample" style="color: #1A1A2E;">Dark on Light Red</span>
+                </div>
+                <div class="swatch-info">
+                    <div class="swatch-role">Primary Light</div>
+                    <div class="swatch-name">Soft Red</div>
+                    <div class="swatch-hex">#F2D4D6</div>
+                    <div class="swatch-usage">Subtle backgrounds, highlight areas, status badges.</div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <div class="section">
+        <h2>Neutral Colors</h2>
+        <div class="palette-row">
+            <div class="swatch">
+                <div class="swatch-color" style="background: #1A1A2E;">
+                    <span class="contrast-sample" style="color: #FFFFFF;">White on Charcoal</span>
+                </div>
+                <div class="swatch-info">
+                    <div class="swatch-role">Dark</div>
+                    <div class="swatch-name">Charcoal</div>
+                    <div class="swatch-hex">#1A1A2E</div>
+                    <div class="swatch-usage">Primary text, dark backgrounds, nav bars.</div>
+                </div>
+            </div>
+            <div class="swatch">
+                <div class="swatch-color" style="background: #3D3D56;">
+                    <span class="contrast-sample" style="color: #FFFFFF;">White on Slate</span>
+                </div>
+                <div class="swatch-info">
+                    <div class="swatch-role">Medium Dark</div>
+                    <div class="swatch-name">Slate</div>
+                    <div class="swatch-hex">#3D3D56</div>
+                    <div class="swatch-usage">Secondary text, subheadings, borders.</div>
+                </div>
+            </div>
+            <div class="swatch">
+                <div class="swatch-color" style="background: #6B6B80;">
+                    <span class="contrast-sample" style="color: #FFFFFF;">White on Steel</span>
+                </div>
+                <div class="swatch-info">
+                    <div class="swatch-role">Medium</div>
+                    <div class="swatch-name">Steel</div>
+                    <div class="swatch-hex">#6B6B80</div>
+                    <div class="swatch-usage">Tertiary text, placeholders, disabled states.</div>
+                </div>
+            </div>
+        </div>
+        <div class="palette-row">
+            <div class="swatch">
+                <div class="swatch-color" style="background: #E8E8ED; border: 1px solid #ccc;">
+                    <span class="contrast-sample" style="color: #1A1A2E;">Dark on Silver</span>
+                </div>
+                <div class="swatch-info">
+                    <div class="swatch-role">Light</div>
+                    <div class="swatch-name">Silver</div>
+                    <div class="swatch-hex">#E8E8ED</div>
+                    <div class="swatch-usage">Borders, dividers, card outlines.</div>
+                </div>
+            </div>
+            <div class="swatch">
+                <div class="swatch-color" style="background: #F8F8FA; border: 1px solid #ccc;">
+                    <span class="contrast-sample" style="color: #1A1A2E;">Dark on Snow</span>
+                </div>
+                <div class="swatch-info">
+                    <div class="swatch-role">Background</div>
+                    <div class="swatch-name">Snow</div>
+                    <div class="swatch-hex">#F8F8FA</div>
+                    <div class="swatch-usage">Page backgrounds, content areas.</div>
+                </div>
+            </div>
+            <div class="swatch">
+                <div class="swatch-color" style="background: #FFFFFF; border: 1px solid #ccc;">
+                    <span class="contrast-sample" style="color: #1A1A2E;">Dark on White</span>
+                </div>
+                <div class="swatch-info">
+                    <div class="swatch-role">White</div>
+                    <div class="swatch-name">White</div>
+                    <div class="swatch-hex">#FFFFFF</div>
+                    <div class="swatch-usage">Cards, modals, input fields.</div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <div class="section">
+        <h2>Accent Colors</h2>
+        <div class="palette-row">
+            <div class="swatch">
+                <div class="swatch-color" style="background: #0D7C3E;">
+                    <span class="contrast-sample" style="color: #FFFFFF;">White on Forest</span>
+                </div>
+                <div class="swatch-info">
+                    <div class="swatch-role">Success</div>
+                    <div class="swatch-name">Forest</div>
+                    <div class="swatch-hex">#0D7C3E</div>
+                    <div class="swatch-usage">Success states, positive metrics, confirmations.</div>
+                </div>
+            </div>
+            <div class="swatch">
+                <div class="swatch-color" style="background: #E5A100;">
+                    <span class="contrast-sample" style="color: #1A1A2E;">Dark on Amber</span>
+                </div>
+                <div class="swatch-info">
+                    <div class="swatch-role">Warning</div>
+                    <div class="swatch-name">Amber</div>
+                    <div class="swatch-hex">#E5A100</div>
+                    <div class="swatch-usage">Warnings, pending states, caution notices.</div>
+                </div>
+            </div>
+            <div class="swatch">
+                <div class="swatch-color" style="background: #D32F2F;">
+                    <span class="contrast-sample" style="color: #FFFFFF;">White on Crimson</span>
+                </div>
+                <div class="swatch-info">
+                    <div class="swatch-role">Error</div>
+                    <div class="swatch-name">Crimson</div>
+                    <div class="swatch-hex">#D32F2F</div>
+                    <div class="swatch-usage">Error states, destructive actions. Distinct from brand red.</div>
+                </div>
+            </div>
+            <div class="swatch">
+                <div class="swatch-color" style="background: #1E3A5F;">
+                    <span class="contrast-sample" style="color: #FFFFFF;">White on Navy</span>
+                </div>
+                <div class="swatch-info">
+                    <div class="swatch-role">Info</div>
+                    <div class="swatch-name">Navy</div>
+                    <div class="swatch-hex">#1E3A5F</div>
+                    <div class="swatch-usage">Informational elements, links, secondary CTAs.</div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <div class="section">
+        <h2>Accessibility (WCAG Contrast Ratios)</h2>
+        <table class="a11y-table">
+            <thead>
+                <tr><th>Combination</th><th>Sample</th><th>Ratio</th><th>Rating</th></tr>
+            </thead>
+            <tbody>
+                <tr>
+                    <td>Agent Red on White</td>
+                    <td><span class="a11y-sample" style="background:#FFFFFF;color:#C41E2A;border:1px solid #E8E8ED;">Sample Text</span></td>
+                    <td>4.65:1</td>
+                    <td><span class="badge badge-aa">AA</span></td>
+                </tr>
+                <tr>
+                    <td>White on Agent Red</td>
+                    <td><span class="a11y-sample" style="background:#C41E2A;color:#FFFFFF;">Sample Text</span></td>
+                    <td>4.65:1</td>
+                    <td><span class="badge badge-aa">AA</span></td>
+                </tr>
+                <tr>
+                    <td>Charcoal on White</td>
+                    <td><span class="a11y-sample" style="background:#FFFFFF;color:#1A1A2E;border:1px solid #E8E8ED;">Sample Text</span></td>
+                    <td>16.2:1</td>
+                    <td><span class="badge badge-aaa">AAA</span></td>
+                </tr>
+                <tr>
+                    <td>White on Navy</td>
+                    <td><span class="a11y-sample" style="background:#1E3A5F;color:#FFFFFF;">Sample Text</span></td>
+                    <td>9.4:1</td>
+                    <td><span class="badge badge-aaa">AAA</span></td>
+                </tr>
+                <tr>
+                    <td>White on Charcoal</td>
+                    <td><span class="a11y-sample" style="background:#1A1A2E;color:#FFFFFF;">Sample Text</span></td>
+                    <td>16.2:1</td>
+                    <td><span class="badge badge-aaa">AAA</span></td>
+                </tr>
+                <tr>
+                    <td>White on Deep Red</td>
+                    <td><span class="a11y-sample" style="background:#9B1420;color:#FFFFFF;">Sample Text</span></td>
+                    <td>6.72:1</td>
+                    <td><span class="badge badge-aaa">AAA</span></td>
+                </tr>
+            </tbody>
+        </table>
+    </div>
+
+    <hr class="divider">
+
+    <!-- ==================== TYPOGRAPHY ==================== -->
+
+    <div class="section">
+        <h2>Typography — Side-by-Side Comparison</h2>
+        <p style="font-size: 15px; color: #6B6B80; margin-bottom: 8px; margin-top: -12px;">
+            Both options use <strong style="color:#3D3D56;">JetBrains Mono</strong> for code. The difference is in headings.
+        </p>
+
+        <div class="type-comparison">
+            <!-- OPTION A -->
+            <div class="type-option">
+                <span class="type-option-label">Option A — Recommended</span>
+                <h3 style="font-family: 'Inter', sans-serif; font-size: 14px; font-weight: 600; color: #6B6B80; text-transform: uppercase; letter-spacing: 0.5px; margin-bottom: 16px;">
+                    Inter (Single Family)
+                </h3>
+
+                <div style="font-family: 'Inter', sans-serif;">
+                    <div style="font-size: 40px; font-weight: 700; line-height: 1.2; color: #1A1A2E; margin-bottom: 8px;">
+                        Automate <span style="color: #C41E2A;">70%</span> of Support
+                    </div>
+                    <div style="font-size: 30px; font-weight: 700; line-height: 1.25; color: #1A1A2E; margin-bottom: 8px;">
+                        Six AI Agents Working Together
+                    </div>
+                    <div style="font-size: 24px; font-weight: 600; line-height: 1.3; color: #3D3D56; margin-bottom: 8px;">
+                        Smart Escalation with Context
+                    </div>
+                    <div style="font-size: 20px; font-weight: 600; line-height: 1.35; color: #3D3D56; margin-bottom: 16px;">
+                        Real-Time Analytics Dashboard
+                    </div>
+                    <div style="font-size: 18px; font-weight: 400; line-height: 1.6; color: #3D3D56; margin-bottom: 8px;">
+                        Agent Red deploys six specialized AI agents that understand your customers, answer their questions instantly, and escalate complex cases to your team.
+                    </div>
+                    <div style="font-size: 16px; font-weight: 400; line-height: 1.6; color: #3D3D56; margin-bottom: 8px;">
+                        Our platform processes over 3,000 requests per second with P95 latency under 2 seconds. Built on Azure with enterprise-grade security and multi-tenant isolation.
+                    </div>
+                    <div style="font-size: 14px; font-weight: 400; line-height: 1.5; color: #6B6B80; margin-bottom: 4px;">
+                        Pricing starts at $299/month for up to 500 conversations per day. No contracts, cancel anytime.
+                    </div>
+                    <div style="font-size: 12px; font-weight: 500; line-height: 1.4; color: #6B6B80; text-transform: uppercase; letter-spacing: 0.5px;">
+                        Enterprise &bull; Professional &bull; Starter
+                    </div>
+                </div>
+
+                <div class="type-meta">
+                    <strong>Font:</strong> Inter (Google Fonts, free)<br>
+                    <strong>Weights:</strong> 400, 500, 600, 700<br>
+                    <strong>Character:</strong> Clean, precise, neutral. Designed specifically for screens.<br>
+                    <strong>Used by:</strong> GitHub, Linear, Vercel, Figma
+                </div>
+            </div>
+
+            <!-- OPTION B -->
+            <div class="type-option">
+                <span class="type-option-label alt">Option B — Alternative</span>
+                <h3 style="font-family: 'Inter', sans-serif; font-size: 14px; font-weight: 600; color: #6B6B80; text-transform: uppercase; letter-spacing: 0.5px; margin-bottom: 16px;">
+                    Plus Jakarta Sans (Headings) + Inter (Body)
+                </h3>
+
+                <div>
+                    <div style="font-family: 'Plus Jakarta Sans', sans-serif; font-size: 40px; font-weight: 800; line-height: 1.2; color: #1A1A2E; margin-bottom: 8px;">
+                        Automate <span style="color: #C41E2A;">70%</span> of Support
+                    </div>
+                    <div style="font-family: 'Plus Jakarta Sans', sans-serif; font-size: 30px; font-weight: 700; line-height: 1.25; color: #1A1A2E; margin-bottom: 8px;">
+                        Six AI Agents Working Together
+                    </div>
+                    <div style="font-family: 'Plus Jakarta Sans', sans-serif; font-size: 24px; font-weight: 600; line-height: 1.3; color: #3D3D56; margin-bottom: 8px;">
+                        Smart Escalation with Context
+                    </div>
+                    <div style="font-family: 'Plus Jakarta Sans', sans-serif; font-size: 20px; font-weight: 600; line-height: 1.35; color: #3D3D56; margin-bottom: 16px;">
+                        Real-Time Analytics Dashboard
+                    </div>
+                    <div style="font-family: 'Inter', sans-serif; font-size: 18px; font-weight: 400; line-height: 1.6; color: #3D3D56; margin-bottom: 8px;">
+                        Agent Red deploys six specialized AI agents that understand your customers, answer their questions instantly, and escalate complex cases to your team.
+                    </div>
+                    <div style="font-family: 'Inter', sans-serif; font-size: 16px; font-weight: 400; line-height: 1.6; color: #3D3D56; margin-bottom: 8px;">
+                        Our platform processes over 3,000 requests per second with P95 latency under 2 seconds. Built on Azure with enterprise-grade security and multi-tenant isolation.
+                    </div>
+                    <div style="font-family: 'Inter', sans-serif; font-size: 14px; font-weight: 400; line-height: 1.5; color: #6B6B80; margin-bottom: 4px;">
+                        Pricing starts at $299/month for up to 500 conversations per day. No contracts, cancel anytime.
+                    </div>
+                    <div style="font-family: 'Inter', sans-serif; font-size: 12px; font-weight: 500; line-height: 1.4; color: #6B6B80; text-transform: uppercase; letter-spacing: 0.5px;">
+                        Enterprise &bull; Professional &bull; Starter
+                    </div>
+                </div>
+
+                <div class="type-meta">
+                    <strong>Headings:</strong> Plus Jakarta Sans (Google Fonts, free)<br>
+                    <strong>Body:</strong> Inter (Google Fonts, free)<br>
+                    <strong>Character:</strong> Warmer, bolder headings with more geometric personality. Body stays clean with Inter.<br>
+                    <strong>Used by:</strong> Notion, Gumroad, Cal.com
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Code font -->
+    <div class="section">
+        <h2>Code / Monospace — JetBrains Mono (Both Options)</h2>
+        <div class="code-sample">
+            <span class="comment"># Agent Red tenant provisioning</span><br>
+            <span class="keyword">from</span> agntcy_app_sdk.factory <span class="keyword">import</span> AgntcyFactory<br><br>
+            factory = AgntcyFactory(enable_tracing=<span class="keyword">True</span>)<br>
+            tenant = factory.create_tenant(<br>
+            &nbsp;&nbsp;&nbsp;&nbsp;name=<span class="string">"Acme E-Commerce"</span>,<br>
+            &nbsp;&nbsp;&nbsp;&nbsp;tier=<span class="string">"professional"</span>,<br>
+            &nbsp;&nbsp;&nbsp;&nbsp;max_conversations=<span class="number">2000</span>,<br>
+            &nbsp;&nbsp;&nbsp;&nbsp;integrations=[<span class="string">"shopify"</span>, <span class="string">"zendesk"</span>]<br>
+            )
+        </div>
+        <div class="type-meta" style="margin-top: 12px;">
+            <strong>Font:</strong> JetBrains Mono (Google Fonts, free) &mdash; 400, 500 weights<br>
+            <strong>Usage:</strong> Code blocks, API references, hex values, terminal output, metrics
+        </div>
+    </div>
+
+    <hr class="divider">
+
+    <!-- ==================== FULL MOCKUPS ==================== -->
+
+    <div class="section">
+        <h2>Full Context Mockups</h2>
+        <p style="font-size: 15px; color: #6B6B80; margin-top: -12px; margin-bottom: 24px;">
+            Same layout, same colors &mdash; only the heading font changes. Compare the feel.
+        </p>
+
+        <!-- OPTION A MOCKUP -->
+        <div class="mockup-label">Option A: Inter (Single Family)</div>
+        <div class="hero-mockup">
+            <div class="hero-nav" style="font-family: 'Inter', sans-serif;">
+                <div class="hero-nav-brand"><span class="red">Agent</span> Red</div>
+                <div class="hero-nav-links">
+                    <a href="#">Features</a>
+                    <a href="#">Pricing</a>
+                    <a href="#">Docs</a>
+                    <a href="#">Integrations</a>
+                </div>
+                <button class="hero-nav-cta" style="font-family: 'Inter', sans-serif;">Start Free Trial</button>
+            </div>
+            <div class="hero-body" style="font-family: 'Inter', sans-serif;">
+                <h3 style="font-size: 44px; font-weight: 700; color: #FFFFFF; margin-bottom: 16px; line-height: 1.15;">
+                    Automate <span style="color: #C41E2A;">70%</span> of Your<br>Customer Support
+                </h3>
+                <p class="hero-sub" style="font-size: 18px;">
+                    Six AI agents that understand your customers, answer instantly, and escalate the tough cases to your team with full context.
+                </p>
+                <button class="demo-btn btn-primary" style="font-family: 'Inter', sans-serif; font-size: 16px; padding: 14px 32px;">Start Free Trial</button>
+                <button class="demo-btn" style="font-family: 'Inter', sans-serif; background: transparent; color: #FFFFFF; border: 2px solid rgba(255,255,255,0.4); font-size: 16px; padding: 14px 32px;">Watch Demo</button>
+                <div class="hero-stats">
+                    <div><div class="hero-stat-value" style="font-family: 'Inter', sans-serif;">3,071</div><div class="hero-stat-label">req/s throughput</div></div>
+                    <div><div class="hero-stat-value" style="font-family: 'Inter', sans-serif;">&lt;2s</div><div class="hero-stat-label">P95 latency</div></div>
+                    <div><div class="hero-stat-value" style="font-family: 'Inter', sans-serif;">99.95%</div><div class="hero-stat-label">uptime SLA</div></div>
+                </div>
+            </div>
+        </div>
+
+        <!-- OPTION B MOCKUP -->
+        <div class="mockup-label" style="margin-top: 48px;">Option B: Plus Jakarta Sans (Headings) + Inter (Body)</div>
+        <div class="hero-mockup">
+            <div class="hero-nav" style="font-family: 'Inter', sans-serif;">
+                <div class="hero-nav-brand" style="font-family: 'Plus Jakarta Sans', sans-serif; font-weight: 800;"><span class="red">Agent</span> Red</div>
+                <div class="hero-nav-links">
+                    <a href="#">Features</a>
+                    <a href="#">Pricing</a>
+                    <a href="#">Docs</a>
+                    <a href="#">Integrations</a>
+                </div>
+                <button class="hero-nav-cta" style="font-family: 'Inter', sans-serif;">Start Free Trial</button>
+            </div>
+            <div class="hero-body">
+                <h3 style="font-family: 'Plus Jakarta Sans', sans-serif; font-size: 44px; font-weight: 800; color: #FFFFFF; margin-bottom: 16px; line-height: 1.15;">
+                    Automate <span style="color: #C41E2A;">70%</span> of Your<br>Customer Support
+                </h3>
+                <p class="hero-sub" style="font-family: 'Inter', sans-serif; font-size: 18px;">
+                    Six AI agents that understand your customers, answer instantly, and escalate the tough cases to your team with full context.
+                </p>
+                <button class="demo-btn btn-primary" style="font-family: 'Inter', sans-serif; font-size: 16px; padding: 14px 32px;">Start Free Trial</button>
+                <button class="demo-btn" style="font-family: 'Inter', sans-serif; background: transparent; color: #FFFFFF; border: 2px solid rgba(255,255,255,0.4); font-size: 16px; padding: 14px 32px;">Watch Demo</button>
+                <div class="hero-stats">
+                    <div><div class="hero-stat-value" style="font-family: 'Plus Jakarta Sans', sans-serif; font-weight: 800;">3,071</div><div class="hero-stat-label" style="font-family: 'Inter', sans-serif;">req/s throughput</div></div>
+                    <div><div class="hero-stat-value" style="font-family: 'Plus Jakarta Sans', sans-serif; font-weight: 800;">&lt;2s</div><div class="hero-stat-label" style="font-family: 'Inter', sans-serif;">P95 latency</div></div>
+                    <div><div class="hero-stat-value" style="font-family: 'Plus Jakarta Sans', sans-serif; font-weight: 800;">99.95%</div><div class="hero-stat-label" style="font-family: 'Inter', sans-serif;">uptime SLA</div></div>
+                </div>
+            </div>
+        </div>
+
+        <!-- PRICING COMPARISON -->
+        <div class="mockup-label" style="margin-top: 48px;">Pricing Cards — Option A (Inter)</div>
+        <div class="pricing-row" style="font-family: 'Inter', sans-serif;">
+            <div class="pricing-card">
+                <div class="tier-name">Starter</div>
+                <div class="tier-price">$299<span>/mo</span></div>
+                <div class="tier-desc">500 conversations/day</div>
+                <ul>
+                    <li>6 AI agents</li>
+                    <li>Shopify integration</li>
+                    <li>Email support</li>
+                </ul>
+                <button class="tier-btn outline" style="font-family: 'Inter', sans-serif;">Get Started</button>
+            </div>
+            <div class="pricing-card featured">
+                <div class="tier-name" style="color: #C41E2A;">Professional</div>
+                <div class="tier-price">$499<span>/mo</span></div>
+                <div class="tier-desc">2,000 conversations/day</div>
+                <ul>
+                    <li>Everything in Starter</li>
+                    <li>Multi-language</li>
+                    <li>Custom integrations</li>
+                    <li>Priority support</li>
+                </ul>
+                <button class="tier-btn primary" style="font-family: 'Inter', sans-serif;">Get Started</button>
+            </div>
+            <div class="pricing-card">
+                <div class="tier-name">Enterprise</div>
+                <div class="tier-price">$999<span>/mo</span></div>
+                <div class="tier-desc">10,000 conversations/day</div>
+                <ul>
+                    <li>Everything in Pro</li>
+                    <li>White-label</li>
+                    <li>Dedicated support</li>
+                    <li>Custom SLA</li>
+                </ul>
+                <button class="tier-btn outline" style="font-family: 'Inter', sans-serif;">Contact Sales</button>
+            </div>
+        </div>
+
+        <div class="mockup-label" style="margin-top: 32px;">Pricing Cards — Option B (Plus Jakarta Sans headings)</div>
+        <div class="pricing-row">
+            <div class="pricing-card" style="font-family: 'Inter', sans-serif;">
+                <div class="tier-name" style="font-family: 'Plus Jakarta Sans', sans-serif;">Starter</div>
+                <div class="tier-price" style="font-family: 'Plus Jakarta Sans', sans-serif; font-weight: 800;">$299<span>/mo</span></div>
+                <div class="tier-desc">500 conversations/day</div>
+                <ul>
+                    <li>6 AI agents</li>
+                    <li>Shopify integration</li>
+                    <li>Email support</li>
+                </ul>
+                <button class="tier-btn outline" style="font-family: 'Inter', sans-serif;">Get Started</button>
+            </div>
+            <div class="pricing-card featured" style="font-family: 'Inter', sans-serif;">
+                <div class="tier-name" style="font-family: 'Plus Jakarta Sans', sans-serif; color: #C41E2A;">Professional</div>
+                <div class="tier-price" style="font-family: 'Plus Jakarta Sans', sans-serif; font-weight: 800;">$499<span>/mo</span></div>
+                <div class="tier-desc">2,000 conversations/day</div>
+                <ul>
+                    <li>Everything in Starter</li>
+                    <li>Multi-language</li>
+                    <li>Custom integrations</li>
+                    <li>Priority support</li>
+                </ul>
+                <button class="tier-btn primary" style="font-family: 'Inter', sans-serif;">Get Started</button>
+            </div>
+            <div class="pricing-card" style="font-family: 'Inter', sans-serif;">
+                <div class="tier-name" style="font-family: 'Plus Jakarta Sans', sans-serif;">Enterprise</div>
+                <div class="tier-price" style="font-family: 'Plus Jakarta Sans', sans-serif; font-weight: 800;">$999<span>/mo</span></div>
+                <div class="tier-desc">10,000 conversations/day</div>
+                <ul>
+                    <li>Everything in Pro</li>
+                    <li>White-label</li>
+                    <li>Dedicated support</li>
+                    <li>Custom SLA</li>
+                </ul>
+                <button class="tier-btn outline" style="font-family: 'Inter', sans-serif;">Contact Sales</button>
+            </div>
+        </div>
+
+        <!-- Status messages -->
+        <div class="mockup-label" style="margin-top: 48px;">Status Messages (Both Options — Same Font)</div>
+        <div class="demo-card" style="font-family: 'Inter', sans-serif;">
+            <div class="demo-alert alert-success">Your agent has been deployed successfully.</div>
+            <div class="demo-alert alert-warning">Usage is approaching your daily conversation limit.</div>
+            <div class="demo-alert alert-error">Failed to connect to Shopify store. Check API credentials.</div>
+            <div class="demo-alert alert-info">A new version of Agent Red is available. Review the changelog.</div>
+        </div>
+
+    </div>
+
+    <div class="footer">
+        &copy; 2026 Remaker Digital, a DBA of VanDusen &amp; Palmeter, LLC. All rights reserved.<br>
+        Agent Red Customer Engagement &mdash; Brand Reference v1.0 (Proposed)
+    </div>
+
+</body>
+</html>

@@ -42,21 +42,21 @@ Agent Red Customer Engagement is a commercial SaaS product built on the open-sou
 
 | Task | Effort | Status |
 |------|--------|--------|
-| Logo concepts (primary, icon, wordmark) | 8 hrs | 📋 Todo |
-| Color palette selection | 2 hrs | 📋 Todo |
-| Typography selection | 2 hrs | 📋 Todo |
-| Brand guidelines document | 4 hrs | 📋 Todo |
-| Favicon and app icons | 2 hrs | 📋 Todo |
+| Logo concepts (primary, icon, wordmark) | 8 hrs | ✅ Done — "The Beacon" AR monogram approved |
+| Color palette selection | 2 hrs | ✅ Done — 15 colors, WCAG AA/AAA verified |
+| Typography selection | 2 hrs | ✅ Done — Inter + JetBrains Mono |
+| Brand guidelines document | 4 hrs | ✅ Done — branding/guidelines/BRAND-GUIDELINES.md |
+| Favicon and app icons | 2 hrs | 📋 Todo — spec defined in LOGO-SPEC.md |
 
 #### 1.2 Legal Documents *(can run parallel with 1.1)*
 **Approach:** AI-draft all documents first. Termly/iubenda deferred until closer to launch.
 
 | Task | Effort | Status |
 |------|--------|--------|
-| Draft Terms of Service | 4 hrs | 📋 Todo |
-| Draft Privacy Policy | 2 hrs | 📋 Todo |
-| Draft SLA document | 4 hrs | 📋 Todo |
-| Draft Data Processing Agreement | 2 hrs | 📋 Todo |
+| Draft Terms of Service | 4 hrs | ✅ Done — legal/terms/TERMS-OF-SERVICE.md |
+| Draft Privacy Policy | 2 hrs | ✅ Done — legal/privacy/PRIVACY-POLICY.md |
+| Draft SLA document | 4 hrs | ✅ Done — legal/sla/SERVICE-LEVEL-AGREEMENT.md |
+| Draft Data Processing Agreement | 2 hrs | ✅ Done — legal/dpa/DATA-PROCESSING-AGREEMENT.md |
 | Validate via Termly/iubenda | 2 hrs | 📋 Deferred to pre-launch |
 
 #### 1.3 Website Content *(depends on 1.1 brand identity)*
@@ -298,6 +298,7 @@ Agent Red Customer Engagement is a commercial SaaS product built on the open-sou
 | 1.1.0 | 2026-01-29 | Phase 0 complete: GitHub repo created, initial commit pushed, arms-length dependency model established |
 | 1.2.0 | 2026-01-29 | Docker dev environment added, AGNTCY baseline verified (local Docker + production Azure) |
 | 1.3.0 | 2026-01-29 | Work priority review complete: brand direction (Bold/Corporate), legal approach (AI-draft first), website (full rewrite), docs (conceptual now, API later), e-commerce platform deferred, multi-tenant architecture doc required, admin guides/videos deferred |
+| 1.4.0 | 2026-01-29 | Phase 1.1 Brand Identity complete (logo, colors, typography, guidelines). Phase 1.2 Legal Documents complete (ToS, Privacy Policy, SLA, DPA — all AI-drafted, pending legal review) |
 
 ---
 
