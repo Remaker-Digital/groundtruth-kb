@@ -4,6 +4,20 @@ Stripe Checkout session management.
 Provides FastAPI endpoints for creating Stripe Checkout Sessions
 (subscription signup), and handling success/cancel redirects.
 
+Tax handling (Stripe Tax):
+    All Checkout Sessions are created with ``automatic_tax={"enabled": True}``.
+    Stripe Tax calculates the applicable sales tax / VAT based on the
+    customer's billing address (which is collected as required). Tax is
+    exclusive (added on top of the listed price), matching US B2B SaaS
+    convention. Products carry tax code ``txcd_10103001`` (SaaS — Business
+    Use). Tax ID collection is enabled so business customers can provide
+    their VAT / tax ID at checkout.
+
+    Prerequisites (Stripe Dashboard):
+      1. Origin address set to Delaware, USA.
+      2. Default tax behavior set to "Exclusive".
+      3. Tax registrations added for nexus states.
+
 Affiliate tracking (Rewardful):
     When a visitor arrives via an affiliate link (?via=token), the
     Rewardful JavaScript snippet stores a referral UUID in a first-party
@@ -214,6 +228,13 @@ async def create_checkout_session(body: CheckoutRequest) -> CheckoutResponse:
         "billing_address_collection": "required",
         # Allow promotion codes at checkout
         "allow_promotion_codes": True,
+        # Stripe Tax: calculate sales tax / VAT automatically based on
+        # the customer's billing address. Requires origin address and
+        # tax registrations to be configured in Stripe Dashboard.
+        "automatic_tax": {"enabled": True},
+        # Allow business customers to provide their tax ID (VAT, etc.)
+        # at checkout. Stripe validates the ID format automatically.
+        "tax_id_collection": {"enabled": True},
     }
 
     # Rewardful affiliate tracking: pass the referral UUID as

@@ -98,19 +98,19 @@ Agent Red Customer Engagement is a commercial SaaS product built on the open-sou
 | Task | Effort | Status |
 |------|--------|--------|
 | Evaluate Shopify vs Stripe vs Paddle for SaaS subscriptions | 4 hrs | ✅ Done — Three-way evaluation complete, dual-channel recommended and approved |
-| Create Stripe account (live + test mode) | 1 hr | 📋 Todo |
-| Create Products, Prices, Coupons in Stripe (test mode) | 2 hrs | 📋 Todo |
-| Implement Stripe Checkout for plan selection | 4 hrs | 📋 Todo |
-| Implement Stripe webhook handler (subscription lifecycle) | 8 hrs | 📋 Todo |
-| Implement metered usage reporting to Stripe | 4 hrs | 📋 Todo |
-| Add Shopify Billing API integration to existing Shopify app code | 8 hrs | 📋 Todo |
+| Create Stripe account (live + test mode) | 1 hr | ✅ Done — Test mode configured, catalog script created |
+| Create Products, Prices, Coupons in Stripe (test mode) | 2 hrs | ✅ Done — 27 Stripe objects (config/stripe_product_ids.json) |
+| Implement Stripe Checkout for plan selection | 4 hrs | ✅ Done — src/integrations/stripe_checkout.py |
+| Implement Stripe webhook handler (subscription lifecycle) | 8 hrs | ✅ Done — src/integrations/stripe_webhooks.py (7 events) |
+| Implement metered usage reporting to Stripe | 4 hrs | ✅ Done — src/integrations/stripe_usage.py (3-tier consumption) |
+| Add Shopify Billing API integration to existing Shopify app code | 8 hrs | ✅ Done — src/integrations/shopify_billing.py + shopify_client.py |
 | Create Shopify App Store listing (description, screenshots, demo) | 4 hrs | 📋 Todo |
 | Submit for Shopify App Store review | 1 hr | 📋 Todo |
-| Implement Stripe Customer Portal link | 1 hr | 📋 Todo |
-| Implement conversation pack purchase flow | 4 hrs | 📋 Todo |
-| Build unified webhook handler (both channels → provisioning) | 8 hrs | 📋 Todo |
-| Set up Stripe Tax | 2 hrs | 📋 Todo |
-| Set up Rewardful for affiliate program | 4 hrs | 📋 Todo |
+| Implement Stripe Customer Portal link | 1 hr | ✅ Done — src/integrations/stripe_portal.py |
+| Implement conversation pack purchase flow | 4 hrs | ✅ Done — src/integrations/stripe_packs.py (FIFO, 90-day validity) |
+| Build unified webhook handler (both channels → provisioning) | 8 hrs | ✅ Done — src/integrations/provisioning.py (channel-agnostic) |
+| Set up Stripe Tax | 2 hrs | ✅ Done — automatic_tax on Checkout, tax_code on Products, tax_behavior on Prices, finalization_failed handler, migration script |
+| Set up Rewardful for affiliate program | 4 hrs | ✅ Done — client_reference_id integration, live connection deferred (Rewardful requires live Stripe) |
 | Test checkout flows (both channels) | 4 hrs | 📋 Todo |
 
 #### 2.2 Multi-Tenant Infrastructure

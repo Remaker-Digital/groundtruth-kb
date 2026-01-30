@@ -12,7 +12,7 @@ This document provides context and guidance for AI assistants working on the Age
 | **Brand Name** | Agent Red Customer Engagement |
 | **Release** | Launch 1.0 |
 | **Type** | Commercial SaaS Product |
-| **Status** | Phase 2.1 E-Commerce ~85% Complete — 10 billing modules, 7 API routers built |
+| **Status** | Phase 2.1 E-Commerce ~90% Complete — 10 billing modules, 7 API routers, Stripe Tax configured |
 | **Owner** | Remaker Digital (DBA of VanDusen & Palmeter, LLC) |
 
 ---
@@ -509,7 +509,7 @@ E:\Claude-Playground\CLAUDE-PROJECTS\Agent Red Customer Engagement\
 │   │   ├── stripe_packs.py         # Conversation pack purchase & FIFO balance tracking
 │   │   ├── stripe_portal.py        # Stripe Customer Portal session management
 │   │   ├── stripe_usage.py         # Metered usage reporting (3-tier: included→packs→overage)
-│   │   ├── stripe_webhooks.py      # Stripe webhook handler (6 events → provisioning)
+│   │   ├── stripe_webhooks.py      # Stripe webhook handler (7 events → provisioning + tax)
 │   │   ├── shopify_client.py       # Async Shopify GraphQL API client (httpx)
 │   │   └── shopify_billing.py      # Shopify Billing API (subscriptions + usage charges)
 │   ├── multi-tenant/               # Tenant management (Phase 2.2)
@@ -543,7 +543,7 @@ E:\Claude-Playground\CLAUDE-PROJECTS\Agent Red Customer Engagement\
 │
 └── scripts/                        # Automation scripts
     ├── setup/                      # Project setup
-    ├── stripe/                     # Stripe catalog creation script
+    ├── stripe/                     # Stripe catalog creation + tax migration scripts
     ├── build/                      # Build automation
     └── deploy/                     # Deployment scripts
 ```
@@ -587,7 +587,7 @@ Continue work on Agent Red Customer Engagement commercial project.
 Location: E:\Claude-Playground\CLAUDE-PROJECTS\Agent Red Customer Engagement
 Key files: CLAUDE.md, docs/PROJECT-PLAN.md
 Current status: Phases 0-1.4 complete. Phase 2.1 e-commerce implementation ~85% complete — all billing code built (10 modules, 7 API routers). Phase 2.5 Persistent Customer Memory planning complete.
-Completed in Phase 2.1: Stripe product catalog (27 objects), Checkout integration (with Rewardful referral tracking), webhook handler (6 events → provisioning), metered usage reporting (3-tier: included→packs→overage), Shopify Billing API (GraphQL, subscriptions + usage), conversation pack purchase flow (FIFO balance), unified provisioning service (channel-agnostic, Stripe + Shopify), Customer Portal, Rewardful affiliate integration.
+Completed in Phase 2.1: Stripe product catalog (27 objects), Checkout integration (with Rewardful referral tracking), webhook handler (7 events → provisioning + tax), metered usage reporting (3-tier: included→packs→overage), Shopify Billing API (GraphQL, subscriptions + usage), conversation pack purchase flow (FIFO balance), unified provisioning service (channel-agnostic, Stripe + Shopify), Customer Portal, Rewardful affiliate integration.
 Remaining Phase 2.1: Stripe Tax setup, Shopify App Store listing (content/creative), App Store review submission, test checkout flows (both channels).
 Please review CLAUDE.md status section and proceed with the next work item, presenting one item at a time for review per the iterative working style documented in CLAUDE.md.
 ```
@@ -699,7 +699,7 @@ This applies to: work priority reviews, architecture decisions, scope changes, m
 - [x] Unified webhook handler (both channels → provisioning) — src/integrations/provisioning.py (BillingChannel enum, TenantStatus lifecycle, channel-agnostic provision/activate/update/deactivate/flag)
 - [x] Stripe Customer Portal — src/integrations/stripe_portal.py (POST /api/billing/portal, tenant lookup for Stripe customer ID resolution)
 - [x] Rewardful affiliate integration — client_reference_id on Checkout Sessions, docs/architecture/REWARDFUL-INTEGRATION.md (live Stripe connection deferred — Rewardful does not support test mode)
-- [ ] Stripe Tax setup
+- [x] Stripe Tax setup — automatic_tax on Checkout Sessions (subscription + payment mode), tax_code `txcd_10103001` (SaaS — Business Use) on Products, tax_behavior `exclusive` on new Prices, tax_id_collection for business VAT/tax IDs, invoice.finalization_failed webhook handler, migration script for existing Products (scripts/stripe/update_tax_codes.py)
 - [ ] Shopify App Store listing (description, screenshots, demo)
 - [ ] App Store review submission
 - [ ] Test checkout flows (both channels)
@@ -722,6 +722,8 @@ This applies to: work priority reviews, architecture decisions, scope changes, m
 - **3-tier conversation consumption:** Included allowance (free) → Pack balance (FIFO, oldest-first, 90-day expiry) → Stripe Billing Meter (overage).
 - **In-memory dev stores:** All state (usage counters, pack balances, tenant records) uses in-memory dicts with DEVELOPMENT ONLY warnings. Production replacement: Cosmos DB with tenant partitioning (Phase 2.2).
 - **Rewardful requires live Stripe:** OAuth connection deferred to launch. Code integration (client_reference_id) works in test mode.
+- **Stripe Tax: exclusive pricing, SaaS B2B tax code:** All Checkout Sessions enable `automatic_tax`. Products carry `txcd_10103001` (SaaS — Business Use). Prices use `tax_behavior="exclusive"` (tax added on top, US B2B standard). `tax_id_collection` enabled for business VAT/tax IDs. Dashboard prerequisites: origin address (Delaware), default tax behavior, nexus state registrations. Cost: $0.50/transaction (Stripe Tax Basic).
+- **invoice.finalization_failed handler added:** Catches cases where Stripe Tax cannot determine customer location (invalid/missing address). Flags tenant for payment issue and logs for investigation.
 
 **Phase 2.5: Persistent Customer Memory (Planned)**
 - [ ] Design customer preference profile schema
@@ -760,4 +762,4 @@ This applies to: work priority reviews, architecture decisions, scope changes, m
 
 *© 2026 Remaker Digital, a DBA of VanDusen & Palmeter, LLC. All rights reserved.*
 *Last Updated: 2026-01-30*
-*Version: 5.0.0*
+*Version: 5.1.0*

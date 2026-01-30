@@ -346,6 +346,11 @@ async def purchase_pack_endpoint(body: PurchasePackRequest) -> PurchasePackRespo
                 "agent_red_pack": body.pack_id,
                 "agent_red_pack_conversations": str(pack.conversations),
             },
+            # Stripe Tax: calculate sales tax / VAT automatically.
+            automatic_tax={"enabled": True},
+            # Persist the billing address entered during checkout back
+            # to the Customer object for future invoice tax calculations.
+            customer_update={"address": "auto"},
         )
     except stripe.StripeError as exc:
         logger.error("Pack checkout session creation failed: %s", exc)

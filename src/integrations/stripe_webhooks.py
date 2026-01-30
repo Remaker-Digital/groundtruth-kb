@@ -15,6 +15,7 @@ Handled events:
     - customer.subscription.deleted
     - invoice.payment_succeeded
     - invoice.payment_failed
+    - invoice.finalization_failed
 
 © 2026 Remaker Digital, a DBA of VanDusen & Palmeter, LLC. All rights reserved.
 """
@@ -602,5 +603,59 @@ async def handle_payment_failed(event: dict) -> dict:
 
     # TODO (Phase 2.2): Send payment failure notification to customer
     # await notification_service.send_payment_failed(result)
+
+    return result
+
+
+@_handles("invoice.finalization_failed")
+async def handle_finalization_failed(event: dict) -> dict:
+    """Invoice could not be finalized — likely a Stripe Tax failure.
+
+    When ``automatic_tax`` is enabled on subscriptions, Stripe Tax must
+    determine the customer's location to calculate tax. If the customer's
+    address is missing or invalid, the invoice cannot be finalized and
+    this event fires. Without handling it, subscription renewals silently
+    stall.
+
+    The ``automatic_tax.status`` field on the invoice indicates the
+    cause:
+      - ``requires_location_inputs`` — address data is insufficient
+      - ``failed`` — tax calculation encountered an error
+      - ``complete`` — tax was calculated (unlikely in this event)
+    """
+    invoice = event["data"]["object"]
+    automatic_tax = invoice.get("automatic_tax", {})
+    last_error = invoice.get("last_finalization_error", {})
+
+    result = {
+        "action": "invoice_finalization_failed",
+        "stripe_invoice_id": invoice["id"],
+        "stripe_subscription_id": invoice.get("subscription"),
+        "stripe_customer_id": invoice.get("customer"),
+        "automatic_tax_status": automatic_tax.get("status"),
+        "error_type": last_error.get("type"),
+        "error_message": last_error.get("message"),
+    }
+
+    logger.warning(
+        "Invoice finalization failed: invoice=%s customer=%s "
+        "tax_status=%s error=%s",
+        result["stripe_invoice_id"],
+        result["stripe_customer_id"],
+        result["automatic_tax_status"],
+        result["error_message"] or result["error_type"] or "unknown",
+    )
+
+    # Flag the tenant so the customer portal can prompt for address update
+    if result["stripe_customer_id"]:
+        tenant = flag_payment_issue(
+            stripe_customer_id=result["stripe_customer_id"],
+        )
+        if tenant:
+            result["tenant_id"] = tenant.tenant_id
+            result["tenant_status"] = tenant.status.value
+
+    # TODO (Phase 2.2): Send notification asking customer to update
+    # their billing address via the Stripe Customer Portal.
 
     return result

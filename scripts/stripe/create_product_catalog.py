@@ -43,6 +43,16 @@ OUTPUT_PATH = PROJECT_ROOT / "config" / "stripe_product_ids.json"
 # Metadata key used to make lookups idempotent
 META_KEY = "agent_red_id"
 
+# Tax code for SaaS — Business Use (Stripe product tax code).
+# Applied to all Agent Red products so Stripe Tax can determine
+# the correct tax rate per jurisdiction. SaaS is taxable in ~25 US
+# states; this code distinguishes B2B SaaS from B2C.
+TAX_CODE_SAAS_B2B = "txcd_10103001"
+
+# Tax behavior for all prices. "exclusive" means tax is added on
+# top of the listed price (standard for US B2B SaaS).
+TAX_BEHAVIOR = "exclusive"
+
 # ---------------------------------------------------------------------------
 # Product catalog definition
 # ---------------------------------------------------------------------------
@@ -200,10 +210,19 @@ def ensure_product(
     description: str,
     extra_metadata: dict | None = None,
 ) -> stripe.Product:
-    """Create a product if it doesn't already exist."""
+    """Create a product if it doesn't already exist.
+
+    All products are created with tax_code for Stripe Tax classification.
+    Existing products are updated to add tax_code if missing.
+    """
     existing = find_existing_product(agent_red_id)
     if existing:
-        print(f"  ✓ Product exists: {name} ({existing.id})")
+        # Ensure tax_code is set on existing products (safe to re-apply)
+        if existing.tax_code != TAX_CODE_SAAS_B2B:
+            stripe.Product.modify(existing.id, tax_code=TAX_CODE_SAAS_B2B)
+            print(f"  ↻ Updated tax_code on: {name} ({existing.id})")
+        else:
+            print(f"  ✓ Product exists: {name} ({existing.id})")
         return existing
 
     metadata = {META_KEY: agent_red_id}
@@ -214,6 +233,7 @@ def ensure_product(
         name=name,
         description=description,
         metadata=metadata,
+        tax_code=TAX_CODE_SAAS_B2B,
     )
     print(f"  + Created product: {name} ({product.id})")
     return product
@@ -226,7 +246,13 @@ def ensure_price(
     currency: str = "usd",
     recurring: dict | None = None,
 ) -> stripe.Price:
-    """Create a price if it doesn't already exist for this lookup_key."""
+    """Create a price if it doesn't already exist for this lookup_key.
+
+    All prices are created with tax_behavior for Stripe Tax. Note that
+    tax_behavior is immutable after Price creation — existing prices
+    without it will rely on the default tax behavior set in Stripe
+    Dashboard.
+    """
     existing = find_existing_price(product_id, lookup_key)
     if existing:
         print(f"  ✓ Price exists: {lookup_key} ({existing.id})")
@@ -238,6 +264,7 @@ def ensure_price(
         "lookup_key": lookup_key,
         "transfer_lookup_key": True,
         "metadata": {META_KEY: lookup_key},
+        "tax_behavior": TAX_BEHAVIOR,
     }
 
     if recurring:
@@ -312,6 +339,7 @@ def ensure_metered_price(
         lookup_key=lookup_key,
         transfer_lookup_key=True,
         metadata={META_KEY: lookup_key},
+        tax_behavior=TAX_BEHAVIOR,
     )
     print(f"  + Created metered price: {lookup_key} ({price.id})")
     return price
