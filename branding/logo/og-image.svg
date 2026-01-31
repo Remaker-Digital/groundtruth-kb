@@ -1,0 +1,56 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!--
+  Agent Red Customer Engagement — Open Graph / Social Share Image
+  Design: AR icon + wordmark centered on charcoal background
+  Dimensions: 1200x630 (OG standard)
+  Usage: Social media link previews (Facebook, LinkedIn, Twitter/X)
+  © 2026 Remaker Digital, a DBA of VanDusen & Palmeter, LLC. All rights reserved.
+-->
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1200 630" width="1200" height="630">
+  <!-- Background -->
+  <rect x="0" y="0" width="1200" height="630" fill="#1A1A2E"/>
+
+  <!-- Centered logo group -->
+  <!-- Icon: AR rounded rectangle -->
+  <rect x="340" y="200" width="140" height="140" rx="30" fill="#C41E2A"/>
+  <text
+    x="361"
+    y="305"
+    font-family="Inter, 'Inter', sans-serif"
+    font-weight="800"
+    font-size="80"
+    fill="#FFFFFF"
+    letter-spacing="-3"
+  >AR</text>
+
+  <!-- Wordmark -->
+  <text
+    x="508"
+    y="295"
+    font-family="Inter, 'Inter', sans-serif"
+    font-weight="700"
+    font-size="64"
+    fill="#FFFFFF"
+    letter-spacing="-1.5"
+  >Agent</text>
+  <text
+    x="752"
+    y="295"
+    font-family="Inter, 'Inter', sans-serif"
+    font-weight="700"
+    font-size="64"
+    fill="#C41E2A"
+    letter-spacing="-1.5"
+  >Red</text>
+
+  <!-- Tagline -->
+  <text
+    x="600"
+    y="400"
+    font-family="Inter, 'Inter', sans-serif"
+    font-weight="400"
+    font-size="24"
+    fill="#E8E8ED"
+    text-anchor="middle"
+  >AI Customer Engagement Platform</text>
+</svg>

@@ -12,7 +12,7 @@ This document provides context and guidance for AI assistants working on the Age
 | **Brand Name** | Agent Red Customer Engagement |
 | **Release** | Launch 1.0 |
 | **Type** | Commercial SaaS Product |
-| **Status** | Phase 2.1 E-Commerce ~90% Complete — 10 billing modules, 7 API routers, Stripe Tax configured |
+| **Status** | Phase 2.1 E-Commerce ~85% Complete. Architecture review complete (32 decisions, 100 work items). Phase 2.2 multi-tenant architecture designed. |
 | **Owner** | Remaker Digital (DBA of VanDusen & Palmeter, LLC) |
 
 ---
@@ -374,13 +374,13 @@ Each tier includes a platform fee (infrastructure, features, support) and an inc
 
 ### Cost Basis & Margin
 
-**Per-conversation AI cost:** ~$0.007 (GPT-4o response generation = 94.5% of total)
+**Per-conversation AI cost:** ~$0.0073 (GPT-4o response generation = 94.5% of total, plus Cosmos DB RU + archival)
 
-**Infrastructure costs (shared, multi-tenant):**
-- Shared platform (Container Apps, Cosmos DB, App Gateway, etc.): ~$200-400/mo total
+**Infrastructure costs (shared, multi-tenant, post-architecture review):**
+- Shared platform (Container Apps Option B+, Cosmos DB, App Gateway, etc.): ~$252-436/mo total
 - Per-tenant marginal cost at 10+ tenants: ~$13-41/mo
 
-**Gross margin at list price:** 82-93% across all scenarios (base fee + overage)
+**Gross margin at list price:** 76-90% across all scenarios (base fee + overage, validated Jan 2026 architecture review)
 
 **Pricing design principles:**
 - Transparent usage pricing as competitive advantage
@@ -528,6 +528,8 @@ E:\Claude-Playground\CLAUDE-PROJECTS\Agent Red Customer Engagement\
 │   │   ├── REWARDFUL-INTEGRATION.md
 │   │   ├── PER-CUSTOMER-AI-PERSONALIZATION-RESEARCH.md
 │   │   └── PERSISTENT-CUSTOMER-MEMORY-METRICS.md
+│   ├── shopify/                    # Shopify App Store materials
+│   │   └── APP-STORE-LISTING.md    # Listing copy, specs, and pre-submission checklist
 │   ├── guides/                     # How-to guides
 │   └── api/                        # API reference
 │
@@ -564,17 +566,24 @@ E:\Claude-Playground\CLAUDE-PROJECTS\Agent Red Customer Engagement\
 | PER-CUSTOMER-AI-PERSONALIZATION-RESEARCH.md | docs/architecture/ | Persistent Customer Memory research foundation |
 | PERSISTENT-CUSTOMER-MEMORY-METRICS.md | docs/architecture/ | Test cases, metrics, and A/B testing framework |
 | stripe_product_ids.json | config/ | Stripe test-mode product/price/coupon IDs (27 objects) |
+| APP-STORE-LISTING.md | docs/shopify/ | Shopify App Store listing copy, asset specs, pre-submission checklist |
+| Master-Plan-Review-01-30-2026.md | docs/ | Architecture review: 32 decisions, 100 work items, SLA validation, cost model |
 
 ---
 
 ## Self-Service Legal Tools
 
+**Plan-of-record:** iubenda (Advanced plan) for automated legal document generation with multi-language support. LegalZoom retained for SLA/DPA reviews and ad-hoc legal questions.
+
 | Document | Tool | Cost |
 |----------|------|------|
-| Terms of Service | Termly | $15-25/mo |
-| Privacy Policy | Termly | Included |
-| Cookie Policy | Termly | Included |
-| Data Processing Agreement | iubenda | $27/mo |
+| Terms of Service | iubenda | Advanced plan |
+| Privacy Policy | iubenda | Included |
+| Cookie Policy | iubenda | Included |
+| Data Processing Agreement | iubenda | Included |
+| SLA / DPA Reviews | LegalZoom | Ad-hoc |
+
+**Language priorities:** Spanish (Mexico), French (Canada) near-term. Portuguese (Brazil), UK English medium-term.
 
 ---
 
@@ -585,11 +594,10 @@ E:\Claude-Playground\CLAUDE-PROJECTS\Agent Red Customer Engagement\
 ```
 Continue work on Agent Red Customer Engagement commercial project.
 Location: E:\Claude-Playground\CLAUDE-PROJECTS\Agent Red Customer Engagement
-Key files: CLAUDE.md, docs/PROJECT-PLAN.md
-Current status: Phases 0-1.4 complete. Phase 2.1 e-commerce implementation ~85% complete — all billing code built (10 modules, 7 API routers). Phase 2.5 Persistent Customer Memory planning complete.
-Completed in Phase 2.1: Stripe product catalog (27 objects), Checkout integration (with Rewardful referral tracking), webhook handler (7 events → provisioning + tax), metered usage reporting (3-tier: included→packs→overage), Shopify Billing API (GraphQL, subscriptions + usage), conversation pack purchase flow (FIFO balance), unified provisioning service (channel-agnostic, Stripe + Shopify), Customer Portal, Rewardful affiliate integration.
-Remaining Phase 2.1: Stripe Tax setup, Shopify App Store listing (content/creative), App Store review submission, test checkout flows (both channels).
-Please review CLAUDE.md status section and proceed with the next work item, presenting one item at a time for review per the iterative working style documented in CLAUDE.md.
+Key files: CLAUDE.md, docs/Master-Plan-Review-01-30-2026.md, docs/PROJECT-PLAN.md
+Current status: Phases 0-1.4 complete. Phase 2.1 e-commerce ~85% complete (10 billing modules built). Architecture review complete — 32 decisions agreed, 100 work items identified and prioritized in Master-Plan-Review-01-30-2026.md. Phase 2.2 multi-tenant architecture fully designed. Persistent Customer Memory implementation designed (4 layers). Cost model validated (76-90% margins). SLA gaps resolved.
+Next priority: Technical implementation per Work Priority Bias. Tier 1 (Critical) work items: Cosmos DB schema + TenantScopedRepository (#13-14, #24-25), API Gateway tenant resolution + dual auth (#18, #27), fail-closed Critic policy (#50), billable conversation definition + ConversationMeter (#71-72). Remaining Phase 2.1: GDPR webhooks, session tokens, App Bridge Save Bar, creative assets, test flows.
+Please review CLAUDE.md (especially the Phase 2.2 architecture section and Work Priority Bias) and the Master Plan Review, then proceed with the highest-priority technical work item, presenting one item at a time for review per the iterative working style documented in CLAUDE.md.
 ```
 
 ### Referencing AGNTCY
@@ -610,6 +618,10 @@ For planning, prioritization, and multi-step decision-making, use an **iterative
 4. Do not batch multiple decisions into a single prompt
 
 This applies to: work priority reviews, architecture decisions, scope changes, milestone planning, and any situation where multiple choices must be made. The goal is collaborative decision-making with full visibility, not fire-and-forget task lists.
+
+### Work Priority Bias
+
+**Technical work has elevated priority over creative/content work.** Technical gap identification, test case creation, testing/results analysis, and implementation of new capabilities should always be prioritized above creative assets, marketing content, and cosmetic work. The rationale: the technical implementation is the foundation for cost estimates, which are in turn the basis for pricing and licensing decisions. Cost estimates and pricing decisions cannot be validated without comprehensive test data from a working implementation.
 
 ### Adding Commercial Features
 
@@ -686,7 +698,7 @@ This applies to: work priority reviews, architecture decisions, scope changes, m
 - **Rewardful does not support Stripe test mode.** Trial account created. OAuth connection requires live Stripe with admin permissions. Backend code integration (client_reference_id on Checkout Sessions) works identically in test/live mode. Recommended plan: Starter ($49/mo, $7,500/mo affiliate revenue cap). Setup checklist documented in docs/architecture/REWARDFUL-INTEGRATION.md.
 - **Shopify annual billing limitation discovered.** Shopify's AppSubscription API does not support `appUsagePricingDetails` with `ANNUAL` interval — only `EVERY_30_DAYS`. Annual subscribers get recurring base only; overage must be handled via `appPurchaseOneTimeCreate` or conversation packs (Phase 2.2).
 
-**Phase 2.1: E-Commerce Store (In Progress — ~85% Complete)**
+**Phase 2.1: E-Commerce Store (In Progress — ~85% Code Complete)**
 - [x] Three-way platform evaluation (Stripe vs Shopify App Store vs Paddle) — docs/architecture/ECOMMERCE-PLATFORM-EVALUATION.md
 - [x] Decision: Dual-channel (Shopify App Store primary + Stripe direct). Paddle rejected.
 - [x] Approval process and partner growth path documented (Appendices A & B)
@@ -700,8 +712,11 @@ This applies to: work priority reviews, architecture decisions, scope changes, m
 - [x] Stripe Customer Portal — src/integrations/stripe_portal.py (POST /api/billing/portal, tenant lookup for Stripe customer ID resolution)
 - [x] Rewardful affiliate integration — client_reference_id on Checkout Sessions, docs/architecture/REWARDFUL-INTEGRATION.md (live Stripe connection deferred — Rewardful does not support test mode)
 - [x] Stripe Tax setup — automatic_tax on Checkout Sessions (subscription + payment mode), tax_code `txcd_10103001` (SaaS — Business Use) on Products, tax_behavior `exclusive` on new Prices, tax_id_collection for business VAT/tax IDs, invoice.finalization_failed webhook handler, migration script for existing Products (scripts/stripe/update_tax_codes.py)
-- [ ] Shopify App Store listing (description, screenshots, demo)
-- [ ] App Store review submission
+- [x] Shopify App Store listing copy — docs/shopify/APP-STORE-LISTING.md (app name, tagline, description, key benefits, feature list, pricing config, search terms, testing instructions, pre-submission checklist). Creative assets (icon, screenshots, video, demo store) pending.
+- [ ] Implement GDPR compliance webhooks — 3 mandatory Shopify endpoints (customers/data_request, customers/redact, shop/redact)
+- [ ] Implement session token authentication for embedded Shopify app (required since 2025, replaces cookie-based auth)
+- [ ] Implement App Bridge Save Bar API integration (required for embedded app save functions)
+- [ ] App Store review submission — blocked by: GDPR webhooks, session tokens, App Bridge Save Bar, creative assets
 - [ ] Test checkout flows (both channels)
 
 **Phase 2.1 API Route Map (7 routers, 15 endpoints):**
@@ -725,19 +740,98 @@ This applies to: work priority reviews, architecture decisions, scope changes, m
 - **Stripe Tax: exclusive pricing, SaaS B2B tax code:** All Checkout Sessions enable `automatic_tax`. Products carry `txcd_10103001` (SaaS — Business Use). Prices use `tax_behavior="exclusive"` (tax added on top, US B2B standard). `tax_id_collection` enabled for business VAT/tax IDs. Dashboard prerequisites: origin address (Delaware), default tax behavior, nexus state registrations. Cost: $0.50/transaction (Stripe Tax Basic).
 - **invoice.finalization_failed handler added:** Catches cases where Stripe Tax cannot determine customer location (invalid/missing address). Flags tenant for payment issue and logs for investigation.
 
-**Phase 2.5: Persistent Customer Memory (Planned)**
-- [ ] Design customer preference profile schema
-- [ ] Implement dynamic system prompt builder (Layer 1)
-- [ ] Build tenant-partitioned vector index for transcripts (Layer 2)
-- [ ] Integrate memory framework — Mem0 or custom (Layer 3)
-- [ ] Build profile extraction pipeline
-- [ ] Implement few-shot example retrieval
-- [ ] Build fine-tuning pipeline (Layer 4, Enterprise add-on)
+**Phase 2.5: Persistent Customer Memory (Architecture Complete — Implementation Pending)**
+- [x] Design customer profile schema — 6 data sources validated (purchase history, cart, geography, marketing, jurisdiction, product questions)
+- [x] Design Layer 1 injection — ~250 token prompt context block
+- [x] Design Layer 2 vectorization — text-embedding-3-large, Cosmos DB DiskANN, tier-gated depth
+- [x] Design Layer 3 extraction — PatternExtractionService, confidence scoring, decay
+- [x] Design Layer 4 fine-tuning pipeline — quality gates, A/B deployment, rollback
+- [x] Design explainability framework — per-response decision trace
+- [x] Design test framework — 20 unit, 10 integration, 5 A/B production tests
+- [ ] Implement Layer 1: CustomerProfileService + SystemPromptBuilder injection (work items 83-85)
+- [ ] Implement Layer 2: Vectorization pipeline + semantic search (work items 87-89)
+- [ ] Implement Layer 3: PatternExtractionService + decay + admin UI (work items 90-92)
+- [ ] Implement Layer 4: Fine-tuning pipeline + deployment + rollback (work items 93-96)
+- [ ] Implement explainability framework (work item 86)
+- [ ] Implement test suites + fixtures (work items 97-100)
 - [ ] Create metrics dashboard (KPIs from PERSISTENT-CUSTOMER-MEMORY-METRICS.md)
-- [ ] A/B testing framework integration
+
+**Phase 2.2: Multi-Tenant Architecture (Designed — 32 Decisions, 100 Work Items)**
+
+Full architecture review completed 2026-01-30. All decisions documented in `docs/Master-Plan-Review-01-30-2026.md`. Key design outcomes:
+
+**Infrastructure (Option B+ — 7 critical components at min=2 replicas):**
+- API Gateway, Intent Classifier, Response Generator, Knowledge Retrieval, NATS, SLIM Gateway, Critic/Supervisor: min=2
+- Escalation, Analytics: min=1
+- Fail-closed Critic policy: pipeline never delivers responses that skip safety validation
+- KEDA auto-scaling with per-agent triggers
+- Monthly infrastructure: ~$252-436 (up from ~$200-400, within $500-1,000 budget)
+
+**Security / Tenant Isolation (Decisions 1-6):**
+- TenantScopedRepository: mandatory data access layer enforcing tenant_id on every DB operation
+- Cosmos DB: 9 collections, partition key = tenant_id (7 tenant-scoped, 2 platform-wide)
+- NATS: tenant-scoped topics `{tenant_id}.{agent}`
+- Dual authentication: Shopify session tokens + API keys, both resolving to server-derived tenant_id
+- Per-tenant rate limits: Starter 10/min, Professional 50/min, Enterprise 200/min
+- Per-tenant secrets in Key Vault: `tenant-{id}-{type}` naming convention
+
+**GDPR Compliance (Decisions 7-10):**
+- PII scrubbing at logging layer (no customer data in Application Insights)
+- Channel-specific grace periods: 48hr Shopify, 30-day Stripe
+- DataExportService + DataDeletionService with data store registry pattern
+- Consent management: `consent_status` (granted/denied/not_asked) gating Persistent Customer Memory Layers 2-4
+
+**Tracing / Observability (Decisions 11-13):**
+- OpenTelemetry: tenant_id injected as custom dimension on all telemetry
+- Correlation ID chain: conversation_id + tenant_id + trace_id across all 6 agents
+- Append-only audit log: 12 event types, time-partitioned, 1-year retention
+
+**Performance / Noisy Neighbor (Decisions 14-17):**
+- Per-tenant concurrency limits: Starter 3, Professional 10, Enterprise 30
+- Layered timeout budget: 8s hard deadline (Intent 800ms, Knowledge 1000ms, Response 3000ms, Critic 800ms)
+- Circuit breakers: Azure OpenAI (5 failures/30s), Cosmos DB (3/15s), NATS (3/10s)
+- TenantUsageMonitor: progressive throttling Watch → Warn → Throttle → Isolate
+
+**Disaster Recovery / Maintenance (Decisions 18-21):**
+- Cosmos DB continuous 7-day backup (~$4-6/month)
+- Long-term archival: Hot (Cosmos) → Warm (Blob Cool, 90d) → Cold (Blob Archive, 7+ years)
+- Customer-Managed Keys (CMK) for encryption at rest with auto-rotation
+- Parquet format for ML training corpus (daily Change Feed → Azure Function → Blob)
+- Zero-downtime rolling deployment with 60s connection draining
+- Maintenance window: Tuesdays 02:00-04:00 UTC
+- DR: Option A (single region + backup) for launch, Option C (geo-replication) at 50+ tenants
+
+**Per-Merchant Behavior Tuning (Decisions 22-23):**
+- 5-layer tenant config system: TenantConfigProcessor → A/B Framework → Config API (10 endpoints) → Merchant UI (9-step onboarding) → Contextual Data Service
+- Config inheritance: platform defaults → tier defaults → tenant overrides (60s cache)
+- Merchant UI: pervasive tooltips, documentation links, live preview, adjacent contextual data
+- SystemPromptBuilder: dynamic prompt assembly per-agent from tenant config with immutable safety guardrails
+
+**Metering / SLA Validation (Decisions 24-27):**
+- Billable conversation: starts on first message, ends on 30-min idle / customer end / escalation / 50 turns
+- ConversationMeter: idempotent counting (dedup on conversation_id), daily reconciliation vs Stripe
+- 3-layer usage transparency: real-time dashboard, per-conversation audit trail (CSV export), dispute resolution workflow
+- Proactive billing alerts: 80%/100% allowance, pack balance low, volume spikes
+- Billable conversation spec published as binding reference document
+- SLA gaps resolved: P50 revised to 1,500ms, maintenance window aligned, backup retention clarified (7d PITR + 90d archive)
+- Cost basis validated: per-conversation ~$0.0073, margins 76-90%, break-even at 2 Starter tenants
+
+**Persistent Customer Memory Implementation (Decisions 28-32):**
+- Layer 1: Customer profile with 6 data sources (purchase history, cart, geography, marketing segments, jurisdiction codes, product questions). ~250 token prompt injection. All tiers.
+- Layer 2: Conversation vectorization (text-embedding-3-large, 3072d, Cosmos DB DiskANN). ~300 token injection. History depth: Starter 90d, Professional 365d, Enterprise unlimited. All tiers.
+- Layer 3: PatternExtractionService (GPT-4o-mini post-conversation). Confidence scoring 0-1, decay 0.05/month. ~100 token injection. Professional+ only.
+- Layer 4: Fine-tuning GPT-4o-mini on 1,000+ conversations. Monthly pipeline with quality gates and A/B validation. Enterprise add-on $299/mo.
+- Response explainability: per-response decision trace (profile factors, knowledge sources, memory signals, A/B variant, Critic assessment)
+- Test framework: 20 unit tests, 10 integration tests, 5 A/B production tests
+
+**SLA Commitments (post-review):**
+- Uptime: Starter 99.5%, Professional 99.9%, Enterprise 99.95%
+- API latency: P50 < 1,500ms, P95 < 2,000ms, P99 < 5,000ms
+- Backup: 7-day point-in-time restore + 90-day warm archive + 7+ year cold archive
+- RTO: 4hr Enterprise, 8hr Professional, 24hr Starter
 
 ### Pending
-- [ ] Phase 2.2: Multi-tenant infrastructure (architecture doc required first)
+- [ ] Phase 2.2: Multi-tenant infrastructure implementation (architecture complete, 100 work items prioritized in Master-Plan-Review-01-30-2026.md)
 
 ---
 
@@ -762,4 +856,4 @@ This applies to: work priority reviews, architecture decisions, scope changes, m
 
 *© 2026 Remaker Digital, a DBA of VanDusen & Palmeter, LLC. All rights reserved.*
 *Last Updated: 2026-01-30*
-*Version: 5.1.0*
+*Version: 6.0.0*

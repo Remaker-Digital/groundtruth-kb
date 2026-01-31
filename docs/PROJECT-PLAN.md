@@ -104,8 +104,11 @@ Agent Red Customer Engagement is a commercial SaaS product built on the open-sou
 | Implement Stripe webhook handler (subscription lifecycle) | 8 hrs | ✅ Done — src/integrations/stripe_webhooks.py (7 events) |
 | Implement metered usage reporting to Stripe | 4 hrs | ✅ Done — src/integrations/stripe_usage.py (3-tier consumption) |
 | Add Shopify Billing API integration to existing Shopify app code | 8 hrs | ✅ Done — src/integrations/shopify_billing.py + shopify_client.py |
-| Create Shopify App Store listing (description, screenshots, demo) | 4 hrs | 📋 Todo |
-| Submit for Shopify App Store review | 1 hr | 📋 Todo |
+| Create Shopify App Store listing (description, screenshots, demo) | 4 hrs | 🔄 In Progress — listing copy drafted (docs/shopify/APP-STORE-LISTING.md), creative assets pending |
+| Implement GDPR compliance webhooks (customers/data_request, customers/redact, shop/redact) | 4 hrs | 📋 Todo — Required for Shopify App Store submission |
+| Implement session token authentication for embedded Shopify app | 4 hrs | 📋 Todo — Required since 2025, replaces cookie-based auth |
+| Implement App Bridge Save Bar API integration | 2 hrs | 📋 Todo — Required for embedded app save functions |
+| Submit for Shopify App Store review | 1 hr | 📋 Todo — Blocked by: GDPR webhooks, session tokens, App Bridge Save Bar, creative assets |
 | Implement Stripe Customer Portal link | 1 hr | ✅ Done — src/integrations/stripe_portal.py |
 | Implement conversation pack purchase flow | 4 hrs | ✅ Done — src/integrations/stripe_packs.py (FIFO, 90-day validity) |
 | Build unified webhook handler (both channels → provisioning) | 8 hrs | ✅ Done — src/integrations/provisioning.py (channel-agnostic) |

@@ -1,0 +1,25 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!--
+  Agent Red Customer Engagement — Icon Master (The Beacon)
+  Design: AR monogram on Agent Red rounded rectangle
+  Usage: Source file for all icon/favicon exports
+  © 2026 Remaker Digital, a DBA of VanDusen & Palmeter, LLC. All rights reserved.
+-->
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1200 1200" width="1200" height="1200">
+  <!-- Background: Agent Red rounded rectangle -->
+  <!-- Corner radius: ~21% of width = 252px -->
+  <rect x="0" y="0" width="1200" height="1200" rx="252" fill="#C41E2A"/>
+
+  <!-- AR Monogram: Inter Extra Bold 800, white, tight letter-spacing -->
+  <!-- Centered vertically, slight left offset for optical balance -->
+  <!-- Font metrics: Inter 800 at ~650px size, baseline ~780px from top -->
+  <text
+    x="200"
+    y="830"
+    font-family="Inter, 'Inter', sans-serif"
+    font-weight="800"
+    font-size="650"
+    fill="#FFFFFF"
+    letter-spacing="-25"
+  >AR</text>
+</svg>
