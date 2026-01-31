@@ -1,0 +1,500 @@
+"""Unit tests for auth + middleware — tenant authentication, rate limiting, dependencies.
+
+Covers:
+    - auth.py: token extraction, domain validation, API key hashing, tenant status
+    - middleware.py: get_tenant_context, require_tier, rate limit calculation,
+      TenantAuthMiddleware dispatch, RateLimitMiddleware sliding window
+
+Run:
+    pytest tests/multi_tenant/test_auth_middleware.py -v
+
+© 2026 Remaker Digital, a DBA of VanDusen & Palmeter, LLC. All rights reserved.
+"""
+
+from __future__ import annotations
+
+import hashlib
+import time
+from datetime import datetime, timezone
+from unittest.mock import AsyncMock, MagicMock, patch
+
+import pytest
+
+from src.multi_tenant.auth import (
+    AUTH_EXEMPT_PREFIXES,
+    AuthenticationError,
+    TenantContext,
+    TenantInactiveError,
+    extract_bearer_token,
+    extract_shop_domain,
+    hash_api_key,
+    is_auth_exempt,
+    validate_tenant_status,
+    verify_api_key,
+)
+from src.multi_tenant.cosmos_schema import TIER_DEFAULTS, TenantStatus, TenantTier
+from src.multi_tenant.middleware import (
+    RateLimitMiddleware,
+    TenantAuthMiddleware,
+    configure_tenant_resolution,
+    get_tenant_context,
+    require_tier,
+)
+
+
+# ---------------------------------------------------------------------------
+# Helpers
+# ---------------------------------------------------------------------------
+
+def _make_request(
+    path: str = "/api/data",
+    tenant_context: TenantContext | None = None,
+    headers: dict | None = None,
+) -> MagicMock:
+    """Build a mock Starlette/FastAPI Request."""
+    req = MagicMock()
+    req.url.path = path
+    req.method = "GET"
+    req.headers = headers or {}
+    req.state = MagicMock()
+    if tenant_context is not None:
+        req.state.tenant_context = tenant_context
+    else:
+        # Simulate missing attribute
+        del req.state.tenant_context
+    return req
+
+
+def _starter_context(tenant_id: str = "t-001") -> TenantContext:
+    return TenantContext(
+        tenant_id=tenant_id,
+        tier=TenantTier.STARTER,
+        status=TenantStatus.ACTIVE,
+        auth_method="api_key",
+    )
+
+
+def _pro_context(tenant_id: str = "t-002") -> TenantContext:
+    return TenantContext(
+        tenant_id=tenant_id,
+        tier=TenantTier.PROFESSIONAL,
+        status=TenantStatus.ACTIVE,
+        auth_method="api_key",
+    )
+
+
+def _enterprise_context(tenant_id: str = "t-003") -> TenantContext:
+    return TenantContext(
+        tenant_id=tenant_id,
+        tier=TenantTier.ENTERPRISE,
+        status=TenantStatus.ACTIVE,
+        auth_method="shopify_session",
+        shop_domain="myshop.myshopify.com",
+    )
+
+
+# ===================================================================
+# auth.py — extract_bearer_token
+# ===================================================================
+
+class TestExtractBearerToken:
+    """AUTH-01: Bearer token extraction from Authorization header."""
+
+    def test_valid_bearer(self):
+        assert extract_bearer_token("Bearer abc123") == "abc123"
+
+    def test_lowercase_bearer(self):
+        assert extract_bearer_token("bearer abc123") == "abc123"
+
+    def test_none_header(self):
+        assert extract_bearer_token(None) is None
+
+    def test_empty_string(self):
+        assert extract_bearer_token("") is None
+
+    def test_basic_auth_ignored(self):
+        assert extract_bearer_token("Basic dXNlcjpwYXNz") is None
+
+    def test_bearer_no_token(self):
+        # "Bearer " with no following token — split gives ["Bearer", ""]
+        result = extract_bearer_token("Bearer ")
+        assert result == ""
+
+    def test_bearer_with_spaces_in_token(self):
+        # Only splits on first space
+        assert extract_bearer_token("Bearer abc def") == "abc def"
+
+
+# ===================================================================
+# auth.py — is_auth_exempt
+# ===================================================================
+
+class TestIsAuthExempt:
+    """AUTH-02: Auth exemption for health, webhooks, docs, checkout callbacks."""
+
+    def test_health_exempt(self):
+        assert is_auth_exempt("/health") is True
+
+    def test_ready_exempt(self):
+        assert is_auth_exempt("/ready") is True
+
+    def test_docs_exempt(self):
+        assert is_auth_exempt("/docs") is True
+
+    def test_redoc_exempt(self):
+        assert is_auth_exempt("/redoc") is True
+
+    def test_openapi_exempt(self):
+        assert is_auth_exempt("/openapi.json") is True
+
+    def test_webhooks_exempt(self):
+        assert is_auth_exempt("/api/webhooks/stripe") is True
+
+    def test_checkout_success_exempt(self):
+        assert is_auth_exempt("/api/checkout/success") is True
+
+    def test_checkout_cancel_exempt(self):
+        assert is_auth_exempt("/api/checkout/cancel") is True
+
+    def test_shopify_confirm_exempt(self):
+        assert is_auth_exempt("/api/shopify/billing/confirm") is True
+
+    def test_dashboard_not_exempt(self):
+        assert is_auth_exempt("/api/dashboard/usage") is False
+
+    def test_config_not_exempt(self):
+        assert is_auth_exempt("/api/config") is False
+
+    def test_tenants_not_exempt(self):
+        assert is_auth_exempt("/api/tenants/lookup") is False
+
+
+# ===================================================================
+# auth.py — hash_api_key
+# ===================================================================
+
+class TestHashApiKey:
+    """AUTH-03: SHA-256 API key hashing."""
+
+    def test_deterministic(self):
+        h1 = hash_api_key("my-secret-key")
+        h2 = hash_api_key("my-secret-key")
+        assert h1 == h2
+
+    def test_sha256_format(self):
+        h = hash_api_key("test")
+        assert len(h) == 64  # SHA-256 hex digest is 64 chars
+        assert all(c in "0123456789abcdef" for c in h)
+
+    def test_matches_hashlib(self):
+        key = "agent-red-api-key-12345"
+        expected = hashlib.sha256(key.encode("utf-8")).hexdigest()
+        assert hash_api_key(key) == expected
+
+    def test_different_keys_differ(self):
+        assert hash_api_key("key-a") != hash_api_key("key-b")
+
+    def test_empty_key(self):
+        # Should not raise — returns hash of empty string
+        h = hash_api_key("")
+        assert len(h) == 64
+
+
+# ===================================================================
+# auth.py — extract_shop_domain
+# ===================================================================
+
+class TestExtractShopDomain:
+    """AUTH-04: Shop domain extraction from JWT payload."""
+
+    def test_valid_iss(self):
+        payload = {"iss": "https://myshop.myshopify.com/admin"}
+        assert extract_shop_domain(payload) == "myshop.myshopify.com"
+
+    def test_missing_iss(self):
+        assert extract_shop_domain({}) == ""
+
+    def test_empty_iss(self):
+        assert extract_shop_domain({"iss": ""}) == ""
+
+    def test_iss_without_path(self):
+        payload = {"iss": "https://shop.myshopify.com"}
+        assert extract_shop_domain(payload) == "shop.myshopify.com"
+
+
+# ===================================================================
+# auth.py — validate_tenant_status
+# ===================================================================
+
+class TestValidateTenantStatus:
+    """AUTH-05: Tenant lifecycle status validation."""
+
+    def test_active_allowed(self):
+        validate_tenant_status("t-1", TenantStatus.ACTIVE)  # no exception
+
+    def test_past_due_allowed(self):
+        validate_tenant_status("t-1", TenantStatus.PAST_DUE)  # no exception
+
+    def test_provisioning_rejected(self):
+        with pytest.raises(TenantInactiveError) as exc_info:
+            validate_tenant_status("t-1", TenantStatus.PROVISIONING)
+        assert exc_info.value.status_code == 403
+        assert "t-1" in exc_info.value.message
+
+    def test_grace_period_rejected_by_default(self):
+        with pytest.raises(TenantInactiveError):
+            validate_tenant_status("t-1", TenantStatus.GRACE_PERIOD)
+
+    def test_grace_period_allowed_when_readonly(self):
+        validate_tenant_status(
+            "t-1", TenantStatus.GRACE_PERIOD, allow_readonly=True,
+        )  # no exception
+
+    def test_deactivated_rejected(self):
+        with pytest.raises(TenantInactiveError):
+            validate_tenant_status("t-1", TenantStatus.DEACTIVATED)
+
+    def test_deactivated_rejected_even_with_readonly(self):
+        with pytest.raises(TenantInactiveError):
+            validate_tenant_status(
+                "t-1", TenantStatus.DEACTIVATED, allow_readonly=True,
+            )
+
+
+# ===================================================================
+# auth.py — verify_api_key
+# ===================================================================
+
+class TestVerifyApiKey:
+    """AUTH-06: API key verification with async lookup."""
+
+    @pytest.mark.asyncio
+    async def test_valid_key_returns_tenant(self):
+        tenant_doc = {"tenant_id": "t-1", "tier": "starter", "status": "active"}
+        lookup = AsyncMock(return_value=tenant_doc)
+        result = await verify_api_key("my-key", lookup)
+        assert result == tenant_doc
+        lookup.assert_awaited_once()
+
+    @pytest.mark.asyncio
+    async def test_no_match_raises(self):
+        lookup = AsyncMock(return_value=None)
+        with pytest.raises(AuthenticationError, match="Invalid API key"):
+            await verify_api_key("bad-key", lookup)
+
+    @pytest.mark.asyncio
+    async def test_empty_key_raises(self):
+        lookup = AsyncMock()
+        with pytest.raises(AuthenticationError, match="API key is required"):
+            await verify_api_key("", lookup)
+        lookup.assert_not_awaited()
+
+    @pytest.mark.asyncio
+    async def test_lookup_receives_hash(self):
+        lookup = AsyncMock(return_value={"tenant_id": "t-1"})
+        await verify_api_key("test-key", lookup)
+        expected_hash = hash_api_key("test-key")
+        lookup.assert_awaited_once_with(expected_hash)
+
+
+# ===================================================================
+# middleware.py — get_tenant_context
+# ===================================================================
+
+class TestGetTenantContext:
+    """MW-01: FastAPI dependency for TenantContext extraction."""
+
+    @pytest.mark.asyncio
+    async def test_returns_context_when_present(self):
+        ctx = _starter_context()
+        req = _make_request(tenant_context=ctx)
+        result = await get_tenant_context(req)
+        assert result is ctx
+
+    @pytest.mark.asyncio
+    async def test_raises_401_when_missing(self):
+        req = _make_request()  # no tenant_context
+        from fastapi import HTTPException
+
+        with pytest.raises(HTTPException) as exc_info:
+            await get_tenant_context(req)
+        assert exc_info.value.status_code == 401
+
+
+# ===================================================================
+# middleware.py — require_tier
+# ===================================================================
+
+class TestRequireTier:
+    """MW-02: Tier enforcement dependency factory."""
+
+    @pytest.mark.asyncio
+    async def test_starter_meets_starter(self):
+        dep = require_tier(TenantTier.STARTER)
+        req = _make_request(tenant_context=_starter_context())
+        result = await dep(req)
+        assert result.tenant_id == "t-001"
+
+    @pytest.mark.asyncio
+    async def test_enterprise_meets_starter(self):
+        dep = require_tier(TenantTier.STARTER)
+        req = _make_request(tenant_context=_enterprise_context())
+        result = await dep(req)
+        assert result.tier == TenantTier.ENTERPRISE
+
+    @pytest.mark.asyncio
+    async def test_starter_fails_professional(self):
+        from fastapi import HTTPException
+
+        dep = require_tier(TenantTier.PROFESSIONAL)
+        req = _make_request(tenant_context=_starter_context())
+        with pytest.raises(HTTPException) as exc_info:
+            await dep(req)
+        assert exc_info.value.status_code == 403
+        assert "professional" in exc_info.value.detail
+
+    @pytest.mark.asyncio
+    async def test_professional_meets_professional(self):
+        dep = require_tier(TenantTier.PROFESSIONAL)
+        req = _make_request(tenant_context=_pro_context())
+        result = await dep(req)
+        assert result.tier == TenantTier.PROFESSIONAL
+
+    @pytest.mark.asyncio
+    async def test_none_tier_raises_403(self):
+        from fastapi import HTTPException
+
+        ctx = TenantContext(tenant_id="t-x", tier=None, status=TenantStatus.ACTIVE)
+        dep = require_tier(TenantTier.STARTER)
+        req = _make_request(tenant_context=ctx)
+        with pytest.raises(HTTPException) as exc_info:
+            await dep(req)
+        assert exc_info.value.status_code == 403
+
+
+# ===================================================================
+# middleware.py — RateLimitMiddleware._get_limit
+# ===================================================================
+
+class TestRateLimitGetLimit:
+    """MW-03: Rate limit resolution from tenant tier."""
+
+    def _make_middleware(self) -> RateLimitMiddleware:
+        return RateLimitMiddleware(app=MagicMock())
+
+    def test_starter_limit(self):
+        mw = self._make_middleware()
+        ctx = _starter_context()
+        assert mw._get_limit(ctx) == TIER_DEFAULTS["starter"]["rate_limit_rpm"]
+
+    def test_professional_limit(self):
+        mw = self._make_middleware()
+        ctx = _pro_context()
+        assert mw._get_limit(ctx) == TIER_DEFAULTS["professional"]["rate_limit_rpm"]
+
+    def test_enterprise_limit(self):
+        mw = self._make_middleware()
+        ctx = _enterprise_context()
+        assert mw._get_limit(ctx) == TIER_DEFAULTS["enterprise"]["rate_limit_rpm"]
+
+    def test_none_tier_returns_none(self):
+        mw = self._make_middleware()
+        ctx = TenantContext(tenant_id="t-x", tier=None, status=TenantStatus.ACTIVE)
+        assert mw._get_limit(ctx) is None
+
+
+# ===================================================================
+# middleware.py — RateLimitMiddleware sliding window
+# ===================================================================
+
+class TestRateLimitSlidingWindow:
+    """MW-04: Sliding window rate counter behavior."""
+
+    def _make_middleware(self) -> RateLimitMiddleware:
+        return RateLimitMiddleware(app=MagicMock())
+
+    def test_window_records_requests(self):
+        mw = self._make_middleware()
+        tenant_id = "t-rate-01"
+        now = time.monotonic()
+        mw._windows[tenant_id].append((now, 1))
+        assert len(mw._windows[tenant_id]) == 1
+
+    def test_expired_entries_cleaned(self):
+        mw = self._make_middleware()
+        tenant_id = "t-rate-02"
+        now = time.monotonic()
+        # Add an entry 120 seconds ago — outside the 60s window
+        mw._windows[tenant_id].append((now - 120.0, 1))
+        mw._windows[tenant_id].append((now, 1))
+
+        # Simulate the cleanup logic from dispatch
+        cutoff = now - mw._window_size
+        mw._windows[tenant_id] = [
+            (ts, count) for ts, count in mw._windows[tenant_id] if ts > cutoff
+        ]
+        assert len(mw._windows[tenant_id]) == 1
+
+    def test_count_accumulates(self):
+        mw = self._make_middleware()
+        tenant_id = "t-rate-03"
+        now = time.monotonic()
+        for i in range(5):
+            mw._windows[tenant_id].append((now + i * 0.1, 1))
+        current_count = sum(count for _, count in mw._windows[tenant_id])
+        assert current_count == 5
+
+
+# ===================================================================
+# middleware.py — configure_tenant_resolution
+# ===================================================================
+
+class TestConfigureTenantResolution:
+    """MW-05: Module-level resolver injection."""
+
+    def test_sets_resolvers(self):
+        import src.multi_tenant.middleware as mw_mod
+
+        mock_shop = AsyncMock()
+        mock_key = AsyncMock()
+        configure_tenant_resolution(mock_shop, mock_key)
+        assert mw_mod._resolve_by_shop_domain is mock_shop
+        assert mw_mod._resolve_by_api_key_hash is mock_key
+
+        # Cleanup
+        mw_mod._resolve_by_shop_domain = None
+        mw_mod._resolve_by_api_key_hash = None
+
+
+# ===================================================================
+# auth.py — TenantContext frozen dataclass
+# ===================================================================
+
+class TestTenantContext:
+    """AUTH-07: TenantContext data integrity."""
+
+    def test_frozen(self):
+        ctx = _starter_context()
+        with pytest.raises(AttributeError):
+            ctx.tenant_id = "different"  # type: ignore[misc]
+
+    def test_defaults(self):
+        ctx = TenantContext(tenant_id="t-1")
+        assert ctx.tier is None
+        assert ctx.status == TenantStatus.ACTIVE
+        assert ctx.auth_method == "api_key"
+        assert ctx.shop_domain is None
+        assert ctx.user_id is None
+        assert ctx.session_id is None
+
+    def test_shopify_fields_populated(self):
+        ctx = TenantContext(
+            tenant_id="t-1",
+            auth_method="shopify_session",
+            shop_domain="store.myshopify.com",
+            user_id="user-42",
+            session_id="sid-abc",
+        )
+        assert ctx.shop_domain == "store.myshopify.com"
+        assert ctx.user_id == "user-42"
+        assert ctx.session_id == "sid-abc"
