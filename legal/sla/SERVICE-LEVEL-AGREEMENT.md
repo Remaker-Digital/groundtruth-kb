@@ -1,8 +1,8 @@
 # Agent Red Customer Engagement — Service Level Agreement
 
 > **Status:** DRAFT — For internal review only. Not yet published.
-> **Version:** 0.1.0
-> **Last Updated:** 2026-01-29
+> **Version:** 0.2.0
+> **Last Updated:** 2026-01-30
 > **Legal Review Required:** Yes — must be reviewed by qualified legal counsel before publication.
 
 ---
@@ -53,7 +53,7 @@ We target the following API response times under normal operating conditions:
 
 | Metric | Target |
 |--------|--------|
-| API Response Time (P50) | < 500 ms |
+| API Response Time (P50) | < 1,500 ms |
 | API Response Time (P95) | < 2,000 ms |
 | API Response Time (P99) | < 5,000 ms |
 
@@ -120,9 +120,9 @@ The following are excluded from Uptime calculations and do not qualify for Servi
 
 #### 4.1 Scheduled Maintenance
 
-- Routine maintenance performed during our maintenance window: **Sundays 02:00–06:00 UTC**
+- Routine maintenance performed during our maintenance window: **Tuesdays 02:00–04:00 UTC**
 - We will provide at least 72 hours' notice for scheduled maintenance via email and in-Service notification
-- We will use commercially reasonable efforts to limit scheduled maintenance to no more than 4 hours per month
+- We will use commercially reasonable efforts to limit scheduled maintenance to no more than 2 hours per week
 
 #### 4.2 Excluded Events
 
@@ -214,9 +214,11 @@ Enterprise tier Customers receive a monthly Service report including:
 
 | Aspect | Commitment |
 |--------|-----------|
-| **Backup Frequency** | Daily automated backups |
-| **Backup Retention** | 30 days |
-| **Recovery Point Objective (RPO)** | 24 hours |
+| **Backup Type** | Continuous (point-in-time restore) |
+| **Hot Backup Retention** | 7-day point-in-time restore (any second within the last 7 days) |
+| **Warm Archive Retention** | 90 days (daily snapshots in Cool storage) |
+| **Cold Archive Retention** | 7+ years (compliance retention in Archive storage) |
+| **Recovery Point Objective (RPO)** | Near-zero (continuous backup) |
 | **Recovery Time Objective (RTO)** | 4 hours (Enterprise), 8 hours (Professional), 24 hours (Starter) |
 
 #### 7.2 Data Durability

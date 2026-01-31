@@ -12,7 +12,7 @@ This document provides context and guidance for AI assistants working on the Age
 | **Brand Name** | Agent Red Customer Engagement |
 | **Release** | Launch 1.0 |
 | **Type** | Commercial SaaS Product |
-| **Status** | Phase 2.1 E-Commerce ~85% complete. Phase 2.2 Tier 1 Critical COMPLETE (7 modules). Tier 2 in progress — NATS + GDPR + OTel + Pipeline Resilience + SystemPromptBuilder + Usage Dashboard API COMPLETE (13 modules, ~6,600 lines). Architecture review complete (32 decisions, 100 work items). |
+| **Status** | Phase 2.1 E-Commerce ~85% complete. Phase 2.2 Tier 1 Critical COMPLETE (7 modules). Tier 2 High COMPLETE — 21 modules (~9,500 lines) + 30 tests. Phase 2.5 Layers 1-2 COMPLETE (3 modules). Architecture review complete (32 decisions, 100 work items). |
 | **Owner** | Remaker Digital (DBA of VanDusen & Palmeter, LLC) |
 
 ---
@@ -512,7 +512,7 @@ E:\Claude-Playground\CLAUDE-PROJECTS\Agent Red Customer Engagement\
 │   │   ├── stripe_webhooks.py      # Stripe webhook handler (7 events → provisioning + tax)
 │   │   ├── shopify_client.py       # Async Shopify GraphQL API client (httpx)
 │   │   └── shopify_billing.py      # Shopify Billing API (subscriptions + usage charges)
-│   ├── multi_tenant/               # Multi-tenant infrastructure (Phase 2.2 — Tier 1 Critical COMPLETE)
+│   ├── multi_tenant/               # Multi-tenant infrastructure (Phase 2.2 — Tier 2 High COMPLETE)
 │   │   ├── __init__.py             # Package init with import hints
 │   │   ├── cosmos_schema.py        # 9 collections, 11 document models, 7 enums, tier defaults
 │   │   ├── cosmos_client.py        # CosmosManager singleton (lazy init, Managed Identity, health)
@@ -521,17 +521,30 @@ E:\Claude-Playground\CLAUDE-PROJECTS\Agent Red Customer Engagement\
 │   │   ├── middleware.py           # TenantAuthMiddleware + RateLimitMiddleware + dependencies
 │   │   ├── conversation_meter.py   # ConversationMeter: billable conv spec, 3-tier metering, alerts
 │   │   ├── critic_policy.py        # Fail-closed Critic enforcement, circuit breaker, health
-│   │   ├── nats_isolation.py      # NATS tenant isolation, topic namespace, subscription auth
-│   │   ├── gdpr_services.py      # PII scrubbing, data export/deletion, consent management
-│   │   ├── otel_tracing.py       # OpenTelemetry tenant tracing, correlation ID propagation
-│   │   ├── pipeline_resilience.py # Per-tenant concurrency, timeout budgets, circuit breakers
+│   │   ├── nats_isolation.py       # NATS tenant isolation, topic namespace, subscription auth
+│   │   ├── gdpr_services.py        # PII scrubbing, data export/deletion, consent management
+│   │   ├── otel_tracing.py         # OpenTelemetry tenant tracing, correlation ID propagation
+│   │   ├── pipeline_resilience.py  # Per-tenant concurrency, timeout budgets, circuit breakers
 │   │   ├── system_prompt_builder.py # Dynamic per-agent prompt assembly (4-layer)
-│   │   └── usage_dashboard_api.py  # Billing transparency REST API (Decision #25)
+│   │   ├── usage_dashboard_api.py  # Billing transparency REST API (Decision #25)
+│   │   ├── tenant_config_schema.py # Tenant config validation, onboarding model
+│   │   ├── tenant_config_processor.py # Config merge: platform → tier → tenant overrides
+│   │   ├── tenant_config_api.py    # Config REST API (10 endpoints, /api/config)
+│   │   ├── tenant_secret_service.py # Key Vault per-tenant secret management
+│   │   ├── customer_profile_service.py # Layer 1 customer profile CRUD, Shopify sync
+│   │   ├── conversation_vectorizer.py # Layer 2 vectorization pipeline, semantic search
+│   │   └── response_explainability.py # Per-response decision trace, explainability framework
 │   ├── ai-features/                # Advanced AI (Phase 2.5)
 │   └── white-label/                # Customization (future)
 │
+├── tests/                          # Test suites
+│   └── persistent_memory/          # Persistent Customer Memory tests (30 tests)
+│       ├── fixtures.py             # Synthetic profiles, conversations, vector data
+│       ├── test_unit_layers.py     # 20 unit tests (L1-L4)
+│       └── test_integration_layers.py # 10 cross-layer integration tests
+│
 ├── infrastructure/                 # Deployment infrastructure
-│   └── terraform/                  # IaC for Azure
+│   └── terraform/                  # IaC for Azure (variables, main, scaling, DR/security)
 │
 ├── website/                        # Marketing website
 │   └── content/                    # Page content (markdown)
@@ -609,21 +622,30 @@ E:\Claude-Playground\CLAUDE-PROJECTS\Agent Red Customer Engagement\
 Continue work on Agent Red Customer Engagement commercial project.
 Location: E:\Claude-Playground\CLAUDE-PROJECTS\Agent Red Customer Engagement
 Key files: CLAUDE.md, docs/Master-Plan-Review-01-30-2026.md, docs/PROJECT-PLAN.md
-Current status: Phases 0-1.4 complete. Phase 2.1 e-commerce ~85% complete (10 billing modules). Phase 2.2 Tier 1 Critical ALL COMPLETE (7 modules). Tier 2 in progress — NATS + GDPR + OTel + Pipeline Resilience + SystemPromptBuilder + Usage Dashboard API COMPLETE (13 modules, ~6,600 lines). Architecture review complete (32 decisions, 100 work items). Cost model validated (76-90% margins).
-Completed Tier 1 Critical items:
-  - #13-14/#24-25: Cosmos DB schema (9 collections, 11 models) + TenantScopedRepository (9 repos)
-  - #18/#27: Dual auth (Shopify JWT + API keys) + TenantAuthMiddleware + RateLimitMiddleware
-  - #71-72: ConversationMeter (billable conv spec, 3-tier consumption, idempotent counting, reconciliation, alerts)
-  - #50: Fail-closed Critic policy (circuit breaker, health monitoring, escalation on unavailability)
-Completed Tier 2 (High) items:
-  - #15-17/#26: NATS tenant isolation (topic namespace, subscription auth, JetStream streams, circuit breaker)
-  - #30-34: GDPR core services (PII scrubbing, data export/deletion, consent management, grace periods)
-  - #39-41: OpenTelemetry tenant tracing (SpanProcessor, LogFilter, CorrelationContext, ASGI middleware, NATS correlation)
-  - #44-46: Pipeline resilience (per-tenant concurrency, timeout budgets, service circuit breakers)
-  - #70: SystemPromptBuilder (4-layer per-agent prompt assembly, resolved-config pattern, Critic immutability, explainability trace)
-  - #73-74: Usage Dashboard API (real-time dashboard, daily volume, conversation list/detail/CSV export, 5 endpoints)
-Next priority: Remaining Tier 2 (High) work items per Master Plan priority framework. Key candidates: TenantUsageMonitor (#51), KEDA scaling (#47-48, infrastructure/Terraform), tenant config schema/processor/API (#63-65). Remaining Phase 2.1: GDPR webhooks (#35), session tokens, App Bridge Save Bar, creative assets, test flows.
-Please review CLAUDE.md (especially the Phase 2.2 implementation progress and Work Priority Bias) and the Master Plan Review, then proceed with the highest-priority Tier 2 technical work item, presenting one item at a time for review per the iterative working style documented in CLAUDE.md.
+Current status: Phases 0-1.4 complete. Phase 2.1 e-commerce ~85% complete (10 billing modules). Phase 2.2 Tier 1 Critical ALL COMPLETE (7 modules). Phase 2.2 Tier 2 (High) ALL COMPLETE (21 modules, ~9,500 lines). Phase 2.5 Layers 1-2 COMPLETE (3 modules + 30 tests). Architecture review complete (32 decisions, 100 work items). Cost model validated (76-90% margins).
+Completed Tier 1 Critical (7 modules):
+  - #13-14/#24-25: Cosmos DB schema + TenantScopedRepository
+  - #18/#27: Dual auth + TenantAuthMiddleware + RateLimitMiddleware
+  - #71-72: ConversationMeter (billable conv spec, 3-tier consumption)
+  - #50: Fail-closed Critic policy (circuit breaker, health monitoring)
+Completed Tier 2 High (14 modules):
+  - #15-17/#26: NATS tenant isolation
+  - #30-34: GDPR core services
+  - #39-41: OpenTelemetry tenant tracing
+  - #44-46: Pipeline resilience
+  - #70: SystemPromptBuilder (4-layer per-agent prompt assembly)
+  - #73-74: Usage Dashboard API (5 endpoints)
+  - #63-65: Tenant config schema/processor/API (10 endpoints)
+  - #29: TenantSecretService (Key Vault integration)
+  - #52/55/58-59: DR & security Terraform (backup, CMK, archival, health probes, rolling deploy)
+  - #77-78: Billing doc + SLA updates
+Completed Phase 2.5 Layers 1-2 (3 modules + 30 tests):
+  - #83-85: CustomerProfileService (Layer 1, Shopify sync, consent)
+  - #87-88: ConversationVectorizer (Layer 2, chunking, embedding, search)
+  - #86: ResponseExplainability (decision trace, serialization)
+  - #97-98/100: Test fixtures + 20 unit tests + 10 integration tests (ALL PASSING)
+Next priority: Remaining Tier 2 Medium + Tier 3 items. Key candidates: TenantUsageMonitor (#51), KEDA scaling (#47-48). Remaining Phase 2.1: GDPR webhooks (#35), session tokens, App Bridge Save Bar, creative assets. Phase 2.5: Layer 3 PatternExtractionService (#90-92, Professional+), Layer 4 fine-tuning (#93-96, Enterprise).
+Please review CLAUDE.md and the Master Plan Review, then proceed with the highest-priority remaining technical work item, presenting one item at a time for review per the iterative working style documented in CLAUDE.md.
 ```
 
 ### Referencing AGNTCY
@@ -745,7 +767,7 @@ This applies to: work priority reviews, architecture decisions, scope changes, m
 - [ ] App Store review submission — blocked by: GDPR webhooks, session tokens, App Bridge Save Bar, creative assets
 - [ ] Test checkout flows (both channels)
 
-**API Route Map (8 routers, 20 endpoints):**
+**API Route Map (9 routers, 30 endpoints):**
 
 | Prefix | Module | Endpoints |
 |--------|--------|-----------|
@@ -757,6 +779,7 @@ This applies to: work priority reviews, architecture decisions, scope changes, m
 | `/api/webhooks` | stripe_webhooks | POST /stripe |
 | `/api/shopify/billing` | shopify_billing | POST /subscribe, GET /confirm, GET /status |
 | `/api/dashboard` | usage_dashboard_api | GET /usage, GET /usage/daily, GET /conversations, GET /conversations/{id}, GET /conversations/export |
+| `/api/config` | tenant_config_api | GET/PUT/PATCH/POST/DELETE config, onboarding wizard, preview, reset, history, diff (10 endpoints) |
 
 **Phase 2.1 Key Technical Decisions:**
 - **Shopify annual billing limitation:** Shopify does not support usage billing with ANNUAL interval. Annual subscriptions get recurring base only; overage deferred to Phase 2.2 (one-time app charges).
@@ -905,7 +928,7 @@ All four Tier 1 Critical work item groups implemented 2026-01-30. Seven modules 
   - 800ms timeout budget per Decision #15
   - httpx connection pooling for Critic HTTP calls
 
-**Phase 2.2 Tier 2 (High) — In Progress:**
+**Phase 2.2 Tier 2 (High) — COMPLETE:**
 
 - [x] **#15-17/#26: NATS Tenant Isolation** — `nats_isolation.py` (~600 lines)
   - TenantNATSManager: singleton managing per-tenant topic namespaces and subscriptions
@@ -974,6 +997,58 @@ All four Tier 1 Critical work item groups implemented 2026-01-30. Seven modules 
   - CSV uses Python csv + io.StringIO → StreamingResponse (no new pip packages).
   - Router mounted at /api/dashboard in main.py (8th router, 20 total endpoints).
 
+- [x] **#63-65: Tenant Configuration Schema + Processor + API** — `tenant_config_schema.py` (~300 lines) + `tenant_config_processor.py` (~350 lines) + `tenant_config_api.py` (~400 lines)
+  - TenantConfigSchema: Pydantic schema with full validation, 9-step onboarding model, tier-aware field limits.
+  - TenantConfigProcessor: validates, cleanses, merges platform defaults → tier defaults → tenant overrides.
+  - TenantConfigAPI: 10 REST endpoints (GET/PUT/PATCH/POST/DELETE config, onboarding wizard, preview, reset, history, diff).
+  - 60s cache with tenant-scoped invalidation. Router mounted at /api/config in main.py (9th router, 30 total endpoints).
+
+- [x] **#29: TenantSecretService — Key Vault Integration** — `tenant_secret_service.py` (~350 lines)
+  - Per-tenant secret CRUD with `tenant-{id}-{type}` naming convention.
+  - Azure Key Vault (DefaultAzureCredential) with in-memory cache (5-min TTL).
+  - Secret types: shopify_api_key, shopify_api_secret, zendesk_api_token, mailchimp_api_key, custom_integration, webhook_secret, encryption_key.
+  - Health check, wired into main.py startup/shutdown/ready.
+
+- [x] **#52/55/58-59: DR & Security Infrastructure** — `infrastructure/terraform/dr_security.tf` (~300 lines)
+  - WI #52: Cosmos DB continuous 7-day backup (azurerm_cosmosdb_account with continuous backup policy, prevent_destroy).
+  - WI #55: Customer-Managed Keys (RSA-2048, 90-day rotation, Key Vault access policy for Cosmos DB + Blob Storage).
+  - WI #52: Three-tier archival storage (warm-archive + cold-archive containers, lifecycle: warm→cool 30d, cool→archive 90d, delete ~7 years).
+  - WI #58: Per-container health probes (liveness + readiness, custom paths/ports for NATS 8222, SLIM Gateway 8443/healthz).
+  - WI #59: Zero-downtime rolling deployment (60s connection draining, maintenance window Tuesday 02:00-04:00 UTC).
+  - All resources gated by boolean variables (enable_cmk, enable_archival_storage, manage_cosmos_db_account).
+  - Updated variables.tf, main.tf health probes, production.tfvars.example.
+
+- [x] **#77-78: Billing Documentation + SLA Updates**
+  - WI #77: Published billable conversation spec — `docs-site/docs/billing/billable-conversation-spec.md`. Customer-facing transparency page: conversation definition, start/end conditions, non-billable prefixes, 3-tier consumption, tier allowances, pack pricing, overage rates, alerts, audit trail, dispute resolution.
+  - WI #78: Updated SLA document to v0.2.0 — P50 revised to 1,500ms (was 500ms), maintenance window aligned to Tuesday 02:00-04:00 UTC (was Sunday), backup retention updated to continuous PITR with 3-tier archival.
+  - Added Billing category to docs-site/sidebars.js.
+
+**Phase 2.5: Persistent Customer Memory — Layers 1-2 Implementation (COMPLETE):**
+
+- [x] **#83-85: CustomerProfileService (Layer 1)** — `customer_profile_service.py` (~520 lines)
+  - Profile CRUD, 6 data source update methods, Shopify sync adapter.
+  - Consent management (is_consent_granted), stale/empty detection.
+  - Tier-aware layer availability (get_available_layers), history depth (get_history_depth_days).
+  - Module-level singleton via get_profile_service().
+
+- [x] **#87-88: ConversationVectorizer (Layer 2)** — `conversation_vectorizer.py` (~520 lines)
+  - Post-conversation pipeline: transcript → chunking (200-300 tokens) → PII scrub → embedding (text-embedding-3-large, 3072d) → Cosmos DB storage.
+  - Semantic search (search_history) with tier-gated depth (Starter 90d, Professional 365d, Enterprise unlimited).
+  - Prompt compression (compress_for_prompt) within ~300 token budget.
+  - Consent-gated: vectorization and search skip when consent != GRANTED.
+
+- [x] **#86: Response Explainability Framework** — `response_explainability.py` (~510 lines)
+  - ResponseDecisionTrace: per-response decision capture (profile, knowledge, memory signals, A/B variant, stages, Critic assessment).
+  - DecisionTraceBuilder: fluent builder for incremental trace construction during pipeline execution.
+  - Full serialization roundtrip (to_dict/from_dict) for Cosmos DB storage.
+  - Data classes: KnowledgeSource, MemorySignal, CriticAssessment, StageAttribution.
+
+- [x] **#97-98/100: Persistent Memory Test Suite** — `tests/persistent_memory/` (3 files, ~1,350 lines)
+  - WI #100: Test fixtures — 7 customer IDs, 4 tenant IDs, 6 factory functions (make_profile, make_conversation_messages, make_conversation_doc, make_vector_results, make_preferences, make_bulk_conversations), sample data constants.
+  - WI #97: 20 unit tests across 4 layers — L1-01→L1-06 (profile CRUD, tier awareness, Shopify sync, prompt injection, empty/stale detection), L2-01→L2-06 (chunking, compression, consent gating, tier depth), L3-01→L3-04 (trace signals, consent, tier availability, roundtrip), L4-01→L4-04 (enterprise gating, model attribution, consent for training, A/B variant).
+  - WI #98: 10 integration tests — CL-01→CL-10 (full stack Enterprise, graceful degradation, layer conflict, new customer, tier upgrade, GDPR deletion, cross-tenant isolation, consent lifecycle, prompt assembly, explainability completeness).
+  - All 30 tests passing.
+
 **Phase 2.2 Key Technical Decisions (Implementation):**
 - **multi_tenant (underscore) package:** Created as `multi_tenant/` (valid Python package name) alongside the original `multi-tenant/` placeholder directory.
 - **PyJWT added to requirements.txt:** `PyJWT>=2.9.0` for Shopify session token verification (HS256).
@@ -1003,8 +1078,13 @@ All four Tier 1 Critical work item groups implemented 2026-01-30. Seven modules 
 - **CSV export in-memory:** For launch volumes (≤20K conversations/month for Enterprise), building the CSV in io.StringIO is sufficient. For future high-volume tenants, this can be replaced with streaming chunked responses or async blob generation.
 
 ### Pending
-- [ ] Phase 2.2: Remaining Tier 2 (High) work items (~70 remaining from Master-Plan-Review-01-30-2026.md)
-- [ ] Phase 2.1: Remaining items (GDPR webhooks, session tokens, App Bridge Save Bar, creative assets, test flows)
+- [ ] Phase 2.2: Remaining Tier 2 Medium + Tier 3 work items (from Master-Plan-Review-01-30-2026.md)
+- [ ] Phase 2.2: TenantUsageMonitor (#51 — progressive throttling Watch → Warn → Throttle → Isolate)
+- [ ] Phase 2.2: KEDA auto-scaling deployment (#47-48 — infrastructure/Terraform, needs production testing)
+- [ ] Phase 2.1: Remaining items (GDPR webhooks #35, session tokens, App Bridge Save Bar, creative assets, test flows)
+- [ ] Phase 2.5: Layer 3 — PatternExtractionService (Professional+, work items #90-92)
+- [ ] Phase 2.5: Layer 4 — Fine-tuning pipeline (Enterprise add-on, work items #93-96)
+- [ ] Phase 2.5: 5 A/B production tests (work items from Decision #32)
 
 ---
 
@@ -1029,4 +1109,4 @@ All four Tier 1 Critical work item groups implemented 2026-01-30. Seven modules 
 
 *© 2026 Remaker Digital, a DBA of VanDusen & Palmeter, LLC. All rights reserved.*
 *Last Updated: 2026-01-30*
-*Version: 7.0.0*
+*Version: 8.0.0*

@@ -67,6 +67,7 @@ from src.integrations.stripe_usage import router as usage_router  # noqa: E402
 from src.integrations.stripe_webhooks import router as webhooks_router  # noqa: E402
 from src.integrations.shopify_billing import router as shopify_billing_router  # noqa: E402
 from src.multi_tenant.usage_dashboard_api import router as dashboard_router  # noqa: E402
+from src.multi_tenant.tenant_config_api import router as config_router  # noqa: E402
 
 app.include_router(provisioning_router)
 app.include_router(checkout_router)
@@ -76,6 +77,7 @@ app.include_router(usage_router)
 app.include_router(webhooks_router)
 app.include_router(shopify_billing_router)
 app.include_router(dashboard_router)
+app.include_router(config_router)
 
 # ---------------------------------------------------------------------------
 # Pipeline resilience — concurrency control + circuit breakers (WI #44-46)
@@ -161,6 +163,35 @@ async def _shutdown_nats() -> None:
 
 
 # ---------------------------------------------------------------------------
+# Tenant secret management — Key Vault integration (Work Item #29)
+# ---------------------------------------------------------------------------
+
+from src.multi_tenant.tenant_secret_service import get_secret_service  # noqa: E402
+
+
+@app.on_event("startup")
+async def _startup_secret_service() -> None:
+    """Initialize the TenantSecretService (Key Vault client)."""
+    try:
+        service = get_secret_service()
+        await service.initialize()
+        logger.info("TenantSecretService initialized")
+    except Exception:
+        logger.warning(
+            "TenantSecretService initialization failed — secret management "
+            "unavailable. Set AZURE_KEYVAULT_URL to configure."
+        )
+
+
+@app.on_event("shutdown")
+async def _shutdown_secret_service() -> None:
+    """Close the Key Vault client."""
+    service = get_secret_service()
+    await service.close()
+    logger.info("TenantSecretService closed")
+
+
+# ---------------------------------------------------------------------------
 # Health endpoints
 # ---------------------------------------------------------------------------
 
@@ -197,5 +228,9 @@ async def ready() -> dict:
         result["circuit_breakers"] = {
             name: state for name, state in cb_summary.items()
         }
+
+    # Key Vault health (WI #29)
+    secret_svc = get_secret_service()
+    result["key_vault"] = await secret_svc.health_check()
 
     return result
