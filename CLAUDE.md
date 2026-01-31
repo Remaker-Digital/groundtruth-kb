@@ -12,7 +12,7 @@ This document provides context and guidance for AI assistants working on the Age
 | **Brand Name** | Agent Red Customer Engagement |
 | **Release** | Launch 1.0 |
 | **Type** | Commercial SaaS Product |
-| **Status** | Phase 2.1 E-Commerce ~85% complete. Phase 2.2 Tier 1 Critical COMPLETE (7 modules). Tier 2 High COMPLETE — 21 modules (~9,500 lines) + 30 tests. Phase 2.5 Layers 1-2 COMPLETE (3 modules). Architecture review complete (32 decisions, 100 work items). |
+| **Status** | Phase 2.1 E-Commerce ~85% complete. Phase 2.2 Tier 1 Critical COMPLETE (7 modules). Tier 2 High COMPLETE — 21 modules (~9,500 lines). Phase 2.5 Layers 1-2 COMPLETE (3 modules). All middleware wired in main.py. 125 tests passing (30 persistent memory + 57 auth/middleware + 38 provisioning/webhooks). Architecture review complete (32 decisions, 100 work items). |
 | **Owner** | Remaker Digital (DBA of VanDusen & Palmeter, LLC) |
 
 ---
@@ -500,7 +500,7 @@ E:\Claude-Playground\CLAUDE-PROJECTS\Agent Red Customer Engagement\
 │
 ├── src/                            # Commercial source code
 │   ├── __init__.py
-│   ├── main.py                     # FastAPI app entrypoint (7 routers, health endpoints)
+│   ├── main.py                     # FastAPI app entrypoint (9 routers, 30 endpoints, 4 middleware)
 │   ├── integrations/               # Billing & platform integrations
 │   │   ├── __init__.py
 │   │   ├── provisioning.py         # Channel-agnostic tenant provisioning service
@@ -537,11 +537,15 @@ E:\Claude-Playground\CLAUDE-PROJECTS\Agent Red Customer Engagement\
 │   ├── ai-features/                # Advanced AI (Phase 2.5)
 │   └── white-label/                # Customization (future)
 │
-├── tests/                          # Test suites
-│   └── persistent_memory/          # Persistent Customer Memory tests (30 tests)
-│       ├── fixtures.py             # Synthetic profiles, conversations, vector data
-│       ├── test_unit_layers.py     # 20 unit tests (L1-L4)
-│       └── test_integration_layers.py # 10 cross-layer integration tests
+├── tests/                          # Test suites (125 tests total)
+│   ├── persistent_memory/          # Persistent Customer Memory tests (30 tests)
+│   │   ├── fixtures.py             # Synthetic profiles, conversations, vector data
+│   │   ├── test_unit_layers.py     # 20 unit tests (L1-L4)
+│   │   └── test_integration_layers.py # 10 cross-layer integration tests
+│   ├── multi_tenant/               # Auth + middleware tests (57 tests)
+│   │   └── test_auth_middleware.py  # Bearer token, auth exempt, hashing, tier, rate limit
+│   └── integrations/               # Billing integration tests (38 tests)
+│       └── test_provisioning_webhooks.py # Tenant lifecycle, webhooks, idempotency
 │
 ├── infrastructure/                 # Deployment infrastructure
 │   └── terraform/                  # IaC for Azure (variables, main, scaling, DR/security)
@@ -622,28 +626,7 @@ E:\Claude-Playground\CLAUDE-PROJECTS\Agent Red Customer Engagement\
 Continue work on Agent Red Customer Engagement commercial project.
 Location: E:\Claude-Playground\CLAUDE-PROJECTS\Agent Red Customer Engagement
 Key files: CLAUDE.md, docs/Master-Plan-Review-01-30-2026.md, docs/PROJECT-PLAN.md
-Current status: Phases 0-1.4 complete. Phase 2.1 e-commerce ~85% complete (10 billing modules). Phase 2.2 Tier 1 Critical ALL COMPLETE (7 modules). Phase 2.2 Tier 2 (High) ALL COMPLETE (21 modules, ~9,500 lines). Phase 2.5 Layers 1-2 COMPLETE (3 modules + 30 tests). Architecture review complete (32 decisions, 100 work items). Cost model validated (76-90% margins).
-Completed Tier 1 Critical (7 modules):
-  - #13-14/#24-25: Cosmos DB schema + TenantScopedRepository
-  - #18/#27: Dual auth + TenantAuthMiddleware + RateLimitMiddleware
-  - #71-72: ConversationMeter (billable conv spec, 3-tier consumption)
-  - #50: Fail-closed Critic policy (circuit breaker, health monitoring)
-Completed Tier 2 High (14 modules):
-  - #15-17/#26: NATS tenant isolation
-  - #30-34: GDPR core services
-  - #39-41: OpenTelemetry tenant tracing
-  - #44-46: Pipeline resilience
-  - #70: SystemPromptBuilder (4-layer per-agent prompt assembly)
-  - #73-74: Usage Dashboard API (5 endpoints)
-  - #63-65: Tenant config schema/processor/API (10 endpoints)
-  - #29: TenantSecretService (Key Vault integration)
-  - #52/55/58-59: DR & security Terraform (backup, CMK, archival, health probes, rolling deploy)
-  - #77-78: Billing doc + SLA updates
-Completed Phase 2.5 Layers 1-2 (3 modules + 30 tests):
-  - #83-85: CustomerProfileService (Layer 1, Shopify sync, consent)
-  - #87-88: ConversationVectorizer (Layer 2, chunking, embedding, search)
-  - #86: ResponseExplainability (decision trace, serialization)
-  - #97-98/100: Test fixtures + 20 unit tests + 10 integration tests (ALL PASSING)
+Current status: Phases 0-1.4 complete. Phase 2.1 e-commerce ~85% complete (10 billing modules). Phase 2.2 Tier 1 Critical ALL COMPLETE (7 modules). Phase 2.2 Tier 2 (High) ALL COMPLETE (21 modules, ~9,500 lines). Phase 2.5 Layers 1-2 COMPLETE (3 modules). All middleware wired in main.py (4 middleware in correct order). 125 tests passing (30 persistent memory + 57 auth/middleware + 38 provisioning/webhooks). Architecture review complete (32 decisions, 100 work items). Cost model validated (76-90% margins). Independent Cursor audit remediated (2026-01-31).
 Next priority: Remaining Tier 2 Medium + Tier 3 items. Key candidates: TenantUsageMonitor (#51), KEDA scaling (#47-48). Remaining Phase 2.1: GDPR webhooks (#35), session tokens, App Bridge Save Bar, creative assets. Phase 2.5: Layer 3 PatternExtractionService (#90-92, Professional+), Layer 4 fine-tuning (#93-96, Enterprise).
 Please review CLAUDE.md and the Master Plan Review, then proceed with the highest-priority remaining technical work item, presenting one item at a time for review per the iterative working style documented in CLAUDE.md.
 ```
@@ -790,7 +773,7 @@ This applies to: work priority reviews, architecture decisions, scope changes, m
 - **Stripe Tax: exclusive pricing, SaaS B2B tax code:** All Checkout Sessions enable `automatic_tax`. Products carry `txcd_10103001` (SaaS — Business Use). Prices use `tax_behavior="exclusive"` (tax added on top, US B2B standard). `tax_id_collection` enabled for business VAT/tax IDs. Dashboard prerequisites: origin address (Delaware), default tax behavior, nexus state registrations. Cost: $0.50/transaction (Stripe Tax Basic).
 - **invoice.finalization_failed handler added:** Catches cases where Stripe Tax cannot determine customer location (invalid/missing address). Flags tenant for payment issue and logs for investigation.
 
-**Phase 2.5: Persistent Customer Memory (Architecture Complete — Implementation Pending)**
+**Phase 2.5: Persistent Customer Memory (Layers 1-2 COMPLETE — Layers 3-4 Pending)**
 - [x] Design customer profile schema — 6 data sources validated (purchase history, cart, geography, marketing, jurisdiction, product questions)
 - [x] Design Layer 1 injection — ~250 token prompt context block
 - [x] Design Layer 2 vectorization — text-embedding-3-large, Cosmos DB DiskANN, tier-gated depth
@@ -798,12 +781,12 @@ This applies to: work priority reviews, architecture decisions, scope changes, m
 - [x] Design Layer 4 fine-tuning pipeline — quality gates, A/B deployment, rollback
 - [x] Design explainability framework — per-response decision trace
 - [x] Design test framework — 20 unit, 10 integration, 5 A/B production tests
-- [ ] Implement Layer 1: CustomerProfileService + SystemPromptBuilder injection (work items 83-85)
-- [ ] Implement Layer 2: Vectorization pipeline + semantic search (work items 87-89)
+- [x] Implement Layer 1: CustomerProfileService + SystemPromptBuilder injection (work items 83-85)
+- [x] Implement Layer 2: Vectorization pipeline + semantic search (work items 87-88)
+- [x] Implement explainability framework (work item 86)
+- [x] Implement test suites + fixtures (work items 97-98, 100) — 30 tests passing
 - [ ] Implement Layer 3: PatternExtractionService + decay + admin UI (work items 90-92)
 - [ ] Implement Layer 4: Fine-tuning pipeline + deployment + rollback (work items 93-96)
-- [ ] Implement explainability framework (work item 86)
-- [ ] Implement test suites + fixtures (work items 97-100)
 - [ ] Create metrics dashboard (KPIs from PERSISTENT-CUSTOMER-MEMORY-METRICS.md)
 
 **Phase 2.2: Multi-Tenant Architecture (Designed — 32 Decisions, 100 Work Items)**
@@ -1049,8 +1032,21 @@ All four Tier 1 Critical work item groups implemented 2026-01-30. Seven modules 
   - WI #98: 10 integration tests — CL-01→CL-10 (full stack Enterprise, graceful degradation, layer conflict, new customer, tier upgrade, GDPR deletion, cross-tenant isolation, consent lifecycle, prompt assembly, explainability completeness).
   - All 30 tests passing.
 
+**Session 2026-01-31: Independent Audit Remediation + Test Coverage**
+
+Cursor-generated independent assessment (`independent-progress-assments/cursor-assessment-report.md`) identified 7 findings. All 6 actionable items resolved:
+
+- [x] **CRITICAL: Middleware not wired in main.py** — TenantAuthMiddleware, RateLimitMiddleware were implemented but never registered. All tenant-scoped endpoints (/api/dashboard/*, /api/config/*) would have failed at runtime. Fixed: middleware stack now registers 4 middleware in correct Starlette reverse order (TenantAuthMiddleware → RateLimitMiddleware → TenantConcurrencyMiddleware → CorrelationMiddleware). Added `_startup_tenant_resolution()` event wiring TenantRepository resolvers. Added `api_key_hash` field to TenantDocument and `find_by_api_key_hash()` to TenantRepository.
+- [x] **HIGH: Master Plan document lag** — ~45 work items updated from "Pending" to "✅ Complete" with module references.
+- [x] **HIGH: PROJECT-PLAN.md stale** — Phase 2.2 expanded from 6 generic rows to 17 specific rows (15 Done, 2 Todo). Phase 2.5 expanded from 9 to 8 rows (4 Done, 4 Todo).
+- [x] **HIGH: README.md outdated** — Pricing corrected ($149/$399/$999), add-ons updated (8 items), repo structure fixed (`multi_tenant/`), roadmap milestones synced, legal section updated.
+- [x] **MEDIUM: No integration tests** — 95 new tests across 2 suites: `tests/multi_tenant/test_auth_middleware.py` (57 tests: bearer token, auth exemption, API key hashing, shop domain, tenant status, API key verification, tenant context dependency, tier enforcement, rate limiting, config resolution, frozen dataclass). `tests/integrations/test_provisioning_webhooks.py` (38 tests: tenant CRUD lifecycle, idempotency, webhook event handlers, grace periods).
+- [x] **LOW: multi-tenant vs multi_tenant directory** — Removed stale `src/multi-tenant/.gitkeep` placeholder.
+
+**Test suite total: 125 tests passing** (30 persistent memory + 57 auth/middleware + 38 provisioning/webhooks).
+
 **Phase 2.2 Key Technical Decisions (Implementation):**
-- **multi_tenant (underscore) package:** Created as `multi_tenant/` (valid Python package name) alongside the original `multi-tenant/` placeholder directory.
+- **multi_tenant (underscore) package:** Created as `multi_tenant/` (valid Python package name). Original `multi-tenant/` placeholder directory removed.
 - **PyJWT added to requirements.txt:** `PyJWT>=2.9.0` for Shopify session token verification (HS256).
 - **httpx reused:** Already in requirements.txt for Shopify client; now also used for Critic HTTP calls with connection pooling.
 - **Atomic counters:** Cosmos DB patch "incr" operations eliminate race conditions present in the Phase 2.1 in-memory stores.
@@ -1108,5 +1104,5 @@ All four Tier 1 Critical work item groups implemented 2026-01-30. Seven modules 
 ---
 
 *© 2026 Remaker Digital, a DBA of VanDusen & Palmeter, LLC. All rights reserved.*
-*Last Updated: 2026-01-30*
-*Version: 8.0.0*
+*Last Updated: 2026-01-31*
+*Version: 8.1.0*
