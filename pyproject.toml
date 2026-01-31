@@ -1,0 +1,53 @@
+# Agent Red Customer Engagement — Project Configuration
+# © 2026 Remaker Digital, a DBA of VanDusen & Palmeter, LLC. All rights reserved.
+
+# ---------------------------------------------------------------------------
+# pytest
+# ---------------------------------------------------------------------------
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+asyncio_mode = "auto"
+python_files = ["test_*.py"]
+python_classes = ["Test*"]
+python_functions = ["test_*"]
+addopts = "-v --tb=short --strict-markers"
+markers = [
+    "unit: fast, isolated unit tests (no I/O, no network)",
+    "integration: cross-module integration tests (may use mocks for external services)",
+    "e2e: end-to-end tests requiring full application stack",
+    "slow: tests that take >2 seconds",
+    "security: adversarial and security-focused tests",
+]
+filterwarnings = [
+    "ignore::DeprecationWarning:pkg_resources",
+    "ignore::DeprecationWarning:google.protobuf",
+    "ignore::PendingDeprecationWarning",
+    "ignore::DeprecationWarning:src.main",
+    "ignore::DeprecationWarning:fastapi",
+]
+
+# ---------------------------------------------------------------------------
+# coverage
+# ---------------------------------------------------------------------------
+
+[tool.coverage.run]
+source = ["src"]
+omit = [
+    "src/__init__.py",
+    "src/*/__init__.py",
+]
+
+[tool.coverage.report]
+# Ramp plan: 20% (baseline) → 50% (P0 tests) → 80% (launch target)
+fail_under = 20
+show_missing = true
+skip_empty = true
+exclude_lines = [
+    "pragma: no cover",
+    "if TYPE_CHECKING:",
+    "if __name__ == .__main__.",
+    "raise NotImplementedError",
+    "pass",
+    "\\.\\.\\.\\s*$",
+]

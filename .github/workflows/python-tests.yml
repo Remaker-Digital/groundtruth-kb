@@ -1,0 +1,93 @@
+# Python Test CI Pipeline
+#
+# Runs pytest with coverage on every PR and push to main.
+# Fails on test failure or coverage below threshold (pyproject.toml).
+#
+# Work Item #104 (Test Infrastructure).
+#
+# (c) 2026 Remaker Digital, a DBA of VanDusen & Palmeter, LLC. All rights reserved.
+
+name: Python Tests
+
+on:
+  pull_request:
+    paths:
+      - 'src/**'
+      - 'tests/**'
+      - 'requirements*.txt'
+      - 'pyproject.toml'
+      - '.github/workflows/python-tests.yml'
+  push:
+    branches: [main]
+    paths:
+      - 'src/**'
+      - 'tests/**'
+      - 'requirements*.txt'
+      - 'pyproject.toml'
+  workflow_dispatch:
+
+jobs:
+  test:
+    name: Tests (Python ${{ matrix.python-version }})
+    runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        python-version: ['3.12', '3.13']
+      fail-fast: false
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up Python ${{ matrix.python-version }}
+        uses: actions/setup-python@v5
+        with:
+          python-version: ${{ matrix.python-version }}
+          cache: 'pip'
+          cache-dependency-path: |
+            requirements.txt
+            requirements-test.txt
+
+      - name: Install dependencies
+        run: |
+          python -m pip install --upgrade pip
+          # Install production deps, skipping agntcy-app-sdk which requires
+          # slim-bindings (gRPC native build) and is not imported by any source module.
+          grep -v '^agntcy-app-sdk' requirements.txt > /tmp/requirements-filtered.txt
+          pip install -r /tmp/requirements-filtered.txt
+          # Install test-only deps (pytest, pytest-asyncio, pytest-cov)
+          pip install pytest pytest-asyncio pytest-cov httpx
+
+      - name: Run tests with coverage
+        run: |
+          python -m pytest tests/ \
+            --cov=src \
+            --cov-report=term-missing \
+            --cov-report=xml:coverage.xml \
+            --junitxml=test-results.xml
+
+      - name: Upload coverage report
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: coverage-report-py${{ matrix.python-version }}
+          path: |
+            coverage.xml
+            test-results.xml
+          retention-days: 30
+
+      - name: Upload coverage to job summary
+        if: always()
+        run: |
+          echo "## Test Results (Python ${{ matrix.python-version }})" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          if [ -f test-results.xml ]; then
+            # Extract test counts from JUnit XML
+            TESTS=$(grep -oP 'tests="\K[0-9]+' test-results.xml | head -1)
+            FAILURES=$(grep -oP 'failures="\K[0-9]+' test-results.xml | head -1)
+            ERRORS=$(grep -oP 'errors="\K[0-9]+' test-results.xml | head -1)
+            echo "| Metric | Value |" >> $GITHUB_STEP_SUMMARY
+            echo "|--------|-------|" >> $GITHUB_STEP_SUMMARY
+            echo "| Tests run | ${TESTS:-0} |" >> $GITHUB_STEP_SUMMARY
+            echo "| Failures | ${FAILURES:-0} |" >> $GITHUB_STEP_SUMMARY
+            echo "| Errors | ${ERRORS:-0} |" >> $GITHUB_STEP_SUMMARY
+          fi

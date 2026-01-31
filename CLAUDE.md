@@ -12,7 +12,7 @@ This document provides context and guidance for AI assistants working on the Age
 | **Brand Name** | Agent Red Customer Engagement |
 | **Release** | Launch 1.0 |
 | **Type** | Commercial SaaS Product |
-| **Status** | Phase 2.1 E-Commerce ~85% complete. Phase 2.2 Tier 1 Critical COMPLETE (7 modules). Tier 2 High COMPLETE — 21 modules (~9,500 lines). Phase 2.5 Layers 1-2 COMPLETE (3 modules). All middleware wired in main.py. 125 tests passing (30 persistent memory + 57 auth/middleware + 38 provisioning/webhooks). Architecture review complete (32 decisions, 100 work items). Test coverage audit complete — comprehensive test plan (~880 tests) and new work items backlog (63 items, WI #101-163) created. |
+| **Status** | Phase 2.1 E-Commerce ~85% complete. Phase 2.2 Tier 1 Critical COMPLETE (7 modules). Tier 2 High COMPLETE — 21 modules (~9,500 lines). Phase 2.5 Layers 1-2 COMPLETE (3 modules). All middleware wired in main.py. **379 tests passing** (P0 launch-blockers COMPLETE: 254 new tests across 8 groups + 125 pre-existing). Test infrastructure complete (WI #101-104). Architecture review complete (32 decisions, 100 work items). Comprehensive test plan (~880 tests) and new work items backlog (63 items, WI #101-163) created. |
 | **Owner** | Remaker Digital (DBA of VanDusen & Palmeter, LLC) |
 
 ---
@@ -537,15 +537,25 @@ E:\Claude-Playground\CLAUDE-PROJECTS\Agent Red Customer Engagement\
 │   ├── ai-features/                # Advanced AI (Phase 2.5)
 │   └── white-label/                # Customization (future)
 │
-├── tests/                          # Test suites (125 tests total)
+├── tests/                          # Test suites (379 tests total)
+│   ├── conftest.py                 # Shared fixtures: TestClient, MockCosmos, MockNATS, MockKV, auth helpers
+│   ├── test_conftest_smoke.py      # 19 fixture smoke tests
+│   ├── test_health.py              # 15 health/ready endpoint + startup event tests (§4.6)
 │   ├── persistent_memory/          # Persistent Customer Memory tests (30 tests)
 │   │   ├── fixtures.py             # Synthetic profiles, conversations, vector data
 │   │   ├── test_unit_layers.py     # 20 unit tests (L1-L4)
 │   │   └── test_integration_layers.py # 10 cross-layer integration tests
-│   ├── multi_tenant/               # Auth + middleware tests (57 tests)
-│   │   └── test_auth_middleware.py  # Bearer token, auth exempt, hashing, tier, rate limit
-│   └── integrations/               # Billing integration tests (38 tests)
-│       └── test_provisioning_webhooks.py # Tenant lifecycle, webhooks, idempotency
+│   ├── multi_tenant/               # Multi-tenant infrastructure tests (206 tests)
+│   │   ├── test_auth_middleware.py  # 57 auth + middleware unit tests
+│   │   ├── test_middleware_pipeline.py # 25 full middleware stack tests (§4.2)
+│   │   ├── test_conversation_meter.py # 38 ConversationMeter unit tests (§4.3)
+│   │   ├── test_critic_policy.py   # 25 CriticPolicy unit tests (§4.4)
+│   │   └── test_cosmos_repository.py # 61 schema + repository tests (§4.5)
+│   └── integrations/               # Billing integration tests (109 tests)
+│       ├── test_provisioning_webhooks.py # 38 tenant lifecycle + webhook tests
+│       ├── test_http_billing.py    # 35 HTTP billing endpoint tests (§4.1)
+│       ├── test_stripe_catalog.py  # 23 Stripe catalog model tests (§4.7)
+│       └── test_usage_consumption.py # 13 3-tier usage consumption tests (§4.8)
 │
 ├── infrastructure/                 # Deployment infrastructure
 │   └── terraform/                  # IaC for Azure (variables, main, scaling, DR/security)
@@ -1095,10 +1105,35 @@ Full test coverage audit conducted across all 29 source modules, 30 API endpoint
 - **Merchant web UI is the largest product gap:** All 30 API endpoints, 10 config endpoints, and 5 dashboard endpoints exist but have no frontend. Self-service operations require curl/Postman.
 - **Test infrastructure is the prerequisite for all testing work:** No pyproject.toml, no conftest.py, no CI pipeline. Must be built first (WI #101-104).
 
+**Session 2026-01-31 (cont.): P0 Test Suite Implementation — 379 tests passing**
+
+Test infrastructure (WI #101-104) and all 8 P0 launch-blocker test groups implemented. 254 new tests created across 10 new test files.
+
+- [x] **WI #101: pyproject.toml** — pytest configuration with asyncio_mode=auto, testpaths, markers (unit, integration, slow)
+- [x] **WI #102: requirements-test.txt** — pytest, pytest-asyncio, pytest-cov, pytest-mock, httpx
+- [x] **WI #103: conftest.py** — MockContainerProxy (CRUD + patch incr), MockCosmosManager, MockQueryIterator, mock_cosmos/mock_nats/mock_keyvault/mock_circuit_breakers fixtures, FastAPI app_client with full middleware stack, AuthenticatedClient wrapper, tenant context + document factories, API key helpers
+- [x] **WI #104: GitHub Actions CI** — .github/workflows/python-tests.yml (Python 3.12/3.14, pip cache, pytest with JUnit XML)
+- [x] **§4.1: test_http_billing.py (35 tests)** — All 9 billing routers (checkout, packs, portal, usage, webhooks, Shopify billing, provisioning), request validation, error handling
+- [x] **§4.2: test_middleware_pipeline.py (25 tests)** — Full middleware stack via TestClient (auth, rate limit, concurrency, correlation), tier status validation, auth exemption
+- [x] **§4.3: test_conversation_meter.py (38 tests)** — Billable conversation spec (CM-01→CM-30 + 8 spec constants), 3-tier consumption, idempotent metering, alerts, reconciliation, idle scanner
+- [x] **§4.4: test_critic_policy.py (25 tests)** — Fail-closed gate (CP-01→CP-20 + 5 extras), circuit breaker state machine, SAFE_FALLBACK_MESSAGE, audit logging, timeout budget
+- [x] **§4.5: test_cosmos_repository.py (61 tests)** — TenantScopedRepository CRUD enforcement (CR-01→CR-25 + 36 supplements), all 11 document models, 7 enums, TIER_DEFAULTS, 9 collections, DiskANN vector index, PlatformScopedRepository
+- [x] **§4.6: test_health.py (15 tests)** — /health liveness, /ready readiness (NATS, circuit breakers, Key Vault), auth exemption, startup events
+- [x] **§4.7: test_stripe_catalog.py (23 tests)** — StripeCatalog from JSON, tier/pack/addon models, price_id_for_interval(), addon tier validation
+- [x] **§4.8: test_usage_consumption.py (13 tests)** — End-to-end 3-tier flow (included → pack FIFO → Stripe overage), pack expiry, billing period reset
+
+**Key technical decisions from this session:**
+- **pytest-asyncio asyncio_mode=auto:** All `async def` test methods run automatically without `@pytest.mark.asyncio`. Required for Python 3.14 compatibility (asyncio.get_event_loop() deprecated in MainThread).
+- **MockContainerProxy with patch "incr":** In-memory mock supports Cosmos DB atomic counter increments, avoiding need for real database in unit tests.
+- **app_client fixture pattern:** FastAPI TestClient with full middleware stack active (auth → rate limit → concurrency → correlation). External services (NATS, Key Vault, circuit breakers) patched at module level. Tenant resolution wired after TestClient startup to avoid race with mocked _startup_tenant_resolution.
+- **AuthenticatedClient wrapper:** Convenience class injecting API key headers on every request. Starter/Professional/Enterprise pre-authenticated clients via fixtures.
+- **inspect.iscoroutinefunction over asyncio.iscoroutinefunction:** Python 3.14 deprecates the asyncio version; using inspect module avoids DeprecationWarning.
+
+**Test suite total: 379 tests passing in ~2s** (10 test files created this session + 3 pre-existing).
+
 ### Pending
-- [ ] **Test infrastructure (WI #101-104):** pyproject.toml, requirements-test.txt, conftest.py with TestClient/mocks, GitHub Actions CI
-- [ ] **P0 launch-blocker tests (~160 tests):** HTTP billing endpoints, middleware pipeline, ConversationMeter, CriticPolicy, Cosmos repository, health endpoints
-- [ ] **New backlog items (WI #101-163):** 63 items staged for prioritization review
+- [ ] **P1 pre-launch tests (~200 tests):** NATS isolation (§5.1, 25 tests), GDPR services (§5.2, 30 tests), OpenTelemetry tracing (§5.3, 20 tests), pipeline resilience (§5.4, 20 tests), SystemPromptBuilder (§5.5, 15 tests), tenant config (§5.6, 25 tests), provisioning lifecycle (§5.7, 15 tests), Shopify billing (§5.8, 15 tests), persistent memory (§5.9, 20 tests), dashboard API (§5.10, 15 tests)
+- [ ] **New backlog items (WI #101-163):** 63 items staged for prioritization review (WI #101-104 now complete)
 - [ ] Phase 2.2: Remaining Tier 2 Medium + Tier 3 work items (from Master-Plan-Review-01-30-2026.md)
 - [ ] Phase 2.2: TenantUsageMonitor (#51 — progressive throttling Watch → Warn → Throttle → Isolate)
 - [ ] Phase 2.2: KEDA auto-scaling deployment (#47-48 — infrastructure/Terraform, needs production testing)
@@ -1130,4 +1165,4 @@ Full test coverage audit conducted across all 29 source modules, 30 API endpoint
 
 *© 2026 Remaker Digital, a DBA of VanDusen & Palmeter, LLC. All rights reserved.*
 *Last Updated: 2026-01-31*
-*Version: 9.0.0*
+*Version: 9.1.0*
