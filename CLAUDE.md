@@ -12,7 +12,7 @@ This document provides context and guidance for AI assistants working on the Age
 | **Brand Name** | Agent Red Customer Engagement |
 | **Release** | Launch 1.0 |
 | **Type** | Commercial SaaS Product |
-| **Status** | Phase 2.1 E-Commerce ~85% complete. Phase 2.2 Tier 1 Critical implementation COMPLETE (7 modules, ~3,500 lines). Architecture review complete (32 decisions, 100 work items). |
+| **Status** | Phase 2.1 E-Commerce ~85% complete. Phase 2.2 Tier 1 Critical COMPLETE (7 modules). Tier 2 in progress — NATS + GDPR + OTel + Pipeline Resilience + SystemPromptBuilder + Usage Dashboard API COMPLETE (13 modules, ~6,600 lines). Architecture review complete (32 decisions, 100 work items). |
 | **Owner** | Remaker Digital (DBA of VanDusen & Palmeter, LLC) |
 
 ---
@@ -520,7 +520,13 @@ E:\Claude-Playground\CLAUDE-PROJECTS\Agent Red Customer Engagement\
 │   │   ├── auth.py                 # Dual auth: Shopify JWT + API key verification
 │   │   ├── middleware.py           # TenantAuthMiddleware + RateLimitMiddleware + dependencies
 │   │   ├── conversation_meter.py   # ConversationMeter: billable conv spec, 3-tier metering, alerts
-│   │   └── critic_policy.py        # Fail-closed Critic enforcement, circuit breaker, health
+│   │   ├── critic_policy.py        # Fail-closed Critic enforcement, circuit breaker, health
+│   │   ├── nats_isolation.py      # NATS tenant isolation, topic namespace, subscription auth
+│   │   ├── gdpr_services.py      # PII scrubbing, data export/deletion, consent management
+│   │   ├── otel_tracing.py       # OpenTelemetry tenant tracing, correlation ID propagation
+│   │   ├── pipeline_resilience.py # Per-tenant concurrency, timeout budgets, circuit breakers
+│   │   ├── system_prompt_builder.py # Dynamic per-agent prompt assembly (4-layer)
+│   │   └── usage_dashboard_api.py  # Billing transparency REST API (Decision #25)
 │   ├── ai-features/                # Advanced AI (Phase 2.5)
 │   └── white-label/                # Customization (future)
 │
@@ -603,13 +609,20 @@ E:\Claude-Playground\CLAUDE-PROJECTS\Agent Red Customer Engagement\
 Continue work on Agent Red Customer Engagement commercial project.
 Location: E:\Claude-Playground\CLAUDE-PROJECTS\Agent Red Customer Engagement
 Key files: CLAUDE.md, docs/Master-Plan-Review-01-30-2026.md, docs/PROJECT-PLAN.md
-Current status: Phases 0-1.4 complete. Phase 2.1 e-commerce ~85% complete (10 billing modules). Phase 2.2 Tier 1 Critical work items ALL COMPLETE — 7 modules built in src/multi_tenant/ (~3,500 lines). Architecture review complete (32 decisions, 100 work items). Cost model validated (76-90% margins).
+Current status: Phases 0-1.4 complete. Phase 2.1 e-commerce ~85% complete (10 billing modules). Phase 2.2 Tier 1 Critical ALL COMPLETE (7 modules). Tier 2 in progress — NATS + GDPR + OTel + Pipeline Resilience + SystemPromptBuilder + Usage Dashboard API COMPLETE (13 modules, ~6,600 lines). Architecture review complete (32 decisions, 100 work items). Cost model validated (76-90% margins).
 Completed Tier 1 Critical items:
   - #13-14/#24-25: Cosmos DB schema (9 collections, 11 models) + TenantScopedRepository (9 repos)
   - #18/#27: Dual auth (Shopify JWT + API keys) + TenantAuthMiddleware + RateLimitMiddleware
   - #71-72: ConversationMeter (billable conv spec, 3-tier consumption, idempotent counting, reconciliation, alerts)
   - #50: Fail-closed Critic policy (circuit breaker, health monitoring, escalation on unavailability)
-Next priority: Tier 2 (High) work items per Master Plan priority framework. Key candidates: NATS tenant isolation (#33-35), GDPR core services (#36-39), OpenTelemetry tracing (#40-43), timeout orchestration (#45), circuit breakers (#46), SystemPromptBuilder (#70), usage dashboard API (#73-74). Also remaining Phase 2.1: GDPR webhooks, session tokens, App Bridge Save Bar, creative assets, test flows.
+Completed Tier 2 (High) items:
+  - #15-17/#26: NATS tenant isolation (topic namespace, subscription auth, JetStream streams, circuit breaker)
+  - #30-34: GDPR core services (PII scrubbing, data export/deletion, consent management, grace periods)
+  - #39-41: OpenTelemetry tenant tracing (SpanProcessor, LogFilter, CorrelationContext, ASGI middleware, NATS correlation)
+  - #44-46: Pipeline resilience (per-tenant concurrency, timeout budgets, service circuit breakers)
+  - #70: SystemPromptBuilder (4-layer per-agent prompt assembly, resolved-config pattern, Critic immutability, explainability trace)
+  - #73-74: Usage Dashboard API (real-time dashboard, daily volume, conversation list/detail/CSV export, 5 endpoints)
+Next priority: Remaining Tier 2 (High) work items per Master Plan priority framework. Key candidates: TenantUsageMonitor (#51), KEDA scaling (#47-48, infrastructure/Terraform), tenant config schema/processor/API (#63-65). Remaining Phase 2.1: GDPR webhooks (#35), session tokens, App Bridge Save Bar, creative assets, test flows.
 Please review CLAUDE.md (especially the Phase 2.2 implementation progress and Work Priority Bias) and the Master Plan Review, then proceed with the highest-priority Tier 2 technical work item, presenting one item at a time for review per the iterative working style documented in CLAUDE.md.
 ```
 
@@ -732,7 +745,7 @@ This applies to: work priority reviews, architecture decisions, scope changes, m
 - [ ] App Store review submission — blocked by: GDPR webhooks, session tokens, App Bridge Save Bar, creative assets
 - [ ] Test checkout flows (both channels)
 
-**Phase 2.1 API Route Map (7 routers, 15 endpoints):**
+**API Route Map (8 routers, 20 endpoints):**
 
 | Prefix | Module | Endpoints |
 |--------|--------|-----------|
@@ -743,6 +756,7 @@ This applies to: work priority reviews, architecture decisions, scope changes, m
 | `/api/usage` | stripe_usage | POST /record, GET /{customer_id} |
 | `/api/webhooks` | stripe_webhooks | POST /stripe |
 | `/api/shopify/billing` | shopify_billing | POST /subscribe, GET /confirm, GET /status |
+| `/api/dashboard` | usage_dashboard_api | GET /usage, GET /usage/daily, GET /conversations, GET /conversations/{id}, GET /conversations/export |
 
 **Phase 2.1 Key Technical Decisions:**
 - **Shopify annual billing limitation:** Shopify does not support usage billing with ANNUAL interval. Annual subscriptions get recurring base only; overage deferred to Phase 2.2 (one-time app charges).
@@ -819,6 +833,7 @@ Full architecture review completed 2026-01-30. All decisions documented in `docs
 - Config inheritance: platform defaults → tier defaults → tenant overrides (60s cache)
 - Merchant UI: pervasive tooltips, documentation links, live preview, adjacent contextual data
 - SystemPromptBuilder: dynamic prompt assembly per-agent from tenant config with immutable safety guardrails
+- **Smart Rollout (Phase 3 design decision, 2026-01-30):** A/B testing for AI prompts is niche — only Zendesk offers it natively (behind highest-priced tier). Gorgias, Tidio, Intercom have no native support. Agent Red's approach: AI-assisted configuration changes with controlled rollout. A foundation model analyses conversation data, identifies improvement opportunities, generates config variants (persona descriptions, escalation thresholds, response styles, segmentation tags), and the merchant's role is narrowly scoped to editorial review and test approval. Merchant answers 5 simple questions: who's in the test group, when does it start, when does it end, which variant to apply, which KPIs to track. The SystemPromptBuilder's resolved-config pattern enables this without modification — the caller swaps which PreferencesDocument is passed based on test group membership. No experiment-specific code in the prompt builder. Implementation deferred to Phase 3 (requires conversation data from Layer 2 + platform benchmarks from sufficient tenants).
 
 **Metering / SLA Validation (Decisions 24-27):**
 - Billable conversation: starts on first message, ends on 30-min idle / customer end / escalation / 50 turns
@@ -890,15 +905,105 @@ All four Tier 1 Critical work item groups implemented 2026-01-30. Seven modules 
   - 800ms timeout budget per Decision #15
   - httpx connection pooling for Critic HTTP calls
 
+**Phase 2.2 Tier 2 (High) — In Progress:**
+
+- [x] **#15-17/#26: NATS Tenant Isolation** — `nats_isolation.py` (~600 lines)
+  - TenantNATSManager: singleton managing per-tenant topic namespaces and subscriptions
+  - Topic namespace: `{tenant_id}.{agent}` for all 6 agents (intent-classifier, knowledge-retrieval, response-generator, escalation-handler, analytics-collector, critic-supervisor)
+  - JetStream stream per tenant: `tenant-{tenant_id}` with wildcard subject `{tenant_id}.>`
+  - Subscription authorization: `authorize_subject()` validates tenant_id prefix before publish/subscribe
+  - NATSAuthorizationError raised on cross-tenant access attempts
+  - provision_tenant_topics(): creates JetStream stream on tenant creation, tier-aware queue depth from TIER_DEFAULTS
+  - update_tenant_stream(): adjusts queue depth on tier change without disrupting subscriptions
+  - deprovision_tenant_topics(): purges messages and deletes stream on tenant deletion
+  - NATSCircuitBreaker: 3 failures / 10s window, 5s recovery (Decision #15)
+  - Correlation ID propagation: build_correlation_headers() / extract_correlation_headers() for Decision #12
+  - Health monitoring for /ready endpoint integration
+  - Module-level singleton with init_nats_manager() / close_nats_manager() lifecycle
+  - Wired into main.py startup/shutdown events
+
+- [x] **#30-34: GDPR Core Services** — `gdpr_services.py` (~800 lines)
+  - PiiScrubber (#30): recursive dict/list scrubbing with field-level classification (DIRECT/INDIRECT/SENSITIVE), regex email/phone detection in free text, scrub_text() for log messages
+  - GracePeriodManager (#31): channel-specific grace periods (Shopify 48hr, Stripe 30d), calculate_grace_period(), is_grace_expired(), GracePeriodResult dataclass
+  - DataStoreRegistry + adapters (#32-33): registry pattern with DataStoreAdapter protocol, CosmosDataStoreAdapter (7 collections), NATSDataStoreAdapter (stream purge/delete)
+  - DataExportService (#32): tenant-level and customer-level export across all registered stores, ExportResult dataclass, audit logging (DATA_EXPORTED)
+  - DataDeletionService (#33): cascading deletion across all stores, grace period enforcement, GracePeriodActiveError, tenant and customer deletion, audit logging (DATA_DELETED)
+  - ConsentManager (#34): consent_status gating for Persistent Customer Memory Layers 2-4, tenant-level and customer-level consent updates, automatic Layer 2-4 data deletion on consent denial, audit logging (CONSENT_CHANGED)
+  - All services integrate with AuditLogRepository for compliance trail
+
+- [x] **#39-40 (+#41): OpenTelemetry Tenant Tracing** — `otel_tracing.py` (~400 lines)
+  - TenantSpanProcessor (#39): injects tenant_id, conversation_id, trace_id, auth_method, tier as span attributes on every span start. Application Insights custom dimensions.
+  - TenantLogFilter (#39): Python logging.Filter injecting tenant context into every log record. Structured log format: `[tenant=X conv=Y trace=Z]`.
+  - CorrelationContext (#40): frozen dataclass carrying the correlation triple (tenant_id + conversation_id + trace_id) via async-safe contextvars.ContextVar.
+  - CorrelationMiddleware (#40): ASGI middleware reading TenantContext from auth and setting CorrelationContext for the request lifecycle. Clears on request completion.
+  - NATS correlation helpers (#40): correlation_to_nats_headers(), nats_headers_to_correlation(), restore_correlation_from_nats() for agent-to-agent propagation.
+  - trace_agent_operation(): convenience span factory for instrumenting agent pipeline steps.
+  - configure_tracing() + configure_logging(): one-call setup wired into main.py startup.
+  - #41 (audit log): already fully implemented in cosmos_schema.py + repository.py (AuditLogDocument, 12 AuditEventType values, AuditLogRepository) — confirmed complete.
+
+- [x] **#44-46: Pipeline Resilience / Performance Noisy Neighbor** — `pipeline_resilience.py` (~500 lines)
+  - TenantConcurrencyMiddleware (#44): per-tenant asyncio.Semaphore + queue depth from TIER_DEFAULTS (Starter 3/5, Professional 10/20, Enterprise 30/50). Returns HTTP 429 when both active slots and waiting queue are full. Lazy _TenantGate creation on first request per tenant.
+  - PipelineTimeoutBudget (#45): layered timeout across 6-agent pipeline with 8,000ms hard deadline. Stage budgets: IC=800ms, KR=1000ms, RG=3000ms, CR=800ms, ESC=1400ms, AN=800ms. StageResult dataclass tracks per-stage duration. PipelineTimeoutError raised on budget exhaustion.
+  - ServiceCircuitBreaker (#46): configurable per-service circuit breaker. Default configs: Azure OpenAI (5 failures/30s window, 15s recovery), Cosmos DB (3/15s, 10s recovery). NATS breaker already in nats_isolation.py.
+  - ServiceCircuitBreakerRegistry: named breaker management with health_summary() and reset_all(). Module-level singleton via get_circuit_breaker_registry().
+  - call_with_breaker(): async helper wrapping any coroutine with circuit breaker protection. Raises ServiceUnavailableError when breaker is OPEN.
+  - Wired into main.py: TenantConcurrencyMiddleware in middleware stack, circuit breaker health in /ready endpoint, registry startup logging.
+
+- [x] **#70: SystemPromptBuilder — per-agent prompt composition** — `system_prompt_builder.py` (~450 lines)
+  - 4-layer prompt assembly: platform base (immutable) → tier capabilities → tenant config → customer context.
+  - AgentRole enum for 6 pipeline agents (intent-classifier, knowledge-retrieval, response-generator, escalation-handler, analytics-collector, critic-supervisor).
+  - Per-agent specialisation: Response Generator gets full persona + customer context + policies; Escalation Handler gets escalation rules + customer summary; Intent Classifier gets language support; Critic/Supervisor prompt is entirely immutable (no tenant config injected).
+  - Platform base prompts: hardcoded safety guardrails per agent, cannot be overridden by merchant config.
+  - Tenant config injection: brand, voice, formality, response length, policies, escalation rules, custom instructions (sandboxed).
+  - Customer context (Layer 1, ~250 token budget): compact summaries from 6 data sources (purchase history, product questions, geography, marketing segments, jurisdiction, cart).
+  - Safety invariant: custom_instructions sandboxed with "advisory — safety rules take precedence" header. Critic prompt immutable.
+  - explain() method for response explainability framework (Decision #32): returns structured trace of layers, config fields, and data sources without exposing prompt text.
+  - build_all() convenience method for pipeline orchestration — returns dict[AgentRole, str].
+  - Stateless builder — receives resolved PreferencesDocument. Agnostic to whether config is live or test-group override (compatible with future Smart Rollout / AI-assisted A/B).
+  - Module-level singleton via get_prompt_builder().
+
+- [x] **#73-74: Usage Dashboard API + Per-Conversation Audit Trail** — `usage_dashboard_api.py` (~350 lines)
+  - Layer 1 (real-time dashboard): GET /api/dashboard/usage — surfaces ConversationMeter.get_usage_dashboard() data (counters, allowance, overage estimate, pack balance, active alerts).
+  - Layer 1 supplement: GET /api/dashboard/usage/daily — per-day total/billable counts for chart rendering, aggregated from ConversationRepository queries.
+  - Layer 2 (audit trail): GET /api/dashboard/conversations — paginated billable conversation list with offset/limit (max 200), total count for pagination metadata.
+  - Layer 2 (detail): GET /api/dashboard/conversations/{id} — full billing attribution via ConversationMeter.get_conversation_billing_detail().
+  - Layer 2 (export): GET /api/dashboard/conversations/export — CSV export of all billable conversations (11 columns: ID, status, customer, billable, messages, turns, timestamps, agents, model, Critic pass/fail).
+  - All endpoints derive tenant_id from TenantContext auth — tenant isolation enforced, no tenant_id in query params.
+  - Pydantic response models: UsageDashboardResponse, DailyVolumeResponse, ConversationListResponse, ConversationDetailResponse.
+  - Service injection via configure_dashboard_services() — wired at app startup after Cosmos DB bootstrap.
+  - CSV uses Python csv + io.StringIO → StreamingResponse (no new pip packages).
+  - Router mounted at /api/dashboard in main.py (8th router, 20 total endpoints).
+
 **Phase 2.2 Key Technical Decisions (Implementation):**
 - **multi_tenant (underscore) package:** Created as `multi_tenant/` (valid Python package name) alongside the original `multi-tenant/` placeholder directory.
 - **PyJWT added to requirements.txt:** `PyJWT>=2.9.0` for Shopify session token verification (HS256).
 - **httpx reused:** Already in requirements.txt for Shopify client; now also used for Critic HTTP calls with connection pooling.
 - **Atomic counters:** Cosmos DB patch "incr" operations eliminate race conditions present in the Phase 2.1 in-memory stores.
 - **Idempotent alerts:** Each usage alert fires once per billing period via the same idempotency key mechanism used for webhook dedup.
+- **nats-py reused:** Already in requirements.txt (`nats-py>=2.9.0`). JetStream API used for stream management (WorkQueue retention, file storage, per-subject message limits).
+- **Non-fatal NATS startup:** NATS connection failure at startup is logged as warning, not fatal — allows development without NATS running.
+- **WorkQueue retention:** JetStream streams use WorkQueue retention (each message consumed once) matching the pipeline's exactly-once processing semantics.
+- **DataStoreAdapter protocol:** Uses Python Protocol (structural subtyping) so adapters don't need to inherit a base class — Key Vault and external service adapters can be added later without modifying existing code.
+- **Cascading deletion order:** memory_vectors → customer_profiles → conversations → usage → knowledge_bases → preferences → tenants. Dependent data deleted first to maintain referential consistency.
+- **Consent denial triggers deletion:** When a customer's consent changes to DENIED, the ConsentManager automatically invokes DataDeletionService to erase Layer 2-4 data, satisfying GDPR Article 17 without manual intervention.
+- **PII scrubbing is non-destructive:** PiiScrubber.scrub() returns a new dict — the original payload is never modified, ensuring upstream code can still use the full data internally.
+- **contextvars for correlation:** CorrelationContext uses Python `contextvars.ContextVar` for async-safe per-request propagation. Each asyncio task inherits its parent's context, so correlation flows naturally through `await` chains.
+- **ASGI-level middleware:** CorrelationMiddleware is a raw ASGI middleware (not Starlette BaseHTTPMiddleware) to avoid the double-read issue and minimize overhead on every request.
+- **Console exporter for dev:** Default OTEL_EXPORTER_TYPE="console" in development. Azure Monitor exporter (azure-monitor-opentelemetry) configured at deployment layer via APPLICATIONINSIGHTS_CONNECTION_STRING env var.
+- **BaseHTTPMiddleware for concurrency:** TenantConcurrencyMiddleware uses Starlette BaseHTTPMiddleware (not raw ASGI) since it needs to read request.state.tenant_context set by TenantAuthMiddleware — acceptable trade-off as the middleware only reads context, not the body.
+- **Lazy tenant gates:** _TenantGate instances (semaphore + queue counter) are created lazily on first request per tenant and cached in a dict. No upfront allocation for tenants that never send traffic.
+- **Queue depth as waiting counter:** Queue depth is not a second semaphore but an atomic counter (asyncio primitives) tracking how many requests are waiting to acquire the concurrency semaphore. When waiting count exceeds queue_depth, new requests are immediately rejected with 429.
+- **Stage budget vs wall-clock:** PipelineTimeoutBudget tracks both per-stage elapsed time and total wall-clock against the 8s deadline. A stage can complete under its budget but the pipeline still aborts if total time is exhausted.
+- **Resolved config pattern:** SystemPromptBuilder receives a resolved PreferencesDocument — it doesn't know whether it's the live config or a test-group override. This keeps the builder single-responsibility and makes it natively compatible with future AI-assisted config rollout ("Smart Rollout") without carrying experiment-specific code.
+- **Critic prompt immutability:** The Critic/Supervisor agent's platform base prompt is the only content it receives — _build_tenant_config_section() returns empty string for AgentRole.CRITIC_SUPERVISOR. No merchant config, custom instructions, or customer context can alter Critic behaviour. Combined with CriticPolicy (fail-closed gate), this is defence-in-depth.
+- **Custom instructions sandboxed:** Merchant custom_instructions appear only in Response Generator prompts, in a clearly delimited section labelled "advisory — safety rules take precedence". Platform base rules and Critic validation override anything in this block.
+- **A/B testing deferred by design:** Market research confirmed A/B testing for AI prompts is niche (only Zendesk offers it natively, behind their highest-priced tier). Agent Red's approach: the builder accepts resolved config, and a future "Smart Rollout" service (Phase 3) can swap which PreferencesDocument is passed based on test group membership. The builder carries zero experiment-specific logic.
+- **Dashboard service injection:** usage_dashboard_api.py uses configure_dashboard_services() rather than importing singletons directly. This allows the services (ConversationMeter, ConversationRepository) to be fully initialised with Cosmos DB connections before the dashboard API uses them. Returns HTTP 503 if services aren't wired yet.
+- **Tenant isolation on all dashboard endpoints:** tenant_id is always derived from TenantContext (set by TenantAuthMiddleware), never from query parameters or path segments. A merchant cannot query another merchant's usage data.
+- **CSV export in-memory:** For launch volumes (≤20K conversations/month for Enterprise), building the CSV in io.StringIO is sufficient. For future high-volume tenants, this can be replaced with streaming chunked responses or async blob generation.
 
 ### Pending
-- [ ] Phase 2.2: Tier 2 (High) and Tier 3 work items (architecture complete, remaining ~88 work items from Master-Plan-Review-01-30-2026.md)
+- [ ] Phase 2.2: Remaining Tier 2 (High) work items (~70 remaining from Master-Plan-Review-01-30-2026.md)
 - [ ] Phase 2.1: Remaining items (GDPR webhooks, session tokens, App Bridge Save Bar, creative assets, test flows)
 
 ---

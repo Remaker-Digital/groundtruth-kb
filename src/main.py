@@ -13,6 +13,7 @@ from __future__ import annotations
 
 import logging
 import os
+from typing import Any
 
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
@@ -65,6 +66,7 @@ from src.integrations.stripe_portal import router as portal_router  # noqa: E402
 from src.integrations.stripe_usage import router as usage_router  # noqa: E402
 from src.integrations.stripe_webhooks import router as webhooks_router  # noqa: E402
 from src.integrations.shopify_billing import router as shopify_billing_router  # noqa: E402
+from src.multi_tenant.usage_dashboard_api import router as dashboard_router  # noqa: E402
 
 app.include_router(provisioning_router)
 app.include_router(checkout_router)
@@ -73,6 +75,90 @@ app.include_router(portal_router)
 app.include_router(usage_router)
 app.include_router(webhooks_router)
 app.include_router(shopify_billing_router)
+app.include_router(dashboard_router)
+
+# ---------------------------------------------------------------------------
+# Pipeline resilience — concurrency control + circuit breakers (WI #44-46)
+# ---------------------------------------------------------------------------
+
+from src.multi_tenant.pipeline_resilience import (  # noqa: E402
+    TenantConcurrencyMiddleware,
+    get_circuit_breaker_registry,
+)
+
+# TenantConcurrencyMiddleware: per-tenant concurrency limiter (asyncio.Semaphore
+# + queue depth).  Added BEFORE CorrelationMiddleware / AFTER
+# TenantAuthMiddleware so that it has TenantContext available.
+# Starlette processes middleware in reverse registration order, so this is
+# registered first but runs after auth.
+app.add_middleware(TenantConcurrencyMiddleware)
+
+# ---------------------------------------------------------------------------
+# OpenTelemetry tenant-aware tracing (Work Items #39-40)
+# ---------------------------------------------------------------------------
+
+from src.multi_tenant.otel_tracing import (  # noqa: E402
+    CorrelationMiddleware,
+    configure_logging as configure_tenant_logging,
+    configure_tracing,
+)
+
+# CorrelationMiddleware: sets CorrelationContext per-request from TenantContext.
+# Must be added AFTER TenantAuthMiddleware (Starlette processes in reverse order).
+app.add_middleware(CorrelationMiddleware)
+
+
+@app.on_event("startup")
+async def _startup_tracing() -> None:
+    """Initialize OpenTelemetry tracing with tenant context injection."""
+    configure_tracing()
+    configure_tenant_logging()
+    logger.info("OpenTelemetry tenant-aware tracing configured")
+
+
+@app.on_event("startup")
+async def _startup_circuit_breakers() -> None:
+    """Pre-register default circuit breakers for external dependencies."""
+    registry = get_circuit_breaker_registry()
+    # Azure OpenAI and Cosmos DB breakers are auto-created on first use via
+    # call_with_breaker(), but pre-registering logs their presence at startup.
+    logger.info(
+        "Circuit breaker registry ready — %d breakers registered",
+        len(registry.health_summary()),
+    )
+
+
+# ---------------------------------------------------------------------------
+# NATS tenant isolation (Work Items #15-17, #26)
+# ---------------------------------------------------------------------------
+
+from src.multi_tenant.nats_isolation import (  # noqa: E402
+    close_nats_manager,
+    get_nats_manager,
+    init_nats_manager,
+)
+
+
+@app.on_event("startup")
+async def _startup_nats() -> None:
+    """Connect to NATS JetStream on application startup."""
+    try:
+        await init_nats_manager()
+        logger.info("NATS tenant isolation manager connected")
+    except Exception:
+        # Non-fatal at startup — NATS may not be available in dev
+        logger.warning(
+            "NATS connection failed at startup — tenant messaging unavailable. "
+            "Set NATS_URL environment variable to configure."
+        )
+
+
+@app.on_event("shutdown")
+async def _shutdown_nats() -> None:
+    """Drain and close NATS connection on application shutdown."""
+    await close_nats_manager()
+    logger.info("NATS tenant isolation manager closed")
+
 
 # ---------------------------------------------------------------------------
 # Health endpoints
@@ -87,6 +173,29 @@ async def health() -> dict:
 
 @app.get("/ready", tags=["system"])
 async def ready() -> dict:
-    """Readiness probe — returns 200 if the service can accept traffic."""
-    # Future: check Stripe API reachability, DB connectivity, etc.
-    return {"status": "ready"}
+    """Readiness probe — returns 200 if the service can accept traffic.
+
+    Checks NATS connectivity when the manager is initialized.
+    """
+    result: dict[str, Any] = {"status": "ready"}
+
+    nats_mgr = get_nats_manager()
+    if nats_mgr.is_connected:
+        nats_health = await nats_mgr.check_health()
+        result["nats"] = {
+            "connected": nats_health.connected,
+            "circuit_breaker": nats_health.circuit_breaker_state,
+            "active_streams": nats_health.active_streams,
+        }
+    else:
+        result["nats"] = {"connected": False}
+
+    # Circuit breaker health for external dependencies (WI #46)
+    cb_registry = get_circuit_breaker_registry()
+    cb_summary = cb_registry.health_summary()
+    if cb_summary:
+        result["circuit_breakers"] = {
+            name: state for name, state in cb_summary.items()
+        }
+
+    return result
