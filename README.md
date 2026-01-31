@@ -67,17 +67,24 @@ Agent Red is built on the open-source [AGNTCY Customer Engagement Platform](http
 
 ```
 Agent Red Customer Engagement/
-├── CLAUDE.md                       # AI assistant guidance
+├── CLAUDE.md                       # AI assistant guidance (canonical status)
 ├── README.md                       # This file — project hub
 ├── Dockerfile                      # Container build
 ├── docker-compose.yml              # Local dev stack (API + NATS)
 ├── requirements.txt                # Python dependencies
 │
 ├── src/                            # Commercial source code
-│   ├── multi-tenant/               # Tenant management
-│   ├── integrations/               # Enterprise integrations
-│   ├── ai-features/                # Advanced AI capabilities
-│   └── white-label/                # Customization engine
+│   ├── main.py                     # FastAPI app entrypoint (9 routers, 30 endpoints)
+│   ├── integrations/               # Billing & platform integrations (Stripe, Shopify)
+│   ├── multi_tenant/               # Multi-tenant infrastructure (21 modules)
+│   ├── ai-features/                # Advanced AI capabilities (future)
+│   └── white-label/                # Customization engine (future)
+│
+├── tests/                          # Test suites
+│   └── persistent_memory/          # Persistent Customer Memory tests (30 tests)
+│
+├── config/                         # Configuration files
+│   └── stripe_product_ids.json     # Stripe test-mode product/price IDs
 │
 ├── infrastructure/                 # Deployment infrastructure
 │   └── terraform/                  # IaC for Azure
@@ -87,41 +94,48 @@ Agent Red Customer Engagement/
 │
 ├── docs/                           # Documentation
 │   ├── PROJECT-PLAN.md             # Launch 1.0 milestones and tasks
+│   ├── Master-Plan-Review-01-30-2026.md  # Architecture review (32 decisions, 100 work items)
 │   ├── COMMERCIAL-SAAS-PROPOSAL.md # Full business analysis
 │   ├── PRODUCT-FEATURES-RAG.md     # Complete feature reference
-│   ├── AGNTCY-BASELINE-VERIFICATION-REPORT.md
 │   ├── architecture/               # Technical architecture
+│   ├── shopify/                    # Shopify App Store materials
 │   ├── guides/                     # How-to guides
 │   └── api/                        # API reference
 │
+├── docs-site/                      # Docusaurus documentation site
+│
 ├── branding/                       # Brand assets
-├── legal/                          # Legal documents
+├── legal/                          # Legal documents (ToS, Privacy, SLA, DPA)
 │
 └── scripts/                        # Automation scripts
-    ├── verify-agntcy-local.ps1     # AGNTCY local verification
-    └── verify-agntcy-production.ps1 # AGNTCY Azure verification
+    ├── stripe/                     # Stripe catalog + tax migration scripts
+    └── deploy/                     # Deployment scripts
 ```
 
 ---
 
 ## Pricing
 
-| Tier | Monthly | Annual | Conversations/Day |
-|------|---------|--------|-------------------|
-| **Starter** | $299 | $2,990 | 500 |
-| **Professional** | $499 | $4,990 | 2,000 |
-| **Enterprise** | $999 | $9,990 | 10,000 |
+Platform Fee + Metered AI Usage — each tier includes a monthly conversation allowance with per-conversation overage.
+
+| Tier | Monthly | Annual (17% off) | Included Conv/mo | Overage Rate |
+|------|---------|-------------------|------------------|--------------|
+| **Starter** | $149 | $124/mo ($1,490/yr) | 1,000 | $0.04/conv |
+| **Professional** | $399 | $332/mo ($3,990/yr) | 5,000 | $0.025/conv |
+| **Enterprise** | $999 | $832/mo ($9,990/yr) | 20,000 | $0.015/conv |
 
 ### Add-On Modules
 
 | Module | Monthly | Available On |
 |--------|---------|--------------|
-| Multi-Language | $149 | Pro, Enterprise |
-| Advanced Analytics | $199 | All |
-| Priority Support | $99 | All |
-| Custom Integrations | $299 | Pro, Enterprise |
-| White-Label | $499 | Enterprise |
-| Dedicated Model Training | $299 | Enterprise |
+| Multi-Language Pack | $99 | All |
+| Advanced Analytics | $149 | Pro, Enterprise |
+| Mailchimp Integration | $49 | Pro, Enterprise |
+| Google Analytics Integration | $49 | Pro, Enterprise |
+| White-Label Package | $399 | Enterprise only |
+| Priority Support Upgrade | $99 | Starter, Pro |
+| Custom Integration Dev | $299 | Enterprise only |
+| Dedicated Model Training | $299 | Enterprise only |
 
 ---
 
@@ -189,11 +203,11 @@ Agent Red and AGNTCY are strictly isolated projects. Even if both are active on 
 | Milestone | Target | Status |
 |-----------|--------|--------|
 | M1: Setup Complete | Week 1 | ✅ Done |
-| M2: Brand Ready | Week 3 | 📋 Todo |
-| M3: Legal Ready | Week 4 | 📋 Todo |
-| M4: Website Live | Week 5 | 📋 Todo |
-| M5: Store Live | Week 7 | 📋 Todo |
-| M6: Docs Complete | Week 8 | 📋 Todo |
+| M2: Brand Ready | Week 3 | ✅ Done |
+| M3: Legal Ready | Week 4 | ✅ Done (pending iubenda validation) |
+| M4: Website Content | Week 5 | ✅ Done |
+| M5: Store Live | Week 7 | 🔄 In Progress (~85% e-commerce) |
+| M6: Docs Complete | Week 8 | ✅ Done (core docs; API ref deferred) |
 | M7: Soft Launch | Week 10 | 📋 Todo |
 | M8: Public Launch | Week 12 | 📋 Todo |
 
@@ -203,9 +217,10 @@ See [`docs/PROJECT-PLAN.md`](docs/PROJECT-PLAN.md) for detailed tasks and the [p
 
 ## Legal
 
-- Terms of Service — *drafting in progress*
-- Privacy Policy — *drafting in progress*
-- Service Level Agreement — *drafting in progress*
+- Terms of Service — `legal/terms/TERMS-OF-SERVICE.md` (AI-drafted, pending iubenda validation)
+- Privacy Policy — `legal/privacy/PRIVACY-POLICY.md` (AI-drafted, pending iubenda validation)
+- Service Level Agreement — `legal/sla/SERVICE-LEVEL-AGREEMENT.md` (v0.2.0)
+- Data Processing Agreement — `legal/dpa/DATA-PROCESSING-AGREEMENT.md` (AI-drafted)
 
 ---
 

@@ -117,31 +117,41 @@ Agent Red Customer Engagement is a commercial SaaS product built on the open-sou
 | Test checkout flows (both channels) | 4 hrs | 📋 Todo |
 
 #### 2.2 Multi-Tenant Infrastructure
-**Approach:** Dedicated architecture document required before any implementation. Architecture approach TBD.
+**Status:** Tier 1 Critical + Tier 2 High COMPLETE (21 modules, ~9,500 lines). Architecture review: 32 decisions, 100 work items (`docs/Master-Plan-Review-01-30-2026.md`).
 
 | Task | Effort | Status |
 |------|--------|--------|
-| Write multi-tenant architecture document | 8 hrs | 📋 Todo |
-| Design tenant isolation architecture | 8 hrs | 📋 Todo |
-| Implement tenant provisioning | 16 hrs | 📋 Todo |
-| Build usage metering | 12 hrs | 📋 Todo |
-| Create customer portal (basic) | 16 hrs | 📋 Todo |
-| Implement API key management | 8 hrs | 📋 Todo |
+| Architecture review (32 decisions, 100 work items) | 8 hrs | ✅ Done — docs/Master-Plan-Review-01-30-2026.md |
+| Cosmos DB schema + TenantScopedRepository (WI #13-14, #24-25) | 16 hrs | ✅ Done — cosmos_schema.py, cosmos_client.py, repository.py |
+| Dual auth + middleware (WI #18, #27-28) | 8 hrs | ✅ Done — auth.py, middleware.py |
+| Billable conversation spec + ConversationMeter (WI #71-72) | 12 hrs | ✅ Done — conversation_meter.py |
+| Fail-closed Critic policy (WI #50) | 8 hrs | ✅ Done — critic_policy.py |
+| NATS tenant isolation (WI #15-17, #26) | 8 hrs | ✅ Done — nats_isolation.py |
+| GDPR services (WI #30-34, #36) | 12 hrs | ✅ Done — gdpr_services.py |
+| OpenTelemetry tracing (WI #39-41) | 8 hrs | ✅ Done — otel_tracing.py |
+| Pipeline resilience (WI #44-46) | 8 hrs | ✅ Done — pipeline_resilience.py |
+| SystemPromptBuilder (WI #70) | 8 hrs | ✅ Done — system_prompt_builder.py |
+| Usage Dashboard API (WI #73-74) | 6 hrs | ✅ Done — usage_dashboard_api.py |
+| Tenant config schema/processor/API (WI #63-65) | 12 hrs | ✅ Done — tenant_config_schema.py, tenant_config_processor.py, tenant_config_api.py |
+| TenantSecretService (WI #29) | 4 hrs | ✅ Done — tenant_secret_service.py |
+| DR + security Terraform (WI #52, #55, #58-59) | 4 hrs | ✅ Done — dr_security.tf |
+| Billing doc + SLA updates (WI #77-78) | 4 hrs | ✅ Done — billable-conversation-spec.md, SLA v0.2.0 |
+| TenantUsageMonitor — progressive throttling (WI #51) | 8 hrs | 📋 Todo |
+| KEDA auto-scaling deployment (WI #47-48) | 8 hrs | 📋 Todo |
 
 #### 2.5 Persistent Customer Memory *(depends on 2.2 multi-tenant infrastructure)*
-**Approach:** Four-layer personalization stack. Architecture research complete (see `docs/architecture/PER-CUSTOMER-AI-PERSONALIZATION-RESEARCH.md`). Metrics framework defined (see `docs/architecture/PERSISTENT-CUSTOMER-MEMORY-METRICS.md`).
+**Status:** Layers 1-2 COMPLETE (3 modules + 30 passing tests). Architecture research complete. Metrics framework defined.
 
 | Task | Effort | Status |
 |------|--------|--------|
-| Design customer preference profile schema | 8 hrs | 📋 Todo |
-| Implement dynamic system prompt builder (Layer 1) | 16 hrs | 📋 Todo |
-| Build tenant-partitioned vector index for transcripts (Layer 2) | 40 hrs | 📋 Todo |
-| Integrate memory framework — Mem0 or custom (Layer 3) | 60 hrs | 📋 Todo |
-| Build profile extraction pipeline | 40 hrs | 📋 Todo |
-| Implement few-shot example retrieval | 40 hrs | 📋 Todo |
-| Build fine-tuning pipeline (Layer 4, Enterprise add-on) | 60 hrs | 📋 Todo |
+| CustomerProfileService — Layer 1 (WI #83-85) | 16 hrs | ✅ Done — customer_profile_service.py |
+| ConversationVectorizer — Layer 2 (WI #87-88) | 40 hrs | ✅ Done — conversation_vectorizer.py |
+| Response explainability framework (WI #86) | 8 hrs | ✅ Done — response_explainability.py |
+| Test fixtures + 20 unit tests + 10 integration tests (WI #97-98, #100) | 16 hrs | ✅ Done — tests/persistent_memory/ (30 tests passing) |
+| PatternExtractionService — Layer 3 (WI #90-92) | 60 hrs | 📋 Todo — Professional+ |
+| Fine-tuning pipeline — Layer 4 (WI #93-96) | 60 hrs | 📋 Todo — Enterprise add-on |
+| 5 A/B production tests (WI #99) | 16 hrs | 📋 Todo |
 | Create metrics dashboard | 40 hrs | 📋 Todo |
-| A/B testing framework integration | 40 hrs | 📋 Todo |
 
 #### 2.3 Admin Guides *(deferred — requires working product)*
 | Task | Effort | Status |

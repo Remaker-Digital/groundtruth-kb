@@ -486,6 +486,32 @@ class TenantRepository(TenantScopedRepository):
 
         return items[0] if items else None
 
+    async def find_by_api_key_hash(
+        self, api_key_hash: str,
+    ) -> dict[str, Any] | None:
+        """Find a tenant by API key hash (cross-partition).
+
+        Used during API key authentication where tenant_id is unknown.
+        This performs a cross-partition query — use sparingly.
+
+        Args:
+            api_key_hash: SHA-256 hex digest of the API key.
+
+        Returns:
+            The tenant document, or None if not found.
+        """
+        items: list[dict[str, Any]] = []
+        async for item in self._container.query_items(
+            query="SELECT * FROM c WHERE c.api_key_hash = @hash",
+            parameters=[{"name": "@hash", "value": api_key_hash}],
+            enable_cross_partition_query=True,
+            max_item_count=1,
+        ):
+            items.append(item)
+            break
+
+        return items[0] if items else None
+
     async def list_by_status(
         self, tenant_id: str, status: TenantStatus,
     ) -> list[dict[str, Any]]:

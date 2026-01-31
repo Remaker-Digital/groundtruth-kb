@@ -205,6 +205,12 @@ class TenantDocument(BaseModel):
         description="Consent for Persistent Customer Memory Layers 2-4",
     )
 
+    # API key authentication (Decision #4)
+    api_key_hash: str | None = Field(
+        default=None,
+        description="SHA-256 hash of the tenant's API key (for direct-channel auth)",
+    )
+
     # Rate limiting (Decision #5)
     rate_limit_rpm: int | None = Field(
         default=None,

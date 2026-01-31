@@ -151,40 +151,40 @@ This review session conducted a comprehensive technical architecture review cove
 
 | # | Work Item | Priority | Status |
 |---|---|---|---|
-| 13 | Design multi-tenant Cosmos DB schema (9 collections) | Critical | Pending |
-| 14 | Implement TenantScopedRepository base class | Critical | Pending |
-| 15 | Design NATS topic namespace with tenant isolation | Critical | Pending |
-| 16 | Implement tenant provisioning for Cosmos DB collections | High | Pending |
-| 17 | Implement tenant-aware NATS subscription management | High | Pending |
-| 18 | Design API Gateway tenant resolution middleware | Critical | Pending |
-| 19 | Implement Shopify session token verification | High | Pending |
-| 20 | Implement API key authentication for direct customers | High | Pending |
-| 21 | Design tenant lifecycle state machine | High | Pending |
-| 22 | Implement usage quota enforcement at API Gateway | High | Pending |
+| 13 | Design multi-tenant Cosmos DB schema (9 collections) | Critical | ✅ Complete — cosmos_schema.py |
+| 14 | Implement TenantScopedRepository base class | Critical | ✅ Complete — repository.py |
+| 15 | Design NATS topic namespace with tenant isolation | Critical | ✅ Complete — nats_isolation.py |
+| 16 | Implement tenant provisioning for Cosmos DB collections | High | ✅ Complete — nats_isolation.py (provision_tenant_topics) |
+| 17 | Implement tenant-aware NATS subscription management | High | ✅ Complete — nats_isolation.py |
+| 18 | Design API Gateway tenant resolution middleware | Critical | ✅ Complete — auth.py + middleware.py |
+| 19 | Implement Shopify session token verification | High | ✅ Complete — auth.py |
+| 20 | Implement API key authentication for direct customers | High | ✅ Complete — auth.py |
+| 21 | Design tenant lifecycle state machine | High | ✅ Complete — cosmos_schema.py (TenantStatus enum) |
+| 22 | Implement usage quota enforcement at API Gateway | High | ✅ Complete — middleware.py (RateLimitMiddleware) |
 | 23 | Design shared-everything cost allocation model | Medium | Pending |
 
 ### Items 24-29: Security / Tenant Isolation
 
 | # | Work Item | Priority | Status |
 |---|---|---|---|
-| 24 | Implement TenantScopedRepository with mandatory tenant_id enforcement | Critical | Pending |
-| 25 | Configure Cosmos DB partition keys for all 9 collections | Critical | Pending |
-| 26 | Implement tenant-scoped NATS topic authorization | High | Pending |
-| 27 | Implement dual authentication (Shopify session tokens + API keys) | High | Pending |
-| 28 | Implement per-tenant rate limiting at API Gateway | High | Pending |
-| 29 | Implement TenantSecretService with Key Vault integration | High | Pending |
+| 24 | Implement TenantScopedRepository with mandatory tenant_id enforcement | Critical | ✅ Complete — repository.py |
+| 25 | Configure Cosmos DB partition keys for all 9 collections | Critical | ✅ Complete — cosmos_schema.py |
+| 26 | Implement tenant-scoped NATS topic authorization | High | ✅ Complete — nats_isolation.py |
+| 27 | Implement dual authentication (Shopify session tokens + API keys) | High | ✅ Complete — auth.py + middleware.py |
+| 28 | Implement per-tenant rate limiting at API Gateway | High | ✅ Complete — middleware.py (RateLimitMiddleware) |
+| 29 | Implement TenantSecretService with Key Vault integration | High | ✅ Complete — tenant_secret_service.py |
 
 ### Items 30-38: GDPR Compliance
 
 | # | Work Item | Priority | Status |
 |---|---|---|---|
-| 30 | Implement PII-scrubbing SpanProcessor and LogProcessor for Application Insights | High | Pending |
-| 31 | Implement channel-specific grace period logic (48hr Shopify, 30d Stripe) | High | Pending |
-| 32 | Implement DataExportService with data store registry | High | Pending |
-| 33 | Implement DataDeletionService with cascading delete across all stores | High | Pending |
-| 34 | Implement consent_status field and gating logic | High | Pending |
+| 30 | Implement PII-scrubbing SpanProcessor and LogProcessor for Application Insights | High | ✅ Complete — gdpr_services.py (PiiScrubber) |
+| 31 | Implement channel-specific grace period logic (48hr Shopify, 30d Stripe) | High | ✅ Complete — gdpr_services.py (GracePeriodManager) |
+| 32 | Implement DataExportService with data store registry | High | ✅ Complete — gdpr_services.py (DataExportService + DataStoreRegistry) |
+| 33 | Implement DataDeletionService with cascading delete across all stores | High | ✅ Complete — gdpr_services.py (DataDeletionService) |
+| 34 | Implement consent_status field and gating logic | High | ✅ Complete — gdpr_services.py (ConsentManager) |
 | 35 | Implement GDPR compliance webhooks (3 Shopify endpoints) | High | Pending |
-| 36 | Implement consent change audit logging | Medium | Pending |
+| 36 | Implement consent change audit logging | Medium | ✅ Complete — gdpr_services.py (audit via AuditLogRepository) |
 | 37 | Implement data retention policy enforcement (automated cleanup) | Medium | Pending |
 | 38 | Create GDPR compliance test suite | Medium | Pending |
 
@@ -192,9 +192,9 @@ This review session conducted a comprehensive technical architecture review cove
 
 | # | Work Item | Priority | Status |
 |---|---|---|---|
-| 39 | Implement OpenTelemetry SpanProcessor injecting tenant_id | High | Pending |
-| 40 | Implement correlation ID propagation across all agents via NATS headers | High | Pending |
-| 41 | Implement append-only audit log (12 event types, time-partitioned) | High | Pending |
+| 39 | Implement OpenTelemetry SpanProcessor injecting tenant_id | High | ✅ Complete — otel_tracing.py (TenantSpanProcessor + TenantLogFilter) |
+| 40 | Implement correlation ID propagation across all agents via NATS headers | High | ✅ Complete — otel_tracing.py (CorrelationContext + CorrelationMiddleware + NATS helpers) |
+| 41 | Implement append-only audit log (12 event types, time-partitioned) | High | ✅ Complete — cosmos_schema.py (AuditLogDocument) + repository.py (AuditLogRepository) |
 | 42 | Build per-tenant Application Insights dashboard template | Medium | Pending |
 | 43 | Implement audit log query API for compliance reporting | Medium | Pending |
 
@@ -202,27 +202,27 @@ This review session conducted a comprehensive technical architecture review cove
 
 | # | Work Item | Priority | Status |
 |---|---|---|---|
-| 44 | Implement TenantConcurrencyMiddleware with per-tenant semaphore and queue depth | High | Pending |
-| 45 | Implement layered timeout budget across 6-agent pipeline | High | Pending |
-| 46 | Implement circuit breakers on Azure OpenAI, Cosmos DB, NATS | High | Pending |
+| 44 | Implement TenantConcurrencyMiddleware with per-tenant semaphore and queue depth | High | ✅ Complete — pipeline_resilience.py |
+| 45 | Implement layered timeout budget across 6-agent pipeline | High | ✅ Complete — pipeline_resilience.py (PipelineTimeoutBudget) |
+| 46 | Implement circuit breakers on Azure OpenAI, Cosmos DB, NATS | High | ✅ Complete — pipeline_resilience.py + nats_isolation.py |
 | 47 | Define KEDA scaling profiles (min/max replicas, triggers) for all 9 containers | High | Pending |
 | 48 | Update Terraform IaC for min replicas = 2 on 7 critical components | High | Pending |
 | 49 | Revise SLA if Option A chosen (N/A — Option B+ selected) | N/A | Resolved |
-| 50 | Implement fail-closed policy for Critic/Supervisor | Critical | Pending |
+| 50 | Implement fail-closed policy for Critic/Supervisor | Critical | ✅ Complete — critic_policy.py |
 | 51 | Implement TenantUsageMonitor with progressive throttling | Medium | Pending |
 
 ### Items 52-62: Disaster Recovery / Maintenance
 
 | # | Work Item | Priority | Status |
 |---|---|---|---|
-| 52 | Enable Cosmos DB continuous backup (7-day) and document restore procedure | High | Pending |
+| 52 | Enable Cosmos DB continuous backup (7-day) and document restore procedure | High | ✅ Complete — dr_security.tf |
 | 53 | Design and implement archival pipeline (Change Feed → Parquet → Blob) | Medium | Pending |
-| 54 | Configure Azure Blob Lifecycle Management (Cool 90d → Archive) | Medium | Pending |
-| 55 | Enable Customer-Managed Keys (CMK) for Cosmos DB and Blob Storage | High | Pending |
+| 54 | Configure Azure Blob Lifecycle Management (Cool 90d → Archive) | Medium | ✅ Complete — dr_security.tf (lifecycle rules) |
+| 55 | Enable Customer-Managed Keys (CMK) for Cosmos DB and Blob Storage | High | ✅ Complete — dr_security.tf |
 | 56 | Implement tenant-level archive purge for GDPR cascade | Medium | Pending |
 | 57 | Document archive rehydration runbook for ML training | Low | Pending |
-| 58 | Configure health probes (readiness + liveness) on all 9 containers | High | Pending |
-| 59 | Configure rolling deployment with connection draining (60s) | High | Pending |
+| 58 | Configure health probes (readiness + liveness) on all 9 containers | High | ✅ Complete — dr_security.tf |
+| 59 | Configure rolling deployment with connection draining (60s) | High | ✅ Complete — dr_security.tf |
 | 60 | Document maintenance runbook (operation types, notification, rollback) | Medium | Pending |
 | 61 | Document DR runbook Option A (manual region redeploy) | Medium | Pending |
 | 62 | Document Option C upgrade path (trigger: 50+ tenants) | Low | Pending |
@@ -231,27 +231,27 @@ This review session conducted a comprehensive technical architecture review cove
 
 | # | Work Item | Priority | Status |
 |---|---|---|---|
-| 63 | Design tenant_config JSON schema with field definitions, validation, tooltips, doc links | High | Pending |
-| 64 | Implement TenantConfigProcessor — validation, cleansing, versioning, A/B resolution | High | Pending |
-| 65 | Implement Configuration API (10 endpoints) | High | Pending |
-| 66 | Design and implement A/B experiment framework | Medium | Pending |
+| 63 | Design tenant_config JSON schema with field definitions, validation, tooltips, doc links | High | ✅ Complete — tenant_config_schema.py |
+| 64 | Implement TenantConfigProcessor — validation, cleansing, versioning, A/B resolution | High | ✅ Complete — tenant_config_processor.py |
+| 65 | Implement Configuration API (10 endpoints) | High | ✅ Complete — tenant_config_api.py |
+| 66 | Design and implement A/B experiment framework | Medium | Pending (deferred to Phase 3 — Smart Rollout) |
 | 67 | Implement Merchant Configuration UI — 9-step onboarding workflow | Medium | Pending |
 | 68 | Implement Contextual Data Service (per-field analytics + benchmarks) | Medium | Pending |
 | 69 | Build config version history and rollback UI | Medium | Pending |
-| 70 | Implement SystemPromptBuilder — per-agent prompt composition | High | Pending |
+| 70 | Implement SystemPromptBuilder — per-agent prompt composition | High | ✅ Complete — system_prompt_builder.py |
 
 ### Items 71-82: Metering and Scaling SLAs
 
 | # | Work Item | Priority | Status |
 |---|---|---|---|
-| 71 | Define and document billable conversation specification | Critical | Pending |
-| 72 | Implement ConversationMeter with idempotent counting and reconciliation | Critical | Pending |
-| 73 | Implement real-time usage dashboard | High | Pending |
-| 74 | Implement per-conversation audit trail with CSV export | High | Pending |
+| 71 | Define and document billable conversation specification | Critical | ✅ Complete — conversation_meter.py |
+| 72 | Implement ConversationMeter with idempotent counting and reconciliation | Critical | ✅ Complete — conversation_meter.py |
+| 73 | Implement real-time usage dashboard | High | ✅ Complete — usage_dashboard_api.py |
+| 74 | Implement per-conversation audit trail with CSV export | High | ✅ Complete — usage_dashboard_api.py |
 | 75 | Implement dispute resolution workflow | Medium | Pending |
-| 76 | Implement proactive billing alerts | Medium | Pending |
-| 77 | Publish billable conversation spec as docs-site page | High | Pending |
-| 78 | Update SLA document (P50, maintenance window, backup retention) | High | Pending |
+| 76 | Implement proactive billing alerts | Medium | ✅ Complete — conversation_meter.py (80%/100% threshold alerts) |
+| 77 | Publish billable conversation spec as docs-site page | High | ✅ Complete — docs-site/docs/billing/billable-conversation-spec.md |
+| 78 | Update SLA document (P50, maintenance window, backup retention) | High | ✅ Complete — SLA v0.2.0 |
 | 79 | Build SLA monitoring dashboard | Medium | Pending |
 | 80 | Investigate P50 latency vs. customer satisfaction impact | Medium | Pending |
 | 81 | Investigate P50 reduction cost/benefit (custom models, PTU, etc.) | Medium | Pending |
@@ -261,12 +261,12 @@ This review session conducted a comprehensive technical architecture review cove
 
 | # | Work Item | Priority | Status |
 |---|---|---|---|
-| 83 | Define customer profile JSON schema (with 6 data sources, PII classification, consent gating) | High | Pending |
-| 84 | Implement CustomerProfileService — CRUD, Shopify sync, history computation, consent | High | Pending |
-| 85 | Implement profile injection into SystemPromptBuilder (~250 token budget) | High | Pending |
-| 86 | Design and implement response explainability framework (per-response decision trace) | High | Pending |
-| 87 | Implement conversation vectorization pipeline (chunking, PII tokenization, embedding, DiskANN) | High | Pending |
-| 88 | Implement customer history semantic search (parallel query, top-K, result compression) | High | Pending |
+| 83 | Define customer profile JSON schema (with 6 data sources, PII classification, consent gating) | High | ✅ Complete — customer_profile_service.py |
+| 84 | Implement CustomerProfileService — CRUD, Shopify sync, history computation, consent | High | ✅ Complete — customer_profile_service.py |
+| 85 | Implement profile injection into SystemPromptBuilder (~250 token budget) | High | ✅ Complete — system_prompt_builder.py + customer_profile_service.py |
+| 86 | Design and implement response explainability framework (per-response decision trace) | High | ✅ Complete — response_explainability.py |
+| 87 | Implement conversation vectorization pipeline (chunking, PII tokenization, embedding, DiskANN) | High | ✅ Complete — conversation_vectorizer.py |
+| 88 | Implement customer history semantic search (parallel query, top-K, result compression) | High | ✅ Complete — conversation_vectorizer.py (search_history + compress_for_prompt) |
 | 89 | Implement tier-based history depth limits and consent-gated vector lifecycle | Medium | Pending |
 | 90 | Implement PatternExtractionService (GPT-4o-mini extraction, confidence scoring, profile merge) | Medium | Pending |
 | 91 | Implement pattern decay mechanism (monthly confidence reduction, cleanup) | Low | Pending |
@@ -275,10 +275,10 @@ This review session conducted a comprehensive technical architecture review cove
 | 94 | Implement fine-tuning job orchestration (Azure OpenAI API, scheduling, evaluation, quality gate) | Low | Pending |
 | 95 | Implement fine-tuned model deployment (per-tenant revision, traffic routing, A/B validation) | Low | Pending |
 | 96 | Implement fine-tuned model rollback | Low | Pending |
-| 97 | Implement Tier 1 unit test suite (20 tests across 4 layers) | High | Pending |
-| 98 | Implement Tier 2 integration test suite (10 cross-layer tests) | High | Pending |
+| 97 | Implement Tier 1 unit test suite (20 tests across 4 layers) | High | ✅ Complete — tests/persistent_memory/test_unit_layers.py |
+| 98 | Implement Tier 2 integration test suite (10 cross-layer tests) | High | ✅ Complete — tests/persistent_memory/test_integration_layers.py |
 | 99 | Design Tier 3 A/B validation framework | Medium | Pending |
-| 100 | Create test data fixtures (synthetic profiles, transcripts, purchases, carts) | High | Pending |
+| 100 | Create test data fixtures (synthetic profiles, transcripts, purchases, carts) | High | ✅ Complete — tests/persistent_memory/fixtures.py |
 
 ---
 

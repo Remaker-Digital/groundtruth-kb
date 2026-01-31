@@ -80,6 +80,16 @@ app.include_router(dashboard_router)
 app.include_router(config_router)
 
 # ---------------------------------------------------------------------------
+# Tenant authentication + rate limiting (Decisions #4-5, WI #18/#27-28)
+# ---------------------------------------------------------------------------
+
+from src.multi_tenant.middleware import (  # noqa: E402
+    RateLimitMiddleware,
+    TenantAuthMiddleware,
+    configure_tenant_resolution,
+)
+
+# ---------------------------------------------------------------------------
 # Pipeline resilience — concurrency control + circuit breakers (WI #44-46)
 # ---------------------------------------------------------------------------
 
@@ -87,13 +97,6 @@ from src.multi_tenant.pipeline_resilience import (  # noqa: E402
     TenantConcurrencyMiddleware,
     get_circuit_breaker_registry,
 )
-
-# TenantConcurrencyMiddleware: per-tenant concurrency limiter (asyncio.Semaphore
-# + queue depth).  Added BEFORE CorrelationMiddleware / AFTER
-# TenantAuthMiddleware so that it has TenantContext available.
-# Starlette processes middleware in reverse registration order, so this is
-# registered first but runs after auth.
-app.add_middleware(TenantConcurrencyMiddleware)
 
 # ---------------------------------------------------------------------------
 # OpenTelemetry tenant-aware tracing (Work Items #39-40)
@@ -105,9 +108,54 @@ from src.multi_tenant.otel_tracing import (  # noqa: E402
     configure_tracing,
 )
 
-# CorrelationMiddleware: sets CorrelationContext per-request from TenantContext.
-# Must be added AFTER TenantAuthMiddleware (Starlette processes in reverse order).
+# ---------------------------------------------------------------------------
+# Middleware stack
+#
+# Starlette processes middleware in REVERSE registration order.
+# Registration order (first registered = outermost = runs last):
+#   1. CorrelationMiddleware    — sets CorrelationContext (needs TenantContext)
+#   2. TenantConcurrencyMiddleware — enforces per-tenant concurrency limits
+#   3. RateLimitMiddleware      — enforces per-tenant rate limits
+#   4. TenantAuthMiddleware     — authenticates and injects TenantContext
+#
+# Execution order (innermost registered = runs first):
+#   TenantAuthMiddleware → RateLimitMiddleware →
+#   TenantConcurrencyMiddleware → CorrelationMiddleware → handler
+# ---------------------------------------------------------------------------
+
 app.add_middleware(CorrelationMiddleware)
+app.add_middleware(TenantConcurrencyMiddleware)
+app.add_middleware(RateLimitMiddleware)
+app.add_middleware(TenantAuthMiddleware)
+
+
+# ---------------------------------------------------------------------------
+# Startup: tenant resolution configuration (Decision #4)
+# ---------------------------------------------------------------------------
+
+from src.multi_tenant.repository import TenantRepository  # noqa: E402
+
+
+@app.on_event("startup")
+async def _startup_tenant_resolution() -> None:
+    """Configure tenant resolution functions for auth middleware.
+
+    Wires TenantRepository lookup methods into the auth middleware so
+    that Shopify session tokens and API keys can resolve to tenant
+    documents in Cosmos DB.
+    """
+    try:
+        tenant_repo = TenantRepository()
+        configure_tenant_resolution(
+            resolve_by_shop_domain=tenant_repo.find_by_shopify_domain,
+            resolve_by_api_key_hash=tenant_repo.find_by_api_key_hash,
+        )
+        logger.info("Tenant resolution configured (Cosmos DB-backed)")
+    except Exception:
+        logger.warning(
+            "Tenant resolution configuration failed — auth middleware will "
+            "reject authenticated requests until Cosmos DB is available."
+        )
 
 
 @app.on_event("startup")
