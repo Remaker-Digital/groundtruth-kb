@@ -32,6 +32,9 @@ opentelemetry-instrumentation-fastapi>=0.49b0
 # Stripe (billing & subscriptions)
 stripe>=8.0.0
 
+# JWT (Shopify session token verification)
+PyJWT>=2.9.0
+
 # Utilities
 pydantic>=2.10.0
 python-dotenv>=1.0.1

@@ -12,7 +12,7 @@ This document provides context and guidance for AI assistants working on the Age
 | **Brand Name** | Agent Red Customer Engagement |
 | **Release** | Launch 1.0 |
 | **Type** | Commercial SaaS Product |
-| **Status** | Phase 2.1 E-Commerce ~85% Complete. Architecture review complete (32 decisions, 100 work items). Phase 2.2 multi-tenant architecture designed. |
+| **Status** | Phase 2.1 E-Commerce ~85% complete. Phase 2.2 Tier 1 Critical implementation COMPLETE (7 modules, ~3,500 lines). Architecture review complete (32 decisions, 100 work items). |
 | **Owner** | Remaker Digital (DBA of VanDusen & Palmeter, LLC) |
 
 ---
@@ -512,7 +512,15 @@ E:\Claude-Playground\CLAUDE-PROJECTS\Agent Red Customer Engagement\
 │   │   ├── stripe_webhooks.py      # Stripe webhook handler (7 events → provisioning + tax)
 │   │   ├── shopify_client.py       # Async Shopify GraphQL API client (httpx)
 │   │   └── shopify_billing.py      # Shopify Billing API (subscriptions + usage charges)
-│   ├── multi-tenant/               # Tenant management (Phase 2.2)
+│   ├── multi_tenant/               # Multi-tenant infrastructure (Phase 2.2 — Tier 1 Critical COMPLETE)
+│   │   ├── __init__.py             # Package init with import hints
+│   │   ├── cosmos_schema.py        # 9 collections, 11 document models, 7 enums, tier defaults
+│   │   ├── cosmos_client.py        # CosmosManager singleton (lazy init, Managed Identity, health)
+│   │   ├── repository.py           # TenantScopedRepository + 9 collection repositories
+│   │   ├── auth.py                 # Dual auth: Shopify JWT + API key verification
+│   │   ├── middleware.py           # TenantAuthMiddleware + RateLimitMiddleware + dependencies
+│   │   ├── conversation_meter.py   # ConversationMeter: billable conv spec, 3-tier metering, alerts
+│   │   └── critic_policy.py        # Fail-closed Critic enforcement, circuit breaker, health
 │   ├── ai-features/                # Advanced AI (Phase 2.5)
 │   └── white-label/                # Customization (future)
 │
@@ -595,9 +603,14 @@ E:\Claude-Playground\CLAUDE-PROJECTS\Agent Red Customer Engagement\
 Continue work on Agent Red Customer Engagement commercial project.
 Location: E:\Claude-Playground\CLAUDE-PROJECTS\Agent Red Customer Engagement
 Key files: CLAUDE.md, docs/Master-Plan-Review-01-30-2026.md, docs/PROJECT-PLAN.md
-Current status: Phases 0-1.4 complete. Phase 2.1 e-commerce ~85% complete (10 billing modules built). Architecture review complete — 32 decisions agreed, 100 work items identified and prioritized in Master-Plan-Review-01-30-2026.md. Phase 2.2 multi-tenant architecture fully designed. Persistent Customer Memory implementation designed (4 layers). Cost model validated (76-90% margins). SLA gaps resolved.
-Next priority: Technical implementation per Work Priority Bias. Tier 1 (Critical) work items: Cosmos DB schema + TenantScopedRepository (#13-14, #24-25), API Gateway tenant resolution + dual auth (#18, #27), fail-closed Critic policy (#50), billable conversation definition + ConversationMeter (#71-72). Remaining Phase 2.1: GDPR webhooks, session tokens, App Bridge Save Bar, creative assets, test flows.
-Please review CLAUDE.md (especially the Phase 2.2 architecture section and Work Priority Bias) and the Master Plan Review, then proceed with the highest-priority technical work item, presenting one item at a time for review per the iterative working style documented in CLAUDE.md.
+Current status: Phases 0-1.4 complete. Phase 2.1 e-commerce ~85% complete (10 billing modules). Phase 2.2 Tier 1 Critical work items ALL COMPLETE — 7 modules built in src/multi_tenant/ (~3,500 lines). Architecture review complete (32 decisions, 100 work items). Cost model validated (76-90% margins).
+Completed Tier 1 Critical items:
+  - #13-14/#24-25: Cosmos DB schema (9 collections, 11 models) + TenantScopedRepository (9 repos)
+  - #18/#27: Dual auth (Shopify JWT + API keys) + TenantAuthMiddleware + RateLimitMiddleware
+  - #71-72: ConversationMeter (billable conv spec, 3-tier consumption, idempotent counting, reconciliation, alerts)
+  - #50: Fail-closed Critic policy (circuit breaker, health monitoring, escalation on unavailability)
+Next priority: Tier 2 (High) work items per Master Plan priority framework. Key candidates: NATS tenant isolation (#33-35), GDPR core services (#36-39), OpenTelemetry tracing (#40-43), timeout orchestration (#45), circuit breakers (#46), SystemPromptBuilder (#70), usage dashboard API (#73-74). Also remaining Phase 2.1: GDPR webhooks, session tokens, App Bridge Save Bar, creative assets, test flows.
+Please review CLAUDE.md (especially the Phase 2.2 implementation progress and Work Priority Bias) and the Master Plan Review, then proceed with the highest-priority Tier 2 technical work item, presenting one item at a time for review per the iterative working style documented in CLAUDE.md.
 ```
 
 ### Referencing AGNTCY
@@ -830,8 +843,63 @@ Full architecture review completed 2026-01-30. All decisions documented in `docs
 - Backup: 7-day point-in-time restore + 90-day warm archive + 7+ year cold archive
 - RTO: 4hr Enterprise, 8hr Professional, 24hr Starter
 
+**Phase 2.2: Multi-Tenant Infrastructure (Tier 1 Critical — COMPLETE)**
+
+All four Tier 1 Critical work item groups implemented 2026-01-30. Seven modules created in `src/multi_tenant/` (~3,500 total lines).
+
+- [x] **#13-14/#24-25: Cosmos DB Schema + TenantScopedRepository** — `cosmos_schema.py` (~560 lines) + `cosmos_client.py` (~150 lines) + `repository.py` (~650 lines)
+  - 9 collection configurations with partition keys, unique keys, composite indexes, DiskANN vector index
+  - 11 Pydantic document models: TenantDocument, ConversationDocument, UsageCounterDocument, PackBalanceDocument, IdempotencyKeyDocument, CustomerProfileDocument, KnowledgeBaseDocument, MemoryVectorDocument, PreferencesDocument, PlatformConfigDocument, AuditLogDocument
+  - 7 enums: TenantTier, TenantStatus, BillingChannel, ConsentStatus, ConversationStatus, AuditEventType, PiiClassification
+  - TIER_DEFAULTS with rate limits, concurrency, history depth, memory layers per tier
+  - CosmosManager singleton (lazy init, account key + Managed Identity support, container caching, health check)
+  - TenantScopedRepository base class: create/read/upsert/patch/delete/query/query_count — all enforce tenant_id
+  - Defense-in-depth: validation on every write, verification on every read, query result filtering
+  - 7 tenant-scoped repos + 2 platform-scoped repos (PlatformConfig, AuditLog)
+  - Atomic counter increments via Cosmos DB patch "incr" (no read-modify-write races)
+
+- [x] **#18/#27: Dual Auth + Tenant Resolution** — `auth.py` (~280 lines) + `middleware.py` (~290 lines)
+  - Shopify session token verification (JWT HS256, PyJWT, 10s leeway, required claims, .myshopify.com domain enforcement)
+  - API key authentication (SHA-256 hash + async lookup)
+  - TenantContext frozen dataclass (tenant_id, tier, status, auth_method, shop_domain, user_id, session_id)
+  - TenantAuthMiddleware (Starlette): authenticates every request, stores TenantContext in request.state
+  - RateLimitMiddleware: per-tenant sliding window (Starter 10rpm, Professional 50rpm, Enterprise 200rpm)
+  - get_tenant_context() and require_tier() FastAPI dependencies
+  - Auth-exempt paths: health, webhooks, checkout callbacks, docs
+
+- [x] **#71-72: Billable Conversation Definition + ConversationMeter** — `conversation_meter.py` (~605 lines)
+  - Billable conversation spec as code: start on first message, end on 30-min idle / customer ends / escalation / 50 turns
+  - Non-billable: test_, admin_, health_, system_ prefixes; no AI response before error
+  - ConversationMeter service: idempotent metering (dedup on conversation_id via idempotency keys)
+  - 3-tier consumption: included allowance → pack balance (FIFO) → Stripe Billing Meter overage
+  - Proactive alerts at 80%/100% thresholds (once per period, idempotent)
+  - Daily reconciliation against Stripe Billing Meter (flags >5% discrepancy for review)
+  - UsageDashboard (Decision #25 Layer 1), per-conversation billing detail (Layer 2)
+  - Idle conversation scanner for periodic timeout enforcement
+
+- [x] **#50: Fail-Closed Critic Policy** — `critic_policy.py` (~450 lines)
+  - CriticPolicy: fail-closed safety gate — response blocked unless Critic explicitly approves
+  - Critic rejection, timeout, error, unavailability all result in blocking
+  - SAFE_FALLBACK_MESSAGE: only unvalidated text deliverable to customers
+  - require_critic_approval() pipeline wrapper: returns (approved, safe_text, result)
+  - CircuitBreaker: CLOSED → OPEN (5 failures/30s) → HALF_OPEN (15s recovery) state machine
+  - CriticResult frozen dataclass: verdict, flags, modifications, latency, tracing
+  - SECURITY_EVENT audit on every blocked response
+  - ESCALATION_TRIGGERED when Critic replicas unavailable
+  - Health monitoring for /ready endpoint integration
+  - 800ms timeout budget per Decision #15
+  - httpx connection pooling for Critic HTTP calls
+
+**Phase 2.2 Key Technical Decisions (Implementation):**
+- **multi_tenant (underscore) package:** Created as `multi_tenant/` (valid Python package name) alongside the original `multi-tenant/` placeholder directory.
+- **PyJWT added to requirements.txt:** `PyJWT>=2.9.0` for Shopify session token verification (HS256).
+- **httpx reused:** Already in requirements.txt for Shopify client; now also used for Critic HTTP calls with connection pooling.
+- **Atomic counters:** Cosmos DB patch "incr" operations eliminate race conditions present in the Phase 2.1 in-memory stores.
+- **Idempotent alerts:** Each usage alert fires once per billing period via the same idempotency key mechanism used for webhook dedup.
+
 ### Pending
-- [ ] Phase 2.2: Multi-tenant infrastructure implementation (architecture complete, 100 work items prioritized in Master-Plan-Review-01-30-2026.md)
+- [ ] Phase 2.2: Tier 2 (High) and Tier 3 work items (architecture complete, remaining ~88 work items from Master-Plan-Review-01-30-2026.md)
+- [ ] Phase 2.1: Remaining items (GDPR webhooks, session tokens, App Bridge Save Bar, creative assets, test flows)
 
 ---
 
@@ -856,4 +924,4 @@ Full architecture review completed 2026-01-30. All decisions documented in `docs
 
 *© 2026 Remaker Digital, a DBA of VanDusen & Palmeter, LLC. All rights reserved.*
 *Last Updated: 2026-01-30*
-*Version: 6.0.0*
+*Version: 7.0.0*
