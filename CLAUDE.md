@@ -12,7 +12,7 @@ This document provides context and guidance for AI assistants working on the Age
 | **Brand Name** | Agent Red Customer Engagement |
 | **Release** | Launch 1.0 |
 | **Type** | Commercial SaaS Product |
-| **Status** | Phase 2.1 E-Commerce ~85% complete. Phase 2.2 Tier 1 Critical COMPLETE (7 modules). Tier 2 High COMPLETE — 21 modules (~9,500 lines). Phase 2.5 Layers 1-2 COMPLETE (3 modules). All middleware wired in main.py. 125 tests passing (30 persistent memory + 57 auth/middleware + 38 provisioning/webhooks). Architecture review complete (32 decisions, 100 work items). |
+| **Status** | Phase 2.1 E-Commerce ~85% complete. Phase 2.2 Tier 1 Critical COMPLETE (7 modules). Tier 2 High COMPLETE — 21 modules (~9,500 lines). Phase 2.5 Layers 1-2 COMPLETE (3 modules). All middleware wired in main.py. 125 tests passing (30 persistent memory + 57 auth/middleware + 38 provisioning/webhooks). Architecture review complete (32 decisions, 100 work items). Test coverage audit complete — comprehensive test plan (~880 tests) and new work items backlog (63 items, WI #101-163) created. |
 | **Owner** | Remaker Digital (DBA of VanDusen & Palmeter, LLC) |
 
 ---
@@ -559,6 +559,8 @@ E:\Claude-Playground\CLAUDE-PROJECTS\Agent Red Customer Engagement\
 │   │   ├── REWARDFUL-INTEGRATION.md
 │   │   ├── PER-CUSTOMER-AI-PERSONALIZATION-RESEARCH.md
 │   │   └── PERSISTENT-CUSTOMER-MEMORY-METRICS.md
+│   ├── COMPREHENSIVE-TEST-PLAN.md  # ~880 enumerated tests, prioritized (P0-P3 + security + perf)
+│   ├── BACKLOG-NEW-WORK-ITEMS.md   # 63 new work items (WI #101-163) from test audit
 │   ├── shopify/                    # Shopify App Store materials
 │   │   └── APP-STORE-LISTING.md    # Listing copy, specs, and pre-submission checklist
 │   ├── guides/                     # How-to guides
@@ -599,6 +601,8 @@ E:\Claude-Playground\CLAUDE-PROJECTS\Agent Red Customer Engagement\
 | stripe_product_ids.json | config/ | Stripe test-mode product/price/coupon IDs (27 objects) |
 | APP-STORE-LISTING.md | docs/shopify/ | Shopify App Store listing copy, asset specs, pre-submission checklist |
 | Master-Plan-Review-01-30-2026.md | docs/ | Architecture review: 32 decisions, 100 work items, SLA validation, cost model |
+| COMPREHENSIVE-TEST-PLAN.md | docs/ | ~880 enumerated tests with IDs, priorities (P0-P3), security, performance, trial, UI-type matrix |
+| BACKLOG-NEW-WORK-ITEMS.md | docs/ | 63 new work items (WI #101-163): test infra, merchant UI, trial env, streaming, optimization, API, ops, security |
 
 ---
 
@@ -625,10 +629,10 @@ E:\Claude-Playground\CLAUDE-PROJECTS\Agent Red Customer Engagement\
 ```
 Continue work on Agent Red Customer Engagement commercial project.
 Location: E:\Claude-Playground\CLAUDE-PROJECTS\Agent Red Customer Engagement
-Key files: CLAUDE.md, docs/Master-Plan-Review-01-30-2026.md, docs/PROJECT-PLAN.md
-Current status: Phases 0-1.4 complete. Phase 2.1 e-commerce ~85% complete (10 billing modules). Phase 2.2 Tier 1 Critical ALL COMPLETE (7 modules). Phase 2.2 Tier 2 (High) ALL COMPLETE (21 modules, ~9,500 lines). Phase 2.5 Layers 1-2 COMPLETE (3 modules). All middleware wired in main.py (4 middleware in correct order). 125 tests passing (30 persistent memory + 57 auth/middleware + 38 provisioning/webhooks). Architecture review complete (32 decisions, 100 work items). Cost model validated (76-90% margins). Independent Cursor audit remediated (2026-01-31).
-Next priority: Remaining Tier 2 Medium + Tier 3 items. Key candidates: TenantUsageMonitor (#51), KEDA scaling (#47-48). Remaining Phase 2.1: GDPR webhooks (#35), session tokens, App Bridge Save Bar, creative assets. Phase 2.5: Layer 3 PatternExtractionService (#90-92, Professional+), Layer 4 fine-tuning (#93-96, Enterprise).
-Please review CLAUDE.md and the Master Plan Review, then proceed with the highest-priority remaining technical work item, presenting one item at a time for review per the iterative working style documented in CLAUDE.md.
+Key files: CLAUDE.md, docs/Master-Plan-Review-01-30-2026.md, docs/COMPREHENSIVE-TEST-PLAN.md, docs/BACKLOG-NEW-WORK-ITEMS.md
+Current status: Phases 0-1.4 complete. Phase 2.1 e-commerce ~85% complete (10 billing modules). Phase 2.2 Tier 1 Critical ALL COMPLETE (7 modules). Tier 2 High ALL COMPLETE (21 modules, ~9,500 lines). Phase 2.5 Layers 1-2 COMPLETE (3 modules). All middleware wired in main.py (4 middleware in correct order). 125 tests passing (30 persistent memory + 57 auth/middleware + 38 provisioning/webhooks). Architecture review complete (32 decisions, 100 work items). Cost model validated (76-90% margins). Independent Cursor audit remediated (2026-01-31). Test coverage audit complete (2026-01-31): ~880 tests enumerated in comprehensive test plan (125 existing, ~755 planned). 63 new work items identified (WI #101-163) covering test infrastructure, merchant web UI, trial environment, SSE streaming, pipeline optimization, API completeness, operational readiness, and security hardening.
+Next priority: Test infrastructure setup (WI #101-104: pyproject.toml, requirements-test.txt, conftest.py, GitHub Actions CI). Then P0 launch-blocker tests (~160 tests: HTTP billing endpoints, middleware pipeline, ConversationMeter, CriticPolicy, Cosmos repository, health endpoints). See docs/COMPREHENSIVE-TEST-PLAN.md §4 for full P0 breakdown. New backlog items (WI #101-163) are staged for prioritization review — see docs/BACKLOG-NEW-WORK-ITEMS.md.
+Please review CLAUDE.md and the Comprehensive Test Plan, then proceed with the highest-priority remaining technical work item, presenting one item at a time for review per the iterative working style documented in CLAUDE.md.
 ```
 
 ### Referencing AGNTCY
@@ -664,7 +668,7 @@ This applies to: work priority reviews, architecture decisions, scope changes, m
 
 ---
 
-## Current Status (2026-01-30)
+## Current Status (2026-01-31)
 
 ### Completed
 
@@ -1073,7 +1077,28 @@ Cursor-generated independent assessment (`independent-progress-assments/cursor-a
 - **Tenant isolation on all dashboard endpoints:** tenant_id is always derived from TenantContext (set by TenantAuthMiddleware), never from query parameters or path segments. A merchant cannot query another merchant's usage data.
 - **CSV export in-memory:** For launch volumes (≤20K conversations/month for Enterprise), building the CSV in io.StringIO is sufficient. For future high-volume tenants, this can be replaced with streaming chunked responses or async blob generation.
 
+**Session 2026-01-31: Test Coverage Audit + Comprehensive Test Plan + New Work Items Backlog**
+
+Full test coverage audit conducted across all 29 source modules, 30 API endpoints, 4 middleware, and 100 existing work items. Key findings:
+
+- [x] **Test coverage audit report** — 125 tests exist covering ~25-30% of public interfaces. 0 HTTP-level endpoint tests (no FastAPI TestClient). 0 config/dashboard endpoint tests. 0 adversarial/security tests. 0 load/performance tests. 19 of 29 source modules have no tests.
+- [x] **Comprehensive test plan created** — `docs/COMPREHENSIVE-TEST-PLAN.md` (~880 tests enumerated with IDs). Organized by priority: P0 launch blockers (~160), P1 pre-launch (~175), P2 launch quality (~135), P3 post-launch (~90), adversarial/security (~45), performance/load (~30), trial/demo (~20), UI-type validation (~100). Proposed test file organization (30 files). Implementation order recommendation.
+- [x] **New work items backlog created** — `docs/BACKLOG-NEW-WORK-ITEMS.md` (63 items, WI #101-163). Categories: test infrastructure (#101-107), merchant web UI (#108-118), trial/demo environment (#119-128), SSE streaming (#129-133), pipeline optimization (#134-139), API completeness (#140-147), operational readiness (#148-156), security hardening (#157-163). 10 items overlap with existing Master Plan WIs (superseding). 53 net-new.
+- [x] **Competitor P50 benchmarking** — Only Intercom publishes actual latency (7,000ms P50 TTFT). Agent Red target of 1,500ms is 4.7x faster but unvalidated.
+- [x] **P50 reduction analysis** — 8 approaches evaluated. SSE streaming highest priority (70-85% perceived reduction, $0 cost). IC+KR parallelization (-800ms, $0). PTU and self-hosting not cost-effective at launch.
+- [x] **UI gap analysis** — Platform has NO merchant web UI. All operations require direct API calls across 9+ interface types. Identified as largest gap for merchant experience.
+- [x] **Trial/demo environment gap** — No trial tier exists. Prospective customers cannot evaluate product pre-purchase. 14-day trial with conversation cap recommended.
+
+**Key findings from this session:**
+- **Competitor latency opacity:** AI customer service industry does not publish latency benchmarks. Only Intercom has a public P50 (7,000ms). This makes Agent Red's 1,500ms target a strong differentiator if validated.
+- **SSE streaming is the highest-ROI optimization:** Zero cost, 70-85% perceived latency reduction, Azure OpenAI supports it natively. Must design Critic validation strategy for streaming (WI #130).
+- **Merchant web UI is the largest product gap:** All 30 API endpoints, 10 config endpoints, and 5 dashboard endpoints exist but have no frontend. Self-service operations require curl/Postman.
+- **Test infrastructure is the prerequisite for all testing work:** No pyproject.toml, no conftest.py, no CI pipeline. Must be built first (WI #101-104).
+
 ### Pending
+- [ ] **Test infrastructure (WI #101-104):** pyproject.toml, requirements-test.txt, conftest.py with TestClient/mocks, GitHub Actions CI
+- [ ] **P0 launch-blocker tests (~160 tests):** HTTP billing endpoints, middleware pipeline, ConversationMeter, CriticPolicy, Cosmos repository, health endpoints
+- [ ] **New backlog items (WI #101-163):** 63 items staged for prioritization review
 - [ ] Phase 2.2: Remaining Tier 2 Medium + Tier 3 work items (from Master-Plan-Review-01-30-2026.md)
 - [ ] Phase 2.2: TenantUsageMonitor (#51 — progressive throttling Watch → Warn → Throttle → Isolate)
 - [ ] Phase 2.2: KEDA auto-scaling deployment (#47-48 — infrastructure/Terraform, needs production testing)
@@ -1105,4 +1130,4 @@ Cursor-generated independent assessment (`independent-progress-assments/cursor-a
 
 *© 2026 Remaker Digital, a DBA of VanDusen & Palmeter, LLC. All rights reserved.*
 *Last Updated: 2026-01-31*
-*Version: 8.1.0*
+*Version: 9.0.0*
