@@ -102,8 +102,8 @@ A solid Agent Red rounded rectangle with a white "AR" monogram in Inter Extra Bo
 
 Logo assets are located in `branding/logo/SVG/` (source) and `branding/logo/PNG/` (rasterized):
 - **Icon:** `icon-master` — AR monogram on split white/red rounded rectangle
-- **Primary (dark bg):** `primary-logo-dark` — horizontal lockup, white text
-- **Primary (light bg):** `primary-logo-light` — horizontal lockup with "Customer Experience" subtitle
+- **Primary (dark bg):** `primary-logo-dark` — "AGENT RED" + "CUSTOMER EXPERIENCE" subtitle, white text for dark backgrounds
+- **Primary (light bg):** `primary-logo-light` — "AGENT RED" + "CUSTOMER EXPERIENCE" subtitle, dark text for light backgrounds
 
 ---
 
