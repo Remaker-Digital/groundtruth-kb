@@ -152,7 +152,7 @@ Each page file includes:
 | BRAND-GUIDELINES.md | branding/guidelines/ | Visual identity, colors, typography |
 | COLOR-PALETTE.md | branding/colors/ | Color reference with CSS variables |
 | TYPOGRAPHY.md | branding/colors/ | Font specifications |
-| LOGO-SPEC.md | branding/logo/ | Logo technical specification |
+| Logo assets | branding/logo/SVG/, branding/logo/PNG/ | Icon master + primary logos (dark/light) |
 | PROJECT-PLAN.md | docs/ | Launch 1.0 milestones and tasks |
 | COMMERCIAL-SAAS-PROPOSAL.md | docs/ | Full business analysis |
 | PRODUCT-FEATURES-RAG.md | docs/ | Complete feature reference |

@@ -46,7 +46,7 @@ Agent Red Customer Experience is a commercial SaaS product built on the open-sou
 | Color palette selection | 2 hrs | ✅ Done — 15 colors, WCAG AA/AAA verified |
 | Typography selection | 2 hrs | ✅ Done — Inter + JetBrains Mono |
 | Brand guidelines document | 4 hrs | ✅ Done — branding/guidelines/BRAND-GUIDELINES.md |
-| Favicon and app icons | 2 hrs | 📋 Todo — spec defined in LOGO-SPEC.md |
+| Favicon and app icons | 2 hrs | 📋 Todo — derive from branding/logo/PNG/icon-master.png |
 
 #### 1.2 Legal Documents *(can run parallel with 1.1)*
 **Approach:** AI-draft all documents first. Termly/iubenda deferred until closer to launch.

@@ -100,8 +100,10 @@ A solid Agent Red rounded rectangle with a white "AR" monogram in Inter Extra Bo
 
 ### Detailed Specification
 
-See [`branding/logo/LOGO-SPEC.md`](../logo/LOGO-SPEC.md) for full technical specification.
-See [`branding/logo/logo-concepts.html`](../logo/logo-concepts.html) for visual reference.
+Logo assets are located in `branding/logo/SVG/` (source) and `branding/logo/PNG/` (rasterized):
+- **Icon:** `icon-master` — AR monogram on split white/red rounded rectangle
+- **Primary (dark bg):** `primary-logo-dark` — horizontal lockup, white text
+- **Primary (light bg):** `primary-logo-light` — horizontal lockup with "Customer Experience" subtitle
 
 ---
 
@@ -314,8 +316,8 @@ All materials must include:
 | Color Palette (reference) | `branding/colors/COLOR-PALETTE.md` |
 | Color Palette (visual) | `branding/colors/color-palette.html` |
 | Typography | `branding/colors/TYPOGRAPHY.md` |
-| Logo Specification | `branding/logo/LOGO-SPEC.md` |
-| Logo Concepts (visual) | `branding/logo/logo-concepts.html` |
+| Logo SVG (source) | `branding/logo/SVG/` (icon-master, primary-logo-dark, primary-logo-light) |
+| Logo PNG (rasterized) | `branding/logo/PNG/` (icon-master, primary-logo-dark, primary-logo-light) |
 | Brand Guidelines | `branding/guidelines/BRAND-GUIDELINES.md` (this file) |
 
 ---

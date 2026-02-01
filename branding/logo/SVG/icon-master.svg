@@ -1,0 +1,32 @@
+<?xml version="1.0" encoding="UTF-8" standalone="no"?>
+<!--
+  Agent Red Customer Experience — Icon Master (The Beacon)
+  Design: AR monogram on Agent Red rounded rectangle
+  Usage: Source file for all icon/favicon exports
+  © 2026 Remaker Digital, a DBA of VanDusen & Palmeter, LLC. All rights reserved.
+-->
+
+<svg
+   viewBox="0 0 1200 1200"
+   width="1200"
+   height="1200"
+   version="1.1"
+   id="svg1"
+   xml:space="preserve"
+   xmlns="http://www.w3.org/2000/svg"
+   xmlns:svg="http://www.w3.org/2000/svg"><defs
+     id="defs1"><style
+       id="style1">.cls-1{fill:#f8f8fa;}.cls-2{fill:#c41e2a;}</style></defs><!-- Background: Agent Red rounded rectangle --><!-- Corner radius: ~21% of width = 252px --><!-- AR Monogram: Inter Extra Bold 800, white, tight letter-spacing --><!-- Centered vertically, slight left offset for optical balance --><!-- Font metrics: Inter 800 at ~650px size, baseline ~780px from top --><g
+     id="Layer_1-2"
+     transform="scale(6.6272712,7.62825)"><path
+       class="cls-1"
+       d="M 78.13,157.3 H 0 C 0,157.3 0,87.01 0,87.01 0,38.96 33.28,0 74.33,0 h 31.89 z"
+       id="path1" /><path
+       class="cls-2"
+       d="m 107,0 h 74.07 v 70.29 c 0,48.06 -33.28,87.02 -74.33,87.02 H 78.9 Z"
+       id="path2" /><path
+       class="cls-1"
+       d="m 101.03,28.85 h 32.34 c 16.53,0 25.1,11.16 25.1,25 0,2.12 -0.24,4.24 -0.6,6.36 -1.81,10.31 -7.24,17.52 -15.45,20.77 5.19,2.68 7.36,7.06 7.36,13.14 v 0.56 c -0.12,7.35 -4.46,21.05 -3.14,33.06 h -23.89 c -0.97,-11.16 3.62,-25.14 3.62,-32.77 0,-3.81 -1.57,-5.93 -5.19,-5.93 h -7.36 l -7,38.71 H 83.05 l 17.98,-98.88 z m 20.15,19.92 -3.98,21.61 h 8.2 c 4.59,0 7.96,-3.25 9.17,-9.75 0.24,-1.41 0.36,-2.68 0.36,-3.81 0,-5.23 -2.53,-8.05 -7.6,-8.05 z"
+       id="path3" /><path
+       d="m 51.88,28.85 h 28.96 l 3.02,98.88 H 61.3 l 0.12,-18.08 H 42.84 l -6.52,18.08 H 13.03 Z m -2.53,62.3 h 12.07 l 0.36,-35.17 z"
+       id="path4" /></g></svg>

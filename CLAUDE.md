@@ -473,7 +473,7 @@ Each tier includes a platform fee (infrastructure, features, support) and an inc
 - [x] Color palette — 15 colors, WCAG AA/AAA verified
 - [x] Typography selection — Inter + JetBrains Mono
 - [x] Brand guidelines document — branding/guidelines/BRAND-GUIDELINES.md
-- [ ] Favicon and app icons — spec defined in LOGO-SPEC.md
+- [ ] Favicon and app icons — derive from branding/logo/PNG/icon-master.png
 - [ ] Social media assets
 - [ ] Email templates
 
