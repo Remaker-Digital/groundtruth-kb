@@ -351,6 +351,26 @@ resource "azurerm_container_app" "apps" {
         }
       }
     }
+
+    # WI #47: Night schedule — scale non-critical to 0 during off-peak hours
+    # Enabled only when var.enable_night_scaling is true and container is non-critical
+    dynamic "custom_scale_rule" {
+      for_each = (
+        var.enable_night_scaling &&
+        !each.value.critical &&
+        each.value.scale_type != "none"
+      ) ? [1] : []
+      content {
+        name             = "night-scale-down"
+        custom_rule_type = "cron"
+        metadata = {
+          timezone        = var.night_scaling_timezone
+          start           = var.night_scaling_start
+          end             = var.night_scaling_end
+          desiredReplicas = "0"
+        }
+      }
+    }
   }
 
   # Ingress — only API Gateway and SLIM Gateway exposed externally

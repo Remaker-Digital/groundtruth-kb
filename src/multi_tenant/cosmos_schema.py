@@ -2,10 +2,10 @@
 Cosmos DB schema definitions for multi-tenant Agent Red platform.
 
 Defines document models (Pydantic), collection configurations, indexing
-policies, and database initialization utilities for all 9 Cosmos DB
+policies, and database initialization utilities for all 10 Cosmos DB
 collections.
 
-Collections (9 total):
+Collections (10 total):
     Tenant-scoped (partition key: /tenant_id):
         1. tenants          — Tenant config, status, billing metadata
         2. conversations    — Conversation transcripts, billing records
@@ -14,10 +14,11 @@ Collections (9 total):
         5. knowledge_bases  — Per-merchant product/FAQ data
         6. memory_vectors   — Layer 2 vectorized transcript chunks
         7. preferences      — Merchant settings, config versions
+        8. team_members     — Merchant team members (admin dashboard access)
 
     Platform-wide:
-        8. platform_config  — Tier defaults, feature flags (partition: /config_type)
-        9. audit_log        — Append-only audit events (partition: /time_partition)
+        9. platform_config  — Tier defaults, feature flags (partition: /config_type)
+       10. audit_log        — Append-only audit events (partition: /time_partition)
 
 Architecture references:
     - Decision #2: Cosmos DB partition key = tenant_id
@@ -57,6 +58,7 @@ COLLECTION_MEMORY_VECTORS = "memory_vectors"
 COLLECTION_PREFERENCES = "preferences"
 COLLECTION_PLATFORM_CONFIG = "platform_config"
 COLLECTION_AUDIT_LOG = "audit_log"
+COLLECTION_TEAM_MEMBERS = "team_members"
 
 ALL_COLLECTIONS = [
     COLLECTION_TENANTS,
@@ -68,6 +70,7 @@ ALL_COLLECTIONS = [
     COLLECTION_PREFERENCES,
     COLLECTION_PLATFORM_CONFIG,
     COLLECTION_AUDIT_LOG,
+    COLLECTION_TEAM_MEMBERS,
 ]
 
 # Cosmos DB Serverless — no provisioned throughput (pay per RU consumed)
@@ -92,6 +95,7 @@ TTL_PACK_BALANCE = 90 * 24 * 60 * 60       # 90 days (pack validity)
 class TenantTier(str, Enum):
     """Subscription tier."""
 
+    TRIAL = "trial"
     STARTER = "starter"
     PROFESSIONAL = "professional"
     ENTERPRISE = "enterprise"
@@ -109,6 +113,7 @@ class TenantStatus(str, Enum):
     PAST_DUE = "past_due"
     GRACE_PERIOD = "grace_period"
     DEACTIVATED = "deactivated"
+    TRIAL_EXPIRED = "trial_expired"
 
 
 class BillingChannel(str, Enum):
@@ -116,6 +121,7 @@ class BillingChannel(str, Enum):
 
     STRIPE = "stripe"
     SHOPIFY = "shopify"
+    TRIAL = "trial"
 
 
 class ConsentStatus(str, Enum):
@@ -211,6 +217,25 @@ class TenantDocument(BaseModel):
         description="SHA-256 hash of the tenant's API key (for direct-channel auth)",
     )
 
+    # Publishable widget key authentication (Decision UI-6)
+    widget_key_hash: str | None = Field(
+        default=None,
+        description="SHA-256 hash of the tenant's publishable widget key (pk_live_...)",
+    )
+
+    # Trial tier (WI #119)
+    trial_expires_at: str | None = Field(
+        default=None,
+        description="ISO 8601 timestamp when the trial period ends. "
+        "Only set for trial-tier tenants. Auth middleware rejects requests "
+        "after this time.",
+    )
+    trial_conversation_limit: int | None = Field(
+        default=None,
+        description="Hard cap on conversations during the trial period. "
+        "Overrides included_conversations from TIER_DEFAULTS when set.",
+    )
+
     # Rate limiting (Decision #5)
     rate_limit_rpm: int | None = Field(
         default=None,
@@ -260,6 +285,13 @@ class ConversationDocument(BaseModel):
     agents_invoked: list[str] = Field(default_factory=list, description="Agents used in pipeline")
     model_used: str | None = Field(default=None, description="Primary model (e.g. gpt-4o)")
     critic_passed: bool | None = Field(default=None, description="Whether Critic approved response")
+
+    # Human agent assignment (WI #171 — admin inbox)
+    assigned_to: str | None = Field(default=None, description="Human agent ID (post-escalation)")
+    internal_notes: list[dict[str, Any]] = Field(
+        default_factory=list,
+        description="Internal merchant notes [{author, content, created_at}]",
+    )
 
     # Transcript (stored as structured messages, not raw text)
     messages: list[dict[str, Any]] = Field(
@@ -619,6 +651,51 @@ class AuditLogDocument(BaseModel):
 
 
 # ---------------------------------------------------------------------------
+# Document models — Collection 10: team_members
+# ---------------------------------------------------------------------------
+
+
+class TeamMemberRole(str, Enum):
+    """Team member roles within a tenant."""
+
+    OWNER = "owner"        # Full access, cannot be removed
+    ADMIN = "admin"        # Full access, can manage team
+    AGENT = "agent"        # Can handle escalated conversations
+    VIEWER = "viewer"      # Read-only dashboard access
+
+
+class TeamMemberDocument(BaseModel):
+    """Team member within a tenant (WI #179).
+
+    Stores merchant team members who can access the admin dashboard
+    and/or handle escalated conversations.
+
+    Partition key: /tenant_id
+    """
+
+    id: str = Field(description="Document ID (= tenant_id:email)")
+    tenant_id: str = Field(description="Partition key")
+    email: str = Field(description="Team member email (unique within tenant)")
+    display_name: str = Field(description="Display name shown in inbox/notes")
+    role: TeamMemberRole = Field(description="Permission role")
+
+    # Status
+    is_active: bool = Field(default=True, description="Whether member has access")
+
+    # Agent-specific (for human-agent escalation)
+    max_concurrent_conversations: int = Field(
+        default=5,
+        description="Max simultaneous escalated conversations this agent can handle",
+    )
+
+    # Metadata
+    created_at: str = Field(description="When member was added")
+    updated_at: str = Field(description="Last update timestamp")
+    last_login_at: str | None = Field(default=None, description="Last dashboard login")
+    invited_by: str | None = Field(default=None, description="Who added this member")
+
+
+# ---------------------------------------------------------------------------
 # Collection configuration
 # ---------------------------------------------------------------------------
 
@@ -635,7 +712,7 @@ class CollectionConfig(BaseModel):
 
 
 def get_collection_configs() -> list[CollectionConfig]:
-    """Return collection configurations for all 9 containers.
+    """Return collection configurations for all 10 containers.
 
     These configs are used by the database initialization utility
     to create containers idempotently.
@@ -848,6 +925,28 @@ def get_collection_configs() -> list[CollectionConfig]:
                 ],
             },
         ),
+        # 10. team_members
+        CollectionConfig(
+            name=COLLECTION_TEAM_MEMBERS,
+            partition_key="/tenant_id",
+            unique_keys=[["/email"]],
+            indexing_policy={
+                "automatic": True,
+                "indexingMode": "consistent",
+                "includedPaths": [{"path": "/*"}],
+                "excludedPaths": [{"path": '/"_etag"/?'}],
+                "compositeIndexes": [
+                    [
+                        {"path": "/role", "order": "ascending"},
+                        {"path": "/is_active", "order": "ascending"},
+                    ],
+                    [
+                        {"path": "/is_active", "order": "ascending"},
+                        {"path": "/updated_at", "order": "descending"},
+                    ],
+                ],
+            },
+        ),
     ]
 
 
@@ -856,6 +955,16 @@ def get_collection_configs() -> list[CollectionConfig]:
 # ---------------------------------------------------------------------------
 
 TIER_DEFAULTS: dict[str, dict[str, Any]] = {
+    TenantTier.TRIAL.value: {
+        "included_conversations": 50,
+        "rate_limit_rpm": 5,
+        "max_concurrent": 2,
+        "queue_depth": 3,
+        "history_depth_days": 14,       # Trial: 14-day retention only
+        "memory_layers": [1],           # Layer 1 only (basic profile)
+        "overage_rate": 0.0,            # No overage — hard cap at 50
+        "trial_duration_days": 14,      # 14-day trial period
+    },
     TenantTier.STARTER.value: {
         "included_conversations": 1_000,
         "rate_limit_rpm": 10,

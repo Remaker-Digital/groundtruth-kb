@@ -16,7 +16,8 @@ Repository hierarchy:
     ├── CustomerProfileRepository — customer_profiles collection (Layer 1)
     ├── KnowledgeBaseRepository — knowledge_bases collection (product/FAQ data)
     ├── MemoryVectorRepository  — memory_vectors collection (Layer 2 + vector search)
-    └── PreferencesRepository   — preferences collection (versioned config)
+    ├── PreferencesRepository   — preferences collection (versioned config)
+    └── TeamMemberRepository    — team_members collection (admin dashboard access)
 
     PlatformScopedRepository  — Base class for platform-wide collections
     ├── PlatformConfigRepository — platform_config collection
@@ -48,6 +49,7 @@ from src.multi_tenant.cosmos_schema import (
     COLLECTION_MEMORY_VECTORS,
     COLLECTION_PLATFORM_CONFIG,
     COLLECTION_PREFERENCES,
+    COLLECTION_TEAM_MEMBERS,
     COLLECTION_TENANTS,
     COLLECTION_USAGE,
     TIER_DEFAULTS,
@@ -62,6 +64,7 @@ from src.multi_tenant.cosmos_schema import (
     PackBalanceDocument,
     PlatformConfigDocument,
     PreferencesDocument,
+    TeamMemberDocument,
     TenantDocument,
     TenantStatus,
     TenantTier,
@@ -512,6 +515,32 @@ class TenantRepository(TenantScopedRepository):
 
         return items[0] if items else None
 
+    async def find_by_widget_key_hash(
+        self, widget_key_hash: str,
+    ) -> dict[str, Any] | None:
+        """Find a tenant by widget key hash (cross-partition).
+
+        Used during publishable widget key authentication (Decision UI-6)
+        where tenant_id is unknown. Scoped to /api/chat/* endpoints only.
+
+        Args:
+            widget_key_hash: SHA-256 hex digest of the widget key.
+
+        Returns:
+            The tenant document, or None if not found.
+        """
+        items: list[dict[str, Any]] = []
+        async for item in self._container.query_items(
+            query="SELECT * FROM c WHERE c.widget_key_hash = @hash",
+            parameters=[{"name": "@hash", "value": widget_key_hash}],
+            enable_cross_partition_query=True,
+            max_item_count=1,
+        ):
+            items.append(item)
+            break
+
+        return items[0] if items else None
+
     async def list_by_status(
         self, tenant_id: str, status: TenantStatus,
     ) -> list[dict[str, Any]]:
@@ -675,6 +704,260 @@ class ConversationRepository(TenantScopedRepository):
                 {"op": "set", "path": "/last_activity_at", "value": now},
             ],
         )
+
+    # --- Admin inbox queries (WI #171) ---
+
+    async def list_filtered(
+        self,
+        tenant_id: str,
+        *,
+        status: ConversationStatus | None = None,
+        customer_id: str | None = None,
+        since: str | None = None,
+        until: str | None = None,
+        assigned_to: str | None = None,
+        offset: int = 0,
+        limit: int = 50,
+    ) -> list[dict[str, Any]]:
+        """List conversations with optional filters for admin inbox.
+
+        Args:
+            tenant_id: Tenant partition key.
+            status: Filter by conversation status (active, escalated, etc.).
+            customer_id: Filter by customer identifier.
+            since: Start timestamp (ISO 8601, inclusive).
+            until: End timestamp (ISO 8601, exclusive).
+            assigned_to: Filter by assigned human agent ID.
+            offset: Pagination offset.
+            limit: Page size.
+        """
+        conditions: list[str] = []
+        params: list[dict[str, Any]] = []
+
+        if status is not None:
+            conditions.append("c.status = @status")
+            params.append({"name": "@status", "value": status.value})
+
+        if customer_id is not None:
+            conditions.append("c.customer_id = @customer_id")
+            params.append({"name": "@customer_id", "value": customer_id})
+
+        if since is not None:
+            conditions.append("c.started_at >= @since")
+            params.append({"name": "@since", "value": since})
+
+        if until is not None:
+            conditions.append("c.started_at < @until")
+            params.append({"name": "@until", "value": until})
+
+        if assigned_to is not None:
+            conditions.append("c.assigned_to = @assigned_to")
+            params.append({"name": "@assigned_to", "value": assigned_to})
+
+        where_clause = " AND ".join(conditions) if conditions else "1=1"
+        params.append({"name": "@offset", "value": offset})
+        params.append({"name": "@limit", "value": limit})
+
+        query_text = (
+            f"SELECT * FROM c WHERE {where_clause} "
+            "ORDER BY c.last_activity_at DESC "
+            "OFFSET @offset LIMIT @limit"
+        )
+
+        return await self.query(tenant_id, query_text, params)
+
+    async def count_filtered(
+        self,
+        tenant_id: str,
+        *,
+        status: ConversationStatus | None = None,
+        customer_id: str | None = None,
+        since: str | None = None,
+        until: str | None = None,
+        assigned_to: str | None = None,
+    ) -> int:
+        """Count conversations matching filters (for pagination metadata)."""
+        conditions: list[str] = []
+        params: list[dict[str, Any]] = []
+
+        if status is not None:
+            conditions.append("c.status = @status")
+            params.append({"name": "@status", "value": status.value})
+
+        if customer_id is not None:
+            conditions.append("c.customer_id = @customer_id")
+            params.append({"name": "@customer_id", "value": customer_id})
+
+        if since is not None:
+            conditions.append("c.started_at >= @since")
+            params.append({"name": "@since", "value": since})
+
+        if until is not None:
+            conditions.append("c.started_at < @until")
+            params.append({"name": "@until", "value": until})
+
+        if assigned_to is not None:
+            conditions.append("c.assigned_to = @assigned_to")
+            params.append({"name": "@assigned_to", "value": assigned_to})
+
+        where_clause = " AND ".join(conditions) if conditions else "1=1"
+        query_text = f"SELECT VALUE COUNT(1) FROM c WHERE {where_clause}"
+
+        return await self.query_count(tenant_id, query_text, params)
+
+    async def assign_agent(
+        self,
+        tenant_id: str,
+        conversation_id: str,
+        agent_id: str,
+    ) -> dict[str, Any]:
+        """Assign a human agent to a conversation (post-escalation)."""
+        now = datetime.now(timezone.utc).isoformat()
+        return await self.patch(
+            tenant_id=tenant_id,
+            document_id=conversation_id,
+            operations=[
+                {"op": "set", "path": "/assigned_to", "value": agent_id},
+                {"op": "set", "path": "/last_activity_at", "value": now},
+            ],
+        )
+
+    async def add_internal_note(
+        self,
+        tenant_id: str,
+        conversation_id: str,
+        note: dict[str, Any],
+    ) -> dict[str, Any]:
+        """Append an internal merchant note to a conversation."""
+        now = datetime.now(timezone.utc).isoformat()
+        return await self.patch(
+            tenant_id=tenant_id,
+            document_id=conversation_id,
+            operations=[
+                {"op": "add", "path": "/internal_notes/-", "value": note},
+                {"op": "set", "path": "/last_activity_at", "value": now},
+            ],
+        )
+
+    # --- Analytics aggregation queries (WI #176-178) ---
+
+    async def count_by_status(
+        self,
+        tenant_id: str,
+        since: str,
+        until: str | None = None,
+    ) -> list[dict[str, Any]]:
+        """Count conversations grouped by status in a date range.
+
+        Returns list of {status, count} dicts.
+        """
+        query_text = (
+            "SELECT c.status, COUNT(1) AS count FROM c "
+            "WHERE c.started_at >= @since"
+        )
+        params: list[dict[str, Any]] = [{"name": "@since", "value": since}]
+
+        if until is not None:
+            query_text += " AND c.started_at < @until"
+            params.append({"name": "@until", "value": until})
+
+        query_text += " GROUP BY c.status"
+
+        return await self.query(tenant_id, query_text, params)
+
+    async def aggregate_metrics(
+        self,
+        tenant_id: str,
+        since: str,
+        until: str | None = None,
+    ) -> dict[str, Any]:
+        """Compute aggregate conversation metrics for a date range.
+
+        Returns a dict with total, billable, avg_turns, avg_messages,
+        escalated, critic_passed, critic_failed counts.
+        """
+        query_text = (
+            "SELECT "
+            "COUNT(1) AS total, "
+            "SUM(c.is_billable ? 1 : 0) AS billable, "
+            "AVG(c.turn_count) AS avg_turns, "
+            "AVG(c.message_count) AS avg_messages, "
+            "SUM(c.status = 'escalated' ? 1 : 0) AS escalated, "
+            "SUM(c.critic_passed = true ? 1 : 0) AS critic_passed, "
+            "SUM(c.critic_passed = false ? 1 : 0) AS critic_failed "
+            "FROM c WHERE c.started_at >= @since"
+        )
+        params: list[dict[str, Any]] = [{"name": "@since", "value": since}]
+
+        if until is not None:
+            query_text += " AND c.started_at < @until"
+            params.append({"name": "@until", "value": until})
+
+        results = await self.query(tenant_id, query_text, params)
+        if results:
+            return results[0]
+        return {
+            "total": 0, "billable": 0, "avg_turns": 0,
+            "avg_messages": 0, "escalated": 0,
+            "critic_passed": 0, "critic_failed": 0,
+        }
+
+    async def list_agents_invoked(
+        self,
+        tenant_id: str,
+        since: str,
+        until: str | None = None,
+    ) -> list[dict[str, Any]]:
+        """List all conversations with their agents_invoked for intent analysis.
+
+        Returns conversation docs with only the fields needed for
+        agent/intent frequency analysis: conversation_id, agents_invoked,
+        status, started_at.
+        """
+        query_text = (
+            "SELECT c.conversation_id, c.agents_invoked, c.status, "
+            "c.started_at FROM c "
+            "WHERE c.started_at >= @since"
+        )
+        params: list[dict[str, Any]] = [{"name": "@since", "value": since}]
+
+        if until is not None:
+            query_text += " AND c.started_at < @until"
+            params.append({"name": "@until", "value": until})
+
+        return await self.query(tenant_id, query_text, params)
+
+    async def list_gap_conversations(
+        self,
+        tenant_id: str,
+        since: str,
+        until: str | None = None,
+        limit: int = 50,
+    ) -> list[dict[str, Any]]:
+        """List conversations that represent potential knowledge gaps.
+
+        Returns conversations with escalated or error status — these
+        indicate the AI couldn't resolve the customer's issue.
+        """
+        query_text = (
+            "SELECT c.conversation_id, c.status, c.customer_id, "
+            "c.turn_count, c.message_count, c.agents_invoked, "
+            "c.critic_passed, c.started_at, c.ended_at "
+            "FROM c "
+            "WHERE (c.status = 'escalated' OR c.status = 'error') "
+            "AND c.started_at >= @since"
+        )
+        params: list[dict[str, Any]] = [{"name": "@since", "value": since}]
+
+        if until is not None:
+            query_text += " AND c.started_at < @until"
+            params.append({"name": "@until", "value": until})
+
+        query_text += " ORDER BY c.started_at DESC"
+        params.append({"name": "@limit", "value": limit})
+        query_text += " OFFSET 0 LIMIT @limit"
+
+        return await self.query(tenant_id, query_text, params)
 
 
 # ---------------------------------------------------------------------------
@@ -965,6 +1248,111 @@ class KnowledgeBaseRepository(TenantScopedRepository):
             parameters=params,
         )
 
+    # --- Admin knowledge base queries (WI #175) ---
+
+    async def list_filtered(
+        self,
+        tenant_id: str,
+        *,
+        entry_type: str | None = None,
+        language: str | None = None,
+        is_active: bool | None = None,
+        search: str | None = None,
+        offset: int = 0,
+        limit: int = 50,
+    ) -> list[dict[str, Any]]:
+        """List knowledge base entries with filters for admin management.
+
+        Args:
+            tenant_id: Tenant partition key.
+            entry_type: Filter by type (product, faq, policy, custom).
+            language: Filter by language code.
+            is_active: Filter by active status (None = all).
+            search: Substring search on title (case-insensitive via CONTAINS).
+            offset: Pagination offset.
+            limit: Page size.
+        """
+        conditions: list[str] = []
+        params: list[dict[str, Any]] = []
+
+        if entry_type is not None:
+            conditions.append("c.entry_type = @entry_type")
+            params.append({"name": "@entry_type", "value": entry_type})
+
+        if language is not None:
+            conditions.append("c.language = @language")
+            params.append({"name": "@language", "value": language})
+
+        if is_active is not None:
+            conditions.append("c.is_active = @is_active")
+            params.append({"name": "@is_active", "value": is_active})
+
+        if search is not None:
+            conditions.append("CONTAINS(LOWER(c.title), LOWER(@search))")
+            params.append({"name": "@search", "value": search})
+
+        where_clause = " AND ".join(conditions) if conditions else "1=1"
+        params.append({"name": "@offset", "value": offset})
+        params.append({"name": "@limit", "value": limit})
+
+        query_text = (
+            f"SELECT * FROM c WHERE {where_clause} "
+            "ORDER BY c.updated_at DESC "
+            "OFFSET @offset LIMIT @limit"
+        )
+
+        return await self.query(tenant_id, query_text, params)
+
+    async def count_filtered(
+        self,
+        tenant_id: str,
+        *,
+        entry_type: str | None = None,
+        language: str | None = None,
+        is_active: bool | None = None,
+        search: str | None = None,
+    ) -> int:
+        """Count knowledge base entries matching filters (for pagination)."""
+        conditions: list[str] = []
+        params: list[dict[str, Any]] = []
+
+        if entry_type is not None:
+            conditions.append("c.entry_type = @entry_type")
+            params.append({"name": "@entry_type", "value": entry_type})
+
+        if language is not None:
+            conditions.append("c.language = @language")
+            params.append({"name": "@language", "value": language})
+
+        if is_active is not None:
+            conditions.append("c.is_active = @is_active")
+            params.append({"name": "@is_active", "value": is_active})
+
+        if search is not None:
+            conditions.append("CONTAINS(LOWER(c.title), LOWER(@search))")
+            params.append({"name": "@search", "value": search})
+
+        where_clause = " AND ".join(conditions) if conditions else "1=1"
+        query_text = f"SELECT VALUE COUNT(1) FROM c WHERE {where_clause}"
+
+        return await self.query_count(tenant_id, query_text, params)
+
+    async def soft_delete(
+        self,
+        tenant_id: str,
+        document_id: str,
+    ) -> dict[str, Any]:
+        """Soft-delete a knowledge base entry (set is_active = false)."""
+        now = datetime.now(timezone.utc).isoformat()
+        return await self.patch(
+            tenant_id=tenant_id,
+            document_id=document_id,
+            operations=[
+                {"op": "set", "path": "/is_active", "value": False},
+                {"op": "set", "path": "/updated_at", "value": now},
+            ],
+        )
+
 
 # ---------------------------------------------------------------------------
 # Collection 6: MemoryVectorRepository
@@ -1142,6 +1530,130 @@ class PreferencesRepository(TenantScopedRepository):
             tenant_id=tenant_id,
             query_text="SELECT * FROM c ORDER BY c.version DESC",
             max_items=max_items,
+        )
+
+
+# ---------------------------------------------------------------------------
+# Collection 8: TeamMemberRepository (WI #179)
+# ---------------------------------------------------------------------------
+
+
+class TeamMemberRepository(TenantScopedRepository):
+    """Repository for the team_members collection.
+
+    Manages merchant team members who access the admin dashboard
+    and/or handle escalated conversations.
+    """
+
+    def __init__(self) -> None:
+        super().__init__(COLLECTION_TEAM_MEMBERS)
+
+    async def list_members(
+        self,
+        tenant_id: str,
+        *,
+        role: str | None = None,
+        is_active: bool | None = None,
+        offset: int = 0,
+        limit: int = 50,
+    ) -> list[dict[str, Any]]:
+        """List team members with optional filtering.
+
+        Args:
+            tenant_id: Tenant partition key.
+            role: Filter by role (owner, admin, agent, viewer).
+            is_active: Filter by active status (None = all).
+            offset: Pagination offset.
+            limit: Page size.
+        """
+        conditions: list[str] = []
+        params: list[dict[str, Any]] = []
+
+        if role is not None:
+            conditions.append("c.role = @role")
+            params.append({"name": "@role", "value": role})
+
+        if is_active is not None:
+            conditions.append("c.is_active = @is_active")
+            params.append({"name": "@is_active", "value": is_active})
+
+        where_clause = " AND ".join(conditions) if conditions else "1=1"
+        params.append({"name": "@offset", "value": offset})
+        params.append({"name": "@limit", "value": limit})
+
+        query_text = (
+            f"SELECT * FROM c WHERE {where_clause} "
+            "ORDER BY c.updated_at DESC "
+            "OFFSET @offset LIMIT @limit"
+        )
+
+        return await self.query(tenant_id, query_text, params)
+
+    async def count_members(
+        self,
+        tenant_id: str,
+        *,
+        role: str | None = None,
+        is_active: bool | None = None,
+    ) -> int:
+        """Count team members matching filters (for pagination)."""
+        conditions: list[str] = []
+        params: list[dict[str, Any]] = []
+
+        if role is not None:
+            conditions.append("c.role = @role")
+            params.append({"name": "@role", "value": role})
+
+        if is_active is not None:
+            conditions.append("c.is_active = @is_active")
+            params.append({"name": "@is_active", "value": is_active})
+
+        where_clause = " AND ".join(conditions) if conditions else "1=1"
+        query_text = f"SELECT VALUE COUNT(1) FROM c WHERE {where_clause}"
+
+        return await self.query_count(tenant_id, query_text, params)
+
+    async def find_by_email(
+        self, tenant_id: str, email: str,
+    ) -> dict[str, Any] | None:
+        """Find a team member by email address (unique within tenant)."""
+        results = await self.query(
+            tenant_id=tenant_id,
+            query_text="SELECT * FROM c WHERE c.email = @email",
+            parameters=[{"name": "@email", "value": email}],
+            max_items=1,
+        )
+        return results[0] if results else None
+
+    async def deactivate(
+        self, tenant_id: str, document_id: str,
+    ) -> dict[str, Any]:
+        """Deactivate a team member (set is_active = false)."""
+        now = datetime.now(timezone.utc).isoformat()
+        return await self.patch(
+            tenant_id=tenant_id,
+            document_id=document_id,
+            operations=[
+                {"op": "set", "path": "/is_active", "value": False},
+                {"op": "set", "path": "/updated_at", "value": now},
+            ],
+        )
+
+    async def list_active_agents(
+        self, tenant_id: str,
+    ) -> list[dict[str, Any]]:
+        """List active team members with the agent role.
+
+        Used for escalation routing — returns agents who can handle
+        escalated conversations.
+        """
+        return await self.query(
+            tenant_id=tenant_id,
+            query_text=(
+                "SELECT * FROM c "
+                "WHERE c.role = 'agent' AND c.is_active = true "
+                "ORDER BY c.max_concurrent_conversations DESC"
+            ),
         )
 
 

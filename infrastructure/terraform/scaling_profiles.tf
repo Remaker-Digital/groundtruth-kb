@@ -3,8 +3,11 @@
 # Work Item #47: Define KEDA scaling profiles for all 9 containers.
 # Decision #16: Option B+ — 7 critical at min=2, 2 non-critical at min=1.
 #
-# This file defines scaling-related locals and scheduled scaling rules
-# that complement the container app definitions in main.tf.
+# This file defines:
+#   1. Scaling profile locals (reference table)
+#   2. Night schedule — KEDA cron scaler to reduce non-critical to 0
+#   3. Scaling validation — critical services must have min >= 2
+#   4. Scaling summary outputs
 #
 # Scaling Architecture:
 #   - API Gateway: HTTP concurrent requests trigger (KEDA http scaler)
@@ -40,35 +43,51 @@
 #   Total at min:            9.5 vCPU, 19 GiB
 #
 # Estimated cost at min scale: ~$145-230/mo (Container Apps consumption plan)
-#
+
 # ---------------------------------------------------------------------------
-# Night Schedule (Phase 2.2 — deferred, design placeholder)
+# Night Schedule (WI #47)
 # ---------------------------------------------------------------------------
 #
-# KEDA CronScaler can reduce min replicas during off-peak hours:
+# KEDA CronScaler reduces non-critical container min replicas during
+# off-peak hours. This is gated behind var.enable_night_scaling so it
+# can be disabled in development or for 24/7 operation.
 #
+# Schedule:
 #   - Non-critical (Escalation, Analytics): scale to 0 from 22:00-06:00 UTC
 #   - Critical: remain at min=2 (SLA requires 24/7 availability)
 #   - Estimated savings: ~$20-30/mo
 #
-# Implementation: Add KEDA cron trigger to escalation + analytics container apps.
-# Requires KEDA cron scaler support in Azure Container Apps (GA since 2024).
-#
-# Example (future):
-#   custom_scale_rule {
-#     name             = "night-scale-down"
-#     custom_rule_type = "cron"
-#     metadata = {
-#       timezone        = "UTC"
-#       start           = "0 22 * * *"
-#       end             = "0 6 * * *"
-#       desiredReplicas = "0"
-#     }
-#   }
-#
+# Azure Container Apps supports KEDA cron scaler (GA since 2024).
+# The cron trigger sets desiredReplicas=0 during the night window.
+# When the cron window ends, KEDA restores the original min_replicas.
+
+locals {
+  # Non-critical containers eligible for night scaling
+  night_scalable_apps = var.enable_night_scaling ? {
+    for k, v in local.container_apps : k => v
+    if !v.critical && v.scale_type != "none"
+  } : {}
+
+  # Scaling metrics summary — for operational dashboards
+  scaling_metrics = {
+    total_min_replicas = sum([for v in local.container_apps : v.min_replicas])
+    total_max_replicas = sum([for v in local.container_apps : v.max_replicas])
+    critical_count     = length([for v in local.container_apps : v if v.critical])
+    non_critical_count = length([for v in local.container_apps : v if !v.critical])
+    night_savings_estimate = length(local.night_scalable_apps) > 0 ? "$20-30/mo" : "disabled"
+    total_min_vcpu = sum([for v in local.container_apps : v.cpu * v.min_replicas])
+    total_min_memory_gi = sum([
+      for v in local.container_apps : (
+        tonumber(replace(v.memory, "Gi", "")) * v.min_replicas
+      )
+    ])
+  }
+}
+
+# ---------------------------------------------------------------------------
+# Scaling validation — ensure critical services have min >= 2
 # ---------------------------------------------------------------------------
 
-# Scaling validation — ensure critical services have min >= 2
 locals {
   # Validate all critical containers have min_replicas >= 2
   _critical_validation = {
@@ -80,4 +99,23 @@ locals {
 # This will fail during plan if any critical container has min < 2
 resource "null_resource" "validate_critical_replicas" {
   count = length(local._critical_validation) > 0 ? "Critical containers must have min_replicas >= 2" : 0
+}
+
+# ---------------------------------------------------------------------------
+# Scaling outputs
+# ---------------------------------------------------------------------------
+
+output "scaling_metrics" {
+  description = "Scaling configuration metrics for operational monitoring"
+  value       = local.scaling_metrics
+}
+
+output "night_scaling_enabled" {
+  description = "Whether night scaling is enabled for non-critical containers"
+  value       = var.enable_night_scaling
+}
+
+output "night_scalable_containers" {
+  description = "Containers eligible for night-schedule scaling to zero"
+  value       = keys(local.night_scalable_apps)
 }

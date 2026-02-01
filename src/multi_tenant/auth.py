@@ -1,11 +1,11 @@
 """
-Dual authentication: Shopify session tokens + API keys.
+Triple authentication: Shopify session tokens + API keys + publishable widget keys.
 
-Verifies incoming requests and resolves them to a tenant_id. Both
+Verifies incoming requests and resolves them to a tenant_id. All three
 authentication channels produce the same TenantContext object that
 downstream handlers use to scope all database operations.
 
-Authentication methods (Decision #4):
+Authentication methods (Decisions #4, UI-6):
     1. Shopify session tokens — JWT signed with app secret (HS256).
        Sent as Authorization: Bearer <token> by App Bridge.
        Resolves tenant via shop domain → tenants collection lookup.
@@ -14,13 +14,18 @@ Authentication methods (Decision #4):
        Sent as X-API-Key: <key> header.
        Resolves tenant via API key hash → tenants collection lookup.
 
-    3. Webhook signatures — Stripe/Shopify webhook-specific auth.
+    3. Publishable widget keys — public credentials for client-side widgets.
+       Sent as X-Widget-Key: pk_live_... header (or ?key= query param for WS).
+       Scoped to /api/chat/* endpoints only. Sets is_widget_auth=True on context.
+       Format: pk_live_{tenant_id_hash}_{random}
+
+    4. Webhook signatures — Stripe/Shopify webhook-specific auth.
        These endpoints bypass tenant resolution (handled per-webhook).
 
 Request flow:
     HTTP request
-    → Extract auth credentials (Bearer token or API key header)
-    → Verify credentials (JWT decode or hash lookup)
+    → Extract auth credentials (Bearer token, API key, or widget key)
+    → Verify credentials (JWT decode, hash lookup, or widget key lookup)
     → Resolve tenant_id from verified identity
     → Validate tenant status (must be ACTIVE or PAST_DUE)
     → Inject TenantContext into request state
@@ -70,6 +75,18 @@ JWT_REQUIRED_CLAIMS = ["iss", "dest", "sub", "jti", "sid", "exp", "nbf", "iat", 
 # API key header name
 API_KEY_HEADER = "X-API-Key"
 
+# Publishable widget key (Decision UI-6)
+WIDGET_KEY_HEADER = "X-Widget-Key"
+WIDGET_KEY_PREFIX = "pk_live_"
+
+# Paths where widget key authentication is allowed.
+# Widget keys are scoped to chat endpoints only — they cannot access
+# billing, config, dashboard, or any other tenant management APIs.
+WIDGET_KEY_ALLOWED_PREFIXES = (
+    "/api/chat/",
+    "/ws/chat/",
+)
+
 # Routes that bypass authentication (webhooks, health, public endpoints)
 AUTH_EXEMPT_PREFIXES = (
     "/health",
@@ -78,6 +95,7 @@ AUTH_EXEMPT_PREFIXES = (
     "/redoc",
     "/openapi.json",
     "/api/webhooks/",
+    "/api/shopify/gdpr/",
     "/api/checkout/success",
     "/api/checkout/cancel",
     "/api/shopify/billing/confirm",
@@ -101,6 +119,9 @@ class TenantContext:
         tier: Subscription tier (for rate limiting, feature gating).
         status: Tenant lifecycle status.
         auth_method: How the request was authenticated.
+        is_widget_auth: True if authenticated via publishable widget key.
+            Widget-authenticated requests are scoped to /api/chat/* only
+            and cannot mutate config, billing, or tenant settings.
         shop_domain: Shopify shop domain (Shopify auth only).
         user_id: Shopify merchant user ID (Shopify auth only).
         session_id: Shopify session ID (Shopify auth only).
@@ -109,7 +130,13 @@ class TenantContext:
     tenant_id: str
     tier: TenantTier | None = None
     status: TenantStatus = TenantStatus.ACTIVE
-    auth_method: str = "api_key"  # "shopify_session" or "api_key"
+    auth_method: str = "api_key"  # "shopify_session", "api_key", or "widget_key"
+
+    # Widget key auth (Decision UI-6) — scoped to /api/chat/* only
+    is_widget_auth: bool = False
+
+    # Trial tier (WI #119) — ISO 8601 expiry timestamp
+    trial_expires_at: str | None = None
 
     # Shopify-specific (populated only for session token auth)
     shop_domain: str | None = None
@@ -306,6 +333,77 @@ async def verify_api_key(
         raise AuthenticationError("Invalid API key.")
 
     return tenant
+
+
+# ---------------------------------------------------------------------------
+# Publishable widget key verification (Decision UI-6)
+# ---------------------------------------------------------------------------
+
+
+def validate_widget_key_format(key: str) -> bool:
+    """Check that a widget key matches the expected format.
+
+    Format: pk_live_{tenant_id_hash}_{random}
+    Example: pk_live_a7f3c9e1_x8k2m5p9
+
+    The key must start with the WIDGET_KEY_PREFIX and contain at least
+    two underscore-separated segments after the prefix.
+    """
+    if not key.startswith(WIDGET_KEY_PREFIX):
+        return False
+    suffix = key[len(WIDGET_KEY_PREFIX):]
+    # Must have at least hash_random (two parts separated by _)
+    parts = suffix.split("_", 1)
+    return len(parts) == 2 and len(parts[0]) >= 4 and len(parts[1]) >= 4
+
+
+def hash_widget_key(key: str) -> str:
+    """Hash a publishable widget key for storage and comparison.
+
+    Uses the same SHA-256 approach as API keys.
+    """
+    return hashlib.sha256(key.encode("utf-8")).hexdigest()
+
+
+async def verify_widget_key(
+    widget_key: str,
+    lookup_fn: Any,
+) -> dict[str, Any]:
+    """Verify a publishable widget key and resolve to a tenant.
+
+    Args:
+        widget_key: The raw widget key (pk_live_...).
+        lookup_fn: Async function that accepts a widget key hash
+            and returns a tenant document or None.
+
+    Returns:
+        The tenant document.
+
+    Raises:
+        AuthenticationError: If the key is invalid or no tenant found.
+    """
+    if not widget_key:
+        raise AuthenticationError("Widget key is required.")
+
+    if not validate_widget_key_format(widget_key):
+        raise AuthenticationError("Invalid widget key format.")
+
+    key_hash = hash_widget_key(widget_key)
+    tenant = await lookup_fn(key_hash)
+
+    if tenant is None:
+        logger.warning("Widget key authentication failed: no matching tenant")
+        raise AuthenticationError("Invalid widget key.")
+
+    return tenant
+
+
+def is_widget_key_allowed_path(path: str) -> bool:
+    """Check if the request path is allowed for widget key auth.
+
+    Widget keys are scoped to /api/chat/* and /ws/chat/* only.
+    """
+    return path.startswith(WIDGET_KEY_ALLOWED_PREFIXES)
 
 
 # ---------------------------------------------------------------------------

@@ -35,6 +35,7 @@ from src.multi_tenant.cosmos_schema import (
     COLLECTION_MEMORY_VECTORS,
     COLLECTION_PLATFORM_CONFIG,
     COLLECTION_PREFERENCES,
+    COLLECTION_TEAM_MEMBERS,
     COLLECTION_TENANTS,
     COLLECTION_USAGE,
     AuditEventType,
@@ -531,11 +532,12 @@ class TestTierDefaults:
 
     @pytest.mark.unit
     def test_tier_defaults_has_all_tiers(self):
-        """CR-18: All 3 tiers present in TIER_DEFAULTS."""
+        """CR-18: All 4 tiers present in TIER_DEFAULTS."""
+        assert "trial" in TIER_DEFAULTS
         assert "starter" in TIER_DEFAULTS
         assert "professional" in TIER_DEFAULTS
         assert "enterprise" in TIER_DEFAULTS
-        assert len(TIER_DEFAULTS) == 3
+        assert len(TIER_DEFAULTS) == 4
 
     @pytest.mark.unit
     def test_tier_defaults_has_all_required_keys(self):
@@ -583,24 +585,24 @@ class TestEnumCompleteness:
 
     @pytest.mark.unit
     def test_tenant_tier_values(self):
-        """CR-19: TenantTier has 3 values."""
+        """CR-19: TenantTier has 4 values (trial + 3 paid)."""
         values = {t.value for t in TenantTier}
-        assert values == {"starter", "professional", "enterprise"}
+        assert values == {"trial", "starter", "professional", "enterprise"}
 
     @pytest.mark.unit
     def test_tenant_status_values(self):
-        """CR-20: TenantStatus has 5 lifecycle values."""
+        """CR-20: TenantStatus has 6 lifecycle values."""
         values = {s.value for s in TenantStatus}
         assert values == {
             "provisioning", "active", "past_due",
-            "grace_period", "deactivated",
+            "grace_period", "deactivated", "trial_expired",
         }
 
     @pytest.mark.unit
     def test_billing_channel_values(self):
-        """CR-20 supplement: BillingChannel has 2 values."""
+        """CR-20 supplement: BillingChannel has 3 values."""
         values = {c.value for c in BillingChannel}
-        assert values == {"stripe", "shopify"}
+        assert values == {"stripe", "shopify", "trial"}
 
     @pytest.mark.unit
     def test_consent_status_values(self):
@@ -681,19 +683,19 @@ class TestCollectionConfigurations:
     """CR-23: 9 collections with correct partition keys and configs."""
 
     @pytest.mark.unit
-    def test_nine_collections_defined(self):
-        """CR-23: ALL_COLLECTIONS has exactly 9 entries."""
-        assert len(ALL_COLLECTIONS) == 9
+    def test_ten_collections_defined(self):
+        """CR-23: ALL_COLLECTIONS has exactly 10 entries."""
+        assert len(ALL_COLLECTIONS) == 10
 
     @pytest.mark.unit
-    def test_collection_configs_returns_nine(self):
-        """CR-23: get_collection_configs() returns 9 configs."""
+    def test_collection_configs_returns_ten(self):
+        """CR-23: get_collection_configs() returns 10 configs."""
         configs = get_collection_configs()
-        assert len(configs) == 9
+        assert len(configs) == 10
 
     @pytest.mark.unit
     def test_tenant_scoped_collections_use_tenant_id_partition(self):
-        """CR-23: 7 tenant-scoped collections partition on /tenant_id."""
+        """CR-23: 8 tenant-scoped collections partition on /tenant_id."""
         configs = get_collection_configs()
         config_map = {c.name: c for c in configs}
 
@@ -705,6 +707,7 @@ class TestCollectionConfigurations:
             COLLECTION_KNOWLEDGE_BASES,
             COLLECTION_MEMORY_VECTORS,
             COLLECTION_PREFERENCES,
+            COLLECTION_TEAM_MEMBERS,
         ]
         for name in tenant_scoped:
             assert config_map[name].partition_key == "/tenant_id", (

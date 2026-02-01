@@ -52,16 +52,18 @@ class BillingChannel(str, Enum):
 
     STRIPE = "stripe"
     SHOPIFY = "shopify"
+    TRIAL = "trial"
 
 
 class TenantStatus(str, Enum):
     """Lifecycle status of a tenant."""
 
-    PROVISIONING = "provisioning"  # Checkout completed, setting up
-    ACTIVE = "active"              # Payment confirmed, fully operational
-    PAST_DUE = "past_due"          # Payment failed, limited access
-    GRACE_PERIOD = "grace_period"  # Cancelled, data preserved (30 days)
-    DEACTIVATED = "deactivated"    # Grace period expired, access revoked
+    PROVISIONING = "provisioning"    # Checkout completed, setting up
+    ACTIVE = "active"                # Payment confirmed, fully operational
+    PAST_DUE = "past_due"            # Payment failed, limited access
+    GRACE_PERIOD = "grace_period"    # Cancelled, data preserved (30 days)
+    DEACTIVATED = "deactivated"      # Grace period expired, access revoked
+    TRIAL_EXPIRED = "trial_expired"  # Trial period ended, must subscribe
 
 
 # ---------------------------------------------------------------------------
@@ -422,6 +424,57 @@ def flag_payment_issue(
     tenant.updated_at = int(time.time())
 
     logger.info("Tenant flagged past_due: tenant=%s", tenant.tenant_id)
+    return tenant
+
+
+def provision_trial_tenant(
+    customer_email: str | None = None,
+    trial_duration_days: int = 14,
+    conversation_limit: int = 50,
+) -> TenantRecord:
+    """Provision a free trial tenant (no billing channel required).
+
+    Creates a tenant with TRIAL tier and ACTIVE status that expires
+    after trial_duration_days. The conversation_limit is a hard cap —
+    no overage billing for trial tenants.
+
+    Called by:
+        - Direct signup (website form, API)
+        - Shopify app install (before subscription purchase)
+
+    Args:
+        customer_email: Contact email for the trial user.
+        trial_duration_days: Number of days the trial lasts (default 14).
+        conversation_limit: Max conversations during trial (default 50).
+
+    Returns:
+        The created TenantRecord.
+    """
+    now = int(time.time())
+    tenant_id = str(uuid.uuid4())
+
+    tenant = TenantRecord(
+        tenant_id=tenant_id,
+        status=TenantStatus.ACTIVE,
+        billing_channel=BillingChannel.TRIAL,
+        tier="trial",
+        interval=None,
+        addons=[],
+        customer_email=customer_email,
+        created_at=now,
+        updated_at=now,
+    )
+
+    _tenants[tenant_id] = tenant
+
+    logger.info(
+        "Trial tenant provisioned: tenant=%s email=%s duration=%dd limit=%d",
+        tenant_id,
+        customer_email,
+        trial_duration_days,
+        conversation_limit,
+    )
+
     return tenant
 
 

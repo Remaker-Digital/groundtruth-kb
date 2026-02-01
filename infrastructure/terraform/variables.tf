@@ -152,6 +152,34 @@ variable "appinsights_connection_string" {
 }
 
 # ---------------------------------------------------------------------------
+# KEDA Night Scaling (WI #47)
+# ---------------------------------------------------------------------------
+
+variable "enable_night_scaling" {
+  description = "Enable KEDA cron-based night scaling for non-critical containers (Escalation, Analytics)"
+  type        = bool
+  default     = false
+}
+
+variable "night_scaling_timezone" {
+  description = "Timezone for night scaling schedule (IANA format)"
+  type        = string
+  default     = "UTC"
+}
+
+variable "night_scaling_start" {
+  description = "Cron expression for night scaling start (scale to 0)"
+  type        = string
+  default     = "0 22 * * *"
+}
+
+variable "night_scaling_end" {
+  description = "Cron expression for night scaling end (restore min replicas)"
+  type        = string
+  default     = "0 6 * * *"
+}
+
+# ---------------------------------------------------------------------------
 # Tags
 # ---------------------------------------------------------------------------
 

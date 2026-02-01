@@ -12,7 +12,7 @@ This document provides context and guidance for AI assistants working on the Age
 | **Brand Name** | Agent Red Customer Engagement |
 | **Release** | Launch 1.0 |
 | **Type** | Commercial SaaS Product |
-| **Status** | Phase 2.1 E-Commerce ~85% complete. Phase 2.2 Tier 1 Critical COMPLETE (7 modules). Tier 2 High COMPLETE — 21 modules (~9,500 lines). Phase 2.5 Layers 1-2 COMPLETE (3 modules). All middleware wired in main.py. **379 tests passing** (P0 launch-blockers COMPLETE: 254 new tests across 8 groups + 125 pre-existing). Test infrastructure complete (WI #101-104). Architecture review complete (32 decisions, 100 work items). Comprehensive test plan (~880 tests) and new work items backlog (63 items, WI #101-163) created. **Phase 3.0 UI/UX: Competitive analysis COMPLETE (5 competitors). 7 architecture decisions approved. Chat API, widget, and admin dashboard fully specified. 24 new work items (WI #164-187).** |
+| **Status** | Phase 2.1 E-Commerce ~85% complete. Phase 2.2 Tier 1 Critical COMPLETE (7 modules). Tier 2 High COMPLETE — 21 modules (~9,500 lines). Tier 2 Medium COMPLETE — 7 additional modules (~2,100 lines). Phase 2.5 Layers 1-2 COMPLETE (3 modules). All middleware wired in main.py (8 middleware layers). **379 tests passing** (P0 launch-blockers COMPLETE: 254 new tests across 8 groups + 125 pre-existing). Test infrastructure complete (WI #101-104). Architecture review complete (32 decisions, 100 work items). Comprehensive test plan (~880 tests) and new work items backlog (63 items, WI #101-163) created. **Phase 3.0 UI/UX: Competitive analysis COMPLETE. Chat API IMPLEMENTED (6 endpoints + SSE manager). Admin APIs IMPLEMENTED (5 routers: inbox, knowledge, analytics, team, GDPR + audit). Widget key auth IMPLEMENTED. Trial tier IMPLEMENTED. 7 architecture decisions approved. 24 work items (WI #164-187).** |
 | **Owner** | Remaker Digital (DBA of VanDusen & Palmeter, LLC) |
 
 ---
@@ -500,7 +500,7 @@ E:\Claude-Playground\CLAUDE-PROJECTS\Agent Red Customer Engagement\
 │
 ├── src/                            # Commercial source code
 │   ├── __init__.py
-│   ├── main.py                     # FastAPI app entrypoint (9 routers, 30 endpoints, 4 middleware)
+│   ├── main.py                     # FastAPI app entrypoint (17 routers, 66 routes, 8 middleware)
 │   ├── integrations/               # Billing & platform integrations
 │   │   ├── __init__.py
 │   │   ├── provisioning.py         # Channel-agnostic tenant provisioning service
@@ -511,14 +511,15 @@ E:\Claude-Playground\CLAUDE-PROJECTS\Agent Red Customer Engagement\
 │   │   ├── stripe_usage.py         # Metered usage reporting (3-tier: included→packs→overage)
 │   │   ├── stripe_webhooks.py      # Stripe webhook handler (7 events → provisioning + tax)
 │   │   ├── shopify_client.py       # Async Shopify GraphQL API client (httpx)
-│   │   └── shopify_billing.py      # Shopify Billing API (subscriptions + usage charges)
-│   ├── multi_tenant/               # Multi-tenant infrastructure (Phase 2.2 — Tier 2 High COMPLETE)
+│   │   ├── shopify_billing.py      # Shopify Billing API (subscriptions + usage charges)
+│   │   └── shopify_gdpr_webhooks.py # Shopify GDPR mandatory webhooks (3 endpoints, HMAC verification)
+│   ├── multi_tenant/               # Multi-tenant infrastructure (Phase 2.2 — Tier 2 Medium COMPLETE)
 │   │   ├── __init__.py             # Package init with import hints
-│   │   ├── cosmos_schema.py        # 9 collections, 11 document models, 7 enums, tier defaults
+│   │   ├── cosmos_schema.py        # 9 collections, 12 document models, 8 enums, tier defaults (incl. trial)
 │   │   ├── cosmos_client.py        # CosmosManager singleton (lazy init, Managed Identity, health)
-│   │   ├── repository.py           # TenantScopedRepository + 9 collection repositories
-│   │   ├── auth.py                 # Dual auth: Shopify JWT + API key verification
-│   │   ├── middleware.py           # TenantAuthMiddleware + RateLimitMiddleware + dependencies
+│   │   ├── repository.py           # TenantScopedRepository + 10 collection repositories
+│   │   ├── auth.py                 # Triple auth: Shopify JWT + API key + publishable widget key
+│   │   ├── middleware.py           # TenantAuthMiddleware + RateLimitMiddleware (with headers) + dependencies
 │   │   ├── conversation_meter.py   # ConversationMeter: billable conv spec, 3-tier metering, alerts
 │   │   ├── critic_policy.py        # Fail-closed Critic enforcement, circuit breaker, health
 │   │   ├── nats_isolation.py       # NATS tenant isolation, topic namespace, subscription auth
@@ -533,12 +534,24 @@ E:\Claude-Playground\CLAUDE-PROJECTS\Agent Red Customer Engagement\
 │   │   ├── tenant_secret_service.py # Key Vault per-tenant secret management
 │   │   ├── customer_profile_service.py # Layer 1 customer profile CRUD, Shopify sync
 │   │   ├── conversation_vectorizer.py # Layer 2 vectorization pipeline, semantic search
-│   │   └── response_explainability.py # Per-response decision trace, explainability framework
-│   ├── chat/                       # Chat API (Phase 3.0 — SPECIFIED, not yet implemented)
-│   │   ├── models.py              # Request/response Pydantic models (~150 lines)
-│   │   ├── session.py             # Conversation lifecycle management (~300 lines)
-│   │   ├── pipeline.py            # 6-agent pipeline orchestrator + SSE (~400 lines)
-│   │   └── endpoints.py           # 6 FastAPI routes: conversations, message, stream, end, WS (~250 lines)
+│   │   ├── response_explainability.py # Per-response decision trace, explainability framework
+│   │   ├── admin_conversation_api.py # Conversation inbox admin API (5 endpoints)
+│   │   ├── admin_knowledge_api.py  # Knowledge base CRUD admin API (5 endpoints)
+│   │   ├── admin_analytics_api.py  # Analytics summary/intents/gaps admin API (3 endpoints)
+│   │   ├── admin_team_api.py       # Team member management admin API (5 endpoints)
+│   │   ├── admin_gdpr_api.py       # GDPR data export/deletion/consent admin API (5 endpoints)
+│   │   ├── admin_audit_api.py      # Audit log query + CSV export admin API (2 endpoints)
+│   │   ├── tenant_usage_monitor.py # Progressive throttling (Watch→Warn→Throttle→Isolate)
+│   │   ├── security_middleware.py  # Body size limit, JSON depth validation, security headers
+│   │   ├── api_versioning.py       # API version headers middleware (X-API-Version)
+│   │   └── structured_logging.py   # JSON structured logging (prod) + colored dev formatter
+│   ├── chat/                       # Chat API (Phase 3.0 — IMPLEMENTED)
+│   │   ├── __init__.py
+│   │   ├── models.py              # Request/response Pydantic models + StreamEvent SSE format (~200 lines)
+│   │   ├── session.py             # Conversation lifecycle management (~350 lines)
+│   │   ├── pipeline.py            # 6-agent pipeline orchestrator + SSE streaming (~800 lines)
+│   │   ├── endpoints.py           # 6 FastAPI routes: conversations, message, stream, end, WS (~350 lines)
+│   │   └── sse_manager.py         # SSE connection manager: heartbeat, reconnection, tenant limits (~280 lines)
 │   ├── ai-features/                # Advanced AI (Phase 2.5)
 │   └── white-label/                # Customization (future)
 │
@@ -650,9 +663,9 @@ E:\Claude-Playground\CLAUDE-PROJECTS\Agent Red Customer Engagement\
 Continue work on Agent Red Customer Engagement commercial project.
 Location: E:\Claude-Playground\CLAUDE-PROJECTS\Agent Red Customer Engagement
 Key files: CLAUDE.md, docs/architecture/UI-UX-ARCHITECTURE-DECISIONS.md, docs/COMPREHENSIVE-TEST-PLAN.md, docs/BACKLOG-NEW-WORK-ITEMS.md
-Current status: Phases 0-1.4 complete. Phase 2.1 e-commerce ~85% complete (10 billing modules). Phase 2.2 Tier 2 High ALL COMPLETE (21 modules, ~9,500 lines). Phase 2.5 Layers 1-2 COMPLETE (3 modules). 379 tests passing (P0 launch-blockers COMPLETE). Phase 3.0 UI/UX design COMPLETE: competitive analysis (5 competitors), 7 architecture decisions approved (framework selection, widget delivery, DOM isolation, hybrid protocol, SSE stream-then-validate, publishable widget key auth, dual admin shells), chat API specified (6 endpoints in src/chat/), chat widget specified (Preact, Shadow DOM + iframe, ~15-20KB), merchant admin dashboard specified (9 shared components, Shopify + standalone shells). 24 new work items (WI #164-187) covering chat API, widget, admin, and supporting backend APIs.
-Next priority: Implementation of the UI/UX specifications. Build order: Phase 1 (Chat API endpoints in src/chat/) → Phase 2 (Chat widget in widget/) → Phase 3 (Shopify Theme App Extension) → Phase 4 (Shared admin components in admin/shared/) → Phase 5 (Shopify admin shell) → Phase 6 (Standalone admin shell). See docs/architecture/UI-UX-ARCHITECTURE-DECISIONS.md for full specs and WI list. P1 pre-launch tests (~200 tests from COMPREHENSIVE-TEST-PLAN.md §5) are also pending.
-Please review CLAUDE.md and the UI/UX Architecture Decisions document, then proceed with the highest-priority remaining technical work item, presenting one item at a time for review per the iterative working style documented in CLAUDE.md.
+Current status: Phases 0-1.4 complete. Phase 2.1 e-commerce ~85% complete (11 billing modules incl. Shopify GDPR webhooks). Phase 2.2 Tier 2 Medium COMPLETE — 28 multi_tenant modules (~12,000 lines). Phase 2.5 Layers 1-2 COMPLETE (3 modules). Phase 3.0 Build Phase 1 COMPLETE: Chat API implemented (6 endpoints + SSE manager in src/chat/), all admin APIs implemented (5 routers: inbox, knowledge, analytics, team, GDPR + audit = 25 endpoints), widget key auth implemented, trial tier implemented. 379 tests passing (P0 launch-blockers COMPLETE). 17 routers, 66 routes, 8 middleware layers. Security hardening: body size limits, JSON depth validation, security headers, API versioning, structured logging, progressive throttling. KEDA night scaling profiles in Terraform.
+Next priority: Please prepare an order of priority for all known outstanding work issues in this project and follow this order when proposing tasks for completion. Remaining major areas: (1) P1 pre-launch tests (~200 tests from COMPREHENSIVE-TEST-PLAN.md §5), (2) Phase 3.0 Build Phase 2+ (Chat widget, Theme App Extension, admin frontends — see UI-UX-ARCHITECTURE-DECISIONS.md §8), (3) Phase 2.1 remaining (session tokens, App Bridge Save Bar, creative assets), (4) backlog items WI #101-163 (many now complete, see BACKLOG-NEW-WORK-ITEMS.md).
+Please review CLAUDE.md, then proceed with the highest-priority remaining technical work item, presenting one item at a time for review per the iterative working style documented in CLAUDE.md.
 ```
 
 ### Referencing AGNTCY
@@ -784,7 +797,7 @@ When evaluating options (architecture, technology, design, implementation approa
 - [ ] App Store review submission — blocked by: GDPR webhooks, session tokens, App Bridge Save Bar, creative assets
 - [ ] Test checkout flows (both channels)
 
-**API Route Map (9 routers, 30 endpoints):**
+**API Route Map (17 routers, 66 routes, 8 middleware):**
 
 | Prefix | Module | Endpoints |
 |--------|--------|-----------|
@@ -795,8 +808,16 @@ When evaluating options (architecture, technology, design, implementation approa
 | `/api/usage` | stripe_usage | POST /record, GET /{customer_id} |
 | `/api/webhooks` | stripe_webhooks | POST /stripe |
 | `/api/shopify/billing` | shopify_billing | POST /subscribe, GET /confirm, GET /status |
+| `/api/shopify/gdpr` | shopify_gdpr_webhooks | POST /customers-data-request, POST /customers-redact, POST /shop-redact |
 | `/api/dashboard` | usage_dashboard_api | GET /usage, GET /usage/daily, GET /conversations, GET /conversations/{id}, GET /conversations/export |
 | `/api/config` | tenant_config_api | GET/PUT/PATCH/POST/DELETE config, onboarding wizard, preview, reset, history, diff (10 endpoints) |
+| `/api/chat` | chat endpoints | POST /conversations, POST /message, GET /stream/{id}, GET /conversations/{id}, POST /conversations/{id}/end, WS /ws/{id} |
+| `/api/admin/conversations` | admin_conversation_api | GET list, GET /{id}, GET /{id}/messages, POST /{id}/assign, POST /{id}/notes |
+| `/api/admin/knowledge` | admin_knowledge_api | GET list, POST create, GET /{id}, PUT /{id}, DELETE /{id} |
+| `/api/analytics` | admin_analytics_api | GET /summary, GET /intents, GET /gaps |
+| `/api/admin/team` | admin_team_api | GET list, POST invite, GET /{id}, PUT /{id}, DELETE /{id} |
+| `/api/admin/gdpr` | admin_gdpr_api | POST /export, POST /delete, GET /consent/{id}, PUT /consent/{id}, GET /consent |
+| `/api/audit` | admin_audit_api | GET (paginated query), GET /export (CSV) |
 
 **Phase 2.1 Key Technical Decisions:**
 - **Shopify annual billing limitation:** Shopify does not support usage billing with ANNUAL interval. Annual subscriptions get recurring base only; overage deferred to Phase 2.2 (one-time app charges).
@@ -1177,15 +1198,44 @@ Full UI/UX design session covering competitive analysis, architecture decisions,
 - **Bundle size competitive advantage** — Widget at ~15-20KB gzip vs Tidio ~40-60KB, Intercom ~80-100KB.
 - **Only Intercom publishes latency** — 7,000ms P50 TTFT. Agent Red target 1,500ms is 4.7x faster.
 
+**Session 2026-01-31: Backend Implementation Sprint (Chat API + Admin APIs + Security + Streaming)**
+
+Implemented 20+ work items across 3 sessions. Major deliverables:
+
+- [x] **WI #164-169/#182: Chat API (Phase 3.0 Build Phase 1)** — `src/chat/` package (4 modules, ~1,700 lines). models.py (StreamEvent SSE format, 7 event types), session.py (ConversationSession lifecycle), pipeline.py (6-agent orchestrator with stream-then-validate), endpoints.py (6 routes: start, message, SSE stream, state, end, WebSocket).
+- [x] **WI #170: Widget key authentication** — `pk_live_{hash}_{random}` publishable keys scoped to `/api/chat/*`. Third auth path in auth.py. find_by_widget_key_hash() in TenantRepository.
+- [x] **WI #119: Trial tier** — TenantTier.TRIAL enum, TIER_DEFAULTS for trial (25 conv, 2 rpm, 1 concurrent, 7-day history, Layer 1 only), TrialConfigDocument schema, trial-aware provisioning in provisioning.py.
+- [x] **WI #171: Admin Conversation Inbox API** — `admin_conversation_api.py` (5 endpoints: list, detail, messages, assign, notes).
+- [x] **WI #175: Admin Knowledge Base API** — `admin_knowledge_api.py` (5 endpoints: CRUD + search).
+- [x] **WI #176-178: Admin Analytics API** — `admin_analytics_api.py` (3 endpoints: summary, intents, gaps).
+- [x] **WI #179: Admin Team Management API** — `admin_team_api.py` (5 endpoints: list, invite, detail, update, remove). TeamMemberDocument + TeamMemberRepository added.
+- [x] **WI #180: Admin GDPR API** — `admin_gdpr_api.py` (5 endpoints: export, delete, consent CRUD).
+- [x] **WI #35: Shopify GDPR webhooks** — `shopify_gdpr_webhooks.py` (3 mandatory endpoints with HMAC-SHA256 verification).
+- [x] **WI #51: TenantUsageMonitor** — `tenant_usage_monitor.py` (~500 lines). Progressive throttling: Watch→Warn→Throttle→Isolate. 5-min rolling window, sticky de-escalation.
+- [x] **WI #157-159: Security middleware** — `security_middleware.py` (~297 lines). RequestBodyLimitMiddleware (1MB, ASGI), JsonDepthValidationMiddleware (50 levels), SecurityHeadersMiddleware (OWASP).
+- [x] **WI #158: Rate limit response headers** — X-RateLimit-Limit, X-RateLimit-Remaining, X-RateLimit-Reset on every response.
+- [x] **WI #140: API versioning** — `api_versioning.py`. ApiVersionMiddleware (X-API-Version: 1.0.0), deprecation notice support.
+- [x] **WI #141: Audit log query API** — `admin_audit_api.py` (2 endpoints: paginated query + CSV export).
+- [x] **WI #148: Health check enhancements** — /health and /ready include API version, usage monitor health, SSE connection stats.
+- [x] **WI #149: Structured logging** — `structured_logging.py`. StructuredJsonFormatter (prod JSON-per-line), DevelopmentFormatter (colored). Replaces basicConfig in main.py.
+- [x] **WI #129: SSE streaming infrastructure** — `sse_manager.py` (~280 lines). SSEConnectionManager: 15s heartbeat keepalive, Last-Event-ID reconnection, per-tenant connection limits, event buffering (100 events/conversation).
+- [x] **WI #130: Critic validation for streaming** — Stream-then-validate pattern already in pipeline.py (Decision UI-5). Tokens stream in real-time, Critic validates post-stream, retracted event replaces text on rejection.
+- [x] **WI #47: KEDA auto-scaling Terraform profiles** — Night schedule cron scaler for non-critical containers (Escalation, Analytics → 0 replicas 22:00-06:00 UTC). Gated by enable_night_scaling variable. Scaling metrics summary locals.
+
+**Key technical decisions from this session:**
+- **8 middleware layers**: TenantAuth → RateLimit → Concurrency → JsonDepth → Correlation → BodyLimit → ApiVersion → SecurityHeaders. Starlette reverse registration order.
+- **ASGI vs BaseHTTPMiddleware**: Raw ASGI for body size limit (intercept before full read) and security headers (no body read needed). BaseHTTPMiddleware for JSON depth (needs request.body()).
+- **SSE heartbeat interval**: 15s `:ping` comments to prevent Azure App Gateway 60s idle timeout.
+- **SSE reconnection**: Events buffered per conversation with monotonic sequence IDs. Last-Event-ID header replays missed events. Buffer expires after 5 minutes of inactivity.
+- **Night scaling gated**: `enable_night_scaling = false` by default. Non-critical containers scale to 0 during 22:00-06:00 UTC when enabled. ~$20-30/mo savings.
+- **Structured logging replaces basicConfig**: Production uses JSON-per-line format for Application Insights ingestion. Development uses colored human-readable format. Controlled by ENVIRONMENT env var.
+- **Progressive throttling sticky de-escalation**: Escalation level drops by at most one step per evaluation cycle to prevent rapid oscillation between Normal and Isolate.
+
 ### Pending
-- [ ] **Phase 3.0 UI/UX implementation:** 6-phase build order (Chat API → Widget → Theme App Extension → Shared admin → Shopify admin → Standalone admin). See docs/architecture/UI-UX-ARCHITECTURE-DECISIONS.md §8.
-- [ ] **New UI work items (WI #164-187):** 18 backend API endpoints + 6 frontend deliverables. See docs/architecture/UI-UX-ARCHITECTURE-DECISIONS.md §7.
+- [ ] **Phase 3.0 UI/UX frontend implementation:** Build Phase 2 (Chat widget in widget/) → Phase 3 (Shopify Theme App Extension) → Phase 4 (Shared admin components in admin/shared/) → Phase 5 (Shopify admin shell) → Phase 6 (Standalone admin shell). See docs/architecture/UI-UX-ARCHITECTURE-DECISIONS.md §8.
 - [ ] **P1 pre-launch tests (~200 tests):** NATS isolation (§5.1, 25 tests), GDPR services (§5.2, 30 tests), OpenTelemetry tracing (§5.3, 20 tests), pipeline resilience (§5.4, 20 tests), SystemPromptBuilder (§5.5, 15 tests), tenant config (§5.6, 25 tests), provisioning lifecycle (§5.7, 15 tests), Shopify billing (§5.8, 15 tests), persistent memory (§5.9, 20 tests), dashboard API (§5.10, 15 tests)
-- [ ] **Existing backlog items (WI #101-163):** 63 items staged for prioritization review (WI #101-104 complete)
-- [ ] Phase 2.2: Remaining Tier 2 Medium + Tier 3 work items (from Master-Plan-Review-01-30-2026.md)
-- [ ] Phase 2.2: TenantUsageMonitor (#51 — progressive throttling Watch → Warn → Throttle → Isolate)
-- [ ] Phase 2.2: KEDA auto-scaling deployment (#47-48 — infrastructure/Terraform, needs production testing)
-- [ ] Phase 2.1: Remaining items (GDPR webhooks #35, session tokens, App Bridge Save Bar, creative assets, test flows)
+- [ ] **Existing backlog items (WI #101-163):** 63 items staged, many now complete. Remaining items include: #105-107 (CI improvements), #108-118 (merchant web UI), #119-128 (trial/demo — #119 done), #131-133 (SSE enhancements — #129-130 done), #134-139 (pipeline optimization), #142-146 (API completeness), #150-156 (operational readiness), #160-163 (security hardening — #157-159 done).
+- [ ] Phase 2.1: Remaining items (session tokens, App Bridge Save Bar, creative assets, test flows)
 - [ ] Phase 2.5: Layer 3 — PatternExtractionService (Professional+, work items #90-92)
 - [ ] Phase 2.5: Layer 4 — Fine-tuning pipeline (Enterprise add-on, work items #93-96)
 - [ ] Phase 2.5: 5 A/B production tests (work items from Decision #32)
@@ -1213,4 +1263,4 @@ Full UI/UX design session covering competitive analysis, architecture decisions,
 
 *© 2026 Remaker Digital, a DBA of VanDusen & Palmeter, LLC. All rights reserved.*
 *Last Updated: 2026-01-31*
-*Version: 10.0.0*
+*Version: 11.0.0*

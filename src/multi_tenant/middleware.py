@@ -44,17 +44,22 @@ from starlette.responses import JSONResponse, Response
 
 from src.multi_tenant.auth import (
     API_KEY_HEADER,
+    WIDGET_KEY_HEADER,
     AuthenticationError,
     TenantContext,
     TenantInactiveError,
     extract_bearer_token,
     extract_shop_domain,
     is_auth_exempt,
+    is_widget_key_allowed_path,
     validate_tenant_status,
     verify_api_key,
     verify_shopify_session_token,
+    verify_widget_key,
 )
 from src.multi_tenant.cosmos_schema import TIER_DEFAULTS, TenantStatus, TenantTier
+
+from datetime import datetime, timezone
 
 logger = logging.getLogger(__name__)
 
@@ -69,11 +74,13 @@ logger = logging.getLogger(__name__)
 
 _resolve_by_shop_domain: Callable | None = None
 _resolve_by_api_key_hash: Callable | None = None
+_resolve_by_widget_key_hash: Callable | None = None
 
 
 def configure_tenant_resolution(
     resolve_by_shop_domain: Callable,
     resolve_by_api_key_hash: Callable,
+    resolve_by_widget_key_hash: Callable | None = None,
 ) -> None:
     """Configure the tenant resolution functions.
 
@@ -85,10 +92,14 @@ def configure_tenant_resolution(
             domain string and returns a tenant dict or None.
         resolve_by_api_key_hash: Async function that accepts an API
             key hash string and returns a tenant dict or None.
+        resolve_by_widget_key_hash: Async function that accepts a widget
+            key hash string and returns a tenant dict or None.
+            Optional — widget key auth is disabled if not provided.
     """
-    global _resolve_by_shop_domain, _resolve_by_api_key_hash
+    global _resolve_by_shop_domain, _resolve_by_api_key_hash, _resolve_by_widget_key_hash
     _resolve_by_shop_domain = resolve_by_shop_domain
     _resolve_by_api_key_hash = resolve_by_api_key_hash
+    _resolve_by_widget_key_hash = resolve_by_widget_key_hash
     logger.info("Tenant resolution functions configured")
 
 
@@ -102,12 +113,16 @@ class TenantAuthMiddleware(BaseHTTPMiddleware):
 
     Processing order:
         1. Check if path is auth-exempt (webhooks, health, docs).
-        2. Extract credentials (Bearer token or X-API-Key header).
-        3. Verify credentials (JWT decode or API key hash lookup).
+        2. Extract credentials (Bearer token, X-API-Key, or X-Widget-Key).
+        3. Verify credentials (JWT decode, API key hash, or widget key hash).
         4. Resolve tenant_id from verified identity.
         5. Validate tenant status (ACTIVE or PAST_DUE).
         6. Store TenantContext in request.state.tenant_context.
         7. Forward to route handler.
+
+    Widget key auth (Decision UI-6) is scoped to /api/chat/* and
+    /ws/chat/* paths only. Requests to other paths with a widget key
+    are rejected.
 
     On authentication failure, returns a JSON error response without
     forwarding to the handler. This prevents any unauthenticated
@@ -139,7 +154,8 @@ class TenantAuthMiddleware(BaseHTTPMiddleware):
     async def _authenticate(self, request: Request) -> TenantContext:
         """Authenticate the request and return a TenantContext.
 
-        Tries Shopify session token first (Bearer), then API key.
+        Tries Shopify session token first (Bearer), then API key,
+        then publishable widget key.
         """
         # Try Shopify session token (Authorization: Bearer <jwt>)
         authorization = request.headers.get("authorization")
@@ -153,11 +169,70 @@ class TenantAuthMiddleware(BaseHTTPMiddleware):
         if api_key:
             return await self._auth_api_key(api_key)
 
+        # Try publishable widget key (X-Widget-Key header or ?key= query param)
+        widget_key = request.headers.get(WIDGET_KEY_HEADER)
+        if not widget_key:
+            # WebSocket connections pass key as query parameter since browsers
+            # cannot set custom headers on WebSocket connections.
+            widget_key = request.query_params.get("key")
+
+        if widget_key:
+            return await self._auth_widget_key(widget_key, request.url.path)
+
         # No credentials provided
         raise AuthenticationError(
             "Authentication required. Provide a Shopify session token "
-            "(Authorization: Bearer <token>) or an API key (X-API-Key header)."
+            "(Authorization: Bearer <token>), an API key (X-API-Key header), "
+            "or a widget key (X-Widget-Key header)."
         )
+
+    @staticmethod
+    def _resolve_tenant_fields(
+        tenant: dict[str, Any],
+    ) -> tuple[str, TenantStatus, TenantTier | None, str | None]:
+        """Extract common fields from a resolved tenant document.
+
+        Returns (tenant_id, status, tier, trial_expires_at).
+        """
+        tenant_id = tenant["tenant_id"]
+        status = TenantStatus(tenant.get("status", "active"))
+        tier_str = tenant.get("tier")
+        tier = TenantTier(tier_str) if tier_str else None
+        trial_expires_at = tenant.get("trial_expires_at")
+        return tenant_id, status, tier, trial_expires_at
+
+    @staticmethod
+    def _check_trial_expiry(
+        tenant_id: str,
+        tier: TenantTier | None,
+        trial_expires_at: str | None,
+    ) -> None:
+        """Reject the request if the trial has expired.
+
+        Raises AuthenticationError (403) if the tenant is on the trial
+        tier and the current time is past trial_expires_at.
+        """
+        if tier != TenantTier.TRIAL or not trial_expires_at:
+            return
+
+        try:
+            expires = datetime.fromisoformat(trial_expires_at)
+            if expires.tzinfo is None:
+                expires = expires.replace(tzinfo=timezone.utc)
+            if datetime.now(timezone.utc) > expires:
+                raise AuthenticationError(
+                    f"Trial period has expired for tenant {tenant_id}. "
+                    "Please subscribe to a paid plan to continue.",
+                    status_code=403,
+                )
+        except AuthenticationError:
+            raise
+        except Exception:
+            # Malformed timestamp — log but don't block
+            logger.warning(
+                "Could not parse trial_expires_at for tenant=%s: %s",
+                tenant_id, trial_expires_at,
+            )
 
     async def _auth_shopify(self, token: str) -> TenantContext:
         """Authenticate via Shopify session token."""
@@ -182,19 +257,16 @@ class TenantAuthMiddleware(BaseHTTPMiddleware):
                 f"No tenant found for shop domain: {shop_domain}"
             )
 
-        tenant_id = tenant["tenant_id"]
-        status = TenantStatus(tenant.get("status", "active"))
-        tier_str = tenant.get("tier")
-        tier = TenantTier(tier_str) if tier_str else None
-
-        # Validate tenant is allowed to make requests
+        tenant_id, status, tier, trial_expires_at = self._resolve_tenant_fields(tenant)
         validate_tenant_status(tenant_id, status)
+        self._check_trial_expiry(tenant_id, tier, trial_expires_at)
 
         return TenantContext(
             tenant_id=tenant_id,
             tier=tier,
             status=status,
             auth_method="shopify_session",
+            trial_expires_at=trial_expires_at,
             shop_domain=shop_domain,
             user_id=payload.get("sub"),
             session_id=payload.get("sid"),
@@ -209,18 +281,50 @@ class TenantAuthMiddleware(BaseHTTPMiddleware):
 
         tenant = await verify_api_key(api_key, _resolve_by_api_key_hash)
 
-        tenant_id = tenant["tenant_id"]
-        status = TenantStatus(tenant.get("status", "active"))
-        tier_str = tenant.get("tier")
-        tier = TenantTier(tier_str) if tier_str else None
-
+        tenant_id, status, tier, trial_expires_at = self._resolve_tenant_fields(tenant)
         validate_tenant_status(tenant_id, status)
+        self._check_trial_expiry(tenant_id, tier, trial_expires_at)
 
         return TenantContext(
             tenant_id=tenant_id,
             tier=tier,
             status=status,
             auth_method="api_key",
+            trial_expires_at=trial_expires_at,
+        )
+
+    async def _auth_widget_key(
+        self, widget_key: str, path: str,
+    ) -> TenantContext:
+        """Authenticate via publishable widget key (Decision UI-6).
+
+        Widget keys are scoped to /api/chat/* and /ws/chat/* only.
+        Requests to other paths are rejected even if the key is valid.
+        """
+        # Enforce path scope — widget keys cannot access billing, config, etc.
+        if not is_widget_key_allowed_path(path):
+            raise AuthenticationError(
+                "Widget key authentication is only valid for /api/chat/ endpoints."
+            )
+
+        if _resolve_by_widget_key_hash is None:
+            raise AuthenticationError(
+                "Widget key resolution not configured.", status_code=500,
+            )
+
+        tenant = await verify_widget_key(widget_key, _resolve_by_widget_key_hash)
+
+        tenant_id, status, tier, trial_expires_at = self._resolve_tenant_fields(tenant)
+        validate_tenant_status(tenant_id, status)
+        self._check_trial_expiry(tenant_id, tier, trial_expires_at)
+
+        return TenantContext(
+            tenant_id=tenant_id,
+            tier=tier,
+            status=status,
+            auth_method="widget_key",
+            is_widget_auth=True,
+            trial_expires_at=trial_expires_at,
         )
 
 
@@ -362,13 +466,26 @@ class RateLimitMiddleware(BaseHTTPMiddleware):
                     "window": "60s",
                     "retry_after": retry_after,
                 },
-                headers={"Retry-After": str(retry_after)},
+                headers={
+                    "Retry-After": str(retry_after),
+                    "X-RateLimit-Limit": str(limit),
+                    "X-RateLimit-Remaining": "0",
+                    "X-RateLimit-Reset": str(retry_after),
+                },
             )
 
         # Record this request
         self._windows[tenant_id].append((now, 1))
+        remaining = max(0, limit - current_count - 1)
 
-        return await call_next(request)
+        response = await call_next(request)
+
+        # Add rate limit headers to successful responses
+        response.headers["X-RateLimit-Limit"] = str(limit)
+        response.headers["X-RateLimit-Remaining"] = str(remaining)
+        response.headers["X-RateLimit-Reset"] = str(int(self._window_size))
+
+        return response
 
     def _get_limit(self, ctx: TenantContext) -> int | None:
         """Get the rate limit for a tenant based on tier.
