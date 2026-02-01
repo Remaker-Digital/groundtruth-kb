@@ -12,7 +12,7 @@ This document provides context and guidance for AI assistants working on the Age
 | **Brand Name** | Agent Red Customer Engagement |
 | **Release** | Launch 1.0 |
 | **Type** | Commercial SaaS Product |
-| **Status** | Phase 2.1 E-Commerce ~85% complete. Phase 2.2 Tier 1 Critical COMPLETE (7 modules). Tier 2 High COMPLETE — 21 modules (~9,500 lines). Phase 2.5 Layers 1-2 COMPLETE (3 modules). All middleware wired in main.py. **379 tests passing** (P0 launch-blockers COMPLETE: 254 new tests across 8 groups + 125 pre-existing). Test infrastructure complete (WI #101-104). Architecture review complete (32 decisions, 100 work items). Comprehensive test plan (~880 tests) and new work items backlog (63 items, WI #101-163) created. |
+| **Status** | Phase 2.1 E-Commerce ~85% complete. Phase 2.2 Tier 1 Critical COMPLETE (7 modules). Tier 2 High COMPLETE — 21 modules (~9,500 lines). Phase 2.5 Layers 1-2 COMPLETE (3 modules). All middleware wired in main.py. **379 tests passing** (P0 launch-blockers COMPLETE: 254 new tests across 8 groups + 125 pre-existing). Test infrastructure complete (WI #101-104). Architecture review complete (32 decisions, 100 work items). Comprehensive test plan (~880 tests) and new work items backlog (63 items, WI #101-163) created. **Phase 3.0 UI/UX: Competitive analysis COMPLETE (5 competitors). 7 architecture decisions approved. Chat API, widget, and admin dashboard fully specified. 24 new work items (WI #164-187).** |
 | **Owner** | Remaker Digital (DBA of VanDusen & Palmeter, LLC) |
 
 ---
@@ -534,6 +534,11 @@ E:\Claude-Playground\CLAUDE-PROJECTS\Agent Red Customer Engagement\
 │   │   ├── customer_profile_service.py # Layer 1 customer profile CRUD, Shopify sync
 │   │   ├── conversation_vectorizer.py # Layer 2 vectorization pipeline, semantic search
 │   │   └── response_explainability.py # Per-response decision trace, explainability framework
+│   ├── chat/                       # Chat API (Phase 3.0 — SPECIFIED, not yet implemented)
+│   │   ├── models.py              # Request/response Pydantic models (~150 lines)
+│   │   ├── session.py             # Conversation lifecycle management (~300 lines)
+│   │   ├── pipeline.py            # 6-agent pipeline orchestrator + SSE (~400 lines)
+│   │   └── endpoints.py           # 6 FastAPI routes: conversations, message, stream, end, WS (~250 lines)
 │   ├── ai-features/                # Advanced AI (Phase 2.5)
 │   └── white-label/                # Customization (future)
 │
@@ -568,7 +573,10 @@ E:\Claude-Playground\CLAUDE-PROJECTS\Agent Red Customer Engagement\
 │   │   ├── ECOMMERCE-PLATFORM-EVALUATION.md
 │   │   ├── REWARDFUL-INTEGRATION.md
 │   │   ├── PER-CUSTOMER-AI-PERSONALIZATION-RESEARCH.md
-│   │   └── PERSISTENT-CUSTOMER-MEMORY-METRICS.md
+│   │   ├── PERSISTENT-CUSTOMER-MEMORY-METRICS.md
+│   │   └── UI-UX-ARCHITECTURE-DECISIONS.md  # 7 UI/UX decisions, chat/widget/admin specs, 24 WIs
+│   ├── research/                   # Competitive research
+│   │   └── UI-UX-COMPETITIVE-ANALYSIS.md    # 5-competitor feature matrix (10 dimensions)
 │   ├── COMPREHENSIVE-TEST-PLAN.md  # ~880 enumerated tests, prioritized (P0-P3 + security + perf)
 │   ├── BACKLOG-NEW-WORK-ITEMS.md   # 63 new work items (WI #101-163) from test audit
 │   ├── shopify/                    # Shopify App Store materials
@@ -613,6 +621,8 @@ E:\Claude-Playground\CLAUDE-PROJECTS\Agent Red Customer Engagement\
 | Master-Plan-Review-01-30-2026.md | docs/ | Architecture review: 32 decisions, 100 work items, SLA validation, cost model |
 | COMPREHENSIVE-TEST-PLAN.md | docs/ | ~880 enumerated tests with IDs, priorities (P0-P3), security, performance, trial, UI-type matrix |
 | BACKLOG-NEW-WORK-ITEMS.md | docs/ | 63 new work items (WI #101-163): test infra, merchant UI, trial env, streaming, optimization, API, ops, security |
+| UI-UX-ARCHITECTURE-DECISIONS.md | docs/architecture/ | 7 UI/UX decisions, chat API/widget/admin specs, build order, 24 new work items (WI #164-187) |
+| UI-UX-COMPETITIVE-ANALYSIS.md | docs/research/ | 5-competitor feature matrix (Tidio, Gorgias, Zendesk, Intercom, Re:amaze) across 10 dimensions |
 
 ---
 
@@ -639,10 +649,10 @@ E:\Claude-Playground\CLAUDE-PROJECTS\Agent Red Customer Engagement\
 ```
 Continue work on Agent Red Customer Engagement commercial project.
 Location: E:\Claude-Playground\CLAUDE-PROJECTS\Agent Red Customer Engagement
-Key files: CLAUDE.md, docs/Master-Plan-Review-01-30-2026.md, docs/COMPREHENSIVE-TEST-PLAN.md, docs/BACKLOG-NEW-WORK-ITEMS.md
-Current status: Phases 0-1.4 complete. Phase 2.1 e-commerce ~85% complete (10 billing modules). Phase 2.2 Tier 1 Critical ALL COMPLETE (7 modules). Tier 2 High ALL COMPLETE (21 modules, ~9,500 lines). Phase 2.5 Layers 1-2 COMPLETE (3 modules). All middleware wired in main.py (4 middleware in correct order). 125 tests passing (30 persistent memory + 57 auth/middleware + 38 provisioning/webhooks). Architecture review complete (32 decisions, 100 work items). Cost model validated (76-90% margins). Independent Cursor audit remediated (2026-01-31). Test coverage audit complete (2026-01-31): ~880 tests enumerated in comprehensive test plan (125 existing, ~755 planned). 63 new work items identified (WI #101-163) covering test infrastructure, merchant web UI, trial environment, SSE streaming, pipeline optimization, API completeness, operational readiness, and security hardening.
-Next priority: Test infrastructure setup (WI #101-104: pyproject.toml, requirements-test.txt, conftest.py, GitHub Actions CI). Then P0 launch-blocker tests (~160 tests: HTTP billing endpoints, middleware pipeline, ConversationMeter, CriticPolicy, Cosmos repository, health endpoints). See docs/COMPREHENSIVE-TEST-PLAN.md §4 for full P0 breakdown. New backlog items (WI #101-163) are staged for prioritization review — see docs/BACKLOG-NEW-WORK-ITEMS.md.
-Please review CLAUDE.md and the Comprehensive Test Plan, then proceed with the highest-priority remaining technical work item, presenting one item at a time for review per the iterative working style documented in CLAUDE.md.
+Key files: CLAUDE.md, docs/architecture/UI-UX-ARCHITECTURE-DECISIONS.md, docs/COMPREHENSIVE-TEST-PLAN.md, docs/BACKLOG-NEW-WORK-ITEMS.md
+Current status: Phases 0-1.4 complete. Phase 2.1 e-commerce ~85% complete (10 billing modules). Phase 2.2 Tier 2 High ALL COMPLETE (21 modules, ~9,500 lines). Phase 2.5 Layers 1-2 COMPLETE (3 modules). 379 tests passing (P0 launch-blockers COMPLETE). Phase 3.0 UI/UX design COMPLETE: competitive analysis (5 competitors), 7 architecture decisions approved (framework selection, widget delivery, DOM isolation, hybrid protocol, SSE stream-then-validate, publishable widget key auth, dual admin shells), chat API specified (6 endpoints in src/chat/), chat widget specified (Preact, Shadow DOM + iframe, ~15-20KB), merchant admin dashboard specified (9 shared components, Shopify + standalone shells). 24 new work items (WI #164-187) covering chat API, widget, admin, and supporting backend APIs.
+Next priority: Implementation of the UI/UX specifications. Build order: Phase 1 (Chat API endpoints in src/chat/) → Phase 2 (Chat widget in widget/) → Phase 3 (Shopify Theme App Extension) → Phase 4 (Shared admin components in admin/shared/) → Phase 5 (Shopify admin shell) → Phase 6 (Standalone admin shell). See docs/architecture/UI-UX-ARCHITECTURE-DECISIONS.md for full specs and WI list. P1 pre-launch tests (~200 tests from COMPREHENSIVE-TEST-PLAN.md §5) are also pending.
+Please review CLAUDE.md and the UI/UX Architecture Decisions document, then proceed with the highest-priority remaining technical work item, presenting one item at a time for review per the iterative working style documented in CLAUDE.md.
 ```
 
 ### Referencing AGNTCY
@@ -663,6 +673,16 @@ For planning, prioritization, and multi-step decision-making, use an **iterative
 4. Do not batch multiple decisions into a single prompt
 
 This applies to: work priority reviews, architecture decisions, scope changes, milestone planning, and any situation where multiple choices must be made. The goal is collaborative decision-making with full visibility, not fire-and-forget task lists.
+
+### Option Evaluation Criteria
+
+When evaluating options (architecture, technology, design, implementation approach), prioritize these concerns in order:
+
+1. **Implementation quality:** Can this option be implemented with high efficiency, robustness, reliability, and usability? Favor approaches where confident, complete, production-grade implementation is achievable.
+2. **Desirability:** Is this option competitively strong, differentiating, or obviously superior in usability compared to alternatives?
+3. **Downstream confidence:** Can documentation, maintenance, and testing for this option be fully accounted for? Avoid options where downstream work is uncertain or likely to be incomplete.
+
+**Avoid vague generalizations** such as "simpler," "harder," "more complex," or "easier" when describing trade-offs. Instead, state specifically what is gained or lost: which protocols, which failure modes, which components, which test coverage implications. Token usage and elapsed time for Claude to perform a task are not meaningful concerns — do not use them as justification for scope reduction or option selection.
 
 ### Work Priority Bias
 
@@ -1131,9 +1151,37 @@ Test infrastructure (WI #101-104) and all 8 P0 launch-blocker test groups implem
 
 **Test suite total: 379 tests passing in ~2s** (10 test files created this session + 3 pre-existing).
 
+**Session 2026-01-31: UI/UX Competitive Analysis + Design Specification**
+
+Full UI/UX design session covering competitive analysis, architecture decisions, and detailed specifications for all three frontend deliverables (chat API, widget, admin dashboard). 7 architecture decisions approved. 24 new work items identified (WI #164-187).
+
+- [x] **Competitive analysis:** 5 highest-install Shopify AI customer service apps (Tidio, Gorgias, Zendesk, Intercom, Re:amaze) analysed across 10 dimensions. Full feature matrices in `docs/research/UI-UX-COMPETITIVE-ANALYSIS.md`. Critical finding: Agent Red has zero frontend — the most critical gap despite having the most sophisticated AI backend.
+- [x] **Decision UI-1: Frontend framework selection** — Preact for widget (~4.5KB gzip), React + Polaris + App Bridge for Shopify admin, React + custom design system for standalone admin. Shared component library between both admin shells.
+- [x] **Decision UI-2: Widget delivery** — Shopify Theme App Extension (app embed block) for Shopify merchants + universal JS snippet for non-Shopify.
+- [x] **Decision UI-3: Widget DOM isolation** — Shadow DOM (closed) for launcher button + iframe for conversation panel. Same architecture as Zendesk.
+- [x] **Decision UI-4: Hybrid communication protocol** — HTTP POST (client→server messages) + SSE (server→client AI streaming) + WebSocket (bidirectional for typing, presence, human-agent chat). All three required at launch — human-agent chat after escalation needs a bidirectional channel.
+- [x] **Decision UI-5: SSE stream-then-validate** — Stream AI tokens to customer in real-time, Critic validates post-stream. Rejection triggers `event: retracted` replacing displayed text with safe fallback. ~800ms exposure window at P50. Alternative (buffer until Critic approves) penalizes >99% of valid responses.
+- [x] **Decision UI-6: Publishable widget key** — `pk_live_{hash}_{random}` for client-side auth scoped to `/api/chat/*` only. Third auth path alongside Shopify JWT and API keys. Optional HMAC customer identity verification.
+- [x] **Decision UI-7: Dual admin frontends** — Shopify embedded admin (Polaris + App Bridge) AND standalone admin (React + custom design) required because Stripe-direct merchants have no Shopify account.
+- [x] **Chat API specification (Phase 1):** `src/chat/` — models.py, session.py, pipeline.py, endpoints.py. 6 endpoints: start conversation, send message, SSE stream, get state, end conversation, WebSocket.
+- [x] **Widget specification (Phase 2):** Preact + TypeScript, Shadow DOM launcher + iframe panel, ~15-20KB gzip bundle. Component tree, state management, transport layer, JavaScript SDK public API, Shopify Liquid template for Theme App Extension.
+- [x] **Admin dashboard specification (Phases 4-6):** 9 shared components (OnboardingWizard, ConfigEditor, UsageDashboard, ConversationInbox, KnowledgeBaseManager, AnalyticsOverview, BillingPortal, WidgetConfigurator, TeamManager). Shopify shell (7 nav items, App Bridge integration). Standalone shell (API key login, custom sidebar, Stripe billing). Page-to-API mapping complete — 4 of 9 components fully supported by existing endpoints; 4 need new backend APIs.
+- [x] **Architecture decisions document:** `docs/architecture/UI-UX-ARCHITECTURE-DECISIONS.md` — all 7 decisions, full specifications, 24 new work items (WI #164-187), build order.
+- [x] **CLAUDE.md working style addition:** "Option Evaluation Criteria" subsection — prioritize (1) implementation quality, (2) desirability, (3) downstream confidence. Avoid "simpler/harder" generalizations. Token/time usage not meaningful concerns.
+
+**Key findings from this session:**
+- **Agent Red has zero UI** — the most critical product gap. All 30+ API endpoints have no frontend. Merchants cannot self-serve any operation without curl/Postman.
+- **Human-agent chat is not optional** — escalated conversations need a bidirectional channel. WebSocket required at launch, not a future enhancement.
+- **Two admin frontends required** — Stripe-direct merchants cannot access Shopify embedded admin. Both shells share a component library to avoid duplication.
+- **4 existing endpoints groups fully support admin pages** — Onboarding, Config Editor, Usage Dashboard, and Billing Portal need zero new backend work. ConversationInbox, KnowledgeBase, Analytics, and Team need new APIs.
+- **Bundle size competitive advantage** — Widget at ~15-20KB gzip vs Tidio ~40-60KB, Intercom ~80-100KB.
+- **Only Intercom publishes latency** — 7,000ms P50 TTFT. Agent Red target 1,500ms is 4.7x faster.
+
 ### Pending
+- [ ] **Phase 3.0 UI/UX implementation:** 6-phase build order (Chat API → Widget → Theme App Extension → Shared admin → Shopify admin → Standalone admin). See docs/architecture/UI-UX-ARCHITECTURE-DECISIONS.md §8.
+- [ ] **New UI work items (WI #164-187):** 18 backend API endpoints + 6 frontend deliverables. See docs/architecture/UI-UX-ARCHITECTURE-DECISIONS.md §7.
 - [ ] **P1 pre-launch tests (~200 tests):** NATS isolation (§5.1, 25 tests), GDPR services (§5.2, 30 tests), OpenTelemetry tracing (§5.3, 20 tests), pipeline resilience (§5.4, 20 tests), SystemPromptBuilder (§5.5, 15 tests), tenant config (§5.6, 25 tests), provisioning lifecycle (§5.7, 15 tests), Shopify billing (§5.8, 15 tests), persistent memory (§5.9, 20 tests), dashboard API (§5.10, 15 tests)
-- [ ] **New backlog items (WI #101-163):** 63 items staged for prioritization review (WI #101-104 now complete)
+- [ ] **Existing backlog items (WI #101-163):** 63 items staged for prioritization review (WI #101-104 complete)
 - [ ] Phase 2.2: Remaining Tier 2 Medium + Tier 3 work items (from Master-Plan-Review-01-30-2026.md)
 - [ ] Phase 2.2: TenantUsageMonitor (#51 — progressive throttling Watch → Warn → Throttle → Isolate)
 - [ ] Phase 2.2: KEDA auto-scaling deployment (#47-48 — infrastructure/Terraform, needs production testing)
@@ -1165,4 +1213,4 @@ Test infrastructure (WI #101-104) and all 8 P0 launch-blocker test groups implem
 
 *© 2026 Remaker Digital, a DBA of VanDusen & Palmeter, LLC. All rights reserved.*
 *Last Updated: 2026-01-31*
-*Version: 9.1.0*
+*Version: 10.0.0*
