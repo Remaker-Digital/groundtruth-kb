@@ -11,7 +11,7 @@
 ## Meta Information
 
 ```yaml
-title: "Pricing - Agent Red Customer Engagement"
+title: "Pricing - Agent Red Customer Experience"
 description: "Transparent pricing for AI customer service. Platform plans from $149/month with included AI conversations. See every cost upfront — no hidden fees, no surprises."
 keywords: "AI customer service pricing, e-commerce support cost, Shopify AI chatbot pricing, Agent Red pricing"
 og_image: "/images/og-pricing.png"
@@ -660,7 +660,7 @@ Questions? Email sales@agentred.io — we respond within 24 hours.
 {
   "@context": "https://schema.org",
   "@type": "Product",
-  "name": "Agent Red Customer Engagement",
+  "name": "Agent Red Customer Experience",
   "description": "AI-powered customer service platform for e-commerce",
   "brand": {
     "@type": "Brand",

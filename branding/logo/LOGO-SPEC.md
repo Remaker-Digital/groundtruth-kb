@@ -1,4 +1,4 @@
-# Agent Red Customer Engagement — Logo Specification
+# Agent Red Customer Experience — Logo Specification
 
 > **Status:** Approved
 > **Concept:** The Beacon (AR Monogram)

@@ -1,4 +1,4 @@
-# Agent Red Customer Engagement — Terraform Variables
+# Agent Red Customer Experience — Terraform Variables
 #
 # Shared variables for all modules. Override via terraform.tfvars
 # or environment variables (TF_VAR_*).

@@ -1,7 +1,7 @@
-# New Work Items Backlog — Agent Red Customer Engagement
+# New Work Items Backlog — Agent Red Customer Experience
 
 > **Status:** Unprioritized backlog — items inferred from Test Coverage Audit (2026-01-31)
-> **Project:** Agent Red Customer Engagement
+> **Project:** Agent Red Customer Experience
 > **Owner:** Remaker Digital (DBA of VanDusen & Palmeter, LLC)
 > **Created:** 2026-01-31
 > **Numbering:** Continues from Master Plan Review WI #1-100

@@ -1,0 +1,323 @@
+/**
+ * MessageList — scrollable container for conversation messages.
+ *
+ * Handles:
+ *   - Auto-scroll to bottom on new messages
+ *   - "Scroll to latest" button when user scrolls up
+ *   - Day separator labels (Today, Yesterday, date)
+ *   - Consecutive message grouping (hide avatar for runs of agent msgs)
+ *   - Typing indicator
+ *   - Greeting message (first thing the user sees)
+ *
+ * Visual reference: Zapier (clean scrollbar, generous padding).
+ * Functional reference: Tidio (auto-scroll, date separators, typing dots).
+ *
+ * © 2026 Remaker Digital, a DBA of VanDusen & Palmeter, LLC. All rights reserved.
+ */
+
+import { h, FunctionComponent } from 'preact';
+import { useRef, useEffect, useState, useCallback } from 'preact/hooks';
+import type { DesignTokens } from '@/theme/tokens';
+import type { Locale } from '@/locale/en';
+import type { Message } from '@/state/store';
+import { MessageBubble, TypingIndicator } from './MessageBubble';
+
+// ---------------------------------------------------------------------------
+// Props
+// ---------------------------------------------------------------------------
+
+interface MessageListProps {
+  tokens: DesignTokens;
+  locale: Locale;
+  messages: Message[];
+  isAgentTyping: boolean;
+  agentName: string;
+  agentAvatarUrl: string | null;
+  greetingMessage: string | null;
+}
+
+// ---------------------------------------------------------------------------
+// Helpers
+// ---------------------------------------------------------------------------
+
+function isSameDay(ts1: number, ts2: number): boolean {
+  const d1 = new Date(ts1);
+  const d2 = new Date(ts2);
+  return (
+    d1.getFullYear() === d2.getFullYear() &&
+    d1.getMonth() === d2.getMonth() &&
+    d1.getDate() === d2.getDate()
+  );
+}
+
+function getDayLabel(timestamp: number, locale: Locale): string {
+  const now = new Date();
+  const date = new Date(timestamp);
+
+  if (isSameDay(now.getTime(), timestamp)) return locale.today;
+
+  const yesterday = new Date(now);
+  yesterday.setDate(yesterday.getDate() - 1);
+  if (isSameDay(yesterday.getTime(), timestamp)) return locale.yesterday;
+
+  return date.toLocaleDateString(undefined, {
+    month: 'short',
+    day: 'numeric',
+    year: date.getFullYear() !== now.getFullYear() ? 'numeric' : undefined,
+  });
+}
+
+/** Whether this message should show an avatar (first in a run of agent msgs). */
+function shouldShowAvatar(messages: Message[], index: number): boolean {
+  const msg = messages[index];
+  if (msg.role !== 'agent') return false;
+  if (index === 0) return true;
+  const prev = messages[index - 1];
+  // Show avatar if previous message is from a different role or different day
+  return prev.role !== 'agent' || !isSameDay(prev.timestamp, msg.timestamp);
+}
+
+// ---------------------------------------------------------------------------
+// Component
+// ---------------------------------------------------------------------------
+
+export const MessageList: FunctionComponent<MessageListProps> = ({
+  tokens,
+  locale,
+  messages,
+  isAgentTyping,
+  agentName,
+  agentAvatarUrl,
+  greetingMessage,
+}) => {
+  const scrollRef = useRef<HTMLDivElement>(null);
+  const [isAtBottom, setIsAtBottom] = useState(true);
+  const [showScrollBtn, setShowScrollBtn] = useState(false);
+
+  // Auto-scroll to bottom when new messages arrive (if already at bottom)
+  useEffect(() => {
+    if (isAtBottom && scrollRef.current) {
+      scrollRef.current.scrollTop = scrollRef.current.scrollHeight;
+    }
+  }, [messages, isAgentTyping, isAtBottom]);
+
+  // Track scroll position
+  const handleScroll = useCallback(() => {
+    if (!scrollRef.current) return;
+    const { scrollTop, scrollHeight, clientHeight } = scrollRef.current;
+    const atBottom = scrollHeight - scrollTop - clientHeight < 40;
+    setIsAtBottom(atBottom);
+    setShowScrollBtn(!atBottom);
+  }, []);
+
+  const scrollToBottom = useCallback(() => {
+    if (scrollRef.current) {
+      scrollRef.current.scrollTo({
+        top: scrollRef.current.scrollHeight,
+        behavior: 'smooth',
+      });
+    }
+  }, []);
+
+  // Build message list with day separators
+  const elements: h.JSX.Element[] = [];
+  let lastDay = 0;
+
+  for (let i = 0; i < messages.length; i++) {
+    const msg = messages[i];
+
+    // Day separator
+    if (!isSameDay(msg.timestamp, lastDay)) {
+      lastDay = msg.timestamp;
+      elements.push(
+        <div
+          key={`day-${msg.timestamp}`}
+          style={{
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            padding: `${tokens.space3} ${tokens.space4}`,
+          }}
+        >
+          <div
+            style={{
+              fontSize: tokens.fontSizeXs,
+              fontFamily: tokens.fontFamily,
+              color: tokens.colorTextMuted,
+              backgroundColor: tokens.colorSurface,
+              padding: `${tokens.space1} ${tokens.space3}`,
+              borderRadius: tokens.borderRadiusFull,
+              fontWeight: tokens.fontWeightMedium,
+            }}
+          >
+            {getDayLabel(msg.timestamp, locale)}
+          </div>
+        </div>,
+      );
+    }
+
+    elements.push(
+      <MessageBubble
+        key={msg.id}
+        tokens={tokens}
+        message={msg}
+        agentName={agentName}
+        agentAvatarUrl={agentAvatarUrl}
+        showAvatar={shouldShowAvatar(messages, i)}
+      />,
+    );
+  }
+
+  return (
+    <div
+      style={{
+        flex: 1,
+        overflow: 'hidden',
+        position: 'relative',
+        backgroundColor: tokens.colorBackground,
+      }}
+    >
+      <div
+        ref={scrollRef}
+        onScroll={handleScroll}
+        style={{
+          height: '100%',
+          overflowY: 'auto',
+          overflowX: 'hidden',
+          paddingTop: tokens.space3,
+          paddingBottom: tokens.space2,
+        }}
+      >
+        {/* Greeting message at top of conversation */}
+        {greetingMessage && messages.length === 0 && (
+          <div
+            style={{
+              display: 'flex',
+              flexDirection: 'column',
+              alignItems: 'center',
+              padding: `${tokens.space8} ${tokens.space6}`,
+              textAlign: 'center',
+            }}
+          >
+            {/* Agent avatar - large */}
+            <div
+              style={{
+                width: tokens.avatarSize,
+                height: tokens.avatarSize,
+                borderRadius: tokens.borderRadiusFull,
+                backgroundColor: tokens.colorPrimary,
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+                color: tokens.colorPrimaryText,
+                marginBottom: tokens.space3,
+                overflow: 'hidden',
+                fontSize: tokens.fontSizeLg,
+                fontWeight: tokens.fontWeightSemibold,
+                fontFamily: tokens.fontFamily,
+              }}
+            >
+              {agentAvatarUrl ? (
+                <img
+                  src={agentAvatarUrl}
+                  alt={agentName}
+                  style={{ width: '100%', height: '100%', objectFit: 'cover' }}
+                />
+              ) : (
+                agentName.charAt(0).toUpperCase()
+              )}
+            </div>
+            <div
+              style={{
+                fontSize: tokens.fontSizeLg,
+                fontWeight: tokens.fontWeightSemibold,
+                fontFamily: tokens.fontFamily,
+                color: tokens.colorText,
+                marginBottom: tokens.space1,
+              }}
+            >
+              {agentName}
+            </div>
+            <div
+              style={{
+                fontSize: tokens.fontSizeMd,
+                fontFamily: tokens.fontFamily,
+                color: tokens.colorTextSecondary,
+                lineHeight: tokens.lineHeightNormal,
+                maxWidth: '280px',
+              }}
+            >
+              {greetingMessage}
+            </div>
+          </div>
+        )}
+
+        {/* Messages */}
+        {elements}
+
+        {/* Typing indicator */}
+        {isAgentTyping && (
+          <TypingIndicator
+            tokens={tokens}
+            agentName={agentName}
+            agentAvatarUrl={agentAvatarUrl}
+            locale={locale.typingIndicator}
+          />
+        )}
+      </div>
+
+      {/* Scroll-to-bottom button */}
+      {showScrollBtn && (
+        <button
+          type="button"
+          aria-label={locale.scrollToBottom}
+          onClick={scrollToBottom}
+          style={{
+            position: 'absolute',
+            bottom: tokens.space3,
+            left: '50%',
+            transform: 'translateX(-50%)',
+            backgroundColor: tokens.colorSurface,
+            color: tokens.colorText,
+            border: `${tokens.borderWidth} solid ${tokens.colorBorder}`,
+            borderRadius: tokens.borderRadiusFull,
+            padding: `${tokens.space1} ${tokens.space3}`,
+            fontSize: tokens.fontSizeXs,
+            fontFamily: tokens.fontFamily,
+            fontWeight: tokens.fontWeightMedium,
+            cursor: 'pointer',
+            boxShadow: tokens.shadowMd,
+            display: 'flex',
+            alignItems: 'center',
+            gap: tokens.space1,
+            outline: 'none',
+          }}
+        >
+          <ChevronDownIcon size={12} />
+          {locale.scrollToBottom}
+        </button>
+      )}
+    </div>
+  );
+};
+
+// ---------------------------------------------------------------------------
+// Icons (inline SVG)
+// ---------------------------------------------------------------------------
+
+function ChevronDownIcon({ size }: { size: number }) {
+  return (
+    <svg
+      width={size}
+      height={size}
+      viewBox="0 0 24 24"
+      fill="none"
+      stroke="currentColor"
+      stroke-width="2.5"
+      stroke-linecap="round"
+      stroke-linejoin="round"
+    >
+      <polyline points="6 9 12 15 18 9" />
+    </svg>
+  );
+}

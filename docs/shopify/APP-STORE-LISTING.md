@@ -1,4 +1,4 @@
-# Shopify App Store Listing — Agent Red Customer Engagement
+# Shopify App Store Listing — Agent Red Customer Experience
 
 > **Status:** Draft — Pending owner review
 > **Created:** 2026-01-30
@@ -31,7 +31,7 @@ This document contains every text field required for the Shopify App Store listi
 **30-character limit**
 
 ```
-Agent Red Customer Engagement
+Agent Red Customer Experience
 ```
 *(30 characters — exact fit)*
 

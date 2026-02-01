@@ -1,4 +1,4 @@
-# UI/UX Architecture Decisions — Agent Red Customer Engagement
+# UI/UX Architecture Decisions — Agent Red Customer Experience
 
 **Date:** 2026-01-31
 **Session:** UI/UX competitive analysis + design specification session

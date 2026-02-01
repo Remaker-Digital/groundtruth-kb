@@ -1,5 +1,5 @@
 """
-Agent Red Customer Engagement — FastAPI application entrypoint.
+Agent Red Customer Experience — FastAPI application entrypoint.
 
 Mounts all API routers and provides health/readiness endpoints.
 
@@ -23,7 +23,7 @@ from fastapi.middleware.cors import CORSMiddleware
 # ---------------------------------------------------------------------------
 
 app = FastAPI(
-    title="Agent Red Customer Engagement",
+    title="Agent Red Customer Experience",
     description="AI-powered customer engagement platform API.",
     version="1.0.0",
     docs_url="/docs" if os.environ.get("ENVIRONMENT") == "development" else None,

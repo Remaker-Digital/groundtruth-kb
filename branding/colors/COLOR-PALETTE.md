@@ -1,4 +1,4 @@
-# Agent Red Customer Engagement — Color Palette
+# Agent Red Customer Experience — Color Palette
 
 > **Status:** Approved
 > **Direction:** Bold/Corporate

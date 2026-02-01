@@ -5,7 +5,7 @@ import {themes as prismThemes} from 'prism-react-renderer';
 /** @type {import('@docusaurus/types').Config} */
 const config = {
   title: 'Agent Red Documentation',
-  tagline: 'AI-Powered Customer Engagement Platform',
+  tagline: 'AI-Powered Customer Experience Platform',
   favicon: 'img/favicon.ico',
 
   future: {

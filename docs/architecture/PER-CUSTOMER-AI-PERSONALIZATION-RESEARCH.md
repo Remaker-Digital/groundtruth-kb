@@ -1,6 +1,6 @@
 # Per-Customer Persistent AI Agent Personalization — Feasibility Research
 
-> **Project:** Agent Red Customer Engagement
+> **Project:** Agent Red Customer Experience
 > **Date:** 2026-01-30
 > **Type:** Technical Research & Architecture Analysis
 > **Status:** Research Complete — Awaiting Decision

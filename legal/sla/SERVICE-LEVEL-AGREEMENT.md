@@ -1,4 +1,4 @@
-# Agent Red Customer Engagement — Service Level Agreement
+# Agent Red Customer Experience — Service Level Agreement
 
 > **Status:** DRAFT — For internal review only. Not yet published.
 > **Version:** 0.2.0
@@ -11,7 +11,7 @@
 
 **Effective Date:** [TO BE SET AT PUBLICATION]
 
-This Service Level Agreement ("SLA") is part of the Terms of Service between VanDusen & Palmeter, LLC, doing business as Remaker Digital ("Company", "we", "us", or "our"), and you ("Customer") for the Agent Red Customer Engagement platform ("Service"). Capitalized terms not defined here have the meanings given in the Terms of Service.
+This Service Level Agreement ("SLA") is part of the Terms of Service between VanDusen & Palmeter, LLC, doing business as Remaker Digital ("Company", "we", "us", or "our"), and you ("Customer") for the Agent Red Customer Experience platform ("Service"). Capitalized terms not defined here have the meanings given in the Terms of Service.
 
 ---
 

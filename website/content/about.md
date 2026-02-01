@@ -10,7 +10,7 @@
 ## Meta Information
 
 ```yaml
-title: "About - Agent Red Customer Engagement"
+title: "About - Agent Red Customer Experience"
 description: "Agent Red builds AI-powered customer service for e-commerce. Built on open-source technology, transparent pricing, and a belief that great support shouldn't require a massive team."
 keywords: "about Agent Red, AI customer service company, Remaker Digital, e-commerce AI"
 og_image: "/images/og-about.png"

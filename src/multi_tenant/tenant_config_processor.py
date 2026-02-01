@@ -155,6 +155,7 @@ class _CacheEntry:
 # are stored in a JSON extension field or will be added to PreferencesDocument
 # in future iterations.
 _PREFS_DIRECT_FIELDS: set[str] = {
+    # AI behavior (original 12 fields)
     "brand_name",
     "brand_voice",
     "primary_language",
@@ -167,6 +168,33 @@ _PREFS_DIRECT_FIELDS: set[str] = {
     "escalation_keywords",
     "memory_enabled",
     "custom_instructions",
+    # Widget appearance — visual (12 fields)
+    "widget_primary_color",
+    "widget_background_color",
+    "widget_position",
+    "widget_offset_x",
+    "widget_offset_y",
+    "widget_agent_avatar_url",
+    "widget_agent_display_name",
+    "widget_agent_title",
+    "widget_logo_url",
+    "widget_show_branding",
+    "widget_mobile_enabled",
+    "widget_dark_mode",
+    # Widget appearance — behavior (9 fields)
+    "widget_offline_message",
+    "widget_auto_open",
+    "widget_auto_open_delay",
+    "widget_operating_hours",
+    "widget_offline_behavior",
+    "widget_prechat_form",
+    "widget_chat_rating_enabled",
+    "widget_sound_enabled",
+    "widget_file_upload_enabled",
+    # Widget appearance — content and targeting (3 fields)
+    "widget_header_text",
+    "widget_input_placeholder",
+    "widget_page_rules",
 }
 
 

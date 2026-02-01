@@ -9,7 +9,7 @@
 
 ## Executive Summary
 
-This evaluation compares three e-commerce platforms for selling Agent Red Customer Engagement as a B2B SaaS product. The assessment uses nine dimensions, with particular emphasis on **addressable market size**, **partner diversity**, and **partner program benefits** — the strategic criteria for joining an ecosystem with established competitors that Agent Red can match on technology and quality but beat dramatically on price.
+This evaluation compares three e-commerce platforms for selling Agent Red Customer Experience as a B2B SaaS product. The assessment uses nine dimensions, with particular emphasis on **addressable market size**, **partner diversity**, and **partner program benefits** — the strategic criteria for joining an ecosystem with established competitors that Agent Red can match on technology and quality but beat dramatically on price.
 
 ### Recommendation: Dual-Channel (Shopify App Store + Stripe)
 

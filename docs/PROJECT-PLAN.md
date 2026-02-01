@@ -1,6 +1,6 @@
-# Agent Red Customer Engagement - Launch 1.0 Project Plan
+# Agent Red Customer Experience - Launch 1.0 Project Plan
 
-> **Project:** Agent Red Customer Engagement
+> **Project:** Agent Red Customer Experience
 > **Release:** Launch 1.0
 > **Timeline:** Q1 2026 (8-12 weeks)
 > **Budget:** $500-1,000/month operational
@@ -9,7 +9,7 @@
 
 ## Executive Summary
 
-Agent Red Customer Engagement is a commercial SaaS product built on the open-source AGNTCY Customer Engagement Platform foundation. Launch 1.0 targets MVP delivery within Q1 2026, focusing on core commercial infrastructure and Phase 1-2 marketing materials.
+Agent Red Customer Experience is a commercial SaaS product built on the open-source AGNTCY Customer Engagement Platform foundation. Launch 1.0 targets MVP delivery within Q1 2026, focusing on core commercial infrastructure and Phase 1-2 marketing materials.
 
 ---
 
@@ -20,7 +20,7 @@ Agent Red Customer Engagement is a commercial SaaS product built on the open-sou
 
 | Task | Status | Owner | Notes |
 |------|--------|-------|-------|
-| Create project directory structure | ✅ Done | - | E:\Claude-Playground\CLAUDE-PROJECTS\Agent Red Customer Engagement |
+| Create project directory structure | ✅ Done | - | E:\Claude-Playground\CLAUDE-PROJECTS\Agent Red Customer Experience |
 | Create CLAUDE.md | ✅ Done | - | AI assistant guidance (v2.0 with full knowledge transfer) |
 | Create PROJECT-PLAN.md | ✅ Done | - | This file |
 | Create GitHub private repository | ✅ Done | - | github.com/Remaker-Digital/agent-red-customer-engagement |

@@ -1,6 +1,6 @@
-# Website Content — Agent Red Customer Engagement
+# Website Content — Agent Red Customer Experience
 
-> **Purpose:** Marketing website content for Agent Red Customer Engagement
+> **Purpose:** Marketing website content for Agent Red Customer Experience
 > **Format:** Structured markdown optimized for implementation in any web framework
 > **Status:** Phase 1.3 Complete — 6 Core Pages Rewritten for Commercial Launch
 > **Brand:** Agent Red (Remaker Digital)
@@ -25,7 +25,7 @@
 ## Key Changes in v2.0
 
 ### Brand
-- All "AGNTCY" references → "Agent Red" / "Agent Red Customer Engagement"
+- All "AGNTCY" references → "Agent Red" / "Agent Red Customer Experience"
 - All URLs → `agentred.io` domain
 - Copyright → Remaker Digital / VanDusen & Palmeter, LLC
 - Social handles → @agentred / Remaker-Digital

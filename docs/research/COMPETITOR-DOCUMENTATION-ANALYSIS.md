@@ -1,6 +1,6 @@
 # Competitor Documentation Analysis & Quality Framework
 
-> **Project:** Agent Red Customer Engagement
+> **Project:** Agent Red Customer Experience
 > **Purpose:** Inform Phase 1.4 documentation strategy with competitor intelligence and measurable quality standards
 > **Date:** 2026-01-29
 > **Scope:** 5 competitors + 4 documentation quality frameworks
@@ -821,5 +821,5 @@ Based on the analysis, Agent Red can differentiate its documentation by excellin
 
 ---
 
-*Analysis prepared for Agent Red Customer Engagement Phase 1.4 planning.*
+*Analysis prepared for Agent Red Customer Experience Phase 1.4 planning.*
 *2026 Remaker Digital, a DBA of VanDusen & Palmeter, LLC. All rights reserved.*

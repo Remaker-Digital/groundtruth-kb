@@ -1,10 +1,10 @@
-# Agent Red Customer Engagement - Development Dockerfile
+# Agent Red Customer Experience - Development Dockerfile
 # © 2026 Remaker Digital, a DBA of VanDusen & Palmeter, LLC. All rights reserved.
 
 FROM python:3.12-slim AS base
 
 LABEL maintainer="Remaker Digital <dev@remakerdigital.com>"
-LABEL project="Agent Red Customer Engagement"
+LABEL project="Agent Red Customer Experience"
 
 # Prevent Python from writing .pyc files and enable unbuffered output
 ENV PYTHONDONTWRITEBYTECODE=1

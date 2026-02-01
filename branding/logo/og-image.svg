@@ -1,6 +1,6 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <!--
-  Agent Red Customer Engagement — Open Graph / Social Share Image
+  Agent Red Customer Experience — Open Graph / Social Share Image
   Design: AR icon + wordmark centered on charcoal background
   Dimensions: 1200x630 (OG standard)
   Usage: Social media link previews (Facebook, LinkedIn, Twitter/X)
@@ -52,5 +52,5 @@
     font-size="24"
     fill="#E8E8ED"
     text-anchor="middle"
-  >AI Customer Engagement Platform</text>
+  >AI Customer Experience Platform</text>
 </svg>

@@ -1,4 +1,4 @@
-# Agent Red Customer Engagement — Main Terraform Configuration
+# Agent Red Customer Experience — Main Terraform Configuration
 #
 # Provisions the Azure Container Apps environment and all 9 container apps
 # with KEDA auto-scaling per Decision #16 (Option B+) and Work Items #47-48.

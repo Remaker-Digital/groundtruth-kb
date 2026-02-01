@@ -1,4 +1,4 @@
-# Agent Red Customer Engagement — Brand Guidelines
+# Agent Red Customer Experience — Brand Guidelines
 
 > **Version:** 1.0
 > **Status:** Approved
@@ -13,9 +13,9 @@
 
 | Form | Usage |
 |------|-------|
-| **Full** | Agent Red Customer Engagement |
+| **Full** | Agent Red Customer Experience |
 | **Short** | Agent Red |
-| **Product Line** | Agent Red (parent brand) > Customer Engagement (product) |
+| **Product Line** | Agent Red (parent brand) > Customer Experience (product) |
 
 ### Brand Personality
 

@@ -1,12 +1,12 @@
 ---
 sidebar_position: 1
 title: Overview
-description: What Agent Red Customer Engagement does, how the six-agent AI pipeline works, and the infrastructure it runs on.
+description: What Agent Red Customer Experience does, how the six-agent AI pipeline works, and the infrastructure it runs on.
 ---
 
 # Platform Overview
 
-Agent Red Customer Engagement automates customer support for e-commerce businesses using a pipeline of six specialized AI agents. Each agent handles a distinct responsibility — from classifying the customer's intent to generating a response and validating it for safety — so that conversations are resolved accurately without human intervention.
+Agent Red Customer Experience automates customer support for e-commerce businesses using a pipeline of six specialized AI agents. Each agent handles a distinct responsibility — from classifying the customer's intent to generating a response and validating it for safety — so that conversations are resolved accurately without human intervention.
 
 ## The agent pipeline
 

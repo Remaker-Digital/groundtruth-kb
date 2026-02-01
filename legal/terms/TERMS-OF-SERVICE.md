@@ -1,4 +1,4 @@
-# Agent Red Customer Engagement — Terms of Service
+# Agent Red Customer Experience — Terms of Service
 
 > **Status:** DRAFT — For internal review only. Not yet published.
 > **Version:** 0.1.0
@@ -11,7 +11,7 @@
 
 **Effective Date:** [TO BE SET AT PUBLICATION]
 
-These Terms of Service ("Terms") govern your access to and use of the Agent Red Customer Engagement platform ("Service"), operated by VanDusen & Palmeter, LLC, doing business as Remaker Digital ("Company", "we", "us", or "our").
+These Terms of Service ("Terms") govern your access to and use of the Agent Red Customer Experience platform ("Service"), operated by VanDusen & Palmeter, LLC, doing business as Remaker Digital ("Company", "we", "us", or "our").
 
 By accessing or using the Service, you agree to be bound by these Terms. If you are using the Service on behalf of an organization, you represent that you have authority to bind that organization to these Terms.
 
@@ -31,7 +31,7 @@ By accessing or using the Service, you agree to be bound by these Terms. If you 
 
 **"End Users"** means the individuals who interact with the Service through your deployment (e.g., your customers submitting support inquiries).
 
-**"Service"** means the Agent Red Customer Engagement platform, including the web application, API, documentation, and any related services.
+**"Service"** means the Agent Red Customer Experience platform, including the web application, API, documentation, and any related services.
 
 **"Persistent Customer Memory"** means the Service's multi-layer personalization system that builds customer context, conversation history, and learned preferences across support sessions to enable personalized responses.
 

@@ -1,7 +1,7 @@
 # Master Plan Review — 2026-01-30
 
 > **Status:** Living document — captures all decisions from the 2026-01-30 architecture review session
-> **Project:** Agent Red Customer Engagement
+> **Project:** Agent Red Customer Experience
 > **Owner:** Remaker Digital (DBA of VanDusen & Palmeter, LLC)
 > **Session Scope:** Multi-tenant architecture, metering/SLA validation, Persistent Customer Memory implementation
 

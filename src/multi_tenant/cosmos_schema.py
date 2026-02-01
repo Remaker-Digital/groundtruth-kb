@@ -581,6 +581,37 @@ class PreferencesDocument(BaseModel):
         description="Merchant-provided instructions appended to system prompt",
     )
 
+    # Widget appearance (onboarding step 9 — Tidio parity, 22 controls)
+    # Visual
+    widget_primary_color: str | None = Field(default=None, description="Hex color for widget header/buttons (#RRGGBB)")
+    widget_background_color: str | None = Field(default=None, description="Hex color for conversation panel background")
+    widget_position: str | None = Field(default=None, description="bottom-right | bottom-left")
+    widget_offset_x: int | None = Field(default=None, description="Horizontal offset from screen edge (px)")
+    widget_offset_y: int | None = Field(default=None, description="Vertical offset from bottom edge (px)")
+    widget_agent_avatar_url: str | None = Field(default=None, description="URL of agent avatar image")
+    widget_agent_display_name: str | None = Field(default=None, description="Name shown in widget header/bubbles")
+    widget_agent_title: str | None = Field(default=None, description="Subtitle under agent name (e.g. Customer Support)")
+    widget_logo_url: str | None = Field(default=None, description="URL of company logo in widget header")
+    widget_show_branding: bool | None = Field(default=None, description="Show 'Powered by Agent Red' badge")
+    widget_mobile_enabled: bool | None = Field(default=None, description="Show widget on mobile devices")
+    widget_dark_mode: bool | None = Field(default=None, description="Use dark color scheme")
+
+    # Behavior
+    widget_offline_message: str | None = Field(default=None, description="Message when team is offline")
+    widget_auto_open: bool | None = Field(default=None, description="Auto-open widget after delay")
+    widget_auto_open_delay: int | None = Field(default=None, description="Seconds before auto-open")
+    widget_operating_hours: dict[str, Any] | None = Field(default=None, description="Structured schedule JSON")
+    widget_offline_behavior: str | None = Field(default=None, description="ai_only | show_form | hide_widget")
+    widget_prechat_form: dict[str, Any] | None = Field(default=None, description="Pre-chat form config JSON")
+    widget_chat_rating_enabled: bool | None = Field(default=None, description="Post-chat thumbs up/down rating")
+    widget_sound_enabled: bool | None = Field(default=None, description="Notification sound for new messages")
+    widget_file_upload_enabled: bool | None = Field(default=None, description="Allow visitor file attachments")
+
+    # Content and targeting
+    widget_header_text: str | None = Field(default=None, description="Custom widget header/title text")
+    widget_input_placeholder: str | None = Field(default=None, description="Message input placeholder text")
+    widget_page_rules: list[str] = Field(default_factory=list, description="URL patterns for page visibility rules")
+
     # Metadata
     created_at: str = Field(description="When this version was created")
     created_by: str | None = Field(default=None, description="Who created this version")

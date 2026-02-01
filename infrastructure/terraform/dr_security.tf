@@ -1,4 +1,4 @@
-# Agent Red Customer Engagement — Disaster Recovery & Security Infrastructure
+# Agent Red Customer Experience — Disaster Recovery & Security Infrastructure
 #
 # Work Items:
 #   #52: Cosmos DB continuous backup (7-day PITR, Decision #18)

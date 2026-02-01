@@ -1,6 +1,6 @@
-# Stripe Platform Evaluation for Agent Red Customer Engagement
+# Stripe Platform Evaluation for Agent Red Customer Experience
 
-> **Project:** Agent Red Customer Engagement
+> **Project:** Agent Red Customer Experience
 > **Purpose:** Formal evaluation of Stripe as the e-commerce/billing platform for Phase 2.1
 > **Date:** 2026-01-29
 > **Scope:** 9 evaluation dimensions for B2B SaaS subscription billing
@@ -78,7 +78,7 @@ Stripe Billing (https://stripe.com/billing) is purpose-built for SaaS subscripti
 #### Base Subscription Tiers
 
 ```
-Product: "Agent Red Customer Engagement"
+Product: "Agent Red Customer Experience"
   Price: starter-monthly     → $149/month (recurring)
   Price: starter-annual      → $1,490/year (recurring, = $124.17/month effective)
   Price: professional-monthly → $399/month (recurring)
@@ -819,7 +819,7 @@ Here is the full mapping of Agent Red's pricing model to Stripe objects:
 
 ```
 Product: agent-red-platform
-  name: "Agent Red Customer Engagement"
+  name: "Agent Red Customer Experience"
   description: "AI-powered customer service platform for e-commerce"
   metadata: { type: "base_platform" }
 
@@ -975,7 +975,7 @@ A Professional customer with two add-ons:
 
 ### 12.1 Verdict: Use Stripe
 
-**Stripe is the recommended billing platform for Agent Red Customer Engagement.**
+**Stripe is the recommended billing platform for Agent Red Customer Experience.**
 
 | Factor | Assessment |
 |--------|------------|
@@ -1092,5 +1092,5 @@ Before final commitment, verify the following at stripe.com and related sites:
 
 ---
 
-*Research prepared for Agent Red Customer Engagement Phase 2.1 E-Commerce Platform Evaluation.*
+*Research prepared for Agent Red Customer Experience Phase 2.1 E-Commerce Platform Evaluation.*
 *(c) 2026 Remaker Digital, a DBA of VanDusen & Palmeter, LLC. All rights reserved.*

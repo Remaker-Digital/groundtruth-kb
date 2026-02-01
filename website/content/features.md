@@ -10,7 +10,7 @@
 ## Meta Information
 
 ```yaml
-title: "Features - Agent Red Customer Engagement Platform"
+title: "Features - Agent Red Customer Experience Platform"
 description: "Six specialized AI agents for customer service: intent classification, knowledge retrieval, response generation, content safety, smart escalation, and analytics. Built for e-commerce."
 keywords: "AI customer service features, e-commerce support automation, Shopify AI chatbot, multi-agent customer service, Agent Red"
 og_image: "/images/og-features.png"

@@ -1,4 +1,4 @@
-# Agent Red Customer Engagement — Privacy Policy
+# Agent Red Customer Experience — Privacy Policy
 
 > **Status:** DRAFT — For internal review only. Not yet published.
 > **Version:** 0.1.0
@@ -11,7 +11,7 @@
 
 **Effective Date:** [TO BE SET AT PUBLICATION]
 
-This Privacy Policy describes how VanDusen & Palmeter, LLC, doing business as Remaker Digital ("Company", "we", "us", or "our"), collects, uses, discloses, and protects information in connection with the Agent Red Customer Engagement platform ("Service").
+This Privacy Policy describes how VanDusen & Palmeter, LLC, doing business as Remaker Digital ("Company", "we", "us", or "our"), collects, uses, discloses, and protects information in connection with the Agent Red Customer Experience platform ("Service").
 
 By accessing or using the Service, you acknowledge that you have read and understood this Privacy Policy. If you do not agree with our practices, do not use the Service.
 
@@ -21,7 +21,7 @@ By accessing or using the Service, you acknowledge that you have read and unders
 
 This Privacy Policy applies to:
 
-- The Agent Red Customer Engagement web application and API;
+- The Agent Red Customer Experience web application and API;
 - Information collected from Account holders ("Customers");
 - Information collected from individuals who interact with the Service through a Customer's deployment ("End Users");
 - Our marketing website at https://remakerdigital.com.

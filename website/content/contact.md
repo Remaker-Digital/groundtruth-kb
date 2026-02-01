@@ -10,7 +10,7 @@
 ## Meta Information
 
 ```yaml
-title: "Contact Us - Agent Red Customer Engagement"
+title: "Contact Us - Agent Red Customer Experience"
 description: "Get in touch with Agent Red. Sales inquiries, support, partnership opportunities, and general questions. We respond within 24 hours."
 keywords: "contact Agent Red, AI customer service support, Agent Red sales"
 og_image: "/images/og-contact.png"

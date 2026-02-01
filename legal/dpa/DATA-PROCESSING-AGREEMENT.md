@@ -1,4 +1,4 @@
-# Agent Red Customer Engagement — Data Processing Agreement
+# Agent Red Customer Experience — Data Processing Agreement
 
 > **Status:** DRAFT — For internal review only. Not yet published.
 > **Version:** 0.1.0
@@ -13,7 +13,7 @@
 
 This Data Processing Agreement ("DPA") forms part of the Terms of Service ("Agreement") between VanDusen & Palmeter, LLC, doing business as Remaker Digital ("Processor", "we", "us", or "our"), and you ("Controller", "Customer"), collectively referred to as the "Parties".
 
-This DPA applies where and to the extent that the Processor processes Personal Data on behalf of the Controller in the course of providing the Agent Red Customer Engagement platform ("Service").
+This DPA applies where and to the extent that the Processor processes Personal Data on behalf of the Controller in the course of providing the Agent Red Customer Experience platform ("Service").
 
 ---
 
@@ -285,7 +285,7 @@ General: legal@remakerdigital.com
 
 | Element | Description |
 |---------|-------------|
-| **Subject Matter** | Processing of Personal Data to provide the Agent Red Customer Engagement platform |
+| **Subject Matter** | Processing of Personal Data to provide the Agent Red Customer Experience platform |
 | **Duration** | For the term of the Agreement |
 | **Nature and Purpose** | AI-powered customer engagement: receiving customer inquiries, processing them through AI models, generating responses, managing escalations, providing analytics |
 | **Categories of Data Subjects** | Customer's employees (Account users); Customer's end users (individuals submitting inquiries) |

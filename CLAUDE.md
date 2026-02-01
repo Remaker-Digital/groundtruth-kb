@@ -1,6 +1,6 @@
-# CLAUDE.md - Agent Red Customer Engagement
+# CLAUDE.md - Agent Red Customer Experience
 
-This document provides context and guidance for AI assistants working on the Agent Red Customer Engagement commercial project.
+This document provides context and guidance for AI assistants working on the Agent Red Customer Experience commercial project.
 
 ---
 
@@ -8,11 +8,11 @@ This document provides context and guidance for AI assistants working on the Age
 
 | Attribute | Value |
 |-----------|-------|
-| **Project Name** | Agent Red Customer Engagement |
-| **Brand Name** | Agent Red Customer Engagement |
+| **Project Name** | Agent Red Customer Experience |
+| **Brand Name** | Agent Red Customer Experience |
 | **Release** | Launch 1.0 |
 | **Type** | Commercial SaaS Product |
-| **Status** | Phase 2.1 E-Commerce ~85% complete. Phase 2.2 Tier 1 Critical COMPLETE (7 modules). Tier 2 High COMPLETE — 21 modules (~9,500 lines). Tier 2 Medium COMPLETE — 7 additional modules (~2,100 lines). Phase 2.5 Layers 1-2 COMPLETE (3 modules). All middleware wired in main.py (8 middleware layers). **379 tests passing** (P0 launch-blockers COMPLETE: 254 new tests across 8 groups + 125 pre-existing). Test infrastructure complete (WI #101-104). Architecture review complete (32 decisions, 100 work items). Comprehensive test plan (~880 tests) and new work items backlog (63 items, WI #101-163) created. **Phase 3.0 UI/UX: Competitive analysis COMPLETE. Chat API IMPLEMENTED (6 endpoints + SSE manager). Admin APIs IMPLEMENTED (5 routers: inbox, knowledge, analytics, team, GDPR + audit). Widget key auth IMPLEMENTED. Trial tier IMPLEMENTED. 7 architecture decisions approved. 24 work items (WI #164-187).** |
+| **Status** | Phase 2.1 E-Commerce ~85% complete. Phase 2.2 Tier 1 Critical COMPLETE (7 modules). Tier 2 High COMPLETE — 21 modules (~9,500 lines). Tier 2 Medium COMPLETE — 7 additional modules (~2,100 lines). Phase 2.5 Layers 1-2 COMPLETE (3 modules). All middleware wired in main.py (8 middleware layers). **593 tests passing** (P0 launch-blockers COMPLETE: 254 new tests across 8 groups + 125 pre-existing + 214 P1 tests). Test infrastructure complete (WI #101-104). Architecture review complete (32 decisions, 100 work items). Comprehensive test plan (~880 tests) and new work items backlog (63 items, WI #101-163) created. **Phase 3.0 UI/UX: Competitive analysis COMPLETE. Chat API IMPLEMENTED (6 endpoints + SSE manager). Admin APIs IMPLEMENTED (5 routers: inbox, knowledge, analytics, team, GDPR + audit). Widget key auth IMPLEMENTED. Trial tier IMPLEMENTED. 7 architecture decisions approved. 24 work items (WI #164-187). Widget frontend BUILD PHASE 2 COMPLETE — 20 files, ~3,200 lines (Preact + TypeScript). Product renamed Customer Experience. Brand primary #C41E2A.** |
 | **Owner** | Remaker Digital (DBA of VanDusen & Palmeter, LLC) |
 
 ---
@@ -478,9 +478,9 @@ Each tier includes a platform fee (infrastructure, features, support) and an inc
 - [ ] Email templates
 
 ### Brand Name Usage
-- **Full:** Agent Red Customer Engagement
+- **Full:** Agent Red Customer Experience
 - **Short:** Agent Red
-- **Product Line:** Agent Red (parent) → Customer Engagement (product)
+- **Product Line:** Agent Red (parent) → Customer Experience (product)
 
 ---
 
@@ -575,6 +575,31 @@ E:\Claude-Playground\CLAUDE-PROJECTS\Agent Red Customer Engagement\
 │       ├── test_stripe_catalog.py  # 23 Stripe catalog model tests (§4.7)
 │       └── test_usage_consumption.py # 13 3-tier usage consumption tests (§4.8)
 │
+├── widget/                         # Chat widget frontend (Phase 3.0 Build Phase 2)
+│   ├── package.json                # Preact 10.25+, Vite 6, TypeScript 5.7
+│   ├── tsconfig.json               # ES2020, Preact JSX, strict mode
+│   ├── vite.config.ts              # IIFE single-file build, terser minification
+│   ├── dev.html                    # Local dev page with SDK controls
+│   └── src/
+│       ├── index.ts                # Entry point: boot, Shadow DOM, iframe, SDK
+│       ├── theme/tokens.ts         # Design tokens, light/dark, WCAG contrast
+│       ├── locale/en.ts            # 34 user-visible strings (i18n-ready)
+│       ├── state/store.ts          # Reactive store, message management
+│       ├── transport/
+│       │   ├── http.ts             # Widget key auth, API client (5 methods)
+│       │   ├── sse.ts              # SSE streaming (6 events, auto-reconnect)
+│       │   └── ws.ts               # WebSocket typing/presence, ping keepalive
+│       └── components/
+│           ├── Launcher.tsx         # Shadow DOM floating button, unread badge
+│           ├── Panel.tsx            # Root panel, lifecycle, SSE/WS management
+│           ├── Header.tsx           # Agent info, avatar, status, close
+│           ├── MessageList.tsx      # Auto-scroll, day separators, typing dots
+│           ├── MessageBubble.tsx    # Customer/agent/system, streaming cursor
+│           ├── InputBar.tsx         # Auto-grow textarea, send, file, branding
+│           ├── PreChatForm.tsx      # Configurable fields, validation
+│           ├── ChatRating.tsx       # Thumbs up/down, comment, thank-you
+│           └── OfflineForm.tsx      # Leave-a-message form
+│
 ├── infrastructure/                 # Deployment infrastructure
 │   └── terraform/                  # IaC for Azure (variables, main, scaling, DR/security)
 │
@@ -660,11 +685,12 @@ E:\Claude-Playground\CLAUDE-PROJECTS\Agent Red Customer Engagement\
 ### Starting a New Session
 
 ```
-Continue work on Agent Red Customer Engagement commercial project.
+Continue work on Agent Red Customer Experience commercial project.
 Location: E:\Claude-Playground\CLAUDE-PROJECTS\Agent Red Customer Engagement
 Key files: CLAUDE.md, docs/architecture/UI-UX-ARCHITECTURE-DECISIONS.md, docs/COMPREHENSIVE-TEST-PLAN.md, docs/BACKLOG-NEW-WORK-ITEMS.md
-Current status: Phases 0-1.4 complete. Phase 2.1 e-commerce ~85% complete (11 billing modules incl. Shopify GDPR webhooks). Phase 2.2 Tier 2 Medium COMPLETE — 28 multi_tenant modules (~12,000 lines). Phase 2.5 Layers 1-2 COMPLETE (3 modules). Phase 3.0 Build Phase 1 COMPLETE: Chat API implemented (6 endpoints + SSE manager in src/chat/), all admin APIs implemented (5 routers: inbox, knowledge, analytics, team, GDPR + audit = 25 endpoints), widget key auth implemented, trial tier implemented. 379 tests passing (P0 launch-blockers COMPLETE). 17 routers, 66 routes, 8 middleware layers. Security hardening: body size limits, JSON depth validation, security headers, API versioning, structured logging, progressive throttling. KEDA night scaling profiles in Terraform.
-Next priority: Please prepare an order of priority for all known outstanding work issues in this project and follow this order when proposing tasks for completion. Remaining major areas: (1) P1 pre-launch tests (~200 tests from COMPREHENSIVE-TEST-PLAN.md §5), (2) Phase 3.0 Build Phase 2+ (Chat widget, Theme App Extension, admin frontends — see UI-UX-ARCHITECTURE-DECISIONS.md §8), (3) Phase 2.1 remaining (session tokens, App Bridge Save Bar, creative assets), (4) backlog items WI #101-163 (many now complete, see BACKLOG-NEW-WORK-ITEMS.md).
+Current status: Phases 0-1.4 complete. Phase 2.1 e-commerce ~85% complete (11 billing modules incl. Shopify GDPR webhooks). Phase 2.2 Tier 2 Medium COMPLETE — 28 multi_tenant modules (~12,000 lines). Phase 2.5 Layers 1-2 COMPLETE (3 modules). Phase 3.0 Build Phase 1 COMPLETE: Chat API (6 endpoints + SSE manager in src/chat/), admin APIs (5 routers: inbox, knowledge, analytics, team, GDPR + audit = 25 endpoints), widget key auth, trial tier. **Phase 3.0 Build Phase 2 COMPLETE: Chat widget frontend (20 files, ~3,200 lines in widget/).** Product renamed to "Customer Experience". Brand primary #C41E2A. 593 tests passing. 17 routers, 66 routes, 8 middleware layers. 24 widget customization fields in tenant config.
+Next priority: Please prepare an order of priority for all known outstanding work issues in this project and follow this order when proposing tasks for completion. Remaining major areas: (1) Widget build validation (npm install && npm run build — verify TypeScript compilation and ~15-20KB gzip bundle target), (2) Phase 3.0 Build Phases 3-6 (Shopify Theme App Extension, admin components, admin shells — see UI-UX-ARCHITECTURE-DECISIONS.md §8), (3) P1 pre-launch tests (~200 tests from COMPREHENSIVE-TEST-PLAN.md §5), (4) Phase 2.1 remaining (session tokens, App Bridge Save Bar, creative assets), (5) Verify Tidio audit findings against live sources, (6) backlog items WI #101-163 (many now complete, see BACKLOG-NEW-WORK-ITEMS.md).
+Important context: Tidio is the primary functional reference (completeness, language, merchant workflows, widget customization). Zapier is the visual styling reference. Persistent Customer Memory (Layers 1-2) is the launch pillar differentiator. Iterative working style: one item at a time, honest assessment, approval before implementation, aggressive scope cutting.
 Please review CLAUDE.md, then proceed with the highest-priority remaining technical work item, presenting one item at a time for review per the iterative working style documented in CLAUDE.md.
 ```
 
@@ -1231,14 +1257,58 @@ Implemented 20+ work items across 3 sessions. Major deliverables:
 - **Structured logging replaces basicConfig**: Production uses JSON-per-line format for Application Insights ingestion. Development uses colored human-readable format. Controlled by ENVIRONMENT env var.
 - **Progressive throttling sticky de-escalation**: Escalation level drops by at most one step per evaluation cycle to prevent rapid oscillation between Normal and Isolate.
 
+**Session 2026-02-01: Widget Frontend Build + Product Rename + Brand Correction**
+
+Comprehensive widget frontend implementation session. Product renamed from "Customer Engagement" to "Customer Experience" across 65+ files. Brand primary color corrected to #C41E2A. 24 widget customization fields added to backend config. Full widget frontend built (20 files, ~3,200 lines). Tidio audit completed with ~70 controls cataloged.
+
+- [x] **Tidio competitive audit** — ~70 merchant-facing controls, 6 workflows, pricing analysis, docs style review. All items that could not be verified from training data marked [VERIFY] for live-source validation.
+- [x] **Widget config gap analysis** — Existing 34 config fields were all AI behavior controls with ZERO widget appearance controls. 22 launch-blocking widget customization fields identified, deferral list agreed upon.
+- [x] **Widget customization schema (24 fields)** — Added to tenant_config_schema.py (OnboardingStep.WIDGET_APPEARANCE = step 9), cosmos_schema.py (PreferencesDocument), tenant_config_processor.py (_PREFS_DIRECT_FIELDS). Visual (12 fields), behavior (9 fields), content/targeting (3 fields).
+- [x] **Product rename: Customer Engagement → Customer Experience** — Executed across 65+ files (source, config, infra, legal, branding, website, docs, CLAUDE.md). Preserved: AGNTCY upstream name, GitHub repo slugs, directory paths.
+- [x] **Brand primary color correction** — #C83232 → #C41E2A (canonical from color-palette.html).
+- [x] **New logo assets acknowledged** — Horizontal lockup (PNG/SVG/WebP), no-margin variant, AR monogram, dark-background white-text variant.
+- [x] **WI #172-174: Widget frontend (Build Phase 2)** — Complete `widget/` project (20 files, ~3,200 lines):
+  - Project scaffold: package.json (Preact + Vite + TypeScript), tsconfig.json, vite.config.ts (IIFE build, terser, ~15-20KB gzip target)
+  - Theme system: tokens.ts (~70 design tokens, WidgetConfig→DesignTokens resolution, light/dark modes, WCAG contrast utilities, Zapier-derived spacing/typography)
+  - Locale: en.ts (34 strings in Locale interface, merchant-overridable, i18n-ready)
+  - State: store.ts (reactive Store class, Message/WidgetState interfaces, streaming/retraction support)
+  - Transport: http.ts (widget key auth, 5 API methods), sse.ts (6 SSE event types, auto-reconnect with exponential backoff), ws.ts (WebSocket typing/presence, ping keepalive, debounced typing indicator)
+  - Components: Launcher.tsx (Shadow DOM, unread badge), Panel.tsx (root container, SSE/WS lifecycle, view routing), Header.tsx (agent info, avatar, status dot), MessageList.tsx (auto-scroll, day separators, typing dots, greeting), MessageBubble.tsx (customer/agent/system, streaming cursor, retraction), InputBar.tsx (auto-grow textarea, Enter-to-send, file attach, branding), PreChatForm.tsx (configurable fields, validation), ChatRating.tsx (thumbs up/down, comment), OfflineForm.tsx (name/email/message form)
+  - Entry: index.ts (boot from script tag data attributes, Shadow DOM launcher mount, iframe panel creation, page rules, mobile detection, auto-open, sound notification, AgentRed SDK on window)
+  - Dev: dev.html (simulated storefront with SDK controls)
+
+**Key technical decisions from this session:**
+- **Tidio is the primary functional reference** — completeness, language, merchant workflows, widget customization controls.
+- **Zapier is the visual styling reference** — layouts, buttons, forms, spacing, font sizes, borders.
+- **Persistent Customer Memory is the launch pillar** — one key differentiator to drive affiliate/promoter narrative.
+- **Full breadth of named controls, no arbitrary CSS at launch** — match Tidio control count without custom CSS injection.
+- **Shadow DOM (closed) for launcher** — merchant CSS cannot leak into widget styling.
+- **iframe for conversation panel** — full DOM isolation, same architecture as Zendesk (Decision UI-3).
+- **3-channel transport** — HTTP POST (messages), SSE (AI streaming), WebSocket (typing/presence) all implemented.
+- **Stream-then-validate** — tokens stream in real-time, Critic retraction replaces text with `retracted` SSE event (Decision UI-5).
+- **SDK on `window.AgentRed`** — open/close/toggle/hide/show/destroy/setUnreadCount/isOpen.
+- **Page rules** — glob pattern matching on window.location.pathname for per-page widget visibility.
+- **Sound notification** — AudioContext beep (800Hz, 150ms) when unread messages arrive while widget is closed.
+- **Design tokens only** — components never hardcode visual values; theme layer cleanly separated for future design specialist.
+- **Locale separation** — all strings in en.ts, merchant overrides applied at boot; translator adds new locale files without touching components.
+
+**Key design decisions confirmed with owner:**
+- **Merchant widget customization** is the primary UX concern (not Agent Red's own UI). Merchants must be able to style the widget to suit their own storefront.
+- **Equal Tidio in every aspect** — retain one key differentiator (Persistent Customer Memory) and substantially lower prices.
+- **Iterative working style confirmed** — one item at a time, honest assessment, concrete deliverables with approval before implementation, aggressive scope cutting.
+
+**593 backend tests passing.** Widget is ready for `npm install && npm run dev`.
+
 ### Pending
-- [ ] **Phase 3.0 UI/UX frontend implementation:** Build Phase 2 (Chat widget in widget/) → Phase 3 (Shopify Theme App Extension) → Phase 4 (Shared admin components in admin/shared/) → Phase 5 (Shopify admin shell) → Phase 6 (Standalone admin shell). See docs/architecture/UI-UX-ARCHITECTURE-DECISIONS.md §8.
+- [ ] **Phase 3.0 UI/UX frontend implementation — remaining:** Build Phase 3 (Shopify Theme App Extension / Liquid template) → Phase 4 (Shared admin components in admin/shared/) → Phase 5 (Shopify admin shell) → Phase 6 (Standalone admin shell). See docs/architecture/UI-UX-ARCHITECTURE-DECISIONS.md §8. **Build Phase 2 (chat widget) is COMPLETE.**
 - [ ] **P1 pre-launch tests (~200 tests):** NATS isolation (§5.1, 25 tests), GDPR services (§5.2, 30 tests), OpenTelemetry tracing (§5.3, 20 tests), pipeline resilience (§5.4, 20 tests), SystemPromptBuilder (§5.5, 15 tests), tenant config (§5.6, 25 tests), provisioning lifecycle (§5.7, 15 tests), Shopify billing (§5.8, 15 tests), persistent memory (§5.9, 20 tests), dashboard API (§5.10, 15 tests)
 - [ ] **Existing backlog items (WI #101-163):** 63 items staged, many now complete. Remaining items include: #105-107 (CI improvements), #108-118 (merchant web UI), #119-128 (trial/demo — #119 done), #131-133 (SSE enhancements — #129-130 done), #134-139 (pipeline optimization), #142-146 (API completeness), #150-156 (operational readiness), #160-163 (security hardening — #157-159 done).
 - [ ] Phase 2.1: Remaining items (session tokens, App Bridge Save Bar, creative assets, test flows)
 - [ ] Phase 2.5: Layer 3 — PatternExtractionService (Professional+, work items #90-92)
 - [ ] Phase 2.5: Layer 4 — Fine-tuning pipeline (Enterprise add-on, work items #93-96)
 - [ ] Phase 2.5: 5 A/B production tests (work items from Decision #32)
+- [ ] **Verify Tidio audit findings** against live sources (items marked [VERIFY] — pricing, feature changes since May 2025)
+- [ ] **Widget build validation:** `npm install && npm run build` in widget/ to verify bundle size target (~15-20KB gzip), TypeScript compilation, and IIFE output
 
 ---
 
@@ -1262,5 +1332,5 @@ Implemented 20+ work items across 3 sessions. Major deliverables:
 ---
 
 *© 2026 Remaker Digital, a DBA of VanDusen & Palmeter, LLC. All rights reserved.*
-*Last Updated: 2026-01-31*
-*Version: 11.0.0*
+*Last Updated: 2026-02-01*
+*Version: 12.0.0*

@@ -10,7 +10,7 @@
 ## Meta Information
 
 ```yaml
-title: "Integrations - Agent Red Customer Engagement"
+title: "Integrations - Agent Red Customer Experience"
 description: "Connect Agent Red to Shopify, Zendesk, Mailchimp, Google Analytics, and more. Native integrations with real-time data sync for AI customer service."
 keywords: "Shopify AI integration, Zendesk integration, customer service integrations, e-commerce API, Agent Red"
 og_image: "/images/og-integrations.png"

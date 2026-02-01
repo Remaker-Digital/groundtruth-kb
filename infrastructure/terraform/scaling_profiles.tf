@@ -1,4 +1,4 @@
-# Agent Red Customer Engagement — KEDA Scaling Profiles
+# Agent Red Customer Experience — KEDA Scaling Profiles
 #
 # Work Item #47: Define KEDA scaling profiles for all 9 containers.
 # Decision #16: Option B+ — 7 critical at min=2, 2 non-critical at min=1.

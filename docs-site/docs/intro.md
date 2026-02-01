@@ -6,7 +6,7 @@ title: Welcome
 
 # Agent Red Documentation
 
-Agent Red Customer Engagement is an AI-powered customer service platform that automates support conversations across your e-commerce channels. Built on a proven open-source foundation with six specialized AI agents, Agent Red delivers accurate, context-aware responses at scale.
+Agent Red Customer Experience is an AI-powered customer service platform that automates support conversations across your e-commerce channels. Built on a proven open-source foundation with six specialized AI agents, Agent Red delivers accurate, context-aware responses at scale.
 
 ## What you'll find here
 

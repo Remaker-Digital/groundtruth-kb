@@ -1,7 +1,7 @@
-# Comprehensive Test Plan — Agent Red Customer Engagement
+# Comprehensive Test Plan — Agent Red Customer Experience
 
 > **Status:** Living document — tracks all existing and planned tests
-> **Project:** Agent Red Customer Engagement
+> **Project:** Agent Red Customer Experience
 > **Owner:** Remaker Digital (DBA of VanDusen & Palmeter, LLC)
 > **Created:** 2026-01-31
 > **Last Updated:** 2026-01-31

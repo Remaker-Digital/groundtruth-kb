@@ -1,0 +1,155 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Agent Red Widget — Development</title>
+  <style>
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    body {
+      font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+      background: #f5f5f5;
+      color: #333;
+      line-height: 1.6;
+    }
+    .merchant-page {
+      max-width: 900px;
+      margin: 0 auto;
+      padding: 40px 24px;
+    }
+    h1 { font-size: 28px; font-weight: 700; margin-bottom: 8px; }
+    .subtitle { color: #666; font-size: 14px; margin-bottom: 32px; }
+    .product-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fill, minmax(200px, 1fr));
+      gap: 20px;
+      margin-bottom: 40px;
+    }
+    .product-card {
+      background: white;
+      border-radius: 12px;
+      padding: 16px;
+      box-shadow: 0 1px 3px rgba(0,0,0,0.08);
+    }
+    .product-card .swatch {
+      width: 100%;
+      height: 140px;
+      border-radius: 8px;
+      margin-bottom: 12px;
+    }
+    .product-card h3 { font-size: 14px; font-weight: 600; margin-bottom: 4px; }
+    .product-card .price { font-size: 16px; font-weight: 700; color: #C41E2A; }
+    .controls {
+      background: white;
+      border-radius: 12px;
+      padding: 24px;
+      box-shadow: 0 1px 3px rgba(0,0,0,0.08);
+      margin-bottom: 24px;
+    }
+    .controls h2 { font-size: 16px; font-weight: 600; margin-bottom: 16px; }
+    .control-row {
+      display: flex;
+      gap: 12px;
+      flex-wrap: wrap;
+      margin-bottom: 12px;
+    }
+    .control-row button {
+      padding: 8px 16px;
+      border-radius: 6px;
+      border: 1px solid #ddd;
+      background: white;
+      cursor: pointer;
+      font-size: 13px;
+      font-family: inherit;
+      transition: all 0.15s;
+    }
+    .control-row button:hover { background: #f0f0f0; border-color: #bbb; }
+    .control-row button.primary {
+      background: #C41E2A;
+      color: white;
+      border-color: #C41E2A;
+    }
+    .control-row button.primary:hover { background: #a3171f; }
+  </style>
+</head>
+<body>
+  <!-- Simulated merchant storefront -->
+  <div class="merchant-page">
+    <h1>Demo Storefront</h1>
+    <p class="subtitle">
+      This page simulates a merchant's storefront for widget development.
+      The Agent Red chat widget loads in the bottom-right corner.
+    </p>
+
+    <!-- SDK controls -->
+    <div class="controls">
+      <h2>Widget SDK Controls</h2>
+      <div class="control-row">
+        <button class="primary" onclick="window.AgentRed?.open()">Open Widget</button>
+        <button onclick="window.AgentRed?.close()">Close Widget</button>
+        <button onclick="window.AgentRed?.toggle()">Toggle</button>
+      </div>
+      <div class="control-row">
+        <button onclick="window.AgentRed?.setUnreadCount(3)">Set 3 Unread</button>
+        <button onclick="window.AgentRed?.setUnreadCount(0)">Clear Unread</button>
+        <button onclick="window.AgentRed?.hide()">Hide</button>
+        <button onclick="window.AgentRed?.show()">Show</button>
+      </div>
+      <div class="control-row">
+        <button onclick="alert('isOpen: ' + window.AgentRed?.isOpen())">Check isOpen</button>
+        <button onclick="window.AgentRed?.destroy()" style="color:#C41E2A">Destroy</button>
+      </div>
+    </div>
+
+    <!-- Fake product grid -->
+    <div class="product-grid">
+      <div class="product-card">
+        <div class="swatch" style="background: linear-gradient(135deg, #667eea, #764ba2);"></div>
+        <h3>Premium Widget</h3>
+        <div class="price">$149/mo</div>
+      </div>
+      <div class="product-card">
+        <div class="swatch" style="background: linear-gradient(135deg, #f093fb, #f5576c);"></div>
+        <h3>Pro Bundle</h3>
+        <div class="price">$399/mo</div>
+      </div>
+      <div class="product-card">
+        <div class="swatch" style="background: linear-gradient(135deg, #4facfe, #00f2fe);"></div>
+        <h3>Enterprise Suite</h3>
+        <div class="price">$999/mo</div>
+      </div>
+      <div class="product-card">
+        <div class="swatch" style="background: linear-gradient(135deg, #43e97b, #38f9d7);"></div>
+        <h3>Starter Pack</h3>
+        <div class="price">$49</div>
+      </div>
+    </div>
+
+    <div class="controls" style="font-size:13px; color:#666">
+      <strong>Dev notes:</strong>
+      <ul style="margin-top:8px; padding-left:20px">
+        <li>Widget loads via the script tag below with a mock widget key</li>
+        <li>API calls will fail (no backend running) — this is for UI development only</li>
+        <li>The widget uses Shadow DOM for the launcher and iframe for the panel</li>
+        <li>Use the SDK controls above to test programmatic widget control</li>
+        <li>Check the browser console for [AgentRed] messages</li>
+      </ul>
+    </div>
+  </div>
+
+  <!-- Agent Red Widget embed (development build) -->
+  <script
+    type="module"
+    src="/src/index.ts"
+    data-widget-key="pk_dev_test_key_12345"
+    data-api-url="http://localhost:8000"
+  ></script>
+
+  <!-- Listen for the widget ready event -->
+  <script>
+    window.addEventListener('agentred:ready', function(e) {
+      console.log('[Dev] Widget ready!', e.detail.sdk);
+    });
+  </script>
+</body>
+</html>

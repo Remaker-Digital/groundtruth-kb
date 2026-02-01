@@ -67,6 +67,18 @@ MAX_FAREWELL_LENGTH = 500
 MAX_FALLBACK_LENGTH = 500
 MAX_BUSINESS_HOURS_SLOTS = 14  # 7 days × 2 shifts
 
+# Widget appearance constants
+MAX_WIDGET_TITLE_LENGTH = 100
+MAX_AGENT_DISPLAY_NAME_LENGTH = 100
+MAX_AGENT_TITLE_LENGTH = 100
+MAX_PLACEHOLDER_TEXT_LENGTH = 200
+MAX_OFFLINE_MESSAGE_LENGTH = 500
+MAX_PAGE_RULES_COUNT = 20
+MAX_PAGE_RULE_LENGTH = 500
+MAX_PRECHAT_FIELDS_COUNT = 10
+HEX_COLOR_PATTERN = r"^#[0-9a-fA-F]{6}$"
+AUTO_OPEN_MAX_DELAY = 120  # seconds
+
 
 # ---------------------------------------------------------------------------
 # Enums — field types and constraint kinds
@@ -87,7 +99,12 @@ class ConfigFieldType(str, Enum):
 
 
 class OnboardingStep(int, Enum):
-    """9-step merchant onboarding workflow (Decision #22)."""
+    """10-step merchant onboarding workflow (Decision #22 + Tidio parity).
+
+    Steps 1-8: AI behavior and business configuration (original).
+    Step 9: Widget appearance and behavior (new — Tidio parity).
+    Step 10: Review and launch (renumbered from 9).
+    """
 
     BRAND_AND_TONE = 1
     LANGUAGES = 2
@@ -97,7 +114,8 @@ class OnboardingStep(int, Enum):
     ESCALATION_RULES = 6
     INTEGRATIONS = 7
     MEMORY_AND_PRIVACY = 8
-    REVIEW_AND_LAUNCH = 9
+    WIDGET_APPEARANCE = 9
+    REVIEW_AND_LAUNCH = 10
 
 
 class TierGate(str, Enum):
@@ -964,14 +982,513 @@ def _build_field_registry() -> dict[str, ConfigFieldDefinition]:
     ))
 
     # ===================================================================
-    # Step 9: Review & Launch (no configurable fields — summary step)
+    # Step 9: Widget Appearance (Tidio parity — 22 controls)
+    #
+    # These fields control the chat widget's visual appearance and
+    # interactive behavior on the merchant's storefront. None are
+    # injected into AI prompts — they are consumed by the widget
+    # frontend (Preact) and the widget configurator admin UI.
+    #
+    # Reference: Tidio competitive audit (2026-02-01).
+    # Architecture: Decision UI-2 (Theme App Extension), UI-3 (Shadow DOM).
+    # ===================================================================
+
+    # --- 9A: Visual controls ---
+
+    fields.append(ConfigFieldDefinition(
+        field_name="widget_primary_color",
+        display_name="Widget Color",
+        field_type=ConfigFieldType.STRING,
+        validation=ValidationRule(
+            pattern=HEX_COLOR_PATTERN,
+        ),
+        platform_default="#C41E2A",  # Agent Red brand primary
+        onboarding_step=OnboardingStep.WIDGET_APPEARANCE,
+        step_order=0,
+        tooltip="The primary color of your chat widget (header, send button, customer message bubbles).",
+        description=(
+            "Controls the widget header background, send button, and outgoing "
+            "customer message bubble color. Use your brand color for consistency. "
+            "Ensure sufficient contrast against white text (WCAG AA)."
+        ),
+        placeholder="#C41E2A",
+        doc_link=f"{DOCS_BASE_URL}/configuration/widget-appearance#color",
+        affects_agents=[],
+    ))
+
+    fields.append(ConfigFieldDefinition(
+        field_name="widget_background_color",
+        display_name="Widget Background",
+        field_type=ConfigFieldType.STRING,
+        validation=ValidationRule(
+            pattern=HEX_COLOR_PATTERN,
+        ),
+        platform_default="#FFFFFF",
+        onboarding_step=OnboardingStep.WIDGET_APPEARANCE,
+        step_order=1,
+        tooltip="Background color of the conversation panel.",
+        description=(
+            "The background color of the chat conversation area. White is "
+            "recommended for readability. Dark mode uses a separate toggle."
+        ),
+        placeholder="#FFFFFF",
+        doc_link=f"{DOCS_BASE_URL}/configuration/widget-appearance#background",
+        affects_agents=[],
+    ))
+
+    fields.append(ConfigFieldDefinition(
+        field_name="widget_position",
+        display_name="Widget Position",
+        field_type=ConfigFieldType.ENUM,
+        validation=ValidationRule(
+            allowed_values=["bottom-right", "bottom-left"],
+        ),
+        platform_default="bottom-right",
+        onboarding_step=OnboardingStep.WIDGET_APPEARANCE,
+        step_order=2,
+        tooltip="Which corner of the screen the chat launcher appears in.",
+        description=(
+            "Bottom-right is standard and expected by most visitors. Use "
+            "bottom-left only if your site has a conflicting element in the "
+            "bottom-right corner."
+        ),
+        doc_link=f"{DOCS_BASE_URL}/configuration/widget-appearance#position",
+        affects_agents=[],
+    ))
+
+    fields.append(ConfigFieldDefinition(
+        field_name="widget_offset_x",
+        display_name="Horizontal Offset",
+        field_type=ConfigFieldType.INTEGER,
+        validation=ValidationRule(
+            min_value=0,
+            max_value=100,
+        ),
+        platform_default=20,
+        onboarding_step=OnboardingStep.WIDGET_APPEARANCE,
+        step_order=3,
+        tooltip="Distance from the screen edge in pixels.",
+        description=(
+            "Horizontal distance from the left or right edge (depending on "
+            "widget position). Default 20px. Increase if the launcher overlaps "
+            "other elements on your site."
+        ),
+        doc_link=f"{DOCS_BASE_URL}/configuration/widget-appearance#offset",
+        affects_agents=[],
+    ))
+
+    fields.append(ConfigFieldDefinition(
+        field_name="widget_offset_y",
+        display_name="Vertical Offset",
+        field_type=ConfigFieldType.INTEGER,
+        validation=ValidationRule(
+            min_value=0,
+            max_value=100,
+        ),
+        platform_default=20,
+        onboarding_step=OnboardingStep.WIDGET_APPEARANCE,
+        step_order=4,
+        tooltip="Distance from the bottom of the screen in pixels.",
+        description=(
+            "Vertical distance from the bottom edge. Default 20px. Increase "
+            "if the launcher overlaps a sticky footer or cookie banner."
+        ),
+        doc_link=f"{DOCS_BASE_URL}/configuration/widget-appearance#offset",
+        affects_agents=[],
+    ))
+
+    fields.append(ConfigFieldDefinition(
+        field_name="widget_agent_avatar_url",
+        display_name="Agent Avatar",
+        field_type=ConfigFieldType.STRING,
+        validation=ValidationRule(
+            max_length=500,
+        ),
+        platform_default=None,
+        onboarding_step=OnboardingStep.WIDGET_APPEARANCE,
+        step_order=5,
+        tooltip="URL of the avatar image shown in the widget header and message bubbles.",
+        description=(
+            "Upload a square image (recommended 200×200px) through the Widget "
+            "Configurator. The URL is stored here after upload. If blank, a "
+            "default Agent Red avatar is shown. Supported formats: PNG, JPG, WebP."
+        ),
+        doc_link=f"{DOCS_BASE_URL}/configuration/widget-appearance#avatar",
+        affects_agents=[],
+    ))
+
+    fields.append(ConfigFieldDefinition(
+        field_name="widget_agent_display_name",
+        display_name="Agent Display Name",
+        field_type=ConfigFieldType.STRING,
+        validation=ValidationRule(
+            max_length=MAX_AGENT_DISPLAY_NAME_LENGTH,
+        ),
+        platform_default=None,
+        onboarding_step=OnboardingStep.WIDGET_APPEARANCE,
+        step_order=6,
+        tooltip="Name shown in the widget header and message bubbles.",
+        description=(
+            "The name displayed as the AI agent's identity in conversations. "
+            "If blank, falls back to your brand name. Keep it short and "
+            "friendly (e.g. 'Support', 'Amy', 'Help Desk')."
+        ),
+        placeholder="e.g. Support, Amy, Help Desk",
+        doc_link=f"{DOCS_BASE_URL}/configuration/widget-appearance#agent-name",
+        affects_agents=[],
+    ))
+
+    fields.append(ConfigFieldDefinition(
+        field_name="widget_agent_title",
+        display_name="Agent Title",
+        field_type=ConfigFieldType.STRING,
+        validation=ValidationRule(
+            max_length=MAX_AGENT_TITLE_LENGTH,
+        ),
+        platform_default=None,
+        onboarding_step=OnboardingStep.WIDGET_APPEARANCE,
+        step_order=7,
+        tooltip="Optional subtitle shown below the agent name (e.g. 'Customer Support').",
+        description=(
+            "A secondary label shown beneath the agent display name in the "
+            "widget header. Optional. Examples: 'Customer Support', "
+            "'AI Assistant', 'Here to help'."
+        ),
+        placeholder="e.g. Customer Support",
+        doc_link=f"{DOCS_BASE_URL}/configuration/widget-appearance#agent-title",
+        affects_agents=[],
+    ))
+
+    fields.append(ConfigFieldDefinition(
+        field_name="widget_logo_url",
+        display_name="Widget Logo",
+        field_type=ConfigFieldType.STRING,
+        validation=ValidationRule(
+            max_length=500,
+        ),
+        platform_default=None,
+        onboarding_step=OnboardingStep.WIDGET_APPEARANCE,
+        step_order=8,
+        tooltip="URL of your company logo displayed in the widget header.",
+        description=(
+            "Upload your company logo through the Widget Configurator. "
+            "Recommended dimensions: 120×40px (landscape). Displayed in the "
+            "widget header area alongside the agent name. If blank, only the "
+            "agent name and avatar are shown."
+        ),
+        doc_link=f"{DOCS_BASE_URL}/configuration/widget-appearance#logo",
+        affects_agents=[],
+    ))
+
+    fields.append(ConfigFieldDefinition(
+        field_name="widget_show_branding",
+        display_name="Show 'Powered by Agent Red'",
+        field_type=ConfigFieldType.BOOLEAN,
+        validation=ValidationRule(),
+        platform_default=True,
+        tier_gate=TierGate.PROFESSIONAL_PLUS,
+        onboarding_step=OnboardingStep.WIDGET_APPEARANCE,
+        step_order=9,
+        tooltip="Display 'Powered by Agent Red' badge in the widget footer.",
+        description=(
+            "Professional and Enterprise tiers can remove the Agent Red branding "
+            "badge from the widget footer. Starter tier always shows branding."
+        ),
+        doc_link=f"{DOCS_BASE_URL}/configuration/widget-appearance#branding",
+        affects_agents=[],
+    ))
+
+    fields.append(ConfigFieldDefinition(
+        field_name="widget_mobile_enabled",
+        display_name="Show on Mobile",
+        field_type=ConfigFieldType.BOOLEAN,
+        validation=ValidationRule(),
+        platform_default=True,
+        onboarding_step=OnboardingStep.WIDGET_APPEARANCE,
+        step_order=10,
+        tooltip="Whether to show the chat widget on mobile devices.",
+        description=(
+            "When disabled, the widget launcher and conversation panel are "
+            "hidden on screens narrower than 768px. Useful if you have a "
+            "dedicated mobile app or mobile-specific support channel."
+        ),
+        doc_link=f"{DOCS_BASE_URL}/configuration/widget-appearance#mobile",
+        affects_agents=[],
+    ))
+
+    fields.append(ConfigFieldDefinition(
+        field_name="widget_dark_mode",
+        display_name="Dark Mode",
+        field_type=ConfigFieldType.BOOLEAN,
+        validation=ValidationRule(),
+        platform_default=False,
+        onboarding_step=OnboardingStep.WIDGET_APPEARANCE,
+        step_order=11,
+        tooltip="Use a dark color scheme for the widget.",
+        description=(
+            "When enabled, the widget uses a dark background with light text. "
+            "Your primary color is still used for accents and buttons. "
+            "Dark mode is not available in most competing products."
+        ),
+        doc_link=f"{DOCS_BASE_URL}/configuration/widget-appearance#dark-mode",
+        affects_agents=[],
+    ))
+
+    # --- 9B: Behavior controls ---
+
+    fields.append(ConfigFieldDefinition(
+        field_name="widget_offline_message",
+        display_name="Offline Message",
+        field_type=ConfigFieldType.TEXT,
+        validation=ValidationRule(
+            max_length=MAX_OFFLINE_MESSAGE_LENGTH,
+        ),
+        platform_default=None,
+        onboarding_step=OnboardingStep.WIDGET_APPEARANCE,
+        step_order=12,
+        tooltip="Message displayed when your support team is offline.",
+        description=(
+            "Shown when all human agents are offline (outside operating hours). "
+            "The AI agent remains available 24/7. This message appears alongside "
+            "the AI chat to set expectations about human response times. "
+            "Leave blank to use the default: 'Our team is currently offline. "
+            "Our AI assistant is available to help you now.'"
+        ),
+        placeholder="e.g. Our team is offline, but our AI assistant is here to help!",
+        doc_link=f"{DOCS_BASE_URL}/configuration/widget-appearance#offline",
+        affects_agents=[],
+    ))
+
+    fields.append(ConfigFieldDefinition(
+        field_name="widget_auto_open",
+        display_name="Auto-Open Widget",
+        field_type=ConfigFieldType.BOOLEAN,
+        validation=ValidationRule(),
+        platform_default=False,
+        onboarding_step=OnboardingStep.WIDGET_APPEARANCE,
+        step_order=13,
+        tooltip="Automatically open the widget after a delay.",
+        description=(
+            "When enabled, the widget opens automatically after the visitor "
+            "has been on the page for the configured delay period. Use "
+            "sparingly — auto-opening can feel intrusive if overused."
+        ),
+        doc_link=f"{DOCS_BASE_URL}/configuration/widget-appearance#auto-open",
+        affects_agents=[],
+    ))
+
+    fields.append(ConfigFieldDefinition(
+        field_name="widget_auto_open_delay",
+        display_name="Auto-Open Delay (seconds)",
+        field_type=ConfigFieldType.INTEGER,
+        validation=ValidationRule(
+            min_value=1,
+            max_value=AUTO_OPEN_MAX_DELAY,
+        ),
+        platform_default=5,
+        onboarding_step=OnboardingStep.WIDGET_APPEARANCE,
+        step_order=14,
+        tooltip="Seconds to wait before auto-opening the widget.",
+        description=(
+            "Only applies when Auto-Open Widget is enabled. The widget "
+            "opens after this many seconds on the page. Recommended: "
+            "3-10 seconds. Longer delays feel less intrusive."
+        ),
+        doc_link=f"{DOCS_BASE_URL}/configuration/widget-appearance#auto-open",
+        affects_agents=[],
+    ))
+
+    fields.append(ConfigFieldDefinition(
+        field_name="widget_operating_hours",
+        display_name="Operating Hours",
+        field_type=ConfigFieldType.OBJECT,
+        validation=ValidationRule(),
+        platform_default=None,
+        onboarding_step=OnboardingStep.WIDGET_APPEARANCE,
+        step_order=15,
+        tooltip="Your team's business hours schedule.",
+        description=(
+            "Structured schedule with per-day time ranges and timezone. "
+            "Format: {timezone: 'America/New_York', schedule: {monday: "
+            "[{start: '09:00', end: '17:00'}], ...}}. When set, the widget "
+            "shows an online/offline indicator. Leave blank for 'always available'."
+        ),
+        doc_link=f"{DOCS_BASE_URL}/configuration/widget-appearance#hours",
+        affects_agents=[],
+    ))
+
+    fields.append(ConfigFieldDefinition(
+        field_name="widget_offline_behavior",
+        display_name="Offline Behavior",
+        field_type=ConfigFieldType.ENUM,
+        validation=ValidationRule(
+            allowed_values=["ai_only", "show_form", "hide_widget"],
+        ),
+        platform_default="ai_only",
+        onboarding_step=OnboardingStep.WIDGET_APPEARANCE,
+        step_order=16,
+        tooltip="What happens when your team is offline.",
+        description=(
+            "AI only: the AI agent handles all conversations (recommended). "
+            "Show form: display a 'leave a message' form instead of chat. "
+            "Hide widget: hide the widget entirely during offline hours."
+        ),
+        doc_link=f"{DOCS_BASE_URL}/configuration/widget-appearance#offline-behavior",
+        affects_agents=[],
+    ))
+
+    fields.append(ConfigFieldDefinition(
+        field_name="widget_prechat_form",
+        display_name="Pre-Chat Form",
+        field_type=ConfigFieldType.OBJECT,
+        validation=ValidationRule(),
+        platform_default=None,
+        onboarding_step=OnboardingStep.WIDGET_APPEARANCE,
+        step_order=17,
+        tooltip="Collect visitor information before starting a conversation.",
+        description=(
+            "When configured, visitors fill in a form before chatting. "
+            "Format: {enabled: true, fields: [{name: 'name', label: 'Your Name', "
+            "type: 'text', required: true}, {name: 'email', label: 'Email', "
+            "type: 'email', required: true}]}. Supports text, email, phone, "
+            "and dropdown field types. Maximum 10 fields."
+        ),
+        doc_link=f"{DOCS_BASE_URL}/configuration/widget-appearance#prechat",
+        affects_agents=[],
+    ))
+
+    fields.append(ConfigFieldDefinition(
+        field_name="widget_chat_rating_enabled",
+        display_name="Post-Chat Rating",
+        field_type=ConfigFieldType.BOOLEAN,
+        validation=ValidationRule(),
+        platform_default=False,
+        onboarding_step=OnboardingStep.WIDGET_APPEARANCE,
+        step_order=18,
+        tooltip="Show a thumbs up/down rating prompt after conversations.",
+        description=(
+            "When enabled, visitors see a satisfaction prompt after the "
+            "conversation ends. Ratings are tracked in the Analytics dashboard. "
+            "Negative ratings optionally include a comment field."
+        ),
+        doc_link=f"{DOCS_BASE_URL}/configuration/widget-appearance#rating",
+        affects_agents=[],
+    ))
+
+    fields.append(ConfigFieldDefinition(
+        field_name="widget_sound_enabled",
+        display_name="Notification Sound",
+        field_type=ConfigFieldType.BOOLEAN,
+        validation=ValidationRule(),
+        platform_default=True,
+        onboarding_step=OnboardingStep.WIDGET_APPEARANCE,
+        step_order=19,
+        tooltip="Play a sound when a new message arrives.",
+        description=(
+            "A subtle notification sound plays in the visitor's browser when "
+            "a new agent message arrives and the widget is minimized. "
+            "Visitors can also mute this from within the widget."
+        ),
+        doc_link=f"{DOCS_BASE_URL}/configuration/widget-appearance#sound",
+        affects_agents=[],
+    ))
+
+    fields.append(ConfigFieldDefinition(
+        field_name="widget_file_upload_enabled",
+        display_name="File Uploads",
+        field_type=ConfigFieldType.BOOLEAN,
+        validation=ValidationRule(),
+        platform_default=True,
+        onboarding_step=OnboardingStep.WIDGET_APPEARANCE,
+        step_order=20,
+        tooltip="Allow visitors to attach images and files.",
+        description=(
+            "When enabled, visitors can attach files (images, PDFs, documents) "
+            "to their messages. Maximum file size: 10MB. Supported formats: "
+            "PNG, JPG, GIF, PDF, DOC, DOCX, TXT. Disable if file attachments "
+            "are not relevant to your support workflow."
+        ),
+        doc_link=f"{DOCS_BASE_URL}/configuration/widget-appearance#files",
+        affects_agents=[],
+    ))
+
+    # --- 9C: Content and targeting controls ---
+
+    fields.append(ConfigFieldDefinition(
+        field_name="widget_header_text",
+        display_name="Widget Header Text",
+        field_type=ConfigFieldType.STRING,
+        validation=ValidationRule(
+            max_length=MAX_WIDGET_TITLE_LENGTH,
+        ),
+        platform_default=None,
+        onboarding_step=OnboardingStep.WIDGET_APPEARANCE,
+        step_order=21,
+        tooltip="Custom title shown at the top of the widget.",
+        description=(
+            "Replaces the default header text. If blank, defaults to "
+            "'Chat with us' or the agent display name. Keep it short "
+            "and action-oriented."
+        ),
+        placeholder="e.g. Chat with us, Need help?, Ask a question",
+        doc_link=f"{DOCS_BASE_URL}/configuration/widget-appearance#header",
+        affects_agents=[],
+    ))
+
+    fields.append(ConfigFieldDefinition(
+        field_name="widget_input_placeholder",
+        display_name="Input Placeholder",
+        field_type=ConfigFieldType.STRING,
+        validation=ValidationRule(
+            max_length=MAX_PLACEHOLDER_TEXT_LENGTH,
+        ),
+        platform_default=None,
+        onboarding_step=OnboardingStep.WIDGET_APPEARANCE,
+        step_order=22,
+        tooltip="Placeholder text in the message input field.",
+        description=(
+            "The grey hint text shown in the empty message input box. "
+            "If blank, defaults to 'Type a message...'. Use it to guide "
+            "visitors toward productive queries."
+        ),
+        placeholder="e.g. Type a message..., Ask me anything...",
+        doc_link=f"{DOCS_BASE_URL}/configuration/widget-appearance#placeholder",
+        affects_agents=[],
+    ))
+
+    fields.append(ConfigFieldDefinition(
+        field_name="widget_page_rules",
+        display_name="Page Visibility Rules",
+        field_type=ConfigFieldType.STRING_LIST,
+        validation=ValidationRule(
+            max_items=MAX_PAGE_RULES_COUNT,
+            max_length=MAX_PAGE_RULE_LENGTH,
+        ),
+        platform_default=[],
+        onboarding_step=OnboardingStep.WIDGET_APPEARANCE,
+        step_order=23,
+        tooltip="Control which pages the widget appears on.",
+        description=(
+            "List of URL patterns to control widget visibility. "
+            "Prefix with '+' to include or '-' to exclude. "
+            "Examples: '+/products/*' (show on product pages), "
+            "'-/checkout' (hide on checkout), '-/admin/*' (hide on admin). "
+            "If empty, the widget appears on all pages."
+        ),
+        placeholder="e.g. +/products/*, -/checkout, -/admin/*",
+        doc_link=f"{DOCS_BASE_URL}/configuration/widget-appearance#page-rules",
+        affects_agents=[],
+    ))
+
+    # ===================================================================
+    # Step 10: Review & Launch (renumbered from 9)
     # This step shows a review of all configured settings.
     # No fields are defined here.
     # ===================================================================
 
     # ===================================================================
     # Advanced settings (not part of onboarding, accessible post-setup)
-    # Mapped to Step 9 (Review & Launch) for schema completeness.
+    # Mapped to Step 10 (Review & Launch) for schema completeness.
     # ===================================================================
 
     fields.append(ConfigFieldDefinition(
@@ -983,7 +1500,7 @@ def _build_field_registry() -> dict[str, ConfigFieldDefinition]:
         ),
         platform_default=None,
         tier_gate=TierGate.PROFESSIONAL_PLUS,
-        onboarding_step=OnboardingStep.REVIEW_AND_LAUNCH,
+        onboarding_step=OnboardingStep.REVIEW_AND_LAUNCH,  # Step 10
         step_order=0,
         tooltip="Advanced: free-form instructions appended to the AI's system prompt.",
         description=(
@@ -1004,7 +1521,7 @@ def _build_field_registry() -> dict[str, ConfigFieldDefinition]:
         field_type=ConfigFieldType.BOOLEAN,
         validation=ValidationRule(),
         platform_default=False,
-        onboarding_step=OnboardingStep.REVIEW_AND_LAUNCH,
+        onboarding_step=OnboardingStep.REVIEW_AND_LAUNCH,  # Step 10
         step_order=1,
         tooltip="Enable test mode — conversations are not billed.",
         description=(

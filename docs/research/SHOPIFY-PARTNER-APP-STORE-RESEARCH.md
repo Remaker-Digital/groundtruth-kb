@@ -1,6 +1,6 @@
 # Shopify Partner Program & App Store Research
 
-> **Project:** Agent Red Customer Engagement
+> **Project:** Agent Red Customer Experience
 > **Purpose:** Formal reference document covering the Shopify Partner Program, App Store listing process, partner tiers, optimization strategies, and related programs relevant to Agent Red's go-to-market strategy
 > **Date:** 2026-01-30
 > **Scope:** 8 research areas (App Store approval, partner tiers, growth benefits, ASO, Plus Partners, Built for Shopify, competitions, certifications)
@@ -690,7 +690,7 @@ Shopify's App Store search algorithm determines which apps appear when merchants
 | Include primary keyword | "Agent Red AI Customer Service" | Primary keyword: customer service |
 | Keep concise | Max ~30 characters for display purposes [VERIFY] | Longer names get truncated in search results |
 | Avoid keyword stuffing | Do not: "Agent Red Customer Service Chatbot AI Helpdesk Support" | Will trigger review rejection |
-| Brand first, keyword second | "Agent Red -- AI Customer Service" or "Agent Red Customer Engagement" | Brand recognition + searchability |
+| Brand first, keyword second | "Agent Red -- AI Customer Service" or "Agent Red Customer Experience" | Brand recognition + searchability |
 
 **Recommendation for Agent Red:** "Agent Red AI Customer Service" or "Agent Red -- AI Customer Support" (contains "customer service" or "customer support" -- the highest-volume search terms in this category).
 
@@ -1124,5 +1124,5 @@ The following items in this document are marked [VERIFY] and should be confirmed
 
 ---
 
-*Research prepared for Agent Red Customer Engagement Phase 2.1 platform and go-to-market planning.*
+*Research prepared for Agent Red Customer Experience Phase 2.1 platform and go-to-market planning.*
 *(c) 2026 Remaker Digital, a DBA of VanDusen & Palmeter, LLC. All rights reserved.*

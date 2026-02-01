@@ -1,4 +1,4 @@
-# Agent Red Customer Engagement
+# Agent Red Customer Experience
 
 > **AI-Powered Customer Service Platform for E-Commerce**
 >
@@ -22,7 +22,7 @@
 
 ## Overview
 
-Agent Red Customer Engagement is a commercial SaaS platform that helps e-commerce businesses automate customer support with intelligent AI agents. It combines six specialized AI agents that work together to understand, respond to, and resolve customer issues instantly — while seamlessly escalating complex cases to your team.
+Agent Red Customer Experience is a commercial SaaS platform that helps e-commerce businesses automate customer support with intelligent AI agents. It combines six specialized AI agents that work together to understand, respond to, and resolve customer issues instantly — while seamlessly escalating complex cases to your team.
 
 ### Key Capabilities
 
@@ -66,7 +66,7 @@ Agent Red is built on the open-source [AGNTCY Customer Engagement Platform](http
 ## Repository Structure
 
 ```
-Agent Red Customer Engagement/
+Agent Red Customer Experience/
 ├── CLAUDE.md                       # AI assistant guidance (canonical status)
 ├── README.md                       # This file — project hub
 ├── Dockerfile                      # Container build
