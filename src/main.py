@@ -75,6 +75,8 @@ from src.multi_tenant.admin_team_api import router as admin_team_router  # noqa:
 from src.multi_tenant.admin_gdpr_api import router as admin_gdpr_router  # noqa: E402
 from src.integrations.shopify_gdpr_webhooks import router as shopify_gdpr_router  # noqa: E402
 from src.multi_tenant.admin_audit_api import router as admin_audit_router  # noqa: E402
+from src.multi_tenant.trial_management import trial_router  # noqa: E402
+from src.multi_tenant.security_hardening import rotation_router  # noqa: E402
 
 app.include_router(provisioning_router)
 app.include_router(checkout_router)
@@ -93,6 +95,8 @@ app.include_router(admin_team_router)
 app.include_router(admin_gdpr_router)
 app.include_router(shopify_gdpr_router)
 app.include_router(admin_audit_router)
+app.include_router(trial_router)
+app.include_router(rotation_router)
 
 # ---------------------------------------------------------------------------
 # Tenant authentication + rate limiting (Decisions #4-5, WI #18/#27-28)
@@ -128,6 +132,7 @@ from src.multi_tenant.security_middleware import (  # noqa: E402
 # ---------------------------------------------------------------------------
 
 from src.multi_tenant.api_versioning import ApiVersionMiddleware  # noqa: E402
+from src.multi_tenant.security_hardening import PreAuthRateLimitMiddleware  # noqa: E402
 
 # ---------------------------------------------------------------------------
 # OpenTelemetry tenant-aware tracing (Work Items #39-40)
@@ -144,20 +149,21 @@ from src.multi_tenant.otel_tracing import (  # noqa: E402
 #
 # Starlette processes middleware in REVERSE registration order.
 # Registration order (first registered = outermost = runs last):
-#   1. SecurityHeadersMiddleware   — security response headers (outermost)
-#   2. ApiVersionMiddleware        — X-API-Version on every response
-#   3. RequestBodyLimitMiddleware  — reject oversized payloads early
-#   4. CorrelationMiddleware       — sets CorrelationContext (needs TenantContext)
+#   1. SecurityHeadersMiddleware    — security response headers (outermost)
+#   2. ApiVersionMiddleware         — X-API-Version on every response
+#   3. RequestBodyLimitMiddleware   — reject oversized payloads early
+#   4. CorrelationMiddleware        — sets CorrelationContext (needs TenantContext)
 #   5. JsonDepthValidationMiddleware — reject deeply nested JSON (needs body)
-#   6. TenantConcurrencyMiddleware — enforces per-tenant concurrency limits
-#   7. RateLimitMiddleware         — enforces per-tenant rate limits + headers
-#   8. TenantAuthMiddleware        — authenticates and injects TenantContext
+#   6. TenantConcurrencyMiddleware  — enforces per-tenant concurrency limits
+#   7. RateLimitMiddleware          — enforces per-tenant rate limits + headers
+#   8. TenantAuthMiddleware         — authenticates and injects TenantContext
+#   9. PreAuthRateLimitMiddleware   — blocks IPs with excessive failed auth (WI #163)
 #
 # Execution order (innermost registered = runs first):
-#   TenantAuthMiddleware → RateLimitMiddleware →
-#   TenantConcurrencyMiddleware → JsonDepthValidation →
-#   CorrelationMiddleware → RequestBodyLimit →
-#   ApiVersion → SecurityHeaders → handler
+#   PreAuthRateLimitMiddleware → TenantAuthMiddleware →
+#   RateLimitMiddleware → TenantConcurrencyMiddleware →
+#   JsonDepthValidation → CorrelationMiddleware →
+#   RequestBodyLimit → ApiVersion → SecurityHeaders → handler
 # ---------------------------------------------------------------------------
 
 app.add_middleware(SecurityHeadersMiddleware)
@@ -168,6 +174,7 @@ app.add_middleware(JsonDepthValidationMiddleware)
 app.add_middleware(TenantConcurrencyMiddleware)
 app.add_middleware(RateLimitMiddleware)
 app.add_middleware(TenantAuthMiddleware)
+app.add_middleware(PreAuthRateLimitMiddleware)
 
 
 # ---------------------------------------------------------------------------
@@ -544,6 +551,211 @@ async def _startup_admin_audit_services() -> None:
 
 
 # ---------------------------------------------------------------------------
+# API key rotation service (WI #159)
+# ---------------------------------------------------------------------------
+
+from src.multi_tenant.security_hardening import configure_key_rotation_services  # noqa: E402
+
+
+@app.on_event("startup")
+async def _startup_key_rotation() -> None:
+    """Initialize the API key rotation service.
+
+    Wires TenantSecretService and TenantRepository into the key
+    rotation endpoints.
+    """
+    try:
+        from src.multi_tenant.repository import TenantRepository
+
+        configure_key_rotation_services(
+            secret_service=get_secret_service(),
+            tenant_repo=TenantRepository(),
+        )
+        logger.info("API key rotation service initialized (2 endpoints)")
+    except Exception:
+        logger.warning(
+            "API key rotation initialization failed — key rotation "
+            "endpoints will return 503 until dependencies are available."
+        )
+
+
+# ---------------------------------------------------------------------------
+# Trial management service (WI #120-128)
+# ---------------------------------------------------------------------------
+
+from src.multi_tenant.trial_management import configure_trial_service  # noqa: E402
+from src.multi_tenant.trial_management import TrialManagementService  # noqa: E402
+from src.multi_tenant.data_retention import (  # noqa: E402
+    DataRetentionService,
+    configure_retention_service,
+)
+from src.multi_tenant.archival_pipeline import (  # noqa: E402
+    ArchivalPipelineService,
+    configure_archival_service,
+)
+from src.multi_tenant.alert_delivery import (  # noqa: E402
+    AlertDeliveryService,
+    DashboardAlertChannel,
+    LogAlertChannel,
+    configure_alert_service,
+)
+
+
+@app.on_event("startup")
+async def _startup_trial_service() -> None:
+    """Initialize the Trial Management Service.
+
+    Wires tenant, usage, conversation, profile, knowledge, and audit
+    repositories into the trial service for provisioning, expiry,
+    cap enforcement, and conversion operations.
+    Non-fatal: trial endpoints return 503 if initialization fails.
+    """
+    try:
+        from src.multi_tenant.repository import (
+            AuditLogRepository,
+            ConversationRepository,
+            CustomerProfileRepository,
+            KnowledgeBaseRepository,
+            TenantRepository,
+            UsageRepository,
+        )
+
+        trial_service = TrialManagementService(
+            tenant_repo=TenantRepository(),
+            usage_repo=UsageRepository(),
+            conversation_repo=ConversationRepository(),
+            profile_repo=CustomerProfileRepository(),
+            knowledge_repo=KnowledgeBaseRepository(),
+            audit_repo=AuditLogRepository(),
+        )
+        configure_trial_service(trial_service)
+        logger.info("Trial management service initialized (3 endpoints)")
+    except Exception:
+        logger.warning(
+            "Trial management service initialization failed — trial "
+            "endpoints will return 503 until dependencies are available."
+        )
+
+
+# ---------------------------------------------------------------------------
+# Data retention enforcement service (WI #154)
+# ---------------------------------------------------------------------------
+
+
+@app.on_event("startup")
+async def _startup_data_retention() -> None:
+    """Initialize the Data Retention Service.
+
+    Wires tenant, conversation, profile, vector, and audit repositories
+    into the retention service for automated cleanup of expired data.
+    Non-fatal: retention enforcement available via scheduled trigger.
+    """
+    try:
+        from src.multi_tenant.repository import (
+            AuditLogRepository,
+            ConversationRepository,
+            CustomerProfileRepository,
+            MemoryVectorRepository,
+            TenantRepository,
+        )
+
+        retention_service = DataRetentionService(
+            tenant_repo=TenantRepository(),
+            conversation_repo=ConversationRepository(),
+            profile_repo=CustomerProfileRepository(),
+            vector_repo=MemoryVectorRepository(),
+            audit_repo=AuditLogRepository(),
+        )
+        configure_retention_service(retention_service)
+        logger.info("Data retention enforcement service initialized")
+    except Exception:
+        logger.warning(
+            "Data retention service initialization failed — automated "
+            "retention enforcement unavailable."
+        )
+
+
+# ---------------------------------------------------------------------------
+# Archival pipeline service (WI #153)
+# ---------------------------------------------------------------------------
+
+
+@app.on_event("startup")
+async def _startup_archival_pipeline() -> None:
+    """Initialize the Archival Pipeline Service.
+
+    Wires tenant, conversation, profile, vector, and audit repositories
+    plus an optional Blob Storage client into the archival service for
+    periodic Hot→Warm data migration.
+    Non-fatal: archival available via scheduled trigger.
+    """
+    try:
+        from src.multi_tenant.repository import (
+            AuditLogRepository,
+            ConversationRepository,
+            CustomerProfileRepository,
+            MemoryVectorRepository,
+            TenantRepository,
+        )
+
+        # Wire Azure Blob Storage client if connection string is available
+        blob_client = None
+        blob_conn = os.environ.get("AZURE_STORAGE_CONNECTION_STRING")
+        if blob_conn:
+            try:
+                from azure.storage.blob import BlobServiceClient
+
+                blob_client = BlobServiceClient.from_connection_string(blob_conn)
+                logger.info("Azure Blob Storage client connected for archival")
+            except Exception:
+                logger.warning("Azure Blob Storage client creation failed — archival will run in dry-run mode")
+
+        archival_service = ArchivalPipelineService(
+            tenant_repo=TenantRepository(),
+            conversation_repo=ConversationRepository(),
+            profile_repo=CustomerProfileRepository(),
+            vector_repo=MemoryVectorRepository(),
+            audit_repo=AuditLogRepository(),
+            blob_client=blob_client,
+        )
+        configure_archival_service(archival_service)
+        logger.info("Archival pipeline service initialized (blob_client: %s)", "connected" if blob_client else "none — dry-run mode")
+    except Exception:
+        logger.warning(
+            "Archival pipeline service initialization failed — "
+            "archival operations unavailable."
+        )
+
+
+# ---------------------------------------------------------------------------
+# Alert delivery service (WI #192)
+# ---------------------------------------------------------------------------
+
+
+@app.on_event("startup")
+async def _startup_alert_delivery() -> None:
+    """Initialize the Alert Delivery Service.
+
+    Registers built-in channels (Log + Dashboard). WebhookAlertChannel
+    is registered per-tenant when merchants configure a webhook URL.
+    """
+    try:
+        service = AlertDeliveryService()
+        service.register_channel(LogAlertChannel())
+        service.register_channel(DashboardAlertChannel())
+        configure_alert_service(service)
+        logger.info(
+            "Alert delivery service initialized (%d channels)",
+            len(service._channels),
+        )
+    except Exception:
+        logger.warning(
+            "Alert delivery service initialization failed — "
+            "alerts will be logged only."
+        )
+
+
+# ---------------------------------------------------------------------------
 # Health endpoints
 # ---------------------------------------------------------------------------
 
@@ -598,6 +810,18 @@ async def ready() -> dict:
 
     sse_mgr = get_sse_manager()
     result["sse_connections"] = sse_mgr.health_summary()
+
+    # SLA monitoring (WI #151)
+    from src.multi_tenant.sla_monitoring import get_sla_monitor
+
+    sla_monitor = get_sla_monitor()
+    result["sla"] = sla_monitor.health_summary()
+
+    # Data retention service health (WI #154)
+    from src.multi_tenant.data_retention import get_retention_service
+
+    retention_svc = get_retention_service()
+    result["data_retention"] = {"configured": retention_svc is not None}
 
     # API version (WI #140)
     from src.multi_tenant.api_versioning import API_VERSION

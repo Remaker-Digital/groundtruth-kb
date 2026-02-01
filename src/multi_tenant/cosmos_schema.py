@@ -143,13 +143,14 @@ class ConversationStatus(str, Enum):
 
 
 class AuditEventType(str, Enum):
-    """Audit log event types (Decision #13 — 12 event types)."""
+    """Audit log event types (Decision #13 — 13 event types)."""
 
     TENANT_CREATED = "tenant.created"
     TENANT_ACTIVATED = "tenant.activated"
     TENANT_UPDATED = "tenant.updated"
     TENANT_DEACTIVATED = "tenant.deactivated"
     TENANT_DELETED = "tenant.deleted"
+    TENANT_PROVISIONED = "tenant.provisioned"
     SUBSCRIPTION_CHANGED = "subscription.changed"
     CONFIG_UPDATED = "config.updated"
     DATA_EXPORTED = "data.exported"

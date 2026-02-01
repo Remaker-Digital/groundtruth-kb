@@ -1,4 +1,4 @@
-# Agent Red Customer Engagement — Multi-Tenant Infrastructure
+# Agent Red Customer Experience — Multi-Tenant Infrastructure
 #
 # Primary imports:
 #   from src.multi_tenant.cosmos_client import get_cosmos_manager
@@ -17,5 +17,11 @@
 #   from src.multi_tenant.customer_profile_service import get_profile_service, CustomerProfileService
 #   from src.multi_tenant.conversation_vectorizer import get_vectorizer, ConversationVectorizer
 #   from src.multi_tenant.response_explainability import DecisionTraceBuilder, ResponseDecisionTrace
+#   from src.multi_tenant.trial_management import TrialManagementService, configure_trial_service
+#   from src.multi_tenant.security_hardening import PreAuthRateLimitMiddleware, rotation_router
+#   from src.multi_tenant.data_retention import DataRetentionService, get_retention_service
+#   from src.multi_tenant.sla_monitoring import SLAMonitoringService, get_sla_monitor
+#   from src.multi_tenant.cost_model import CostModelCalculator, get_cost_calculator
+#   from src.multi_tenant.archival_pipeline import ArchivalPipelineService, get_archival_service
 #
 # © 2026 Remaker Digital, a DBA of VanDusen & Palmeter, LLC. All rights reserved.

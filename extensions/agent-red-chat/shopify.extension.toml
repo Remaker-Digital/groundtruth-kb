@@ -1,0 +1,20 @@
+# Agent Red Customer Experience — Shopify Theme App Extension
+#
+# This extension embeds the Agent Red chat widget on Shopify storefronts
+# as an app embed block. Merchants activate it in the theme editor.
+#
+# Shopify CLI: shopify app deploy
+# Docs: https://shopify.dev/docs/apps/build/online-store/theme-app-extensions
+#
+# (c) 2026 Remaker Digital, a DBA of VanDusen & Palmeter, LLC. All rights reserved.
+
+api_version = "2025-01"
+
+[[extensions]]
+name = "Agent Red Chat"
+handle = "agent-red-chat"
+type = "theme"
+
+  [extensions.capabilities]
+  # App embed block — renders at document level (target: "body")
+  app_embed = true

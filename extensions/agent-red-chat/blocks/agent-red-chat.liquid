@@ -1,0 +1,152 @@
+{% comment %}
+  Agent Red Customer Experience — Chat Widget (App Embed Block)
+
+  Shopify Theme App Extension that embeds the Agent Red chat widget
+  on the merchant's storefront. Configured via the Shopify theme editor
+  under Online Store > Themes > Customize > App embeds.
+
+  Architecture (Decision UI-2):
+    - App embed block with target: "body" (renders at document level)
+    - Widget bundle loaded from Shopify CDN via asset_url
+    - Publishable widget key for client-side auth (Decision UI-6)
+    - Shadow DOM launcher + iframe panel (Decision UI-3)
+
+  Merchant activation:
+    1. Install the Agent Red app
+    2. Go to Online Store > Themes > Customize
+    3. Click App embeds in the sidebar
+    4. Toggle "Agent Red Chat" on
+    5. Enter the widget key from the Agent Red dashboard
+    6. Configure color, position, and behavior
+    7. Save
+
+  (c) 2026 Remaker Digital, a DBA of VanDusen & Palmeter, LLC. All rights reserved.
+{% endcomment %}
+
+{% if block.settings.widget_key != blank %}
+  <script
+    src="{{ 'agent-red-widget.iife.js' | asset_url }}"
+    defer
+    data-widget-key="{{ block.settings.widget_key }}"
+    data-api-url="{{ block.settings.api_url | default: 'https://api.agentred.io' }}"
+    data-color="{{ block.settings.primary_color }}"
+    data-position="{{ block.settings.position }}"
+    {% if block.settings.auto_open %}data-auto-open="true"{% endif %}
+    {% if block.settings.auto_open_delay > 0 %}data-auto-open-delay="{{ block.settings.auto_open_delay }}"{% endif %}
+    {% unless block.settings.mobile_enabled %}data-mobile-enabled="false"{% endunless %}
+    {% unless block.settings.sound_enabled %}data-sound-enabled="false"{% endunless %}
+    {% if block.settings.greeting_message != blank %}data-greeting="{{ block.settings.greeting_message | escape }}"{% endif %}
+    {% if block.settings.header_text != blank %}data-header-text="{{ block.settings.header_text | escape }}"{% endif %}
+    {% if block.settings.agent_name != blank %}data-agent-name="{{ block.settings.agent_name | escape }}"{% endif %}
+  ></script>
+{% endif %}
+
+{% schema %}
+{
+  "name": "Agent Red Chat",
+  "target": "body",
+  "enabled_on": {
+    "templates": ["*"]
+  },
+  "settings": [
+    {
+      "type": "header",
+      "content": "Connection"
+    },
+    {
+      "type": "text",
+      "id": "widget_key",
+      "label": "Widget Key",
+      "info": "Your publishable widget key from the Agent Red dashboard (starts with pk_live_)"
+    },
+    {
+      "type": "text",
+      "id": "api_url",
+      "label": "API URL",
+      "default": "https://api.agentred.io",
+      "info": "Leave as default unless instructed by Agent Red support"
+    },
+    {
+      "type": "header",
+      "content": "Appearance"
+    },
+    {
+      "type": "color",
+      "id": "primary_color",
+      "label": "Primary Color",
+      "default": "#C41E2A",
+      "info": "Main widget color (launcher button, header background)"
+    },
+    {
+      "type": "select",
+      "id": "position",
+      "label": "Widget Position",
+      "default": "bottom-right",
+      "options": [
+        { "value": "bottom-right", "label": "Bottom Right" },
+        { "value": "bottom-left", "label": "Bottom Left" }
+      ]
+    },
+    {
+      "type": "header",
+      "content": "Content"
+    },
+    {
+      "type": "text",
+      "id": "header_text",
+      "label": "Header Text",
+      "placeholder": "How can we help?",
+      "info": "Custom header text shown at the top of the chat panel"
+    },
+    {
+      "type": "text",
+      "id": "agent_name",
+      "label": "Agent Display Name",
+      "placeholder": "AI Assistant",
+      "info": "Name shown next to agent messages"
+    },
+    {
+      "type": "textarea",
+      "id": "greeting_message",
+      "label": "Greeting Message",
+      "placeholder": "Hi! How can I help you today?",
+      "info": "First message shown when the customer opens the widget"
+    },
+    {
+      "type": "header",
+      "content": "Behavior"
+    },
+    {
+      "type": "checkbox",
+      "id": "auto_open",
+      "label": "Auto-open widget",
+      "default": false,
+      "info": "Automatically open the chat widget after a delay"
+    },
+    {
+      "type": "range",
+      "id": "auto_open_delay",
+      "label": "Auto-open delay (seconds)",
+      "min": 1,
+      "max": 30,
+      "step": 1,
+      "default": 3,
+      "info": "Seconds to wait before auto-opening (only if auto-open is enabled)"
+    },
+    {
+      "type": "checkbox",
+      "id": "mobile_enabled",
+      "label": "Show on mobile",
+      "default": true,
+      "info": "Display the widget on mobile devices"
+    },
+    {
+      "type": "checkbox",
+      "id": "sound_enabled",
+      "label": "Notification sound",
+      "default": true,
+      "info": "Play a sound when new messages arrive while the widget is closed"
+    }
+  ]
+}
+{% endschema %}

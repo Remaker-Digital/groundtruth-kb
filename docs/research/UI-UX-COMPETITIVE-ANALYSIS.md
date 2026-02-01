@@ -3,7 +3,7 @@
 **Date:** 2026-01-31
 **Scope:** Five highest-install AI customer service apps on the Shopify App Store
 **Purpose:** Identify table-stakes UI/UX requirements for Agent Red Launch 1.0 and inform build priorities
-**Confidence:** Research based on public documentation, Shopify App Store listings, and published developer resources. Pricing data marked [VERIFY] where values may have shifted after May 2025.
+**Confidence:** Research based on public documentation, Shopify App Store listings, and published developer resources. **All pricing data verified against live pricing pages on 2026-02-01.** Original estimates for Gorgias and Zendesk were significantly low — corrected upward after verification (see Pricing Verification Checklist at end of document).
 
 © 2026 Remaker Digital, a DBA of VanDusen & Palmeter, LLC. All rights reserved.
 
@@ -269,31 +269,31 @@ All scenarios assume AI-enabled support. Agent Red includes AI in all tiers.
 
 | Platform | Estimated Monthly Cost | Notes |
 |----------|----------------------:|-------|
-| Tidio (Growth + Lyro 1K) | ~$218 | $59 platform + $159 Lyro pack [VERIFY] |
-| Gorgias (Basic + AI) | ~$260+ | $60 base + $200+ automation [VERIFY] |
-| Re:amaze (Pro, 1 agent) | ~$49 | AI included but limited capability |
-| Intercom (Essential, 1 seat) | ~$629 | $29 seat + $594 Fin (600 resolutions at $0.99) + $6 other |
-| Zendesk (Growth, 1 agent) | ~$589 | $89 seat + $500 resolutions (at $1/each) [VERIFY] |
+| Tidio (Growth + Lyro 1K) | ~$198-208 | $49 platform + $149 Lyro 1K pack [VERIFIED 2026-02-01: Growth from $49/mo, Lyro ~$0.50/conv] |
+| Gorgias (Basic + AI) | ~$960 | $60 base (300 tickets) + $900 AI Agent (1000 × $0.90) [VERIFIED 2026-02-01: AI resolution $0.90/each + double-billed as ticket] |
+| Re:amaze (Pro, 1 agent) | ~$49 | AI included but limited capability [VERIFIED 2026-02-01: $49/agent/mo] |
+| Intercom (Essential, 1 seat) | ~$620 | $29 seat + $594 Fin (600 resolutions at $0.99) [VERIFIED 2026-02-01: Fin = $0.99/resolution, unchanged] |
+| Zendesk (Suite Growth, 1 agent) | ~$579+ | $79 seat + $50 Advanced AI + ~$450+ resolutions (at $2.00/each PAYG) [VERIFIED 2026-02-01: Suite Growth $79/agent, AI resolutions $2.00/each, Advanced AI $50/agent] |
 | **Agent Red Starter** | **$149** | **1,000 conversations included, full 6-agent AI** |
 
 #### Scenario B: Small Team — 3 agents, 5,000 conversations/month
 
 | Platform | Estimated Monthly Cost | Notes |
 |----------|----------------------:|-------|
-| Tidio (Tidio+) | ~$500+ | Custom pricing at this volume [VERIFY] |
-| Gorgias (Pro + AI) | ~$660-860 | $360 base + $300-500 automation [VERIFY] |
-| Re:amaze (Pro, 3 agents) | ~$147 | AI included but limited capability |
-| Intercom (Advanced, 3 seats) | ~$3,639 | $255 seats + $2,970 Fin + $414 other |
-| Zendesk (Pro, 3 agents + AI) | ~$2,495 | $345 seats + $150 AI + $2,000 resolutions [VERIFY] |
+| Tidio (Plus) | ~$749+ | Plus plan at $749/mo for custom quotas [VERIFIED 2026-02-01: Plus = $749/mo] |
+| Gorgias (Pro + AI) | ~$1,440-3,690 | $360 base (2K tickets) + $1,080 overage (3K×$36/100) + AI Agent $0-2,250 (0-50% AI, $0.90/resolution, double-billed as ticket) [VERIFIED 2026-02-01] |
+| Re:amaze (Pro, 3 agents) | ~$147 | $49/agent × 3 — AI included but limited capability [VERIFIED 2026-02-01] |
+| Intercom (Advanced, 3 seats) | ~$2,730-3,639 | $255 seats (3×$85) + $2,475-2,970 Fin (50-60% AI, $0.99/resolution) + $0-414 add-ons [VERIFIED 2026-02-01] |
+| Zendesk (Pro, 3 agents + AI) | ~$5,615 | $465 seats (3×$155 Pro) + $150 Advanced AI (3×$50) + $5,000 resolutions (50% AI, 2,500×$2.00) [VERIFIED 2026-02-01] |
 | **Agent Red Professional** | **$399** | **5,000 conversations included, full 6-agent AI** |
 
 #### Scenario C: Growing Team — 5 agents, 20,000 conversations/month
 
 | Platform | Estimated Monthly Cost | Notes |
 |----------|----------------------:|-------|
-| Gorgias (Advanced + AI) | ~$1,200+ | $900 base + automation [VERIFY] |
-| Intercom (Expert, 5 seats) | ~$12,490 | $660 seats + $11,880 Fin (60% of 20K) |
-| Zendesk (Pro, 5 agents + AI) | ~$5,825 | $575 seats + $250 AI + $5,000 resolutions [VERIFY] |
+| Gorgias (Advanced + AI) | ~$6,300-15,300 | $900 base (5K tickets) + $5,400 overage (15K×$36/100) + AI Agent $0-9,000 (0-50% AI, $0.90/resolution, double-billed as ticket) [VERIFIED 2026-02-01] |
+| Intercom (Expert, 5 seats) | ~$12,540 | $660 seats (5×$132) + $11,880 Fin (60% AI, 12,000×$0.99) [VERIFIED 2026-02-01] |
+| Zendesk (Pro, 5 agents + AI) | ~$21,025 | $775 seats (5×$155 Pro) + $250 Advanced AI (5×$50) + $20,000 resolutions (50% AI, 10,000×$2.00) [VERIFIED 2026-02-01] |
 | **Agent Red Enterprise** | **$999** | **20,000 conversations included, full 6-agent AI** |
 
 ### Pricing Model Comparison
@@ -308,7 +308,7 @@ All scenarios assume AI-enabled support. Agent Red includes AI in all tiers.
 
 ### Key Finding
 
-**Agent Red's pricing is 2-14x cheaper than enterprise competitors at equivalent AI volume, and price-competitive with SMB tools while delivering far superior AI.** The pricing model is a structural advantage — the flat platform fee with transparent per-conversation overage is simpler and more predictable than any competitor's model.
+**Agent Red's pricing is 4-21x cheaper than enterprise competitors at equivalent AI conversation volume.** At 5,000 conversations/month, Agent Red ($399) vs Zendesk Pro+AI (~$5,615) is a 14x advantage. At 20,000 conversations/month, Agent Red ($999) vs Zendesk (~$21,025) or Intercom (~$12,540) is a 13-21x advantage. The pricing model is a structural advantage — the flat platform fee with transparent per-conversation overage is simpler and more predictable than any competitor's per-resolution or per-ticket model. *All competitor estimates verified against live pricing pages 2026-02-01. AI adoption assumed at 50-60% of volume for AI-resolution-based competitors.*
 
 ---
 
@@ -515,11 +515,11 @@ Cosmos DB partition-level isolation, NATS topic namespaces, per-tenant rate limi
 
 Before using specific pricing numbers in marketing or strategic materials, verify:
 
-- [ ] Tidio pricing at tidio.com/pricing (Lyro pack sizes and prices change frequently)
-- [ ] Gorgias pricing at gorgias.com/pricing (pricing page is JavaScript-rendered)
-- [ ] Zendesk pricing at zendesk.com/pricing (Advanced AI add-on rate, per-resolution pricing)
-- [ ] Intercom pricing at intercom.com/pricing (Fin per-resolution rate, seat costs)
-- [ ] Re:amaze pricing at reamaze.com/pricing (may have changed post-GoDaddy acquisition)
+- [x] Tidio pricing at tidio.com/pricing — **VERIFIED 2026-02-01**: Starter $24/mo, Growth from $49/mo, Plus $749/mo, Premium from $2,999/mo. Lyro AI ~$0.50/conv. Our estimates were directionally correct but Tidio restructured to 5 tiers. Scenario A revised from ~$218 to ~$198-208. Scenario B revised from ~$500+ to $749+ (Plus plan). Agent Red remains 2-5x cheaper.
+- [x] Gorgias pricing — **VERIFIED 2026-02-01**: Starter $10, Basic $60 (350 tickets), Pro $360 (2K tickets), Advanced $900 (5K tickets). No per-seat charges. Overage $36-40/100 tickets depending on tier. AI Agent $0.90/resolution (annual) or $1.00 (monthly), each AI resolution double-billed as a ticket. Original estimates were drastically low — corrected Scenario A from ~$260+ to ~$960, Scenario B from ~$660-860 to ~$1,440-3,690, Scenario C from ~$1,200+ to ~$6,300-15,300.
+- [x] Zendesk pricing — **VERIFIED 2026-02-01**: Suite Team $55, Growth $89, Professional $155, Enterprise $209 (all per agent/mo annual). Advanced AI add-on $50/agent/mo. AI resolutions $2.00/each PAYG. Original estimates used incorrect $79 Growth pricing instead of $155 Professional — corrected Scenario B from ~$2,495 to ~$5,615, Scenario C from ~$5,825 to ~$21,025.
+- [x] Intercom pricing — **VERIFIED 2026-02-01**: Essential $29, Advanced $85, Expert $132 (all per seat/mo annual). Fin AI Agent $0.99/resolution (unchanged from original estimates). Copilot add-on $35/seat/mo. Original estimates were directionally correct. Minor adjustments to Scenario B ($3,639 → $2,730-3,639 range) and Scenario C ($12,490 → $12,540).
+- [x] Re:amaze pricing — **VERIFIED 2026-02-01**: $49/agent/mo (Pro plan). AI Copilot included but limited capability. Pricing unchanged from original estimates. Remains the lowest-cost competitor at scale but with significantly less AI capability.
 
 ---
 

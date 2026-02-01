@@ -260,6 +260,9 @@ class SecurityHeadersMiddleware:
     Adds standard security headers per OWASP recommendations. HSTS is
     only added when the request appears to be over HTTPS (detected via
     the X-Forwarded-Proto header or the ASGI scope scheme).
+
+    Also records request latency for SLA monitoring (WI #191) since this
+    is the outermost middleware and wraps the full request lifecycle.
     """
 
     def __init__(self, app: ASGIApp) -> None:
@@ -269,6 +272,10 @@ class SecurityHeadersMiddleware:
         if scope["type"] != "http":
             await self.app(scope, receive, send)
             return
+
+        import time
+
+        start_time = time.monotonic()
 
         # Detect HTTPS from scope or X-Forwarded-Proto header
         is_https = scope.get("scheme") == "https"
@@ -289,8 +296,37 @@ class SecurityHeadersMiddleware:
                         (b"strict-transport-security", HSTS_HEADER.encode())
                     )
 
+                # Add Server-Timing header with total processing time
+                elapsed_ms = (time.monotonic() - start_time) * 1000
+                headers.append(
+                    (b"server-timing", f"total;dur={elapsed_ms:.1f}".encode())
+                )
+
                 message["headers"] = headers
 
             await send(message)
 
-        await self.app(scope, receive, send_with_security_headers)
+        try:
+            await self.app(scope, receive, send_with_security_headers)
+        finally:
+            # Record latency for SLA monitoring (WI #191)
+            elapsed_ms = (time.monotonic() - start_time) * 1000
+            try:
+                from src.multi_tenant.sla_monitoring import get_sla_monitor
+
+                monitor = get_sla_monitor()
+                # Extract tenant_id if set by TenantAuthMiddleware
+                state = scope.get("state", {})
+                tenant_ctx = state.get("tenant_context")
+                tenant_id = (
+                    getattr(tenant_ctx, "tenant_id", None)
+                    if tenant_ctx
+                    else None
+                )
+                if tenant_id:
+                    monitor.record_latency(tenant_id, elapsed_ms)
+                else:
+                    # Platform-wide only (unauthenticated requests)
+                    monitor.record_latency("__platform__", elapsed_ms)
+            except Exception:
+                pass  # SLA recording is best-effort

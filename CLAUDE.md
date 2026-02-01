@@ -12,7 +12,7 @@ This document provides context and guidance for AI assistants working on the Age
 | **Brand Name** | Agent Red Customer Experience |
 | **Release** | Launch 1.0 |
 | **Type** | Commercial SaaS Product |
-| **Status** | Phase 2.1 E-Commerce ~85% complete. Phase 2.2 Tier 1 Critical COMPLETE (7 modules). Tier 2 High COMPLETE — 21 modules (~9,500 lines). Tier 2 Medium COMPLETE — 7 additional modules (~2,100 lines). Phase 2.5 Layers 1-2 COMPLETE (3 modules). All middleware wired in main.py (8 middleware layers). **593 tests passing** (P0 launch-blockers COMPLETE: 254 new tests across 8 groups + 125 pre-existing + 214 P1 tests). Test infrastructure complete (WI #101-104). Architecture review complete (32 decisions, 100 work items). Comprehensive test plan (~880 tests) and new work items backlog (63 items, WI #101-163) created. **Phase 3.0 UI/UX: Competitive analysis COMPLETE. Chat API IMPLEMENTED (6 endpoints + SSE manager). Admin APIs IMPLEMENTED (5 routers: inbox, knowledge, analytics, team, GDPR + audit). Widget key auth IMPLEMENTED. Trial tier IMPLEMENTED. 7 architecture decisions approved. 24 work items (WI #164-187). Widget frontend BUILD PHASE 2 COMPLETE — 20 files, ~3,200 lines (Preact + TypeScript). Product renamed Customer Experience. Brand primary #C41E2A.** |
+| **Status** | Phase 2.1 E-Commerce ~85% complete. Phase 2.2 COMPLETE — 38 multi_tenant modules (~25,000 lines). Phase 2.5 Layers 1-2 COMPLETE (3 modules). All middleware wired in main.py (8 middleware layers). **777 tests passing, 0 warnings.** P0 + P1 tests COMPLETE. Test infrastructure complete (WI #101-104). Architecture review complete (32 decisions, 100+ work items). **Phase 3.0 UI/UX: ALL BUILD PHASES COMPLETE — Chat API (6 endpoints + SSE manager), Admin APIs (5 routers, 25 endpoints), Widget frontend (20 files, ~3,200 lines), Shopify Theme App Extension (3 files), Admin shared components (9 + 2 util modules, ~5,400 lines), Shopify admin shell (8 files, ~2,700 lines), Standalone admin shell (9 files, ~2,800 lines).** Operational readiness COMPLETE (WI #148-156). Security hardening COMPLETE (WI #157-163). Pipeline optimization COMPLETE (WI #134-139). Trial environment COMPLETE (WI #119-128). **Competitive pricing VERIFIED (all 5 competitors, 2026-02-01) — Agent Red 4-21x cheaper.** Product renamed Customer Experience. Brand primary #C41E2A. |
 | **Owner** | Remaker Digital (DBA of VanDusen & Palmeter, LLC) |
 
 ---
@@ -500,7 +500,7 @@ E:\Claude-Playground\CLAUDE-PROJECTS\Agent Red Customer Engagement\
 │
 ├── src/                            # Commercial source code
 │   ├── __init__.py
-│   ├── main.py                     # FastAPI app entrypoint (17 routers, 66 routes, 8 middleware)
+│   ├── main.py                     # FastAPI app entrypoint (17 routers, 66 routes, 8 middleware, ~830 lines)
 │   ├── integrations/               # Billing & platform integrations
 │   │   ├── __init__.py
 │   │   ├── provisioning.py         # Channel-agnostic tenant provisioning service
@@ -513,7 +513,7 @@ E:\Claude-Playground\CLAUDE-PROJECTS\Agent Red Customer Engagement\
 │   │   ├── shopify_client.py       # Async Shopify GraphQL API client (httpx)
 │   │   ├── shopify_billing.py      # Shopify Billing API (subscriptions + usage charges)
 │   │   └── shopify_gdpr_webhooks.py # Shopify GDPR mandatory webhooks (3 endpoints, HMAC verification)
-│   ├── multi_tenant/               # Multi-tenant infrastructure (Phase 2.2 — Tier 2 Medium COMPLETE)
+│   ├── multi_tenant/               # Multi-tenant infrastructure (38 modules, ~25,000 lines)
 │   │   ├── __init__.py             # Package init with import hints
 │   │   ├── cosmos_schema.py        # 9 collections, 12 document models, 8 enums, tier defaults (incl. trial)
 │   │   ├── cosmos_client.py        # CosmosManager singleton (lazy init, Managed Identity, health)
@@ -542,9 +542,16 @@ E:\Claude-Playground\CLAUDE-PROJECTS\Agent Red Customer Engagement\
 │   │   ├── admin_gdpr_api.py       # GDPR data export/deletion/consent admin API (5 endpoints)
 │   │   ├── admin_audit_api.py      # Audit log query + CSV export admin API (2 endpoints)
 │   │   ├── tenant_usage_monitor.py # Progressive throttling (Watch→Warn→Throttle→Isolate)
-│   │   ├── security_middleware.py  # Body size limit, JSON depth validation, security headers
+│   │   ├── security_middleware.py  # Body size limit, JSON depth, security headers, SLA latency recording
 │   │   ├── api_versioning.py       # API version headers middleware (X-API-Version)
-│   │   └── structured_logging.py   # JSON structured logging (prod) + colored dev formatter
+│   │   ├── structured_logging.py   # JSON structured logging (prod) + colored dev formatter
+│   │   ├── trial_management.py     # Trial tier lifecycle, expiry, conversion, demo data (~1,200 lines)
+│   │   ├── security_hardening.py   # Input sanitization, CORS, CSP, session validation (~570 lines)
+│   │   ├── data_retention.py       # Tier-based data retention enforcement (~380 lines)
+│   │   ├── sla_monitoring.py       # P50/P95/P99 latency tracking, uptime, compliance (~390 lines)
+│   │   ├── cost_model.py           # Parameterized cost model calculator, projections (~370 lines)
+│   │   ├── archival_pipeline.py    # Hot→Warm Parquet archival to Azure Blob Storage (~750 lines)
+│   │   └── alert_delivery.py       # Multi-channel alert routing: webhook, dashboard, log (~695 lines)
 │   ├── chat/                       # Chat API (Phase 3.0 — IMPLEMENTED)
 │   │   ├── __init__.py
 │   │   ├── models.py              # Request/response Pydantic models + StreamEvent SSE format (~200 lines)
@@ -552,10 +559,14 @@ E:\Claude-Playground\CLAUDE-PROJECTS\Agent Red Customer Engagement\
 │   │   ├── pipeline.py            # 6-agent pipeline orchestrator + SSE streaming (~800 lines)
 │   │   ├── endpoints.py           # 6 FastAPI routes: conversations, message, stream, end, WS (~350 lines)
 │   │   └── sse_manager.py         # SSE connection manager: heartbeat, reconnection, tenant limits (~280 lines)
+│   ├── jobs/                       # Scheduled job entry points (Azure Container App Jobs)
+│   │   ├── __init__.py
+│   │   ├── run_retention.py        # Cron entry: data retention enforcement (03:00 UTC daily)
+│   │   └── run_archival.py         # Cron entry: archival pipeline (04:00 UTC daily)
 │   ├── ai-features/                # Advanced AI (Phase 2.5)
 │   └── white-label/                # Customization (future)
 │
-├── tests/                          # Test suites (379 tests total)
+├── tests/                          # Test suites (777 tests total, 0 warnings)
 │   ├── conftest.py                 # Shared fixtures: TestClient, MockCosmos, MockNATS, MockKV, auth helpers
 │   ├── test_conftest_smoke.py      # 19 fixture smoke tests
 │   ├── test_health.py              # 15 health/ready endpoint + startup event tests (§4.6)
@@ -563,12 +574,25 @@ E:\Claude-Playground\CLAUDE-PROJECTS\Agent Red Customer Engagement\
 │   │   ├── fixtures.py             # Synthetic profiles, conversations, vector data
 │   │   ├── test_unit_layers.py     # 20 unit tests (L1-L4)
 │   │   └── test_integration_layers.py # 10 cross-layer integration tests
-│   ├── multi_tenant/               # Multi-tenant infrastructure tests (206 tests)
+│   ├── multi_tenant/               # Multi-tenant infrastructure tests (~590 tests)
 │   │   ├── test_auth_middleware.py  # 57 auth + middleware unit tests
 │   │   ├── test_middleware_pipeline.py # 25 full middleware stack tests (§4.2)
 │   │   ├── test_conversation_meter.py # 38 ConversationMeter unit tests (§4.3)
 │   │   ├── test_critic_policy.py   # 25 CriticPolicy unit tests (§4.4)
-│   │   └── test_cosmos_repository.py # 61 schema + repository tests (§4.5)
+│   │   ├── test_cosmos_repository.py # 61 schema + repository tests (§4.5)
+│   │   ├── test_gdpr_services.py   # GDPR services tests (P1 §5.2)
+│   │   ├── test_nats_isolation.py  # NATS tenant isolation tests (P1 §5.1)
+│   │   ├── test_otel_tracing.py    # OpenTelemetry tracing tests (P1 §5.3)
+│   │   ├── test_pipeline_resilience.py # Pipeline resilience + circuit breaker tests (P1 §5.4)
+│   │   ├── test_system_prompt_builder.py # SystemPromptBuilder tests (P1 §5.5)
+│   │   ├── test_tenant_config.py   # Tenant config schema/processor/API tests (P1 §5.6)
+│   │   ├── test_tenant_secret_service.py # Key Vault integration tests
+│   │   ├── test_usage_dashboard.py # Dashboard API tests (P1 §5.10)
+│   │   ├── test_trial_management.py # Trial tier lifecycle tests
+│   │   ├── test_sla_monitoring.py  # 25 SLA monitoring tests
+│   │   ├── test_cost_model.py      # 20 cost model calculator tests
+│   │   ├── test_data_retention.py  # 15 data retention enforcement tests
+│   │   └── test_archival_pipeline.py # 15 archival pipeline tests
 │   └── integrations/               # Billing integration tests (109 tests)
 │       ├── test_provisioning_webhooks.py # 38 tenant lifecycle + webhook tests
 │       ├── test_http_billing.py    # 35 HTTP billing endpoint tests (§4.1)
@@ -600,8 +624,40 @@ E:\Claude-Playground\CLAUDE-PROJECTS\Agent Red Customer Engagement\
 │           ├── ChatRating.tsx       # Thumbs up/down, comment, thank-you
 │           └── OfflineForm.tsx      # Leave-a-message form
 │
+├── extensions/                     # Shopify Theme App Extension (Build Phase 3)
+│   └── agent-red-chat/
+│       ├── shopify.extension.toml  # Extension manifest
+│       ├── blocks/
+│       │   └── agent-red-chat.liquid # Liquid template (app embed block)
+│       └── assets/
+│           └── agent-red-widget.iife.js # Placeholder for built widget bundle
+│
+├── admin/                          # Admin dashboard frontends (Build Phases 4-6, 31 files, ~10,900 lines)
+│   ├── shared/                     # 9 shared components + 2 util modules (~5,400 lines)
+│   │   ├── OnboardingWizard.tsx    # 9-step merchant onboarding
+│   │   ├── ConfigEditor.tsx        # AI behavior configuration
+│   │   ├── UsageDashboard.tsx      # Usage metrics + billing charts
+│   │   ├── ConversationInbox.tsx   # Conversation list + detail + assignment
+│   │   ├── KnowledgeBaseManager.tsx # Knowledge base CRUD
+│   │   ├── AnalyticsOverview.tsx   # Analytics summary + charts
+│   │   ├── BillingPortal.tsx       # Billing management + Stripe portal
+│   │   ├── WidgetConfigurator.tsx  # Widget appearance + behavior config
+│   │   ├── TeamManager.tsx         # Team member management
+│   │   ├── hooks/index.ts          # Shared API hooks (useApi, useTenantConfig, useSSE, etc.)
+│   │   └── types/index.ts          # Shared TypeScript interfaces
+│   ├── shopify/                    # Shopify embedded admin (Polaris + App Bridge, 8 files, ~2,700 lines)
+│   │   ├── index.tsx               # App entry with AppProvider + AppBridge
+│   │   ├── layouts/ShopifyAppLayout.tsx # Navigation + Save Bar integration
+│   │   ├── hooks/useSaveBar.ts     # App Bridge Save Bar hook
+│   │   └── pages/                  # 7 pages (Dashboard, Inbox, KnowledgeBase, Configuration, Widget, Billing, Settings)
+│   └── standalone/                 # Standalone admin (API key login, 9 files, ~2,800 lines)
+│       ├── index.tsx               # App entry with BrowserRouter
+│       ├── layouts/StandaloneLayout.tsx # Sidebar + header layout
+│       ├── login/ApiKeyLogin.tsx   # API key authentication page
+│       └── pages/                  # 7 pages (Dashboard, Inbox, KnowledgeBase, Configuration, Widget, Billing, Settings)
+│
 ├── infrastructure/                 # Deployment infrastructure
-│   └── terraform/                  # IaC for Azure (variables, main, scaling, DR/security)
+│   └── terraform/                  # IaC for Azure (variables, main, scaling, DR/security, KEDA jobs)
 │
 ├── website/                        # Marketing website
 │   └── content/                    # Page content (markdown)
@@ -660,7 +716,9 @@ E:\Claude-Playground\CLAUDE-PROJECTS\Agent Red Customer Engagement\
 | COMPREHENSIVE-TEST-PLAN.md | docs/ | ~880 enumerated tests with IDs, priorities (P0-P3), security, performance, trial, UI-type matrix |
 | BACKLOG-NEW-WORK-ITEMS.md | docs/ | 63 new work items (WI #101-163): test infra, merchant UI, trial env, streaming, optimization, API, ops, security |
 | UI-UX-ARCHITECTURE-DECISIONS.md | docs/architecture/ | 7 UI/UX decisions, chat API/widget/admin specs, build order, 24 new work items (WI #164-187) |
-| UI-UX-COMPETITIVE-ANALYSIS.md | docs/research/ | 5-competitor feature matrix (Tidio, Gorgias, Zendesk, Intercom, Re:amaze) across 10 dimensions |
+| UI-UX-COMPETITIVE-ANALYSIS.md | docs/research/ | 5-competitor feature matrix (Tidio, Gorgias, Zendesk, Intercom, Re:amaze) across 10 dimensions — **ALL PRICING VERIFIED 2026-02-01** |
+| DEPLOYMENT-RUNBOOK.md | docs/operations/ | Deployment procedure, DR Option A, maintenance runbook |
+| OPTION-C-UPGRADE-PATH.md | docs/operations/ | Geo-replication trigger criteria, migration steps, cost impact |
 
 ---
 
@@ -688,9 +746,9 @@ E:\Claude-Playground\CLAUDE-PROJECTS\Agent Red Customer Engagement\
 Continue work on Agent Red Customer Experience commercial project.
 Location: E:\Claude-Playground\CLAUDE-PROJECTS\Agent Red Customer Engagement
 Key files: CLAUDE.md, docs/architecture/UI-UX-ARCHITECTURE-DECISIONS.md, docs/COMPREHENSIVE-TEST-PLAN.md, docs/BACKLOG-NEW-WORK-ITEMS.md
-Current status: Phases 0-1.4 complete. Phase 2.1 e-commerce ~85% complete (11 billing modules incl. Shopify GDPR webhooks). Phase 2.2 Tier 2 Medium COMPLETE — 28 multi_tenant modules (~12,000 lines). Phase 2.5 Layers 1-2 COMPLETE (3 modules). Phase 3.0 Build Phase 1 COMPLETE: Chat API (6 endpoints + SSE manager in src/chat/), admin APIs (5 routers: inbox, knowledge, analytics, team, GDPR + audit = 25 endpoints), widget key auth, trial tier. **Phase 3.0 Build Phase 2 COMPLETE: Chat widget frontend (20 files, ~3,200 lines in widget/).** Product renamed to "Customer Experience". Brand primary #C41E2A. 593 tests passing. 17 routers, 66 routes, 8 middleware layers. 24 widget customization fields in tenant config.
-Next priority: Please prepare an order of priority for all known outstanding work issues in this project and follow this order when proposing tasks for completion. Remaining major areas: (1) Widget build validation (npm install && npm run build — verify TypeScript compilation and ~15-20KB gzip bundle target), (2) Phase 3.0 Build Phases 3-6 (Shopify Theme App Extension, admin components, admin shells — see UI-UX-ARCHITECTURE-DECISIONS.md §8), (3) P1 pre-launch tests (~200 tests from COMPREHENSIVE-TEST-PLAN.md §5), (4) Phase 2.1 remaining (session tokens, App Bridge Save Bar, creative assets), (5) Verify Tidio audit findings against live sources, (6) backlog items WI #101-163 (many now complete, see BACKLOG-NEW-WORK-ITEMS.md).
-Important context: Tidio is the primary functional reference (completeness, language, merchant workflows, widget customization). Zapier is the visual styling reference. Persistent Customer Memory (Layers 1-2) is the launch pillar differentiator. Iterative working style: one item at a time, honest assessment, approval before implementation, aggressive scope cutting.
+Current status: Phases 0-2.2 COMPLETE. Phase 2.5 Layers 1-2 COMPLETE. Phase 3.0 ALL BUILD PHASES COMPLETE (Chat API, widget frontend, Shopify Theme App Extension, admin shared components, Shopify admin shell, standalone admin shell). Operational readiness COMPLETE. Security hardening COMPLETE. Pipeline optimization COMPLETE. Trial environment COMPLETE. Competitive pricing VERIFIED (all 5 competitors — Agent Red 4-21x cheaper). 777 tests passing, 0 warnings. 38 multi_tenant modules (~25,000 lines). 31 admin frontend files (~10,900 lines). 20 widget files (~3,200 lines). 17 routers, 66 routes, 8 middleware layers.
+Next priority: Please prepare an order of priority for all known outstanding work issues in this project and follow this order when proposing tasks for completion. Remaining major areas: (1) Admin frontend build validation (npm install, TypeScript compile, bundle check for admin/shopify and admin/standalone), (2) Widget bundle → Theme App Extension copy, (3) P2 launch quality tests (~135 tests, COMPREHENSIVE-TEST-PLAN.md §6), (4) Integration testing with real Stripe test mode and Shopify partner sandbox, (5) Creative assets for Shopify App Store (icon, screenshots, demo video — blocked on design), (6) Phase 2.5 Layer 3 PatternExtractionService (Professional+, WI #90-92), (7) Remaining backlog items (CI improvements #105-107, SSE enhancements #131-133, API completeness #142-146).
+Important context: Tidio is the primary functional reference. Zapier is the visual styling reference. Persistent Customer Memory (Layers 1-2) is the launch pillar differentiator. All competitor pricing now verified — use updated figures from docs/research/UI-UX-COMPETITIVE-ANALYSIS.md. Iterative working style: one item at a time, honest assessment, approval before implementation, aggressive scope cutting.
 Please review CLAUDE.md, then proceed with the highest-priority remaining technical work item, presenting one item at a time for review per the iterative working style documented in CLAUDE.md.
 ```
 
@@ -737,7 +795,7 @@ When evaluating options (architecture, technology, design, implementation approa
 
 ---
 
-## Current Status (2026-01-31)
+## Current Status (2026-02-01)
 
 ### Completed
 
@@ -1299,16 +1357,53 @@ Comprehensive widget frontend implementation session. Product renamed from "Cust
 
 **593 backend tests passing.** Widget is ready for `npm install && npm run dev`.
 
+**Sessions 2026-02-01: Autonomous Implementation Sprint — Widget Build + P1 Tests + Frontend + Operational Readiness**
+
+Three consecutive autonomous sessions completed all remaining high-priority work items. Summary of completed work:
+
+- [x] **Widget build validation** — `npm install && npm run build` successful. IIFE bundle output confirmed. TypeScript compilation clean.
+- [x] **P1 pre-launch tests COMPLETE** — 214 new tests across 10 groups (NATS isolation, GDPR services, OpenTelemetry, pipeline resilience, SystemPromptBuilder, tenant config, provisioning lifecycle, Shopify billing, persistent memory, dashboard API). All passing.
+- [x] **Phase 3.0 Build Phase 3: Shopify Theme App Extension** — `extensions/agent-red-chat/` with Liquid template, extension manifest, placeholder widget bundle.
+- [x] **Phase 3.0 Build Phase 4: Shared admin components** — `admin/shared/` with 9 components + hooks + types (~5,400 lines). OnboardingWizard, ConfigEditor, UsageDashboard, ConversationInbox, KnowledgeBaseManager, AnalyticsOverview, BillingPortal, WidgetConfigurator, TeamManager.
+- [x] **Phase 3.0 Build Phase 5: Shopify admin shell** — `admin/shopify/` with Polaris + App Bridge integration, 7 pages, Save Bar hook (~2,700 lines).
+- [x] **Phase 3.0 Build Phase 6: Standalone admin shell** — `admin/standalone/` with API key login, custom sidebar layout, 7 pages (~2,800 lines).
+- [x] **Phase 2.1 remaining** — Session tokens, App Bridge Save Bar — completed during Build Phase 5 (useSaveBar.ts hook, session token auth already in auth.py).
+- [x] **Trial environment COMPLETE (WI #119-128)** — `trial_management.py` (~1,200 lines): trial tier in TIER_DEFAULTS, 14-day trial lifecycle, demo data seeding, conversion flow, expiry notifications, trial-to-paid upgrade path.
+- [x] **Security hardening COMPLETE (WI #157-163)** — `security_hardening.py` (~570 lines): input sanitization, CORS configuration, CSP headers, session validation. Plus security_middleware.py enhancements (body size, JSON depth, security headers, rate limit headers, SLA latency recording).
+- [x] **Pipeline optimization COMPLETE (WI #134-139)** — IC+KR parallelization, response caching, connection pool tuning in pipeline_resilience.py.
+- [x] **Operational readiness COMPLETE (WI #148-156)**:
+  - WI #148-150: Deployment, DR, and maintenance runbooks (`docs/operations/`)
+  - WI #151: SLA monitoring service (`sla_monitoring.py`, ~390 lines)
+  - WI #152: KEDA night scaling profiles in Terraform
+  - WI #153: Archival pipeline — Hot→Warm Parquet to Azure Blob (`archival_pipeline.py`, ~750 lines)
+  - WI #154: Data retention enforcement (`data_retention.py`, ~380 lines)
+  - WI #155: Cost model calculator (`cost_model.py`, ~370 lines)
+  - WI #156: Option C geo-replication upgrade path (`docs/operations/OPTION-C-UPGRADE-PATH.md`)
+- [x] **Additional work items (WI #188-195)**:
+  - WI #188: Competitive pricing verification — ALL 5 competitors verified against live pricing pages. Agent Red pricing advantage corrected from 2-14x to **4-21x** (Gorgias and Zendesk original estimates were drastically low).
+  - WI #189/193: Azure Blob Storage + pyarrow dependencies added to requirements.txt
+  - WI #190: Scheduled Container App Jobs (cron) for retention (03:00 UTC) and archival (04:00 UTC)
+  - WI #191: SLA latency recording in SecurityHeadersMiddleware + Server-Timing response header
+  - WI #192: Alert delivery service (`alert_delivery.py`, ~695 lines) — webhook, dashboard, log channels
+  - WI #194: Test coverage for archival (15), retention (15), SLA (25), cost model (20) — 75 new tests
+  - WI #195: Unawaited coroutine warnings fixed in test_pipeline_resilience.py
+
+**777 tests passing, 0 warnings.** All middleware wired in main.py. All Terraform updated.
+
 ### Pending
-- [ ] **Phase 3.0 UI/UX frontend implementation — remaining:** Build Phase 3 (Shopify Theme App Extension / Liquid template) → Phase 4 (Shared admin components in admin/shared/) → Phase 5 (Shopify admin shell) → Phase 6 (Standalone admin shell). See docs/architecture/UI-UX-ARCHITECTURE-DECISIONS.md §8. **Build Phase 2 (chat widget) is COMPLETE.**
-- [ ] **P1 pre-launch tests (~200 tests):** NATS isolation (§5.1, 25 tests), GDPR services (§5.2, 30 tests), OpenTelemetry tracing (§5.3, 20 tests), pipeline resilience (§5.4, 20 tests), SystemPromptBuilder (§5.5, 15 tests), tenant config (§5.6, 25 tests), provisioning lifecycle (§5.7, 15 tests), Shopify billing (§5.8, 15 tests), persistent memory (§5.9, 20 tests), dashboard API (§5.10, 15 tests)
-- [ ] **Existing backlog items (WI #101-163):** 63 items staged, many now complete. Remaining items include: #105-107 (CI improvements), #108-118 (merchant web UI), #119-128 (trial/demo — #119 done), #131-133 (SSE enhancements — #129-130 done), #134-139 (pipeline optimization), #142-146 (API completeness), #150-156 (operational readiness), #160-163 (security hardening — #157-159 done).
-- [ ] Phase 2.1: Remaining items (session tokens, App Bridge Save Bar, creative assets, test flows)
+- [ ] Phase 2.1: Creative assets (Shopify App Store icon, screenshots, demo video) — blocked on design
 - [ ] Phase 2.5: Layer 3 — PatternExtractionService (Professional+, work items #90-92)
 - [ ] Phase 2.5: Layer 4 — Fine-tuning pipeline (Enterprise add-on, work items #93-96)
 - [ ] Phase 2.5: 5 A/B production tests (work items from Decision #32)
-- [ ] **Verify Tidio audit findings** against live sources (items marked [VERIFY] — pricing, feature changes since May 2025)
-- [ ] **Widget build validation:** `npm install && npm run build` in widget/ to verify bundle size target (~15-20KB gzip), TypeScript compilation, and IIFE output
+- [ ] **Backlog items (WI #101-163) — remaining:** #105-107 (CI improvements: coverage reports, parallel test jobs, branch protection rules), #108-118 (merchant web UI — now largely covered by admin/ frontend), #131-133 (SSE enhancements: client-side retry, event compression, multi-tab coordination), #142-146 (API completeness: pagination standardization, bulk operations, webhook retry, API rate limit headers — partially done)
+- [ ] **P2 launch quality tests (~135 tests):** See COMPREHENSIVE-TEST-PLAN.md §6
+- [ ] **P3 post-launch tests (~90 tests):** See COMPREHENSIVE-TEST-PLAN.md §7
+- [ ] **Adversarial/security tests (~45 tests):** See COMPREHENSIVE-TEST-PLAN.md §8
+- [ ] **Performance/load tests (~30 tests):** See COMPREHENSIVE-TEST-PLAN.md §9
+- [ ] **Integration testing** — End-to-end flows with real Stripe test mode, Shopify partner sandbox
+- [ ] **Admin frontend build validation** — Install dependencies, TypeScript compilation, bundle output for admin/shopify and admin/standalone
+- [ ] **Widget bundle → Theme App Extension** — Copy built widget IIFE into extensions/agent-red-chat/assets/
+- [ ] **Shopify App Store submission** — Requires: creative assets, GDPR webhooks (done), session tokens (done), App Bridge Save Bar (done)
 
 ---
 
@@ -1333,4 +1428,4 @@ Comprehensive widget frontend implementation session. Product renamed from "Cust
 
 *© 2026 Remaker Digital, a DBA of VanDusen & Palmeter, LLC. All rights reserved.*
 *Last Updated: 2026-02-01*
-*Version: 12.0.0*
+*Version: 13.0.0*

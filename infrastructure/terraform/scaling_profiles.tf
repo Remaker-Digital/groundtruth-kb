@@ -119,3 +119,109 @@ output "night_scalable_containers" {
   description = "Containers eligible for night-schedule scaling to zero"
   value       = keys(local.night_scalable_apps)
 }
+
+# ---------------------------------------------------------------------------
+# Scheduled Jobs — Data Retention + Archival Pipeline (WI #190)
+# ---------------------------------------------------------------------------
+#
+# Azure Container App Jobs run as cron-triggered short-lived containers.
+# Each job runs the FastAPI app with a management command that invokes
+# the data retention or archival pipeline service, then exits.
+#
+# Schedule:
+#   - Data retention:    03:00 UTC daily (deletes expired data per tier)
+#   - Archival pipeline: 04:00 UTC daily (moves aged data to Blob Parquet)
+#
+# Both jobs share the same container image as the API Gateway but run
+# with a different entrypoint command.
+#
+# Gated behind var.enable_scheduled_jobs.
+
+resource "azurerm_container_app_job" "data_retention" {
+  count = var.enable_scheduled_jobs ? 1 : 0
+
+  name                         = "agent-red-data-retention"
+  resource_group_name          = var.resource_group_name
+  location                     = var.location
+  container_app_environment_id = azurerm_container_app_environment.main.id
+
+  replica_timeout_in_seconds = 1800
+  replica_retry_limit        = 1
+
+  schedule_trigger_config {
+    cron_expression = var.retention_schedule
+  }
+
+  template {
+    container {
+      name   = "retention"
+      image  = "${var.container_registry}/api-gateway:${var.job_image_tag}"
+      cpu    = 0.25
+      memory = "0.5Gi"
+
+      command = ["python", "-m", "src.jobs.run_retention"]
+
+      env {
+        name  = "COSMOS_DB_ENDPOINT"
+        value = var.cosmos_db_endpoint
+      }
+      env {
+        name  = "COSMOS_DB_DATABASE"
+        value = var.cosmos_db_database
+      }
+      env {
+        name  = "ENVIRONMENT"
+        value = var.environment
+      }
+    }
+  }
+
+  tags = var.tags
+}
+
+resource "azurerm_container_app_job" "archival_pipeline" {
+  count = var.enable_scheduled_jobs ? 1 : 0
+
+  name                         = "agent-red-archival-pipeline"
+  resource_group_name          = var.resource_group_name
+  location                     = var.location
+  container_app_environment_id = azurerm_container_app_environment.main.id
+
+  replica_timeout_in_seconds = 3600
+  replica_retry_limit        = 1
+
+  schedule_trigger_config {
+    cron_expression = var.archival_schedule
+  }
+
+  template {
+    container {
+      name   = "archival"
+      image  = "${var.container_registry}/api-gateway:${var.job_image_tag}"
+      cpu    = 0.5
+      memory = "1Gi"
+
+      command = ["python", "-m", "src.jobs.run_archival"]
+
+      env {
+        name  = "COSMOS_DB_ENDPOINT"
+        value = var.cosmos_db_endpoint
+      }
+      env {
+        name  = "COSMOS_DB_DATABASE"
+        value = var.cosmos_db_database
+      }
+      env {
+        name  = "ENVIRONMENT"
+        value = var.environment
+      }
+    }
+  }
+
+  tags = var.tags
+}
+
+output "scheduled_jobs_enabled" {
+  description = "Whether scheduled jobs (data retention + archival) are enabled"
+  value       = var.enable_scheduled_jobs
+}

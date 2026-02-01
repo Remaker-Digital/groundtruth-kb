@@ -39,6 +39,7 @@ import src.multi_tenant.cosmos_client as _cosmos_client_mod
 import src.multi_tenant.nats_isolation as _nats_isolation_mod
 import src.multi_tenant.tenant_secret_service as _secret_service_mod
 import src.multi_tenant.pipeline_resilience as _pipeline_resilience_mod
+import src.multi_tenant.security_hardening as _security_hardening_mod
 
 
 # ---------------------------------------------------------------------------
@@ -48,6 +49,21 @@ import src.multi_tenant.pipeline_resilience as _pipeline_resilience_mod
 STARTER_TENANT_ID = "t-starter-001"
 PROFESSIONAL_TENANT_ID = "t-pro-002"
 ENTERPRISE_TENANT_ID = "t-ent-003"
+
+
+@pytest.fixture(autouse=True)
+def _reset_pre_auth_rate_limiter():
+    """Reset the pre-auth rate limiter before each test.
+
+    The PreAuthRateLimiter is a module-level singleton that accumulates
+    failed auth attempts across tests. Without this reset, tests that
+    intentionally send unauthenticated requests (e.g., testing auth
+    rejection) would cause later tests to be blocked.
+    """
+    limiter = _security_hardening_mod.get_pre_auth_limiter()
+    limiter._trackers.clear()
+    yield
+    limiter._trackers.clear()
 
 
 @pytest.fixture
@@ -484,6 +500,7 @@ def app_client(
                 resolve_by_shop_domain=domain_resolver,
                 resolve_by_api_key_hash=key_resolver,
             )
+
             yield client
 
 

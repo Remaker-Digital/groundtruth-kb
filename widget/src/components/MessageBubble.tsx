@@ -15,7 +15,7 @@
  * © 2026 Remaker Digital, a DBA of VanDusen & Palmeter, LLC. All rights reserved.
  */
 
-import { h, FunctionComponent } from 'preact';
+import { FunctionComponent } from 'preact';
 import type { DesignTokens } from '@/theme/tokens';
 import type { Message } from '@/state/store';
 

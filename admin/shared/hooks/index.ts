@@ -1,0 +1,372 @@
+/**
+ * Shared React hooks for the Admin component library.
+ *
+ * Each hook encapsulates API communication for a specific domain.
+ * Shells inject the `apiFetch` function (which handles auth headers)
+ * so hooks are auth-agnostic.
+ *
+ * © 2026 Remaker Digital, a DBA of VanDusen & Palmeter, LLC. All rights reserved.
+ */
+
+import { useState, useEffect, useCallback, useRef } from 'react';
+import type {
+  ConfigReadResult,
+  ConfigUpdateResult,
+  UsageDashboard,
+  DailyVolume,
+  ConversationSummary,
+  InboxConversation,
+  ConversationMessage,
+  KBArticle,
+  AnalyticsSummary,
+  IntentBreakdown,
+  KnowledgeGap,
+  TeamMember,
+  OnboardingStepConfig,
+  PaginatedList,
+} from '../types';
+
+// ---------------------------------------------------------------------------
+// Generic fetch hook
+// ---------------------------------------------------------------------------
+
+type ApiFetch = (path: string, init?: RequestInit) => Promise<Response>;
+
+interface UseApiResult<T> {
+  data: T | null;
+  loading: boolean;
+  error: string | null;
+  refetch: () => void;
+}
+
+function useApi<T>(apiFetch: ApiFetch, path: string, enabled = true): UseApiResult<T> {
+  const [data, setData] = useState<T | null>(null);
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+  const [tick, setTick] = useState(0);
+
+  const refetch = useCallback(() => setTick((t) => t + 1), []);
+
+  useEffect(() => {
+    if (!enabled) return;
+
+    let cancelled = false;
+    setLoading(true);
+    setError(null);
+
+    apiFetch(path)
+      .then(async (resp) => {
+        if (cancelled) return;
+        if (!resp.ok) {
+          const body = await resp.text().catch(() => '');
+          throw new Error(`${resp.status}: ${body}`);
+        }
+        const json = await resp.json();
+        setData(json);
+      })
+      .catch((err) => {
+        if (!cancelled) setError(err.message || 'Request failed');
+      })
+      .finally(() => {
+        if (!cancelled) setLoading(false);
+      });
+
+    return () => {
+      cancelled = true;
+    };
+  }, [apiFetch, path, tick, enabled]);
+
+  return { data, loading, error, refetch };
+}
+
+// ---------------------------------------------------------------------------
+// Config hooks
+// ---------------------------------------------------------------------------
+
+export function useConfig(apiFetch: ApiFetch) {
+  return useApi<ConfigReadResult>(apiFetch, '/api/config');
+}
+
+export function useConfigSchema(apiFetch: ApiFetch, step?: string) {
+  const path = step ? `/api/config/schema/${step}` : '/api/config/schema';
+  return useApi<{ fields: Array<Record<string, unknown>> }>(apiFetch, path);
+}
+
+export function useConfigVersions(apiFetch: ApiFetch) {
+  return useApi<{ versions: Array<Record<string, unknown>> }>(apiFetch, '/api/config/versions');
+}
+
+export function useUpdateConfig(apiFetch: ApiFetch) {
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+
+  const updateConfig = useCallback(
+    async (changes: Record<string, unknown>): Promise<ConfigUpdateResult | null> => {
+      setLoading(true);
+      setError(null);
+      try {
+        const resp = await apiFetch('/api/config', {
+          method: 'PUT',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(changes),
+        });
+        if (!resp.ok) throw new Error(`${resp.status}`);
+        return await resp.json();
+      } catch (err: unknown) {
+        const msg = err instanceof Error ? err.message : 'Update failed';
+        setError(msg);
+        return null;
+      } finally {
+        setLoading(false);
+      }
+    },
+    [apiFetch],
+  );
+
+  return { updateConfig, loading, error };
+}
+
+// ---------------------------------------------------------------------------
+// Onboarding hooks
+// ---------------------------------------------------------------------------
+
+export function useOnboardingSteps(apiFetch: ApiFetch) {
+  return useApi<{ steps: OnboardingStepConfig[] }>(apiFetch, '/api/config/onboarding');
+}
+
+// ---------------------------------------------------------------------------
+// Usage hooks
+// ---------------------------------------------------------------------------
+
+export function useUsageDashboard(apiFetch: ApiFetch, billingPeriod?: string) {
+  const path = billingPeriod
+    ? `/api/dashboard/usage?billing_period=${billingPeriod}`
+    : '/api/dashboard/usage';
+  return useApi<UsageDashboard>(apiFetch, path);
+}
+
+export function useDailyVolume(apiFetch: ApiFetch, billingPeriod?: string) {
+  const path = billingPeriod
+    ? `/api/dashboard/usage/daily?billing_period=${billingPeriod}`
+    : '/api/dashboard/usage/daily';
+  return useApi<{ days: DailyVolume[] }>(apiFetch, path);
+}
+
+export function useConversationList(
+  apiFetch: ApiFetch,
+  billingPeriod?: string,
+  offset = 0,
+  limit = 50,
+) {
+  const params = new URLSearchParams();
+  if (billingPeriod) params.set('billing_period', billingPeriod);
+  params.set('offset', String(offset));
+  params.set('limit', String(limit));
+  const path = `/api/dashboard/conversations?${params}`;
+  return useApi<PaginatedList<ConversationSummary>>(apiFetch, path);
+}
+
+// ---------------------------------------------------------------------------
+// Inbox hooks
+// ---------------------------------------------------------------------------
+
+export function useInboxConversations(apiFetch: ApiFetch) {
+  return useApi<{ conversations: InboxConversation[] }>(apiFetch, '/api/admin/conversations');
+}
+
+export function useConversationMessages(apiFetch: ApiFetch, conversationId: string) {
+  return useApi<{ messages: ConversationMessage[] }>(
+    apiFetch,
+    `/api/admin/conversations/${conversationId}/messages`,
+    !!conversationId,
+  );
+}
+
+export function useAssignConversation(apiFetch: ApiFetch) {
+  const [loading, setLoading] = useState(false);
+
+  const assign = useCallback(
+    async (conversationId: string, agentId: string) => {
+      setLoading(true);
+      try {
+        await apiFetch(`/api/admin/conversations/${conversationId}/assign`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ agent_id: agentId }),
+        });
+      } finally {
+        setLoading(false);
+      }
+    },
+    [apiFetch],
+  );
+
+  return { assign, loading };
+}
+
+// ---------------------------------------------------------------------------
+// Knowledge Base hooks
+// ---------------------------------------------------------------------------
+
+export function useKnowledgeBase(apiFetch: ApiFetch) {
+  return useApi<{ articles: KBArticle[] }>(apiFetch, '/api/admin/knowledge');
+}
+
+export function useKBArticle(apiFetch: ApiFetch, articleId: string) {
+  return useApi<KBArticle>(apiFetch, `/api/admin/knowledge/${articleId}`, !!articleId);
+}
+
+export function useSaveKBArticle(apiFetch: ApiFetch) {
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+
+  const save = useCallback(
+    async (article: Partial<KBArticle>): Promise<KBArticle | null> => {
+      setLoading(true);
+      setError(null);
+      try {
+        const isNew = !article.id;
+        const resp = await apiFetch(
+          isNew ? '/api/admin/knowledge' : `/api/admin/knowledge/${article.id}`,
+          {
+            method: isNew ? 'POST' : 'PUT',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify(article),
+          },
+        );
+        if (!resp.ok) throw new Error(`${resp.status}`);
+        return await resp.json();
+      } catch (err: unknown) {
+        const msg = err instanceof Error ? err.message : 'Save failed';
+        setError(msg);
+        return null;
+      } finally {
+        setLoading(false);
+      }
+    },
+    [apiFetch],
+  );
+
+  return { save, loading, error };
+}
+
+// ---------------------------------------------------------------------------
+// Analytics hooks
+// ---------------------------------------------------------------------------
+
+export function useAnalyticsSummary(apiFetch: ApiFetch) {
+  return useApi<AnalyticsSummary>(apiFetch, '/api/analytics/summary');
+}
+
+export function useIntentBreakdown(apiFetch: ApiFetch) {
+  return useApi<{ intents: IntentBreakdown[] }>(apiFetch, '/api/analytics/intents');
+}
+
+export function useKnowledgeGaps(apiFetch: ApiFetch) {
+  return useApi<{ gaps: KnowledgeGap[] }>(apiFetch, '/api/analytics/gaps');
+}
+
+// ---------------------------------------------------------------------------
+// Team hooks
+// ---------------------------------------------------------------------------
+
+export function useTeamMembers(apiFetch: ApiFetch) {
+  return useApi<{ members: TeamMember[] }>(apiFetch, '/api/admin/team');
+}
+
+export function useInviteTeamMember(apiFetch: ApiFetch) {
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+
+  const invite = useCallback(
+    async (email: string, role: string, name?: string) => {
+      setLoading(true);
+      setError(null);
+      try {
+        const resp = await apiFetch('/api/admin/team', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ email, role, name }),
+        });
+        if (!resp.ok) throw new Error(`${resp.status}`);
+        return await resp.json();
+      } catch (err: unknown) {
+        const msg = err instanceof Error ? err.message : 'Invite failed';
+        setError(msg);
+        return null;
+      } finally {
+        setLoading(false);
+      }
+    },
+    [apiFetch],
+  );
+
+  return { invite, loading, error };
+}
+
+// ---------------------------------------------------------------------------
+// Billing hooks
+// ---------------------------------------------------------------------------
+
+export function useBillingStatus(apiFetch: ApiFetch, channel: 'shopify' | 'stripe') {
+  const path = channel === 'shopify' ? '/api/shopify/billing/status' : '/api/billing/portal';
+  return useApi<Record<string, unknown>>(apiFetch, path);
+}
+
+export function usePackBalance(apiFetch: ApiFetch, customerId: string) {
+  return useApi<{ balance: number; packs: Array<Record<string, unknown>> }>(
+    apiFetch,
+    `/api/packs/balance/${customerId}`,
+    !!customerId,
+  );
+}
+
+// ---------------------------------------------------------------------------
+// Polling hook (for real-time inbox)
+// ---------------------------------------------------------------------------
+
+export function usePolling<T>(
+  apiFetch: ApiFetch,
+  path: string,
+  intervalMs = 5000,
+): UseApiResult<T> {
+  const [data, setData] = useState<T | null>(null);
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+  const [tick, setTick] = useState(0);
+  const intervalRef = useRef<ReturnType<typeof setInterval>>();
+
+  const refetch = useCallback(() => setTick((t) => t + 1), []);
+
+  useEffect(() => {
+    let cancelled = false;
+
+    const fetchData = () => {
+      setLoading(true);
+      apiFetch(path)
+        .then(async (resp) => {
+          if (cancelled) return;
+          if (!resp.ok) throw new Error(`${resp.status}`);
+          const json = await resp.json();
+          setData(json);
+          setError(null);
+        })
+        .catch((err) => {
+          if (!cancelled) setError(err.message);
+        })
+        .finally(() => {
+          if (!cancelled) setLoading(false);
+        });
+    };
+
+    fetchData();
+    intervalRef.current = setInterval(fetchData, intervalMs);
+
+    return () => {
+      cancelled = true;
+      if (intervalRef.current) clearInterval(intervalRef.current);
+    };
+  }, [apiFetch, path, intervalMs, tick]);
+
+  return { data, loading, error, refetch };
+}

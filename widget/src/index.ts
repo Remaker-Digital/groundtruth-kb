@@ -31,8 +31,8 @@ import type { WidgetConfig } from '@/theme/tokens';
 import { resolveTokens } from '@/theme/tokens';
 import { en } from '@/locale/en';
 import type { Locale } from '@/locale/en';
-import { createStore, getStore } from '@/state/store';
-import { configureTransport, fetchWidgetConfig, getTransportConfig } from '@/transport/http';
+import { createStore } from '@/state/store';
+import { configureTransport, fetchWidgetConfig } from '@/transport/http';
 import { Launcher } from '@/components/Launcher';
 import { Panel } from '@/components/Panel';
 
@@ -81,11 +81,34 @@ interface AgentRedSDK {
     return;
   }
 
+  // Read inline overrides from data attributes (set by Shopify Liquid template)
+  const dataOverrides: Record<string, string | boolean> = {};
+  const attrMap: Record<string, string> = {
+    'data-color': 'widget_primary_color',
+    'data-position': 'widget_position',
+    'data-auto-open': 'widget_auto_open',
+    'data-auto-open-delay': 'widget_auto_open_delay',
+    'data-mobile-enabled': 'widget_mobile_enabled',
+    'data-sound-enabled': 'widget_sound_enabled',
+    'data-greeting': 'greeting_message',
+    'data-header-text': 'widget_header_text',
+    'data-agent-name': 'widget_agent_display_name',
+  };
+  for (const [attr, configKey] of Object.entries(attrMap)) {
+    const val = scriptTag.getAttribute(attr);
+    if (val !== null) {
+      // Convert boolean-like strings
+      if (val === 'true') dataOverrides[configKey] = true;
+      else if (val === 'false') dataOverrides[configKey] = false;
+      else dataOverrides[configKey] = val;
+    }
+  }
+
   // Configure transport
   configureTransport({ apiBaseUrl, widgetKey });
 
   // Fetch config and initialize
-  init(widgetKey, apiBaseUrl).catch((err) => {
+  init(widgetKey, apiBaseUrl, dataOverrides).catch((err) => {
     console.error('[AgentRed] Widget initialization failed:', err);
   });
 })();
@@ -94,13 +117,23 @@ interface AgentRedSDK {
 // Initialization
 // ---------------------------------------------------------------------------
 
-async function init(_widgetKey: string, _apiBaseUrl: string): Promise<void> {
+async function init(
+  _widgetKey: string,
+  _apiBaseUrl: string,
+  dataOverrides?: Record<string, string | boolean>,
+): Promise<void> {
   // Fetch widget configuration from the API
-  const config = await fetchWidgetConfig();
-  if (!config) {
+  const fetchedConfig = await fetchWidgetConfig();
+  if (!fetchedConfig) {
     console.warn('[AgentRed] Failed to fetch widget configuration. Widget will not load.');
     return;
   }
+  // Merge data-attribute overrides from the script tag (Shopify Liquid template)
+  // These take precedence over API-fetched config so merchants can configure
+  // basic settings directly in the Shopify theme editor.
+  const config: WidgetConfig = dataOverrides
+    ? { ...fetchedConfig, ...dataOverrides } as WidgetConfig
+    : fetchedConfig;
 
   // Check page rules — should this page show the widget?
   if (!shouldShowOnPage(config)) return;
@@ -124,7 +157,6 @@ async function init(_widgetKey: string, _apiBaseUrl: string): Promise<void> {
 
   // State for tracking panel iframe
   let panelIframe: HTMLIFrameElement | null = null;
-  let panelVisible = false;
 
   // Resolve tokens for launcher
   const tokens = resolveTokens(config);
@@ -220,7 +252,6 @@ async function init(_widgetKey: string, _apiBaseUrl: string): Promise<void> {
         panelIframe.style.pointerEvents = 'auto';
       }
     });
-    panelVisible = true;
   }
 
   function hidePanel() {
@@ -229,7 +260,6 @@ async function init(_widgetKey: string, _apiBaseUrl: string): Promise<void> {
       panelIframe.style.transform = 'translateY(12px) scale(0.95)';
       panelIframe.style.pointerEvents = 'none';
     }
-    panelVisible = false;
   }
 
   // ---- Widget control functions -------------------------------------------

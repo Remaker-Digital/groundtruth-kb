@@ -130,8 +130,10 @@ class TestPipelineTimeoutBudget:
 
         assert budget.is_expired
 
+        coro = _fast_coroutine()
         with pytest.raises(PipelineTimeoutError) as exc_info:
-            await budget.execute_with_budget("stage-late", _fast_coroutine())
+            await budget.execute_with_budget("stage-late", coro)
+        coro.close()
 
         assert exc_info.value.stage == "stage-late"
         assert exc_info.value.budget_ms == 0
@@ -385,8 +387,10 @@ class TestCallWithBreaker:
         breaker.record_failure()
         assert breaker.is_open
 
+        coro = _fast_coroutine()
         with pytest.raises(ServiceUnavailableError) as exc_info:
-            await call_with_breaker(breaker, _fast_coroutine())
+            await call_with_breaker(breaker, coro)
+        coro.close()
 
         assert exc_info.value.service_name == "test-svc"
 

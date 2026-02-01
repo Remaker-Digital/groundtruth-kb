@@ -18,7 +18,7 @@
  * © 2026 Remaker Digital, a DBA of VanDusen & Palmeter, LLC. All rights reserved.
  */
 
-import { h, FunctionComponent } from 'preact';
+import { FunctionComponent } from 'preact';
 import { useState, useEffect, useCallback, useRef } from 'preact/hooks';
 import type { DesignTokens, WidgetConfig } from '@/theme/tokens';
 import { resolveTokens } from '@/theme/tokens';
@@ -214,6 +214,7 @@ export const Panel: FunctionComponent<PanelProps> = ({
   }, [connectSSE]);
 
   /** End the current conversation. */
+  /** End the current conversation (wired to Header close). */
   const handleEndConversation = useCallback(async () => {
     const store = getStore();
     const { conversationId } = store.getState();
@@ -316,7 +317,7 @@ export const Panel: FunctionComponent<PanelProps> = ({
         agentAvatarUrl={agentAvatarUrl}
         logoUrl={logoUrl}
         headerText={config.widget_header_text || null}
-        onClose={onClose}
+        onClose={() => { handleEndConversation(); onClose(); }}
       />
 
       {/* Connection status banner */}

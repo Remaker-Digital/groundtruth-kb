@@ -180,6 +180,34 @@ variable "night_scaling_end" {
 }
 
 # ---------------------------------------------------------------------------
+# Scheduled Jobs — Data Retention + Archival (WI #190)
+# ---------------------------------------------------------------------------
+
+variable "enable_scheduled_jobs" {
+  description = "Enable scheduled Container App Jobs for data retention and archival"
+  type        = bool
+  default     = false
+}
+
+variable "retention_schedule" {
+  description = "Cron expression for data retention job (default: daily at 03:00 UTC)"
+  type        = string
+  default     = "0 3 * * *"
+}
+
+variable "archival_schedule" {
+  description = "Cron expression for archival pipeline job (default: daily at 04:00 UTC)"
+  type        = string
+  default     = "0 4 * * *"
+}
+
+variable "job_image_tag" {
+  description = "Docker image tag for scheduled job container"
+  type        = string
+  default     = "latest"
+}
+
+# ---------------------------------------------------------------------------
 # Tags
 # ---------------------------------------------------------------------------
 

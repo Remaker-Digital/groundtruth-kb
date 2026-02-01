@@ -442,47 +442,10 @@ async def list_conversations(
 
 
 # ---------------------------------------------------------------------------
-# Layer 2: Single conversation billing detail
-# ---------------------------------------------------------------------------
-
-@router.get(
-    "/conversations/{conversation_id}",
-    response_model=ConversationDetailResponse,
-)
-async def get_conversation_detail(
-    conversation_id: str,
-    ctx: TenantContext = Depends(get_tenant_context),
-) -> ConversationDetailResponse:
-    """Get full billing detail for a single conversation.
-
-    Returns the complete billing attribution record including agents
-    invoked, model used, Critic pass/fail, and timing data.
-    """
-    meter = _get_meter()
-
-    try:
-        detail = await meter.get_conversation_billing_detail(
-            tenant_id=ctx.tenant_id,
-            conversation_id=conversation_id,
-        )
-    except Exception as exc:
-        logger.warning(
-            "Conversation detail lookup failed: tenant=%s conversation=%s error=%s",
-            ctx.tenant_id[:8],
-            conversation_id,
-            exc,
-        )
-        raise HTTPException(
-            status_code=404,
-            detail=f"Conversation {conversation_id} not found",
-        ) from exc
-
-    return ConversationDetailResponse(**detail)
-
-
-# ---------------------------------------------------------------------------
 # Layer 2: CSV export
 # ---------------------------------------------------------------------------
+# NOTE: This route MUST be registered before /conversations/{conversation_id}
+# to prevent FastAPI from matching "export" as a conversation_id path param.
 
 # CSV column definitions — controls export field order and headers
 _CSV_COLUMNS = [
@@ -589,3 +552,42 @@ async def export_conversations_csv(
             "Content-Disposition": f'attachment; filename="{filename}"',
         },
     )
+
+
+# ---------------------------------------------------------------------------
+# Layer 2: Single conversation billing detail
+# ---------------------------------------------------------------------------
+
+@router.get(
+    "/conversations/{conversation_id}",
+    response_model=ConversationDetailResponse,
+)
+async def get_conversation_detail(
+    conversation_id: str,
+    ctx: TenantContext = Depends(get_tenant_context),
+) -> ConversationDetailResponse:
+    """Get full billing detail for a single conversation.
+
+    Returns the complete billing attribution record including agents
+    invoked, model used, Critic pass/fail, and timing data.
+    """
+    meter = _get_meter()
+
+    try:
+        detail = await meter.get_conversation_billing_detail(
+            tenant_id=ctx.tenant_id,
+            conversation_id=conversation_id,
+        )
+    except Exception as exc:
+        logger.warning(
+            "Conversation detail lookup failed: tenant=%s conversation=%s error=%s",
+            ctx.tenant_id[:8],
+            conversation_id,
+            exc,
+        )
+        raise HTTPException(
+            status_code=404,
+            detail=f"Conversation {conversation_id} not found",
+        ) from exc
+
+    return ConversationDetailResponse(**detail)

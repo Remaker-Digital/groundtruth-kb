@@ -1,0 +1,695 @@
+"""
+Alert delivery mechanism for multi-tenant Agent Red platform.
+
+Implements WI #192: Centralised alert routing and delivery. Currently,
+ConversationMeter (billing thresholds), TenantUsageMonitor (escalation
+levels), and SLAMonitoringService (compliance violations) all generate
+alerts but have no delivery channel. This module provides:
+
+    1. AlertDeliveryService — routes alerts to registered channels
+    2. Three built-in channels:
+       a. WebhookAlertChannel — POST JSON to merchant webhook URL
+       b. DashboardAlertChannel — persist to Cosmos DB for admin UI
+       c. LogAlertChannel — structured log output (always-on fallback)
+    3. Convenience functions for common alert scenarios
+
+Alert lifecycle:
+    Source (ConversationMeter / UsageMonitor / SLA) creates an Alert →
+    AlertDeliveryService.deliver_alert() iterates registered channels →
+    each channel attempts delivery → DeliveryResult returned with
+    per-channel success/failure.
+
+Architecture references:
+    - Decision #26: Proactive billing alerts (80%/100% thresholds)
+    - Decision #17: Progressive throttling alerts (Watch→Warn→Throttle→Isolate)
+    - WI #151: SLA monitoring dashboard (compliance violations)
+    - WI #192: Alert delivery mechanism (this module)
+
+© 2026 Remaker Digital, a DBA of VanDusen & Palmeter, LLC. All rights reserved.
+"""
+
+from __future__ import annotations
+
+import logging
+import uuid
+from abc import ABC, abstractmethod
+from dataclasses import dataclass, field
+from datetime import datetime, timezone
+from enum import Enum
+from typing import Any
+
+logger = logging.getLogger(__name__)
+
+
+# ---------------------------------------------------------------------------
+# Enums
+# ---------------------------------------------------------------------------
+
+
+class AlertType(str, Enum):
+    """Types of alerts the platform can generate."""
+
+    USAGE_80_PCT = "usage_80_pct"
+    USAGE_100_PCT = "usage_100_pct"
+    PACK_BALANCE_LOW = "pack_balance_low"
+    VOLUME_SPIKE = "volume_spike"
+    THROTTLE_ACTIVATED = "throttle_activated"
+    SLA_VIOLATION = "sla_violation"
+    TRIAL_EXPIRING = "trial_expiring"
+    RETENTION_COMPLETE = "retention_complete"
+
+
+class AlertSeverity(str, Enum):
+    """Alert severity levels."""
+
+    INFO = "info"
+    WARNING = "warning"
+    CRITICAL = "critical"
+
+
+# Map alert types to their default severity
+_DEFAULT_SEVERITY: dict[AlertType, AlertSeverity] = {
+    AlertType.USAGE_80_PCT: AlertSeverity.WARNING,
+    AlertType.USAGE_100_PCT: AlertSeverity.CRITICAL,
+    AlertType.PACK_BALANCE_LOW: AlertSeverity.WARNING,
+    AlertType.VOLUME_SPIKE: AlertSeverity.WARNING,
+    AlertType.THROTTLE_ACTIVATED: AlertSeverity.CRITICAL,
+    AlertType.SLA_VIOLATION: AlertSeverity.CRITICAL,
+    AlertType.TRIAL_EXPIRING: AlertSeverity.INFO,
+    AlertType.RETENTION_COMPLETE: AlertSeverity.INFO,
+}
+
+
+# ---------------------------------------------------------------------------
+# Data classes
+# ---------------------------------------------------------------------------
+
+
+@dataclass(frozen=True)
+class Alert:
+    """An alert to be delivered to one or more channels.
+
+    Attributes:
+        alert_id: Unique identifier for this alert instance.
+        tenant_id: Tenant that generated or is affected by this alert.
+        alert_type: Category of the alert (from AlertType enum).
+        severity: How urgent the alert is.
+        title: Short human-readable summary (max ~120 chars).
+        message: Detailed description of the alert condition.
+        metadata: Arbitrary key-value data relevant to the alert.
+        timestamp: ISO 8601 UTC timestamp when the alert was created.
+    """
+
+    alert_id: str
+    tenant_id: str
+    alert_type: AlertType
+    severity: AlertSeverity
+    title: str
+    message: str
+    metadata: dict[str, Any] = field(default_factory=dict)
+    timestamp: str = field(
+        default_factory=lambda: datetime.now(timezone.utc).isoformat(),
+    )
+
+    def to_dict(self) -> dict[str, Any]:
+        """Serialise the alert to a plain dict (for JSON / Cosmos DB)."""
+        return {
+            "alert_id": self.alert_id,
+            "tenant_id": self.tenant_id,
+            "alert_type": self.alert_type.value,
+            "severity": self.severity.value,
+            "title": self.title,
+            "message": self.message,
+            "metadata": self.metadata,
+            "timestamp": self.timestamp,
+        }
+
+
+@dataclass(frozen=True)
+class ChannelResult:
+    """Delivery outcome for a single channel."""
+
+    channel_name: str
+    success: bool
+    error: str | None = None
+
+
+@dataclass(frozen=True)
+class DeliveryResult:
+    """Aggregate delivery outcome across all channels.
+
+    Attributes:
+        alert_id: The alert that was delivered (or attempted).
+        channels_attempted: Number of channels that attempted delivery.
+        channels_succeeded: Number of channels that succeeded.
+        channels_failed: Number of channels that failed.
+        errors: Per-channel error details for failed deliveries.
+    """
+
+    alert_id: str
+    channels_attempted: int
+    channels_succeeded: int
+    channels_failed: int
+    errors: list[ChannelResult] = field(default_factory=list)
+
+
+# ---------------------------------------------------------------------------
+# AlertChannel — abstract base for delivery channels
+# ---------------------------------------------------------------------------
+
+
+class AlertChannel(ABC):
+    """Base class for alert delivery channels.
+
+    Subclasses implement deliver() to send the alert via a specific
+    transport (webhook, database, log, email, etc.).
+    """
+
+    @property
+    @abstractmethod
+    def name(self) -> str:
+        """Human-readable channel name (used in DeliveryResult)."""
+
+    @abstractmethod
+    async def deliver(self, alert: Alert) -> ChannelResult:
+        """Attempt to deliver the alert via this channel.
+
+        Returns:
+            ChannelResult indicating success or failure.
+        """
+
+
+# ---------------------------------------------------------------------------
+# Built-in channels
+# ---------------------------------------------------------------------------
+
+
+class LogAlertChannel(AlertChannel):
+    """Structured log output channel (always-on fallback).
+
+    Writes every alert to the Python logger at a level matching the
+    alert severity: INFO → info, WARNING → warning, CRITICAL → error.
+    """
+
+    @property
+    def name(self) -> str:
+        return "log"
+
+    async def deliver(self, alert: Alert) -> ChannelResult:
+        """Write the alert to structured log output."""
+        try:
+            log_fn = {
+                AlertSeverity.INFO: logger.info,
+                AlertSeverity.WARNING: logger.warning,
+                AlertSeverity.CRITICAL: logger.error,
+            }.get(alert.severity, logger.info)
+
+            log_fn(
+                "ALERT [%s] tenant=%s severity=%s title=%s message=%s metadata=%s",
+                alert.alert_type.value,
+                alert.tenant_id,
+                alert.severity.value,
+                alert.title,
+                alert.message,
+                alert.metadata,
+            )
+            return ChannelResult(channel_name=self.name, success=True)
+
+        except Exception as exc:
+            return ChannelResult(
+                channel_name=self.name,
+                success=False,
+                error=str(exc),
+            )
+
+
+class DashboardAlertChannel(AlertChannel):
+    """Persist alerts to Cosmos DB for admin dashboard retrieval.
+
+    Stores each alert as a document in the audit log (using
+    AuditLogRepository) so merchants can view historical alerts in
+    the admin UI. The alert payload is stored in the audit event's
+    ``details`` field.
+
+    Dependencies:
+        audit_repo: AuditLogRepository (or any object with a
+            ``log_event()`` async method matching the audit interface).
+    """
+
+    def __init__(self, audit_repo: Any) -> None:
+        self._audit = audit_repo
+
+    @property
+    def name(self) -> str:
+        return "dashboard"
+
+    async def deliver(self, alert: Alert) -> ChannelResult:
+        """Persist the alert to Cosmos DB via the audit log."""
+        try:
+            # Import here to avoid circular dependency at module load
+            from src.multi_tenant.cosmos_schema import AuditEventType
+
+            await self._audit.log_event(
+                tenant_id=alert.tenant_id,
+                event_type=AuditEventType.SUBSCRIPTION_CHANGED,
+                actor="alert_delivery",
+                actor_type="system",
+                payload={
+                    "alert_id": alert.alert_id,
+                    "alert_type": alert.alert_type.value,
+                    "severity": alert.severity.value,
+                    "title": alert.title,
+                    "message": alert.message,
+                    "metadata": alert.metadata,
+                },
+            )
+            return ChannelResult(channel_name=self.name, success=True)
+
+        except Exception as exc:
+            logger.exception(
+                "DashboardAlertChannel delivery failed: alert_id=%s tenant=%s",
+                alert.alert_id, alert.tenant_id,
+            )
+            return ChannelResult(
+                channel_name=self.name,
+                success=False,
+                error=str(exc),
+            )
+
+
+class WebhookAlertChannel(AlertChannel):
+    """POST JSON to the merchant's configured webhook URL.
+
+    Uses httpx async client with a 5-second timeout and up to 2
+    retries (3 total attempts). The webhook URL is resolved per
+    tenant from the preferences repository.
+
+    Dependencies:
+        preferences_repo: Any repository with an async ``read()``
+            method returning a dict with a ``webhook_url`` field.
+    """
+
+    # Connection / retry settings
+    TIMEOUT_SECONDS = 5.0
+    MAX_RETRIES = 2  # 2 retries = 3 total attempts
+
+    def __init__(self, preferences_repo: Any) -> None:
+        self._preferences = preferences_repo
+
+    @property
+    def name(self) -> str:
+        return "webhook"
+
+    async def deliver(self, alert: Alert) -> ChannelResult:
+        """POST the alert payload to the tenant's webhook URL."""
+        import httpx
+
+        # Resolve webhook URL from tenant preferences
+        webhook_url: str | None = None
+        try:
+            prefs = await self._preferences.read(
+                alert.tenant_id, alert.tenant_id,
+            )
+            webhook_url = prefs.get("webhook_url") if prefs else None
+        except Exception:
+            logger.debug(
+                "Could not read preferences for tenant=%s", alert.tenant_id,
+            )
+
+        if not webhook_url:
+            return ChannelResult(
+                channel_name=self.name,
+                success=False,
+                error="no webhook_url configured for tenant",
+            )
+
+        payload = alert.to_dict()
+        last_error: str | None = None
+
+        for attempt in range(1 + self.MAX_RETRIES):
+            try:
+                async with httpx.AsyncClient(
+                    timeout=httpx.Timeout(self.TIMEOUT_SECONDS),
+                ) as client:
+                    response = await client.post(
+                        webhook_url,
+                        json=payload,
+                        headers={
+                            "Content-Type": "application/json",
+                            "User-Agent": "AgentRed-AlertDelivery/1.0",
+                            "X-Alert-Id": alert.alert_id,
+                            "X-Alert-Type": alert.alert_type.value,
+                        },
+                    )
+                    if response.status_code < 300:
+                        return ChannelResult(
+                            channel_name=self.name, success=True,
+                        )
+                    last_error = (
+                        f"HTTP {response.status_code} from webhook"
+                    )
+
+            except httpx.TimeoutException:
+                last_error = f"timeout after {self.TIMEOUT_SECONDS}s (attempt {attempt + 1})"
+                logger.debug(
+                    "Webhook timeout: tenant=%s url=%s attempt=%d",
+                    alert.tenant_id, webhook_url, attempt + 1,
+                )
+            except Exception as exc:
+                last_error = f"{type(exc).__name__}: {exc}"
+                logger.debug(
+                    "Webhook delivery error: tenant=%s attempt=%d error=%s",
+                    alert.tenant_id, attempt + 1, last_error,
+                )
+
+        logger.warning(
+            "WebhookAlertChannel exhausted retries: alert_id=%s tenant=%s error=%s",
+            alert.alert_id, alert.tenant_id, last_error,
+        )
+        return ChannelResult(
+            channel_name=self.name,
+            success=False,
+            error=last_error,
+        )
+
+
+# ---------------------------------------------------------------------------
+# AlertDeliveryService
+# ---------------------------------------------------------------------------
+
+
+class AlertDeliveryService:
+    """Routes alerts to registered delivery channels.
+
+    Always includes a LogAlertChannel as the fallback channel. Additional
+    channels (webhook, dashboard, email) are registered at startup via
+    register_channel().
+
+    Usage:
+        service = AlertDeliveryService()
+        service.register_channel(DashboardAlertChannel(audit_repo))
+        service.register_channel(WebhookAlertChannel(prefs_repo))
+
+        result = await service.deliver_alert(alert)
+    """
+
+    def __init__(self) -> None:
+        self._channels: list[AlertChannel] = []
+        # Log channel is always present as the final fallback
+        self._log_channel = LogAlertChannel()
+
+    def register_channel(self, channel: AlertChannel) -> None:
+        """Register a delivery channel.
+
+        Channels are attempted in registration order, with the log
+        channel always executed last as a fallback.
+
+        Args:
+            channel: An AlertChannel implementation to add.
+        """
+        # Avoid duplicate registration of the same channel type
+        for existing in self._channels:
+            if existing.name == channel.name:
+                logger.warning(
+                    "Alert channel '%s' already registered — replacing",
+                    channel.name,
+                )
+                self._channels.remove(existing)
+                break
+
+        self._channels.append(channel)
+        logger.info("Alert delivery channel registered: %s", channel.name)
+
+    def get_registered_channels(self) -> list[str]:
+        """Return the names of all registered channels (plus 'log')."""
+        return [ch.name for ch in self._channels] + [self._log_channel.name]
+
+    async def deliver_alert(self, alert: Alert) -> DeliveryResult:
+        """Route an alert to all registered delivery channels.
+
+        Each channel is attempted independently — a failure in one
+        channel does not prevent delivery to others. The log channel
+        is always invoked last as a guaranteed fallback.
+
+        Args:
+            alert: The alert to deliver.
+
+        Returns:
+            DeliveryResult with per-channel outcomes.
+        """
+        all_channels = list(self._channels) + [self._log_channel]
+        results: list[ChannelResult] = []
+
+        for channel in all_channels:
+            try:
+                result = await channel.deliver(alert)
+                results.append(result)
+            except Exception as exc:
+                results.append(
+                    ChannelResult(
+                        channel_name=channel.name,
+                        success=False,
+                        error=f"unhandled: {type(exc).__name__}: {exc}",
+                    ),
+                )
+
+        succeeded = sum(1 for r in results if r.success)
+        failed = sum(1 for r in results if not r.success)
+        errors = [r for r in results if not r.success]
+
+        return DeliveryResult(
+            alert_id=alert.alert_id,
+            channels_attempted=len(results),
+            channels_succeeded=succeeded,
+            channels_failed=failed,
+            errors=errors,
+        )
+
+
+# ---------------------------------------------------------------------------
+# Alert factory helpers
+# ---------------------------------------------------------------------------
+
+
+def _make_alert_id() -> str:
+    """Generate a unique alert identifier."""
+    return f"alert_{uuid.uuid4().hex[:16]}"
+
+
+def create_alert(
+    tenant_id: str,
+    alert_type: AlertType,
+    title: str,
+    message: str,
+    severity: AlertSeverity | None = None,
+    metadata: dict[str, Any] | None = None,
+) -> Alert:
+    """Create an Alert with auto-generated ID and timestamp.
+
+    If severity is not provided, uses the default severity for the
+    given alert_type.
+
+    Args:
+        tenant_id: Tenant generating the alert.
+        alert_type: Category of alert.
+        title: Short summary.
+        message: Detailed description.
+        severity: Override default severity (optional).
+        metadata: Additional context (optional).
+
+    Returns:
+        A fully populated Alert instance.
+    """
+    if severity is None:
+        severity = _DEFAULT_SEVERITY.get(alert_type, AlertSeverity.INFO)
+
+    return Alert(
+        alert_id=_make_alert_id(),
+        tenant_id=tenant_id,
+        alert_type=alert_type,
+        severity=severity,
+        title=title,
+        message=message,
+        metadata=metadata or {},
+    )
+
+
+# ---------------------------------------------------------------------------
+# Convenience functions for common alerts
+# ---------------------------------------------------------------------------
+
+
+async def send_usage_alert(
+    tenant_id: str,
+    pct_used: float,
+    tier: str,
+) -> DeliveryResult | None:
+    """Create and deliver a USAGE_80_PCT or USAGE_100_PCT alert.
+
+    Selects the appropriate alert type based on the usage percentage.
+
+    Args:
+        tenant_id: Tenant that crossed the threshold.
+        pct_used: Usage percentage (0-100+). Values >= 100 produce
+            a USAGE_100_PCT alert; values >= 80 produce USAGE_80_PCT.
+        tier: Tenant tier (for metadata).
+
+    Returns:
+        DeliveryResult, or None if no service is configured.
+    """
+    service = get_alert_service()
+    if service is None:
+        return None
+
+    if pct_used >= 100:
+        alert_type = AlertType.USAGE_100_PCT
+        title = "Included conversation allowance exhausted"
+        message = (
+            f"Usage has reached {pct_used:.0f}% of included allowance. "
+            "Additional conversations will consume pack balance or incur overage charges."
+        )
+    else:
+        alert_type = AlertType.USAGE_80_PCT
+        title = "Approaching conversation allowance limit"
+        message = (
+            f"Usage has reached {pct_used:.0f}% of included allowance. "
+            "Consider purchasing a conversation pack to avoid overage charges."
+        )
+
+    alert = create_alert(
+        tenant_id=tenant_id,
+        alert_type=alert_type,
+        title=title,
+        message=message,
+        metadata={
+            "pct_used": round(pct_used, 1),
+            "tier": tier,
+        },
+    )
+
+    return await service.deliver_alert(alert)
+
+
+async def send_throttle_alert(
+    tenant_id: str,
+    level: str,
+    tier: str,
+) -> DeliveryResult | None:
+    """Create and deliver a THROTTLE_ACTIVATED alert.
+
+    Called when TenantUsageMonitor escalates a tenant to Throttle or
+    Isolate level.
+
+    Args:
+        tenant_id: Tenant being throttled.
+        level: Escalation level name (e.g. "throttle", "isolate").
+        tier: Tenant tier (for metadata).
+
+    Returns:
+        DeliveryResult, or None if no service is configured.
+    """
+    service = get_alert_service()
+    if service is None:
+        return None
+
+    severity = AlertSeverity.CRITICAL if level == "isolate" else AlertSeverity.WARNING
+
+    alert = create_alert(
+        tenant_id=tenant_id,
+        alert_type=AlertType.THROTTLE_ACTIVATED,
+        title=f"Rate limiting active — escalation level: {level}",
+        message=(
+            f"Tenant has been escalated to '{level}' due to elevated resource "
+            "consumption. Request rate limits have been reduced to protect "
+            "platform stability."
+        ),
+        severity=severity,
+        metadata={
+            "escalation_level": level,
+            "tier": tier,
+        },
+    )
+
+    return await service.deliver_alert(alert)
+
+
+async def send_sla_alert(
+    tenant_id: str,
+    violation_type: str,
+    details: dict[str, Any] | None = None,
+) -> DeliveryResult | None:
+    """Create and deliver an SLA_VIOLATION alert.
+
+    Called when SLAMonitoringService detects a compliance violation
+    (latency exceeding targets, uptime below threshold, etc.).
+
+    Args:
+        tenant_id: Affected tenant.
+        violation_type: What was violated (e.g. "p95_latency", "uptime").
+        details: Additional violation details (actual vs target values).
+
+    Returns:
+        DeliveryResult, or None if no service is configured.
+    """
+    service = get_alert_service()
+    if service is None:
+        return None
+
+    alert = create_alert(
+        tenant_id=tenant_id,
+        alert_type=AlertType.SLA_VIOLATION,
+        title=f"SLA violation detected — {violation_type}",
+        message=(
+            f"A service level agreement violation has been detected for "
+            f"metric '{violation_type}'. Review the SLA monitoring dashboard "
+            "for details."
+        ),
+        metadata={
+            "violation_type": violation_type,
+            **(details or {}),
+        },
+    )
+
+    return await service.deliver_alert(alert)
+
+
+# ---------------------------------------------------------------------------
+# Module singleton
+# ---------------------------------------------------------------------------
+
+_alert_service: AlertDeliveryService | None = None
+
+
+def get_alert_service() -> AlertDeliveryService | None:
+    """Get the module-level AlertDeliveryService singleton.
+
+    Returns None if the service has not been configured via
+    configure_alert_service(). Callers should handle None gracefully
+    (alerts are silently dropped when no service is wired).
+    """
+    return _alert_service
+
+
+def configure_alert_service(service: AlertDeliveryService) -> None:
+    """Wire the alert delivery service at app startup.
+
+    Typical usage in main.py:
+
+        from src.multi_tenant.alert_delivery import (
+            AlertDeliveryService,
+            DashboardAlertChannel,
+            WebhookAlertChannel,
+            configure_alert_service,
+        )
+
+        service = AlertDeliveryService()
+        service.register_channel(DashboardAlertChannel(audit_repo))
+        service.register_channel(WebhookAlertChannel(preferences_repo))
+        configure_alert_service(service)
+    """
+    global _alert_service
+    _alert_service = service
+    logger.info(
+        "Alert delivery service configured with channels: %s",
+        service.get_registered_channels(),
+    )

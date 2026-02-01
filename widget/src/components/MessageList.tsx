@@ -15,7 +15,7 @@
  * © 2026 Remaker Digital, a DBA of VanDusen & Palmeter, LLC. All rights reserved.
  */
 
-import { h, FunctionComponent } from 'preact';
+import { FunctionComponent, JSX } from 'preact';
 import { useRef, useEffect, useState, useCallback } from 'preact/hooks';
 import type { DesignTokens } from '@/theme/tokens';
 import type { Locale } from '@/locale/en';
@@ -120,7 +120,7 @@ export const MessageList: FunctionComponent<MessageListProps> = ({
   }, []);
 
   // Build message list with day separators
-  const elements: h.JSX.Element[] = [];
+  const elements: JSX.Element[] = [];
   let lastDay = 0;
 
   for (let i = 0; i < messages.length; i++) {
