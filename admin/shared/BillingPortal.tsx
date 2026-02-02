@@ -30,8 +30,8 @@
  */
 
 import React, { useState, useMemo } from 'react';
-import type { BaseComponentProps, TenantTier } from '../types';
-import { useUsageDashboard, usePackBalance, useBillingStatus } from '../hooks';
+import type { BaseComponentProps, TenantTier } from './types';
+import { useUsageDashboard, usePackBalance, useBillingStatus } from './hooks';
 
 // ---------------------------------------------------------------------------
 // Extended props
@@ -443,7 +443,7 @@ function getTierOrder(tier: TenantTier): number {
 // Component
 // ---------------------------------------------------------------------------
 
-const BillingPortal: React.FC<BillingPortalProps> = ({
+export const BillingPortal: React.FC<BillingPortalProps> = ({
   tenantContext,
   apiFetch,
   onNotify,
@@ -557,14 +557,14 @@ const BillingPortal: React.FC<BillingPortalProps> = ({
             {tenantContext.status.replace(/_/g, ' ').replace(/\b\w/g, (c) => c.toUpperCase())}
           </span>
         </div>
-        {billing.data && (billing.data as Record<string, unknown>).renewal_date && (
+        {billing.data && (billing.data as Record<string, unknown>).renewal_date ? (
           <div style={styles.row}>
             <span style={styles.label}>Next Renewal</span>
             <span style={styles.value}>
               {formatDate((billing.data as Record<string, unknown>).renewal_date as string)}
             </span>
           </div>
-        )}
+        ) : null}
         <div style={{ marginTop: 16 }}>
           <button
             style={styles.button('primary')}

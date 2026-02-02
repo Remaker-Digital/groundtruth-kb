@@ -16,9 +16,9 @@
  */
 
 import React, { createContext, useCallback, useContext, useEffect, useState } from 'react';
-import { useNavigate, useLocation } from 'react-router-dom';
+import { useLocation } from 'react-router-dom';
 import { Frame, Loading, Banner } from '@shopify/polaris';
-import type { TenantContext, BaseComponentProps } from '../../shared/types';
+import type { TenantContext } from '../../shared/types';
 
 // ---------------------------------------------------------------------------
 // Types
@@ -68,7 +68,6 @@ export const ShopifyAppLayout: React.FC<ShopifyAppLayoutProps> = ({
   shopifyConfig,
   children,
 }) => {
-  const navigate = useNavigate();
   const location = useLocation();
   const [tenantContext, setTenantContext] = useState<TenantContext | null>(null);
   const [loading, setLoading] = useState(true);

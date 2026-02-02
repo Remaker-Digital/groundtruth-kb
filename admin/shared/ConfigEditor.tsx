@@ -38,8 +38,8 @@ import type {
   ConfigFieldType,
   ConfigVersion,
   ConfigDiff,
-} from '../types';
-import { useConfig, useUpdateConfig, useConfigVersions, useConfigSchema } from '../hooks';
+} from './types';
+import { useConfig, useUpdateConfig, useConfigVersions, useConfigSchema } from './hooks';
 
 // ---------------------------------------------------------------------------
 // Group definitions

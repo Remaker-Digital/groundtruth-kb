@@ -14,8 +14,8 @@
  */
 
 import React, { useMemo } from 'react';
-import type { BaseComponentProps, IntentBreakdown, KnowledgeGap } from '../types';
-import { useAnalyticsSummary, useIntentBreakdown, useKnowledgeGaps } from '../hooks';
+import type { BaseComponentProps, IntentBreakdown, KnowledgeGap } from './types';
+import { useAnalyticsSummary, useIntentBreakdown, useKnowledgeGaps } from './hooks';
 
 // ---------------------------------------------------------------------------
 // Style constants

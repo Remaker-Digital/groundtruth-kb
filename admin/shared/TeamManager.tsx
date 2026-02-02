@@ -26,8 +26,8 @@
  */
 
 import React, { useState, useCallback } from 'react';
-import type { BaseComponentProps, TeamMember, TeamRole } from '../types';
-import { useTeamMembers, useInviteTeamMember } from '../hooks';
+import type { BaseComponentProps, TeamMember, TeamRole } from './types';
+import { useTeamMembers, useInviteTeamMember } from './hooks';
 
 // ---------------------------------------------------------------------------
 // Constants
@@ -446,7 +446,7 @@ function formatRelativeDate(dateStr: string | null | undefined): string {
 // Component
 // ---------------------------------------------------------------------------
 
-const TeamManager: React.FC<BaseComponentProps> = ({
+export const TeamManager: React.FC<BaseComponentProps> = ({
   tenantContext,
   apiFetch,
   onNotify,

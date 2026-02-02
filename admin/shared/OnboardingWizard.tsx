@@ -32,8 +32,8 @@ import type {
   OnboardingStepConfig,
   ConfigField,
   ConfigFieldType,
-} from '../types';
-import { useOnboardingSteps, useUpdateConfig, useConfigSchema } from '../hooks';
+} from './types';
+import { useOnboardingSteps, useUpdateConfig, useConfigSchema } from './hooks';
 
 // ---------------------------------------------------------------------------
 // Step metadata — display labels for each onboarding step

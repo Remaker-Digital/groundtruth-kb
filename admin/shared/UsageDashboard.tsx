@@ -37,8 +37,8 @@ import type {
   UsageDashboard as UsageDashboardData,
   DailyVolume,
   ConversationSummary,
-} from '../types';
-import { useUsageDashboard, useDailyVolume, useConversationList } from '../hooks';
+} from './types';
+import { useUsageDashboard, useDailyVolume, useConversationList } from './hooks';
 
 // ---------------------------------------------------------------------------
 // Constants

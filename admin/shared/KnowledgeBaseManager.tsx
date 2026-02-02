@@ -13,8 +13,8 @@
  */
 
 import React, { useState, useCallback, useMemo } from 'react';
-import type { BaseComponentProps, KBArticle, KBArticleStatus } from '../types';
-import { useKnowledgeBase, useKBArticle, useSaveKBArticle } from '../hooks';
+import type { BaseComponentProps, KBArticle, KBArticleStatus } from './types';
+import { useKnowledgeBase, useKBArticle, useSaveKBArticle } from './hooks';
 
 // ---------------------------------------------------------------------------
 // Style constants

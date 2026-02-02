@@ -24,7 +24,7 @@ import type {
   TeamMember,
   OnboardingStepConfig,
   PaginatedList,
-} from '../types';
+} from '../types/index';
 
 // ---------------------------------------------------------------------------
 // Generic fetch hook

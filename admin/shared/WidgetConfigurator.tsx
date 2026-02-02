@@ -25,8 +25,8 @@
  */
 
 import React, { useState, useCallback, useMemo, useEffect } from 'react';
-import type { BaseComponentProps } from '../types';
-import { useConfig, useUpdateConfig } from '../hooks';
+import type { BaseComponentProps } from './types';
+import { useConfig, useUpdateConfig } from './hooks';
 
 // ---------------------------------------------------------------------------
 // Types
@@ -819,7 +819,7 @@ function extractWidgetConfig(raw: Record<string, unknown>): WidgetConfig {
   const cfg: WidgetConfig = { ...DEFAULT_CONFIG };
   for (const key of Object.keys(DEFAULT_CONFIG) as Array<keyof WidgetConfig>) {
     if (raw[key] !== undefined && raw[key] !== null) {
-      (cfg as Record<string, unknown>)[key] = raw[key];
+      (cfg as unknown as Record<string, unknown>)[key] = raw[key];
     }
   }
   return cfg;
@@ -862,7 +862,7 @@ function diffConfig(
 // Component
 // ---------------------------------------------------------------------------
 
-const WidgetConfigurator: React.FC<BaseComponentProps> = ({
+export const WidgetConfigurator: React.FC<BaseComponentProps> = ({
   tenantContext,
   apiFetch,
   onNotify,

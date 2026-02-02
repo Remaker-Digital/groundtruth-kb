@@ -18,13 +18,13 @@ import type {
   ConversationMessage,
   ConversationStatus,
   TeamMember,
-} from '../types';
+} from './types';
 import {
   usePolling,
   useConversationMessages,
   useAssignConversation,
   useTeamMembers,
-} from '../hooks';
+} from './hooks';
 
 // ---------------------------------------------------------------------------
 // Style constants
