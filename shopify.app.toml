@@ -1,0 +1,29 @@
+# Agent Red Customer Experience - Shopify App Configuration
+# © 2026 Remaker Digital, a DBA of VanDusen & Palmeter, LLC. All rights reserved.
+#
+# This file configures the Shopify app via `shopify app deploy`.
+# See: https://shopify.dev/docs/apps/tools/cli/configuration
+
+name = "Agent Red Customer Experience"
+client_id = "4c6cf726cd1f9f5389caf48f78af9735"
+application_url = "https://localhost:8000"
+embedded = true
+
+[build]
+automatically_update_urls_on_dev = true
+
+[auth]
+redirect_urls = [
+  "https://localhost:8000/api/shopify/billing/confirm"
+]
+
+[access_scopes]
+scopes = "read_orders,read_products,read_customers,read_inventory"
+
+[webhooks]
+api_version = "2026-01"
+
+[webhooks.privacy_compliance]
+customer_data_request_url = "https://app.agentred.com/api/shopify/gdpr/customers-data-request"
+customer_deletion_url = "https://app.agentred.com/api/shopify/gdpr/customers-redact"
+shop_deletion_url = "https://app.agentred.com/api/shopify/gdpr/shop-redact"

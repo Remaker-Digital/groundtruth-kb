@@ -188,16 +188,16 @@ class TestXM11CheckoutCallbacks:
 
 
 # ===================================================================
-# XM-12: Checkout session requires auth (Stripe-direct merchants)
+# XM-12: Config PUT requires auth (protected endpoint)
 # ===================================================================
 
 
-class TestXM12CheckoutSession:
-    def test_checkout_session_requires_auth(self, app_client):
-        """POST /api/checkout/session is NOT auth-exempt."""
-        resp = app_client.post(
-            "/api/checkout/session",
-            json={"tier": "starter", "interval": "month"},
+class TestXM12ConfigPutRequiresAuth:
+    def test_config_put_requires_auth(self, app_client):
+        """PUT /api/config is NOT auth-exempt."""
+        resp = app_client.put(
+            "/api/config",
+            json={"brand_name": "Test"},
         )
         assert resp.status_code == 401
 

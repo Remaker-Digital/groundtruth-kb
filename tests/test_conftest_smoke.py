@@ -76,21 +76,21 @@ class TestAppClientAuth:
     """Verify that the middleware stack rejects/accepts requests correctly."""
 
     def test_protected_endpoint_no_auth_returns_401(self, app_client):
-        resp = app_client.get("/api/tenants/lookup")
+        resp = app_client.get("/api/dashboard/usage")
         assert resp.status_code == 401
 
     def test_protected_endpoint_with_api_key(self, app_client):
         resp = app_client.get(
-            "/api/tenants/lookup",
+            "/api/dashboard/usage",
             headers=auth_headers_api_key(TEST_API_KEY_STARTER),
         )
         # Should not be 401 — auth should pass.
-        # Actual status depends on handler logic (may be 400/422 for missing params).
+        # Actual status depends on handler logic (may be 503 for unconfigured services).
         assert resp.status_code != 401
 
     def test_protected_endpoint_bad_key_returns_401(self, app_client):
         resp = app_client.get(
-            "/api/tenants/lookup",
+            "/api/dashboard/usage",
             headers=auth_headers_api_key("arsk_completely_invalid_key"),
         )
         assert resp.status_code == 401

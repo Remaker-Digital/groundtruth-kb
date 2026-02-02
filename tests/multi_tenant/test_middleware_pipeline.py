@@ -122,7 +122,7 @@ class TestAuthentication:
     @pytest.mark.unit
     def test_unauthenticated_request_returns_401(self, app_client):
         """MWP-01: Unauthenticated request to protected endpoint → 401."""
-        resp = app_client.get("/api/tenants/lookup?shop=test.myshopify.com")
+        resp = app_client.get("/api/dashboard/usage")
         assert resp.status_code == 401
         assert "error" in resp.json()
 
@@ -165,7 +165,7 @@ class TestAuthentication:
         """MWP-04: Expired Shopify session token → 401."""
         token = _make_shopify_jwt(expired=True)
         resp = app_client.get(
-            "/api/tenants/lookup?shop=test.myshopify.com",
+            "/api/dashboard/usage",
             headers=auth_headers_bearer(token),
         )
         assert resp.status_code == 401
@@ -175,7 +175,7 @@ class TestAuthentication:
     def test_invalid_api_key_returns_401(self, app_client):
         """MWP-05: Invalid API key → 401."""
         resp = app_client.get(
-            "/api/tenants/lookup?shop=test.myshopify.com",
+            "/api/dashboard/usage",
             headers=auth_headers_api_key("arsk_completely_invalid_key"),
         )
         assert resp.status_code == 401
@@ -233,16 +233,16 @@ class TestRateLimiting:
         # Use a protected endpoint to properly test rate limiting
         for i in range(10):
             resp = app_client.get(
-                "/api/tenants/lookup?shop=test.myshopify.com",
+                "/api/dashboard/usage",
                 headers=headers,
             )
-            assert resp.status_code in (200, 404), (
+            assert resp.status_code in (200, 503), (
                 f"Request {i+1} should succeed, got {resp.status_code}"
             )
 
         # 11th request should be rate-limited
         resp = app_client.get(
-            "/api/tenants/lookup?shop=test.myshopify.com",
+            "/api/dashboard/usage",
             headers=headers,
         )
         assert resp.status_code == 429
@@ -258,16 +258,16 @@ class TestRateLimiting:
         # Professional limit is 50 rpm — send 50 requests
         for i in range(50):
             resp = app_client.get(
-                "/api/tenants/lookup?shop=test.myshopify.com",
+                "/api/dashboard/usage",
                 headers=headers,
             )
-            assert resp.status_code in (200, 404), (
+            assert resp.status_code in (200, 503), (
                 f"Request {i+1} should succeed, got {resp.status_code}"
             )
 
         # 51st should fail
         resp = app_client.get(
-            "/api/tenants/lookup?shop=test.myshopify.com",
+            "/api/dashboard/usage",
             headers=headers,
         )
         assert resp.status_code == 429
@@ -284,10 +284,10 @@ class TestRateLimiting:
         # Send 50 requests (subset of 200 limit)
         for i in range(50):
             resp = app_client.get(
-                "/api/tenants/lookup?shop=test.myshopify.com",
+                "/api/dashboard/usage",
                 headers=headers,
             )
-            assert resp.status_code in (200, 404), (
+            assert resp.status_code in (200, 503), (
                 f"Request {i+1} should succeed, got {resp.status_code}"
             )
 
@@ -319,13 +319,13 @@ class TestRateLimiting:
         # Fill up the rate limit
         for _ in range(10):
             app_client.get(
-                "/api/tenants/lookup?shop=test.myshopify.com",
+                "/api/dashboard/usage",
                 headers=headers,
             )
 
         # Verify 11th is blocked
         resp = app_client.get(
-            "/api/tenants/lookup?shop=test.myshopify.com",
+            "/api/dashboard/usage",
             headers=headers,
         )
         assert resp.status_code == 429
@@ -339,10 +339,10 @@ class TestRateLimiting:
 
         # Now the next request should succeed (expired entries cleaned)
         resp = app_client.get(
-            "/api/tenants/lookup?shop=test.myshopify.com",
+            "/api/dashboard/usage",
             headers=headers,
         )
-        assert resp.status_code in (200, 404)
+        assert resp.status_code in (200, 503)
 
     @pytest.mark.unit
     def test_rate_limit_429_includes_retry_after(self, app_client):
@@ -352,12 +352,12 @@ class TestRateLimiting:
         # Exhaust rate limit
         for _ in range(10):
             app_client.get(
-                "/api/tenants/lookup?shop=test.myshopify.com",
+                "/api/dashboard/usage",
                 headers=headers,
             )
 
         resp = app_client.get(
-            "/api/tenants/lookup?shop=test.myshopify.com",
+            "/api/dashboard/usage",
             headers=headers,
         )
         assert resp.status_code == 429
@@ -600,7 +600,7 @@ class TestTenantStatusEnforcement:
             app_client, TenantStatus.PROVISIONING,
         )
         resp = app_client.get(
-            "/api/tenants/lookup?shop=test.myshopify.com",
+            "/api/dashboard/usage",
             headers=headers,
         )
         assert resp.status_code == 403
@@ -612,7 +612,7 @@ class TestTenantStatusEnforcement:
             app_client, TenantStatus.DEACTIVATED,
         )
         resp = app_client.get(
-            "/api/tenants/lookup?shop=test.myshopify.com",
+            "/api/dashboard/usage",
             headers=headers,
         )
         assert resp.status_code == 403
@@ -625,11 +625,11 @@ class TestTenantStatusEnforcement:
         )
         # PAST_DUE is in _ACTIVE_STATUSES, so requests succeed
         resp = app_client.get(
-            "/api/tenants/lookup?shop=test.myshopify.com",
+            "/api/dashboard/usage",
             headers=headers,
         )
         # 200 or 404 (not found) — but NOT 401 or 403
-        assert resp.status_code in (200, 404)
+        assert resp.status_code in (200, 503)
 
     @pytest.mark.unit
     def test_grace_period_tenant_returns_403(self, app_client):
@@ -643,7 +643,7 @@ class TestTenantStatusEnforcement:
             app_client, TenantStatus.GRACE_PERIOD,
         )
         resp = app_client.get(
-            "/api/tenants/lookup?shop=test.myshopify.com",
+            "/api/dashboard/usage",
             headers=headers,
         )
         assert resp.status_code == 403

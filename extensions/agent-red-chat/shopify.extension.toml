@@ -13,6 +13,9 @@ api_version = "2025-01"
 [[extensions]]
 name = "Agent Red Chat"
 handle = "agent-red-chat"
+
+uid = "1eeaaebd-dbfb-fc4c-5ccc-c3dd4a1c83d9a5f38f8d"
+
 type = "theme"
 
   [extensions.capabilities]

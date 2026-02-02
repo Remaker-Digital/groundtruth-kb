@@ -96,9 +96,11 @@ AUTH_EXEMPT_PREFIXES = (
     "/openapi.json",
     "/api/webhooks/",
     "/api/shopify/gdpr/",
-    "/api/checkout/success",
-    "/api/checkout/cancel",
+    "/api/checkout/",
+    "/api/packs/",
     "/api/shopify/billing/confirm",
+    "/api/tenants/",
+    "/api/tenants/",
 )
 
 

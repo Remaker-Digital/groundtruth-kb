@@ -1,0 +1,11 @@
+{
+  "name": "agent-red-customer-experience",
+  "version": "1.0.0",
+  "private": true,
+  "description": "Agent Red Customer Experience - Shopify App",
+  "scripts": {
+    "shopify": "shopify",
+    "deploy": "shopify app deploy",
+    "dev": "shopify app dev"
+  }
+}

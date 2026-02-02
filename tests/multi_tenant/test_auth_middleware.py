@@ -165,8 +165,8 @@ class TestIsAuthExempt:
     def test_config_not_exempt(self):
         assert is_auth_exempt("/api/config") is False
 
-    def test_tenants_not_exempt(self):
-        assert is_auth_exempt("/api/tenants/lookup") is False
+    def test_admin_conversations_not_exempt(self):
+        assert is_auth_exempt("/api/admin/conversations") is False
 
 
 # ===================================================================

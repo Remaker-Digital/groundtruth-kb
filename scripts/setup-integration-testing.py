@@ -23,6 +23,10 @@ import sys
 from pathlib import Path
 from typing import Any, Dict
 
+# Add project root to sys.path so 'src' package is importable
+PROJECT_ROOT = Path(__file__).resolve().parent.parent
+sys.path.insert(0, str(PROJECT_ROOT))
+
 import stripe
 from dotenv import load_dotenv
 
@@ -71,12 +75,22 @@ def validate_stripe_config() -> bool:
         account = stripe.Account.retrieve()
         print(f"✅ Stripe API connection successful")
         print(f"   Account ID: {account.id}")
-        print(f"   Country: {account.country}")
-        print(f"   Test mode: {not account.livemode}")
-        
-        if account.livemode:
-            print("❌ Account is in live mode - use test mode only!")
-            return False
+        print(f"   Country: {account.get('country', 'unknown')}")
+
+        # Check live mode - handle different Stripe SDK versions
+        is_livemode = account.get("livemode", None)
+        if is_livemode is None:
+            # Newer SDK versions or sandbox: infer from API key prefix
+            is_test = api_key.startswith("sk_test_")
+            print(f"   Test mode: {is_test} (inferred from API key prefix)")
+            if not is_test:
+                print("❌ API key is not a test key - use test mode only!")
+                return False
+        else:
+            print(f"   Test mode: {not is_livemode}")
+            if is_livemode:
+                print("❌ Account is in live mode - use test mode only!")
+                return False
         
     except stripe.StripeError as e:
         print(f"❌ Stripe API connection failed: {e}")
@@ -205,8 +219,8 @@ def test_webhook_endpoint() -> bool:
                 print("   ✅ All required events configured")
             
         else:
-            print(f"⚠️  No webhook endpoint found for {webhook_url}")
-            print("   Create one in Stripe Dashboard → Developers → Webhooks")
+            print(f"ℹ️  No dashboard webhook endpoint found for {webhook_url}")
+            print("   This is OK if using Stripe CLI: stripe listen --forward-to localhost:8000/api/webhooks/stripe")
         
     except stripe.StripeError as e:
         print(f"❌ Failed to list webhook endpoints: {e}")

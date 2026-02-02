@@ -85,6 +85,14 @@ class StripeCatalog(BaseModel):
             )
         return self.tiers[tier_name]
 
+    def get_pack(self, pack_id: str) -> PackCatalog:
+        """Get a conversation pack by ID, raising ValueError if not found."""
+        if pack_id not in self.packs:
+            raise ValueError(
+                f"Unknown pack '{pack_id}'. Valid: {sorted(self.packs.keys())}"
+            )
+        return self.packs[pack_id]
+
     def get_addon(self, addon_id: str) -> AddonCatalog:
         """Get an add-on by ID, raising ValueError if not found."""
         if addon_id not in self.addons:
