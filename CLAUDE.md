@@ -781,6 +781,19 @@ When evaluating options (architecture, technology, design, implementation approa
 
 **Avoid vague generalizations** such as "simpler," "harder," "more complex," or "easier" when describing trade-offs. Instead, state specifically what is gained or lost: which protocols, which failure modes, which components, which test coverage implications. Token usage and elapsed time for Claude to perform a task are not meaningful concerns — do not use them as justification for scope reduction or option selection.
 
+### Continuous Improvement Feedback
+
+The owner values active feedback on their communication effectiveness. When processing user messages, Claude should provide brief inline coaching notes when it observes:
+
+- **Terminology inconsistency:** Flag when terms drift (e.g., "task" vs "work item" vs "WI" vs "issue"). Standard terms: "WI #NNN" for numbered work items, "work item" for generic, "task" for ad-hoc session actions, "issue" for GitHub Issues.
+- **Bare approvals that could carry steering:** If an approval like "Yes" or "OK" would benefit from a one-sentence clarification of priority or constraint, suggest it.
+- **Approve-then-constrain pattern:** If a constraint arrives as a follow-up message immediately after an approval, note that combining them into one message is more efficient.
+- **Open-ended questions:** If a question would get a more useful answer with a specified format (table, list, yes/no with evidence), suggest the reframe.
+- **Credential exposure:** Flag any credentials, tokens, or secrets pasted into the chat — reference env files instead.
+- **Missing structure:** If a multi-part instruction would benefit from bullets or numbers, suggest it.
+
+**Format:** Feedback should appear as a brief parenthetical note (1-2 sentences) at the end of the response, prefixed with "💡 **Feedback:**". It should never interrupt the primary work output. Skip feedback when the message is already clear and well-structured — only flag genuine opportunities, not every message.
+
 ### Work Priority Bias
 
 **Technical work has elevated priority over creative/content work.** Technical gap identification, test case creation, testing/results analysis, and implementation of new capabilities should always be prioritized above creative assets, marketing content, and cosmetic work. The rationale: the technical implementation is the foundation for cost estimates, which are in turn the basis for pricing and licensing decisions. Cost estimates and pricing decisions cannot be validated without comprehensive test data from a working implementation.
