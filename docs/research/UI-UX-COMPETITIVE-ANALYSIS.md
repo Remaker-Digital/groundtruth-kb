@@ -53,13 +53,13 @@ Shopify App Store review count is a strong signal of Shopify-native adoption. Ti
 
 | Feature | Tidio | Gorgias | Zendesk | Intercom | Re:amaze | Agent Red |
 |---------|:-----:|:-------:|:-------:|:--------:|:--------:|:---------:|
-| Floating chat bubble | ✅ | ✅ | ✅ | ✅ | ✅ | ❌ |
-| Chat window with messages | ✅ | ✅ | ✅ | ✅ | ✅ | ❌ |
-| Typing indicators | ✅ | ✅ | ✅ | ✅ | ✅ | ❌ |
-| File/image sharing | ✅ | ✅ | ✅ | ✅ | ✅ | ❌ |
-| Pre-chat form (name/email) | ✅ | ✅ | ✅ | ✅ | ✅ | ❌ |
-| Offline contact form | ✅ | ✅ | ✅ | ✅ | ✅ | ❌ |
-| Proactive messages | ✅ | ✅ | ✅ | ✅ | ✅ | ❌ |
+| Floating chat bubble | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ |
+| Chat window with messages | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ |
+| Typing indicators | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ |
+| File/image sharing | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ |
+| Pre-chat form (name/email) | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ |
+| Offline contact form | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ |
+| Proactive messages | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ |
 | Quick reply buttons | ✅ | ✅ | ✅ | ✅ | ❓ | ❌ |
 | Product card carousels | ✅ | ✅ | ✅ | ✅ | ❌ | ❌ |
 | In-widget FAQ search | ❌ | ✅ | ✅ | ✅ | ✅ | ❌ |
@@ -72,20 +72,20 @@ Shopify App Store review count is a strong signal of Shopify-native adoption. Ti
 
 | Feature | Tidio | Gorgias | Zendesk | Intercom | Re:amaze | Agent Red |
 |---------|:-----:|:-------:|:-------:|:--------:|:--------:|:---------:|
-| Brand colors | ✅ | ✅ | ✅ | ✅ | ✅ | ❌ |
-| Position (left/right) | ✅ | ✅ | ✅ | ✅ | ✅ | ❌ |
-| Custom avatar/logo | ✅ | ✅ | ✅ | ✅ | ✅ | ❌ |
-| Custom greeting text | ✅ | ✅ | ✅ | ✅ | ✅ | ❌ |
-| Multi-language | ✅ | ✅ | ✅ | ✅ | ✅ | ❌ |
-| CSS override | ❌ | Limited | ❌ (iframe) | ❌ (iframe) | ✅ | ❌ |
-| Remove vendor branding | Paid | Tier-dep. | Tier-dep. | ❌ | Tier-dep. | N/A |
-| Full white-label | ❌ | ❌ | ❌ | ❌ | ❌ | Planned |
-| Dark mode | ❌ | ❌ | Partial | ✅ | ❌ | ❌ |
-| Custom launcher button (JS) | ✅ | Limited | ✅ | ✅ | ✅ | ❌ |
+| Brand colors | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ |
+| Position (left/right) | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ |
+| Custom avatar/logo | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ |
+| Custom greeting text | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ |
+| Multi-language | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ (i18n) |
+| CSS override | ❌ | Limited | ❌ (iframe) | ❌ (iframe) | ✅ | ❌ (iframe) |
+| Remove vendor branding | Paid | Tier-dep. | Tier-dep. | ❌ | Tier-dep. | ✅ (Ent.) |
+| Full white-label | ❌ | ❌ | ❌ | ❌ | ❌ | ✅ (Ent.) |
+| Dark mode | ❌ | ❌ | Partial | ✅ | ❌ | ✅ |
+| Custom launcher button (JS) | ✅ | Limited | ✅ | ✅ | ✅ | ✅ (SDK) |
 
 ### Summary — Customer-Facing UI
 
-**Every competitor ships a chat widget.** It is the single most fundamental UI component. Agent Red has zero customer-facing UI. This is the most critical gap — without a chat widget, there is no product to evaluate on the Shopify App Store.
+**Every competitor ships a chat widget.** It is the single most fundamental UI component. ~~Agent Red has zero customer-facing UI.~~ **UPDATE (2026-02-01):** Agent Red's chat widget is now complete — Preact frontend (20 files, ~3,200 lines), Shadow DOM launcher + iframe panel, SSE streaming, WebSocket typing/presence, theme system, i18n-ready locale. Shopify Theme App Extension created. See `widget/` and `extensions/agent-red-chat/`.
 
 ---
 
@@ -95,20 +95,20 @@ Shopify App Store review count is a strong signal of Shopify-native adoption. Ti
 
 | Surface | Tidio | Gorgias | Zendesk | Intercom | Re:amaze | Agent Red |
 |---------|:-----:|:-------:|:-------:|:--------:|:--------:|:---------:|
-| Unified conversation inbox | ✅ | ✅ | ✅ | ✅ | ✅ | ❌ |
-| Customer sidebar (orders, profile) | ✅ | ✅ | ✅ | ✅ | ✅ | ❌ |
-| Analytics/reporting dashboard | ✅ | ✅ | ✅ | ✅ | ✅ | API only |
-| Team/agent management | ✅ | ✅ | ✅ | ✅ | ✅ | ❌ |
-| Widget configuration UI | ✅ | ✅ | ✅ | ✅ | ✅ | ❌ |
+| Unified conversation inbox | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ |
+| Customer sidebar (orders, profile) | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ |
+| Analytics/reporting dashboard | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ |
+| Team/agent management | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ |
+| Widget configuration UI | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ |
 | Canned response / macro editor | ✅ | ✅ | ✅ | ✅ | ✅ | ❌ |
 | Visual chatbot/flow builder | ✅ | ✅ | ✅ | ✅ | ❌* | ❌ |
-| AI configuration console | ✅ | ✅ | ✅ | ✅ | Limited | ❌ |
-| Knowledge base / FAQ editor | ❌ | ✅ | ✅ | ✅ | ✅ | ❌ |
+| AI configuration console | ✅ | ✅ | ✅ | ✅ | Limited | ✅ |
+| Knowledge base / FAQ editor | ❌ | ✅ | ✅ | ✅ | ✅ | ✅ |
 | Help center (customer-facing KB) | ❌ | ✅ | ✅ | ✅ | ✅ | ❌ |
 | Rules/automation builder | ❌ | ✅ | ✅ | ✅ | ✅ (Cues) | ❌ |
 | SLA management UI | ❌ | ✅ | ✅ | ✅ | ✅ | ❌ |
-| CSAT survey config | ❌ | ✅ | ✅ | ❌ | ✅ | ❌ |
-| Usage/billing dashboard | Basic | Basic | ✅ | ✅ | Basic | API only |
+| CSAT survey config | ❌ | ✅ | ✅ | ❌ | ✅ | ✅ |
+| Usage/billing dashboard | Basic | Basic | ✅ | ✅ | Basic | ✅ |
 | Live visitor tracking | ✅ | ❌ | ❌ | ❌ | ✅ | ❌ |
 | Status page | ❌ | ❌ | ❌ | ❌ | ✅ | ❌ |
 | Multi-store management | ❌ | ✅ | ✅ | ✅ | ✅ | ✅ (arch.) |
@@ -306,6 +306,32 @@ All scenarios assume AI-enabled support. Agent Red includes AI in all tiers.
 | **Incentive alignment** | Neutral | Neutral | Misaligned (AI success → higher cost) | Misaligned | Aligned | **Aligned** |
 | **Predictability** | Medium | Medium | Low | Low | High | **High** |
 
+### Pricing Comparison Visualization
+
+```mermaid
+xychart-beta
+    title "Monthly Cost: Solo Merchant (1,000 AI conversations)"
+    x-axis ["Agent Red", "Re:amaze", "Tidio", "Zendesk", "Intercom", "Gorgias"]
+    y-axis "USD/month" 0 --> 1000
+    bar [149, 49, 208, 579, 620, 960]
+```
+
+```mermaid
+xychart-beta
+    title "Monthly Cost: Small Team (5,000 AI conversations)"
+    x-axis ["Agent Red", "Re:amaze", "Tidio", "Gorgias", "Intercom", "Zendesk"]
+    y-axis "USD/month" 0 --> 6000
+    bar [399, 147, 749, 2565, 3185, 5615]
+```
+
+```mermaid
+xychart-beta
+    title "Monthly Cost: Growing Team (20,000 AI conversations)"
+    x-axis ["Agent Red", "Gorgias", "Intercom", "Zendesk"]
+    y-axis "USD/month" 0 --> 22000
+    bar [999, 10800, 12540, 21025]
+```
+
 ### Key Finding
 
 **Agent Red's pricing is 4-21x cheaper than enterprise competitors at equivalent AI conversation volume.** At 5,000 conversations/month, Agent Red ($399) vs Zendesk Pro+AI (~$5,615) is a 14x advantage. At 20,000 conversations/month, Agent Red ($999) vs Zendesk (~$21,025) or Intercom (~$12,540) is a 13-21x advantage. The pricing model is a structural advantage — the flat platform fee with transparent per-conversation overage is simpler and more predictable than any competitor's per-resolution or per-ticket model. *All competitor estimates verified against live pricing pages 2026-02-01. AI adoption assumed at 50-60% of volume for AI-resolution-based competitors.*
@@ -316,25 +342,29 @@ All scenarios assume AI-enabled support. Agent Red includes AI in all tiers.
 
 ### Critical Gaps (Block Shopify App Store Approval)
 
+> **UPDATE (2026-02-02):** All critical gaps resolved. Chat widget, Theme App Extension, widget customization, pre-chat form, and offline behavior all implemented in Phase 3.0 Build Phase 2-3.
+
 | Gap | Every Competitor Has This | Agent Red Status | Impact |
 |-----|:-------------------------:|-----------------|--------|
-| Customer chat widget | ✅ (5/5) | ❌ None | **No product to ship** |
-| Shopify Theme App Extension / widget install | ✅ (5/5) | ❌ None | **Cannot install on storefronts** |
-| Widget customization (colors, position, branding) | ✅ (5/5) | ❌ None | **Cannot match merchant brand** |
-| Pre-chat form for customer info | ✅ (5/5) | ❌ None | **Cannot identify customers** |
-| Offline/away behavior | ✅ (5/5) | ❌ None | **Widget broken outside business hours** |
+| Customer chat widget | ✅ (5/5) | ✅ **Complete** | Widget: 20 files, ~3,200 lines |
+| Shopify Theme App Extension / widget install | ✅ (5/5) | ✅ **Complete** | extensions/agent-red-chat/ |
+| Widget customization (colors, position, branding) | ✅ (5/5) | ✅ **Complete** | 24 config fields, dark mode, i18n |
+| Pre-chat form for customer info | ✅ (5/5) | ✅ **Complete** | PreChatForm.tsx with configurable fields |
+| Offline/away behavior | ✅ (5/5) | ✅ **Complete** | OfflineForm.tsx (leave-a-message) |
 
 ### Major Gaps (Block First Paying Merchant)
 
+> **UPDATE (2026-02-02):** All major gaps resolved. Admin dashboard (2 shells), conversation inbox, widget config, analytics, knowledge base, team management, and JS SDK all implemented in Phase 3.0 Build Phases 4-6.
+
 | Gap | Competitors With This | Agent Red Status | Impact |
 |-----|:---------------------:|-----------------|--------|
-| Merchant admin dashboard | 5/5 | ❌ API only | Cannot configure product without developer |
-| Conversation inbox | 5/5 | ❌ None | Cannot view/manage customer conversations |
-| Widget configuration UI | 5/5 | ❌ None | Cannot brand the widget |
-| Analytics/reporting dashboard | 5/5 | API only | Cannot see performance metrics |
-| Knowledge base editor | 4/5 | ❌ None | Cannot teach AI merchant-specific knowledge |
-| Team management UI | 5/5 | ❌ None | Cannot add support agents |
-| JavaScript Widget SDK | 5/5 | ❌ None | Cannot support non-Shopify merchants |
+| Merchant admin dashboard | 5/5 | ✅ **Complete** | Shopify shell + standalone shell |
+| Conversation inbox | 5/5 | ✅ **Complete** | admin/shared/ConversationInbox.tsx |
+| Widget configuration UI | 5/5 | ✅ **Complete** | admin/shared/WidgetConfigurator.tsx |
+| Analytics/reporting dashboard | 5/5 | ✅ **Complete** | admin/shared/AnalyticsOverview.tsx + UsageDashboard.tsx |
+| Knowledge base editor | 4/5 | ✅ **Complete** | admin/shared/KnowledgeBaseManager.tsx |
+| Team management UI | 5/5 | ✅ **Complete** | admin/shared/TeamManager.tsx |
+| JavaScript Widget SDK | 5/5 | ✅ **Complete** | window.AgentRed SDK (open/close/toggle/etc.) |
 
 ### Moderate Gaps (Hurt Competitiveness Post-Launch)
 

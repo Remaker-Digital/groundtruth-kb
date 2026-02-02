@@ -4,9 +4,10 @@
 > **Project:** Agent Red Customer Experience
 > **Owner:** Remaker Digital (DBA of VanDusen & Palmeter, LLC)
 > **Created:** 2026-01-31
-> **Last Updated:** 2026-01-31
+> **Last Updated:** 2026-02-02
 > **Baseline:** 125 tests passing (audit date: 2026-01-31)
-> **Target:** ~750-875 tests at launch readiness
+> **Current:** 999 tests passing, 0 warnings (as of 2026-02-01)
+> **Original Target:** ~750-875 tests at launch readiness — **EXCEEDED**
 
 ---
 
@@ -29,36 +30,50 @@
 
 ## 1. Executive Summary
 
-### Current State
+### Current State (Updated 2026-02-02)
 
-| Metric | Value |
-|--------|-------|
-| Tests passing | 125 |
-| Test files | 5 (3 test files + 1 fixtures + 2 __init__.py) |
-| Source modules | 29 (19 multi_tenant + 10 integrations) |
-| Modules with tests | 4 of 29 (14%) |
-| API endpoints | 30 across 9 routers |
-| Endpoints with HTTP tests | 0 of 30 (0%) |
-| HTTP-level tests (TestClient) | 0 |
-| Config endpoints tested | 0 of 10 |
-| Middleware integration tests | 0 |
-| Load / performance tests | 0 |
-| Adversarial / security tests | 0 |
-| CI pipeline | None |
+> **Note:** This section was originally written at audit time (2026-01-31, 125 tests). Implementation sprints on 2026-01-31 and 2026-02-01 brought the count to **999 tests passing, 0 warnings**. The original audit is preserved below for historical context. The gap analysis has been updated to reflect current coverage.
 
-### Gap Analysis
+```mermaid
+pie title Test Distribution (999 tests)
+    "P0 Launch Blockers" : 379
+    "P1 Pre-Launch" : 214
+    "P2 Launch Quality" : 222
+    "Operational (SLA, Retention, etc)" : 75
+    "Persistent Memory" : 30
+    "Conftest Smoke" : 19
+    "Health Endpoints" : 15
+    "Pre-existing (Auth, Provisioning)" : 45
+```
 
-| Category | Existing | Planned | Gap |
-|----------|----------|---------|-----|
-| Unit tests (service layer) | 125 | ~350 | ~225 |
-| HTTP endpoint tests (TestClient) | 0 | ~150 | ~150 |
-| Integration tests (cross-module) | 10 | ~80 | ~70 |
-| Middleware pipeline tests | 0 | ~40 | ~40 |
-| Adversarial / security tests | 0 | ~45 | ~45 |
-| Performance / load tests | 0 | ~30 | ~30 |
-| Trial / demo environment tests | 0 | ~20 | ~20 |
-| UI-type validation tests | 0 | ~100 | ~100 |
-| **Total** | **125** | **~815** | **~690** |
+| Metric | At Audit (2026-01-31) | Current (2026-02-02) |
+|--------|----------------------|---------------------|
+| Tests passing | 125 | **999** |
+| Test files | 5 | **~25** |
+| Source modules | 29 | **55+** (38 multi_tenant + 11 integrations + 6 chat) |
+| Modules with tests | 4 of 29 (14%) | **~35 of 55 (~64%)** |
+| API endpoints | 30 across 9 routers | **67 across 19 routers** |
+| Endpoints with HTTP tests | 0 of 30 (0%) | **~40 of 67 (~60%)** |
+| HTTP-level tests (TestClient) | 0 | **~150+** |
+| Config endpoints tested | 0 of 10 | **10 of 10 (100%)** |
+| Middleware integration tests | 0 | **25+** |
+| Load / performance tests | 0 | **0** (infra planned, WI #107) |
+| Adversarial / security tests | 0 | **~20** (P2 §6.8 error handling) |
+| CI pipeline | None | **GitHub Actions** (Python 3.12/3.14) |
+
+### Gap Analysis (Updated 2026-02-02)
+
+| Category | At Audit | Current | Planned | Remaining Gap |
+|----------|----------|---------|---------|---------------|
+| Unit tests (service layer) | 125 | ~500 | ~550 | ~50 |
+| HTTP endpoint tests (TestClient) | 0 | ~150 | ~200 | ~50 |
+| Integration tests (cross-module) | 10 | ~80 | ~80 | ~0 |
+| Middleware pipeline tests | 0 | 25 | ~40 | ~15 |
+| Adversarial / security tests | 0 | ~20 | ~45 | ~25 |
+| Performance / load tests | 0 | 0 | ~30 | ~30 |
+| Trial / demo environment tests | 0 | ~25 | ~25 | ~0 |
+| Operational tests (SLA, retention, archival, cost) | 0 | 75 | ~75 | ~0 |
+| **Total** | **125** | **999** | **~1,045** | **~170** |
 
 ---
 

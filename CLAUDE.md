@@ -12,7 +12,7 @@ This document provides context and guidance for AI assistants working on the Age
 | **Brand Name** | Agent Red Customer Experience |
 | **Release** | Launch 1.0 |
 | **Type** | Commercial SaaS Product |
-| **Status** | Phase 2.1 E-Commerce ~85% complete. Phase 2.2 COMPLETE — 38 multi_tenant modules (~25,000 lines). Phase 2.5 Layers 1-2 COMPLETE (3 modules). All middleware wired in main.py (8 middleware layers). **999 tests passing, 0 warnings.** P0 + P1 + P2 tests COMPLETE. Test infrastructure complete (WI #101-104). Architecture review complete (32 decisions, 100+ work items). **Phase 3.0 UI/UX: ALL BUILD PHASES COMPLETE — Chat API (6 endpoints + SSE manager), Admin APIs (5 routers, 25 endpoints), Widget frontend (20 files, ~3,200 lines), Shopify Theme App Extension (3 files), Admin shared components (9 + 2 util modules, ~5,400 lines), Shopify admin shell (8 files, ~2,700 lines, build validated), Standalone admin shell (9 files, ~2,800 lines, build validated).** Admin frontend build configs created (package.json, tsconfig.json, vite.config.ts for both shells + shared workspace root). Operational readiness COMPLETE (WI #148-156). Security hardening COMPLETE (WI #157-163). Pipeline optimization COMPLETE (WI #134-139). Trial environment COMPLETE (WI #119-128). **Competitive pricing VERIFIED (all 5 competitors, 2026-02-01) — Agent Red 4-21x cheaper.** Product renamed Customer Experience. Brand primary #C41E2A. |
+| **Status** | Phase 2.1 E-Commerce ~95% complete (creative assets + integration testing remain). Phase 2.2 COMPLETE — 38 multi_tenant modules (~25,000 lines). Phase 2.5 Layers 1-2 COMPLETE (3 modules). All middleware wired in main.py (9 middleware layers). Phase 2.1 E-Commerce ~95% complete (creative assets and integration testing remain). **999 tests passing, 0 warnings.** P0 + P1 + P2 tests COMPLETE. Test infrastructure complete (WI #101-104). Architecture review complete (32 decisions, 100+ work items). **Phase 3.0 UI/UX: ALL BUILD PHASES COMPLETE — Chat API (6 endpoints + SSE manager), Admin APIs (5 routers, 25 endpoints), Widget frontend (20 files, ~3,200 lines), Shopify Theme App Extension (3 files), Admin shared components (9 + 2 util modules, ~5,400 lines), Shopify admin shell (8 files, ~2,700 lines, build validated), Standalone admin shell (9 files, ~2,800 lines, build validated).** Admin frontend build configs created (package.json, tsconfig.json, vite.config.ts for both shells + shared workspace root). Operational readiness COMPLETE (WI #148-156). Security hardening COMPLETE (WI #157-163). Pipeline optimization COMPLETE (WI #134-139). Trial environment COMPLETE (WI #119-128). **Competitive pricing VERIFIED (all 5 competitors, 2026-02-01) — Agent Red 4-21x cheaper.** Product renamed Customer Experience. Brand primary #C41E2A. |
 | **Owner** | Remaker Digital (DBA of VanDusen & Palmeter, LLC) |
 
 ---
@@ -500,7 +500,7 @@ E:\Claude-Playground\CLAUDE-PROJECTS\Agent Red Customer Engagement\
 │
 ├── src/                            # Commercial source code
 │   ├── __init__.py
-│   ├── main.py                     # FastAPI app entrypoint (17 routers, 66 routes, 8 middleware, ~830 lines)
+│   ├── main.py                     # FastAPI app entrypoint (19 routers, 67 routes, 9 middleware, ~830 lines)
 │   ├── integrations/               # Billing & platform integrations
 │   │   ├── __init__.py
 │   │   ├── provisioning.py         # Channel-agnostic tenant provisioning service
@@ -745,10 +745,10 @@ E:\Claude-Playground\CLAUDE-PROJECTS\Agent Red Customer Engagement\
 ```
 Continue work on Agent Red Customer Experience commercial project.
 Location: E:\Claude-Playground\CLAUDE-PROJECTS\Agent Red Customer Engagement
-Key files: CLAUDE.md, docs/architecture/UI-UX-ARCHITECTURE-DECISIONS.md, docs/COMPREHENSIVE-TEST-PLAN.md, docs/BACKLOG-NEW-WORK-ITEMS.md
-Current status: Phases 0-2.2 COMPLETE. Phase 2.5 Layers 1-2 COMPLETE. Phase 3.0 ALL BUILD PHASES COMPLETE (Chat API, widget frontend, Shopify Theme App Extension, admin shared components, Shopify admin shell, standalone admin shell). Admin frontend build validation COMPLETE (both shells compile and bundle). Operational readiness COMPLETE. Security hardening COMPLETE. Pipeline optimization COMPLETE. Trial environment COMPLETE. Competitive pricing VERIFIED (all 5 competitors — Agent Red 4-21x cheaper). 999 tests passing (P0 + P1 + P2), 0 warnings. 38 multi_tenant modules (~25,000 lines). 31 admin frontend files (~10,900 lines). 20 widget files (~3,200 lines). 17 routers, 66 routes, 8 middleware layers.
-Next priority: Please prepare an order of priority for all known outstanding work issues in this project and follow this order when proposing tasks for completion. Remaining major areas: (1) Integration testing with real Stripe test mode and Shopify partner sandbox, (2) Phase 2.5 Layer 3 PatternExtractionService (Professional+, WI #90-92), (3) P3 post-launch tests (~90 tests, COMPREHENSIVE-TEST-PLAN.md §7), (4) Adversarial/security tests (~45 tests, COMPREHENSIVE-TEST-PLAN.md §8), (5) CI improvements (coverage reports, parallel jobs, branch protection — WI #105-107), (6) SSE enhancements (client-side retry, compression, multi-tab — WI #131-133), (7) API completeness (pagination, bulk ops, webhook retry — WI #142-146), (8) Creative assets for Shopify App Store (icon, screenshots, demo video — blocked on design).
-Important context: Tidio is the primary functional reference. Zapier is the visual styling reference. Persistent Customer Memory (Layers 1-2) is the launch pillar differentiator. All competitor pricing now verified — use updated figures from docs/research/UI-UX-COMPETITIVE-ANALYSIS.md. Iterative working style: one item at a time, honest assessment, approval before implementation, aggressive scope cutting.
+Key files: CLAUDE.md, docs/PROJECT-PLAN.md, docs/BACKLOG-NEW-WORK-ITEMS.md, docs/COMPREHENSIVE-TEST-PLAN.md
+Current status: ALL CORE PHASES COMPLETE. Phases 0-2.2 COMPLETE (38 multi_tenant modules, ~25,000 lines). Phase 2.5 Layers 1-2 COMPLETE (3 modules). Phase 3.0 ALL BUILD PHASES COMPLETE (Chat API 6 endpoints + SSE, widget 20 files ~3,200 lines, Shopify Theme App Extension, admin shared 9 components ~5,400 lines, Shopify admin shell ~2,700 lines, standalone admin shell ~2,800 lines — both build-validated). Operational readiness COMPLETE. Security hardening COMPLETE. Pipeline optimization COMPLETE. Trial environment COMPLETE. Competitive pricing VERIFIED (all 5 competitors, 2026-02-01 — Agent Red 4-21x cheaper). 999 tests passing (P0+P1+P2+operational), 0 warnings, ~12s execution. 19 routers, 67 routes, 9 middleware layers. Full documentation audit completed 2026-02-02 — all planning docs corrected and synchronized, 13 Mermaid diagrams added. GitHub wiki updated with architecture overviews.
+Remaining work (priority order): (1) P3 post-launch tests (~90 tests, COMPREHENSIVE-TEST-PLAN.md §7), (2) Adversarial/security tests (~45 tests, §8), (3) Performance/load tests (~30 tests, §9), (4) Integration testing with real Stripe test mode and Shopify partner sandbox (scaffolding in scripts/), (5) Phase 2.5 Layer 3 PatternExtractionService (Professional+, WI #90-92), (6) CI improvements (coverage reports, parallel jobs — WI #105, #107), (7) SSE enhancements (client-side retry, metering, multi-tab — WI #131-133), (8) API completeness (customer profiles, OpenAPI — WI #142, #147), (9) Remaining security (API key rotation, Stripe IP allowlisting — WI #159, #162), (10) Creative assets for Shopify App Store (icon, screenshots, demo video — blocked on design).
+Important context: Tidio is the primary functional reference. Zapier is the visual styling reference. Persistent Customer Memory (Layers 1-2) is the launch pillar differentiator. All competitor pricing verified 2026-02-01 — see docs/research/UI-UX-COMPETITIVE-ANALYSIS.md. 12 remaining backlog items listed in docs/BACKLOG-NEW-WORK-ITEMS.md §9 (Remaining Work Items table). Iterative working style: one item at a time, honest assessment, approval before implementation, aggressive scope cutting.
 Please review CLAUDE.md, then proceed with the highest-priority remaining technical work item, presenting one item at a time for review per the iterative working style documented in CLAUDE.md.
 ```
 
@@ -881,7 +881,7 @@ When evaluating options (architecture, technology, design, implementation approa
 - [ ] App Store review submission — blocked by: GDPR webhooks, session tokens, App Bridge Save Bar, creative assets
 - [ ] Test checkout flows (both channels)
 
-**API Route Map (17 routers, 66 routes, 8 middleware):**
+**API Route Map (19 routers, 67 routes, 9 middleware):**
 
 | Prefix | Module | Endpoints |
 |--------|--------|-----------|
@@ -1307,7 +1307,7 @@ Implemented 20+ work items across 3 sessions. Major deliverables:
 - [x] **WI #47: KEDA auto-scaling Terraform profiles** — Night schedule cron scaler for non-critical containers (Escalation, Analytics → 0 replicas 22:00-06:00 UTC). Gated by enable_night_scaling variable. Scaling metrics summary locals.
 
 **Key technical decisions from this session:**
-- **8 middleware layers**: TenantAuth → RateLimit → Concurrency → JsonDepth → Correlation → BodyLimit → ApiVersion → SecurityHeaders. Starlette reverse registration order.
+- **9 middleware layers**: PreAuthRateLimit → TenantAuth → RateLimit → Concurrency → JsonDepth → Correlation → BodyLimit → ApiVersion → SecurityHeaders. Starlette reverse registration order.
 - **ASGI vs BaseHTTPMiddleware**: Raw ASGI for body size limit (intercept before full read) and security headers (no body read needed). BaseHTTPMiddleware for JSON depth (needs request.body()).
 - **SSE heartbeat interval**: 15s `:ping` comments to prevent Azure App Gateway 60s idle timeout.
 - **SSE reconnection**: Events buffered per conversation with monotonic sequence IDs. Last-Event-ID header replays missed events. Buffer expires after 5 minutes of inactivity.
@@ -1426,17 +1426,36 @@ Two major deliverables completed in this session:
 
 **Test suite total: 999 tests passing in ~12s** (8 new P2 test files).
 
+**Session 2026-02-02: Full Project Audit + Documentation Synchronization**
+
+Comprehensive review of every planning document, architecture doc, operational doc, legal doc, and source code structure. All documents audited for correctness and completeness. 13 Mermaid diagrams added across 6 documents. GitHub wiki updated with architecture overviews.
+
+- [x] **APP-STORE-LISTING.md** — Fixed critical typo: `docs.agentrced.com` → `docs.agentred.com`
+- [x] **BACKLOG-NEW-WORK-ITEMS.md** — Full rewrite: 51 of 63 WIs updated from "Todo" to "Complete" with file references. Added pie chart, Gantt timeline, bar chart. Remaining 12 items prioritized.
+- [x] **COMPREHENSIVE-TEST-PLAN.md** — Updated baseline from 125 to 999 tests. Added test distribution pie chart and revised gap analysis table.
+- [x] **PROJECT-PLAN.md** — Full rewrite v2.0.0: Added Phase 3 (UI/UX, 6 deliverables), Phase 4 (Testing, 999 tests), Phase 5 (Ops). Added Gantt timeline, milestone flowchart, test bar chart, build phase flowchart. Milestones M5-M7 updated to Complete.
+- [x] **Master-Plan-Review-01-30-2026.md** — 13 work items updated from "Pending" to "Complete" (#35, #37, #43, #47-48, #51, #53, #60-62, #67, #79, #82, #89). Added architecture overview flowchart and work item pie chart.
+- [x] **UI-UX-COMPETITIVE-ANALYSIS.md** — Feature matrices updated: all critical/major gaps changed from ❌ to ✅. 3 pricing comparison bar charts added. Gap analysis tables annotated with completion notes.
+- [x] **UI-UX-ARCHITECTURE-DECISIONS.md** — Stale "zero UI" finding corrected. Color `#E53E3E` → `#C41E2A`. Frontend architecture flowchart added.
+- [x] **README.md** — Milestones M5-M7 updated from stale to current.
+- [x] **CLAUDE.md** — Router 17→19, routes 66→67, middleware 8→9, Phase 2.1 85%→95%. Session prompt updated. Integration testing scaffolding files tracked.
+
+**Key audit findings:**
+- **Source code counts verified:** 38 multi_tenant modules (correct), 19 routers (was 17), 67 routes (was 66), 9 middleware (was 8), 999 tests (correct).
+- **All legal/operational docs verified correct:** Product name, brand color #C41E2A, pricing $149/$399/$999, SLA P50/P95/P99, copyright notices — all consistent.
+- **Integration testing scaffolding created prior to this session:** .env.integration.example, scripts/setup-integration-testing.py, scripts/run-integration-tests.py, tests/integration_real_services.py, docs/INTEGRATION-TESTING-SETUP.md.
+
 ### Pending
-- [ ] Phase 2.1: Creative assets (Shopify App Store icon, screenshots, demo video) — blocked on design
-- [ ] Phase 2.5: Layer 3 — PatternExtractionService (Professional+, work items #90-92)
-- [ ] Phase 2.5: Layer 4 — Fine-tuning pipeline (Enterprise add-on, work items #93-96)
-- [ ] Phase 2.5: 5 A/B production tests (work items from Decision #32)
-- [ ] **Backlog items (WI #101-163) — remaining:** #105-107 (CI improvements: coverage reports, parallel test jobs, branch protection rules), #108-118 (merchant web UI — now largely covered by admin/ frontend), #131-133 (SSE enhancements: client-side retry, event compression, multi-tab coordination), #142-146 (API completeness: pagination standardization, bulk operations, webhook retry, API rate limit headers — partially done)
 - [ ] **P3 post-launch tests (~90 tests):** See COMPREHENSIVE-TEST-PLAN.md §7
 - [ ] **Adversarial/security tests (~45 tests):** See COMPREHENSIVE-TEST-PLAN.md §8
 - [ ] **Performance/load tests (~30 tests):** See COMPREHENSIVE-TEST-PLAN.md §9
-- [ ] **Integration testing** — End-to-end flows with real Stripe test mode, Shopify partner sandbox
-- [ ] **Shopify App Store submission** — Requires: creative assets, GDPR webhooks (done), session tokens (done), App Bridge Save Bar (done)
+- [ ] **Integration testing** — End-to-end flows with real Stripe test mode, Shopify partner sandbox. Scaffolding in scripts/ and tests/integration_real_services.py
+- [ ] **Phase 2.5: Layer 3** — PatternExtractionService (Professional+, work items #90-92)
+- [ ] **Phase 2.5: Layer 4** — Fine-tuning pipeline (Enterprise add-on, work items #93-96)
+- [ ] **Phase 2.5: 5 A/B production tests** (work items from Decision #32)
+- [ ] **Backlog items (12 remaining):** #105 (coverage gate), #107 (perf test infra), #131-133 (SSE enhancements), #137-139 (pipeline post-launch), #142 (customer profile endpoints), #147 (OpenAPI schema), #159 (API key rotation), #162 (Stripe IP allowlisting)
+- [ ] **Shopify App Store submission** — Requires: creative assets (icon, screenshots, demo video — blocked on design). All technical prerequisites done (GDPR webhooks, session tokens, App Bridge Save Bar)
+- [ ] **Phase 2.1: Creative assets** — Shopify App Store icon (1024x1024), screenshots, demo video — blocked on design
 
 ---
 
@@ -1460,5 +1479,5 @@ Two major deliverables completed in this session:
 ---
 
 *© 2026 Remaker Digital, a DBA of VanDusen & Palmeter, LLC. All rights reserved.*
-*Last Updated: 2026-02-01*
-*Version: 14.0.0*
+*Last Updated: 2026-02-02*
+*Version: 14.1.0*

@@ -280,7 +280,7 @@ support@remakerdigital.com
 
 ### Support URL
 ```
-https://docs.agentrced.com
+https://docs.agentred.com
 ```
 *(Placeholder — update with actual docs-site URL when deployed)*
 

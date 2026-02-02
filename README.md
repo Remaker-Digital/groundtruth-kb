@@ -206,10 +206,10 @@ Agent Red and AGNTCY are strictly isolated projects. Even if both are active on 
 | M2: Brand Ready | Week 3 | ✅ Done |
 | M3: Legal Ready | Week 4 | ✅ Done (pending iubenda validation) |
 | M4: Website Content | Week 5 | ✅ Done |
-| M5: Store Live | Week 7 | 🔄 In Progress (~85% e-commerce) |
-| M6: Docs Complete | Week 8 | ✅ Done (core docs; API ref deferred) |
-| M7: Soft Launch | Week 10 | 📋 Todo |
-| M8: Public Launch | Week 12 | 📋 Todo |
+| M5: Backend Complete | Week 7 | ✅ Done (38 multi-tenant modules, 11 billing modules, 999 tests) |
+| M6: Frontend Complete | Week 8 | ✅ Done (chat API, widget, admin shells — both build validated) |
+| M7: Testing Complete | Week 9 | ✅ Done (P0+P1+P2, CI pipeline) |
+| M8: Public Launch | Week 12 | 🔄 In Progress (integration testing, Shopify App Store submission) |
 
 See [`docs/PROJECT-PLAN.md`](docs/PROJECT-PLAN.md) for detailed tasks and the [issues board](https://github.com/mike-remakerdigital/agent-red/issues) for live tracking.
 

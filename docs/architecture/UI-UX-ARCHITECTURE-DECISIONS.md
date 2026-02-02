@@ -27,7 +27,7 @@ Full analysis in `docs/research/UI-UX-COMPETITIVE-ANALYSIS.md`.
 
 **Competitors analyzed:** Tidio, Gorgias, Zendesk, Intercom, Re:amaze (top 5 by Shopify installs).
 
-**Critical finding:** Agent Red has zero customer-facing or merchant-facing UI. All 30 API endpoints, 10 config endpoints, and 5 dashboard endpoints exist but have no frontend. This is the most critical gap.
+**Critical finding (original, 2026-01-31):** Agent Red had zero customer-facing or merchant-facing UI. **UPDATE (2026-02-01):** All frontend deliverables now complete — chat widget, Shopify Theme App Extension, admin shared components, Shopify admin shell, standalone admin shell. Both admin shells build-validated.
 
 **Table-stakes UI requirements for Shopify App Store credibility:**
 - Embeddable chat widget (JavaScript snippet + Theme App Extension)
@@ -42,6 +42,63 @@ Full analysis in `docs/research/UI-UX-COMPETITIVE-ANALYSIS.md`.
 - Per-response explainability traces
 - $0.007/conversation AI cost (2-13x cheaper per interaction than competitors)
 - SSE streaming with ~1,500ms P50 (4.7x faster than Intercom's published 7,000ms)
+
+### Frontend Architecture Overview (All Build Phases Complete)
+
+```mermaid
+flowchart TB
+    subgraph "Customer-Facing"
+        direction TB
+        L[Launcher Button<br/>Shadow DOM - closed]
+        P[Conversation Panel<br/>iframe isolation]
+        L --> P
+    end
+
+    subgraph "Transport Layer"
+        HTTP[HTTP POST<br/>Messages]
+        SSE[SSE Stream<br/>AI Tokens]
+        WS[WebSocket<br/>Typing/Presence]
+    end
+
+    subgraph "Shopify Merchants"
+        STE[Theme App Extension<br/>Liquid app embed block]
+        SAP[Shopify Admin Shell<br/>Polaris + App Bridge<br/>7 pages, ~2,700 lines]
+    end
+
+    subgraph "Direct Merchants"
+        JS[JS Snippet<br/>Universal embed]
+        DAP[Standalone Admin Shell<br/>React + API key login<br/>7 pages, ~2,800 lines]
+    end
+
+    subgraph "Shared Admin Components (9)"
+        OW[Onboarding<br/>Wizard]
+        CE[Config<br/>Editor]
+        UD[Usage<br/>Dashboard]
+        CI[Conversation<br/>Inbox]
+        KB[Knowledge<br/>Base]
+        AO[Analytics<br/>Overview]
+        BP[Billing<br/>Portal]
+        WC[Widget<br/>Config]
+        TM[Team<br/>Manager]
+    end
+
+    subgraph "Backend API (19 routers, 67 routes)"
+        CHAT[Chat API<br/>6 endpoints]
+        ADMIN[Admin APIs<br/>25 endpoints]
+        BILLING[Billing APIs<br/>20 endpoints]
+        CONFIG[Config API<br/>10 endpoints]
+    end
+
+    P --> HTTP & SSE & WS
+    STE --> L
+    JS --> L
+    SAP --> OW & CE & UD & CI & KB & AO & BP & WC & TM
+    DAP --> OW & CE & UD & CI & KB & AO & BP & WC & TM
+    HTTP & SSE & WS --> CHAT
+    OW & CE --> CONFIG
+    UD & BP --> BILLING
+    CI & KB & AO & TM --> ADMIN
+```
 
 ---
 
@@ -257,7 +314,7 @@ window.AgentRed = {
   "target": "body",
   "settings": [
     { "type": "text", "id": "widget_key", "label": "Widget Key" },
-    { "type": "color", "id": "primary_color", "label": "Primary Color", "default": "#E53E3E" },
+    { "type": "color", "id": "primary_color", "label": "Primary Color", "default": "#C41E2A" },
     { "type": "select", "id": "position", "label": "Position", "options": [...], "default": "bottom-right" }
   ]
 }

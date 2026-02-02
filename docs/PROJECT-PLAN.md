@@ -4,6 +4,7 @@
 > **Release:** Launch 1.0
 > **Timeline:** Q1 2026 (8-12 weeks)
 > **Budget:** $500-1,000/month operational
+> **Last Updated:** 2026-02-02
 
 ---
 
@@ -13,188 +14,338 @@ Agent Red Customer Experience is a commercial SaaS product built on the open-sou
 
 ---
 
+## Project Progress
+
+```mermaid
+gantt
+    title Agent Red Launch 1.0 — Project Timeline
+    dateFormat YYYY-MM-DD
+    axisFormat %m-%d
+
+    section Phase 0: Setup
+    Project setup & AGNTCY baseline       :done, p0, 2026-01-29, 1d
+
+    section Phase 1: Foundation
+    1.1 Brand Identity                    :done, p11, 2026-01-29, 1d
+    1.2 Legal Documents                   :done, p12, 2026-01-29, 1d
+    1.3 Website Content                   :done, p13, 2026-01-29, 1d
+    1.4 Public Documentation              :done, p14, 2026-01-29, 1d
+
+    section Phase 2: Product
+    2.1 E-Commerce Store                  :done, p21, 2026-01-30, 2d
+    2.2 Multi-Tenant Infrastructure       :done, p22, 2026-01-30, 2d
+    2.5 Persistent Memory L1-L2           :done, p25, 2026-01-31, 1d
+
+    section Phase 3: UI/UX
+    3.0 Chat API                          :done, p31, 2026-02-01, 1d
+    3.0 Widget Frontend                   :done, p32, 2026-02-01, 1d
+    3.0 Shopify Theme App Extension       :done, p33, 2026-02-01, 1d
+    3.0 Admin Shared Components           :done, p34, 2026-02-01, 1d
+    3.0 Shopify Admin Shell               :done, p35, 2026-02-01, 1d
+    3.0 Standalone Admin Shell            :done, p36, 2026-02-01, 1d
+
+    section Testing
+    P0 Launch Blockers (379 tests)        :done, t1, 2026-01-31, 1d
+    P1 Pre-Launch (214 tests)             :done, t2, 2026-02-01, 1d
+    P2 Launch Quality (222 tests)         :done, t3, 2026-02-01, 1d
+    Operational Tests (75 tests)          :done, t4, 2026-02-01, 1d
+
+    section Remaining
+    P3 Post-Launch Tests                  :active, r1, 2026-02-02, 7d
+    Integration Testing (real services)   :r2, after r1, 7d
+    Shopify App Store Submission          :r3, after r2, 7d
+```
+
+```mermaid
+pie title Phase Completion Status
+    "Complete" : 14
+    "In Progress" : 1
+    "Remaining" : 4
+```
+
+---
+
 ## Project Phases
 
 ### Phase 0: Project Setup (Week 1)
 **Status:** Complete ✅
 
-| Task | Status | Owner | Notes |
-|------|--------|-------|-------|
-| Create project directory structure | ✅ Done | - | E:\Claude-Playground\CLAUDE-PROJECTS\Agent Red Customer Experience |
-| Create CLAUDE.md | ✅ Done | - | AI assistant guidance (v2.0 with full knowledge transfer) |
-| Create PROJECT-PLAN.md | ✅ Done | - | This file |
-| Create GitHub repository | ✅ Done | - | github.com/mike-remakerdigital/agent-red |
-| AGNTCY dependency model | ✅ Done | - | Arms-length via public GitHub (no submodule) |
-| Migrate commercial materials | ✅ Done | - | SaaS proposal, product features, website content |
-| Initial commit pushed | ✅ Done | - | 23 files, 5,825 lines |
-| Docker dev environment | ✅ Done | - | Dockerfile, docker-compose.yml, requirements.txt |
-| AGNTCY baseline verification (local) | ✅ Done | - | 15 containers healthy, 97.8% unit / 99.3% integration pass |
-| AGNTCY baseline verification (Azure) | ✅ Done | - | All 53 resources operational, evaluation 94% intent / 100% escalation precision |
-| Set up GitHub Project board | ✅ Done | - | [Issues](https://github.com/mike-remakerdigital/agent-red/issues), 8 milestone issues (M1-M8) |
+| Task | Status | Notes |
+|------|--------|-------|
+| Create project directory structure | ✅ Done | E:\Claude-Playground\CLAUDE-PROJECTS\Agent Red Customer Engagement |
+| Create CLAUDE.md | ✅ Done | AI assistant guidance (v14.0.0 with full knowledge transfer) |
+| Create PROJECT-PLAN.md | ✅ Done | This file |
+| Create GitHub repository | ✅ Done | github.com/mike-remakerdigital/agent-red |
+| AGNTCY dependency model | ✅ Done | Arms-length via public GitHub (no submodule) |
+| Migrate commercial materials | ✅ Done | SaaS proposal, product features, website content |
+| Initial commit pushed | ✅ Done | 23 files, 5,825 lines |
+| Docker dev environment | ✅ Done | Dockerfile, docker-compose.yml, requirements.txt |
+| AGNTCY baseline verification (local) | ✅ Done | 15 containers healthy, 97.8% unit / 99.3% integration pass |
+| AGNTCY baseline verification (Azure) | ✅ Done | All 53 resources operational |
+| Set up GitHub Project board | ✅ Done | 8 milestone issues (M1-M8) |
 
 ---
 
 ### Phase 1: Foundation (Weeks 2-4)
-
-#### 1.1 Brand Identity *(can start immediately)*
-**Direction:** Bold/Corporate — dark reds, navy/charcoal accents, strong sans-serif typography
-**Approach:** AI-generated concepts and full brand system drafted in-house
-
-| Task | Effort | Status |
-|------|--------|--------|
-| Logo concepts (primary, icon, wordmark) | 8 hrs | ✅ Done — "The Beacon" AR monogram approved |
-| Color palette selection | 2 hrs | ✅ Done — 15 colors, WCAG AA/AAA verified |
-| Typography selection | 2 hrs | ✅ Done — Inter + JetBrains Mono |
-| Brand guidelines document | 4 hrs | ✅ Done — branding/guidelines/BRAND-GUIDELINES.md |
-| Favicon and app icons | 2 hrs | 📋 Todo — derive from branding/logo/PNG/icon-master.png |
-
-#### 1.2 Legal Documents *(can run parallel with 1.1)*
-**Approach:** AI-draft all documents first. Termly/iubenda deferred until closer to launch.
-
-| Task | Effort | Status |
-|------|--------|--------|
-| Draft Terms of Service | 4 hrs | ✅ Done — legal/terms/TERMS-OF-SERVICE.md |
-| Draft Privacy Policy | 2 hrs | ✅ Done — legal/privacy/PRIVACY-POLICY.md |
-| Draft SLA document | 4 hrs | ✅ Done — legal/sla/SERVICE-LEVEL-AGREEMENT.md |
-| Draft Data Processing Agreement | 2 hrs | ✅ Done — legal/dpa/DATA-PROCESSING-AGREEMENT.md |
-| Validate via Termly/iubenda | 2 hrs | 📋 Deferred to pre-launch |
-
-#### 1.3 Website Content *(depends on 1.1 brand identity)*
 **Status:** Complete ✅
-**Approach:** Full rewrite for commercial buyer audience. Existing AGNTCY content used as technical reference only.
-**Platform:** Deferred — content written in markdown, hosting platform chosen later.
-**Key Decisions:** Pricing model redesigned from flat-rate ($299/$499/$999) to platform fee + metered AI usage ($149/$399/$999 base + per-conversation overage). All fabricated social proof removed and replaced with verified AGNTCY evaluation metrics.
 
-| Task | Effort | Status |
-|------|--------|--------|
-| Write homepage (commercial buyer focus) | 4 hrs | ✅ Done — Outcome-driven hero, verified performance metrics, removed fake social proof |
-| Write features page | 3 hrs | ✅ Done — Rebranded, 6-category scrollspy layout preserved |
-| Write pricing page | 2 hrs | ✅ Done — Complete redesign: base + AI usage model, competitor research, cost modeling |
-| Write integrations page | 3 hrs | ✅ Done — Rebranded, Mailchimp/GA moved to add-on pricing ($49/mo) |
-| Write about page | 2 hrs | ✅ Done — Honesty pass: removed all fabricated content, added open-source foundation story |
-| Write contact page | 2 hrs | ✅ Done — New page: form, channels, partner program teaser, URL parameter support |
+#### 1.1 Brand Identity
 
-#### 1.4 Public Documentation *(can start alongside 1.3)*
-**Status:** Complete ✅
-**Approach:** Docusaurus scaffold + conceptual guides + quality framework. API-specific docs deferred to Phase 2.
-**Key Decisions:** Mermaid diagrams adopted as standard for all technical illustrations (Eraser.io evaluated but deferred to Phase 2.2 for architecture diagrams). Documentation quality CI pipeline established (Vale, markdownlint, link-check, coverage audit). Diataxis framework adopted for content classification. Feature inventory system created for coverage tracking.
+| Task | Status |
+|------|--------|
+| Logo concepts (primary, icon, wordmark) | ✅ Done — "The Beacon" AR monogram approved |
+| Color palette selection | ✅ Done — 15 colors, WCAG AA/AAA, primary #C41E2A |
+| Typography selection | ✅ Done — Inter + JetBrains Mono |
+| Brand guidelines document | ✅ Done — branding/guidelines/BRAND-GUIDELINES.md |
+| Favicon and app icons | 📋 Todo — derive from branding/logo/PNG/icon-master.png |
 
-| Task | Effort | Status |
-|------|--------|--------|
-| Set up Docusaurus | 4 hrs | ✅ Done — docs-site/ with Agent Red branding, Mermaid support, strict build mode |
-| Documentation quality framework | 6 hrs | ✅ Done — Vale, markdownlint, alex, link-check, coverage audit, CI pipeline, feedback widget |
-| Write getting-started guide | 4 hrs | ✅ Done — 3 pages (overview, how-it-works, setup), 14 Mermaid diagrams |
-| Write Shopify integration guide | 3 hrs | ✅ Done — OAuth, sync, field mapping, order lookups, troubleshooting, 6 Mermaid diagrams |
-| Write API authentication guide | 2 hrs | 📋 Deferred to Phase 2 |
-| Document API endpoints | 8 hrs | 📋 Deferred to Phase 2 |
+#### 1.2 Legal Documents
+
+| Task | Status |
+|------|--------|
+| Draft Terms of Service | ✅ Done — legal/terms/TERMS-OF-SERVICE.md |
+| Draft Privacy Policy | ✅ Done — legal/privacy/PRIVACY-POLICY.md |
+| Draft SLA document | ✅ Done — legal/sla/SERVICE-LEVEL-AGREEMENT.md (v0.2.0) |
+| Draft Data Processing Agreement | ✅ Done — legal/dpa/DATA-PROCESSING-AGREEMENT.md |
+| Validate via iubenda | 📋 Deferred to pre-launch |
+
+#### 1.3 Website Content
+
+| Task | Status |
+|------|--------|
+| Write homepage (commercial buyer focus) | ✅ Done |
+| Write features page | ✅ Done |
+| Write pricing page | ✅ Done — $149/$399/$999 base + metered AI usage |
+| Write integrations page | ✅ Done |
+| Write about page | ✅ Done |
+| Write contact page | ✅ Done |
+
+#### 1.4 Public Documentation
+
+| Task | Status |
+|------|--------|
+| Set up Docusaurus | ✅ Done — docs-site/ with Agent Red branding, Mermaid support |
+| Documentation quality framework | ✅ Done — Vale, markdownlint, alex, link-check, CI pipeline |
+| Write getting-started guide | ✅ Done — 3 pages, 14 Mermaid diagrams |
+| Write Shopify integration guide | ✅ Done — OAuth, sync, field mapping, 6 Mermaid diagrams |
+| API authentication guide | 📋 Deferred to Phase 2 |
+| API endpoint documentation | 📋 Deferred to Phase 2 |
 
 ---
 
 ### Phase 2: Product & Infrastructure (Weeks 5-8)
+**Status:** Complete ✅ (E-Commerce ~95%, Multi-Tenant 100%, Memory L1-L2 100%)
 
 #### 2.1 E-Commerce Store
-**Platform:** Dual-channel — Shopify App Store (primary distribution) + Stripe (direct sales). Decision documented in `docs/architecture/ECOMMERCE-PLATFORM-EVALUATION.md`. Paddle evaluated and rejected (no marketplace, higher fees, redundant with Shopify tax handling).
+**Platform:** Dual-channel — Shopify App Store (primary) + Stripe (direct). Decision documented in `docs/architecture/ECOMMERCE-PLATFORM-EVALUATION.md`.
 
-| Task | Effort | Status |
-|------|--------|--------|
-| Evaluate Shopify vs Stripe vs Paddle for SaaS subscriptions | 4 hrs | ✅ Done — Three-way evaluation complete, dual-channel recommended and approved |
-| Create Stripe account (live + test mode) | 1 hr | ✅ Done — Test mode configured, catalog script created |
-| Create Products, Prices, Coupons in Stripe (test mode) | 2 hrs | ✅ Done — 27 Stripe objects (config/stripe_product_ids.json) |
-| Implement Stripe Checkout for plan selection | 4 hrs | ✅ Done — src/integrations/stripe_checkout.py |
-| Implement Stripe webhook handler (subscription lifecycle) | 8 hrs | ✅ Done — src/integrations/stripe_webhooks.py (7 events) |
-| Implement metered usage reporting to Stripe | 4 hrs | ✅ Done — src/integrations/stripe_usage.py (3-tier consumption) |
-| Add Shopify Billing API integration to existing Shopify app code | 8 hrs | ✅ Done — src/integrations/shopify_billing.py + shopify_client.py |
-| Create Shopify App Store listing (description, screenshots, demo) | 4 hrs | 🔄 In Progress — listing copy drafted (docs/shopify/APP-STORE-LISTING.md), creative assets pending |
-| Implement GDPR compliance webhooks (customers/data_request, customers/redact, shop/redact) | 4 hrs | 📋 Todo — Required for Shopify App Store submission |
-| Implement session token authentication for embedded Shopify app | 4 hrs | 📋 Todo — Required since 2025, replaces cookie-based auth |
-| Implement App Bridge Save Bar API integration | 2 hrs | 📋 Todo — Required for embedded app save functions |
-| Submit for Shopify App Store review | 1 hr | 📋 Todo — Blocked by: GDPR webhooks, session tokens, App Bridge Save Bar, creative assets |
-| Implement Stripe Customer Portal link | 1 hr | ✅ Done — src/integrations/stripe_portal.py |
-| Implement conversation pack purchase flow | 4 hrs | ✅ Done — src/integrations/stripe_packs.py (FIFO, 90-day validity) |
-| Build unified webhook handler (both channels → provisioning) | 8 hrs | ✅ Done — src/integrations/provisioning.py (channel-agnostic) |
-| Set up Stripe Tax | 2 hrs | ✅ Done — automatic_tax on Checkout, tax_code on Products, tax_behavior on Prices, finalization_failed handler, migration script |
-| Set up Rewardful for affiliate program | 4 hrs | ✅ Done — client_reference_id integration, live connection deferred (Rewardful requires live Stripe) |
-| Test checkout flows (both channels) | 4 hrs | 📋 Todo |
+| Task | Status |
+|------|--------|
+| Evaluate Shopify vs Stripe vs Paddle | ✅ Done — Three-way evaluation, dual-channel |
+| Create Stripe Products/Prices/Coupons (test mode) | ✅ Done — 27 objects (config/stripe_product_ids.json) |
+| Implement Stripe Checkout | ✅ Done — stripe_checkout.py |
+| Implement Stripe webhook handler (7 events) | ✅ Done — stripe_webhooks.py |
+| Implement metered usage reporting (3-tier) | ✅ Done — stripe_usage.py |
+| Implement Shopify Billing API | ✅ Done — shopify_billing.py + shopify_client.py |
+| Implement conversation pack purchase flow | ✅ Done — stripe_packs.py (FIFO, 90-day validity) |
+| Implement unified webhook handler | ✅ Done — provisioning.py (channel-agnostic) |
+| Implement Stripe Customer Portal | ✅ Done — stripe_portal.py |
+| Set up Stripe Tax | ✅ Done — automatic_tax, txcd_10103001, exclusive pricing |
+| Set up Rewardful affiliate integration | ✅ Done — client_reference_id (live connection deferred) |
+| Implement GDPR compliance webhooks (3 Shopify endpoints) | ✅ Done — shopify_gdpr_webhooks.py |
+| Implement session token authentication | ✅ Done — auth.py (Shopify JWT verification) |
+| Implement App Bridge Save Bar API | ✅ Done — admin/shopify/hooks/useSaveBar.ts |
+| Shopify App Store listing copy | ✅ Done — docs/shopify/APP-STORE-LISTING.md |
+| Creative assets (icon, screenshots, demo video) | 📋 Todo — blocked on design |
+| Submit for Shopify App Store review | 📋 Todo — blocked by creative assets |
+| Test checkout flows (both channels) | 📋 Todo — integration testing |
 
 #### 2.2 Multi-Tenant Infrastructure
-**Status:** Tier 1 Critical + Tier 2 High COMPLETE (21 modules, ~9,500 lines). Architecture review: 32 decisions, 100 work items (`docs/Master-Plan-Review-01-30-2026.md`).
+**Status:** COMPLETE — 38 modules, ~25,000 lines. Architecture review: 32 decisions, 100 work items.
 
-| Task | Effort | Status |
-|------|--------|--------|
-| Architecture review (32 decisions, 100 work items) | 8 hrs | ✅ Done — docs/Master-Plan-Review-01-30-2026.md |
-| Cosmos DB schema + TenantScopedRepository (WI #13-14, #24-25) | 16 hrs | ✅ Done — cosmos_schema.py, cosmos_client.py, repository.py |
-| Dual auth + middleware (WI #18, #27-28) | 8 hrs | ✅ Done — auth.py, middleware.py |
-| Billable conversation spec + ConversationMeter (WI #71-72) | 12 hrs | ✅ Done — conversation_meter.py |
-| Fail-closed Critic policy (WI #50) | 8 hrs | ✅ Done — critic_policy.py |
-| NATS tenant isolation (WI #15-17, #26) | 8 hrs | ✅ Done — nats_isolation.py |
-| GDPR services (WI #30-34, #36) | 12 hrs | ✅ Done — gdpr_services.py |
-| OpenTelemetry tracing (WI #39-41) | 8 hrs | ✅ Done — otel_tracing.py |
-| Pipeline resilience (WI #44-46) | 8 hrs | ✅ Done — pipeline_resilience.py |
-| SystemPromptBuilder (WI #70) | 8 hrs | ✅ Done — system_prompt_builder.py |
-| Usage Dashboard API (WI #73-74) | 6 hrs | ✅ Done — usage_dashboard_api.py |
-| Tenant config schema/processor/API (WI #63-65) | 12 hrs | ✅ Done — tenant_config_schema.py, tenant_config_processor.py, tenant_config_api.py |
-| TenantSecretService (WI #29) | 4 hrs | ✅ Done — tenant_secret_service.py |
-| DR + security Terraform (WI #52, #55, #58-59) | 4 hrs | ✅ Done — dr_security.tf |
-| Billing doc + SLA updates (WI #77-78) | 4 hrs | ✅ Done — billable-conversation-spec.md, SLA v0.2.0 |
-| TenantUsageMonitor — progressive throttling (WI #51) | 8 hrs | 📋 Todo |
-| KEDA auto-scaling deployment (WI #47-48) | 8 hrs | 📋 Todo |
+| Task | Status |
+|------|--------|
+| Architecture review (32 decisions, 100 WIs) | ✅ Done — docs/Master-Plan-Review-01-30-2026.md |
+| Cosmos DB schema + TenantScopedRepository (#13-14, #24-25) | ✅ Done — cosmos_schema.py, cosmos_client.py, repository.py |
+| Dual auth + middleware (#18, #27-28) | ✅ Done — auth.py, middleware.py |
+| Billable conversation + ConversationMeter (#71-72) | ✅ Done — conversation_meter.py |
+| Fail-closed Critic policy (#50) | ✅ Done — critic_policy.py |
+| NATS tenant isolation (#15-17, #26) | ✅ Done — nats_isolation.py |
+| GDPR services (#30-34, #36) | ✅ Done — gdpr_services.py |
+| OpenTelemetry tracing (#39-41) | ✅ Done — otel_tracing.py |
+| Pipeline resilience (#44-46) | ✅ Done — pipeline_resilience.py |
+| SystemPromptBuilder (#70) | ✅ Done — system_prompt_builder.py |
+| Usage Dashboard API (#73-74) | ✅ Done — usage_dashboard_api.py |
+| Tenant config schema/processor/API (#63-65) | ✅ Done — tenant_config_*.py (3 modules) |
+| TenantSecretService (#29) | ✅ Done — tenant_secret_service.py |
+| DR + security Terraform (#52, #55, #58-59) | ✅ Done — dr_security.tf |
+| Billing doc + SLA updates (#77-78) | ✅ Done — billable-conversation-spec.md, SLA v0.2.0 |
+| TenantUsageMonitor progressive throttling (#51) | ✅ Done — tenant_usage_monitor.py |
+| KEDA auto-scaling profiles (#47-48) | ✅ Done — dr_security.tf (KEDA + night scaling) |
+| Security middleware (#157-159) | ✅ Done — security_middleware.py |
+| Security hardening (#160-163) | ✅ Done — security_hardening.py |
+| Structured logging (#149) | ✅ Done — structured_logging.py |
+| API versioning (#140) | ✅ Done — api_versioning.py |
+| Trial management (#119-128) | ✅ Done — trial_management.py (~1,200 lines) |
+| SLA monitoring (#151) | ✅ Done — sla_monitoring.py (~390 lines) |
+| Data retention (#154) | ✅ Done — data_retention.py (~380 lines) |
+| Archival pipeline (#153) | ✅ Done — archival_pipeline.py (~750 lines) |
+| Cost model calculator (#155) | ✅ Done — cost_model.py (~370 lines) |
+| Alert delivery (#192) | ✅ Done — alert_delivery.py (~695 lines) |
 
-#### 2.5 Persistent Customer Memory *(depends on 2.2 multi-tenant infrastructure)*
-**Status:** Layers 1-2 COMPLETE (3 modules + 30 passing tests). Architecture research complete. Metrics framework defined.
+#### 2.5 Persistent Customer Memory
+**Status:** Layers 1-2 COMPLETE (3 modules + 30 passing tests). Layers 3-4 deferred.
 
-| Task | Effort | Status |
-|------|--------|--------|
-| CustomerProfileService — Layer 1 (WI #83-85) | 16 hrs | ✅ Done — customer_profile_service.py |
-| ConversationVectorizer — Layer 2 (WI #87-88) | 40 hrs | ✅ Done — conversation_vectorizer.py |
-| Response explainability framework (WI #86) | 8 hrs | ✅ Done — response_explainability.py |
-| Test fixtures + 20 unit tests + 10 integration tests (WI #97-98, #100) | 16 hrs | ✅ Done — tests/persistent_memory/ (30 tests passing) |
-| PatternExtractionService — Layer 3 (WI #90-92) | 60 hrs | 📋 Todo — Professional+ |
-| Fine-tuning pipeline — Layer 4 (WI #93-96) | 60 hrs | 📋 Todo — Enterprise add-on |
-| 5 A/B production tests (WI #99) | 16 hrs | 📋 Todo |
-| Create metrics dashboard | 40 hrs | 📋 Todo |
+| Task | Status |
+|------|--------|
+| CustomerProfileService — Layer 1 (#83-85) | ✅ Done — customer_profile_service.py |
+| ConversationVectorizer — Layer 2 (#87-88) | ✅ Done — conversation_vectorizer.py |
+| Response explainability framework (#86) | ✅ Done — response_explainability.py |
+| Test fixtures + 30 tests (#97-98, #100) | ✅ Done — tests/persistent_memory/ |
+| PatternExtractionService — Layer 3 (#90-92) | 📋 Todo — Professional+ |
+| Fine-tuning pipeline — Layer 4 (#93-96) | 📋 Todo — Enterprise add-on |
+| 5 A/B production tests (#99) | 📋 Todo |
 
 #### 2.3 Admin Guides *(deferred — requires working product)*
-| Task | Effort | Status |
-|------|--------|--------|
-| Initial setup guide | 4 hrs | 📋 Todo |
-| Shopify connection guide | 2 hrs | 📋 Todo |
-| Knowledge base setup guide | 3 hrs | 📋 Todo |
-| Monitoring and alerts guide | 3 hrs | 📋 Todo |
+| Task | Status |
+|------|--------|
+| Initial setup guide | 📋 Todo |
+| Shopify connection guide | 📋 Todo |
+| Knowledge base setup guide | 📋 Todo |
+| Monitoring and alerts guide | 📋 Todo |
 
 #### 2.4 Demo Videos *(deferred — requires working product)*
-| Task | Effort | Status |
-|------|--------|--------|
-| Platform overview (2-3 min) | 4 hrs | 📋 Todo |
-| Quick start tutorial (3-5 min) | 4 hrs | 📋 Todo |
+| Task | Status |
+|------|--------|
+| Platform overview (2-3 min) | 📋 Todo |
+| Quick start tutorial (3-5 min) | 📋 Todo |
 
 ---
 
-### Phase 3: Launch Preparation (Weeks 9-12)
+### Phase 3: UI/UX Frontend (Weeks 9-10)
+**Status:** ALL BUILD PHASES COMPLETE ✅
 
-#### 3.1 Testing & QA
-| Task | Effort | Status |
-|------|--------|--------|
-| End-to-end checkout testing | 8 hrs | 📋 Todo |
-| Multi-tenant isolation testing | 8 hrs | 📋 Todo |
-| Load testing | 8 hrs | 📋 Todo |
-| Security review | 8 hrs | 📋 Todo |
+```mermaid
+flowchart LR
+    subgraph "Build Phase 1"
+        A[Chat API<br/>6 endpoints + SSE]
+    end
+    subgraph "Build Phase 2"
+        B[Widget Frontend<br/>20 files, ~3,200 lines]
+    end
+    subgraph "Build Phase 3"
+        C[Shopify Theme<br/>App Extension]
+    end
+    subgraph "Build Phase 4"
+        D[Admin Shared<br/>9 components]
+    end
+    subgraph "Build Phase 5"
+        E[Shopify Admin<br/>Polaris + App Bridge]
+    end
+    subgraph "Build Phase 6"
+        F[Standalone Admin<br/>API key login]
+    end
 
-#### 3.2 Deployment
-| Task | Effort | Status |
-|------|--------|--------|
-| Set up production environment | 8 hrs | 📋 Todo |
-| Configure monitoring | 4 hrs | 📋 Todo |
-| Set up alerting | 4 hrs | 📋 Todo |
-| Document runbooks | 8 hrs | 📋 Todo |
+    A --> B --> C --> D --> E & F
 
-#### 3.3 Launch Readiness
-| Task | Effort | Status |
-|------|--------|--------|
-| Final website review | 4 hrs | 📋 Todo |
-| Final documentation review | 4 hrs | 📋 Todo |
-| Soft launch (beta users) | - | 📋 Todo |
-| Address beta feedback | 16 hrs | 📋 Todo |
-| Public launch | - | 📋 Todo |
+    style A fill:#d4edda
+    style B fill:#d4edda
+    style C fill:#d4edda
+    style D fill:#d4edda
+    style E fill:#d4edda
+    style F fill:#d4edda
+```
+
+| Deliverable | Files | Lines | Status |
+|-------------|-------|-------|--------|
+| Chat API (models, session, pipeline, endpoints, SSE manager) | 6 modules | ~2,800 | ✅ Complete |
+| Widget frontend (Preact, Shadow DOM, iframe, 3-channel transport) | 20 files | ~3,200 | ✅ Complete |
+| Shopify Theme App Extension (Liquid template, manifest) | 3 files | ~200 | ✅ Complete |
+| Admin shared components (9 components + hooks + types) | 11 files | ~5,400 | ✅ Complete |
+| Shopify admin shell (Polaris + App Bridge, 7 pages) | 10 files | ~2,700 | ✅ Complete (build validated) |
+| Standalone admin shell (API key login, 7 pages) | 10 files | ~2,800 | ✅ Complete (build validated) |
+
+**Admin Build Validation:**
+- admin/shopify: 0 TS errors, 599.57 KB bundle (146.67 KB gzip)
+- admin/standalone: 0 TS errors, 304.74 KB bundle (87.63 KB gzip)
+
+---
+
+### Phase 4: Testing & QA
+**Status:** P0+P1+P2 COMPLETE — 999 tests passing, 0 warnings
+
+```mermaid
+xychart-beta
+    title "Test Coverage by Priority"
+    x-axis ["P0 Blockers", "P1 Pre-Launch", "P2 Quality", "Operational", "P3 Post", "Security", "Perf/Load"]
+    y-axis "Tests" 0 --> 400
+    bar [379, 214, 222, 75, 0, 0, 0]
+```
+
+| Suite | Tests | Status |
+|-------|-------|--------|
+| P0 — Launch blockers (HTTP billing, middleware, meter, Critic, Cosmos, health, catalog, usage) | 379 | ✅ Complete |
+| P1 — Pre-launch (NATS, GDPR, OTEL, resilience, prompts, config, Shopify, memory, dashboard) | 214 | ✅ Complete |
+| P2 — Launch quality (Shopify client, billing, checkout, explainability, profiles, vectors, cross-module, errors) | 222 | ✅ Complete |
+| Operational (archival, retention, SLA, cost model) | 75 | ✅ Complete |
+| Conftest smoke + health + pre-existing | 109 | ✅ Complete |
+| P3 — Post-launch (~90 tests) | 0 | 📋 Todo |
+| Adversarial / security (~45 tests) | 0 | 📋 Todo |
+| Performance / load (~30 tests) | 0 | 📋 Todo |
+
+| Metric | Value |
+|--------|-------|
+| Total tests | 999 |
+| Warnings | 0 |
+| Execution time | ~12s |
+| CI pipeline | GitHub Actions (Python 3.12/3.14) |
+
+---
+
+### Phase 5: Operational Readiness
+**Status:** Complete ✅
+
+| Task | Status |
+|------|--------|
+| Deployment runbook | ✅ Done — docs/operations/DEPLOYMENT-RUNBOOK.md |
+| DR runbook — Option A | ✅ Done — docs/operations/DEPLOYMENT-RUNBOOK.md |
+| Maintenance runbook | ✅ Done — docs/operations/DEPLOYMENT-RUNBOOK.md |
+| Option C upgrade path documentation | ✅ Done — docs/operations/OPTION-C-UPGRADE-PATH.md |
+| SLA monitoring service | ✅ Done — sla_monitoring.py |
+| Data retention enforcement | ✅ Done — data_retention.py |
+| Archival pipeline (Hot→Warm Parquet) | ✅ Done — archival_pipeline.py |
+| Cost model calculator | ✅ Done — cost_model.py |
+| Alert delivery service | ✅ Done — alert_delivery.py |
+| KEDA night scaling | ✅ Done — dr_security.tf |
+| Scheduled Container App Jobs (cron) | ✅ Done — run_retention.py, run_archival.py |
+
+---
+
+### Phase 6: Launch Preparation (Remaining)
+
+#### 6.1 Pre-Launch Testing
+| Task | Status |
+|------|--------|
+| P3 post-launch tests (~90 tests) | 📋 Todo |
+| Adversarial/security tests (~45 tests) | 📋 Todo |
+| Performance/load tests (~30 tests) | 📋 Todo |
+| Integration testing (real Stripe + Shopify sandbox) | 📋 Todo |
+
+#### 6.2 Shopify App Store Submission
+| Task | Status |
+|------|--------|
+| App icon (1024x1024) | 📋 Todo — blocked on design |
+| Screenshots (desktop + mobile) | 📋 Todo — blocked on design |
+| Demo video | 📋 Todo — blocked on design |
+| App Store review submission | 📋 Todo — blocked by creative assets |
+
+#### 6.3 Launch Readiness
+| Task | Status |
+|------|--------|
+| Final documentation review | 📋 Todo |
+| Soft launch (beta users) | 📋 Todo |
+| Address beta feedback | 📋 Todo |
+| Public launch | 📋 Todo |
 
 ---
 
@@ -204,21 +355,12 @@ Agent Red Customer Experience is a commercial SaaS product built on the open-sou
 
 | Category | Service | Monthly Cost |
 |----------|---------|--------------|
-| **Infrastructure** | Azure (production) | $300-500 |
-| **E-commerce** | Stripe (~3.5% variable) + Shopify App Store ($0 commission < $1M) + Rewardful (~$49-99/mo affiliates) | $49-99 + variable |
-| **Legal** | Termly + iubenda (deferred to pre-launch) | $0-52 |
-| **Marketing** | Buffer (future) | $0-30 |
+| **Infrastructure** | Azure (production) | $252-436 |
+| **E-commerce** | Stripe (~3.5% variable) + Shopify ($0 < $1M) + Rewardful (~$49/mo) | $49 + variable |
+| **Legal** | iubenda (Advanced plan) | $0-52 |
 | **Documentation** | Docusaurus (Vercel) | $0 |
 | **Domain/DNS** | Cloudflare | $0-20 |
-| **Total** | | **$371-681** |
-
-### One-Time Costs
-
-| Item | Estimated Cost |
-|------|----------------|
-| Logo design (if outsourced) | $0-500 |
-| Stock imagery | $0-100 |
-| **Total** | **$0-600** |
+| **Total** | | **$301-557** |
 
 ---
 
@@ -226,11 +368,11 @@ Agent Red Customer Experience is a commercial SaaS product built on the open-sou
 
 | Risk | Impact | Probability | Mitigation |
 |------|--------|-------------|------------|
-| Timeline slip | High | Medium | MVP scope, prioritize core features |
-| Budget overrun | Medium | Low | Aggressive cost monitoring, lean approach |
-| Multi-tenant complexity | High | Medium | Start simple, iterate |
-| Brand confusion with AGNTCY | Medium | Low | Clear differentiation messaging, full website rewrite |
-| E-commerce platform fit | Medium | Medium | Evaluate Shopify vs Stripe before committing |
+| Timeline slip | High | Medium | MVP scope, aggressive optimization |
+| Budget overrun | Medium | Low | Cost model validated ($252-436/mo infra) |
+| Multi-tenant complexity | High | Low | 38 modules complete, 999 tests passing |
+| Shopify App Store rejection | Medium | Medium | GDPR webhooks, session tokens, Save Bar all implemented |
+| Creative asset delays | Medium | High | App Store submission blocked on icon/screenshots |
 
 ---
 
@@ -238,14 +380,18 @@ Agent Red Customer Experience is a commercial SaaS product built on the open-sou
 
 ### Launch 1.0 Minimum Viable
 
-| Criterion | Target |
-|-----------|--------|
-| Website live | ✅ Yes |
-| Documentation published | ✅ Yes |
-| Legal documents published | ✅ Yes |
-| Shopify store operational | ✅ Yes |
-| First trial signup | ✅ Yes |
-| Platform stable for 48 hrs | ✅ Yes |
+| Criterion | Target | Status |
+|-----------|--------|--------|
+| Website content ready | Yes | ✅ |
+| Documentation published | Yes | ✅ |
+| Legal documents drafted | Yes | ✅ |
+| Multi-tenant infrastructure | Yes | ✅ (38 modules, 999 tests) |
+| Chat widget functional | Yes | ✅ (20 files, build validated) |
+| Admin dashboard functional | Yes | ✅ (2 shells, build validated) |
+| E-commerce billing functional | Yes | ✅ (dual-channel) |
+| Shopify App Store listed | Yes | 📋 Pending (creative assets) |
+| First trial signup | Yes | 📋 Pending |
+| Platform stable 48 hrs | Yes | 📋 Pending (integration testing) |
 
 ### Post-Launch (30 days)
 
@@ -266,72 +412,45 @@ Agent Red Customer Experience is a commercial SaaS product built on the open-sou
 |------------|------|------|
 | AGNTCY open-source stability | Technical | Medium |
 | Azure service availability | Infrastructure | Low |
-| Shopify App Store | E-commerce (primary distribution) | Low |
-| Stripe | E-commerce (direct billing) | Low |
+| Shopify App Store review | E-commerce (primary) | Low |
+| Stripe | E-commerce (direct) | Low |
 | Rewardful | Affiliate program | Low |
-| Termly/iubenda services | Legal | Low |
-
-### Internal Dependencies
-
-| Item | Depends On |
-|------|------------|
-| Website launch | Brand identity, content |
-| E-commerce store | Pricing finalized, products defined, platform decision ✅ (Shopify App Store + Stripe) |
-| Multi-tenant infra | Architecture design document approved |
-| Persistent Customer Memory | Multi-tenant infrastructure (tenant-partitioned data) |
-| API documentation | Multi-tenant infrastructure built, API surface defined |
-| Conceptual docs | Product features known (can start Phase 1) |
-| Admin guides | Working product to document |
-| Demo videos | Working product to demonstrate |
-
----
-
-## Team & Responsibilities
-
-| Role | Responsibilities |
-|------|------------------|
-| Product Owner | Scope decisions, prioritization, acceptance |
-| Technical Lead | Architecture, code review, technical decisions |
-| Developer | Implementation, testing, deployment |
-| Content | Website copy, documentation, guides |
-| Design | Brand identity, UI/UX (if applicable) |
-
----
-
-## Communication
-
-### Status Updates
-
-| Meeting | Frequency | Purpose |
-|---------|-----------|---------|
-| Sprint planning | Weekly | Plan next week's work |
-| Standup | Daily | Progress, blockers |
-| Demo | Bi-weekly | Show completed work |
-| Retrospective | Bi-weekly | Process improvement |
-
-### Documentation
-
-| Document | Update Frequency |
-|----------|------------------|
-| PROJECT-PLAN.md | Weekly |
-| CLAUDE.md | As needed |
-| GitHub Issues | Daily |
-| Project Board | Daily |
+| iubenda | Legal document generation | Low |
 
 ---
 
 ## Milestones
 
-| Milestone | Target Date | Deliverables |
-|-----------|-------------|--------------|
-| **M1: Setup Complete** | Week 1 | Repo, project board ✅ |
-| **M2: Brand Ready** | Week 3 | Logo concepts, color palette, typography, brand guidelines |
-| **M3: Legal Ready** | Week 4 | AI-drafted ToS, Privacy, SLA, DPA (Termly/iubenda deferred) |
-| **M4: Website Live** | Week 5 | Marketing site deployed |
-| **M5: Store Live** | Week 7 | E-commerce store operational (platform TBD) |
-| **M6: Docs Complete** | Week 8 | Documentation published |
-| **M7: Soft Launch** | Week 10 | Beta users invited |
-| **M8: Public Launch** | Week 12 | General availability |
+```mermaid
+flowchart LR
+    M1[M1: Setup<br/>✅ Week 1] --> M2[M2: Brand<br/>✅ Week 2]
+    M2 --> M3[M3: Legal<br/>✅ Week 3]
+    M3 --> M4[M4: Website<br/>✅ Week 4]
+    M4 --> M5[M5: Backend<br/>✅ Week 5-6]
+    M5 --> M6[M6: Frontend<br/>✅ Week 7-8]
+    M6 --> M7[M7: Testing<br/>✅ Week 9]
+    M7 --> M8[M8: Launch<br/>🔄 Week 10-12]
+
+    style M1 fill:#d4edda
+    style M2 fill:#d4edda
+    style M3 fill:#d4edda
+    style M4 fill:#d4edda
+    style M5 fill:#d4edda
+    style M6 fill:#d4edda
+    style M7 fill:#d4edda
+    style M8 fill:#fff3cd
+```
+
+| Milestone | Deliverables | Status |
+|-----------|--------------|--------|
+| **M1: Setup Complete** | Repo, project board | ✅ Complete |
+| **M2: Brand Ready** | Logo, color palette, typography, guidelines | ✅ Complete |
+| **M3: Legal Ready** | ToS, Privacy, SLA, DPA (AI-drafted) | ✅ Complete |
+| **M4: Website Ready** | Marketing site content (6 pages) | ✅ Complete |
+| **M5: Backend Complete** | Multi-tenant (38 modules), billing (11 modules), memory (3 modules) | ✅ Complete |
+| **M6: Frontend Complete** | Chat API, widget, Shopify extension, admin (2 shells) | ✅ Complete |
+| **M7: Testing Complete** | 999 tests (P0+P1+P2), CI pipeline | ✅ Complete |
+| **M8: Public Launch** | App Store listed, integration tested, soft launch, GA | 🔄 In Progress |
 
 ---
 
@@ -340,14 +459,15 @@ Agent Red Customer Experience is a commercial SaaS product built on the open-sou
 | Version | Date | Changes |
 |---------|------|---------|
 | 1.0.0 | 2026-01-29 | Initial project plan |
-| 1.1.0 | 2026-01-29 | Phase 0 complete: GitHub repo created, initial commit pushed, arms-length dependency model established |
-| 1.2.0 | 2026-01-29 | Docker dev environment added, AGNTCY baseline verified (local Docker + production Azure) |
-| 1.3.0 | 2026-01-29 | Work priority review complete: brand direction (Bold/Corporate), legal approach (AI-draft first), website (full rewrite), docs (conceptual now, API later), e-commerce platform deferred, multi-tenant architecture doc required, admin guides/videos deferred |
-| 1.4.0 | 2026-01-29 | Phase 1.1 Brand Identity complete (logo, colors, typography, guidelines). Phase 1.2 Legal Documents complete (ToS, Privacy Policy, SLA, DPA — all AI-drafted, pending legal review) |
-| 1.5.0 | 2026-01-29 | Phase 1.3 Website Content complete — 6 pages rewritten for Agent Red commercial brand. Major pricing model redesign: flat-rate → platform fee + metered AI usage ($149/$399/$999 base, included conversations, tiered overage). Honesty pass removed all fabricated social proof. New contact page added. Content principles established: honesty, accuracy, correctness. |
-| 1.6.0 | 2026-01-29 | Phase 1.4 Public Documentation complete — Docusaurus site scaffolded with Agent Red branding and Mermaid diagram support. Documentation quality framework added: Vale prose linting (Google style + custom Agent Red rules), markdownlint, alex (inclusivity), markdown-link-check, coverage audit system (Diataxis-based feature inventory). GitHub Actions CI pipeline for docs quality. 5 content pages written: Platform Overview, How It Works, Initial Setup, Shopify Integration, Welcome. 20 Mermaid diagrams total. Coverage: 26% actionable slots documented (52% explanation, 21% how-to). "Was this helpful?" feedback widget added. Eraser.io evaluated, deferred to Phase 2.2. |
-| 1.7.0 | 2026-01-30 | Phase 2.1 platform decision complete — Three-way evaluation (Stripe vs Shopify App Store vs Paddle) documented in `docs/architecture/ECOMMERCE-PLATFORM-EVALUATION.md`. Decision: Dual-channel (Shopify App Store as primary distribution + Stripe for direct sales). Paddle rejected (no marketplace, higher fees, redundant tax handling). Phase 2.1 task list updated with 15 implementation tasks (~75 hrs). Strategic alignment confirmed: Shopify App Store provides established competitor ecosystem for price disruption strategy. |
-| 1.8.0 | 2026-01-30 | Persistent Customer Memory added as 5th commercial differentiator. Phase 2.5 added with 9 implementation tasks (~344 hrs). Metrics framework and test cases documented in `docs/architecture/PERSISTENT-CUSTOMER-MEMORY-METRICS.md`. Research foundation in `docs/architecture/PER-CUSTOMER-AI-PERSONALIZATION-RESEARCH.md`. Feature propagated across all 18 project files (business docs, marketing, docs-site, legal, brand). Dedicated Model Training add-on added ($299/mo, Enterprise only). |
+| 1.1.0 | 2026-01-29 | Phase 0 complete |
+| 1.2.0 | 2026-01-29 | Docker dev environment, AGNTCY baseline verified |
+| 1.3.0 | 2026-01-29 | Work priority review complete |
+| 1.4.0 | 2026-01-29 | Phase 1.1 + 1.2 complete |
+| 1.5.0 | 2026-01-29 | Phase 1.3 website content complete |
+| 1.6.0 | 2026-01-29 | Phase 1.4 documentation complete |
+| 1.7.0 | 2026-01-30 | Phase 2.1 platform decision, dual-channel |
+| 1.8.0 | 2026-01-30 | Phase 2.5 Persistent Customer Memory added |
+| 2.0.0 | 2026-02-02 | **Major update:** Phase 2.1-2.2 complete (38 multi_tenant modules, 11 integration modules). Phase 2.5 Layers 1-2 complete. Phase 3.0 ALL BUILD PHASES complete (chat API, widget, admin shells). 999 tests passing. Operational readiness, security hardening, pipeline optimization, trial environment all complete. PROJECT-PLAN restructured to reflect actual phase completion. |
 
 ---
 
