@@ -17,8 +17,8 @@ const config = {
   url: 'https://docs.agentred.com',
   baseUrl: '/',
 
-  organizationName: 'Remaker-Digital',
-  projectName: 'agent-red-customer-engagement',
+  organizationName: 'mike-remakerdigital',
+  projectName: 'agent-red',
 
   onBrokenLinks: 'throw',
   onBrokenMarkdownLinks: 'throw',

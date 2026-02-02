@@ -72,7 +72,7 @@ ATTR_TIER = "tenant.tier"
 ATTR_AGENT = "pipeline.agent"
 
 # Service identification
-SERVICE_NAME = "agent-red-customer-engagement"
+SERVICE_NAME = "agent-red"
 SERVICE_VERSION = "1.0.0"
 
 # Environment

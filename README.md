@@ -10,8 +10,8 @@
 
 | Resource | Link |
 |----------|------|
-| **Project Board** | [Agent Red Launch 1.0](https://github.com/orgs/Remaker-Digital/projects/2) |
-| **Milestones** | [Issues](https://github.com/Remaker-Digital/agent-red-customer-engagement/issues) (M1-M8) |
+| **Repository** | [mike-remakerdigital/agent-red](https://github.com/mike-remakerdigital/agent-red) |
+| **Milestones** | [Issues](https://github.com/mike-remakerdigital/agent-red/issues) (M1-M8) |
 | **Project Plan** | [`docs/PROJECT-PLAN.md`](docs/PROJECT-PLAN.md) |
 | **AI Assistant Guide** | [`CLAUDE.md`](CLAUDE.md) |
 | **Commercial Proposal** | [`docs/COMMERCIAL-SAAS-PROPOSAL.md`](docs/COMMERCIAL-SAAS-PROPOSAL.md) |
@@ -171,8 +171,8 @@ Deployed on Azure (East US 2):
 
 ```bash
 # Clone the repository
-git clone https://github.com/Remaker-Digital/agent-red-customer-engagement.git
-cd agent-red-customer-engagement
+git clone https://github.com/mike-remakerdigital/agent-red.git
+cd agent-red
 
 # Copy environment template
 cp .env.example .env.local
@@ -211,7 +211,7 @@ Agent Red and AGNTCY are strictly isolated projects. Even if both are active on 
 | M7: Soft Launch | Week 10 | 📋 Todo |
 | M8: Public Launch | Week 12 | 📋 Todo |
 
-See [`docs/PROJECT-PLAN.md`](docs/PROJECT-PLAN.md) for detailed tasks and the [project board](https://github.com/orgs/Remaker-Digital/projects/2) for live tracking.
+See [`docs/PROJECT-PLAN.md`](docs/PROJECT-PLAN.md) for detailed tasks and the [issues board](https://github.com/mike-remakerdigital/agent-red/issues) for live tracking.
 
 ---
 

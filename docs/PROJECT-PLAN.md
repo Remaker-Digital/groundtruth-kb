@@ -23,14 +23,14 @@ Agent Red Customer Experience is a commercial SaaS product built on the open-sou
 | Create project directory structure | ✅ Done | - | E:\Claude-Playground\CLAUDE-PROJECTS\Agent Red Customer Experience |
 | Create CLAUDE.md | ✅ Done | - | AI assistant guidance (v2.0 with full knowledge transfer) |
 | Create PROJECT-PLAN.md | ✅ Done | - | This file |
-| Create GitHub private repository | ✅ Done | - | github.com/Remaker-Digital/agent-red-customer-engagement |
+| Create GitHub repository | ✅ Done | - | github.com/mike-remakerdigital/agent-red |
 | AGNTCY dependency model | ✅ Done | - | Arms-length via public GitHub (no submodule) |
 | Migrate commercial materials | ✅ Done | - | SaaS proposal, product features, website content |
 | Initial commit pushed | ✅ Done | - | 23 files, 5,825 lines |
 | Docker dev environment | ✅ Done | - | Dockerfile, docker-compose.yml, requirements.txt |
 | AGNTCY baseline verification (local) | ✅ Done | - | 15 containers healthy, 97.8% unit / 99.3% integration pass |
 | AGNTCY baseline verification (Azure) | ✅ Done | - | All 53 resources operational, evaluation 94% intent / 100% escalation precision |
-| Set up GitHub Project board | ✅ Done | - | [Project #2](https://github.com/orgs/Remaker-Digital/projects/2), 8 milestone issues (M1-M8) |
+| Set up GitHub Project board | ✅ Done | - | [Issues](https://github.com/mike-remakerdigital/agent-red/issues), 8 milestone issues (M1-M8) |
 
 ---
 
