@@ -1,13 +1,14 @@
 """Test data fixtures for Persistent Customer Memory (WI #100, Decision #32).
 
-Synthetic profiles, transcripts, purchases, carts, and vector data for
-deterministic testing across all 4 memory layers.
+Synthetic profiles, transcripts, purchases, carts, vector data, and
+fine-tuning configuration for deterministic testing across all 4 memory layers.
 
 Usage:
     from tests.persistent_memory.fixtures import (
         TENANT_STARTER, TENANT_PROFESSIONAL, TENANT_ENTERPRISE,
         CUSTOMER_RETURNING, CUSTOMER_NEW, CUSTOMER_STALE,
         make_profile, make_conversation_messages, make_vector_results,
+        make_fine_tuning_config, make_training_job, make_fine_tuned_model,
     )
 
 © 2026 Remaker Digital, a DBA of VanDusen & Palmeter, LLC. All rights reserved.
@@ -468,3 +469,114 @@ def make_bulk_conversations(
         ])
 
     return conversations
+
+
+# ---------------------------------------------------------------------------
+# Fine-tuning pipeline fixtures (WI #93-96, Layer 4)
+# ---------------------------------------------------------------------------
+
+
+def make_fine_tuning_config(
+    tenant_id: str = TENANT_ENTERPRISE,
+    *,
+    enabled: bool = True,
+    schedule: str = "monthly",
+    min_conversations: int = 1000,
+    active_model_id: str | None = None,
+    active_model_version: int | None = None,
+    ab_experiment_id: str | None = None,
+) -> PreferencesDocument:
+    """Create a PreferencesDocument configured for fine-tuning.
+
+    Returns an Enterprise-tier preferences document with fine-tuning
+    fields set.  Extends :func:`make_preferences` with Layer 4 fields.
+    """
+    prefs = make_preferences(
+        tenant_id=tenant_id,
+        brand_name="Enterprise Corp",
+        voice="professional",
+        formality="formal",
+        response_length="detailed",
+    )
+    prefs.fine_tuning_enabled = enabled
+    prefs.fine_tuning_schedule = schedule
+    prefs.fine_tuning_min_conversations = min_conversations
+    prefs.fine_tuning_active_model_id = active_model_id
+    prefs.fine_tuning_active_model_version = active_model_version
+    prefs.fine_tuning_ab_experiment_id = ab_experiment_id
+    return prefs
+
+
+def make_training_job(
+    tenant_id: str = TENANT_ENTERPRISE,
+    *,
+    job_id: str = "ftjob-test-001",
+    openai_job_id: str = "ftjob-abc123",
+    status: str = "completed",
+    base_model: str = "gpt-4o-mini",
+    training_conversations: int = 1500,
+    training_examples: int = 4500,
+    validation_examples: int = 500,
+    resulting_model_id: str | None = "ft:gpt-4o-mini:agentred:tenant-ent-001:v1",
+    error_message: str | None = None,
+) -> dict[str, Any]:
+    """Create a TrainingJobRecord-compatible dict for testing.
+
+    Returns a dict matching the TrainingJobRecord dataclass fields.
+    """
+    return {
+        "id": job_id,
+        "tenant_id": tenant_id,
+        "job_id": job_id,
+        "openai_job_id": openai_job_id,
+        "status": status,
+        "base_model": base_model,
+        "training_conversations": training_conversations,
+        "training_examples": training_examples,
+        "validation_examples": validation_examples,
+        "training_file_id": "file-train-abc123",
+        "validation_file_id": "file-val-abc123",
+        "resulting_model_id": resulting_model_id,
+        "quality_report": None,
+        "cost_estimate": 12.50,
+        "error_message": error_message,
+        "created_at": _days_ago(7),
+        "started_at": _days_ago(7),
+        "completed_at": _days_ago(6),
+    }
+
+
+def make_fine_tuned_model(
+    tenant_id: str = TENANT_ENTERPRISE,
+    *,
+    model_id: str = "ft:gpt-4o-mini:agentred:tenant-ent-001:v1",
+    model_version: int = 1,
+    status: str = "deployed",
+    base_model: str = "gpt-4o-mini",
+    training_job_id: str = "ftjob-test-001",
+    training_data_count: int = 1500,
+    deployed_at: str | None = None,
+    rolled_back_at: str | None = None,
+    rollback_reason: str | None = None,
+) -> dict[str, Any]:
+    """Create a FineTunedModelRecord-compatible dict for testing.
+
+    Returns a dict matching the FineTunedModelRecord dataclass fields.
+    """
+    return {
+        "id": f"{tenant_id}:model:{model_version}",
+        "tenant_id": tenant_id,
+        "model_id": model_id,
+        "model_version": model_version,
+        "status": status,
+        "base_model": base_model,
+        "training_job_id": training_job_id,
+        "training_data_count": training_data_count,
+        "quality_report": None,
+        "ab_experiment": None,
+        "deployed_at": deployed_at or _days_ago(5),
+        "rolled_back_at": rolled_back_at,
+        "rollback_reason": rollback_reason,
+        "created_at": _days_ago(6),
+        "updated_at": _now(),
+    }

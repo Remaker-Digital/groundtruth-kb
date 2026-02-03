@@ -1,6 +1,6 @@
 """SystemPromptBuilder — dynamic per-agent prompt assembly (Decision #23, WI #70).
 
-Composes system prompts for each of the 6 pipeline agents from four layers:
+Composes system prompts for each of the 6 pipeline agents from five layers:
 
     1. Platform base   — immutable safety guardrails and core behavioural
                          instructions.  Cannot be overridden by merchant config.
@@ -10,6 +10,9 @@ Composes system prompts for each of the 6 pipeline agents from four layers:
                           tone, policies, escalation rules, custom instructions).
     4. Customer context — Layer 1 profile injection (~250 token budget) from
                           CustomerProfileDocument when available.
+    5. Pattern context  — Layer 3 cross-session behavioral patterns (~100 token
+                          budget) from PatternExtractionService when available.
+                          Professional+ only, consent-gated.
 
 The builder receives a **resolved** PreferencesDocument.  It does not know or
 care whether that document is the tenant's live config or a test-group
@@ -23,9 +26,11 @@ Per-agent specialisation
                         taxonomy.  No customer context.
 - Knowledge Retrieval:  search guidance, product domain, knowledge-base scope.
                         No customer context.
-- Response Generator:   **full** merchant persona + customer context + policies.
+- Response Generator:   **full** merchant persona + customer context + patterns
+                        + policies.
 - Escalation Handler:   escalation rules, thresholds, keywords + customer
-                        context (for VIP detection, prior escalation history).
+                        context + patterns (for VIP detection, prior escalation
+                        history, recurring issues).
 - Analytics Collector:  metric collection directives.  No customer context.
 - Critic/Supervisor:    safety rules only — **never** modified by tenant config.
 
@@ -42,12 +47,15 @@ Architecture references
 - Decision #22: Tenant configuration management (5-layer system)
 - Decision #23: SystemPromptBuilder (template-based dynamic assembly)
 - Decision #28: Layer 1 customer context injection (~250 tokens)
+- Decision #30: Layer 3 cross-session pattern learning (~100 tokens)
 - WI #70:  Implement SystemPromptBuilder — per-agent prompt composition
 - WI #85:  Profile injection into SystemPromptBuilder (~250 token budget)
+- WI #92:  Pattern context injection into SystemPromptBuilder (~100 tokens)
 
 Dependencies (all implemented):
 - cosmos_schema.py:  TenantDocument, PreferencesDocument,
                      CustomerProfileDocument, TIER_DEFAULTS, TenantTier
+- pattern_extraction.py: ExtractedPattern, PatternExtractionService
 - No new pip packages required.
 
 © 2026 Remaker Digital, a DBA of VanDusen & Palmeter, LLC. All rights reserved.
@@ -97,7 +105,8 @@ class AgentRole(str, Enum):
 #   Tier capabilities: ~50 tokens
 #   Tenant config:     ~150 tokens
 #   Customer context:  ~250 tokens (Layer 1)
-#   Total headroom:    ~650 tokens — well within GPT-4o 128K context
+#   Pattern context:   ~100 tokens (Layer 3, Professional+)
+#   Total headroom:    ~750 tokens — well within GPT-4o 128K context
 # ---------------------------------------------------------------------------
 
 _PLATFORM_BASE: dict[AgentRole, str] = {
@@ -459,6 +468,7 @@ class SystemPromptBuilder:
         tenant: TenantDocument,
         preferences: PreferencesDocument,
         customer_profile: CustomerProfileDocument | None = None,
+        pattern_context: str | None = None,
     ) -> str:
         """Assemble the system prompt for *agent*.
 
@@ -474,6 +484,12 @@ class SystemPromptBuilder:
         customer_profile:
             Optional Layer 1 customer profile.  When provided, customer
             context is injected for agents that support it.
+        pattern_context:
+            Optional Layer 3 pattern context string, pre-built by
+            ``PatternExtractionService.build_pattern_context()``.  When
+            provided, injected for agents that support customer awareness
+            (Response Generator + Escalation Handler).  Professional+
+            only — the caller is responsible for tier gating.
 
         Returns
         -------
@@ -506,15 +522,32 @@ class SystemPromptBuilder:
             if ctx_section:
                 sections.append(ctx_section)
 
+        # Layer 5 — Pattern context (Layer 3 of Persistent Customer Memory)
+        # Only injected for agents that benefit from behavioral pattern
+        # awareness: Response Generator and Escalation Handler.
+        # The Critic prompt is NEVER modified (immutable safety invariant).
+        if (
+            pattern_context
+            and agent in (
+                AgentRole.RESPONSE_GENERATOR,
+                AgentRole.ESCALATION_HANDLER,
+            )
+        ):
+            sections.append(pattern_context)
+
         prompt = "\n\n".join(sections)
 
         logger.debug(
             "SystemPromptBuilder: %s prompt assembled for tenant=%s "
-            "(%d sections, ~%d chars)",
+            "(%d sections, ~%d chars, pattern_context=%s)",
             agent.value,
             tenant.tenant_id[:8],
             len(sections),
             len(prompt),
+            "yes" if pattern_context and agent in (
+                AgentRole.RESPONSE_GENERATOR,
+                AgentRole.ESCALATION_HANDLER,
+            ) else "no",
         )
 
         return prompt
@@ -524,14 +557,23 @@ class SystemPromptBuilder:
         tenant: TenantDocument,
         preferences: PreferencesDocument,
         customer_profile: CustomerProfileDocument | None = None,
+        pattern_context: str | None = None,
     ) -> dict[AgentRole, str]:
         """Build system prompts for all 6 pipeline agents at once.
 
         Convenience method for pipeline orchestration — returns a dict
         keyed by :class:`AgentRole`.
+
+        Parameters
+        ----------
+        pattern_context:
+            Optional Layer 3 pattern context string.  Passed through to
+            :meth:`build` for agents that support it.
         """
         return {
-            role: self.build(role, tenant, preferences, customer_profile)
+            role: self.build(
+                role, tenant, preferences, customer_profile, pattern_context,
+            )
             for role in AgentRole
         }
 
@@ -543,6 +585,7 @@ class SystemPromptBuilder:
         tenant: TenantDocument,
         preferences: PreferencesDocument,
         customer_profile: CustomerProfileDocument | None = None,
+        pattern_context: str | None = None,
     ) -> dict[str, Any]:
         """Return a structured trace of what the prompt contains.
 
@@ -591,6 +634,17 @@ class SystemPromptBuilder:
                 trace["customer_context_sources"] = (
                     _extract_customer_data_sources(customer_profile, agent)
                 )
+
+        # Was pattern context injected? (Layer 3)
+        if (
+            pattern_context
+            and agent in (
+                AgentRole.RESPONSE_GENERATOR,
+                AgentRole.ESCALATION_HANDLER,
+            )
+        ):
+            trace["layers_active"].append("pattern_context")
+            trace["pattern_context_length"] = len(pattern_context)
 
         # Tier feature gates
         trace["memory_layers_available"] = defaults.get("memory_layers", [])

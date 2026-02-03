@@ -498,6 +498,21 @@ class DecisionTraceBuilder:
         self._trace.response_language = language
         return self
 
+    def set_ab_variant(
+        self,
+        variant: str,
+        experiment_id: str | None = None,
+    ) -> DecisionTraceBuilder:
+        """Record A/B experiment variant assignment (Layer 4, WI #93-96).
+
+        Args:
+            variant: ``"control"`` (base model) or ``"treatment"`` (fine-tuned).
+            experiment_id: The active experiment identifier.
+        """
+        self._trace.ab_variant = variant
+        self._trace.ab_experiment_id = experiment_id
+        return self
+
     def build(self) -> ResponseDecisionTrace:
         """Finalize and return the decision trace.
 

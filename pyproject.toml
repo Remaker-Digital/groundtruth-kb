@@ -40,7 +40,9 @@ omit = [
 
 [tool.coverage.report]
 # Ramp plan: 20% (baseline) → 50% (P0 tests) → 80% (launch target)
-fail_under = 20
+# Updated 2026-02-03: 1,154 unit tests covering all 38 multi_tenant modules,
+# 19 routers, and 11 integration modules.  Gate raised from 20% to 50%.
+fail_under = 50
 show_missing = true
 skip_empty = true
 exclude_lines = [

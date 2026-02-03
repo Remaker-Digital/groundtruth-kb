@@ -158,6 +158,8 @@ class AuditEventType(str, Enum):
     CONSENT_CHANGED = "consent.changed"
     ESCALATION_TRIGGERED = "escalation.triggered"
     SECURITY_EVENT = "security.event"
+    MODEL_DEPLOYED = "model.deployed"
+    MODEL_ROLLED_BACK = "model.rolled_back"
 
 
 class PiiClassification(str, Enum):
@@ -612,6 +614,32 @@ class PreferencesDocument(BaseModel):
     widget_header_text: str | None = Field(default=None, description="Custom widget header/title text")
     widget_input_placeholder: str | None = Field(default=None, description="Message input placeholder text")
     widget_page_rules: list[str] = Field(default_factory=list, description="URL patterns for page visibility rules")
+
+    # Fine-tuning configuration (Enterprise add-on, Layer 4 — Decision #31, WI #93-96)
+    fine_tuning_enabled: bool = Field(
+        default=False,
+        description="Whether per-tenant fine-tuning is active (Enterprise add-on, $299/mo)",
+    )
+    fine_tuning_schedule: str | None = Field(
+        default=None,
+        description="Retraining schedule: monthly | weekly | trigger",
+    )
+    fine_tuning_min_conversations: int = Field(
+        default=1000,
+        description="Minimum conversation count before fine-tuning is eligible",
+    )
+    fine_tuning_active_model_id: str | None = Field(
+        default=None,
+        description="Currently deployed fine-tuned model ID (ft:gpt-4o-mini:...)",
+    )
+    fine_tuning_active_model_version: int | None = Field(
+        default=None,
+        description="Version number of the active fine-tuned model",
+    )
+    fine_tuning_ab_experiment_id: str | None = Field(
+        default=None,
+        description="Currently active A/B experiment ID (if any)",
+    )
 
     # Metadata
     created_at: str = Field(description="When this version was created")

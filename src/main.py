@@ -24,10 +24,51 @@ from fastapi.middleware.cors import CORSMiddleware
 
 app = FastAPI(
     title="Agent Red Customer Experience",
-    description="AI-powered customer engagement platform API.",
+    description=(
+        "AI-powered customer experience platform API.\n\n"
+        "## Authentication\n\n"
+        "Three authentication methods are supported:\n"
+        "- **Shopify Session Token**: `Authorization: Bearer <jwt>` — for Shopify embedded apps\n"
+        "- **API Key**: `X-API-Key: <key>` — for direct-channel merchants\n"
+        "- **Widget Key**: `X-Widget-Key: pk_live_...` — for client-side chat widgets "
+        "(scoped to `/api/chat/*`)\n\n"
+        "## Rate Limits\n\n"
+        "Per-tenant rate limits are enforced. Check `X-RateLimit-Limit`, "
+        "`X-RateLimit-Remaining`, and `X-RateLimit-Reset` response headers.\n\n"
+        "---\n"
+        "© 2026 Remaker Digital. All rights reserved."
+    ),
     version="1.0.0",
     docs_url="/docs" if os.environ.get("ENVIRONMENT") == "development" else None,
     redoc_url="/redoc" if os.environ.get("ENVIRONMENT") == "development" else None,
+    openapi_url="/openapi.json",
+    openapi_tags=[
+        {"name": "system", "description": "Health and readiness probes"},
+        {"name": "checkout", "description": "Stripe Checkout session management"},
+        {"name": "billing", "description": "Billing portal and usage reporting"},
+        {"name": "packs", "description": "Conversation pack purchases"},
+        {"name": "webhooks", "description": "Stripe and Shopify webhook handlers"},
+        {"name": "shopify-billing", "description": "Shopify Billing API integration"},
+        {"name": "shopify-gdpr", "description": "Shopify GDPR mandatory webhooks"},
+        {"name": "dashboard", "description": "Usage dashboard and billing transparency"},
+        {"name": "config", "description": "Tenant configuration management"},
+        {"name": "chat", "description": "Chat API: conversations, streaming, WebSocket"},
+        {"name": "admin-conversations", "description": "Conversation inbox management"},
+        {"name": "admin-knowledge", "description": "Knowledge base CRUD"},
+        {"name": "admin-analytics", "description": "Analytics summaries and insights"},
+        {"name": "admin-team", "description": "Team member management"},
+        {"name": "admin-gdpr", "description": "GDPR data export, deletion, and consent"},
+        {"name": "admin-audit", "description": "Audit log query and export"},
+        {"name": "admin-profiles", "description": "Customer profile management"},
+        {"name": "trial", "description": "Trial tier lifecycle management"},
+        {"name": "security", "description": "API key and widget key rotation"},
+    ],
+    responses={
+        401: {"description": "Authentication required or invalid credentials"},
+        403: {"description": "Tenant inactive or insufficient permissions"},
+        429: {"description": "Rate limit exceeded"},
+        503: {"description": "Service not initialized"},
+    },
 )
 
 # ---------------------------------------------------------------------------
@@ -77,6 +118,7 @@ from src.integrations.shopify_gdpr_webhooks import router as shopify_gdpr_router
 from src.multi_tenant.admin_audit_api import router as admin_audit_router  # noqa: E402
 from src.multi_tenant.trial_management import trial_router  # noqa: E402
 from src.multi_tenant.security_hardening import rotation_router  # noqa: E402
+from src.multi_tenant.admin_customer_profile_api import router as admin_profile_router  # noqa: E402
 
 app.include_router(provisioning_router)
 app.include_router(checkout_router)
@@ -97,6 +139,7 @@ app.include_router(shopify_gdpr_router)
 app.include_router(admin_audit_router)
 app.include_router(trial_router)
 app.include_router(rotation_router)
+app.include_router(admin_profile_router)
 
 # ---------------------------------------------------------------------------
 # Tenant authentication + rate limiting (Decisions #4-5, WI #18/#27-28)
@@ -547,6 +590,85 @@ async def _startup_admin_audit_services() -> None:
         logger.warning(
             "Admin audit log initialization failed — audit endpoints "
             "will return 503 until dependencies are available."
+        )
+
+
+# ---------------------------------------------------------------------------
+# Admin Customer Profile API (WI #142)
+# ---------------------------------------------------------------------------
+
+from src.multi_tenant.admin_customer_profile_api import configure_admin_profile_services  # noqa: E402
+
+
+@app.on_event("startup")
+async def _startup_admin_profile_services() -> None:
+    """Initialize the Admin Customer Profile API.
+
+    Wires CustomerProfileService into the admin profile endpoints.
+    Non-fatal: admin endpoints return 503 if initialization fails.
+    """
+    try:
+        from src.multi_tenant.customer_profile_service import get_profile_service
+
+        configure_admin_profile_services(profile_service=get_profile_service())
+        logger.info("Admin customer profile API initialized (5 endpoints)")
+    except Exception:
+        logger.warning(
+            "Admin customer profile initialization failed — profile endpoints "
+            "will return 503 until dependencies are available."
+        )
+
+
+# ---------------------------------------------------------------------------
+# Pattern extraction service — Layer 3 cross-session learning (WI #90-92)
+# ---------------------------------------------------------------------------
+
+from src.multi_tenant.pattern_extraction import get_pattern_service  # noqa: E402
+
+
+@app.on_event("startup")
+async def _startup_pattern_service() -> None:
+    """Initialize the PatternExtractionService (Layer 3).
+
+    Configures the service in dev mode (in-memory store) at startup.
+    Production deployment wires a Cosmos DB pattern repository.
+    Non-fatal: Layer 3 degrades gracefully when unconfigured.
+    """
+    try:
+        service = get_pattern_service()
+        service.configure()
+        logger.info("PatternExtractionService initialized (Layer 3, dev mode)")
+    except Exception:
+        logger.warning(
+            "PatternExtractionService initialization failed — Layer 3 "
+            "pattern learning unavailable."
+        )
+
+
+# ---------------------------------------------------------------------------
+# Fine-tuning pipeline service — Layer 4 dedicated model training (WI #93-96)
+# ---------------------------------------------------------------------------
+
+from src.multi_tenant.fine_tuning_pipeline import get_fine_tuning_service  # noqa: E402
+
+
+@app.on_event("startup")
+async def _startup_fine_tuning_service() -> None:
+    """Initialize the FineTuningPipelineService (Layer 4).
+
+    Configures the service in dev mode (in-memory store) at startup.
+    Production deployment wires a Cosmos DB model repository.
+    Non-fatal: Layer 4 degrades gracefully when unconfigured.
+    Enterprise add-on ($299/mo) — tier-gated at the service level.
+    """
+    try:
+        service = get_fine_tuning_service()
+        service.configure()
+        logger.info("FineTuningPipelineService initialized (Layer 4, dev mode)")
+    except Exception:
+        logger.warning(
+            "FineTuningPipelineService initialization failed — Layer 4 "
+            "fine-tuning pipeline unavailable."
         )
 
 

@@ -56,6 +56,72 @@ if not _WEBHOOK_SECRET:
     )
 
 # ---------------------------------------------------------------------------
+# WI #162: Stripe webhook IP allowlisting (defense-in-depth)
+#
+# Stripe publishes their webhook source IP ranges. When STRIPE_IP_ALLOWLIST
+# is enabled, requests from non-Stripe IPs are rejected before signature
+# verification. This is optional — signature verification alone is
+# cryptographically sufficient, but IP allowlisting adds network-level
+# defense against replay attacks with stolen signatures.
+#
+# Stripe IP ranges: https://docs.stripe.com/ips#webhook-notifications
+# ---------------------------------------------------------------------------
+
+# Stripe webhook source IP ranges (CIDR notation)
+# Updated: 2026-02-03. Check Stripe docs for current ranges.
+STRIPE_WEBHOOK_IP_RANGES: list[str] = [
+    "3.18.12.63",
+    "3.130.192.149",
+    "13.235.14.237",
+    "13.235.122.149",
+    "18.211.135.69",
+    "35.154.171.200",
+    "52.15.183.38",
+    "54.88.130.119",
+    "54.88.130.237",
+    "54.187.174.169",
+    "54.187.205.235",
+    "54.187.216.72",
+]
+
+# Enable IP allowlisting via env var (disabled by default — Stripe CLI uses localhost)
+_ENABLE_IP_ALLOWLIST = os.environ.get("STRIPE_IP_ALLOWLIST_ENABLED", "false").lower() == "true"
+
+# Build set for O(1) lookup (individual IPs, not CIDR — Stripe publishes /32s)
+_ALLOWED_IPS: set[str] = set(STRIPE_WEBHOOK_IP_RANGES)
+# Always allow localhost for development (Stripe CLI forwarding)
+_ALLOWED_IPS.update({"127.0.0.1", "::1", "localhost"})
+
+
+def _check_stripe_ip(request: Request) -> bool:
+    """Check if the request originates from a known Stripe IP.
+
+    Checks X-Forwarded-For (if behind a reverse proxy like App Gateway)
+    and falls back to the direct client IP.
+
+    Returns True if IP is allowed or allowlisting is disabled.
+    """
+    if not _ENABLE_IP_ALLOWLIST:
+        return True
+
+    # Check X-Forwarded-For first (Azure App Gateway sets this)
+    forwarded_for = request.headers.get("x-forwarded-for", "")
+    if forwarded_for:
+        # First IP in the chain is the original client
+        client_ip = forwarded_for.split(",")[0].strip()
+    else:
+        client_ip = request.client.host if request.client else ""
+
+    if client_ip in _ALLOWED_IPS:
+        return True
+
+    logger.warning(
+        "Stripe webhook rejected: IP %s not in allowlist (enable_allowlist=%s)",
+        client_ip, _ENABLE_IP_ALLOWLIST,
+    )
+    return False
+
+# ---------------------------------------------------------------------------
 # Router
 # ---------------------------------------------------------------------------
 
@@ -122,6 +188,13 @@ async def stripe_webhook(request: Request) -> JSONResponse:
     3. Dispatch to the appropriate event handler.
     4. Return 200 to acknowledge receipt (Stripe retries on non-2xx).
     """
+    # WI #162: IP allowlist check (defense-in-depth, before signature verification)
+    if not _check_stripe_ip(request):
+        raise HTTPException(
+            status_code=403,
+            detail="Webhook source IP not in allowlist.",
+        )
+
     # Read raw body for signature verification
     payload = await request.body()
     sig_header = request.headers.get("stripe-signature", "")

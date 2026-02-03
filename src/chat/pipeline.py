@@ -77,6 +77,9 @@ from src.multi_tenant.system_prompt_builder import (
     SystemPromptBuilder,
 )
 
+# Layer 4: Fine-tuned model selection + A/B routing (WI #93-96)
+# Imported lazily inside execute() to avoid circular import at module load.
+
 logger = logging.getLogger(__name__)
 
 
@@ -230,6 +233,69 @@ class ChatPipeline:
             trace.set_profile_context(prompt_trace)
 
             # ---------------------------------------------------------------
+            # Layer 4: Fine-tuned model selection + A/B routing (WI #93-96)
+            #
+            # If the tenant has a fine-tuned model deployed (Enterprise
+            # add-on), use it for the Response Generator instead of the
+            # default gpt-4o. If an A/B experiment is active, the customer
+            # is deterministically assigned to control (base model) or
+            # treatment (fine-tuned model) via SHA-256 hash.
+            # ---------------------------------------------------------------
+            response_model = "gpt-4o"  # Default base model
+            ab_variant: str | None = None
+            ab_experiment_id: str | None = None
+
+            if (
+                preferences.fine_tuning_enabled
+                and preferences.fine_tuning_active_model_id
+            ):
+                try:
+                    from src.multi_tenant.fine_tuning_pipeline import (
+                        get_fine_tuning_service,
+                    )
+
+                    ft_service = get_fine_tuning_service()
+
+                    if preferences.fine_tuning_ab_experiment_id:
+                        # A/B experiment active — deterministic assignment
+                        experiment = await ft_service.get_experiment(
+                            preferences.fine_tuning_ab_experiment_id,
+                        )
+                        if experiment and customer_id:
+                            variant = ft_service.assign_customer_variant(
+                                experiment, customer_id,
+                            )
+                            ab_variant = variant
+                            ab_experiment_id = experiment.experiment_id
+                            if variant == "treatment":
+                                response_model = (
+                                    preferences.fine_tuning_active_model_id
+                                )
+                            # else: variant == "control", keep base model
+                            trace.set_ab_variant(ab_variant, ab_experiment_id)
+                    else:
+                        # No A/B experiment — use fine-tuned model directly
+                        response_model = (
+                            preferences.fine_tuning_active_model_id
+                        )
+
+                    logger.debug(
+                        "Layer 4 model selection: tenant=%s model=%s "
+                        "ab_variant=%s ab_experiment=%s",
+                        tenant_id,
+                        response_model,
+                        ab_variant,
+                        ab_experiment_id,
+                    )
+                except Exception:
+                    logger.debug(
+                        "Layer 4 model selection failed — falling back "
+                        "to base model for tenant=%s",
+                        tenant_id,
+                    )
+                    response_model = "gpt-4o"
+
+            # ---------------------------------------------------------------
             # Phase 1: Intent Classification + Knowledge Retrieval
             #
             # WI #134: IC and KR run concurrently (asyncio.gather). Both
@@ -325,6 +391,7 @@ class ChatPipeline:
                 knowledge_context=knowledge_context,
                 system_prompt=prompts[AgentRole.RESPONSE_GENERATOR],
                 budget=budget,
+                model=response_model,
             ):
                 full_response += chunk
                 sequence += 1
@@ -333,7 +400,7 @@ class ChatPipeline:
             rg_elapsed = (time.monotonic() - rg_start) * 1000
             trace.add_stage(
                 "response-generator",
-                model="gpt-4o",
+                model=response_model,
                 latency_ms=rg_elapsed,
             )
 
@@ -369,12 +436,14 @@ class ChatPipeline:
                     conversation_id=conversation_id,
                     content=safe_text,
                     agents_invoked=[s.stage for s in budget.stages],
-                    model_used="gpt-4o",
+                    model_used=response_model,
                     critic_passed=True,
                     metadata={
                         "intent": intent,
                         "confidence": confidence,
                         "total_latency_ms": budget.elapsed_ms,
+                        **({"ab_variant": ab_variant, "ab_experiment_id": ab_experiment_id}
+                           if ab_variant else {}),
                     },
                 )
                 yield validated_event(conversation_id, message_id)
@@ -385,7 +454,7 @@ class ChatPipeline:
                     conversation_id=conversation_id,
                     content=safe_text,
                     agents_invoked=[s.stage for s in budget.stages],
-                    model_used="gpt-4o",
+                    model_used=response_model,
                     critic_passed=False,
                     metadata={
                         "intent": intent,
@@ -557,6 +626,7 @@ class ChatPipeline:
         knowledge_context: str,
         system_prompt: str,
         budget: PipelineTimeoutBudget,
+        model: str = "gpt-4o",
     ) -> AsyncGenerator[str, None]:
         """Call the Response Generator with SSE streaming.
 
@@ -569,6 +639,10 @@ class ChatPipeline:
         context, knowledge results). Azure OpenAI caches the static prefix
         across requests, reducing latency by 15-25% and token cost by
         20-35% for repeated prefixes.
+
+        WI #93-96: The ``model`` parameter allows Layer 4 fine-tuned
+        models to override the default gpt-4o for Enterprise tenants
+        with the fine-tuning add-on enabled.
         """
         url = self._agent_urls.get("response-generator", "")
         client = await self._get_http_client()
@@ -584,6 +658,7 @@ class ChatPipeline:
                 "intent": intent,
                 "knowledge_context": knowledge_context,
                 "system_prompt": system_prompt,
+                "model": model,
                 # WI #135: Hint for prompt caching — the Response Generator
                 # agent should structure the OpenAI messages array with the
                 # system_prompt as a separate system message to enable

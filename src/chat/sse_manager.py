@@ -30,10 +30,11 @@ Architecture references:
 from __future__ import annotations
 
 import asyncio
+import json
 import logging
 import time
 from collections import defaultdict
-from collections.abc import AsyncGenerator
+from collections.abc import AsyncGenerator, Callable
 from dataclasses import dataclass, field
 from typing import Any
 
@@ -59,6 +60,11 @@ MAX_BUFFERED_EVENTS = 100
 # inactivity (no new events). Prevents memory leaks from abandoned
 # conversations.
 BUFFER_EXPIRY_SECONDS = 300  # 5 minutes
+
+# Default client-side reconnection interval (milliseconds).
+# The ``retry:`` SSE directive tells the browser's EventSource how long
+# to wait before reconnecting after a connection drop.
+DEFAULT_RETRY_MS = 3000
 
 
 # ---------------------------------------------------------------------------
@@ -134,6 +140,16 @@ class SSEConnectionManager:
         # {conversation_id: EventBuffer} — event buffers for reconnection
         self._buffers: dict[str, EventBuffer] = {}
 
+        # WI #132: Optional metering callback invoked on first streamed chunk.
+        # Signature: callback(tenant_id: str, conversation_id: str) -> None
+        self._metering_callback: Callable[[str, str], Any] | None = None
+
+        # WI #133: Multi-tab tracking.
+        # {tenant_id: {conversation_id: set[tab_id]}}
+        self._tab_connections: dict[str, dict[str, set[str]]] = defaultdict(
+            lambda: defaultdict(set),
+        )
+
     def can_connect(self, tenant_id: str, tier: str = "starter") -> bool:
         """Check if a new SSE connection is allowed for this tenant.
 
@@ -146,22 +162,80 @@ class SSEConnectionManager:
         current = len(self._connections.get(tenant_id, set()))
         return current < max_concurrent
 
-    def connect(self, tenant_id: str, conversation_id: str) -> None:
-        """Register an active SSE connection."""
+    def connect(
+        self,
+        tenant_id: str,
+        conversation_id: str,
+        tab_id: str | None = None,
+    ) -> None:
+        """Register an active SSE connection.
+
+        Args:
+            tenant_id: Tenant identifier.
+            conversation_id: Conversation identifier.
+            tab_id: Optional browser tab identifier for multi-tab support
+                (WI #133). Multiple tabs can stream the same conversation.
+        """
         self._connections[tenant_id].add(conversation_id)
+
+        # WI #133: Track tab_id if provided
+        if tab_id is not None:
+            self._tab_connections[tenant_id][conversation_id].add(tab_id)
 
         # Initialize event buffer if not exists
         if conversation_id not in self._buffers:
             self._buffers[conversation_id] = EventBuffer()
 
         logger.debug(
-            "SSE connected: tenant=%s conv=%s active=%d",
+            "SSE connected: tenant=%s conv=%s tab=%s active=%d",
             tenant_id[:8], conversation_id[:8],
+            tab_id or "default",
             len(self._connections[tenant_id]),
         )
 
-    def disconnect(self, tenant_id: str, conversation_id: str) -> None:
-        """Unregister an SSE connection."""
+    def disconnect(
+        self,
+        tenant_id: str,
+        conversation_id: str,
+        tab_id: str | None = None,
+    ) -> None:
+        """Unregister an SSE connection.
+
+        Args:
+            tenant_id: Tenant identifier.
+            conversation_id: Conversation identifier.
+            tab_id: Optional browser tab identifier (WI #133). If provided,
+                only that tab is removed. The conversation connection is
+                removed only when no tabs remain (or if tab_id is None,
+                which removes the conversation unconditionally).
+        """
+        if tab_id is not None:
+            # WI #133: Remove specific tab
+            tenant_tabs = self._tab_connections.get(tenant_id)
+            if tenant_tabs and conversation_id in tenant_tabs:
+                tenant_tabs[conversation_id].discard(tab_id)
+                # If tabs remain, keep the conversation connection alive
+                if tenant_tabs[conversation_id]:
+                    logger.debug(
+                        "SSE tab disconnected: tenant=%s conv=%s tab=%s remaining=%d",
+                        tenant_id[:8], conversation_id[:8], tab_id,
+                        len(tenant_tabs[conversation_id]),
+                    )
+                    return
+                # No tabs left — clean up tab tracking and fall through
+                # to remove the conversation connection
+                del tenant_tabs[conversation_id]
+                if not tenant_tabs:
+                    del self._tab_connections[tenant_id]
+        else:
+            # No tab_id — unconditional disconnect; clean up all tab tracking
+            tenant_tabs = self._tab_connections.get(tenant_id)
+            if tenant_tabs and conversation_id in tenant_tabs:
+                del tenant_tabs[conversation_id]
+                if not tenant_tabs:
+                    del self._tab_connections[tenant_id]
+
+        # Remove conversation from active connections
         conns = self._connections.get(tenant_id)
         if conns:
             conns.discard(conversation_id)
@@ -169,12 +243,18 @@ class SSEConnectionManager:
                 del self._connections[tenant_id]
 
         logger.debug(
-            "SSE disconnected: tenant=%s conv=%s",
+            "SSE disconnected: tenant=%s conv=%s tab=%s",
             tenant_id[:8], conversation_id[:8],
+            tab_id or "all",
         )
 
     def get_active_count(self, tenant_id: str) -> int:
-        """Get the number of active SSE connections for a tenant."""
+        """Get the number of active SSE conversations for a tenant.
+
+        Counts unique conversations, not individual tabs (WI #133).
+        Multiple browser tabs streaming the same conversation count as
+        one active connection for limit-enforcement purposes.
+        """
         return len(self._connections.get(tenant_id, set()))
 
     def get_replay_events(
@@ -195,6 +275,7 @@ class SSEConnectionManager:
         pipeline_events: AsyncGenerator[StreamEvent, None],
         *,
         enable_heartbeat: bool = True,
+        retry_ms: int = DEFAULT_RETRY_MS,
     ) -> AsyncGenerator[str, None]:
         """Wrap a pipeline event generator with heartbeat and buffering.
 
@@ -202,11 +283,21 @@ class SSEConnectionManager:
         Sends ``:ping`` keepalive comments between events. Catches mid-stream
         errors and emits error/done events before closing.
 
+        WI #131: Emits a ``retry:`` directive as the first event in every
+        stream so the client's EventSource knows the reconnection interval.
+
+        WI #132: Invokes the metering callback on the first non-heartbeat
+        event (first-chunk metering) if a callback has been configured via
+        :meth:`configure_metering`.
+
         Args:
             tenant_id: Tenant identifier (for logging).
             conversation_id: Conversation identifier (for buffering).
             pipeline_events: Async generator of StreamEvent from ChatPipeline.
             enable_heartbeat: Whether to send keepalive pings (default True).
+            retry_ms: Client-side reconnection interval in milliseconds
+                (WI #131). Sent as the SSE ``retry:`` directive. Default
+                is :data:`DEFAULT_RETRY_MS` (3000ms).
 
         Yields:
             SSE-formatted strings ready for HTTP response body.
@@ -216,6 +307,13 @@ class SSEConnectionManager:
             buf = EventBuffer()
             self._buffers[conversation_id] = buf
 
+        # WI #131: Emit retry directive as the very first SSE line so the
+        # client's EventSource sets its reconnection interval immediately.
+        yield self.format_retry_directive(retry_ms)
+
+        # WI #132: Track whether metering has been triggered for this stream.
+        metering_triggered = False
+
         try:
             async for event in self._with_heartbeat(
                 pipeline_events, enable_heartbeat,
@@ -224,6 +322,24 @@ class SSEConnectionManager:
                     # Heartbeat ping
                     yield ":ping\n\n"
                     continue
+
+                # WI #132: Meter conversation on first real (non-heartbeat) chunk.
+                if not metering_triggered:
+                    metering_triggered = True
+                    if self._metering_callback is not None:
+                        try:
+                            result = self._metering_callback(
+                                tenant_id, conversation_id,
+                            )
+                            # Support both sync and async callbacks
+                            if asyncio.iscoroutine(result):
+                                await result
+                        except Exception:
+                            logger.warning(
+                                "Metering callback failed: tenant=%s conv=%s",
+                                tenant_id[:8], conversation_id[:8],
+                                exc_info=True,
+                            )
 
                 # Serialize event with sequence ID for reconnection
                 sse_text = event.to_sse()
@@ -239,18 +355,18 @@ class SSEConnectionManager:
                 tenant_id[:8], conversation_id[:8],
             )
         except Exception:
-            # Mid-stream error — emit error + done events
+            # Mid-stream error — emit error + done events (WI #131 enhanced)
             logger.exception(
                 "SSE stream error: tenant=%s conv=%s",
                 tenant_id[:8], conversation_id[:8],
             )
-            err = error_event(
-                "An error occurred during streaming. Please try again.",
+            err_sse = self.format_error_event(
+                message="An error occurred during streaming. Please try again.",
                 code="stream_error",
+                recoverable=True,
             )
-            sse_text = err.to_sse()
-            seq = buf.append(sse_text)
-            yield f"id: {seq}\n{sse_text}"
+            seq = buf.append(err_sse)
+            yield f"id: {seq}\n{err_sse}"
 
             end = done_event(conversation_id, 0)
             sse_text = end.to_sse()
@@ -285,6 +401,131 @@ class SSEConnectionManager:
             except StopAsyncIteration:
                 break
 
+    # ------------------------------------------------------------------
+    # WI #131: SSE error handling enhancements
+    # ------------------------------------------------------------------
+
+    @staticmethod
+    def format_retry_directive(retry_ms: int = DEFAULT_RETRY_MS) -> str:
+        """Format an SSE ``retry:`` directive.
+
+        The ``retry:`` field tells the browser's ``EventSource`` how many
+        milliseconds to wait before attempting automatic reconnection
+        after the connection drops.
+
+        Args:
+            retry_ms: Reconnection interval in milliseconds (default 3000).
+
+        Returns:
+            SSE-formatted retry directive string.
+        """
+        return f"retry: {retry_ms}\n\n"
+
+    @staticmethod
+    def format_error_event(
+        message: str,
+        code: str,
+        recoverable: bool = True,
+    ) -> str:
+        """Format a fully-formed SSE error event with structured JSON data.
+
+        Includes a ``recoverable`` flag so the client can decide whether
+        to retry the connection or display a terminal error.
+
+        Args:
+            message: Human-readable error description.
+            code: Machine-readable error code (e.g. ``"stream_error"``).
+            recoverable: Whether the client should attempt reconnection.
+
+        Returns:
+            SSE-formatted error event string.
+        """
+        data = {
+            "message": message,
+            "code": code,
+            "recoverable": recoverable,
+        }
+        return f"event: error\ndata: {json.dumps(data)}\n\n"
+
+    # ------------------------------------------------------------------
+    # WI #132: Conversation metering integration
+    # ------------------------------------------------------------------
+
+    def configure_metering(
+        self,
+        callback: Callable[[str, str], Any] | None,
+    ) -> None:
+        """Set (or clear) the metering callback for first-chunk billing.
+
+        The callback is invoked once per stream on the first non-heartbeat
+        event, allowing the billing system to meter the conversation at
+        first-chunk delivery rather than waiting for response completion.
+
+        Args:
+            callback: A callable ``(tenant_id, conversation_id) -> None``
+                (may be sync or async). Pass ``None`` to disable metering.
+        """
+        self._metering_callback = callback
+        logger.debug(
+            "SSE metering callback %s",
+            "configured" if callback is not None else "cleared",
+        )
+
+    # ------------------------------------------------------------------
+    # WI #133: Multi-tab coordination
+    # ------------------------------------------------------------------
+
+    def get_active_conversations(self, tenant_id: str) -> set[str]:
+        """Return the set of conversation_ids with active SSE connections.
+
+        Args:
+            tenant_id: Tenant identifier.
+
+        Returns:
+            Set of conversation_id strings. Empty set if no active streams.
+        """
+        return set(self._connections.get(tenant_id, set()))
+
+    def is_conversation_active(
+        self,
+        tenant_id: str,
+        conversation_id: str,
+    ) -> bool:
+        """Check if a specific conversation has an active SSE connection.
+
+        Args:
+            tenant_id: Tenant identifier.
+            conversation_id: Conversation identifier.
+
+        Returns:
+            True if the conversation currently has at least one active
+            SSE stream for this tenant.
+        """
+        conns = self._connections.get(tenant_id)
+        if conns is None:
+            return False
+        return conversation_id in conns
+
+    def get_tab_count(
+        self,
+        tenant_id: str,
+        conversation_id: str,
+    ) -> int:
+        """Return the number of tabs streaming a given conversation.
+
+        Args:
+            tenant_id: Tenant identifier.
+            conversation_id: Conversation identifier.
+
+        Returns:
+            Number of distinct tab_ids. Returns 0 if no tabs are tracked
+            (either no connection or connected without tab_id).
+        """
+        tenant_tabs = self._tab_connections.get(tenant_id)
+        if tenant_tabs is None:
+            return 0
+        return len(tenant_tabs.get(conversation_id, set()))
+
     def cleanup_expired_buffers(self) -> int:
         """Remove expired event buffers. Returns the number removed.
 
@@ -302,10 +543,17 @@ class SSEConnectionManager:
         total_connections = sum(
             len(convs) for convs in self._connections.values()
         )
+        total_tabs = sum(
+            len(tabs)
+            for tenant_tabs in self._tab_connections.values()
+            for tabs in tenant_tabs.values()
+        )
         return {
             "active_connections": total_connections,
+            "active_tabs": total_tabs,
             "tenants_streaming": len(self._connections),
             "event_buffers": len(self._buffers),
+            "metering_configured": self._metering_callback is not None,
         }
 
 

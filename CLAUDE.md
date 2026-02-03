@@ -12,7 +12,7 @@ This document provides context and guidance for AI assistants working on the Age
 | **Brand Name** | Agent Red Customer Experience |
 | **Release** | Launch 1.0 |
 | **Type** | Commercial SaaS Product |
-| **Status** | Phase 2.1 E-Commerce ~98% complete (creative assets remain; integration testing COMPLETE). Phase 2.2 COMPLETE — 38 multi_tenant modules (~25,000 lines). Phase 2.5 Layers 1-2 COMPLETE (3 modules). All middleware wired in main.py (9 middleware layers). **1,196 tests passing (1,154 unit + 42 integration), 0 warnings.** P0 + P1 + P2 tests COMPLETE. Integration testing with real Stripe test mode + Shopify partner sandbox + Azure services COMPLETE. Test infrastructure complete (WI #101-104). Architecture review complete (32 decisions, 100+ work items). **Phase 3.0 UI/UX: ALL BUILD PHASES COMPLETE — Chat API (6 endpoints + SSE manager), Admin APIs (5 routers, 25 endpoints), Widget frontend (20 files, ~3,200 lines), Shopify Theme App Extension (3 files), Admin shared components (9 + 2 util modules, ~5,400 lines), Shopify admin shell (8 files, ~2,700 lines, build validated), Standalone admin shell (9 files, ~2,800 lines, build validated).** Admin frontend build configs created (package.json, tsconfig.json, vite.config.ts for both shells + shared workspace root). **Renderable HTML prototype COMPLETE + OWNER-APPROVED — both shells (Mantine + Polaris) with 9 standalone + 7 Shopify pages, full mock data, dark mode default, pure neutral grey dark scale, brand palette Option A (#C41E2A), shell switcher, Polaris CSS isolation, widget dark mode preview.** Operational readiness COMPLETE (WI #148-156). Security hardening COMPLETE (WI #157-163). Pipeline optimization COMPLETE (WI #134-139). Trial environment COMPLETE (WI #119-128). **Competitive pricing VERIFIED (all 5 competitors, 2026-02-01) — Agent Red 4-21x cheaper.** Product renamed Customer Experience. Brand primary #C41E2A. Shopify Partner app deployed (client_id: 4c6cf726cd1f9f5389caf48f78af9735), installed on blanco-9939.myshopify.com dev store. |
+| **Status** | Phase 2.1 E-Commerce ~98% complete (creative assets remain; integration testing COMPLETE). Phase 2.2 COMPLETE — 41 multi_tenant modules (~28,000 lines). **Phase 2.5 Persistent Customer Memory ALL 4 LAYERS COMPLETE** (6 modules: customer_profile_service, conversation_vectorizer, response_explainability, pattern_extraction, fine_tuning_pipeline, admin_customer_profile_api). All middleware wired in main.py (9 middleware layers). **1,235 unit tests + 42 integration tests = 1,277 total, 0 failures.** P0 + P1 + P2 + P3 tests COMPLETE. Integration testing with real Stripe test mode + Shopify partner sandbox + Azure services COMPLETE. Test infrastructure complete (WI #101-104). Architecture review complete (32 decisions, 100+ work items). **Phase 3.0 UI/UX: ALL BUILD PHASES COMPLETE — Chat API (6 endpoints + SSE manager), Admin APIs (5 routers, 25 endpoints), Widget frontend (20 files, ~3,200 lines), Shopify Theme App Extension (3 files), Admin shared components (9 + 2 util modules, ~5,400 lines), Shopify admin shell (8 files, ~2,700 lines, build validated), Standalone admin shell (9 files, ~2,800 lines, build validated).** Admin frontend build configs created (package.json, tsconfig.json, vite.config.ts for both shells + shared workspace root). **Renderable HTML prototype COMPLETE + OWNER-APPROVED — both shells (Mantine + Polaris) with 9 standalone + 7 Shopify pages, full mock data, dark mode default, pure neutral grey dark scale, brand palette Option A (#C41E2A), shell switcher, Polaris CSS isolation, widget dark mode preview.** Operational readiness COMPLETE (WI #148-156). Security hardening COMPLETE (WI #157-163). Pipeline optimization COMPLETE (WI #134-139). Trial environment COMPLETE (WI #119-128). **Competitive pricing VERIFIED (all 5 competitors, 2026-02-01) — Agent Red 4-21x cheaper.** Product renamed Customer Experience. Brand primary #C41E2A. Shopify Partner app deployed (client_id: 4c6cf726cd1f9f5389caf48f78af9735), installed on blanco-9939.myshopify.com dev store. |
 | **Owner** | Remaker Digital (DBA of VanDusen & Palmeter, LLC) |
 
 ---
@@ -507,7 +507,7 @@ E:\Claude-Playground\CLAUDE-PROJECTS\Agent Red Customer Engagement\
 │
 ├── src/                            # Commercial source code
 │   ├── __init__.py
-│   ├── main.py                     # FastAPI app entrypoint (19 routers, 67 routes, 9 middleware, ~830 lines)
+│   ├── main.py                     # FastAPI app entrypoint (19 routers, 67 routes, 9 middleware, ~950 lines)
 │   ├── integrations/               # Billing & platform integrations
 │   │   ├── __init__.py
 │   │   ├── provisioning.py         # Channel-agnostic tenant provisioning service
@@ -520,7 +520,7 @@ E:\Claude-Playground\CLAUDE-PROJECTS\Agent Red Customer Engagement\
 │   │   ├── shopify_client.py       # Async Shopify GraphQL API client (httpx)
 │   │   ├── shopify_billing.py      # Shopify Billing API (subscriptions + usage charges)
 │   │   └── shopify_gdpr_webhooks.py # Shopify GDPR mandatory webhooks (3 endpoints, HMAC verification)
-│   ├── multi_tenant/               # Multi-tenant infrastructure (38 modules, ~25,000 lines)
+│   ├── multi_tenant/               # Multi-tenant infrastructure (41 modules, ~28,000 lines)
 │   │   ├── __init__.py             # Package init with import hints
 │   │   ├── cosmos_schema.py        # 9 collections, 12 document models, 8 enums, tier defaults (incl. trial)
 │   │   ├── cosmos_client.py        # CosmosManager singleton (lazy init, Managed Identity, health)
@@ -558,7 +558,10 @@ E:\Claude-Playground\CLAUDE-PROJECTS\Agent Red Customer Engagement\
 │   │   ├── sla_monitoring.py       # P50/P95/P99 latency tracking, uptime, compliance (~390 lines)
 │   │   ├── cost_model.py           # Parameterized cost model calculator, projections (~370 lines)
 │   │   ├── archival_pipeline.py    # Hot→Warm Parquet archival to Azure Blob Storage (~750 lines)
-│   │   └── alert_delivery.py       # Multi-channel alert routing: webhook, dashboard, log (~695 lines)
+│   │   ├── alert_delivery.py       # Multi-channel alert routing: webhook, dashboard, log (~695 lines)
+│   │   ├── pattern_extraction.py   # Layer 3 cross-session learning, pattern decay (~1,060 lines)
+│   │   ├── fine_tuning_pipeline.py # Layer 4 fine-tuning pipeline, quality gates, A/B (~1,870 lines)
+│   │   └── admin_customer_profile_api.py # Customer profile admin API (~450 lines)
 │   ├── chat/                       # Chat API (Phase 3.0 — IMPLEMENTED)
 │   │   ├── __init__.py
 │   │   ├── models.py              # Request/response Pydantic models + StreamEvent SSE format (~200 lines)
@@ -573,14 +576,15 @@ E:\Claude-Playground\CLAUDE-PROJECTS\Agent Red Customer Engagement\
 │   ├── ai-features/                # Advanced AI (Phase 2.5)
 │   └── white-label/                # Customization (future)
 │
-├── tests/                          # Test suites (777 tests total, 0 warnings)
+├── tests/                          # Test suites (1,235 unit + 42 integration = 1,277 total, 0 failures)
 │   ├── conftest.py                 # Shared fixtures: TestClient, MockCosmos, MockNATS, MockKV, auth helpers
 │   ├── test_conftest_smoke.py      # 19 fixture smoke tests
 │   ├── test_health.py              # 15 health/ready endpoint + startup event tests (§4.6)
-│   ├── persistent_memory/          # Persistent Customer Memory tests (30 tests)
-│   │   ├── fixtures.py             # Synthetic profiles, conversations, vector data
+│   ├── persistent_memory/          # Persistent Customer Memory tests (111 tests)
+│   │   ├── fixtures.py             # Synthetic profiles, conversations, vector data, fine-tuning factories
 │   │   ├── test_unit_layers.py     # 20 unit tests (L1-L4)
-│   │   └── test_integration_layers.py # 10 cross-layer integration tests
+│   │   ├── test_integration_layers.py # 10 cross-layer integration tests
+│   │   └── test_fine_tuning.py     # 81 fine-tuning pipeline tests (FT-01→FT-10, FT-S01→FT-S15)
 │   ├── multi_tenant/               # Multi-tenant infrastructure tests (~590 tests)
 │   │   ├── test_auth_middleware.py  # 57 auth + middleware unit tests
 │   │   ├── test_middleware_pipeline.py # 25 full middleware stack tests (§4.2)
@@ -771,9 +775,9 @@ E:\Claude-Playground\CLAUDE-PROJECTS\Agent Red Customer Engagement\
 Continue work on Agent Red Customer Experience commercial project.
 Location: E:\Claude-Playground\CLAUDE-PROJECTS\Agent Red Customer Engagement
 Key files: CLAUDE.md, docs/PROJECT-PLAN.md, docs/BACKLOG-NEW-WORK-ITEMS.md, docs/COMPREHENSIVE-TEST-PLAN.md
-Current status: ALL CORE PHASES COMPLETE. ALL TESTING COMPLETE (P0-P3 + adversarial + performance + integration). Phases 0-2.2 COMPLETE (38 multi_tenant modules, ~25,000 lines). Phase 2.5 Layers 1-2 COMPLETE (3 modules). Phase 3.0 ALL BUILD PHASES COMPLETE (Chat API 6 endpoints + SSE, widget 20 files ~3,200 lines, Shopify Theme App Extension, admin shared 9 components ~5,400 lines, Shopify admin shell ~2,700 lines, standalone admin shell ~2,800 lines — both build-validated). Renderable HTML prototype OWNER-APPROVED (2026-02-03) — both shells (Mantine + Polaris) with 9 standalone + 7 Shopify pages, full mock data, dark mode default, pure neutral grey dark scale, brand palette Option A (#C41E2A), shell switcher, Polaris CSS isolation, widget dark mode preview (28+ files in prototype/). Design frozen as production reference. Operational readiness COMPLETE. Security hardening COMPLETE. Pipeline optimization COMPLETE. Trial environment COMPLETE. Competitive pricing VERIFIED (all 5 competitors, 2026-02-01 — Agent Red 4-21x cheaper). Azure infrastructure provisioned: aoai-agentred-eastus2, cosmos-agentred-eastus2, kv-agentred-eastus2 (all East US 2). Integration testing with real Stripe test mode + Shopify partner sandbox + Azure services COMPLETE (42 tests). 1,196 tests passing (1,154 unit + 42 integration), 0 warnings. 19 routers, 67 routes, 9 middleware layers. Shopify Partner app deployed (client_id: 4c6cf726cd1f9f5389caf48f78af9735) and installed on blanco-9939.myshopify.com dev store.
-Remaining work (priority order): (1) Cosmos DB full initialization (create all 10 containers with DiskANN vector index — Vector Search capability already enabled), (2) Azure OpenAI custom subdomain (az cognitiveservices account update --custom-domain), (3) Phase 2.5 Layer 3 PatternExtractionService (Professional+, WI #90-92), (4) CI improvements (coverage reports, parallel jobs — WI #105, #107), (5) SSE enhancements (client-side retry, metering, multi-tab — WI #131-133), (6) API completeness (customer profiles, OpenAPI — WI #142, #147), (7) Remaining security (API key rotation, Stripe IP allowlisting — WI #159, #162), (8) Add-on integration tests (Mailchimp, Zendesk, GA4), (9) Creative assets for Shopify App Store (icon, screenshots, demo video — blocked on design).
-Important context: Tidio is the primary functional reference. Zapier is the visual styling reference. Persistent Customer Memory (Layers 1-2) is the launch pillar differentiator. All competitor pricing verified 2026-02-01 — see docs/research/UI-UX-COMPETITIVE-ANALYSIS.md. 12 remaining backlog items listed in docs/BACKLOG-NEW-WORK-ITEMS.md §9 (Remaining Work Items table). Prototype approved and frozen — runs via `cd prototype && npm run dev` (port 3000). Stripe CLI configured for local webhook forwarding (stripe listen). Azure credentials in .env.local — production deployment uses Managed Identity (not API keys). Iterative working style: one item at a time, honest assessment, approval before implementation, aggressive scope cutting.
+Current status: ALL CORE PHASES COMPLETE. ALL TESTING COMPLETE (P0-P3 + adversarial + performance + integration). Phases 0-2.2 COMPLETE (41 multi_tenant modules, ~28,000 lines). Phase 2.5 Persistent Customer Memory ALL 4 LAYERS COMPLETE (6 modules: customer_profile_service, conversation_vectorizer, response_explainability, pattern_extraction, fine_tuning_pipeline, admin_customer_profile_api). Phase 3.0 ALL BUILD PHASES COMPLETE (Chat API 6 endpoints + SSE, widget 20 files ~3,200 lines, Shopify Theme App Extension, admin shared 9 components ~5,400 lines, Shopify admin shell ~2,700 lines, standalone admin shell ~2,800 lines — both build-validated). Renderable HTML prototype OWNER-APPROVED (2026-02-03). Design frozen as production reference. Operational readiness COMPLETE. Security hardening COMPLETE. Pipeline optimization COMPLETE. Trial environment COMPLETE. Competitive pricing VERIFIED (all 5 competitors, 2026-02-01 — Agent Red 4-21x cheaper). Azure infrastructure provisioned: aoai-agentred-eastus2, cosmos-agentred-eastus2, kv-agentred-eastus2 (all East US 2). Integration testing with real Stripe test mode + Shopify partner sandbox + Azure services COMPLETE (42 tests). 1,235 unit tests + 42 integration tests = 1,277 total, 0 failures. 19 routers, 67 routes, 9 middleware layers. Shopify Partner app deployed (client_id: 4c6cf726cd1f9f5389caf48f78af9735) and installed on blanco-9939.myshopify.com dev store.
+Remaining work (priority order): (1) Cosmos DB full initialization (create all 10 containers with DiskANN vector index — Vector Search capability already enabled), (2) Azure OpenAI custom subdomain (az cognitiveservices account update --custom-domain), (3) CI improvements (coverage reports, parallel jobs — WI #105, #107), (4) SSE enhancements (client-side retry, metering, multi-tab — WI #131-133), (5) API completeness (customer profiles, OpenAPI — WI #142, #147), (6) Remaining security (API key rotation, Stripe IP allowlisting — WI #159, #162), (7) Add-on integration tests (Mailchimp, Zendesk, GA4), (8) Creative assets for Shopify App Store (icon, screenshots, demo video — blocked on design), (9) Persistent Memory metrics dashboard, (10) 5 A/B production tests (Decision #32).
+Important context: Tidio is the primary functional reference. Zapier is the visual styling reference. Persistent Customer Memory (all 4 layers) is the launch pillar differentiator. All competitor pricing verified 2026-02-01 — see docs/research/UI-UX-COMPETITIVE-ANALYSIS.md. Remaining backlog items listed in docs/BACKLOG-NEW-WORK-ITEMS.md §9 (Remaining Work Items table). Prototype approved and frozen — runs via `cd prototype && npm run dev` (port 3000). Stripe CLI configured for local webhook forwarding (stripe listen). Azure credentials in .env.local — production deployment uses Managed Identity (not API keys). Iterative working style: one item at a time, honest assessment, approval before implementation, aggressive scope cutting.
 Please review CLAUDE.md, then proceed with the highest-priority remaining work item, presenting one item at a time for review per the iterative working style documented in CLAUDE.md.
 ```
 
@@ -950,7 +954,7 @@ The owner values active feedback on their communication effectiveness. When proc
 - **Stripe Tax: exclusive pricing, SaaS B2B tax code:** All Checkout Sessions enable `automatic_tax`. Products carry `txcd_10103001` (SaaS — Business Use). Prices use `tax_behavior="exclusive"` (tax added on top, US B2B standard). `tax_id_collection` enabled for business VAT/tax IDs. Dashboard prerequisites: origin address (Delaware), default tax behavior, nexus state registrations. Cost: $0.50/transaction (Stripe Tax Basic).
 - **invoice.finalization_failed handler added:** Catches cases where Stripe Tax cannot determine customer location (invalid/missing address). Flags tenant for payment issue and logs for investigation.
 
-**Phase 2.5: Persistent Customer Memory (Layers 1-2 COMPLETE — Layers 3-4 Pending)**
+**Phase 2.5: Persistent Customer Memory (ALL 4 LAYERS COMPLETE)**
 - [x] Design customer profile schema — 6 data sources validated (purchase history, cart, geography, marketing, jurisdiction, product questions)
 - [x] Design Layer 1 injection — ~250 token prompt context block
 - [x] Design Layer 2 vectorization — text-embedding-3-large, Cosmos DB DiskANN, tier-gated depth
@@ -962,8 +966,8 @@ The owner values active feedback on their communication effectiveness. When proc
 - [x] Implement Layer 2: Vectorization pipeline + semantic search (work items 87-88)
 - [x] Implement explainability framework (work item 86)
 - [x] Implement test suites + fixtures (work items 97-98, 100) — 30 tests passing
-- [ ] Implement Layer 3: PatternExtractionService + decay + admin UI (work items 90-92)
-- [ ] Implement Layer 4: Fine-tuning pipeline + deployment + rollback (work items 93-96)
+- [x] Implement Layer 3: PatternExtractionService + decay + admin profile API (work items 90-92) — `pattern_extraction.py` (~1,060 lines), `admin_customer_profile_api.py` (~450 lines)
+- [x] Implement Layer 4: Fine-tuning pipeline + deployment + rollback (work items 93-96) — `fine_tuning_pipeline.py` (~1,870 lines), 81 tests in `test_fine_tuning.py`
 - [ ] Create metrics dashboard (KPIs from PERSISTENT-CUSTOMER-MEMORY-METRICS.md)
 
 **Phase 2.2: Multi-Tenant Architecture (Designed — 32 Decisions, 100 Work Items)**
@@ -1616,13 +1620,37 @@ Owner-driven visual review session. All feedback items addressed iteratively. Pr
 - branding/logo/SVG/primary-logo-no-wordmark.svg
 - prototype/public/logo/primary-logo-no-wordmark.svg
 
+**Session 2026-02-03: Phase 2.5 Layers 3-4 Implementation (Persistent Customer Memory COMPLETE)**
+
+Two autonomous sessions completing the final two layers of the Persistent Customer Memory stack. All 4 layers now implemented.
+
+- [x] **WI #90-92: Layer 3 PatternExtractionService (Professional+)** — `pattern_extraction.py` (~1,060 lines). Cross-session learning: GPT-4o-mini post-conversation pattern extraction, confidence scoring (0-1), monthly decay (0.05/month), preference/style/topic patterns, tier-gated (Professional+), consent-gated, mockable LLM calls for dev mode. Module-level singleton via `get_pattern_service()`.
+- [x] **Admin Customer Profile API** — `admin_customer_profile_api.py` (~450 lines). CRUD endpoints for customer profiles, Shopify sync trigger, Layer 1-3 data access.
+- [x] **WI #93-96: Layer 4 Fine-Tuning Pipeline (Enterprise add-on, $299/mo)** — `fine_tuning_pipeline.py` (~1,870 lines). 7-stage pipeline: Collect→Cleanse→Format→Train→Compare→Evaluate→Deploy. 11 Pydantic data models (FineTuningStatus enum with 11 states, QualityGateResult, QualityGateReport, TrainingJobRecord, FineTunedModelRecord, ABExperimentConfig). 5 quality gates (hallucination ≤0.05, format ≥0.75, tone ≥0.80, facts ≥0.90, BLEU/ROUGE). A/B experiment support (80/20 split, SHA-256 deterministic assignment, 7-day minimum). Model versioning (max 3 kept), rollback with reason tracking, GDPR deletion.
+- [x] **Pipeline model selection + A/B routing** — `pipeline.py` modified: dynamic model override from `preferences.fine_tuning_active_model_id`, A/B experiment customer-level variant assignment, trace recording via `DecisionTraceBuilder.set_ab_variant()`.
+- [x] **main.py wiring** — Startup events for both Layer 3 (`_startup_pattern_service`) and Layer 4 (`_startup_fine_tuning_service`), non-fatal pattern.
+- [x] **cosmos_schema.py** — 6 PreferencesDocument fields (fine_tuning_enabled, schedule, min_conversations, active_model_id, active_model_version, ab_experiment_id) + 2 AuditEventType values (MODEL_DEPLOYED, MODEL_ROLLED_BACK).
+- [x] **response_explainability.py** — Added `set_ab_variant()` to DecisionTraceBuilder.
+- [x] **Test fixtures** — 3 factory functions in fixtures.py: `make_fine_tuning_config()`, `make_training_job()`, `make_fine_tuned_model()`.
+- [x] **81 fine-tuning tests** — `test_fine_tuning.py` (~1,250 lines): FT-01 (data collection tier/consent gating), FT-02 (PII scrubbing with real PiiScrubber), FT-03 (minimum threshold), FT-04 (training API + dev store), FT-05/06 (quality gates pass/fail), FT-07 (A/B experiment: deterministic assignment, 80/20 distribution), FT-08 (promotion with/without A/B), FT-09 (rollback), FT-10 (enterprise-only gate), FT-S01 (JSONL format + validation split), FT-S02 (split determinism), FT-S03 (version cap), FT-S04 (GDPR deletion), FT-S05 (consent blocking), FT-S06 (dev mode mockable APIs), FT-S07 (BLEU/ROUGE computation), FT-S08 (constants), FT-S09 (data models), FT-S10 (singleton), FT-S11 (model queries), FT-S12 (tier defaults), FT-S13 (PreferencesDocument fields), FT-S14 (fixture factories), FT-S15 (pipeline model selection integration).
+- [x] **Existing test fix** — `test_cosmos_repository.py` AuditEventType count updated from 13 to 15.
+
+**Test suite total: 1,235 unit tests + 42 integration tests = 1,277 total, 0 failures.**
+
+**Key technical decisions from these sessions:**
+- **PiiScrubber injection for training data**: Fine-tuning service accepts PiiScrubber via `configure(pii_scrubber=...)`. Cleanse stage calls `scrub_text()` on every message content field. Tests use `with_pii_scrubber=True` to verify PII removal.
+- **Deterministic A/B assignment**: `sha256(experiment_id:customer_id:seed) % 100` — same customer always gets same variant for a given experiment. 80/20 control/treatment split verified with 1,000-customer distribution test.
+- **Quality gate architecture**: 5 gates are private async methods (`_run_quality_gate_*`), each calling `_call_model_for_evaluation()` which is mockable in dev mode. `evaluate_gates()` is a simple `all(g.passed for g in report.gate_results)` — single failure blocks deployment.
+- **Model selection in pipeline**: Lazy import of `get_fine_tuning_service()` in `execute()` to avoid circular imports. Falls back to `"gpt-4o"` on any exception. A/B variant recorded on trace before pipeline execution begins.
+- **`enable_ab_test` parameter on `deploy_model()`**: Default `True` creates A/B experiment; explicit `False` deploys directly. Tests cover both paths.
+
 ### Pending
 - [x] ~~**P3 post-launch tests (~90 tests):**~~ COMPLETE — §7.2, §7.4 implemented; §7.3, §7.5 verified by existing tests.
 - [x] ~~**Adversarial/security tests (~45 tests):**~~ COMPLETE — 50 tests in `tests/security/test_adversarial.py`.
 - [x] ~~**Performance/load tests (~30 tests):**~~ COMPLETE — 47 tests in `tests/performance/test_performance.py`.
 - [x] ~~**Integration testing**~~ — COMPLETE. 42 tests (20 Stripe + 22 Azure) against real Stripe test mode + Shopify partner sandbox + Azure services.
-- [ ] **Phase 2.5: Layer 3** — PatternExtractionService (Professional+, work items #90-92)
-- [ ] **Phase 2.5: Layer 4** — Fine-tuning pipeline (Enterprise add-on, work items #93-96)
+- [x] ~~**Phase 2.5: Layer 3**~~ — COMPLETE. PatternExtractionService (Professional+, WI #90-92) — `pattern_extraction.py` (~1,060 lines), `admin_customer_profile_api.py` (~450 lines).
+- [x] ~~**Phase 2.5: Layer 4**~~ — COMPLETE. Fine-tuning pipeline (Enterprise add-on, WI #93-96) — `fine_tuning_pipeline.py` (~1,870 lines), 81 tests. Model selection + A/B routing wired into `pipeline.py`.
 - [ ] **Phase 2.5: 5 A/B production tests** (work items from Decision #32)
 - [ ] **Cosmos DB full initialization** — Run `initialize()` against production Cosmos DB to create all 10 containers with proper indexes and DiskANN vector policy (Vector Search now enabled)
 - [ ] **Azure OpenAI custom subdomain** — Run `az cognitiveservices account update --custom-domain aoai-agentred-eastus2` for SDK compatibility
@@ -1655,4 +1683,4 @@ Owner-driven visual review session. All feedback items addressed iteratively. Pr
 
 *© 2026 Remaker Digital, a DBA of VanDusen & Palmeter, LLC. All rights reserved.*
 *Last Updated: 2026-02-03*
-*Version: 19.0.0*
+*Version: 20.0.0*

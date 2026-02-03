@@ -102,7 +102,8 @@ class CosmosManager:
         """
         await self._ensure_client()
         assert self._client is not None
-        result = await initialize_database(self._client)
+        database_name = os.environ.get("COSMOS_DB_DATABASE", DATABASE_NAME)
+        result = await initialize_database(self._client, database_name=database_name)
         self._initialized = True
         return result
 

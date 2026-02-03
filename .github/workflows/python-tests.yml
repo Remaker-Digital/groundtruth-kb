@@ -1,9 +1,9 @@
 # Python Test CI Pipeline
 #
 # Runs pytest with coverage on every PR and push to main.
-# Fails on test failure or coverage below threshold (pyproject.toml).
+# Fails on test failure or coverage below threshold (pyproject.toml: fail_under=50).
 #
-# Work Item #104 (Test Infrastructure).
+# Work Items #104 (Test Infrastructure), #105 (Coverage Gate).
 #
 # (c) 2026 Remaker Digital, a DBA of VanDusen & Palmeter, LLC. All rights reserved.
 
@@ -63,7 +63,11 @@ jobs:
             --cov=src \
             --cov-report=term-missing \
             --cov-report=xml:coverage.xml \
-            --junitxml=test-results.xml
+            --cov-report=html:htmlcov \
+            --cov-fail-under=50 \
+            --junitxml=test-results.xml \
+            --ignore=tests/integration_real_services.py \
+            --ignore=tests/integration
 
       - name: Upload coverage report
         if: always()
@@ -73,21 +77,42 @@ jobs:
           path: |
             coverage.xml
             test-results.xml
+            htmlcov/
           retention-days: 30
 
-      - name: Upload coverage to job summary
+      - name: Coverage and test summary
         if: always()
         run: |
           echo "## Test Results (Python ${{ matrix.python-version }})" >> $GITHUB_STEP_SUMMARY
           echo "" >> $GITHUB_STEP_SUMMARY
+
+          # Extract test counts from JUnit XML
           if [ -f test-results.xml ]; then
-            # Extract test counts from JUnit XML
             TESTS=$(grep -oP 'tests="\K[0-9]+' test-results.xml | head -1)
             FAILURES=$(grep -oP 'failures="\K[0-9]+' test-results.xml | head -1)
             ERRORS=$(grep -oP 'errors="\K[0-9]+' test-results.xml | head -1)
+            echo "### Tests" >> $GITHUB_STEP_SUMMARY
             echo "| Metric | Value |" >> $GITHUB_STEP_SUMMARY
             echo "|--------|-------|" >> $GITHUB_STEP_SUMMARY
             echo "| Tests run | ${TESTS:-0} |" >> $GITHUB_STEP_SUMMARY
             echo "| Failures | ${FAILURES:-0} |" >> $GITHUB_STEP_SUMMARY
             echo "| Errors | ${ERRORS:-0} |" >> $GITHUB_STEP_SUMMARY
+            echo "" >> $GITHUB_STEP_SUMMARY
+          fi
+
+          # Extract coverage percentage from XML
+          if [ -f coverage.xml ]; then
+            COVERAGE=$(python -c "
+          import xml.etree.ElementTree as ET
+          tree = ET.parse('coverage.xml')
+          root = tree.getroot()
+          rate = float(root.attrib.get('line-rate', 0))
+          print(f'{rate * 100:.1f}')
+          " 2>/dev/null || echo "N/A")
+            echo "### Coverage" >> $GITHUB_STEP_SUMMARY
+            echo "| Metric | Value |" >> $GITHUB_STEP_SUMMARY
+            echo "|--------|-------|" >> $GITHUB_STEP_SUMMARY
+            echo "| Line coverage | ${COVERAGE}% |" >> $GITHUB_STEP_SUMMARY
+            echo "| Minimum required | 50% |" >> $GITHUB_STEP_SUMMARY
+            echo "" >> $GITHUB_STEP_SUMMARY
           fi
