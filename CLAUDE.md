@@ -12,7 +12,7 @@ This document provides context and guidance for AI assistants working on the Age
 | **Brand Name** | Agent Red Customer Experience |
 | **Release** | Launch 1.0 |
 | **Type** | Commercial SaaS Product |
-| **Status** | Phase 2.1 E-Commerce ~98% complete (creative assets remain; integration testing COMPLETE). Phase 2.2 COMPLETE — 38 multi_tenant modules (~25,000 lines). Phase 2.5 Layers 1-2 COMPLETE (3 modules). All middleware wired in main.py (9 middleware layers). **1,196 tests passing (1,154 unit + 42 integration), 0 warnings.** P0 + P1 + P2 tests COMPLETE. Integration testing with real Stripe test mode + Shopify partner sandbox + Azure services COMPLETE. Test infrastructure complete (WI #101-104). Architecture review complete (32 decisions, 100+ work items). **Phase 3.0 UI/UX: ALL BUILD PHASES COMPLETE — Chat API (6 endpoints + SSE manager), Admin APIs (5 routers, 25 endpoints), Widget frontend (20 files, ~3,200 lines), Shopify Theme App Extension (3 files), Admin shared components (9 + 2 util modules, ~5,400 lines), Shopify admin shell (8 files, ~2,700 lines, build validated), Standalone admin shell (9 files, ~2,800 lines, build validated).** Admin frontend build configs created (package.json, tsconfig.json, vite.config.ts for both shells + shared workspace root). Operational readiness COMPLETE (WI #148-156). Security hardening COMPLETE (WI #157-163). Pipeline optimization COMPLETE (WI #134-139). Trial environment COMPLETE (WI #119-128). **Competitive pricing VERIFIED (all 5 competitors, 2026-02-01) — Agent Red 4-21x cheaper.** Product renamed Customer Experience. Brand primary #C41E2A. Shopify Partner app deployed (client_id: 4c6cf726cd1f9f5389caf48f78af9735), installed on blanco-9939.myshopify.com dev store. |
+| **Status** | Phase 2.1 E-Commerce ~98% complete (creative assets remain; integration testing COMPLETE). Phase 2.2 COMPLETE — 38 multi_tenant modules (~25,000 lines). Phase 2.5 Layers 1-2 COMPLETE (3 modules). All middleware wired in main.py (9 middleware layers). **1,196 tests passing (1,154 unit + 42 integration), 0 warnings.** P0 + P1 + P2 tests COMPLETE. Integration testing with real Stripe test mode + Shopify partner sandbox + Azure services COMPLETE. Test infrastructure complete (WI #101-104). Architecture review complete (32 decisions, 100+ work items). **Phase 3.0 UI/UX: ALL BUILD PHASES COMPLETE — Chat API (6 endpoints + SSE manager), Admin APIs (5 routers, 25 endpoints), Widget frontend (20 files, ~3,200 lines), Shopify Theme App Extension (3 files), Admin shared components (9 + 2 util modules, ~5,400 lines), Shopify admin shell (8 files, ~2,700 lines, build validated), Standalone admin shell (9 files, ~2,800 lines, build validated).** Admin frontend build configs created (package.json, tsconfig.json, vite.config.ts for both shells + shared workspace root). **Renderable HTML prototype COMPLETE — both shells (Mantine + Polaris) with 9 standalone + 7 Shopify pages, full mock data, dark mode, brand palette Option A, shell switcher.** Operational readiness COMPLETE (WI #148-156). Security hardening COMPLETE (WI #157-163). Pipeline optimization COMPLETE (WI #134-139). Trial environment COMPLETE (WI #119-128). **Competitive pricing VERIFIED (all 5 competitors, 2026-02-01) — Agent Red 4-21x cheaper.** Product renamed Customer Experience. Brand primary #C41E2A. Shopify Partner app deployed (client_id: 4c6cf726cd1f9f5389caf48f78af9735), installed on blanco-9939.myshopify.com dev store. |
 | **Owner** | Remaker Digital (DBA of VanDusen & Palmeter, LLC) |
 
 ---
@@ -631,6 +631,22 @@ E:\Claude-Playground\CLAUDE-PROJECTS\Agent Red Customer Engagement\
 │           ├── ChatRating.tsx       # Thumbs up/down, comment, thank-you
 │           └── OfflineForm.tsx      # Leave-a-message form
 │
+├── prototype/                      # Renderable admin dashboard prototype (Mantine + Polaris)
+│   ├── package.json                # Mantine 7, Polaris 12, React 18, Recharts, Vite 6
+│   ├── tsconfig.json               # ES2020, strict, Vite client types
+│   ├── vite.config.ts              # React plugin, port 3000
+│   ├── index.html                  # Entry HTML with Inter + JetBrains Mono fonts
+│   ├── public/logo/                # Brand logo SVGs (copied from branding/)
+│   └── src/
+│       ├── main.tsx                # MantineProvider + shell switcher (standalone/shopify)
+│       ├── data/mockData.ts        # Comprehensive mock data (~500 lines)
+│       ├── standalone/             # Mantine v7 standalone admin shell
+│       │   ├── StandaloneApp.tsx   # AppShell, sidebar nav, dark mode toggle
+│       │   └── pages/              # 9 pages (Dashboard, Inbox, KnowledgeBase, Analytics, Config, Widget, Billing, Team, Onboarding)
+│       └── shopify/                # Polaris embedded admin shell
+│           ├── ShopifyApp.tsx      # Polaris Frame + Navigation
+│           └── pages/              # 7 pages (Dashboard, Analytics, Inbox, Knowledge, Config, Widget, Billing)
+│
 ├── extensions/                     # Shopify Theme App Extension (Build Phase 3)
 │   └── agent-red-chat/
 │       ├── shopify.extension.toml  # Extension manifest
@@ -755,10 +771,10 @@ E:\Claude-Playground\CLAUDE-PROJECTS\Agent Red Customer Engagement\
 Continue work on Agent Red Customer Experience commercial project.
 Location: E:\Claude-Playground\CLAUDE-PROJECTS\Agent Red Customer Engagement
 Key files: CLAUDE.md, docs/PROJECT-PLAN.md, docs/BACKLOG-NEW-WORK-ITEMS.md, docs/COMPREHENSIVE-TEST-PLAN.md
-Current status: ALL CORE PHASES COMPLETE. ALL TESTING COMPLETE (P0-P3 + adversarial + performance + integration). Phases 0-2.2 COMPLETE (38 multi_tenant modules, ~25,000 lines). Phase 2.5 Layers 1-2 COMPLETE (3 modules). Phase 3.0 ALL BUILD PHASES COMPLETE (Chat API 6 endpoints + SSE, widget 20 files ~3,200 lines, Shopify Theme App Extension, admin shared 9 components ~5,400 lines, Shopify admin shell ~2,700 lines, standalone admin shell ~2,800 lines — both build-validated). Operational readiness COMPLETE. Security hardening COMPLETE. Pipeline optimization COMPLETE. Trial environment COMPLETE. Competitive pricing VERIFIED (all 5 competitors, 2026-02-01 — Agent Red 4-21x cheaper). Azure infrastructure provisioned: aoai-agentred-eastus2, cosmos-agentred-eastus2, kv-agentred-eastus2 (all East US 2). Integration testing with real Stripe test mode + Shopify partner sandbox + Azure services COMPLETE (42 tests). 1,196 tests passing (1,154 unit + 42 integration), 0 warnings. 19 routers, 67 routes, 9 middleware layers. Shopify Partner app deployed (client_id: 4c6cf726cd1f9f5389caf48f78af9735) and installed on blanco-9939.myshopify.com dev store.
-Remaining work (priority order): (1) UI/UX feature implementation to close competitive gap, (2) Cosmos DB full initialization (create all 10 containers with DiskANN vector index), (3) Azure OpenAI custom subdomain, (4) Phase 2.5 Layer 3 PatternExtractionService (Professional+, WI #90-92), (5) CI improvements (coverage reports, parallel jobs — WI #105, #107), (6) SSE enhancements (client-side retry, metering, multi-tab — WI #131-133), (7) API completeness (customer profiles, OpenAPI — WI #142, #147), (8) Remaining security (API key rotation, Stripe IP allowlisting — WI #159, #162), (9) Add-on integration tests (Mailchimp, Zendesk, GA4), (10) Creative assets for Shopify App Store (icon, screenshots, demo video — blocked on design).
-Important context: Tidio is the primary functional reference. Zapier is the visual styling reference. Persistent Customer Memory (Layers 1-2) is the launch pillar differentiator. All competitor pricing verified 2026-02-01 — see docs/research/UI-UX-COMPETITIVE-ANALYSIS.md. 12 remaining backlog items listed in docs/BACKLOG-NEW-WORK-ITEMS.md §9 (Remaining Work Items table). Stripe CLI configured for local webhook forwarding (stripe listen). Stripe Tax requires account verification — sandbox tests accept 502. Mixed billing intervals (annual base + monthly overage) not supported in single Checkout. Azure credentials in .env.local — production deployment uses Managed Identity (not API keys). Iterative working style: one item at a time, honest assessment, approval before implementation, aggressive scope cutting.
-Please review CLAUDE.md, then proceed with the highest-priority remaining technical work item, presenting one item at a time for review per the iterative working style documented in CLAUDE.md.
+Current status: ALL CORE PHASES COMPLETE. ALL TESTING COMPLETE (P0-P3 + adversarial + performance + integration). Phases 0-2.2 COMPLETE (38 multi_tenant modules, ~25,000 lines). Phase 2.5 Layers 1-2 COMPLETE (3 modules). Phase 3.0 ALL BUILD PHASES COMPLETE (Chat API 6 endpoints + SSE, widget 20 files ~3,200 lines, Shopify Theme App Extension, admin shared 9 components ~5,400 lines, Shopify admin shell ~2,700 lines, standalone admin shell ~2,800 lines — both build-validated). Renderable HTML prototype COMPLETE — both shells (Mantine + Polaris) with 9 standalone + 7 Shopify pages, full mock data, dark mode, brand palette Option A (#C41E2A), shell switcher (28 files in prototype/). Operational readiness COMPLETE. Security hardening COMPLETE. Pipeline optimization COMPLETE. Trial environment COMPLETE. Competitive pricing VERIFIED (all 5 competitors, 2026-02-01 — Agent Red 4-21x cheaper). Azure infrastructure provisioned: aoai-agentred-eastus2, cosmos-agentred-eastus2, kv-agentred-eastus2 (all East US 2). Integration testing with real Stripe test mode + Shopify partner sandbox + Azure services COMPLETE (42 tests). 1,196 tests passing (1,154 unit + 42 integration), 0 warnings. 19 routers, 67 routes, 9 middleware layers. Shopify Partner app deployed (client_id: 4c6cf726cd1f9f5389caf48f78af9735) and installed on blanco-9939.myshopify.com dev store.
+Remaining work (priority order): (1) Prototype visual review — owner examining renderable prototype, feedback expected on layouts/workflows/styling, (2) Cosmos DB full initialization (create all 10 containers with DiskANN vector index), (3) Azure OpenAI custom subdomain, (4) Phase 2.5 Layer 3 PatternExtractionService (Professional+, WI #90-92), (5) CI improvements (coverage reports, parallel jobs — WI #105, #107), (6) SSE enhancements (client-side retry, metering, multi-tab — WI #131-133), (7) API completeness (customer profiles, OpenAPI — WI #142, #147), (8) Remaining security (API key rotation, Stripe IP allowlisting — WI #159, #162), (9) Add-on integration tests (Mailchimp, Zendesk, GA4), (10) Creative assets for Shopify App Store (icon, screenshots, demo video — blocked on design).
+Important context: Tidio is the primary functional reference. Zapier is the visual styling reference. Persistent Customer Memory (Layers 1-2) is the launch pillar differentiator. All competitor pricing verified 2026-02-01 — see docs/research/UI-UX-COMPETITIVE-ANALYSIS.md. 12 remaining backlog items listed in docs/BACKLOG-NEW-WORK-ITEMS.md §9 (Remaining Work Items table). Prototype runs via `cd prototype && npm run dev` (port 3000). Stripe CLI configured for local webhook forwarding (stripe listen). Azure credentials in .env.local — production deployment uses Managed Identity (not API keys). Iterative working style: one item at a time, honest assessment, approval before implementation, aggressive scope cutting.
+Please review CLAUDE.md, then proceed with the highest-priority remaining work item, presenting one item at a time for review per the iterative working style documented in CLAUDE.md.
 ```
 
 ### Referencing AGNTCY
@@ -1522,6 +1538,48 @@ Three major deliverables completed across two sessions:
 - **azure-keyvault-secrets v4.10 API change:** `begin_delete_secret()` (poller-based) replaced by `delete_secret()` (direct async).
 - **Cosmos DB test isolation:** Tests create only needed containers (tenants, usage) rather than calling `initialize()` which creates all 10 containers including `memory_vectors` — avoids hard dependency on Vector Search capability for basic CRUD tests.
 
+**Session 2026-02-02: Renderable Admin Dashboard Prototype**
+
+Full visual prototype built for owner review — both admin shells renderable in-browser with comprehensive mock data and all 16 pages.
+
+- [x] **Prototype scaffold** — `prototype/` directory with package.json (Mantine 7 + Polaris 12 + React 18 + Recharts + Vite 6), tsconfig.json, vite.config.ts, index.html (Google Fonts: Inter + JetBrains Mono).
+- [x] **Brand theme (Option A)** — Mantine createTheme with custom 'brand' color scale (10 shades centered on #C41E2A), dark scale with brand neutrals, Inter font family, all 15 palette colors in theme.other.colors.
+- [x] **Mock data layer** — `src/data/mockData.ts` (~500 lines): 8 conversations with message threads, 7 knowledge articles, 4 team members, 30 days of daily volume data, 9 intent categories, 2 defensive config rollouts (1 active, 1 auto-reverted), billing/usage/invoice data, 9-step onboarding wizard, widget config, tenant config. All TypeScript interfaces exported.
+- [x] **Shell switcher** — Floating bottom-right toggle button (Standalone Mantine / Shopify Polaris). Independent shell routing.
+- [x] **Standalone shell (Mantine v7, 9 pages):**
+  - StandaloneApp.tsx — AppShell with 260px sidebar, 56px header, dark mode toggle, primary-logo-light/dark.svg, brand palette nav items
+  - DashboardPage — 6 stat cards, 30-day area chart (Recharts), recent conversations, top intents
+  - InboxPage — 3-column layout (280px list / flex thread / 320px customer details), message threading, memory/confidence badges
+  - KnowledgeBasePage — Table with search, edit modal, article categories
+  - AnalyticsPage — Time period selector, area charts, intent breakdown table
+  - ConfigurationPage — Two-column layout with AI persona editor, policies, escalation rules, defensive rollout panel
+  - WidgetConfigPage — Split layout with live widget preview mockup
+  - BillingPage — Plan card, usage progress bars, conversation packs, invoice history
+  - TeamPage — Member table with roles/permissions, invite modal
+  - OnboardingPage — Mantine Stepper (9 steps with form fields)
+- [x] **Shopify shell (Polaris, 7 pages):**
+  - ShopifyApp.tsx — Polaris AppProvider + Frame with Navigation
+  - ShopifyDashboard, ShopifyAnalytics, ShopifyInbox, ShopifyKnowledge, ShopifyConfig, ShopifyWidget, ShopifyBilling — all using Polaris components (Page, Layout, LegacyCard, DataTable, Badge, etc.)
+- [x] **Dark mode** — `useMantineColorScheme` + `useComputedColorScheme` hooks, ActionIcon toggle (sun/moon SVGs), logo swaps between primary-logo-light.svg and primary-logo-dark.svg.
+- [x] **Brand logos** — Copied from branding/logo/SVG/ to prototype/public/logo/. Header uses primary-logo-light/dark.svg (not icon-master.svg). Product name only in tooltip/alt text.
+- [x] **Build validated** — 0 TypeScript errors, 1,433 KB bundle (387 KB gzip). Tiptap dependencies removed (peer conflict). Polaris type mismatches fixed (Select onChange, Badge children, TextField type).
+
+**Key design decisions from this session:**
+- **Mantine v7 for standalone admin** — AppShell, NavLink, ThemeIcon, Stepper, charts. Matches the design specification from UI-UX-ARCHITECTURE-DECISIONS.md.
+- **Polaris 12 for Shopify admin** — Frame, Navigation, LegacyCard, DataTable. Native Shopify look and feel.
+- **Option A typography confirmed** — Inter single family (not Inter + Sora dual family). Applied to both Mantine theme and HTML body.
+- **Dark mode is a core feature** — Logo swaps (light/dark variant), Mantine color scheme hooks, toggle in header. Owner explicitly flagged this as important.
+- **Logo = horizontal lockup, not icon** — Header displays primary-logo-light/dark.svg (full lockup). Icon-master.svg is for favicons/app icons only.
+- **No redundant text** — "Agent Red Customer Experience" appears only as tooltip and alt text, not as visible text alongside the logo.
+- **`color="brand"` not `color="red"`** — All Mantine color references use the custom 'brand' scale to ensure #C41E2A is used instead of Mantine's default red. Semantic danger actions (delete, remove) retain `color="red"`.
+
+**Files created (28 new):**
+- prototype/package.json, tsconfig.json, vite.config.ts, index.html
+- prototype/src/main.tsx, src/data/mockData.ts
+- prototype/src/standalone/StandaloneApp.tsx + 9 page files
+- prototype/src/shopify/ShopifyApp.tsx + 7 page files
+- prototype/public/logo/ (3 SVG files copied from branding/)
+
 ### Pending
 - [x] ~~**P3 post-launch tests (~90 tests):**~~ COMPLETE — §7.2, §7.4 implemented; §7.3, §7.5 verified by existing tests.
 - [x] ~~**Adversarial/security tests (~45 tests):**~~ COMPLETE — 50 tests in `tests/security/test_adversarial.py`.
@@ -1534,6 +1592,7 @@ Three major deliverables completed across two sessions:
 - [ ] **Azure OpenAI custom subdomain** — Run `az cognitiveservices account update --custom-domain aoai-agentred-eastus2` for SDK compatibility
 - [ ] **Backlog items (12 remaining):** #105 (coverage gate), #107 (perf test infra), #131-133 (SSE enhancements), #137-139 (pipeline post-launch), #142 (customer profile endpoints), #147 (OpenAPI schema), #159 (API key rotation), #162 (Stripe IP allowlisting)
 - [ ] **Add-on integration tests** — Mailchimp, Zendesk, GA4 have API keys in `.env.local` but no integration tests. Lower priority (add-on modules, not core platform).
+- [ ] **Prototype visual review** — Owner examining renderable prototype (`cd prototype && npm run dev`). Feedback on layouts, workflows, and styling expected. Iterate until approved, then use as reference for production admin frontend.
 - [ ] **Shopify App Store submission** — Requires: creative assets (icon, screenshots, demo video — blocked on design). All technical prerequisites done (GDPR webhooks, session tokens, App Bridge Save Bar)
 - [ ] **Phase 2.1: Creative assets** — Shopify App Store icon (1024x1024), screenshots, demo video — blocked on design
 
@@ -1559,5 +1618,5 @@ Three major deliverables completed across two sessions:
 ---
 
 *© 2026 Remaker Digital, a DBA of VanDusen & Palmeter, LLC. All rights reserved.*
-*Last Updated: 2026-02-03*
-*Version: 17.0.0*
+*Last Updated: 2026-02-02*
+*Version: 18.0.0*
