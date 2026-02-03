@@ -79,7 +79,8 @@ export function StandaloneApp() {
   const [opened, { toggle }] = useDisclosure();
   const theme = useMantineTheme();
   const { setColorScheme } = useMantineColorScheme();
-  const computedColorScheme = useComputedColorScheme('light');
+  const computedColorScheme = useComputedColorScheme('dark');
+  const isDark = computedColorScheme === 'dark';
 
   const renderPage = () => {
     switch (activePage) {
@@ -101,17 +102,39 @@ export function StandaloneApp() {
       header={{ height: 56 }}
       navbar={{ width: 260, breakpoint: 'sm', collapsed: { mobile: !opened } }}
       padding="md"
+      styles={{
+        header: {
+          borderBottom: isDark ? '1px solid rgba(255,255,255,0.06)' : '1px solid #e0e0e0',
+          background: isDark ? undefined : '#f0f0f0',
+        },
+        navbar: {
+          borderRight: isDark ? '1px solid rgba(255,255,255,0.06)' : undefined,
+        },
+        main: {
+          background: isDark ? '#111111' : undefined,
+        },
+      }}
     >
       <AppShell.Header>
         <Group h="100%" px="md" justify="space-between">
           <Group>
             <Burger opened={opened} onClick={toggle} hiddenFrom="sm" size="sm" />
             <Tooltip label="Agent Red Customer Experience" position="bottom" openDelay={500}>
-              <img
-                src={computedColorScheme === 'dark' ? '/logo/primary-logo-dark.svg' : '/logo/primary-logo-light.svg'}
-                alt="Agent Red Customer Experience"
-                style={{ height: 28, display: 'block' }}
-              />
+              <Group gap={10} align="center" style={{ cursor: 'default' }}>
+                <img
+                  src="/logo/primary-logo-no-wordmark.svg"
+                  alt="Agent Red"
+                  style={{ height: 30, display: 'block' }}
+                />
+                <Text
+                  size="sm"
+                  fw={500}
+                  c={isDark ? 'gray.4' : 'gray.6'}
+                  style={{ letterSpacing: '0.02em', userSelect: 'none' }}
+                >
+                  Customer Experience
+                </Text>
+              </Group>
             </Tooltip>
           </Group>
           <Group gap="xs">
@@ -158,12 +181,18 @@ export function StandaloneApp() {
         <AppShell.Section grow>
           {navItems.map(item => {
             const IconComponent = Icons[item.icon];
+            const isActive = activePage === item.page;
             return (
               <NavLink
                 key={item.page}
                 label={item.label}
                 leftSection={
-                  <ThemeIcon variant={activePage === item.page ? 'filled' : 'light'} size="sm" color={activePage === item.page ? 'brand' : 'gray'}>
+                  <ThemeIcon
+                    variant={isActive ? 'filled' : isDark ? 'default' : 'light'}
+                    size="sm"
+                    color={isActive ? 'brand' : 'gray'}
+                    style={!isActive && isDark ? { background: 'transparent', border: 'none' } : undefined}
+                  >
                     <IconComponent />
                   </ThemeIcon>
                 }
@@ -174,15 +203,19 @@ export function StandaloneApp() {
                     </Badge>
                   ) : undefined
                 }
-                active={activePage === item.page}
+                active={isActive}
                 onClick={() => setActivePage(item.page)}
-                style={{ borderRadius: 8, marginBottom: 2 }}
+                style={{
+                  borderRadius: 8,
+                  marginBottom: 2,
+                  ...(isActive && isDark ? { background: 'rgba(196, 30, 42, 0.12)' } : {}),
+                }}
               />
             );
           })}
         </AppShell.Section>
         <AppShell.Section>
-          <Box p="xs" style={{ borderTop: '1px solid var(--mantine-color-gray-2)' }}>
+          <Box p="xs" style={{ borderTop: isDark ? '1px solid rgba(255,255,255,0.06)' : '1px solid var(--mantine-color-gray-2)' }}>
             <Text size="xs" c="dimmed" ta="center">
               Agent Red v1.0.0
             </Text>

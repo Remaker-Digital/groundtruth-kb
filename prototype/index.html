@@ -9,7 +9,33 @@
   <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
   <style>
     * { margin: 0; padding: 0; box-sizing: border-box; }
-    body { font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif; color: #1A1A2E; }
+    body { font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif; color: #1E1E1E; }
+    /*
+     * Polaris CSS sets `body { color: var(--p-color-text) }` which resolves to a dark
+     * charcoal (~#303030) and overrides Mantine's text color in dark mode.
+     *
+     * Fix strategy:
+     * 1. Override --p-color-text on <html> in dark mode so body inherits light text
+     * 2. The Polaris shell wrapper restores --p-color-text to Polaris's own value
+     *    so Polaris components render correctly on their light background
+     */
+    html[data-mantine-color-scheme="dark"] {
+      --p-color-text: #F5F5F5;
+      color: #F5F5F5;
+    }
+    html[data-mantine-color-scheme="dark"] body {
+      color: #F5F5F5;
+    }
+    /* Polaris shell: restore Polaris's own text color for the light-bg Shopify admin */
+    html[data-mantine-color-scheme="dark"] .polaris-shell-wrapper {
+      --p-color-text: #303030;
+      color: #303030;
+    }
+    /* Thinner, subtler borders on Paper cards in dark mode */
+    [data-mantine-color-scheme="dark"] .mantine-Paper-root {
+      --_paper-border-color: rgba(255, 255, 255, 0.08);
+      border-color: rgba(255, 255, 255, 0.08);
+    }
   </style>
 </head>
 <body>

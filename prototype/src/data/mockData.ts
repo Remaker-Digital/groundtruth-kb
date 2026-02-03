@@ -142,6 +142,7 @@ export interface WidgetConfig {
   launcherSize: number;
   launcherIcon: 'chat' | 'headset' | 'help' | 'custom';
   position: 'bottom-right' | 'bottom-left';
+  colorMode: 'light' | 'dark' | 'auto';
   zIndex: number;
   // Behavior
   autoOpen: boolean;
@@ -674,6 +675,7 @@ export const DEFAULT_WIDGET_CONFIG: WidgetConfig = {
   launcherSize: 60,
   launcherIcon: 'chat',
   position: 'bottom-right',
+  colorMode: 'light',
   zIndex: 9999,
   autoOpen: false,
   autoOpenDelay: 5,

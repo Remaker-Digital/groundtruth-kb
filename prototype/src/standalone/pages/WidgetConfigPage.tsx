@@ -81,6 +81,28 @@ function LauncherIcon({ icon, size }: { icon: string; size: number }) {
 // --- Live Preview Component ---
 function WidgetPreview({ config }: { config: WidgetConfig }) {
   const isRight = config.position === 'bottom-right';
+  const dk = config.colorMode === 'dark';
+
+  // Color tokens — light vs dark widget mode
+  const panelBg = dk ? '#1E1E1E' : '#fff';
+  const msgAreaBg = dk ? '#111111' : '#fafafa';
+  const agentBubbleBg = dk ? '#2A2A2A' : '#fff';
+  const agentBubbleBorder = dk ? 'rgba(255,255,255,0.08)' : '#e9ecef';
+  const agentBubbleText = dk ? '#E0E0E0' : undefined;
+  const dateSepBg = dk ? '#2A2A2A' : '#f1f3f5';
+  const dateSepText = dk ? '#787878' : undefined;
+  const inputBg = dk ? '#2A2A2A' : '#f1f3f5';
+  const inputText = dk ? '#5C5C5C' : '#adb5bd';
+  const inputBarBg = dk ? '#1E1E1E' : '#fff';
+  const inputBarBorder = dk ? 'rgba(255,255,255,0.06)' : '#e9ecef';
+  const brandingText = dk ? '#5C5C5C' : undefined;
+  const pageBg = dk ? '#111111' : '#f8f9fa';
+  const pageBorder = dk ? 'rgba(255,255,255,0.08)' : '#dee2e6';
+  // Simulated page chrome
+  const chromeBg = dk ? '#1E1E1E' : '#e9ecef';
+  const chromeBorder = dk ? 'rgba(255,255,255,0.06)' : '#dee2e6';
+  const skeletonDark = dk ? '#2A2A2A' : '#dee2e6';
+  const skeletonLight = dk ? '#1E1E1E' : '#e9ecef';
 
   return (
     <Box
@@ -88,29 +110,29 @@ function WidgetPreview({ config }: { config: WidgetConfig }) {
         position: 'relative',
         width: '100%',
         minHeight: 580,
-        background: '#f8f9fa',
+        background: pageBg,
         borderRadius: 12,
-        border: '1px solid #dee2e6',
+        border: `1px solid ${pageBorder}`,
         overflow: 'hidden',
         padding: 20,
       }}
     >
       {/* Simulated browser content background */}
       <Box style={{ position: 'absolute', top: 0, left: 0, right: 0, bottom: 0, opacity: 0.35 }}>
-        <Box style={{ height: 40, background: '#e9ecef', borderBottom: '1px solid #dee2e6', display: 'flex', alignItems: 'center', padding: '0 12px', gap: 6 }}>
+        <Box style={{ height: 40, background: chromeBg, borderBottom: `1px solid ${chromeBorder}`, display: 'flex', alignItems: 'center', padding: '0 12px', gap: 6 }}>
           <Box style={{ width: 10, height: 10, borderRadius: '50%', background: '#ff6b6b' }} />
           <Box style={{ width: 10, height: 10, borderRadius: '50%', background: '#ffd43b' }} />
           <Box style={{ width: 10, height: 10, borderRadius: '50%', background: '#69db7c' }} />
-          <Box style={{ flex: 1, height: 20, background: '#dee2e6', borderRadius: 10, marginLeft: 12 }} />
+          <Box style={{ flex: 1, height: 20, background: skeletonDark, borderRadius: 10, marginLeft: 12 }} />
         </Box>
         <Box style={{ padding: 20 }}>
-          <Box style={{ height: 14, background: '#dee2e6', borderRadius: 4, marginBottom: 10, width: '60%' }} />
-          <Box style={{ height: 10, background: '#e9ecef', borderRadius: 4, marginBottom: 8, width: '90%' }} />
-          <Box style={{ height: 10, background: '#e9ecef', borderRadius: 4, marginBottom: 8, width: '75%' }} />
-          <Box style={{ height: 10, background: '#e9ecef', borderRadius: 4, marginBottom: 20, width: '85%' }} />
-          <Box style={{ height: 120, background: '#e9ecef', borderRadius: 8, marginBottom: 16 }} />
-          <Box style={{ height: 10, background: '#e9ecef', borderRadius: 4, marginBottom: 8, width: '80%' }} />
-          <Box style={{ height: 10, background: '#e9ecef', borderRadius: 4, width: '65%' }} />
+          <Box style={{ height: 14, background: skeletonDark, borderRadius: 4, marginBottom: 10, width: '60%' }} />
+          <Box style={{ height: 10, background: skeletonLight, borderRadius: 4, marginBottom: 8, width: '90%' }} />
+          <Box style={{ height: 10, background: skeletonLight, borderRadius: 4, marginBottom: 8, width: '75%' }} />
+          <Box style={{ height: 10, background: skeletonLight, borderRadius: 4, marginBottom: 20, width: '85%' }} />
+          <Box style={{ height: 120, background: skeletonLight, borderRadius: 8, marginBottom: 16 }} />
+          <Box style={{ height: 10, background: skeletonLight, borderRadius: 4, marginBottom: 8, width: '80%' }} />
+          <Box style={{ height: 10, background: skeletonLight, borderRadius: 4, width: '65%' }} />
         </Box>
       </Box>
 
@@ -123,8 +145,8 @@ function WidgetPreview({ config }: { config: WidgetConfig }) {
           width: 350,
           height: 440,
           borderRadius: config.borderRadius,
-          boxShadow: '0 8px 32px rgba(0,0,0,0.18)',
-          background: '#fff',
+          boxShadow: dk ? '0 8px 32px rgba(0,0,0,0.4)' : '0 8px 32px rgba(0,0,0,0.18)',
+          background: panelBg,
           display: 'flex',
           flexDirection: 'column',
           overflow: 'hidden',
@@ -174,10 +196,10 @@ function WidgetPreview({ config }: { config: WidgetConfig }) {
         </Box>
 
         {/* Messages area */}
-        <Box style={{ flex: 1, padding: '14px 16px', overflowY: 'auto', background: '#fafafa' }}>
+        <Box style={{ flex: 1, padding: '14px 16px', overflowY: 'auto', background: msgAreaBg }}>
           {/* Date separator */}
           <Group justify="center" mb={12}>
-            <Text size="xs" c="dimmed" style={{ background: '#f1f3f5', padding: '2px 10px', borderRadius: 10 }}>
+            <Text size="xs" c={dateSepText || 'dimmed'} style={{ background: dateSepBg, padding: '2px 10px', borderRadius: 10 }}>
               Today
             </Text>
           </Group>
@@ -204,14 +226,14 @@ function WidgetPreview({ config }: { config: WidgetConfig }) {
               </Box>
               <Box
                 style={{
-                  background: '#fff',
-                  border: '1px solid #e9ecef',
+                  background: agentBubbleBg,
+                  border: `1px solid ${agentBubbleBorder}`,
                   borderRadius: '4px 16px 16px 16px',
                   padding: '10px 14px',
                   maxWidth: '78%',
                 }}
               >
-                <Text size="xs" style={{ lineHeight: 1.5 }}>
+                <Text size="xs" c={agentBubbleText} style={{ lineHeight: 1.5 }}>
                   {config.greetingMessage}
                 </Text>
               </Box>
@@ -256,14 +278,14 @@ function WidgetPreview({ config }: { config: WidgetConfig }) {
             </Box>
             <Box
               style={{
-                background: '#fff',
-                border: '1px solid #e9ecef',
+                background: agentBubbleBg,
+                border: `1px solid ${agentBubbleBorder}`,
                 borderRadius: '4px 16px 16px 16px',
                 padding: '10px 14px',
                 maxWidth: '78%',
               }}
             >
-              <Text size="xs" style={{ lineHeight: 1.5 }}>
+              <Text size="xs" c={agentBubbleText} style={{ lineHeight: 1.5 }}>
                 Of course! I'd be happy to help. Could you share your order number?
               </Text>
             </Box>
@@ -273,9 +295,9 @@ function WidgetPreview({ config }: { config: WidgetConfig }) {
         {/* Input bar */}
         <Box
           style={{
-            borderTop: '1px solid #e9ecef',
+            borderTop: `1px solid ${inputBarBorder}`,
             padding: '10px 12px',
-            background: '#fff',
+            background: inputBarBg,
             flexShrink: 0,
           }}
         >
@@ -283,11 +305,11 @@ function WidgetPreview({ config }: { config: WidgetConfig }) {
             <Box
               style={{
                 flex: 1,
-                background: '#f1f3f5',
+                background: inputBg,
                 borderRadius: config.borderRadius > 12 ? 20 : 8,
                 padding: '8px 14px',
                 fontSize: 12,
-                color: '#adb5bd',
+                color: inputText,
               }}
             >
               {config.inputPlaceholder || 'Type your message...'}
@@ -312,7 +334,7 @@ function WidgetPreview({ config }: { config: WidgetConfig }) {
             </Box>
           </Group>
           {/* Branding */}
-          <Text size="xs" c="dimmed" ta="center" mt={6} style={{ fontSize: 10 }}>
+          <Text size="xs" c={brandingText || 'dimmed'} ta="center" mt={6} style={{ fontSize: 10 }}>
             Powered by <span style={{ fontWeight: 600, color: config.primaryColor }}>Agent Red</span>
           </Text>
         </Box>
@@ -449,6 +471,22 @@ export function WidgetConfigPage() {
                     data={[
                       { label: 'Bottom Right', value: 'bottom-right' },
                       { label: 'Bottom Left', value: 'bottom-left' },
+                    ]}
+                    color="brand"
+                  />
+                </div>
+                <div>
+                  <Text size="sm" fw={500} mb={6}>
+                    Color Mode
+                  </Text>
+                  <SegmentedControl
+                    fullWidth
+                    value={config.colorMode}
+                    onChange={(val) => update('colorMode', val as WidgetConfig['colorMode'])}
+                    data={[
+                      { label: 'Light', value: 'light' },
+                      { label: 'Dark', value: 'dark' },
+                      { label: 'Auto', value: 'auto' },
                     ]}
                     color="brand"
                   />

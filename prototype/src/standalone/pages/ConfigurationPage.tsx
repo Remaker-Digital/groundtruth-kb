@@ -21,6 +21,7 @@ import {
   Divider,
   Grid,
   Box,
+  useComputedColorScheme,
 } from '@mantine/core';
 import {
   DEFAULT_TENANT_CONFIG,
@@ -230,6 +231,9 @@ function RolloutCard({ rollout }: { rollout: ConfigRollout }) {
 export function ConfigurationPage() {
   const [config, setConfig] = useState<TenantConfig>({ ...DEFAULT_TENANT_CONFIG });
   const [hasChanges, setHasChanges] = useState(false);
+  const computedColorScheme = useComputedColorScheme('dark');
+  const isDark = computedColorScheme === 'dark';
+  const previewBg = isDark ? 'rgba(255,255,255,0.04)' : '#f8f9fa';
 
   // Track changes
   const updateConfig = <K extends keyof TenantConfig>(key: K, value: TenantConfig[K]) => {
@@ -497,7 +501,7 @@ export function ConfigurationPage() {
                 p="sm"
                 radius="md"
                 style={{
-                  backgroundColor: '#f8f9fa',
+                  backgroundColor: previewBg,
                   borderLeft: `3px solid ${BRAND_RED}`,
                 }}
               >

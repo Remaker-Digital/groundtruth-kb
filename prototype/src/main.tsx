@@ -3,6 +3,8 @@ import ReactDOM from 'react-dom/client';
 import { MantineProvider, createTheme } from '@mantine/core';
 import { Notifications } from '@mantine/notifications';
 import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom';
+// Polaris CSS loaded BEFORE Mantine so Mantine styles take precedence
+import '@shopify/polaris/build/esm/styles.css';
 import '@mantine/core/styles.css';
 import '@mantine/charts/styles.css';
 import '@mantine/dates/styles.css';
@@ -28,18 +30,18 @@ const agentRedTheme = createTheme({
       '#870E18', // 8
       '#720912', // 9
     ],
-    // Semantic colors matching brand palette
+    // Neutral grey dark scale (no blue/purple tint)
     dark: [
-      '#F8F8FA', // 0 - Snow (Background)
-      '#E8E8ED', // 1 - Silver (Borders)
-      '#B0B0BC', // 2
-      '#8E8EA0', // 3
-      '#6B6B80', // 4 - Steel (Tertiary text)
-      '#3D3D56', // 5 - Slate (Secondary text)
-      '#2D2D44', // 6
-      '#1A1A2E', // 7 - Charcoal (Primary text) ★
-      '#141425', // 8
-      '#0E0E1C', // 9
+      '#F5F5F5', // 0 - Light grey (text on dark bg)
+      '#E0E0E0', // 1 - Borders (light)
+      '#A0A0A0', // 2 - Muted text
+      '#787878', // 3 - Secondary text
+      '#5C5C5C', // 4 - Tertiary text
+      '#3A3A3A', // 5 - Elevated surface (cards)
+      '#2A2A2A', // 6 - Sidebar / panels
+      '#1E1E1E', // 7 - Main background ★
+      '#171717', // 8 - Deepest surface
+      '#111111', // 9 - True dark
     ],
   },
   fontFamily: "'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif",
@@ -50,17 +52,18 @@ const agentRedTheme = createTheme({
   },
   defaultRadius: 'md',
   cursorType: 'pointer',
+  components: {},
   other: {
     // Brand palette reference (for inline styles)
     colors: {
       primary: '#C41E2A',
       primaryDark: '#9B1420',
       primaryLight: '#F2D4D6',
-      charcoal: '#1A1A2E',
-      slate: '#3D3D56',
-      steel: '#6B6B80',
-      silver: '#E8E8ED',
-      snow: '#F8F8FA',
+      charcoal: '#1E1E1E',
+      slate: '#3A3A3A',
+      steel: '#5C5C5C',
+      silver: '#E0E0E0',
+      snow: '#F5F5F5',
       success: '#0D7C3E',
       warning: '#E5A100',
       error: '#D32F2F',
@@ -129,7 +132,7 @@ function ShellSwitcher() {
 
 function App() {
   return (
-    <MantineProvider theme={agentRedTheme} defaultColorScheme="light">
+    <MantineProvider theme={agentRedTheme} defaultColorScheme="dark">
       <Notifications position="top-right" />
       <BrowserRouter>
         <ShellSwitcher />

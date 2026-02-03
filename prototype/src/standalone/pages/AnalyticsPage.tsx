@@ -14,6 +14,7 @@ import {
   SegmentedControl,
   Box,
   ThemeIcon,
+  useComputedColorScheme,
 } from '@mantine/core';
 import {
   AreaChart,
@@ -165,6 +166,17 @@ export function AnalyticsPage() {
   const summary = ANALYTICS_SUMMARY;
   const scale = scaleForPeriod(period);
   const chartData = filterByPeriod(DAILY_VOLUMES, period);
+  const computedColorScheme = useComputedColorScheme('dark');
+  const isDark = computedColorScheme === 'dark';
+
+  // Dark-mode-aware chart colors
+  const gridStroke = isDark ? 'rgba(255,255,255,0.06)' : '#e9ecef';
+  const axisTickFill = isDark ? '#5C5C5C' : '#868e96';
+  const axisLineStroke = isDark ? 'rgba(255,255,255,0.08)' : '#dee2e6';
+  const tooltipBg = isDark ? '#2A2A2A' : '#fff';
+  const tooltipBorder = isDark ? 'rgba(255,255,255,0.1)' : '#dee2e6';
+  const tooltipColor = isDark ? '#E0E0E0' : undefined;
+  const cardBorder = isDark ? 'rgba(255,255,255,0.06)' : 'var(--mantine-color-gray-2)';
 
   // Scale total conversations for period, keep rates unchanged
   const scaledTotal = Math.round(summary.totalConversations * scale);
@@ -270,24 +282,26 @@ export function AnalyticsPage() {
                 <stop offset="95%" stopColor="#D97706" stopOpacity={0} />
               </linearGradient>
             </defs>
-            <CartesianGrid strokeDasharray="3 3" stroke="#e9ecef" />
+            <CartesianGrid strokeDasharray="3 3" stroke={gridStroke} />
             <XAxis
               dataKey="date"
               tickFormatter={formatChartDate}
-              tick={{ fontSize: 11, fill: '#868e96' }}
-              axisLine={{ stroke: '#dee2e6' }}
+              tick={{ fontSize: 11, fill: axisTickFill }}
+              axisLine={{ stroke: axisLineStroke }}
               tickLine={false}
             />
             <YAxis
-              tick={{ fontSize: 11, fill: '#868e96' }}
-              axisLine={{ stroke: '#dee2e6' }}
+              tick={{ fontSize: 11, fill: axisTickFill }}
+              axisLine={{ stroke: axisLineStroke }}
               tickLine={false}
             />
             <Tooltip
               contentStyle={{
                 borderRadius: 8,
-                border: '1px solid #dee2e6',
+                border: `1px solid ${tooltipBorder}`,
                 fontSize: 12,
+                background: tooltipBg,
+                color: tooltipColor,
               }}
               labelFormatter={(label) => `Date: ${label}`}
             />
@@ -434,7 +448,7 @@ export function AnalyticsPage() {
               p="md"
               radius="sm"
               style={{
-                border: '1px solid var(--mantine-color-gray-2)',
+                border: `1px solid ${cardBorder}`,
               }}
             >
               <Group justify="space-between" mb={4}>

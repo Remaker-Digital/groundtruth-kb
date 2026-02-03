@@ -15,6 +15,7 @@ import {
   Divider,
   Avatar,
   Box,
+  useComputedColorScheme,
 } from '@mantine/core';
 import { CONVERSATIONS, MESSAGES, CUSTOMERS } from '../../data/mockData';
 import type { Conversation, Message, Customer } from '../../data/mockData';
@@ -197,14 +198,20 @@ function ConversationItem({
   conversation,
   isSelected,
   onClick,
+  selectedBgColor,
+  hoverBgColor,
 }: {
   conversation: Conversation;
   isSelected: boolean;
   onClick: () => void;
+  selectedBgColor?: string;
+  hoverBgColor?: string;
 }) {
   const initials = getInitials(conversation.customerName);
   const color = avatarColor(conversation.customerName);
   const isUnread = conversation.status === 'active' || conversation.status === 'escalated';
+  const selBg = selectedBgColor || BRAND_LIGHT;
+  const hovBg = hoverBgColor || '#f8f9fa';
 
   return (
     <Box
@@ -213,12 +220,12 @@ function ConversationItem({
         padding: '10px 12px',
         borderRadius: 8,
         cursor: 'pointer',
-        background: isSelected ? BRAND_LIGHT : 'transparent',
+        background: isSelected ? selBg : 'transparent',
         borderLeft: isSelected ? `3px solid ${BRAND}` : '3px solid transparent',
         transition: 'background 0.15s',
       }}
       onMouseEnter={(e: React.MouseEvent<HTMLDivElement>) => {
-        if (!isSelected) (e.currentTarget as HTMLDivElement).style.background = '#f8f9fa';
+        if (!isSelected) (e.currentTarget as HTMLDivElement).style.background = hovBg;
       }}
       onMouseLeave={(e: React.MouseEvent<HTMLDivElement>) => {
         if (!isSelected) (e.currentTarget as HTMLDivElement).style.background = 'transparent';
@@ -292,7 +299,7 @@ function ConversationItem({
 }
 
 /** Center panel: single message bubble */
-function MessageBubble({ message }: { message: Message }) {
+function MessageBubble({ message, agentBubbleBg, customerBubbleBg }: { message: Message; agentBubbleBg?: string; customerBubbleBg?: string }) {
   if (message.sender === 'system') {
     return (
       <Box style={{ textAlign: 'center', padding: '8px 0' }}>
@@ -307,6 +314,8 @@ function MessageBubble({ message }: { message: Message }) {
   }
 
   const isAgent = message.sender === 'agent';
+  const agentBg = agentBubbleBg || BRAND_LIGHT;
+  const custBg = customerBubbleBg || '#f1f3f5';
   return (
     <Box
       style={{
@@ -317,16 +326,29 @@ function MessageBubble({ message }: { message: Message }) {
     >
       <Box style={{ maxWidth: '75%' }}>
         {/* Sender name */}
-        <Text size="xs" c="dimmed" mb={2} ta={isAgent ? 'right' : 'left'}>
-          {message.senderName}
-        </Text>
+        {isAgent ? (
+          <Group gap={6} justify="flex-end" mb={2}>
+            <Text size="xs" c="dimmed">
+              {message.senderName}
+            </Text>
+            <img
+              src="/logo/icon-master.svg"
+              alt="Agent Red"
+              style={{ height: 16, width: 16, display: 'block', opacity: 0.85 }}
+            />
+          </Group>
+        ) : (
+          <Text size="xs" c="dimmed" mb={2} ta="left">
+            {message.senderName}
+          </Text>
+        )}
 
         {/* Bubble */}
         <Paper
           p="sm"
           radius="lg"
           style={{
-            background: isAgent ? BRAND_LIGHT : '#f1f3f5',
+            background: isAgent ? agentBg : custBg,
             borderBottomRightRadius: isAgent ? 4 : undefined,
             borderBottomLeftRadius: !isAgent ? 4 : undefined,
           }}
@@ -427,6 +449,17 @@ export function InboxPage() {
   const [filter, setFilter] = useState('all');
   const [search, setSearch] = useState('');
   const messageEndRef = useRef<HTMLDivElement>(null);
+  const computedColorScheme = useComputedColorScheme('dark');
+  const isDark = computedColorScheme === 'dark';
+
+  // Dark-mode-aware colors
+  const panelBg = isDark ? '#1E1E1E' : '#fff';
+  const centerBg = isDark ? '#111111' : '#fafafa';
+  const borderColor = isDark ? 'rgba(255,255,255,0.06)' : 'var(--mantine-color-gray-2)';
+  const hoverBg = isDark ? 'rgba(255,255,255,0.04)' : '#f8f9fa';
+  const selectedBg = isDark ? 'rgba(196, 30, 42, 0.1)' : BRAND_LIGHT;
+  const bubbleAgentBg = isDark ? 'rgba(255,255,255,0.08)' : '#f1f3f5';
+  const bubbleCustomerBg = isDark ? 'rgba(255,255,255,0.06)' : '#f1f3f5';
 
   const selectedConversation = CONVERSATIONS.find((c) => c.id === selectedId) || CONVERSATIONS[0];
   const selectedMessages = MESSAGES[selectedId] || [];
@@ -487,8 +520,8 @@ export function InboxPage() {
           flexShrink: 0,
           display: 'flex',
           flexDirection: 'column',
-          borderRight: '1px solid var(--mantine-color-gray-2)',
-          background: '#fff',
+          borderRight: `1px solid ${borderColor}`,
+          background: panelBg,
         }}
       >
         {/* Search */}
@@ -519,7 +552,7 @@ export function InboxPage() {
               { label: `Escalated (${counts.escalated})`, value: 'escalated' },
             ]}
             styles={{
-              root: { background: 'var(--mantine-color-gray-0)' },
+              root: { background: isDark ? 'rgba(255,255,255,0.04)' : 'var(--mantine-color-gray-0)' },
             }}
           />
         </Box>
@@ -540,6 +573,8 @@ export function InboxPage() {
                   conversation={conv}
                   isSelected={conv.id === selectedId}
                   onClick={() => setSelectedId(conv.id)}
+                  selectedBgColor={selectedBg}
+                  hoverBgColor={hoverBg}
                 />
               ))
             )}
@@ -555,7 +590,7 @@ export function InboxPage() {
           flex: 1,
           display: 'flex',
           flexDirection: 'column',
-          background: '#fafafa',
+          background: centerBg,
           minWidth: 0,
         }}
       >
@@ -564,8 +599,8 @@ export function InboxPage() {
           px="md"
           py="sm"
           style={{
-            background: '#fff',
-            borderBottom: '1px solid var(--mantine-color-gray-2)',
+            background: panelBg,
+            borderBottom: `1px solid ${borderColor}`,
           }}
         >
           <Group justify="space-between" wrap="nowrap">
@@ -630,7 +665,7 @@ export function InboxPage() {
             ) : (
               <Stack gap={8}>
                 {selectedMessages.map((msg) => (
-                  <MessageBubble key={msg.id} message={msg} />
+                  <MessageBubble key={msg.id} message={msg} agentBubbleBg={bubbleAgentBg} customerBubbleBg={bubbleCustomerBg} />
                 ))}
                 <div ref={messageEndRef} />
               </Stack>
@@ -643,8 +678,8 @@ export function InboxPage() {
           px="md"
           py="sm"
           style={{
-            background: '#fff',
-            borderTop: '1px solid var(--mantine-color-gray-2)',
+            background: panelBg,
+            borderTop: `1px solid ${borderColor}`,
           }}
         >
           <Group gap={8} wrap="nowrap">
@@ -684,8 +719,8 @@ export function InboxPage() {
           flexShrink: 0,
           display: 'flex',
           flexDirection: 'column',
-          borderLeft: '1px solid var(--mantine-color-gray-2)',
-          background: '#fff',
+          borderLeft: `1px solid ${borderColor}`,
+          background: panelBg,
         }}
       >
         <ScrollArea style={{ flex: 1 }} type="auto" offsetScrollbars>
@@ -819,9 +854,13 @@ export function InboxPage() {
                         p="xs"
                         radius="sm"
                         style={{
-                          background: conv.id === selectedId ? BRAND_LIGHT : 'var(--mantine-color-gray-0)',
+                          background: conv.id === selectedId
+                            ? (isDark ? 'rgba(196, 30, 42, 0.12)' : BRAND_LIGHT)
+                            : (isDark ? 'rgba(255,255,255,0.04)' : 'var(--mantine-color-gray-0)'),
                           cursor: 'pointer',
-                          border: conv.id === selectedId ? `1px solid ${BRAND}40` : '1px solid transparent',
+                          border: conv.id === selectedId
+                            ? `1px solid ${isDark ? 'rgba(196, 30, 42, 0.25)' : BRAND + '40'}`
+                            : '1px solid transparent',
                         }}
                         onClick={() => setSelectedId(conv.id)}
                       >

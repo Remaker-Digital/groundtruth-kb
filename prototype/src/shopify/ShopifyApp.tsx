@@ -11,6 +11,15 @@ import {
   Badge,
   Box,
 } from '@shopify/polaris';
+import {
+  HomeIcon,
+  ChatIcon,
+  CollectionIcon,
+  ChartVerticalFilledIcon,
+  SettingsIcon,
+  DesktopIcon,
+  CreditCardIcon,
+} from '@shopify/polaris-icons';
 import enTranslations from '@shopify/polaris/locales/en.json';
 
 import { ShopifyDashboard } from './pages/ShopifyDashboard';
@@ -38,26 +47,26 @@ export function ShopifyApp() {
         items={[
           {
             label: 'Dashboard',
-            icon: () => <span>📊</span>,
+            icon: HomeIcon,
             selected: activePage === 'dashboard',
             onClick: () => setActivePage('dashboard'),
           },
           {
             label: 'Inbox',
-            icon: () => <span>💬</span>,
+            icon: ChatIcon,
             badge: '3',
             selected: activePage === 'inbox',
             onClick: () => setActivePage('inbox'),
           },
           {
             label: 'Knowledge Base',
-            icon: () => <span>📚</span>,
+            icon: CollectionIcon,
             selected: activePage === 'knowledge',
             onClick: () => setActivePage('knowledge'),
           },
           {
             label: 'Analytics',
-            icon: () => <span>📈</span>,
+            icon: ChartVerticalFilledIcon,
             selected: activePage === 'analytics',
             onClick: () => setActivePage('analytics'),
           },
@@ -68,19 +77,19 @@ export function ShopifyApp() {
         items={[
           {
             label: 'Configuration',
-            icon: () => <span>⚙️</span>,
+            icon: SettingsIcon,
             selected: activePage === 'config',
             onClick: () => setActivePage('config'),
           },
           {
             label: 'Widget',
-            icon: () => <span>🖥️</span>,
+            icon: DesktopIcon,
             selected: activePage === 'widget',
             onClick: () => setActivePage('widget'),
           },
           {
             label: 'Billing',
-            icon: () => <span>💳</span>,
+            icon: CreditCardIcon,
             selected: activePage === 'billing',
             onClick: () => setActivePage('billing'),
           },
@@ -140,7 +149,7 @@ export function ShopifyApp() {
   };
 
   return (
-    <div style={{ background: '#f6f6f7', minHeight: '100vh' }}>
+    <div className="polaris-shell-wrapper" style={{ background: '#f6f6f7', minHeight: '100vh' }}>
       <AppProvider i18n={enTranslations}>
         <Frame
           topBar={topBarMarkup}
