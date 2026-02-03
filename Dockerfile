@@ -1,37 +1,80 @@
-# Agent Red Customer Experience - Development Dockerfile
+# Dockerfile — Agent Red Customer Experience API Server (Production)
 # © 2026 Remaker Digital, a DBA of VanDusen & Palmeter, LLC. All rights reserved.
+#
+# Build:
+#   docker build -t agentred-api:latest .
+#
+# Run:
+#   docker run -p 8000:8000 \
+#     -e AZURE_OPENAI_ENDPOINT=https://aoai-agentred-eastus2.openai.azure.com/ \
+#     -e COSMOS_DB_ENDPOINT=https://cosmos-agentred-eastus2.documents.azure.com:443/ \
+#     -e KEY_VAULT_URL=https://kv-agentred-eastus2.vault.azure.net/ \
+#     agentred-api:latest
 
-FROM python:3.12-slim AS base
+FROM python:3.12-slim
 
+# --------------------------------------------------------------------------
+# Metadata
+# --------------------------------------------------------------------------
 LABEL maintainer="Remaker Digital <dev@remakerdigital.com>"
 LABEL project="Agent Red Customer Experience"
+LABEL version="1.0.0"
+LABEL copyright="© 2026 Remaker Digital, a DBA of VanDusen & Palmeter, LLC. All rights reserved."
 
-# Prevent Python from writing .pyc files and enable unbuffered output
+# --------------------------------------------------------------------------
+# Environment
+# --------------------------------------------------------------------------
+# Prevent .pyc files and enable unbuffered stdout/stderr for container logs
 ENV PYTHONDONTWRITEBYTECODE=1
 ENV PYTHONUNBUFFERED=1
+ENV ENVIRONMENT=production
 
-# Set working directory
+# --------------------------------------------------------------------------
+# System dependencies
+# --------------------------------------------------------------------------
 WORKDIR /app
 
-# Install system dependencies
-RUN apt-get update && apt-get install -y --no-install-recommends \
-    curl \
+RUN apt-get update \
+    && apt-get install -y --no-install-recommends \
+        curl \
+        tini \
     && rm -rf /var/lib/apt/lists/*
 
-# Install Python dependencies
-COPY requirements.txt* ./
-RUN pip install --no-cache-dir --upgrade pip && \
-    if [ -f requirements.txt ]; then pip install --no-cache-dir -r requirements.txt; fi
+# --------------------------------------------------------------------------
+# Python dependencies (cached layer — only rebuilds when requirements.txt changes)
+# --------------------------------------------------------------------------
+COPY requirements.txt ./
+RUN pip install --no-cache-dir --upgrade pip \
+    && pip install --no-cache-dir -r requirements.txt
 
-# Copy application source
+# --------------------------------------------------------------------------
+# Application source and configuration
+# --------------------------------------------------------------------------
 COPY src/ ./src/
+COPY config/ ./config/
 
-# Expose default service port
-EXPOSE 8080
+# --------------------------------------------------------------------------
+# Non-root user for security
+# --------------------------------------------------------------------------
+RUN groupadd --gid 1000 agentred \
+    && useradd --uid 1000 --gid agentred --shell /bin/sh --no-create-home agentred \
+    && chown -R agentred:agentred /app
 
-# Health check
-HEALTHCHECK --interval=30s --timeout=5s --start-period=10s --retries=3 \
-    CMD curl -f http://localhost:8080/health || exit 1
+USER agentred
 
-# Default command (override in docker-compose for development)
-CMD ["python", "-m", "uvicorn", "src.main:app", "--host", "0.0.0.0", "--port", "8080"]
+# --------------------------------------------------------------------------
+# Networking
+# --------------------------------------------------------------------------
+EXPOSE 8000
+
+# --------------------------------------------------------------------------
+# Health check — /health is the liveness probe endpoint
+# --------------------------------------------------------------------------
+HEALTHCHECK --interval=30s --timeout=5s --start-period=15s --retries=3 \
+    CMD curl -f http://localhost:8000/health || exit 1
+
+# --------------------------------------------------------------------------
+# Entrypoint — tini ensures proper signal handling for PID 1
+# --------------------------------------------------------------------------
+ENTRYPOINT ["tini", "--"]
+CMD ["uvicorn", "src.main:app", "--host", "0.0.0.0", "--port", "8000", "--workers", "2", "--log-level", "warning"]

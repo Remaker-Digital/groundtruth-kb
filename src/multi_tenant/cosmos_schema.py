@@ -46,7 +46,7 @@ logger = logging.getLogger(__name__)
 # Constants
 # ---------------------------------------------------------------------------
 
-DATABASE_NAME = "agent-red-prod"
+DATABASE_NAME = "agentred"
 
 # Collection names — used as container IDs in Cosmos DB
 COLLECTION_TENANTS = "tenants"
@@ -1072,7 +1072,7 @@ async def initialize_database(
 
     Args:
         client: An azure.cosmos.aio.CosmosClient instance.
-        database_name: Database name (default: agent-red-prod).
+        database_name: Database name (default: agentred).
 
     Returns:
         Dict with creation results: {database, containers: {name: status}}.

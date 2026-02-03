@@ -4,13 +4,13 @@
 > **Release:** Launch 1.0
 > **Timeline:** Q1 2026 (8-12 weeks)
 > **Budget:** $500-1,000/month operational
-> **Last Updated:** 2026-02-02
+> **Last Updated:** 2026-02-03
 
 ---
 
 ## Executive Summary
 
-Agent Red Customer Experience is a commercial SaaS product built on the open-source AGNTCY Customer Engagement Platform foundation. Launch 1.0 targets MVP delivery within Q1 2026, focusing on core commercial infrastructure and Phase 1-2 marketing materials.
+Agent Red Customer Experience is a commercial SaaS product built on the open-source AGNTCY Customer Engagement Platform foundation. Launch 1.0 is a fully capable product release for general availability, targeting Q1 2026.
 
 ---
 
@@ -44,23 +44,30 @@ gantt
     3.0 Shopify Admin Shell               :done, p35, 2026-02-01, 1d
     3.0 Standalone Admin Shell            :done, p36, 2026-02-01, 1d
 
+    section Phase 2.5: Memory
+    Persistent Memory L3-L4              :done, p25b, 2026-02-03, 1d
+
     section Testing
     P0 Launch Blockers (379 tests)        :done, t1, 2026-01-31, 1d
     P1 Pre-Launch (214 tests)             :done, t2, 2026-02-01, 1d
     P2 Launch Quality (222 tests)         :done, t3, 2026-02-01, 1d
-    Operational Tests (75 tests)          :done, t4, 2026-02-01, 1d
+    Operational + P3 + Security + Perf    :done, t4, 2026-02-01, 2d
+    Integration Tests (42 real services)  :done, t5, 2026-02-02, 1d
 
-    section Remaining
-    P3 Post-Launch Tests                  :active, r1, 2026-02-02, 7d
-    Integration Testing (real services)   :r2, after r1, 7d
-    Shopify App Store Submission          :r3, after r2, 7d
+    section Launch Preparation
+    Cosmos DB initialization              :done, r0, 2026-02-03, 1d
+    Production deployment                 :active, r1, 2026-02-03, 3d
+    Remaker Digital storefront setup      :r2, after r1, 2d
+    UX consultant evaluation (Mazel)      :r3, after r2, 5d
+    Shopify App Store submission          :r4, after r1, 7d
+    GA launch                             :milestone, m8, after r4, 0d
 ```
 
 ```mermaid
 pie title Phase Completion Status
-    "Complete" : 14
-    "In Progress" : 1
-    "Remaining" : 4
+    "Complete" : 18
+    "In Progress" : 2
+    "Remaining (owner-blocked)" : 3
 ```
 
 ---
@@ -111,6 +118,10 @@ pie title Phase Completion Status
 
 #### 1.3 Website Content
 
+**Website strategy (decided 2026-02-03):**
+- **1.0:** Agent Red pages hosted within https://remakerdigital.com under an "Applications" category. Opportunistic — not blocking 1.0 release.
+- **1.1:** Standalone Agent Red website hosted on Azure. Target: polished, dedicated web presence.
+
 | Task | Status |
 |------|--------|
 | Write homepage (commercial buyer focus) | ✅ Done |
@@ -119,6 +130,8 @@ pie title Phase Completion Status
 | Write integrations page | ✅ Done |
 | Write about page | ✅ Done |
 | Write contact page | ✅ Done |
+| Host within remakerdigital.com (Applications category) | 📋 1.0 — opportunistic, not blocking |
+| Standalone agentred.com website on Azure | 📋 1.1 release |
 
 #### 1.4 Public Documentation
 
@@ -134,7 +147,7 @@ pie title Phase Completion Status
 ---
 
 ### Phase 2: Product & Infrastructure (Weeks 5-8)
-**Status:** Complete ✅ (E-Commerce ~95%, Multi-Tenant 100%, Memory L1-L2 100%)
+**Status:** Complete ✅ (E-Commerce ~98%, Multi-Tenant 100%, Memory ALL 4 LAYERS 100%)
 
 #### 2.1 E-Commerce Store
 **Platform:** Dual-channel — Shopify App Store (primary) + Stripe (direct). Decision documented in `docs/architecture/ECOMMERCE-PLATFORM-EVALUATION.md`.
@@ -161,7 +174,7 @@ pie title Phase Completion Status
 | Test checkout flows (both channels) | 📋 Todo — integration testing |
 
 #### 2.2 Multi-Tenant Infrastructure
-**Status:** COMPLETE — 38 modules, ~25,000 lines. Architecture review: 32 decisions, 100 work items.
+**Status:** COMPLETE — 41 modules, ~28,000 lines. Architecture review: 32 decisions, 100 work items.
 
 | Task | Status |
 |------|--------|
@@ -194,17 +207,18 @@ pie title Phase Completion Status
 | Alert delivery (#192) | ✅ Done — alert_delivery.py (~695 lines) |
 
 #### 2.5 Persistent Customer Memory
-**Status:** Layers 1-2 COMPLETE (3 modules + 30 passing tests). Layers 3-4 deferred.
+**Status:** ALL 4 LAYERS COMPLETE — 6 modules, 111 passing tests. Launch pillar differentiator.
 
 | Task | Status |
 |------|--------|
-| CustomerProfileService — Layer 1 (#83-85) | ✅ Done — customer_profile_service.py |
-| ConversationVectorizer — Layer 2 (#87-88) | ✅ Done — conversation_vectorizer.py |
-| Response explainability framework (#86) | ✅ Done — response_explainability.py |
-| Test fixtures + 30 tests (#97-98, #100) | ✅ Done — tests/persistent_memory/ |
-| PatternExtractionService — Layer 3 (#90-92) | 📋 Todo — Professional+ |
-| Fine-tuning pipeline — Layer 4 (#93-96) | 📋 Todo — Enterprise add-on |
-| 5 A/B production tests (#99) | 📋 Todo |
+| CustomerProfileService — Layer 1 (#83-85) | ✅ Done — customer_profile_service.py (~520 lines) |
+| ConversationVectorizer — Layer 2 (#87-88) | ✅ Done — conversation_vectorizer.py (~520 lines) |
+| Response explainability framework (#86) | ✅ Done — response_explainability.py (~510 lines) |
+| PatternExtractionService — Layer 3 (#90-92) | ✅ Done — pattern_extraction.py (~1,060 lines) |
+| Admin Customer Profile API (#92) | ✅ Done — admin_customer_profile_api.py (~450 lines) |
+| Fine-tuning pipeline — Layer 4 (#93-96) | ✅ Done — fine_tuning_pipeline.py (~1,870 lines) |
+| Test fixtures + 111 tests (#97-98, #100) | ✅ Done — tests/persistent_memory/ (30 unit/integration + 81 fine-tuning) |
+| 5 A/B production tests (#99) | 📋 Todo — requires sufficient production conversation volume |
 
 #### 2.3 Admin Guides *(deferred — requires working product)*
 | Task | Status |
@@ -272,14 +286,14 @@ flowchart LR
 ---
 
 ### Phase 4: Testing & QA
-**Status:** P0+P1+P2 COMPLETE — 999 tests passing, 0 warnings
+**Status:** ALL PRIORITIES COMPLETE — 1,277 tests (1,235 unit + 42 integration), 0 failures ✅
 
 ```mermaid
 xychart-beta
     title "Test Coverage by Priority"
-    x-axis ["P0 Blockers", "P1 Pre-Launch", "P2 Quality", "Operational", "P3 Post", "Security", "Perf/Load"]
+    x-axis ["P0 Blockers", "P1 Pre-Launch", "P2 Quality", "Operational", "P3 Post", "Security", "Perf/Load", "Integration"]
     y-axis "Tests" 0 --> 400
-    bar [379, 214, 222, 75, 0, 0, 0]
+    bar [379, 214, 222, 75, 40, 50, 47, 42]
 ```
 
 | Suite | Tests | Status |
@@ -288,16 +302,20 @@ xychart-beta
 | P1 — Pre-launch (NATS, GDPR, OTEL, resilience, prompts, config, Shopify, memory, dashboard) | 214 | ✅ Complete |
 | P2 — Launch quality (Shopify client, billing, checkout, explainability, profiles, vectors, cross-module, errors) | 222 | ✅ Complete |
 | Operational (archival, retention, SLA, cost model) | 75 | ✅ Complete |
-| Conftest smoke + health + pre-existing | 109 | ✅ Complete |
-| P3 — Post-launch (~90 tests) | 0 | 📋 Todo |
-| Adversarial / security (~45 tests) | 0 | 📋 Todo |
-| Performance / load (~30 tests) | 0 | 📋 Todo |
+| P3 — Post-launch (tenant config deep, usage dashboard deep, audit log, usage monitor) | ~40 | ✅ Complete |
+| Adversarial / security (injection, auth bypass, data isolation, rate limiting, input abuse) | 50 | ✅ Complete |
+| Performance / load (SLA latency, pipeline timeout, circuit breakers, SSE, cost model) | 47 | ✅ Complete |
+| Persistent Memory (L1-L4 unit + integration + fine-tuning) | 111 | ✅ Complete |
+| Conftest smoke + health + pre-existing | 97 | ✅ Complete |
+| Integration — real Stripe test mode (20 tests) | 20 | ✅ Complete |
+| Integration — real Azure services (22 tests: OpenAI, Cosmos DB, Key Vault, E2E) | 22 | ✅ Complete |
 
 | Metric | Value |
 |--------|-------|
-| Total tests | 999 |
-| Warnings | 0 |
-| Execution time | ~12s |
+| Unit tests | 1,235 |
+| Integration tests (real services) | 42 |
+| Total tests | 1,277 |
+| Failures | 0 |
 | CI pipeline | GitHub Actions (Python 3.12/3.14) |
 
 ---
@@ -321,31 +339,51 @@ xychart-beta
 
 ---
 
-### Phase 6: Launch Preparation (Remaining)
+### Phase 6: Launch Preparation
+**Status:** In Progress 🔄
 
-#### 6.1 Pre-Launch Testing
-| Task | Status |
-|------|--------|
-| P3 post-launch tests (~90 tests) | 📋 Todo |
-| Adversarial/security tests (~45 tests) | 📋 Todo |
-| Performance/load tests (~30 tests) | 📋 Todo |
-| Integration testing (real Stripe + Shopify sandbox) | 📋 Todo |
+#### 6.1 Infrastructure & Deployment
+| Task | WI | Status |
+|------|-----|--------|
+| Cosmos DB full initialization (10 containers, DiskANN) | — | ✅ Done — scripts/init_cosmos_containers.py, all 10 verified |
+| Azure OpenAI custom subdomain | — | 📋 Todo — `az cognitiveservices account update --custom-domain` |
+| Build Docker container images + push to ACR | #196 | 📋 Todo |
+| Production deployment (Terraform apply) | #197 | 📋 Todo |
+| Widget bundle → Theme App Extension deployment | #198 | 📋 Todo |
 
-#### 6.2 Shopify App Store Submission
-| Task | Status |
-|------|--------|
-| App icon (1024x1024) | 📋 Todo — blocked on design |
-| Screenshots (desktop + mobile) | 📋 Todo — blocked on design |
-| Demo video | 📋 Todo — blocked on design |
-| App Store review submission | 📋 Todo — blocked by creative assets |
+#### 6.2 Remaker Digital Storefront (Sales Channel + Live Demo)
+**Strategy (decided 2026-02-03):** Create a Remaker Digital Shopify storefront to serve dual purpose: (1) sell Agent Red subscriptions via Stripe-direct, (2) deploy Agent Red as the store's own chat system as a live product demo. Agent Red becomes tenant #1.
 
-#### 6.3 Launch Readiness
-| Task | Status |
-|------|--------|
-| Final documentation review | 📋 Todo |
-| Soft launch (beta users) | 📋 Todo |
-| Address beta feedback | 📋 Todo |
-| Public launch | 📋 Todo |
+| Task | WI | Status |
+|------|-----|--------|
+| Create Remaker Digital Shopify storefront | #199 | 📋 Todo — owner task |
+| Onboard Remaker Digital as tenant #1 | #200 | 📋 Todo — requires production deployment |
+| Seed knowledge base with Agent Red product data | #201 | 📋 Todo |
+| Deploy widget on storefront | #202 | 📋 Todo — requires production backend |
+| UX consultant evaluation — Mazel (onboarding, Shopify integration, widget testing, escalation) | #203 | 📋 Todo — requires working storefront |
+
+#### 6.3 Shopify App Store Submission
+| Task | WI | Status |
+|------|-----|--------|
+| App icon (1200x1200) | — | 📋 Todo — owner/designer task |
+| Key benefit images (3× 1600x1200) | — | 📋 Todo — owner task |
+| Screenshots (desktop + mobile, 1600x900) | — | 📋 Todo — requires live storefront |
+| Demo video (optional) | — | 📋 Todo — requires live storefront |
+| Submit for Shopify App Store review | — | 📋 Todo — blocked by creative assets + production deployment |
+
+#### 6.4 Creative Assets
+| Task | WI | Status |
+|------|-----|--------|
+| Favicon and app icons (from icon-master.png) | #204 | 📋 Todo |
+| Admin UI color palette refinement | — | 📋 Todo — graphic designer working on worksheet |
+| OG image for social sharing (1200x630) | — | 📋 Todo |
+
+#### 6.5 Launch Readiness
+| Task | WI | Status |
+|------|-----|--------|
+| Final documentation review | — | 📋 Todo |
+| Production stability validation (48 hrs) | — | 📋 Todo — requires production deployment |
+| GA launch | — | 📋 Todo |
 
 ---
 
@@ -370,7 +408,7 @@ xychart-beta
 |------|--------|-------------|------------|
 | Timeline slip | High | Medium | MVP scope, aggressive optimization |
 | Budget overrun | Medium | Low | Cost model validated ($252-436/mo infra) |
-| Multi-tenant complexity | High | Low | 38 modules complete, 999 tests passing |
+| Multi-tenant complexity | High | Low | 41 modules complete, 1,277 tests passing |
 | Shopify App Store rejection | Medium | Medium | GDPR webhooks, session tokens, Save Bar all implemented |
 | Creative asset delays | Medium | High | App Store submission blocked on icon/screenshots |
 
@@ -385,13 +423,15 @@ xychart-beta
 | Website content ready | Yes | ✅ |
 | Documentation published | Yes | ✅ |
 | Legal documents drafted | Yes | ✅ |
-| Multi-tenant infrastructure | Yes | ✅ (38 modules, 999 tests) |
+| Multi-tenant infrastructure | Yes | ✅ (41 modules, 1,277 tests) |
 | Chat widget functional | Yes | ✅ (20 files, build validated) |
 | Admin dashboard functional | Yes | ✅ (2 shells, build validated) |
 | E-commerce billing functional | Yes | ✅ (dual-channel) |
-| Shopify App Store listed | Yes | 📋 Pending (creative assets) |
+| Persistent Customer Memory (all 4 layers) | Yes | ✅ (6 modules, 111 tests) |
+| Remaker Digital storefront (live demo) | Yes | 📋 Pending (production deployment) |
+| Shopify App Store listed | Yes | 📋 Pending (creative assets + deployment) |
 | First trial signup | Yes | 📋 Pending |
-| Platform stable 48 hrs | Yes | 📋 Pending (integration testing) |
+| Platform stable 48 hrs | Yes | 📋 Pending (production deployment) |
 
 ### Post-Launch (30 days)
 
@@ -447,10 +487,11 @@ flowchart LR
 | **M2: Brand Ready** | Logo, color palette, typography, guidelines | ✅ Complete |
 | **M3: Legal Ready** | ToS, Privacy, SLA, DPA (AI-drafted) | ✅ Complete |
 | **M4: Website Ready** | Marketing site content (6 pages) | ✅ Complete |
-| **M5: Backend Complete** | Multi-tenant (38 modules), billing (11 modules), memory (3 modules) | ✅ Complete |
-| **M6: Frontend Complete** | Chat API, widget, Shopify extension, admin (2 shells) | ✅ Complete |
-| **M7: Testing Complete** | 999 tests (P0+P1+P2), CI pipeline | ✅ Complete |
-| **M8: Public Launch** | App Store listed, integration tested, soft launch, GA | 🔄 In Progress |
+| **M5: Backend Complete** | Multi-tenant (41 modules), billing (11 modules), memory (6 modules) | ✅ Complete |
+| **M6: Frontend Complete** | Chat API, widget, Shopify extension, admin (2 shells), prototype approved | ✅ Complete |
+| **M7: Testing Complete** | 1,277 tests (P0-P3 + security + perf + 42 integration), CI pipeline | ✅ Complete |
+| **M8: Production Deployment** | Azure deployment, storefront setup, UX evaluation | 🔄 In Progress |
+| **M9: GA Launch** | App Store listed, first trial signup, 48hr stability | 📋 Pending |
 
 ---
 
@@ -468,6 +509,7 @@ flowchart LR
 | 1.7.0 | 2026-01-30 | Phase 2.1 platform decision, dual-channel |
 | 1.8.0 | 2026-01-30 | Phase 2.5 Persistent Customer Memory added |
 | 2.0.0 | 2026-02-02 | **Major update:** Phase 2.1-2.2 complete (38 multi_tenant modules, 11 integration modules). Phase 2.5 Layers 1-2 complete. Phase 3.0 ALL BUILD PHASES complete (chat API, widget, admin shells). 999 tests passing. Operational readiness, security hardening, pipeline optimization, trial environment all complete. PROJECT-PLAN restructured to reflect actual phase completion. |
+| 3.0.0 | 2026-02-03 | **Launch preparation update:** Phase 2.5 ALL 4 LAYERS COMPLETE (6 modules, 111 tests). Test suite updated: 1,235 unit + 42 integration = 1,277 total, 0 failures. P3, adversarial, performance tests all complete. Cosmos DB 10 containers initialized and verified. Prototype approved by owner (frozen as production reference). Remaker Digital storefront strategy approved (dual-purpose: sales + live demo). UX consultant (Mazel) engaged. New WIs #196-204 added for launch preparation. Phase 6 restructured: Infrastructure, Storefront, App Store, Creative Assets, Launch Readiness. No beta/soft launch — 1.0 is full GA release. |
 
 ---
 

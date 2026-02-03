@@ -15,7 +15,7 @@ Usage:
 Configuration (environment variables):
     COSMOS_DB_ENDPOINT    — Cosmos DB account endpoint URL
     COSMOS_DB_KEY         — Cosmos DB account key (or use Managed Identity)
-    COSMOS_DB_DATABASE    — Database name (default: agent-red-prod)
+    COSMOS_DB_DATABASE    — Database name (default: agentred)
     COSMOS_USE_MANAGED_ID — "true" to use Azure Managed Identity instead of key
 
 © 2026 Remaker Digital, a DBA of VanDusen & Palmeter, LLC. All rights reserved.

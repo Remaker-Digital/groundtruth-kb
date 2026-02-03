@@ -881,6 +881,22 @@ The owner values active feedback on their communication effectiveness. When proc
 - [x] Contact — new page with form, channels, partner program teaser
 - [x] Content README index updated
 
+**Website hosting strategy (decided 2026-02-03):**
+- **1.0:** Agent Red pages within https://remakerdigital.com ("Applications" category). Opportunistic — not blocking 1.0 release.
+- **1.1:** Standalone Agent Red website on Azure. Dedicated web presence with full polish.
+
+**Remaker Digital storefront strategy (decided 2026-02-03):**
+- Create a Remaker Digital Shopify storefront as dual-purpose: (1) sell Agent Red subscriptions via Stripe-direct, (2) deploy Agent Red as the store's own chat system as a live product demo.
+- Agent Red becomes tenant #1 (dogfooding). Every merchant workflow is validated on this real storefront.
+- The storefront provides the "live demo" URL for Shopify App Store listing and affiliate/promoter content.
+- Knowledge base seeded with Agent Red product data (pricing, features, setup guides, FAQ).
+- UX consultant (Mazel) will evaluate core merchant workflows on this storefront: onboarding, Shopify integration, widget testing on multiple devices, escalation workflows.
+- **Mazel access timeline:** Prototype available immediately (`cd prototype && npm run dev`). Live system requires production deployment sprint (~1-2 working days).
+
+**External team (as of 2026-02-03):**
+- **Graphic designer:** Refining Admin UI color palette (working from branding/color-palette-worksheet.html)
+- **UX consultant (Mazel):** Evaluating core merchant workflows — onboarding, Shopify integration, widget testing, escalation
+
 **Phase 1.4: Public Documentation**
 - [x] Docusaurus scaffold — docs-site/ with Agent Red branding, Mermaid diagram support
 - [x] Documentation quality framework — Vale, markdownlint, alex, link-check, coverage audit, GitHub Actions CI
@@ -1645,20 +1661,20 @@ Two autonomous sessions completing the final two layers of the Persistent Custom
 - **`enable_ab_test` parameter on `deploy_model()`**: Default `True` creates A/B experiment; explicit `False` deploys directly. Tests cover both paths.
 
 ### Pending
-- [x] ~~**P3 post-launch tests (~90 tests):**~~ COMPLETE — §7.2, §7.4 implemented; §7.3, §7.5 verified by existing tests.
-- [x] ~~**Adversarial/security tests (~45 tests):**~~ COMPLETE — 50 tests in `tests/security/test_adversarial.py`.
-- [x] ~~**Performance/load tests (~30 tests):**~~ COMPLETE — 47 tests in `tests/performance/test_performance.py`.
-- [x] ~~**Integration testing**~~ — COMPLETE. 42 tests (20 Stripe + 22 Azure) against real Stripe test mode + Shopify partner sandbox + Azure services.
-- [x] ~~**Phase 2.5: Layer 3**~~ — COMPLETE. PatternExtractionService (Professional+, WI #90-92) — `pattern_extraction.py` (~1,060 lines), `admin_customer_profile_api.py` (~450 lines).
-- [x] ~~**Phase 2.5: Layer 4**~~ — COMPLETE. Fine-tuning pipeline (Enterprise add-on, WI #93-96) — `fine_tuning_pipeline.py` (~1,870 lines), 81 tests. Model selection + A/B routing wired into `pipeline.py`.
-- [ ] **Phase 2.5: 5 A/B production tests** (work items from Decision #32)
-- [ ] **Cosmos DB full initialization** — Run `initialize()` against production Cosmos DB to create all 10 containers with proper indexes and DiskANN vector policy (Vector Search now enabled)
-- [ ] **Azure OpenAI custom subdomain** — Run `az cognitiveservices account update --custom-domain aoai-agentred-eastus2` for SDK compatibility
+- [x] ~~**Cosmos DB full initialization**~~ — COMPLETE. 10/10 containers created and verified. scripts/init_cosmos_containers.py. DATABASE_NAME corrected to "agentred".
+- [x] ~~**Azure OpenAI custom subdomain**~~ — Already configured as `aoai-agentred-eastus2`. Endpoint: `https://aoai-agentred-eastus2.openai.azure.com/`.
+- [x] ~~**Production Dockerfile**~~ — COMPLETE. Dockerfile (Python 3.12-slim, non-root user, tini, healthcheck) + .dockerignore.
+- [x] ~~**Widget IIFE bundle**~~ — COMPLETE. Built (58.12 KB, 17.30 KB gzip) and copied to extensions/agent-red-chat/assets/.
+- [x] ~~**Knowledge base seed data**~~ — COMPLETE. scripts/seed_knowledge_base.py (32 articles, 26,470 chars). Supports `--load --tenant-id <ID>`.
+- [x] ~~**Favicon and app icons**~~ — COMPLETE. favicon.ico, apple-touch-icon.png (180), icon-192.png, icon-512.png. Prototype index.html updated.
+- [x] ~~**Color palette worksheet for designer**~~ — COMPLETE. branding/color-palette-worksheet.html. Waiting for designer to return.
+- [ ] **Production deployment (WI #197)** — Terraform apply, Docker images to ACR, Container Apps deployment. Requires Docker Desktop running.
+- [ ] **Remaker Digital storefront (WI #199-202)** — Owner creates storefront → onboard as tenant #1 → seed KB → deploy widget.
+- [ ] **UX consultant evaluation (WI #203)** — Mazel evaluates workflows on live storefront. Blocked on production deployment.
+- [ ] **Phase 2.5: 5 A/B production tests** (work items from Decision #32) — requires production conversation volume.
 - [ ] **Backlog items (12 remaining):** #105 (coverage gate), #107 (perf test infra), #131-133 (SSE enhancements), #137-139 (pipeline post-launch), #142 (customer profile endpoints), #147 (OpenAPI schema), #159 (API key rotation), #162 (Stripe IP allowlisting)
-- [ ] **Add-on integration tests** — Mailchimp, Zendesk, GA4 have API keys in `.env.local` but no integration tests. Lower priority (add-on modules, not core platform).
-- [x] ~~**Prototype visual review**~~ — COMPLETE. Owner approved 2026-02-03. Both shells (Mantine + Polaris) rendering correctly. Dark mode default, pure neutral greys, widget dark mode preview, Polaris CSS isolation. Design is frozen as production reference.
-- [ ] **Shopify App Store submission** — Requires: creative assets (icon, screenshots, demo video — blocked on design). All technical prerequisites done (GDPR webhooks, session tokens, App Bridge Save Bar)
-- [ ] **Phase 2.1: Creative assets** — Shopify App Store icon (1024x1024), screenshots, demo video — blocked on design
+- [ ] **Shopify App Store submission** — Requires: creative assets (icon, screenshots — owner/designer tasks) + production deployment
+- [ ] **Creative assets** — App icon (1200x1200), key benefit images (3× 1600x1200), screenshots — owner/designer tasks
 
 ---
 
@@ -1683,4 +1699,4 @@ Two autonomous sessions completing the final two layers of the Persistent Custom
 
 *© 2026 Remaker Digital, a DBA of VanDusen & Palmeter, LLC. All rights reserved.*
 *Last Updated: 2026-02-03*
-*Version: 20.0.0*
+*Version: 21.0.0*

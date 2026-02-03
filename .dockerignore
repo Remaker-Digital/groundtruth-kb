@@ -1,40 +1,105 @@
-# Agent Red Customer Experience - Docker Build Context Ignore
+# .dockerignore — Agent Red Customer Experience
+# © 2026 Remaker Digital, a DBA of VanDusen & Palmeter, LLC. All rights reserved.
+#
+# Excludes everything not needed inside the production container image.
+
+# Version control
 .git
 .github
+.gitignore
+
+# IDE / editor
 .vscode
 .idea
 .claude
+
+# Environment files (secrets — never bake into images)
 .env
+.env.*
 .env.local
+.env.integration
 .env.*.local
+.env.example
+.env.integration.example
+
+# Python artifacts
 __pycache__
 *.pyc
 *.pyo
-node_modules
+*.egg-info
 .pytest_cache
 .mypy_cache
 .ruff_cache
 htmlcov
 .coverage
-*.egg-info
 dist
 build
+
+# Tests (not needed in production image)
+tests/
+pyproject.toml
+requirements-test.txt
+
+# Documentation
+docs/
+docs-site/
+README.md
+CLAUDE.md
+
+# Branding / legal / marketing (not runtime dependencies)
+branding/
+legal/
+website/
+
+# Frontend projects (built and served separately)
+prototype/
+admin/
+widget/
+extensions/
+
+# Node / frontend tooling
+node_modules/
+package.json
+package-lock.json
+shopify.app.toml
+
+# Infrastructure as code
+infrastructure/
 .terraform
-*.tfstate*
+*.tfstate
+*.tfstate.backup
+*.tfvars
+
+# Scripts (setup/deploy tooling, not application code)
+scripts/
+
+# Independent assessments
+independent-progress-assments/
+
+# Temporary / local
+local/
+scratch/
+temp/
+tmp/
 *.log
 *.tmp
 *.bak
-docs
-branding
-legal
-website
-scripts
-local
-scratch
-temp
-tmp
-customer-data
-financial
+
+# Sensitive data directories
+customer-data/
+financial/
+
+# OS artifacts
 Thumbs.db
 desktop.ini
 .DS_Store
+
+# Docker (prevent recursive context)
+Dockerfile
+docker-compose.yml
+docker-compose*.yml
+.dockerignore
+
+# Stripe CLI binary
+stripe.exe
+stripe

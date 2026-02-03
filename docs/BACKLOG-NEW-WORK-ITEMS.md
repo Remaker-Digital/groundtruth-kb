@@ -4,7 +4,7 @@
 > **Project:** Agent Red Customer Experience
 > **Owner:** Remaker Digital (DBA of VanDusen & Palmeter, LLC)
 > **Created:** 2026-01-31
-> **Last Updated:** 2026-02-02
+> **Last Updated:** 2026-02-03
 > **Numbering:** Continues from Master Plan Review WI #1-100
 > **Review Status:** Updated with completion statuses from 2026-01-31 and 2026-02-01 implementation sprints
 
@@ -267,6 +267,65 @@ These 63 new work items complement the existing 100 work items in `docs/Master-P
 
 **Net new items (no overlap): 53**
 **Superseding items (overlap with Master Plan): 10**
+
+---
+
+## 10. Launch Preparation (WI #196-204)
+
+**NEW — Added 2026-02-03.** Work items for production deployment, Remaker Digital storefront (dual-purpose: sales channel + live demo), UX consultant evaluation, and creative assets.
+
+| # | Work Item | Priority | Status | Rationale |
+|---|-----------|----------|--------|-----------|
+| 196 | Build Docker container images + push to ACR | High | 📋 Todo | Production deployment prerequisite — Dockerfiles for API Gateway, all 6 agents, SLIM Gateway |
+| 197 | Execute production Terraform deployment (Container Apps, App Gateway, networking) | High | 📋 Todo | Production infrastructure — all Terraform modules ready, needs `terraform apply` |
+| 198 | Build widget bundle + deploy to Shopify Theme App Extension | High | 📋 Todo | Widget IIFE bundle → extensions/agent-red-chat/assets/. Requires `shopify app deploy` |
+| 199 | Create Remaker Digital Shopify storefront | High | 📋 Todo | **Owner task.** Branded storefront for Agent Red subscription sales + live demo |
+| 200 | Onboard Remaker Digital as tenant #1 (trial → paid) | High | 📋 Todo | First tenant provisioning via production system. Validates full onboarding flow |
+| 201 | Seed knowledge base with Agent Red product data | Medium | 📋 Todo | Product info, pricing, features, setup guides, FAQ for demo widget conversations |
+| 202 | Deploy widget on Remaker Digital storefront + verify end-to-end | Medium | 📋 Todo | Theme App Extension enabled, widget renders, AI responds, escalation works |
+| 203 | UX consultant evaluation (Mazel) — onboarding, Shopify integration, widget testing, escalation | Medium | 📋 Todo | **Blocked on production deployment.** Mazel evaluates core merchant workflows |
+| 204 | Generate favicon and app icons from icon-master.png | Medium | 📋 Todo | favicon.ico (16/32/48), apple-touch-icon (180), PWA icons (192/512) |
+
+### Updated Work Item Counts
+
+| Category | Total | Complete | Remaining | IDs |
+|----------|-------|----------|-----------|-----|
+| Test Infrastructure | 7 | 5 | 2 | #101-107 |
+| Merchant Web UI | 11 | 10 | 1 | #108-118 |
+| Trial / Demo Environment | 10 | 10 | 0 | #119-128 |
+| Response Streaming (SSE) | 5 | 2 | 3 | #129-133 |
+| Pipeline Optimization | 6 | 3 | 3 | #134-139 |
+| API Completeness | 8 | 6 | 2 | #140-147 |
+| Operational Readiness | 9 | 9 | 0 | #148-156 |
+| Security Hardening | 7 | 6 | 1 | #157-163 |
+| Launch Preparation | 9 | 0 | 9 | #196-204 |
+| **Total** | **72** | **51** | **21** | **#101-204** |
+
+### Remaining Work Items (Priority Order — 1.0 GA)
+
+| # | Work Item | Priority | Blocked By |
+|---|-----------|----------|------------|
+| 196 | Docker images + ACR push | High | — (unblocked) |
+| 197 | Production Terraform deployment | High | #196 |
+| 198 | Widget bundle → Theme App Extension | High | #197 |
+| 199 | Create Remaker Digital storefront | High | Owner |
+| 200 | Onboard tenant #1 | High | #197, #199 |
+| 201 | Seed knowledge base | Medium | #200 |
+| 202 | Deploy widget on storefront | Medium | #198, #200 |
+| 203 | UX evaluation (Mazel) | Medium | #202 |
+| 204 | Favicon and app icons | Medium | — (unblocked) |
+| 131 | SSE error handling | Medium | Post-launch |
+| 132 | Streaming metering | Medium | Post-launch |
+| 133 | SSE multi-tab | Medium | Post-launch |
+| 105 | Coverage reporting | Medium | Post-launch |
+| 107 | Performance test infra | Medium | Post-launch |
+| 142 | Customer profile endpoints | Medium | Post-launch |
+| 147 | OpenAPI schema | Low | Post-launch |
+| 159 | API key rotation | Medium | Post-launch |
+| 162 | Stripe IP allowlisting | Low | Post-launch |
+| 137 | Semantic response caching | Low | Post-launch |
+| 138 | Context pre-computation | Low | Post-launch |
+| 139 | PTU investigation | Low | Post-launch |
 
 ---
 

@@ -1,0 +1,1258 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Agent Red Admin UI — Color Palette Worksheet</title>
+<style>
+  @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap');
+
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+
+  body {
+    font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+    background: #F5F5F5;
+    color: #1E1E1E;
+    padding: 40px;
+    line-height: 1.5;
+  }
+
+  h1 {
+    font-size: 28px;
+    font-weight: 700;
+    margin-bottom: 8px;
+  }
+
+  h2 {
+    font-size: 20px;
+    font-weight: 600;
+    margin: 40px 0 16px 0;
+    padding-bottom: 8px;
+    border-bottom: 2px solid #E0E0E0;
+  }
+
+  h3 {
+    font-size: 15px;
+    font-weight: 600;
+    margin: 24px 0 12px 0;
+    color: #5C5C5C;
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
+  }
+
+  .intro {
+    max-width: 800px;
+    margin-bottom: 32px;
+    color: #5C5C5C;
+    font-size: 14px;
+  }
+
+  .intro strong { color: #1E1E1E; }
+
+  .instructions {
+    background: #FDE8E8;
+    border: 1px solid #F2D4D6;
+    border-radius: 8px;
+    padding: 16px 20px;
+    margin-bottom: 32px;
+    font-size: 13px;
+    color: #1E1E1E;
+  }
+
+  .instructions ol { margin-left: 20px; }
+  .instructions li { margin-bottom: 4px; }
+
+  /* ================================================================
+     DUAL MODE LAYOUT
+     ================================================================ */
+
+  .mode-pair {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 24px;
+    margin-bottom: 32px;
+  }
+
+  .mode-panel {
+    border-radius: 12px;
+    padding: 24px;
+    border: 1px solid #E0E0E0;
+  }
+
+  .mode-panel.dark {
+    background: #1E1E1E;
+    color: #F5F5F5;
+    border-color: #3A3A3A;
+  }
+
+  .mode-panel.light {
+    background: #FFFFFF;
+    color: #1E1E1E;
+    border-color: #E0E0E0;
+  }
+
+  .mode-label {
+    font-size: 11px;
+    font-weight: 700;
+    text-transform: uppercase;
+    letter-spacing: 0.1em;
+    margin-bottom: 16px;
+    padding-bottom: 8px;
+  }
+
+  .mode-panel.dark .mode-label {
+    color: #A0A0A0;
+    border-bottom: 1px solid rgba(255,255,255,0.08);
+  }
+
+  .mode-panel.light .mode-label {
+    color: #787878;
+    border-bottom: 1px solid #E0E0E0;
+  }
+
+  /* ================================================================
+     COLOR SWATCH ROW
+     ================================================================ */
+
+  .swatch-row {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    padding: 8px 0;
+    border-bottom: 1px solid rgba(128,128,128,0.1);
+  }
+
+  .swatch-row:last-child { border-bottom: none; }
+
+  .swatch {
+    width: 36px;
+    height: 36px;
+    border-radius: 6px;
+    flex-shrink: 0;
+    border: 1px solid rgba(128,128,128,0.2);
+  }
+
+  .swatch-info {
+    flex: 1;
+    min-width: 0;
+  }
+
+  .swatch-name {
+    font-size: 13px;
+    font-weight: 600;
+  }
+
+  .swatch-hex {
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 12px;
+    opacity: 0.7;
+  }
+
+  .swatch-input {
+    width: 100px;
+    padding: 4px 8px;
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 12px;
+    border: 1px dashed #C41E2A;
+    border-radius: 4px;
+    background: rgba(196, 30, 42, 0.05);
+    color: inherit;
+    text-align: center;
+  }
+
+  .swatch-input::placeholder {
+    color: #A0A0A0;
+    font-style: italic;
+  }
+
+  /* ================================================================
+     ELEMENT SAMPLES
+     ================================================================ */
+
+  .sample-card {
+    border-radius: 8px;
+    padding: 16px;
+    margin: 8px 0;
+  }
+
+  .sample-card.dark {
+    background: #2A2A2A;
+    border: 1px solid rgba(255,255,255,0.08);
+  }
+
+  .sample-card.light {
+    background: #FFFFFF;
+    border: 1px solid #E0E0E0;
+  }
+
+  .sample-badge {
+    display: inline-block;
+    padding: 2px 10px;
+    border-radius: 12px;
+    font-size: 11px;
+    font-weight: 600;
+  }
+
+  .sample-button {
+    display: inline-block;
+    padding: 8px 20px;
+    border-radius: 6px;
+    font-size: 13px;
+    font-weight: 600;
+    border: none;
+    cursor: default;
+    font-family: inherit;
+  }
+
+  .sample-input {
+    padding: 8px 12px;
+    border-radius: 6px;
+    font-size: 13px;
+    font-family: inherit;
+    width: 200px;
+  }
+
+  .sample-nav-item {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    padding: 8px 12px;
+    border-radius: 8px;
+    font-size: 13px;
+    font-weight: 500;
+  }
+
+  .sample-nav-icon {
+    width: 28px;
+    height: 28px;
+    border-radius: 6px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 12px;
+    font-weight: 700;
+  }
+
+  .sample-stat-card {
+    padding: 16px;
+    border-radius: 8px;
+  }
+
+  .chart-bar {
+    height: 8px;
+    border-radius: 4px;
+    margin: 4px 0;
+  }
+
+  .avatar {
+    width: 32px;
+    height: 32px;
+    border-radius: 50%;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 12px;
+    font-weight: 700;
+    color: #fff;
+    margin-right: 4px;
+  }
+
+  .progress-bar-track {
+    height: 8px;
+    border-radius: 4px;
+    overflow: hidden;
+    margin: 4px 0 8px 0;
+  }
+
+  .progress-bar-fill {
+    height: 100%;
+    border-radius: 4px;
+  }
+
+  /* Print styles */
+  @media print {
+    body { padding: 20px; font-size: 11px; }
+    .mode-pair { break-inside: avoid; }
+    .swatch-input { border: 1px solid #C41E2A; }
+  }
+
+  .section-break {
+    height: 1px;
+    background: #E0E0E0;
+    margin: 48px 0;
+  }
+
+  .annotation {
+    font-size: 11px;
+    color: #787878;
+    font-style: italic;
+    margin-top: 4px;
+  }
+
+  /* Table for reference summary */
+  table.ref-table {
+    width: 100%;
+    border-collapse: collapse;
+    font-size: 13px;
+    margin: 16px 0;
+  }
+  table.ref-table th, table.ref-table td {
+    padding: 8px 12px;
+    border: 1px solid #E0E0E0;
+    text-align: left;
+  }
+  table.ref-table th {
+    background: #F5F5F5;
+    font-weight: 600;
+    font-size: 11px;
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
+  }
+  table.ref-table td.mono {
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 12px;
+  }
+  td.new-color {
+    background: rgba(196, 30, 42, 0.05);
+    border: 1px dashed #C41E2A;
+    min-width: 100px;
+  }
+</style>
+</head>
+<body>
+
+<h1>Agent Red Customer Experience</h1>
+<p style="font-size: 16px; font-weight: 500; color: #5C5C5C; margin-bottom: 24px;">Admin UI Color Palette Worksheet</p>
+
+<div class="intro">
+  <p>This worksheet shows <strong>every UI element type</strong> used in the Agent Red admin dashboard, rendered in both <strong>Dark Mode</strong> (default) and <strong>Light Mode</strong>, with the current hex color labeled on each element.</p>
+  <p style="margin-top: 8px;">The designer should fill in the <strong>"New Color"</strong> column for any element she wants to change. Leave blank to keep the current value.</p>
+</div>
+
+<div class="instructions">
+  <strong>Instructions for the Designer:</strong>
+  <ol>
+    <li>Review each element in both Dark and Light mode panels below.</li>
+    <li>For any color you want to change, write your new hex value in the <span style="border: 1px dashed #C41E2A; padding: 1px 6px; border-radius: 3px; font-family: 'JetBrains Mono', monospace; font-size: 11px;">New Color</span> field.</li>
+    <li>Leave the field blank if the current color should remain unchanged.</li>
+    <li>The reference table at the bottom summarizes all tokens — you can also fill in values there.</li>
+    <li>Return this file (or a PDF/screenshot with annotations) and we will apply all changes.</li>
+  </ol>
+</div>
+
+<!-- ================================================================
+     SECTION 1: SURFACE COLORS (Backgrounds)
+     ================================================================ -->
+
+<h2>1. Surface Colors (Backgrounds)</h2>
+<p class="annotation">These define the layered depth of the interface — from deepest background to elevated cards.</p>
+
+<div class="mode-pair">
+  <!-- DARK MODE -->
+  <div class="mode-panel dark">
+    <div class="mode-label">Dark Mode</div>
+
+    <div class="swatch-row">
+      <div class="swatch" style="background: #111111;"></div>
+      <div class="swatch-info">
+        <div class="swatch-name">Page Background (deepest)</div>
+        <div class="swatch-hex">#111111</div>
+      </div>
+      <input class="swatch-input" placeholder="New color" style="background: rgba(255,255,255,0.05); border-color: #5C5C5C; color: #F5F5F5;">
+    </div>
+
+    <div class="swatch-row">
+      <div class="swatch" style="background: #1E1E1E;"></div>
+      <div class="swatch-info">
+        <div class="swatch-name">Main Surface / Sidebar</div>
+        <div class="swatch-hex">#1E1E1E</div>
+      </div>
+      <input class="swatch-input" placeholder="New color" style="background: rgba(255,255,255,0.05); border-color: #5C5C5C; color: #F5F5F5;">
+    </div>
+
+    <div class="swatch-row">
+      <div class="swatch" style="background: #2A2A2A;"></div>
+      <div class="swatch-info">
+        <div class="swatch-name">Card / Elevated Surface</div>
+        <div class="swatch-hex">#2A2A2A</div>
+      </div>
+      <input class="swatch-input" placeholder="New color" style="background: rgba(255,255,255,0.05); border-color: #5C5C5C; color: #F5F5F5;">
+    </div>
+
+    <div class="swatch-row">
+      <div class="swatch" style="background: #3A3A3A;"></div>
+      <div class="swatch-info">
+        <div class="swatch-name">Input / Interactive Surface</div>
+        <div class="swatch-hex">#3A3A3A</div>
+      </div>
+      <input class="swatch-input" placeholder="New color" style="background: rgba(255,255,255,0.05); border-color: #5C5C5C; color: #F5F5F5;">
+    </div>
+
+  </div>
+
+  <!-- LIGHT MODE -->
+  <div class="mode-panel light">
+    <div class="mode-label">Light Mode</div>
+
+    <div class="swatch-row">
+      <div class="swatch" style="background: #F5F5F5; border-color: #E0E0E0;"></div>
+      <div class="swatch-info">
+        <div class="swatch-name">Page Background</div>
+        <div class="swatch-hex">#F5F5F5</div>
+      </div>
+      <input class="swatch-input" placeholder="New color">
+    </div>
+
+    <div class="swatch-row">
+      <div class="swatch" style="background: #f0f0f0; border-color: #E0E0E0;"></div>
+      <div class="swatch-info">
+        <div class="swatch-name">Header Background</div>
+        <div class="swatch-hex">#f0f0f0</div>
+      </div>
+      <input class="swatch-input" placeholder="New color">
+    </div>
+
+    <div class="swatch-row">
+      <div class="swatch" style="background: #FFFFFF; border-color: #E0E0E0;"></div>
+      <div class="swatch-info">
+        <div class="swatch-name">Card / Elevated Surface</div>
+        <div class="swatch-hex">#FFFFFF</div>
+      </div>
+      <input class="swatch-input" placeholder="New color">
+    </div>
+
+    <div class="swatch-row">
+      <div class="swatch" style="background: #f1f3f5; border-color: #E0E0E0;"></div>
+      <div class="swatch-info">
+        <div class="swatch-name">Input / Interactive Surface</div>
+        <div class="swatch-hex">#f1f3f5</div>
+      </div>
+      <input class="swatch-input" placeholder="New color">
+    </div>
+
+  </div>
+</div>
+
+<!-- ================================================================
+     SECTION 2: TEXT COLORS
+     ================================================================ -->
+
+<h2>2. Text Colors</h2>
+
+<div class="mode-pair">
+  <div class="mode-panel dark">
+    <div class="mode-label">Dark Mode</div>
+
+    <div class="swatch-row">
+      <div class="swatch" style="background: #F5F5F5;"></div>
+      <div class="swatch-info">
+        <div class="swatch-name" style="color: #F5F5F5;">Primary Text</div>
+        <div class="swatch-hex">#F5F5F5</div>
+      </div>
+      <input class="swatch-input" placeholder="New color" style="background: rgba(255,255,255,0.05); border-color: #5C5C5C; color: #F5F5F5;">
+    </div>
+
+    <div class="swatch-row">
+      <div class="swatch" style="background: #E0E0E0;"></div>
+      <div class="swatch-info">
+        <div class="swatch-name" style="color: #E0E0E0;">Secondary Text</div>
+        <div class="swatch-hex">#E0E0E0</div>
+      </div>
+      <input class="swatch-input" placeholder="New color" style="background: rgba(255,255,255,0.05); border-color: #5C5C5C; color: #F5F5F5;">
+    </div>
+
+    <div class="swatch-row">
+      <div class="swatch" style="background: #A0A0A0;"></div>
+      <div class="swatch-info">
+        <div class="swatch-name" style="color: #A0A0A0;">Muted / Dimmed Text</div>
+        <div class="swatch-hex">#A0A0A0</div>
+      </div>
+      <input class="swatch-input" placeholder="New color" style="background: rgba(255,255,255,0.05); border-color: #5C5C5C; color: #F5F5F5;">
+    </div>
+
+    <div class="swatch-row">
+      <div class="swatch" style="background: #787878;"></div>
+      <div class="swatch-info">
+        <div class="swatch-name" style="color: #787878;">Tertiary / Placeholder Text</div>
+        <div class="swatch-hex">#787878</div>
+      </div>
+      <input class="swatch-input" placeholder="New color" style="background: rgba(255,255,255,0.05); border-color: #5C5C5C; color: #F5F5F5;">
+    </div>
+
+    <div class="swatch-row">
+      <div class="swatch" style="background: #5C5C5C;"></div>
+      <div class="swatch-info">
+        <div class="swatch-name" style="color: #5C5C5C;">Disabled / Chart Axis Text</div>
+        <div class="swatch-hex">#5C5C5C</div>
+      </div>
+      <input class="swatch-input" placeholder="New color" style="background: rgba(255,255,255,0.05); border-color: #5C5C5C; color: #F5F5F5;">
+    </div>
+
+  </div>
+
+  <div class="mode-panel light">
+    <div class="mode-label">Light Mode</div>
+
+    <div class="swatch-row">
+      <div class="swatch" style="background: #1E1E1E;"></div>
+      <div class="swatch-info">
+        <div class="swatch-name">Primary Text</div>
+        <div class="swatch-hex">#1E1E1E</div>
+      </div>
+      <input class="swatch-input" placeholder="New color">
+    </div>
+
+    <div class="swatch-row">
+      <div class="swatch" style="background: #3A3A3A;"></div>
+      <div class="swatch-info">
+        <div class="swatch-name" style="color: #3A3A3A;">Secondary Text</div>
+        <div class="swatch-hex">#3A3A3A</div>
+      </div>
+      <input class="swatch-input" placeholder="New color">
+    </div>
+
+    <div class="swatch-row">
+      <div class="swatch" style="background: #5C5C5C;"></div>
+      <div class="swatch-info">
+        <div class="swatch-name" style="color: #5C5C5C;">Muted / Dimmed Text</div>
+        <div class="swatch-hex">#5C5C5C</div>
+      </div>
+      <input class="swatch-input" placeholder="New color">
+    </div>
+
+    <div class="swatch-row">
+      <div class="swatch" style="background: #787878;"></div>
+      <div class="swatch-info">
+        <div class="swatch-name" style="color: #787878;">Tertiary / Placeholder Text</div>
+        <div class="swatch-hex">#787878</div>
+      </div>
+      <input class="swatch-input" placeholder="New color">
+    </div>
+
+    <div class="swatch-row">
+      <div class="swatch" style="background: #868e96;"></div>
+      <div class="swatch-info">
+        <div class="swatch-name" style="color: #868e96;">Chart Axis Text</div>
+        <div class="swatch-hex">#868e96</div>
+      </div>
+      <input class="swatch-input" placeholder="New color">
+    </div>
+
+  </div>
+</div>
+
+<!-- ================================================================
+     SECTION 3: BORDER & SEPARATOR COLORS
+     ================================================================ -->
+
+<h2>3. Borders & Separators</h2>
+
+<div class="mode-pair">
+  <div class="mode-panel dark">
+    <div class="mode-label">Dark Mode</div>
+
+    <div class="swatch-row">
+      <div class="swatch" style="background: rgba(255,255,255,0.06); border: 1px solid rgba(255,255,255,0.15);"></div>
+      <div class="swatch-info">
+        <div class="swatch-name">Card Border / Divider</div>
+        <div class="swatch-hex">rgba(255,255,255,0.08)</div>
+      </div>
+      <input class="swatch-input" placeholder="New color" style="background: rgba(255,255,255,0.05); border-color: #5C5C5C; color: #F5F5F5;">
+    </div>
+
+    <div class="swatch-row">
+      <div class="swatch" style="background: rgba(255,255,255,0.06); border: 1px solid rgba(255,255,255,0.1);"></div>
+      <div class="swatch-info">
+        <div class="swatch-name">Subtle Divider (header, footer)</div>
+        <div class="swatch-hex">rgba(255,255,255,0.06)</div>
+      </div>
+      <input class="swatch-input" placeholder="New color" style="background: rgba(255,255,255,0.05); border-color: #5C5C5C; color: #F5F5F5;">
+    </div>
+
+    <div class="swatch-row">
+      <div class="swatch" style="background: rgba(255,255,255,0.06);"></div>
+      <div class="swatch-info">
+        <div class="swatch-name">Chart Grid Lines</div>
+        <div class="swatch-hex">rgba(255,255,255,0.06)</div>
+      </div>
+      <input class="swatch-input" placeholder="New color" style="background: rgba(255,255,255,0.05); border-color: #5C5C5C; color: #F5F5F5;">
+    </div>
+
+  </div>
+
+  <div class="mode-panel light">
+    <div class="mode-label">Light Mode</div>
+
+    <div class="swatch-row">
+      <div class="swatch" style="background: #E0E0E0;"></div>
+      <div class="swatch-info">
+        <div class="swatch-name">Card Border / Divider</div>
+        <div class="swatch-hex">#E0E0E0</div>
+      </div>
+      <input class="swatch-input" placeholder="New color">
+    </div>
+
+    <div class="swatch-row">
+      <div class="swatch" style="background: #e9ecef;"></div>
+      <div class="swatch-info">
+        <div class="swatch-name">Chart Grid Lines</div>
+        <div class="swatch-hex">#e9ecef</div>
+      </div>
+      <input class="swatch-input" placeholder="New color">
+    </div>
+
+    <div class="swatch-row">
+      <div class="swatch" style="background: #dee2e6;"></div>
+      <div class="swatch-info">
+        <div class="swatch-name">Tooltip Border</div>
+        <div class="swatch-hex">#dee2e6</div>
+      </div>
+      <input class="swatch-input" placeholder="New color">
+    </div>
+
+  </div>
+</div>
+
+<!-- ================================================================
+     SECTION 4: BRAND & ACCENT COLORS
+     ================================================================ -->
+
+<h2>4. Brand & Accent Colors</h2>
+<p class="annotation">These apply identically in both modes unless the designer specifies separate values.</p>
+
+<div class="mode-pair">
+  <div class="mode-panel dark">
+    <div class="mode-label">Dark Mode — Live Samples</div>
+
+    <div style="margin-bottom: 16px;">
+      <span class="sample-badge" style="background: rgba(196,30,42,0.15); color: #F2D4D6;">Brand Badge</span>&nbsp;
+      <span class="sample-badge" style="background: rgba(37,99,235,0.15); color: #93c5fd;">Info Badge</span>&nbsp;
+      <span class="sample-badge" style="background: rgba(5,150,105,0.15); color: #6ee7b7;">Success Badge</span>&nbsp;
+      <span class="sample-badge" style="background: rgba(217,119,6,0.15); color: #fcd34d;">Warning Badge</span>&nbsp;
+      <span class="sample-badge" style="background: rgba(211,47,47,0.15); color: #fca5a5;">Error Badge</span>
+    </div>
+
+    <div style="margin-bottom: 16px;">
+      <span class="sample-button" style="background: #C41E2A; color: #fff;">Primary Button #C41E2A</span>&nbsp;
+      <span class="sample-button" style="background: #9B1420; color: #fff;">Hover State #9B1420</span>&nbsp;
+      <span class="sample-button" style="background: #3A3A3A; color: #F5F5F5; border: 1px solid rgba(255,255,255,0.1);">Default Button #3A3A3A</span>
+    </div>
+
+    <div style="margin-bottom: 16px;">
+      <div class="sample-nav-item" style="background: rgba(196,30,42,0.12);">
+        <div class="sample-nav-icon" style="background: #C41E2A; color: #fff;">D</div>
+        <span style="color: #F5F5F5; font-weight: 600;">Active Nav Item</span>
+        <span style="font-size: 11px; color: #A0A0A0; margin-left: auto;">bg: rgba(196,30,42,0.12)</span>
+      </div>
+      <div class="sample-nav-item" style="margin-top: 4px;">
+        <div class="sample-nav-icon" style="background: transparent; color: #A0A0A0; border: none;">I</div>
+        <span style="color: #E0E0E0;">Inactive Nav Item</span>
+      </div>
+    </div>
+
+  </div>
+
+  <div class="mode-panel light">
+    <div class="mode-label">Shared Accent Palette — Fill In New Colors</div>
+
+    <div class="swatch-row">
+      <div class="swatch" style="background: #C41E2A;"></div>
+      <div class="swatch-info">
+        <div class="swatch-name">Brand Primary</div>
+        <div class="swatch-hex">#C41E2A</div>
+      </div>
+      <input class="swatch-input" placeholder="New color">
+    </div>
+
+    <div class="swatch-row">
+      <div class="swatch" style="background: #9B1420;"></div>
+      <div class="swatch-info">
+        <div class="swatch-name">Brand Primary Dark (hover)</div>
+        <div class="swatch-hex">#9B1420</div>
+      </div>
+      <input class="swatch-input" placeholder="New color">
+    </div>
+
+    <div class="swatch-row">
+      <div class="swatch" style="background: #F2D4D6;"></div>
+      <div class="swatch-info">
+        <div class="swatch-name">Brand Primary Light (tint)</div>
+        <div class="swatch-hex">#F2D4D6</div>
+      </div>
+      <input class="swatch-input" placeholder="New color">
+    </div>
+
+    <div class="swatch-row">
+      <div class="swatch" style="background: #2563EB;"></div>
+      <div class="swatch-info">
+        <div class="swatch-name">Blue (info, billable chart)</div>
+        <div class="swatch-hex">#2563EB</div>
+      </div>
+      <input class="swatch-input" placeholder="New color">
+    </div>
+
+    <div class="swatch-row">
+      <div class="swatch" style="background: #059669;"></div>
+      <div class="swatch-info">
+        <div class="swatch-name">Green (success, AI resolved)</div>
+        <div class="swatch-hex">#059669</div>
+      </div>
+      <input class="swatch-input" placeholder="New color">
+    </div>
+
+    <div class="swatch-row">
+      <div class="swatch" style="background: #D97706;"></div>
+      <div class="swatch-info">
+        <div class="swatch-name">Amber (warning, escalated)</div>
+        <div class="swatch-hex">#D97706</div>
+      </div>
+      <input class="swatch-input" placeholder="New color">
+    </div>
+
+    <div class="swatch-row">
+      <div class="swatch" style="background: #D32F2F;"></div>
+      <div class="swatch-info">
+        <div class="swatch-name">Red (error, danger)</div>
+        <div class="swatch-hex">#D32F2F</div>
+      </div>
+      <input class="swatch-input" placeholder="New color">
+    </div>
+
+    <div class="swatch-row">
+      <div class="swatch" style="background: #7C3AED;"></div>
+      <div class="swatch-info">
+        <div class="swatch-name">Violet (memory indicator)</div>
+        <div class="swatch-hex">#7C3AED</div>
+      </div>
+      <input class="swatch-input" placeholder="New color">
+    </div>
+
+    <div class="swatch-row">
+      <div class="swatch" style="background: #1E3A5F;"></div>
+      <div class="swatch-info">
+        <div class="swatch-name">Deep Blue (info semantic)</div>
+        <div class="swatch-hex">#1E3A5F</div>
+      </div>
+      <input class="swatch-input" placeholder="New color">
+    </div>
+
+  </div>
+</div>
+
+<!-- ================================================================
+     SECTION 5: CHARTS & DATA VISUALIZATION
+     ================================================================ -->
+
+<h2>5. Charts & Data Visualization</h2>
+
+<div class="mode-pair">
+  <div class="mode-panel dark">
+    <div class="mode-label">Dark Mode — Chart Sample</div>
+
+    <div style="padding: 16px; background: #2A2A2A; border-radius: 8px; border: 1px solid rgba(255,255,255,0.08);">
+      <div style="font-size: 13px; font-weight: 600; margin-bottom: 12px; color: #F5F5F5;">Daily Conversation Volume</div>
+
+      <!-- Simulated chart area -->
+      <div style="position: relative; height: 120px; border-left: 1px solid rgba(255,255,255,0.08); border-bottom: 1px solid rgba(255,255,255,0.08); padding: 8px;">
+        <!-- Grid lines -->
+        <div style="position: absolute; left: 0; right: 0; top: 25%; border-top: 1px dashed rgba(255,255,255,0.06);"></div>
+        <div style="position: absolute; left: 0; right: 0; top: 50%; border-top: 1px dashed rgba(255,255,255,0.06);"></div>
+        <div style="position: absolute; left: 0; right: 0; top: 75%; border-top: 1px dashed rgba(255,255,255,0.06);"></div>
+
+        <!-- Chart lines (simulated) -->
+        <svg width="100%" height="100%" viewBox="0 0 400 100" preserveAspectRatio="none" style="position: absolute; left: 0; top: 0;">
+          <polyline points="0,60 50,55 100,40 150,45 200,30 250,35 300,20 350,25 400,15" fill="none" stroke="#C41E2A" stroke-width="2"/>
+          <polyline points="0,70 50,68 100,55 150,58 200,48 250,52 300,40 350,42 400,35" fill="none" stroke="#2563EB" stroke-width="1.5"/>
+          <polyline points="0,75 50,72 100,65 150,68 200,60 250,62 300,55 350,58 400,50" fill="none" stroke="#059669" stroke-width="1.5"/>
+          <polyline points="0,90 50,88 100,85 150,87 200,82 250,84 300,80 350,82 400,78" fill="none" stroke="#D97706" stroke-width="1.5"/>
+        </svg>
+
+        <!-- Axis labels -->
+        <div style="position: absolute; bottom: -18px; left: 0; font-size: 10px; color: #5C5C5C;">1/4</div>
+        <div style="position: absolute; bottom: -18px; right: 0; font-size: 10px; color: #5C5C5C;">2/3</div>
+      </div>
+
+      <!-- Legend -->
+      <div style="display: flex; gap: 16px; margin-top: 24px; justify-content: center;">
+        <div style="display: flex; align-items: center; gap: 6px;">
+          <div style="width: 10px; height: 10px; border-radius: 2px; background: #C41E2A;"></div>
+          <span style="font-size: 11px; color: #A0A0A0;">Total</span>
+        </div>
+        <div style="display: flex; align-items: center; gap: 6px;">
+          <div style="width: 10px; height: 10px; border-radius: 2px; background: #2563EB;"></div>
+          <span style="font-size: 11px; color: #A0A0A0;">Billable</span>
+        </div>
+        <div style="display: flex; align-items: center; gap: 6px;">
+          <div style="width: 10px; height: 10px; border-radius: 2px; background: #059669;"></div>
+          <span style="font-size: 11px; color: #A0A0A0;">AI Resolved</span>
+        </div>
+        <div style="display: flex; align-items: center; gap: 6px;">
+          <div style="width: 10px; height: 10px; border-radius: 2px; background: #D97706;"></div>
+          <span style="font-size: 11px; color: #A0A0A0;">Escalated</span>
+        </div>
+      </div>
+    </div>
+
+  </div>
+
+  <div class="mode-panel light">
+    <div class="mode-label">Chart Color Assignments — Fill In New Colors</div>
+
+    <div class="swatch-row">
+      <div class="swatch" style="background: #C41E2A;"></div>
+      <div class="swatch-info">
+        <div class="swatch-name">Chart Line: Total</div>
+        <div class="swatch-hex">#C41E2A (brand primary)</div>
+      </div>
+      <input class="swatch-input" placeholder="New color">
+    </div>
+
+    <div class="swatch-row">
+      <div class="swatch" style="background: #2563EB;"></div>
+      <div class="swatch-info">
+        <div class="swatch-name">Chart Line: Billable</div>
+        <div class="swatch-hex">#2563EB</div>
+      </div>
+      <input class="swatch-input" placeholder="New color">
+    </div>
+
+    <div class="swatch-row">
+      <div class="swatch" style="background: #059669;"></div>
+      <div class="swatch-info">
+        <div class="swatch-name">Chart Line: AI Resolved</div>
+        <div class="swatch-hex">#059669</div>
+      </div>
+      <input class="swatch-input" placeholder="New color">
+    </div>
+
+    <div class="swatch-row">
+      <div class="swatch" style="background: #D97706;"></div>
+      <div class="swatch-info">
+        <div class="swatch-name">Chart Line: Escalated</div>
+        <div class="swatch-hex">#D97706</div>
+      </div>
+      <input class="swatch-input" placeholder="New color">
+    </div>
+
+    <div class="swatch-row">
+      <div class="swatch" style="background: #DB2777;"></div>
+      <div class="swatch-info">
+        <div class="swatch-name">Chart (spare / 5th series)</div>
+        <div class="swatch-hex">#DB2777</div>
+      </div>
+      <input class="swatch-input" placeholder="New color">
+    </div>
+
+  </div>
+</div>
+
+<!-- ================================================================
+     SECTION 6: STATUS INDICATORS & PRIORITY
+     ================================================================ -->
+
+<h2>6. Status Indicators & Priority Levels</h2>
+
+<div class="mode-pair">
+  <div class="mode-panel dark">
+    <div class="mode-label">Dark Mode — Status Badges</div>
+
+    <div style="margin-bottom: 12px;">
+      <strong style="font-size: 12px; color: #A0A0A0;">Conversation Status:</strong><br><br>
+      <span class="sample-badge" style="background: rgba(5,150,105,0.15); color: #6ee7b7;">Active</span>&nbsp;
+      <span class="sample-badge" style="background: rgba(37,99,235,0.15); color: #93c5fd;">Waiting</span>&nbsp;
+      <span class="sample-badge" style="background: rgba(5,150,105,0.15); color: #6ee7b7;">Resolved</span>&nbsp;
+      <span class="sample-badge" style="background: rgba(211,47,47,0.15); color: #fca5a5;">Escalated</span>&nbsp;
+      <span class="sample-badge" style="background: rgba(255,255,255,0.1); color: #A0A0A0;">Closed</span>
+    </div>
+
+    <div style="margin-bottom: 12px;">
+      <strong style="font-size: 12px; color: #A0A0A0;">Priority Levels:</strong><br><br>
+      <span class="sample-badge" style="background: rgba(239,68,68,0.15); color: #fca5a5;">&#9679; Urgent <span style="font-family: 'JetBrains Mono'; font-size: 10px; opacity: 0.7;">#ef4444</span></span>&nbsp;
+      <span class="sample-badge" style="background: rgba(249,115,22,0.15); color: #fdba74;">&#9679; High <span style="font-family: 'JetBrains Mono'; font-size: 10px; opacity: 0.7;">#f97316</span></span>&nbsp;
+      <span class="sample-badge" style="background: rgba(245,158,11,0.15); color: #fcd34d;">&#9679; Medium <span style="font-family: 'JetBrains Mono'; font-size: 10px; opacity: 0.7;">#f59e0b</span></span>&nbsp;
+      <span class="sample-badge" style="background: rgba(148,163,184,0.15); color: #cbd5e1;">&#9679; Low <span style="font-family: 'JetBrains Mono'; font-size: 10px; opacity: 0.7;">#94a3b8</span></span>
+    </div>
+
+    <div>
+      <strong style="font-size: 12px; color: #A0A0A0;">Team Member Avatars:</strong><br><br>
+      <span class="avatar" style="background: #C41E2A;">MV</span>
+      <span class="avatar" style="background: #2563EB;">AK</span>
+      <span class="avatar" style="background: #059669;">DP</span>
+      <span class="avatar" style="background: #D97706;">AR</span>
+      <span class="avatar" style="background: #7C3AED;">JL</span>
+      <span class="avatar" style="background: #DB2777;">SM</span>
+    </div>
+
+  </div>
+
+  <div class="mode-panel light">
+    <div class="mode-label">Status & Priority Colors — Fill In New Colors</div>
+
+    <h3 style="margin-top: 0;">Priority Dot Colors</h3>
+
+    <div class="swatch-row">
+      <div class="swatch" style="background: #ef4444;"></div>
+      <div class="swatch-info">
+        <div class="swatch-name">Urgent</div>
+        <div class="swatch-hex">#ef4444</div>
+      </div>
+      <input class="swatch-input" placeholder="New color">
+    </div>
+
+    <div class="swatch-row">
+      <div class="swatch" style="background: #f97316;"></div>
+      <div class="swatch-info">
+        <div class="swatch-name">High</div>
+        <div class="swatch-hex">#f97316</div>
+      </div>
+      <input class="swatch-input" placeholder="New color">
+    </div>
+
+    <div class="swatch-row">
+      <div class="swatch" style="background: #f59e0b;"></div>
+      <div class="swatch-info">
+        <div class="swatch-name">Medium</div>
+        <div class="swatch-hex">#f59e0b</div>
+      </div>
+      <input class="swatch-input" placeholder="New color">
+    </div>
+
+    <div class="swatch-row">
+      <div class="swatch" style="background: #94a3b8;"></div>
+      <div class="swatch-info">
+        <div class="swatch-name">Low</div>
+        <div class="swatch-hex">#94a3b8</div>
+      </div>
+      <input class="swatch-input" placeholder="New color">
+    </div>
+
+    <h3>Avatar Palette (6 slots)</h3>
+
+    <div class="swatch-row">
+      <div class="swatch" style="background: #C41E2A; border-radius: 50%;"></div>
+      <div class="swatch-info">
+        <div class="swatch-name">Avatar 1 (brand)</div>
+        <div class="swatch-hex">#C41E2A</div>
+      </div>
+      <input class="swatch-input" placeholder="New color">
+    </div>
+
+    <div class="swatch-row">
+      <div class="swatch" style="background: #2563EB; border-radius: 50%;"></div>
+      <div class="swatch-info">
+        <div class="swatch-name">Avatar 2 (blue)</div>
+        <div class="swatch-hex">#2563EB</div>
+      </div>
+      <input class="swatch-input" placeholder="New color">
+    </div>
+
+    <div class="swatch-row">
+      <div class="swatch" style="background: #059669; border-radius: 50%;"></div>
+      <div class="swatch-info">
+        <div class="swatch-name">Avatar 3 (green)</div>
+        <div class="swatch-hex">#059669</div>
+      </div>
+      <input class="swatch-input" placeholder="New color">
+    </div>
+
+    <div class="swatch-row">
+      <div class="swatch" style="background: #D97706; border-radius: 50%;"></div>
+      <div class="swatch-info">
+        <div class="swatch-name">Avatar 4 (amber)</div>
+        <div class="swatch-hex">#D97706</div>
+      </div>
+      <input class="swatch-input" placeholder="New color">
+    </div>
+
+    <div class="swatch-row">
+      <div class="swatch" style="background: #7C3AED; border-radius: 50%;"></div>
+      <div class="swatch-info">
+        <div class="swatch-name">Avatar 5 (violet)</div>
+        <div class="swatch-hex">#7C3AED</div>
+      </div>
+      <input class="swatch-input" placeholder="New color">
+    </div>
+
+    <div class="swatch-row">
+      <div class="swatch" style="background: #DB2777; border-radius: 50%;"></div>
+      <div class="swatch-info">
+        <div class="swatch-name">Avatar 6 (pink)</div>
+        <div class="swatch-hex">#DB2777</div>
+      </div>
+      <input class="swatch-input" placeholder="New color">
+    </div>
+
+  </div>
+</div>
+
+<!-- ================================================================
+     SECTION 7: INTERACTIVE STATES
+     ================================================================ -->
+
+<h2>7. Interactive States</h2>
+
+<div class="mode-pair">
+  <div class="mode-panel dark">
+    <div class="mode-label">Dark Mode — Hover & Focus</div>
+
+    <div class="swatch-row">
+      <div class="swatch" style="background: rgba(196,30,42,0.12);"></div>
+      <div class="swatch-info">
+        <div class="swatch-name">Active Nav Background</div>
+        <div class="swatch-hex">rgba(196,30,42,0.12)</div>
+      </div>
+      <input class="swatch-input" placeholder="New color" style="background: rgba(255,255,255,0.05); border-color: #5C5C5C; color: #F5F5F5;">
+    </div>
+
+    <div class="swatch-row">
+      <div class="swatch" style="background: rgba(255,255,255,0.04);"></div>
+      <div class="swatch-info">
+        <div class="swatch-name">Hover Background (subtle)</div>
+        <div class="swatch-hex">rgba(255,255,255,0.04)</div>
+      </div>
+      <input class="swatch-input" placeholder="New color" style="background: rgba(255,255,255,0.05); border-color: #5C5C5C; color: #F5F5F5;">
+    </div>
+
+    <div class="swatch-row">
+      <div class="swatch" style="background: rgba(196,30,42,0.25); border: 1px solid rgba(196,30,42,0.4);"></div>
+      <div class="swatch-info">
+        <div class="swatch-name">Selected Item Border</div>
+        <div class="swatch-hex">rgba(196,30,42,0.25)</div>
+      </div>
+      <input class="swatch-input" placeholder="New color" style="background: rgba(255,255,255,0.05); border-color: #5C5C5C; color: #F5F5F5;">
+    </div>
+
+    <div class="swatch-row">
+      <div class="swatch" style="background: rgba(255,255,255,0.06);"></div>
+      <div class="swatch-info">
+        <div class="swatch-name">Progress Bar Track</div>
+        <div class="swatch-hex">rgba(255,255,255,0.06)</div>
+      </div>
+      <input class="swatch-input" placeholder="New color" style="background: rgba(255,255,255,0.05); border-color: #5C5C5C; color: #F5F5F5;">
+    </div>
+
+  </div>
+
+  <div class="mode-panel light">
+    <div class="mode-label">Light Mode — Hover & Focus</div>
+
+    <div class="swatch-row">
+      <div class="swatch" style="background: #f1f3f5;"></div>
+      <div class="swatch-info">
+        <div class="swatch-name">Hover Background</div>
+        <div class="swatch-hex">#f1f3f5</div>
+      </div>
+      <input class="swatch-input" placeholder="New color">
+    </div>
+
+    <div class="swatch-row">
+      <div class="swatch" style="background: #C41E2A; opacity: 0.1;"></div>
+      <div class="swatch-info">
+        <div class="swatch-name">Active Nav Background</div>
+        <div class="swatch-hex">Mantine default (brand light)</div>
+      </div>
+      <input class="swatch-input" placeholder="New color">
+    </div>
+
+    <div class="swatch-row">
+      <div class="swatch" style="background: #f1f3f5;"></div>
+      <div class="swatch-info">
+        <div class="swatch-name">Progress Bar Track</div>
+        <div class="swatch-hex">#f1f3f5</div>
+      </div>
+      <input class="swatch-input" placeholder="New color">
+    </div>
+
+  </div>
+</div>
+
+<!-- ================================================================
+     SECTION 8: WIDGET PREVIEW COLORS
+     ================================================================ -->
+
+<h2>8. Chat Widget Preview (Merchant-Facing)</h2>
+<p class="annotation">The widget uses the merchant's configured colors. These are the default preview values.</p>
+
+<div class="mode-pair">
+  <div class="mode-panel dark">
+    <div class="mode-label">Widget Dark Mode Preview</div>
+
+    <div style="width: 260px; border-radius: 12px; overflow: hidden; border: 1px solid rgba(255,255,255,0.08);">
+      <!-- Widget header -->
+      <div style="background: #C41E2A; padding: 14px 16px; color: #fff;">
+        <div style="font-size: 14px; font-weight: 600;">Agent Red</div>
+        <div style="font-size: 11px; opacity: 0.8;">Typically replies in seconds</div>
+      </div>
+      <!-- Widget body -->
+      <div style="background: #1E1E1E; padding: 16px; min-height: 120px;">
+        <!-- Agent message -->
+        <div style="background: #2A2A2A; border-radius: 12px 12px 12px 4px; padding: 10px 14px; margin-bottom: 8px; max-width: 200px;">
+          <div style="font-size: 12px; color: #E0E0E0;">Hi! How can I help you today?</div>
+        </div>
+        <!-- Customer message -->
+        <div style="background: #C41E2A; border-radius: 12px 12px 4px 12px; padding: 10px 14px; margin-left: auto; max-width: 200px; text-align: right;">
+          <div style="font-size: 12px; color: #fff;">Where is my order?</div>
+        </div>
+      </div>
+      <!-- Widget input -->
+      <div style="background: #2A2A2A; padding: 10px 16px; border-top: 1px solid rgba(255,255,255,0.06);">
+        <div style="background: #3A3A3A; border-radius: 20px; padding: 8px 14px; font-size: 12px; color: #787878;">Type a message...</div>
+      </div>
+    </div>
+
+  </div>
+
+  <div class="mode-panel light">
+    <div class="mode-label">Widget Colors — Fill In New Colors</div>
+
+    <div class="swatch-row">
+      <div class="swatch" style="background: #C41E2A;"></div>
+      <div class="swatch-info">
+        <div class="swatch-name">Widget Header / Customer Bubble</div>
+        <div class="swatch-hex">#C41E2A (brand primary)</div>
+      </div>
+      <input class="swatch-input" placeholder="New color">
+    </div>
+
+    <div class="swatch-row">
+      <div class="swatch" style="background: #1E1E1E;"></div>
+      <div class="swatch-info">
+        <div class="swatch-name">Widget Body (dark mode)</div>
+        <div class="swatch-hex">#1E1E1E</div>
+      </div>
+      <input class="swatch-input" placeholder="New color">
+    </div>
+
+    <div class="swatch-row">
+      <div class="swatch" style="background: #2A2A2A;"></div>
+      <div class="swatch-info">
+        <div class="swatch-name">Agent Bubble (dark mode)</div>
+        <div class="swatch-hex">#2A2A2A</div>
+      </div>
+      <input class="swatch-input" placeholder="New color">
+    </div>
+
+    <div class="swatch-row">
+      <div class="swatch" style="background: #69db7c;"></div>
+      <div class="swatch-info">
+        <div class="swatch-name">Online Status Dot</div>
+        <div class="swatch-hex">#69db7c</div>
+      </div>
+      <input class="swatch-input" placeholder="New color">
+    </div>
+
+    <div class="swatch-row">
+      <div class="swatch" style="background: #ff6b6b;"></div>
+      <div class="swatch-info">
+        <div class="swatch-name">Offline Status Dot</div>
+        <div class="swatch-hex">#ff6b6b</div>
+      </div>
+      <input class="swatch-input" placeholder="New color">
+    </div>
+
+    <div class="swatch-row">
+      <div class="swatch" style="background: #ffd43b;"></div>
+      <div class="swatch-info">
+        <div class="swatch-name">Away Status Dot</div>
+        <div class="swatch-hex">#ffd43b</div>
+      </div>
+      <input class="swatch-input" placeholder="New color">
+    </div>
+
+  </div>
+</div>
+
+
+<div class="section-break"></div>
+
+<!-- ================================================================
+     SECTION 9: FULL REFERENCE TABLE
+     ================================================================ -->
+
+<h2>9. Complete Token Reference Table</h2>
+<p class="annotation">This is the master list. Fill in the "New Color" column for any value you want to change. Every row maps to a specific CSS token in the codebase.</p>
+
+<table class="ref-table">
+  <thead>
+    <tr>
+      <th style="width: 30%;">Element / Token</th>
+      <th style="width: 20%;">Dark Mode Current</th>
+      <th style="width: 15%;" class="new-color">Dark Mode New</th>
+      <th style="width: 20%;">Light Mode Current</th>
+      <th style="width: 15%;" class="new-color">Light Mode New</th>
+    </tr>
+  </thead>
+  <tbody>
+    <tr><td colspan="5" style="background: #f1f3f5; font-weight: 700; font-size: 12px; text-transform: uppercase; letter-spacing: 0.05em;">Surfaces</td></tr>
+    <tr><td>Page Background (deepest)</td><td class="mono">#111111</td><td class="new-color"></td><td class="mono">#F5F5F5</td><td class="new-color"></td></tr>
+    <tr><td>Main Surface / Sidebar / Navbar</td><td class="mono">#1E1E1E</td><td class="new-color"></td><td class="mono">Mantine default (white)</td><td class="new-color"></td></tr>
+    <tr><td>Header Background</td><td class="mono">Mantine default (dark.7)</td><td class="new-color"></td><td class="mono">#f0f0f0</td><td class="new-color"></td></tr>
+    <tr><td>Card / Elevated Surface (Paper)</td><td class="mono">#2A2A2A</td><td class="new-color"></td><td class="mono">#FFFFFF</td><td class="new-color"></td></tr>
+    <tr><td>Input / Interactive Surface</td><td class="mono">#3A3A3A</td><td class="new-color"></td><td class="mono">#f1f3f5</td><td class="new-color"></td></tr>
+    <tr><td>Tooltip Background</td><td class="mono">#2A2A2A</td><td class="new-color"></td><td class="mono">#FFFFFF</td><td class="new-color"></td></tr>
+
+    <tr><td colspan="5" style="background: #f1f3f5; font-weight: 700; font-size: 12px; text-transform: uppercase; letter-spacing: 0.05em;">Text</td></tr>
+    <tr><td>Primary Text</td><td class="mono">#F5F5F5</td><td class="new-color"></td><td class="mono">#1E1E1E</td><td class="new-color"></td></tr>
+    <tr><td>Secondary Text</td><td class="mono">#E0E0E0</td><td class="new-color"></td><td class="mono">#3A3A3A</td><td class="new-color"></td></tr>
+    <tr><td>Muted / Dimmed Text</td><td class="mono">#A0A0A0</td><td class="new-color"></td><td class="mono">#5C5C5C</td><td class="new-color"></td></tr>
+    <tr><td>Tertiary / Placeholder Text</td><td class="mono">#787878</td><td class="new-color"></td><td class="mono">#787878</td><td class="new-color"></td></tr>
+    <tr><td>Disabled / Chart Axis Text</td><td class="mono">#5C5C5C</td><td class="new-color"></td><td class="mono">#868e96</td><td class="new-color"></td></tr>
+
+    <tr><td colspan="5" style="background: #f1f3f5; font-weight: 700; font-size: 12px; text-transform: uppercase; letter-spacing: 0.05em;">Borders & Separators</td></tr>
+    <tr><td>Card Border</td><td class="mono">rgba(255,255,255,0.08)</td><td class="new-color"></td><td class="mono">#E0E0E0</td><td class="new-color"></td></tr>
+    <tr><td>Subtle Divider (header/footer)</td><td class="mono">rgba(255,255,255,0.06)</td><td class="new-color"></td><td class="mono">#E0E0E0</td><td class="new-color"></td></tr>
+    <tr><td>Chart Grid Lines</td><td class="mono">rgba(255,255,255,0.06)</td><td class="new-color"></td><td class="mono">#e9ecef</td><td class="new-color"></td></tr>
+    <tr><td>Tooltip Border</td><td class="mono">rgba(255,255,255,0.1)</td><td class="new-color"></td><td class="mono">#dee2e6</td><td class="new-color"></td></tr>
+
+    <tr><td colspan="5" style="background: #f1f3f5; font-weight: 700; font-size: 12px; text-transform: uppercase; letter-spacing: 0.05em;">Brand & Accent (both modes)</td></tr>
+    <tr><td>Brand Primary</td><td class="mono" colspan="2" style="text-align: center;">#C41E2A</td><td class="new-color" colspan="2"></td></tr>
+    <tr><td>Brand Primary Dark (hover)</td><td class="mono" colspan="2" style="text-align: center;">#9B1420</td><td class="new-color" colspan="2"></td></tr>
+    <tr><td>Brand Primary Light (tint)</td><td class="mono" colspan="2" style="text-align: center;">#F2D4D6</td><td class="new-color" colspan="2"></td></tr>
+    <tr><td>Blue (info, billable)</td><td class="mono" colspan="2" style="text-align: center;">#2563EB</td><td class="new-color" colspan="2"></td></tr>
+    <tr><td>Green (success, AI resolved)</td><td class="mono" colspan="2" style="text-align: center;">#059669</td><td class="new-color" colspan="2"></td></tr>
+    <tr><td>Amber (warning, escalated)</td><td class="mono" colspan="2" style="text-align: center;">#D97706</td><td class="new-color" colspan="2"></td></tr>
+    <tr><td>Red (error, danger)</td><td class="mono" colspan="2" style="text-align: center;">#D32F2F</td><td class="new-color" colspan="2"></td></tr>
+    <tr><td>Violet (memory indicator)</td><td class="mono" colspan="2" style="text-align: center;">#7C3AED</td><td class="new-color" colspan="2"></td></tr>
+    <tr><td>Deep Blue (info semantic)</td><td class="mono" colspan="2" style="text-align: center;">#1E3A5F</td><td class="new-color" colspan="2"></td></tr>
+    <tr><td>Pink (avatar 6th slot)</td><td class="mono" colspan="2" style="text-align: center;">#DB2777</td><td class="new-color" colspan="2"></td></tr>
+
+    <tr><td colspan="5" style="background: #f1f3f5; font-weight: 700; font-size: 12px; text-transform: uppercase; letter-spacing: 0.05em;">Interactive States</td></tr>
+    <tr><td>Active Nav Background</td><td class="mono">rgba(196,30,42,0.12)</td><td class="new-color"></td><td class="mono">Mantine default</td><td class="new-color"></td></tr>
+    <tr><td>Hover Background (subtle)</td><td class="mono">rgba(255,255,255,0.04)</td><td class="new-color"></td><td class="mono">#f1f3f5</td><td class="new-color"></td></tr>
+    <tr><td>Selected Item Border</td><td class="mono">rgba(196,30,42,0.25)</td><td class="new-color"></td><td class="mono">Mantine default</td><td class="new-color"></td></tr>
+    <tr><td>Progress Bar Track</td><td class="mono">rgba(255,255,255,0.06)</td><td class="new-color"></td><td class="mono">#f1f3f5</td><td class="new-color"></td></tr>
+
+    <tr><td colspan="5" style="background: #f1f3f5; font-weight: 700; font-size: 12px; text-transform: uppercase; letter-spacing: 0.05em;">Priority Indicators</td></tr>
+    <tr><td>Priority: Urgent</td><td class="mono" colspan="2" style="text-align: center;">#ef4444</td><td class="new-color" colspan="2"></td></tr>
+    <tr><td>Priority: High</td><td class="mono" colspan="2" style="text-align: center;">#f97316</td><td class="new-color" colspan="2"></td></tr>
+    <tr><td>Priority: Medium</td><td class="mono" colspan="2" style="text-align: center;">#f59e0b</td><td class="new-color" colspan="2"></td></tr>
+    <tr><td>Priority: Low</td><td class="mono" colspan="2" style="text-align: center;">#94a3b8</td><td class="new-color" colspan="2"></td></tr>
+
+    <tr><td colspan="5" style="background: #f1f3f5; font-weight: 700; font-size: 12px; text-transform: uppercase; letter-spacing: 0.05em;">Widget Defaults</td></tr>
+    <tr><td>Widget Header / Customer Bubble</td><td class="mono" colspan="2" style="text-align: center;">#C41E2A</td><td class="new-color" colspan="2"></td></tr>
+    <tr><td>Widget Online Dot</td><td class="mono" colspan="2" style="text-align: center;">#69db7c</td><td class="new-color" colspan="2"></td></tr>
+    <tr><td>Widget Offline Dot</td><td class="mono" colspan="2" style="text-align: center;">#ff6b6b</td><td class="new-color" colspan="2"></td></tr>
+    <tr><td>Widget Away Dot</td><td class="mono" colspan="2" style="text-align: center;">#ffd43b</td><td class="new-color" colspan="2"></td></tr>
+  </tbody>
+</table>
+
+<div class="section-break"></div>
+
+<h2>10. Notes & Additional Guidance</h2>
+
+<div style="background: #f8f9fa; border-radius: 8px; padding: 20px; border: 1px solid #E0E0E0; font-size: 13px; line-height: 1.7;">
+  <p><strong>Typography:</strong> Inter (body) + JetBrains Mono (code). These are fixed and not part of this color review.</p>
+  <p style="margin-top: 8px;"><strong>Dark mode is the default.</strong> Most merchants will see dark mode first. Prioritize dark mode polish.</p>
+  <p style="margin-top: 8px;"><strong>Accessibility:</strong> All text colors must maintain WCAG AA contrast (4.5:1 for body text, 3:1 for large text) against their background.</p>
+  <p style="margin-top: 8px;"><strong>Pure neutral greys:</strong> Current dark mode uses no blue/purple tints. If you introduce tinted greys, please note the tint direction (warm/cool) so we can apply it consistently.</p>
+  <p style="margin-top: 8px;"><strong>Brand primary (#C41E2A):</strong> This is the approved brand color. Changes here affect the entire product identity — logo, buttons, accents, charts, widget header.</p>
+  <p style="margin-top: 8px;"><strong>Returning the worksheet:</strong> Fill in only the values you want changed. You can return this HTML file with values typed in, a PDF with annotations, or a simple spreadsheet mapping "Token Name → New Color." Any format works.</p>
+</div>
+
+<div style="margin-top: 40px; padding-top: 20px; border-top: 1px solid #E0E0E0; font-size: 11px; color: #A0A0A0; text-align: center;">
+  Agent Red Customer Experience &mdash; Color Palette Worksheet v1.0 &mdash; February 2026<br>
+  &copy; 2026 Remaker Digital, a DBA of VanDusen &amp; Palmeter, LLC. All rights reserved.
+</div>
+
+</body>
+</html>
