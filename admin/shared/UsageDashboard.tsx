@@ -428,11 +428,13 @@ const st = {
 // Helpers
 // ---------------------------------------------------------------------------
 
-function formatNumber(n: number): string {
+function formatNumber(n: number | undefined | null): string {
+  if (n == null) return '0';
   return n.toLocaleString(undefined, { maximumFractionDigits: 0 });
 }
 
-function formatCurrency(n: number): string {
+function formatCurrency(n: number | undefined | null): string {
+  if (n == null) return '$0.00';
   return `$${n.toFixed(2)}`;
 }
 
@@ -497,7 +499,7 @@ const UsageMeter: React.FC<UsageMeterProps> = ({ usage }) => {
             color: isOverage ? '#C41E2A' : percent > 80 ? '#f59e0b' : '#16a34a',
           }}
         >
-          {percent.toFixed(0)}%
+          {(percent ?? 0).toFixed(0)}%
         </span>
       </div>
 
@@ -951,8 +953,8 @@ export const UsageDashboard: React.FC<BaseComponentProps> = ({
           <>
             <UsageMeter usage={usage} />
             <SummaryCards usage={usage} />
-            {usage.activeAlerts.length > 0 && (
-              <AlertsPanel alerts={usage.activeAlerts} />
+            {(usage.activeAlerts ?? []).length > 0 && (
+              <AlertsPanel alerts={usage.activeAlerts ?? []} />
             )}
           </>
         ) : (

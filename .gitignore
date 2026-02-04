@@ -116,6 +116,7 @@ override.tf.json
 *.temp
 *.bak
 *.backup
+*.build-timestamp
 
 # =============================================================================
 # PDF Generation (one-off scripts, not part of product)

@@ -82,11 +82,15 @@ export const ShopifyAppLayout: React.FC<ShopifyAppLayoutProps> = ({
   const getSessionToken = useCallback(async (): Promise<string> => {
     // In Shopify embedded apps, shopify.idToken() provides the session token.
     // This is the App Bridge 4.x pattern (replaces getSessionToken from 3.x).
-    const shopify = (window as unknown as { shopify?: { idToken: () => Promise<string> } }).shopify;
-    if (shopify?.idToken) {
-      return await shopify.idToken();
+    try {
+      const shopify = (window as unknown as { shopify?: { idToken: () => Promise<string> } }).shopify;
+      if (shopify?.idToken) {
+        return await shopify.idToken();
+      }
+    } catch (e) {
+      console.error('[AgentRed] App Bridge idToken() failed:', e);
     }
-    throw new Error('Shopify App Bridge not available');
+    throw new Error('Shopify App Bridge not available — this app must be opened from the Shopify admin.');
   }, []);
 
   // ---- Authenticated fetch -----------------------------------------------
@@ -124,9 +128,25 @@ export const ShopifyAppLayout: React.FC<ShopifyAppLayoutProps> = ({
 
     async function resolveTenant() {
       try {
-        const resp = await apiFetch('/api/tenants/lookup');
+        const shop = shopifyConfig.shop || '';
+        if (!shop) {
+          throw new Error('Shop domain not found — this app must be opened from the Shopify admin.');
+        }
+
+        // Try authenticated fetch first, fall back to unauthenticated lookup
+        let resp: Response;
+        try {
+          resp = await apiFetch(`/api/tenants/lookup?shop=${encodeURIComponent(shop)}`);
+        } catch {
+          // App Bridge may not be available (e.g. during initial load) —
+          // tenant lookup is auth-exempt, so try without auth
+          resp = await fetch(`${API_BASE_URL}/api/tenants/lookup?shop=${encodeURIComponent(shop)}`);
+        }
+
         if (!resp.ok) throw new Error(`Tenant lookup failed: ${resp.status}`);
         const data = await resp.json();
+        if (!data.found) throw new Error(`Store "${shop}" is not registered with Agent Red.`);
+
         if (!cancelled) {
           setTenantContext({
             tenantId: data.tenant_id,
@@ -138,6 +158,7 @@ export const ShopifyAppLayout: React.FC<ShopifyAppLayoutProps> = ({
           setLoading(false);
         }
       } catch (err) {
+        console.error('[AgentRed] Tenant resolution failed:', err);
         if (!cancelled) {
           setError(err instanceof Error ? err.message : 'Failed to load tenant');
           setLoading(false);
@@ -216,7 +237,11 @@ export const ShopifyAppLayout: React.FC<ShopifyAppLayoutProps> = ({
         {error && (
           <div style={{ padding: '16px' }}>
             <Banner tone="critical">
-              <p>Failed to load: {error}</p>
+              <p>{error}</p>
+              <p style={{ marginTop: '8px', fontSize: '13px' }}>
+                If you are seeing this outside of Shopify Admin, open your app from
+                Shopify Admin → Apps → Agent Red Customer Experience.
+              </p>
             </Banner>
           </div>
         )}

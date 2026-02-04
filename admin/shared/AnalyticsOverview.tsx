@@ -51,7 +51,8 @@ const BAR_COLORS = [
 // Utilities
 // ---------------------------------------------------------------------------
 
-function formatMs(ms: number): string {
+function formatMs(ms: number | undefined | null): string {
+  if (ms == null) return '--';
   if (ms < 1000) return `${Math.round(ms)}ms`;
   const sec = ms / 1000;
   if (sec < 60) return `${sec.toFixed(1)}s`;
@@ -60,11 +61,13 @@ function formatMs(ms: number): string {
   return `${min}m ${remSec}s`;
 }
 
-function formatPercent(value: number): string {
+function formatPercent(value: number | undefined | null): string {
+  if (value == null) return '--';
   return `${(value * 100).toFixed(1)}%`;
 }
 
-function formatNumber(value: number): string {
+function formatNumber(value: number | undefined | null): string {
+  if (value == null) return '0';
   if (value >= 1_000_000) return `${(value / 1_000_000).toFixed(1)}M`;
   if (value >= 1_000) return `${(value / 1_000).toFixed(1)}K`;
   return value.toLocaleString();
@@ -238,7 +241,7 @@ const IntentBarChart: React.FC<IntentBarChartProps> = ({ intents }) => {
   if (intents.length === 0) {
     return (
       <EmptyState
-        icon="\u{1F4CA}"
+        icon={String.fromCodePoint(0x1F4CA)}
         title="No intent data"
         subtitle="Intent breakdown will appear once conversations are processed."
       />
@@ -328,7 +331,7 @@ const KnowledgeGapsTable: React.FC<KnowledgeGapsTableProps> = ({ gaps }) => {
   if (gaps.length === 0) {
     return (
       <EmptyState
-        icon="\u{2705}"
+        icon={String.fromCodePoint(0x2705)}
         title="No knowledge gaps detected"
         subtitle="Your knowledge base is covering all customer queries."
       />
@@ -487,8 +490,8 @@ export const AnalyticsOverview: React.FC<BaseComponentProps> = ({
   }
 
   // Determine rating color for CSAT
-  function csatColor(score: number | null): string {
-    if (score === null) return COLOR_GRAY;
+  function csatColor(score: number | null | undefined): string {
+    if (score == null) return COLOR_GRAY;
     if (score >= 4.0) return COLOR_SUCCESS;
     if (score >= 3.0) return COLOR_WARNING;
     return COLOR_DANGER;
@@ -591,8 +594,8 @@ export const AnalyticsOverview: React.FC<BaseComponentProps> = ({
             />
             <SummaryCard
               label="CSAT"
-              value={summary.customerSatisfaction !== null ? summary.customerSatisfaction.toFixed(1) : '--'}
-              subtext={summary.customerSatisfaction !== null ? 'out of 5.0' : 'No ratings yet'}
+              value={summary.customerSatisfaction != null ? summary.customerSatisfaction.toFixed(1) : '--'}
+              subtext={summary.customerSatisfaction != null ? 'out of 5.0' : 'No ratings yet'}
               accentColor={csatColor(summary.customerSatisfaction)}
             />
           </div>

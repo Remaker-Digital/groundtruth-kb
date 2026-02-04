@@ -763,7 +763,7 @@ export const KnowledgeBaseManager: React.FC<BaseComponentProps> = ({
 
       {!kbLoading && !kbError && articles.length === 0 && (
         <EmptyState
-          icon="\u{1F4DA}"
+          icon={String.fromCodePoint(0x1F4DA)}
           title="No articles yet"
           subtitle="Create your first knowledge base article to help your AI agent answer customer questions."
         />
@@ -771,7 +771,7 @@ export const KnowledgeBaseManager: React.FC<BaseComponentProps> = ({
 
       {!kbLoading && !kbError && articles.length > 0 && filteredArticles.length === 0 && (
         <EmptyState
-          icon="\u{1F50D}"
+          icon={String.fromCodePoint(0x1F50D)}
           title="No matching articles"
           subtitle="Try adjusting your search query or filters."
         />

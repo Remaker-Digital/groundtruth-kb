@@ -39,6 +39,9 @@ from typing import Any
 from fastapi import APIRouter, HTTPException
 from pydantic import BaseModel, Field
 
+# Cosmos DB fallback for tenant lookup (populated at startup)
+_tenant_repo = None
+
 logger = logging.getLogger(__name__)
 
 
@@ -151,8 +154,8 @@ class TenantResponse(BaseModel):
     tier: str | None
     interval: str | None
     addons: list[str]
-    created_at: int
-    updated_at: int
+    created_at: str | int | None = None
+    updated_at: str | int | None = None
 
 
 class TenantLookupResponse(BaseModel):
@@ -524,6 +527,40 @@ def _lookup_tenant(
 
 
 # ---------------------------------------------------------------------------
+# Cosmos DB fallback configuration
+# ---------------------------------------------------------------------------
+
+
+def configure_tenant_lookup_repo(tenant_repo: Any) -> None:
+    """Wire Cosmos DB TenantRepository for lookup fallback.
+
+    Called from main.py startup to enable /api/tenants/lookup and
+    /api/tenants/{tenant_id} to query Cosmos DB when the in-memory
+    index has no match (e.g., tenants provisioned via scripts).
+    """
+    global _tenant_repo  # noqa: PLW0603
+    _tenant_repo = tenant_repo
+    logger.info("Tenant lookup Cosmos DB fallback configured")
+
+
+async def _cosmos_lookup(
+    tenant_id: str | None = None,
+    shopify_shop_domain: str | None = None,
+) -> dict[str, Any] | None:
+    """Fallback to Cosmos DB when in-memory index misses."""
+    if _tenant_repo is None:
+        return None
+    try:
+        if shopify_shop_domain:
+            return await _tenant_repo.find_by_shopify_domain(shopify_shop_domain)
+        if tenant_id:
+            return await _tenant_repo.read(tenant_id, tenant_id)
+    except Exception as exc:
+        logger.warning("Cosmos DB tenant lookup failed: %s", exc)
+    return None
+
+
+# ---------------------------------------------------------------------------
 # Endpoints
 # ---------------------------------------------------------------------------
 
@@ -556,6 +593,16 @@ async def lookup_tenant_endpoint(
     )
 
     if not tenant:
+        # Fallback to Cosmos DB for tenants provisioned outside webhook flow
+        doc = await _cosmos_lookup(shopify_shop_domain=shop)
+        if doc:
+            return TenantLookupResponse(
+                found=True,
+                tenant_id=doc.get("tenant_id") or doc.get("id"),
+                status=doc.get("status"),
+                tier=doc.get("tier"),
+                billing_channel=doc.get("billing_channel"),
+            )
         return TenantLookupResponse(found=False)
 
     return TenantLookupResponse(
@@ -576,7 +623,20 @@ async def get_tenant_endpoint(tenant_id: str) -> TenantResponse:
     """
     tenant = get_tenant(tenant_id=tenant_id)
     if not tenant:
-        raise HTTPException(status_code=404, detail="Tenant not found.")
+        # Fallback to Cosmos DB
+        doc = await _cosmos_lookup(tenant_id=tenant_id)
+        if not doc:
+            raise HTTPException(status_code=404, detail="Tenant not found.")
+        return TenantResponse(
+            tenant_id=doc.get("tenant_id") or doc.get("id"),
+            status=doc.get("status"),
+            billing_channel=doc.get("billing_channel"),
+            tier=doc.get("tier"),
+            interval=doc.get("interval"),
+            addons=doc.get("addons", []),
+            created_at=doc.get("created_at"),
+            updated_at=doc.get("updated_at"),
+        )
 
     return TenantResponse(
         tenant_id=tenant.tenant_id,

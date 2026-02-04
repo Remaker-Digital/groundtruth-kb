@@ -402,11 +402,13 @@ const styles = {
 // Helpers
 // ---------------------------------------------------------------------------
 
-function formatNumber(n: number): string {
+function formatNumber(n: number | undefined | null): string {
+  if (n == null) return '0';
   return n.toLocaleString('en-US');
 }
 
-function formatCurrency(amount: number): string {
+function formatCurrency(amount: number | undefined | null): string {
+  if (amount == null) return '$0.00';
   return new Intl.NumberFormat('en-US', {
     style: 'currency',
     currency: 'USD',

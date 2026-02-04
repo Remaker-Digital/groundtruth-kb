@@ -663,7 +663,7 @@ export const ConversationInbox: React.FC<BaseComponentProps> = ({
           )}
           {!inboxLoading && !inboxError && conversations.length === 0 && (
             <EmptyState
-              icon="\u{1F4AC}"
+              icon={String.fromCodePoint(0x1F4AC)}
               title="No conversations yet"
               subtitle="Conversations will appear here when customers start chatting."
             />
@@ -690,7 +690,7 @@ export const ConversationInbox: React.FC<BaseComponentProps> = ({
       >
         {!selectedId ? (
           <EmptyState
-            icon="\u{1F4E8}"
+            icon={String.fromCodePoint(0x1F4E8)}
             title="Select a conversation"
             subtitle="Choose a conversation from the list to view the message transcript."
           />
@@ -763,7 +763,7 @@ export const ConversationInbox: React.FC<BaseComponentProps> = ({
               )}
               {!messagesLoading && !messagesError && messages.length === 0 && (
                 <EmptyState
-                  icon="\u{1F4DD}"
+                  icon={String.fromCodePoint(0x1F4DD)}
                   title="No messages"
                   subtitle="This conversation has no messages yet."
                 />

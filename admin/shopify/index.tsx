@@ -24,8 +24,8 @@ import enTranslations from '@shopify/polaris/locales/en.json';
 import { ShopifyAppLayout } from './layouts/ShopifyAppLayout';
 import { DashboardPage } from './pages/Dashboard';
 import { InboxPage } from './pages/Inbox';
-import { ConfigurationPage } from './pages/Configuration';
 import { KnowledgeBasePage } from './pages/KnowledgeBase';
+import { ConfigurationPage } from './pages/Configuration';
 import { WidgetPage } from './pages/Widget';
 import { BillingPage } from './pages/Billing';
 import { SettingsPage } from './pages/Settings';
@@ -44,7 +44,80 @@ function getShopifyConfig() {
 }
 
 // ---------------------------------------------------------------------------
-// App
+// Error Boundary — catches render crashes in page components
+// ---------------------------------------------------------------------------
+
+interface ErrorBoundaryState {
+  hasError: boolean;
+  error: Error | null;
+}
+
+class PageErrorBoundary extends React.Component<
+  { children: React.ReactNode; pageName?: string },
+  ErrorBoundaryState
+> {
+  constructor(props: { children: React.ReactNode; pageName?: string }) {
+    super(props);
+    this.state = { hasError: false, error: null };
+  }
+
+  static getDerivedStateFromError(error: Error): ErrorBoundaryState {
+    return { hasError: true, error };
+  }
+
+  componentDidCatch(error: Error, info: React.ErrorInfo) {
+    console.error(`[PageErrorBoundary] ${this.props.pageName ?? 'Unknown'} crashed:`, error, info);
+  }
+
+  render() {
+    if (this.state.hasError) {
+      return (
+        <div style={{
+          padding: 32,
+          fontFamily: '-apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif',
+          textAlign: 'center',
+        }}>
+          <h2 style={{ color: '#C41E2A', marginBottom: 8 }}>
+            Page Error
+          </h2>
+          <p style={{ color: '#666', fontSize: 14, marginBottom: 16 }}>
+            {this.props.pageName ?? 'This page'} encountered an error.
+          </p>
+          <pre style={{
+            textAlign: 'left',
+            padding: 12,
+            background: '#f5f5f5',
+            borderRadius: 6,
+            fontSize: 12,
+            overflow: 'auto',
+            maxHeight: 200,
+            color: '#C41E2A',
+          }}>
+            {this.state.error?.message}
+          </pre>
+          <button
+            onClick={() => this.setState({ hasError: false, error: null })}
+            style={{
+              marginTop: 16,
+              padding: '8px 20px',
+              border: '1px solid #ccc',
+              borderRadius: 6,
+              background: '#fff',
+              cursor: 'pointer',
+              fontSize: 13,
+            }}
+          >
+            Try Again
+          </button>
+        </div>
+      );
+    }
+    return this.props.children;
+  }
+}
+
+// ---------------------------------------------------------------------------
+// App — full Shopify embedded admin
 // ---------------------------------------------------------------------------
 
 const App: React.FC = () => {
@@ -52,16 +125,16 @@ const App: React.FC = () => {
 
   return (
     <AppProvider i18n={enTranslations}>
-      <BrowserRouter>
+      <BrowserRouter basename="/admin/shopify">
         <ShopifyAppLayout shopifyConfig={config}>
           <Routes>
-            <Route path="/" element={<DashboardPage />} />
-            <Route path="/inbox" element={<InboxPage />} />
-            <Route path="/configuration" element={<ConfigurationPage />} />
-            <Route path="/knowledge-base" element={<KnowledgeBasePage />} />
-            <Route path="/widget" element={<WidgetPage />} />
-            <Route path="/billing" element={<BillingPage />} />
-            <Route path="/settings" element={<SettingsPage />} />
+            <Route path="/" element={<PageErrorBoundary pageName="Dashboard"><DashboardPage /></PageErrorBoundary>} />
+            <Route path="/inbox" element={<PageErrorBoundary pageName="Inbox"><InboxPage /></PageErrorBoundary>} />
+            <Route path="/knowledge" element={<PageErrorBoundary pageName="Knowledge Base"><KnowledgeBasePage /></PageErrorBoundary>} />
+            <Route path="/configuration" element={<PageErrorBoundary pageName="Configuration"><ConfigurationPage /></PageErrorBoundary>} />
+            <Route path="/widget" element={<PageErrorBoundary pageName="Widget"><WidgetPage /></PageErrorBoundary>} />
+            <Route path="/billing" element={<PageErrorBoundary pageName="Billing"><BillingPage /></PageErrorBoundary>} />
+            <Route path="/settings" element={<PageErrorBoundary pageName="Settings"><SettingsPage /></PageErrorBoundary>} />
             <Route path="*" element={<Navigate to="/" replace />} />
           </Routes>
         </ShopifyAppLayout>

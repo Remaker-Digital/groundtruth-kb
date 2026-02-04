@@ -327,6 +327,9 @@ async def _startup_tenant_resolution() -> None:
             resolve_by_api_key_hash=tenant_repo.find_by_api_key_hash,
             resolve_by_widget_key_hash=tenant_repo.find_by_widget_key_hash,
         )
+        # Also wire Cosmos DB fallback for /api/tenants/lookup endpoint
+        from src.integrations.provisioning import configure_tenant_lookup_repo
+        configure_tenant_lookup_repo(tenant_repo)
         logger.info("Tenant resolution configured (Cosmos DB-backed, triple auth)")
     except Exception:
         logger.warning(

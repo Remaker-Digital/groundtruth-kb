@@ -34,7 +34,7 @@ export const BillingPage: React.FC = () => {
           body: JSON.stringify({ pack_size: packSize }),
         });
         if (!resp.ok) throw new Error('Purchase failed');
-        onNotify(`Conversation pack (${packSize.toLocaleString()}) purchased!`, 'success');
+        onNotify(`Conversation pack (${(packSize ?? 0).toLocaleString()}) purchased!`, 'success');
       } catch {
         onNotify('Failed to purchase pack. Please try again.', 'error');
       }

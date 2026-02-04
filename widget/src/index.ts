@@ -219,7 +219,7 @@ async function init(
     const iframeDoc = iframe.contentDocument;
     if (iframeDoc) {
       iframeDoc.open();
-      iframeDoc.write('<!DOCTYPE html><html><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"></head><body style="margin:0;padding:0;overflow:hidden"><div id="ar-panel-root"></div></body></html>');
+      iframeDoc.write('<!DOCTYPE html><html style="height:100%;margin:0"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"></head><body style="height:100%;margin:0;padding:0;overflow:hidden"><div id="ar-panel-root" style="height:100%"></div></body></html>');
       iframeDoc.close();
 
       // Render Panel component into iframe
