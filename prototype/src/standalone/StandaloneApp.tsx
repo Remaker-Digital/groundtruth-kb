@@ -105,15 +105,15 @@ export function StandaloneApp() {
       padding="md"
       styles={{
         header: {
-          borderBottom: isDark ? '1px solid rgba(255,255,255,0.06)' : '1px solid #1E1E1E',
+          borderBottom: isDark ? '1px solid #272727' : '1px solid #1E1E1E',
           background: '#0a0a0a',
         },
         navbar: {
-          borderRight: isDark ? '1px solid rgba(255,255,255,0.06)' : undefined,
+          borderRight: isDark ? '1px solid #272727' : undefined,
           background: isDark ? '#0a0a0a' : undefined,
         },
         main: {
-          background: isDark ? '#363636' : undefined,
+          background: isDark ? '#141414' : undefined,
         },
       }}
     >
@@ -218,16 +218,29 @@ export function StandaloneApp() {
                 style={{
                   borderRadius: 8,
                   marginBottom: 2,
-                  ...(isActive && isDark ? { background: 'rgba(255, 255, 255, 0.06)' } : {}),
+                  ...(isActive && isDark ? { background: '#1f1f1f', border: '1px solid #272727' } : {}),
                 }}
               />
             );
           })}
         </AppShell.Section>
         <AppShell.Section>
-          <Box p="xs" style={{ borderTop: isDark ? '1px solid rgba(255,255,255,0.06)' : '1px solid var(--mantine-color-gray-2)' }}>
+          <Box p="xs" style={{ borderTop: isDark ? '1px solid #272727' : '1px solid var(--mantine-color-gray-2)' }}>
+            <Group gap={8} justify="center" mb={6}>
+              <img
+                src="/logo/remaker-digital-logo.svg"
+                alt="Remaker Digital"
+                style={{
+                  height: 20,
+                  display: 'block',
+                }}
+              />
+            </Group>
             <Text size="xs" c="dimmed" ta="center">
-              Agent Red v1.0.0
+              Agent Red Customer Experience v1.0.0
+            </Text>
+            <Text size="xs" c="dimmed" ta="center">
+              A product of remakerdigital.com
             </Text>
           </Box>
         </AppShell.Section>

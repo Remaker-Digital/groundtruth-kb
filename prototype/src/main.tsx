@@ -30,18 +30,18 @@ const agentRedTheme = createTheme({
       '#870E18', // 8
       '#720912', // 9
     ],
-    // Neutral grey dark scale — designer-approved (2026-02-03 mockup)
-    // Depth hierarchy: header/sidebar (#0a0a0a) → cards (#19191a) → page (#363636)
+    // Neutral grey dark scale — designer-approved (2026-02-03 mockup, revised by Mazel)
+    // Depth hierarchy: header/sidebar (#0a0a0a) → page (#141414) → cards (#1f1f1f) → borders (#272727)
     dark: [
       '#F5F5F5', // 0 - Light grey (text on dark bg)
       '#E0E0E0', // 1 - Borders (light)
       '#A0A0A0', // 2 - Muted text
       '#787878', // 3 - Secondary text
       '#5C5C5C', // 4 - Tertiary text
-      '#363636', // 5 - Page background ★
-      '#19191a', // 6 - Cards / elevated surfaces
+      '#141414', // 5 - Page background ★
+      '#1f1f1f', // 6 - Cards / elevated surfaces
       '#0a0a0a', // 7 - Header, sidebar (deepest chrome) ★
-      '#19191a', // 8 - Card surface (alias)
+      '#1f1f1f', // 8 - Card surface (alias)
       '#0a0a0a', // 9 - True dark (alias)
     ],
   },
@@ -61,7 +61,7 @@ const agentRedTheme = createTheme({
       primaryDark: '#9B1420',
       primaryLight: '#F2D4D6',
       charcoal: '#0a0a0a',
-      slate: '#363636',
+      slate: '#141414',
       steel: '#5C5C5C',
       silver: '#E0E0E0',
       snow: '#F5F5F5',

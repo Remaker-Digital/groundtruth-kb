@@ -35,12 +35,49 @@
       --p-color-text: #303030;
       color: #303030;
     }
-    /* Card borders: subtle tone matching page bg — owner-approved (2026-02-04) */
-    /* Designer's #938a87 taupe at 0.2px was too bold at browser-minimum 0.5px; fallback to page-bg match */
+    /* Card borders: visible 1px borders — Mazel design revision (2026-02-03 mockup) */
     [data-mantine-color-scheme="dark"] .mantine-Paper-root {
-      --_paper-border-color: #363636;
-      border-color: #363636;
+      --_paper-border-color: #272727;
+      border-color: #272727;
       border-width: 1px;
+    }
+    /* Table row borders: match card border color — Mazel design revision */
+    [data-mantine-color-scheme="dark"] .mantine-Table-tr {
+      border-color: #272727;
+    }
+    [data-mantine-color-scheme="dark"] .mantine-Table-th,
+    [data-mantine-color-scheme="dark"] .mantine-Table-td {
+      border-color: #272727;
+    }
+    /* Input / Select borders: match card border color — Mazel design revision */
+    [data-mantine-color-scheme="dark"] .mantine-Input-input,
+    [data-mantine-color-scheme="dark"] .mantine-Select-input {
+      border-color: #272727;
+    }
+    /* Button borders (variant=default/outline): match card border color — Mazel design revision */
+    [data-mantine-color-scheme="dark"] .mantine-Button-root[data-variant="default"],
+    [data-mantine-color-scheme="dark"] .mantine-Button-root[data-variant="outline"] {
+      border-color: #272727;
+    }
+    /* Chip borders: match card border color — Mazel design revision */
+    [data-mantine-color-scheme="dark"] .mantine-Chip-label:not([data-checked]) {
+      border-color: #272727;
+    }
+    /* Accordion borders: match card border color — Mazel design revision */
+    [data-mantine-color-scheme="dark"] .mantine-Accordion-item {
+      border-color: #272727;
+    }
+    [data-mantine-color-scheme="dark"] .mantine-Accordion-control {
+      border-color: #272727;
+    }
+    /* Badge borders (variant=outline): match card border color — Mazel design revision */
+    [data-mantine-color-scheme="dark"] .mantine-Badge-root[data-variant="outline"] {
+      border-color: #272727;
+    }
+    /* Divider borders: match card border color — Mazel design revision */
+    [data-mantine-color-scheme="dark"] .mantine-Divider-root {
+      --_divider-color: #272727;
+      border-color: #272727;
     }
     /* Light mode: dark sticky header to match dark mode chrome */
     html[data-mantine-color-scheme="light"] .mantine-AppShell-header {

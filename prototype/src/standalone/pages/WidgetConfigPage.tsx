@@ -83,25 +83,25 @@ function WidgetPreview({ config }: { config: WidgetConfig }) {
   const isRight = config.position === 'bottom-right';
   const dk = config.colorMode === 'dark';
 
-  // Color tokens — light vs dark widget mode (widget preview uses its own palette)
-  const panelBg = dk ? '#19191a' : '#fff';
-  const msgAreaBg = dk ? '#363636' : '#fafafa';
-  const agentBubbleBg = dk ? '#19191a' : '#fff';
-  const agentBubbleBorder = dk ? '#363636' : '#e9ecef';
+  // Color tokens — light vs dark widget mode (Mazel design revision 2026-02-03 mockup)
+  const panelBg = dk ? '#1f1f1f' : '#fff';
+  const msgAreaBg = dk ? '#141414' : '#fafafa';
+  const agentBubbleBg = dk ? '#1f1f1f' : '#fff';
+  const agentBubbleBorder = dk ? '#272727' : '#e9ecef';
   const agentBubbleText = dk ? '#E0E0E0' : undefined;
-  const dateSepBg = dk ? '#19191a' : '#f1f3f5';
+  const dateSepBg = dk ? '#1f1f1f' : '#f1f3f5';
   const dateSepText = dk ? '#787878' : undefined;
-  const inputBg = dk ? '#19191a' : '#f1f3f5';
+  const inputBg = dk ? '#1f1f1f' : '#f1f3f5';
   const inputText = dk ? '#5C5C5C' : '#adb5bd';
   const inputBarBg = dk ? '#0a0a0a' : '#fff';
-  const inputBarBorder = dk ? '#363636' : '#e9ecef';
+  const inputBarBorder = dk ? '#272727' : '#e9ecef';
   const brandingText = dk ? '#5C5C5C' : undefined;
-  const pageBg = dk ? '#363636' : '#f8f9fa';
-  const pageBorder = dk ? '#363636' : '#dee2e6';
+  const pageBg = dk ? '#141414' : '#f8f9fa';
+  const pageBorder = dk ? '#272727' : '#dee2e6';
   // Simulated page chrome
   const chromeBg = dk ? '#0a0a0a' : '#e9ecef';
-  const chromeBorder = dk ? '#363636' : '#dee2e6';
-  const skeletonDark = dk ? '#19191a' : '#dee2e6';
+  const chromeBorder = dk ? '#272727' : '#dee2e6';
+  const skeletonDark = dk ? '#1f1f1f' : '#dee2e6';
   const skeletonLight = dk ? '#0a0a0a' : '#e9ecef';
 
   return (

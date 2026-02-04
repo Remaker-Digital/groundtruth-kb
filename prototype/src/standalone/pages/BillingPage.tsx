@@ -147,12 +147,12 @@ export function BillingPage() {
   const computedColorScheme = useComputedColorScheme('dark');
   const isDark = computedColorScheme === 'dark';
 
-  // Dark-mode-aware chart colors — designer palette (2026-02-03)
+  // Dark-mode-aware chart colors — Mazel design revision (2026-02-03 mockup)
   const gridStroke = isDark ? 'rgba(255,255,255,0.06)' : '#e9ecef';
   const axisTickFill = isDark ? '#5C5C5C' : '#868e96';
-  const axisLineStroke = isDark ? '#363636' : '#dee2e6';
-  const tooltipBg = isDark ? '#19191a' : '#fff';
-  const tooltipBorder = isDark ? '#363636' : '#dee2e6';
+  const axisLineStroke = isDark ? '#272727' : '#dee2e6';
+  const tooltipBg = isDark ? '#1f1f1f' : '#fff';
+  const tooltipBorder = isDark ? '#272727' : '#dee2e6';
   const tooltipColor = isDark ? '#E0E0E0' : undefined;
 
   const estimatedInvoice = billing.monthlyBase + billing.currentOverage;

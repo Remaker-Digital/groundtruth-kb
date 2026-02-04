@@ -452,14 +452,14 @@ export function InboxPage() {
   const computedColorScheme = useComputedColorScheme('dark');
   const isDark = computedColorScheme === 'dark';
 
-  // Dark-mode-aware colors — designer palette (2026-02-03)
-  const panelBg = isDark ? '#19191a' : '#fff';
-  const centerBg = isDark ? '#19191a' : '#fafafa';
-  const borderColor = isDark ? '#363636' : 'var(--mantine-color-gray-2)';
+  // Dark-mode-aware colors — Mazel design revision (2026-02-03 mockup)
+  const panelBg = isDark ? '#0a0a0a' : '#fff';
+  const centerBg = isDark ? '#0a0a0a' : '#fafafa';
+  const borderColor = isDark ? '#272727' : 'var(--mantine-color-gray-2)';
   const hoverBg = isDark ? 'rgba(255,255,255,0.04)' : '#f8f9fa';
-  const selectedBg = isDark ? 'rgba(255, 255, 255, 0.08)' : BRAND_LIGHT;
-  const bubbleAgentBg = isDark ? 'rgba(255,255,255,0.08)' : '#f1f3f5';
-  const bubbleCustomerBg = isDark ? 'rgba(255,255,255,0.06)' : '#f1f3f5';
+  const selectedBg = isDark ? '#1f1f1f' : BRAND_LIGHT;
+  const bubbleAgentBg = isDark ? '#1f1f1f' : '#f1f3f5';
+  const bubbleCustomerBg = isDark ? '#1f1f1f' : '#f1f3f5';
 
   const selectedConversation = CONVERSATIONS.find((c) => c.id === selectedId) || CONVERSATIONS[0];
   const selectedMessages = MESSAGES[selectedId] || [];
@@ -533,7 +533,7 @@ export function InboxPage() {
             value={search}
             onChange={(e) => setSearch(e.currentTarget.value)}
             styles={{
-              input: { borderColor: 'var(--mantine-color-gray-3)' },
+              input: { borderColor: isDark ? '#272727' : 'var(--mantine-color-gray-3)' },
             }}
           />
         </Box>
@@ -690,8 +690,7 @@ export function InboxPage() {
               style={{ flex: 1 }}
               styles={{
                 input: {
-                  borderColor: 'var(--mantine-color-gray-3)',
-                  '&:disabled': { background: '#fafafa' },
+                  borderColor: isDark ? '#272727' : 'var(--mantine-color-gray-3)',
                 },
               }}
             />
@@ -855,12 +854,12 @@ export function InboxPage() {
                         radius="sm"
                         style={{
                           background: conv.id === selectedId
-                            ? (isDark ? 'rgba(255, 255, 255, 0.08)' : BRAND_LIGHT)
-                            : (isDark ? 'rgba(255,255,255,0.04)' : 'var(--mantine-color-gray-0)'),
+                            ? (isDark ? '#1f1f1f' : BRAND_LIGHT)
+                            : (isDark ? '#141414' : 'var(--mantine-color-gray-0)'),
                           cursor: 'pointer',
                           border: conv.id === selectedId
-                            ? `1px solid ${isDark ? 'rgba(255, 255, 255, 0.15)' : BRAND + '40'}`
-                            : '1px solid transparent',
+                            ? `1px solid ${isDark ? '#272727' : BRAND + '40'}`
+                            : `1px solid ${isDark ? '#272727' : 'transparent'}`,
                         }}
                         onClick={() => setSelectedId(conv.id)}
                       >
