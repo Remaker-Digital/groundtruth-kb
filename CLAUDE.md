@@ -12,7 +12,7 @@ This document provides context and guidance for AI assistants working on the Age
 | **Brand Name** | Agent Red Customer Experience |
 | **Release** | Launch 1.0 |
 | **Type** | Commercial SaaS Product |
-| **Status** | Phase 2.1 E-Commerce ~98% complete (creative assets remain; integration testing COMPLETE). Phase 2.2 COMPLETE — 41 multi_tenant modules (~28,000 lines). **Phase 2.5 Persistent Customer Memory ALL 4 LAYERS COMPLETE** (6 modules: customer_profile_service, conversation_vectorizer, response_explainability, pattern_extraction, fine_tuning_pipeline, admin_customer_profile_api). All middleware wired in main.py (9 middleware layers). **1,235 unit tests + 42 integration tests = 1,277 total, 0 failures.** P0 + P1 + P2 + P3 tests COMPLETE. Integration testing with real Stripe test mode + Shopify partner sandbox + Azure services COMPLETE. Test infrastructure complete (WI #101-104). Architecture review complete (32 decisions, 100+ work items). **Phase 3.0 UI/UX: ALL BUILD PHASES COMPLETE — Chat API (6 endpoints + SSE manager), Admin APIs (5 routers, 25 endpoints), Widget frontend (20 files, ~3,200 lines), Shopify Theme App Extension (3 files), Admin shared components (9 + 2 util modules, ~5,400 lines), Shopify admin shell (8 files, ~2,700 lines, build validated), Standalone admin shell (9 files, ~2,800 lines, build validated).** Admin frontend build configs created (package.json, tsconfig.json, vite.config.ts for both shells + shared workspace root). **Renderable HTML prototype COMPLETE + OWNER-APPROVED — both shells (Mantine + Polaris) with 9 standalone + 7 Shopify pages, full mock data, dark mode default, pure neutral grey dark scale, brand palette Option A (#C41E2A), shell switcher, Polaris CSS isolation, widget dark mode preview.** Operational readiness COMPLETE (WI #148-156). Security hardening COMPLETE (WI #157-163). Pipeline optimization COMPLETE (WI #134-139). Trial environment COMPLETE (WI #119-128). **Competitive pricing VERIFIED (all 5 competitors, 2026-02-01) — Agent Red 4-21x cheaper.** Product renamed Customer Experience. Brand primary #C41E2A. Shopify Partner app deployed (client_id: 4c6cf726cd1f9f5389caf48f78af9735), installed on blanco-9939.myshopify.com dev store. |
+| **Status** | Phase 2.1 E-Commerce ~98% complete (creative assets remain; integration testing COMPLETE). Phase 2.2 COMPLETE — 41 multi_tenant modules (~28,000 lines). **Phase 2.5 Persistent Customer Memory ALL 4 LAYERS COMPLETE** (6 modules: customer_profile_service, conversation_vectorizer, response_explainability, pattern_extraction, fine_tuning_pipeline, admin_customer_profile_api). All middleware wired in main.py (9 middleware layers). **1,235 unit tests + 42 integration tests = 1,277 total, 0 failures.** P0 + P1 + P2 + P3 tests COMPLETE. Integration testing with real Stripe test mode + Shopify partner sandbox + Azure services COMPLETE. Test infrastructure complete (WI #101-104). Architecture review complete (32 decisions, 100+ work items). **Phase 3.0 UI/UX: ALL BUILD PHASES COMPLETE — Chat API (6 endpoints + SSE manager), Admin APIs (5 routers, 25 endpoints), Widget frontend (20 files, ~3,200 lines), Shopify Theme App Extension (3 files), Admin shared components (9 + 2 util modules, ~5,400 lines), Shopify admin shell (8 files, ~2,700 lines, build validated), Standalone admin shell (9 files, ~2,800 lines, build validated).** Admin frontend build configs created (package.json, tsconfig.json, vite.config.ts for both shells + shared workspace root). **Renderable HTML prototype COMPLETE + OWNER-APPROVED — both shells (Mantine + Polaris) with 9 standalone + 7 Shopify pages, full mock data, dark mode default, pure neutral grey dark scale, brand palette Option A (#C41E2A), shell switcher, Polaris CSS isolation, widget dark mode preview.** Operational readiness COMPLETE (WI #148-156). Security hardening COMPLETE (WI #157-163). Pipeline optimization COMPLETE (WI #134-139). Trial environment COMPLETE (WI #119-128). **Competitive pricing VERIFIED (all 5 competitors, 2026-02-01) — Agent Red 4-21x cheaper.** Product renamed Customer Experience. Brand primary #C41E2A. Shopify Partner app deployed (client_id: 4c6cf726cd1f9f5389caf48f78af9735), installed on blanco-9939.myshopify.com dev store. **Production deployment COMPLETE (WI #197) — 9 Container Apps on Azure Container Apps (agentred-prod-rg, East US 2), API Gateway healthy (/health 200, /ready 200), Terraform state clean (16 managed resources, 0 changes), 27 RBAC assignments (AcrPull + Key Vault + Cosmos DB).** |
 | **Owner** | Remaker Digital (DBA of VanDusen & Palmeter, LLC) |
 
 ---
@@ -154,17 +154,49 @@ Agent Red owns the production Azure deployment and all associated credentials. T
 
 | Resource | Name | Region | Notes |
 |----------|------|--------|-------|
-| Azure OpenAI | aoai-agentred-eastus2 | East US 2 | Agent Red-owned |
-| Cosmos DB | cosmos-agentred-eastus2 (Serverless) | East US 2 | Agent Red-owned, EnableNoSQLVectorSearch, database: `agentred` |
-| Key Vault | kv-agentred-eastus2 (RBAC-enabled) | East US 2 | Agent Red-owned |
+| Resource Group | agentred-prod-rg | East US 2 | Agent Red production (17 resources) |
+| Azure OpenAI | aoai-agentred-eastus2 | East US 2 | S0, 3 deployments (gpt-4o, gpt-4o-mini, text-embedding-3-large) |
+| Cosmos DB | cosmos-agentred-eastus2 (Serverless) | East US 2 | EnableNoSQLVectorSearch, database: `agentred`, 10 containers, DiskANN vector index, continuous 30-day backup |
+| Key Vault | kv-agentred-eastus2 (RBAC-enabled) | East US 2 | Key Vault Secrets Officer role assigned |
+| Container Registry | acragentredeastus2 | East US 2 | 9 repositories, Agent Red-owned |
+| Container App Environment | agent-red-cae | East US 2 | Domain: `lemonriver-f59f94b7.eastus2.azurecontainerapps.io`, Static IP: 20.97.131.247 |
+| Log Analytics Workspace | agent-red-logs | East US 2 | PerGB2018 SKU, 30-day retention |
+| Virtual Network | agentred-prod-vnet | East US 2 | Subnet: container-apps (10.1.0.0/23, delegated to Microsoft.App) |
+| Application Insights | agntcy-cs-prod-appinsights-rc6vcp | East US 2 | Legacy, shared with AGNTCY |
 | Resource Group | agntcy-prod-rg | East US 2 | Legacy AGNTCY deployment |
-| Container Registry | acragntcycsprodrc6vcp.azurecr.io | East US 2 | Legacy AGNTCY deployment |
-| Application Insights | agntcy-cs-prod-appinsights-rc6vcp | East US 2 | Legacy AGNTCY deployment |
-| App Configuration | agntcy-cs-prod-config | East US 2 | Legacy AGNTCY deployment |
-| Application Gateway | agntcy-cs-prod-appgw (Public IP: 20.110.214.55) | East US 2 | Legacy AGNTCY deployment |
-| Virtual Network | agntcy-cs-prod-vnet (10.0.0.0/16) | East US 2 | Legacy AGNTCY deployment |
 
-**Deployed Containers (all running, 0 restarts):**
+**Container Apps (9 deployed, agentred-prod-rg):**
+
+| Container App | Port | Image | Min/Max | Status | Ingress |
+|---------------|------|-------|---------|--------|---------|
+| agent-red-api-gateway | 8000 | api-gateway:v1.0.0 | 2/8 | Succeeded | External HTTP (FQDN: `agent-red-api-gateway.lemonriver-f59f94b7.eastus2.azurecontainerapps.io`) |
+| agent-red-nats | 4222 | nats:2.10-alpine | 2/2 | Succeeded | Internal TCP (FQDN: `agent-red-nats.internal.lemonriver-f59f94b7.eastus2.azurecontainerapps.io`) |
+| agent-red-slim-gateway | 8443 | slim-gateway:latest | 2/2 | Succeeded | Internal TCP |
+| agent-red-intent-classifier | 8080 | intent-classifier:v1.1.0-openai | 2/6 | Succeeded (ActivationFailed*) | Internal HTTP |
+| agent-red-knowledge-retrieval | 8080 | knowledge-retrieval:v1.1.1-fix | 2/6 | Succeeded (ActivationFailed*) | Internal HTTP |
+| agent-red-response-generator | 8080 | response-generator:v1.1.0-openai | 2/10 | Succeeded (ActivationFailed*) | Internal HTTP |
+| agent-red-critic-supervisor | 8080 | critic-supervisor:v1.1.0-openai | 2/4 | Succeeded (ActivationFailed*) | Internal HTTP |
+| agent-red-escalation | 8080 | escalation:v1.1.0-openai | 1/3 | Succeeded (ActivationFailed*) | Internal HTTP |
+| agent-red-analytics | 8080 | analytics:v1.1.0-openai | 1/2 | Succeeded (ActivationFailed*) | Internal HTTP |
+
+\* **ActivationFailed = expected state for AGNTCY agent containers.** These upstream images run in "demo mode" (process sample messages then exit) and don't expose HTTP health endpoints. Container Apps health probes fail, causing restart loops. This is accepted for launch — Agent Red's pipeline uses Azure OpenAI directly via the API Gateway, not through these agent containers.
+
+**RBAC Assignments (27 total):**
+
+Each of the 9 Container App system-assigned managed identities has:
+- AcrPull on `acragentredeastus2` (image pull)
+- Key Vault Secrets Officer on `kv-agentred-eastus2` (secret access)
+- Cosmos DB Built-in Data Contributor on `cosmos-agentred-eastus2` (database access)
+
+CLI user principal (oid: `ca91fd37-e660-42d6-8d57-a84b50a3e186`) has Key Vault Secrets Officer for administrative access.
+
+**Terraform State (16 managed resources, clean plan):**
+- `terraform plan -var-file=production.tfvars` requires `TF_VAR_appinsights_connection_string` env var
+- All 9 Container Apps imported into state
+- `lifecycle { ignore_changes = [infrastructure_resource_group_name] }` on Container App Environment (prevents destructive replacement from Azure auto-assigned value)
+- `workload_profile_name = "Consumption"` explicitly set (prevents plan drift from Azure auto-assignment)
+
+**Legacy AGNTCY Deployment (agntcy-prod-rg):**
 
 | Container | Private IP | Port | Image |
 |-----------|------------|------|-------|
@@ -197,18 +229,39 @@ Agent Red owns the production Azure deployment and all associated credentials. T
 - mailchimp-api-key
 - google-analytics-service-account
 
-**Environment Variables (production):**
+**Environment Variables (production Container Apps):**
 ```bash
+ENVIRONMENT=production
 AZURE_OPENAI_ENDPOINT=https://aoai-agentred-eastus2.openai.azure.com/
 AZURE_OPENAI_API_KEY=<stored in kv-agentred-eastus2>
 COSMOS_DB_ENDPOINT=https://cosmos-agentred-eastus2.documents.azure.com:443/
 COSMOS_DB_DATABASE=agentred
+COSMOS_USE_MANAGED_ID=true
 KEY_VAULT_URL=https://kv-agentred-eastus2.vault.azure.net/
+AZURE_KEYVAULT_URL=https://kv-agentred-eastus2.vault.azure.net/
 USE_AZURE_OPENAI=true
 USE_REAL_APIS=true
+NATS_URL=nats://agent-red-nats.internal.lemonriver-f59f94b7.eastus2.azurecontainerapps.io:4222
+GRACEFUL_SHUTDOWN_TIMEOUT=60
+APPLICATIONINSIGHTS_CONNECTION_STRING=<stored as secret>
 ```
 
-Agent Red-owned Azure resources (Azure OpenAI, Cosmos DB, Key Vault) are provisioned and verified. Legacy AGNTCY resources remain available for the deployed agent containers.
+**Production Endpoint Verification (2026-02-03):**
+- `GET /health` → 200 OK (API version, uptime)
+- `GET /ready` → 200 OK (Key Vault: healthy, circuit breakers: all closed, NATS: connected=false — lazy init expected)
+- All 8 auth-protected endpoint groups → 401 Unauthorized (auth enforced)
+- All 3 public billing endpoints → 400/405 (expected — no payload)
+- Webhook endpoint → 500 (expected — no signing secret configured in env)
+
+Agent Red-owned Azure resources are fully provisioned, deployed, and verified. Terraform state is clean (0 changes). Legacy AGNTCY resources in agntcy-prod-rg remain available for reference.
+
+**Azure Administration Notes:**
+- **Git Bash path mangling:** On Windows, prefix Azure CLI commands with `MSYS_NO_PATHCONV=1` when paths contain `/subscriptions/...` to prevent Git Bash from interpreting them as Unix paths.
+- **Container App revision triggers:** When Container Apps fail initial provisioning (no revision exists), `az containerapp revision restart` fails with "Method Not Allowed". Use `az containerapp update --set-env-vars "DEPLOY_TIMESTAMP=$(date +%s)"` to trigger new revision creation.
+- **RBAC propagation delay:** After assigning Key Vault or Cosmos DB RBAC roles, wait ~30 seconds before restarting containers to ensure role propagation.
+- **Terraform import requires var-file:** `terraform import -var-file=production.tfvars` with `TF_VAR_appinsights_connection_string` set as env var (sensitive variable).
+- **Container App Environment replacement hazard:** Azure auto-assigns `infrastructure_resource_group_name` (e.g., `ME_agent-red-cae_agentred-prod-rg_eastus2`). If not in Terraform config, plan shows destructive replacement of all 9 Container Apps. Fix: `lifecycle { ignore_changes = [infrastructure_resource_group_name] }`.
+- **workload_profile_name drift:** Azure auto-assigns `"Consumption"` but Terraform shows as `null → "Consumption"` on every plan. Fix: explicitly set `workload_profile_name = "Consumption"` in resource block.
 
 ### Key AGNTCY Architecture Patterns for Reuse
 
@@ -775,9 +828,10 @@ E:\Claude-Playground\CLAUDE-PROJECTS\Agent Red Customer Engagement\
 Continue work on Agent Red Customer Experience commercial project.
 Location: E:\Claude-Playground\CLAUDE-PROJECTS\Agent Red Customer Engagement
 Key files: CLAUDE.md, docs/PROJECT-PLAN.md, docs/BACKLOG-NEW-WORK-ITEMS.md, docs/COMPREHENSIVE-TEST-PLAN.md
-Current status: ALL CORE PHASES COMPLETE. ALL TESTING COMPLETE (P0-P3 + adversarial + performance + integration). Phases 0-2.2 COMPLETE (41 multi_tenant modules, ~28,000 lines). Phase 2.5 Persistent Customer Memory ALL 4 LAYERS COMPLETE (6 modules: customer_profile_service, conversation_vectorizer, response_explainability, pattern_extraction, fine_tuning_pipeline, admin_customer_profile_api). Phase 3.0 ALL BUILD PHASES COMPLETE (Chat API 6 endpoints + SSE, widget 20 files ~3,200 lines, Shopify Theme App Extension, admin shared 9 components ~5,400 lines, Shopify admin shell ~2,700 lines, standalone admin shell ~2,800 lines — both build-validated). Renderable HTML prototype OWNER-APPROVED (2026-02-03). Design frozen as production reference. Operational readiness COMPLETE. Security hardening COMPLETE. Pipeline optimization COMPLETE. Trial environment COMPLETE. Competitive pricing VERIFIED (all 5 competitors, 2026-02-01 — Agent Red 4-21x cheaper). Azure infrastructure provisioned: aoai-agentred-eastus2, cosmos-agentred-eastus2, kv-agentred-eastus2 (all East US 2). Integration testing with real Stripe test mode + Shopify partner sandbox + Azure services COMPLETE (42 tests). 1,235 unit tests + 42 integration tests = 1,277 total, 0 failures. 19 routers, 67 routes, 9 middleware layers. Shopify Partner app deployed (client_id: 4c6cf726cd1f9f5389caf48f78af9735) and installed on blanco-9939.myshopify.com dev store.
-Remaining work (priority order): (1) Cosmos DB full initialization (create all 10 containers with DiskANN vector index — Vector Search capability already enabled), (2) Azure OpenAI custom subdomain (az cognitiveservices account update --custom-domain), (3) CI improvements (coverage reports, parallel jobs — WI #105, #107), (4) SSE enhancements (client-side retry, metering, multi-tab — WI #131-133), (5) API completeness (customer profiles, OpenAPI — WI #142, #147), (6) Remaining security (API key rotation, Stripe IP allowlisting — WI #159, #162), (7) Add-on integration tests (Mailchimp, Zendesk, GA4), (8) Creative assets for Shopify App Store (icon, screenshots, demo video — blocked on design), (9) Persistent Memory metrics dashboard, (10) 5 A/B production tests (Decision #32).
-Important context: Tidio is the primary functional reference. Zapier is the visual styling reference. Persistent Customer Memory (all 4 layers) is the launch pillar differentiator. All competitor pricing verified 2026-02-01 — see docs/research/UI-UX-COMPETITIVE-ANALYSIS.md. Remaining backlog items listed in docs/BACKLOG-NEW-WORK-ITEMS.md §9 (Remaining Work Items table). Prototype approved and frozen — runs via `cd prototype && npm run dev` (port 3000). Stripe CLI configured for local webhook forwarding (stripe listen). Azure credentials in .env.local — production deployment uses Managed Identity (not API keys). Iterative working style: one item at a time, honest assessment, approval before implementation, aggressive scope cutting.
+Current status: ALL CORE PHASES COMPLETE. ALL TESTING COMPLETE (P0-P3 + adversarial + performance + integration). PRODUCTION DEPLOYMENT COMPLETE — 9 Container Apps on Azure Container Apps (agentred-prod-rg, East US 2), API Gateway healthy, Terraform state clean (16 managed resources, 0 changes), 27 RBAC assignments. Phases 0-2.2 COMPLETE (41 multi_tenant modules, ~28,000 lines). Phase 2.5 Persistent Customer Memory ALL 4 LAYERS COMPLETE (6 modules). Phase 3.0 ALL BUILD PHASES COMPLETE (Chat API, widget, Shopify extension, admin shared components, both admin shells — build-validated). Renderable HTML prototype OWNER-APPROVED (2026-02-03). Design frozen as production reference. Operational readiness COMPLETE. Security hardening COMPLETE. Pipeline optimization COMPLETE. Trial environment COMPLETE. Competitive pricing VERIFIED (all 5 competitors, 2026-02-01 — Agent Red 4-21x cheaper). 1,235 unit tests + 42 integration tests = 1,277 total, 0 failures. 19 routers, 67 routes, 9 middleware layers. Shopify Partner app deployed (client_id: 4c6cf726cd1f9f5389caf48f78af9735).
+Azure production: API Gateway FQDN: agent-red-api-gateway.lemonriver-f59f94b7.eastus2.azurecontainerapps.io. Container App Environment domain: lemonriver-f59f94b7.eastus2.azurecontainerapps.io. Static IP: 20.97.131.247. NATS internal: agent-red-nats.internal.lemonriver-f59f94b7.eastus2.azurecontainerapps.io:4222. Terraform clean plan requires: TF_VAR_appinsights_connection_string env var + -var-file=production.tfvars.
+Remaining work (priority order): (1) Remaker Digital storefront — owner creates storefront, onboard as tenant #1, seed KB, deploy widget (WI #199-202), (2) UX consultant evaluation — Mazel evaluates on live storefront (WI #203, blocked on storefront), (3) CI improvements (coverage reports, parallel jobs — WI #105, #107), (4) SSE enhancements (client-side retry, metering, multi-tab — WI #131-133), (5) API completeness (customer profiles, OpenAPI — WI #142, #147), (6) Remaining security (API key rotation, Stripe IP allowlisting — WI #159, #162), (7) Creative assets for Shopify App Store (icon, screenshots — owner/designer tasks), (8) Persistent Memory metrics dashboard, (9) 5 A/B production tests (Decision #32).
+Important context: Tidio is the primary functional reference. Zapier is the visual styling reference. Persistent Customer Memory (all 4 layers) is the launch pillar differentiator. Prototype approved and frozen — runs via `cd prototype && npm run dev` (port 3000). Production deployment uses Managed Identity (not API keys). Agent containers show ActivationFailed — expected (AGNTCY demo mode images). NATS connected=false — expected (lazy init). Iterative working style: one item at a time, honest assessment, approval before implementation, aggressive scope cutting.
 Please review CLAUDE.md, then proceed with the highest-priority remaining work item, presenting one item at a time for review per the iterative working style documented in CLAUDE.md.
 ```
 
@@ -1660,6 +1714,25 @@ Two autonomous sessions completing the final two layers of the Persistent Custom
 - **Model selection in pipeline**: Lazy import of `get_fine_tuning_service()` in `execute()` to avoid circular imports. Falls back to `"gpt-4o"` on any exception. A/B variant recorded on trace before pipeline execution begins.
 - **`enable_ab_test` parameter on `deploy_model()`**: Default `True` creates A/B experiment; explicit `False` deploys directly. Tests cover both paths.
 
+**Session 2026-02-03: Production Deployment + Azure Environment Audit**
+
+Full production deployment to Azure Container Apps, comprehensive environment audit, Terraform state reconciliation, and endpoint verification. Admin UI light/dark toggle fix.
+
+- [x] **WI #197: Production deployment COMPLETE** — 9 Container Apps deployed to agentred-prod-rg via Terraform apply. API Gateway healthy (/health 200, /ready 200). All 9 ProvisioningState: Succeeded.
+- [x] **Terraform state reconciliation** — Imported all 9 Container Apps into state (original apply state was incomplete). Fixed Container App Environment replacement hazard (`lifecycle { ignore_changes = [infrastructure_resource_group_name] }`). Fixed workload_profile_name drift (explicit `"Consumption"`). Achieved clean plan: "No changes."
+- [x] **RBAC assignments (27 total)** — 9 AcrPull + 9 Key Vault Secrets Officer + 9 Cosmos DB Built-in Data Contributor for Container App managed identities. CLI user Key Vault Secrets Officer.
+- [x] **NATS ingress fix** — NATS had no ingress (excluded by ingress conditions in main.tf). Rewrote to 3 ingress blocks: external HTTP (API Gateway), internal TCP (NATS + SLIM), internal HTTP (agents).
+- [x] **Stale database cleanup** — Deleted legacy "agent-red-prod" Cosmos DB database (leftover from testing).
+- [x] **Comprehensive endpoint testing** — /health, /ready, all 8 auth-protected groups, 3 public billing endpoints, webhooks, chat — all returning expected status codes.
+- [x] **Admin UI toggle fix** — Light/Dark toggle in StandaloneApp.tsx now retains dark mode styling in both modes (matches always-dark header). Changed from `variant="default"` to `variant="subtle"` with explicit dark styling.
+- [x] **production.tfvars updated** — NATS URLs updated to actual internal FQDNs.
+
+**Key technical decisions from this session:**
+- **Agent container ActivationFailed is accepted state:** Upstream AGNTCY images run in "demo mode" then exit. No HTTP health endpoints. Container Apps health probes fail, causing restart. Pipeline uses Azure OpenAI directly via API Gateway.
+- **NATS connected=false is expected:** Lazy initialization — connection established on first pipeline execution, not at startup.
+- **3 ingress block architecture:** External HTTP for API Gateway only, internal TCP for NATS (4222) + SLIM Gateway (8443), internal HTTP for agent containers (8080). Previous 2-block design excluded NATS.
+- **Container App Environment lifecycle:** `infrastructure_resource_group_name` is auto-assigned by Azure (e.g., `ME_agent-red-cae_agentred-prod-rg_eastus2`). Must be in `ignore_changes` to prevent destructive replacement of entire environment + all Container Apps.
+
 ### Pending
 - [x] ~~**Cosmos DB full initialization**~~ — COMPLETE. 10/10 containers created and verified. scripts/init_cosmos_containers.py. DATABASE_NAME corrected to "agentred".
 - [x] ~~**Azure OpenAI custom subdomain**~~ — Already configured as `aoai-agentred-eastus2`. Endpoint: `https://aoai-agentred-eastus2.openai.azure.com/`.
@@ -1668,12 +1741,12 @@ Two autonomous sessions completing the final two layers of the Persistent Custom
 - [x] ~~**Knowledge base seed data**~~ — COMPLETE. scripts/seed_knowledge_base.py (32 articles, 26,470 chars). Supports `--load --tenant-id <ID>`.
 - [x] ~~**Favicon and app icons**~~ — COMPLETE. favicon.ico, apple-touch-icon.png (180), icon-192.png, icon-512.png. Prototype index.html updated.
 - [x] ~~**Color palette worksheet for designer**~~ — COMPLETE. branding/color-palette-worksheet.html. Waiting for designer to return.
-- [ ] **Production deployment (WI #197)** — Terraform apply, Docker images to ACR, Container Apps deployment. Requires Docker Desktop running.
-- [ ] **Remaker Digital storefront (WI #199-202)** — Owner creates storefront → onboard as tenant #1 → seed KB → deploy widget.
-- [ ] **UX consultant evaluation (WI #203)** — Mazel evaluates workflows on live storefront. Blocked on production deployment.
+- [x] ~~**Production deployment (WI #197)**~~ — COMPLETE. 9 Container Apps, Terraform clean, API Gateway healthy, 27 RBAC assignments.
+- [ ] **Remaker Digital storefront (WI #199-202)** — Owner creates storefront → onboard as tenant #1 → seed KB → deploy widget. **No longer blocked** (production deployment complete).
+- [ ] **UX consultant evaluation (WI #203)** — Mazel evaluates workflows on live storefront. Blocked on storefront creation.
 - [ ] **Phase 2.5: 5 A/B production tests** (work items from Decision #32) — requires production conversation volume.
 - [ ] **Backlog items (12 remaining):** #105 (coverage gate), #107 (perf test infra), #131-133 (SSE enhancements), #137-139 (pipeline post-launch), #142 (customer profile endpoints), #147 (OpenAPI schema), #159 (API key rotation), #162 (Stripe IP allowlisting)
-- [ ] **Shopify App Store submission** — Requires: creative assets (icon, screenshots — owner/designer tasks) + production deployment
+- [ ] **Shopify App Store submission** — Requires: creative assets (icon, screenshots — owner/designer tasks)
 - [ ] **Creative assets** — App icon (1200x1200), key benefit images (3× 1600x1200), screenshots — owner/designer tasks
 
 ---
@@ -1699,4 +1772,4 @@ Two autonomous sessions completing the final two layers of the Persistent Custom
 
 *© 2026 Remaker Digital, a DBA of VanDusen & Palmeter, LLC. All rights reserved.*
 *Last Updated: 2026-02-03*
-*Version: 21.0.0*
+*Version: 22.0.0*

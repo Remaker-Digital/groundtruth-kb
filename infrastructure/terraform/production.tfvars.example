@@ -11,27 +11,31 @@
 # Azure subscription
 subscription_id = "YOUR_SUBSCRIPTION_ID"
 
-# Resource group (existing)
-resource_group_name = "agntcy-prod-rg"
+# Resource group (Agent Red dedicated)
+resource_group_name = "agentred-prod-rg"
 location            = "eastus2"
 environment         = "production"
 
-# Container Registry (existing)
-container_registry = "acragntcycsprodrc6vcp.azurecr.io"
+# Container Registry (Agent Red dedicated)
+container_registry = "acragentredeastus2.azurecr.io"
 
 # Container App Environment
 container_app_environment_name = "agent-red-cae"
 
 # Network — subnet must be delegated to Microsoft.App/environments
-container_apps_subnet_id = "/subscriptions/YOUR_SUB/resourceGroups/agntcy-prod-rg/providers/Microsoft.Network/virtualNetworks/agntcy-cs-prod-vnet/subnets/container-apps"
+container_apps_subnet_id = "/subscriptions/YOUR_SUB/resourceGroups/agentred-prod-rg/providers/Microsoft.Network/virtualNetworks/agentred-prod-vnet/subnets/container-apps"
 
-# NATS (internal VNet address)
-nats_url = "nats://10.0.1.5:4222"
+# Azure OpenAI
+azure_openai_endpoint = "https://aoai-agentred-eastus2.openai.azure.com/"
 
-# Cosmos DB (existing)
-cosmos_db_endpoint      = "https://cosmos-agntcy-cs-prod-rc6vcp.documents.azure.com:443/"
-cosmos_db_database      = "agent-red-prod"
-cosmos_db_account_name  = "cosmos-agntcy-cs-prod-rc6vcp"
+# NATS (internal Container App FQDN — updated after first deployment)
+nats_url                  = "nats://agent-red-nats.internal:4222"
+nats_monitoring_endpoint  = "agent-red-nats.internal:8222"
+
+# Cosmos DB (Agent Red dedicated — already provisioned)
+cosmos_db_endpoint      = "https://cosmos-agentred-eastus2.documents.azure.com:443/"
+cosmos_db_database      = "agentred"
+cosmos_db_account_name  = "cosmos-agentred-eastus2"
 manage_cosmos_db_account = false # Set true only for fresh deployments
 
 # Customer-Managed Keys (Decision #20 — enable after Key Vault RBAC is configured)
@@ -41,8 +45,8 @@ enable_cmk = false
 enable_archival_storage       = false
 archival_storage_account_name = "agentredarchival"
 
-# Key Vault (existing)
-key_vault_url = "https://kv-agntcy-cs-prod-rc6vcp.vault.azure.net/"
+# Key Vault (Agent Red dedicated — already provisioned)
+key_vault_url = "https://kv-agentred-eastus2.vault.azure.net/"
 
 # Application Insights (sensitive — set via TF_VAR_appinsights_connection_string env var)
 # appinsights_connection_string = "InstrumentationKey=...;IngestionEndpoint=..."

@@ -7,7 +7,9 @@
   "scripts": {
     "dev": "vite",
     "build": "tsc && vite build",
-    "preview": "vite preview"
+    "preview": "vite preview",
+    "build:capture-runner": "esbuild scripts/dom-to-svg-runner.js --bundle --format=iife --outfile=scripts/dom-to-svg-browser.js --platform=browser",
+    "capture-to-svg": "npm run build:capture-runner && node scripts/capture-page-to-svg.js"
   },
   "dependencies": {
     "@mantine/charts": "^7.17.0",
@@ -28,6 +30,8 @@
     "@types/react": "^18.3.18",
     "@types/react-dom": "^18.3.5",
     "@vitejs/plugin-react": "^4.3.4",
+    "dom-to-svg": "^0.12.2",
+    "puppeteer": "^23.11.1",
     "typescript": "^5.7.3",
     "vite": "^6.0.0"
   }

@@ -17,7 +17,7 @@ variable "subscription_id" {
 variable "resource_group_name" {
   description = "Name of the Azure Resource Group"
   type        = string
-  default     = "agntcy-prod-rg"
+  default     = "agentred-prod-rg"
 }
 
 variable "location" {
@@ -44,7 +44,7 @@ variable "environment" {
 variable "container_registry" {
   description = "Azure Container Registry login server"
   type        = string
-  default     = "acragntcycsprodrc6vcp.azurecr.io"
+  default     = "acragentredeastus2.azurecr.io"
 }
 
 # ---------------------------------------------------------------------------
@@ -60,7 +60,7 @@ variable "container_app_environment_name" {
 variable "vnet_name" {
   description = "Virtual network name"
   type        = string
-  default     = "agntcy-cs-prod-vnet"
+  default     = "agentred-prod-vnet"
 }
 
 variable "container_apps_subnet_id" {
@@ -73,9 +73,25 @@ variable "container_apps_subnet_id" {
 # ---------------------------------------------------------------------------
 
 variable "nats_url" {
-  description = "NATS JetStream URL (internal VNet address)"
+  description = "NATS JetStream URL (internal Container App FQDN)"
   type        = string
-  default     = "nats://10.0.1.5:4222"
+  default     = "nats://agent-red-nats.internal:4222"
+}
+
+variable "nats_monitoring_endpoint" {
+  description = "NATS monitoring endpoint for KEDA scaler (host:port format)"
+  type        = string
+  default     = "agent-red-nats.internal:8222"
+}
+
+# ---------------------------------------------------------------------------
+# Azure OpenAI
+# ---------------------------------------------------------------------------
+
+variable "azure_openai_endpoint" {
+  description = "Azure OpenAI Service endpoint URL"
+  type        = string
+  default     = "https://aoai-agentred-eastus2.openai.azure.com/"
 }
 
 # ---------------------------------------------------------------------------
@@ -90,13 +106,13 @@ variable "cosmos_db_endpoint" {
 variable "cosmos_db_database" {
   description = "Cosmos DB database name"
   type        = string
-  default     = "agent-red-prod"
+  default     = "agentred"
 }
 
 variable "cosmos_db_account_name" {
   description = "Cosmos DB account name (for data source lookups)"
   type        = string
-  default     = "cosmos-agntcy-cs-prod-rc6vcp"
+  default     = "cosmos-agentred-eastus2"
 }
 
 variable "manage_cosmos_db_account" {
@@ -138,7 +154,7 @@ variable "archival_storage_account_name" {
 variable "key_vault_url" {
   description = "Azure Key Vault endpoint URL"
   type        = string
-  default     = "https://kv-agntcy-cs-prod-rc6vcp.vault.azure.net/"
+  default     = "https://kv-agentred-eastus2.vault.azure.net/"
 }
 
 # ---------------------------------------------------------------------------

@@ -344,8 +344,8 @@ locals {
     api-gateway = {
       liveness_path    = "/health"
       readiness_path   = "/ready"
-      liveness_port    = 8080
-      readiness_port   = 8080
+      liveness_port    = 8000
+      readiness_port   = 8000
       initial_delay    = 10
       liveness_period  = 30
       readiness_period = 15

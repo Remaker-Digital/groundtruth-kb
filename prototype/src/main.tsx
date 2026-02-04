@@ -30,18 +30,19 @@ const agentRedTheme = createTheme({
       '#870E18', // 8
       '#720912', // 9
     ],
-    // Neutral grey dark scale (no blue/purple tint)
+    // Neutral grey dark scale — designer-approved (2026-02-03 mockup)
+    // Depth hierarchy: header/sidebar (#0a0a0a) → cards (#19191a) → page (#363636)
     dark: [
       '#F5F5F5', // 0 - Light grey (text on dark bg)
       '#E0E0E0', // 1 - Borders (light)
       '#A0A0A0', // 2 - Muted text
       '#787878', // 3 - Secondary text
       '#5C5C5C', // 4 - Tertiary text
-      '#3A3A3A', // 5 - Elevated surface (cards)
-      '#2A2A2A', // 6 - Sidebar / panels
-      '#1E1E1E', // 7 - Main background ★
-      '#171717', // 8 - Deepest surface
-      '#111111', // 9 - True dark
+      '#363636', // 5 - Page background ★
+      '#19191a', // 6 - Cards / elevated surfaces
+      '#0a0a0a', // 7 - Header, sidebar (deepest chrome) ★
+      '#19191a', // 8 - Card surface (alias)
+      '#0a0a0a', // 9 - True dark (alias)
     ],
   },
   fontFamily: "'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif",
@@ -59,8 +60,8 @@ const agentRedTheme = createTheme({
       primary: '#C41E2A',
       primaryDark: '#9B1420',
       primaryLight: '#F2D4D6',
-      charcoal: '#1E1E1E',
-      slate: '#3A3A3A',
+      charcoal: '#0a0a0a',
+      slate: '#363636',
       steel: '#5C5C5C',
       silver: '#E0E0E0',
       snow: '#F5F5F5',

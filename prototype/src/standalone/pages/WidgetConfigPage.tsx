@@ -83,26 +83,26 @@ function WidgetPreview({ config }: { config: WidgetConfig }) {
   const isRight = config.position === 'bottom-right';
   const dk = config.colorMode === 'dark';
 
-  // Color tokens — light vs dark widget mode
-  const panelBg = dk ? '#1E1E1E' : '#fff';
-  const msgAreaBg = dk ? '#111111' : '#fafafa';
-  const agentBubbleBg = dk ? '#2A2A2A' : '#fff';
-  const agentBubbleBorder = dk ? 'rgba(255,255,255,0.08)' : '#e9ecef';
+  // Color tokens — light vs dark widget mode (widget preview uses its own palette)
+  const panelBg = dk ? '#19191a' : '#fff';
+  const msgAreaBg = dk ? '#363636' : '#fafafa';
+  const agentBubbleBg = dk ? '#19191a' : '#fff';
+  const agentBubbleBorder = dk ? '#363636' : '#e9ecef';
   const agentBubbleText = dk ? '#E0E0E0' : undefined;
-  const dateSepBg = dk ? '#2A2A2A' : '#f1f3f5';
+  const dateSepBg = dk ? '#19191a' : '#f1f3f5';
   const dateSepText = dk ? '#787878' : undefined;
-  const inputBg = dk ? '#2A2A2A' : '#f1f3f5';
+  const inputBg = dk ? '#19191a' : '#f1f3f5';
   const inputText = dk ? '#5C5C5C' : '#adb5bd';
-  const inputBarBg = dk ? '#1E1E1E' : '#fff';
-  const inputBarBorder = dk ? 'rgba(255,255,255,0.06)' : '#e9ecef';
+  const inputBarBg = dk ? '#0a0a0a' : '#fff';
+  const inputBarBorder = dk ? '#363636' : '#e9ecef';
   const brandingText = dk ? '#5C5C5C' : undefined;
-  const pageBg = dk ? '#111111' : '#f8f9fa';
-  const pageBorder = dk ? 'rgba(255,255,255,0.08)' : '#dee2e6';
+  const pageBg = dk ? '#363636' : '#f8f9fa';
+  const pageBorder = dk ? '#363636' : '#dee2e6';
   // Simulated page chrome
-  const chromeBg = dk ? '#1E1E1E' : '#e9ecef';
-  const chromeBorder = dk ? 'rgba(255,255,255,0.06)' : '#dee2e6';
-  const skeletonDark = dk ? '#2A2A2A' : '#dee2e6';
-  const skeletonLight = dk ? '#1E1E1E' : '#e9ecef';
+  const chromeBg = dk ? '#0a0a0a' : '#e9ecef';
+  const chromeBorder = dk ? '#363636' : '#dee2e6';
+  const skeletonDark = dk ? '#19191a' : '#dee2e6';
+  const skeletonLight = dk ? '#0a0a0a' : '#e9ecef';
 
   return (
     <Box

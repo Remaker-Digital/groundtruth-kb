@@ -35,10 +35,21 @@
       --p-color-text: #303030;
       color: #303030;
     }
-    /* Thinner, subtler borders on Paper cards in dark mode */
+    /* Card borders: subtle tone matching page bg — owner-approved (2026-02-04) */
+    /* Designer's #938a87 taupe at 0.2px was too bold at browser-minimum 0.5px; fallback to page-bg match */
     [data-mantine-color-scheme="dark"] .mantine-Paper-root {
-      --_paper-border-color: rgba(255, 255, 255, 0.08);
-      border-color: rgba(255, 255, 255, 0.08);
+      --_paper-border-color: #363636;
+      border-color: #363636;
+      border-width: 1px;
+    }
+    /* Light mode: dark sticky header to match dark mode chrome */
+    html[data-mantine-color-scheme="light"] .mantine-AppShell-header {
+      background: #0a0a0a !important;
+      border-bottom-color: #1E1E1E !important;
+    }
+    html[data-mantine-color-scheme="light"] .mantine-AppShell-header .mantine-Text-root,
+    html[data-mantine-color-scheme="light"] .mantine-AppShell-header .mantine-ActionIcon-root {
+      color: #F5F5F5;
     }
   </style>
 </head>

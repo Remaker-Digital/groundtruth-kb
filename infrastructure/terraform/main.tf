@@ -29,8 +29,8 @@ terraform {
 
   # Remote state — uncomment and configure for team use
   # backend "azurerm" {
-  #   resource_group_name  = "agntcy-prod-rg"
-  #   storage_account_name = "agntcytfstate"
+  #   resource_group_name  = "agentred-prod-rg"
+  #   storage_account_name = "agentredtfstate"
   #   container_name       = "tfstate"
   #   key                  = "agent-red.tfstate"
   # }
@@ -66,6 +66,11 @@ resource "azurerm_container_app_environment" "main" {
   log_analytics_workspace_id = azurerm_log_analytics_workspace.main.id
 
   tags = var.tags
+
+  # Prevent replacement when Azure auto-assigns infrastructure_resource_group_name
+  lifecycle {
+    ignore_changes = [infrastructure_resource_group_name]
+  }
 }
 
 resource "azurerm_log_analytics_workspace" "main" {
@@ -73,7 +78,7 @@ resource "azurerm_log_analytics_workspace" "main" {
   location            = var.location
   resource_group_name = var.resource_group_name
   sku                 = "PerGB2018"
-  retention_in_days   = 7
+  retention_in_days   = 30
 
   tags = var.tags
 }
@@ -92,6 +97,7 @@ locals {
     { name = "COSMOS_USE_MANAGED_ID", value = "true" },
     { name = "AZURE_KEYVAULT_URL", value = var.key_vault_url },
     { name = "USE_AZURE_OPENAI", value = "true" },
+    { name = "AZURE_OPENAI_ENDPOINT", value = var.azure_openai_endpoint },
     { name = "APPLICATIONINSIGHTS_CONNECTION_STRING", secret_name = "appinsights-connection-string" },
     # WI #59: Graceful shutdown — containers get 60s to drain connections
     { name = "GRACEFUL_SHUTDOWN_TIMEOUT", value = "60" },
@@ -101,8 +107,8 @@ locals {
   # Format: name => { image, port, cpu, memory, min, max, critical, scale_trigger }
   container_apps = {
     api-gateway = {
-      image        = "api-gateway:v1.1.2-openai"
-      port         = 8080
+      image        = "api-gateway:v1.0.0"
+      port         = 8000
       cpu          = 0.5
       memory       = "1Gi"
       min_replicas = 2
@@ -247,6 +253,7 @@ resource "azurerm_container_app" "apps" {
   container_app_environment_id = azurerm_container_app_environment.main.id
   resource_group_name          = var.resource_group_name
   revision_mode                = "Single"
+  workload_profile_name        = "Consumption"
 
   tags = merge(var.tags, {
     component = each.key
@@ -343,7 +350,7 @@ resource "azurerm_container_app" "apps" {
         name             = "nats-queue-depth"
         custom_rule_type = "nats-jetstream"
         metadata = {
-          natsServerMonitoringEndpoint = "nats://10.0.1.5:8222"
+          natsServerMonitoringEndpoint = var.nats_monitoring_endpoint
           account                      = "$G"
           stream                       = each.value.scale_rule.consumer_group
           consumer                     = each.value.scale_rule.consumer_group
@@ -373,13 +380,13 @@ resource "azurerm_container_app" "apps" {
     }
   }
 
-  # Ingress — only API Gateway and SLIM Gateway exposed externally
+  # Ingress — API Gateway is the only externally exposed container
   dynamic "ingress" {
-    for_each = contains(["api-gateway", "slim-gateway"], each.key) ? [1] : []
+    for_each = each.key == "api-gateway" ? [1] : []
     content {
-      external_enabled = each.key == "api-gateway"
+      external_enabled = true
       target_port      = each.value.port
-      transport        = each.key == "slim-gateway" ? "tcp" : "auto"
+      transport        = "auto"
 
       traffic_weight {
         latest_revision = true
@@ -388,7 +395,22 @@ resource "azurerm_container_app" "apps" {
     }
   }
 
-  # Internal ingress for agent containers (inter-service communication)
+  # Internal TCP ingress for NATS (port 4222) and SLIM Gateway (port 8443)
+  dynamic "ingress" {
+    for_each = contains(["nats", "slim-gateway"], each.key) ? [1] : []
+    content {
+      external_enabled = false
+      target_port      = each.value.port
+      transport        = "tcp"
+
+      traffic_weight {
+        latest_revision = true
+        percentage      = 100
+      }
+    }
+  }
+
+  # Internal HTTP ingress for agent containers (inter-service communication)
   dynamic "ingress" {
     for_each = !contains(["api-gateway", "slim-gateway", "nats"], each.key) ? [1] : []
     content {

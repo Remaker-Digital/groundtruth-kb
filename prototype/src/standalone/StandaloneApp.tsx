@@ -98,20 +98,22 @@ export function StandaloneApp() {
   };
 
   return (
+    <div id="app-shell-capture-root" style={{ position: 'relative', width: '100%', minHeight: '100vh' }}>
     <AppShell
       header={{ height: 56 }}
       navbar={{ width: 260, breakpoint: 'sm', collapsed: { mobile: !opened } }}
       padding="md"
       styles={{
         header: {
-          borderBottom: isDark ? '1px solid rgba(255,255,255,0.06)' : '1px solid #e0e0e0',
-          background: isDark ? undefined : '#f0f0f0',
+          borderBottom: isDark ? '1px solid rgba(255,255,255,0.06)' : '1px solid #1E1E1E',
+          background: '#0a0a0a',
         },
         navbar: {
           borderRight: isDark ? '1px solid rgba(255,255,255,0.06)' : undefined,
+          background: isDark ? '#0a0a0a' : undefined,
         },
         main: {
-          background: isDark ? '#111111' : undefined,
+          background: isDark ? '#363636' : undefined,
         },
       }}
     >
@@ -129,7 +131,7 @@ export function StandaloneApp() {
                 <Text
                   size="sm"
                   fw={500}
-                  c={isDark ? 'gray.4' : 'gray.6'}
+                  c="gray.4"
                   style={{ letterSpacing: '0.02em', userSelect: 'none' }}
                 >
                   Customer Experience
@@ -139,12 +141,17 @@ export function StandaloneApp() {
           </Group>
           <Group gap="xs">
             <Badge variant="light" color="green" size="sm">Professional</Badge>
-            {/* Dark mode toggle */}
+            {/* Dark mode toggle — always dark styling since header is always dark */}
             <ActionIcon
-              variant="default"
+              variant="subtle"
               size="md"
               onClick={() => setColorScheme(computedColorScheme === 'dark' ? 'light' : 'dark')}
               aria-label="Toggle dark mode"
+              style={{
+                color: '#A0A0A0',
+                border: '1px solid rgba(255, 255, 255, 0.12)',
+                background: 'rgba(255, 255, 255, 0.06)',
+              }}
             >
               {computedColorScheme === 'dark' ? (
                 <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
@@ -205,10 +212,13 @@ export function StandaloneApp() {
                 }
                 active={isActive}
                 onClick={() => setActivePage(item.page)}
+                styles={{
+                  label: isActive && isDark ? { color: '#F5F5F5' } : undefined,
+                }}
                 style={{
                   borderRadius: 8,
                   marginBottom: 2,
-                  ...(isActive && isDark ? { background: 'rgba(196, 30, 42, 0.12)' } : {}),
+                  ...(isActive && isDark ? { background: 'rgba(255, 255, 255, 0.06)' } : {}),
                 }}
               />
             );
@@ -227,5 +237,6 @@ export function StandaloneApp() {
         {renderPage()}
       </AppShell.Main>
     </AppShell>
+    </div>
   );
 }

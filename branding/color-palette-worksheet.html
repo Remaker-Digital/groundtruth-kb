@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>Agent Red Admin UI — Color Palette Worksheet</title>
+<title>Agent Red Admin UI — Color Palette Worksheet v2.0</title>
 <style>
   @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap');
 
@@ -49,6 +49,28 @@
 
   .intro strong { color: #1E1E1E; }
 
+  .version-badge {
+    display: inline-block;
+    background: #059669;
+    color: #fff;
+    font-size: 11px;
+    font-weight: 700;
+    padding: 3px 10px;
+    border-radius: 12px;
+    margin-left: 12px;
+    vertical-align: middle;
+  }
+
+  .update-note {
+    background: #E8F5E9;
+    border: 1px solid #A5D6A7;
+    border-radius: 8px;
+    padding: 14px 20px;
+    margin-bottom: 20px;
+    font-size: 13px;
+    color: #1E1E1E;
+  }
+
   .instructions {
     background: #FDE8E8;
     border: 1px solid #F2D4D6;
@@ -80,9 +102,9 @@
   }
 
   .mode-panel.dark {
-    background: #1E1E1E;
+    background: #363636;
     color: #F5F5F5;
-    border-color: #3A3A3A;
+    border-color: #938a87;
   }
 
   .mode-panel.light {
@@ -102,7 +124,7 @@
 
   .mode-panel.dark .mode-label {
     color: #A0A0A0;
-    border-bottom: 1px solid rgba(255,255,255,0.08);
+    border-bottom: 1px solid #938a87;
   }
 
   .mode-panel.light .mode-label {
@@ -142,6 +164,14 @@
     font-weight: 600;
   }
 
+  .swatch-desc {
+    font-size: 11px;
+    opacity: 0.65;
+    font-style: italic;
+    margin-top: 1px;
+    line-height: 1.3;
+  }
+
   .swatch-hex {
     font-family: 'JetBrains Mono', monospace;
     font-size: 12px;
@@ -165,6 +195,16 @@
     font-style: italic;
   }
 
+  .swatch-input.dark-input {
+    background: rgba(255,255,255,0.05);
+    border-color: #938a87;
+    color: #F5F5F5;
+  }
+
+  .swatch-input.dark-input::placeholder {
+    color: #787878;
+  }
+
   /* ================================================================
      ELEMENT SAMPLES
      ================================================================ */
@@ -176,8 +216,8 @@
   }
 
   .sample-card.dark {
-    background: #2A2A2A;
-    border: 1px solid rgba(255,255,255,0.08);
+    background: #19191a;
+    border: 0.5px solid #938a87;
   }
 
   .sample-card.light {
@@ -316,26 +356,60 @@
     background: rgba(196, 30, 42, 0.05);
     border: 1px dashed #C41E2A;
     min-width: 100px;
+    padding: 4px 6px;
+  }
+  td.new-color input.swatch-input {
+    width: 100%;
+    border: none;
+    background: transparent;
+    padding: 4px 6px;
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 12px;
+    color: #1E1E1E;
+    text-align: center;
+  }
+  td.new-color input.swatch-input::placeholder {
+    color: #A0A0A0;
+    font-style: italic;
+  }
+
+  /* Change indicator */
+  .changed-tag {
+    display: inline-block;
+    background: #059669;
+    color: #fff;
+    font-size: 9px;
+    font-weight: 700;
+    padding: 1px 6px;
+    border-radius: 8px;
+    margin-left: 6px;
+    vertical-align: middle;
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
   }
 </style>
 </head>
 <body>
 
-<h1>Agent Red Customer Experience</h1>
+<h1>Agent Red Customer Experience <span class="version-badge">v2.0</span></h1>
 <p style="font-size: 16px; font-weight: 500; color: #5C5C5C; margin-bottom: 24px;">Admin UI Color Palette Worksheet</p>
+
+<div class="update-note">
+  <strong>Updated 2026-02-04:</strong> Colors updated per designer feedback. All "Current" values below reflect the approved changes that are now live in the prototype. Use the <span style="border: 1px dashed #C41E2A; padding: 1px 6px; border-radius: 3px; font-family: 'JetBrains Mono', monospace; font-size: 11px;">New Color</span> fields for any further refinements. Items marked with <span class="changed-tag">changed</span> were updated in this revision.
+</div>
 
 <div class="intro">
   <p>This worksheet shows <strong>every UI element type</strong> used in the Agent Red admin dashboard, rendered in both <strong>Dark Mode</strong> (default) and <strong>Light Mode</strong>, with the current hex color labeled on each element.</p>
-  <p style="margin-top: 8px;">The designer should fill in the <strong>"New Color"</strong> column for any element she wants to change. Leave blank to keep the current value.</p>
+  <p style="margin-top: 8px;">Each element includes a brief description explaining <strong>where you see it</strong> on the actual admin dashboard pages. The designer should fill in the <strong>"New Color"</strong> input field for any element she wants to change. Leave blank to keep the current value.</p>
 </div>
 
 <div class="instructions">
   <strong>Instructions for the Designer:</strong>
   <ol>
-    <li>Review each element in both Dark and Light mode panels below.</li>
-    <li>For any color you want to change, write your new hex value in the <span style="border: 1px dashed #C41E2A; padding: 1px 6px; border-radius: 3px; font-family: 'JetBrains Mono', monospace; font-size: 11px;">New Color</span> field.</li>
+    <li>Review each element in both Dark and Light mode panels below. Each swatch includes a description of where the element appears on the admin dashboard.</li>
+    <li>For any color you want to change, type your new hex value in the <span style="border: 1px dashed #C41E2A; padding: 1px 6px; border-radius: 3px; font-family: 'JetBrains Mono', monospace; font-size: 11px;">New Color</span> input field next to each swatch.</li>
     <li>Leave the field blank if the current color should remain unchanged.</li>
-    <li>The reference table at the bottom summarizes all tokens — you can also fill in values there.</li>
+    <li>The reference table in Section 9 also has input fields in every "New Color" cell -- you can fill in values there instead if you prefer a spreadsheet-style view.</li>
     <li>Return this file (or a PDF/screenshot with annotations) and we will apply all changes.</li>
   </ol>
 </div>
@@ -345,47 +419,71 @@
      ================================================================ -->
 
 <h2>1. Surface Colors (Backgrounds)</h2>
-<p class="annotation">These define the layered depth of the interface — from deepest background to elevated cards.</p>
+<p class="annotation">These define the layered depth of the interface -- from the deepest page background to the elevated card surfaces. Each layer should be visually distinct from its neighbor.</p>
 
 <div class="mode-pair">
   <!-- DARK MODE -->
-  <div class="mode-panel dark">
-    <div class="mode-label">Dark Mode</div>
+  <div class="mode-panel dark" style="background: #363636;">
+    <div class="mode-label">Dark Mode (Default)</div>
 
     <div class="swatch-row">
-      <div class="swatch" style="background: #111111;"></div>
+      <div class="swatch" style="background: #363636;"></div>
       <div class="swatch-info">
-        <div class="swatch-name">Page Background (deepest)</div>
-        <div class="swatch-hex">#111111</div>
+        <div class="swatch-name">Page Background <span class="changed-tag">changed</span></div>
+        <div class="swatch-desc">The main content area behind all cards. Visible as the grey backdrop when you look at the Dashboard, Inbox, or any page.</div>
+        <div class="swatch-hex">#363636</div>
       </div>
-      <input class="swatch-input" placeholder="New color" style="background: rgba(255,255,255,0.05); border-color: #5C5C5C; color: #F5F5F5;">
+      <input class="swatch-input dark-input" placeholder="New color">
     </div>
 
     <div class="swatch-row">
-      <div class="swatch" style="background: #1E1E1E;"></div>
+      <div class="swatch" style="background: #0a0a0a;"></div>
       <div class="swatch-info">
-        <div class="swatch-name">Main Surface / Sidebar</div>
-        <div class="swatch-hex">#1E1E1E</div>
+        <div class="swatch-name">Header Background <span class="changed-tag">changed</span></div>
+        <div class="swatch-desc">The top bar (56px tall) containing the AR logo, "Customer Experience" text, and dark mode toggle button. Same color in both dark and light mode.</div>
+        <div class="swatch-hex">#0a0a0a</div>
       </div>
-      <input class="swatch-input" placeholder="New color" style="background: rgba(255,255,255,0.05); border-color: #5C5C5C; color: #F5F5F5;">
+      <input class="swatch-input dark-input" placeholder="New color">
     </div>
 
     <div class="swatch-row">
-      <div class="swatch" style="background: #2A2A2A;"></div>
+      <div class="swatch" style="background: #0a0a0a;"></div>
       <div class="swatch-info">
-        <div class="swatch-name">Card / Elevated Surface</div>
-        <div class="swatch-hex">#2A2A2A</div>
+        <div class="swatch-name">Sidebar Background <span class="changed-tag">changed</span></div>
+        <div class="swatch-desc">The left navigation panel (260px wide) containing nav items like Dashboard, Inbox, Knowledge Base, etc.</div>
+        <div class="swatch-hex">#0a0a0a</div>
       </div>
-      <input class="swatch-input" placeholder="New color" style="background: rgba(255,255,255,0.05); border-color: #5C5C5C; color: #F5F5F5;">
+      <input class="swatch-input dark-input" placeholder="New color">
+    </div>
+
+    <div class="swatch-row">
+      <div class="swatch" style="background: #19191a;"></div>
+      <div class="swatch-info">
+        <div class="swatch-name">Card / Paper Surface <span class="changed-tag">changed</span></div>
+        <div class="swatch-desc">Every white-ish panel on the page: stat cards on Dashboard, the conversation list in Inbox, the editor panels in Configuration, invoice tables in Billing.</div>
+        <div class="swatch-hex">#19191a</div>
+      </div>
+      <input class="swatch-input dark-input" placeholder="New color">
+    </div>
+
+    <div class="swatch-row">
+      <div class="swatch" style="background: #19191a;"></div>
+      <div class="swatch-info">
+        <div class="swatch-name">Tooltip Background <span class="changed-tag">changed</span></div>
+        <div class="swatch-desc">Small floating info boxes that appear when you hover over chart data points, badges, or info icons.</div>
+        <div class="swatch-hex">#19191a</div>
+      </div>
+      <input class="swatch-input dark-input" placeholder="New color">
     </div>
 
     <div class="swatch-row">
       <div class="swatch" style="background: #3A3A3A;"></div>
       <div class="swatch-info">
         <div class="swatch-name">Input / Interactive Surface</div>
+        <div class="swatch-desc">Text fields, dropdowns, search boxes. The darker background inside form controls.</div>
         <div class="swatch-hex">#3A3A3A</div>
       </div>
-      <input class="swatch-input" placeholder="New color" style="background: rgba(255,255,255,0.05); border-color: #5C5C5C; color: #F5F5F5;">
+      <input class="swatch-input dark-input" placeholder="New color">
     </div>
 
   </div>
@@ -398,16 +496,28 @@
       <div class="swatch" style="background: #F5F5F5; border-color: #E0E0E0;"></div>
       <div class="swatch-info">
         <div class="swatch-name">Page Background</div>
+        <div class="swatch-desc">The main content area behind all cards, same as dark mode but light.</div>
         <div class="swatch-hex">#F5F5F5</div>
       </div>
       <input class="swatch-input" placeholder="New color">
     </div>
 
     <div class="swatch-row">
-      <div class="swatch" style="background: #f0f0f0; border-color: #E0E0E0;"></div>
+      <div class="swatch" style="background: #0a0a0a;"></div>
       <div class="swatch-info">
-        <div class="swatch-name">Header Background</div>
-        <div class="swatch-hex">#f0f0f0</div>
+        <div class="swatch-name">Header Background <span class="changed-tag">changed</span></div>
+        <div class="swatch-desc">The top bar is now near-black in BOTH modes. Contains the AR logo and toggle. Text is light (#F5F5F5) on this dark header.</div>
+        <div class="swatch-hex">#0a0a0a</div>
+      </div>
+      <input class="swatch-input" placeholder="New color">
+    </div>
+
+    <div class="swatch-row">
+      <div class="swatch" style="background: #F5F5F5; border-color: #E0E0E0;"></div>
+      <div class="swatch-info">
+        <div class="swatch-name">Header Text Color <span class="changed-tag">changed</span></div>
+        <div class="swatch-desc">Text and icons in the header bar. Now always light because the header is always dark.</div>
+        <div class="swatch-hex">#F5F5F5</div>
       </div>
       <input class="swatch-input" placeholder="New color">
     </div>
@@ -416,6 +526,7 @@
       <div class="swatch" style="background: #FFFFFF; border-color: #E0E0E0;"></div>
       <div class="swatch-info">
         <div class="swatch-name">Card / Elevated Surface</div>
+        <div class="swatch-desc">Stat cards, list panels, editor panels -- same role as dark mode but white.</div>
         <div class="swatch-hex">#FFFFFF</div>
       </div>
       <input class="swatch-input" placeholder="New color">
@@ -425,6 +536,7 @@
       <div class="swatch" style="background: #f1f3f5; border-color: #E0E0E0;"></div>
       <div class="swatch-info">
         <div class="swatch-name">Input / Interactive Surface</div>
+        <div class="swatch-desc">Text fields, dropdowns, search boxes in light mode.</div>
         <div class="swatch-hex">#f1f3f5</div>
       </div>
       <input class="swatch-input" placeholder="New color">
@@ -440,52 +552,57 @@
 <h2>2. Text Colors</h2>
 
 <div class="mode-pair">
-  <div class="mode-panel dark">
+  <div class="mode-panel dark" style="background: #363636;">
     <div class="mode-label">Dark Mode</div>
 
     <div class="swatch-row">
       <div class="swatch" style="background: #F5F5F5;"></div>
       <div class="swatch-info">
         <div class="swatch-name" style="color: #F5F5F5;">Primary Text</div>
+        <div class="swatch-desc">Headings, stat numbers, nav item labels, card titles. The most prominent text on every page.</div>
         <div class="swatch-hex">#F5F5F5</div>
       </div>
-      <input class="swatch-input" placeholder="New color" style="background: rgba(255,255,255,0.05); border-color: #5C5C5C; color: #F5F5F5;">
+      <input class="swatch-input dark-input" placeholder="New color">
     </div>
 
     <div class="swatch-row">
       <div class="swatch" style="background: #E0E0E0;"></div>
       <div class="swatch-info">
         <div class="swatch-name" style="color: #E0E0E0;">Secondary Text</div>
+        <div class="swatch-desc">Body text in cards, conversation message content, table cell values.</div>
         <div class="swatch-hex">#E0E0E0</div>
       </div>
-      <input class="swatch-input" placeholder="New color" style="background: rgba(255,255,255,0.05); border-color: #5C5C5C; color: #F5F5F5;">
+      <input class="swatch-input dark-input" placeholder="New color">
     </div>
 
     <div class="swatch-row">
       <div class="swatch" style="background: #A0A0A0;"></div>
       <div class="swatch-info">
         <div class="swatch-name" style="color: #A0A0A0;">Muted / Dimmed Text</div>
+        <div class="swatch-desc">Stat card labels ("Total Conversations"), section headers, chart legend text.</div>
         <div class="swatch-hex">#A0A0A0</div>
       </div>
-      <input class="swatch-input" placeholder="New color" style="background: rgba(255,255,255,0.05); border-color: #5C5C5C; color: #F5F5F5;">
+      <input class="swatch-input dark-input" placeholder="New color">
     </div>
 
     <div class="swatch-row">
       <div class="swatch" style="background: #787878;"></div>
       <div class="swatch-info">
         <div class="swatch-name" style="color: #787878;">Tertiary / Placeholder Text</div>
+        <div class="swatch-desc">Placeholder text in empty search boxes, "Type a message..." in the widget input.</div>
         <div class="swatch-hex">#787878</div>
       </div>
-      <input class="swatch-input" placeholder="New color" style="background: rgba(255,255,255,0.05); border-color: #5C5C5C; color: #F5F5F5;">
+      <input class="swatch-input dark-input" placeholder="New color">
     </div>
 
     <div class="swatch-row">
       <div class="swatch" style="background: #5C5C5C;"></div>
       <div class="swatch-info">
         <div class="swatch-name" style="color: #5C5C5C;">Disabled / Chart Axis Text</div>
+        <div class="swatch-desc">Date labels along the x-axis of charts, disabled button text.</div>
         <div class="swatch-hex">#5C5C5C</div>
       </div>
-      <input class="swatch-input" placeholder="New color" style="background: rgba(255,255,255,0.05); border-color: #5C5C5C; color: #F5F5F5;">
+      <input class="swatch-input dark-input" placeholder="New color">
     </div>
 
   </div>
@@ -497,6 +614,7 @@
       <div class="swatch" style="background: #1E1E1E;"></div>
       <div class="swatch-info">
         <div class="swatch-name">Primary Text</div>
+        <div class="swatch-desc">Headings, stat numbers, nav items, card titles in light mode.</div>
         <div class="swatch-hex">#1E1E1E</div>
       </div>
       <input class="swatch-input" placeholder="New color">
@@ -506,6 +624,7 @@
       <div class="swatch" style="background: #3A3A3A;"></div>
       <div class="swatch-info">
         <div class="swatch-name" style="color: #3A3A3A;">Secondary Text</div>
+        <div class="swatch-desc">Body text, table values in light mode.</div>
         <div class="swatch-hex">#3A3A3A</div>
       </div>
       <input class="swatch-input" placeholder="New color">
@@ -515,6 +634,7 @@
       <div class="swatch" style="background: #5C5C5C;"></div>
       <div class="swatch-info">
         <div class="swatch-name" style="color: #5C5C5C;">Muted / Dimmed Text</div>
+        <div class="swatch-desc">Stat card labels, section headers in light mode.</div>
         <div class="swatch-hex">#5C5C5C</div>
       </div>
       <input class="swatch-input" placeholder="New color">
@@ -524,6 +644,7 @@
       <div class="swatch" style="background: #787878;"></div>
       <div class="swatch-info">
         <div class="swatch-name" style="color: #787878;">Tertiary / Placeholder Text</div>
+        <div class="swatch-desc">Placeholder text in light mode form fields.</div>
         <div class="swatch-hex">#787878</div>
       </div>
       <input class="swatch-input" placeholder="New color">
@@ -533,6 +654,7 @@
       <div class="swatch" style="background: #868e96;"></div>
       <div class="swatch-info">
         <div class="swatch-name" style="color: #868e96;">Chart Axis Text</div>
+        <div class="swatch-desc">Date labels and value labels on chart axes in light mode.</div>
         <div class="swatch-hex">#868e96</div>
       </div>
       <input class="swatch-input" placeholder="New color">
@@ -548,34 +670,47 @@
 <h2>3. Borders & Separators</h2>
 
 <div class="mode-pair">
-  <div class="mode-panel dark">
+  <div class="mode-panel dark" style="background: #363636;">
     <div class="mode-label">Dark Mode</div>
 
     <div class="swatch-row">
-      <div class="swatch" style="background: rgba(255,255,255,0.06); border: 1px solid rgba(255,255,255,0.15);"></div>
+      <div class="swatch" style="background: #19191a; border: 0.5px solid #938a87;"></div>
       <div class="swatch-info">
-        <div class="swatch-name">Card Border / Divider</div>
-        <div class="swatch-hex">rgba(255,255,255,0.08)</div>
+        <div class="swatch-name">Card Border <span class="changed-tag">changed</span></div>
+        <div class="swatch-desc">The thin border around every Paper/Card element. Visible around stat cards on Dashboard, conversation list panels in Inbox, editor sections in Configuration. Now a warm taupe at 0.5px width.</div>
+        <div class="swatch-hex">#938a87 (0.5px)</div>
       </div>
-      <input class="swatch-input" placeholder="New color" style="background: rgba(255,255,255,0.05); border-color: #5C5C5C; color: #F5F5F5;">
+      <input class="swatch-input dark-input" placeholder="New color">
     </div>
 
     <div class="swatch-row">
-      <div class="swatch" style="background: rgba(255,255,255,0.06); border: 1px solid rgba(255,255,255,0.1);"></div>
+      <div class="swatch" style="background: #19191a; border: 0.5px solid #938a87;"></div>
       <div class="swatch-info">
-        <div class="swatch-name">Subtle Divider (header, footer)</div>
-        <div class="swatch-hex">rgba(255,255,255,0.06)</div>
+        <div class="swatch-name">Tooltip Border <span class="changed-tag">changed</span></div>
+        <div class="swatch-desc">The border around floating tooltip popups that appear on hover. Same warm taupe as card borders for consistency.</div>
+        <div class="swatch-hex">#938a87</div>
       </div>
-      <input class="swatch-input" placeholder="New color" style="background: rgba(255,255,255,0.05); border-color: #5C5C5C; color: #F5F5F5;">
+      <input class="swatch-input dark-input" placeholder="New color">
     </div>
 
     <div class="swatch-row">
-      <div class="swatch" style="background: rgba(255,255,255,0.06);"></div>
+      <div class="swatch" style="background: transparent; border-bottom: 1px solid #938a87; border-radius: 0;"></div>
       <div class="swatch-info">
-        <div class="swatch-name">Chart Grid Lines</div>
-        <div class="swatch-hex">rgba(255,255,255,0.06)</div>
+        <div class="swatch-name">Chart Axis Lines <span class="changed-tag">changed</span></div>
+        <div class="swatch-desc">The horizontal and vertical lines framing the chart area on Dashboard and Analytics. Also the dashed grid lines inside charts.</div>
+        <div class="swatch-hex">#938a87</div>
       </div>
-      <input class="swatch-input" placeholder="New color" style="background: rgba(255,255,255,0.05); border-color: #5C5C5C; color: #F5F5F5;">
+      <input class="swatch-input dark-input" placeholder="New color">
+    </div>
+
+    <!-- Sample card showing the new border style -->
+    <div style="margin-top: 12px;">
+      <div style="font-size: 11px; color: #A0A0A0; margin-bottom: 6px;">SAMPLE: Card with new border</div>
+      <div style="background: #19191a; border: 0.5px solid #938a87; border-radius: 8px; padding: 16px;">
+        <div style="font-size: 13px; font-weight: 600; color: #F5F5F5;">Total Conversations</div>
+        <div style="font-size: 24px; font-weight: 700; color: #F5F5F5; margin: 4px 0;">1,247</div>
+        <div style="font-size: 11px; color: #A0A0A0;">+12% from last month</div>
+      </div>
     </div>
 
   </div>
@@ -587,6 +722,7 @@
       <div class="swatch" style="background: #E0E0E0;"></div>
       <div class="swatch-info">
         <div class="swatch-name">Card Border / Divider</div>
+        <div class="swatch-desc">Border around cards, tables, and section dividers in light mode.</div>
         <div class="swatch-hex">#E0E0E0</div>
       </div>
       <input class="swatch-input" placeholder="New color">
@@ -596,6 +732,7 @@
       <div class="swatch" style="background: #e9ecef;"></div>
       <div class="swatch-info">
         <div class="swatch-name">Chart Grid Lines</div>
+        <div class="swatch-desc">Dashed horizontal lines inside chart areas in light mode.</div>
         <div class="swatch-hex">#e9ecef</div>
       </div>
       <input class="swatch-input" placeholder="New color">
@@ -605,6 +742,7 @@
       <div class="swatch" style="background: #dee2e6;"></div>
       <div class="swatch-info">
         <div class="swatch-name">Tooltip Border</div>
+        <div class="swatch-desc">Border around tooltip popups in light mode.</div>
         <div class="swatch-hex">#dee2e6</div>
       </div>
       <input class="swatch-input" placeholder="New color">
@@ -621,8 +759,8 @@
 <p class="annotation">These apply identically in both modes unless the designer specifies separate values.</p>
 
 <div class="mode-pair">
-  <div class="mode-panel dark">
-    <div class="mode-label">Dark Mode — Live Samples</div>
+  <div class="mode-panel dark" style="background: #363636;">
+    <div class="mode-label">Dark Mode -- Live Samples</div>
 
     <div style="margin-bottom: 16px;">
       <span class="sample-badge" style="background: rgba(196,30,42,0.15); color: #F2D4D6;">Brand Badge</span>&nbsp;
@@ -635,15 +773,16 @@
     <div style="margin-bottom: 16px;">
       <span class="sample-button" style="background: #C41E2A; color: #fff;">Primary Button #C41E2A</span>&nbsp;
       <span class="sample-button" style="background: #9B1420; color: #fff;">Hover State #9B1420</span>&nbsp;
-      <span class="sample-button" style="background: #3A3A3A; color: #F5F5F5; border: 1px solid rgba(255,255,255,0.1);">Default Button #3A3A3A</span>
+      <span class="sample-button" style="background: #3A3A3A; color: #F5F5F5; border: 1px solid #938a87;">Default Button #3A3A3A</span>
     </div>
 
     <div style="margin-bottom: 16px;">
-      <div class="sample-nav-item" style="background: rgba(196,30,42,0.12);">
+      <div class="sample-nav-item" style="background: rgba(255,255,255,0.06);">
         <div class="sample-nav-icon" style="background: #C41E2A; color: #fff;">D</div>
-        <span style="color: #F5F5F5; font-weight: 600;">Active Nav Item</span>
-        <span style="font-size: 11px; color: #A0A0A0; margin-left: auto;">bg: rgba(196,30,42,0.12)</span>
+        <span style="color: #F5F5F5; font-weight: 600;">Active Nav Item <span class="changed-tag">changed</span></span>
+        <span style="font-size: 11px; color: #A0A0A0; margin-left: auto;">bg: rgba(255,255,255,0.06)</span>
       </div>
+      <div style="font-size: 10px; color: #787878; padding: 4px 12px;">The currently selected page in the left sidebar. Now uses a subtle white highlight instead of a red tint.</div>
       <div class="sample-nav-item" style="margin-top: 4px;">
         <div class="sample-nav-icon" style="background: transparent; color: #A0A0A0; border: none;">I</div>
         <span style="color: #E0E0E0;">Inactive Nav Item</span>
@@ -653,12 +792,13 @@
   </div>
 
   <div class="mode-panel light">
-    <div class="mode-label">Shared Accent Palette — Fill In New Colors</div>
+    <div class="mode-label">Shared Accent Palette -- Fill In New Colors</div>
 
     <div class="swatch-row">
       <div class="swatch" style="background: #C41E2A;"></div>
       <div class="swatch-info">
         <div class="swatch-name">Brand Primary</div>
+        <div class="swatch-desc">Primary action buttons, chart "Total" line, widget header, customer chat bubbles, nav item icons.</div>
         <div class="swatch-hex">#C41E2A</div>
       </div>
       <input class="swatch-input" placeholder="New color">
@@ -668,6 +808,7 @@
       <div class="swatch" style="background: #9B1420;"></div>
       <div class="swatch-info">
         <div class="swatch-name">Brand Primary Dark (hover)</div>
+        <div class="swatch-desc">Darkened brand color shown when hovering over the primary action button.</div>
         <div class="swatch-hex">#9B1420</div>
       </div>
       <input class="swatch-input" placeholder="New color">
@@ -677,6 +818,7 @@
       <div class="swatch" style="background: #F2D4D6;"></div>
       <div class="swatch-info">
         <div class="swatch-name">Brand Primary Light (tint)</div>
+        <div class="swatch-desc">Light tint used for brand badges and light-mode accent backgrounds.</div>
         <div class="swatch-hex">#F2D4D6</div>
       </div>
       <input class="swatch-input" placeholder="New color">
@@ -686,6 +828,7 @@
       <div class="swatch" style="background: #2563EB;"></div>
       <div class="swatch-info">
         <div class="swatch-name">Blue (info, billable chart)</div>
+        <div class="swatch-desc">Info badges, "Billable" chart line, "Waiting" conversation status.</div>
         <div class="swatch-hex">#2563EB</div>
       </div>
       <input class="swatch-input" placeholder="New color">
@@ -695,6 +838,7 @@
       <div class="swatch" style="background: #059669;"></div>
       <div class="swatch-info">
         <div class="swatch-name">Green (success, AI resolved)</div>
+        <div class="swatch-desc">Success badges, "AI Resolved" chart line, "Active" / "Resolved" conversation status.</div>
         <div class="swatch-hex">#059669</div>
       </div>
       <input class="swatch-input" placeholder="New color">
@@ -704,6 +848,7 @@
       <div class="swatch" style="background: #D97706;"></div>
       <div class="swatch-info">
         <div class="swatch-name">Amber (warning, escalated)</div>
+        <div class="swatch-desc">Warning badges, "Escalated" chart line, escalation indicators.</div>
         <div class="swatch-hex">#D97706</div>
       </div>
       <input class="swatch-input" placeholder="New color">
@@ -713,6 +858,7 @@
       <div class="swatch" style="background: #D32F2F;"></div>
       <div class="swatch-info">
         <div class="swatch-name">Red (error, danger)</div>
+        <div class="swatch-desc">Error badges, destructive action buttons (Delete, Remove), system error alerts.</div>
         <div class="swatch-hex">#D32F2F</div>
       </div>
       <input class="swatch-input" placeholder="New color">
@@ -722,6 +868,7 @@
       <div class="swatch" style="background: #7C3AED;"></div>
       <div class="swatch-info">
         <div class="swatch-name">Violet (memory indicator)</div>
+        <div class="swatch-desc">Persistent Customer Memory badges and confidence scores in the Inbox conversation detail panel.</div>
         <div class="swatch-hex">#7C3AED</div>
       </div>
       <input class="swatch-input" placeholder="New color">
@@ -731,6 +878,7 @@
       <div class="swatch" style="background: #1E3A5F;"></div>
       <div class="swatch-info">
         <div class="swatch-name">Deep Blue (info semantic)</div>
+        <div class="swatch-desc">Informational callout backgrounds, info alert boxes.</div>
         <div class="swatch-hex">#1E3A5F</div>
       </div>
       <input class="swatch-input" placeholder="New color">
@@ -746,18 +894,18 @@
 <h2>5. Charts & Data Visualization</h2>
 
 <div class="mode-pair">
-  <div class="mode-panel dark">
-    <div class="mode-label">Dark Mode — Chart Sample</div>
+  <div class="mode-panel dark" style="background: #363636;">
+    <div class="mode-label">Dark Mode -- Chart Sample</div>
 
-    <div style="padding: 16px; background: #2A2A2A; border-radius: 8px; border: 1px solid rgba(255,255,255,0.08);">
+    <div style="padding: 16px; background: #19191a; border-radius: 8px; border: 0.5px solid #938a87;">
       <div style="font-size: 13px; font-weight: 600; margin-bottom: 12px; color: #F5F5F5;">Daily Conversation Volume</div>
 
       <!-- Simulated chart area -->
-      <div style="position: relative; height: 120px; border-left: 1px solid rgba(255,255,255,0.08); border-bottom: 1px solid rgba(255,255,255,0.08); padding: 8px;">
+      <div style="position: relative; height: 120px; border-left: 1px solid #938a87; border-bottom: 1px solid #938a87; padding: 8px;">
         <!-- Grid lines -->
-        <div style="position: absolute; left: 0; right: 0; top: 25%; border-top: 1px dashed rgba(255,255,255,0.06);"></div>
-        <div style="position: absolute; left: 0; right: 0; top: 50%; border-top: 1px dashed rgba(255,255,255,0.06);"></div>
-        <div style="position: absolute; left: 0; right: 0; top: 75%; border-top: 1px dashed rgba(255,255,255,0.06);"></div>
+        <div style="position: absolute; left: 0; right: 0; top: 25%; border-top: 1px dashed rgba(147,138,135,0.4);"></div>
+        <div style="position: absolute; left: 0; right: 0; top: 50%; border-top: 1px dashed rgba(147,138,135,0.4);"></div>
+        <div style="position: absolute; left: 0; right: 0; top: 75%; border-top: 1px dashed rgba(147,138,135,0.4);"></div>
 
         <!-- Chart lines (simulated) -->
         <svg width="100%" height="100%" viewBox="0 0 400 100" preserveAspectRatio="none" style="position: absolute; left: 0; top: 0;">
@@ -793,15 +941,20 @@
       </div>
     </div>
 
+    <div style="font-size: 10px; color: #787878; margin-top: 8px;">
+      This card uses bg #19191a, border #938a87 (0.5px), axis lines #938a87, grid dashes at 40% opacity of #938a87.
+    </div>
+
   </div>
 
   <div class="mode-panel light">
-    <div class="mode-label">Chart Color Assignments — Fill In New Colors</div>
+    <div class="mode-label">Chart Color Assignments -- Fill In New Colors</div>
 
     <div class="swatch-row">
       <div class="swatch" style="background: #C41E2A;"></div>
       <div class="swatch-info">
         <div class="swatch-name">Chart Line: Total</div>
+        <div class="swatch-desc">The primary (thickest) line on conversation volume charts.</div>
         <div class="swatch-hex">#C41E2A (brand primary)</div>
       </div>
       <input class="swatch-input" placeholder="New color">
@@ -811,6 +964,7 @@
       <div class="swatch" style="background: #2563EB;"></div>
       <div class="swatch-info">
         <div class="swatch-name">Chart Line: Billable</div>
+        <div class="swatch-desc">The blue line tracking billable conversation count.</div>
         <div class="swatch-hex">#2563EB</div>
       </div>
       <input class="swatch-input" placeholder="New color">
@@ -820,6 +974,7 @@
       <div class="swatch" style="background: #059669;"></div>
       <div class="swatch-info">
         <div class="swatch-name">Chart Line: AI Resolved</div>
+        <div class="swatch-desc">The green line tracking conversations resolved by AI without escalation.</div>
         <div class="swatch-hex">#059669</div>
       </div>
       <input class="swatch-input" placeholder="New color">
@@ -829,6 +984,7 @@
       <div class="swatch" style="background: #D97706;"></div>
       <div class="swatch-info">
         <div class="swatch-name">Chart Line: Escalated</div>
+        <div class="swatch-desc">The amber line tracking conversations that were escalated to human agents.</div>
         <div class="swatch-hex">#D97706</div>
       </div>
       <input class="swatch-input" placeholder="New color">
@@ -838,6 +994,7 @@
       <div class="swatch" style="background: #DB2777;"></div>
       <div class="swatch-info">
         <div class="swatch-name">Chart (spare / 5th series)</div>
+        <div class="swatch-desc">Reserved for future chart data series.</div>
         <div class="swatch-hex">#DB2777</div>
       </div>
       <input class="swatch-input" placeholder="New color">
@@ -853,11 +1010,11 @@
 <h2>6. Status Indicators & Priority Levels</h2>
 
 <div class="mode-pair">
-  <div class="mode-panel dark">
-    <div class="mode-label">Dark Mode — Status Badges</div>
+  <div class="mode-panel dark" style="background: #363636;">
+    <div class="mode-label">Dark Mode -- Status Badges</div>
 
     <div style="margin-bottom: 12px;">
-      <strong style="font-size: 12px; color: #A0A0A0;">Conversation Status:</strong><br><br>
+      <strong style="font-size: 12px; color: #A0A0A0;">Conversation Status (Inbox page):</strong><br><br>
       <span class="sample-badge" style="background: rgba(5,150,105,0.15); color: #6ee7b7;">Active</span>&nbsp;
       <span class="sample-badge" style="background: rgba(37,99,235,0.15); color: #93c5fd;">Waiting</span>&nbsp;
       <span class="sample-badge" style="background: rgba(5,150,105,0.15); color: #6ee7b7;">Resolved</span>&nbsp;
@@ -866,7 +1023,7 @@
     </div>
 
     <div style="margin-bottom: 12px;">
-      <strong style="font-size: 12px; color: #A0A0A0;">Priority Levels:</strong><br><br>
+      <strong style="font-size: 12px; color: #A0A0A0;">Priority Levels (Inbox conversation list):</strong><br><br>
       <span class="sample-badge" style="background: rgba(239,68,68,0.15); color: #fca5a5;">&#9679; Urgent <span style="font-family: 'JetBrains Mono'; font-size: 10px; opacity: 0.7;">#ef4444</span></span>&nbsp;
       <span class="sample-badge" style="background: rgba(249,115,22,0.15); color: #fdba74;">&#9679; High <span style="font-family: 'JetBrains Mono'; font-size: 10px; opacity: 0.7;">#f97316</span></span>&nbsp;
       <span class="sample-badge" style="background: rgba(245,158,11,0.15); color: #fcd34d;">&#9679; Medium <span style="font-family: 'JetBrains Mono'; font-size: 10px; opacity: 0.7;">#f59e0b</span></span>&nbsp;
@@ -874,7 +1031,7 @@
     </div>
 
     <div>
-      <strong style="font-size: 12px; color: #A0A0A0;">Team Member Avatars:</strong><br><br>
+      <strong style="font-size: 12px; color: #A0A0A0;">Team Member Avatars (Team page, Inbox assignment):</strong><br><br>
       <span class="avatar" style="background: #C41E2A;">MV</span>
       <span class="avatar" style="background: #2563EB;">AK</span>
       <span class="avatar" style="background: #059669;">DP</span>
@@ -886,7 +1043,7 @@
   </div>
 
   <div class="mode-panel light">
-    <div class="mode-label">Status & Priority Colors — Fill In New Colors</div>
+    <div class="mode-label">Status & Priority Colors -- Fill In New Colors</div>
 
     <h3 style="margin-top: 0;">Priority Dot Colors</h3>
 
@@ -894,6 +1051,7 @@
       <div class="swatch" style="background: #ef4444;"></div>
       <div class="swatch-info">
         <div class="swatch-name">Urgent</div>
+        <div class="swatch-desc">Colored dot next to urgent-priority conversations in Inbox list.</div>
         <div class="swatch-hex">#ef4444</div>
       </div>
       <input class="swatch-input" placeholder="New color">
@@ -932,6 +1090,7 @@
       <div class="swatch" style="background: #C41E2A; border-radius: 50%;"></div>
       <div class="swatch-info">
         <div class="swatch-name">Avatar 1 (brand)</div>
+        <div class="swatch-desc">Background color for the 1st team member avatar circle.</div>
         <div class="swatch-hex">#C41E2A</div>
       </div>
       <input class="swatch-input" placeholder="New color">
@@ -992,54 +1151,69 @@
 <h2>7. Interactive States</h2>
 
 <div class="mode-pair">
-  <div class="mode-panel dark">
-    <div class="mode-label">Dark Mode — Hover & Focus</div>
+  <div class="mode-panel dark" style="background: #363636;">
+    <div class="mode-label">Dark Mode -- Hover & Focus</div>
 
     <div class="swatch-row">
-      <div class="swatch" style="background: rgba(196,30,42,0.12);"></div>
+      <div class="swatch" style="background: rgba(255,255,255,0.06);"></div>
       <div class="swatch-info">
-        <div class="swatch-name">Active Nav Background</div>
-        <div class="swatch-hex">rgba(196,30,42,0.12)</div>
+        <div class="swatch-name">Active Nav Background <span class="changed-tag">changed</span></div>
+        <div class="swatch-desc">Background highlight on the currently selected nav item in the sidebar. Changed from red tint to neutral white at 6% opacity.</div>
+        <div class="swatch-hex">rgba(255,255,255,0.06)</div>
       </div>
-      <input class="swatch-input" placeholder="New color" style="background: rgba(255,255,255,0.05); border-color: #5C5C5C; color: #F5F5F5;">
+      <input class="swatch-input dark-input" placeholder="New color">
     </div>
 
     <div class="swatch-row">
       <div class="swatch" style="background: rgba(255,255,255,0.04);"></div>
       <div class="swatch-info">
         <div class="swatch-name">Hover Background (subtle)</div>
+        <div class="swatch-desc">Background that appears when hovering over a non-selected nav item or a table row.</div>
         <div class="swatch-hex">rgba(255,255,255,0.04)</div>
       </div>
-      <input class="swatch-input" placeholder="New color" style="background: rgba(255,255,255,0.05); border-color: #5C5C5C; color: #F5F5F5;">
+      <input class="swatch-input dark-input" placeholder="New color">
     </div>
 
     <div class="swatch-row">
-      <div class="swatch" style="background: rgba(196,30,42,0.25); border: 1px solid rgba(196,30,42,0.4);"></div>
+      <div class="swatch" style="background: rgba(255,255,255,0.08); border: 1px solid rgba(255,255,255,0.15);"></div>
       <div class="swatch-info">
-        <div class="swatch-name">Selected Item Border</div>
-        <div class="swatch-hex">rgba(196,30,42,0.25)</div>
+        <div class="swatch-name">Selected Item Background <span class="changed-tag">changed</span></div>
+        <div class="swatch-desc">Background of the currently selected conversation in the Inbox list. Changed from red tint to neutral white at 8% opacity.</div>
+        <div class="swatch-hex">rgba(255,255,255,0.08)</div>
       </div>
-      <input class="swatch-input" placeholder="New color" style="background: rgba(255,255,255,0.05); border-color: #5C5C5C; color: #F5F5F5;">
+      <input class="swatch-input dark-input" placeholder="New color">
+    </div>
+
+    <div class="swatch-row">
+      <div class="swatch" style="background: transparent; border: 1px solid rgba(255,255,255,0.15);"></div>
+      <div class="swatch-info">
+        <div class="swatch-name">Selected Item Border <span class="changed-tag">changed</span></div>
+        <div class="swatch-desc">Border around the selected conversation card in Inbox. Changed from red tint to neutral white at 15% opacity.</div>
+        <div class="swatch-hex">rgba(255,255,255,0.15)</div>
+      </div>
+      <input class="swatch-input dark-input" placeholder="New color">
     </div>
 
     <div class="swatch-row">
       <div class="swatch" style="background: rgba(255,255,255,0.06);"></div>
       <div class="swatch-info">
         <div class="swatch-name">Progress Bar Track</div>
+        <div class="swatch-desc">The empty background track of progress bars on the Billing page (usage progress, allowance bars).</div>
         <div class="swatch-hex">rgba(255,255,255,0.06)</div>
       </div>
-      <input class="swatch-input" placeholder="New color" style="background: rgba(255,255,255,0.05); border-color: #5C5C5C; color: #F5F5F5;">
+      <input class="swatch-input dark-input" placeholder="New color">
     </div>
 
   </div>
 
   <div class="mode-panel light">
-    <div class="mode-label">Light Mode — Hover & Focus</div>
+    <div class="mode-label">Light Mode -- Hover & Focus</div>
 
     <div class="swatch-row">
       <div class="swatch" style="background: #f1f3f5;"></div>
       <div class="swatch-info">
         <div class="swatch-name">Hover Background</div>
+        <div class="swatch-desc">Background on hovered nav items and table rows in light mode.</div>
         <div class="swatch-hex">#f1f3f5</div>
       </div>
       <input class="swatch-input" placeholder="New color">
@@ -1048,7 +1222,8 @@
     <div class="swatch-row">
       <div class="swatch" style="background: #C41E2A; opacity: 0.1;"></div>
       <div class="swatch-info">
-        <div class="swatch-name">Active Nav Background</div>
+        <div class="swatch-name">Active Nav Background (light)</div>
+        <div class="swatch-desc">Active nav item highlight in light mode sidebar.</div>
         <div class="swatch-hex">Mantine default (brand light)</div>
       </div>
       <input class="swatch-input" placeholder="New color">
@@ -1058,6 +1233,7 @@
       <div class="swatch" style="background: #f1f3f5;"></div>
       <div class="swatch-info">
         <div class="swatch-name">Progress Bar Track</div>
+        <div class="swatch-desc">Empty progress bar background in light mode.</div>
         <div class="swatch-hex">#f1f3f5</div>
       </div>
       <input class="swatch-input" placeholder="New color">
@@ -1071,22 +1247,22 @@
      ================================================================ -->
 
 <h2>8. Chat Widget Preview (Merchant-Facing)</h2>
-<p class="annotation">The widget uses the merchant's configured colors. These are the default preview values.</p>
+<p class="annotation">The chat widget floats on the merchant's storefront. It uses the merchant's configured colors. These are the default preview values shown on the Widget Configuration page.</p>
 
 <div class="mode-pair">
-  <div class="mode-panel dark">
-    <div class="mode-label">Widget Dark Mode Preview</div>
+  <div class="mode-panel dark" style="background: #363636;">
+    <div class="mode-label">Widget Dark Mode Preview <span class="changed-tag">changed</span></div>
 
-    <div style="width: 260px; border-radius: 12px; overflow: hidden; border: 1px solid rgba(255,255,255,0.08);">
+    <div style="width: 260px; border-radius: 12px; overflow: hidden; border: 0.5px solid #938a87;">
       <!-- Widget header -->
       <div style="background: #C41E2A; padding: 14px 16px; color: #fff;">
         <div style="font-size: 14px; font-weight: 600;">Agent Red</div>
         <div style="font-size: 11px; opacity: 0.8;">Typically replies in seconds</div>
       </div>
       <!-- Widget body -->
-      <div style="background: #1E1E1E; padding: 16px; min-height: 120px;">
+      <div style="background: #363636; padding: 16px; min-height: 120px;">
         <!-- Agent message -->
-        <div style="background: #2A2A2A; border-radius: 12px 12px 12px 4px; padding: 10px 14px; margin-bottom: 8px; max-width: 200px;">
+        <div style="background: #19191a; border-radius: 12px 12px 12px 4px; padding: 10px 14px; margin-bottom: 8px; max-width: 200px; border: 0.5px solid #938a87;">
           <div style="font-size: 12px; color: #E0E0E0;">Hi! How can I help you today?</div>
         </div>
         <!-- Customer message -->
@@ -1095,39 +1271,66 @@
         </div>
       </div>
       <!-- Widget input -->
-      <div style="background: #2A2A2A; padding: 10px 16px; border-top: 1px solid rgba(255,255,255,0.06);">
+      <div style="background: #19191a; padding: 10px 16px; border-top: 0.5px solid #938a87;">
         <div style="background: #3A3A3A; border-radius: 20px; padding: 8px 14px; font-size: 12px; color: #787878;">Type a message...</div>
       </div>
+    </div>
+
+    <div style="font-size: 10px; color: #787878; margin-top: 8px;">
+      Widget body: #363636, agent bubble: #19191a, borders: #938a87 (0.5px), input area: #19191a.
     </div>
 
   </div>
 
   <div class="mode-panel light">
-    <div class="mode-label">Widget Colors — Fill In New Colors</div>
+    <div class="mode-label">Widget Colors -- Fill In New Colors</div>
 
     <div class="swatch-row">
       <div class="swatch" style="background: #C41E2A;"></div>
       <div class="swatch-info">
         <div class="swatch-name">Widget Header / Customer Bubble</div>
+        <div class="swatch-desc">The colored header bar at the top of the chat widget, and the background of the customer's sent messages.</div>
         <div class="swatch-hex">#C41E2A (brand primary)</div>
       </div>
       <input class="swatch-input" placeholder="New color">
     </div>
 
     <div class="swatch-row">
-      <div class="swatch" style="background: #1E1E1E;"></div>
+      <div class="swatch" style="background: #363636;"></div>
       <div class="swatch-info">
-        <div class="swatch-name">Widget Body (dark mode)</div>
-        <div class="swatch-hex">#1E1E1E</div>
+        <div class="swatch-name">Widget Body (dark mode) <span class="changed-tag">changed</span></div>
+        <div class="swatch-desc">The main message area background where conversation bubbles appear.</div>
+        <div class="swatch-hex">#363636</div>
       </div>
       <input class="swatch-input" placeholder="New color">
     </div>
 
     <div class="swatch-row">
-      <div class="swatch" style="background: #2A2A2A;"></div>
+      <div class="swatch" style="background: #19191a;"></div>
       <div class="swatch-info">
-        <div class="swatch-name">Agent Bubble (dark mode)</div>
-        <div class="swatch-hex">#2A2A2A</div>
+        <div class="swatch-name">Agent Bubble (dark mode) <span class="changed-tag">changed</span></div>
+        <div class="swatch-desc">The background of messages sent by the AI agent.</div>
+        <div class="swatch-hex">#19191a</div>
+      </div>
+      <input class="swatch-input" placeholder="New color">
+    </div>
+
+    <div class="swatch-row">
+      <div class="swatch" style="background: #19191a;"></div>
+      <div class="swatch-info">
+        <div class="swatch-name">Widget Input Area (dark mode) <span class="changed-tag">changed</span></div>
+        <div class="swatch-desc">The bottom bar containing the text input field. Sits below the message area.</div>
+        <div class="swatch-hex">#19191a</div>
+      </div>
+      <input class="swatch-input" placeholder="New color">
+    </div>
+
+    <div class="swatch-row">
+      <div class="swatch" style="background: #938a87;"></div>
+      <div class="swatch-info">
+        <div class="swatch-name">Widget Border (dark mode) <span class="changed-tag">changed</span></div>
+        <div class="swatch-desc">The outer border of the widget and the separator between message area and input area.</div>
+        <div class="swatch-hex">#938a87 (0.5px)</div>
       </div>
       <input class="swatch-input" placeholder="New color">
     </div>
@@ -1136,6 +1339,7 @@
       <div class="swatch" style="background: #69db7c;"></div>
       <div class="swatch-info">
         <div class="swatch-name">Online Status Dot</div>
+        <div class="swatch-desc">Small green dot indicating the AI agent is online and responding.</div>
         <div class="swatch-hex">#69db7c</div>
       </div>
       <input class="swatch-input" placeholder="New color">
@@ -1145,6 +1349,7 @@
       <div class="swatch" style="background: #ff6b6b;"></div>
       <div class="swatch-info">
         <div class="swatch-name">Offline Status Dot</div>
+        <div class="swatch-desc">Small red dot when the agent is offline.</div>
         <div class="swatch-hex">#ff6b6b</div>
       </div>
       <input class="swatch-input" placeholder="New color">
@@ -1154,6 +1359,7 @@
       <div class="swatch" style="background: #ffd43b;"></div>
       <div class="swatch-info">
         <div class="swatch-name">Away Status Dot</div>
+        <div class="swatch-desc">Small yellow dot when the agent is in away mode.</div>
         <div class="swatch-hex">#ffd43b</div>
       </div>
       <input class="swatch-input" placeholder="New color">
@@ -1170,7 +1376,7 @@
      ================================================================ -->
 
 <h2>9. Complete Token Reference Table</h2>
-<p class="annotation">This is the master list. Fill in the "New Color" column for any value you want to change. Every row maps to a specific CSS token in the codebase.</p>
+<p class="annotation">This is the master list. Every "New Color" cell contains a text input field -- click inside the cell and type your new hex value. Every row maps to a specific CSS token in the codebase. Items marked <span class="changed-tag">changed</span> were updated in the 2026-02-04 revision.</p>
 
 <table class="ref-table">
   <thead>
@@ -1184,55 +1390,60 @@
   </thead>
   <tbody>
     <tr><td colspan="5" style="background: #f1f3f5; font-weight: 700; font-size: 12px; text-transform: uppercase; letter-spacing: 0.05em;">Surfaces</td></tr>
-    <tr><td>Page Background (deepest)</td><td class="mono">#111111</td><td class="new-color"></td><td class="mono">#F5F5F5</td><td class="new-color"></td></tr>
-    <tr><td>Main Surface / Sidebar / Navbar</td><td class="mono">#1E1E1E</td><td class="new-color"></td><td class="mono">Mantine default (white)</td><td class="new-color"></td></tr>
-    <tr><td>Header Background</td><td class="mono">Mantine default (dark.7)</td><td class="new-color"></td><td class="mono">#f0f0f0</td><td class="new-color"></td></tr>
-    <tr><td>Card / Elevated Surface (Paper)</td><td class="mono">#2A2A2A</td><td class="new-color"></td><td class="mono">#FFFFFF</td><td class="new-color"></td></tr>
-    <tr><td>Input / Interactive Surface</td><td class="mono">#3A3A3A</td><td class="new-color"></td><td class="mono">#f1f3f5</td><td class="new-color"></td></tr>
-    <tr><td>Tooltip Background</td><td class="mono">#2A2A2A</td><td class="new-color"></td><td class="mono">#FFFFFF</td><td class="new-color"></td></tr>
+    <tr><td>Page Background <span class="changed-tag">changed</span><br><span style="font-size:10px;color:#787878;">Main content area behind all cards</span></td><td class="mono">#363636</td><td class="new-color"><input class="swatch-input" placeholder="new"></td><td class="mono">#F5F5F5</td><td class="new-color"><input class="swatch-input" placeholder="new"></td></tr>
+    <tr><td>Header Background <span class="changed-tag">changed</span><br><span style="font-size:10px;color:#787878;">Top bar with logo and toggle (both modes)</span></td><td class="mono">#0a0a0a</td><td class="new-color"><input class="swatch-input" placeholder="new"></td><td class="mono">#0a0a0a</td><td class="new-color"><input class="swatch-input" placeholder="new"></td></tr>
+    <tr><td>Sidebar Background <span class="changed-tag">changed</span><br><span style="font-size:10px;color:#787878;">Left nav panel, 260px wide</span></td><td class="mono">#0a0a0a</td><td class="new-color"><input class="swatch-input" placeholder="new"></td><td class="mono">Mantine default</td><td class="new-color"><input class="swatch-input" placeholder="new"></td></tr>
+    <tr><td>Card / Paper Surface <span class="changed-tag">changed</span><br><span style="font-size:10px;color:#787878;">Stat cards, list panels, editors</span></td><td class="mono">#19191a</td><td class="new-color"><input class="swatch-input" placeholder="new"></td><td class="mono">#FFFFFF</td><td class="new-color"><input class="swatch-input" placeholder="new"></td></tr>
+    <tr><td>Input / Interactive Surface<br><span style="font-size:10px;color:#787878;">Text fields, dropdowns, search</span></td><td class="mono">#3A3A3A</td><td class="new-color"><input class="swatch-input" placeholder="new"></td><td class="mono">#f1f3f5</td><td class="new-color"><input class="swatch-input" placeholder="new"></td></tr>
+    <tr><td>Tooltip Background <span class="changed-tag">changed</span><br><span style="font-size:10px;color:#787878;">Hover info popups on charts/badges</span></td><td class="mono">#19191a</td><td class="new-color"><input class="swatch-input" placeholder="new"></td><td class="mono">#FFFFFF</td><td class="new-color"><input class="swatch-input" placeholder="new"></td></tr>
 
     <tr><td colspan="5" style="background: #f1f3f5; font-weight: 700; font-size: 12px; text-transform: uppercase; letter-spacing: 0.05em;">Text</td></tr>
-    <tr><td>Primary Text</td><td class="mono">#F5F5F5</td><td class="new-color"></td><td class="mono">#1E1E1E</td><td class="new-color"></td></tr>
-    <tr><td>Secondary Text</td><td class="mono">#E0E0E0</td><td class="new-color"></td><td class="mono">#3A3A3A</td><td class="new-color"></td></tr>
-    <tr><td>Muted / Dimmed Text</td><td class="mono">#A0A0A0</td><td class="new-color"></td><td class="mono">#5C5C5C</td><td class="new-color"></td></tr>
-    <tr><td>Tertiary / Placeholder Text</td><td class="mono">#787878</td><td class="new-color"></td><td class="mono">#787878</td><td class="new-color"></td></tr>
-    <tr><td>Disabled / Chart Axis Text</td><td class="mono">#5C5C5C</td><td class="new-color"></td><td class="mono">#868e96</td><td class="new-color"></td></tr>
+    <tr><td>Primary Text<br><span style="font-size:10px;color:#787878;">Headings, stat numbers, card titles</span></td><td class="mono">#F5F5F5</td><td class="new-color"><input class="swatch-input" placeholder="new"></td><td class="mono">#1E1E1E</td><td class="new-color"><input class="swatch-input" placeholder="new"></td></tr>
+    <tr><td>Secondary Text<br><span style="font-size:10px;color:#787878;">Body text, table values</span></td><td class="mono">#E0E0E0</td><td class="new-color"><input class="swatch-input" placeholder="new"></td><td class="mono">#3A3A3A</td><td class="new-color"><input class="swatch-input" placeholder="new"></td></tr>
+    <tr><td>Muted / Dimmed Text<br><span style="font-size:10px;color:#787878;">Stat labels, section headers, legends</span></td><td class="mono">#A0A0A0</td><td class="new-color"><input class="swatch-input" placeholder="new"></td><td class="mono">#5C5C5C</td><td class="new-color"><input class="swatch-input" placeholder="new"></td></tr>
+    <tr><td>Tertiary / Placeholder Text<br><span style="font-size:10px;color:#787878;">Empty search box text</span></td><td class="mono">#787878</td><td class="new-color"><input class="swatch-input" placeholder="new"></td><td class="mono">#787878</td><td class="new-color"><input class="swatch-input" placeholder="new"></td></tr>
+    <tr><td>Disabled / Chart Axis Text<br><span style="font-size:10px;color:#787878;">Date labels on chart x-axis</span></td><td class="mono">#5C5C5C</td><td class="new-color"><input class="swatch-input" placeholder="new"></td><td class="mono">#868e96</td><td class="new-color"><input class="swatch-input" placeholder="new"></td></tr>
+    <tr><td>Header Text (light mode) <span class="changed-tag">changed</span><br><span style="font-size:10px;color:#787878;">Text on the always-dark header bar</span></td><td class="mono">#F5F5F5</td><td class="new-color"><input class="swatch-input" placeholder="new"></td><td class="mono">#F5F5F5</td><td class="new-color"><input class="swatch-input" placeholder="new"></td></tr>
 
     <tr><td colspan="5" style="background: #f1f3f5; font-weight: 700; font-size: 12px; text-transform: uppercase; letter-spacing: 0.05em;">Borders & Separators</td></tr>
-    <tr><td>Card Border</td><td class="mono">rgba(255,255,255,0.08)</td><td class="new-color"></td><td class="mono">#E0E0E0</td><td class="new-color"></td></tr>
-    <tr><td>Subtle Divider (header/footer)</td><td class="mono">rgba(255,255,255,0.06)</td><td class="new-color"></td><td class="mono">#E0E0E0</td><td class="new-color"></td></tr>
-    <tr><td>Chart Grid Lines</td><td class="mono">rgba(255,255,255,0.06)</td><td class="new-color"></td><td class="mono">#e9ecef</td><td class="new-color"></td></tr>
-    <tr><td>Tooltip Border</td><td class="mono">rgba(255,255,255,0.1)</td><td class="new-color"></td><td class="mono">#dee2e6</td><td class="new-color"></td></tr>
+    <tr><td>Card Border <span class="changed-tag">changed</span><br><span style="font-size:10px;color:#787878;">Thin border around every card/panel (0.5px)</span></td><td class="mono">#938a87</td><td class="new-color"><input class="swatch-input" placeholder="new"></td><td class="mono">#E0E0E0</td><td class="new-color"><input class="swatch-input" placeholder="new"></td></tr>
+    <tr><td>Tooltip Border <span class="changed-tag">changed</span><br><span style="font-size:10px;color:#787878;">Border on hover info popups</span></td><td class="mono">#938a87</td><td class="new-color"><input class="swatch-input" placeholder="new"></td><td class="mono">#dee2e6</td><td class="new-color"><input class="swatch-input" placeholder="new"></td></tr>
+    <tr><td>Chart Axis Lines <span class="changed-tag">changed</span><br><span style="font-size:10px;color:#787878;">Lines framing the chart area</span></td><td class="mono">#938a87</td><td class="new-color"><input class="swatch-input" placeholder="new"></td><td class="mono">#e9ecef</td><td class="new-color"><input class="swatch-input" placeholder="new"></td></tr>
 
     <tr><td colspan="5" style="background: #f1f3f5; font-weight: 700; font-size: 12px; text-transform: uppercase; letter-spacing: 0.05em;">Brand & Accent (both modes)</td></tr>
-    <tr><td>Brand Primary</td><td class="mono" colspan="2" style="text-align: center;">#C41E2A</td><td class="new-color" colspan="2"></td></tr>
-    <tr><td>Brand Primary Dark (hover)</td><td class="mono" colspan="2" style="text-align: center;">#9B1420</td><td class="new-color" colspan="2"></td></tr>
-    <tr><td>Brand Primary Light (tint)</td><td class="mono" colspan="2" style="text-align: center;">#F2D4D6</td><td class="new-color" colspan="2"></td></tr>
-    <tr><td>Blue (info, billable)</td><td class="mono" colspan="2" style="text-align: center;">#2563EB</td><td class="new-color" colspan="2"></td></tr>
-    <tr><td>Green (success, AI resolved)</td><td class="mono" colspan="2" style="text-align: center;">#059669</td><td class="new-color" colspan="2"></td></tr>
-    <tr><td>Amber (warning, escalated)</td><td class="mono" colspan="2" style="text-align: center;">#D97706</td><td class="new-color" colspan="2"></td></tr>
-    <tr><td>Red (error, danger)</td><td class="mono" colspan="2" style="text-align: center;">#D32F2F</td><td class="new-color" colspan="2"></td></tr>
-    <tr><td>Violet (memory indicator)</td><td class="mono" colspan="2" style="text-align: center;">#7C3AED</td><td class="new-color" colspan="2"></td></tr>
-    <tr><td>Deep Blue (info semantic)</td><td class="mono" colspan="2" style="text-align: center;">#1E3A5F</td><td class="new-color" colspan="2"></td></tr>
-    <tr><td>Pink (avatar 6th slot)</td><td class="mono" colspan="2" style="text-align: center;">#DB2777</td><td class="new-color" colspan="2"></td></tr>
+    <tr><td>Brand Primary<br><span style="font-size:10px;color:#787878;">Buttons, chart line, widget header</span></td><td class="mono" colspan="2" style="text-align: center;">#C41E2A</td><td class="new-color" colspan="2"><input class="swatch-input" placeholder="new" style="width:100%;"></td></tr>
+    <tr><td>Brand Primary Dark (hover)<br><span style="font-size:10px;color:#787878;">Button hover darkened state</span></td><td class="mono" colspan="2" style="text-align: center;">#9B1420</td><td class="new-color" colspan="2"><input class="swatch-input" placeholder="new" style="width:100%;"></td></tr>
+    <tr><td>Brand Primary Light (tint)<br><span style="font-size:10px;color:#787878;">Light brand badge background</span></td><td class="mono" colspan="2" style="text-align: center;">#F2D4D6</td><td class="new-color" colspan="2"><input class="swatch-input" placeholder="new" style="width:100%;"></td></tr>
+    <tr><td>Blue (info, billable)<br><span style="font-size:10px;color:#787878;">Info badges, billable chart line</span></td><td class="mono" colspan="2" style="text-align: center;">#2563EB</td><td class="new-color" colspan="2"><input class="swatch-input" placeholder="new" style="width:100%;"></td></tr>
+    <tr><td>Green (success, AI resolved)<br><span style="font-size:10px;color:#787878;">Success badges, resolved chart line</span></td><td class="mono" colspan="2" style="text-align: center;">#059669</td><td class="new-color" colspan="2"><input class="swatch-input" placeholder="new" style="width:100%;"></td></tr>
+    <tr><td>Amber (warning, escalated)<br><span style="font-size:10px;color:#787878;">Warning badges, escalated chart line</span></td><td class="mono" colspan="2" style="text-align: center;">#D97706</td><td class="new-color" colspan="2"><input class="swatch-input" placeholder="new" style="width:100%;"></td></tr>
+    <tr><td>Red (error, danger)<br><span style="font-size:10px;color:#787878;">Error badges, delete buttons</span></td><td class="mono" colspan="2" style="text-align: center;">#D32F2F</td><td class="new-color" colspan="2"><input class="swatch-input" placeholder="new" style="width:100%;"></td></tr>
+    <tr><td>Violet (memory indicator)<br><span style="font-size:10px;color:#787878;">Memory badges in Inbox detail</span></td><td class="mono" colspan="2" style="text-align: center;">#7C3AED</td><td class="new-color" colspan="2"><input class="swatch-input" placeholder="new" style="width:100%;"></td></tr>
+    <tr><td>Deep Blue (info semantic)<br><span style="font-size:10px;color:#787878;">Info callout backgrounds</span></td><td class="mono" colspan="2" style="text-align: center;">#1E3A5F</td><td class="new-color" colspan="2"><input class="swatch-input" placeholder="new" style="width:100%;"></td></tr>
+    <tr><td>Pink (avatar 6th slot)<br><span style="font-size:10px;color:#787878;">6th team member avatar color</span></td><td class="mono" colspan="2" style="text-align: center;">#DB2777</td><td class="new-color" colspan="2"><input class="swatch-input" placeholder="new" style="width:100%;"></td></tr>
 
     <tr><td colspan="5" style="background: #f1f3f5; font-weight: 700; font-size: 12px; text-transform: uppercase; letter-spacing: 0.05em;">Interactive States</td></tr>
-    <tr><td>Active Nav Background</td><td class="mono">rgba(196,30,42,0.12)</td><td class="new-color"></td><td class="mono">Mantine default</td><td class="new-color"></td></tr>
-    <tr><td>Hover Background (subtle)</td><td class="mono">rgba(255,255,255,0.04)</td><td class="new-color"></td><td class="mono">#f1f3f5</td><td class="new-color"></td></tr>
-    <tr><td>Selected Item Border</td><td class="mono">rgba(196,30,42,0.25)</td><td class="new-color"></td><td class="mono">Mantine default</td><td class="new-color"></td></tr>
-    <tr><td>Progress Bar Track</td><td class="mono">rgba(255,255,255,0.06)</td><td class="new-color"></td><td class="mono">#f1f3f5</td><td class="new-color"></td></tr>
+    <tr><td>Active Nav Background <span class="changed-tag">changed</span><br><span style="font-size:10px;color:#787878;">Selected page highlight in sidebar</span></td><td class="mono">rgba(255,255,255,0.06)</td><td class="new-color"><input class="swatch-input" placeholder="new"></td><td class="mono">Mantine default</td><td class="new-color"><input class="swatch-input" placeholder="new"></td></tr>
+    <tr><td>Hover Background (subtle)<br><span style="font-size:10px;color:#787878;">Non-selected item hover highlight</span></td><td class="mono">rgba(255,255,255,0.04)</td><td class="new-color"><input class="swatch-input" placeholder="new"></td><td class="mono">#f1f3f5</td><td class="new-color"><input class="swatch-input" placeholder="new"></td></tr>
+    <tr><td>Selected Item Background <span class="changed-tag">changed</span><br><span style="font-size:10px;color:#787878;">Selected conversation in Inbox list</span></td><td class="mono">rgba(255,255,255,0.08)</td><td class="new-color"><input class="swatch-input" placeholder="new"></td><td class="mono">Mantine default</td><td class="new-color"><input class="swatch-input" placeholder="new"></td></tr>
+    <tr><td>Selected Item Border <span class="changed-tag">changed</span><br><span style="font-size:10px;color:#787878;">Border on selected conversation card</span></td><td class="mono">rgba(255,255,255,0.15)</td><td class="new-color"><input class="swatch-input" placeholder="new"></td><td class="mono">Mantine default</td><td class="new-color"><input class="swatch-input" placeholder="new"></td></tr>
+    <tr><td>Progress Bar Track<br><span style="font-size:10px;color:#787878;">Empty track on Billing page bars</span></td><td class="mono">rgba(255,255,255,0.06)</td><td class="new-color"><input class="swatch-input" placeholder="new"></td><td class="mono">#f1f3f5</td><td class="new-color"><input class="swatch-input" placeholder="new"></td></tr>
 
     <tr><td colspan="5" style="background: #f1f3f5; font-weight: 700; font-size: 12px; text-transform: uppercase; letter-spacing: 0.05em;">Priority Indicators</td></tr>
-    <tr><td>Priority: Urgent</td><td class="mono" colspan="2" style="text-align: center;">#ef4444</td><td class="new-color" colspan="2"></td></tr>
-    <tr><td>Priority: High</td><td class="mono" colspan="2" style="text-align: center;">#f97316</td><td class="new-color" colspan="2"></td></tr>
-    <tr><td>Priority: Medium</td><td class="mono" colspan="2" style="text-align: center;">#f59e0b</td><td class="new-color" colspan="2"></td></tr>
-    <tr><td>Priority: Low</td><td class="mono" colspan="2" style="text-align: center;">#94a3b8</td><td class="new-color" colspan="2"></td></tr>
+    <tr><td>Priority: Urgent<br><span style="font-size:10px;color:#787878;">Dot color in Inbox list</span></td><td class="mono" colspan="2" style="text-align: center;">#ef4444</td><td class="new-color" colspan="2"><input class="swatch-input" placeholder="new" style="width:100%;"></td></tr>
+    <tr><td>Priority: High</td><td class="mono" colspan="2" style="text-align: center;">#f97316</td><td class="new-color" colspan="2"><input class="swatch-input" placeholder="new" style="width:100%;"></td></tr>
+    <tr><td>Priority: Medium</td><td class="mono" colspan="2" style="text-align: center;">#f59e0b</td><td class="new-color" colspan="2"><input class="swatch-input" placeholder="new" style="width:100%;"></td></tr>
+    <tr><td>Priority: Low</td><td class="mono" colspan="2" style="text-align: center;">#94a3b8</td><td class="new-color" colspan="2"><input class="swatch-input" placeholder="new" style="width:100%;"></td></tr>
 
     <tr><td colspan="5" style="background: #f1f3f5; font-weight: 700; font-size: 12px; text-transform: uppercase; letter-spacing: 0.05em;">Widget Defaults</td></tr>
-    <tr><td>Widget Header / Customer Bubble</td><td class="mono" colspan="2" style="text-align: center;">#C41E2A</td><td class="new-color" colspan="2"></td></tr>
-    <tr><td>Widget Online Dot</td><td class="mono" colspan="2" style="text-align: center;">#69db7c</td><td class="new-color" colspan="2"></td></tr>
-    <tr><td>Widget Offline Dot</td><td class="mono" colspan="2" style="text-align: center;">#ff6b6b</td><td class="new-color" colspan="2"></td></tr>
-    <tr><td>Widget Away Dot</td><td class="mono" colspan="2" style="text-align: center;">#ffd43b</td><td class="new-color" colspan="2"></td></tr>
+    <tr><td>Widget Header / Customer Bubble<br><span style="font-size:10px;color:#787878;">Top bar and sent message bg</span></td><td class="mono" colspan="2" style="text-align: center;">#C41E2A</td><td class="new-color" colspan="2"><input class="swatch-input" placeholder="new" style="width:100%;"></td></tr>
+    <tr><td>Widget Body (dark mode) <span class="changed-tag">changed</span><br><span style="font-size:10px;color:#787878;">Message area background</span></td><td class="mono" colspan="2" style="text-align: center;">#363636</td><td class="new-color" colspan="2"><input class="swatch-input" placeholder="new" style="width:100%;"></td></tr>
+    <tr><td>Widget Agent Bubble (dark mode) <span class="changed-tag">changed</span><br><span style="font-size:10px;color:#787878;">AI response message background</span></td><td class="mono" colspan="2" style="text-align: center;">#19191a</td><td class="new-color" colspan="2"><input class="swatch-input" placeholder="new" style="width:100%;"></td></tr>
+    <tr><td>Widget Input Area (dark mode) <span class="changed-tag">changed</span><br><span style="font-size:10px;color:#787878;">Bottom bar with text input</span></td><td class="mono" colspan="2" style="text-align: center;">#19191a</td><td class="new-color" colspan="2"><input class="swatch-input" placeholder="new" style="width:100%;"></td></tr>
+    <tr><td>Widget Border (dark mode) <span class="changed-tag">changed</span><br><span style="font-size:10px;color:#787878;">Outer border and separators</span></td><td class="mono" colspan="2" style="text-align: center;">#938a87 (0.5px)</td><td class="new-color" colspan="2"><input class="swatch-input" placeholder="new" style="width:100%;"></td></tr>
+    <tr><td>Widget Online Dot<br><span style="font-size:10px;color:#787878;">Agent status indicator</span></td><td class="mono" colspan="2" style="text-align: center;">#69db7c</td><td class="new-color" colspan="2"><input class="swatch-input" placeholder="new" style="width:100%;"></td></tr>
+    <tr><td>Widget Offline Dot</td><td class="mono" colspan="2" style="text-align: center;">#ff6b6b</td><td class="new-color" colspan="2"><input class="swatch-input" placeholder="new" style="width:100%;"></td></tr>
+    <tr><td>Widget Away Dot</td><td class="mono" colspan="2" style="text-align: center;">#ffd43b</td><td class="new-color" colspan="2"><input class="swatch-input" placeholder="new" style="width:100%;"></td></tr>
   </tbody>
 </table>
 
@@ -1243,14 +1454,17 @@
 <div style="background: #f8f9fa; border-radius: 8px; padding: 20px; border: 1px solid #E0E0E0; font-size: 13px; line-height: 1.7;">
   <p><strong>Typography:</strong> Inter (body) + JetBrains Mono (code). These are fixed and not part of this color review.</p>
   <p style="margin-top: 8px;"><strong>Dark mode is the default.</strong> Most merchants will see dark mode first. Prioritize dark mode polish.</p>
+  <p style="margin-top: 8px;"><strong>Header is now always dark (#0a0a0a)</strong> in both dark and light mode. Text in the header is always light (#F5F5F5).</p>
+  <p style="margin-top: 8px;"><strong>Warm taupe borders (#938a87):</strong> The designer introduced a warm taupe border color at 0.5px width. This replaces the previous rgba(255,255,255,0.08) semi-transparent borders. If you want to adjust the warmth or opacity, note the direction (warmer/cooler) so we can apply consistently.</p>
   <p style="margin-top: 8px;"><strong>Accessibility:</strong> All text colors must maintain WCAG AA contrast (4.5:1 for body text, 3:1 for large text) against their background.</p>
-  <p style="margin-top: 8px;"><strong>Pure neutral greys:</strong> Current dark mode uses no blue/purple tints. If you introduce tinted greys, please note the tint direction (warm/cool) so we can apply it consistently.</p>
-  <p style="margin-top: 8px;"><strong>Brand primary (#C41E2A):</strong> This is the approved brand color. Changes here affect the entire product identity — logo, buttons, accents, charts, widget header.</p>
-  <p style="margin-top: 8px;"><strong>Returning the worksheet:</strong> Fill in only the values you want changed. You can return this HTML file with values typed in, a PDF with annotations, or a simple spreadsheet mapping "Token Name → New Color." Any format works.</p>
+  <p style="margin-top: 8px;"><strong>Brand primary (#C41E2A):</strong> This is the approved brand color. Changes here affect the entire product identity -- logo, buttons, accents, charts, widget header.</p>
+  <p style="margin-top: 8px;"><strong>Nav/selection states now neutral:</strong> Active nav background, selected conversation background, and selected item borders now use neutral white-at-opacity instead of red tints. If you want to reintroduce color, specify the exact rgba value.</p>
+  <p style="margin-top: 8px;"><strong>Returning the worksheet:</strong> Fill in only the values you want changed. You can return this HTML file with values typed in, a PDF with annotations, or a simple spreadsheet mapping "Token Name -> New Color." Any format works.</p>
 </div>
 
 <div style="margin-top: 40px; padding-top: 20px; border-top: 1px solid #E0E0E0; font-size: 11px; color: #A0A0A0; text-align: center;">
-  Agent Red Customer Experience &mdash; Color Palette Worksheet v1.0 &mdash; February 2026<br>
+  Agent Red Customer Experience &mdash; Color Palette Worksheet v2.0 &mdash; February 2026<br>
+  Colors updated per designer feedback (2026-02-04). Fill in "New Color" fields for any further refinements.<br>
   &copy; 2026 Remaker Digital, a DBA of VanDusen &amp; Palmeter, LLC. All rights reserved.
 </div>
 
