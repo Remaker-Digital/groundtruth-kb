@@ -54,6 +54,11 @@ COPY src/ ./src/
 COPY config/ ./config/
 
 # --------------------------------------------------------------------------
+# Admin SPA (pre-built Vite output for Shopify embedded admin)
+# --------------------------------------------------------------------------
+COPY admin/shopify/dist/ ./admin/shopify/dist/
+
+# --------------------------------------------------------------------------
 # Non-root user for security
 # --------------------------------------------------------------------------
 RUN groupadd --gid 1000 agentred \

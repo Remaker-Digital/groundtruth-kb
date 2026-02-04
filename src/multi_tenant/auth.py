@@ -80,11 +80,13 @@ WIDGET_KEY_HEADER = "X-Widget-Key"
 WIDGET_KEY_PREFIX = "pk_live_"
 
 # Paths where widget key authentication is allowed.
-# Widget keys are scoped to chat endpoints only — they cannot access
-# billing, config, dashboard, or any other tenant management APIs.
+# Widget keys are scoped to chat endpoints and widget config only — they
+# cannot access billing, dashboard, or any other tenant management APIs.
+# /api/config is read-only and required for widget initialization.
 WIDGET_KEY_ALLOWED_PREFIXES = (
     "/api/chat/",
     "/ws/chat/",
+    "/api/config",
 )
 
 # Routes that bypass authentication (webhooks, health, public endpoints)
@@ -100,7 +102,7 @@ AUTH_EXEMPT_PREFIXES = (
     "/api/packs/",
     "/api/shopify/billing/confirm",
     "/api/tenants/",
-    "/api/tenants/",
+    "/admin/",
 )
 
 

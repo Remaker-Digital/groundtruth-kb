@@ -132,6 +132,10 @@ class TenantAuthMiddleware(BaseHTTPMiddleware):
     async def dispatch(
         self, request: Request, call_next: RequestResponseEndpoint,
     ) -> Response:
+        # Let CORS preflight (OPTIONS) through — CORSMiddleware handles these.
+        if request.method == "OPTIONS":
+            return await call_next(request)
+
         # Skip auth for exempt paths
         if is_auth_exempt(request.url.path):
             return await call_next(request)
@@ -147,6 +151,15 @@ class TenantAuthMiddleware(BaseHTTPMiddleware):
             return JSONResponse(
                 status_code=exc.status_code,
                 content={"error": exc.message},
+            )
+        except Exception as exc:
+            logger.exception(
+                "Unexpected error during authentication: path=%s method=%s",
+                request.url.path, request.method,
+            )
+            return JSONResponse(
+                status_code=500,
+                content={"error": "Internal authentication error."},
             )
 
         return await call_next(request)

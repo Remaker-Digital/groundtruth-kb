@@ -841,8 +841,8 @@ class TestWidgetKeyScoping:
     """Validate widget key authentication scope."""
 
     def test_widget_key_only_for_chat_endpoints(self):
-        """Widget key is only accepted on /api/chat/ and /ws/chat/ paths."""
-        assert WIDGET_KEY_ALLOWED_PREFIXES == ("/api/chat/", "/ws/chat/")
+        """Widget key is only accepted on /api/chat/, /ws/chat/, and /api/config paths."""
+        assert WIDGET_KEY_ALLOWED_PREFIXES == ("/api/chat/", "/ws/chat/", "/api/config")
 
     def test_auth_exempt_paths_documented(self):
         """Auth-exempt paths include expected entries."""

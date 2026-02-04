@@ -32,7 +32,7 @@ __pycache__
 .ruff_cache
 htmlcov
 .coverage
-dist
+# Python dist/build artifacts
 build
 
 # Tests (not needed in production image)
@@ -53,9 +53,23 @@ website/
 
 # Frontend projects (built and served separately)
 prototype/
-admin/
 widget/
 extensions/
+
+# Admin: exclude everything EXCEPT admin/shopify/dist/ (pre-built SPA assets)
+admin/standalone/
+admin/shared/
+admin/package.json
+admin/package-lock.json
+admin/shopify/src/
+admin/shopify/node_modules/
+admin/shopify/package.json
+admin/shopify/package-lock.json
+admin/shopify/tsconfig.json
+admin/shopify/vite.config.ts
+admin/shopify/vite-env.d.ts
+admin/shopify/index.html
+admin/shopify/index.tsx
 
 # Node / frontend tooling
 node_modules/
@@ -75,6 +89,10 @@ scripts/
 
 # Independent assessments
 independent-progress-assments/
+
+# Wiki
+agent-red.wiki/
+*.wiki/
 
 # Temporary / local
 local/

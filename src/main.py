@@ -72,6 +72,31 @@ app = FastAPI(
 )
 
 # ---------------------------------------------------------------------------
+# Global exception handler (catches unhandled exceptions in route handlers)
+# ---------------------------------------------------------------------------
+
+import traceback  # noqa: E402
+
+from fastapi import Request  # noqa: E402
+from fastapi.responses import JSONResponse  # noqa: E402
+
+
+@app.exception_handler(Exception)
+async def _global_exception_handler(request: Request, exc: Exception) -> JSONResponse:
+    """Catch and log unhandled exceptions to aid production debugging."""
+    _logger = logging.getLogger("src.main")
+    _logger.error(
+        "Unhandled exception: path=%s method=%s error=%s\n%s",
+        request.url.path, request.method, exc,
+        traceback.format_exc(),
+    )
+    return JSONResponse(
+        status_code=500,
+        content={"error": "Internal server error."},
+    )
+
+
+# ---------------------------------------------------------------------------
 # Middleware
 # ---------------------------------------------------------------------------
 
@@ -140,6 +165,48 @@ app.include_router(admin_audit_router)
 app.include_router(trial_router)
 app.include_router(rotation_router)
 app.include_router(admin_profile_router)
+
+# ---------------------------------------------------------------------------
+# Shopify Embedded Admin SPA (static files + catch-all for SPA routing)
+# ---------------------------------------------------------------------------
+
+import pathlib  # noqa: E402
+
+from fastapi.responses import FileResponse, HTMLResponse  # noqa: E402
+from starlette.staticfiles import StaticFiles  # noqa: E402
+
+_admin_shopify_dist = pathlib.Path(__file__).resolve().parent.parent / "admin" / "shopify" / "dist"
+
+if _admin_shopify_dist.is_dir():
+    # Serve static assets (JS, CSS, sourcemaps) from the Vite build output
+    app.mount(
+        "/admin/shopify/assets",
+        StaticFiles(directory=str(_admin_shopify_dist / "assets")),
+        name="admin-shopify-assets",
+    )
+
+    @app.get("/admin/shopify/{full_path:path}", include_in_schema=False)
+    async def _admin_shopify_spa(full_path: str) -> FileResponse:
+        """Catch-all route for the Shopify embedded admin SPA.
+
+        All client-side routes (/, /inbox, /billing, etc.) return the same
+        index.html so React Router can handle routing. This is standard SPA
+        behaviour — the server always returns the shell HTML, and the
+        JavaScript app determines what to render based on the URL.
+        """
+        return FileResponse(str(_admin_shopify_dist / "index.html"))
+
+    @app.get("/admin/shopify", include_in_schema=False)
+    async def _admin_shopify_index() -> FileResponse:
+        """Serve the Shopify embedded admin SPA root."""
+        return FileResponse(str(_admin_shopify_dist / "index.html"))
+
+    logger.info("Shopify embedded admin SPA mounted at /admin/shopify")
+else:
+    logger.warning(
+        "Shopify admin SPA dist directory not found at %s — "
+        "embedded admin will not be available", _admin_shopify_dist,
+    )
 
 # ---------------------------------------------------------------------------
 # Tenant authentication + rate limiting (Decisions #4-5, WI #18/#27-28)
@@ -224,7 +291,25 @@ app.add_middleware(PreAuthRateLimitMiddleware)
 # Startup: tenant resolution configuration (Decision #4)
 # ---------------------------------------------------------------------------
 
+from src.multi_tenant.cosmos_client import get_cosmos_manager  # noqa: E402
 from src.multi_tenant.repository import TenantRepository  # noqa: E402
+
+
+@app.on_event("startup")
+async def _startup_cosmos_db() -> None:
+    """Initialize Cosmos DB client and database connection.
+
+    Must run before any startup event that uses repositories.
+    """
+    try:
+        cosmos = get_cosmos_manager()
+        await cosmos._ensure_client()
+        logger.info("Cosmos DB client initialized")
+    except Exception as exc:
+        logger.warning(
+            "Cosmos DB initialization failed — database operations will be "
+            "unavailable until connection is established: %s", exc,
+        )
 
 
 @app.on_event("startup")
@@ -300,6 +385,13 @@ async def _shutdown_nats() -> None:
     """Drain and close NATS connection on application shutdown."""
     await close_nats_manager()
     logger.info("NATS tenant isolation manager closed")
+
+
+@app.on_event("shutdown")
+async def _shutdown_cosmos_db() -> None:
+    """Close the Cosmos DB client on application shutdown."""
+    cosmos = get_cosmos_manager()
+    await cosmos.close()
 
 
 # ---------------------------------------------------------------------------

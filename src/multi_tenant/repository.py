@@ -455,7 +455,7 @@ class TenantRepository(TenantScopedRepository):
         async for item in self._container.query_items(
             query="SELECT * FROM c WHERE c.stripe_customer_id = @stripe_id",
             parameters=[{"name": "@stripe_id", "value": stripe_customer_id}],
-            enable_cross_partition_query=True,
+            # Cross-partition query (default in SDK v4+)
             max_item_count=1,
         ):
             items.append(item)
@@ -481,7 +481,7 @@ class TenantRepository(TenantScopedRepository):
         async for item in self._container.query_items(
             query="SELECT * FROM c WHERE c.shopify_shop_domain = @domain",
             parameters=[{"name": "@domain", "value": shopify_shop_domain}],
-            enable_cross_partition_query=True,
+            # Cross-partition query (default in SDK v4+)
             max_item_count=1,
         ):
             items.append(item)
@@ -507,7 +507,7 @@ class TenantRepository(TenantScopedRepository):
         async for item in self._container.query_items(
             query="SELECT * FROM c WHERE c.api_key_hash = @hash",
             parameters=[{"name": "@hash", "value": api_key_hash}],
-            enable_cross_partition_query=True,
+            # Cross-partition query (default in SDK v4+)
             max_item_count=1,
         ):
             items.append(item)
@@ -533,7 +533,7 @@ class TenantRepository(TenantScopedRepository):
         async for item in self._container.query_items(
             query="SELECT * FROM c WHERE c.widget_key_hash = @hash",
             parameters=[{"name": "@hash", "value": widget_key_hash}],
-            enable_cross_partition_query=True,
+            # Cross-partition query (default in SDK v4+)
             max_item_count=1,
         ):
             items.append(item)

@@ -284,12 +284,31 @@ class SecurityHeadersMiddleware:
             proto = headers.get(b"x-forwarded-proto", b"").decode("latin-1")
             is_https = proto == "https"
 
+        # Check if this is a Shopify embedded admin path — these need to be
+        # frameable by Shopify's admin iframe, so X-Frame-Options: DENY must
+        # be replaced with CSP frame-ancestors allowing Shopify domains.
+        request_path = scope.get("path", "")
+        is_shopify_admin = request_path.startswith("/admin/")
+
         async def send_with_security_headers(message: Message) -> None:
             if message["type"] == "http.response.start":
                 headers = list(message.get("headers", []))
 
                 for name, value in SECURITY_HEADERS.items():
+                    # Skip X-Frame-Options for Shopify embedded admin (uses CSP instead)
+                    if name == "X-Frame-Options" and is_shopify_admin:
+                        continue
+                    # Skip Cache-Control: no-store for admin static assets
+                    if name == "Cache-Control" and is_shopify_admin:
+                        continue
                     headers.append((name.lower().encode(), value.encode()))
+
+                # Shopify embedded admin: allow framing from Shopify domains
+                if is_shopify_admin:
+                    headers.append((
+                        b"content-security-policy",
+                        b"frame-ancestors https://*.myshopify.com https://admin.shopify.com",
+                    ))
 
                 if is_https:
                     headers.append(

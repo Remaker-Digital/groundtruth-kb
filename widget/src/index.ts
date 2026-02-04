@@ -244,13 +244,17 @@ async function init(
       panelIframe = createPanelIframe();
     }
 
-    // Trigger animation on next frame
+    // Double-rAF ensures the browser has painted the initial opacity:0 state
+    // before we transition to opacity:1. A single rAF often fires in the same
+    // paint frame as the DOM insertion, causing the transition to be skipped.
     requestAnimationFrame(() => {
-      if (panelIframe) {
-        panelIframe.style.opacity = '1';
-        panelIframe.style.transform = 'translateY(0) scale(1)';
-        panelIframe.style.pointerEvents = 'auto';
-      }
+      requestAnimationFrame(() => {
+        if (panelIframe) {
+          panelIframe.style.opacity = '1';
+          panelIframe.style.transform = 'translateY(0) scale(1)';
+          panelIframe.style.pointerEvents = 'auto';
+        }
+      });
     });
   }
 
@@ -367,6 +371,10 @@ function mountLauncherHost(): { shadowHost: HTMLElement; shadowRoot: ShadowRoot 
   const host = document.createElement('div');
   host.id = 'agent-red-widget';
   host.setAttribute('aria-hidden', 'false');
+  // Shopify Dawn (and many themes) hide empty divs via `div:empty { display: none }`.
+  // A closed Shadow DOM has no light-DOM children, so the host matches `:empty`.
+  // Force it visible so the shadow-rendered launcher button is not hidden.
+  host.style.display = 'block';
   document.body.appendChild(host);
 
   const shadow = host.attachShadow({ mode: 'closed' });
