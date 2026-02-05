@@ -1,5 +1,5 @@
 """
-Provision blanco-9939.myshopify.com as Agent Red tenant #1.
+Provision agent-red.myshopify.com as Agent Red tenant #1.
 
 Creates the tenant document in Cosmos DB with Professional tier,
 generates API key and publishable widget key, and stores credential
@@ -179,19 +179,62 @@ async def provision(dry_run: bool = True, seed_kb: bool = False) -> None:
         id=f"{TENANT_ID}_preferences_v1",
         tenant_id=TENANT_ID,
         version=1,
+        is_current=True,
+        # Brand & tone
         brand_name="Agent Red",
         brand_voice="helpful, professional, and knowledgeable",
-        formality="balanced",
-        response_length="medium",
-        language_primary="en",
-        languages_enabled=["en"],
-        return_policy="",
-        shipping_info="",
+        # Languages
+        primary_language="en",
+        additional_languages=[],
+        # Response style
+        response_length="standard",
+        formality_level="balanced",
+        # Business policies
+        return_policy="Agent Red subscriptions can be cancelled at any time. Monthly subscriptions end at the close of the current billing period. Annual subscriptions are non-refundable but can be cancelled to prevent renewal.",
+        shipping_info="Agent Red is a cloud-hosted SaaS product. No shipping required. Access is provisioned immediately upon subscription activation.",
+        # Escalation rules
         escalation_threshold=0.7,
-        escalation_keywords=["speak to a person", "human agent", "manager"],
-        custom_instructions="You are Agent Red, an AI customer service assistant for Remaker Digital. Help customers learn about Agent Red Customer Experience, its features, pricing, and setup process.",
+        escalation_keywords=["speak to a person", "human agent", "manager", "refund", "cancel subscription"],
+        # Memory & privacy
+        memory_enabled=True,
+        # Custom instructions
+        custom_instructions=(
+            "You are the Agent Red AI assistant on the Agent Red Customer Experience "
+            "storefront. Your role is to help visitors and merchants understand "
+            "Agent Red's features, pricing, setup process, and competitive advantages. "
+            "You are a live demonstration of the product itself — your responses showcase "
+            "Persistent Customer Memory, fail-closed safety validation, and the six-agent "
+            "pipeline. When asked about competitors, be factual and specific about Agent Red's "
+            "advantages (4-21x cheaper, 4.7x faster P50, lightweight 15-20KB widget) without "
+            "disparaging other products. For returning visitors, reference their previous "
+            "interactions to demonstrate the memory capability."
+        ),
+        # Widget appearance — visual
+        widget_primary_color="#C41E2A",
+        widget_background_color="#141414",
+        widget_position="bottom-right",
+        widget_offset_x=20,
+        widget_offset_y=20,
+        widget_agent_display_name="Agent Red AI",
+        widget_agent_title="Customer Experience Assistant",
+        widget_show_branding=True,
+        widget_mobile_enabled=True,
+        widget_dark_mode=True,
+        # Widget behavior
+        widget_offline_message="We're currently offline, but our AI assistant is available 24/7. Leave a message and we'll follow up!",
+        widget_auto_open=True,
+        widget_auto_open_delay=5,
+        widget_offline_behavior="ai_only",
+        widget_chat_rating_enabled=True,
+        widget_sound_enabled=True,
+        widget_file_upload_enabled=False,
+        # Widget content
+        widget_header_text="Agent Red Support",
+        widget_input_placeholder="Ask about features, pricing, or setup...",
+        widget_page_rules=[],
+        # Metadata
         created_at=now,
-        updated_at=now,
+        created_by="provision_tenant_one.py",
     )
 
     try:
@@ -230,7 +273,7 @@ async def provision(dry_run: bool = True, seed_kb: bool = False) -> None:
 
 async def main() -> None:
     parser = argparse.ArgumentParser(
-        description="Provision blanco-9939.myshopify.com as Agent Red tenant #1",
+        description="Provision agent-red.myshopify.com as Agent Red tenant #1",
     )
     parser.add_argument(
         "--provision",

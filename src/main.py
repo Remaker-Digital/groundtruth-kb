@@ -339,6 +339,51 @@ async def _startup_tenant_resolution() -> None:
 
 
 @app.on_event("startup")
+async def _startup_config_processor() -> None:
+    """Wire TenantConfigProcessor with Cosmos DB repositories.
+
+    Required for config persistence via PUT /api/config. Without this,
+    config updates succeed in-memory but are lost on next read.
+    """
+    try:
+        from src.multi_tenant.repository import AuditLogRepository, PreferencesRepository
+        from src.multi_tenant.tenant_config_processor import get_config_processor
+
+        prefs_repo = PreferencesRepository()
+        audit_repo = AuditLogRepository()
+        processor = get_config_processor()
+        processor.configure(prefs_repo, audit_repo)
+        logger.info("TenantConfigProcessor configured with Cosmos DB repositories")
+    except Exception:
+        logger.warning(
+            "TenantConfigProcessor configuration failed — config updates "
+            "will not persist until Cosmos DB is available."
+        )
+
+
+@app.on_event("startup")
+async def _startup_dashboard_services() -> None:
+    """Wire usage dashboard API with Cosmos DB repositories.
+
+    Required for GET /api/dashboard/* endpoints to return real data.
+    """
+    try:
+        from src.multi_tenant.usage_dashboard_api import configure_dashboard_services
+        from src.multi_tenant.conversation_meter import get_conversation_meter
+        from src.multi_tenant.repository import ConversationRepository
+
+        conv_repo = ConversationRepository()
+        meter = get_conversation_meter()
+        configure_dashboard_services(meter, conv_repo)
+        logger.info("Usage dashboard services configured")
+    except Exception:
+        logger.warning(
+            "Dashboard services configuration failed — /api/dashboard/* "
+            "endpoints will return 503 until Cosmos DB is available."
+        )
+
+
+@app.on_event("startup")
 async def _startup_tracing() -> None:
     """Initialize OpenTelemetry tracing with tenant context injection."""
     configure_tracing()
