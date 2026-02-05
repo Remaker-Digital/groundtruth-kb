@@ -41,7 +41,8 @@ from typing import Any
 
 from fastapi import APIRouter, Depends, HTTPException, Query
 from fastapi.responses import StreamingResponse
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, ConfigDict, Field
+from pydantic.alias_generators import to_camel
 
 from src.multi_tenant.auth import TenantContext
 from src.multi_tenant.middleware import get_tenant_context
@@ -56,6 +57,8 @@ logger = logging.getLogger(__name__)
 
 class UsageDashboardResponse(BaseModel):
     """Layer 1: Real-time usage dashboard for the current billing period."""
+
+    model_config = ConfigDict(alias_generator=to_camel, populate_by_name=True)
 
     tenant_id: str
     billing_period: str
@@ -82,6 +85,8 @@ class UsageDashboardResponse(BaseModel):
 class DailyVolumeEntry(BaseModel):
     """A single day's conversation volume."""
 
+    model_config = ConfigDict(alias_generator=to_camel, populate_by_name=True)
+
     date: str = Field(description="Date (YYYY-MM-DD)")
     total: int = Field(description="Total conversations")
     billable: int = Field(description="Billable conversations")
@@ -90,6 +95,8 @@ class DailyVolumeEntry(BaseModel):
 class DailyVolumeResponse(BaseModel):
     """Daily volume breakdown for chart rendering."""
 
+    model_config = ConfigDict(alias_generator=to_camel, populate_by_name=True)
+
     tenant_id: str
     billing_period: str
     days: list[DailyVolumeEntry]
@@ -97,6 +104,8 @@ class DailyVolumeResponse(BaseModel):
 
 class ConversationSummary(BaseModel):
     """Compact conversation record for list endpoints."""
+
+    model_config = ConfigDict(alias_generator=to_camel, populate_by_name=True)
 
     conversation_id: str
     status: str | None = None
@@ -114,6 +123,8 @@ class ConversationSummary(BaseModel):
 class ConversationListResponse(BaseModel):
     """Paginated list of conversations with metadata."""
 
+    model_config = ConfigDict(alias_generator=to_camel, populate_by_name=True)
+
     tenant_id: str
     billing_period: str
     total_count: int = Field(description="Total matching conversations")
@@ -124,6 +135,8 @@ class ConversationListResponse(BaseModel):
 
 class ConversationDetailResponse(BaseModel):
     """Full billing detail for a single conversation (Layer 2)."""
+
+    model_config = ConfigDict(alias_generator=to_camel, populate_by_name=True)
 
     conversation_id: str
     tenant_id: str
@@ -173,23 +186,13 @@ def configure_dashboard_services(
     logger.info("Usage dashboard API services configured")
 
 
-def _get_meter() -> Any:
-    """Get the ConversationMeter, raising 503 if not initialised."""
-    if _conversation_meter is None:
-        raise HTTPException(
-            status_code=503,
-            detail="Usage dashboard services not initialised",
-        )
+def _get_meter() -> Any | None:
+    """Get the ConversationMeter, or None if not initialised."""
     return _conversation_meter
 
 
-def _get_repo() -> Any:
-    """Get the ConversationRepository, raising 503 if not initialised."""
-    if _conversation_repo is None:
-        raise HTTPException(
-            status_code=503,
-            detail="Usage dashboard services not initialised",
-        )
+def _get_repo() -> Any | None:
+    """Get the ConversationRepository, or None if not initialised."""
     return _conversation_repo
 
 
@@ -222,6 +225,25 @@ async def get_usage_dashboard(
     (Decision #25).
     """
     meter = _get_meter()
+
+    if billing_period is None:
+        billing_period = datetime.now(timezone.utc).strftime("%Y-%m")
+
+    if meter is None:
+        # Services not yet initialised — return zeroed fallback
+        return UsageDashboardResponse(
+            tenant_id=ctx.tenant_id,
+            billing_period=billing_period,
+            total_conversations=0,
+            included_allowance=0,
+            remaining_included=0,
+            pack_balance=0,
+            overage_conversations=0,
+            overage_reported=0,
+            usage_percent=0.0,
+            estimated_overage_cost=0.0,
+            active_alerts=[],
+        )
 
     dashboard = await meter.get_usage_dashboard(
         tenant_id=ctx.tenant_id,
@@ -267,6 +289,14 @@ async def get_daily_volume(
     if billing_period is None:
         billing_period = datetime.now(timezone.utc).strftime("%Y-%m")
 
+    if repo is None:
+        # Services not yet initialised — return empty fallback
+        return DailyVolumeResponse(
+            tenant_id=ctx.tenant_id,
+            billing_period=billing_period,
+            days=[],
+        )
+
     # Parse period to get date range
     try:
         year, month = billing_period.split("-")
@@ -302,7 +332,7 @@ async def get_daily_volume(
     all_conversations = await repo.query(
         tenant_id=ctx.tenant_id,
         query_text=(
-            "SELECT c.started_at, c.is_billable FROM c "
+            "SELECT c.tenant_id, c.started_at, c.is_billable FROM c "
             "WHERE c.started_at >= @since AND c.started_at < @until "
             "ORDER BY c.started_at ASC"
         ),
@@ -369,6 +399,17 @@ async def list_conversations(
 
     if billing_period is None:
         billing_period = datetime.now(timezone.utc).strftime("%Y-%m")
+
+    if repo is None or meter is None:
+        # Services not yet initialised — return empty fallback
+        return ConversationListResponse(
+            tenant_id=ctx.tenant_id,
+            billing_period=billing_period,
+            total_count=0,
+            offset=offset,
+            limit=limit,
+            conversations=[],
+        )
 
     # Parse period
     try:
@@ -487,6 +528,21 @@ async def export_conversations_csv(
     if billing_period is None:
         billing_period = datetime.now(timezone.utc).strftime("%Y-%m")
 
+    if repo is None:
+        # Services not yet initialised — return empty CSV
+        output = io.StringIO()
+        writer = csv.writer(output)
+        writer.writerow([header for _, header in _CSV_COLUMNS])
+        output.seek(0)
+        filename = f"conversations-{ctx.tenant_id[:8]}-{billing_period}.csv"
+        return StreamingResponse(
+            iter([output.getvalue()]),
+            media_type="text/csv",
+            headers={
+                "Content-Disposition": f'attachment; filename="{filename}"',
+            },
+        )
+
     # Parse period
     try:
         year, month = billing_period.split("-")
@@ -572,6 +628,12 @@ async def get_conversation_detail(
     invoked, model used, Critic pass/fail, and timing data.
     """
     meter = _get_meter()
+
+    if meter is None:
+        raise HTTPException(
+            status_code=404,
+            detail=f"Conversation {conversation_id} not found",
+        )
 
     try:
         detail = await meter.get_conversation_billing_detail(

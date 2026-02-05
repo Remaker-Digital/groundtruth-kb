@@ -40,7 +40,8 @@ import logging
 from typing import Any
 
 from fastapi import APIRouter, Depends, HTTPException
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, ConfigDict, Field
+from pydantic.alias_generators import to_camel
 
 from src.multi_tenant.auth import TenantContext
 from src.multi_tenant.cosmos_schema import TenantTier
@@ -54,8 +55,10 @@ from src.multi_tenant.tenant_config_processor import (
 )
 from src.multi_tenant.tenant_config_schema import (
     OnboardingStep,
+    TierGate,
     export_schema_for_api,
     get_fields_by_step,
+    resolve_defaults,
 )
 
 logger = logging.getLogger(__name__)
@@ -165,6 +168,42 @@ class StepFieldsResponse(BaseModel):
     step_name: str
     fields: list[dict[str, Any]]
     total_fields: int = 0
+
+
+class OnboardingFieldResponse(BaseModel):
+    """A single config field for onboarding step rendering."""
+
+    model_config = ConfigDict(alias_generator=to_camel, populate_by_name=True)
+
+    key: str
+    label: str
+    description: str
+    type: str
+    default_value: Any = None
+    current_value: Any = None
+    tier_gate: str | None = None
+    step_order: int = 0
+    group: str = ""
+
+
+class OnboardingStepResponse(BaseModel):
+    """A single onboarding step with its fields."""
+
+    model_config = ConfigDict(alias_generator=to_camel, populate_by_name=True)
+
+    step: str
+    label: str
+    description: str
+    fields: list[OnboardingFieldResponse]
+    is_complete: bool = False
+
+
+class OnboardingResponse(BaseModel):
+    """Full onboarding wizard data — all steps at once."""
+
+    model_config = ConfigDict(alias_generator=to_camel, populate_by_name=True)
+
+    steps: list[OnboardingStepResponse]
 
 
 # ---------------------------------------------------------------------------
@@ -368,6 +407,87 @@ async def get_config_diff(
 
 
 # ---------------------------------------------------------------------------
+# 5b. GET /api/config/onboarding — All onboarding steps at once
+# ---------------------------------------------------------------------------
+
+# Step descriptions for UI display
+_STEP_DESCRIPTIONS: dict[OnboardingStep, str] = {
+    OnboardingStep.BRAND_AND_TONE: "Set your brand name, voice, and greeting messages.",
+    OnboardingStep.LANGUAGES: "Configure primary and additional languages.",
+    OnboardingStep.RESPONSE_STYLE: "Control response length, formality, and emoji usage.",
+    OnboardingStep.KNOWLEDGE_BASE: "Configure knowledge scope and product recommendations.",
+    OnboardingStep.BUSINESS_POLICIES: "Add return, shipping, warranty, and support policies.",
+    OnboardingStep.ESCALATION_RULES: "Set escalation thresholds, keywords, and notifications.",
+    OnboardingStep.INTEGRATIONS: "Enable Shopify sync, Zendesk, Mailchimp, and GA4.",
+    OnboardingStep.MEMORY_AND_PRIVACY: "Configure customer memory layers and data retention.",
+    OnboardingStep.WIDGET_APPEARANCE: "Customize widget colors, position, and behavior.",
+    OnboardingStep.REVIEW_AND_LAUNCH: "Review all settings and launch your AI agent.",
+}
+
+
+@router.get("/onboarding", response_model=OnboardingResponse)
+async def get_onboarding_steps(
+    ctx: TenantContext = Depends(get_tenant_context),
+) -> OnboardingResponse:
+    """Get all onboarding steps with their fields for the wizard UI.
+
+    Returns every step in order, each with its tier-filtered fields,
+    current defaults, and a completion flag (always False for now —
+    completion tracking is a future enhancement).
+    """
+    tier = _resolve_tier(ctx)
+
+    # Get current resolved config to populate currentValue
+    processor = get_config_processor()
+    config_result = await processor.get_config(ctx.tenant_id, tier)
+    current_config = config_result.config if config_result else {}
+
+    # Tier ranking for field filtering
+    tier_rank = {TenantTier.STARTER: 0, TenantTier.PROFESSIONAL: 1, TenantTier.ENTERPRISE: 2}
+    gate_rank = {TierGate.ALL: 0, TierGate.PROFESSIONAL_PLUS: 1, TierGate.ENTERPRISE_ONLY: 2}
+    rank = tier_rank.get(tier, 0)
+
+    defaults = resolve_defaults(tier)
+
+    steps: list[OnboardingStepResponse] = []
+    for step in OnboardingStep:
+        fields = get_fields_by_step(step)
+
+        # Filter by tier gate
+        available_fields = [
+            f for f in fields
+            if gate_rank.get(f.tier_gate, 0) <= rank
+        ]
+
+        step_name_label = step.name.lower().replace("_", " ").title()
+
+        field_responses = [
+            OnboardingFieldResponse(
+                key=f.field_name,
+                label=f.display_name,
+                description=f.description or f.tooltip,
+                type=f.field_type.value,
+                default_value=defaults.get(f.field_name),
+                current_value=current_config.get(f.field_name, defaults.get(f.field_name)),
+                tier_gate=f.tier_gate.value if f.tier_gate != TierGate.ALL else None,
+                step_order=f.step_order,
+                group=step_name_label,
+            )
+            for f in available_fields
+        ]
+
+        steps.append(OnboardingStepResponse(
+            step=step.name.lower(),
+            label=step_name_label,
+            description=_STEP_DESCRIPTIONS.get(step, ""),
+            fields=field_responses,
+            is_complete=False,
+        ))
+
+    return OnboardingResponse(steps=steps)
+
+
+# ---------------------------------------------------------------------------
 # 6. GET /api/config/schema — Full field schema for UI rendering
 # ---------------------------------------------------------------------------
 
@@ -433,7 +553,6 @@ async def get_step_fields(
 
     # Filter by tier gate
     tier_rank = {TenantTier.STARTER: 0, TenantTier.PROFESSIONAL: 1, TenantTier.ENTERPRISE: 2}
-    from src.multi_tenant.tenant_config_schema import TierGate
     gate_rank = {TierGate.ALL: 0, TierGate.PROFESSIONAL_PLUS: 1, TierGate.ENTERPRISE_ONLY: 2}
     rank = tier_rank.get(tier, 0)
 
@@ -443,7 +562,6 @@ async def get_step_fields(
     ]
 
     # Build response
-    from src.multi_tenant.tenant_config_schema import resolve_defaults
     defaults = resolve_defaults(tier)
 
     field_dicts = [

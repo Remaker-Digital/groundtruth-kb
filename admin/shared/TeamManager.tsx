@@ -473,7 +473,7 @@ export const TeamManager: React.FC<BaseComponentProps> = ({
   const { invite, loading: inviting, error: inviteError } = useInviteTeamMember(apiFetch);
 
   const members: TeamMember[] = team.data?.members ?? [];
-  const activeCount = members.filter((m) => m.status === 'active').length;
+  const activeCount = members.filter((m) => m.isActive).length;
   const totalCount = members.length;
 
   // -------------------------------------------------------------------------
@@ -511,8 +511,8 @@ export const TeamManager: React.FC<BaseComponentProps> = ({
 
   const openEdit = useCallback((member: TeamMember) => {
     setEditMember(member);
-    setEditRole(member.role);
-    setEditActive(member.status === 'active');
+    setEditRole(member.role as TeamRole);
+    setEditActive(member.isActive);
   }, []);
 
   const handleSaveEdit = useCallback(async () => {
@@ -523,7 +523,7 @@ export const TeamManager: React.FC<BaseComponentProps> = ({
       const body: Record<string, unknown> = {};
       if (editRole !== editMember.role) body.role = editRole;
       const isNowActive = editActive;
-      const wasActive = editMember.status === 'active';
+      const wasActive = editMember.isActive;
       if (isNowActive !== wasActive) body.is_active = isNowActive;
 
       if (Object.keys(body).length === 0) {
@@ -784,8 +784,9 @@ export const TeamManager: React.FC<BaseComponentProps> = ({
               <tbody>
                 {members.map((member) => {
                   const isOwner = member.role === 'owner';
-                  const isDisabled = member.status === 'disabled';
-                  const statusInfo = STATUS_DISPLAY[member.status] || STATUS_DISPLAY.active;
+                  const isDisabled = !member.isActive;
+                  const memberStatus = member.isActive ? 'active' : 'disabled';
+                  const statusInfo = STATUS_DISPLAY[memberStatus] || STATUS_DISPLAY.active;
 
                   return (
                     <tr key={member.id} style={s.tr(isDisabled)}>
@@ -793,7 +794,7 @@ export const TeamManager: React.FC<BaseComponentProps> = ({
                       <td style={s.td}>
                         <div style={s.memberInfo}>
                           <span style={s.memberName}>
-                            {member.name || '(No name)'}
+                            {member.displayName || '(No name)'}
                           </span>
                           <span style={s.memberEmail}>{member.email}</span>
                         </div>
@@ -816,13 +817,13 @@ export const TeamManager: React.FC<BaseComponentProps> = ({
 
                       {/* Joined */}
                       <td style={s.td}>
-                        <span style={s.dateText}>{formatDate(member.joinedAt)}</span>
+                        <span style={s.dateText}>{formatDate(member.createdAt)}</span>
                       </td>
 
                       {/* Last active */}
                       <td style={s.td}>
                         <span style={s.dateText}>
-                          {formatRelativeDate(member.lastActiveAt)}
+                          {formatRelativeDate(member.lastLoginAt)}
                         </span>
                       </td>
 
@@ -890,7 +891,7 @@ export const TeamManager: React.FC<BaseComponentProps> = ({
           <div style={s.modal} onClick={(e) => e.stopPropagation()}>
             <h4 style={s.modalTitle}>Remove Team Member</h4>
             <p style={s.modalBody}>
-              Are you sure you want to remove <strong>{confirmMember.name || confirmMember.email}</strong> ({confirmMember.email})?
+              Are you sure you want to remove <strong>{confirmMember.displayName || confirmMember.email}</strong> ({confirmMember.email})?
               They will no longer have access to the admin dashboard or be able to handle
               escalated conversations. This action can be reversed by reactivating the member.
             </p>
@@ -935,7 +936,7 @@ export const TeamManager: React.FC<BaseComponentProps> = ({
               color: '#6B7280',
               margin: '0 0 20px 0',
             }}>
-              {editMember.name || editMember.email} ({editMember.email})
+              {editMember.displayName || editMember.email} ({editMember.email})
             </p>
 
             <div style={{ marginBottom: 16 }}>

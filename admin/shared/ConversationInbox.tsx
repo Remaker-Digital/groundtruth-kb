@@ -16,7 +16,6 @@ import type {
   BaseComponentProps,
   InboxConversation,
   ConversationMessage,
-  ConversationStatus,
   TeamMember,
 } from './types';
 import {
@@ -43,18 +42,22 @@ const FONT_FAMILY = "'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', Hel
 const FONT_MONO = "'JetBrains Mono', 'SFMono-Regular', Consolas, monospace";
 const BORDER_RADIUS = '6px';
 
-const STATUS_COLORS: Record<ConversationStatus, string> = {
+const STATUS_COLORS: Record<string, string> = {
   active: COLOR_SUCCESS,
   ended: COLOR_GRAY,
   escalated: COLOR_DANGER,
   idle: '#e36209',
+  timed_out: '#e36209',
+  error: COLOR_DANGER,
 };
 
-const STATUS_LABELS: Record<ConversationStatus, string> = {
+const STATUS_LABELS: Record<string, string> = {
   active: 'Active',
   ended: 'Ended',
   escalated: 'Escalated',
   idle: 'Idle',
+  timed_out: 'Timed Out',
+  error: 'Error',
 };
 
 // ---------------------------------------------------------------------------
@@ -77,13 +80,17 @@ function formatRelativeTime(isoString: string | null): string {
   return date.toLocaleDateString();
 }
 
-function formatTimestamp(ts: number): string {
+function formatTimestamp(ts: string | null): string {
+  if (!ts) return '--';
   const d = new Date(ts);
+  if (isNaN(d.getTime())) return '--';
   return d.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
 }
 
-function formatDateHeader(ts: number): string {
+function formatDateHeader(ts: string | null): string {
+  if (!ts) return 'Unknown';
   const d = new Date(ts);
+  if (isNaN(d.getTime())) return 'Unknown';
   const today = new Date();
   const yesterday = new Date(today);
   yesterday.setDate(yesterday.getDate() - 1);
@@ -97,30 +104,35 @@ function formatDateHeader(ts: number): string {
 // Sub-components
 // ---------------------------------------------------------------------------
 
-const StatusBadge: React.FC<{ status: ConversationStatus }> = ({ status }) => (
-  <span
-    style={{
-      display: 'inline-flex',
-      alignItems: 'center',
-      gap: '5px',
-      fontSize: '12px',
-      color: STATUS_COLORS[status],
-      fontWeight: 500,
-    }}
-  >
+const StatusBadge: React.FC<{ status: string | null }> = ({ status }) => {
+  const key = status ?? 'idle';
+  const color = STATUS_COLORS[key] ?? COLOR_GRAY;
+  const label = STATUS_LABELS[key] ?? (status ?? 'Unknown');
+  return (
     <span
       style={{
-        width: '8px',
-        height: '8px',
-        borderRadius: '50%',
-        backgroundColor: STATUS_COLORS[status],
-        display: 'inline-block',
-        flexShrink: 0,
+        display: 'inline-flex',
+        alignItems: 'center',
+        gap: '5px',
+        fontSize: '12px',
+        color,
+        fontWeight: 500,
       }}
-    />
-    {STATUS_LABELS[status]}
-  </span>
-);
+    >
+      <span
+        style={{
+          width: '8px',
+          height: '8px',
+          borderRadius: '50%',
+          backgroundColor: color,
+          display: 'inline-block',
+          flexShrink: 0,
+        }}
+      />
+      {label}
+    </span>
+  );
+};
 
 interface ConversationItemProps {
   conversation: InboxConversation;
@@ -158,7 +170,7 @@ const ConversationItem: React.FC<ConversationItemProps> = ({ conversation, isSel
         {conversation.customerName || conversation.customerId || 'Anonymous'}
       </span>
       <span style={{ fontSize: '11px', color: COLOR_TEXT_SECONDARY }}>
-        {formatRelativeTime(conversation.lastMessageAt)}
+        {formatRelativeTime(conversation.lastActivityAt ?? conversation.startedAt)}
       </span>
     </div>
     <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
@@ -218,7 +230,7 @@ const MessageBubble: React.FC<MessageBubbleProps> = ({ message }) => {
             textAlign: isCustomer ? ('left' as const) : ('right' as const),
           }}
         >
-          {isCustomer ? 'Customer' : message.agentName || 'Agent'} {' '}
+          {isCustomer ? 'Customer' : 'Agent Red AI'} {' '}
           <span style={{ fontFamily: FONT_MONO, fontSize: '10px' }}>
             {formatTimestamp(message.timestamp)}
           </span>
@@ -288,10 +300,10 @@ const AssignModal: React.FC<AssignModalProps> = ({ conversationId, members, onAs
         >
           <option value="">Select team member...</option>
           {members
-            .filter((m) => m.status === 'active')
+            .filter((m) => m.isActive)
             .map((m) => (
               <option key={m.id} value={m.id}>
-                {m.name} ({m.role})
+                {m.displayName} ({m.role})
               </option>
             ))}
         </select>
@@ -571,7 +583,7 @@ export const ConversationInbox: React.FC<BaseComponentProps> = ({
     }
   }, [messages]);
 
-  const selectedConversation = conversations.find((c) => c.id === selectedId) || null;
+  const selectedConversation = conversations.find((c) => c.conversationId === selectedId) || null;
 
   const handleAssign = useCallback(
     async (conversationId: string, agentId: string) => {
@@ -595,7 +607,8 @@ export const ConversationInbox: React.FC<BaseComponentProps> = ({
   const groupedMessages: Array<{ dateLabel: string; messages: ConversationMessage[] }> = [];
   let currentDateStr = '';
   for (const msg of messages) {
-    const dateStr = new Date(msg.timestamp).toDateString();
+    const ts = msg.timestamp ?? '';
+    const dateStr = ts ? new Date(ts).toDateString() : 'Unknown';
     if (dateStr !== currentDateStr) {
       currentDateStr = dateStr;
       groupedMessages.push({ dateLabel: formatDateHeader(msg.timestamp), messages: [] });
@@ -670,10 +683,10 @@ export const ConversationInbox: React.FC<BaseComponentProps> = ({
           )}
           {conversations.map((conv) => (
             <ConversationItem
-              key={conv.id}
+              key={conv.conversationId}
               conversation={conv}
-              isSelected={conv.id === selectedId}
-              onClick={() => setSelectedId(conv.id)}
+              isSelected={conv.conversationId === selectedId}
+              onClick={() => setSelectedId(conv.conversationId)}
             />
           ))}
         </div>
@@ -792,8 +805,8 @@ export const ConversationInbox: React.FC<BaseComponentProps> = ({
                       {group.dateLabel}
                     </span>
                   </div>
-                  {group.messages.map((msg) => (
-                    <MessageBubble key={msg.id} message={msg} />
+                  {group.messages.map((msg, idx) => (
+                    <MessageBubble key={msg.messageId ?? `msg-${idx}`} message={msg} />
                   ))}
                 </div>
               ))}

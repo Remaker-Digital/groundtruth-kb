@@ -62,43 +62,35 @@ export const ApiKeyLogin: React.FC<ApiKeyLoginProps> = ({ onLogin }) => {
         display: 'flex',
         alignItems: 'center',
         justifyContent: 'center',
-        backgroundColor: '#f6f6f7',
-        fontFamily: '-apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif',
+        backgroundColor: '#0a0a0a',
+        fontFamily: 'Inter, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif',
       }}
     >
       <div
         style={{
           width: '100%',
-          maxWidth: '400px',
-          backgroundColor: '#ffffff',
+          maxWidth: '380px',
+          backgroundColor: '#1f1f1f',
           borderRadius: '12px',
-          boxShadow: '0 2px 8px rgba(0, 0, 0, 0.08)',
+          border: '1px solid #272727',
           padding: '40px',
         }}
       >
         {/* Logo / Brand */}
         <div style={{ textAlign: 'center', marginBottom: '32px' }}>
-          <div
+          <img
+            src="/admin/standalone/icon-master.svg"
+            alt="Agent Red"
             style={{
-              display: 'inline-flex',
-              alignItems: 'center',
-              justifyContent: 'center',
               width: '48px',
               height: '48px',
-              borderRadius: '12px',
-              backgroundColor: '#C41E2A',
-              color: '#ffffff',
-              fontSize: '20px',
-              fontWeight: 700,
               marginBottom: '16px',
             }}
-          >
-            AR
-          </div>
-          <h1 style={{ margin: '0 0 4px', fontSize: '20px', fontWeight: 600, color: '#1a1a1a' }}>
+          />
+          <h1 style={{ margin: '0 0 4px', fontSize: '20px', fontWeight: 600, color: '#f5f5f5' }}>
             Agent Red
           </h1>
-          <p style={{ margin: 0, fontSize: '14px', color: '#6d7175' }}>
+          <p style={{ margin: 0, fontSize: '14px', color: '#a0a0a0' }}>
             Customer Experience Admin
           </p>
         </div>
@@ -111,7 +103,7 @@ export const ApiKeyLogin: React.FC<ApiKeyLoginProps> = ({ onLogin }) => {
               display: 'block',
               fontSize: '14px',
               fontWeight: 500,
-              color: '#202223',
+              color: '#e0e0e0',
               marginBottom: '6px',
             }}
           >
@@ -126,24 +118,26 @@ export const ApiKeyLogin: React.FC<ApiKeyLoginProps> = ({ onLogin }) => {
             autoFocus
             style={{
               width: '100%',
-              padding: '10px 12px',
+              padding: '10px 14px',
               fontSize: '14px',
-              border: `1px solid ${error ? '#d72c0d' : '#c9cccf'}`,
-              borderRadius: '6px',
+              border: `1px solid ${error ? '#ff6b6b' : '#272727'}`,
+              borderRadius: '8px',
               outline: 'none',
               boxSizing: 'border-box',
+              backgroundColor: '#141414',
+              color: '#e0e0e0',
               transition: 'border-color 0.15s',
             }}
             onFocus={(e) => {
-              if (!error) (e.target as HTMLInputElement).style.borderColor = '#5c6ac4';
+              if (!error) (e.target as HTMLInputElement).style.borderColor = '#ff3621';
             }}
             onBlur={(e) => {
-              if (!error) (e.target as HTMLInputElement).style.borderColor = '#c9cccf';
+              if (!error) (e.target as HTMLInputElement).style.borderColor = '#272727';
             }}
           />
 
           {error && (
-            <p style={{ margin: '8px 0 0', fontSize: '13px', color: '#d72c0d' }}>
+            <p style={{ margin: '8px 0 0', fontSize: '13px', color: '#ff6b6b' }}>
               {error}
             </p>
           )}
@@ -155,10 +149,10 @@ export const ApiKeyLogin: React.FC<ApiKeyLoginProps> = ({ onLogin }) => {
               width: '100%',
               marginTop: '16px',
               padding: '10px',
-              backgroundColor: loading ? '#8c9196' : '#C41E2A',
+              backgroundColor: loading ? '#555' : '#ff3621',
               color: '#ffffff',
               border: 'none',
-              borderRadius: '6px',
+              borderRadius: '8px',
               fontSize: '14px',
               fontWeight: 600,
               cursor: loading ? 'default' : 'pointer',
@@ -174,7 +168,7 @@ export const ApiKeyLogin: React.FC<ApiKeyLoginProps> = ({ onLogin }) => {
             marginTop: '24px',
             textAlign: 'center',
             fontSize: '12px',
-            color: '#8c9196',
+            color: '#787878',
           }}
         >
           Find your API key in your welcome email or contact support.

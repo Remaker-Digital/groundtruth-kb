@@ -36,7 +36,9 @@ import uuid
 from enum import Enum
 from typing import Any
 
-from fastapi import APIRouter, HTTPException
+import hashlib
+
+from fastapi import APIRouter, HTTPException, Request
 from pydantic import BaseModel, Field
 
 # Cosmos DB fallback for tenant lookup (populated at startup)
@@ -560,6 +562,23 @@ async def _cosmos_lookup(
     return None
 
 
+async def _cosmos_lookup_by_api_key(api_key: str) -> dict[str, Any] | None:
+    """Lookup a tenant in Cosmos DB by API key hash.
+
+    Used by the standalone admin login flow — the raw key is hashed
+    with SHA-256 and matched against the api_key_hash field stored
+    in the tenant document.
+    """
+    if _tenant_repo is None:
+        return None
+    try:
+        key_hash = hashlib.sha256(api_key.encode("utf-8")).hexdigest()
+        return await _tenant_repo.find_by_api_key_hash(key_hash)
+    except Exception as exc:
+        logger.warning("Cosmos DB API key lookup failed: %s", exc)
+    return None
+
+
 # ---------------------------------------------------------------------------
 # Endpoints
 # ---------------------------------------------------------------------------
@@ -567,24 +586,44 @@ async def _cosmos_lookup(
 
 @router.get("/lookup", response_model=TenantLookupResponse)
 async def lookup_tenant_endpoint(
+    request: Request,
     stripe_customer_id: str | None = None,
     shop: str | None = None,
 ) -> TenantLookupResponse:
-    """Lookup a tenant by Stripe customer ID or Shopify shop domain.
+    """Lookup a tenant by Stripe customer ID, Shopify shop domain, or API key.
 
     Query parameters:
         stripe_customer_id: Stripe customer ID (cus_...)
         shop: Shopify store domain (*.myshopify.com)
 
-    At least one parameter is required.
+    Headers:
+        X-API-Key: API key for standalone admin authentication
+
+    At least one lookup method is required.
 
     NOTE: This route is declared before /{tenant_id} to prevent
     FastAPI from matching "lookup" as a tenant_id path parameter.
     """
+    # --- API key lookup (standalone admin login) ---
+    # Only attempt API key auth when no query parameters are provided.
+    # When shop or stripe_customer_id is given, those take precedence.
+    api_key = request.headers.get("X-API-Key", "").strip()
+    if api_key and not stripe_customer_id and not shop:
+        doc = await _cosmos_lookup_by_api_key(api_key)
+        if doc:
+            return TenantLookupResponse(
+                found=True,
+                tenant_id=doc.get("tenant_id") or doc.get("id"),
+                status=doc.get("status"),
+                tier=doc.get("tier"),
+                billing_channel=doc.get("billing_channel"),
+            )
+        raise HTTPException(status_code=401, detail="Invalid API key.")
+
     if not stripe_customer_id and not shop:
         raise HTTPException(
             status_code=400,
-            detail="Provide 'stripe_customer_id' or 'shop' query parameter.",
+            detail="Provide 'stripe_customer_id' or 'shop' query parameter, or X-API-Key header.",
         )
 
     tenant = get_tenant(

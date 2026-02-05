@@ -278,7 +278,7 @@ class TestXM18AnalyticsSummary:
 
 class TestXM19TeamList:
     def test_team_list(self, enterprise_client):
-        resp = enterprise_client.get("/api/team")
+        resp = enterprise_client.get("/api/admin/team")
         assert resp.status_code in (200, 429, 500, 503)
 
 

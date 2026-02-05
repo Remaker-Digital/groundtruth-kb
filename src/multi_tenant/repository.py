@@ -357,12 +357,16 @@ class TenantScopedRepository:
             kwargs["max_item_count"] = max_items
 
         async for item in self._container.query_items(**kwargs):
-            # Defense-in-depth: verify every returned item belongs to this tenant
-            if item.get("tenant_id") != tenant_id:
+            # Defense-in-depth: verify every returned item belongs to this tenant.
+            # Aggregate/projection queries may omit tenant_id (GROUP BY, COUNT,
+            # AVG, etc.) — skip the check when tenant_id is not in the result
+            # since partition_key already guarantees isolation at DB level.
+            item_tenant = item.get("tenant_id")
+            if item_tenant is not None and item_tenant != tenant_id:
                 logger.error(
                     "TENANT ISOLATION BREACH: query on %s returned item with "
                     "tenant_id=%s, expected=%s. Item suppressed.",
-                    self._collection_name, item.get("tenant_id"), tenant_id,
+                    self._collection_name, item_tenant, tenant_id,
                 )
                 continue
             items.append(item)
@@ -915,7 +919,7 @@ class ConversationRepository(TenantScopedRepository):
         status, started_at.
         """
         query_text = (
-            "SELECT c.conversation_id, c.agents_invoked, c.status, "
+            "SELECT c.tenant_id, c.conversation_id, c.agents_invoked, c.status, "
             "c.started_at FROM c "
             "WHERE c.started_at >= @since"
         )
@@ -940,7 +944,7 @@ class ConversationRepository(TenantScopedRepository):
         indicate the AI couldn't resolve the customer's issue.
         """
         query_text = (
-            "SELECT c.conversation_id, c.status, c.customer_id, "
+            "SELECT c.tenant_id, c.conversation_id, c.status, c.customer_id, "
             "c.turn_count, c.message_count, c.agents_invoked, "
             "c.critic_passed, c.started_at, c.ended_at "
             "FROM c "

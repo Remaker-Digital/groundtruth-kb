@@ -149,23 +149,28 @@ export interface PaginatedList<T> {
 export type ConversationStatus = 'active' | 'ended' | 'escalated' | 'idle';
 
 export interface ConversationMessage {
-  id: string;
+  messageId: string | null;
   role: 'customer' | 'agent' | 'system';
   content: string;
-  timestamp: number;
-  agentName?: string;
+  timestamp: string | null;
+  metadata?: Record<string, unknown> | null;
 }
 
 export interface InboxConversation {
-  id: string;
+  conversationId: string;
   customerId: string | null;
   customerName: string | null;
-  status: ConversationStatus;
+  status: string | null;
   assignedTo: string | null;
   messageCount: number;
-  lastMessageAt: string | null;
-  startedAt: string;
-  isEscalated: boolean;
+  turnCount: number;
+  startedAt: string | null;
+  endedAt: string | null;
+  lastActivityAt: string | null;
+  isBillable: boolean;
+  agentsInvoked: string[];
+  modelUsed: string | null;
+  criticPassed: boolean | null;
 }
 
 // ---------------------------------------------------------------------------
@@ -189,24 +194,40 @@ export interface KBArticle {
 // ---------------------------------------------------------------------------
 
 export interface AnalyticsSummary {
+  tenantId: string;
+  since: string;
+  until: string;
   totalConversations: number;
-  avgResponseTime: number;
-  resolutionRate: number;
-  escalationRate: number;
+  billableConversations: number;
+  avgTurns: number;
+  avgMessages: number;
+  avgResponseTime: number | null;
+  resolutionRate: number | null;
   customerSatisfaction: number | null;
-  period: string;
+  statusBreakdown: Array<{ status: string; count: number }>;
+  escalationCount: number;
+  escalationRate: number;
+  criticPassed: number;
+  criticFailed: number;
+  criticPassRate: number;
 }
 
 export interface IntentBreakdown {
-  intent: string;
-  count: number;
+  agent: string;
+  invocationCount: number;
   percentage: number;
 }
 
 export interface KnowledgeGap {
-  query: string;
-  frequency: number;
-  lastSeen: string;
+  conversationId: string;
+  status: string;
+  customerId: string | null;
+  turnCount: number;
+  messageCount: number;
+  agentsInvoked: string[];
+  criticPassed: boolean | null;
+  startedAt: string | null;
+  endedAt: string | null;
 }
 
 // ---------------------------------------------------------------------------
@@ -217,12 +238,16 @@ export type TeamRole = 'owner' | 'admin' | 'agent' | 'viewer';
 
 export interface TeamMember {
   id: string;
+  tenantId: string;
   email: string;
-  name: string;
-  role: TeamRole;
-  status: 'active' | 'invited' | 'disabled';
-  joinedAt: string | null;
-  lastActiveAt: string | null;
+  displayName: string;
+  role: string;
+  isActive: boolean;
+  maxConcurrentConversations: number;
+  createdAt: string;
+  updatedAt: string;
+  lastLoginAt: string | null;
+  invitedBy: string | null;
 }
 
 // ---------------------------------------------------------------------------

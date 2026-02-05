@@ -265,6 +265,7 @@ _STANDALONE_LOGIN_HTML = """<!DOCTYPE html>
 </head>
 <body>
 <div class="card">
+  <img src="data:image/svg+xml,%3Csvg viewBox='0 0 128 128' xmlns='http://www.w3.org/2000/svg'%3E%3Crect width='128' height='128' fill='%23ff3621' rx='0'/%3E%3Cg fill='%23fff' transform='translate(2,2) scale(0.97)'%3E%3Cpath d='M39.2 69.6V59.3c0-3.1-3.2-4-5.9-4.2v-6.8c2.8-.1 5.9-1 5.9-3.8V31c0-5.3 4.7-9.2 9.5-9.2h5.5v8h-3c-2.6 0-3.3 1.5-3.3 3.8v11.2c0 4.6-3.7 6.2-6.6 6.6v.1c2.3.4 6.5 1.6 6.6 6.9V69.3c0 2.3.6 3.8 3.3 3.8h3v8h-5.5c-4.8 0-9.5-3.8-9.5-9.1z'/%3E%3Cpath d='M56.4 34.2h9.5v5.8h.1c1.8-4.3 6-6.7 10.8-6.7 1.3 0 1.9.2 2.2.3v9.8c-.9-.3-2.1-.5-3.2-.5-5.9 0-9.4 3.8-9.4 9.1v16.7h-10V34.2z'/%3E%3Cpath d='M87.3 71.2h2.9c2.7 0 3.3-1.5 3.3-3.7V56.7c0-5.4 4.3-6.5 6.5-6.9v-.1c-2.9-.4-6.5-1.6-6.5-6.2V32.4c0-2.3-.6-3.8-3.3-3.8h-2.9v-8h5.6c4.8 0 9.5 3.9 9.5 9.2v13.3c0 2.8 3.2 3.7 5.9 3.8v6.8c-2.8.2-5.9 1.1-5.9 4.2V69.6c0 5.3-4.7 9.1-9.5 9.1H87.3z'/%3E%3C/g%3E%3C/svg%3E" alt="Agent Red" width="48" height="48" style="margin-bottom:16px;display:block;margin-left:auto;margin-right:auto" />
   <h1>Agent Red Admin Preview</h1>
   <p>Enter the preview password to continue.</p>
   <div class="error" id="err">Incorrect password. Please try again.</div>
@@ -342,9 +343,18 @@ if _admin_standalone_dist.is_dir():
 
     @app.get("/admin/standalone/{full_path:path}", include_in_schema=False)
     async def _admin_standalone_spa(request: Request, full_path: str) -> StarletteResponse:
-        """Catch-all route for the standalone admin SPA (password-gated)."""
+        """Catch-all route for the standalone admin SPA (password-gated).
+
+        If full_path matches a real file in dist/ (e.g. icon-master.svg),
+        serve that file directly.  Otherwise fall through to index.html
+        for SPA client-side routing.
+        """
         if not _check_preview_cookie(request):
             return HTMLResponse(content=_STANDALONE_LOGIN_HTML)
+        # Serve real static files (SVG, PNG, etc.) from dist root
+        candidate = _admin_standalone_dist / full_path
+        if candidate.is_file() and ".." not in full_path:
+            return FileResponse(str(candidate))
         return FileResponse(str(_admin_standalone_dist / "index.html"))
 
     logger.info(

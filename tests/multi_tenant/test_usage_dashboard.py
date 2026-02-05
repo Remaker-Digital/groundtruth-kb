@@ -220,9 +220,9 @@ class TestGetUsageDashboard:
         resp = dashboard_client.get("/api/dashboard/usage")
         assert resp.status_code == 200
         data = resp.json()
-        assert data["tenant_id"] == TENANT_ID
-        assert data["total_conversations"] == 150
-        assert data["included_allowance"] == 1000
+        assert data["tenantId"] == TENANT_ID
+        assert data["totalConversations"] == 150
+        assert data["includedAllowance"] == 1000
 
     def test_ud05_usage_with_billing_period(self, dashboard_client, mock_meter):
         """UD-05: GET /usage accepts billing_period query param."""
@@ -232,10 +232,13 @@ class TestGetUsageDashboard:
         call_kwargs = mock_meter.get_usage_dashboard.call_args[1]
         assert call_kwargs["billing_period"] == "2026-01"
 
-    def test_ud06_usage_503_when_unconfigured(self, unconfigured_client):
-        """UD-06: GET /usage returns 503 when services not initialized."""
+    def test_ud06_usage_fallback_when_unconfigured(self, unconfigured_client):
+        """UD-06: GET /usage returns zeroed fallback when services not initialized."""
         resp = unconfigured_client.get("/api/dashboard/usage")
-        assert resp.status_code == 503
+        assert resp.status_code == 200
+        data = resp.json()
+        assert data["totalConversations"] == 0
+        assert data["includedAllowance"] == 0
 
 
 # ---------------------------------------------------------------------------
@@ -250,8 +253,8 @@ class TestGetDailyVolume:
         resp = dashboard_client.get("/api/dashboard/usage/daily?billing_period=2026-01")
         assert resp.status_code == 200
         data = resp.json()
-        assert data["tenant_id"] == TENANT_ID
-        assert data["billing_period"] == "2026-01"
+        assert data["tenantId"] == TENANT_ID
+        assert data["billingPeriod"] == "2026-01"
         assert "days" in data
 
     def test_ud08_daily_volume_invalid_period(self, dashboard_client):
@@ -272,9 +275,9 @@ class TestListConversations:
         resp = dashboard_client.get("/api/dashboard/conversations?billing_period=2026-01")
         assert resp.status_code == 200
         data = resp.json()
-        assert data["tenant_id"] == TENANT_ID
+        assert data["tenantId"] == TENANT_ID
         assert "conversations" in data
-        assert data["total_count"] == 1
+        assert data["totalCount"] == 1
 
     def test_ud10_list_conversations_pagination(self, dashboard_client, mock_repo):
         """UD-10: Pagination params are passed correctly."""
@@ -306,8 +309,8 @@ class TestGetConversationDetail:
         resp = dashboard_client.get("/api/dashboard/conversations/conv-001")
         assert resp.status_code == 200
         data = resp.json()
-        assert data["conversation_id"] == "conv-001"
-        assert data["is_billable"] is True
+        assert data["conversationId"] == "conv-001"
+        assert data["isBillable"] is True
 
     def test_ud13_get_detail_not_found(self, dashboard_client, mock_meter):
         """UD-13: GET /conversations/{id} returns 404 on error."""
@@ -338,9 +341,10 @@ class TestExportCSV:
         assert len(lines) >= 2  # header + at least 1 data row
         assert "Conversation ID" in lines[0]
 
-    def test_ud15_export_csv_503_unconfigured(self, unconfigured_client):
-        """UD-15: CSV export returns 503 when services not initialized."""
+    def test_ud15_export_csv_empty_when_unconfigured(self, unconfigured_client):
+        """UD-15: CSV export returns empty CSV when services not initialized."""
         resp = unconfigured_client.get(
             "/api/dashboard/conversations/export?billing_period=2026-01"
         )
-        assert resp.status_code == 503
+        assert resp.status_code == 200
+        assert "text/csv" in resp.headers.get("content-type", "")

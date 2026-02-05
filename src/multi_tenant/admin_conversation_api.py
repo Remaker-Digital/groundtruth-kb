@@ -35,7 +35,8 @@ from datetime import datetime, timezone
 from typing import Any
 
 from fastapi import APIRouter, Depends, HTTPException, Query
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, ConfigDict, Field
+from pydantic.alias_generators import to_camel
 
 from src.multi_tenant.auth import TenantContext
 from src.multi_tenant.cosmos_schema import ConversationStatus
@@ -53,9 +54,12 @@ logger = logging.getLogger(__name__)
 class AdminConversationSummary(BaseModel):
     """Compact conversation record for the admin inbox list view."""
 
+    model_config = ConfigDict(alias_generator=to_camel, populate_by_name=True)
+
     conversation_id: str
     status: str | None = None
     customer_id: str | None = None
+    customer_name: str | None = None
     is_billable: bool = False
     message_count: int = 0
     turn_count: int = 0
@@ -71,6 +75,8 @@ class AdminConversationSummary(BaseModel):
 class AdminConversationListResponse(BaseModel):
     """Paginated list of conversations for the admin inbox."""
 
+    model_config = ConfigDict(alias_generator=to_camel, populate_by_name=True)
+
     tenant_id: str
     total_count: int = Field(description="Total matching conversations")
     offset: int
@@ -81,10 +87,13 @@ class AdminConversationListResponse(BaseModel):
 class AdminConversationDetailResponse(BaseModel):
     """Full conversation detail for the admin inbox."""
 
+    model_config = ConfigDict(alias_generator=to_camel, populate_by_name=True)
+
     conversation_id: str
     tenant_id: str
     status: str | None = None
     customer_id: str | None = None
+    customer_name: str | None = None
     is_billable: bool = False
     message_count: int = 0
     turn_count: int = 0
@@ -101,6 +110,8 @@ class AdminConversationDetailResponse(BaseModel):
 class MessageEntry(BaseModel):
     """A single message in the conversation transcript."""
 
+    model_config = ConfigDict(alias_generator=to_camel, populate_by_name=True)
+
     role: str
     content: str
     timestamp: str | None = None
@@ -111,6 +122,8 @@ class MessageEntry(BaseModel):
 class ConversationMessagesResponse(BaseModel):
     """Full message history for a conversation."""
 
+    model_config = ConfigDict(alias_generator=to_camel, populate_by_name=True)
+
     conversation_id: str
     tenant_id: str
     message_count: int
@@ -119,6 +132,8 @@ class ConversationMessagesResponse(BaseModel):
 
 class AssignAgentRequest(BaseModel):
     """Request body for POST /api/admin/conversations/{id}/assign."""
+
+    model_config = ConfigDict(alias_generator=to_camel, populate_by_name=True)
 
     agent_id: str = Field(
         min_length=1,
@@ -130,6 +145,8 @@ class AssignAgentRequest(BaseModel):
 class AssignAgentResponse(BaseModel):
     """Response for successful agent assignment."""
 
+    model_config = ConfigDict(alias_generator=to_camel, populate_by_name=True)
+
     conversation_id: str
     assigned_to: str
     assigned_at: str
@@ -137,6 +154,8 @@ class AssignAgentResponse(BaseModel):
 
 class AddNoteRequest(BaseModel):
     """Request body for POST /api/admin/conversations/{id}/notes."""
+
+    model_config = ConfigDict(alias_generator=to_camel, populate_by_name=True)
 
     content: str = Field(
         min_length=1,
@@ -152,6 +171,8 @@ class AddNoteRequest(BaseModel):
 
 class AddNoteResponse(BaseModel):
     """Response for successfully added note."""
+
+    model_config = ConfigDict(alias_generator=to_camel, populate_by_name=True)
 
     conversation_id: str
     note_id: str
@@ -185,6 +206,53 @@ def _get_repo() -> ConversationRepository:
             detail="Admin conversation services not initialised",
         )
     return _conversation_repo
+
+
+async def _read_conversation(
+    repo: ConversationRepository,
+    tenant_id: str,
+    conversation_id: str,
+) -> dict[str, Any]:
+    """Read a conversation by ID, falling back to a query if the point read fails.
+
+    Cosmos DB point reads require the document 'id' to match exactly.
+    Seeded conversations may use 'conversation_id' as their 'id', but
+    the frontend may pass either field. If the point read (by id) fails,
+    we fall back to a query on the 'conversation_id' field within the
+    tenant's partition.
+
+    Raises HTTPException 404 if not found via either method.
+    """
+    # Try point read first (fastest path)
+    try:
+        return await repo.read(tenant_id, conversation_id)
+    except DocumentNotFoundError:
+        pass
+
+    # Fallback: query by conversation_id field within tenant partition
+    try:
+        results = await repo.query(
+            tenant_id=tenant_id,
+            query_text=(
+                "SELECT * FROM c WHERE c.conversation_id = @conv_id"
+            ),
+            parameters=[
+                {"name": "@conv_id", "value": conversation_id},
+            ],
+        )
+        if results:
+            return results[0]
+    except Exception:
+        logger.warning(
+            "Conversation query fallback failed: tenant=%s conversation=%s",
+            tenant_id[:8],
+            conversation_id,
+        )
+
+    raise HTTPException(
+        status_code=404,
+        detail=f"Conversation {conversation_id} not found",
+    )
 
 
 # ---------------------------------------------------------------------------
@@ -270,6 +338,7 @@ async def list_conversations(
             conversation_id=c.get("conversation_id", c.get("id", "")),
             status=c.get("status"),
             customer_id=c.get("customer_id"),
+            customer_name=c.get("customer_name", c.get("customer_id")),
             is_billable=c.get("is_billable", False),
             message_count=c.get("message_count", 0),
             turn_count=c.get("turn_count", 0),
@@ -314,19 +383,14 @@ async def get_conversation_detail(
     """
     repo = _get_repo()
 
-    try:
-        doc = await repo.read(ctx.tenant_id, conversation_id)
-    except DocumentNotFoundError:
-        raise HTTPException(
-            status_code=404,
-            detail=f"Conversation {conversation_id} not found",
-        )
+    doc = await _read_conversation(repo, ctx.tenant_id, conversation_id)
 
     return AdminConversationDetailResponse(
         conversation_id=doc.get("conversation_id", doc.get("id", "")),
         tenant_id=ctx.tenant_id,
         status=doc.get("status"),
         customer_id=doc.get("customer_id"),
+        customer_name=doc.get("customer_name", doc.get("customer_id")),
         is_billable=doc.get("is_billable", False),
         message_count=doc.get("message_count", 0),
         turn_count=doc.get("turn_count", 0),
@@ -361,13 +425,7 @@ async def get_conversation_messages(
     """
     repo = _get_repo()
 
-    try:
-        doc = await repo.read(ctx.tenant_id, conversation_id)
-    except DocumentNotFoundError:
-        raise HTTPException(
-            status_code=404,
-            detail=f"Conversation {conversation_id} not found",
-        )
+    doc = await _read_conversation(repo, ctx.tenant_id, conversation_id)
 
     raw_messages = doc.get("messages", [])
     messages = [

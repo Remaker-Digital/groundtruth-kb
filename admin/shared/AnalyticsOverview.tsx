@@ -235,7 +235,7 @@ interface IntentBarChartProps {
 const IntentBarChart: React.FC<IntentBarChartProps> = ({ intents }) => {
   const maxCount = useMemo(() => {
     if (intents.length === 0) return 1;
-    return Math.max(...intents.map((i) => i.count), 1);
+    return Math.max(...intents.map((i) => i.invocationCount ?? 0), 1);
   }, [intents]);
 
   if (intents.length === 0) {
@@ -251,11 +251,11 @@ const IntentBarChart: React.FC<IntentBarChartProps> = ({ intents }) => {
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
       {intents.map((intent, idx) => {
-        const barWidth = Math.max((intent.count / maxCount) * 100, 2);
+        const barWidth = Math.max(((intent.invocationCount ?? 0) / maxCount) * 100, 2);
         const color = BAR_COLORS[idx % BAR_COLORS.length];
 
         return (
-          <div key={intent.intent} style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
+          <div key={intent.agent} style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
             {/* Label */}
             <div
               style={{
@@ -268,9 +268,9 @@ const IntentBarChart: React.FC<IntentBarChartProps> = ({ intents }) => {
                 textOverflow: 'ellipsis',
                 whiteSpace: 'nowrap',
               }}
-              title={intent.intent}
+              title={intent.agent}
             >
-              {intent.intent}
+              {intent.agent}
             </div>
 
             {/* Bar */}
@@ -306,9 +306,9 @@ const IntentBarChart: React.FC<IntentBarChartProps> = ({ intents }) => {
                   flexShrink: 0,
                 }}
               >
-                {formatNumber(intent.count)}{' '}
+                {formatNumber(intent.invocationCount)}{' '}
                 <span style={{ fontSize: '11px', color: COLOR_GRAY }}>
-                  ({formatPercent(intent.percentage)})
+                  ({(intent.percentage ?? 0).toFixed(1)}%)
                 </span>
               </div>
             </div>
@@ -338,61 +338,33 @@ const KnowledgeGapsTable: React.FC<KnowledgeGapsTableProps> = ({ gaps }) => {
     );
   }
 
+  const thStyle: React.CSSProperties = {
+    padding: '10px 16px',
+    textAlign: 'left',
+    fontSize: '12px',
+    fontWeight: 600,
+    color: COLOR_TEXT_SECONDARY,
+    borderBottom: `1px solid ${COLOR_BORDER}`,
+    textTransform: 'uppercase',
+    letterSpacing: '0.5px',
+  };
+
   return (
     <div style={{ overflowX: 'auto' }}>
       <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '14px' }}>
         <thead>
           <tr style={{ backgroundColor: COLOR_LIGHT_GRAY }}>
-            <th
-              style={{
-                padding: '10px 16px',
-                textAlign: 'left',
-                fontSize: '12px',
-                fontWeight: 600,
-                color: COLOR_TEXT_SECONDARY,
-                borderBottom: `1px solid ${COLOR_BORDER}`,
-                textTransform: 'uppercase',
-                letterSpacing: '0.5px',
-              }}
-            >
-              Unresolved Query
-            </th>
-            <th
-              style={{
-                padding: '10px 16px',
-                textAlign: 'right',
-                fontSize: '12px',
-                fontWeight: 600,
-                color: COLOR_TEXT_SECONDARY,
-                borderBottom: `1px solid ${COLOR_BORDER}`,
-                textTransform: 'uppercase',
-                letterSpacing: '0.5px',
-                width: '100px',
-              }}
-            >
-              Frequency
-            </th>
-            <th
-              style={{
-                padding: '10px 16px',
-                textAlign: 'right',
-                fontSize: '12px',
-                fontWeight: 600,
-                color: COLOR_TEXT_SECONDARY,
-                borderBottom: `1px solid ${COLOR_BORDER}`,
-                textTransform: 'uppercase',
-                letterSpacing: '0.5px',
-                width: '120px',
-              }}
-            >
-              Last Seen
-            </th>
+            <th style={thStyle}>Conversation</th>
+            <th style={{ ...thStyle, width: '100px' }}>Status</th>
+            <th style={{ ...thStyle, width: '80px', textAlign: 'right' }}>Turns</th>
+            <th style={{ ...thStyle, width: '80px', textAlign: 'right' }}>Messages</th>
+            <th style={{ ...thStyle, width: '120px', textAlign: 'right' }}>Started</th>
           </tr>
         </thead>
         <tbody>
           {gaps.map((gap, idx) => (
             <tr
-              key={`${gap.query}-${idx}`}
+              key={`${gap.conversationId}-${idx}`}
               style={{ backgroundColor: idx % 2 === 0 ? COLOR_WHITE : COLOR_LIGHT_GRAY }}
             >
               <td
@@ -403,7 +375,21 @@ const KnowledgeGapsTable: React.FC<KnowledgeGapsTableProps> = ({ gaps }) => {
                   fontSize: '13px',
                 }}
               >
-                {gap.query}
+                <div>{gap.conversationId}</div>
+                {gap.customerId && (
+                  <div style={{ fontSize: '11px', color: COLOR_TEXT_SECONDARY }}>{gap.customerId}</div>
+                )}
+              </td>
+              <td
+                style={{
+                  padding: '10px 16px',
+                  borderBottom: `1px solid ${COLOR_BORDER}`,
+                  fontSize: '12px',
+                  color: gap.status === 'escalated' ? COLOR_DANGER : COLOR_TEXT,
+                  fontWeight: gap.status === 'escalated' ? 600 : 400,
+                }}
+              >
+                {gap.status ?? 'unknown'}
               </td>
               <td
                 style={{
@@ -412,11 +398,20 @@ const KnowledgeGapsTable: React.FC<KnowledgeGapsTableProps> = ({ gaps }) => {
                   textAlign: 'right',
                   fontFamily: FONT_MONO,
                   fontSize: '13px',
-                  color: gap.frequency >= 10 ? COLOR_DANGER : gap.frequency >= 5 ? COLOR_WARNING : COLOR_TEXT,
-                  fontWeight: gap.frequency >= 10 ? 600 : 400,
                 }}
               >
-                {gap.frequency}
+                {gap.turnCount ?? 0}
+              </td>
+              <td
+                style={{
+                  padding: '10px 16px',
+                  borderBottom: `1px solid ${COLOR_BORDER}`,
+                  textAlign: 'right',
+                  fontFamily: FONT_MONO,
+                  fontSize: '13px',
+                }}
+              >
+                {gap.messageCount ?? 0}
               </td>
               <td
                 style={{
@@ -427,7 +422,7 @@ const KnowledgeGapsTable: React.FC<KnowledgeGapsTableProps> = ({ gaps }) => {
                   color: COLOR_TEXT_SECONDARY,
                 }}
               >
-                {formatRelativeDate(gap.lastSeen)}
+                {gap.startedAt ? formatRelativeDate(gap.startedAt) : '--'}
               </td>
             </tr>
           ))}
@@ -528,9 +523,9 @@ export const AnalyticsOverview: React.FC<BaseComponentProps> = ({
           <h2 style={{ margin: 0, fontSize: '18px', fontWeight: 600, color: COLOR_TEXT }}>
             Analytics Overview
           </h2>
-          {summary?.period && (
+          {summary?.since && summary?.until && (
             <span style={{ fontSize: '13px', color: COLOR_TEXT_SECONDARY }}>
-              Period: {summary.period}
+              {formatDate(summary.since)} &ndash; {formatDate(summary.until)}
             </span>
           )}
         </div>
@@ -579,13 +574,13 @@ export const AnalyticsOverview: React.FC<BaseComponentProps> = ({
             <SummaryCard
               label="Avg Response Time"
               value={formatMs(summary.avgResponseTime)}
-              subtext={summary.avgResponseTime <= 2000 ? 'Within SLA' : 'Above P95 target'}
-              accentColor={summary.avgResponseTime <= 2000 ? COLOR_SUCCESS : COLOR_WARNING}
+              subtext={summary.avgResponseTime != null ? (summary.avgResponseTime <= 2000 ? 'Within SLA' : 'Above P95 target') : undefined}
+              accentColor={summary.avgResponseTime != null ? (summary.avgResponseTime <= 2000 ? COLOR_SUCCESS : COLOR_WARNING) : COLOR_GRAY}
             />
             <SummaryCard
               label="Resolution Rate"
               value={formatPercent(summary.resolutionRate)}
-              accentColor={summary.resolutionRate >= 0.8 ? COLOR_SUCCESS : COLOR_WARNING}
+              accentColor={summary.resolutionRate != null ? (summary.resolutionRate >= 0.8 ? COLOR_SUCCESS : COLOR_WARNING) : COLOR_GRAY}
             />
             <SummaryCard
               label="Escalation Rate"

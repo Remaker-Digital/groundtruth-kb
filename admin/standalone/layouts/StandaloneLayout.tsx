@@ -1,18 +1,38 @@
 /**
- * StandaloneLayout — custom layout with sidebar navigation.
+ * StandaloneLayout — Mantine AppShell with sidebar navigation.
  *
- * Provides:
- *   - Agent Red branded sidebar with navigation links
- *   - Authenticated apiFetch via API key header
- *   - TenantContext resolution from API key
- *   - Notification banner system
+ * Merges prototype StandaloneApp visual layout with production AppContext:
+ *   - Mantine AppShell (260px navbar, 56px header)
+ *   - 9 SVG nav icons, dark mode toggle, brand logo + wordmark
+ *   - Remaker Digital footer with version
+ *   - AppContext.Provider with apiFetch (X-API-Key injection)
+ *   - Tenant context resolution from API key
+ *   - Mantine notifications.show() instead of banner notifications
+ *
+ * Four-tier dark mode hierarchy (designer-approved):
+ *   chrome #0a0a0a → page #141414 → surface #1f1f1f → border #272727
  *
  * © 2026 Remaker Digital, a DBA of VanDusen & Palmeter, LLC. All rights reserved.
  */
 
 import React, { createContext, useCallback, useContext, useEffect, useState } from 'react';
-import { useNavigate, useLocation, Link } from 'react-router-dom';
-import type { TenantContext } from '../../shared/types';
+import { useNavigate, useLocation } from 'react-router-dom';
+import {
+  AppShell,
+  NavLink,
+  Group,
+  Text,
+  ThemeIcon,
+  Badge,
+  Box,
+  Burger,
+  Tooltip,
+  ActionIcon,
+  useMantineColorScheme,
+  useComputedColorScheme,
+} from '@mantine/core';
+import { useDisclosure } from '@mantine/hooks';
+import { notifications } from '@mantine/notifications';
 
 // ---------------------------------------------------------------------------
 // Types
@@ -22,6 +42,13 @@ interface StandaloneLayoutProps {
   apiKey: string;
   onLogout: () => void;
   children: React.ReactNode;
+}
+
+interface TenantContext {
+  tenantId: string;
+  tier: string;
+  status: string;
+  billingChannel: string;
 }
 
 interface AppContextValue {
@@ -49,17 +76,72 @@ export function useAppContext(): AppContextValue {
 
 const API_BASE_URL = import.meta.env?.VITE_API_URL || '';
 
-const BRAND_COLOR = '#C41E2A';
-const SIDEBAR_WIDTH = 240;
+// SVG Icons — from prototype StandaloneApp.tsx
+const Icons = {
+  dashboard: () => (
+    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+      <rect x="3" y="3" width="7" height="7" /><rect x="14" y="3" width="7" height="7" /><rect x="3" y="14" width="7" height="7" /><rect x="14" y="14" width="7" height="7" />
+    </svg>
+  ),
+  inbox: () => (
+    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+      <path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z" />
+    </svg>
+  ),
+  knowledge: () => (
+    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+      <path d="M4 19.5A2.5 2.5 0 0 1 6.5 17H20" /><path d="M6.5 2H20v20H6.5A2.5 2.5 0 0 1 4 19.5v-15A2.5 2.5 0 0 1 6.5 2z" />
+    </svg>
+  ),
+  analytics: () => (
+    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+      <line x1="18" y1="20" x2="18" y2="10" /><line x1="12" y1="20" x2="12" y2="4" /><line x1="6" y1="20" x2="6" y2="14" />
+    </svg>
+  ),
+  config: () => (
+    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+      <circle cx="12" cy="12" r="3" /><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1 0 2.83 2 2 0 0 1-2.83 0l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-2 2 2 2 0 0 1-2-2v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83 0 2 2 0 0 1 0-2.83l.06-.06A1.65 1.65 0 0 0 4.68 15a1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1-2-2 2 2 0 0 1 2-2h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 0-2.83 2 2 0 0 1 2.83 0l.06.06A1.65 1.65 0 0 0 9 4.68a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 2-2 2 2 0 0 1 2 2v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 0 2 2 0 0 1 0 2.83l-.06.06A1.65 1.65 0 0 0 19.4 9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 2 2 2 2 0 0 1-2 2h-.09a1.65 1.65 0 0 0-1.51 1z" />
+    </svg>
+  ),
+  widget: () => (
+    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+      <rect x="2" y="3" width="20" height="14" rx="2" ry="2" /><line x1="8" y1="21" x2="16" y2="21" /><line x1="12" y1="17" x2="12" y2="21" />
+    </svg>
+  ),
+  billing: () => (
+    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+      <rect x="1" y="4" width="22" height="16" rx="2" ry="2" /><line x1="1" y1="10" x2="23" y2="10" />
+    </svg>
+  ),
+  team: () => (
+    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+      <path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2" /><circle cx="9" cy="7" r="4" /><path d="M23 21v-2a4 4 0 0 0-3-3.87" /><path d="M16 3.13a4 4 0 0 1 0 7.75" />
+    </svg>
+  ),
+  onboarding: () => (
+    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+      <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z" /><polyline points="14 2 14 8 20 8" /><line x1="16" y1="13" x2="8" y2="13" /><line x1="16" y1="17" x2="8" y2="17" /><polyline points="10 9 9 9 8 9" />
+    </svg>
+  ),
+};
 
-const NAV_ITEMS = [
-  { path: '/', label: 'Dashboard', icon: '\u{1F4CA}' },
-  { path: '/inbox', label: 'Inbox', icon: '\u{1F4E8}' },
-  { path: '/configuration', label: 'Configuration', icon: '\u{2699}\u{FE0F}' },
-  { path: '/knowledge-base', label: 'Knowledge Base', icon: '\u{1F4DA}' },
-  { path: '/widget', label: 'Widget', icon: '\u{1F4AC}' },
-  { path: '/billing', label: 'Billing', icon: '\u{1F4B3}' },
-  { path: '/settings', label: 'Settings', icon: '\u{1F527}' },
+type NavPage = {
+  path: string;
+  label: string;
+  icon: keyof typeof Icons;
+  badge?: number;
+};
+
+const navItems: NavPage[] = [
+  { path: '/', label: 'Dashboard', icon: 'dashboard' },
+  { path: '/inbox', label: 'Inbox', icon: 'inbox' },
+  { path: '/knowledge-base', label: 'Knowledge Base', icon: 'knowledge' },
+  { path: '/analytics', label: 'Analytics', icon: 'analytics' },
+  { path: '/configuration', label: 'Configuration', icon: 'config' },
+  { path: '/widget', label: 'Widget', icon: 'widget' },
+  { path: '/team', label: 'Team', icon: 'team' },
+  { path: '/billing', label: 'Billing', icon: 'billing' },
+  { path: '/onboarding', label: 'Setup Wizard', icon: 'onboarding' },
 ];
 
 // ---------------------------------------------------------------------------
@@ -72,13 +154,15 @@ export const StandaloneLayout: React.FC<StandaloneLayoutProps> = ({
   children,
 }) => {
   const location = useLocation();
+  const navigate = useNavigate();
+  const [opened, { toggle }] = useDisclosure();
+  const { setColorScheme } = useMantineColorScheme();
+  const computedColorScheme = useComputedColorScheme('dark');
+  const isDark = computedColorScheme === 'dark';
+
   const [tenantContext, setTenantContext] = useState<TenantContext | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
-  const [notification, setNotification] = useState<{
-    message: string;
-    type: 'success' | 'error' | 'warning' | 'info';
-  } | null>(null);
 
   // ---- Authenticated fetch -----------------------------------------------
 
@@ -95,12 +179,21 @@ export const StandaloneLayout: React.FC<StandaloneLayoutProps> = ({
     [apiKey],
   );
 
-  // ---- Notification handler ----------------------------------------------
+  // ---- Notification handler (Mantine notifications) ----------------------
 
   const onNotify = useCallback(
     (message: string, type: 'success' | 'error' | 'warning' | 'info') => {
-      setNotification({ message, type });
-      setTimeout(() => setNotification(null), 5000);
+      const colorMap: Record<string, string> = {
+        success: 'green',
+        error: 'red',
+        warning: 'yellow',
+        info: 'blue',
+      };
+      notifications.show({
+        message,
+        color: colorMap[type] || 'blue',
+        autoClose: 5000,
+      });
     },
     [],
   );
@@ -126,7 +219,7 @@ export const StandaloneLayout: React.FC<StandaloneLayoutProps> = ({
             tenantId: data.tenant_id,
             tier: data.tier,
             status: data.status,
-            billingChannel: 'stripe',
+            billingChannel: data.billing_channel || 'stripe',
           });
           setLoading(false);
         }
@@ -142,16 +235,7 @@ export const StandaloneLayout: React.FC<StandaloneLayoutProps> = ({
     return () => { cancelled = true; };
   }, [apiFetch, onLogout]);
 
-  // ---- Notification colors -----------------------------------------------
-
-  const notifColors: Record<string, { bg: string; border: string; text: string }> = {
-    success: { bg: '#f1f8f5', border: '#2e7d32', text: '#1b5e20' },
-    error: { bg: '#fef2f2', border: '#d72c0d', text: '#c62828' },
-    warning: { bg: '#fffbeb', border: '#f59e0b', text: '#92400e' },
-    info: { bg: '#eff6ff', border: '#3b82f6', text: '#1e40af' },
-  };
-
-  // ---- Render ------------------------------------------------------------
+  // ---- Context value -----------------------------------------------------
 
   const contextValue: AppContextValue = {
     tenantContext,
@@ -160,163 +244,187 @@ export const StandaloneLayout: React.FC<StandaloneLayoutProps> = ({
     loading,
   };
 
+  // ---- Render ------------------------------------------------------------
+
   return (
     <AppContext.Provider value={contextValue}>
-      <div style={{ display: 'flex', minHeight: '100vh', fontFamily: '-apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif' }}>
-        {/* Sidebar */}
-        <aside
-          style={{
-            width: `${SIDEBAR_WIDTH}px`,
-            backgroundColor: '#1a1a2e',
-            color: '#ffffff',
-            display: 'flex',
-            flexDirection: 'column',
-            flexShrink: 0,
-          }}
-        >
-          {/* Brand */}
-          <div style={{ padding: '20px 16px', borderBottom: '1px solid rgba(255,255,255,0.1)' }}>
-            <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
-              <div
+      <AppShell
+        header={{ height: 56 }}
+        navbar={{ width: 260, breakpoint: 'sm', collapsed: { mobile: !opened } }}
+        padding="md"
+        styles={{
+          header: {
+            borderBottom: isDark ? '1px solid #272727' : '1px solid #1E1E1E',
+            background: '#0a0a0a',
+          },
+          navbar: {
+            borderRight: isDark ? '1px solid #272727' : undefined,
+            background: isDark ? '#0a0a0a' : undefined,
+          },
+          main: {
+            background: isDark ? '#141414' : undefined,
+          },
+        }}
+      >
+        {/* ---- Header ---- */}
+        <AppShell.Header>
+          <Group h="100%" px="md" justify="space-between">
+            <Group>
+              <Burger opened={opened} onClick={toggle} hiddenFrom="sm" size="sm" />
+              <Tooltip label="Agent Red Customer Experience" position="bottom" openDelay={500}>
+                <Group gap={10} align="center" style={{ cursor: 'default' }}>
+                  <img
+                    src="/admin/standalone/primary-logo-no-wordmark.svg"
+                    alt="Agent Red"
+                    style={{ height: 30, display: 'block' }}
+                  />
+                  <Text
+                    size="sm"
+                    fw={500}
+                    c="gray.4"
+                    style={{ letterSpacing: '0.02em', userSelect: 'none' }}
+                  >
+                    Customer Experience
+                  </Text>
+                </Group>
+              </Tooltip>
+            </Group>
+            <Group gap="xs">
+              {tenantContext && (
+                <Badge variant="light" color="green" size="sm" tt="capitalize">
+                  {tenantContext.tier}
+                </Badge>
+              )}
+              {/* Dark mode toggle */}
+              <ActionIcon
+                variant="subtle"
+                size="md"
+                onClick={() => setColorScheme(isDark ? 'light' : 'dark')}
+                aria-label="Toggle dark mode"
                 style={{
-                  width: '32px',
-                  height: '32px',
-                  borderRadius: '8px',
-                  backgroundColor: BRAND_COLOR,
-                  display: 'flex',
-                  alignItems: 'center',
-                  justifyContent: 'center',
-                  fontSize: '14px',
-                  fontWeight: 700,
+                  color: '#A0A0A0',
+                  border: '1px solid rgba(255, 255, 255, 0.12)',
+                  background: 'rgba(255, 255, 255, 0.06)',
                 }}
               >
-                AR
-              </div>
-              <div>
-                <div style={{ fontSize: '14px', fontWeight: 600 }}>Agent Red</div>
-                <div style={{ fontSize: '11px', opacity: 0.6 }}>Customer Experience</div>
-              </div>
-            </div>
-          </div>
+                {isDark ? (
+                  <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                    <circle cx="12" cy="12" r="5" /><line x1="12" y1="1" x2="12" y2="3" /><line x1="12" y1="21" x2="12" y2="23" /><line x1="4.22" y1="4.22" x2="5.64" y2="5.64" /><line x1="18.36" y1="18.36" x2="19.78" y2="19.78" /><line x1="1" y1="12" x2="3" y2="12" /><line x1="21" y1="12" x2="23" y2="12" /><line x1="4.22" y1="19.78" x2="5.64" y2="18.36" /><line x1="18.36" y1="5.64" x2="19.78" y2="4.22" />
+                  </svg>
+                ) : (
+                  <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                    <path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z" />
+                  </svg>
+                )}
+              </ActionIcon>
+              {/* Sign Out */}
+              <ActionIcon
+                variant="subtle"
+                size="md"
+                onClick={onLogout}
+                aria-label="Sign out"
+                style={{
+                  color: '#A0A0A0',
+                  border: '1px solid rgba(255, 255, 255, 0.12)',
+                  background: 'rgba(255, 255, 255, 0.06)',
+                }}
+              >
+                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                  <path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4" /><polyline points="16 17 21 12 16 7" /><line x1="21" y1="12" x2="9" y2="12" />
+                </svg>
+              </ActionIcon>
+            </Group>
+          </Group>
+        </AppShell.Header>
 
-          {/* Nav Links */}
-          <nav style={{ flex: 1, padding: '8px 0' }}>
-            {NAV_ITEMS.map((item) => {
-              const isActive = location.pathname === item.path;
+        {/* ---- Navbar ---- */}
+        <AppShell.Navbar p="xs">
+          <AppShell.Section grow>
+            {navItems.map((item) => {
+              const IconComponent = Icons[item.icon];
+              const isActive = location.pathname === item.path
+                || (item.path !== '/' && location.pathname.startsWith(item.path));
+
               return (
-                <Link
+                <NavLink
                   key={item.path}
-                  to={item.path}
-                  style={{
-                    display: 'flex',
-                    alignItems: 'center',
-                    gap: '10px',
-                    padding: '10px 16px',
-                    fontSize: '14px',
-                    color: isActive ? '#ffffff' : 'rgba(255,255,255,0.7)',
-                    backgroundColor: isActive ? 'rgba(255,255,255,0.1)' : 'transparent',
-                    textDecoration: 'none',
-                    borderLeft: isActive ? `3px solid ${BRAND_COLOR}` : '3px solid transparent',
-                    transition: 'all 0.15s',
+                  label={item.label}
+                  leftSection={
+                    <ThemeIcon
+                      variant={isActive ? 'filled' : isDark ? 'default' : 'light'}
+                      size="sm"
+                      color={isActive ? 'brand' : 'gray'}
+                      style={!isActive && isDark ? { background: 'transparent', border: 'none' } : undefined}
+                    >
+                      <IconComponent />
+                    </ThemeIcon>
+                  }
+                  rightSection={
+                    item.badge ? (
+                      <Badge size="xs" variant="filled" color="brand" circle>
+                        {item.badge}
+                      </Badge>
+                    ) : undefined
+                  }
+                  active={isActive}
+                  onClick={() => navigate(item.path)}
+                  styles={{
+                    label: isActive && isDark ? { color: '#F5F5F5' } : undefined,
                   }}
-                >
-                  <span style={{ fontSize: '16px', width: '20px', textAlign: 'center' }}>
-                    {item.icon}
-                  </span>
-                  {item.label}
-                </Link>
+                  style={{
+                    borderRadius: 8,
+                    marginBottom: 2,
+                    ...(isActive && isDark ? { background: '#1f1f1f', border: '1px solid #272727' } : {}),
+                  }}
+                />
               );
             })}
-          </nav>
+          </AppShell.Section>
 
-          {/* Tier badge + Logout */}
-          <div style={{ padding: '16px', borderTop: '1px solid rgba(255,255,255,0.1)' }}>
-            {tenantContext && (
-              <div
-                style={{
-                  fontSize: '11px',
-                  textTransform: 'uppercase',
-                  letterSpacing: '0.05em',
-                  opacity: 0.6,
-                  marginBottom: '12px',
-                }}
-              >
-                {tenantContext.tier} tier
-              </div>
-            )}
-            <button
-              onClick={onLogout}
-              style={{
-                width: '100%',
-                padding: '8px',
-                backgroundColor: 'rgba(255,255,255,0.1)',
-                color: 'rgba(255,255,255,0.8)',
-                border: 'none',
-                borderRadius: '4px',
-                fontSize: '13px',
-                cursor: 'pointer',
-              }}
-            >
-              Sign Out
-            </button>
-          </div>
-        </aside>
+          {/* Footer with Remaker Digital branding */}
+          <AppShell.Section>
+            <Box p="xs" style={{ borderTop: isDark ? '1px solid #272727' : '1px solid var(--mantine-color-gray-2)' }}>
+              <Group gap={8} justify="center" mb={4}>
+                <img
+                  src="/admin/standalone/remaker-digital-logo.svg"
+                  alt="Remaker Digital"
+                  style={{ height: 22, display: 'block' }}
+                />
+              </Group>
+              <Text size="xs" c="dimmed" ta="center" lh={1.3}>
+                Agent Red Customer Experience
+              </Text>
+              <Text size="xs" c="dimmed" ta="center" lh={1.3}>
+                v1.0.0
+              </Text>
+              <Text size="xs" c="dimmed" ta="center" lh={1.4} mt={4} style={{ opacity: 0.7, fontSize: 10 }}>
+                Brought to you by remakerdigital.com
+              </Text>
+              <Text size="xs" c="dimmed" ta="center" lh={1.4} style={{ opacity: 0.7, fontSize: 10 }}>
+                {String.fromCodePoint(0x00A9)} 2026 Remaker Digital, a DBA of
+              </Text>
+              <Text size="xs" c="dimmed" ta="center" lh={1.4} style={{ opacity: 0.7, fontSize: 10 }}>
+                VanDusen & Palmeter, LLC. All rights reserved.
+              </Text>
+            </Box>
+          </AppShell.Section>
+        </AppShell.Navbar>
 
-        {/* Main content */}
-        <main style={{ flex: 1, backgroundColor: '#f6f6f7', overflow: 'auto' }}>
-          {/* Notification banner */}
-          {notification && (
-            <div
-              style={{
-                padding: '12px 20px',
-                backgroundColor: notifColors[notification.type].bg,
-                borderBottom: `2px solid ${notifColors[notification.type].border}`,
-                color: notifColors[notification.type].text,
-                fontSize: '14px',
-                display: 'flex',
-                justifyContent: 'space-between',
-                alignItems: 'center',
-              }}
-            >
-              <span>{notification.message}</span>
-              <button
-                onClick={() => setNotification(null)}
-                style={{
-                  background: 'none',
-                  border: 'none',
-                  fontSize: '16px',
-                  cursor: 'pointer',
-                  color: 'inherit',
-                  padding: '0 4px',
-                }}
-              >
-                x
-              </button>
-            </div>
-          )}
-
-          {/* Error state */}
+        {/* ---- Main content ---- */}
+        <AppShell.Main>
           {error && (
-            <div style={{ padding: '20px', color: '#d72c0d' }}>
+            <Box p="md" c="red">
               Failed to load: {error}
-            </div>
+            </Box>
           )}
-
-          {/* Loading state */}
           {loading && (
-            <div style={{ padding: '40px', textAlign: 'center', color: '#8c9196' }}>
+            <Box p="xl" ta="center" c="dimmed">
               Loading...
-            </div>
+            </Box>
           )}
-
-          {/* Page content */}
-          {!loading && !error && (
-            <div style={{ padding: '24px' }}>
-              {children}
-            </div>
-          )}
-        </main>
-      </div>
+          {!loading && !error && children}
+        </AppShell.Main>
+      </AppShell>
     </AppContext.Provider>
   );
 };

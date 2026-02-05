@@ -35,7 +35,8 @@ from datetime import datetime, timezone
 from typing import Any
 
 from fastapi import APIRouter, Depends, HTTPException, Query
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, ConfigDict, Field
+from pydantic.alias_generators import to_camel
 
 from src.multi_tenant.auth import TenantContext
 from src.multi_tenant.middleware import get_tenant_context
@@ -59,6 +60,8 @@ VALID_ENTRY_TYPES = {"product", "faq", "policy", "custom"}
 class KnowledgeEntryResponse(BaseModel):
     """A single knowledge base entry."""
 
+    model_config = ConfigDict(alias_generator=to_camel, populate_by_name=True)
+
     id: str
     tenant_id: str
     entry_type: str
@@ -75,15 +78,19 @@ class KnowledgeEntryResponse(BaseModel):
 class KnowledgeListResponse(BaseModel):
     """Paginated list of knowledge base entries."""
 
+    model_config = ConfigDict(alias_generator=to_camel, populate_by_name=True)
+
     tenant_id: str
     total_count: int = Field(description="Total matching entries")
     offset: int
     limit: int
-    entries: list[KnowledgeEntryResponse]
+    articles: list[KnowledgeEntryResponse]
 
 
 class CreateKnowledgeEntryRequest(BaseModel):
     """Request body for POST /api/admin/knowledge."""
+
+    model_config = ConfigDict(alias_generator=to_camel, populate_by_name=True)
 
     entry_type: str = Field(
         description="Entry type: product, faq, policy, or custom",
@@ -115,6 +122,8 @@ class CreateKnowledgeEntryRequest(BaseModel):
 
 class UpdateKnowledgeEntryRequest(BaseModel):
     """Request body for PUT /api/admin/knowledge/{id}."""
+
+    model_config = ConfigDict(alias_generator=to_camel, populate_by_name=True)
 
     entry_type: str | None = Field(
         default=None,
@@ -153,6 +162,8 @@ class UpdateKnowledgeEntryRequest(BaseModel):
 
 class DeleteKnowledgeEntryResponse(BaseModel):
     """Response for successful soft-delete."""
+
+    model_config = ConfigDict(alias_generator=to_camel, populate_by_name=True)
 
     id: str
     deleted_at: str
@@ -276,7 +287,7 @@ async def list_knowledge_entries(
         total_count=total_count,
         offset=offset,
         limit=limit,
-        entries=entries,
+        articles=entries,
     )
 
 

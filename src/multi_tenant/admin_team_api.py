@@ -34,7 +34,8 @@ from datetime import datetime, timezone
 from typing import Any
 
 from fastapi import APIRouter, Depends, HTTPException, Query
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, ConfigDict, Field
+from pydantic.alias_generators import to_camel
 
 from src.multi_tenant.auth import TenantContext
 from src.multi_tenant.middleware import get_tenant_context
@@ -58,6 +59,8 @@ VALID_ROLES = {"owner", "admin", "agent", "viewer"}
 class TeamMemberResponse(BaseModel):
     """A single team member."""
 
+    model_config = ConfigDict(alias_generator=to_camel, populate_by_name=True)
+
     id: str
     tenant_id: str
     email: str
@@ -74,6 +77,8 @@ class TeamMemberResponse(BaseModel):
 class TeamListResponse(BaseModel):
     """Paginated list of team members."""
 
+    model_config = ConfigDict(alias_generator=to_camel, populate_by_name=True)
+
     tenant_id: str
     total_count: int = Field(description="Total matching members")
     offset: int
@@ -83,6 +88,8 @@ class TeamListResponse(BaseModel):
 
 class CreateTeamMemberRequest(BaseModel):
     """Request body for POST /api/team."""
+
+    model_config = ConfigDict(alias_generator=to_camel, populate_by_name=True)
 
     email: str = Field(
         min_length=3,
@@ -108,6 +115,8 @@ class CreateTeamMemberRequest(BaseModel):
 class UpdateTeamMemberRequest(BaseModel):
     """Request body for PUT /api/team/{member_id}."""
 
+    model_config = ConfigDict(alias_generator=to_camel, populate_by_name=True)
+
     display_name: str | None = Field(
         default=None,
         min_length=1,
@@ -132,6 +141,8 @@ class UpdateTeamMemberRequest(BaseModel):
 
 class DeactivateTeamMemberResponse(BaseModel):
     """Response for successful deactivation."""
+
+    model_config = ConfigDict(alias_generator=to_camel, populate_by_name=True)
 
     id: str
     deactivated_at: str
@@ -170,7 +181,7 @@ def _get_repo() -> TeamMemberRepository:
 # Router
 # ---------------------------------------------------------------------------
 
-router = APIRouter(prefix="/api/team", tags=["admin-team"])
+router = APIRouter(prefix="/api/admin/team", tags=["admin-team"])
 
 
 # ---------------------------------------------------------------------------
