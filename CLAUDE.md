@@ -1886,6 +1886,49 @@ Three major deliverables completed across two continued sessions.
 - scripts/provision_tenant_one.py — Field name fix
 - prototype/public/ — All favicon/icon PNGs + logo SVGs replaced
 
+**Session 2026-02-05: RAG Infrastructure Gap Analysis**
+
+Comprehensive RAG infrastructure audit revealing critical gap: Merchant Knowledge Base uses basic CRUD with keyword search only, while Persistent Customer Memory (Layer 2) correctly implements vector embeddings. Full competitive research and 17 new work items identified.
+
+- [x] **Admin page verification COMPLETE** — All 9 standalone admin pages verified working with real API data: Dashboard, Inbox, Knowledge Base, Analytics, Configuration, Widget, Team, Billing, Setup Wizard.
+- [x] **RAG Gap Analysis** — Owner identified Knowledge Base "Add Article" modal as insufficient. Full audit conducted:
+  - **Gap 1:** KB entries have NO vector embeddings (KnowledgeBaseDocument lacks `embedding` field)
+  - **Gap 2:** Pipeline uses naive keyword matching (`_call_knowledge_retrieval_direct()` in pipeline.py lines 744-850), NOT vector search
+  - **Gap 3:** No document upload capability (PDF, DOCX, CSV) — manual text entry only
+  - **Gap 4:** No staleness/freshness tracking for KB entries
+  - **Gap 5:** No hybrid retrieval (BM25 + vector with RRF) despite documentation claims
+- [x] **Document inconsistencies identified:**
+  - PRODUCT-FEATURES-RAG.md line 525: claims "1536-dimension" but actual is 3072 (text-embedding-3-large)
+  - PRODUCT-FEATURES-RAG.md line 207: claims "semantic embeddings...vector similarity search" for KB — actually keyword matching
+  - PRODUCT-FEATURES-RAG.md line 466: claims "Hybrid search (BM25 + dense vectors)" — not implemented
+  - PRODUCT-FEATURES-RAG.md line 221: claims "Index freshness < 1 hour" — no freshness tracking exists
+- [x] **Competitive research completed:**
+  - Salesforce Agentforce: PDF/HTML/TXT upload, E5-Large-V2 embeddings, hybrid search enabled by default
+  - Intercom Fin AI: PDF/DOCX upload, 100MB limit, 10-minute processing, image extraction
+  - Tidio Lyro: CSV import, URL scraping, conversation history auto-learning
+  - Zendesk AI: Staleness detection, Unleash acquisition for enterprise AI search
+  - Industry 2026: Daily re-indexing, embedding drift monitoring, RRF hybrid retrieval, 68.8% cost reduction from semantic caching
+- [x] **Architecture document created** — `docs/architecture/RAG-GAP-ANALYSIS.md` (~250 lines): Executive summary, current vs ideal state, document inconsistencies, competitive research, 17 work items with estimates
+- [x] **17 new work items (WI #209-225):**
+  - P0: KB Vectorization (#209-213) — schema, embedding pipeline, vector search, hybrid retrieval, monitoring (9 days)
+  - P0: Document Upload (#214-218) — file upload API, parsing pipeline, chunking, bulk ops, admin UI (9 days)
+  - P1: Staleness Management (#219-222) — schema, detection service, UI, auto re-embedding (4.5 days)
+  - P1: Semantic Caching (#223-225) — query cache, response cache, monitoring (4 days)
+  - **Total: ~26.5 development days**
+
+**Key findings:**
+- **Two RAG systems with different maturity:** Persistent Customer Memory (Layer 2) correctly implemented with vector embeddings + DiskANN + semantic search. Merchant Knowledge Base is basic CRUD with keyword matching only.
+- **Architecture Decision RAG-1:** Extend Layer 2 vectorization pattern (`conversation_vectorizer.py`) to Knowledge Base for consistency and reduced risk.
+- **Vector dimensions:** text-embedding-3-large produces 3072 dimensions, not 1536 as documented in some places.
+- **Competitive gap:** All major competitors (Salesforce, Intercom, Tidio, Zendesk) support document upload. Agent Red does not.
+
+**Files created (1):**
+- docs/architecture/RAG-GAP-ANALYSIS.md — Complete gap analysis with work items
+
+**Files modified (2):**
+- docs/BACKLOG-NEW-WORK-ITEMS.md — Added WI #209-225 (17 items)
+- CLAUDE.md — Session summary and new work items reference
+
 ### Pending
 - [x] ~~**Cosmos DB full initialization**~~ — COMPLETE. 10/10 containers created and verified. scripts/init_cosmos_containers.py. DATABASE_NAME corrected to "agentred".
 - [x] ~~**Azure OpenAI custom subdomain**~~ — Already configured as `aoai-agentred-eastus2`. Endpoint: `https://aoai-agentred-eastus2.openai.azure.com/`.
@@ -1904,7 +1947,8 @@ Three major deliverables completed across two continued sessions.
 - [ ] **UX consultant evaluation (WI #203)** — Mazel evaluates workflows on live storefront + standalone admin at `/admin/standalone/`. Blocked on storefront creation.
 - [ ] **End-to-end chat testing** — Validate ChatPipeline with real Azure OpenAI on production. Requires AZURE_OPENAI_ENDPOINT + AZURE_OPENAI_API_KEY on Container App.
 - [ ] **Phase 2.5: 5 A/B production tests** (work items from Decision #32) — requires production conversation volume.
-- [ ] **Backlog items (12 remaining):** #105 (coverage gate), #107 (perf test infra), #131-133 (SSE enhancements), #137-139 (pipeline post-launch), #142 (customer profile endpoints), #147 (OpenAPI schema), #159 (API key rotation), #162 (Stripe IP allowlisting)
+- [ ] **Backlog items (12 remaining pre-RAG):** #105 (coverage gate), #107 (perf test infra), #131-133 (SSE enhancements), #137-139 (pipeline post-launch), #142 (customer profile endpoints), #147 (OpenAPI schema), #159 (API key rotation), #162 (Stripe IP allowlisting)
+- [ ] **RAG Infrastructure (WI #209-225, 17 items, ~26.5 days)** — P0: KB vectorization (#209-213), document upload (#214-218). P1: staleness management (#219-222), semantic caching (#223-225). Full gap analysis in `docs/architecture/RAG-GAP-ANALYSIS.md`.
 - [ ] **Shopify App Store submission** — Requires: creative assets (icon, screenshots — owner/designer tasks)
 - [ ] **Creative assets** — App icon (1200x1200), key benefit images (3× 1600x1200), screenshots — owner/designer tasks
 

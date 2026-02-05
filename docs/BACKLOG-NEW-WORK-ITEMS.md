@@ -4,7 +4,7 @@
 > **Project:** Agent Red Customer Experience
 > **Owner:** Remaker Digital (DBA of VanDusen & Palmeter, LLC)
 > **Created:** 2026-01-31
-> **Last Updated:** 2026-02-03
+> **Last Updated:** 2026-02-05
 > **Numbering:** Continues from Master Plan Review WI #1-100
 > **Review Status:** Updated with completion statuses from 2026-01-31 and 2026-02-01 implementation sprints
 
@@ -13,10 +13,10 @@
 ## Progress Overview
 
 ```mermaid
-pie title Work Item Status (WI #101-163)
-    "Complete" : 45
+pie title Work Item Status (WI #101-225)
+    "Complete" : 51
     "Partially Complete" : 5
-    "Remaining" : 13
+    "Remaining" : 33
 ```
 
 ```mermaid
@@ -51,6 +51,11 @@ gantt
 
     section Security
     WI #157-163 (hardening)        :done, 2026-02-01, 1d
+
+    section RAG Infrastructure
+    WI #209-213 (KB vectorization) :2026-02-10, 9d
+    WI #214-218 (doc upload)       :2026-02-19, 9d
+    WI #219-225 (staleness/cache)  :2026-02-28, 9d
 ```
 
 ## Table of Contents
@@ -64,6 +69,8 @@ gantt
 7. [Operational Readiness](#7-operational-readiness-wi-148-156)
 8. [Security Hardening](#8-security-hardening-wi-157-163)
 9. [Summary](#9-summary)
+10. [Launch Preparation](#10-launch-preparation-wi-196-204)
+11. [RAG Infrastructure](#11-rag-infrastructure-wi-209-225)
 
 ---
 
@@ -326,6 +333,86 @@ These 63 new work items complement the existing 100 work items in `docs/Master-P
 | 137 | Semantic response caching | Low | Post-launch |
 | 138 | Context pre-computation | Low | Post-launch |
 | 139 | PTU investigation | Low | Post-launch |
+
+---
+
+## 11. RAG Infrastructure (WI #209-225)
+
+**NEW — Added 2026-02-05.** Comprehensive RAG infrastructure gap analysis revealed that Merchant Knowledge Base has basic CRUD with keyword search only, while Persistent Customer Memory (Layer 2) correctly uses vector embeddings. These work items bring the Knowledge Base to production-grade RAG standards.
+
+> **Reference:** Full gap analysis in `docs/architecture/RAG-GAP-ANALYSIS.md`
+
+### P0: Knowledge Base Vectorization (WI #209-213) — 9 days
+
+| # | Work Item | Priority | Status | Rationale |
+|---|-----------|----------|--------|-----------|
+| 209 | KB Vector Embedding Schema — add embedding, embedding_model, embedded_at fields to KnowledgeBaseDocument, DiskANN vector index | P0 | 📋 Todo | KB lacks vector embeddings entirely |
+| 210 | KB Embedding Pipeline — create knowledge_vectorizer.py, embed on create/update, batch embedding | P0 | 📋 Todo | No vectorization pipeline for KB entries |
+| 211 | KB Vector Search — replace keyword matching in _call_knowledge_retrieval_direct() with cosine similarity | P0 | 📋 Todo | Current retrieval uses naive keyword matching |
+| 212 | Hybrid Retrieval — add BM25 scoring, implement Reciprocal Rank Fusion (RRF), configurable alpha | P0 | 📋 Todo | Industry best practice: 1-9% recall improvement |
+| 213 | Retrieval Quality Monitoring — log retrieval events with scores, track click-through, dashboard | P0 | 📋 Todo | No visibility into retrieval effectiveness |
+
+### P0: Document Upload & Processing (WI #214-218) — 9 days
+
+| # | Work Item | Priority | Status | Rationale |
+|---|-----------|----------|--------|-----------|
+| 214 | File Upload API — POST /api/admin/knowledge/upload, multipart/form-data, PDF/DOCX/CSV/TXT | P0 | 📋 Todo | Current KB is manual text entry only |
+| 215 | Document Parsing Pipeline — create document_parser.py, PDF (PyPDF2), DOCX (python-docx), CSV, HTML/URL | P0 | 📋 Todo | No document parsing capability |
+| 216 | Document Chunking — page-level chunking (256-512 tokens), respect paragraph boundaries | P0 | 📋 Todo | Chunking required for effective retrieval |
+| 217 | Bulk Import/Export — CSV export of all KB entries, CSV import with validation | P0 | 📋 Todo | No bulk operations for KB management |
+| 218 | Admin UI for Upload — file dropzone in KnowledgeBaseManager.tsx, progress indicator | P0 | 📋 Todo | No UI for document upload |
+
+### P1: Staleness & Freshness Management (WI #219-222) — 4.5 days
+
+| # | Work Item | Priority | Status | Rationale |
+|---|-----------|----------|--------|-----------|
+| 219 | Staleness Schema — add last_verified_at, staleness_score, auto_refresh_enabled to KnowledgeBaseDocument | P1 | 📋 Todo | No freshness tracking for KB entries |
+| 220 | Staleness Detection Service — create staleness_service.py, compute staleness from age + feedback | P1 | 📋 Todo | Cannot identify outdated content |
+| 221 | Refresh Prompts UI — badge stale entries in table, "Mark as verified" action | P1 | 📋 Todo | No UI for staleness management |
+| 222 | Automatic Re-embedding — scheduled job for stale entries, re-embed on content change | P1 | 📋 Todo | No embedding drift prevention |
+
+### P1: Semantic Caching (WI #223-225) — 4 days
+
+| # | Work Item | Priority | Status | Rationale |
+|---|-----------|----------|--------|-----------|
+| 223 | Query Embedding Cache — cache query embeddings, TTL-based expiration | P1 | 📋 Todo | No query caching (redundant embeddings) |
+| 224 | Semantic Response Cache — cache similar queries by vector similarity (0.90 threshold) | P1 | 📋 Todo | Industry: 68.8% reduction in LLM API calls |
+| 225 | Cache Monitoring Dashboard — hit rate metrics, cost savings estimate | P1 | 📋 Todo | No visibility into cache effectiveness |
+
+### RAG Work Item Summary
+
+| Priority | Work Items | Total Effort | Description |
+|----------|------------|--------------|-------------|
+| **P0** | WI #209-218 | 18 days | KB vectorization + document upload |
+| **P1** | WI #219-225 | 8.5 days | Staleness + caching |
+| **Total** | 17 items | 26.5 days | Full RAG infrastructure |
+
+### Document Inconsistencies Resolved
+
+| Document | Issue | Resolution |
+|----------|-------|------------|
+| PRODUCT-FEATURES-RAG.md line 525 | Claims "1536-dimension embeddings" | Actual: 3072 dimensions (text-embedding-3-large) |
+| PRODUCT-FEATURES-RAG.md line 207 | Claims "semantic embeddings...vector similarity search" for KB | Current: keyword matching only → WI #211 |
+| PRODUCT-FEATURES-RAG.md line 466 | Claims "Hybrid search (BM25 + dense vectors)" | Not implemented → WI #212 |
+| PRODUCT-FEATURES-RAG.md line 221 | Claims "Index freshness: < 1 hour" | No freshness tracking → WI #219-222 |
+
+---
+
+### Updated Work Item Counts (Final)
+
+| Category | Total | Complete | Remaining | IDs |
+|----------|-------|----------|-----------|-----|
+| Test Infrastructure | 7 | 5 | 2 | #101-107 |
+| Merchant Web UI | 11 | 10 | 1 | #108-118 |
+| Trial / Demo Environment | 10 | 10 | 0 | #119-128 |
+| Response Streaming (SSE) | 5 | 2 | 3 | #129-133 |
+| Pipeline Optimization | 6 | 3 | 3 | #134-139 |
+| API Completeness | 8 | 6 | 2 | #140-147 |
+| Operational Readiness | 9 | 9 | 0 | #148-156 |
+| Security Hardening | 7 | 6 | 1 | #157-163 |
+| Launch Preparation | 9 | 0 | 9 | #196-204 |
+| **RAG Infrastructure** | **17** | **0** | **17** | **#209-225** |
+| **Total** | **89** | **51** | **38** | **#101-225** |
 
 ---
 
