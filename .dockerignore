@@ -56,11 +56,11 @@ prototype/
 widget/
 extensions/
 
-# Admin: exclude everything EXCEPT admin/shopify/dist/ (pre-built SPA assets)
-admin/standalone/
+# Admin: exclude everything EXCEPT admin/{shopify,standalone}/dist/ (pre-built SPA assets)
 admin/shared/
 admin/package.json
 admin/package-lock.json
+# Shopify admin — exclude source, keep dist/
 admin/shopify/src/
 admin/shopify/node_modules/
 admin/shopify/package.json
@@ -70,6 +70,19 @@ admin/shopify/vite.config.ts
 admin/shopify/vite-env.d.ts
 admin/shopify/index.html
 admin/shopify/index.tsx
+# Standalone admin — exclude source, keep dist/
+admin/standalone/src/
+admin/standalone/node_modules/
+admin/standalone/package.json
+admin/standalone/package-lock.json
+admin/standalone/tsconfig.json
+admin/standalone/vite.config.ts
+admin/standalone/vite-env.d.ts
+admin/standalone/index.html
+admin/standalone/index.tsx
+admin/standalone/login/
+admin/standalone/layouts/
+admin/standalone/pages/
 
 # Node / frontend tooling
 node_modules/

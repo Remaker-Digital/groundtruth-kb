@@ -176,7 +176,7 @@ async def provision(dry_run: bool = True, seed_kb: bool = False) -> None:
 
     prefs_repo = PreferencesRepository()
     prefs_doc = PreferencesDocument(
-        id=f"{TENANT_ID}_preferences_v1",
+        id=f"{TENANT_ID}:1",
         tenant_id=TENANT_ID,
         version=1,
         is_current=True,

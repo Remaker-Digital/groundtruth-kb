@@ -54,12 +54,13 @@ COPY src/ ./src/
 COPY config/ ./config/
 
 # --------------------------------------------------------------------------
-# Admin SPA (pre-built Vite output for Shopify embedded admin)
+# Admin SPAs (pre-built Vite output for embedded + standalone admin)
 # ARG+RUN pattern forces full cache invalidation for COPY below
 # --------------------------------------------------------------------------
 ARG ADMIN_SPA_VERSION=unknown
 RUN echo "admin-spa-version=${ADMIN_SPA_VERSION}" > /tmp/.admin-version
 COPY admin/shopify/dist/ ./admin/shopify/dist/
+COPY admin/standalone/dist/ ./admin/standalone/dist/
 
 # --------------------------------------------------------------------------
 # Non-root user for security

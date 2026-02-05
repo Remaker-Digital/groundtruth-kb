@@ -208,6 +208,156 @@ else:
         "embedded admin will not be available", _admin_shopify_dist,
     )
 
+
+# ---------------------------------------------------------------------------
+# Standalone Admin SPA — password-gated for UX review access
+# ---------------------------------------------------------------------------
+# Simple password gate: visitors enter a password, receive a session cookie,
+# and can browse the standalone admin freely.  The password is set via the
+# ADMIN_PREVIEW_PASSWORD environment variable.
+#
+# This is NOT production auth for merchants — it's a casual-trespasser gate
+# so UX designers and stakeholders can access the admin without running it
+# locally.  Merchant auth is handled inside the SPA (API key login page).
+# ---------------------------------------------------------------------------
+
+import hashlib  # noqa: E402
+import secrets as _secrets  # noqa: E402
+
+from starlette.responses import Response as StarletteResponse  # noqa: E402
+
+_admin_standalone_dist = (
+    pathlib.Path(__file__).resolve().parent.parent / "admin" / "standalone" / "dist"
+)
+_ADMIN_PREVIEW_PASSWORD = os.environ.get("ADMIN_PREVIEW_PASSWORD", "")
+_ADMIN_COOKIE_NAME = "agentred_preview"
+# Deterministic token derived from the password so all gateway replicas agree
+_ADMIN_COOKIE_VALUE = (
+    hashlib.sha256(f"agentred-preview:{_ADMIN_PREVIEW_PASSWORD}".encode()).hexdigest()[:32]
+    if _ADMIN_PREVIEW_PASSWORD
+    else ""
+)
+
+_STANDALONE_LOGIN_HTML = """<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8"/>
+<meta name="viewport" content="width=device-width, initial-scale=1"/>
+<title>Agent Red — Preview Access</title>
+<style>
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body { background: #0a0a0a; color: #e0e0e0; font-family: Inter, system-ui, sans-serif;
+         display: flex; align-items: center; justify-content: center; min-height: 100vh; }
+  .card { background: #1f1f1f; border: 1px solid #272727; border-radius: 12px;
+          padding: 40px; max-width: 380px; width: 100%; text-align: center; }
+  h1 { font-size: 20px; margin-bottom: 8px; color: #f5f5f5; }
+  p { font-size: 14px; color: #a0a0a0; margin-bottom: 24px; }
+  input { width: 100%; padding: 10px 14px; border: 1px solid #272727; border-radius: 8px;
+          background: #141414; color: #e0e0e0; font-size: 14px; margin-bottom: 16px;
+          outline: none; }
+  input:focus { border-color: #ff3621; }
+  button { width: 100%; padding: 10px; border: none; border-radius: 8px;
+           background: #ff3621; color: #fff; font-size: 14px; font-weight: 600;
+           cursor: pointer; }
+  button:hover { background: #e62e1a; }
+  .error { color: #ff6b6b; font-size: 13px; margin-bottom: 12px; display: none; }
+</style>
+</head>
+<body>
+<div class="card">
+  <h1>Agent Red Admin Preview</h1>
+  <p>Enter the preview password to continue.</p>
+  <div class="error" id="err">Incorrect password. Please try again.</div>
+  <form method="POST" action="/admin/standalone/_auth">
+    <input type="password" name="password" placeholder="Password" autofocus required/>
+    <button type="submit">Continue</button>
+  </form>
+</div>
+</body>
+</html>"""
+
+
+if _admin_standalone_dist.is_dir():
+
+    def _check_preview_cookie(request: Request) -> bool:
+        """Return True if the request has a valid preview session cookie."""
+        if not _ADMIN_PREVIEW_PASSWORD:
+            # No password configured — allow all access
+            return True
+        cookie = request.cookies.get(_ADMIN_COOKIE_NAME, "")
+        return cookie == _ADMIN_COOKIE_VALUE
+
+    @app.post("/admin/standalone/_auth", include_in_schema=False)
+    async def _admin_standalone_auth(request: Request) -> StarletteResponse:
+        """Validate the preview password and set a session cookie."""
+        form = await request.form()
+        password = str(form.get("password", ""))
+
+        if password == _ADMIN_PREVIEW_PASSWORD and _ADMIN_PREVIEW_PASSWORD:
+            response = StarletteResponse(
+                status_code=303,
+                headers={"location": "/admin/standalone/"},
+            )
+            response.set_cookie(
+                _ADMIN_COOKIE_NAME,
+                _ADMIN_COOKIE_VALUE,
+                httponly=True,
+                secure=True,
+                samesite="lax",
+                max_age=86400 * 7,  # 7 days
+            )
+            return response
+
+        # Wrong password — re-render login with error
+        error_html = _STANDALONE_LOGIN_HTML.replace(
+            'display: none;', 'display: block;',
+        )
+        return HTMLResponse(content=error_html, status_code=403)
+
+    # IMPORTANT: Register explicit root routes BEFORE the StaticFiles mount.
+    # Starlette evaluates routes in registration order; if the mount were first,
+    # it could shadow the root path.  The assets mount only claims
+    # /admin/standalone/assets/* and does NOT interfere with other sub-paths.
+
+    @app.get("/admin/standalone/", include_in_schema=False)
+    async def _admin_standalone_index_slash(request: Request) -> StarletteResponse:
+        """Serve the standalone admin SPA root with trailing slash (password-gated)."""
+        if not _check_preview_cookie(request):
+            return HTMLResponse(content=_STANDALONE_LOGIN_HTML)
+        return FileResponse(str(_admin_standalone_dist / "index.html"))
+
+    @app.get("/admin/standalone", include_in_schema=False)
+    async def _admin_standalone_index(request: Request) -> StarletteResponse:
+        """Serve the standalone admin SPA root (password-gated)."""
+        if not _check_preview_cookie(request):
+            return HTMLResponse(content=_STANDALONE_LOGIN_HTML)
+        return FileResponse(str(_admin_standalone_dist / "index.html"))
+
+    # Serve static assets (JS, CSS, sourcemaps) from the Vite build output
+    app.mount(
+        "/admin/standalone/assets",
+        StaticFiles(directory=str(_admin_standalone_dist / "assets")),
+        name="admin-standalone-assets",
+    )
+
+    @app.get("/admin/standalone/{full_path:path}", include_in_schema=False)
+    async def _admin_standalone_spa(request: Request, full_path: str) -> StarletteResponse:
+        """Catch-all route for the standalone admin SPA (password-gated)."""
+        if not _check_preview_cookie(request):
+            return HTMLResponse(content=_STANDALONE_LOGIN_HTML)
+        return FileResponse(str(_admin_standalone_dist / "index.html"))
+
+    logger.info(
+        "Standalone admin SPA mounted at /admin/standalone%s",
+        " (password-gated)" if _ADMIN_PREVIEW_PASSWORD else " (NO PASSWORD — open access)",
+    )
+else:
+    logger.warning(
+        "Standalone admin SPA dist directory not found at %s — "
+        "standalone admin will not be available", _admin_standalone_dist,
+    )
+
+
 # ---------------------------------------------------------------------------
 # Tenant authentication + rate limiting (Decisions #4-5, WI #18/#27-28)
 # ---------------------------------------------------------------------------
@@ -343,7 +493,7 @@ async def _startup_config_processor() -> None:
     """Wire TenantConfigProcessor with Cosmos DB repositories.
 
     Required for config persistence via PUT /api/config. Without this,
-    config updates succeed in-memory but are lost on next read.
+    config updates will be rejected with an error (not silently lost).
     """
     try:
         from src.multi_tenant.repository import AuditLogRepository, PreferencesRepository
@@ -354,10 +504,12 @@ async def _startup_config_processor() -> None:
         processor = get_config_processor()
         processor.configure(prefs_repo, audit_repo)
         logger.info("TenantConfigProcessor configured with Cosmos DB repositories")
-    except Exception:
-        logger.warning(
-            "TenantConfigProcessor configuration failed — config updates "
-            "will not persist until Cosmos DB is available."
+    except Exception as exc:
+        logger.error(
+            "TenantConfigProcessor configuration FAILED — config updates "
+            "will be rejected until Cosmos DB is available. Error: %s",
+            exc,
+            exc_info=True,
         )
 
 
@@ -488,24 +640,31 @@ async def _startup_chat_services() -> None:
     Non-fatal: chat endpoints return 503 if initialization fails.
     """
     try:
-        from src.multi_tenant.repository import ConversationRepository
+        from src.multi_tenant.repository import ConversationRepository, KnowledgeBaseRepository
         from src.multi_tenant.customer_profile_service import get_profile_service
         from src.multi_tenant.system_prompt_builder import get_prompt_builder
+        from src.chat.pipeline import USE_AGENT_CONTAINERS
 
         conv_repo = ConversationRepository()
         session = configure_conversation_session(
             conversation_repo=conv_repo,
         )
 
+        # WI #207: Create KnowledgeBaseRepository for direct retrieval
+        kb_repo = KnowledgeBaseRepository()
+
         pipeline = configure_chat_pipeline(
             session=session,
             prompt_builder=get_prompt_builder(),
             profile_service=get_profile_service(),
+            kb_repo=kb_repo,
         )
 
+        mode = "agent containers" if USE_AGENT_CONTAINERS else "direct Azure OpenAI"
         configure_chat_services(session=session, pipeline=pipeline)
         logger.info(
-            "Chat API services initialized (session + pipeline, 6 endpoints)"
+            "Chat API services initialized (session + pipeline, 6 endpoints, mode=%s)",
+            mode,
         )
     except Exception:
         logger.warning(

@@ -470,15 +470,25 @@ class TenantConfigProcessor:
             created_by=actor,
         )
 
-        if self._is_configured:
-            async with self._lock:
-                await self._prefs_repo.create_version(tenant_id, prefs_doc)
-        else:
-            logger.warning(
+        if not self._is_configured:
+            logger.error(
                 "TenantConfigProcessor: repositories not configured — "
-                "config change for tenant=%s NOT persisted (dev mode)",
+                "config change for tenant=%s REJECTED. Call configure() "
+                "at startup to wire Cosmos DB repositories.",
                 tenant_id,
             )
+            result.success = False
+            result.validation = ConfigValidationResult(
+                valid=False,
+                errors=[{
+                    "field": "_system",
+                    "message": "Configuration service is not available. Please try again later.",
+                }],
+            )
+            return result
+
+        async with self._lock:
+            await self._prefs_repo.create_version(tenant_id, prefs_doc)
 
         # Step 6: Invalidate cache
         self._invalidate_cache(tenant_id)
@@ -538,6 +548,23 @@ class TenantConfigProcessor:
                     "new": default_val,
                 }
 
+        if not self._is_configured:
+            logger.error(
+                "TenantConfigProcessor: repositories not configured — "
+                "config reset for tenant=%s REJECTED.",
+                tenant_id,
+            )
+            return ConfigUpdateResult(
+                success=False,
+                validation=ConfigValidationResult(
+                    valid=False,
+                    errors=[{
+                        "field": "_system",
+                        "message": "Configuration service is not available. Please try again later.",
+                    }],
+                ),
+            )
+
         new_version = current_version + 1
         prefs_doc = _config_to_preferences(
             tenant_id=tenant_id,
@@ -546,9 +573,8 @@ class TenantConfigProcessor:
             created_by=actor,
         )
 
-        if self._is_configured:
-            async with self._lock:
-                await self._prefs_repo.create_version(tenant_id, prefs_doc)
+        async with self._lock:
+            await self._prefs_repo.create_version(tenant_id, prefs_doc)
 
         self._invalidate_cache(tenant_id)
 
@@ -671,12 +697,17 @@ class TenantConfigProcessor:
             ConfigRollbackResult with version info.
         """
         if not self._is_configured:
+            logger.error(
+                "TenantConfigProcessor: repositories not configured — "
+                "rollback for tenant=%s REJECTED.",
+                tenant_id,
+            )
             return ConfigRollbackResult(
                 success=False,
                 from_version=0,
                 to_version=target_version,
                 new_version=0,
-                message="Repositories not configured",
+                message="Configuration service is not available. Please try again later.",
             )
 
         # Get target version
@@ -867,11 +898,32 @@ class TenantConfigProcessor:
         # Layer 3: tenant overrides from Cosmos DB
         version = 0
         if self._is_configured:
-            current = await self._prefs_repo.get_current(tenant_id)
+            try:
+                current = await self._prefs_repo.get_current(tenant_id)
+            except Exception as exc:
+                logger.warning(
+                    "Failed to read preferences for tenant=%s from Cosmos DB "
+                    "(returning tier defaults): %s",
+                    tenant_id[:8], exc,
+                )
+                current = None
+
             if current is not None:
                 version = current.get("version", 0)
                 stored = _preferences_to_config(current)
                 resolved.update(stored)
+            else:
+                logger.debug(
+                    "No preferences document found for tenant=%s — "
+                    "returning tier defaults only (version=0)",
+                    tenant_id[:8],
+                )
+        else:
+            logger.warning(
+                "TenantConfigProcessor not configured — returning tier "
+                "defaults only for tenant=%s. Config persistence is unavailable.",
+                tenant_id[:8],
+            )
 
         return resolved, version
 

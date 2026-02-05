@@ -77,6 +77,16 @@ from src.multi_tenant.system_prompt_builder import (
     SystemPromptBuilder,
 )
 
+# Azure OpenAI direct integration (WI #207 — Issue #32)
+# When USE_AGENT_CONTAINERS is false (default), the pipeline calls Azure
+# OpenAI directly instead of routing through AGNTCY agent containers.
+# This is required because the upstream AGNTCY containers are in
+# ActivationFailed state (demo mode images with no HTTP endpoints).
+try:
+    from openai import AsyncAzureOpenAI
+except ImportError:
+    AsyncAzureOpenAI = None  # type: ignore[assignment,misc]
+
 # Layer 4: Fine-tuned model selection + A/B routing (WI #93-96)
 # Imported lazily inside execute() to avoid circular import at module load.
 
@@ -87,8 +97,17 @@ logger = logging.getLogger(__name__)
 # Constants — agent HTTP endpoints (configurable via environment)
 # ---------------------------------------------------------------------------
 
+# USE_AGENT_CONTAINERS controls whether the pipeline routes through AGNTCY
+# agent containers (HTTP) or calls Azure OpenAI directly.
+#
+# Default: False — use direct Azure OpenAI calls.
+# Set to "true" only when AGNTCY agent containers are healthy and serving.
+USE_AGENT_CONTAINERS = os.environ.get(
+    "USE_AGENT_CONTAINERS", "false"
+).lower() == "true"
+
 # Default agent URLs — overridden by environment variables in production.
-# These match the Container App private IPs from CLAUDE.md.
+# Only used when USE_AGENT_CONTAINERS=true.
 AGENT_URLS: dict[str, str] = {
     "intent-classifier": os.environ.get(
         "AGENT_INTENT_CLASSIFIER_URL", "http://10.0.1.10:8080"
@@ -117,6 +136,37 @@ AGENT_ANALYTICS_PATH = "/collect"
 
 # Escalation intent value from the Intent Classifier
 ESCALATION_INTENT = "escalation"
+
+# Azure OpenAI model deployment names (match aoai-agentred-eastus2 deployments)
+AZURE_IC_MODEL = os.environ.get("AZURE_IC_MODEL", "gpt-4o-mini")
+AZURE_RG_MODEL = os.environ.get("AZURE_RG_MODEL", "gpt-4o")
+AZURE_CR_MODEL = os.environ.get("AZURE_CR_MODEL", "gpt-4o-mini")
+AZURE_EMBEDDING_MODEL = os.environ.get(
+    "AZURE_EMBEDDING_MODEL", "text-embedding-3-large"
+)
+AZURE_EMBEDDING_DIMENSIONS = 3072
+
+# Intent classification taxonomy — the set of intents the IC can return.
+# Matches AGNTCY's upstream 17-intent taxonomy.
+INTENT_TAXONOMY = [
+    "general_inquiry",
+    "product_question",
+    "order_status",
+    "return_request",
+    "exchange_request",
+    "refund_request",
+    "shipping_inquiry",
+    "pricing_question",
+    "availability_check",
+    "complaint",
+    "feedback",
+    "account_issue",
+    "payment_issue",
+    "subscription_question",
+    "technical_support",
+    "greeting",
+    "escalation",
+]
 
 
 # ---------------------------------------------------------------------------
@@ -150,6 +200,8 @@ class ChatPipeline:
         critic: CriticPolicy | None = None,
         meter: ConversationMeter | None = None,
         agent_urls: dict[str, str] | None = None,
+        openai_client: Any | None = None,
+        kb_repo: Any | None = None,
     ) -> None:
         self._session = session
         self._prompt_builder = prompt_builder
@@ -159,6 +211,10 @@ class ChatPipeline:
         self._meter = meter
         self._agent_urls = agent_urls or AGENT_URLS
         self._http_client: httpx.AsyncClient | None = None
+        # Azure OpenAI direct client (WI #207)
+        self._openai_client = openai_client
+        # Knowledge base repository for direct retrieval
+        self._kb_repo = kb_repo
 
     async def _get_http_client(self) -> httpx.AsyncClient:
         """Lazy-initialize the shared HTTP client with connection pooling."""
@@ -210,6 +266,9 @@ class ChatPipeline:
         budget = PipelineTimeoutBudget()
         trace = DecisionTraceBuilder()
         tier = tenant.tier or TenantTier.STARTER
+
+        # Store tenant_id for knowledge retrieval (used by _call_knowledge_retrieval_direct)
+        self._current_tenant_id = tenant_id
 
         try:
             # ---------------------------------------------------------------
@@ -576,7 +635,7 @@ class ChatPipeline:
         return profile
 
     # -------------------------------------------------------------------
-    # Agent HTTP calls
+    # Agent calls — dispatch to direct Azure OpenAI or HTTP containers
     # -------------------------------------------------------------------
 
     async def _call_intent_classifier(
@@ -584,7 +643,76 @@ class ChatPipeline:
         message: str,
         system_prompt: str,
     ) -> dict[str, Any]:
-        """Call the Intent Classification agent via HTTP."""
+        """Classify customer intent.
+
+        Routes to Azure OpenAI directly (default) or AGNTCY container
+        based on USE_AGENT_CONTAINERS flag.
+        """
+        if USE_AGENT_CONTAINERS:
+            return await self._call_intent_classifier_http(message, system_prompt)
+        return await self._call_intent_classifier_direct(message, system_prompt)
+
+    async def _call_intent_classifier_direct(
+        self,
+        message: str,
+        system_prompt: str,
+    ) -> dict[str, Any]:
+        """Call Azure OpenAI GPT-4o-mini for intent classification.
+
+        Uses JSON mode to get structured output with intent and confidence.
+        """
+        if not self._openai_client:
+            logger.warning(
+                "No OpenAI client configured — returning general_inquiry default"
+            )
+            return {"intent": "general_inquiry", "confidence": 0.5, "model": AZURE_IC_MODEL}
+
+        intent_list = ", ".join(INTENT_TAXONOMY)
+        ic_user_prompt = (
+            f"Classify the following customer message into exactly one intent.\n"
+            f"Valid intents: {intent_list}\n\n"
+            f"Respond with a JSON object containing:\n"
+            f'- "intent": one of the valid intents listed above\n'
+            f'- "confidence": a number between 0.0 and 1.0\n'
+            f'- "reasoning": a brief explanation (1 sentence)\n\n'
+            f"Customer message: {message}"
+        )
+
+        response = await self._openai_client.chat.completions.create(
+            model=AZURE_IC_MODEL,
+            messages=[
+                {"role": "system", "content": system_prompt},
+                {"role": "user", "content": ic_user_prompt},
+            ],
+            temperature=0.0,
+            max_tokens=150,
+            response_format={"type": "json_object"},
+        )
+
+        content = response.choices[0].message.content or "{}"
+        try:
+            parsed = json.loads(content)
+        except json.JSONDecodeError:
+            parsed = {}
+
+        intent = parsed.get("intent", "general_inquiry")
+        if intent not in INTENT_TAXONOMY:
+            intent = "general_inquiry"
+
+        return {
+            "intent": intent,
+            "confidence": float(parsed.get("confidence", 0.5)),
+            "model": AZURE_IC_MODEL,
+            "tokens_input": response.usage.prompt_tokens if response.usage else 0,
+            "tokens_output": response.usage.completion_tokens if response.usage else 0,
+        }
+
+    async def _call_intent_classifier_http(
+        self,
+        message: str,
+        system_prompt: str,
+    ) -> dict[str, Any]:
+        """Call the Intent Classification agent via HTTP (AGNTCY container)."""
         url = self._agent_urls.get("intent-classifier", "")
         client = await self._get_http_client()
 
@@ -604,7 +732,143 @@ class ChatPipeline:
         intent: str,
         system_prompt: str,
     ) -> dict[str, Any]:
-        """Call the Knowledge Retrieval agent via HTTP."""
+        """Retrieve relevant knowledge for the customer message.
+
+        Routes to Azure OpenAI embeddings + Cosmos DB (default) or
+        AGNTCY container based on USE_AGENT_CONTAINERS flag.
+        """
+        if USE_AGENT_CONTAINERS:
+            return await self._call_knowledge_retrieval_http(message, intent, system_prompt)
+        return await self._call_knowledge_retrieval_direct(message, intent, system_prompt)
+
+    async def _call_knowledge_retrieval_direct(
+        self,
+        message: str,
+        intent: str,
+        system_prompt: str,
+    ) -> dict[str, Any]:
+        """Retrieve knowledge using text search on the knowledge base.
+
+        Searches the KnowledgeBaseRepository by matching the message
+        against active knowledge base entries. Falls back to empty
+        context when no KB repo is configured.
+
+        Note: This uses Cosmos DB text search (CONTAINS) rather than
+        vector search. Vector search is used for Layer 2 conversation
+        memory. Knowledge base entries are structured documents where
+        text search is sufficient and avoids the embedding round-trip.
+        """
+        if not self._kb_repo:
+            logger.warning(
+                "No KnowledgeBaseRepository configured — "
+                "returning empty knowledge context"
+            )
+            return {
+                "context": "",
+                "sources": [],
+                "model": AZURE_EMBEDDING_MODEL,
+            }
+
+        # Get the tenant_id from the current execution context
+        # (it's passed through the pipeline via the session)
+        tenant_id = getattr(self, "_current_tenant_id", None)
+        if not tenant_id:
+            return {"context": "", "sources": [], "model": AZURE_EMBEDDING_MODEL}
+
+        try:
+            # Search by keyword-based matching: extract key terms from message
+            # and search active KB entries
+            entries = await self._kb_repo.list_active(tenant_id)
+
+            if not entries:
+                return {"context": "", "sources": [], "model": AZURE_EMBEDDING_MODEL}
+
+            # Score entries by simple keyword relevance
+            message_lower = message.lower()
+            scored: list[tuple[float, dict[str, Any]]] = []
+
+            for entry in entries:
+                title = (entry.get("title") or "").lower()
+                content = (entry.get("content") or "").lower()
+                tags = [t.lower() for t in (entry.get("tags") or [])]
+
+                # Simple relevance scoring
+                score = 0.0
+                message_words = set(message_lower.split())
+
+                # Title match (highest weight)
+                for word in message_words:
+                    if len(word) > 2 and word in title:
+                        score += 3.0
+
+                # Tag match (high weight)
+                for word in message_words:
+                    if word in tags:
+                        score += 2.0
+
+                # Content match (moderate weight)
+                for word in message_words:
+                    if len(word) > 3 and word in content:
+                        score += 1.0
+
+                # Intent match boost
+                intent_lower = intent.lower().replace("_", " ")
+                for iword in intent_lower.split():
+                    if len(iword) > 2 and (iword in title or iword in content):
+                        score += 1.5
+
+                if score > 0:
+                    scored.append((score, entry))
+
+            # Sort by score descending, take top 5
+            scored.sort(key=lambda x: x[0], reverse=True)
+            top_entries = scored[:5]
+
+            if not top_entries:
+                return {"context": "", "sources": [], "model": AZURE_EMBEDDING_MODEL}
+
+            # Build context string from matched entries
+            context_parts: list[str] = []
+            sources: list[dict[str, Any]] = []
+
+            for relevance, entry in top_entries:
+                title = entry.get("title", "Untitled")
+                content = entry.get("content", "")
+                entry_type = entry.get("entry_type", "")
+
+                # Truncate content to ~500 chars per entry
+                if len(content) > 500:
+                    content = content[:500] + "..."
+
+                context_parts.append(f"[{entry_type.upper()}] {title}\n{content}")
+                sources.append({
+                    "id": entry.get("id", ""),
+                    "title": title,
+                    "score": round(relevance / 10.0, 2),  # Normalize to 0-1
+                    "type": entry_type,
+                })
+
+            return {
+                "context": "\n\n---\n\n".join(context_parts),
+                "sources": sources,
+                "model": "text-search",
+                "tokens_input": 0,
+                "tokens_output": 0,
+            }
+
+        except Exception as exc:
+            logger.warning(
+                "Knowledge retrieval failed: %s — returning empty context", exc,
+            )
+            return {"context": "", "sources": [], "model": AZURE_EMBEDDING_MODEL}
+
+    async def _call_knowledge_retrieval_http(
+        self,
+        message: str,
+        intent: str,
+        system_prompt: str,
+    ) -> dict[str, Any]:
+        """Call the Knowledge Retrieval agent via HTTP (AGNTCY container)."""
         url = self._agent_urls.get("knowledge-retrieval", "")
         client = await self._get_http_client()
 
@@ -628,22 +892,93 @@ class ChatPipeline:
         budget: PipelineTimeoutBudget,
         model: str = "gpt-4o",
     ) -> AsyncGenerator[str, None]:
-        """Call the Response Generator with SSE streaming.
+        """Generate a streaming AI response.
 
-        Yields text chunks as they arrive from the Response Generator.
-        The budget's remaining time is used as the read timeout.
-
-        WI #135: Prompt prefix caching — the system_prompt is split into
-        a static prefix (platform base + tier config, shared across all
-        conversations for this tenant) and a dynamic suffix (customer
-        context, knowledge results). Azure OpenAI caches the static prefix
-        across requests, reducing latency by 15-25% and token cost by
-        20-35% for repeated prefixes.
+        Routes to Azure OpenAI directly (default) or AGNTCY container
+        based on USE_AGENT_CONTAINERS flag.
 
         WI #93-96: The ``model`` parameter allows Layer 4 fine-tuned
         models to override the default gpt-4o for Enterprise tenants
         with the fine-tuning add-on enabled.
         """
+        if USE_AGENT_CONTAINERS:
+            async for chunk in self._call_response_generator_stream_http(
+                customer_message, intent, knowledge_context,
+                system_prompt, budget, model,
+            ):
+                yield chunk
+        else:
+            async for chunk in self._call_response_generator_stream_direct(
+                customer_message, intent, knowledge_context,
+                system_prompt, budget, model,
+            ):
+                yield chunk
+
+    async def _call_response_generator_stream_direct(
+        self,
+        customer_message: str,
+        intent: str,
+        knowledge_context: str,
+        system_prompt: str,
+        budget: PipelineTimeoutBudget,
+        model: str = "gpt-4o",
+    ) -> AsyncGenerator[str, None]:
+        """Stream response from Azure OpenAI directly.
+
+        Uses the Azure OpenAI SDK's streaming chat completion API.
+        The system_prompt (assembled by SystemPromptBuilder) is passed
+        as a separate system message to enable Azure OpenAI's automatic
+        prompt prefix caching (WI #135).
+        """
+        if not self._openai_client:
+            logger.warning(
+                "No OpenAI client configured — yielding fallback response"
+            )
+            yield "I'm sorry, but I'm unable to generate a response right now. Please try again shortly."
+            return
+
+        # Build user message with knowledge context
+        user_content_parts: list[str] = []
+        if knowledge_context:
+            user_content_parts.append(
+                f"RELEVANT KNOWLEDGE:\n{knowledge_context}\n"
+            )
+        user_content_parts.append(
+            f"CUSTOMER INTENT: {intent}\n\n"
+            f"CUSTOMER MESSAGE: {customer_message}"
+        )
+        user_content = "\n".join(user_content_parts)
+
+        remaining_ms = budget.remaining_ms
+        # Azure OpenAI SDK uses seconds for timeout
+        timeout_seconds = max(0.5, remaining_ms / 1000)
+
+        stream = await self._openai_client.chat.completions.create(
+            model=model,
+            messages=[
+                {"role": "system", "content": system_prompt},
+                {"role": "user", "content": user_content},
+            ],
+            temperature=0.7,
+            max_tokens=1024,
+            stream=True,
+            timeout=timeout_seconds,
+        )
+
+        async for chunk in stream:
+            if chunk.choices and chunk.choices[0].delta.content:
+                yield chunk.choices[0].delta.content
+
+    async def _call_response_generator_stream_http(
+        self,
+        customer_message: str,
+        intent: str,
+        knowledge_context: str,
+        system_prompt: str,
+        budget: PipelineTimeoutBudget,
+        model: str = "gpt-4o",
+    ) -> AsyncGenerator[str, None]:
+        """Call the Response Generator via HTTP (AGNTCY container) with SSE streaming."""
         url = self._agent_urls.get("response-generator", "")
         client = await self._get_http_client()
 
@@ -659,10 +994,6 @@ class ChatPipeline:
                 "knowledge_context": knowledge_context,
                 "system_prompt": system_prompt,
                 "model": model,
-                # WI #135: Hint for prompt caching — the Response Generator
-                # agent should structure the OpenAI messages array with the
-                # system_prompt as a separate system message to enable
-                # Azure OpenAI's automatic prefix caching.
                 "enable_prefix_caching": True,
             },
             timeout=httpx.Timeout(
@@ -676,7 +1007,6 @@ class ChatPipeline:
             async for line in response.aiter_lines():
                 if not line.strip():
                     continue
-                # SSE format: "data: {text}" or raw text chunks
                 if line.startswith("data: "):
                     data = line[6:]
                     if data == "[DONE]":
@@ -701,30 +1031,166 @@ class ChatPipeline:
     ) -> tuple[bool, str, Any]:
         """Validate the generated response via the Critic (fail-closed).
 
-        If no CriticPolicy is configured, returns the safe fallback
-        (fail-closed by default — no unvalidated responses).
-        """
-        if not self._critic:
-            # Fail-closed: no Critic configured means no response delivered
-            from src.multi_tenant.critic_policy import CriticBlockReason, CriticResult, CriticVerdict
+        Priority order:
+        1. CriticPolicy (HTTP to AGNTCY container) — if configured
+        2. Direct Azure OpenAI GPT-4o-mini validation — if OpenAI client available
+        3. Fail-closed fallback — no unvalidated responses delivered
 
-            fallback_result = CriticResult(
+        The direct Azure OpenAI path (option 2) implements the same
+        fail-closed semantics: if the model says "reject" or if the
+        call fails, the response is blocked.
+        """
+        from src.multi_tenant.critic_policy import CriticBlockReason, CriticResult, CriticVerdict
+
+        # Option 1: Use CriticPolicy if configured (HTTP to AGNTCY containers)
+        if self._critic:
+            return await self._critic.require_critic_approval(
+                tenant_id=tenant_id,
+                conversation_id=conversation_id,
+                response_text=response_text,
+                customer_message=customer_message,
+            )
+
+        # Option 2: Direct Azure OpenAI validation (WI #207)
+        if self._openai_client and not USE_AGENT_CONTAINERS:
+            return await self._validate_with_critic_direct(
+                tenant_id, conversation_id, response_text,
+                customer_message, budget,
+            )
+
+        # Option 3: Fail-closed — no Critic available
+        fallback_result = CriticResult(
+            approved=False,
+            verdict=None,
+            block_reason=CriticBlockReason.UNAVAILABLE,
+            flags=[],
+            modified_response=None,
+            latency_ms=0.0,
+            critic_instance="none",
+            request_id=f"critic-{conversation_id}-{int(time.time() * 1000)}",
+        )
+        return False, SAFE_FALLBACK_MESSAGE, fallback_result
+
+    async def _validate_with_critic_direct(
+        self,
+        tenant_id: str,
+        conversation_id: str,
+        response_text: str,
+        customer_message: str,
+        budget: PipelineTimeoutBudget,
+    ) -> tuple[bool, str, Any]:
+        """Validate response using Azure OpenAI GPT-4o-mini directly.
+
+        Implements the same fail-closed semantics as CriticPolicy:
+        - Model approves → deliver response
+        - Model rejects → block + use fallback
+        - Call fails → block + use fallback (fail-closed)
+
+        The Critic system prompt is the immutable platform base from
+        SystemPromptBuilder — no tenant config injected (Decision #23).
+        """
+        from src.multi_tenant.critic_policy import CriticBlockReason, CriticResult, CriticVerdict
+
+        request_id = f"critic-direct-{conversation_id}-{int(time.time() * 1000)}"
+        start_time = time.monotonic()
+
+        try:
+            critic_user_prompt = (
+                "Review the following AI-generated customer service response.\n\n"
+                f"CUSTOMER MESSAGE:\n{customer_message}\n\n"
+                f"AI RESPONSE:\n{response_text}\n\n"
+                "Evaluate this response and return a JSON object with:\n"
+                '- "verdict": "approved" if safe to deliver, "rejected" if unsafe, '
+                '"modified" if approved with changes\n'
+                '- "flags": array of any safety concerns (e.g., "potential_hallucination", '
+                '"pii_detected", "brand_safety_risk")\n'
+                '- "modified_response": if verdict is "modified", provide the corrected text\n'
+                '- "reasoning": brief explanation of your decision\n\n'
+                "Apply the safety rules from your system prompt strictly."
+            )
+
+            # Get the immutable Critic system prompt
+            from src.multi_tenant.system_prompt_builder import _PLATFORM_BASE
+            critic_system_prompt = _PLATFORM_BASE.get(
+                AgentRole.CRITIC_SUPERVISOR, ""
+            )
+
+            response = await self._openai_client.chat.completions.create(
+                model=AZURE_CR_MODEL,
+                messages=[
+                    {"role": "system", "content": critic_system_prompt},
+                    {"role": "user", "content": critic_user_prompt},
+                ],
+                temperature=0.0,
+                max_tokens=300,
+                response_format={"type": "json_object"},
+            )
+
+            elapsed = (time.monotonic() - start_time) * 1000
+            content = response.choices[0].message.content or "{}"
+
+            try:
+                parsed = json.loads(content)
+            except json.JSONDecodeError:
+                parsed = {}
+
+            verdict_str = parsed.get("verdict", "rejected")
+            try:
+                verdict = CriticVerdict(verdict_str)
+            except ValueError:
+                verdict = CriticVerdict.REJECTED
+
+            approved = verdict in (CriticVerdict.APPROVED, CriticVerdict.MODIFIED)
+            flags = parsed.get("flags", [])
+            modified_response = parsed.get("modified_response")
+
+            if verdict == CriticVerdict.MODIFIED and not modified_response:
+                approved = False
+                flags.append("modified_verdict_without_text")
+
+            block_reason = None if approved else CriticBlockReason.REJECTED
+
+            result = CriticResult(
+                approved=approved,
+                verdict=verdict,
+                block_reason=block_reason,
+                flags=flags,
+                modified_response=modified_response if approved else None,
+                latency_ms=elapsed,
+                critic_instance="azure-openai-direct",
+                request_id=request_id,
+            )
+
+            if approved:
+                safe_text = modified_response or response_text
+                return True, safe_text, result
+            else:
+                logger.warning(
+                    "Critic (direct) rejected response: tenant=%s conv=%s "
+                    "flags=%s",
+                    tenant_id, conversation_id, flags,
+                )
+                return False, SAFE_FALLBACK_MESSAGE, result
+
+        except Exception as exc:
+            # Fail-closed: any error means block the response
+            elapsed = (time.monotonic() - start_time) * 1000
+            logger.warning(
+                "Critic (direct) call failed — BLOCKING response "
+                "(fail-closed): tenant=%s conv=%s error=%s",
+                tenant_id, conversation_id, exc,
+            )
+            result = CriticResult(
                 approved=False,
                 verdict=None,
-                block_reason=CriticBlockReason.UNAVAILABLE,
-                flags=[],
+                block_reason=CriticBlockReason.ERROR,
+                flags=["critic_direct_error"],
                 modified_response=None,
-                latency_ms=0.0,
-                critic_instance="none",
+                latency_ms=elapsed,
+                critic_instance="azure-openai-direct",
+                request_id=request_id,
             )
-            return False, SAFE_FALLBACK_MESSAGE, fallback_result
-
-        return await self._critic.require_critic_approval(
-            tenant_id=tenant_id,
-            conversation_id=conversation_id,
-            response_text=response_text,
-            customer_message=customer_message,
-        )
+            return False, SAFE_FALLBACK_MESSAGE, result
 
     # -------------------------------------------------------------------
     # Escalation handling
@@ -785,7 +1251,63 @@ class ChatPipeline:
         message: str,
         system_prompt: str,
     ) -> dict[str, Any]:
-        """Call the Escalation Handler agent via HTTP."""
+        """Route escalation to Azure OpenAI directly or AGNTCY container."""
+        if USE_AGENT_CONTAINERS:
+            return await self._call_escalation_handler_http(message, system_prompt)
+        return await self._call_escalation_handler_direct(message, system_prompt)
+
+    async def _call_escalation_handler_direct(
+        self,
+        message: str,
+        system_prompt: str,
+    ) -> dict[str, Any]:
+        """Evaluate escalation context using Azure OpenAI GPT-4o-mini."""
+        if not self._openai_client:
+            return {"reason": "Customer requested human agent", "model": AZURE_IC_MODEL}
+
+        esc_user_prompt = (
+            "Analyze the following customer message and determine the "
+            "escalation reason. Respond with a JSON object containing:\n"
+            '- "reason": a clear, concise summary of why the customer needs '
+            "human assistance (1-2 sentences)\n"
+            '- "urgency": "low", "medium", or "high"\n'
+            '- "context_summary": brief summary for the human agent\n\n'
+            f"Customer message: {message}"
+        )
+
+        try:
+            response = await self._openai_client.chat.completions.create(
+                model=AZURE_IC_MODEL,
+                messages=[
+                    {"role": "system", "content": system_prompt},
+                    {"role": "user", "content": esc_user_prompt},
+                ],
+                temperature=0.0,
+                max_tokens=200,
+                response_format={"type": "json_object"},
+            )
+
+            content = response.choices[0].message.content or "{}"
+            try:
+                parsed = json.loads(content)
+            except json.JSONDecodeError:
+                parsed = {}
+
+            return {
+                "reason": parsed.get("reason", "Customer requested human agent"),
+                "urgency": parsed.get("urgency", "medium"),
+                "context_summary": parsed.get("context_summary", ""),
+                "model": AZURE_IC_MODEL,
+            }
+        except Exception:
+            return {"reason": "Customer requested human agent", "model": AZURE_IC_MODEL}
+
+    async def _call_escalation_handler_http(
+        self,
+        message: str,
+        system_prompt: str,
+    ) -> dict[str, Any]:
+        """Call the Escalation Handler agent via HTTP (AGNTCY container)."""
         url = self._agent_urls.get("escalation-handler", "")
         client = await self._get_http_client()
 
@@ -811,29 +1333,42 @@ class ChatPipeline:
         budget: PipelineTimeoutBudget,
         trace: DecisionTraceBuilder,
     ) -> None:
-        """Send analytics event asynchronously (non-blocking)."""
-        try:
-            url = self._agent_urls.get("analytics-collector", "")
-            client = await self._get_http_client()
+        """Send analytics event asynchronously (non-blocking).
 
-            await client.post(
-                f"{url.rstrip('/')}{AGENT_ANALYTICS_PATH}",
-                json={
-                    "tenant_id": tenant_id,
-                    "conversation_id": conversation_id,
-                    "intent": intent,
-                    "stages": [
-                        {
-                            "stage": s.stage,
-                            "elapsed_ms": s.elapsed_ms,
-                            "succeeded": s.succeeded,
-                        }
-                        for s in budget.stages
-                    ],
-                    "total_latency_ms": budget.elapsed_ms,
-                },
-                timeout=httpx.Timeout(connect=1.0, read=2.0, write=1.0, pool=1.0),
-            )
+        When USE_AGENT_CONTAINERS is false, analytics are logged locally
+        instead of sending to the AGNTCY analytics container.
+        """
+        try:
+            analytics_data = {
+                "tenant_id": tenant_id,
+                "conversation_id": conversation_id,
+                "intent": intent,
+                "stages": [
+                    {
+                        "stage": s.stage,
+                        "elapsed_ms": s.elapsed_ms,
+                        "succeeded": s.succeeded,
+                    }
+                    for s in budget.stages
+                ],
+                "total_latency_ms": budget.elapsed_ms,
+            }
+
+            if USE_AGENT_CONTAINERS:
+                url = self._agent_urls.get("analytics-collector", "")
+                client = await self._get_http_client()
+                await client.post(
+                    f"{url.rstrip('/')}{AGENT_ANALYTICS_PATH}",
+                    json=analytics_data,
+                    timeout=httpx.Timeout(connect=1.0, read=2.0, write=1.0, pool=1.0),
+                )
+            else:
+                # Log analytics locally when not using agent containers
+                logger.info(
+                    "Analytics: conv=%s intent=%s stages=%d latency=%.0fms",
+                    conversation_id, intent, len(budget.stages),
+                    budget.elapsed_ms,
+                )
         except Exception:
             # Analytics is fire-and-forget — never block the pipeline
             logger.debug(
@@ -847,6 +1382,32 @@ class ChatPipeline:
 # ---------------------------------------------------------------------------
 
 _pipeline: ChatPipeline | None = None
+
+
+def _create_openai_client() -> Any:
+    """Create an AsyncAzureOpenAI client from environment variables.
+
+    Returns None if credentials are not configured (development mode).
+    """
+    if AsyncAzureOpenAI is None:
+        logger.warning("openai package not installed — direct Azure OpenAI calls disabled")
+        return None
+
+    endpoint = os.environ.get("AZURE_OPENAI_ENDPOINT", "")
+    api_key = os.environ.get("AZURE_OPENAI_API_KEY", "")
+
+    if not endpoint or not api_key:
+        logger.warning(
+            "AZURE_OPENAI_ENDPOINT or AZURE_OPENAI_API_KEY not set — "
+            "direct Azure OpenAI calls disabled"
+        )
+        return None
+
+    return AsyncAzureOpenAI(
+        azure_endpoint=endpoint,
+        api_key=api_key,
+        api_version="2024-10-21",
+    )
 
 
 def get_chat_pipeline() -> ChatPipeline:
@@ -866,6 +1427,7 @@ def get_chat_pipeline() -> ChatPipeline:
             session=get_conversation_session(),
             prompt_builder=get_prompt_builder(),
             profile_service=get_profile_service(),
+            openai_client=_create_openai_client(),
         )
     return _pipeline
 
@@ -878,11 +1440,19 @@ def configure_chat_pipeline(
     critic: CriticPolicy | None = None,
     meter: ConversationMeter | None = None,
     agent_urls: dict[str, str] | None = None,
+    openai_client: Any | None = None,
+    kb_repo: Any | None = None,
 ) -> ChatPipeline:
     """Configure the module-level singleton with explicit dependencies.
 
     Called during app startup (main.py) after all services are initialized.
+
+    When openai_client is not provided and USE_AGENT_CONTAINERS is False,
+    a default AsyncAzureOpenAI client is created from environment variables.
     """
+    if openai_client is None and not USE_AGENT_CONTAINERS:
+        openai_client = _create_openai_client()
+
     global _pipeline
     _pipeline = ChatPipeline(
         session=session,
@@ -892,5 +1462,7 @@ def configure_chat_pipeline(
         critic=critic,
         meter=meter,
         agent_urls=agent_urls,
+        openai_client=openai_client,
+        kb_repo=kb_repo,
     )
     return _pipeline

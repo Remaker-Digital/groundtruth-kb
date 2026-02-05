@@ -80,7 +80,7 @@ const App: React.FC = () => {
   }
 
   return (
-    <BrowserRouter basename="/admin">
+    <BrowserRouter basename="/admin/standalone">
       <StandaloneLayout apiKey={apiKey} onLogout={handleLogout}>
         <Routes>
           <Route path="/" element={<DashboardPage />} />
