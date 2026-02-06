@@ -721,7 +721,17 @@ async def get_billing_status(shop_domain: str) -> dict[str, Any]:
 # ---------------------------------------------------------------------------
 
 
-@router.post("/subscribe", response_model=SubscribeResponse)
+@router.post(
+    "/subscribe",
+    response_model=SubscribeResponse,
+    status_code=200,
+    summary="Create a Shopify app subscription",
+    description="Creates a Shopify app subscription for a merchant. The merchant will be redirected to Shopify's confirmation page to approve the charge.",
+    responses={
+        400: {"description": "Invalid tier or billing interval"},
+        502: {"description": "Shopify GraphQL API error during subscription creation"},
+    },
+)
 async def subscribe_endpoint(body: SubscribeRequest) -> SubscribeResponse:
     """Create a Shopify app subscription for a merchant.
 
@@ -765,7 +775,16 @@ async def subscribe_endpoint(body: SubscribeRequest) -> SubscribeResponse:
     )
 
 
-@router.get("/confirm")
+@router.get(
+    "/confirm",
+    status_code=200,
+    summary="Handle Shopify post-approval redirect",
+    description="Handles Shopify's post-approval redirect after a merchant approves the subscription charge. Confirms the subscription is active and provisions the tenant.",
+    responses={
+        400: {"description": "Missing shop query parameter"},
+        502: {"description": "Shopify API error during subscription confirmation"},
+    },
+)
 async def confirm_endpoint(request: Request) -> JSONResponse:
     """Handle Shopify's post-approval redirect.
 
@@ -811,7 +830,17 @@ async def confirm_endpoint(request: Request) -> JSONResponse:
     )
 
 
-@router.get("/status", response_model=BillingStatusResponse)
+@router.get(
+    "/status",
+    response_model=BillingStatusResponse,
+    status_code=200,
+    summary="Get Shopify merchant billing status",
+    description="Returns the current billing status for a Shopify merchant, including active subscription details and line items.",
+    responses={
+        400: {"description": "Missing shop query parameter"},
+        502: {"description": "Shopify API error during status retrieval"},
+    },
+)
 async def status_endpoint(shop: str) -> BillingStatusResponse:
     """Get the current billing status for a Shopify merchant.
 

@@ -153,7 +153,18 @@ def _resolve_stripe_customer_id(
 # ---------------------------------------------------------------------------
 
 
-@router.post("/portal", response_model=PortalResponse)
+@router.post(
+    "/portal",
+    response_model=PortalResponse,
+    status_code=200,
+    summary="Create a Customer Portal session",
+    description="Creates a Stripe Customer Portal session where the customer can manage their subscription, update payment methods, view invoices, and cancel or resume.",
+    responses={
+        400: {"description": "Missing tenant_id and stripe_customer_id, or tenant has no Stripe billing"},
+        404: {"description": "Tenant not found"},
+        502: {"description": "Stripe API error during portal session creation"},
+    },
+)
 async def create_portal_session(body: PortalRequest) -> PortalResponse:
     """Create a Stripe Customer Portal session.
 

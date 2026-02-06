@@ -584,7 +584,17 @@ async def _cosmos_lookup_by_api_key(api_key: str) -> dict[str, Any] | None:
 # ---------------------------------------------------------------------------
 
 
-@router.get("/lookup", response_model=TenantLookupResponse)
+@router.get(
+    "/lookup",
+    response_model=TenantLookupResponse,
+    status_code=200,
+    summary="Lookup tenant by channel identifier",
+    description="Looks up a tenant by Stripe customer ID, Shopify shop domain, or API key header. Returns the tenant's status, tier, and billing channel.",
+    responses={
+        400: {"description": "No lookup parameter or API key provided"},
+        401: {"description": "Invalid API key"},
+    },
+)
 async def lookup_tenant_endpoint(
     request: Request,
     stripe_customer_id: str | None = None,
@@ -653,7 +663,16 @@ async def lookup_tenant_endpoint(
     )
 
 
-@router.get("/{tenant_id}", response_model=TenantResponse)
+@router.get(
+    "/{tenant_id}",
+    response_model=TenantResponse,
+    status_code=200,
+    summary="Get tenant status by ID",
+    description="Returns the full tenant status record including lifecycle status, billing channel, tier, interval, and add-ons.",
+    responses={
+        404: {"description": "Tenant not found"},
+    },
+)
 async def get_tenant_endpoint(tenant_id: str) -> TenantResponse:
     """Get tenant status by tenant ID.
 

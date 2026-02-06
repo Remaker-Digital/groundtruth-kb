@@ -12,15 +12,16 @@
  * (c) 2026 Remaker Digital, a DBA of VanDusen & Palmeter, LLC. All rights reserved.
  */
 
-import React, { useState, useCallback, useMemo } from 'react';
-import type { BaseComponentProps, KBArticle, KBArticleStatus } from './types';
-import { useKnowledgeBase, useKBArticle, useSaveKBArticle } from './hooks';
+import React, { useState, useCallback, useMemo, useRef } from 'react';
+import type { BaseComponentProps, KBArticle, KBArticleStatus, KBUploadResult } from './types';
+import { useKnowledgeBase, useKBArticle, useSaveKBArticle, useUploadFile, useImportUrl, useExportCSV, useStalenessSummary, useVerifyEntry } from './hooks';
+import { HelpTooltip } from './HelpTooltip';
 
 // ---------------------------------------------------------------------------
 // Style constants
 // ---------------------------------------------------------------------------
 
-const BRAND_PRIMARY = '#C41E2A';
+const BRAND_PRIMARY = '#ff3621';
 const COLOR_SUCCESS = '#22863a';
 const COLOR_DANGER = '#d73a49';
 const COLOR_GRAY = '#6a737d';
@@ -37,6 +38,13 @@ const STATUS_BADGE_STYLES: Record<KBArticleStatus, { bg: string; color: string; 
   draft: { bg: '#fff8c5', color: COLOR_WARNING, label: 'Draft' },
   published: { bg: '#dcffe4', color: COLOR_SUCCESS, label: 'Published' },
   archived: { bg: COLOR_LIGHT_GRAY, color: COLOR_GRAY, label: 'Archived' },
+};
+
+const STALENESS_BADGE_STYLES: Record<string, { bg: string; color: string; label: string }> = {
+  fresh: { bg: '#dcffe4', color: COLOR_SUCCESS, label: 'Fresh' },
+  aging: { bg: '#fff8c5', color: COLOR_WARNING, label: 'Aging' },
+  stale: { bg: '#ffeef0', color: COLOR_DANGER, label: 'Stale' },
+  very_stale: { bg: '#ffeef0', color: COLOR_DANGER, label: 'Very Stale' },
 };
 
 const ALL_STATUSES: Array<{ value: '' | KBArticleStatus; label: string }> = [
@@ -69,6 +77,42 @@ function extractCategories(articles: KBArticle[]): string[] {
 
 const KBStatusBadge: React.FC<{ status: KBArticleStatus }> = ({ status }) => {
   const style = STATUS_BADGE_STYLES[status];
+  return (
+    <span
+      style={{
+        display: 'inline-block',
+        fontSize: '11px',
+        fontWeight: 600,
+        padding: '2px 8px',
+        borderRadius: '10px',
+        backgroundColor: style.bg,
+        color: style.color,
+      }}
+    >
+      {style.label}
+    </span>
+  );
+};
+
+const KBStalenessBadge: React.FC<{ category: string | null | undefined }> = ({ category }) => {
+  if (!category) {
+    return (
+      <span
+        style={{
+          display: 'inline-block',
+          fontSize: '11px',
+          fontWeight: 600,
+          padding: '2px 8px',
+          borderRadius: '10px',
+          backgroundColor: COLOR_LIGHT_GRAY,
+          color: COLOR_GRAY,
+        }}
+      >
+        --
+      </span>
+    );
+  }
+  const style = STALENESS_BADGE_STYLES[category] ?? STALENESS_BADGE_STYLES.fresh;
   return (
     <span
       style={{
@@ -210,6 +254,203 @@ function buttonStyle(variant: 'primary' | 'secondary' | 'danger', disabled = fal
 }
 
 // ---------------------------------------------------------------------------
+// File upload sub-component
+// ---------------------------------------------------------------------------
+
+const ACCEPTED_TYPES = '.pdf,.docx,.csv,.txt';
+const ACCEPTED_LABELS = 'PDF, DOCX, CSV, TXT';
+const MAX_FILE_SIZE_MB = 50;
+
+interface FileUploadZoneProps {
+  onFileSelected: (file: File) => void;
+  uploading: boolean;
+  progress: 'idle' | 'uploading' | 'processing' | 'done';
+  error: string | null;
+}
+
+const FileUploadZone: React.FC<FileUploadZoneProps> = ({ onFileSelected, uploading, progress, error }) => {
+  const inputRef = useRef<HTMLInputElement>(null);
+  const [dragOver, setDragOver] = useState(false);
+
+  const handleDrop = useCallback(
+    (e: React.DragEvent) => {
+      e.preventDefault();
+      setDragOver(false);
+      if (uploading) return;
+      const file = e.dataTransfer.files?.[0];
+      if (file) onFileSelected(file);
+    },
+    [onFileSelected, uploading],
+  );
+
+  const handleFileChange = useCallback(
+    (e: React.ChangeEvent<HTMLInputElement>) => {
+      const file = e.target.files?.[0];
+      if (file) onFileSelected(file);
+      if (inputRef.current) inputRef.current.value = '';
+    },
+    [onFileSelected],
+  );
+
+  const progressLabel = progress === 'uploading' ? 'Uploading...' : progress === 'processing' ? 'Processing document...' : '';
+
+  return (
+    <div>
+      <div
+        onDragOver={(e) => { e.preventDefault(); setDragOver(true); }}
+        onDragLeave={() => setDragOver(false)}
+        onDrop={handleDrop}
+        onClick={() => !uploading && inputRef.current?.click()}
+        style={{
+          border: `2px dashed ${dragOver ? BRAND_PRIMARY : COLOR_BORDER}`,
+          borderRadius: BORDER_RADIUS,
+          padding: '40px 24px',
+          textAlign: 'center' as const,
+          cursor: uploading ? 'default' : 'pointer',
+          backgroundColor: dragOver ? `${BRAND_PRIMARY}08` : COLOR_LIGHT_GRAY,
+          transition: 'all 0.2s ease',
+          opacity: uploading ? 0.7 : 1,
+        }}
+      >
+        <input
+          ref={inputRef}
+          type="file"
+          accept={ACCEPTED_TYPES}
+          onChange={handleFileChange}
+          style={{ display: 'none' }}
+        />
+        <div style={{ fontSize: '32px', marginBottom: '8px' }}>
+          {uploading ? String.fromCodePoint(0x23F3) : String.fromCodePoint(0x1F4C4)}
+        </div>
+        {uploading ? (
+          <div>
+            <span style={{ fontSize: '14px', fontWeight: 500, color: COLOR_TEXT }}>{progressLabel}</span>
+            <div style={{ marginTop: '12px' }}>
+              <div style={{
+                width: '200px', height: '4px', backgroundColor: COLOR_BORDER,
+                borderRadius: '2px', margin: '0 auto', overflow: 'hidden',
+              }}>
+                <div style={{
+                  height: '100%', backgroundColor: BRAND_PRIMARY,
+                  width: progress === 'uploading' ? '40%' : '80%',
+                  transition: 'width 0.5s ease',
+                  borderRadius: '2px',
+                }} />
+              </div>
+            </div>
+          </div>
+        ) : (
+          <>
+            <span style={{ fontSize: '14px', fontWeight: 500, color: COLOR_TEXT }}>
+              Drop a file here or click to browse
+            </span>
+            <br />
+            <span style={{ fontSize: '12px', color: COLOR_TEXT_SECONDARY, marginTop: '4px', display: 'inline-block' }}>
+              Supported: {ACCEPTED_LABELS} (max {MAX_FILE_SIZE_MB}MB)
+            </span>
+          </>
+        )}
+      </div>
+      {error && (
+        <div style={{
+          marginTop: '8px', padding: '8px 12px', backgroundColor: '#ffeef0',
+          border: `1px solid ${COLOR_DANGER}33`, borderRadius: BORDER_RADIUS,
+          fontSize: '13px', color: COLOR_DANGER,
+        }}>
+          {error}
+        </div>
+      )}
+    </div>
+  );
+};
+
+// ---------------------------------------------------------------------------
+// URL import sub-component
+// ---------------------------------------------------------------------------
+
+interface URLImportFormProps {
+  onImport: (url: string) => void;
+  importing: boolean;
+  error: string | null;
+}
+
+const URLImportForm: React.FC<URLImportFormProps> = ({ onImport, importing, error }) => {
+  const [url, setUrl] = useState('');
+
+  const handleSubmit = useCallback(() => {
+    const trimmed = url.trim();
+    if (!trimmed) return;
+    onImport(trimmed);
+  }, [url, onImport]);
+
+  return (
+    <div>
+      <label style={{ display: 'block', fontSize: '13px', fontWeight: 600, color: COLOR_TEXT, marginBottom: '6px' }}>
+        Website URL
+      </label>
+      <div style={{ display: 'flex', gap: '8px' }}>
+        <input
+          type="url"
+          value={url}
+          onChange={(e) => setUrl(e.target.value)}
+          placeholder="https://example.com/faq"
+          style={inputStyle({ flex: '1' })}
+          disabled={importing}
+        />
+        <button
+          onClick={handleSubmit}
+          disabled={!url.trim() || importing}
+          style={buttonStyle('primary', !url.trim() || importing)}
+        >
+          {importing ? 'Importing...' : 'Import'}
+        </button>
+      </div>
+      <span style={{ display: 'block', fontSize: '12px', color: COLOR_TEXT_SECONDARY, marginTop: '4px' }}>
+        We'll extract text content from the page and create knowledge base entries.
+      </span>
+      {error && (
+        <div style={{
+          marginTop: '8px', padding: '8px 12px', backgroundColor: '#ffeef0',
+          border: `1px solid ${COLOR_DANGER}33`, borderRadius: BORDER_RADIUS,
+          fontSize: '13px', color: COLOR_DANGER,
+        }}>
+          {error}
+        </div>
+      )}
+    </div>
+  );
+};
+
+// ---------------------------------------------------------------------------
+// Upload result display sub-component
+// ---------------------------------------------------------------------------
+
+interface UploadResultDisplayProps {
+  result: KBUploadResult;
+  onDone: () => void;
+}
+
+const UploadResultDisplay: React.FC<UploadResultDisplayProps> = ({ result, onDone }) => (
+  <div style={{
+    padding: '24px', backgroundColor: '#dcffe4', border: `1px solid ${COLOR_SUCCESS}33`,
+    borderRadius: BORDER_RADIUS, textAlign: 'center' as const,
+  }}>
+    <div style={{ fontSize: '32px', marginBottom: '8px' }}>{String.fromCodePoint(0x2705)}</div>
+    <div style={{ fontSize: '15px', fontWeight: 600, color: COLOR_TEXT, marginBottom: '4px' }}>
+      Import Successful
+    </div>
+    <div style={{ fontSize: '13px', color: COLOR_TEXT_SECONDARY, marginBottom: '16px' }}>
+      Created {result.entries_created} {result.entries_created === 1 ? 'entry' : 'entries'} from{' '}
+      {result.source_filename || result.source_url || 'document'}{' '}
+      ({Math.round(result.total_chars / 1000)}K characters)
+    </div>
+    <button onClick={onDone} style={buttonStyle('primary')}>
+      Back to Knowledge Base
+    </button>
+  </div>
+);
+
+// ---------------------------------------------------------------------------
 // Editor sub-component
 // ---------------------------------------------------------------------------
 
@@ -298,6 +539,7 @@ const ArticleEditor: React.FC<ArticleEditorProps> = ({
           }}
         >
           Title <span style={{ color: COLOR_DANGER }}>*</span>
+          <HelpTooltip text="A clear, descriptive title helps the AI match articles to customer questions." />
         </label>
         <input
           type="text"
@@ -399,6 +641,7 @@ const ArticleEditor: React.FC<ArticleEditorProps> = ({
           }}
         >
           Content <span style={{ color: COLOR_DANGER }}>*</span>
+          <HelpTooltip text="The full article text the AI will reference when answering questions." />
         </label>
         <textarea
           value={content}
@@ -467,9 +710,11 @@ const ArticleEditor: React.FC<ArticleEditorProps> = ({
 interface ArticleRowProps {
   article: KBArticle;
   onClick: () => void;
+  onVerify?: (id: string) => void;
+  verifying?: boolean;
 }
 
-const ArticleRow: React.FC<ArticleRowProps> = ({ article, onClick }) => (
+const ArticleRow: React.FC<ArticleRowProps> = ({ article, onClick, onVerify, verifying }) => (
   <tr
     onClick={onClick}
     style={{ cursor: 'pointer', transition: 'background-color 0.15s ease' }}
@@ -499,6 +744,9 @@ const ArticleRow: React.FC<ArticleRowProps> = ({ article, onClick }) => (
     <td style={{ padding: '12px 16px', borderBottom: `1px solid ${COLOR_BORDER}` }}>
       <KBStatusBadge status={article.status} />
     </td>
+    <td style={{ padding: '12px 16px', borderBottom: `1px solid ${COLOR_BORDER}` }}>
+      <KBStalenessBadge category={article.stalenessCategory} />
+    </td>
     <td
       style={{
         padding: '12px 16px',
@@ -508,6 +756,37 @@ const ArticleRow: React.FC<ArticleRowProps> = ({ article, onClick }) => (
       }}
     >
       {formatDate(article.updatedAt)}
+    </td>
+    <td
+      style={{
+        padding: '12px 16px',
+        borderBottom: `1px solid ${COLOR_BORDER}`,
+      }}
+    >
+      {onVerify && (article.stalenessCategory === 'stale' || article.stalenessCategory === 'aging' || article.stalenessCategory === 'very_stale') && (
+        <button
+          onClick={(e) => {
+            e.stopPropagation();
+            onVerify(article.id);
+          }}
+          disabled={verifying}
+          style={{
+            padding: '4px 10px',
+            border: `1px solid ${COLOR_SUCCESS}`,
+            borderRadius: BORDER_RADIUS,
+            backgroundColor: 'transparent',
+            color: COLOR_SUCCESS,
+            fontSize: '11px',
+            fontFamily: FONT_FAMILY,
+            fontWeight: 500,
+            cursor: verifying ? 'not-allowed' : 'pointer',
+            opacity: verifying ? 0.6 : 1,
+            whiteSpace: 'nowrap' as const,
+          }}
+        >
+          {verifying ? 'Verifying...' : 'Verify'}
+        </button>
+      )}
     </td>
   </tr>
 );
@@ -521,10 +800,12 @@ export const KnowledgeBaseManager: React.FC<BaseComponentProps> = ({
   apiFetch,
   onNotify,
 }) => {
-  // View state: 'list' or 'editor'
-  const [view, setView] = useState<'list' | 'editor'>('list');
+  // View state: 'list', 'editor', or 'import'
+  const [view, setView] = useState<'list' | 'editor' | 'import'>('list');
   const [editingArticle, setEditingArticle] = useState<Partial<KBArticle> | null>(null);
   const [deleting, setDeleting] = useState(false);
+  const [uploadResult, setUploadResult] = useState<KBUploadResult | null>(null);
+  const [importTab, setImportTab] = useState<'file' | 'url'>('file');
 
   // Filters
   const [searchQuery, setSearchQuery] = useState('');
@@ -542,6 +823,15 @@ export const KnowledgeBaseManager: React.FC<BaseComponentProps> = ({
 
   // Save hook
   const { save, loading: saving, error: saveError } = useSaveKBArticle(apiFetch);
+
+  // Upload/import/export hooks
+  const { upload: uploadFile, loading: uploading, error: uploadError, progress: uploadProgress, reset: resetUpload } = useUploadFile(apiFetch);
+  const { importUrl, loading: importing, error: importError } = useImportUrl(apiFetch);
+  const { exportCSV, loading: exporting, error: exportError } = useExportCSV(apiFetch);
+
+  // Staleness hooks
+  const { data: stalenessData, refetch: refetchStaleness } = useStalenessSummary(apiFetch);
+  const { verify, loading: verifying } = useVerifyEntry(apiFetch);
 
   // Extract categories from articles for the filter dropdown and editor
   const categories = useMemo(() => extractCategories(articles), [articles]);
@@ -571,6 +861,68 @@ export const KnowledgeBaseManager: React.FC<BaseComponentProps> = ({
     setEditingArticle({ title: '', content: '', category: '', status: 'draft' });
     setView('editor');
   }, []);
+
+  const handleOpenImport = useCallback(() => {
+    setUploadResult(null);
+    resetUpload();
+    setImportTab('file');
+    setView('import');
+  }, [resetUpload]);
+
+  const handleFileUpload = useCallback(
+    async (file: File) => {
+      const result = await uploadFile(file);
+      if (result) {
+        setUploadResult(result);
+        onNotify(`Imported ${result.entries_created} entries from ${file.name}`, 'success');
+      } else {
+        onNotify('File upload failed', 'error');
+      }
+    },
+    [uploadFile, onNotify],
+  );
+
+  const handleUrlImport = useCallback(
+    async (url: string) => {
+      const result = await importUrl(url);
+      if (result) {
+        setUploadResult(result);
+        onNotify(`Imported ${result.entries_created} entries from URL`, 'success');
+      } else {
+        onNotify('URL import failed', 'error');
+      }
+    },
+    [importUrl, onNotify],
+  );
+
+  const handleImportDone = useCallback(() => {
+    setUploadResult(null);
+    setView('list');
+    refetchKB();
+  }, [refetchKB]);
+
+  const handleExport = useCallback(async () => {
+    const ok = await exportCSV();
+    if (ok) {
+      onNotify('Knowledge base exported as CSV', 'success');
+    } else {
+      onNotify(exportError || 'Export failed', 'error');
+    }
+  }, [exportCSV, exportError, onNotify]);
+
+  const handleVerify = useCallback(
+    async (entryId: string) => {
+      const result = await verify(entryId);
+      if (result) {
+        onNotify('Article verified as current', 'success');
+        refetchKB();
+        refetchStaleness();
+      } else {
+        onNotify('Failed to verify article', 'error');
+      }
+    },
+    [verify, onNotify, refetchKB, refetchStaleness],
+  );
 
   const handleOpenEdit = useCallback(
     (article: KBArticle) => {
@@ -648,6 +1000,78 @@ export const KnowledgeBaseManager: React.FC<BaseComponentProps> = ({
     );
   }
 
+  // Import view
+  if (view === 'import') {
+    return (
+      <div
+        style={{
+          fontFamily: FONT_FAMILY,
+          border: `1px solid ${COLOR_BORDER}`,
+          borderRadius: BORDER_RADIUS,
+          backgroundColor: COLOR_WHITE,
+          minHeight: '500px',
+        }}
+      >
+        <div style={{ padding: '24px' }}>
+          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '24px' }}>
+            <h2 style={{ margin: 0, fontSize: '18px', fontWeight: 600, color: COLOR_TEXT }}>
+              Import Content
+              <HelpTooltip text="Upload PDF, DOCX, CSV, or TXT files to automatically create knowledge base entries." />
+            </h2>
+            <button onClick={() => { setView('list'); refetchKB(); }} style={buttonStyle('secondary')}>
+              Back to List
+            </button>
+          </div>
+
+          {uploadResult ? (
+            <UploadResultDisplay result={uploadResult} onDone={handleImportDone} />
+          ) : (
+            <>
+              {/* Tab selector */}
+              <div style={{ display: 'flex', gap: '0', marginBottom: '24px', borderBottom: `1px solid ${COLOR_BORDER}` }}>
+                {(['file', 'url'] as const).map((tab) => (
+                  <button
+                    key={tab}
+                    onClick={() => setImportTab(tab)}
+                    style={{
+                      padding: '10px 20px',
+                      border: 'none',
+                      borderBottom: importTab === tab ? `2px solid ${BRAND_PRIMARY}` : '2px solid transparent',
+                      backgroundColor: 'transparent',
+                      color: importTab === tab ? BRAND_PRIMARY : COLOR_TEXT_SECONDARY,
+                      fontWeight: importTab === tab ? 600 : 400,
+                      fontSize: '14px',
+                      fontFamily: FONT_FAMILY,
+                      cursor: 'pointer',
+                      transition: 'all 0.15s ease',
+                    }}
+                  >
+                    {tab === 'file' ? 'Upload File' : 'Import URL'}
+                  </button>
+                ))}
+              </div>
+
+              {importTab === 'file' ? (
+                <FileUploadZone
+                  onFileSelected={handleFileUpload}
+                  uploading={uploading}
+                  progress={uploadProgress}
+                  error={uploadError}
+                />
+              ) : (
+                <URLImportForm
+                  onImport={handleUrlImport}
+                  importing={importing}
+                  error={importError}
+                />
+              )}
+            </>
+          )}
+        </div>
+      </div>
+    );
+  }
+
   // List view
   return (
     <div
@@ -672,16 +1096,53 @@ export const KnowledgeBaseManager: React.FC<BaseComponentProps> = ({
         <div>
           <h2 style={{ margin: 0, fontSize: '18px', fontWeight: 600, color: COLOR_TEXT }}>
             Knowledge Base
+            <HelpTooltip text="Articles, FAQs, and policies that the AI searches to answer customer questions. Keep it accurate and up to date." />
           </h2>
           <span style={{ fontSize: '13px', color: COLOR_TEXT_SECONDARY }}>
             {articles.length} article{articles.length !== 1 ? 's' : ''}
             {filteredArticles.length !== articles.length && ` (${filteredArticles.length} shown)`}
           </span>
         </div>
-        <button onClick={handleOpenNew} style={buttonStyle('primary')}>
-          + New Article
-        </button>
+        <div style={{ display: 'flex', gap: '8px' }}>
+          <button
+            onClick={handleExport}
+            disabled={exporting || articles.length === 0}
+            style={buttonStyle('secondary', exporting || articles.length === 0)}
+          >
+            {exporting ? 'Exporting...' : 'Export CSV'}
+          </button>
+          <button onClick={handleOpenImport} style={buttonStyle('secondary')}>
+            Import
+          </button>
+          <HelpTooltip text="Import multiple articles at once from a CSV file." />
+          <button onClick={handleOpenNew} style={buttonStyle('primary')}>
+            + New Article
+          </button>
+        </div>
       </div>
+
+      {/* Staleness summary banner */}
+      {stalenessData && (stalenessData.staleCount > 0 || stalenessData.veryStaleCount > 0) && (
+        <div
+          style={{
+            padding: '10px 20px',
+            borderBottom: `1px solid ${COLOR_BORDER}`,
+            backgroundColor: '#ffeef0',
+            display: 'flex',
+            alignItems: 'center',
+            gap: '16px',
+            fontSize: '13px',
+          }}
+        >
+          <span style={{ color: COLOR_DANGER, fontWeight: 600 }}>
+            {stalenessData.staleCount + stalenessData.veryStaleCount} article{(stalenessData.staleCount + stalenessData.veryStaleCount) !== 1 ? 's' : ''} need attention
+          </span>
+          <span style={{ color: COLOR_TEXT_SECONDARY }}>
+            {stalenessData.freshCount} fresh, {stalenessData.agingCount} aging, {stalenessData.staleCount} stale
+            {stalenessData.veryStaleCount > 0 && `, ${stalenessData.veryStaleCount} very stale`}
+          </span>
+        </div>
+      )}
 
       {/* Filters */}
       <div
@@ -816,6 +1277,7 @@ export const KnowledgeBaseManager: React.FC<BaseComponentProps> = ({
                   }}
                 >
                   Category
+                  <HelpTooltip text="Organize articles by topic for easier management. The AI uses categories to narrow searches." />
                 </th>
                 <th
                   style={{
@@ -831,6 +1293,23 @@ export const KnowledgeBaseManager: React.FC<BaseComponentProps> = ({
                   }}
                 >
                   Status
+                  <HelpTooltip text="Draft articles are not used by the AI. Publish when ready." />
+                </th>
+                <th
+                  style={{
+                    padding: '10px 16px',
+                    textAlign: 'left',
+                    fontSize: '12px',
+                    fontWeight: 600,
+                    color: COLOR_TEXT_SECONDARY,
+                    borderBottom: `1px solid ${COLOR_BORDER}`,
+                    textTransform: 'uppercase',
+                    letterSpacing: '0.5px',
+                    width: '100px',
+                  }}
+                >
+                  Freshness
+                  <HelpTooltip text="How recently the article content has been verified. Stale articles may contain outdated information." />
                 </th>
                 <th
                   style={{
@@ -847,6 +1326,21 @@ export const KnowledgeBaseManager: React.FC<BaseComponentProps> = ({
                 >
                   Last Updated
                 </th>
+                <th
+                  style={{
+                    padding: '10px 16px',
+                    textAlign: 'left',
+                    fontSize: '12px',
+                    fontWeight: 600,
+                    color: COLOR_TEXT_SECONDARY,
+                    borderBottom: `1px solid ${COLOR_BORDER}`,
+                    textTransform: 'uppercase',
+                    letterSpacing: '0.5px',
+                    width: '90px',
+                  }}
+                >
+                  Actions
+                </th>
               </tr>
             </thead>
             <tbody>
@@ -855,6 +1349,8 @@ export const KnowledgeBaseManager: React.FC<BaseComponentProps> = ({
                   key={article.id}
                   article={article}
                   onClick={() => handleOpenEdit(article)}
+                  onVerify={handleVerify}
+                  verifying={verifying}
                 />
               ))}
             </tbody>

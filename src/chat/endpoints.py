@@ -34,7 +34,7 @@ import json
 import logging
 from typing import Any
 
-from fastapi import APIRouter, Depends, HTTPException, Request, WebSocket, WebSocketDisconnect
+from fastapi import APIRouter, Depends, HTTPException, Query, Request, WebSocket, WebSocketDisconnect
 from fastapi.responses import StreamingResponse
 
 from src.chat.models import (
@@ -176,6 +176,11 @@ async def _load_tenant_context(
     response_model=ConversationStartResponse,
     status_code=201,
     summary="Start a new conversation",
+    description="Creates a new conversation and returns stream/WebSocket URLs. If an initial_message is included, it is stored as the first customer message and the pipeline is triggered.",
+    responses={
+        403: {"description": "Trial conversation limit reached"},
+        503: {"description": "Chat service not initialized"},
+    },
 )
 async def start_conversation(
     request: ConversationStartRequest,
@@ -214,6 +219,13 @@ async def start_conversation(
     "/message",
     response_model=SendMessageResponse,
     summary="Send a customer message",
+    description="Appends a customer message to an active conversation. The AI response arrives via the SSE stream endpoint, not in this HTTP response.",
+    responses={
+        404: {"description": "Conversation not found"},
+        409: {"description": "Conversation is not active"},
+        422: {"description": "Turn limit reached"},
+        503: {"description": "Chat service not initialized"},
+    },
 )
 async def send_message(
     request: SendMessageRequest,
@@ -256,11 +268,25 @@ async def send_message(
 @router.get(
     "/stream/{conversation_id}",
     summary="SSE stream of AI response",
+    description="Server-Sent Events stream for real-time AI response delivery. Supports reconnection via Last-Event-ID header. Events include token, validated, retracted, stage, error, and done.",
+    responses={
+        400: {"description": "No customer message to process"},
+        404: {"description": "Conversation not found"},
+        429: {"description": "Too many active streaming connections for tenant"},
+        503: {"description": "Chat pipeline not initialized"},
+    },
 )
 async def stream_response(
     conversation_id: str,
     request: Request,
     ctx: TenantContext = Depends(get_tenant_context),
+    tab_id: str | None = Query(
+        default=None,
+        max_length=64,
+        description="Browser tab identifier for multi-tab coordination (WI #133). "
+        "Multiple tabs streaming the same conversation share a single connection "
+        "slot. The widget generates a unique tab_id per browser tab.",
+    ),
 ) -> StreamingResponse:
     """Server-Sent Events stream for AI response delivery.
 
@@ -280,6 +306,10 @@ async def stream_response(
     Supports reconnection via ``Last-Event-ID`` header — if the client
     reconnects after a disconnect, buffered events since the given ID
     are replayed before new events start streaming.
+
+    WI #133: Pass ``tab_id`` query parameter for multi-tab coordination.
+    Multiple tabs streaming the same conversation share one connection
+    slot for concurrency limit purposes.
     """
     from src.chat.sse_manager import get_sse_manager
 
@@ -329,7 +359,7 @@ async def stream_response(
             pass
 
     async def event_generator():
-        sse_mgr.connect(ctx.tenant_id, conversation_id)
+        sse_mgr.connect(ctx.tenant_id, conversation_id, tab_id=tab_id)
         try:
             # Replay buffered events if reconnecting
             if last_event_id > 0:
@@ -352,17 +382,68 @@ async def stream_response(
             ):
                 yield sse_text
         finally:
-            sse_mgr.disconnect(ctx.tenant_id, conversation_id)
+            sse_mgr.disconnect(ctx.tenant_id, conversation_id, tab_id=tab_id)
+
+    # WI #133: Include tab count in response headers so the widget knows
+    # whether other tabs are already streaming this conversation.
+    tab_count = sse_mgr.get_tab_count(ctx.tenant_id, conversation_id)
+    response_headers = {
+        "Cache-Control": "no-cache",
+        "Connection": "keep-alive",
+        "X-Accel-Buffering": "no",
+    }
+    if tab_id is not None:
+        response_headers["X-Tab-Count"] = str(tab_count + 1)  # Include this tab
 
     return StreamingResponse(
         event_generator(),
         media_type="text/event-stream",
-        headers={
-            "Cache-Control": "no-cache",
-            "Connection": "keep-alive",
-            "X-Accel-Buffering": "no",
-        },
+        headers=response_headers,
     )
+
+
+# ---------------------------------------------------------------------------
+# GET /api/chat/stream/{conversation_id}/status — Stream status (WI #133)
+# ---------------------------------------------------------------------------
+
+
+@router.get(
+    "/stream/{conversation_id}/status",
+    summary="Check SSE stream status for a conversation",
+    description="Returns the current streaming status for a conversation, including active tab count. "
+    "Used by the widget for multi-tab coordination — a tab can check if another tab is already "
+    "streaming before opening its own SSE connection.",
+    responses={
+        503: {"description": "SSE manager not initialized"},
+    },
+)
+async def stream_status(
+    conversation_id: str,
+    ctx: TenantContext = Depends(get_tenant_context),
+) -> dict[str, Any]:
+    """Check SSE stream status for multi-tab coordination (WI #133).
+
+    Returns whether the conversation is actively streaming, how many
+    tabs are connected, and whether the tenant has capacity for more
+    connections.
+
+    This is a lightweight poll endpoint — no database queries. The widget
+    can call this before opening an SSE connection to decide whether to
+    connect (new stream) or piggyback (share existing stream via
+    BroadcastChannel API or localStorage).
+    """
+    from src.chat.sse_manager import get_sse_manager
+
+    sse_mgr = get_sse_manager()
+    tier_str = ctx.tier.value if ctx.tier else "starter"
+
+    return {
+        "conversation_id": conversation_id,
+        "is_streaming": sse_mgr.is_conversation_active(ctx.tenant_id, conversation_id),
+        "tab_count": sse_mgr.get_tab_count(ctx.tenant_id, conversation_id),
+        "can_connect": sse_mgr.can_connect(ctx.tenant_id, tier_str),
+        "active_connections": sse_mgr.get_active_count(ctx.tenant_id),
+    }
 
 
 # ---------------------------------------------------------------------------
@@ -374,6 +455,11 @@ async def stream_response(
     "/conversations/{conversation_id}",
     response_model=ConversationStateResponse,
     summary="Get conversation state",
+    description="Retrieves the current state of a conversation including the full message history in chronological order. Used by the widget to restore state on page reload.",
+    responses={
+        404: {"description": "Conversation not found"},
+        503: {"description": "Chat service not initialized"},
+    },
 )
 async def get_conversation(
     conversation_id: str,
@@ -401,6 +487,12 @@ async def get_conversation(
     "/conversations/{conversation_id}/end",
     response_model=EndConversationResponse,
     summary="End a conversation",
+    description="Ends an active conversation with optional feedback (rating, text). The conversation is metered for billing at this point.",
+    responses={
+        404: {"description": "Conversation not found"},
+        409: {"description": "Conversation is not active"},
+        503: {"description": "Chat service not initialized"},
+    },
 )
 async def end_conversation(
     conversation_id: str,

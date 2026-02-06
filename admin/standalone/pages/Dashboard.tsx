@@ -30,7 +30,7 @@ import {
   useIntentBreakdown,
 } from '../../shared/hooks/index';
 
-const BRAND_RED = '#C41E2A';
+const BRAND_RED = '#ff3621';
 
 const statusColorMap: Record<string, string> = {
   active: 'blue',

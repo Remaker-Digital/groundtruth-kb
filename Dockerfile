@@ -49,16 +49,16 @@ RUN pip install --no-cache-dir --upgrade pip \
 
 # --------------------------------------------------------------------------
 # Application source and configuration
+# ARG+RUN pattern forces full cache invalidation for COPY below
 # --------------------------------------------------------------------------
+ARG BUILD_VERSION=unknown
+RUN echo "build-version=${BUILD_VERSION}" > /tmp/.build-version
 COPY src/ ./src/
 COPY config/ ./config/
 
 # --------------------------------------------------------------------------
 # Admin SPAs (pre-built Vite output for embedded + standalone admin)
-# ARG+RUN pattern forces full cache invalidation for COPY below
 # --------------------------------------------------------------------------
-ARG ADMIN_SPA_VERSION=unknown
-RUN echo "admin-spa-version=${ADMIN_SPA_VERSION}" > /tmp/.admin-version
 COPY admin/shopify/dist/ ./admin/shopify/dist/
 COPY admin/standalone/dist/ ./admin/standalone/dist/
 
@@ -86,4 +86,4 @@ HEALTHCHECK --interval=30s --timeout=5s --start-period=15s --retries=3 \
 # Entrypoint — tini ensures proper signal handling for PID 1
 # --------------------------------------------------------------------------
 ENTRYPOINT ["tini", "--"]
-CMD ["uvicorn", "src.main:app", "--host", "0.0.0.0", "--port", "8000", "--workers", "2", "--log-level", "warning"]
+CMD ["uvicorn", "src.main:app", "--host", "0.0.0.0", "--port", "8000", "--workers", "2", "--log-level", "info"]

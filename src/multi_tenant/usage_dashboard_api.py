@@ -207,7 +207,12 @@ router = APIRouter(prefix="/api/dashboard", tags=["dashboard"])
 # Layer 1: Real-time usage dashboard
 # ---------------------------------------------------------------------------
 
-@router.get("/usage", response_model=UsageDashboardResponse)
+@router.get(
+    "/usage",
+    response_model=UsageDashboardResponse,
+    summary="Get real-time usage dashboard",
+    description="Returns current conversation counts, allowance remaining, overage estimate, pack balance, and active billing alerts for the authenticated tenant.",
+)
 async def get_usage_dashboard(
     billing_period: str | None = Query(
         None,
@@ -269,7 +274,15 @@ async def get_usage_dashboard(
 # Layer 1 supplement: daily volume chart data
 # ---------------------------------------------------------------------------
 
-@router.get("/usage/daily", response_model=DailyVolumeResponse)
+@router.get(
+    "/usage/daily",
+    response_model=DailyVolumeResponse,
+    summary="Get daily conversation volume",
+    description="Returns per-day total and billable conversation counts for chart rendering in the merchant dashboard.",
+    responses={
+        400: {"description": "Invalid billing_period format"},
+    },
+)
 async def get_daily_volume(
     billing_period: str | None = Query(
         None,
@@ -374,7 +387,15 @@ async def get_daily_volume(
 # Layer 2: Per-conversation audit trail
 # ---------------------------------------------------------------------------
 
-@router.get("/conversations", response_model=ConversationListResponse)
+@router.get(
+    "/conversations",
+    response_model=ConversationListResponse,
+    summary="List billable conversations",
+    description="Returns a paginated list of billable conversations for the authenticated tenant with compact summaries.",
+    responses={
+        400: {"description": "Invalid billing_period format"},
+    },
+)
 async def list_conversations(
     billing_period: str | None = Query(
         None,
@@ -504,7 +525,14 @@ _CSV_COLUMNS = [
 ]
 
 
-@router.get("/conversations/export")
+@router.get(
+    "/conversations/export",
+    summary="Export conversations as CSV",
+    description="Exports all billable conversations for the specified billing period as a downloadable CSV file.",
+    responses={
+        400: {"description": "Invalid billing_period format"},
+    },
+)
 async def export_conversations_csv(
     billing_period: str | None = Query(
         None,
@@ -617,6 +645,11 @@ async def export_conversations_csv(
 @router.get(
     "/conversations/{conversation_id}",
     response_model=ConversationDetailResponse,
+    summary="Get conversation billing detail",
+    description="Returns the complete billing attribution record for a single conversation including agents invoked, model used, and Critic pass/fail.",
+    responses={
+        404: {"description": "Conversation not found"},
+    },
 )
 async def get_conversation_detail(
     conversation_id: str,

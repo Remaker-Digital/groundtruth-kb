@@ -170,7 +170,17 @@ def _build_line_items(
 # ---------------------------------------------------------------------------
 
 
-@router.post("/session", response_model=CheckoutResponse)
+@router.post(
+    "/session",
+    response_model=CheckoutResponse,
+    status_code=200,
+    summary="Create a Stripe Checkout session",
+    description="Creates a Stripe Checkout Session for subscription signup including base tier price, metered overage price, and any selected add-on prices as recurring line items.",
+    responses={
+        400: {"description": "Invalid tier, billing interval, or add-on configuration"},
+        502: {"description": "Stripe API error during session creation"},
+    },
+)
 async def create_checkout_session(body: CheckoutRequest) -> CheckoutResponse:
     """Create a Stripe Checkout Session for subscription signup.
 
@@ -270,7 +280,12 @@ async def create_checkout_session(body: CheckoutRequest) -> CheckoutResponse:
     )
 
 
-@router.get("/success")
+@router.get(
+    "/success",
+    status_code=200,
+    summary="Handle successful checkout redirect",
+    description="Handles the post-payment success redirect from Stripe. Returns session details or a thank-you message.",
+)
 async def checkout_success(request: Request) -> JSONResponse:
     """Handle successful checkout redirect.
 
@@ -317,7 +332,12 @@ async def checkout_success(request: Request) -> JSONResponse:
     )
 
 
-@router.get("/cancel")
+@router.get(
+    "/cancel",
+    status_code=200,
+    summary="Handle cancelled checkout redirect",
+    description="Handles the cancelled checkout redirect. Returns a message indicating checkout was not completed.",
+)
 async def checkout_cancel() -> JSONResponse:
     """Handle cancelled checkout redirect.
 

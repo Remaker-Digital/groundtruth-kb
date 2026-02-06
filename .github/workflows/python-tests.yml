@@ -1,7 +1,7 @@
 # Python Test CI Pipeline
 #
 # Runs pytest with coverage on every PR and push to main.
-# Fails on test failure or coverage below threshold (pyproject.toml: fail_under=50).
+# Fails on test failure or coverage below threshold (pyproject.toml: fail_under=70).
 #
 # Work Items #104 (Test Infrastructure), #105 (Coverage Gate).
 #
@@ -64,7 +64,8 @@ jobs:
             --cov-report=term-missing \
             --cov-report=xml:coverage.xml \
             --cov-report=html:htmlcov \
-            --cov-fail-under=50 \
+            --cov-report=json:coverage.json \
+            --cov-fail-under=70 \
             --junitxml=test-results.xml \
             --ignore=tests/integration_real_services.py \
             --ignore=tests/integration
@@ -76,6 +77,7 @@ jobs:
           name: coverage-report-py${{ matrix.python-version }}
           path: |
             coverage.xml
+            coverage.json
             test-results.xml
             htmlcov/
           retention-days: 30
@@ -109,10 +111,53 @@ jobs:
           rate = float(root.attrib.get('line-rate', 0))
           print(f'{rate * 100:.1f}')
           " 2>/dev/null || echo "N/A")
+
+            # Determine badge color based on coverage
+            BADGE_COLOR="red"
+            COV_NUM=$(echo "$COVERAGE" | cut -d'.' -f1)
+            if [ "$COV_NUM" -ge 90 ]; then BADGE_COLOR="brightgreen"
+            elif [ "$COV_NUM" -ge 80 ]; then BADGE_COLOR="green"
+            elif [ "$COV_NUM" -ge 70 ]; then BADGE_COLOR="yellowgreen"
+            elif [ "$COV_NUM" -ge 60 ]; then BADGE_COLOR="yellow"
+            elif [ "$COV_NUM" -ge 50 ]; then BADGE_COLOR="orange"
+            fi
+
             echo "### Coverage" >> $GITHUB_STEP_SUMMARY
+            echo "![Coverage](https://img.shields.io/badge/coverage-${COVERAGE}%25-${BADGE_COLOR})" >> $GITHUB_STEP_SUMMARY
+            echo "" >> $GITHUB_STEP_SUMMARY
             echo "| Metric | Value |" >> $GITHUB_STEP_SUMMARY
             echo "|--------|-------|" >> $GITHUB_STEP_SUMMARY
             echo "| Line coverage | ${COVERAGE}% |" >> $GITHUB_STEP_SUMMARY
-            echo "| Minimum required | 50% |" >> $GITHUB_STEP_SUMMARY
+            echo "| Minimum required | 70% |" >> $GITHUB_STEP_SUMMARY
+            echo "| Launch target | 80% |" >> $GITHUB_STEP_SUMMARY
             echo "" >> $GITHUB_STEP_SUMMARY
+          fi
+
+          # Per-module coverage breakdown from JSON
+          if [ -f coverage.json ]; then
+            echo "### Module Coverage" >> $GITHUB_STEP_SUMMARY
+            echo "" >> $GITHUB_STEP_SUMMARY
+            python -c "
+          import json
+          with open('coverage.json') as f:
+              data = json.load(f)
+          files = data.get('files', {})
+          print('| Module | Stmts | Miss | Cover |')
+          print('|--------|-------|------|-------|')
+          # Sort by coverage ascending (worst first)
+          entries = []
+          for path, info in files.items():
+              summary = info.get('summary', {})
+              stmts = summary.get('num_statements', 0)
+              miss = summary.get('missing_lines', 0)
+              pct = summary.get('percent_covered', 0)
+              short = path.replace('src/', '')
+              entries.append((pct, short, stmts, miss))
+          entries.sort()
+          # Show bottom 10 (lowest coverage)
+          for pct, short, stmts, miss in entries[:10]:
+              print(f'| {short} | {stmts} | {miss} | {pct:.0f}% |')
+          if len(entries) > 10:
+              print(f'| ... ({len(entries) - 10} more modules above 70%) | | | |')
+          " >> $GITHUB_STEP_SUMMARY 2>/dev/null || true
           fi

@@ -29,12 +29,15 @@ Dependencies:
 
 from __future__ import annotations
 
+import csv
+import io
 import logging
 import uuid
 from datetime import datetime, timezone
 from typing import Any
 
-from fastapi import APIRouter, Depends, HTTPException, Query
+from fastapi import APIRouter, Depends, File, HTTPException, Query, UploadFile
+from fastapi.responses import StreamingResponse
 from pydantic import BaseModel, ConfigDict, Field
 from pydantic.alias_generators import to_camel
 
@@ -73,6 +76,14 @@ class KnowledgeEntryResponse(BaseModel):
     is_active: bool = True
     created_at: str
     updated_at: str
+    # Staleness fields (WI #219-221)
+    staleness_score: float | None = Field(default=None, description="0.0 (fresh) to 1.0 (stale)")
+    staleness_category: str | None = Field(default=None, description="fresh | aging | stale | very_stale")
+    last_verified_at: str | None = Field(default=None, description="Last human verification timestamp")
+    embedded_at: str | None = Field(default=None, description="Last embedding timestamp")
+    source_type: str | None = Field(default=None, description="manual | pdf | docx | csv | url")
+    source_filename: str | None = None
+    source_url: str | None = None
 
 
 class KnowledgeListResponse(BaseModel):
@@ -169,23 +180,102 @@ class DeleteKnowledgeEntryResponse(BaseModel):
     deleted_at: str
 
 
+class UploadResultResponse(BaseModel):
+    """Response for document upload (WI #214)."""
+
+    model_config = ConfigDict(alias_generator=to_camel, populate_by_name=True)
+
+    source_type: str = Field(description="pdf | docx | csv | txt | url")
+    source_filename: str | None = Field(default=None, description="Original filename")
+    source_url: str | None = Field(default=None, description="Source URL if URL import")
+    entries_created: int = Field(description="Number of KB entries created")
+    total_chars: int = Field(description="Total characters extracted")
+    entry_ids: list[str] = Field(description="IDs of created entries")
+    parent_entry_id: str | None = Field(default=None, description="Parent ID for multi-chunk documents")
+
+
+class URLImportRequest(BaseModel):
+    """Request body for POST /api/admin/knowledge/import-url."""
+
+    model_config = ConfigDict(alias_generator=to_camel, populate_by_name=True)
+
+    url: str = Field(description="URL to scrape and import")
+    entry_type: str = Field(
+        default="custom",
+        description="Entry type for imported content",
+    )
+
+
+class StalenessScoreResponse(BaseModel):
+    """Staleness score for a single entry."""
+
+    model_config = ConfigDict(alias_generator=to_camel, populate_by_name=True)
+
+    id: str
+    staleness_score: float
+    staleness_category: str
+    last_verified_at: str | None = None
+    embedded_at: str | None = None
+
+
+class StalenessSummaryResponse(BaseModel):
+    """Summary of staleness across the tenant's KB."""
+
+    model_config = ConfigDict(alias_generator=to_camel, populate_by_name=True)
+
+    total_entries: int
+    avg_staleness_score: float
+    fresh_count: int
+    aging_count: int
+    stale_count: int
+    very_stale_count: int
+    needs_attention: int
+
+
+class StaleEntriesResponse(BaseModel):
+    """List of stale entries."""
+
+    model_config = ConfigDict(alias_generator=to_camel, populate_by_name=True)
+
+    entries: list[StalenessScoreResponse]
+    threshold: float
+
+
 # ---------------------------------------------------------------------------
 # Service accessor
 # ---------------------------------------------------------------------------
 
 _knowledge_repo: KnowledgeBaseRepository | None = None
+_knowledge_vectorizer: Any = None  # KnowledgeVectorizer (optional)
+_staleness_service: Any = None  # StalenessService (optional)
 
 
 def configure_admin_knowledge_services(
     knowledge_repo: KnowledgeBaseRepository,
+    knowledge_vectorizer: Any = None,
+    staleness_service: Any = None,
 ) -> None:
-    """Wire the admin knowledge API to its backing repository.
+    """Wire the admin knowledge API to its backing repository and vectorizer.
 
     Called during app startup after KnowledgeBaseRepository is initialised.
+    When knowledge_vectorizer is provided, KB entries are automatically
+    embedded on create and update (WI #210).
+
+    Args:
+        knowledge_repo: KnowledgeBaseRepository instance.
+        knowledge_vectorizer: Optional KnowledgeVectorizer for auto-embedding.
+        staleness_service: Optional StalenessService for freshness tracking.
     """
-    global _knowledge_repo
+    global _knowledge_repo, _knowledge_vectorizer, _staleness_service
     _knowledge_repo = knowledge_repo
-    logger.info("Admin knowledge base API services configured")
+    _knowledge_vectorizer = knowledge_vectorizer
+    _staleness_service = staleness_service
+    vectorizer_status = "enabled" if knowledge_vectorizer else "disabled"
+    staleness_status = "enabled" if staleness_service else "disabled"
+    logger.info(
+        "Admin knowledge base API services configured (vectorization=%s, staleness=%s)",
+        vectorizer_status, staleness_status,
+    )
 
 
 def _get_repo() -> KnowledgeBaseRepository:
@@ -205,12 +295,50 @@ def _get_repo() -> KnowledgeBaseRepository:
 router = APIRouter(prefix="/api/admin/knowledge", tags=["admin-knowledge"])
 
 
+def _build_entry_response(entry: dict[str, Any], tenant_id: str) -> KnowledgeEntryResponse:
+    """Build a KnowledgeEntryResponse from a raw entry dict."""
+    from src.multi_tenant.staleness_service import classify_staleness
+
+    score = entry.get("staleness_score")
+    category = classify_staleness(score) if score is not None else None
+
+    return KnowledgeEntryResponse(
+        id=entry.get("id", ""),
+        tenant_id=tenant_id,
+        entry_type=entry.get("entry_type", "custom"),
+        title=entry.get("title", ""),
+        content=entry.get("content", ""),
+        metadata=entry.get("metadata", {}),
+        tags=entry.get("tags", []),
+        language=entry.get("language", "en"),
+        is_active=entry.get("is_active", True),
+        created_at=entry.get("created_at", ""),
+        updated_at=entry.get("updated_at", ""),
+        staleness_score=score,
+        staleness_category=category,
+        last_verified_at=entry.get("last_verified_at"),
+        embedded_at=entry.get("embedded_at"),
+        source_type=entry.get("source_type"),
+        source_filename=entry.get("source_filename"),
+        source_url=entry.get("source_url"),
+    )
+
+
 # ---------------------------------------------------------------------------
 # GET /api/admin/knowledge — List with filtering & pagination
 # ---------------------------------------------------------------------------
 
 
-@router.get("", response_model=KnowledgeListResponse)
+@router.get(
+    "",
+    response_model=KnowledgeListResponse,
+    summary="List knowledge base entries",
+    description="Returns a paginated list of knowledge base entries. Supports filtering by type, language, active status, and title search.",
+    responses={
+        400: {"description": "Invalid entry_type filter value"},
+        503: {"description": "Knowledge base services not initialized"},
+    },
+)
 async def list_knowledge_entries(
     entry_type: str | None = Query(
         None,
@@ -265,22 +393,7 @@ async def list_knowledge_entries(
         limit=limit,
     )
 
-    entries = [
-        KnowledgeEntryResponse(
-            id=e.get("id", ""),
-            tenant_id=ctx.tenant_id,
-            entry_type=e.get("entry_type", "custom"),
-            title=e.get("title", ""),
-            content=e.get("content", ""),
-            metadata=e.get("metadata", {}),
-            tags=e.get("tags", []),
-            language=e.get("language", "en"),
-            is_active=e.get("is_active", True),
-            created_at=e.get("created_at", ""),
-            updated_at=e.get("updated_at", ""),
-        )
-        for e in entries_raw
-    ]
+    entries = [_build_entry_response(e, ctx.tenant_id) for e in entries_raw]
 
     return KnowledgeListResponse(
         tenant_id=ctx.tenant_id,
@@ -296,7 +409,16 @@ async def list_knowledge_entries(
 # ---------------------------------------------------------------------------
 
 
-@router.get("/{entry_id}", response_model=KnowledgeEntryResponse)
+@router.get(
+    "/{entry_id}",
+    response_model=KnowledgeEntryResponse,
+    summary="Get knowledge base entry",
+    description="Returns a single knowledge base entry by ID.",
+    responses={
+        404: {"description": "Knowledge entry not found"},
+        503: {"description": "Knowledge base services not initialized"},
+    },
+)
 async def get_knowledge_entry(
     entry_id: str,
     ctx: TenantContext = Depends(get_tenant_context),
@@ -312,19 +434,7 @@ async def get_knowledge_entry(
             detail=f"Knowledge entry {entry_id} not found",
         )
 
-    return KnowledgeEntryResponse(
-        id=doc.get("id", ""),
-        tenant_id=ctx.tenant_id,
-        entry_type=doc.get("entry_type", "custom"),
-        title=doc.get("title", ""),
-        content=doc.get("content", ""),
-        metadata=doc.get("metadata", {}),
-        tags=doc.get("tags", []),
-        language=doc.get("language", "en"),
-        is_active=doc.get("is_active", True),
-        created_at=doc.get("created_at", ""),
-        updated_at=doc.get("updated_at", ""),
-    )
+    return _build_entry_response(doc, ctx.tenant_id)
 
 
 # ---------------------------------------------------------------------------
@@ -332,7 +442,17 @@ async def get_knowledge_entry(
 # ---------------------------------------------------------------------------
 
 
-@router.post("", response_model=KnowledgeEntryResponse, status_code=201)
+@router.post(
+    "",
+    response_model=KnowledgeEntryResponse,
+    status_code=201,
+    summary="Create knowledge base entry",
+    description="Creates a new knowledge base entry. The entry is immediately active and searchable by the Knowledge Retrieval agent.",
+    responses={
+        400: {"description": "Invalid entry_type value"},
+        503: {"description": "Knowledge base services not initialized"},
+    },
+)
 async def create_knowledge_entry(
     request: CreateKnowledgeEntryRequest,
     ctx: TenantContext = Depends(get_tenant_context),
@@ -379,19 +499,30 @@ async def create_knowledge_entry(
         ctx.tenant_id[:8],
     )
 
-    return KnowledgeEntryResponse(
-        id=entry_id,
-        tenant_id=ctx.tenant_id,
-        entry_type=request.entry_type,
-        title=request.title,
-        content=request.content,
-        metadata=request.metadata,
-        tags=request.tags,
-        language=request.language,
-        is_active=True,
-        created_at=now,
-        updated_at=now,
-    )
+    # Trigger async embedding (WI #210 — non-blocking, best-effort)
+    if _knowledge_vectorizer:
+        try:
+            entry_dict = doc.model_dump() if hasattr(doc, "model_dump") else doc.dict()
+            await _knowledge_vectorizer.embed_entry(ctx.tenant_id, entry_dict)
+        except Exception as embed_exc:
+            logger.warning(
+                "KB entry embedding failed (non-blocking): id=%s error=%s",
+                entry_id, embed_exc,
+            )
+
+    created_dict = {
+        "id": entry_id,
+        "entry_type": request.entry_type,
+        "title": request.title,
+        "content": request.content,
+        "metadata": request.metadata,
+        "tags": request.tags,
+        "language": request.language,
+        "is_active": True,
+        "created_at": now,
+        "updated_at": now,
+    }
+    return _build_entry_response(created_dict, ctx.tenant_id)
 
 
 # ---------------------------------------------------------------------------
@@ -399,7 +530,17 @@ async def create_knowledge_entry(
 # ---------------------------------------------------------------------------
 
 
-@router.put("/{entry_id}", response_model=KnowledgeEntryResponse)
+@router.put(
+    "/{entry_id}",
+    response_model=KnowledgeEntryResponse,
+    summary="Update knowledge base entry",
+    description="Updates an existing knowledge base entry. Only provided fields are updated; omitted fields retain their current values.",
+    responses={
+        400: {"description": "Invalid entry_type value"},
+        404: {"description": "Knowledge entry not found"},
+        503: {"description": "Knowledge base services not initialized"},
+    },
+)
 async def update_knowledge_entry(
     entry_id: str,
     request: UpdateKnowledgeEntryRequest,
@@ -479,19 +620,19 @@ async def update_knowledge_entry(
         ctx.tenant_id[:8],
     )
 
-    return KnowledgeEntryResponse(
-        id=entry_id,
-        tenant_id=ctx.tenant_id,
-        entry_type=updated.get("entry_type", "custom"),
-        title=updated.get("title", ""),
-        content=updated.get("content", ""),
-        metadata=updated.get("metadata", {}),
-        tags=updated.get("tags", []),
-        language=updated.get("language", "en"),
-        is_active=updated.get("is_active", True),
-        created_at=updated.get("created_at", ""),
-        updated_at=now,
-    )
+    # Re-embed if title or content changed (WI #210 — content hash will detect changes)
+    if _knowledge_vectorizer and (request.title is not None or request.content is not None):
+        try:
+            await _knowledge_vectorizer.embed_entry(ctx.tenant_id, updated)
+        except Exception as embed_exc:
+            logger.warning(
+                "KB entry re-embedding failed (non-blocking): id=%s error=%s",
+                entry_id, embed_exc,
+            )
+
+    updated["id"] = entry_id
+    updated["updated_at"] = now
+    return _build_entry_response(updated, ctx.tenant_id)
 
 
 # ---------------------------------------------------------------------------
@@ -499,7 +640,16 @@ async def update_knowledge_entry(
 # ---------------------------------------------------------------------------
 
 
-@router.delete("/{entry_id}", response_model=DeleteKnowledgeEntryResponse)
+@router.delete(
+    "/{entry_id}",
+    response_model=DeleteKnowledgeEntryResponse,
+    summary="Soft-delete knowledge base entry",
+    description="Sets is_active to false so the entry is no longer returned by the Knowledge Retrieval agent. The data is preserved for audit purposes and can be reactivated via PUT.",
+    responses={
+        404: {"description": "Knowledge entry not found"},
+        503: {"description": "Knowledge base services not initialized"},
+    },
+)
 async def delete_knowledge_entry(
     entry_id: str,
     ctx: TenantContext = Depends(get_tenant_context),
@@ -532,3 +682,425 @@ async def delete_knowledge_entry(
         id=entry_id,
         deleted_at=now,
     )
+
+
+# ---------------------------------------------------------------------------
+# POST /api/admin/knowledge/upload — File upload (WI #214)
+# ---------------------------------------------------------------------------
+
+
+@router.post(
+    "/upload",
+    response_model=UploadResultResponse,
+    status_code=201,
+    summary="Upload document to knowledge base",
+    description="Uploads a document (PDF, DOCX, CSV, or TXT) and parses it into knowledge base entries. Multi-page documents are chunked with paragraph-aware splitting.",
+    responses={
+        400: {"description": "Invalid entry_type, missing filename, or empty file"},
+        422: {"description": "Document parsing failed or no content extracted"},
+        503: {"description": "Knowledge base services not initialized"},
+    },
+)
+async def upload_knowledge_document(
+    file: UploadFile = File(..., description="PDF, DOCX, CSV, or TXT file"),
+    entry_type: str = Query(
+        "custom",
+        description="Default entry type for parsed entries (product, faq, policy, custom)",
+    ),
+    ctx: TenantContext = Depends(get_tenant_context),
+) -> UploadResultResponse:
+    """Upload a document and parse it into knowledge base entries.
+
+    Supported formats:
+        - **PDF**: Text extracted page-by-page, chunked into entries
+        - **DOCX**: Paragraphs extracted with heading preservation
+        - **CSV**: Each row becomes a separate entry (requires title,content columns)
+        - **TXT**: Plain text chunked into entries
+
+    Multi-page documents are automatically chunked with paragraph-aware
+    splitting (~400 tokens per chunk, 50-token overlap). Each chunk becomes
+    a separate KB entry linked via parent_entry_id.
+
+    Size limits: PDF 50 MB, others 4 MB.
+    """
+    repo = _get_repo()
+
+    if entry_type not in VALID_ENTRY_TYPES:
+        raise HTTPException(
+            status_code=400,
+            detail=f"Invalid entry_type '{entry_type}'. Valid values: {sorted(VALID_ENTRY_TYPES)}",
+        )
+
+    if not file.filename:
+        raise HTTPException(status_code=400, detail="Filename is required")
+
+    # Read file content
+    file_content = await file.read()
+    file_size = len(file_content)
+
+    if file_size == 0:
+        raise HTTPException(status_code=400, detail="Uploaded file is empty")
+
+    # Validate file type and size
+    from src.multi_tenant.document_parser import validate_file
+
+    validation_error = validate_file(file.filename, file_size)
+    if validation_error:
+        raise HTTPException(status_code=400, detail=validation_error)
+
+    # Parse the document
+    from src.multi_tenant.document_parser import chunks_to_kb_entries, parse_file
+
+    parse_result = await parse_file(file_content, file.filename)
+
+    if not parse_result.success:
+        raise HTTPException(
+            status_code=422,
+            detail=f"Document parsing failed: {parse_result.error}",
+        )
+
+    # Convert chunks to KB entries
+    entries = chunks_to_kb_entries(
+        parse_result=parse_result,
+        tenant_id=ctx.tenant_id,
+        default_entry_type=entry_type,
+    )
+
+    if not entries:
+        raise HTTPException(
+            status_code=422,
+            detail="No content could be extracted from the document.",
+        )
+
+    # Create entries in Cosmos DB
+    entry_ids: list[str] = []
+    from src.multi_tenant.cosmos_schema import KnowledgeBaseDocument
+
+    for entry_dict in entries:
+        doc = KnowledgeBaseDocument(**entry_dict)
+        await repo.create(ctx.tenant_id, doc)
+        entry_ids.append(entry_dict["id"])
+
+    parent_id = entries[0].get("parent_entry_id") if len(entries) > 1 else None
+
+    logger.info(
+        "Document uploaded: file=%s type=%s entries=%d chars=%d tenant=%s",
+        file.filename,
+        parse_result.source_type,
+        len(entries),
+        parse_result.total_chars,
+        ctx.tenant_id[:8],
+    )
+
+    # Trigger batch embedding (non-blocking, best-effort)
+    if _knowledge_vectorizer:
+        try:
+            await _knowledge_vectorizer.embed_batch(ctx.tenant_id, entries)
+        except Exception as embed_exc:
+            logger.warning(
+                "Batch embedding after upload failed (non-blocking): %s", embed_exc
+            )
+
+    return UploadResultResponse(
+        source_type=parse_result.source_type,
+        source_filename=file.filename,
+        entries_created=len(entries),
+        total_chars=parse_result.total_chars,
+        entry_ids=entry_ids,
+        parent_entry_id=parent_id,
+    )
+
+
+# ---------------------------------------------------------------------------
+# POST /api/admin/knowledge/import-url — URL import (WI #215)
+# ---------------------------------------------------------------------------
+
+
+@router.post(
+    "/import-url",
+    response_model=UploadResultResponse,
+    status_code=201,
+    summary="Import knowledge from URL",
+    description="Scrapes a web page, extracts main text content, and creates knowledge base entries. Navigation, scripts, and non-content elements are stripped.",
+    responses={
+        400: {"description": "Invalid entry_type or malformed URL"},
+        422: {"description": "URL import failed or no content extracted"},
+        503: {"description": "Knowledge base services not initialized"},
+    },
+)
+async def import_knowledge_from_url(
+    request: URLImportRequest,
+    ctx: TenantContext = Depends(get_tenant_context),
+) -> UploadResultResponse:
+    """Import knowledge from a web page URL.
+
+    Scrapes the page, extracts main text content, and creates KB entries.
+    Navigation, scripts, and non-content elements are stripped.
+
+    Maximum page size: 4 MB.
+    """
+    repo = _get_repo()
+
+    if request.entry_type not in VALID_ENTRY_TYPES:
+        raise HTTPException(
+            status_code=400,
+            detail=f"Invalid entry_type '{request.entry_type}'. Valid values: {sorted(VALID_ENTRY_TYPES)}",
+        )
+
+    # Validate URL
+    url = request.url.strip()
+    if not url.startswith(("http://", "https://")):
+        raise HTTPException(
+            status_code=400,
+            detail="URL must start with http:// or https://",
+        )
+
+    # Parse the URL
+    from src.multi_tenant.document_parser import chunks_to_kb_entries, parse_url
+
+    parse_result = await parse_url(url)
+
+    if not parse_result.success:
+        raise HTTPException(
+            status_code=422,
+            detail=f"URL import failed: {parse_result.error}",
+        )
+
+    # Convert chunks to KB entries
+    entries = chunks_to_kb_entries(
+        parse_result=parse_result,
+        tenant_id=ctx.tenant_id,
+        default_entry_type=request.entry_type,
+    )
+
+    if not entries:
+        raise HTTPException(
+            status_code=422,
+            detail="No content could be extracted from the URL.",
+        )
+
+    # Create entries in Cosmos DB
+    entry_ids: list[str] = []
+    from src.multi_tenant.cosmos_schema import KnowledgeBaseDocument
+
+    for entry_dict in entries:
+        doc = KnowledgeBaseDocument(**entry_dict)
+        await repo.create(ctx.tenant_id, doc)
+        entry_ids.append(entry_dict["id"])
+
+    parent_id = entries[0].get("parent_entry_id") if len(entries) > 1 else None
+
+    logger.info(
+        "URL imported: url=%s entries=%d chars=%d tenant=%s",
+        url,
+        len(entries),
+        parse_result.total_chars,
+        ctx.tenant_id[:8],
+    )
+
+    # Trigger batch embedding (non-blocking, best-effort)
+    if _knowledge_vectorizer:
+        try:
+            await _knowledge_vectorizer.embed_batch(ctx.tenant_id, entries)
+        except Exception as embed_exc:
+            logger.warning(
+                "Batch embedding after URL import failed (non-blocking): %s", embed_exc
+            )
+
+    return UploadResultResponse(
+        source_type=parse_result.source_type,
+        source_url=url,
+        entries_created=len(entries),
+        total_chars=parse_result.total_chars,
+        entry_ids=entry_ids,
+        parent_entry_id=parent_id,
+    )
+
+
+# ---------------------------------------------------------------------------
+# GET /api/admin/knowledge/export — CSV export (WI #217)
+# ---------------------------------------------------------------------------
+
+
+@router.get(
+    "/export",
+    summary="Export knowledge base as CSV",
+    description="Exports all knowledge base entries as a downloadable CSV file with columns for id, type, title, content, tags, language, active status, source info, and timestamps.",
+    responses={
+        503: {"description": "Knowledge base services not initialized"},
+    },
+)
+async def export_knowledge_entries(
+    ctx: TenantContext = Depends(get_tenant_context),
+) -> StreamingResponse:
+    """Export all knowledge base entries as CSV.
+
+    Columns: id, entry_type, title, content, tags, language, is_active,
+    source_type, source_filename, source_url, created_at, updated_at.
+    """
+    repo = _get_repo()
+
+    entries = await repo.list_filtered(
+        tenant_id=ctx.tenant_id,
+        offset=0,
+        limit=10000,  # Practical upper bound
+    )
+
+    output = io.StringIO()
+    writer = csv.writer(output)
+
+    # Header
+    writer.writerow([
+        "id",
+        "entry_type",
+        "title",
+        "content",
+        "tags",
+        "language",
+        "is_active",
+        "source_type",
+        "source_filename",
+        "source_url",
+        "created_at",
+        "updated_at",
+    ])
+
+    for entry in entries:
+        tags_str = ";".join(entry.get("tags", []))
+        writer.writerow([
+            entry.get("id", ""),
+            entry.get("entry_type", ""),
+            entry.get("title", ""),
+            entry.get("content", ""),
+            tags_str,
+            entry.get("language", "en"),
+            entry.get("is_active", True),
+            entry.get("source_type", "manual"),
+            entry.get("source_filename", ""),
+            entry.get("source_url", ""),
+            entry.get("created_at", ""),
+            entry.get("updated_at", ""),
+        ])
+
+    logger.info(
+        "KB export: entries=%d tenant=%s",
+        len(entries),
+        ctx.tenant_id[:8],
+    )
+
+    return StreamingResponse(
+        iter([output.getvalue()]),
+        media_type="text/csv",
+        headers={"Content-Disposition": "attachment; filename=knowledge-base-export.csv"},
+    )
+
+
+# ---------------------------------------------------------------------------
+# GET /api/admin/knowledge/staleness — Staleness summary (WI #221)
+# ---------------------------------------------------------------------------
+
+
+@router.get(
+    "/staleness",
+    response_model=StalenessSummaryResponse,
+    summary="Get content staleness summary",
+    description="Returns a summary of content staleness across the knowledge base, including counts of fresh, aging, stale, and very stale entries with the average staleness score.",
+    responses={
+        503: {"description": "Staleness service not initialized"},
+    },
+)
+async def get_staleness_summary(
+    ctx: TenantContext = Depends(get_tenant_context),
+) -> StalenessSummaryResponse:
+    """Get a summary of content staleness across the knowledge base.
+
+    Returns counts of fresh, aging, stale, and very stale entries
+    along with the average staleness score.
+    """
+    if _staleness_service is None:
+        raise HTTPException(status_code=503, detail="Staleness service not initialised")
+
+    summary = await _staleness_service.get_summary(ctx.tenant_id)
+    return StalenessSummaryResponse(**summary)
+
+
+# ---------------------------------------------------------------------------
+# GET /api/admin/knowledge/stale — List stale entries (WI #221)
+# ---------------------------------------------------------------------------
+
+
+@router.get(
+    "/stale",
+    response_model=StaleEntriesResponse,
+    summary="List stale knowledge entries",
+    description="Lists knowledge base entries above the staleness threshold. Default threshold is 0.6, returning stale and very stale entries.",
+    responses={
+        503: {"description": "Staleness service not initialized"},
+    },
+)
+async def list_stale_entries(
+    threshold: float = Query(
+        0.6,
+        ge=0.0,
+        le=1.0,
+        description="Minimum staleness score to include",
+    ),
+    ctx: TenantContext = Depends(get_tenant_context),
+) -> StaleEntriesResponse:
+    """List knowledge base entries above the staleness threshold.
+
+    Default threshold is 0.6 (stale + very stale entries).
+    """
+    if _staleness_service is None:
+        raise HTTPException(status_code=503, detail="Staleness service not initialised")
+
+    stale = await _staleness_service.list_stale(ctx.tenant_id, threshold=threshold)
+    entries = [
+        StalenessScoreResponse(
+            id=e["id"],
+            staleness_score=e["staleness_score"],
+            staleness_category=e["staleness_category"],
+            last_verified_at=e.get("last_verified_at"),
+            embedded_at=e.get("embedded_at"),
+        )
+        for e in stale
+    ]
+    return StaleEntriesResponse(entries=entries, threshold=threshold)
+
+
+# ---------------------------------------------------------------------------
+# POST /api/admin/knowledge/{entry_id}/verify — Mark as verified (WI #221)
+# ---------------------------------------------------------------------------
+
+
+@router.post(
+    "/{entry_id}/verify",
+    response_model=StalenessScoreResponse,
+    summary="Mark entry as verified",
+    description="Marks a knowledge base entry as verified by a human, updating last_verified_at and recalculating the staleness score.",
+    responses={
+        404: {"description": "Knowledge entry not found"},
+        503: {"description": "Staleness service not initialized"},
+    },
+)
+async def verify_knowledge_entry(
+    entry_id: str,
+    ctx: TenantContext = Depends(get_tenant_context),
+) -> StalenessScoreResponse:
+    """Mark a knowledge base entry as verified by a human.
+
+    Updates `last_verified_at` to the current time and recalculates
+    the staleness score. This is the primary way merchants confirm
+    that content is still current and accurate.
+    """
+    if _staleness_service is None:
+        raise HTTPException(status_code=503, detail="Staleness service not initialised")
+
+    try:
+        result = await _staleness_service.verify_entry(ctx.tenant_id, entry_id)
+    except Exception as exc:
+        if "not found" in str(exc).lower():
+            raise HTTPException(status_code=404, detail=f"Knowledge entry {entry_id} not found")
+        raise
+
+    return StalenessScoreResponse(**result)

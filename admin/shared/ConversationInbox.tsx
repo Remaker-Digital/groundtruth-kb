@@ -24,12 +24,13 @@ import {
   useAssignConversation,
   useTeamMembers,
 } from './hooks';
+import { HelpTooltip } from './HelpTooltip';
 
 // ---------------------------------------------------------------------------
 // Style constants
 // ---------------------------------------------------------------------------
 
-const BRAND_PRIMARY = '#C41E2A';
+const BRAND_PRIMARY = '#ff3621';
 const COLOR_SUCCESS = '#22863a';
 const COLOR_DANGER = '#d73a49';
 const COLOR_GRAY = '#6a737d';
@@ -175,7 +176,24 @@ const ConversationItem: React.FC<ConversationItemProps> = ({ conversation, isSel
     </div>
     <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
       <StatusBadge status={conversation.status} />
-      <span style={{ fontSize: '12px', color: COLOR_TEXT_SECONDARY }}>
+      <span style={{ fontSize: '12px', color: COLOR_TEXT_SECONDARY, display: 'inline-flex', alignItems: 'center', gap: '6px' }}>
+        {conversation.isBillable && (
+          <span style={{ display: 'inline-flex', alignItems: 'center' }}>
+            <span
+              style={{
+                fontSize: '10px',
+                fontWeight: 600,
+                color: COLOR_SUCCESS,
+                backgroundColor: COLOR_SUCCESS + '18',
+                padding: '1px 5px',
+                borderRadius: '4px',
+              }}
+            >
+              Billable
+            </span>
+            <HelpTooltip text="Whether this conversation counts toward your monthly allowance." />
+          </span>
+        )}
         {conversation.messageCount} message{conversation.messageCount !== 1 ? 's' : ''}
       </span>
     </div>
@@ -281,8 +299,9 @@ const AssignModal: React.FC<AssignModalProps> = ({ conversationId, members, onAs
         }}
         onClick={(e) => e.stopPropagation()}
       >
-        <h3 style={{ margin: '0 0 16px 0', fontSize: '16px', fontWeight: 600, color: COLOR_TEXT }}>
+        <h3 style={{ margin: '0 0 16px 0', fontSize: '16px', fontWeight: 600, color: COLOR_TEXT, display: 'inline-flex', alignItems: 'center' }}>
           Assign Conversation
+          <HelpTooltip text="Assign this conversation to a team member for follow-up." />
         </h3>
         <select
           value={selectedAgent}
@@ -409,8 +428,9 @@ const NoteModal: React.FC<NoteModalProps> = ({ conversationId, apiFetch, onClose
         }}
         onClick={(e) => e.stopPropagation()}
       >
-        <h3 style={{ margin: '0 0 16px 0', fontSize: '16px', fontWeight: 600, color: COLOR_TEXT }}>
+        <h3 style={{ margin: '0 0 16px 0', fontSize: '16px', fontWeight: 600, color: COLOR_TEXT, display: 'inline-flex', alignItems: 'center' }}>
           Add Internal Note
+          <HelpTooltip text="Private notes visible only to your team, not to customers." />
         </h3>
         <textarea
           value={note}
@@ -650,8 +670,9 @@ export const ConversationInbox: React.FC<BaseComponentProps> = ({
             justifyContent: 'space-between',
           }}
         >
-          <h2 style={{ margin: 0, fontSize: '16px', fontWeight: 600, color: COLOR_TEXT }}>
+          <h2 style={{ margin: 0, fontSize: '16px', fontWeight: 600, color: COLOR_TEXT, display: 'inline-flex', alignItems: 'center' }}>
             Conversations
+            <HelpTooltip text="Real-time list of customer conversations. Filter by status to find active, escalated, or completed chats." />
           </h2>
           <span
             style={{
@@ -725,8 +746,9 @@ export const ConversationInbox: React.FC<BaseComponentProps> = ({
                   {selectedConversation?.customerName || selectedConversation?.customerId || 'Anonymous'}
                 </span>
                 {selectedConversation && (
-                  <span style={{ marginLeft: '10px' }}>
+                  <span style={{ marginLeft: '10px', display: 'inline-flex', alignItems: 'center' }}>
                     <StatusBadge status={selectedConversation.status} />
+                    <HelpTooltip text="Filter conversations by their current state." />
                   </span>
                 )}
               </div>

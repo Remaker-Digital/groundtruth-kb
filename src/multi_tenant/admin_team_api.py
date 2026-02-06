@@ -189,7 +189,16 @@ router = APIRouter(prefix="/api/admin/team", tags=["admin-team"])
 # ---------------------------------------------------------------------------
 
 
-@router.get("", response_model=TeamListResponse)
+@router.get(
+    "",
+    response_model=TeamListResponse,
+    summary="List team members",
+    description="Returns a paginated list of team members. Supports filtering by role and active status, ordered by most recently updated first.",
+    responses={
+        400: {"description": "Invalid role filter value"},
+        503: {"description": "Team management services not initialized"},
+    },
+)
 async def list_team_members(
     role: str | None = Query(
         None,
@@ -262,7 +271,16 @@ async def list_team_members(
 # ---------------------------------------------------------------------------
 
 
-@router.get("/{member_id}", response_model=TeamMemberResponse)
+@router.get(
+    "/{member_id}",
+    response_model=TeamMemberResponse,
+    summary="Get team member",
+    description="Returns a single team member by ID.",
+    responses={
+        404: {"description": "Team member not found"},
+        503: {"description": "Team management services not initialized"},
+    },
+)
 async def get_team_member(
     member_id: str,
     ctx: TenantContext = Depends(get_tenant_context),
@@ -298,7 +316,18 @@ async def get_team_member(
 # ---------------------------------------------------------------------------
 
 
-@router.post("", response_model=TeamMemberResponse, status_code=201)
+@router.post(
+    "",
+    response_model=TeamMemberResponse,
+    status_code=201,
+    summary="Create team member",
+    description="Creates a new team member who is immediately active and can access the admin dashboard based on their assigned role.",
+    responses={
+        400: {"description": "Invalid role or attempt to create owner"},
+        409: {"description": "Team member with this email already exists"},
+        503: {"description": "Team management services not initialized"},
+    },
+)
 async def create_team_member(
     request: CreateTeamMemberRequest,
     ctx: TenantContext = Depends(get_tenant_context),
@@ -380,7 +409,17 @@ async def create_team_member(
 # ---------------------------------------------------------------------------
 
 
-@router.put("/{member_id}", response_model=TeamMemberResponse)
+@router.put(
+    "/{member_id}",
+    response_model=TeamMemberResponse,
+    summary="Update team member",
+    description="Updates an existing team member. Only provided fields are updated; omitted fields retain their current values. The owner role cannot be changed.",
+    responses={
+        400: {"description": "Invalid role, attempt to change owner role, or attempt to promote to owner"},
+        404: {"description": "Team member not found"},
+        503: {"description": "Team management services not initialized"},
+    },
+)
 async def update_team_member(
     member_id: str,
     request: UpdateTeamMemberRequest,
@@ -482,7 +521,17 @@ async def update_team_member(
 # ---------------------------------------------------------------------------
 
 
-@router.delete("/{member_id}", response_model=DeactivateTeamMemberResponse)
+@router.delete(
+    "/{member_id}",
+    response_model=DeactivateTeamMemberResponse,
+    summary="Deactivate team member",
+    description="Sets is_active to false so the member can no longer access the admin dashboard. The record is preserved for audit purposes. The tenant owner cannot be deactivated.",
+    responses={
+        400: {"description": "Cannot deactivate the tenant owner"},
+        404: {"description": "Team member not found"},
+        503: {"description": "Team management services not initialized"},
+    },
+)
 async def deactivate_team_member(
     member_id: str,
     ctx: TenantContext = Depends(get_tenant_context),

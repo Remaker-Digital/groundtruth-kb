@@ -894,14 +894,30 @@ async def load_to_cosmos(tenant_id: str, dry_run: bool = False) -> None:
     from src.multi_tenant.cosmos_schema import KnowledgeBaseDocument
     from src.multi_tenant.repository import KnowledgeBaseRepository
 
+    from src.multi_tenant.knowledge_vectorizer import compute_content_hash
+
     repo = KnowledgeBaseRepository()
     now = datetime.now(timezone.utc).isoformat()
 
+    # Idempotency: fetch existing active titles to avoid duplicates
+    existing = await repo.list_active(tenant_id)
+    existing_titles = {e.get("title", "") for e in existing}
+    if existing_titles:
+        print(f"  Found {len(existing_titles)} existing active entries — will skip duplicates", flush=True)
+
     created = 0
+    skipped = 0
     errors = 0
 
     for article in SEED_ARTICLES:
+        # Skip articles that already exist (title-based dedup)
+        if article["title"] in existing_titles:
+            print(f"  [SKIP] Already exists: {article['title']}")
+            skipped += 1
+            continue
+
         entry_id = str(uuid.uuid4())
+        content_hash = compute_content_hash(article["title"], article["content"])
         doc = KnowledgeBaseDocument(
             id=entry_id,
             tenant_id=tenant_id,
@@ -912,6 +928,7 @@ async def load_to_cosmos(tenant_id: str, dry_run: bool = False) -> None:
             tags=article.get("tags", []),
             language=article.get("language", "en"),
             is_active=article.get("is_active", True),
+            content_hash=content_hash,
             created_at=now,
             updated_at=now,
         )
@@ -930,7 +947,7 @@ async def load_to_cosmos(tenant_id: str, dry_run: bool = False) -> None:
             errors += 1
             logger.exception("Failed to create knowledge entry: %s", article["title"])
 
-    print(f"\nLoad complete: {created} created, {errors} errors")
+    print(f"\nLoad complete: {created} created, {skipped} skipped, {errors} errors")
 
 
 async def main() -> None:

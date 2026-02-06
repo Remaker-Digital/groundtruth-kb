@@ -267,7 +267,16 @@ router = APIRouter(prefix="/api/admin/conversations", tags=["admin-inbox"])
 # ---------------------------------------------------------------------------
 
 
-@router.get("", response_model=AdminConversationListResponse)
+@router.get(
+    "",
+    response_model=AdminConversationListResponse,
+    summary="List admin inbox conversations",
+    description="Returns a paginated list of conversations for the merchant admin inbox. Supports filtering by status, customer, date range, and assigned agent.",
+    responses={
+        400: {"description": "Invalid status filter value"},
+        503: {"description": "Admin conversation services not initialized"},
+    },
+)
 async def list_conversations(
     status: str | None = Query(
         None,
@@ -370,6 +379,12 @@ async def list_conversations(
 @router.get(
     "/{conversation_id}",
     response_model=AdminConversationDetailResponse,
+    summary="Get conversation detail",
+    description="Returns full conversation detail including internal notes and pipeline trace. Message transcript is available via the separate /messages endpoint.",
+    responses={
+        404: {"description": "Conversation not found"},
+        503: {"description": "Admin conversation services not initialized"},
+    },
 )
 async def get_conversation_detail(
     conversation_id: str,
@@ -413,6 +428,12 @@ async def get_conversation_detail(
 @router.get(
     "/{conversation_id}/messages",
     response_model=ConversationMessagesResponse,
+    summary="Get conversation message history",
+    description="Returns all messages in chronological order, including customer messages, AI responses, system events, and human agent messages.",
+    responses={
+        404: {"description": "Conversation not found"},
+        503: {"description": "Admin conversation services not initialized"},
+    },
 )
 async def get_conversation_messages(
     conversation_id: str,
@@ -455,6 +476,12 @@ async def get_conversation_messages(
 @router.post(
     "/{conversation_id}/assign",
     response_model=AssignAgentResponse,
+    summary="Assign human agent to conversation",
+    description="Assigns a human agent to a conversation, typically after an escalation event. The assigned agent receives the conversation in their inbox.",
+    responses={
+        404: {"description": "Conversation not found"},
+        503: {"description": "Admin conversation services not initialized"},
+    },
 )
 async def assign_agent(
     conversation_id: str,
@@ -506,6 +533,12 @@ async def assign_agent(
     "/{conversation_id}/notes",
     response_model=AddNoteResponse,
     status_code=201,
+    summary="Add internal note to conversation",
+    description="Adds an internal merchant note to a conversation. Notes are visible only to the merchant team, never shown to the customer.",
+    responses={
+        404: {"description": "Conversation not found"},
+        503: {"description": "Admin conversation services not initialized"},
+    },
 )
 async def add_note(
     conversation_id: str,

@@ -44,14 +44,14 @@ import { OnboardingPage } from './pages/Onboarding';
 const agentRedTheme = createTheme({
   primaryColor: 'brand',
   colors: {
-    // Brand red scale: lightest -> darkest, index 5 = primary #C41E2A
+    // Brand red scale: lightest -> darkest, index 5 = primary #ff3621
     brand: [
       '#FDE8E8', // 0 - error bg tint
       '#F2D4D6', // 1 - Soft Red (Primary Light)
       '#E8A3A7', // 2
       '#DC7278', // 3
       '#D14B52', // 4
-      '#C41E2A', // 5 - Agent Red (Primary)
+      '#ff3621', // 5 - Agent Red (Primary)
       '#B01824', // 6
       '#9B1420', // 7 - Deep Red (Primary Dark, hover)
       '#870E18', // 8
@@ -82,7 +82,7 @@ const agentRedTheme = createTheme({
   cursorType: 'pointer',
   other: {
     colors: {
-      primary: '#C41E2A',
+      primary: '#ff3621',
       primaryDark: '#9B1420',
       primaryLight: '#F2D4D6',
       charcoal: '#0a0a0a',

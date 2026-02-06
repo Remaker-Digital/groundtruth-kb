@@ -75,17 +75,24 @@ logger = logging.getLogger(__name__)
 # ---------------------------------------------------------------------------
 
 # Total pipeline hard deadline (milliseconds)
-PIPELINE_DEADLINE_MS = 8_000
+# Decision #15 originally specified 8,000ms. Increased to 30,000ms for
+# production Azure OpenAI latency (cold-start model endpoints can take
+# 3-8s on first request). The SLA P95 target of 2,000ms is measured
+# end-to-end at the HTTP layer, not at the pipeline budget layer.
+PIPELINE_DEADLINE_MS = 30_000
 
 # Per-stage timeout budgets (milliseconds)
-# These sum to 7,800ms, leaving 200ms headroom for orchestration overhead
+# Increased from original Decision #15 values to accommodate real Azure
+# OpenAI latency. Cold-start calls to GPT-4o-mini take 2-5s, GPT-4o
+# streaming takes 3-10s. These budgets are generous to avoid false
+# timeouts — actual SLA compliance is measured by sla_monitoring.py.
 STAGE_BUDGETS_MS: dict[str, int] = {
-    "intent-classifier":    800,
-    "knowledge-retrieval": 1_000,
-    "response-generator":  3_000,
-    "critic-supervisor":     800,
-    "escalation-handler":  1_400,
-    "analytics-collector":   800,
+    "intent-classifier":   5_000,
+    "knowledge-retrieval": 10_000,
+    "response-generator": 15_000,
+    "critic-supervisor":   5_000,
+    "escalation-handler":  5_000,
+    "analytics-collector": 3_000,
 }
 
 # Circuit breaker configurations per service (Decision #15)
@@ -352,6 +359,11 @@ class PipelineTimeoutBudget:
     def is_expired(self) -> bool:
         """Whether the total pipeline deadline has been exceeded."""
         return self.remaining_ms <= 0
+
+    @property
+    def stages(self) -> list[StageResult]:
+        """Public access to the recorded stage results."""
+        return self._stage_results
 
     async def execute_with_budget(
         self,

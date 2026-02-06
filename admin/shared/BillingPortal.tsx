@@ -32,6 +32,7 @@
 import React, { useState, useMemo } from 'react';
 import type { BaseComponentProps, TenantTier } from './types';
 import { useUsageDashboard, usePackBalance, useBillingStatus } from './hooks';
+import { HelpTooltip } from './HelpTooltip';
 
 // ---------------------------------------------------------------------------
 // Extended props
@@ -58,7 +59,7 @@ const TIER_DISPLAY: Record<string, { label: string; color: string }> = {
   trial: { label: 'Trial', color: '#6B7280' },
   starter: { label: 'Starter', color: '#2563EB' },
   professional: { label: 'Professional', color: '#7C3AED' },
-  enterprise: { label: 'Enterprise', color: '#C41E2A' },
+  enterprise: { label: 'Enterprise', color: '#ff3621' },
 };
 
 const TIER_FEATURES: Array<{
@@ -236,7 +237,7 @@ const styles = {
     border: variant === 'outline' ? '1px solid #D1D5DB' : 'none',
     background:
       variant === 'primary'
-        ? '#C41E2A'
+        ? '#ff3621'
         : variant === 'secondary'
           ? '#F3F4F6'
           : 'transparent',
@@ -276,7 +277,7 @@ const styles = {
   packPrice: {
     fontSize: 28,
     fontWeight: 700,
-    color: '#C41E2A',
+    color: '#ff3621',
     margin: 0,
   } as React.CSSProperties,
 
@@ -294,7 +295,7 @@ const styles = {
 
   tierCard: (isCurrentTier: boolean): React.CSSProperties => ({
     background: isCurrentTier ? '#FEF2F2' : '#FFFFFF',
-    border: isCurrentTier ? '2px solid #C41E2A' : '1px solid #E5E7EB',
+    border: isCurrentTier ? '2px solid #ff3621' : '1px solid #E5E7EB',
     borderRadius: 8,
     padding: 20,
     position: 'relative' as const,
@@ -304,7 +305,7 @@ const styles = {
     position: 'absolute' as const,
     top: -10,
     right: 16,
-    background: '#C41E2A',
+    background: '#ff3621',
     color: '#FFFFFF',
     fontSize: 11,
     fontWeight: 600,
@@ -544,7 +545,7 @@ export const BillingPortal: React.FC<BillingPortalProps> = ({
       <div style={styles.card}>
         <h3 style={styles.sectionTitle}>Subscription</h3>
         <div style={styles.row}>
-          <span style={styles.label}>Current Plan</span>
+          <span style={styles.label}>Current Plan <HelpTooltip text="Your active subscription tier and billing status." /></span>
           <span style={styles.badge(tierDisplay.color)}>{tierDisplay.label}</span>
         </div>
         <div style={styles.row}>
@@ -581,7 +582,7 @@ export const BillingPortal: React.FC<BillingPortalProps> = ({
 
       {/* Usage Summary Card */}
       <div style={styles.card}>
-        <h3 style={styles.sectionTitle}>Usage This Period</h3>
+        <h3 style={styles.sectionTitle}>Usage This Period <HelpTooltip text="Conversation usage for the current monthly billing cycle." /></h3>
 
         {usage.data ? (
           <>
@@ -663,7 +664,7 @@ export const BillingPortal: React.FC<BillingPortalProps> = ({
 
       {/* Conversation Packs Card */}
       <div style={styles.card}>
-        <h3 style={styles.sectionTitle}>Conversation Packs</h3>
+        <h3 style={styles.sectionTitle}>Conversation Packs <HelpTooltip text="Pre-purchase conversation credits at a discount. Packs are consumed before overage billing and expire after 90 days." /></h3>
         <p style={{
           fontSize: 13,
           color: '#6B7280',
@@ -734,7 +735,7 @@ export const BillingPortal: React.FC<BillingPortalProps> = ({
       {/* Upgrade Tier Section */}
       {upgradeTiers.length > 0 && (
         <div style={styles.card}>
-          <h3 style={styles.sectionTitle}>Upgrade Your Plan</h3>
+          <h3 style={styles.sectionTitle}>Upgrade Plan <HelpTooltip text="Compare features and pricing across all tiers. Annual billing saves 17%." /></h3>
           <p style={{
             fontSize: 13,
             color: '#6B7280',
@@ -766,11 +767,11 @@ export const BillingPortal: React.FC<BillingPortalProps> = ({
                     fontSize: 13,
                   }}>
                     <div>
-                      <span style={styles.label}>Included</span>
+                      <span style={styles.label}>Included <HelpTooltip text="Conversations included in your plan's monthly fee." /></span>
                       <div style={{ ...styles.value, fontSize: 15 }}>{tier.conversations}</div>
                     </div>
                     <div>
-                      <span style={styles.label}>Overage</span>
+                      <span style={styles.label}>Overage Rate <HelpTooltip text="Per-conversation charge for usage beyond included allowance and pack balance." /></span>
                       <div style={{ ...styles.value, fontSize: 15 }}>{tier.overage}</div>
                     </div>
                   </div>

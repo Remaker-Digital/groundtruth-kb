@@ -133,7 +133,7 @@ const styles = {
     flex: 1,
     height: 6,
     borderRadius: 3,
-    backgroundColor: completed ? '#C41E2A' : active ? '#e8939a' : '#e0e0e0',
+    backgroundColor: completed ? '#ff3621' : active ? '#e8939a' : '#e0e0e0',
     transition: 'background-color 0.25s ease',
   }),
 
@@ -240,7 +240,7 @@ const styles = {
   checkbox: {
     width: 18,
     height: 18,
-    accentColor: '#C41E2A',
+    accentColor: '#ff3621',
     cursor: 'pointer',
   } as React.CSSProperties,
 
@@ -278,7 +278,7 @@ const styles = {
     padding: '10px 24px',
     fontSize: 14,
     fontWeight: 600,
-    backgroundColor: '#C41E2A',
+    backgroundColor: '#ff3621',
     color: '#fff',
     border: 'none',
     borderRadius: 6,

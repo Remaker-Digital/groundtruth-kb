@@ -334,7 +334,16 @@ def reset_usage(stripe_customer_id: str) -> None:
 # ---------------------------------------------------------------------------
 
 
-@router.post("/record", response_model=RecordConversationResponse)
+@router.post(
+    "/record",
+    response_model=RecordConversationResponse,
+    status_code=200,
+    summary="Record conversation usage",
+    description="Records conversation usage for a customer. Called internally by the conversation pipeline to track consumption against the tier allowance, pack balance, and overage.",
+    responses={
+        400: {"description": "Invalid tier or request parameters"},
+    },
+)
 async def record_usage_endpoint(body: RecordConversationRequest) -> RecordConversationResponse:
     """Record conversation usage for a customer.
 
@@ -352,7 +361,16 @@ async def record_usage_endpoint(body: RecordConversationRequest) -> RecordConver
         raise HTTPException(status_code=400, detail=str(exc)) from exc
 
 
-@router.get("/{customer_id}", response_model=UsageSummaryResponse)
+@router.get(
+    "/{customer_id}",
+    response_model=UsageSummaryResponse,
+    status_code=200,
+    summary="Get customer usage summary",
+    description="Returns the current billing period usage summary for a customer, including total conversations, included allowance, pack balance, and overage details.",
+    responses={
+        400: {"description": "Invalid tier parameter"},
+    },
+)
 async def get_usage_endpoint(customer_id: str, tier: str) -> UsageSummaryResponse:
     """Get current usage summary for a customer.
 

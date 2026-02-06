@@ -338,11 +338,36 @@ def retracted_event(fallback_text: str, reason: str) -> StreamEvent:
     )
 
 
-def error_event(message: str, code: str = "pipeline_error") -> StreamEvent:
-    """Create an error event — pipeline failure."""
+def error_event(
+    message: str,
+    code: str = "pipeline_error",
+    *,
+    recoverable: bool = True,
+    tokens_sent: int | None = None,
+    stage: str | None = None,
+) -> StreamEvent:
+    """Create an error event — pipeline failure.
+
+    Args:
+        message: Human-readable error description.
+        code: Machine-readable error code.
+        recoverable: Whether the client should retry (WI #131).
+        tokens_sent: Number of token chunks already streamed before
+            the error occurred (WI #131 — partial response tracking).
+        stage: Pipeline stage where the error occurred (WI #131).
+    """
+    data: dict[str, Any] = {
+        "message": message,
+        "code": code,
+        "recoverable": recoverable,
+    }
+    if tokens_sent is not None:
+        data["tokens_sent"] = tokens_sent
+    if stage is not None:
+        data["stage"] = stage
     return StreamEvent(
         event=StreamEventType.ERROR,
-        data={"message": message, "code": code},
+        data=data,
     )
 
 

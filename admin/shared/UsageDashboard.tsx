@@ -39,6 +39,7 @@ import type {
   ConversationSummary,
 } from './types';
 import { useUsageDashboard, useDailyVolume, useConversationList } from './hooks';
+import { HelpTooltip } from './HelpTooltip';
 
 // ---------------------------------------------------------------------------
 // Constants
@@ -178,7 +179,7 @@ const st = {
   meterFill: (percent: number, isOverage: boolean): React.CSSProperties => ({
     height: '100%',
     width: `${Math.min(percent, 100)}%`,
-    backgroundColor: isOverage ? '#C41E2A' : percent > 80 ? '#f59e0b' : '#16a34a',
+    backgroundColor: isOverage ? '#ff3621' : percent > 80 ? '#f59e0b' : '#16a34a',
     borderRadius: 6,
     transition: 'width 0.4s ease, background-color 0.3s ease',
   }),
@@ -189,7 +190,7 @@ const st = {
     right: 0,
     height: '100%',
     width: `${Math.min(overflowPercent, 20)}%`,
-    backgroundColor: '#C41E2A',
+    backgroundColor: '#ff3621',
     opacity: 0.3,
     borderRadius: '0 6px 6px 0',
   }),
@@ -496,7 +497,7 @@ const UsageMeter: React.FC<UsageMeterProps> = ({ usage }) => {
           style={{
             fontSize: 14,
             fontWeight: 600,
-            color: isOverage ? '#C41E2A' : percent > 80 ? '#f59e0b' : '#16a34a',
+            color: isOverage ? '#ff3621' : percent > 80 ? '#f59e0b' : '#16a34a',
           }}
         >
           {(percent ?? 0).toFixed(0)}%
@@ -512,14 +513,14 @@ const UsageMeter: React.FC<UsageMeterProps> = ({ usage }) => {
         <div
           style={{
             fontSize: 12,
-            color: '#C41E2A',
+            color: '#ff3621',
             marginTop: 8,
             fontWeight: 500,
           }}
         >
           {formatNumber(usage.overageConversations)} overage conversation
           {usage.overageConversations === 1 ? '' : 's'} &middot; Estimated
-          cost: {formatCurrency(usage.estimatedOverageCost)}
+          cost: {formatCurrency(usage.estimatedOverageCost)}<HelpTooltip text="Projected cost for overage conversations at your tier's per-conversation rate." />
         </div>
       )}
     </div>
@@ -534,23 +535,23 @@ interface SummaryCardsProps {
 const SummaryCards: React.FC<SummaryCardsProps> = ({ usage }) => (
   <div style={st.cardsRow}>
     <div style={st.card}>
-      <p style={st.cardLabel}>Remaining Included</p>
+      <p style={st.cardLabel}>Remaining Included<HelpTooltip text="Conversations used from your plan's included monthly allowance." /></p>
       <p style={st.cardValue}>{formatNumber(usage.remainingIncluded)}</p>
       <p style={st.cardSub}>of {formatNumber(usage.includedAllowance)}</p>
     </div>
 
     <div style={st.card}>
-      <p style={st.cardLabel}>Pack Balance</p>
+      <p style={st.cardLabel}>Pack Balance<HelpTooltip text="Remaining pre-purchased conversation credits (FIFO, 90-day validity)." /></p>
       <p style={st.cardValue}>{formatNumber(usage.packBalance)}</p>
       <p style={st.cardSub}>pre-purchased conversations</p>
     </div>
 
     <div style={st.card}>
-      <p style={st.cardLabel}>Overage</p>
+      <p style={st.cardLabel}>Overage<HelpTooltip text="Conversations beyond your included allowance and pack balance, billed at your tier's overage rate." /></p>
       <p
         style={{
           ...st.cardValue,
-          color: usage.overageConversations > 0 ? '#C41E2A' : '#1a1a1a',
+          color: usage.overageConversations > 0 ? '#ff3621' : '#1a1a1a',
         }}
       >
         {formatNumber(usage.overageConversations)}
@@ -627,7 +628,7 @@ const DailyChart: React.FC<DailyChartProps> = ({ days }) => {
                     title={`Total: ${day.total}`}
                   />
                   <div
-                    style={st.bar(billableH, '#C41E2A')}
+                    style={st.bar(billableH, '#ff3621')}
                     title={`Billable: ${day.billable}`}
                   />
                 </div>
@@ -644,7 +645,7 @@ const DailyChart: React.FC<DailyChartProps> = ({ days }) => {
           Total
         </span>
         <span>
-          <span style={st.legendDot('#C41E2A')} />
+          <span style={st.legendDot('#ff3621')} />
           Billable
         </span>
       </div>
@@ -964,7 +965,7 @@ export const UsageDashboard: React.FC<BaseComponentProps> = ({
 
       {/* Section 2: Daily Volume Chart */}
       <div style={st.section}>
-        <h3 style={st.sectionTitle}>Daily Volume</h3>
+        <h3 style={st.sectionTitle}>Daily Volume<HelpTooltip text="Total and billable conversations per day for the selected billing period." /></h3>
 
         {dailyLoading && days.length === 0 ? (
           <div style={{ padding: 24, textAlign: 'center', color: '#888', fontSize: 14 }}>
@@ -982,7 +983,7 @@ export const UsageDashboard: React.FC<BaseComponentProps> = ({
       {/* Section 3: Conversation List */}
       <div style={st.section}>
         <div style={st.tableHeaderRow}>
-          <h3 style={st.sectionTitle}>Conversations</h3>
+          <h3 style={st.sectionTitle}>Conversations<HelpTooltip text="Conversations where the AI produced at least one response. Non-billable: test, admin, health-check, and system conversations." /></h3>
           <button
             style={{
               ...st.exportBtn,

@@ -44,7 +44,7 @@ import { useUsageDashboard, useDailyVolume } from '../../shared/hooks/index';
 // Constants
 // ---------------------------------------------------------------------------
 
-const BRAND_RED = '#C41E2A';
+const BRAND_RED = '#ff3621';
 
 const TIER_LABELS: Record<string, string> = {
   trial: 'Trial',

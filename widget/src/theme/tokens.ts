@@ -13,7 +13,7 @@
  *
  * Visual reference: Zapier (layouts, spacing, forms, buttons).
  * Functional reference: Tidio (controls, behaviors, workflows).
- * Brand: Agent Red (Inter, #C41E2A, 15-color palette).
+ * Brand: Agent Red (Inter, #ff3621, 15-color palette).
  *
  * © 2026 Remaker Digital, a DBA of VanDusen & Palmeter, LLC. All rights reserved.
  */
@@ -139,7 +139,7 @@ export interface WidgetConfig {
 // ---------------------------------------------------------------------------
 
 const DEFAULTS = {
-  primaryColor: '#C41E2A',
+  primaryColor: '#ff3621',
   backgroundColor: '#FFFFFF',
   position: 'bottom-right' as const,
   offsetX: 20,

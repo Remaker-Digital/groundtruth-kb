@@ -65,7 +65,7 @@ interface WidgetConfig {
 }
 
 const DEFAULT_CONFIG: WidgetConfig = {
-  widget_primary_color: '#C41E2A',
+  widget_primary_color: '#ff3621',
   widget_background_color: '#FFFFFF',
   widget_position: 'bottom-right',
   widget_offset_x: 20,
@@ -136,10 +136,10 @@ const s = {
     padding: '10px 20px',
     fontSize: 14,
     fontWeight: active ? 600 : 500,
-    color: active ? '#C41E2A' : '#6B7280',
+    color: active ? '#ff3621' : '#6B7280',
     background: 'transparent',
     border: 'none',
-    borderBottom: active ? '2px solid #C41E2A' : '2px solid transparent',
+    borderBottom: active ? '2px solid #ff3621' : '2px solid transparent',
     marginBottom: -2,
     cursor: 'pointer',
     transition: 'color 0.15s ease',
@@ -261,7 +261,7 @@ const s = {
     width: 40,
     height: 22,
     borderRadius: 11,
-    background: on ? '#C41E2A' : '#D1D5DB',
+    background: on ? '#ff3621' : '#D1D5DB',
     position: 'relative' as const,
     transition: 'background 0.2s ease',
     flexShrink: 0,
@@ -346,7 +346,7 @@ const s = {
 
   saveButton: {
     padding: '8px 24px',
-    background: '#C41E2A',
+    background: '#ff3621',
     color: '#FFFFFF',
     border: 'none',
     borderRadius: 6,
@@ -522,7 +522,7 @@ interface PreviewProps {
 
 const WidgetPreview: React.FC<PreviewProps> = ({ config }) => {
   const isDark = config.widget_dark_mode;
-  const primaryColor = config.widget_primary_color || '#C41E2A';
+  const primaryColor = config.widget_primary_color || '#ff3621';
   const bgColor = isDark ? '#1A1A2E' : (config.widget_background_color || '#FFFFFF');
   const textColor = isDark ? '#E5E7EB' : '#111827';
   const subtextColor = isDark ? '#9CA3AF' : '#6B7280';

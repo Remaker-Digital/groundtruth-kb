@@ -179,7 +179,17 @@ def _handles(event_type: str):
 # ---------------------------------------------------------------------------
 
 
-@router.post("/stripe")
+@router.post(
+    "/stripe",
+    status_code=200,
+    summary="Receive Stripe webhook events",
+    description="Receives and processes Stripe webhook events. Verifies signature, checks for duplicates, and dispatches to the appropriate event handler.",
+    responses={
+        400: {"description": "Invalid payload or signature verification failed"},
+        403: {"description": "Webhook source IP not in allowlist"},
+        500: {"description": "Webhook secret not configured"},
+    },
+)
 async def stripe_webhook(request: Request) -> JSONResponse:
     """Receive and process Stripe webhook events.
 

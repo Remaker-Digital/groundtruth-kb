@@ -34,6 +34,10 @@ export interface ConfigField {
   key: string;
   label: string;
   description: string;
+  /** Short hover tooltip (1-2 sentences). */
+  tooltip?: string;
+  /** Link to relevant documentation page. */
+  docLink?: string;
   type: ConfigFieldType;
   defaultValue: unknown;
   currentValue: unknown;
@@ -187,6 +191,25 @@ export interface KBArticle {
   status: KBArticleStatus;
   createdAt: string;
   updatedAt: string;
+  sourceType?: string;
+  sourceFilename?: string;
+  sourceUrl?: string;
+  chunkIndex?: number | null;
+  parentEntryId?: string | null;
+  stalenessScore?: number | null;
+  stalenessCategory?: string | null;
+  lastVerifiedAt?: string | null;
+  embeddedAt?: string | null;
+}
+
+export interface KBUploadResult {
+  source_type: string;
+  source_filename?: string;
+  source_url?: string;
+  entries_created: number;
+  total_chars: number;
+  entry_ids: string[];
+  parent_entry_id?: string | null;
 }
 
 // ---------------------------------------------------------------------------

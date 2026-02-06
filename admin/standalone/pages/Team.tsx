@@ -39,9 +39,9 @@ import type { TeamRole } from '../../shared/types/index';
 // Constants
 // ---------------------------------------------------------------------------
 
-const BRAND_RED = '#C41E2A';
+const BRAND_RED = '#ff3621';
 
-const AVATAR_PALETTE = ['#C41E2A', '#2563EB', '#059669', '#D97706', '#7C3AED', '#DB2777'];
+const AVATAR_PALETTE = ['#ff3621', '#2563EB', '#059669', '#D97706', '#7C3AED', '#DB2777'];
 
 const roleColorMap: Record<string, string> = {
   owner: 'red',

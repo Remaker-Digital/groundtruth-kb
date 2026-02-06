@@ -1002,7 +1002,7 @@ def _build_field_registry() -> dict[str, ConfigFieldDefinition]:
         validation=ValidationRule(
             pattern=HEX_COLOR_PATTERN,
         ),
-        platform_default="#C41E2A",  # Agent Red brand primary
+        platform_default="#ff3621",  # Agent Red brand primary
         onboarding_step=OnboardingStep.WIDGET_APPEARANCE,
         step_order=0,
         tooltip="The primary color of your chat widget (header, send button, customer message bubbles).",
@@ -1011,7 +1011,7 @@ def _build_field_registry() -> dict[str, ConfigFieldDefinition]:
             "customer message bubble color. Use your brand color for consistency. "
             "Ensure sufficient contrast against white text (WCAG AA)."
         ),
-        placeholder="#C41E2A",
+        placeholder="#ff3621",
         doc_link=f"{DOCS_BASE_URL}/configuration/widget-appearance#color",
         affects_agents=[],
     ))

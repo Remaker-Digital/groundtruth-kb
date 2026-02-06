@@ -185,7 +185,16 @@ router = APIRouter(prefix="/api/shopify/gdpr", tags=["shopify-gdpr"])
 # ---------------------------------------------------------------------------
 
 
-@router.post("/customers-data-request")
+@router.post(
+    "/customers-data-request",
+    status_code=200,
+    summary="Handle customer data request webhook",
+    description="Handles the Shopify customers/data_request GDPR webhook. Verifies HMAC signature and exports customer data when services are available.",
+    responses={
+        400: {"description": "Invalid JSON payload"},
+        401: {"description": "Missing or invalid HMAC signature"},
+    },
+)
 async def customers_data_request(request: Request) -> JSONResponse:
     """Handle Shopify customers/data_request webhook.
 
@@ -271,7 +280,16 @@ async def customers_data_request(request: Request) -> JSONResponse:
 # ---------------------------------------------------------------------------
 
 
-@router.post("/customers-redact")
+@router.post(
+    "/customers-redact",
+    status_code=200,
+    summary="Handle customer data redaction webhook",
+    description="Handles the Shopify customers/redact GDPR webhook. Verifies HMAC signature and deletes all personal data for the specified customer.",
+    responses={
+        400: {"description": "Invalid JSON payload"},
+        401: {"description": "Missing or invalid HMAC signature"},
+    },
+)
 async def customers_redact(request: Request) -> JSONResponse:
     """Handle Shopify customers/redact webhook.
 
@@ -349,7 +367,16 @@ async def customers_redact(request: Request) -> JSONResponse:
 # ---------------------------------------------------------------------------
 
 
-@router.post("/shop-redact")
+@router.post(
+    "/shop-redact",
+    status_code=200,
+    summary="Handle shop data redaction webhook",
+    description="Handles the Shopify shop/redact GDPR webhook. Verifies HMAC signature and deletes all data associated with the shop after the 48-hour grace period.",
+    responses={
+        400: {"description": "Invalid JSON payload"},
+        401: {"description": "Missing or invalid HMAC signature"},
+    },
+)
 async def shop_redact(request: Request) -> JSONResponse:
     """Handle Shopify shop/redact webhook.
 

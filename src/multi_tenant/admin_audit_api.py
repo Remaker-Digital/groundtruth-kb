@@ -122,7 +122,17 @@ router = APIRouter(prefix="/api/audit", tags=["admin-audit"])
 # ---------------------------------------------------------------------------
 
 
-@router.get("", response_model=AuditListResponse)
+@router.get(
+    "",
+    response_model=AuditListResponse,
+    summary="Query audit log events",
+    description="Returns a paginated list of audit log events. Supports filtering by event type, customer ID, and date range, ordered by most recent first.",
+    responses={
+        400: {"description": "Invalid event_type filter value"},
+        500: {"description": "Audit log query failed"},
+        503: {"description": "Audit log services not initialized"},
+    },
+)
 async def list_audit_events(
     event_type: str | None = Query(
         None,
@@ -223,7 +233,16 @@ async def list_audit_events(
 # ---------------------------------------------------------------------------
 
 
-@router.get("/export")
+@router.get(
+    "/export",
+    summary="Export audit log as CSV",
+    description="Exports audit log events as a downloadable CSV file. Same filtering as the query endpoint but returns all matching events.",
+    responses={
+        400: {"description": "Invalid event_type filter value"},
+        500: {"description": "Audit log export failed"},
+        503: {"description": "Audit log services not initialized"},
+    },
+)
 async def export_audit_events(
     event_type: str | None = Query(None),
     customer_id: str | None = Query(None),

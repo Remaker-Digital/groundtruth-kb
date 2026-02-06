@@ -18,6 +18,7 @@ import type {
   InboxConversation,
   ConversationMessage,
   KBArticle,
+  KBUploadResult,
   AnalyticsSummary,
   IntentBreakdown,
   KnowledgeGap,
@@ -248,6 +249,177 @@ export function useSaveKBArticle(apiFetch: ApiFetch) {
   );
 
   return { save, loading, error };
+}
+
+export function useUploadFile(apiFetch: ApiFetch) {
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+  const [progress, setProgress] = useState<'idle' | 'uploading' | 'processing' | 'done'>('idle');
+
+  const upload = useCallback(
+    async (file: File, entryType?: string): Promise<KBUploadResult | null> => {
+      setLoading(true);
+      setError(null);
+      setProgress('uploading');
+      try {
+        const formData = new FormData();
+        formData.append('file', file);
+        if (entryType) formData.append('entry_type', entryType);
+
+        setProgress('processing');
+        const resp = await apiFetch('/api/admin/knowledge/upload', {
+          method: 'POST',
+          body: formData,
+        });
+        if (!resp.ok) {
+          const body = await resp.json().catch(() => ({ detail: `${resp.status}` }));
+          throw new Error(body.detail || `Upload failed: ${resp.status}`);
+        }
+        setProgress('done');
+        return await resp.json();
+      } catch (err: unknown) {
+        const msg = err instanceof Error ? err.message : 'Upload failed';
+        setError(msg);
+        return null;
+      } finally {
+        setLoading(false);
+      }
+    },
+    [apiFetch],
+  );
+
+  const reset = useCallback(() => {
+    setProgress('idle');
+    setError(null);
+  }, []);
+
+  return { upload, loading, error, progress, reset };
+}
+
+export function useImportUrl(apiFetch: ApiFetch) {
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+
+  const importUrl = useCallback(
+    async (url: string, entryType?: string): Promise<KBUploadResult | null> => {
+      setLoading(true);
+      setError(null);
+      try {
+        const resp = await apiFetch('/api/admin/knowledge/import-url', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ url, entry_type: entryType }),
+        });
+        if (!resp.ok) {
+          const body = await resp.json().catch(() => ({ detail: `${resp.status}` }));
+          throw new Error(body.detail || `Import failed: ${resp.status}`);
+        }
+        return await resp.json();
+      } catch (err: unknown) {
+        const msg = err instanceof Error ? err.message : 'Import failed';
+        setError(msg);
+        return null;
+      } finally {
+        setLoading(false);
+      }
+    },
+    [apiFetch],
+  );
+
+  return { importUrl, loading, error };
+}
+
+export function useExportCSV(apiFetch: ApiFetch) {
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+
+  const exportCSV = useCallback(async () => {
+    setLoading(true);
+    setError(null);
+    try {
+      const resp = await apiFetch('/api/admin/knowledge/export');
+      if (!resp.ok) throw new Error(`Export failed: ${resp.status}`);
+      const blob = await resp.blob();
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = `knowledge-base-export-${new Date().toISOString().slice(0, 10)}.csv`;
+      document.body.appendChild(a);
+      a.click();
+      document.body.removeChild(a);
+      URL.revokeObjectURL(url);
+      return true;
+    } catch (err: unknown) {
+      const msg = err instanceof Error ? err.message : 'Export failed';
+      setError(msg);
+      return false;
+    } finally {
+      setLoading(false);
+    }
+  }, [apiFetch]);
+
+  return { exportCSV, loading, error };
+}
+
+// ---------------------------------------------------------------------------
+// Knowledge Base Staleness hooks (WI #219-222)
+// ---------------------------------------------------------------------------
+
+export interface StalenessSummary {
+  totalEntries: number;
+  avgStalenessScore: number;
+  freshCount: number;
+  agingCount: number;
+  staleCount: number;
+  veryStaleCount: number;
+  needsAttention: number;
+}
+
+export interface StalenessScore {
+  id: string;
+  stalenessScore: number;
+  stalenessCategory: string;
+  lastVerifiedAt: string | null;
+  embeddedAt: string | null;
+}
+
+export function useStalenessSummary(apiFetch: ApiFetch) {
+  return useApi<StalenessSummary>(apiFetch, '/api/admin/knowledge/staleness');
+}
+
+export function useStaleEntries(apiFetch: ApiFetch, threshold = 0.6) {
+  return useApi<{ entries: StalenessScore[]; threshold: number }>(
+    apiFetch,
+    `/api/admin/knowledge/stale?threshold=${threshold}`,
+  );
+}
+
+export function useVerifyEntry(apiFetch: ApiFetch) {
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+
+  const verify = useCallback(
+    async (entryId: string): Promise<StalenessScore | null> => {
+      setLoading(true);
+      setError(null);
+      try {
+        const resp = await apiFetch(`/api/admin/knowledge/${entryId}/verify`, {
+          method: 'POST',
+        });
+        if (!resp.ok) throw new Error(`${resp.status}`);
+        return await resp.json();
+      } catch (err: unknown) {
+        const msg = err instanceof Error ? err.message : 'Verify failed';
+        setError(msg);
+        return null;
+      } finally {
+        setLoading(false);
+      }
+    },
+    [apiFetch],
+  );
+
+  return { verify, loading, error };
 }
 
 // ---------------------------------------------------------------------------

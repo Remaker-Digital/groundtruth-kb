@@ -24,6 +24,6 @@ scopes = "read_orders,read_products,read_customers,read_inventory"
 api_version = "2026-01"
 
 [webhooks.privacy_compliance]
-customer_data_request_url = "https://app.agentred.com/api/shopify/gdpr/customers-data-request"
-customer_deletion_url = "https://app.agentred.com/api/shopify/gdpr/customers-redact"
-shop_deletion_url = "https://app.agentred.com/api/shopify/gdpr/shop-redact"
+customer_data_request_url = "https://agent-red-api-gateway.lemonriver-f59f94b7.eastus2.azurecontainerapps.io/api/shopify/gdpr/customers-data-request"
+customer_deletion_url = "https://agent-red-api-gateway.lemonriver-f59f94b7.eastus2.azurecontainerapps.io/api/shopify/gdpr/customers-redact"
+shop_deletion_url = "https://agent-red-api-gateway.lemonriver-f59f94b7.eastus2.azurecontainerapps.io/api/shopify/gdpr/shop-redact"

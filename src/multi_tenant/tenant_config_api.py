@@ -234,7 +234,12 @@ router = APIRouter(prefix="/api/config", tags=["configuration"])
 # 1. GET /api/config — Current resolved config
 # ---------------------------------------------------------------------------
 
-@router.get("", response_model=ConfigResponse)
+@router.get(
+    "",
+    response_model=ConfigResponse,
+    summary="Get current resolved configuration",
+    description="Returns the tenant's configuration with all inheritance applied: platform defaults, tier defaults, and tenant overrides. Result may come from a 60-second cache.",
+)
 async def get_config(
     ctx: TenantContext = Depends(get_tenant_context),
 ) -> ConfigResponse:
@@ -263,7 +268,16 @@ async def get_config(
 # 2. PUT /api/config — Partial config update
 # ---------------------------------------------------------------------------
 
-@router.put("", response_model=ConfigUpdateResponse)
+@router.put(
+    "",
+    response_model=ConfigUpdateResponse,
+    summary="Update tenant configuration",
+    description="Applies partial configuration changes. Only provided fields are updated; omitted fields retain their current values. Returns validation errors if any field fails validation or tier gating.",
+    responses={
+        400: {"description": "No configuration fields provided"},
+        422: {"description": "Validation errors in submitted fields"},
+    },
+)
 async def update_config(
     body: ConfigUpdateRequest,
     ctx: TenantContext = Depends(get_tenant_context),
@@ -326,7 +340,12 @@ async def update_config(
 # 3. POST /api/config/validate — Dry-run validation
 # ---------------------------------------------------------------------------
 
-@router.post("/validate", response_model=ConfigValidateResponse)
+@router.post(
+    "/validate",
+    response_model=ConfigValidateResponse,
+    summary="Validate configuration changes",
+    description="Validates proposed configuration changes without persisting. Use for live preview and feedback in the merchant UI before committing.",
+)
 async def validate_config_endpoint(
     body: ConfigValidateRequest,
     ctx: TenantContext = Depends(get_tenant_context),
@@ -353,7 +372,12 @@ async def validate_config_endpoint(
 # 4. POST /api/config/reset — Reset to tier defaults
 # ---------------------------------------------------------------------------
 
-@router.post("/reset", response_model=ConfigUpdateResponse)
+@router.post(
+    "/reset",
+    response_model=ConfigUpdateResponse,
+    summary="Reset configuration to defaults",
+    description="Resets all configuration to tier defaults. Creates a new version with only default values and clears all tenant overrides.",
+)
 async def reset_config(
     ctx: TenantContext = Depends(get_tenant_context),
 ) -> ConfigUpdateResponse:
@@ -384,7 +408,12 @@ async def reset_config(
 # 5. GET /api/config/diff — Overrides vs. defaults
 # ---------------------------------------------------------------------------
 
-@router.get("/diff", response_model=ConfigDiffResponse)
+@router.get(
+    "/diff",
+    response_model=ConfigDiffResponse,
+    summary="Get config overrides vs defaults",
+    description="Shows fields where the tenant's config differs from tier defaults. Useful for understanding what has been customized.",
+)
 async def get_config_diff(
     ctx: TenantContext = Depends(get_tenant_context),
 ) -> ConfigDiffResponse:
@@ -425,7 +454,12 @@ _STEP_DESCRIPTIONS: dict[OnboardingStep, str] = {
 }
 
 
-@router.get("/onboarding", response_model=OnboardingResponse)
+@router.get(
+    "/onboarding",
+    response_model=OnboardingResponse,
+    summary="Get onboarding wizard steps",
+    description="Returns all onboarding steps with their tier-filtered fields, current defaults, and completion flags for the wizard UI.",
+)
 async def get_onboarding_steps(
     ctx: TenantContext = Depends(get_tenant_context),
 ) -> OnboardingResponse:
@@ -491,7 +525,12 @@ async def get_onboarding_steps(
 # 6. GET /api/config/schema — Full field schema for UI rendering
 # ---------------------------------------------------------------------------
 
-@router.get("/schema", response_model=ConfigSchemaResponse)
+@router.get(
+    "/schema",
+    response_model=ConfigSchemaResponse,
+    summary="Get configuration field schema",
+    description="Returns field metadata (types, validation rules, defaults, tooltips) organized by onboarding step. Fields are filtered by the tenant's tier.",
+)
 async def get_config_schema(
     ctx: TenantContext = Depends(get_tenant_context),
 ) -> ConfigSchemaResponse:
@@ -519,7 +558,15 @@ async def get_config_schema(
 # 7. GET /api/config/schema/{step} — Fields for a specific onboarding step
 # ---------------------------------------------------------------------------
 
-@router.get("/schema/{step}", response_model=StepFieldsResponse)
+@router.get(
+    "/schema/{step}",
+    response_model=StepFieldsResponse,
+    summary="Get fields for onboarding step",
+    description="Returns configuration fields for a specific onboarding step (1-9), filtered by the tenant's tier.",
+    responses={
+        400: {"description": "Invalid step number (must be 1-9)"},
+    },
+)
 async def get_step_fields(
     step: int,
     ctx: TenantContext = Depends(get_tenant_context),
@@ -600,7 +647,12 @@ async def get_step_fields(
 # 8. GET /api/config/versions — Version history
 # ---------------------------------------------------------------------------
 
-@router.get("/versions", response_model=ConfigVersionListResponse)
+@router.get(
+    "/versions",
+    response_model=ConfigVersionListResponse,
+    summary="List configuration versions",
+    description="Returns up to 20 most recent configuration versions, newest first, with version number, timestamp, and creator.",
+)
 async def list_config_versions(
     ctx: TenantContext = Depends(get_tenant_context),
 ) -> ConfigVersionListResponse:
@@ -625,7 +677,15 @@ async def list_config_versions(
 # 9. GET /api/config/versions/{version} — Specific historical version
 # ---------------------------------------------------------------------------
 
-@router.get("/versions/{version}", response_model=ConfigResponse)
+@router.get(
+    "/versions/{version}",
+    response_model=ConfigResponse,
+    summary="Get specific configuration version",
+    description="Returns the resolved configuration as it was at a specific historical version, merged with current tier defaults.",
+    responses={
+        404: {"description": "Configuration version not found"},
+    },
+)
 async def get_config_version(
     version: int,
     ctx: TenantContext = Depends(get_tenant_context),
@@ -658,7 +718,15 @@ async def get_config_version(
 # 10. POST /api/config/rollback — Roll back to a previous version
 # ---------------------------------------------------------------------------
 
-@router.post("/rollback", response_model=ConfigRollbackResponse)
+@router.post(
+    "/rollback",
+    response_model=ConfigRollbackResponse,
+    summary="Roll back to previous version",
+    description="Creates a new version with the contents of the target version. No versions are deleted and full history is preserved.",
+    responses={
+        404: {"description": "Target version not found"},
+    },
+)
 async def rollback_config(
     body: ConfigRollbackRequest,
     ctx: TenantContext = Depends(get_tenant_context),

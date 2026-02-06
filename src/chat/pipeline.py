@@ -37,7 +37,9 @@ import asyncio
 import json
 import logging
 import os
+import sys
 import time
+import traceback
 from collections.abc import AsyncGenerator
 from typing import Any
 
@@ -91,6 +93,76 @@ except ImportError:
 # Imported lazily inside execute() to avoid circular import at module load.
 
 logger = logging.getLogger(__name__)
+
+
+# ---------------------------------------------------------------------------
+# WI #131: Azure OpenAI error classification
+# ---------------------------------------------------------------------------
+
+
+def _classify_openai_error(exc: Exception) -> tuple[str, str, bool]:
+    """Classify an Azure OpenAI exception into error code, message, and recoverability.
+
+    Returns:
+        (code, message, recoverable) tuple for the error_event factory.
+    """
+    exc_type = type(exc).__name__
+    exc_msg = str(exc).lower()
+
+    # Rate limit (HTTP 429)
+    if "ratelimit" in exc_type.lower() or "429" in str(exc):
+        return (
+            "rate_limited",
+            "AI service is temporarily busy. Please wait a moment and try again.",
+            True,
+        )
+
+    # Content filter triggered (Azure OpenAI specific)
+    if "content_filter" in exc_msg or "contentfilter" in exc_msg:
+        return (
+            "content_filtered",
+            "Your message could not be processed due to content safety policies.",
+            False,
+        )
+
+    # Model overloaded / server error (HTTP 503)
+    if "503" in str(exc) or "overloaded" in exc_msg or "server_error" in exc_msg:
+        return (
+            "model_overloaded",
+            "The AI model is temporarily overloaded. Please try again shortly.",
+            True,
+        )
+
+    # Timeout
+    if "timeout" in exc_type.lower() or "timeout" in exc_msg:
+        return (
+            "generation_timeout",
+            "Response generation timed out. Please try again.",
+            True,
+        )
+
+    # Authentication / configuration error (non-recoverable)
+    if "auth" in exc_type.lower() or "401" in str(exc) or "403" in str(exc):
+        return (
+            "ai_configuration_error",
+            "AI service configuration error. Please contact support.",
+            False,
+        )
+
+    # Connection error
+    if "connect" in exc_type.lower() or "connection" in exc_msg:
+        return (
+            "ai_connection_error",
+            "Unable to connect to AI service. Please try again shortly.",
+            True,
+        )
+
+    # Generic fallback
+    return (
+        "generation_error",
+        "An error occurred while generating the response. Please try again.",
+        True,
+    )
 
 
 # ---------------------------------------------------------------------------
@@ -264,7 +336,11 @@ class ChatPipeline:
             StreamEvent objects (stage, token, validated/retracted, done/error).
         """
         budget = PipelineTimeoutBudget()
-        trace = DecisionTraceBuilder()
+        trace = DecisionTraceBuilder(
+            conversation_id=conversation_id,
+            tenant_id=tenant_id,
+            customer_id=customer_id or "",
+        )
         tier = tenant.tier or TenantTier.STARTER
 
         # Store tenant_id for knowledge retrieval (used by _call_knowledge_retrieval_direct)
@@ -444,17 +520,34 @@ class ChatPipeline:
             full_response = ""
             sequence = 0
 
-            async for chunk in self._call_response_generator_stream(
-                customer_message=customer_message,
-                intent=intent,
-                knowledge_context=knowledge_context,
-                system_prompt=prompts[AgentRole.RESPONSE_GENERATOR],
-                budget=budget,
-                model=response_model,
-            ):
-                full_response += chunk
-                sequence += 1
-                yield token_event(chunk, sequence)
+            try:
+                async for chunk in self._call_response_generator_stream(
+                    customer_message=customer_message,
+                    intent=intent,
+                    knowledge_context=knowledge_context,
+                    system_prompt=prompts[AgentRole.RESPONSE_GENERATOR],
+                    budget=budget,
+                    model=response_model,
+                ):
+                    full_response += chunk
+                    sequence += 1
+                    yield token_event(chunk, sequence)
+            except (PipelineTimeoutError, ServiceUnavailableError):
+                raise  # Let outer handlers deal with these
+            except Exception as rg_exc:
+                code, msg, recoverable = _classify_openai_error(rg_exc)
+                logger.warning(
+                    "Response generator error mid-stream: conv=%s tokens_sent=%d code=%s err=%s",
+                    conversation_id, sequence, code, rg_exc,
+                )
+                yield error_event(
+                    msg, code=code,
+                    recoverable=recoverable,
+                    tokens_sent=sequence,
+                    stage="response-generator",
+                )
+                yield done_event(conversation_id, 0)
+                return
 
             rg_elapsed = (time.monotonic() - rg_start) * 1000
             trace.add_stage(
@@ -557,6 +650,8 @@ class ChatPipeline:
             yield error_event(
                 "Response took too long. Please try again.",
                 code="pipeline_timeout",
+                recoverable=True,
+                stage=exc.stage,
             )
             yield done_event(conversation_id, 0)
 
@@ -568,16 +663,31 @@ class ChatPipeline:
             yield error_event(
                 "A required service is temporarily unavailable. Please try again shortly.",
                 code="service_unavailable",
+                recoverable=True,
+                stage=exc.service_name,
             )
             yield done_event(conversation_id, 0)
 
-        except Exception:
+        except Exception as exc:
+            # Include exception details in SSE event for debugging
+            exc_type = type(exc).__name__
+            exc_msg = str(exc)[:500]  # Truncate long messages
+            tb_str = traceback.format_exc()
+
+            # Print to stderr to bypass structured logging formatter
+            print(
+                f"[PIPELINE FATAL] conv={conversation_id} "
+                f"tenant={tenant_id}\n{tb_str}",
+                file=sys.stderr, flush=True,
+            )
             logger.exception(
-                "Pipeline error: conv=%s", conversation_id,
+                "Pipeline error: conv=%s type=%s msg=%s",
+                conversation_id, exc_type, exc_msg,
             )
             yield error_event(
-                "An unexpected error occurred. Please try again.",
+                f"An unexpected error occurred: {exc_type}: {exc_msg}",
                 code="internal_error",
+                recoverable=True,
             )
             yield done_event(conversation_id, 0)
 
@@ -747,118 +857,53 @@ class ChatPipeline:
         intent: str,
         system_prompt: str,
     ) -> dict[str, Any]:
-        """Retrieve knowledge using text search on the knowledge base.
+        """Retrieve knowledge using hybrid vector + BM25 search (WI #211-212).
 
-        Searches the KnowledgeBaseRepository by matching the message
-        against active knowledge base entries. Falls back to empty
-        context when no KB repo is configured.
+        Uses the KnowledgeVectorizer for enterprise-grade retrieval:
+        1. Embeds the query via text-embedding-3-large
+        2. Runs DiskANN vector search on Cosmos DB
+        3. Computes BM25 keyword scores
+        4. Fuses results via Reciprocal Rank Fusion (RRF)
 
-        Note: This uses Cosmos DB text search (CONTAINS) rather than
-        vector search. Vector search is used for Layer 2 conversation
-        memory. Knowledge base entries are structured documents where
-        text search is sufficient and avoids the embedding round-trip.
+        Falls back gracefully:
+        - No vectorizer → BM25-only via vectorizer
+        - No KB repo → empty context
+        - Vectorizer not configured → empty context
         """
-        if not self._kb_repo:
-            logger.warning(
-                "No KnowledgeBaseRepository configured — "
-                "returning empty knowledge context"
-            )
-            return {
-                "context": "",
-                "sources": [],
-                "model": AZURE_EMBEDDING_MODEL,
-            }
-
-        # Get the tenant_id from the current execution context
-        # (it's passed through the pipeline via the session)
         tenant_id = getattr(self, "_current_tenant_id", None)
         if not tenant_id:
             return {"context": "", "sources": [], "model": AZURE_EMBEDDING_MODEL}
 
+        # Use KnowledgeVectorizer for hybrid retrieval (WI #210-212)
         try:
-            # Search by keyword-based matching: extract key terms from message
-            # and search active KB entries
-            entries = await self._kb_repo.list_active(tenant_id)
+            from src.multi_tenant.knowledge_vectorizer import (
+                KnowledgeVectorizer,
+                get_knowledge_vectorizer,
+            )
 
-            if not entries:
-                return {"context": "", "sources": [], "model": AZURE_EMBEDDING_MODEL}
+            vectorizer = get_knowledge_vectorizer()
+            if not vectorizer._configured:
+                raise RuntimeError("KnowledgeVectorizer not configured")
 
-            # Score entries by simple keyword relevance
-            message_lower = message.lower()
-            scored: list[tuple[float, dict[str, Any]]] = []
+            results = await vectorizer.search(
+                tenant_id=tenant_id,
+                query=message,
+                top_k=5,
+            )
 
-            for entry in entries:
-                title = (entry.get("title") or "").lower()
-                content = (entry.get("content") or "").lower()
-                tags = [t.lower() for t in (entry.get("tags") or [])]
+            formatted = KnowledgeVectorizer.format_for_pipeline(results)
 
-                # Simple relevance scoring
-                score = 0.0
-                message_words = set(message_lower.split())
+            # Add token tracking fields for pipeline compatibility
+            formatted.setdefault("tokens_input", 0)
+            formatted.setdefault("tokens_output", 0)
 
-                # Title match (highest weight)
-                for word in message_words:
-                    if len(word) > 2 and word in title:
-                        score += 3.0
-
-                # Tag match (high weight)
-                for word in message_words:
-                    if word in tags:
-                        score += 2.0
-
-                # Content match (moderate weight)
-                for word in message_words:
-                    if len(word) > 3 and word in content:
-                        score += 1.0
-
-                # Intent match boost
-                intent_lower = intent.lower().replace("_", " ")
-                for iword in intent_lower.split():
-                    if len(iword) > 2 and (iword in title or iword in content):
-                        score += 1.5
-
-                if score > 0:
-                    scored.append((score, entry))
-
-            # Sort by score descending, take top 5
-            scored.sort(key=lambda x: x[0], reverse=True)
-            top_entries = scored[:5]
-
-            if not top_entries:
-                return {"context": "", "sources": [], "model": AZURE_EMBEDDING_MODEL}
-
-            # Build context string from matched entries
-            context_parts: list[str] = []
-            sources: list[dict[str, Any]] = []
-
-            for relevance, entry in top_entries:
-                title = entry.get("title", "Untitled")
-                content = entry.get("content", "")
-                entry_type = entry.get("entry_type", "")
-
-                # Truncate content to ~500 chars per entry
-                if len(content) > 500:
-                    content = content[:500] + "..."
-
-                context_parts.append(f"[{entry_type.upper()}] {title}\n{content}")
-                sources.append({
-                    "id": entry.get("id", ""),
-                    "title": title,
-                    "score": round(relevance / 10.0, 2),  # Normalize to 0-1
-                    "type": entry_type,
-                })
-
-            return {
-                "context": "\n\n---\n\n".join(context_parts),
-                "sources": sources,
-                "model": "text-search",
-                "tokens_input": 0,
-                "tokens_output": 0,
-            }
+            return formatted
 
         except Exception as exc:
             logger.warning(
-                "Knowledge retrieval failed: %s — returning empty context", exc,
+                "Hybrid KB retrieval unavailable (%s) — "
+                "returning empty knowledge context",
+                exc,
             )
             return {"context": "", "sources": [], "model": AZURE_EMBEDDING_MODEL}
 
@@ -1129,15 +1174,29 @@ class ChatPipeline:
             elapsed = (time.monotonic() - start_time) * 1000
             content = response.choices[0].message.content or "{}"
 
+            logger.info(
+                "Critic (direct) raw response: conv=%s content=%s",
+                conversation_id[:8], content[:500],
+            )
+
             try:
                 parsed = json.loads(content)
             except json.JSONDecodeError:
+                logger.warning(
+                    "Critic (direct) JSON parse failed: conv=%s content=%s",
+                    conversation_id[:8], content[:200],
+                )
                 parsed = {}
 
             verdict_str = parsed.get("verdict", "rejected")
+            reasoning = parsed.get("reasoning", "")
             try:
                 verdict = CriticVerdict(verdict_str)
             except ValueError:
+                logger.warning(
+                    "Critic (direct) unknown verdict: conv=%s verdict=%s",
+                    conversation_id[:8], verdict_str,
+                )
                 verdict = CriticVerdict.REJECTED
 
             approved = verdict in (CriticVerdict.APPROVED, CriticVerdict.MODIFIED)
@@ -1161,14 +1220,22 @@ class ChatPipeline:
                 request_id=request_id,
             )
 
+            logger.info(
+                "Critic (direct) decision: conv=%s approved=%s verdict=%s "
+                "flags=%s reasoning=%s",
+                conversation_id[:8], approved, verdict_str, flags,
+                reasoning[:200] if reasoning else "none",
+            )
+
             if approved:
                 safe_text = modified_response or response_text
                 return True, safe_text, result
             else:
                 logger.warning(
                     "Critic (direct) rejected response: tenant=%s conv=%s "
-                    "flags=%s",
+                    "flags=%s reasoning=%s",
                     tenant_id, conversation_id, flags,
+                    reasoning[:200] if reasoning else "none",
                 )
                 return False, SAFE_FALLBACK_MESSAGE, result
 

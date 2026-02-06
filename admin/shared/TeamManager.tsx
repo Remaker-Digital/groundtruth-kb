@@ -28,6 +28,7 @@
 import React, { useState, useCallback } from 'react';
 import type { BaseComponentProps, TeamMember, TeamRole } from './types';
 import { useTeamMembers, useInviteTeamMember } from './hooks';
+import { HelpTooltip } from './HelpTooltip';
 
 // ---------------------------------------------------------------------------
 // Constants
@@ -240,7 +241,7 @@ const s = {
     padding: '8px 20px',
     fontSize: 14,
     fontWeight: 600,
-    background: '#C41E2A',
+    background: '#ff3621',
     color: '#FFFFFF',
     border: 'none',
     borderRadius: 6,
@@ -333,7 +334,7 @@ const s = {
     padding: '8px 20px',
     fontSize: 14,
     fontWeight: 600,
-    background: '#C41E2A',
+    background: '#ff3621',
     color: '#FFFFFF',
     border: 'none',
     borderRadius: 6,
@@ -644,7 +645,7 @@ export const TeamManager: React.FC<BaseComponentProps> = ({
           marginBottom: 16,
         }}>
           <div>
-            <h3 style={s.sectionTitle}>Team Members</h3>
+            <h3 style={s.sectionTitle}>Team Members<HelpTooltip text="Manage who can access your Agent Red admin dashboard and what they can do." /></h3>
             <p style={s.sectionDescription}>
               {activeCount} active member{activeCount !== 1 ? 's' : ''} of {totalCount} total.
               Manage roles and access for your support team.
@@ -698,6 +699,7 @@ export const TeamManager: React.FC<BaseComponentProps> = ({
               marginBottom: 12,
             }}>
               Invite New Team Member
+              <HelpTooltip text="Send an invitation to a new team member. They will receive an email with access instructions." />
             </div>
             <div style={s.formRow}>
               <div style={s.formField}>
@@ -724,7 +726,7 @@ export const TeamManager: React.FC<BaseComponentProps> = ({
                 />
               </div>
               <div style={{ ...s.formField, minWidth: 140, flex: '0 0 auto' }}>
-                <label style={s.formLabel}>Role *</label>
+                <label style={s.formLabel}>Role *<HelpTooltip text="Controls what actions a team member can perform. Owner has full access; Viewer is read-only." /></label>
                 <select
                   style={s.select}
                   value={inviteRole}
@@ -774,7 +776,7 @@ export const TeamManager: React.FC<BaseComponentProps> = ({
               <thead>
                 <tr>
                   <th style={s.th}>Member</th>
-                  <th style={s.th}>Role</th>
+                  <th style={s.th}>Role<HelpTooltip text="Controls what actions a team member can perform. Owner has full access; Viewer is read-only." /></th>
                   <th style={s.th}>Status</th>
                   <th style={s.th}>Joined</th>
                   <th style={s.th}>Last Active</th>
@@ -940,7 +942,7 @@ export const TeamManager: React.FC<BaseComponentProps> = ({
             </p>
 
             <div style={{ marginBottom: 16 }}>
-              <label style={s.formLabel}>Role</label>
+              <label style={s.formLabel}>Role<HelpTooltip text="Controls what actions a team member can perform. Owner has full access; Viewer is read-only." /></label>
               <select
                 style={{ ...s.select, marginTop: 4 }}
                 value={editRole}

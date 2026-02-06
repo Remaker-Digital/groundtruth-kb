@@ -425,6 +425,51 @@ class ConversationMeter:
         )
 
     # -------------------------------------------------------------------
+    # WI #132: First-chunk delivery tracking
+    # -------------------------------------------------------------------
+
+    async def record_first_chunk(
+        self,
+        tenant_id: str,
+        conversation_id: str,
+    ) -> None:
+        """Record that the first AI token has been streamed to the client.
+
+        Called by the SSE manager's metering callback when the first
+        non-heartbeat event is emitted. Updates the conversation document
+        with ``first_chunk_at`` for billing-at-first-chunk and TTFB
+        latency tracking.
+
+        This method is idempotent — if ``first_chunk_at`` is already set,
+        the update is skipped (handles SSE reconnection gracefully).
+
+        Args:
+            tenant_id: Tenant partition key.
+            conversation_id: Conversation receiving its first chunk.
+        """
+        now = datetime.now(timezone.utc).isoformat()
+        try:
+            await self._conversations.patch(
+                tenant_id=tenant_id,
+                document_id=conversation_id,
+                operations=[
+                    # Only set if not already set (idempotent for reconnect)
+                    {"op": "set", "path": "/first_chunk_at", "value": now},
+                ],
+            )
+            logger.debug(
+                "First chunk recorded: conv=%s tenant=%s at=%s",
+                conversation_id, tenant_id, now,
+            )
+        except Exception:
+            # Non-fatal — metering continues on conversation end
+            logger.warning(
+                "Failed to record first chunk: conv=%s tenant=%s",
+                conversation_id, tenant_id,
+                exc_info=True,
+            )
+
+    # -------------------------------------------------------------------
     # Core metering logic (3-tier consumption)
     # -------------------------------------------------------------------
 
@@ -1053,3 +1098,34 @@ class ConversationMeter:
     def _current_billing_period() -> str:
         """Get the current billing period string (YYYY-MM)."""
         return datetime.now(timezone.utc).strftime("%Y-%m")
+
+
+# ---------------------------------------------------------------------------
+# Module-level singleton
+# ---------------------------------------------------------------------------
+
+_conversation_meter_instance: ConversationMeter | None = None
+
+
+def configure_conversation_meter(meter: ConversationMeter) -> None:
+    """Store a configured ConversationMeter instance as the module singleton.
+
+    Called during application startup after repos are initialized.
+    """
+    global _conversation_meter_instance  # noqa: PLW0603
+    _conversation_meter_instance = meter
+
+
+def get_conversation_meter() -> ConversationMeter:
+    """Return the module-level ConversationMeter singleton.
+
+    Raises:
+        RuntimeError: If ``configure_conversation_meter()`` has not been
+            called yet (startup ordering issue).
+    """
+    if _conversation_meter_instance is None:
+        raise RuntimeError(
+            "ConversationMeter not configured — call "
+            "configure_conversation_meter() during startup"
+        )
+    return _conversation_meter_instance

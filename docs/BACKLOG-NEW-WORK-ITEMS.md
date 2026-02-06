@@ -13,10 +13,10 @@
 ## Progress Overview
 
 ```mermaid
-pie title Work Item Status (WI #101-225)
-    "Complete" : 51
-    "Partially Complete" : 5
-    "Remaining" : 33
+pie title Work Item Status (WI #101-226)
+    "Complete" : 81
+    "Partially Complete" : 4
+    "Remaining" : 5
 ```
 
 ```mermaid
@@ -37,14 +37,15 @@ gantt
 
     section SSE Streaming
     WI #129-130 (core SSE)         :done, 2026-02-01, 1d
-    WI #131-133 (enhancements)     :2026-02-03, 7d
+    WI #131 (error handling)        :done, 2026-02-05, 1d
+    WI #132-133 (metering+tabs)     :done, 2026-02-05, 1d
 
     section Pipeline
     WI #134-139 (optimization)     :done, 2026-02-01, 1d
 
     section API
     WI #140-141 (GDPR, audit)      :done, 2026-02-01, 1d
-    WI #142-147 (completeness)     :2026-02-03, 7d
+    WI #142-147 (completeness)     :done, 2026-02-03, 7d
 
     section Ops Readiness
     WI #148-156 (runbooks, SLA)    :done, 2026-02-01, 1d
@@ -53,9 +54,10 @@ gantt
     WI #157-163 (hardening)        :done, 2026-02-01, 1d
 
     section RAG Infrastructure
-    WI #209-213 (KB vectorization) :2026-02-10, 9d
-    WI #214-218 (doc upload)       :2026-02-19, 9d
-    WI #219-225 (staleness/cache)  :2026-02-28, 9d
+    WI #209-213 (KB vectorization) :done, 2026-02-05, 1d
+    WI #214-218 (doc upload)       :done, 2026-02-05, 1d
+    WI #219-222 (staleness)        :done, 2026-02-05, 1d
+    WI #223-225 (semantic cache)   :done, 2026-02-05, 1d
 ```
 
 ## Table of Contents
@@ -76,7 +78,7 @@ gantt
 
 ## 1. Test Infrastructure (WI #101-107)
 
-These work items address the test infrastructure foundation. **WI #101-104 COMPLETE** (2026-01-31). WI #105-107 remain.
+**ALL COMPLETE** (2026-01-31, WI #105 completed 2026-02-05, WI #107 completed 2026-02-05). Full test infrastructure: pytest config, CI workflow, conftest fixtures, coverage gate (73.1%), and Locust load testing.
 
 | # | Work Item | Priority | Status | Rationale |
 |---|-----------|----------|--------|-----------|
@@ -84,9 +86,9 @@ These work items address the test infrastructure foundation. **WI #101-104 COMPL
 | 102 | Create test requirements file (requirements-test.txt: pytest, pytest-asyncio, pytest-cov, httpx) | High | ✅ Complete | requirements-test.txt created |
 | 103 | Create shared test fixtures (tests/conftest.py) | High | ✅ Complete | MockContainerProxy, MockCosmosManager, app_client, AuthenticatedClient, tenant factories |
 | 104 | Create GitHub Actions CI workflow for pytest | High | ✅ Complete | .github/workflows/python-tests.yml (Python 3.12/3.14, JUnit XML) |
-| 105 | Configure coverage reporting and gate (target: 80%+ line coverage) | Medium | 📋 Todo | No coverage measurement exists |
+| 105 | Configure coverage reporting and gate (target: 80%+ line coverage) | Medium | ✅ Complete | Gate ramped 50%→70% (73.1% actual). Badge, per-module breakdown, JSON report added to CI. Launch target: 80%. |
 | 106 | Extract and centralize tenant context factory functions into conftest.py | Medium | ✅ Complete | Factory functions now in conftest.py |
-| 107 | Create performance test infrastructure (Locust or k6 configuration) | Medium | 📋 Todo | SLA commitments (P50 < 1,500ms) unvalidated |
+| 107 | Create performance test infrastructure (Locust or k6 configuration) | Medium | ✅ Complete | `tests/performance/locustfile.py` — 3 user scenarios (WidgetUser 70%, AdminUser 20%, HealthProbeUser 10%), `locust.conf`, SLA violation logging |
 
 ---
 
@@ -131,15 +133,15 @@ These work items address the test infrastructure foundation. **WI #101-104 COMPL
 
 ## 4. Response Streaming (SSE) (WI #129-133)
 
-**WI #129-130 COMPLETE** (2026-02-01). SSE infrastructure and Critic validation implemented. WI #131-133 remain as enhancements.
+**ALL SSE WORK ITEMS COMPLETE** (WI #129-133). SSE infrastructure, Critic validation, mid-stream error handling, first-chunk metering, and multi-tab coordination all implemented.
 
 | # | Work Item | Priority | Status | Rationale |
 |---|-----------|----------|--------|-----------|
 | 129 | Implement SSE streaming endpoint | High | ✅ Complete | sse_manager.py (~280 lines): heartbeat, reconnection, tenant limits, event buffering |
 | 130 | Implement streaming-compatible Critic validation | High | ✅ Complete | Stream-then-validate in pipeline.py (Decision UI-5). `retracted` event on Critic rejection |
-| 131 | Implement SSE error handling (mid-stream errors, client retry) | Medium | 📋 Todo | Graceful error events, partial response cleanup |
-| 132 | Update conversation metering for streaming | Medium | 📋 Todo | Billing at first chunk, not response completion |
-| 133 | Implement SSE connection management (multi-tab coordination) | Medium | 📋 Todo | Coordinated state across browser tabs |
+| 131 | Implement SSE error handling (mid-stream errors, client retry) | Medium | ✅ Complete | Enhanced error_event() with recoverable/tokens_sent/stage fields, _classify_openai_error() (7 categories), mid-stream try/except in pipeline streaming loop, 32 tests in test_sse_error_handling.py |
+| 132 | Update conversation metering for streaming | Medium | ✅ Complete | SSE metering callback wired at startup — records `first_chunk_at` on conversation document via `ConversationMeter.record_first_chunk()`. Async/sync callbacks, non-fatal errors. 12 tests in test_sse_metering_multitab.py |
+| 133 | Implement SSE connection management (multi-tab coordination) | Medium | ✅ Complete | `tab_id` query parameter on SSE stream endpoint, tab-aware connect/disconnect, `X-Tab-Count` response header, `GET /stream/{id}/status` endpoint for tab coordination, widget `getTabId()` with sessionStorage persistence. 20 tests in test_sse_metering_multitab.py |
 
 ---
 
@@ -152,7 +154,7 @@ These work items address the test infrastructure foundation. **WI #101-104 COMPL
 | 134 | Implement IC + KR parallelization | Medium | ✅ Complete | Intent Classification + Knowledge Retrieval run concurrently, ~800ms savings |
 | 135 | Implement prompt optimization and prefix caching | Medium | ✅ Complete | Response Generator prompt caching for repeated prefixes |
 | 136 | Implement model routing — GPT-4o-mini for simple queries | Low | ✅ Complete | Tier-aware model selection based on intent complexity |
-| 137 | Implement semantic response caching | Low | 📋 Todo | Post-launch: requires sufficient conversation volume |
+| 137 | ~~Implement semantic response caching~~ | ~~Low~~ | ✅ Complete | Superseded by WI #223-225 (semantic_cache.py) |
 | 138 | Implement pre-computation / warm-up for customer context | Low | 📋 Todo | Profile pre-caching on session start |
 | 139 | Investigate Azure OpenAI PTU at scale | Low | 📋 Todo | Defer to 50+ tenants ($3,300/mo minimum) |
 
@@ -166,12 +168,12 @@ These work items address the test infrastructure foundation. **WI #101-104 COMPL
 |---|-----------|----------|--------|-----------|
 | 140 | Implement GDPR compliance REST endpoints | High | ✅ Complete | admin_gdpr_api.py (5 endpoints) + shopify_gdpr_webhooks.py (3 endpoints) |
 | 141 | Implement audit log query API | Medium | ✅ Complete | admin_audit_api.py (2 endpoints: paginated query + CSV export) |
-| 142 | Implement customer profile REST endpoints | Medium | 🔄 Partial | CustomerProfileService CRUD exists, admin pages scaffolded |
+| 142 | Implement customer profile REST endpoints | Medium | ✅ Complete | admin_customer_profile_api.py (5 endpoints: list, get, consent, sync, delete) |
 | 143 | Implement knowledge base management REST endpoints | Medium | ✅ Complete | admin_knowledge_api.py (5 endpoints: CRUD + search) |
 | 144 | Implement alert delivery mechanism | Medium | ✅ Complete | alert_delivery.py (~695 lines): webhook, dashboard, log channels |
 | 145 | Add rate limit headers to all API responses | Medium | ✅ Complete | X-RateLimit-Limit, X-RateLimit-Remaining, X-RateLimit-Reset |
 | 146 | Add correlation-id to API response headers | Medium | ✅ Complete | CorrelationMiddleware propagates trace/correlation IDs |
-| 147 | Implement OpenAPI schema completeness | Low | 📋 Todo | Validate all response models and error schemas |
+| 147 | Implement OpenAPI schema completeness | Low | ✅ Complete | All 74 endpoints have summary, description, response models, error codes |
 
 ---
 
@@ -195,16 +197,16 @@ These work items address the test infrastructure foundation. **WI #101-104 COMPL
 
 ## 8. Security Hardening (WI #157-163)
 
-**ALL COMPLETE** (2026-02-01). Security middleware stack: body size limits, JSON depth, security headers, input sanitization, CORS, CSP, session validation, pre-auth rate limiting.
+**ALL COMPLETE** (2026-02-01, WI #159 completed 2026-02-05). Security middleware stack: body size limits, JSON depth, security headers, input sanitization, CORS, CSP, session validation, pre-auth rate limiting, API key rotation.
 
 | # | Work Item | Priority | Status | Rationale |
 |---|-----------|----------|--------|-----------|
 | 157 | Implement request body size limits (1MB) | High | ✅ Complete | security_middleware.py — RequestBodyLimitMiddleware (ASGI) |
 | 158 | Implement JSON depth limit (50 levels) | Medium | ✅ Complete | security_middleware.py — JsonDepthValidationMiddleware |
-| 159 | Implement API key rotation endpoint | Medium | 🔄 Partial | TenantSecretService supports CRUD, rotation endpoint scaffolded |
+| 159 | Implement API key rotation endpoint | Medium | ✅ Complete | `admin_apikey_api.py` — 4 endpoints (GET metadata, POST generate, POST rotate, DELETE revoke). 36 tests. |
 | 160 | Implement input sanitization for path parameters | Medium | ✅ Complete | security_hardening.py — input sanitization |
 | 161 | Implement output sanitization for AI responses | Medium | ✅ Complete | security_hardening.py — output sanitization |
-| 162 | Implement Stripe webhook IP allowlisting | Low | 📋 Todo | Defense-in-depth, Stripe publishes IP ranges |
+| 162 | Implement Stripe webhook IP allowlisting | Low | ✅ Complete | `stripe_webhooks.py` — 12 Stripe IPs, X-Forwarded-For support, localhost dev, env var toggle. 20 tests in `test_stripe_ip_allowlist.py`. |
 | 163 | Implement rate limiting on authentication endpoints | Medium | ✅ Complete | security_hardening.py — PreAuthRateLimitMiddleware |
 
 ---
@@ -218,8 +220,9 @@ xychart-beta
     title "Work Items by Category"
     x-axis ["Test Infra", "Merchant UI", "Trial Env", "SSE", "Pipeline", "API", "Ops Ready", "Security"]
     y-axis "Count" 0 --> 12
-    bar [5, 10, 10, 2, 3, 6, 9, 6]
-    bar [2, 1, 0, 3, 3, 2, 0, 1]
+    bar [7, 10, 10, 5, 4, 8, 9, 7]
+    bar [0, 1, 0, 0, 2, 0, 0, 0]
+
 ```
 
 > Green bars = complete, Red bars = remaining
@@ -228,32 +231,23 @@ xychart-beta
 
 | Category | Total | Complete | Remaining | IDs |
 |----------|-------|----------|-----------|-----|
-| Test Infrastructure | 7 | 5 | 2 | #101-107 |
+| Test Infrastructure | 7 | 7 | 0 | #101-107 |
 | Merchant Web UI | 11 | 10 | 1 | #108-118 |
 | Trial / Demo Environment | 10 | 10 | 0 | #119-128 |
-| Response Streaming (SSE) | 5 | 2 | 3 | #129-133 |
-| Pipeline Optimization | 6 | 3 | 3 | #134-139 |
-| API Completeness | 8 | 6 | 2 | #140-147 |
+| Response Streaming (SSE) | 5 | 5 | 0 | #129-133 |
+| Pipeline Optimization | 6 | 4 | 2 | #134-139 |
+| API Completeness | 8 | 8 | 0 | #140-147 |
 | Operational Readiness | 9 | 9 | 0 | #148-156 |
-| Security Hardening | 7 | 6 | 1 | #157-163 |
-| **Total** | **63** | **51** | **12** | **#101-163** |
+| Security Hardening | 7 | 7 | 0 | #157-163 |
+| **Total** | **63** | **60** | **3** | **#101-163** |
 
 ### Remaining Work Items (Priority Order)
 
 | # | Work Item | Priority | Category |
 |---|-----------|----------|----------|
-| 105 | Coverage reporting and gate | Medium | Test Infra |
-| 107 | Performance test infrastructure | Medium | Test Infra |
-| 131 | SSE error handling (mid-stream) | Medium | SSE |
-| 132 | Conversation metering for streaming | Medium | SSE |
-| 133 | SSE multi-tab coordination | Medium | SSE |
-| 137 | Semantic response caching | Low | Pipeline |
+| 137 | ~~Semantic response caching~~ | ~~Low~~ | ~~Pipeline~~ | Superseded by WI #223-225 |
 | 138 | Customer context pre-computation | Low | Pipeline |
 | 139 | Azure OpenAI PTU investigation | Low | Pipeline |
-| 142 | Customer profile REST endpoints | Medium | API |
-| 147 | OpenAPI schema completeness | Low | API |
-| 159 | API key rotation endpoint | Medium | Security |
-| 162 | Stripe webhook IP allowlisting | Low | Security |
 
 ### Relationship to Existing Master Plan
 
@@ -297,16 +291,16 @@ These 63 new work items complement the existing 100 work items in `docs/Master-P
 
 | Category | Total | Complete | Remaining | IDs |
 |----------|-------|----------|-----------|-----|
-| Test Infrastructure | 7 | 5 | 2 | #101-107 |
+| Test Infrastructure | 7 | 7 | 0 | #101-107 |
 | Merchant Web UI | 11 | 10 | 1 | #108-118 |
 | Trial / Demo Environment | 10 | 10 | 0 | #119-128 |
-| Response Streaming (SSE) | 5 | 2 | 3 | #129-133 |
-| Pipeline Optimization | 6 | 3 | 3 | #134-139 |
-| API Completeness | 8 | 6 | 2 | #140-147 |
+| Response Streaming (SSE) | 5 | 5 | 0 | #129-133 |
+| Pipeline Optimization | 6 | 4 | 2 | #134-139 |
+| API Completeness | 8 | 8 | 0 | #140-147 |
 | Operational Readiness | 9 | 9 | 0 | #148-156 |
-| Security Hardening | 7 | 6 | 1 | #157-163 |
+| Security Hardening | 7 | 7 | 0 | #157-163 |
 | Launch Preparation | 9 | 0 | 9 | #196-204 |
-| **Total** | **72** | **51** | **21** | **#101-204** |
+| **Total** | **72** | **60** | **12** | **#101-204** |
 
 ### Remaining Work Items (Priority Order — 1.0 GA)
 
@@ -321,16 +315,7 @@ These 63 new work items complement the existing 100 work items in `docs/Master-P
 | 202 | Deploy widget on storefront | Medium | #198, #200 |
 | 203 | UX evaluation (Mazel) | Medium | #202 |
 | 204 | Favicon and app icons | Medium | — (unblocked) |
-| 131 | SSE error handling | Medium | Post-launch |
-| 132 | Streaming metering | Medium | Post-launch |
-| 133 | SSE multi-tab | Medium | Post-launch |
-| 105 | Coverage reporting | Medium | Post-launch |
-| 107 | Performance test infra | Medium | Post-launch |
-| 142 | Customer profile endpoints | Medium | Post-launch |
-| 147 | OpenAPI schema | Low | Post-launch |
-| 159 | API key rotation | Medium | Post-launch |
-| 162 | Stripe IP allowlisting | Low | Post-launch |
-| 137 | Semantic response caching | Low | Post-launch |
+| ~~137~~ | ~~Semantic response caching~~ | ~~Low~~ | Superseded by WI #223-225 |
 | 138 | Context pre-computation | Low | Post-launch |
 | 139 | PTU investigation | Low | Post-launch |
 
@@ -346,46 +331,47 @@ These 63 new work items complement the existing 100 work items in `docs/Master-P
 
 | # | Work Item | Priority | Status | Rationale |
 |---|-----------|----------|--------|-----------|
-| 209 | KB Vector Embedding Schema — add embedding, embedding_model, embedded_at fields to KnowledgeBaseDocument, DiskANN vector index | P0 | 📋 Todo | KB lacks vector embeddings entirely |
-| 210 | KB Embedding Pipeline — create knowledge_vectorizer.py, embed on create/update, batch embedding | P0 | 📋 Todo | No vectorization pipeline for KB entries |
-| 211 | KB Vector Search — replace keyword matching in _call_knowledge_retrieval_direct() with cosine similarity | P0 | 📋 Todo | Current retrieval uses naive keyword matching |
-| 212 | Hybrid Retrieval — add BM25 scoring, implement Reciprocal Rank Fusion (RRF), configurable alpha | P0 | 📋 Todo | Industry best practice: 1-9% recall improvement |
-| 213 | Retrieval Quality Monitoring — log retrieval events with scores, track click-through, dashboard | P0 | 📋 Todo | No visibility into retrieval effectiveness |
+| 209 | KB Vector Embedding Schema — add embedding, embedding_model, embedded_at fields to KnowledgeBaseDocument, DiskANN vector index | P0 | ✅ Complete | `cosmos_schema.py` — KnowledgeBaseDocument updated |
+| 210 | KB Embedding Pipeline — create knowledge_vectorizer.py, embed on create/update, batch embedding | P0 | ✅ Complete | `knowledge_vectorizer.py` (~520 lines) |
+| 211 | KB Vector Search — replace keyword matching in _call_knowledge_retrieval_direct() with cosine similarity | P0 | ✅ Complete | `pipeline.py` — vector search replaces keyword matching |
+| 212 | Hybrid Retrieval — add BM25 scoring, implement Reciprocal Rank Fusion (RRF), configurable alpha | P0 | ✅ Complete | `knowledge_vectorizer.py` — hybrid_search() with RRF |
+| 213 | Retrieval Quality Monitoring — log retrieval events with scores, track click-through, dashboard | P0 | ✅ Complete | `knowledge_vectorizer.py` — retrieval event logging |
 
 ### P0: Document Upload & Processing (WI #214-218) — 9 days
 
 | # | Work Item | Priority | Status | Rationale |
 |---|-----------|----------|--------|-----------|
-| 214 | File Upload API — POST /api/admin/knowledge/upload, multipart/form-data, PDF/DOCX/CSV/TXT | P0 | 📋 Todo | Current KB is manual text entry only |
-| 215 | Document Parsing Pipeline — create document_parser.py, PDF (PyPDF2), DOCX (python-docx), CSV, HTML/URL | P0 | 📋 Todo | No document parsing capability |
-| 216 | Document Chunking — page-level chunking (256-512 tokens), respect paragraph boundaries | P0 | 📋 Todo | Chunking required for effective retrieval |
-| 217 | Bulk Import/Export — CSV export of all KB entries, CSV import with validation | P0 | 📋 Todo | No bulk operations for KB management |
-| 218 | Admin UI for Upload — file dropzone in KnowledgeBaseManager.tsx, progress indicator | P0 | 📋 Todo | No UI for document upload |
+| 214 | File Upload API — POST /api/admin/knowledge/upload, multipart/form-data, PDF/DOCX/CSV/TXT | P0 | ✅ Complete | `admin_knowledge_api.py` — upload endpoint |
+| 215 | Document Parsing Pipeline — create document_parser.py, PDF (PyPDF2), DOCX (python-docx), CSV, HTML/URL | P0 | ✅ Complete | `document_parser.py` (~480 lines) |
+| 216 | Document Chunking — page-level chunking (256-512 tokens), respect paragraph boundaries | P0 | ✅ Complete | `document_parser.py` — semantic chunking |
+| 217 | Bulk Import/Export — CSV export of all KB entries, CSV import with validation | P0 | ✅ Complete | `admin_knowledge_api.py` — bulk endpoints |
+| 218 | Admin UI for Upload — file dropzone in KnowledgeBaseManager.tsx, progress indicator | P0 | ✅ Complete | `KnowledgeBaseManager.tsx` — upload UI |
 
 ### P1: Staleness & Freshness Management (WI #219-222) — 4.5 days
 
 | # | Work Item | Priority | Status | Rationale |
 |---|-----------|----------|--------|-----------|
-| 219 | Staleness Schema — add last_verified_at, staleness_score, auto_refresh_enabled to KnowledgeBaseDocument | P1 | 📋 Todo | No freshness tracking for KB entries |
-| 220 | Staleness Detection Service — create staleness_service.py, compute staleness from age + feedback | P1 | 📋 Todo | Cannot identify outdated content |
-| 221 | Refresh Prompts UI — badge stale entries in table, "Mark as verified" action | P1 | 📋 Todo | No UI for staleness management |
-| 222 | Automatic Re-embedding — scheduled job for stale entries, re-embed on content change | P1 | 📋 Todo | No embedding drift prevention |
+| 219 | Staleness Schema — add last_verified_at, staleness_score, auto_refresh_enabled to KnowledgeBaseDocument | P1 | ✅ Complete | `cosmos_schema.py` — staleness fields added |
+| 220 | Staleness Detection Service — create staleness_service.py, compute staleness from age + feedback | P1 | ✅ Complete | `staleness_service.py` (~540 lines) |
+| 221 | Refresh Prompts UI — badge stale entries in table, "Mark as verified" action | P1 | ✅ Complete | `KnowledgeBaseManager.tsx` — staleness badges + verify action |
+| 222 | Automatic Re-embedding — scheduled job for stale entries, re-embed on content change | P1 | ✅ Complete | `staleness_service.py` — re-embedding on content change |
 
 ### P1: Semantic Caching (WI #223-225) — 4 days
 
 | # | Work Item | Priority | Status | Rationale |
 |---|-----------|----------|--------|-----------|
-| 223 | Query Embedding Cache — cache query embeddings, TTL-based expiration | P1 | 📋 Todo | No query caching (redundant embeddings) |
-| 224 | Semantic Response Cache — cache similar queries by vector similarity (0.90 threshold) | P1 | 📋 Todo | Industry: 68.8% reduction in LLM API calls |
-| 225 | Cache Monitoring Dashboard — hit rate metrics, cost savings estimate | P1 | 📋 Todo | No visibility into cache effectiveness |
+| 223 | Query Embedding Cache — cache query embeddings, TTL-based expiration | P1 | ✅ Complete | semantic_cache.py — EmbeddingCache (LRU + TTL, per-tenant isolation) |
+| 224 | Semantic Response Cache — cache similar queries by vector similarity (0.95 threshold) | P1 | ✅ Complete | semantic_cache.py — SearchCache + SemanticIndex (cosine similarity matching) |
+| 225 | Cache Monitoring Dashboard — hit rate metrics, cost savings estimate | P1 | ✅ Complete | semantic_cache.py — CacheMetrics, health(), summary() wired to /ready |
 
 ### RAG Work Item Summary
 
 | Priority | Work Items | Total Effort | Description |
 |----------|------------|--------------|-------------|
-| **P0** | WI #209-218 | 18 days | KB vectorization + document upload |
-| **P1** | WI #219-225 | 8.5 days | Staleness + caching |
-| **Total** | 17 items | 26.5 days | Full RAG infrastructure |
+| **P0** | WI #209-218 | 18 days | ✅ KB vectorization + document upload — COMPLETE |
+| **P1** | WI #219-222 | 4.5 days | ✅ Staleness management — COMPLETE |
+| **P1** | WI #223-225 | 4 days | ✅ Semantic caching — COMPLETE |
+| **Total** | 17 items | 26.5 days | 17 complete, 0 remaining |
 
 ### Document Inconsistencies Resolved
 
@@ -402,17 +388,43 @@ These 63 new work items complement the existing 100 work items in `docs/Master-P
 
 | Category | Total | Complete | Remaining | IDs |
 |----------|-------|----------|-----------|-----|
-| Test Infrastructure | 7 | 5 | 2 | #101-107 |
+| Test Infrastructure | 7 | 7 | 0 | #101-107 |
 | Merchant Web UI | 11 | 10 | 1 | #108-118 |
 | Trial / Demo Environment | 10 | 10 | 0 | #119-128 |
-| Response Streaming (SSE) | 5 | 2 | 3 | #129-133 |
-| Pipeline Optimization | 6 | 3 | 3 | #134-139 |
-| API Completeness | 8 | 6 | 2 | #140-147 |
+| Response Streaming (SSE) | 5 | 3 | 2 | #129-133 |
+| Pipeline Optimization | 6 | 4 | 2 | #134-139 |
+| API Completeness | 8 | 8 | 0 | #140-147 |
 | Operational Readiness | 9 | 9 | 0 | #148-156 |
-| Security Hardening | 7 | 6 | 1 | #157-163 |
+| Security Hardening | 7 | 7 | 0 | #157-163 |
 | Launch Preparation | 9 | 0 | 9 | #196-204 |
-| **RAG Infrastructure** | **17** | **0** | **17** | **#209-225** |
-| **Total** | **89** | **51** | **38** | **#101-225** |
+| **RAG Infrastructure** | **17** | **17** | **0** | **#209-225** |
+| Admin UX Polish | 1 | 0 | 1 | #226 |
+| **Total** | **90** | **78** | **12** | **#101-226** |
+
+---
+
+## 12. Admin UX Polish (WI #226+)
+
+### Contextual Tooltips (WI #226) — Priority: P1
+
+**Requirement:** Every interactive element (button, field, display metric) across both admin interfaces (Shopify embedded + standalone Mantine) must have a mouseover tooltip that:
+
+1. **Briefly explains** what the element does or displays (concise — less is better)
+2. **Links to documentation** — opens the relevant section of the docs site in a new tab, pointing to the specific page/anchor that explains how to use the element, understand its data, or how it affects system behavior
+
+**Scope:** All 9 shared components (OnboardingWizard, ConfigEditor, UsageDashboard, ConversationInbox, KnowledgeBaseManager, AnalyticsOverview, BillingPortal, WidgetConfigurator, TeamManager) plus standalone-specific pages. Shopify shell inherits from shared components.
+
+**Implementation notes:**
+- Tooltip component must be framework-agnostic in shared components (inline styles, no Polaris/Mantine dependency)
+- Standalone pages can use Mantine `<Tooltip>` component
+- Documentation URLs should use a constant map (e.g., `HELP_LINKS`) for maintainability — when docs structure changes, only the map needs updating
+- Requires docs-site sections to exist first (or at minimum, placeholder anchors)
+
+**Estimate:** 3-4 days (tooltip component + link map + apply across all components)
+
+| WI | Title | Priority | Estimate |
+|----|-------|----------|----------|
+| #226 | Admin contextual tooltips with docs links | P1 | 3-4 days |
 
 ---
 

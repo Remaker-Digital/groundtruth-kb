@@ -210,7 +210,7 @@ async def provision(dry_run: bool = True, seed_kb: bool = False) -> None:
             "interactions to demonstrate the memory capability."
         ),
         # Widget appearance — visual
-        widget_primary_color="#C41E2A",
+        widget_primary_color="#ff3621",
         widget_background_color="#141414",
         widget_position="bottom-right",
         widget_offset_x=20,

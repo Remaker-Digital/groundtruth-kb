@@ -32,7 +32,9 @@ from __future__ import annotations
 import asyncio
 import json
 import logging
+import sys
 import time
+import traceback
 from collections import defaultdict
 from collections.abc import AsyncGenerator, Callable
 from dataclasses import dataclass, field
@@ -354,14 +356,22 @@ class SSEConnectionManager:
                 "SSE stream cancelled: tenant=%s conv=%s",
                 tenant_id[:8], conversation_id[:8],
             )
-        except Exception:
+        except Exception as exc:
             # Mid-stream error — emit error + done events (WI #131 enhanced)
+            exc_type = type(exc).__name__
+            exc_msg = str(exc)[:500]
+            # Print to stderr to bypass structured logging formatter
+            print(
+                f"[SSE FATAL] tenant={tenant_id[:8]} conv={conversation_id[:8]}"
+                f"\n{traceback.format_exc()}",
+                file=sys.stderr, flush=True,
+            )
             logger.exception(
-                "SSE stream error: tenant=%s conv=%s",
-                tenant_id[:8], conversation_id[:8],
+                "SSE stream error: tenant=%s conv=%s type=%s msg=%s",
+                tenant_id[:8], conversation_id[:8], exc_type, exc_msg,
             )
             err_sse = self.format_error_event(
-                message="An error occurred during streaming. Please try again.",
+                message=f"Stream error: {exc_type}: {exc_msg}",
                 code="stream_error",
                 recoverable=True,
             )

@@ -206,7 +206,16 @@ router = APIRouter(prefix="/api/gdpr", tags=["admin-gdpr"])
 # ---------------------------------------------------------------------------
 
 
-@router.post("/export", response_model=ExportResponse)
+@router.post(
+    "/export",
+    response_model=ExportResponse,
+    summary="Export tenant or customer data",
+    description="Exports data for GDPR right of access (Article 15) and portability (Article 20). Scope determines whether the entire tenant's data or a specific customer's data is exported.",
+    responses={
+        400: {"description": "Invalid scope or missing customer_id"},
+        503: {"description": "GDPR export services not initialized"},
+    },
+)
 async def export_data(
     request: ExportRequest,
     ctx: TenantContext = Depends(get_tenant_context),
@@ -260,7 +269,17 @@ async def export_data(
 # ---------------------------------------------------------------------------
 
 
-@router.post("/delete", response_model=DeleteResponse)
+@router.post(
+    "/delete",
+    response_model=DeleteResponse,
+    summary="Delete tenant or customer data",
+    description="Performs cascading data deletion for GDPR right to erasure (Article 17). Tenant-level deletion checks the grace period unless force=true. Customer-level deletion proceeds immediately.",
+    responses={
+        400: {"description": "Invalid scope or missing customer_id"},
+        409: {"description": "Grace period still active for tenant"},
+        503: {"description": "GDPR deletion services not initialized"},
+    },
+)
 async def delete_data(
     request: DeleteRequest,
     ctx: TenantContext = Depends(get_tenant_context),
@@ -332,7 +351,15 @@ async def delete_data(
 # ---------------------------------------------------------------------------
 
 
-@router.get("/consent", response_model=ConsentStatusResponse)
+@router.get(
+    "/consent",
+    response_model=ConsentStatusResponse,
+    summary="Get tenant consent status",
+    description="Returns the tenant's current consent status for Persistent Customer Memory. Consent gates Layers 2-4; Layer 1 is always active regardless.",
+    responses={
+        503: {"description": "GDPR consent services not initialized"},
+    },
+)
 async def get_consent_status(
     ctx: TenantContext = Depends(get_tenant_context),
 ) -> ConsentStatusResponse:
@@ -367,7 +394,16 @@ async def get_consent_status(
 # ---------------------------------------------------------------------------
 
 
-@router.put("/consent", response_model=UpdateConsentResponse)
+@router.put(
+    "/consent",
+    response_model=UpdateConsentResponse,
+    summary="Update tenant consent status",
+    description="Updates the tenant's consent status for Persistent Customer Memory. Setting to 'denied' prevents new Layer 2-4 data from being stored.",
+    responses={
+        400: {"description": "Invalid consent_status value"},
+        503: {"description": "GDPR consent services not initialized"},
+    },
+)
 async def update_consent(
     request: UpdateConsentRequest,
     ctx: TenantContext = Depends(get_tenant_context),
@@ -416,7 +452,16 @@ async def update_consent(
 # ---------------------------------------------------------------------------
 
 
-@router.put("/consent/customer", response_model=UpdateConsentResponse)
+@router.put(
+    "/consent/customer",
+    response_model=UpdateConsentResponse,
+    summary="Update customer consent status",
+    description="Updates a specific customer's consent status. Setting to 'denied' triggers automatic deletion of the customer's Layer 2-4 data per GDPR Article 17.",
+    responses={
+        400: {"description": "Invalid consent_status value"},
+        503: {"description": "GDPR consent services not initialized"},
+    },
+)
 async def update_customer_consent(
     request: UpdateCustomerConsentRequest,
     ctx: TenantContext = Depends(get_tenant_context),

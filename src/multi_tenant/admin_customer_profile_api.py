@@ -184,7 +184,16 @@ router = APIRouter(prefix="/api/admin/profiles", tags=["admin-profiles"])
 # ---------------------------------------------------------------------------
 
 
-@router.get("", response_model=ProfileListResponse)
+@router.get(
+    "",
+    response_model=ProfileListResponse,
+    summary="List customer profiles",
+    description="Returns a paginated list of customer profiles. Supports filtering by consent status, ordered by most recently updated first.",
+    responses={
+        400: {"description": "Invalid consent_status filter value"},
+        503: {"description": "Admin profile repository not initialized"},
+    },
+)
 async def list_profiles(
     consent_status: str | None = Query(
         None,
@@ -263,7 +272,16 @@ async def list_profiles(
 # ---------------------------------------------------------------------------
 
 
-@router.get("/{customer_id}", response_model=CustomerProfileResponse)
+@router.get(
+    "/{customer_id}",
+    response_model=CustomerProfileResponse,
+    summary="Get customer profile",
+    description="Returns the full Layer 1 profile for a single customer including all 6 data sources and consent status.",
+    responses={
+        404: {"description": "Customer profile not found"},
+        503: {"description": "Admin profile services not initialized"},
+    },
+)
 async def get_profile(
     customer_id: str,
     ctx: TenantContext = Depends(get_tenant_context),
@@ -308,6 +326,13 @@ async def get_profile(
 @router.put(
     "/{customer_id}/consent",
     response_model=ConsentUpdateResponse,
+    summary="Update customer consent",
+    description="Updates a customer's GDPR consent status for Persistent Customer Memory. Setting to 'denied' may trigger deletion of Layer 2-4 data.",
+    responses={
+        400: {"description": "Invalid consent_status value"},
+        404: {"description": "Customer profile not found"},
+        503: {"description": "Admin profile services not initialized"},
+    },
 )
 async def update_consent(
     customer_id: str,
@@ -371,6 +396,11 @@ async def update_consent(
 @router.post(
     "/{customer_id}/sync",
     response_model=ShopifySyncResponse,
+    summary="Trigger Shopify data sync",
+    description="Accepts normalized Shopify data and merges it into the customer's Layer 1 profile. This is the admin-initiated equivalent of the automatic webhook-driven sync.",
+    responses={
+        503: {"description": "Admin profile services not initialized"},
+    },
 )
 async def sync_shopify_data(
     customer_id: str,
@@ -417,6 +447,12 @@ async def sync_shopify_data(
 @router.delete(
     "/{customer_id}",
     response_model=ProfileDeleteResponse,
+    summary="Delete customer profile",
+    description="Removes the Layer 1 customer profile document for GDPR right to erasure. Does not automatically delete Layer 2-4 data; use the GDPR deletion API for comprehensive erasure.",
+    responses={
+        404: {"description": "Customer profile not found"},
+        503: {"description": "Admin profile services not initialized"},
+    },
 )
 async def delete_profile(
     customer_id: str,

@@ -126,9 +126,9 @@ class TestSchemaValidation:
 
     def test_hex_color_pattern(self):
         """widget_primary_color validates hex color pattern."""
-        is_valid, _, sanitized = validate_field("widget_primary_color", "#C41E2A", TenantTier.STARTER)
+        is_valid, _, sanitized = validate_field("widget_primary_color", "#ff3621", TenantTier.STARTER)
         assert is_valid is True
-        assert sanitized == "#C41E2A"
+        assert sanitized == "#ff3621"
 
         is_valid, error, _ = validate_field("widget_primary_color", "not-a-color", TenantTier.STARTER)
         assert is_valid is False

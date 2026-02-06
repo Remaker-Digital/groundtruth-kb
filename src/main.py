@@ -144,6 +144,7 @@ from src.multi_tenant.admin_audit_api import router as admin_audit_router  # noq
 from src.multi_tenant.trial_management import trial_router  # noqa: E402
 from src.multi_tenant.security_hardening import rotation_router  # noqa: E402
 from src.multi_tenant.admin_customer_profile_api import router as admin_profile_router  # noqa: E402
+from src.multi_tenant.admin_apikey_api import router as admin_apikey_router  # noqa: E402
 
 app.include_router(provisioning_router)
 app.include_router(checkout_router)
@@ -165,6 +166,7 @@ app.include_router(admin_audit_router)
 app.include_router(trial_router)
 app.include_router(rotation_router)
 app.include_router(admin_profile_router)
+app.include_router(admin_apikey_router)
 
 # ---------------------------------------------------------------------------
 # Shopify Embedded Admin SPA (static files + catch-all for SPA routing)
@@ -524,6 +526,40 @@ async def _startup_config_processor() -> None:
 
 
 @app.on_event("startup")
+async def _startup_conversation_meter() -> None:
+    """Create and configure the ConversationMeter singleton.
+
+    Required before dashboard services and SSE metering can use it.
+    """
+    try:
+        from src.multi_tenant.conversation_meter import (
+            ConversationMeter,
+            configure_conversation_meter,
+        )
+        from src.multi_tenant.repository import (
+            AuditLogRepository,
+            ConversationRepository,
+            TenantRepository,
+            UsageRepository,
+        )
+
+        meter = ConversationMeter(
+            conversation_repo=ConversationRepository(),
+            usage_repo=UsageRepository(),
+            audit_repo=AuditLogRepository(),
+            tenant_repo=TenantRepository(),
+        )
+        configure_conversation_meter(meter)
+        logger.info("ConversationMeter singleton configured")
+    except Exception:
+        logger.warning(
+            "ConversationMeter initialization failed — metering and "
+            "dashboard services will be unavailable.",
+            exc_info=True,
+        )
+
+
+@app.on_event("startup")
 async def _startup_dashboard_services() -> None:
     """Wire usage dashboard API with Cosmos DB repositories.
 
@@ -672,6 +708,29 @@ async def _startup_chat_services() -> None:
 
         mode = "agent containers" if USE_AGENT_CONTAINERS else "direct Azure OpenAI"
         configure_chat_services(session=session, pipeline=pipeline)
+
+        # WI #132: Wire SSE metering callback for first-chunk billing.
+        # Records first_chunk_at timestamp on the conversation document
+        # when the first AI token is streamed to the client.
+        try:
+            from src.chat.sse_manager import get_sse_manager
+            from src.multi_tenant.conversation_meter import get_conversation_meter
+
+            sse_mgr = get_sse_manager()
+            meter = get_conversation_meter()
+
+            async def _on_first_chunk(tenant_id: str, conversation_id: str) -> None:
+                await meter.record_first_chunk(tenant_id, conversation_id)
+
+            sse_mgr.configure_metering(_on_first_chunk)
+            logger.info("SSE first-chunk metering callback configured")
+        except Exception:
+            logger.warning(
+                "SSE metering callback configuration failed — "
+                "first-chunk billing will not be recorded.",
+                exc_info=True,
+            )
+
         logger.info(
             "Chat API services initialized (session + pipeline, 6 endpoints, mode=%s)",
             mode,
@@ -724,6 +783,54 @@ async def _startup_admin_inbox_services() -> None:
 
 
 # ---------------------------------------------------------------------------
+# Knowledge Base Vectorizer (WI #209-213 — RAG infrastructure)
+# ---------------------------------------------------------------------------
+
+from src.multi_tenant.knowledge_vectorizer import get_knowledge_vectorizer  # noqa: E402
+
+
+@app.on_event("startup")
+async def _startup_knowledge_vectorizer() -> None:
+    """Initialize the Knowledge Base vectorizer for hybrid retrieval.
+
+    Configures KnowledgeVectorizer with KnowledgeBaseRepository and
+    Azure OpenAI client for embedding. Used by both the chat pipeline
+    (hybrid KB retrieval) and admin knowledge API (embed on create/update).
+
+    Non-fatal: KB retrieval falls back to empty context if unavailable.
+    """
+    try:
+        from src.multi_tenant.repository import KnowledgeBaseRepository
+
+        kb_repo = KnowledgeBaseRepository()
+        vectorizer = get_knowledge_vectorizer()
+
+        # Create OpenAI client for embeddings (same pattern as chat pipeline)
+        openai_client = None
+        from src.chat.pipeline import USE_AGENT_CONTAINERS as _use_containers
+        if not _use_containers:
+            try:
+                from src.chat.pipeline import _create_openai_client
+                openai_client = _create_openai_client()
+            except Exception:
+                logger.warning(
+                    "Azure OpenAI client creation failed for KB vectorizer — "
+                    "embeddings will use dev-mode zero vectors."
+                )
+
+        vectorizer.configure(
+            kb_repo=kb_repo,
+            openai_client=openai_client,
+        )
+        logger.info("Knowledge Base vectorizer configured (hybrid retrieval enabled)")
+    except Exception as exc:
+        logger.warning(
+            "Knowledge Base vectorizer initialization failed — "
+            "KB retrieval will be unavailable: %s", exc,
+        )
+
+
+# ---------------------------------------------------------------------------
 # Admin Knowledge Base API (WI #175)
 # ---------------------------------------------------------------------------
 
@@ -734,15 +841,28 @@ from src.multi_tenant.admin_knowledge_api import configure_admin_knowledge_servi
 async def _startup_admin_knowledge_services() -> None:
     """Initialize the Admin Knowledge Base API.
 
-    Wires KnowledgeBaseRepository into the admin knowledge endpoints.
+    Wires KnowledgeBaseRepository and KnowledgeVectorizer into the admin
+    knowledge endpoints. Embedding is triggered on create/update.
     Non-fatal: admin endpoints return 503 if initialization fails.
     """
     try:
         from src.multi_tenant.repository import KnowledgeBaseRepository
+        from src.multi_tenant.staleness_service import get_staleness_service
 
         kb_repo = KnowledgeBaseRepository()
-        configure_admin_knowledge_services(knowledge_repo=kb_repo)
-        logger.info("Admin knowledge base API initialized (5 endpoints)")
+        vectorizer = get_knowledge_vectorizer()
+        active_vectorizer = vectorizer if vectorizer._configured else None
+
+        # Configure staleness service (WI #219-222)
+        staleness_svc = get_staleness_service()
+        staleness_svc.configure(kb_repo=kb_repo, vectorizer=active_vectorizer)
+
+        configure_admin_knowledge_services(
+            knowledge_repo=kb_repo,
+            knowledge_vectorizer=active_vectorizer,
+            staleness_service=staleness_svc,
+        )
+        logger.info("Admin knowledge base API initialized (8 endpoints, vectorization+staleness enabled)")
     except Exception:
         logger.warning(
             "Admin knowledge base initialization failed — admin endpoints "
@@ -929,6 +1049,37 @@ async def _startup_admin_profile_services() -> None:
 
 
 # ---------------------------------------------------------------------------
+# Admin API Key Management (WI #159)
+# ---------------------------------------------------------------------------
+
+from src.multi_tenant.admin_apikey_api import configure_apikey_services  # noqa: E402
+
+
+@app.on_event("startup")
+async def _startup_admin_apikey_services() -> None:
+    """Initialize the Admin API Key Management API.
+
+    Wires TenantRepository + AuditLogRepository for API key CRUD.
+    Non-fatal: endpoints return 503 if initialization fails.
+    """
+    try:
+        from src.multi_tenant.repository import TenantRepository, AuditLogRepository
+
+        tenant_repo = TenantRepository(cosmos_manager=None)
+        audit_repo = AuditLogRepository(cosmos_manager=None)
+        configure_apikey_services(
+            tenant_repo=tenant_repo,
+            audit_repo=audit_repo,
+        )
+        logger.info("Admin API key management initialized (4 endpoints)")
+    except Exception:
+        logger.warning(
+            "Admin API key initialization failed — API key endpoints "
+            "will return 503 until dependencies are available."
+        )
+
+
+# ---------------------------------------------------------------------------
 # Pattern extraction service — Layer 3 cross-session learning (WI #90-92)
 # ---------------------------------------------------------------------------
 
@@ -1027,6 +1178,7 @@ from src.multi_tenant.archival_pipeline import (  # noqa: E402
 from src.multi_tenant.alert_delivery import (  # noqa: E402
     AlertDeliveryService,
     DashboardAlertChannel,
+    EmailAlertChannel,
     LogAlertChannel,
     configure_alert_service,
 )
@@ -1167,17 +1319,40 @@ async def _startup_archival_pipeline() -> None:
 async def _startup_alert_delivery() -> None:
     """Initialize the Alert Delivery Service.
 
-    Registers built-in channels (Log + Dashboard). WebhookAlertChannel
-    is registered per-tenant when merchants configure a webhook URL.
+    Registers built-in channels: Log, Dashboard, Email.
+    Email channel requires AZURE_COMM_CONNECTION_STRING or SMTP_HOST
+    env var to actually send — gracefully skips if unconfigured.
     """
     try:
+        from src.multi_tenant.repository import (
+            PreferencesRepository,
+            TenantRepository,
+        )
+        from src.multi_tenant.cosmos_client import get_cosmos_manager
+
         service = AlertDeliveryService()
         service.register_channel(LogAlertChannel())
         service.register_channel(DashboardAlertChannel())
+
+        # Email channel — uses preferences + tenant repos for recipient lookup
+        try:
+            manager = get_cosmos_manager()
+            prefs_repo = PreferencesRepository(manager)
+            tenant_repo = TenantRepository(manager)
+            service.register_channel(
+                EmailAlertChannel(prefs_repo, tenant_repo),
+            )
+        except Exception:
+            logger.warning(
+                "EmailAlertChannel not registered — "
+                "Cosmos DB may not be available."
+            )
+
         configure_alert_service(service)
         logger.info(
-            "Alert delivery service initialized (%d channels)",
+            "Alert delivery service initialized (%d channels): %s",
             len(service._channels),
+            service.get_registered_channels(),
         )
     except Exception:
         logger.warning(
@@ -1253,6 +1428,19 @@ async def ready() -> dict:
 
     retention_svc = get_retention_service()
     result["data_retention"] = {"configured": retention_svc is not None}
+
+    # KB retrieval metrics (WI #213)
+    kb_vectorizer = get_knowledge_vectorizer()
+    if kb_vectorizer._configured:
+        result["kb_retrieval"] = kb_vectorizer.metrics.summary()
+    else:
+        result["kb_retrieval"] = {"configured": False}
+
+    # Semantic cache health (WI #223-225)
+    from src.multi_tenant.semantic_cache import get_semantic_cache
+
+    sem_cache = get_semantic_cache()
+    result["semantic_cache"] = sem_cache.health()
 
     # API version (WI #140)
     from src.multi_tenant.api_versioning import API_VERSION

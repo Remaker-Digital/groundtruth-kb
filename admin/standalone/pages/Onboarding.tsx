@@ -32,7 +32,7 @@ import type { ConfigFieldType } from '../../shared/types/index';
 // Constants
 // ---------------------------------------------------------------------------
 
-const BRAND_RED = '#C41E2A';
+const BRAND_RED = '#ff3621';
 
 // ---------------------------------------------------------------------------
 // Field type mapping: API ConfigFieldType → renderer type

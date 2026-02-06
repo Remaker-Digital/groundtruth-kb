@@ -28,7 +28,7 @@ import { useConfig, useUpdateConfig } from '../../shared/hooks/index';
 // Constants
 // ---------------------------------------------------------------------------
 
-const BRAND_RED = '#C41E2A';
+const BRAND_RED = '#ff3621';
 
 const FONT_OPTIONS = [
   { value: 'Inter, system-ui, sans-serif', label: 'Inter (System)' },

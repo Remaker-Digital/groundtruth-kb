@@ -46,6 +46,10 @@ coverage.xml
 *.cover
 *.py,cover
 .hypothesis/
+
+# Load test outputs
+tests/performance/load-test-report.html
+tests/performance/load-test-results*.csv
 .mypy_cache/
 .ruff_cache/
 
@@ -153,6 +157,12 @@ stripe
 # AI Assistant
 # =============================================================================
 .claude/
+cookies.txt
+
+# =============================================================================
+# GitHub Wiki (separate repo, not committed to main)
+# =============================================================================
+agent-red.wiki/
 
 # =============================================================================
 # Research / Scratch Data

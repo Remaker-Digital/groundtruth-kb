@@ -307,6 +307,14 @@ class ConversationDocument(BaseModel):
     ended_at: str | None = Field(default=None, description="Conversation end timestamp")
     last_activity_at: str = Field(description="Last message timestamp (for idle timeout)")
 
+    # WI #132: First-chunk delivery timestamp — set when the first AI token
+    # is streamed to the client via SSE. Used for billing-at-first-chunk and
+    # time-to-first-byte (TTFB) latency tracking.
+    first_chunk_at: str | None = Field(
+        default=None,
+        description="ISO 8601 timestamp when first AI token was delivered to client",
+    )
+
     # TTL — no default TTL; conversations persist in hot storage until
     # archival pipeline moves them to warm/cold tiers (Decision #18+).
     ttl: int | None = Field(default=None, alias="_ts_ttl", description="Cosmos DB TTL (seconds)")
@@ -469,6 +477,10 @@ class KnowledgeBaseDocument(BaseModel):
     Knowledge Retrieval agent searches during conversations.
 
     Partition key: /tenant_id
+
+    RAG vectorization (WI #209): entries are embedded via text-embedding-3-large
+    (3072 dimensions) and stored with a DiskANN vector index for semantic search.
+    The embedding field is populated asynchronously after create/update.
     """
 
     id: str = Field(description="Document ID")
@@ -486,6 +498,59 @@ class KnowledgeBaseDocument(BaseModel):
     # Search optimization
     tags: list[str] = Field(default_factory=list, description="Search tags")
     language: str = Field(default="en", description="Content language (ISO 639-1)")
+
+    # Vector embedding (WI #209 — RAG vectorization)
+    embedding: list[float] | None = Field(
+        default=None,
+        description="3072-dimensional embedding vector (text-embedding-3-large). "
+        "Populated asynchronously after create/update.",
+    )
+    embedding_model: str | None = Field(
+        default=None,
+        description="Model used to generate the embedding (e.g. text-embedding-3-large)",
+    )
+    embedded_at: str | None = Field(
+        default=None,
+        description="ISO 8601 timestamp when the embedding was last generated",
+    )
+    content_hash: str | None = Field(
+        default=None,
+        description="SHA-256 hash of title+content at embedding time. "
+        "Used to detect content changes requiring re-embedding.",
+    )
+
+    # Staleness tracking (WI #219)
+    last_verified_at: str | None = Field(
+        default=None,
+        description="ISO 8601 timestamp when a human last confirmed this content is current",
+    )
+    staleness_score: float | None = Field(
+        default=None,
+        description="Computed staleness score 0.0 (fresh) to 1.0 (stale). "
+        "Based on age, feedback signals, and entry type.",
+    )
+
+    # Document upload metadata (WI #214-216)
+    source_type: str | None = Field(
+        default=None,
+        description="How this entry was created: manual | pdf | docx | csv | url",
+    )
+    source_filename: str | None = Field(
+        default=None,
+        description="Original filename for uploaded documents",
+    )
+    source_url: str | None = Field(
+        default=None,
+        description="Source URL for URL-imported entries",
+    )
+    chunk_index: int | None = Field(
+        default=None,
+        description="Chunk position within a multi-chunk document (0-based)",
+    )
+    parent_entry_id: str | None = Field(
+        default=None,
+        description="ID of the parent entry when this is a chunk of a larger document",
+    )
 
     # Lifecycle
     is_active: bool = Field(default=True, description="Whether entry is searchable")
@@ -614,6 +679,12 @@ class PreferencesDocument(BaseModel):
     widget_header_text: str | None = Field(default=None, description="Custom widget header/title text")
     widget_input_placeholder: str | None = Field(default=None, description="Message input placeholder text")
     widget_page_rules: list[str] = Field(default_factory=list, description="URL patterns for page visibility rules")
+
+    # Notifications (WI-G: email alerts)
+    notification_email: str | None = Field(
+        default=None,
+        description="Email address for alert notifications (usage, trial, outage)",
+    )
 
     # Fine-tuning configuration (Enterprise add-on, Layer 4 — Decision #31, WI #93-96)
     fine_tuning_enabled: bool = Field(
@@ -865,16 +936,27 @@ def get_collection_configs() -> list[CollectionConfig]:
                 ],
             },
         ),
-        # 5. knowledge_bases
+        # 5. knowledge_bases (with DiskANN vector index — WI #209)
         CollectionConfig(
             name=COLLECTION_KNOWLEDGE_BASES,
             partition_key="/tenant_id",
+            vector_embedding_policy={
+                "vectorEmbeddings": [
+                    {
+                        "path": "/embedding",
+                        "dataType": "float32",
+                        "dimensions": VECTOR_DIMENSIONS,
+                        "distanceFunction": VECTOR_SIMILARITY,
+                    },
+                ],
+            },
             indexing_policy={
                 "automatic": True,
                 "indexingMode": "consistent",
                 "includedPaths": [{"path": "/*"}],
                 "excludedPaths": [
                     {"path": "/content/?"},  # Full text excluded from range index
+                    {"path": "/embedding/*"},  # Vector handled by vector index
                     {"path": '/"_etag"/?'},
                 ],
                 "compositeIndexes": [
@@ -886,6 +968,16 @@ def get_collection_configs() -> list[CollectionConfig]:
                         {"path": "/language", "order": "ascending"},
                         {"path": "/entry_type", "order": "ascending"},
                     ],
+                    [
+                        {"path": "/is_active", "order": "ascending"},
+                        {"path": "/embedded_at", "order": "descending"},
+                    ],
+                ],
+                "vectorIndexes": [
+                    {
+                        "path": "/embedding",
+                        "type": "diskANN",
+                    },
                 ],
             },
         ),

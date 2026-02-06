@@ -300,7 +300,17 @@ def get_pack_balance(stripe_customer_id: str) -> dict[str, Any]:
 # ---------------------------------------------------------------------------
 
 
-@router.post("/purchase", response_model=PurchasePackResponse)
+@router.post(
+    "/purchase",
+    response_model=PurchasePackResponse,
+    status_code=200,
+    summary="Purchase a conversation pack",
+    description="Creates a Stripe Checkout Session for a one-time conversation pack purchase. Pack metadata is attached so the webhook handler can credit the balance on completion.",
+    responses={
+        400: {"description": "Invalid pack_id"},
+        502: {"description": "Stripe API error during session creation"},
+    },
+)
 async def purchase_pack_endpoint(body: PurchasePackRequest) -> PurchasePackResponse:
     """Create a Stripe Checkout Session for a one-time pack purchase.
 
@@ -378,7 +388,13 @@ async def purchase_pack_endpoint(body: PurchasePackRequest) -> PurchasePackRespo
     )
 
 
-@router.get("/balance/{customer_id}", response_model=PackBalanceResponse)
+@router.get(
+    "/balance/{customer_id}",
+    response_model=PackBalanceResponse,
+    status_code=200,
+    summary="Get customer pack balance",
+    description="Returns the current pack balance for a customer, including active packs with remaining conversations and expiry dates.",
+)
 async def get_balance_endpoint(customer_id: str) -> PackBalanceResponse:
     """Get the current pack balance for a customer.
 

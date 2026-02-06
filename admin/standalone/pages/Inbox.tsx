@@ -26,7 +26,7 @@ import type { InboxConversation, ConversationMessage } from '../../shared/types/
 // Constants
 // ---------------------------------------------------------------------------
 
-const BRAND_RED = '#C41E2A';
+const BRAND_RED = '#ff3621';
 const HEADER_HEIGHT = 56;
 const PAGE_PADDING = 16;
 
@@ -39,7 +39,7 @@ const STATUS_COLORS: Record<string, string> = {
   error: 'red',
 };
 
-const AVATAR_PALETTE = ['#C41E2A', '#2563EB', '#059669', '#D97706', '#7C3AED', '#DB2777'];
+const AVATAR_PALETTE = ['#ff3621', '#2563EB', '#059669', '#D97706', '#7C3AED', '#DB2777'];
 
 // ---------------------------------------------------------------------------
 // Helpers

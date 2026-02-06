@@ -57,6 +57,9 @@ class AlertType(str, Enum):
     SLA_VIOLATION = "sla_violation"
     TRIAL_EXPIRING = "trial_expiring"
     RETENTION_COMPLETE = "retention_complete"
+    API_KEY_GENERATED = "api_key_generated"
+    TEAM_INVITE = "team_invite"
+    OUTAGE_NOTIFICATION = "outage_notification"
 
 
 class AlertSeverity(str, Enum):
@@ -77,6 +80,9 @@ _DEFAULT_SEVERITY: dict[AlertType, AlertSeverity] = {
     AlertType.SLA_VIOLATION: AlertSeverity.CRITICAL,
     AlertType.TRIAL_EXPIRING: AlertSeverity.INFO,
     AlertType.RETENTION_COMPLETE: AlertSeverity.INFO,
+    AlertType.API_KEY_GENERATED: AlertSeverity.INFO,
+    AlertType.TEAM_INVITE: AlertSeverity.INFO,
+    AlertType.OUTAGE_NOTIFICATION: AlertSeverity.CRITICAL,
 }
 
 
@@ -374,6 +380,390 @@ class WebhookAlertChannel(AlertChannel):
 
 
 # ---------------------------------------------------------------------------
+# Email templates (WI-G)
+# ---------------------------------------------------------------------------
+
+# Shared email wrapper with Agent Red branding
+_EMAIL_WRAPPER = """<!DOCTYPE html>
+<html>
+<head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"></head>
+<body style="margin:0;padding:0;background:#f4f4f5;font-family:Inter,-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,sans-serif">
+<table width="100%" cellpadding="0" cellspacing="0" style="background:#f4f4f5;padding:32px 0">
+<tr><td align="center">
+<table width="600" cellpadding="0" cellspacing="0" style="background:#ffffff;border-radius:8px;overflow:hidden;box-shadow:0 1px 3px rgba(0,0,0,0.1)">
+<tr><td style="background:#141414;padding:24px 32px">
+  <span style="color:#ff3621;font-size:20px;font-weight:700">Agent Red</span>
+  <span style="color:#a0a0a0;font-size:14px;margin-left:8px">Customer Experience</span>
+</td></tr>
+<tr><td style="padding:32px">{body}</td></tr>
+<tr><td style="background:#f9fafb;padding:16px 32px;border-top:1px solid #e5e7eb">
+  <p style="margin:0;color:#9ca3af;font-size:12px;text-align:center">
+    Agent Red Customer Experience &mdash; a product of <a href="https://remakerdigital.com" style="color:#ff3621;text-decoration:none">Remaker Digital</a>
+  </p>
+</td></tr>
+</table>
+</td></tr>
+</table>
+</body>
+</html>"""
+
+
+def _severity_color(severity: AlertSeverity) -> str:
+    """Map alert severity to a hex color for email badges."""
+    return {
+        AlertSeverity.INFO: "#3b82f6",
+        AlertSeverity.WARNING: "#f59e0b",
+        AlertSeverity.CRITICAL: "#ef4444",
+    }.get(severity, "#6b7280")
+
+
+def _render_email(alert: Alert) -> tuple[str, str]:
+    """Render an alert into (subject, html_body).
+
+    Returns a plain subject line and full HTML email body using the
+    branded wrapper template. Uses alert-type-specific body content
+    with a generic fallback.
+    """
+    subject = f"[Agent Red] {alert.title}"
+    badge_color = _severity_color(alert.severity)
+
+    # Alert-type-specific body templates
+    body_templates: dict[str, str] = {
+        # Usage alerts
+        AlertType.USAGE_80_PCT: (
+            '<h2 style="margin:0 0 16px;color:#111827;font-size:20px">Approaching Usage Limit</h2>'
+            '<div style="display:inline-block;padding:4px 12px;border-radius:12px;'
+            f'background:{badge_color};color:#fff;font-size:12px;font-weight:600">'
+            '{severity}</div>'
+            '<p style="color:#374151;line-height:1.6;margin:16px 0">{message}</p>'
+            '<div style="background:#fef3c7;border:1px solid #fcd34d;border-radius:6px;padding:16px;margin:16px 0">'
+            '<strong style="color:#92400e">Recommendation:</strong>'
+            '<p style="color:#92400e;margin:8px 0 0">Purchase a conversation pack to avoid overage charges '
+            'and ensure uninterrupted service.</p></div>'
+        ),
+        AlertType.USAGE_100_PCT: (
+            '<h2 style="margin:0 0 16px;color:#111827;font-size:20px">Conversation Allowance Exhausted</h2>'
+            '<div style="display:inline-block;padding:4px 12px;border-radius:12px;'
+            f'background:{badge_color};color:#fff;font-size:12px;font-weight:600">'
+            '{severity}</div>'
+            '<p style="color:#374151;line-height:1.6;margin:16px 0">{message}</p>'
+            '<div style="background:#fee2e2;border:1px solid #fca5a5;border-radius:6px;padding:16px;margin:16px 0">'
+            '<strong style="color:#991b1b">Action Required:</strong>'
+            '<p style="color:#991b1b;margin:8px 0 0">Your included conversations are exhausted. '
+            'Additional conversations will draw from pack balance or incur per-conversation overage charges.</p></div>'
+        ),
+        # Trial expiry
+        AlertType.TRIAL_EXPIRING: (
+            '<h2 style="margin:0 0 16px;color:#111827;font-size:20px">Trial Expiring Soon</h2>'
+            '<div style="display:inline-block;padding:4px 12px;border-radius:12px;'
+            f'background:{badge_color};color:#fff;font-size:12px;font-weight:600">'
+            '{severity}</div>'
+            '<p style="color:#374151;line-height:1.6;margin:16px 0">{message}</p>'
+            '<div style="background:#eff6ff;border:1px solid #93c5fd;border-radius:6px;padding:16px;margin:16px 0">'
+            '<strong style="color:#1e40af">Upgrade to keep your setup:</strong>'
+            '<p style="color:#1e40af;margin:8px 0 0">Your AI configuration, knowledge base, and conversation '
+            'history will be preserved when you subscribe to any paid plan.</p></div>'
+        ),
+        # API key delivery
+        AlertType.API_KEY_GENERATED: (
+            '<h2 style="margin:0 0 16px;color:#111827;font-size:20px">API Key Generated</h2>'
+            '<div style="display:inline-block;padding:4px 12px;border-radius:12px;'
+            f'background:{badge_color};color:#fff;font-size:12px;font-weight:600">'
+            '{severity}</div>'
+            '<p style="color:#374151;line-height:1.6;margin:16px 0">{message}</p>'
+            '<div style="background:#f3f4f6;border:1px solid #d1d5db;border-radius:6px;'
+            'padding:16px;margin:16px 0;font-family:\'JetBrains Mono\',monospace">'
+            '<code style="word-break:break-all;color:#111827;font-size:14px">{api_key}</code></div>'
+            '<div style="background:#fef3c7;border:1px solid #fcd34d;border-radius:6px;padding:16px;margin:16px 0">'
+            '<strong style="color:#92400e">Security Notice:</strong>'
+            '<p style="color:#92400e;margin:8px 0 0">Store this key securely. It will not be shown again. '
+            'If lost, generate a new key from the admin dashboard.</p></div>'
+        ),
+        # Team invite
+        AlertType.TEAM_INVITE: (
+            '<h2 style="margin:0 0 16px;color:#111827;font-size:20px">Team Invitation</h2>'
+            '<p style="color:#374151;line-height:1.6;margin:16px 0">{message}</p>'
+            '<div style="background:#eff6ff;border:1px solid #93c5fd;border-radius:6px;padding:16px;margin:16px 0">'
+            '<strong style="color:#1e40af">Getting Started:</strong>'
+            '<p style="color:#1e40af;margin:8px 0 0">Log in to the Agent Red admin dashboard with your '
+            'email address to access your team workspace.</p></div>'
+        ),
+        # Outage / SLA
+        AlertType.OUTAGE_NOTIFICATION: (
+            '<h2 style="margin:0 0 16px;color:#111827;font-size:20px">Service Notification</h2>'
+            '<div style="display:inline-block;padding:4px 12px;border-radius:12px;'
+            f'background:{badge_color};color:#fff;font-size:12px;font-weight:600">'
+            '{severity}</div>'
+            '<p style="color:#374151;line-height:1.6;margin:16px 0">{message}</p>'
+            '<div style="background:#fee2e2;border:1px solid #fca5a5;border-radius:6px;padding:16px;margin:16px 0">'
+            '<strong style="color:#991b1b">Status:</strong>'
+            '<p style="color:#991b1b;margin:8px 0 0">Our team is actively investigating. '
+            'You will receive a follow-up notification when the issue is resolved.</p></div>'
+        ),
+    }
+
+    # Select body template or use generic fallback
+    body_tmpl = body_templates.get(alert.alert_type, (
+        '<h2 style="margin:0 0 16px;color:#111827;font-size:20px">{title}</h2>'
+        '<div style="display:inline-block;padding:4px 12px;border-radius:12px;'
+        f'background:{badge_color};color:#fff;font-size:12px;font-weight:600">'
+        '{severity}</div>'
+        '<p style="color:#374151;line-height:1.6;margin:16px 0">{message}</p>'
+    ))
+
+    # Format template with alert fields
+    format_kwargs = {
+        "title": alert.title,
+        "severity": alert.severity.value.upper(),
+        "message": alert.message,
+        "api_key": alert.metadata.get("api_key", ""),
+    }
+    body_html = body_tmpl.format(**format_kwargs)
+    full_html = _EMAIL_WRAPPER.format(body=body_html)
+
+    return subject, full_html
+
+
+class EmailAlertChannel(AlertChannel):
+    """Send alert emails via Azure Communication Services or SMTP.
+
+    Resolves the notification email from the tenant's preferences
+    (``notification_email`` field) with fallback to the tenant's
+    ``customer_email``. If neither is configured, delivery is skipped.
+
+    Provider priority:
+        1. Azure Communication Services (``AZURE_COMM_CONNECTION_STRING`` env var)
+        2. SMTP (``SMTP_HOST`` env var) — SendGrid, Mailgun, etc.
+        3. Skip delivery with informational log
+
+    Dependencies:
+        preferences_repo: For resolving per-tenant notification_email.
+        tenant_repo: Fallback to customer_email from TenantDocument.
+
+    © 2026 Remaker Digital, a DBA of VanDusen & Palmeter, LLC. All rights reserved.
+    """
+
+    SENDER_ADDRESS = "noreply@agentred.com"
+    TIMEOUT_SECONDS = 10.0
+
+    def __init__(
+        self,
+        preferences_repo: Any,
+        tenant_repo: Any,
+    ) -> None:
+        self._preferences = preferences_repo
+        self._tenants = tenant_repo
+
+    @property
+    def name(self) -> str:
+        return "email"
+
+    async def _resolve_recipient(self, tenant_id: str) -> str | None:
+        """Look up the notification email for a tenant.
+
+        Checks preferences.notification_email first, then falls back
+        to the tenant's customer_email.
+        """
+        # 1. Try preferences.notification_email
+        try:
+            prefs = await self._preferences.read(tenant_id, tenant_id)
+            if prefs and prefs.get("notification_email"):
+                return prefs["notification_email"]
+        except Exception:
+            logger.debug(
+                "Could not read preferences for tenant=%s", tenant_id,
+            )
+
+        # 2. Fallback to tenant.customer_email
+        try:
+            tenant = await self._tenants.read(tenant_id, tenant_id)
+            if tenant and tenant.get("customer_email"):
+                return tenant["customer_email"]
+        except Exception:
+            logger.debug(
+                "Could not read tenant for tenant=%s", tenant_id,
+            )
+
+        return None
+
+    async def _send_via_azure_comm(
+        self,
+        to_email: str,
+        subject: str,
+        html_body: str,
+        alert: Alert,
+    ) -> ChannelResult:
+        """Send email using Azure Communication Services."""
+        import os
+
+        conn_str = os.environ.get("AZURE_COMM_CONNECTION_STRING", "")
+        if not conn_str:
+            return ChannelResult(
+                channel_name=self.name,
+                success=False,
+                error="AZURE_COMM_CONNECTION_STRING not configured",
+            )
+
+        try:
+            from azure.communication.email import EmailClient
+
+            client = EmailClient.from_connection_string(conn_str)
+            message = {
+                "senderAddress": self.SENDER_ADDRESS,
+                "recipients": {
+                    "to": [{"address": to_email}],
+                },
+                "content": {
+                    "subject": subject,
+                    "html": html_body,
+                },
+            }
+            poller = client.begin_send(message)
+            result = poller.result()
+            status = getattr(result, "status", "unknown")
+
+            if status == "Succeeded":
+                logger.info(
+                    "Email sent via Azure Comm: alert_id=%s to=%s",
+                    alert.alert_id, to_email,
+                )
+                return ChannelResult(channel_name=self.name, success=True)
+            else:
+                return ChannelResult(
+                    channel_name=self.name,
+                    success=False,
+                    error=f"Azure Comm status: {status}",
+                )
+
+        except ImportError:
+            return ChannelResult(
+                channel_name=self.name,
+                success=False,
+                error="azure-communication-email package not installed",
+            )
+        except Exception as exc:
+            return ChannelResult(
+                channel_name=self.name,
+                success=False,
+                error=f"Azure Comm error: {type(exc).__name__}: {exc}",
+            )
+
+    async def _send_via_smtp(
+        self,
+        to_email: str,
+        subject: str,
+        html_body: str,
+        alert: Alert,
+    ) -> ChannelResult:
+        """Send email using SMTP (SendGrid, Mailgun, generic SMTP)."""
+        import os
+        import smtplib
+        from email.mime.multipart import MIMEMultipart
+        from email.mime.text import MIMEText
+
+        smtp_host = os.environ.get("SMTP_HOST", "")
+        smtp_port = int(os.environ.get("SMTP_PORT", "587"))
+        smtp_user = os.environ.get("SMTP_USERNAME", "")
+        smtp_pass = os.environ.get("SMTP_PASSWORD", "")
+
+        if not smtp_host:
+            return ChannelResult(
+                channel_name=self.name,
+                success=False,
+                error="SMTP_HOST not configured",
+            )
+
+        try:
+            msg = MIMEMultipart("alternative")
+            msg["From"] = f"Agent Red <{self.SENDER_ADDRESS}>"
+            msg["To"] = to_email
+            msg["Subject"] = subject
+            msg["X-Alert-Id"] = alert.alert_id
+            msg["X-Alert-Type"] = alert.alert_type.value
+            msg.attach(MIMEText(alert.message, "plain"))
+            msg.attach(MIMEText(html_body, "html"))
+
+            with smtplib.SMTP(smtp_host, smtp_port, timeout=self.TIMEOUT_SECONDS) as server:
+                server.ehlo()
+                if smtp_port != 25:
+                    server.starttls()
+                if smtp_user and smtp_pass:
+                    server.login(smtp_user, smtp_pass)
+                server.send_message(msg)
+
+            logger.info(
+                "Email sent via SMTP: alert_id=%s to=%s host=%s",
+                alert.alert_id, to_email, smtp_host,
+            )
+            return ChannelResult(channel_name=self.name, success=True)
+
+        except smtplib.SMTPException as exc:
+            return ChannelResult(
+                channel_name=self.name,
+                success=False,
+                error=f"SMTP error: {type(exc).__name__}: {exc}",
+            )
+        except Exception as exc:
+            return ChannelResult(
+                channel_name=self.name,
+                success=False,
+                error=f"Email send error: {type(exc).__name__}: {exc}",
+            )
+
+    async def deliver(self, alert: Alert) -> ChannelResult:
+        """Send an email notification for the alert.
+
+        Provider selection: Azure Comm Services > SMTP > skip.
+        Recipient resolution: preferences.notification_email > tenant.customer_email.
+        """
+        import os
+
+        # Team invites go to the invitee, not the tenant owner
+        if (
+            alert.alert_type == AlertType.TEAM_INVITE
+            and alert.metadata.get("invitee_email")
+        ):
+            to_email = alert.metadata["invitee_email"]
+        else:
+            to_email = await self._resolve_recipient(alert.tenant_id)
+
+        if not to_email:
+            return ChannelResult(
+                channel_name=self.name,
+                success=False,
+                error="no notification_email or customer_email for tenant",
+            )
+
+        # Render email content
+        subject, html_body = _render_email(alert)
+
+        # Try Azure Communication Services first
+        if os.environ.get("AZURE_COMM_CONNECTION_STRING"):
+            return await self._send_via_azure_comm(
+                to_email, subject, html_body, alert,
+            )
+
+        # Fall back to SMTP
+        if os.environ.get("SMTP_HOST"):
+            return await self._send_via_smtp(
+                to_email, subject, html_body, alert,
+            )
+
+        # No provider configured — log and skip
+        logger.warning(
+            "EmailAlertChannel: no email provider configured "
+            "(set AZURE_COMM_CONNECTION_STRING or SMTP_HOST). "
+            "alert_id=%s to=%s skipped.",
+            alert.alert_id, to_email,
+        )
+        return ChannelResult(
+            channel_name=self.name,
+            success=False,
+            error="no email provider configured (AZURE_COMM_CONNECTION_STRING or SMTP_HOST)",
+        )
+
+
+# ---------------------------------------------------------------------------
 # AlertDeliveryService
 # ---------------------------------------------------------------------------
 
@@ -646,6 +1036,131 @@ async def send_sla_alert(
         ),
         metadata={
             "violation_type": violation_type,
+            **(details or {}),
+        },
+    )
+
+    return await service.deliver_alert(alert)
+
+
+async def send_api_key_alert(
+    tenant_id: str,
+    api_key: str,
+    action: str = "generated",
+) -> DeliveryResult | None:
+    """Create and deliver an API_KEY_GENERATED alert.
+
+    Sends the raw API key to the merchant's notification email so they
+    have a recoverable copy (the key is not stored in plaintext).
+
+    Args:
+        tenant_id: Tenant the key belongs to.
+        api_key: The raw API key string (shown once).
+        action: "generated" or "rotated".
+
+    Returns:
+        DeliveryResult, or None if no service is configured.
+    """
+    service = get_alert_service()
+    if service is None:
+        return None
+
+    alert = create_alert(
+        tenant_id=tenant_id,
+        alert_type=AlertType.API_KEY_GENERATED,
+        title=f"API key {action}",
+        message=(
+            f"A new API key has been {action} for your Agent Red account. "
+            "This key provides full access to the Agent Red API. "
+            "Store it securely — it will not be displayed again."
+        ),
+        metadata={
+            "api_key": api_key,
+            "action": action,
+        },
+    )
+
+    return await service.deliver_alert(alert)
+
+
+async def send_team_invite_alert(
+    tenant_id: str,
+    invitee_email: str,
+    inviter_name: str,
+    role: str,
+) -> DeliveryResult | None:
+    """Create and deliver a TEAM_INVITE alert.
+
+    Sends an invitation email to a new team member. Note: this alert
+    is special — it should be sent to the *invitee_email*, not the
+    tenant's notification email. The EmailAlertChannel's recipient
+    resolution is bypassed by setting invitee_email in metadata.
+
+    Args:
+        tenant_id: Tenant issuing the invite.
+        invitee_email: Email of the person being invited.
+        inviter_name: Name of the person sending the invite.
+        role: Role being assigned (e.g. "admin", "agent").
+
+    Returns:
+        DeliveryResult, or None if no service is configured.
+    """
+    service = get_alert_service()
+    if service is None:
+        return None
+
+    alert = create_alert(
+        tenant_id=tenant_id,
+        alert_type=AlertType.TEAM_INVITE,
+        title=f"You've been invited to join a team",
+        message=(
+            f"{inviter_name} has invited you to join their Agent Red team "
+            f"as a {role}. Log in to the Agent Red admin dashboard with "
+            f"your email address ({invitee_email}) to get started."
+        ),
+        metadata={
+            "invitee_email": invitee_email,
+            "inviter_name": inviter_name,
+            "role": role,
+        },
+    )
+
+    return await service.deliver_alert(alert)
+
+
+async def send_outage_alert(
+    tenant_id: str,
+    affected_service: str,
+    details: dict[str, Any] | None = None,
+) -> DeliveryResult | None:
+    """Create and deliver an OUTAGE_NOTIFICATION alert.
+
+    Called when the platform detects a service degradation or outage
+    affecting the tenant.
+
+    Args:
+        tenant_id: Affected tenant.
+        affected_service: Name of the affected service component.
+        details: Additional context (start time, impact, ETA).
+
+    Returns:
+        DeliveryResult, or None if no service is configured.
+    """
+    service = get_alert_service()
+    if service is None:
+        return None
+
+    alert = create_alert(
+        tenant_id=tenant_id,
+        alert_type=AlertType.OUTAGE_NOTIFICATION,
+        title=f"Service disruption — {affected_service}",
+        message=(
+            f"We have detected a service disruption affecting {affected_service}. "
+            "Our team is investigating and working to restore normal operation. "
+            "You will receive a follow-up notification when the issue is resolved."
+        ),
+        metadata={
+            "affected_service": affected_service,
             **(details or {}),
         },
     )

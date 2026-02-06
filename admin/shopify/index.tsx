@@ -77,7 +77,7 @@ class PageErrorBoundary extends React.Component<
           fontFamily: '-apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif',
           textAlign: 'center',
         }}>
-          <h2 style={{ color: '#C41E2A', marginBottom: 8 }}>
+          <h2 style={{ color: '#ff3621', marginBottom: 8 }}>
             Page Error
           </h2>
           <p style={{ color: '#666', fontSize: 14, marginBottom: 16 }}>
@@ -91,7 +91,7 @@ class PageErrorBoundary extends React.Component<
             fontSize: 12,
             overflow: 'auto',
             maxHeight: 200,
-            color: '#C41E2A',
+            color: '#ff3621',
           }}>
             {this.state.error?.message}
           </pre>

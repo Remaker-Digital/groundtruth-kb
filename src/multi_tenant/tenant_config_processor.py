@@ -195,6 +195,8 @@ _PREFS_DIRECT_FIELDS: set[str] = {
     "widget_header_text",
     "widget_input_placeholder",
     "widget_page_rules",
+    # Notifications (WI-G)
+    "notification_email",
 }
 
 

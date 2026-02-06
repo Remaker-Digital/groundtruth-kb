@@ -207,7 +207,15 @@ router = APIRouter(prefix="/api/analytics", tags=["admin-analytics"])
 # ---------------------------------------------------------------------------
 
 
-@router.get("/summary", response_model=AnalyticsSummaryResponse)
+@router.get(
+    "/summary",
+    response_model=AnalyticsSummaryResponse,
+    summary="Get analytics summary metrics",
+    description="Returns aggregated conversation metrics for a date range including total/billable counts, average turns/messages, status breakdown, escalation rate, and Critic pass rate.",
+    responses={
+        503: {"description": "Admin analytics services not initialized"},
+    },
+)
 async def get_analytics_summary(
     since: str | None = Query(
         None,
@@ -294,7 +302,15 @@ async def get_analytics_summary(
 # ---------------------------------------------------------------------------
 
 
-@router.get("/intents", response_model=IntentsResponse)
+@router.get(
+    "/intents",
+    response_model=IntentsResponse,
+    summary="Get intent distribution",
+    description="Returns agent/intent invocation distribution for a date range, showing which pipeline stages are most active and identifying routing patterns.",
+    responses={
+        503: {"description": "Admin analytics services not initialized"},
+    },
+)
 async def get_intent_distribution(
     since: str | None = Query(
         None,
@@ -356,7 +372,15 @@ async def get_intent_distribution(
 # ---------------------------------------------------------------------------
 
 
-@router.get("/gaps", response_model=GapsResponse)
+@router.get(
+    "/gaps",
+    response_model=GapsResponse,
+    summary="Get knowledge gap report",
+    description="Returns conversations with escalated or error status, representing cases where the AI could not resolve the customer's request. Useful for identifying missing knowledge base content.",
+    responses={
+        503: {"description": "Admin analytics services not initialized"},
+    },
+)
 async def get_knowledge_gaps(
     since: str | None = Query(
         None,

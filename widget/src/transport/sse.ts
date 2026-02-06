@@ -55,6 +55,21 @@ interface StreamEvent {
 // SSE connection
 // ---------------------------------------------------------------------------
 
+/**
+ * Generate a unique tab identifier for multi-tab coordination (WI #133).
+ * Persisted in sessionStorage so reconnections from the same tab reuse
+ * the same ID. Different tabs get different IDs.
+ */
+function getTabId(): string {
+  const KEY = '__agentred_tab_id';
+  let id = sessionStorage.getItem(KEY);
+  if (!id) {
+    id = `tab_${Date.now()}_${Math.random().toString(36).slice(2, 8)}`;
+    sessionStorage.setItem(KEY, id);
+  }
+  return id;
+}
+
 export class SSEConnection {
   private eventSource: EventSource | null = null;
   private lastEventId: string | null = null;
@@ -64,8 +79,11 @@ export class SSEConnection {
   private reconnectTimer: ReturnType<typeof setTimeout> | null = null;
   private closed = false;
   private currentStreamContent = '';
+  private tabId: string;
 
-  constructor(private options: SSEOptions) {}
+  constructor(private options: SSEOptions) {
+    this.tabId = getTabId();
+  }
 
   connect(): void {
     if (this.closed) return;
@@ -77,6 +95,11 @@ export class SSEConnection {
     // EventSource doesn't support custom headers, so we pass the widget key
     // as a query parameter. The backend accepts both header and query param.
     url.searchParams.set('widget_key', this.options.widgetKey);
+
+    // WI #133: Pass tab_id for multi-tab coordination. The backend tracks
+    // which tabs are streaming the same conversation and shares connection
+    // slots so multiple tabs don't exhaust per-tenant concurrency limits.
+    url.searchParams.set('tab_id', this.tabId);
 
     if (this.lastEventId) {
       url.searchParams.set('last_event_id', this.lastEventId);
