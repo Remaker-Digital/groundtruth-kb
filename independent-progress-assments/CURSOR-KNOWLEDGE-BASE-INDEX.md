@@ -27,6 +27,7 @@
 | **CURSOR-INSIGHT-DROPBOX/EXEC-SUMMARY-EXPANDED-2026-02-01.pdf** | PDF version. Generate via `node scripts/generate-exec-summary-pdf.mjs`. |
 | **CURSOR-INSIGHT-DROPBOX/EXEC-SUMMARY-SUPPORTING-RESEARCH.md** | Supporting data for executive summary. |
 | **CURSOR-INSIGHT-DROPBOX/ARR-FORECAST-ANALYSIS-2026-02-01.md** | ARR targets ($350K–$10M): customer counts, gross profit, time-to-reach. |
+| **CURSOR-INSIGHT-DROPBOX/LAUNCH-READINESS-REPORT-2026-02-06.md** | Pre-GA launch readiness report: architecture, implementation, usability, compliance, cost; strengths and weaknesses; evidence-based. |
 | **Third-Party-Assessment-Validation-Report.html** (project root) | Kiro’s validation of EXEC-SUMMARY-EXPANDED-2026-02-01; methodology and improvement guidance in EXEC-SUMMARY-REPORT-GUIDE §10. |
 
 ---

@@ -50,6 +50,16 @@
 
 ---
 
+### 2026-02-06 — Launch Readiness Report
+
+| Area | Finding | Evidence | Suggested action | Status |
+|------|---------|----------|------------------|--------|
+| Process | Launch Readiness Report prepared per owner request: architecture (9 dims), implementation (9 dims), usability (10 dims), compliance (GDPR, Shopify), cost. | LAUNCH-READINESS-REPORT-2026-02-06.md in CURSOR-INSIGHT-DROPBOX. | Report delivered; owner to triage weaknesses (WI #198b, doc sync, load test, legal, creative assets, CORS, standalone auth, browser matrix). | Open |
+| Technical | Doc inconsistency: GDPR webhooks and session token/Save Bar implemented in code but listed incomplete in CLAUDE.md Phase 2.1 and APP-STORE-LISTING §11–§12. | shopify_gdpr_webhooks.py (3 endpoints, HMAC); auth.py (JWT); useSaveBar.ts. | Update checklists to "implemented; verify in production." | Open |
+| Technical | No executed performance/load test in repo; COMPREHENSIVE-TEST-PLAN lists ~30 tests as remaining gap. | COMPREHENSIVE-TEST-PLAN §9; CLAUDE.md. | Run one baseline load test before GA; record P95. | Open |
+
+---
+
 ## How to Add an Entry
 
 1. Add a new row under the latest date block (or start a new date block).

@@ -3,7 +3,7 @@
 import React, { useState, useEffect } from 'react';
 import {
   Paper,
-  ColorInput,
+  ColorPicker,
   Slider,
   Select,
   SegmentedControl,
@@ -45,6 +45,23 @@ const ICON_OPTIONS = [
 ];
 
 const PRE_CHAT_FIELDS = ['name', 'email', 'phone', 'company'];
+
+/** Template variables available in the greeting message. */
+const GREETING_VARIABLES: { token: string; label: string; preview: string }[] = [
+  { token: '<FIRST_NAME>', label: 'Customer first name', preview: 'Sarah' },
+  { token: '<LAST_NAME>', label: 'Customer last name', preview: 'Johnson' },
+  { token: '<FULL_NAME>', label: 'Customer full name', preview: 'Sarah Johnson' },
+  { token: '<COMPANY>', label: 'Company name', preview: 'Acme Inc.' },
+];
+
+/** Replace template tokens with preview sample values. */
+function renderGreetingPreview(msg: string): string {
+  let rendered = msg;
+  for (const v of GREETING_VARIABLES) {
+    rendered = rendered.replaceAll(v.token, v.preview);
+  }
+  return rendered;
+}
 
 // ---------------------------------------------------------------------------
 // Local WidgetConfig interface + defaults
@@ -163,6 +180,68 @@ function SectionHeader({ children }: { children: React.ReactNode }) {
 }
 
 // ---------------------------------------------------------------------------
+// ColorField — Mantine ColorPicker + hex input + swatches
+// ---------------------------------------------------------------------------
+
+function ColorField({
+  label,
+  value,
+  onChange,
+  swatches,
+}: {
+  label: string;
+  value: string;
+  onChange: (val: string) => void;
+  swatches?: string[];
+}) {
+  const defaultSwatches = [BRAND_RED, '#2563EB', '#059669', '#7C3AED', '#D97706', '#DB2777', '#000000', '#FFFFFF'];
+
+  return (
+    <div>
+      <Text size="sm" fw={500} mb={6}>{label}</Text>
+      {/* Swatch preview + hex input row */}
+      <Group gap={10} mb={8} align="center">
+        <Box
+          style={{
+            width: 36,
+            height: 36,
+            borderRadius: 6,
+            background: value || '#FFFFFF',
+            border: '1px solid var(--mantine-color-default-border)',
+            flexShrink: 0,
+          }}
+        />
+        <TextInput
+          value={value}
+          onChange={(e) => {
+            const v = e.currentTarget.value;
+            if (/^#[0-9a-fA-F]{0,6}$/.test(v) || v === '') {
+              onChange(v);
+            }
+          }}
+          placeholder="#RRGGBB"
+          maxLength={7}
+          style={{ width: 120 }}
+          styles={{ input: { fontFamily: "'JetBrains Mono', monospace", fontSize: 13 } }}
+        />
+      </Group>
+      {/* Gradient picker with hue slider */}
+      <ColorPicker
+        value={value}
+        onChange={onChange}
+        format="hex"
+        fullWidth
+        swatches={swatches || defaultSwatches}
+        swatchesPerRow={8}
+        saturationLabel="Saturation"
+        hueLabel="Hue"
+        size="md"
+      />
+    </div>
+  );
+}
+
+// ---------------------------------------------------------------------------
 // Launcher icon SVGs for the preview
 // ---------------------------------------------------------------------------
 
@@ -208,14 +287,14 @@ function WidgetPreview({ config }: { config: WidgetConfig }) {
   const msgAreaBg = dk ? '#141414' : '#fafafa';
   const agentBubbleBg = dk ? '#1f1f1f' : '#fff';
   const agentBubbleBorder = dk ? '#272727' : '#e9ecef';
-  const agentBubbleText = dk ? '#E0E0E0' : undefined;
+  const agentBubbleText = dk ? '#E0E0E0' : '#1f2937';
   const dateSepBg = dk ? '#1f1f1f' : '#f1f3f5';
-  const dateSepText = dk ? '#787878' : undefined;
+  const dateSepText = dk ? '#787878' : '#6b7280';
   const inputBg = dk ? '#1f1f1f' : '#f1f3f5';
-  const inputText = dk ? '#5C5C5C' : '#adb5bd';
+  const inputText = dk ? '#5C5C5C' : '#9ca3af';
   const inputBarBg = dk ? '#0a0a0a' : '#fff';
   const inputBarBorder = dk ? '#272727' : '#e9ecef';
-  const brandingText = dk ? '#5C5C5C' : undefined;
+  const brandingText = dk ? '#5C5C5C' : '#9ca3af';
   const pageBg = dk ? '#141414' : '#f8f9fa';
   const pageBorder = dk ? '#272727' : '#dee2e6';
   // Simulated page chrome
@@ -354,7 +433,7 @@ function WidgetPreview({ config }: { config: WidgetConfig }) {
                 }}
               >
                 <Text size="xs" c={agentBubbleText} style={{ lineHeight: 1.5 }}>
-                  {config.greetingMessage}
+                  {renderGreetingPreview(config.greetingMessage)}
                 </Text>
               </Box>
             </Group>
@@ -548,19 +627,17 @@ export function WidgetPage() {
               <SectionHeader>Appearance</SectionHeader>
               <Divider mb="md" />
               <Stack gap="sm">
-                <ColorInput
+                <ColorField
                   label="Primary Color"
                   value={config.primaryColor}
                   onChange={(val) => update('primaryColor', val)}
-                  format="hex"
-                  swatches={[BRAND_RED, '#2563EB', '#059669', '#7C3AED', '#D97706', '#DB2777', '#000000']}
+                  swatches={[BRAND_RED, '#2563EB', '#059669', '#7C3AED', '#D97706', '#DB2777', '#000000', '#FFFFFF']}
                 />
-                <ColorInput
+                <ColorField
                   label="Header Gradient End"
                   value={config.headerGradientEnd}
                   onChange={(val) => update('headerGradientEnd', val)}
-                  format="hex"
-                  swatches={['#8B1520', '#1E40AF', '#047857', '#5B21B6', '#B45309', '#BE185D', '#1F2937']}
+                  swatches={['#8B1520', '#1E40AF', '#047857', '#5B21B6', '#B45309', '#BE185D', '#1F2937', '#374151']}
                 />
                 <Select
                   label="Font Family"
@@ -672,15 +749,42 @@ export function WidgetPage() {
                   onChange={(e) => update('greetingEnabled', e.currentTarget.checked)}
                   color="brand"
                 />
-                <Textarea
-                  label="Greeting Message"
-                  value={config.greetingMessage}
-                  onChange={(e) => update('greetingMessage', e.currentTarget.value)}
-                  disabled={!config.greetingEnabled}
-                  autosize
-                  minRows={2}
-                  maxRows={4}
-                />
+                <div>
+                  <Textarea
+                    label="Greeting Message"
+                    value={config.greetingMessage}
+                    onChange={(e) => update('greetingMessage', e.currentTarget.value)}
+                    disabled={!config.greetingEnabled}
+                    autosize
+                    minRows={2}
+                    maxRows={4}
+                    description="Personalize with template variables — click to insert."
+                  />
+                  {config.greetingEnabled && (
+                    <Group gap={6} mt={6} wrap="wrap">
+                      {GREETING_VARIABLES.map((v) => (
+                        <Button
+                          key={v.token}
+                          size="compact-xs"
+                          variant="light"
+                          color="gray"
+                          style={{ fontSize: 11, fontFamily: "'JetBrains Mono', monospace" }}
+                          title={v.label}
+                          onClick={() => {
+                            const cur = config.greetingMessage;
+                            // Insert token at the end (or before trailing punctuation)
+                            const trimmed = cur.trimEnd();
+                            const trailing = cur.slice(trimmed.length);
+                            const needsSpace = trimmed.length > 0 && !trimmed.endsWith(' ');
+                            update('greetingMessage', trimmed + (needsSpace ? ' ' : '') + v.token + trailing);
+                          }}
+                        >
+                          {v.token}
+                        </Button>
+                      ))}
+                    </Group>
+                  )}
+                </div>
                 <Divider variant="dashed" />
                 <Switch
                   label="Pre-chat form"

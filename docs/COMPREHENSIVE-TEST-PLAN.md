@@ -620,7 +620,43 @@ Module: `tests/multi_tenant/test_system_prompt_builder.py`
 | SPB-19 | PreferencesDocument compatibility | Input contract |
 | SPB-20 | get_prompt_builder() singleton | Singleton |
 
-**P1 Subtotal: 175 tests**
+### 5.9 API Key Management & Public Reset Tests (25 tests)
+
+Module: `tests/multi_tenant/test_admin_apikey.py` (existing: 36 tests) + `tests/multi_tenant/test_apikey_reset.py` (new)
+
+**Existing coverage (36 tests):** Key generation format/uniqueness, rotation, revocation, metadata retrieval, conflict detection, audit logging, service injection, Pydantic models, constants.
+
+**New tests for public reset endpoint and full lifecycle:**
+
+| ID | Test | Validates |
+|----|------|-----------|
+| AKR-01 | POST /api/admin/api-keys/reset with valid email → 200 + generic message | Reset endpoint |
+| AKR-02 | POST /api/admin/api-keys/reset with unknown email → 200 + same generic message | Enumeration prevention |
+| AKR-03 | POST /api/admin/api-keys/reset with invalid email format → 200 + same generic message | Graceful rejection |
+| AKR-04 | POST /api/admin/api-keys/reset rate limited after 3 requests from same IP → 429 | IP rate limiting |
+| AKR-05 | Rate limit window resets after 5 minutes | Window expiry |
+| AKR-06 | Different IPs can each make 3 requests independently | Per-IP isolation |
+| AKR-07 | Reset generates new key and updates tenant api_key_hash in Cosmos DB | Key replacement |
+| AKR-08 | Reset immediately invalidates old key (old hash no longer matches) | Old key invalidation |
+| AKR-09 | Reset sets api_key_last_rotated_at timestamp | Rotation tracking |
+| AKR-10 | Reset calls _send_api_key_email with correct args (to_email, raw_key, tenant_name) | Email dispatch |
+| AKR-11 | Reset logs SECURITY_EVENT audit entry with key_prefix and email_sent status | Audit trail |
+| AKR-12 | Reset endpoint accessible without authentication (auth-exempt) | Public access |
+| AKR-13 | SMTP email sending with valid SMTP_HOST config → returns True | Email delivery |
+| AKR-14 | Missing SMTP_HOST → _send_api_key_email returns False, reset still succeeds | Graceful degradation |
+| AKR-15 | SMTP connection failure → _send_api_key_email returns False, reset still succeeds | Error handling |
+| AKR-16 | Email HTML body contains branded Agent Red template with key | Email content |
+| AKR-17 | Email plain-text fallback body contains the API key | Plain text fallback |
+| AKR-18 | Reset via email then login with new key → authenticated successfully | End-to-end reset flow |
+| AKR-19 | Reset via email then login with old key → 401 | Old key invalidation E2E |
+| AKR-20 | find_by_customer_email performs case-insensitive lookup | Email normalization |
+| AKR-21 | Email with leading/trailing whitespace is trimmed before lookup | Input sanitization |
+| AKR-22 | Service not initialized (503) when _tenant_repo is None | Service injection |
+| AKR-23 | Request with missing email field → 422 validation error | Schema validation |
+| AKR-24 | Concurrent reset requests for same email → both succeed, last key wins | Concurrency |
+| AKR-25 | Widget.js endpoint auth-exempt (200 without auth) | Static file serving |
+
+**P1 Subtotal: 200 tests** (175 existing + 25 new)
 
 ---
 
@@ -991,6 +1027,8 @@ Module: `tests/security/test_adversarial.py`
 | SEC-18 | Bearer token with XXE payload → rejected | Input sanitization |
 | SEC-19 | Extremely long API key (>10KB) → rejected | Length validation |
 | SEC-20 | null bytes in API key → rejected | Input sanitization |
+| SEC-20a | API key reset with XSS payload in email field → sanitized | Input sanitization |
+| SEC-20b | API key reset response is identical for found vs not-found email | Enumeration prevention |
 
 ### 8.3 Rate Limit & Resource Exhaustion (10 tests)
 
@@ -1001,6 +1039,8 @@ Module: `tests/security/test_adversarial.py`
 | SEC-23 | Extremely large request body (>1MB) → rejected | Body limit |
 | SEC-24 | Slowloris-style slow request → timeout | Timeout |
 | SEC-25 | Rapid API key rotation attempts → rate limited | Rate limit |
+| SEC-25a | API key reset rate limit: 4th request from same IP within 5 min → 429 | Reset rate limit |
+| SEC-25b | API key reset rate limit: different IPs are independent | Per-IP isolation |
 | SEC-26 | Webhook replay attack (same event_id) → deduplicated | Idempotency |
 | SEC-27 | Invalid Stripe webhook signature → rejected | Signature verification |
 | SEC-28 | Oversized webhook payload → rejected | Size limit |
@@ -1272,7 +1312,7 @@ These are infrastructure-as-code validation tests (run via `terraform validate` 
 |----------|----------|------------|--------|
 | — | Existing tests | 125 | ✅ Passing |
 | P0 | Launch blockers | 160 | ❌ Not started |
-| P1 | Pre-launch required | 175 | ❌ Not started |
+| P1 | Pre-launch required | 200 | ❌ Not started |
 | P2 | Launch quality | 135 | ❌ Not started |
 | P3 | Post-launch / continuous | 90 | ❌ Not started |
 | — | Adversarial & security | 45 | ❌ Not started |
@@ -1307,6 +1347,7 @@ These are infrastructure-as-code validation tests (run via `terraform validate` 
 | stripe_usage.py | 0 | ~10 (HTTP-BILL + UC) | ~10 |
 | shopify_billing.py + shopify_client.py | 0 | ~30 (SHB + SHC) | ~30 |
 | stripe_catalog.py | 0 | ~5 (SC) | ~5 |
+| admin_apikey_api.py | 36 | ~25 (AKR) | ~61 |
 | main.py (app, startup, health) | 0 | ~10 (HE) | ~10 |
 | Cross-module integration | 10 | ~20 (XM) | ~30 |
 | Adversarial / security | 0 | ~45 (SEC) | ~45 |
@@ -1356,7 +1397,9 @@ tests/
 │   ├── test_archival.py                 # AR-01 to AR-10
 │   ├── test_audit_log.py               # AL-01 to AL-10
 │   ├── test_data_retention.py           # DRT-01 to DRT-10
-│   └── test_ab_validation.py            # AB-01 to AB-10
+│   ├── test_ab_validation.py            # AB-01 to AB-10
+│   ├── test_admin_apikey.py             # EXISTING (36 tests)
+│   └── test_apikey_reset.py             # AKR-01 to AKR-25
 ├── persistent_memory/
 │   ├── fixtures.py                      # EXISTING
 │   ├── test_unit_layers.py              # EXISTING (20 tests)

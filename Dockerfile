@@ -63,6 +63,11 @@ COPY admin/shopify/dist/ ./admin/shopify/dist/
 COPY admin/standalone/dist/ ./admin/standalone/dist/
 
 # --------------------------------------------------------------------------
+# Widget bundle (IIFE single-file for embedding via <script> tag)
+# --------------------------------------------------------------------------
+COPY widget/dist/ ./widget/dist/
+
+# --------------------------------------------------------------------------
 # Non-root user for security
 # --------------------------------------------------------------------------
 RUN groupadd --gid 1000 agentred \

@@ -93,6 +93,8 @@ interface AgentRedSDK {
     'data-greeting': 'greeting_message',
     'data-header-text': 'widget_header_text',
     'data-agent-name': 'widget_agent_display_name',
+    'data-context': 'widget_context',
+    'data-customer-name': 'widget_customer_name',
   };
   for (const [attr, configKey] of Object.entries(attrMap)) {
     const val = scriptTag.getAttribute(attr);

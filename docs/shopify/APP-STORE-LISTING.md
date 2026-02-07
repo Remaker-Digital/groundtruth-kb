@@ -37,7 +37,7 @@ Agent Red Customer Experience
 
 ### App Icon
 - **Specification:** 1200 x 1200 px, PNG or JPEG, no transparency
-- **Design:** The Beacon AR monogram on solid Agent Red primary (#C41E2A) background
+- **Design:** The Beacon AR monogram on solid Agent Red primary (#ff3621) background
 - **Safe area:** Logo fills 750-900 px of the 1200 px canvas, 75 px margin from edges
 - **Status:** Requires export from brand assets (logo spec exists in branding/logo/)
 
@@ -313,7 +313,7 @@ https://docs.agentred.com/changelog
 |-----------|---------------|
 | Dimensions | 1200 x 1200 px |
 | Format | PNG (preferred) or JPEG |
-| Background | Solid Agent Red primary (#C41E2A) |
+| Background | Solid Agent Red primary (#ff3621) |
 | Content | The Beacon AR monogram, centered |
 | Logo size | 750-900 px within the 1200 px canvas |
 | Margin | 75 px clear space from all edges |
@@ -443,7 +443,7 @@ https://docs.agentred.com/changelog
 | `customers/redact` | `POST /api/shopify/gdpr/customers-redact` | Delete customer data after store uninstall or customer request |
 | `shop/redact` | `POST /api/shopify/gdpr/shop-redact` | Delete all shop data 48 hours after app uninstall |
 
-**Implementation status:** Not yet implemented. These endpoints must be built before app submission (requirement, not optional).
+**Implementation status:** Implemented in `src/integrations/shopify_gdpr_webhooks.py` (WI #35). All 3 endpoints mounted at `/api/shopify/gdpr/`, HMAC-SHA256 verification enforced. GDPR webhook URLs updated to production API Gateway FQDN in `shopify.app.toml`. Verify SHOPIFY_API_SECRET is set on the Container App for HMAC verification in production.
 
 ---
 
@@ -472,9 +472,9 @@ https://docs.agentred.com/changelog
 - [ ] Demo store setup
 
 ### Technical Requirements
-- [ ] GDPR compliance webhooks (3 endpoints)
-- [ ] Session token authentication for embedded app
-- [ ] App Bridge Save Bar API integration
+- [x] GDPR compliance webhooks (3 endpoints) — `shopify_gdpr_webhooks.py`, HMAC verified
+- [x] Session token authentication for embedded app — JWT HS256 in `auth.py`, App Bridge in `admin/shopify`
+- [x] App Bridge Save Bar API integration — `useSaveBar.ts` hook
 - [ ] Performance validation (<500ms P95 responses)
 - [ ] Privacy policy hosted at public URL
 - [ ] Test credentials prepared for review team

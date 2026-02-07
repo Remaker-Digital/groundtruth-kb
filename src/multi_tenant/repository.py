@@ -519,6 +519,33 @@ class TenantRepository(TenantScopedRepository):
 
         return items[0] if items else None
 
+    async def find_by_customer_email(
+        self, email: str,
+    ) -> dict[str, Any] | None:
+        """Find a tenant by customer email (cross-partition).
+
+        Used during API key reset workflow where the merchant provides
+        their email but has no valid API key for authentication.
+        This performs a cross-partition query -- use sparingly.
+
+        Args:
+            email: The merchant's registered email address.
+
+        Returns:
+            The tenant document, or None if not found.
+        """
+        items: list[dict[str, Any]] = []
+        async for item in self._container.query_items(
+            query="SELECT * FROM c WHERE c.customer_email = @email",
+            parameters=[{"name": "@email", "value": email}],
+            # Cross-partition query (default in SDK v4+)
+            max_item_count=1,
+        ):
+            items.append(item)
+            break
+
+        return items[0] if items else None
+
     async def find_by_widget_key_hash(
         self, widget_key_hash: str,
     ) -> dict[str, Any] | None:

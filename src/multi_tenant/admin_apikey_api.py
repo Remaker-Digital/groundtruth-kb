@@ -1,11 +1,12 @@
-"""Admin API Key Management API — generate, rotate, revoke API keys (WI #159).
+"""Admin API Key Management API — generate, rotate, revoke, reset API keys.
 
 Provides REST endpoints for merchant API key lifecycle management:
 
-    GET    /api/admin/api-keys       — Get current API key metadata (prefix, created)
-    POST   /api/admin/api-keys       — Generate a new API key (only if none exists)
+    GET    /api/admin/api-keys        — Get current API key metadata (prefix, created)
+    POST   /api/admin/api-keys        — Generate a new API key (only if none exists)
     POST   /api/admin/api-keys/rotate — Rotate: generate new key, invalidate old
-    DELETE /api/admin/api-keys       — Revoke the current API key
+    DELETE /api/admin/api-keys        — Revoke the current API key
+    POST   /api/admin/api-keys/reset  — PUBLIC: Reset key via email verification
 
 API keys are the primary authentication mechanism for direct-channel (Stripe)
 merchants. Shopify merchants use session tokens but may also use API keys for
@@ -17,6 +18,7 @@ Security properties:
     - Key format: ar_live_{tenant_prefix}_{random} (40 chars)
     - Rotation creates new key + updates hash atomically
     - All operations logged to audit trail (SECURITY_EVENT)
+    - Reset endpoint is rate-limited and always returns 200 (email enumeration prevention)
 
 Architecture references:
     - Decision #4: Triple auth (Shopify JWT + API key + widget key)
@@ -34,12 +36,14 @@ Dependencies:
 from __future__ import annotations
 
 import logging
+import os
+import re
 import secrets
 import string
 from datetime import datetime, timezone
 from typing import Any
 
-from fastapi import APIRouter, Depends, HTTPException
+from fastapi import APIRouter, Depends, HTTPException, Request
 from pydantic import BaseModel, ConfigDict, Field
 from pydantic.alias_generators import to_camel
 
@@ -113,6 +117,34 @@ class ApiKeyRevokedResponse(BaseModel):
     revoked_at: str = Field(description="ISO 8601 timestamp")
 
 
+class ApiKeyResetRequest(BaseModel):
+    """Request body for the public API key reset endpoint."""
+
+    model_config = ConfigDict(
+        alias_generator=to_camel,
+        populate_by_name=True,
+    )
+
+    email: str = Field(description="Registered merchant email address")
+
+
+class ApiKeyResetResponse(BaseModel):
+    """Response for the API key reset endpoint.
+
+    Always returns the same message regardless of whether the email
+    was found, to prevent email enumeration attacks.
+    """
+
+    model_config = ConfigDict(
+        alias_generator=to_camel,
+        populate_by_name=True,
+    )
+
+    message: str = Field(
+        default="If an account with that email exists, a new API key has been sent.",
+    )
+
+
 # ---------------------------------------------------------------------------
 # Key generation
 # ---------------------------------------------------------------------------
@@ -132,6 +164,140 @@ def generate_api_key(tenant_id: str) -> str:
         secrets.choice(API_KEY_ALPHABET) for _ in range(API_KEY_RANDOM_LENGTH)
     )
     return f"{API_KEY_PREFIX}{tenant_prefix}_{random_part}"
+
+
+# ---------------------------------------------------------------------------
+# In-memory rate limiter for public reset endpoint
+# ---------------------------------------------------------------------------
+
+_reset_rate_limit: dict[str, list[float]] = {}  # IP -> list of timestamps
+RESET_RATE_WINDOW = 300.0  # 5 minutes
+RESET_RATE_MAX = 3  # max 3 requests per window per IP
+
+# Email validation regex
+_EMAIL_RE = re.compile(r"^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}$")
+
+
+def _is_rate_limited(client_ip: str) -> bool:
+    """Check if a client IP has exceeded the reset rate limit."""
+    import time
+
+    now = time.time()
+    window_start = now - RESET_RATE_WINDOW
+
+    # Clean old entries
+    if client_ip in _reset_rate_limit:
+        _reset_rate_limit[client_ip] = [
+            ts for ts in _reset_rate_limit[client_ip] if ts > window_start
+        ]
+
+    requests = _reset_rate_limit.get(client_ip, [])
+    if len(requests) >= RESET_RATE_MAX:
+        return True
+
+    # Record this request
+    _reset_rate_limit.setdefault(client_ip, []).append(now)
+    return False
+
+
+async def _send_api_key_email(
+    to_email: str,
+    raw_key: str,
+    tenant_name: str | None = None,
+) -> bool:
+    """Send the new API key to the merchant via SMTP.
+
+    Uses the same SMTP configuration as alert_delivery.py (SendGrid, etc.).
+    Returns True if sent successfully, False otherwise.
+    """
+    import smtplib
+    from email.mime.multipart import MIMEMultipart
+    from email.mime.text import MIMEText
+
+    smtp_host = os.environ.get("SMTP_HOST", "")
+    smtp_port = int(os.environ.get("SMTP_PORT", "587"))
+    smtp_user = os.environ.get("SMTP_USERNAME", "")
+    smtp_pass = os.environ.get("SMTP_PASSWORD", "")
+    sender = os.environ.get("SMTP_FROM_ADDRESS", "noreply@agentred.com")
+
+    if not smtp_host:
+        logger.warning("SMTP_HOST not configured — cannot send API key reset email")
+        return False
+
+    name_display = f" ({tenant_name})" if tenant_name else ""
+    subject = "Your Agent Red API Key Has Been Reset"
+
+    html_body = f"""\
+<!DOCTYPE html>
+<html>
+<head><meta charset="utf-8"/></head>
+<body style="margin:0;padding:0;background:#0a0a0a;font-family:Inter,system-ui,sans-serif;">
+<div style="max-width:560px;margin:40px auto;padding:40px;background:#1f1f1f;border-radius:12px;border:1px solid #272727;">
+  <div style="text-align:center;margin-bottom:24px;">
+    <h1 style="margin:0;font-size:20px;color:#F5F5F5;">Agent Red</h1>
+    <p style="margin:4px 0 0;font-size:14px;color:#A0A0A0;">Customer Experience</p>
+  </div>
+  <h2 style="margin:0 0 16px;font-size:16px;color:#F5F5F5;">API Key Reset</h2>
+  <p style="margin:0 0 12px;font-size:14px;color:#E0E0E0;line-height:1.6;">
+    A new API key was generated for your account{name_display}. Your previous key has been
+    invalidated and will no longer work.
+  </p>
+  <div style="background:#141414;border:1px solid #272727;border-radius:8px;padding:16px;margin:16px 0;">
+    <p style="margin:0 0 6px;font-size:12px;color:#A0A0A0;text-transform:uppercase;letter-spacing:0.5px;">Your New API Key</p>
+    <p style="margin:0;font-family:'JetBrains Mono',monospace;font-size:13px;color:#ff3621;word-break:break-all;">{raw_key}</p>
+  </div>
+  <p style="margin:16px 0 0;font-size:13px;color:#A0A0A0;line-height:1.5;">
+    Copy this key and use it to sign in to your admin dashboard. This key will not
+    be shown again.
+  </p>
+  <hr style="border:none;border-top:1px solid #272727;margin:24px 0;" />
+  <p style="margin:0 0 8px;font-size:13px;color:#ff6b6b;font-weight:500;">
+    Did you not request this reset?
+  </p>
+  <p style="margin:0;font-size:13px;color:#A0A0A0;line-height:1.5;">
+    If you did not request a key reset, someone may have access to your email.
+    Please contact <a href="mailto:support@agentred.com" style="color:#ff3621;text-decoration:none;">support@agentred.com</a>
+    immediately to secure your account.
+  </p>
+  <hr style="border:none;border-top:1px solid #272727;margin:24px 0;" />
+  <p style="margin:0;font-size:11px;color:#787878;text-align:center;">
+    Agent Red Customer Experience &mdash; A product of Remaker Digital
+  </p>
+</div>
+</body>
+</html>"""
+
+    plain_body = (
+        f"Agent Red API Key Reset\n\n"
+        f"A new API key was generated for your account{name_display}.\n"
+        f"Your previous key has been invalidated.\n\n"
+        f"Your New API Key:\n{raw_key}\n\n"
+        f"Copy this key and use it to sign in. This key will not be shown again.\n\n"
+        f"If you did not request this reset, contact support@agentred.com immediately.\n"
+    )
+
+    try:
+        msg = MIMEMultipart("alternative")
+        msg["From"] = f"Agent Red <{sender}>"
+        msg["To"] = to_email
+        msg["Subject"] = subject
+        msg.attach(MIMEText(plain_body, "plain"))
+        msg.attach(MIMEText(html_body, "html"))
+
+        with smtplib.SMTP(smtp_host, smtp_port, timeout=10.0) as server:
+            server.ehlo()
+            if smtp_port != 25:
+                server.starttls()
+            if smtp_user and smtp_pass:
+                server.login(smtp_user, smtp_pass)
+            server.send_message(msg)
+
+        logger.info("API key reset email sent to %s", to_email)
+        return True
+
+    except Exception:
+        logger.exception("Failed to send API key reset email to %s", to_email)
+        return False
 
 
 # ---------------------------------------------------------------------------
@@ -398,3 +564,106 @@ async def revoke_api_key(
     )
 
     return ApiKeyRevokedResponse(revoked_at=now)
+
+
+# ---------------------------------------------------------------------------
+# Public endpoint: API key reset (no auth required)
+# ---------------------------------------------------------------------------
+
+
+@router.post(
+    "/reset",
+    response_model=ApiKeyResetResponse,
+    summary="Reset API key via email (public)",
+    description=(
+        "Public endpoint for merchants who lost their API key. "
+        "Looks up the account by email, generates a new key, and sends it via email. "
+        "Always returns 200 regardless of whether the email was found (prevents enumeration)."
+    ),
+)
+async def reset_api_key_via_email(
+    body: ApiKeyResetRequest,
+    request: Request,
+) -> ApiKeyResetResponse:
+    """Reset a merchant's API key via email verification.
+
+    This is a PUBLIC endpoint — no authentication required.  The merchant
+    provides their registered email address; if it matches a tenant, a new
+    API key is generated and emailed to them.
+
+    Security:
+        - Rate limited: 3 requests per 5-minute window per IP
+        - Always returns the same message (prevents email enumeration)
+        - Audit logged as SECURITY_EVENT
+        - Old key immediately invalidated on reset
+    """
+    if _tenant_repo is None:
+        raise HTTPException(status_code=503, detail="Service not initialized")
+
+    # Rate limit by client IP
+    client_ip = request.client.host if request.client else "unknown"
+    if _is_rate_limited(client_ip):
+        logger.warning(
+            "API key reset rate limited: ip=%s email=%s",
+            client_ip, body.email,
+        )
+        raise HTTPException(
+            status_code=429,
+            detail="Too many reset requests. Please try again in a few minutes.",
+        )
+
+    # Validate email format
+    email = body.email.strip().lower()
+    if not _EMAIL_RE.match(email):
+        # Return generic message to avoid leaking validation details
+        return ApiKeyResetResponse()
+
+    # Look up tenant by email
+    tenant = await _tenant_repo.find_by_customer_email(email)
+    if tenant is None:
+        # No tenant found — return the same message (no enumeration)
+        logger.info(
+            "API key reset requested for unknown email: ip=%s", client_ip,
+        )
+        return ApiKeyResetResponse()
+
+    tenant_id = tenant.get("id", tenant.get("tenant_id", ""))
+    tenant_name = tenant.get("company_name") or tenant.get("tenant_name")
+
+    # Generate new key and update tenant
+    raw_key = generate_api_key(tenant_id)
+    key_hash = hash_api_key(raw_key)
+    now = datetime.now(timezone.utc).isoformat()
+    key_prefix = raw_key[:12]
+
+    await _tenant_repo.patch(
+        item_id=tenant_id,
+        partition_key=tenant_id,
+        operations=[
+            {"op": "set", "path": "/api_key_hash", "value": key_hash},
+            {"op": "set", "path": "/api_key_prefix", "value": key_prefix},
+            {"op": "set", "path": "/api_key_created_at", "value": now},
+            {"op": "set", "path": "/api_key_last_rotated_at", "value": now},
+        ],
+    )
+
+    # Send the new key via email
+    email_sent = await _send_api_key_email(email, raw_key, tenant_name)
+
+    await _log_audit(
+        tenant_id,
+        "security.event",
+        {
+            "action": "api_key_reset_via_email",
+            "key_prefix": key_prefix,
+            "email_sent": email_sent,
+            "client_ip": client_ip,
+        },
+    )
+
+    logger.info(
+        "API key reset for tenant %s via email (prefix: %s, email_sent: %s)",
+        tenant_id, key_prefix, email_sent,
+    )
+
+    return ApiKeyResetResponse()

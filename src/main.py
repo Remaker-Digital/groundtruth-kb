@@ -16,6 +16,7 @@ import os
 from typing import Any
 
 from fastapi import FastAPI
+from fastapi.responses import Response
 from fastapi.middleware.cors import CORSMiddleware
 
 # ---------------------------------------------------------------------------
@@ -101,11 +102,15 @@ async def _global_exception_handler(request: Request, exc: Exception) -> JSONRes
 # ---------------------------------------------------------------------------
 
 # CORS — restrict in production via APP_CORS_ORIGINS env var
+# APP_CORS_ORIGINS: comma-separated explicit origins (e.g., "https://admin.shopify.com,https://example.com")
+# APP_CORS_ORIGIN_REGEX: regex for wildcard subdomains (e.g., "https://.*\\.myshopify\\.com")
 _cors_origins = os.environ.get("APP_CORS_ORIGINS", "*").split(",")
+_cors_origin_regex = os.environ.get("APP_CORS_ORIGIN_REGEX", None)
 
 app.add_middleware(
     CORSMiddleware,
     allow_origins=_cors_origins,
+    allow_origin_regex=_cors_origin_regex,
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
@@ -187,6 +192,8 @@ if _admin_shopify_dist.is_dir():
         name="admin-shopify-assets",
     )
 
+    _SHOPIFY_NO_CACHE = {"Cache-Control": "no-cache, no-store, must-revalidate", "Pragma": "no-cache"}
+
     @app.get("/admin/shopify/{full_path:path}", include_in_schema=False)
     async def _admin_shopify_spa(full_path: str) -> FileResponse:
         """Catch-all route for the Shopify embedded admin SPA.
@@ -196,12 +203,12 @@ if _admin_shopify_dist.is_dir():
         behaviour — the server always returns the shell HTML, and the
         JavaScript app determines what to render based on the URL.
         """
-        return FileResponse(str(_admin_shopify_dist / "index.html"))
+        return FileResponse(str(_admin_shopify_dist / "index.html"), headers=_SHOPIFY_NO_CACHE)
 
     @app.get("/admin/shopify", include_in_schema=False)
     async def _admin_shopify_index() -> FileResponse:
         """Serve the Shopify embedded admin SPA root."""
-        return FileResponse(str(_admin_shopify_dist / "index.html"))
+        return FileResponse(str(_admin_shopify_dist / "index.html"), headers=_SHOPIFY_NO_CACHE)
 
     logger.info("Shopify embedded admin SPA mounted at /admin/shopify")
 else:
@@ -212,15 +219,45 @@ else:
 
 
 # ---------------------------------------------------------------------------
-# Standalone Admin SPA — password-gated for UX review access
+# Widget JS bundle — served at /widget.js for embedding in any page
 # ---------------------------------------------------------------------------
-# Simple password gate: visitors enter a password, receive a session cookie,
-# and can browse the standalone admin freely.  The password is set via the
-# ADMIN_PREVIEW_PASSWORD environment variable.
+
+_widget_dist = pathlib.Path(__file__).resolve().parent.parent / "widget" / "dist"
+_widget_bundle = _widget_dist / "agent-red-widget.iife.js"
+
+
+@app.get("/widget.js", include_in_schema=False)
+async def _serve_widget_js() -> Response:
+    """Serve the Agent Red chat widget IIFE bundle.
+
+    This is the single-file JavaScript bundle that merchants (or the admin
+    UI) include via a ``<script>`` tag.  It boots the Shadow DOM launcher
+    and iframe conversation panel.
+    """
+    if not _widget_bundle.is_file():
+        return JSONResponse(
+            {"detail": "Widget bundle not available"},
+            status_code=404,
+        )
+    return FileResponse(
+        str(_widget_bundle),
+        media_type="application/javascript",
+        headers={
+            "Cache-Control": "public, max-age=3600, s-maxage=86400",
+            "Access-Control-Allow-Origin": "*",
+        },
+    )
+
+
+# ---------------------------------------------------------------------------
+# Standalone Admin SPA — production merchant admin (password-gated)
+# ---------------------------------------------------------------------------
+# Password gate: merchants enter a password, receive a session cookie, and
+# access the full admin dashboard.  The password is set via the
+# ADMIN_PREVIEW_PASSWORD environment variable on the Container App.
 #
-# This is NOT production auth for merchants — it's a casual-trespasser gate
-# so UX designers and stakeholders can access the admin without running it
-# locally.  Merchant auth is handled inside the SPA (API key login page).
+# After passing the password gate, merchants sign in with their API key
+# inside the SPA for tenant-scoped access to all admin features.
 # ---------------------------------------------------------------------------
 
 import hashlib  # noqa: E402
@@ -231,50 +268,103 @@ from starlette.responses import Response as StarletteResponse  # noqa: E402
 _admin_standalone_dist = (
     pathlib.Path(__file__).resolve().parent.parent / "admin" / "standalone" / "dist"
 )
-_ADMIN_PREVIEW_PASSWORD = os.environ.get("ADMIN_PREVIEW_PASSWORD", "")
-_ADMIN_COOKIE_NAME = "agentred_preview"
-# Deterministic token derived from the password so all gateway replicas agree
-_ADMIN_COOKIE_VALUE = (
-    hashlib.sha256(f"agentred-preview:{_ADMIN_PREVIEW_PASSWORD}".encode()).hexdigest()[:32]
-    if _ADMIN_PREVIEW_PASSWORD
+_ADMIN_INITIAL_PASSWORD = os.environ.get("ADMIN_PREVIEW_PASSWORD", "")
+_ADMIN_COOKIE_NAME = "agentred_admin"
+# Mutable password hash — allows runtime password changes.  Falls back to env var.
+# Deterministic token derived from the password so all gateway replicas agree.
+_admin_password_hash: str = (
+    hashlib.sha256(f"agentred-admin:{_ADMIN_INITIAL_PASSWORD}".encode()).hexdigest()
+    if _ADMIN_INITIAL_PASSWORD
     else ""
 )
 
-_STANDALONE_LOGIN_HTML = """<!DOCTYPE html>
-<html lang="en">
-<head>
-<meta charset="utf-8"/>
-<meta name="viewport" content="width=device-width, initial-scale=1"/>
-<title>Agent Red — Preview Access</title>
-<style>
+def _compute_cookie_value(password: str) -> str:
+    """Derive a deterministic cookie token from a password."""
+    return hashlib.sha256(f"agentred-admin:{password}".encode()).hexdigest()[:32]
+
+_admin_cookie_value: str = (
+    _compute_cookie_value(_ADMIN_INITIAL_PASSWORD) if _ADMIN_INITIAL_PASSWORD else ""
+)
+# Store the current active password for comparison during password change
+_admin_current_password: str = _ADMIN_INITIAL_PASSWORD
+
+_STANDALONE_SHARED_STYLES = """
   * { box-sizing: border-box; margin: 0; padding: 0; }
   body { background: #0a0a0a; color: #e0e0e0; font-family: Inter, system-ui, sans-serif;
          display: flex; align-items: center; justify-content: center; min-height: 100vh; }
   .card { background: #1f1f1f; border: 1px solid #272727; border-radius: 12px;
-          padding: 40px; max-width: 380px; width: 100%; text-align: center; }
-  h1 { font-size: 20px; margin-bottom: 8px; color: #f5f5f5; }
-  p { font-size: 14px; color: #a0a0a0; margin-bottom: 24px; }
+          padding: 40px; max-width: 400px; width: 100%; text-align: center; }
+  h1 { font-size: 20px; margin-bottom: 4px; color: #f5f5f5; }
+  .subtitle { font-size: 14px; color: #a0a0a0; margin-bottom: 24px; }
+  label { display: block; font-size: 13px; font-weight: 500; color: #a0a0a0;
+          margin-bottom: 6px; text-align: left; }
   input { width: 100%; padding: 10px 14px; border: 1px solid #272727; border-radius: 8px;
-          background: #141414; color: #e0e0e0; font-size: 14px; margin-bottom: 16px;
+          background: #141414; color: #e0e0e0; font-size: 14px; margin-bottom: 12px;
           outline: none; }
   input:focus { border-color: #ff3621; }
-  button { width: 100%; padding: 10px; border: none; border-radius: 8px;
+  button[type="submit"] { width: 100%; padding: 10px; border: none; border-radius: 8px;
            background: #ff3621; color: #fff; font-size: 14px; font-weight: 600;
-           cursor: pointer; }
-  button:hover { background: #e62e1a; }
+           cursor: pointer; margin-top: 4px; }
+  button[type="submit"]:hover { background: #e62e1a; }
   .error { color: #ff6b6b; font-size: 13px; margin-bottom: 12px; display: none; }
-</style>
+  .success { color: #4caf50; font-size: 13px; margin-bottom: 12px; display: none; }
+  .link { color: #ff3621; font-size: 13px; text-decoration: none; cursor: pointer;
+          display: inline-block; margin-top: 16px; }
+  .link:hover { text-decoration: underline; }
+  .logo { margin-bottom: 16px; display: block; margin-left: auto; margin-right: auto; }
+"""
+
+_LOGO_DATA_URI = "data:image/svg+xml,%3Csvg viewBox='0 0 128 128' xmlns='http://www.w3.org/2000/svg'%3E%3Crect width='128' height='128' fill='%23ff3621' rx='0'/%3E%3Cg fill='%23fff' transform='translate(2,2) scale(0.97)'%3E%3Cpath d='M39.2 69.6V59.3c0-3.1-3.2-4-5.9-4.2v-6.8c2.8-.1 5.9-1 5.9-3.8V31c0-5.3 4.7-9.2 9.5-9.2h5.5v8h-3c-2.6 0-3.3 1.5-3.3 3.8v11.2c0 4.6-3.7 6.2-6.6 6.6v.1c2.3.4 6.5 1.6 6.6 6.9V69.3c0 2.3.6 3.8 3.3 3.8h3v8h-5.5c-4.8 0-9.5-3.8-9.5-9.1z'/%3E%3Cpath d='M56.4 34.2h9.5v5.8h.1c1.8-4.3 6-6.7 10.8-6.7 1.3 0 1.9.2 2.2.3v9.8c-.9-.3-2.1-.5-3.2-.5-5.9 0-9.4 3.8-9.4 9.1v16.7h-10V34.2z'/%3E%3Cpath d='M87.3 71.2h2.9c2.7 0 3.3-1.5 3.3-3.7V56.7c0-5.4 4.3-6.5 6.5-6.9v-.1c-2.9-.4-6.5-1.6-6.5-6.2V32.4c0-2.3-.6-3.8-3.3-3.8h-2.9v-8h5.6c4.8 0 9.5 3.9 9.5 9.2v13.3c0 2.8 3.2 3.7 5.9 3.8v6.8c-2.8.2-5.9 1.1-5.9 4.2V69.6c0 5.3-4.7 9.1-9.5 9.1H87.3z'/%3E%3C/g%3E%3C/svg%3E"
+
+_STANDALONE_LOGIN_HTML = f"""<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8"/>
+<meta name="viewport" content="width=device-width, initial-scale=1"/>
+<title>Agent Red — Sign In</title>
+<style>{_STANDALONE_SHARED_STYLES}</style>
 </head>
 <body>
 <div class="card">
-  <img src="data:image/svg+xml,%3Csvg viewBox='0 0 128 128' xmlns='http://www.w3.org/2000/svg'%3E%3Crect width='128' height='128' fill='%23ff3621' rx='0'/%3E%3Cg fill='%23fff' transform='translate(2,2) scale(0.97)'%3E%3Cpath d='M39.2 69.6V59.3c0-3.1-3.2-4-5.9-4.2v-6.8c2.8-.1 5.9-1 5.9-3.8V31c0-5.3 4.7-9.2 9.5-9.2h5.5v8h-3c-2.6 0-3.3 1.5-3.3 3.8v11.2c0 4.6-3.7 6.2-6.6 6.6v.1c2.3.4 6.5 1.6 6.6 6.9V69.3c0 2.3.6 3.8 3.3 3.8h3v8h-5.5c-4.8 0-9.5-3.8-9.5-9.1z'/%3E%3Cpath d='M56.4 34.2h9.5v5.8h.1c1.8-4.3 6-6.7 10.8-6.7 1.3 0 1.9.2 2.2.3v9.8c-.9-.3-2.1-.5-3.2-.5-5.9 0-9.4 3.8-9.4 9.1v16.7h-10V34.2z'/%3E%3Cpath d='M87.3 71.2h2.9c2.7 0 3.3-1.5 3.3-3.7V56.7c0-5.4 4.3-6.5 6.5-6.9v-.1c-2.9-.4-6.5-1.6-6.5-6.2V32.4c0-2.3-.6-3.8-3.3-3.8h-2.9v-8h5.6c4.8 0 9.5 3.9 9.5 9.2v13.3c0 2.8 3.2 3.7 5.9 3.8v6.8c-2.8.2-5.9 1.1-5.9 4.2V69.6c0 5.3-4.7 9.1-9.5 9.1H87.3z'/%3E%3C/g%3E%3C/svg%3E" alt="Agent Red" width="48" height="48" style="margin-bottom:16px;display:block;margin-left:auto;margin-right:auto" />
-  <h1>Agent Red Admin Preview</h1>
-  <p>Enter the preview password to continue.</p>
+  <img src="{_LOGO_DATA_URI}" alt="Agent Red" width="48" height="48" class="logo" />
+  <h1>Agent Red</h1>
+  <p class="subtitle">Customer Experience Admin</p>
   <div class="error" id="err">Incorrect password. Please try again.</div>
   <form method="POST" action="/admin/standalone/_auth">
-    <input type="password" name="password" placeholder="Password" autofocus required/>
-    <button type="submit">Continue</button>
+    <label for="pw">Password</label>
+    <input id="pw" type="password" name="password" placeholder="Enter your password" autofocus required/>
+    <button type="submit">Sign In</button>
   </form>
+  <a href="/admin/standalone/_change-password" class="link">Change password</a>
+</div>
+</body>
+</html>"""
+
+_STANDALONE_CHANGE_PW_HTML = f"""<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8"/>
+<meta name="viewport" content="width=device-width, initial-scale=1"/>
+<title>Agent Red — Change Password</title>
+<style>{_STANDALONE_SHARED_STYLES}</style>
+</head>
+<body>
+<div class="card">
+  <img src="{_LOGO_DATA_URI}" alt="Agent Red" width="48" height="48" class="logo" />
+  <h1>Change Password</h1>
+  <p class="subtitle">Enter your current password and choose a new one.</p>
+  <div class="error" id="err">Current password is incorrect.</div>
+  <div class="success" id="ok">Password changed successfully!</div>
+  <form method="POST" action="/admin/standalone/_change-password">
+    <label for="current">Current Password</label>
+    <input id="current" type="password" name="current_password" placeholder="Current password" autofocus required/>
+    <label for="new">New Password</label>
+    <input id="new" type="password" name="new_password" placeholder="New password" required minlength="6"/>
+    <label for="confirm">Confirm New Password</label>
+    <input id="confirm" type="password" name="confirm_password" placeholder="Confirm new password" required minlength="6"/>
+    <button type="submit">Change Password</button>
+  </form>
+  <a href="/admin/standalone/" class="link">Back to sign in</a>
 </div>
 </body>
 </html>"""
@@ -282,28 +372,30 @@ _STANDALONE_LOGIN_HTML = """<!DOCTYPE html>
 
 if _admin_standalone_dist.is_dir():
 
-    def _check_preview_cookie(request: Request) -> bool:
-        """Return True if the request has a valid preview session cookie."""
-        if not _ADMIN_PREVIEW_PASSWORD:
+    def _check_admin_cookie(request: Request) -> bool:
+        """Return True if the request has a valid admin session cookie."""
+        global _admin_current_password, _admin_cookie_value
+        if not _admin_current_password:
             # No password configured — allow all access
             return True
         cookie = request.cookies.get(_ADMIN_COOKIE_NAME, "")
-        return cookie == _ADMIN_COOKIE_VALUE
+        return cookie == _admin_cookie_value
 
     @app.post("/admin/standalone/_auth", include_in_schema=False)
     async def _admin_standalone_auth(request: Request) -> StarletteResponse:
-        """Validate the preview password and set a session cookie."""
+        """Validate the admin password and set a session cookie."""
+        global _admin_current_password, _admin_cookie_value
         form = await request.form()
         password = str(form.get("password", ""))
 
-        if password == _ADMIN_PREVIEW_PASSWORD and _ADMIN_PREVIEW_PASSWORD:
+        if password == _admin_current_password and _admin_current_password:
             response = StarletteResponse(
                 status_code=303,
                 headers={"location": "/admin/standalone/"},
             )
             response.set_cookie(
                 _ADMIN_COOKIE_NAME,
-                _ADMIN_COOKIE_VALUE,
+                _admin_cookie_value,
                 httponly=True,
                 secure=True,
                 samesite="lax",
@@ -313,28 +405,93 @@ if _admin_standalone_dist.is_dir():
 
         # Wrong password — re-render login with error
         error_html = _STANDALONE_LOGIN_HTML.replace(
-            'display: none;', 'display: block;',
+            'class="error" id="err"', 'class="error" id="err" style="display:block"',
         )
         return HTMLResponse(content=error_html, status_code=403)
+
+    @app.get("/admin/standalone/_change-password", include_in_schema=False)
+    async def _admin_change_password_form(request: Request) -> HTMLResponse:
+        """Show the change password form."""
+        return HTMLResponse(content=_STANDALONE_CHANGE_PW_HTML)
+
+    @app.post("/admin/standalone/_change-password", include_in_schema=False)
+    async def _admin_change_password(request: Request) -> StarletteResponse:
+        """Process password change: verify current, set new."""
+        global _admin_current_password, _admin_cookie_value, _admin_password_hash
+        form = await request.form()
+        current = str(form.get("current_password", ""))
+        new_pw = str(form.get("new_password", ""))
+        confirm = str(form.get("confirm_password", ""))
+
+        # Validate current password
+        if current != _admin_current_password or not _admin_current_password:
+            error_html = _STANDALONE_CHANGE_PW_HTML.replace(
+                'class="error" id="err"', 'class="error" id="err" style="display:block"',
+            )
+            return HTMLResponse(content=error_html, status_code=403)
+
+        # Validate new passwords match
+        if new_pw != confirm:
+            mismatch_html = _STANDALONE_CHANGE_PW_HTML.replace(
+                'Current password is incorrect.',
+                'New passwords do not match.',
+            ).replace(
+                'class="error" id="err"', 'class="error" id="err" style="display:block"',
+            )
+            return HTMLResponse(content=mismatch_html, status_code=400)
+
+        # Validate minimum length
+        if len(new_pw) < 6:
+            short_html = _STANDALONE_CHANGE_PW_HTML.replace(
+                'Current password is incorrect.',
+                'New password must be at least 6 characters.',
+            ).replace(
+                'class="error" id="err"', 'class="error" id="err" style="display:block"',
+            )
+            return HTMLResponse(content=short_html, status_code=400)
+
+        # Update the password (in-memory — persists until container restart)
+        _admin_current_password = new_pw
+        _admin_cookie_value = _compute_cookie_value(new_pw)
+        _admin_password_hash = hashlib.sha256(
+            f"agentred-admin:{new_pw}".encode(),
+        ).hexdigest()
+
+        logger.info("Admin password changed successfully (in-memory update)")
+
+        # Show success, then redirect to sign-in with new cookie
+        success_html = _STANDALONE_CHANGE_PW_HTML.replace(
+            'class="success" id="ok"', 'class="success" id="ok" style="display:block"',
+        )
+        response = HTMLResponse(content=success_html)
+        # Invalidate old session cookie so they must sign in with new password
+        response.delete_cookie(_ADMIN_COOKIE_NAME)
+        return response
 
     # IMPORTANT: Register explicit root routes BEFORE the StaticFiles mount.
     # Starlette evaluates routes in registration order; if the mount were first,
     # it could shadow the root path.  The assets mount only claims
     # /admin/standalone/assets/* and does NOT interfere with other sub-paths.
 
+    # Cache-control headers for HTML pages: must revalidate on every load
+    # so that new deployments with updated Vite hashed assets are picked up
+    # immediately.  Hashed assets (/assets/*) are served by StaticFiles with
+    # long-lived caching (content hash in filename = immutable).
+    _NO_CACHE_HEADERS = {"Cache-Control": "no-cache, no-store, must-revalidate", "Pragma": "no-cache"}
+
     @app.get("/admin/standalone/", include_in_schema=False)
     async def _admin_standalone_index_slash(request: Request) -> StarletteResponse:
         """Serve the standalone admin SPA root with trailing slash (password-gated)."""
-        if not _check_preview_cookie(request):
-            return HTMLResponse(content=_STANDALONE_LOGIN_HTML)
-        return FileResponse(str(_admin_standalone_dist / "index.html"))
+        if not _check_admin_cookie(request):
+            return HTMLResponse(content=_STANDALONE_LOGIN_HTML, headers=_NO_CACHE_HEADERS)
+        return FileResponse(str(_admin_standalone_dist / "index.html"), headers=_NO_CACHE_HEADERS)
 
     @app.get("/admin/standalone", include_in_schema=False)
     async def _admin_standalone_index(request: Request) -> StarletteResponse:
         """Serve the standalone admin SPA root (password-gated)."""
-        if not _check_preview_cookie(request):
-            return HTMLResponse(content=_STANDALONE_LOGIN_HTML)
-        return FileResponse(str(_admin_standalone_dist / "index.html"))
+        if not _check_admin_cookie(request):
+            return HTMLResponse(content=_STANDALONE_LOGIN_HTML, headers=_NO_CACHE_HEADERS)
+        return FileResponse(str(_admin_standalone_dist / "index.html"), headers=_NO_CACHE_HEADERS)
 
     # Serve static assets (JS, CSS, sourcemaps) from the Vite build output
     app.mount(
@@ -351,17 +508,17 @@ if _admin_standalone_dist.is_dir():
         serve that file directly.  Otherwise fall through to index.html
         for SPA client-side routing.
         """
-        if not _check_preview_cookie(request):
-            return HTMLResponse(content=_STANDALONE_LOGIN_HTML)
+        if not _check_admin_cookie(request):
+            return HTMLResponse(content=_STANDALONE_LOGIN_HTML, headers=_NO_CACHE_HEADERS)
         # Serve real static files (SVG, PNG, etc.) from dist root
         candidate = _admin_standalone_dist / full_path
         if candidate.is_file() and ".." not in full_path:
             return FileResponse(str(candidate))
-        return FileResponse(str(_admin_standalone_dist / "index.html"))
+        return FileResponse(str(_admin_standalone_dist / "index.html"), headers=_NO_CACHE_HEADERS)
 
     logger.info(
         "Standalone admin SPA mounted at /admin/standalone%s",
-        " (password-gated)" if _ADMIN_PREVIEW_PASSWORD else " (NO PASSWORD — open access)",
+        " (password-gated)" if _admin_current_password else " (NO PASSWORD — open access)",
     )
 else:
     logger.warning(

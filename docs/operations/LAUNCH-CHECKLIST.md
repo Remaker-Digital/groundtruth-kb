@@ -108,10 +108,10 @@ Reference: `docs/shopify/APP-STORE-LISTING.md` for full specifications.
 
 ## Shopify App Store Submission
 
-### Step 6: Update GDPR Webhook URLs **[OWNER]**
+### Step 6: Deploy GDPR Webhook URLs **[OWNER]**
 
-Edit `shopify.app.toml` and replace the placeholder `app.agentred.com` URLs
-with the production API Gateway FQDN:
+GDPR webhook URLs in `shopify.app.toml` have been updated to production API
+Gateway FQDN (2026-02-06). Deploy to push the configuration to Shopify:
 
 ```toml
 [webhooks]
@@ -199,6 +199,39 @@ After both channels are live, verify:
 - [ ] Trial signup: verify 14-day trial tier, conversation limit enforced
 - [ ] Usage metering: verify usage counters increment in dashboard
 - [ ] Billing alerts: verify 80%/100% threshold notifications in admin dashboard
+
+---
+
+## Browser & Device Verification Matrix **[OWNER/QA]**
+
+One-pass verification across target browsers and devices. For each combination,
+confirm: (1) chat widget renders and opens/closes, (2) messages send and stream,
+(3) standalone admin dashboard loads, (4) no console errors.
+
+### Desktop
+
+| Browser | Widget | Chat | Admin | Notes |
+|---------|--------|------|-------|-------|
+| Chrome (latest) | [ ] | [ ] | [ ] | Primary target |
+| Edge (latest) | [ ] | [ ] | [ ] | Chromium-based; expect identical to Chrome |
+| Firefox (latest) | [ ] | [ ] | [ ] | Verify Shadow DOM rendering |
+
+### Mobile
+
+| Browser / Device | Widget | Chat | Notes |
+|------------------|--------|------|-------|
+| Safari (iOS 17+) | [ ] | [ ] | Test on iPhone; verify mobile detection + full-screen panel |
+| Chrome (Android) | [ ] | [ ] | Test on any Android phone |
+
+### Shopify Embedded Admin
+
+| Context | Loads | Navigation | Notes |
+|---------|-------|------------|-------|
+| Shopify Admin (Chrome) | [ ] | [ ] | Verify iframe + App Bridge |
+| Shopify Admin (Mobile Safari) | [ ] | [ ] | Verify responsive frame |
+
+**Pass criteria:** All checkboxes marked. Console errors related to missing
+tenant data are acceptable pre-provisioning; rendering/JS errors are not.
 
 ---
 

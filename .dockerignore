@@ -53,8 +53,15 @@ website/
 
 # Frontend projects (built and served separately)
 prototype/
-widget/
 extensions/
+# Widget — exclude source, keep dist/ (IIFE bundle served at /widget.js)
+widget/src/
+widget/node_modules/
+widget/package.json
+widget/package-lock.json
+widget/tsconfig.json
+widget/vite.config.ts
+widget/dev.html
 
 # Admin: exclude everything EXCEPT admin/{shopify,standalone}/dist/ (pre-built SPA assets)
 admin/shared/

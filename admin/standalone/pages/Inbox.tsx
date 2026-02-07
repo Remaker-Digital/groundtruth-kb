@@ -273,9 +273,9 @@ function MessageBubble({
               {senderName}
             </Text>
             <img
-              src="/admin/standalone/primary-logo-no-wordmark.svg"
+              src="/admin/standalone/icon-master.svg"
               alt="Agent Red"
-              style={{ height: 16, width: 16, display: 'block', opacity: 0.85 }}
+              style={{ height: 16, width: 16, display: 'block', opacity: 0.85, borderRadius: 2 }}
             />
           </Group>
         ) : (
@@ -423,7 +423,7 @@ export function InboxPage() {
         </Box>
 
         {/* Filter tabs */}
-        <Box p="sm" pb="xs">
+        <Box px={6} py="xs">
           <SegmentedControl
             value={filter}
             onChange={setFilter}
@@ -432,11 +432,12 @@ export function InboxPage() {
             data={[
               { label: `All (${counts.all})`, value: 'all' },
               { label: `Active (${counts.active})`, value: 'active' },
-              { label: `Escalated (${counts.escalated})`, value: 'escalated' },
+              { label: `Esc (${counts.escalated})`, value: 'escalated' },
               { label: `Idle (${counts.idle})`, value: 'idle' },
             ]}
             styles={{
               root: { background: isDark ? 'rgba(255,255,255,0.04)' : 'var(--mantine-color-gray-0)' },
+              label: { padding: '4px 6px', fontSize: 11 },
             }}
           />
         </Box>

@@ -235,6 +235,61 @@ export const StandaloneLayout: React.FC<StandaloneLayoutProps> = ({
     return () => { cancelled = true; };
   }, [apiFetch, onLogout]);
 
+  // ---- Chat widget injection (auto-embed for admin users) ----------------
+
+  useEffect(() => {
+    // Only inject widget once tenant context is resolved and no existing widget
+    if (!tenantContext || document.getElementById('agent-red-admin-widget')) return;
+
+    // Resolve API base URL — same origin as admin or explicit VITE_API_URL
+    const apiUrl = API_BASE_URL || window.location.origin;
+
+    // Fetch the tenant's widget key from the config endpoint
+    async function injectWidget() {
+      try {
+        const resp = await apiFetch('/api/config');
+        if (!resp.ok) return;
+        const cfg = await resp.json();
+        const widgetKey = cfg?.preferences?.widget_key || cfg?.widget_key;
+        if (!widgetKey) {
+          console.warn('[AgentRed Admin] No widget key found in tenant config — chat widget not loaded.');
+          return;
+        }
+
+        // Create the widget script tag with admin-specific overrides
+        const script = document.createElement('script');
+        script.id = 'agent-red-admin-widget';
+        script.src = `${apiUrl}/widget.js`;
+        script.setAttribute('data-widget-key', widgetKey);
+        script.setAttribute('data-api-url', apiUrl);
+        script.setAttribute('data-auto-open', 'false');
+        script.setAttribute('data-auto-open-delay', '0');
+        script.setAttribute('data-context', 'admin');
+        script.setAttribute('data-greeting',
+          'Hi! I\u2019m your Agent Red AI assistant. Ask me anything about managing your store, configuring the widget, or understanding your analytics.');
+        script.setAttribute('data-header-text', 'Agent Red Assistant');
+        script.setAttribute('data-agent-name', 'Agent Red AI');
+        script.setAttribute('data-sound-enabled', 'false');
+        document.body.appendChild(script);
+      } catch (err) {
+        console.warn('[AgentRed Admin] Could not load chat widget:', err);
+      }
+    }
+
+    injectWidget();
+
+    // Cleanup on unmount
+    return () => {
+      // Remove widget if it exists
+      const existing = document.getElementById('agent-red-admin-widget');
+      if (existing) existing.remove();
+      // Destroy SDK if available
+      const sdk = (window as unknown as Record<string, unknown>).AgentRed as
+        { destroy?: () => void } | undefined;
+      if (sdk?.destroy) sdk.destroy();
+    };
+  }, [tenantContext, apiFetch]);
+
   // ---- Context value -----------------------------------------------------
 
   const contextValue: AppContextValue = {
@@ -276,7 +331,7 @@ export const StandaloneLayout: React.FC<StandaloneLayoutProps> = ({
                   <img
                     src="/admin/standalone/primary-logo-no-wordmark.svg"
                     alt="Agent Red"
-                    style={{ height: 30, display: 'block' }}
+                    style={{ height: 28, display: 'block' }}
                   />
                   <Text
                     size="sm"

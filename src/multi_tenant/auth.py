@@ -96,12 +96,14 @@ AUTH_EXEMPT_PREFIXES = (
     "/docs",
     "/redoc",
     "/openapi.json",
+    "/widget.js",
     "/api/webhooks/",
     "/api/shopify/gdpr/",
     "/api/checkout/",
     "/api/packs/",
     "/api/shopify/billing/confirm",
     "/api/tenants/",
+    "/api/admin/api-keys/reset",
     "/admin/",
 )
 
