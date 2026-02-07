@@ -182,12 +182,17 @@ class TenantAuthMiddleware(BaseHTTPMiddleware):
         if api_key:
             return await self._auth_api_key(api_key)
 
-        # Try publishable widget key (X-Widget-Key header or ?key= query param)
+        # Try publishable widget key (X-Widget-Key header or query param)
         widget_key = request.headers.get(WIDGET_KEY_HEADER)
         if not widget_key:
-            # WebSocket connections pass key as query parameter since browsers
-            # cannot set custom headers on WebSocket connections.
-            widget_key = request.query_params.get("key")
+            # EventSource (SSE) and WebSocket connections pass the key as a
+            # query parameter since browsers cannot set custom headers on
+            # these connection types.
+            # SSE uses ?widget_key=, WebSocket uses ?key= (both accepted).
+            widget_key = (
+                request.query_params.get("widget_key")
+                or request.query_params.get("key")
+            )
 
         if widget_key:
             return await self._auth_widget_key(widget_key, request.url.path)

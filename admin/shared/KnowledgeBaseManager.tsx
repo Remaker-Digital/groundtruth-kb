@@ -75,8 +75,11 @@ function extractCategories(articles: KBArticle[]): string[] {
 // Sub-components
 // ---------------------------------------------------------------------------
 
-const KBStatusBadge: React.FC<{ status: KBArticleStatus }> = ({ status }) => {
-  const style = STATUS_BADGE_STYLES[status];
+const KBStatusBadge: React.FC<{ status: KBArticleStatus; isActive?: boolean }> = ({ status, isActive }) => {
+  // Backend may return is_active (boolean) instead of status (string).
+  // Derive status from is_active if status is missing.
+  const effectiveStatus: KBArticleStatus = status ?? (isActive === false ? 'archived' : 'published');
+  const style = STATUS_BADGE_STYLES[effectiveStatus] ?? STATUS_BADGE_STYLES.published;
   return (
     <span
       style={{
@@ -742,7 +745,7 @@ const ArticleRow: React.FC<ArticleRowProps> = ({ article, onClick, onVerify, ver
       </span>
     </td>
     <td style={{ padding: '12px 16px', borderBottom: `1px solid ${COLOR_BORDER}` }}>
-      <KBStatusBadge status={article.status} />
+      <KBStatusBadge status={article.status} isActive={article.is_active} />
     </td>
     <td style={{ padding: '12px 16px', borderBottom: `1px solid ${COLOR_BORDER}` }}>
       <KBStalenessBadge category={article.stalenessCategory} />

@@ -4,11 +4,12 @@
  * Connects to GET /api/chat/stream/{conversation_id} and receives
  * Server-Sent Events as the AI generates tokens. Events:
  *
- *   stream_start    — AI response generation begins
- *   token           — Individual token (append to current message)
- *   stream_end      — AI response complete
+ *   stage           — Pipeline stage progress (started/completed with latency)
+ *   token           — Individual token chunk (append to current message)
+ *   validated       — Critic approved the response (finalize message)
+ *   done            — Stream complete for this turn
  *   retracted       — Critic rejected the response (replace with fallback)
- *   error           — Pipeline error
+ *   error           — Pipeline error (with code, recoverable flag)
  *   agent_typing    — Human agent is typing (post-escalation)
  *
  * Supports Last-Event-ID for reconnection (SSEConnectionManager on backend
@@ -38,9 +39,10 @@ interface SSEOptions {
 }
 
 type StreamEventType =
-  | 'stream_start'
+  | 'stage'
   | 'token'
-  | 'stream_end'
+  | 'validated'
+  | 'done'
   | 'retracted'
   | 'error'
   | 'agent_typing';
@@ -78,6 +80,7 @@ export class SSEConnection {
   private reconnectBaseDelay = 1000; // 1s, exponential backoff
   private reconnectTimer: ReturnType<typeof setTimeout> | null = null;
   private closed = false;
+  private streamComplete = false; // Set true after 'done' — prevents reconnect
   private currentStreamContent = '';
   private tabId: string;
 
@@ -87,6 +90,9 @@ export class SSEConnection {
 
   connect(): void {
     if (this.closed) return;
+
+    // Reset stream-complete flag for new turn
+    this.streamComplete = false;
 
     const url = new URL(
       `${this.options.apiBaseUrl}/api/chat/stream/${this.options.conversationId}`,
@@ -120,6 +126,12 @@ export class SSEConnection {
 
       if (this.closed) return;
 
+      // If the stream completed normally ('done' received), don't reconnect.
+      // EventSource fires onerror when the server closes the connection,
+      // which happens after the 'done' event. Reconnecting would re-run
+      // the pipeline and create duplicate/retracted messages.
+      if (this.streamComplete) return;
+
       if (this.options.onConnectionLost) {
         this.options.onConnectionLost();
       }
@@ -127,17 +139,21 @@ export class SSEConnection {
       this.scheduleReconnect();
     };
 
-    // Listen for each event type
-    this.eventSource.addEventListener('stream_start', (e: MessageEvent) => {
-      this.handleEvent({ type: 'stream_start', data: e.data, id: e.lastEventId });
+    // Listen for each event type (matching server StreamEventType enum)
+    this.eventSource.addEventListener('stage', (e: MessageEvent) => {
+      this.handleEvent({ type: 'stage', data: e.data, id: e.lastEventId });
     });
 
     this.eventSource.addEventListener('token', (e: MessageEvent) => {
       this.handleEvent({ type: 'token', data: e.data, id: e.lastEventId });
     });
 
-    this.eventSource.addEventListener('stream_end', (e: MessageEvent) => {
-      this.handleEvent({ type: 'stream_end', data: e.data, id: e.lastEventId });
+    this.eventSource.addEventListener('validated', (e: MessageEvent) => {
+      this.handleEvent({ type: 'validated', data: e.data, id: e.lastEventId });
+    });
+
+    this.eventSource.addEventListener('done', (e: MessageEvent) => {
+      this.handleEvent({ type: 'done', data: e.data, id: e.lastEventId });
     });
 
     this.eventSource.addEventListener('retracted', (e: MessageEvent) => {
@@ -175,32 +191,62 @@ export class SSEConnection {
     const store = getStore();
 
     switch (event.type) {
-      case 'stream_start': {
-        // Add a new empty agent message in streaming state
-        this.currentStreamContent = '';
-        const msg: Message = {
-          id: `msg_${Date.now()}_agent`,
-          role: 'agent',
-          content: '',
-          timestamp: Date.now(),
-          streaming: true,
-        };
-        store.addMessage(msg);
-        store.setState({ isAgentTyping: false });
+      case 'stage': {
+        // Pipeline stage progress — when response-generator starts,
+        // create the empty agent message bubble for token streaming.
+        try {
+          const parsed = JSON.parse(event.data);
+          if (parsed.stage === 'response-generator' && parsed.status === 'started') {
+            this.currentStreamContent = '';
+            const msg: Message = {
+              id: `msg_${Date.now()}_agent`,
+              role: 'agent',
+              content: '',
+              timestamp: Date.now(),
+              streaming: true,
+            };
+            store.addMessage(msg);
+            store.setState({ isAgentTyping: false });
+          }
+        } catch { /* ignore malformed stage events */ }
         break;
       }
 
       case 'token': {
         // Append token to the current streaming message
-        this.currentStreamContent += event.data;
+        try {
+          const parsed = JSON.parse(event.data);
+          this.currentStreamContent += parsed.text || '';
+        } catch {
+          // Fallback: treat raw data as text
+          this.currentStreamContent += event.data;
+        }
         store.updateLastAgentMessage(this.currentStreamContent, true);
         break;
       }
 
-      case 'stream_end': {
-        // Mark the streaming message as complete
+      case 'validated': {
+        // Critic approved — mark the streaming message as complete
         store.updateLastAgentMessage(this.currentStreamContent, false);
         this.currentStreamContent = '';
+        break;
+      }
+
+      case 'done': {
+        // Stream complete for this turn — ensure message is finalized
+        if (this.currentStreamContent) {
+          store.updateLastAgentMessage(this.currentStreamContent, false);
+          this.currentStreamContent = '';
+        }
+        // Mark stream as complete and close the EventSource to prevent
+        // auto-reconnect. The server runs the pipeline on every SSE
+        // connection, so reconnecting after 'done' would trigger a
+        // duplicate pipeline run, creating ghost messages and retractions.
+        this.streamComplete = true;
+        if (this.eventSource) {
+          this.eventSource.close();
+          this.eventSource = null;
+        }
         break;
       }
 
@@ -209,7 +255,8 @@ export class SSEConnection {
         let fallback = 'I apologize, but I need to rephrase my response. How else can I help you?';
         try {
           const parsed = JSON.parse(event.data);
-          if (parsed.fallback) fallback = parsed.fallback;
+          if (parsed.fallback_text) fallback = parsed.fallback_text;
+          else if (parsed.fallback) fallback = parsed.fallback;
         } catch { /* use default */ }
         store.retractLastAgentMessage(fallback);
         this.currentStreamContent = '';
@@ -217,7 +264,14 @@ export class SSEConnection {
       }
 
       case 'error': {
-        store.setState({ error: event.data || 'An error occurred' });
+        let errorMsg = 'An error occurred';
+        try {
+          const parsed = JSON.parse(event.data);
+          errorMsg = parsed.message || errorMsg;
+        } catch {
+          errorMsg = event.data || errorMsg;
+        }
+        store.setState({ error: errorMsg });
         break;
       }
 

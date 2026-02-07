@@ -171,9 +171,11 @@ function luminance(hex: string): number {
   return 0.2126 * r + 0.7152 * g + 0.0722 * b;
 }
 
-/** Choose white or black text for contrast against a background. */
+/** Choose white or black text for contrast against a background.
+ *  Threshold raised to 0.36 so saturated colors (red, orange, deep blue)
+ *  get white text — matching user expectations over strict WCAG min-contrast. */
 function contrastText(bgHex: string): string {
-  return luminance(bgHex) > 0.179 ? '#1A1A1A' : '#FFFFFF';
+  return luminance(bgHex) > 0.36 ? '#1A1A1A' : '#FFFFFF';
 }
 
 // ---------------------------------------------------------------------------

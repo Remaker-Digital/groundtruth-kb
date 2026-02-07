@@ -26,7 +26,7 @@ import type { Locale } from '@/locale/en';
 // ---------------------------------------------------------------------------
 
 const MAX_MESSAGE_LENGTH = 2000;
-const MIN_TEXTAREA_HEIGHT = 20;
+const MIN_TEXTAREA_HEIGHT = 44;
 const MAX_TEXTAREA_HEIGHT = 120;
 
 // ---------------------------------------------------------------------------
@@ -157,7 +157,7 @@ export const InputBar: FunctionComponent<InputBarProps> = ({
           onKeyDown={handleKeyDown}
           placeholder={placeholder}
           disabled={disabled}
-          rows={1}
+          rows={2}
           aria-label={placeholder}
           style={{
             flex: 1,

@@ -1028,6 +1028,80 @@ async def _startup_admin_knowledge_services() -> None:
 
 
 # ---------------------------------------------------------------------------
+# KB Auto-Embedding on Startup
+# ---------------------------------------------------------------------------
+
+
+@app.on_event("startup")
+async def _startup_embed_unembedded_kb() -> None:
+    """Embed any KB entries that lack vector embeddings.
+
+    Queries for all tenants with knowledge base entries, then runs
+    embed_unembedded() for each tenant. This ensures articles added
+    via seed scripts or admin UI (without --embed flag) get vectorized
+    automatically on app boot.
+
+    Non-fatal: if embedding fails, KB retrieval falls back to BM25-only.
+    """
+    try:
+        vectorizer = get_knowledge_vectorizer()
+        if not vectorizer._configured:
+            logger.info("KB vectorizer not configured — skipping auto-embedding")
+            return
+
+        # Cross-partition query to find all tenant_ids with KB entries
+        from src.multi_tenant.cosmos_client import get_cosmos_manager
+        from src.multi_tenant.cosmos_schema import COLLECTION_KNOWLEDGE_BASES
+
+        cosmos = get_cosmos_manager()
+        container = cosmos.get_container(COLLECTION_KNOWLEDGE_BASES)
+
+        tenant_ids: set[str] = set()
+        async for item in container.query_items(
+            query=(
+                "SELECT DISTINCT c.tenant_id FROM c "
+                "WHERE c.is_active = true "
+                "AND (NOT IS_DEFINED(c.embedding) OR c.embedding = null)"
+            ),
+            enable_cross_partition_query=True,
+        ):
+            tid = item.get("tenant_id")
+            if tid:
+                tenant_ids.add(tid)
+
+        if not tenant_ids:
+            logger.info("No unembedded KB entries found — all articles are vectorized")
+            return
+
+        total_embedded = 0
+        for tenant_id in sorted(tenant_ids):
+            try:
+                count = await vectorizer.embed_unembedded(tenant_id)
+                total_embedded += count
+                if count > 0:
+                    logger.info(
+                        "Auto-embedded %d KB entries for tenant=%s",
+                        count, tenant_id[:8],
+                    )
+            except Exception as exc:
+                logger.warning(
+                    "Auto-embedding failed for tenant=%s: %s",
+                    tenant_id[:8], exc,
+                )
+
+        if total_embedded > 0:
+            logger.info(
+                "KB auto-embedding complete: %d entries across %d tenants",
+                total_embedded, len(tenant_ids),
+            )
+    except Exception as exc:
+        logger.warning(
+            "KB auto-embedding startup task failed — "
+            "unembedded entries will use BM25-only retrieval: %s", exc,
+        )
+
+
+# ---------------------------------------------------------------------------
 # Admin Analytics API (WI #176-178)
 # ---------------------------------------------------------------------------
 

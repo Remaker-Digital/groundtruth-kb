@@ -1,5 +1,5 @@
 # Agent Red Customer Experience — Pre-GA Verification Checklist
-Date: 2026-02-07
+Date: TBD (set when code freeze is declared)
 Owner: Release Manager
 Purpose: Single-pass verification before GA launch.
 
@@ -19,7 +19,10 @@ are ready. Mark each item complete with evidence notes.
 - [ ] `ENVIRONMENT=production` in production
 - [ ] `APPLICATIONINSIGHTS_CONNECTION_STRING` set
 - [ ] `AZURE_KEYVAULT_URL` set and health check passes
-- [ ] `NATS_URL` set and `/ready` reports connected (if NATS enabled)
+- [ ] `COSMOS_DB_ENDPOINT` set (or `COSMOS_USE_MANAGED_ID=true`)
+- [ ] `SENDGRID_API_KEY` set (for EmailAlertChannel — usage alerts, trial expiry, API key delivery)
+- [ ] `ADMIN_PREVIEW_PASSWORD` set to production value (standalone admin gate)
+- [ ] `NATS_URL` set — note: `connected=false` at `/ready` is expected (lazy init). App takes 30-60s to become healthy due to NATS retry loop.
 
 Evidence:
 - /health:
@@ -71,10 +74,14 @@ Evidence:
 - [ ] Usage dashboard returns data
 - [ ] GDPR export endpoint works for test tenant
 - [ ] GDPR delete endpoint works for test tenant
+- [ ] Widget visible on storefront page (Shadow DOM renders, launcher button clickable)
+- [ ] Widget SSE streaming works (open widget, send message, receive streamed AI response)
+- [ ] API key reset flow: `POST /api/admin/api-keys/reset` returns 200, rate limiting returns 429 after 3 requests/5min
 
 Evidence:
 - Conversation ID:
 - Admin URL:
+- Widget storefront URL:
 
 ---
 
@@ -115,9 +122,12 @@ Evidence:
 - [ ] Widget key scope enforced (cannot access non-chat endpoints)
 - [ ] Pre-auth rate limiting verified (429 after repeated failures)
 - [ ] Security headers present on API responses
+- [ ] CORS: `OPTIONS` request from non-allowed origin is rejected
+- [ ] CORS: `OPTIONS` request from allowed origin returns correct `Access-Control-Allow-Origin`
 
 Evidence:
 - Header sample:
+- CORS test origin:
 
 ---
 

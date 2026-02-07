@@ -165,7 +165,7 @@ export const Panel: FunctionComponent<PanelProps> = ({
       widgetKey: transportCfg.widgetKey,
       conversationId,
       onConnectionLost: () => store.setState({ isReconnecting: true }),
-      onConnectionRestored: () => store.setState({ isReconnecting: false }),
+      onConnectionRestored: () => store.setState({ isReconnecting: false, error: null }),
     });
 
     sseRef.current.connect();
@@ -185,9 +185,8 @@ export const Panel: FunctionComponent<PanelProps> = ({
         return;
       }
       store.setState({ conversationId: newId, isLoading: false });
-      connectSSE(newId);
 
-      // Add the customer message
+      // Add the customer message to UI immediately (optimistic)
       store.addMessage({
         id: `msg_${Date.now()}_customer`,
         role: 'customer',
@@ -195,7 +194,13 @@ export const Panel: FunctionComponent<PanelProps> = ({
         timestamp: Date.now(),
       });
 
+      // Send the message BEFORE opening SSE — the SSE stream endpoint
+      // checks for the last customer message and returns 400 if none exists.
+      // Previously connectSSE() fired first, causing a race condition.
       await apiSendMessage(newId, content);
+
+      // Now connect SSE — the message is guaranteed to exist on the server
+      connectSSE(newId);
       return;
     }
 
@@ -210,7 +215,13 @@ export const Panel: FunctionComponent<PanelProps> = ({
     const ok = await apiSendMessage(conversationId, content);
     if (!ok) {
       store.setState({ error: 'Failed to send message' });
+      return;
     }
+
+    // Reconnect SSE for this turn — the previous SSE connection closes
+    // after the 'done' event to prevent duplicate pipeline runs. Each
+    // new message needs a fresh SSE connection to receive the AI response.
+    connectSSE(conversationId);
   }, [connectSSE]);
 
   /** End the current conversation. */
@@ -409,7 +420,7 @@ const ConnectionBanner: FunctionComponent<{
         justifyContent: 'center',
         gap: tokens.space2,
         padding: `${tokens.space2} ${tokens.space4}`,
-        backgroundColor: isError ? tokens.colorError : tokens.colorPrimary,
+        backgroundColor: isError ? '#6B6B6B' : tokens.colorPrimary,
         color: '#FFFFFF',
         fontSize: tokens.fontSizeXs,
         fontFamily: tokens.fontFamily,

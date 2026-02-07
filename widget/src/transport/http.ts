@@ -104,7 +104,7 @@ export async function startConversation(
   const resp = await request<{ conversation_id: string }>(
     'POST',
     '/api/chat/conversations',
-    customerData ? { customer_data: customerData } : undefined,
+    customerData ? { customer_data: customerData } : {},
   );
   return resp.ok && resp.data ? resp.data.conversation_id : null;
 }
@@ -123,7 +123,7 @@ export async function sendMessage(
 
 /** End a conversation. */
 export async function endConversation(conversationId: string): Promise<boolean> {
-  const resp = await request('POST', `/api/chat/conversations/${conversationId}/end`);
+  const resp = await request('POST', `/api/chat/conversations/${conversationId}/end`, {});
   return resp.ok;
 }
 

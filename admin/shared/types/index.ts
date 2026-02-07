@@ -189,6 +189,7 @@ export interface KBArticle {
   content: string;
   category: string;
   status: KBArticleStatus;
+  is_active?: boolean;
   createdAt: string;
   updatedAt: string;
   sourceType?: string;
