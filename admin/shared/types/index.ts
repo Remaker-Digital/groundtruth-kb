@@ -21,6 +21,7 @@ export interface TenantContext {
   tier: TenantTier;
   status: TenantStatus;
   billingChannel: BillingChannel;
+  hasStripeBilling: boolean;
   shopDomain?: string;
 }
 

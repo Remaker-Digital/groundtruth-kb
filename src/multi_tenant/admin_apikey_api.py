@@ -284,13 +284,21 @@ async def _send_api_key_email(
         msg.attach(MIMEText(plain_body, "plain"))
         msg.attach(MIMEText(html_body, "html"))
 
-        with smtplib.SMTP(smtp_host, smtp_port, timeout=10.0) as server:
-            server.ehlo()
-            if smtp_port != 25:
-                server.starttls()
-            if smtp_user and smtp_pass:
-                server.login(smtp_user, smtp_pass)
-            server.send_message(msg)
+        if smtp_port == 465:
+            # Implicit SSL/TLS (e.g., Titan Email, some providers)
+            with smtplib.SMTP_SSL(smtp_host, smtp_port, timeout=10.0) as server:
+                if smtp_user and smtp_pass:
+                    server.login(smtp_user, smtp_pass)
+                server.send_message(msg)
+        else:
+            # STARTTLS on port 587 or plain on port 25
+            with smtplib.SMTP(smtp_host, smtp_port, timeout=10.0) as server:
+                server.ehlo()
+                if smtp_port != 25:
+                    server.starttls()
+                if smtp_user and smtp_pass:
+                    server.login(smtp_user, smtp_pass)
+                server.send_message(msg)
 
         logger.info("API key reset email sent to %s", to_email)
         return True
@@ -335,16 +343,14 @@ async def _log_audit(
     try:
         from src.multi_tenant.cosmos_schema import AuditEventType
 
-        await _audit_repo.create(
+        # Map string event type to enum
+        audit_event = AuditEventType(event_type)
+        await _audit_repo.log_event(
+            event_type=audit_event,
             tenant_id=tenant_id,
-            document={
-                "id": f"audit-{secrets.token_hex(8)}",
-                "tenant_id": tenant_id,
-                "event_type": event_type,
-                "details": details,
-                "timestamp": datetime.now(timezone.utc).isoformat(),
-                "actor": "admin",
-            },
+            actor="admin",
+            actor_type="admin",
+            payload=details,
         )
     except Exception:
         logger.warning("Failed to write audit log for API key operation", exc_info=True)
@@ -419,8 +425,8 @@ async def generate_new_api_key(
 
     # Update tenant document with new key hash + metadata
     await _tenant_repo.patch(
-        item_id=ctx.tenant_id,
-        partition_key=ctx.tenant_id,
+        tenant_id=ctx.tenant_id,
+        document_id=ctx.tenant_id,
         operations=[
             {"op": "set", "path": "/api_key_hash", "value": key_hash},
             {"op": "set", "path": "/api_key_prefix", "value": key_prefix},
@@ -477,8 +483,8 @@ async def rotate_api_key(
 
     # Atomically update with new key hash
     await _tenant_repo.patch(
-        item_id=ctx.tenant_id,
-        partition_key=ctx.tenant_id,
+        tenant_id=ctx.tenant_id,
+        document_id=ctx.tenant_id,
         operations=[
             {"op": "set", "path": "/api_key_hash", "value": key_hash},
             {"op": "set", "path": "/api_key_prefix", "value": key_prefix},
@@ -541,8 +547,8 @@ async def revoke_api_key(
 
     # Clear key hash and metadata
     await _tenant_repo.patch(
-        item_id=ctx.tenant_id,
-        partition_key=ctx.tenant_id,
+        tenant_id=ctx.tenant_id,
+        document_id=ctx.tenant_id,
         operations=[
             {"op": "set", "path": "/api_key_hash", "value": None},
             {"op": "set", "path": "/api_key_prefix", "value": None},
@@ -637,8 +643,8 @@ async def reset_api_key_via_email(
     key_prefix = raw_key[:12]
 
     await _tenant_repo.patch(
-        item_id=tenant_id,
-        partition_key=tenant_id,
+        tenant_id=tenant_id,
+        document_id=tenant_id,
         operations=[
             {"op": "set", "path": "/api_key_hash", "value": key_hash},
             {"op": "set", "path": "/api_key_prefix", "value": key_prefix},

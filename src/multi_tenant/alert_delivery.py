@@ -683,13 +683,21 @@ class EmailAlertChannel(AlertChannel):
             msg.attach(MIMEText(alert.message, "plain"))
             msg.attach(MIMEText(html_body, "html"))
 
-            with smtplib.SMTP(smtp_host, smtp_port, timeout=self.TIMEOUT_SECONDS) as server:
-                server.ehlo()
-                if smtp_port != 25:
-                    server.starttls()
-                if smtp_user and smtp_pass:
-                    server.login(smtp_user, smtp_pass)
-                server.send_message(msg)
+            if smtp_port == 465:
+                # Implicit SSL/TLS (e.g., Titan Email, some providers)
+                with smtplib.SMTP_SSL(smtp_host, smtp_port, timeout=self.TIMEOUT_SECONDS) as server:
+                    if smtp_user and smtp_pass:
+                        server.login(smtp_user, smtp_pass)
+                    server.send_message(msg)
+            else:
+                # STARTTLS on port 587 or plain on port 25
+                with smtplib.SMTP(smtp_host, smtp_port, timeout=self.TIMEOUT_SECONDS) as server:
+                    server.ehlo()
+                    if smtp_port != 25:
+                        server.starttls()
+                    if smtp_user and smtp_pass:
+                        server.login(smtp_user, smtp_pass)
+                    server.send_message(msg)
 
             logger.info(
                 "Email sent via SMTP: alert_id=%s to=%s host=%s",

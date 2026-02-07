@@ -336,9 +336,11 @@ export const BillingPage: React.FC = () => {
               </div>
             </Group>
           </Stack>
-          <Button color="brand" onClick={handleManageSubscription}>
-            Manage Subscription
-          </Button>
+          {tenantContext?.hasStripeBilling && (
+            <Button color="brand" onClick={handleManageSubscription}>
+              Manage Subscription
+            </Button>
+          )}
         </Group>
       </Paper>
 
@@ -512,20 +514,31 @@ export const BillingPage: React.FC = () => {
         </SimpleGrid>
       </div>
 
-      {/* Manage Billing (replaces Invoice History table) */}
-      <Paper p="lg" radius="md" withBorder>
-        <Group justify="space-between" align="center">
+      {/* Manage Billing (replaces Invoice History table) — only for Stripe-billed tenants */}
+      {tenantContext?.hasStripeBilling ? (
+        <Paper p="lg" radius="md" withBorder>
+          <Group justify="space-between" align="center">
+            <div>
+              <Text fw={600}>Invoices & Payment Methods</Text>
+              <Text size="sm" c="dimmed">
+                View invoice history, update payment methods, and manage your subscription through Stripe.
+              </Text>
+            </div>
+            <Button color="brand" size="md" onClick={handleManageBilling}>
+              Manage Billing
+            </Button>
+          </Group>
+        </Paper>
+      ) : (
+        <Paper p="lg" radius="md" withBorder>
           <div>
-            <Text fw={600}>Invoices & Payment Methods</Text>
+            <Text fw={600}>Billing Management</Text>
             <Text size="sm" c="dimmed">
-              View invoice history, update payment methods, and manage your subscription through Stripe.
+              Your subscription is managed directly. Contact support for billing changes.
             </Text>
           </div>
-          <Button color="brand" size="md" onClick={handleManageBilling}>
-            Manage Billing
-          </Button>
-        </Group>
-      </Paper>
+        </Paper>
+      )}
     </Stack>
   );
 };

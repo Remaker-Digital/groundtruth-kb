@@ -354,12 +354,14 @@ class TestResetEmailAndAudit:
             body = ApiKeyResetRequest(email="merchant@example.com")
             await reset_api_key_via_email(body, mock_request)
 
-        mock_audit_repo.create.assert_called_once()
-        audit_doc = mock_audit_repo.create.call_args.kwargs.get("document") or mock_audit_repo.create.call_args[1]["document"]
-        assert audit_doc["event_type"] == "security.event"
-        assert "api_key_reset_via_email" in str(audit_doc["details"])
-        assert "key_prefix" in audit_doc["details"]
-        assert "email_sent" in audit_doc["details"]
+        mock_audit_repo.log_event.assert_called_once()
+        audit_call = mock_audit_repo.log_event.call_args
+        from src.multi_tenant.cosmos_schema import AuditEventType
+        assert audit_call.kwargs["event_type"] == AuditEventType.SECURITY_EVENT
+        audit_payload = audit_call.kwargs["payload"]
+        assert "api_key_reset_via_email" in str(audit_payload)
+        assert "key_prefix" in audit_payload
+        assert "email_sent" in audit_payload
 
 
 # ---------------------------------------------------------------------------

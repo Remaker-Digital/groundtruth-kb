@@ -49,6 +49,7 @@ interface TenantContext {
   tier: string;
   status: string;
   billingChannel: string;
+  hasStripeBilling: boolean;
 }
 
 interface AppContextValue {
@@ -220,6 +221,7 @@ export const StandaloneLayout: React.FC<StandaloneLayoutProps> = ({
             tier: data.tier,
             status: data.status,
             billingChannel: data.billing_channel || 'stripe',
+            hasStripeBilling: data.has_stripe_billing ?? false,
           });
           setLoading(false);
         }

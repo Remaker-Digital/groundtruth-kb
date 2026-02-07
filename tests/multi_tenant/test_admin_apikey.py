@@ -249,10 +249,11 @@ class TestGenerateKey:
 
         self.tenant_repo.read.return_value = {"tenant_id": "t-001"}
         await generate_new_api_key(ctx=ctx)
-        self.audit_repo.create.assert_called_once()
-        audit_call = self.audit_repo.create.call_args
-        assert audit_call.kwargs["document"]["event_type"] == "security.event"
-        assert "api_key_generated" in str(audit_call.kwargs["document"]["details"])
+        self.audit_repo.log_event.assert_called_once()
+        audit_call = self.audit_repo.log_event.call_args
+        from src.multi_tenant.cosmos_schema import AuditEventType
+        assert audit_call.kwargs["event_type"] == AuditEventType.SECURITY_EVENT
+        assert "api_key_generated" in str(audit_call.kwargs["payload"])
 
 
 class TestRotateKey:
@@ -309,9 +310,10 @@ class TestRotateKey:
             "api_key_prefix": "ar_live_old_",
         }
         await rotate_api_key(ctx=ctx)
-        audit_details = self.audit_repo.create.call_args.kwargs["document"]["details"]
-        assert audit_details["action"] == "api_key_rotated"
-        assert audit_details["old_prefix"] == "ar_live_old_"
+        self.audit_repo.log_event.assert_called_once()
+        audit_payload = self.audit_repo.log_event.call_args.kwargs["payload"]
+        assert audit_payload["action"] == "api_key_rotated"
+        assert audit_payload["old_prefix"] == "ar_live_old_"
 
     @pytest.mark.asyncio
     async def test_rotate_generates_different_key_than_old(self, ctx):
@@ -379,9 +381,10 @@ class TestRevokeKey:
             "api_key_prefix": "ar_live_t001",
         }
         await revoke_api_key(ctx=ctx)
-        audit_details = self.audit_repo.create.call_args.kwargs["document"]["details"]
-        assert audit_details["action"] == "api_key_revoked"
-        assert audit_details["revoked_prefix"] == "ar_live_t001"
+        self.audit_repo.log_event.assert_called_once()
+        audit_payload = self.audit_repo.log_event.call_args.kwargs["payload"]
+        assert audit_payload["action"] == "api_key_revoked"
+        assert audit_payload["revoked_prefix"] == "ar_live_t001"
 
 
 class TestServiceNotInitialized:

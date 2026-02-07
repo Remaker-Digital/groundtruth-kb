@@ -1296,8 +1296,8 @@ async def _startup_admin_apikey_services() -> None:
     try:
         from src.multi_tenant.repository import TenantRepository, AuditLogRepository
 
-        tenant_repo = TenantRepository(cosmos_manager=None)
-        audit_repo = AuditLogRepository(cosmos_manager=None)
+        tenant_repo = TenantRepository()
+        audit_repo = AuditLogRepository()
         configure_apikey_services(
             tenant_repo=tenant_repo,
             audit_repo=audit_repo,
@@ -1411,6 +1411,7 @@ from src.multi_tenant.alert_delivery import (  # noqa: E402
     DashboardAlertChannel,
     EmailAlertChannel,
     LogAlertChannel,
+    WebhookAlertChannel,
     configure_alert_service,
 )
 
@@ -1556,20 +1557,31 @@ async def _startup_alert_delivery() -> None:
     """
     try:
         from src.multi_tenant.repository import (
+            AuditLogRepository,
             PreferencesRepository,
             TenantRepository,
         )
-        from src.multi_tenant.cosmos_client import get_cosmos_manager
 
         service = AlertDeliveryService()
+
+        # Log channel — always available, structured logging fallback
         service.register_channel(LogAlertChannel())
-        service.register_channel(DashboardAlertChannel())
+
+        # Dashboard channel — persists alerts to Cosmos DB audit log
+        try:
+            audit_repo = AuditLogRepository()
+            service.register_channel(DashboardAlertChannel(audit_repo))
+        except Exception:
+            logger.warning(
+                "DashboardAlertChannel not registered — "
+                "audit log repository unavailable."
+            )
 
         # Email channel — uses preferences + tenant repos for recipient lookup
+        prefs_repo = None
         try:
-            manager = get_cosmos_manager()
-            prefs_repo = PreferencesRepository(manager)
-            tenant_repo = TenantRepository(manager)
+            prefs_repo = PreferencesRepository()
+            tenant_repo = TenantRepository()
             service.register_channel(
                 EmailAlertChannel(prefs_repo, tenant_repo),
             )
@@ -1577,6 +1589,17 @@ async def _startup_alert_delivery() -> None:
             logger.warning(
                 "EmailAlertChannel not registered — "
                 "Cosmos DB may not be available."
+            )
+
+        # Webhook channel — POSTs alerts to merchant webhook URLs
+        try:
+            if not prefs_repo:
+                prefs_repo = PreferencesRepository()
+            service.register_channel(WebhookAlertChannel(prefs_repo))
+        except Exception:
+            logger.warning(
+                "WebhookAlertChannel not registered — "
+                "preferences repository unavailable."
             )
 
         configure_alert_service(service)

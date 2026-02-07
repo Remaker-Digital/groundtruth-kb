@@ -168,6 +168,7 @@ class TenantLookupResponse(BaseModel):
     status: TenantStatus | None = None
     tier: str | None = None
     billing_channel: BillingChannel | None = None
+    has_stripe_billing: bool = False
 
 
 # ---------------------------------------------------------------------------
@@ -627,6 +628,7 @@ async def lookup_tenant_endpoint(
                 status=doc.get("status"),
                 tier=doc.get("tier"),
                 billing_channel=doc.get("billing_channel"),
+                has_stripe_billing=bool(doc.get("stripe_customer_id")),
             )
         raise HTTPException(status_code=401, detail="Invalid API key.")
 
@@ -651,6 +653,7 @@ async def lookup_tenant_endpoint(
                 status=doc.get("status"),
                 tier=doc.get("tier"),
                 billing_channel=doc.get("billing_channel"),
+                has_stripe_billing=bool(doc.get("stripe_customer_id")),
             )
         return TenantLookupResponse(found=False)
 
@@ -660,6 +663,7 @@ async def lookup_tenant_endpoint(
         status=tenant.status,
         tier=tenant.tier,
         billing_channel=tenant.billing_channel,
+        has_stripe_billing=bool(tenant.stripe_customer_id),
     )
 
 
