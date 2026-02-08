@@ -32,8 +32,10 @@ import {
   useComputedColorScheme,
 } from '@mantine/core';
 import { useAppContext } from '../layouts/StandaloneLayout';
-import { useOnboardingSteps, useUpdateConfig } from '../../shared/hooks/index';
-import type { ConfigFieldType } from '../../shared/types/index';
+import { useOnboardingSteps, useUpdateConfig, useIntegrations, useActivateIntegration, useDeactivateIntegration } from '../../shared/hooks/index';
+import type { ConfigFieldType, IntegrationSummary } from '../../shared/types/index';
+import { HelpTooltip } from '../../shared/HelpTooltip';
+import { useNavigate } from 'react-router-dom';
 
 // ---------------------------------------------------------------------------
 // Constants
@@ -168,6 +170,9 @@ interface LocalField {
   value: unknown;
   placeholder?: string;
   options?: Array<{ value: string; label: string }>;
+  tooltip?: string;
+  docLink?: string;
+  required?: boolean;
 }
 
 interface LocalStep {
@@ -264,6 +269,9 @@ export function OnboardingPage() {
           value: localVal !== undefined ? localVal : (f.currentValue ?? f.defaultValue),
           placeholder: f.description,
           options: f.options,
+          tooltip: f.tooltip,
+          docLink: f.docLink,
+          required: f.validation?.required,
         };
       }),
     }));
@@ -342,58 +350,73 @@ export function OnboardingPage() {
 
   // ---- Dynamic field renderer ---------------------------------------------
 
+  /** Compose a label with required indicator and help tooltip */
+  const fieldLabel = (field: LocalField): React.ReactNode => (
+    <span style={{ display: 'inline-flex', alignItems: 'center' }}>
+      {field.label}
+      {field.required && <span style={{ color: '#ff3621', marginLeft: 3, fontWeight: 700 }}>*</span>}
+      {field.tooltip && <HelpTooltip text={field.tooltip} docLink={field.docLink} />}
+    </span>
+  );
+
   const renderField = (field: LocalField, fieldIndex: number) => {
+    const label = fieldLabel(field);
+
     switch (field.type) {
       case 'text':
         return (
           <TextInput
             key={field.key}
-            label={field.label}
+            label={label}
             placeholder={field.placeholder || ''}
             value={String(field.value ?? '')}
             onChange={(e) => updateFieldValue(fieldIndex, e.currentTarget.value)}
+            withAsterisk={field.required}
           />
         );
       case 'textarea':
         return (
           <Textarea
             key={field.key}
-            label={field.label}
+            label={label}
             placeholder={field.placeholder || ''}
             value={String(field.value ?? '')}
             onChange={(e) => updateFieldValue(fieldIndex, e.currentTarget.value)}
             minRows={3}
             autosize
+            withAsterisk={field.required}
           />
         );
       case 'url':
         return (
           <TextInput
             key={field.key}
-            label={field.label}
+            label={label}
             placeholder={field.placeholder || 'https://'}
             value={String(field.value ?? '')}
             onChange={(e) => updateFieldValue(fieldIndex, e.currentTarget.value)}
             type="url"
+            withAsterisk={field.required}
           />
         );
       case 'select':
         return (
           <Select
             key={field.key}
-            label={field.label}
+            label={label}
             placeholder="Select..."
             value={field.value != null ? String(field.value) : null}
             data={field.options ?? []}
             onChange={(val) => updateFieldValue(fieldIndex, val)}
             allowDeselect={false}
+            withAsterisk={field.required}
           />
         );
       case 'multiselect':
         return (
           <div key={field.key}>
             <Text size="sm" fw={500} mb={6}>
-              {field.label}
+              {label}
             </Text>
             <Chip.Group
               multiple
@@ -414,7 +437,7 @@ export function OnboardingPage() {
         return (
           <Switch
             key={field.key}
-            label={field.label}
+            label={label}
             description={field.placeholder}
             checked={Boolean(field.value)}
             onChange={(e) => updateFieldValue(fieldIndex, e.currentTarget.checked)}
@@ -425,28 +448,30 @@ export function OnboardingPage() {
         return (
           <NumberInput
             key={field.key}
-            label={field.label}
+            label={label}
             value={typeof field.value === 'number' ? field.value : 0}
             onChange={(val) => updateFieldValue(fieldIndex, val)}
             min={0}
+            withAsterisk={field.required}
           />
         );
       case 'email':
         return (
           <TextInput
             key={field.key}
-            label={field.label}
+            label={label}
             placeholder={field.placeholder || 'email@example.com'}
             value={String(field.value ?? '')}
             onChange={(e) => updateFieldValue(fieldIndex, e.currentTarget.value)}
             type="email"
+            withAsterisk={field.required}
           />
         );
       case 'color':
         return (
           <ColorInput
             key={field.key}
-            label={field.label}
+            label={label}
             value={String(field.value ?? BRAND_RED)}
             onChange={(val) => updateFieldValue(fieldIndex, val)}
             format="hex"
@@ -456,7 +481,7 @@ export function OnboardingPage() {
         return (
           <TextInput
             key={field.key}
-            label={field.label}
+            label={label}
             value={String(field.value ?? '')}
             onChange={(e) => updateFieldValue(fieldIndex, e.currentTarget.value)}
           />
@@ -561,7 +586,8 @@ export function OnboardingPage() {
                   placeholder={`${cat.id}@yourcompany.com`}
                   size="sm"
                   value={cfg.email}
-                  onChange={(e) => updateCatField(cat.id, 'email', e.currentTarget.value)}
+                  onChange={(e) => updateCatField(cat.id, 'email', e.currentTarget?.value ?? '')}
+                  onKeyDown={(e) => { if (e.key === 'Enter') { e.preventDefault(); e.stopPropagation(); } }}
                   disabled={!cfg.enabled}
                 />
                 <div>
@@ -596,12 +622,21 @@ export function OnboardingPage() {
                     size="xs"
                     placeholder="Add keyword and press Enter..."
                     value={kwInputs[cat.id] || ''}
-                    onChange={(e) => setKwInputs((p) => ({ ...p, [cat.id]: e.currentTarget.value }))}
+                    onChange={(e) => {
+                      const val = e.currentTarget?.value ?? '';
+                      setKwInputs((p) => ({ ...p, [cat.id]: val }));
+                    }}
                     onKeyDown={(e) => {
                       if (e.key === 'Enter') {
                         e.preventDefault();
-                        addKw(cat.id, kwInputs[cat.id] || '');
-                        setKwInputs((p) => ({ ...p, [cat.id]: '' }));
+                        e.stopPropagation();
+                        const catId = cat.id;
+                        const inputVal = kwInputs[catId] || '';
+                        // Clear input FIRST to avoid stale ref issues
+                        setKwInputs((p) => ({ ...p, [catId]: '' }));
+                        if (inputVal.trim()) {
+                          addKw(catId, inputVal);
+                        }
                       }
                     }}
                     disabled={!cfg.enabled}
@@ -888,6 +923,161 @@ export function OnboardingPage() {
             </Paper>
           </div>
         </div>
+      </Stack>
+    );
+  };
+
+  // ---- Custom step: Integrations (C11) — card-based UI -------------------
+
+  const navigate = useNavigate();
+  const { data: integrationsList, loading: integrationsLoading, error: integrationsError, refetch: refetchIntegrations } = useIntegrations(apiFetch);
+  const { activate: activateIntegration, loading: activatingInteg } = useActivateIntegration(apiFetch);
+  const { deactivate: deactivateIntegration, loading: deactivatingInteg } = useDeactivateIntegration(apiFetch);
+
+  const INTEG_ICONS: Record<string, string> = {
+    shopify: '\uD83D\uDED2',
+    zendesk: '\uD83C\uDFAB',
+    mailchimp: '\uD83D\uDCE7',
+    google_analytics: '\uD83D\uDCCA',
+  };
+
+  const TIER_ORDER_MAP: Record<string, number> = { trial: 0, starter: 1, professional: 2, enterprise: 3 };
+
+  const handleIntegrationToggle = useCallback(async (type: string, isEnabled: boolean) => {
+    try {
+      if (isEnabled) {
+        await deactivateIntegration(type);
+        onNotify('Integration deactivated.', 'info');
+      } else {
+        await activateIntegration(type);
+        onNotify('Integration activated!', 'success');
+      }
+      refetchIntegrations();
+    } catch {
+      onNotify('Failed to update integration.', 'error');
+    }
+  }, [activateIntegration, deactivateIntegration, onNotify, refetchIntegrations]);
+
+  const renderIntegrationsStep = () => {
+    if (integrationsLoading && !integrationsList) {
+      return (
+        <Stack align="center" py="xl">
+          <Loader size="sm" color={BRAND_RED} />
+          <Text size="sm" c="dimmed">Loading integrations...</Text>
+        </Stack>
+      );
+    }
+
+    if (integrationsError) {
+      return (
+        <Alert color="red" variant="light" title="Failed to load integrations">
+          {integrationsError}
+          <br />
+          <Button variant="light" color={BRAND_RED} size="xs" mt="sm" onClick={refetchIntegrations}>
+            Retry
+          </Button>
+        </Alert>
+      );
+    }
+
+    const items: IntegrationSummary[] = integrationsList ?? [];
+
+    return (
+      <Stack gap="md">
+        <Text size="sm" c="dimmed">
+          Enable the integrations you want to use. You can configure them in detail on the{' '}
+          <Text
+            component="span"
+            c={BRAND_RED}
+            style={{ cursor: 'pointer', textDecoration: 'underline' }}
+            onClick={() => navigate('/integrations')}
+          >
+            Integrations page
+          </Text>.
+        </Text>
+
+        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(280px, 1fr))', gap: 12 }}>
+          {items.map((integ) => {
+            const icon = INTEG_ICONS[integ.type] ?? '\u{1F517}';
+            const statusColor =
+              integ.status === 'connected' ? '#0D7C3E'
+              : integ.status === 'error' ? '#D32F2F'
+              : isDark ? '#5C5C5C' : '#9ca3af';
+
+            return (
+              <Paper
+                key={integ.type}
+                p="md"
+                radius="sm"
+                style={{
+                  backgroundColor: isDark ? '#141414' : '#f8f9fa',
+                  border: `1px solid ${integ.enabled ? BRAND_RED : isDark ? '#272727' : '#dee2e6'}`,
+                }}
+              >
+                <Group justify="space-between" mb={6}>
+                  <Group gap="sm">
+                    <span style={{ fontSize: 20 }}>{icon}</span>
+                    <Text size="sm" fw={600}>{integ.name}</Text>
+                  </Group>
+                  <Badge
+                    size="xs"
+                    variant="light"
+                    color={integ.status === 'connected' ? 'green' : integ.status === 'error' ? 'red' : 'gray'}
+                  >
+                    <span
+                      style={{
+                        display: 'inline-block',
+                        width: 6,
+                        height: 6,
+                        borderRadius: '50%',
+                        backgroundColor: statusColor,
+                        marginRight: 4,
+                        verticalAlign: 'middle',
+                      }}
+                    />
+                    {integ.status ?? 'Not configured'}
+                  </Badge>
+                </Group>
+
+                <Text size="xs" c="dimmed" mb="sm" lineClamp={2}>
+                  {integ.description}
+                </Text>
+
+                <Group justify="space-between">
+                  {!integ.tierMet ? (
+                    <Text size="xs" c="dimmed" fs="italic">
+                      {integ.tierGate}+ tier required
+                    </Text>
+                  ) : (
+                    <Switch
+                      size="sm"
+                      color={BRAND_RED}
+                      checked={integ.enabled}
+                      onChange={() => handleIntegrationToggle(integ.type, integ.enabled)}
+                      disabled={activatingInteg || deactivatingInteg}
+                      label={integ.enabled ? 'Enabled' : 'Disabled'}
+                    />
+                  )}
+                  <Button
+                    variant="subtle"
+                    size="xs"
+                    color={BRAND_RED}
+                    onClick={() => navigate('/integrations')}
+                    p={0}
+                  >
+                    Configure {String.fromCodePoint(0x2192)}
+                  </Button>
+                </Group>
+              </Paper>
+            );
+          })}
+        </div>
+
+        {items.length === 0 && (
+          <Text size="sm" c="dimmed" ta="center" py="xl">
+            No integrations available.
+          </Text>
+        )}
       </Stack>
     );
   };
@@ -1188,9 +1378,11 @@ export function OnboardingPage() {
 
               <Divider />
 
-              {/* Form fields — custom renderers for escalation and widget steps */}
+              {/* Form fields — custom renderers for special steps */}
               {currentStep.step === 'escalation_rules' ? (
                 renderEscalationStep()
+              ) : currentStep.step === 'integrations' ? (
+                renderIntegrationsStep()
               ) : currentStep.step === 'widget_appearance' ? (
                 renderWidgetAppearanceStep()
               ) : (

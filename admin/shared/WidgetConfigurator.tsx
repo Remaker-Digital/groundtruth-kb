@@ -14,6 +14,10 @@
  * Data hooks:
  *   - useConfig: reads the current tenant configuration
  *   - useUpdateConfig: saves changed widget fields via PUT /api/config
+ *   - useWidgetAppearances: GET /api/config/widget-appearances (C4)
+ *   - useSaveWidgetAppearance: POST /api/config/widget-appearances (C4)
+ *   - useActivateWidgetAppearance: POST /api/config/widget-appearances/{name}/activate (C4)
+ *   - useDeleteWidgetAppearance: DELETE /api/config/widget-appearances/{name} (C4)
  *
  * Architecture references:
  *   - Decision UI-2: Widget delivery (Theme App Extension + JS snippet)
@@ -26,7 +30,15 @@
 
 import React, { useState, useCallback, useMemo, useEffect } from 'react';
 import type { BaseComponentProps } from './types';
-import { useConfig, useUpdateConfig } from './hooks';
+import {
+  useConfig,
+  useUpdateConfig,
+  useWidgetAppearances,
+  useSaveWidgetAppearance,
+  useActivateWidgetAppearance,
+  useDeleteWidgetAppearance,
+} from './hooks';
+import type { NamedConfigSummary } from './hooks';
 
 // ---------------------------------------------------------------------------
 // Types
@@ -48,6 +60,12 @@ interface WidgetConfig {
   widget_show_branding: boolean;
   widget_mobile_enabled: boolean;
   widget_dark_mode: boolean;
+  widget_agent_bubble_color: string;
+  widget_agent_bubble_text_color: string;
+  widget_customer_bubble_color: string;
+  widget_customer_bubble_text_color: string;
+  widget_launcher_shape: 'circle' | 'rounded-square' | 'pill';
+  widget_launcher_icon: 'chat' | 'headset' | 'help';
   // Behavior (9)
   widget_offline_message: string;
   widget_auto_open: boolean;
@@ -77,6 +95,12 @@ const DEFAULT_CONFIG: WidgetConfig = {
   widget_show_branding: true,
   widget_mobile_enabled: true,
   widget_dark_mode: false,
+  widget_agent_bubble_color: '',
+  widget_agent_bubble_text_color: '',
+  widget_customer_bubble_color: '',
+  widget_customer_bubble_text_color: '',
+  widget_launcher_shape: 'circle',
+  widget_launcher_icon: 'chat',
   widget_offline_message: '',
   widget_auto_open: false,
   widget_auto_open_delay: 5,
@@ -456,6 +480,91 @@ function makeStyles(dark: boolean) {
       color: textMuted,
       margin: '0 0 12px 0',
       lineHeight: 1.5,
+    } as React.CSSProperties,
+
+    // Named appearance bar (C4)
+    appearanceBar: {
+      display: 'flex',
+      alignItems: 'center',
+      gap: 12,
+      padding: '10px 16px',
+      background: dark ? '#0a0a0a' : '#F9FAFB',
+      border: `1px solid ${border}`,
+      borderRadius: 8,
+      marginBottom: 16,
+      flexWrap: 'wrap' as const,
+    } as React.CSSProperties,
+
+    appearanceLabel: {
+      fontSize: 13,
+      color: textMuted,
+      whiteSpace: 'nowrap' as const,
+    } as React.CSSProperties,
+
+    appearanceName: {
+      fontSize: 13,
+      fontWeight: 600,
+      color: text,
+      background: dark ? '#272727' : '#E5E7EB',
+      padding: '2px 10px',
+      borderRadius: 4,
+    } as React.CSSProperties,
+
+    appearanceSelect: {
+      padding: '4px 8px',
+      fontSize: 13,
+      border: `1px solid ${border}`,
+      borderRadius: 4,
+      color: inputText,
+      background: inputBg,
+      cursor: 'pointer',
+    } as React.CSSProperties,
+
+    appearanceBtn: {
+      padding: '4px 10px',
+      fontSize: 12,
+      fontWeight: 500,
+      border: `1px solid ${border}`,
+      borderRadius: 4,
+      background: buttonBg,
+      color: textSecondary,
+      cursor: 'pointer',
+      whiteSpace: 'nowrap' as const,
+    } as React.CSSProperties,
+
+    // Save As modal
+    modalOverlay: {
+      position: 'fixed' as const,
+      inset: 0,
+      background: 'rgba(0,0,0,0.5)',
+      display: 'flex',
+      alignItems: 'center',
+      justifyContent: 'center',
+      zIndex: 9999,
+    } as React.CSSProperties,
+
+    modalContent: {
+      background: bg,
+      border: `1px solid ${border}`,
+      borderRadius: 12,
+      padding: 24,
+      width: 400,
+      maxWidth: '90vw',
+      boxShadow: '0 20px 60px rgba(0,0,0,0.3)',
+    } as React.CSSProperties,
+
+    modalTitle: {
+      fontSize: 16,
+      fontWeight: 600,
+      color: text,
+      margin: '0 0 16px 0',
+    } as React.CSSProperties,
+
+    modalActions: {
+      display: 'flex',
+      justifyContent: 'flex-end',
+      gap: 8,
+      marginTop: 16,
     } as React.CSSProperties,
   };
 }
@@ -872,7 +981,14 @@ const WidgetPreview: React.FC<PreviewProps> = ({ config, st }) => {
   const bgColor = isDark ? '#1A1A2E' : (config.widget_background_color || '#FFFFFF');
   const textColor = isDark ? '#E5E7EB' : '#111827';
   const subtextColor = isDark ? '#9CA3AF' : '#6B7280';
-  const agentBubbleBg = isDark ? '#374151' : '#F3F4F6';
+  const agentBubbleBg = config.widget_agent_bubble_color || (isDark ? '#374151' : '#F3F4F6');
+  const agentBubbleText = config.widget_agent_bubble_text_color || textColor;
+  const customerBubbleBg = config.widget_customer_bubble_color || primaryColor;
+  const customerBubbleTextAuto = hexToLum(customerBubbleBg) > 0.5 ? '#111827' : '#FFFFFF';
+  const customerBubbleText = config.widget_customer_bubble_text_color || customerBubbleTextAuto;
+  const launcherShape = config.widget_launcher_shape || 'circle';
+  const launcherBorderRadius = launcherShape === 'rounded-square' ? 12 : launcherShape === 'pill' ? 24 : '50%';
+  const launcherIcon = config.widget_launcher_icon || 'chat';
   const headerText = config.widget_header_text || 'Chat with us';
   const agentName = config.widget_agent_display_name || 'Support';
   const agentTitle = config.widget_agent_title || 'AI Assistant';
@@ -1004,7 +1120,7 @@ const WidgetPreview: React.FC<PreviewProps> = ({ config, st }) => {
                 borderRadius: '12px 12px 12px 4px',
                 padding: '8px 12px',
                 fontSize: 13,
-                color: textColor,
+                color: agentBubbleText,
                 maxWidth: '75%',
                 lineHeight: 1.4,
               }}>
@@ -1018,11 +1134,11 @@ const WidgetPreview: React.FC<PreviewProps> = ({ config, st }) => {
               justifyContent: 'flex-end',
             }}>
               <div style={{
-                background: primaryColor,
+                background: customerBubbleBg,
                 borderRadius: '12px 12px 4px 12px',
                 padding: '8px 12px',
                 fontSize: 13,
-                color: headerTextColor,
+                color: customerBubbleText,
                 maxWidth: '75%',
                 lineHeight: 1.4,
               }}>
@@ -1052,7 +1168,7 @@ const WidgetPreview: React.FC<PreviewProps> = ({ config, st }) => {
                 borderRadius: '12px 12px 12px 4px',
                 padding: '8px 12px',
                 fontSize: 13,
-                color: textColor,
+                color: agentBubbleText,
                 maxWidth: '75%',
                 lineHeight: 1.4,
               }}>
@@ -1131,7 +1247,7 @@ const WidgetPreview: React.FC<PreviewProps> = ({ config, st }) => {
           <div style={{
             width: 52,
             height: 52,
-            borderRadius: '50%',
+            borderRadius: launcherBorderRadius,
             background: primaryColor,
             display: 'flex',
             alignItems: 'center',
@@ -1139,7 +1255,22 @@ const WidgetPreview: React.FC<PreviewProps> = ({ config, st }) => {
             boxShadow: '0 4px 12px rgba(0,0,0,0.2)',
             cursor: 'default',
           }}>
-            <span style={{ fontSize: 22, color: headerTextColor }}>&#128172;</span>
+            <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke={headerTextColor} strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+              {launcherIcon === 'headset' ? (
+                <>
+                  <path d="M3 18v-6a9 9 0 0 1 18 0v6" />
+                  <path d="M21 19a2 2 0 0 1-2 2h-1a2 2 0 0 1-2-2v-3a2 2 0 0 1 2-2h3zM3 19a2 2 0 0 0 2 2h1a2 2 0 0 0 2-2v-3a2 2 0 0 0-2-2H3z" />
+                </>
+              ) : launcherIcon === 'help' ? (
+                <>
+                  <circle cx="12" cy="12" r="10" />
+                  <path d="M9.09 9a3 3 0 0 1 5.83 1c0 2-3 3-3 3" />
+                  <line x1="12" y1="17" x2="12.01" y2="17" />
+                </>
+              ) : (
+                <path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z" />
+              )}
+            </svg>
           </div>
         </div>
 
@@ -1150,7 +1281,7 @@ const WidgetPreview: React.FC<PreviewProps> = ({ config, st }) => {
           fontSize: 11,
           color: isDark ? '#9CA3AF' : '#6B7280',
         }}>
-          Position: {position} &middot; Offset: {config.widget_offset_x}px / {config.widget_offset_y}px
+          Position: {position} &middot; Shape: {launcherShape} &middot; Offset: {config.widget_offset_x}px / {config.widget_offset_y}px
         </div>
       </div>
     </div>
@@ -1228,6 +1359,29 @@ export const WidgetConfigurator: React.FC<BaseComponentProps> = ({
   // Data hooks
   const config = useConfig(apiFetch);
   const { updateConfig, loading: saving, error: saveError } = useUpdateConfig(apiFetch);
+
+  // Named appearance state (C4)
+  const [showSaveAsModal, setShowSaveAsModal] = useState(false);
+  const [saveAsName, setSaveAsName] = useState('');
+
+  // Named appearance hooks
+  const {
+    data: appearancesData,
+    loading: appearancesLoading,
+    refetch: refetchAppearances,
+  } = useWidgetAppearances(apiFetch);
+  const { saveAppearance, loading: savingAppearance } = useSaveWidgetAppearance(apiFetch);
+  const { activateAppearance, loading: activatingAppearance } = useActivateWidgetAppearance(apiFetch);
+  const { deleteAppearance, loading: deletingAppearance } = useDeleteWidgetAppearance(apiFetch);
+
+  const appearances: NamedConfigSummary[] = useMemo(
+    () => appearancesData?.configs ?? [],
+    [appearancesData],
+  );
+  const activeAppearanceName: string = useMemo(() => {
+    const active = appearances.find((a) => a.isActive);
+    return active?.name ?? 'Default';
+  }, [appearances]);
 
   // Sync remote config to local state
   useEffect(() => {
@@ -1325,6 +1479,62 @@ export const WidgetConfigurator: React.FC<BaseComponentProps> = ({
   }, [localConfig.widget_page_rules, updateField]);
 
   // -------------------------------------------------------------------------
+  // Named appearance handlers (C4)
+  // -------------------------------------------------------------------------
+
+  const handleSaveAppearance = useCallback(async () => {
+    const name = saveAsName.trim();
+    if (!name) return;
+    const ok = await saveAppearance(name);
+    if (ok) {
+      setShowSaveAsModal(false);
+      setSaveAsName('');
+      onNotify(`Widget appearance "${name}" saved.`, 'success');
+      refetchAppearances();
+    } else {
+      onNotify('Failed to save widget appearance.', 'error');
+    }
+  }, [saveAsName, saveAppearance, onNotify, refetchAppearances]);
+
+  const handleActivateAppearance = useCallback(
+    async (name: string) => {
+      const ok = await activateAppearance(name);
+      if (ok) {
+        onNotify(`Widget appearance "${name}" activated.`, 'success');
+        refetchAppearances();
+        config.refetch();
+      } else {
+        onNotify(`Failed to activate appearance "${name}".`, 'error');
+      }
+    },
+    [activateAppearance, onNotify, refetchAppearances, config],
+  );
+
+  const handleDeleteAppearance = useCallback(
+    async (name: string) => {
+      const ok = await deleteAppearance(name);
+      if (ok) {
+        onNotify(`Widget appearance "${name}" deleted.`, 'success');
+        refetchAppearances();
+      } else {
+        onNotify(`Failed to delete appearance "${name}".`, 'error');
+      }
+    },
+    [deleteAppearance, onNotify, refetchAppearances],
+  );
+
+  const handleRestoreDefaultAppearance = useCallback(async () => {
+    const ok = await activateAppearance('Default');
+    if (ok) {
+      onNotify('Restored to Default widget appearance.', 'success');
+      refetchAppearances();
+      config.refetch();
+    } else {
+      onNotify('Failed to restore Default appearance.', 'error');
+    }
+  }, [activateAppearance, onNotify, refetchAppearances, config]);
+
+  // -------------------------------------------------------------------------
   // Loading state
   // -------------------------------------------------------------------------
 
@@ -1376,6 +1586,121 @@ export const WidgetConfigurator: React.FC<BaseComponentProps> = ({
           </div>
         )}
 
+        {/* Named Appearance Bar (C4) */}
+        <div style={s.appearanceBar}>
+          <span style={s.appearanceLabel}>Selected Appearance:</span>
+          <span style={s.appearanceName}>{activeAppearanceName}</span>
+
+          {/* Switch to a different named appearance */}
+          {appearances.filter((a) => !a.isActive).length > 0 && (
+            <select
+              style={s.appearanceSelect}
+              value=""
+              onChange={(e) => {
+                if (e.target.value) handleActivateAppearance(e.target.value);
+              }}
+              disabled={activatingAppearance}
+            >
+              <option value="">Switch appearance...</option>
+              {appearances
+                .filter((a) => !a.isActive)
+                .map((a) => (
+                  <option key={a.name} value={a.name}>
+                    {a.name}
+                  </option>
+                ))}
+            </select>
+          )}
+
+          {/* Save As */}
+          <button
+            style={s.appearanceBtn}
+            onClick={() => { setSaveAsName(''); setShowSaveAsModal(true); }}
+            disabled={savingAppearance}
+          >
+            Save As...
+          </button>
+
+          {/* Restore to Default (only visible when non-Default is active) */}
+          {activeAppearanceName !== 'Default' && (
+            <button
+              style={s.appearanceBtn}
+              onClick={handleRestoreDefaultAppearance}
+              disabled={activatingAppearance}
+            >
+              Restore to Default
+            </button>
+          )}
+
+          {/* Delete an appearance (excludes Default and active) */}
+          {appearances.filter((a) => !a.isDefault && !a.isActive).length > 0 && (
+            <select
+              style={s.appearanceSelect}
+              value=""
+              onChange={(e) => {
+                if (e.target.value) handleDeleteAppearance(e.target.value);
+              }}
+              disabled={deletingAppearance}
+            >
+              <option value="">Delete...</option>
+              {appearances
+                .filter((a) => !a.isDefault && !a.isActive)
+                .map((a) => (
+                  <option key={a.name} value={a.name}>
+                    {a.name}
+                  </option>
+                ))}
+            </select>
+          )}
+        </div>
+
+        {/* Save As Modal (C4) */}
+        {showSaveAsModal && (
+          <div
+            style={s.modalOverlay}
+            onClick={(e) => { if (e.target === e.currentTarget) setShowSaveAsModal(false); }}
+          >
+            <div style={s.modalContent}>
+              <h3 style={s.modalTitle}>Save Widget Appearance As</h3>
+              <Field st={s} label="Appearance Name" description="Choose a descriptive name for this set of widget settings.">
+                <input
+                  type="text"
+                  style={s.input}
+                  value={saveAsName}
+                  placeholder='e.g. "Dark Theme", "Holiday", "Brand v2"'
+                  maxLength={64}
+                  autoFocus
+                  onChange={(e) => setSaveAsName(e.target.value)}
+                  onKeyDown={(e) => {
+                    if (e.key === 'Enter' && saveAsName.trim()) handleSaveAppearance();
+                    if (e.key === 'Escape') setShowSaveAsModal(false);
+                  }}
+                />
+              </Field>
+              {saveAsName.trim().toLowerCase() === 'default' && (
+                <div style={{ fontSize: 12, color: '#F59E0B', marginTop: 4 }}>
+                  This will overwrite the Default appearance snapshot.
+                </div>
+              )}
+              <div style={s.modalActions}>
+                <button
+                  style={s.discardButton}
+                  onClick={() => setShowSaveAsModal(false)}
+                >
+                  Cancel
+                </button>
+                <button
+                  style={s.saveButton}
+                  onClick={handleSaveAppearance}
+                  disabled={!saveAsName.trim() || savingAppearance}
+                >
+                  {savingAppearance ? 'Saving...' : 'Save Appearance'}
+                </button>
+              </div>
+            </div>
+          </div>
+        )}
+
         {/* Tabs */}
         <div style={s.tabs}>
           {(['visual', 'behavior', 'content'] as Tab[]).map((tab) => (
@@ -1416,6 +1741,68 @@ export const WidgetConfigurator: React.FC<BaseComponentProps> = ({
               value={localConfig.widget_dark_mode}
               onChange={(v) => updateField('widget_dark_mode', v)}
             />
+
+            <h4 style={s.sectionTitle}>Message Bubble Colors</h4>
+            <ColorPickerField
+              st={s}
+              label="Agent Bubble Color"
+              description="Background of AI / agent messages. Leave blank for default."
+              value={localConfig.widget_agent_bubble_color}
+              onChange={(v) => updateField('widget_agent_bubble_color', v)}
+            />
+            <ColorPickerField
+              st={s}
+              label="Agent Bubble Text Color"
+              description="Text color in agent messages. Leave blank for auto-contrast."
+              value={localConfig.widget_agent_bubble_text_color}
+              onChange={(v) => updateField('widget_agent_bubble_text_color', v)}
+            />
+            <ColorPickerField
+              st={s}
+              label="Customer Bubble Color"
+              description="Background of customer messages. Defaults to your primary color."
+              value={localConfig.widget_customer_bubble_color}
+              onChange={(v) => updateField('widget_customer_bubble_color', v)}
+            />
+            <ColorPickerField
+              st={s}
+              label="Customer Bubble Text Color"
+              description="Text color in customer messages. Leave blank for auto-contrast."
+              value={localConfig.widget_customer_bubble_text_color}
+              onChange={(v) => updateField('widget_customer_bubble_text_color', v)}
+            />
+
+            <h4 style={s.sectionTitle}>Launcher</h4>
+            <Field
+              st={s}
+              label="Launcher Shape"
+              description="Shape of the floating launcher button."
+            >
+              <select
+                style={s.select}
+                value={localConfig.widget_launcher_shape}
+                onChange={(e) => updateField('widget_launcher_shape', e.target.value as 'circle' | 'rounded-square' | 'pill')}
+              >
+                <option value="circle">Circle</option>
+                <option value="rounded-square">Rounded Square</option>
+                <option value="pill">Pill</option>
+              </select>
+            </Field>
+            <Field
+              st={s}
+              label="Launcher Icon"
+              description="Icon displayed on the launcher button."
+            >
+              <select
+                style={s.select}
+                value={localConfig.widget_launcher_icon}
+                onChange={(e) => updateField('widget_launcher_icon', e.target.value as 'chat' | 'headset' | 'help')}
+              >
+                <option value="chat">Chat Bubble</option>
+                <option value="headset">Headset</option>
+                <option value="help">Help / Question Mark</option>
+              </select>
+            </Field>
 
             <h4 style={s.sectionTitle}>Position & Layout</h4>
             <Field
@@ -1517,11 +1904,15 @@ export const WidgetConfigurator: React.FC<BaseComponentProps> = ({
             <ToggleField
               st={s}
               label="Show 'Powered by Agent Red'"
-              description="Professional and Enterprise tiers can remove branding. Starter always shows."
-              value={localConfig.widget_show_branding}
+              description={
+                tenantContext.tier === 'enterprise'
+                  ? 'Toggle off to remove Agent Red branding from the widget.'
+                  : 'Available on Enterprise tier \u2014 Upgrade to remove branding.'
+              }
+              value={tenantContext.tier !== 'enterprise' ? true : localConfig.widget_show_branding}
               onChange={(v) => {
-                if (!v && (tenantContext.tier === 'starter' || tenantContext.tier === 'trial')) {
-                  onNotify('Branding removal requires Professional tier or above.', 'warning');
+                if (tenantContext.tier !== 'enterprise') {
+                  onNotify('Branding removal is available on the Enterprise tier. Upgrade to remove "Powered by Agent Red".', 'warning');
                   return;
                 }
                 updateField('widget_show_branding', v);

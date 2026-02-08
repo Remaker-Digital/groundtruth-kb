@@ -449,6 +449,12 @@ https://docs.agentred.com/changelog
 
 ## 12. Pre-Submission Checklist
 
+> **Canonical checklist:** The copy-of-record for Shopify App Store submission readiness is
+> [`docs/operations/SHOPIFY-APP-REVIEW-PREFLIGHT-CHECKLIST.md`](../operations/SHOPIFY-APP-REVIEW-PREFLIGHT-CHECKLIST.md).
+> This section tracks listing content completion only. For the full submission procedure
+> (OAuth testing, billing, performance, GraphQL mandate, incognito testing, etc.), use the
+> pre-flight checklist.
+
 ### Content (This Document)
 - [x] App name (30 chars)
 - [x] Tagline / subtitle (62 chars)

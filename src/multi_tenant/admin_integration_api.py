@@ -1,0 +1,419 @@
+"""
+Admin Integration Management API — C10 capability dependency.
+
+Provides endpoints for listing, configuring, activating, deactivating,
+and managing third-party integrations (Shopify, Zendesk, Mailchimp,
+Google Analytics).
+
+Integration enable/disable fields are stored in PreferencesDocument.
+Connection status metadata is also stored there.  Actual credential
+management (API keys, tokens) is handled separately by
+TenantSecretService in Key Vault.
+
+Routes:
+    GET  /api/admin/integrations          — List all integrations + status
+    GET  /api/admin/integrations/{type}   — Get single integration detail
+    PUT  /api/admin/integrations/{type}   — Update integration config
+    POST /api/admin/integrations/{type}/activate   — Activate
+    POST /api/admin/integrations/{type}/deactivate — Deactivate
+    DELETE /api/admin/integrations/{type}           — Disconnect + remove creds
+
+© 2026 Remaker Digital, a DBA of VanDusen & Palmeter, LLC. All rights reserved.
+"""
+
+from __future__ import annotations
+
+import logging
+from typing import Any
+
+from fastapi import APIRouter, Depends, HTTPException
+from pydantic import BaseModel, Field
+
+from src.multi_tenant.middleware import get_tenant_context, TenantContext
+
+logger = logging.getLogger(__name__)
+
+# ---------------------------------------------------------------------------
+# Integration registry — static metadata for the 4 supported integrations
+# ---------------------------------------------------------------------------
+
+INTEGRATION_TYPES = ("shopify", "zendesk", "mailchimp", "google_analytics")
+
+_INTEGRATION_META: dict[str, dict[str, Any]] = {
+    "shopify": {
+        "name": "Shopify",
+        "description": "Sync product catalog and customer data from your Shopify store.",
+        "icon": "shopify",
+        "enable_field": "shopify_sync_enabled",
+        "status_field": "shopify_integration_status",
+        "tier_gate": None,  # available on all tiers
+        "config_fields": [
+            {"key": "shopify_sync_enabled", "label": "Product Sync", "type": "boolean"},
+        ],
+    },
+    "zendesk": {
+        "name": "Zendesk",
+        "description": "Create Zendesk tickets automatically on conversation escalation.",
+        "icon": "zendesk",
+        "enable_field": "zendesk_escalation_enabled",
+        "status_field": "zendesk_integration_status",
+        "tier_gate": "professional",
+        "config_fields": [
+            {"key": "zendesk_escalation_enabled", "label": "Auto-create Tickets", "type": "boolean"},
+        ],
+    },
+    "mailchimp": {
+        "name": "Mailchimp",
+        "description": "Import customer segments from Mailchimp for AI personalization.",
+        "icon": "mailchimp",
+        "enable_field": "mailchimp_segment_sync",
+        "status_field": "mailchimp_integration_status",
+        "tier_gate": "professional",
+        "config_fields": [
+            {"key": "mailchimp_segment_sync", "label": "Segment Sync", "type": "boolean"},
+        ],
+    },
+    "google_analytics": {
+        "name": "Google Analytics",
+        "description": "Export conversation events to your GA4 property for unified analytics.",
+        "icon": "google_analytics",
+        "enable_field": "google_analytics_enabled",
+        "status_field": "google_analytics_integration_status",
+        "tier_gate": "professional",
+        "config_fields": [
+            {"key": "google_analytics_enabled", "label": "Event Export", "type": "boolean"},
+        ],
+    },
+}
+
+# ---------------------------------------------------------------------------
+# Request / Response models
+# ---------------------------------------------------------------------------
+
+
+class IntegrationSummary(BaseModel):
+    """Summary of one integration returned in the list endpoint."""
+    type: str = Field(description="Integration key (shopify, zendesk, etc.)")
+    name: str = Field(description="Human-readable name")
+    description: str
+    icon: str
+    enabled: bool = Field(description="Whether the integration feature is turned on")
+    status: str | None = Field(
+        default=None,
+        description="Connection status: connected | disconnected | error | None",
+    )
+    tier_gate: str | None = Field(
+        default=None,
+        description="Minimum tier required (null = all tiers)",
+    )
+    tier_met: bool = Field(
+        default=True,
+        description="Whether the current tenant tier meets the gate",
+    )
+
+
+class IntegrationDetail(IntegrationSummary):
+    """Detailed view including config fields."""
+    config_fields: list[dict[str, Any]] = Field(default_factory=list)
+
+
+class IntegrationUpdateRequest(BaseModel):
+    """Body for PUT — update integration-specific config fields."""
+    config: dict[str, Any] = Field(
+        default_factory=dict,
+        description="Key-value pairs to update (e.g., {shopify_sync_enabled: true})",
+    )
+
+
+class IntegrationResponse(BaseModel):
+    """Generic mutation response."""
+    success: bool
+    message: str
+    integration: IntegrationSummary | None = None
+
+
+# ---------------------------------------------------------------------------
+# Helpers
+# ---------------------------------------------------------------------------
+
+# Tier ordering for gate checks
+_TIER_ORDER = {"trial": 0, "starter": 1, "professional": 2, "enterprise": 3}
+
+# Config processor singleton (lazy import to avoid circular deps)
+_config_processor = None
+
+
+def _get_config_processor():
+    global _config_processor
+    if _config_processor is None:
+        from src.multi_tenant.tenant_config_processor import get_config_processor
+        _config_processor = get_config_processor()
+    return _config_processor
+
+
+def _tier_meets_gate(tenant_tier: str, gate: str | None) -> bool:
+    """Check if the tenant tier meets or exceeds the gate tier."""
+    if gate is None:
+        return True
+    return _TIER_ORDER.get(tenant_tier, 0) >= _TIER_ORDER.get(gate, 0)
+
+
+def _build_summary(
+    int_type: str,
+    meta: dict[str, Any],
+    config: dict[str, Any],
+    tenant_tier: str,
+) -> IntegrationSummary:
+    """Build an IntegrationSummary from metadata + resolved config."""
+    enable_field = meta["enable_field"]
+    status_field = meta["status_field"]
+
+    return IntegrationSummary(
+        type=int_type,
+        name=meta["name"],
+        description=meta["description"],
+        icon=meta["icon"],
+        enabled=bool(config.get(enable_field, False)),
+        status=config.get(status_field),
+        tier_gate=meta["tier_gate"],
+        tier_met=_tier_meets_gate(tenant_tier, meta["tier_gate"]),
+    )
+
+
+# ---------------------------------------------------------------------------
+# Router
+# ---------------------------------------------------------------------------
+
+router = APIRouter(
+    prefix="/api/admin/integrations",
+    tags=["admin-integrations"],
+)
+
+
+@router.get("", response_model=list[IntegrationSummary])
+async def list_integrations(
+    ctx: TenantContext = Depends(get_tenant_context),
+):
+    """List all available integrations with their current status."""
+    processor = _get_config_processor()
+    cfg_result = await processor.get_resolved_config(ctx.tenant_id, ctx.tier)
+    config = cfg_result.config if cfg_result else {}
+
+    return [
+        _build_summary(int_type, meta, config, ctx.tier)
+        for int_type, meta in _INTEGRATION_META.items()
+    ]
+
+
+@router.get("/{integration_type}", response_model=IntegrationDetail)
+async def get_integration(
+    integration_type: str,
+    ctx: TenantContext = Depends(get_tenant_context),
+):
+    """Get detailed info for a specific integration."""
+    if integration_type not in _INTEGRATION_META:
+        raise HTTPException(status_code=404, detail=f"Unknown integration: {integration_type}")
+
+    meta = _INTEGRATION_META[integration_type]
+    processor = _get_config_processor()
+    cfg_result = await processor.get_resolved_config(ctx.tenant_id, ctx.tier)
+    config = cfg_result.config if cfg_result else {}
+
+    summary = _build_summary(integration_type, meta, config, ctx.tier)
+    return IntegrationDetail(
+        **summary.model_dump(),
+        config_fields=meta["config_fields"],
+    )
+
+
+@router.put("/{integration_type}", response_model=IntegrationResponse)
+async def update_integration(
+    integration_type: str,
+    body: IntegrationUpdateRequest,
+    ctx: TenantContext = Depends(get_tenant_context),
+):
+    """Update integration-specific configuration fields."""
+    if integration_type not in _INTEGRATION_META:
+        raise HTTPException(status_code=404, detail=f"Unknown integration: {integration_type}")
+
+    meta = _INTEGRATION_META[integration_type]
+
+    # Tier gate check
+    if not _tier_meets_gate(ctx.tier, meta["tier_gate"]):
+        raise HTTPException(
+            status_code=403,
+            detail=f"{meta['name']} requires {meta['tier_gate']} tier or above.",
+        )
+
+    # Only allow updating fields that belong to this integration
+    allowed_keys = {f["key"] for f in meta["config_fields"]}
+    allowed_keys.add(meta["enable_field"])
+    invalid = set(body.config.keys()) - allowed_keys
+    if invalid:
+        raise HTTPException(
+            status_code=400,
+            detail=f"Fields not allowed for {meta['name']}: {', '.join(invalid)}",
+        )
+
+    processor = _get_config_processor()
+    result = await processor.update_config(
+        tenant_id=ctx.tenant_id,
+        tier=ctx.tier,
+        updates=body.config,
+        actor=f"admin:{ctx.tenant_id}",
+    )
+
+    if not result or not result.success:
+        raise HTTPException(status_code=500, detail="Failed to update integration config.")
+
+    # Re-read to get updated summary
+    cfg_result = await processor.get_resolved_config(ctx.tenant_id, ctx.tier)
+    config = cfg_result.config if cfg_result else {}
+    summary = _build_summary(integration_type, meta, config, ctx.tier)
+
+    logger.info(
+        "Integration %s updated for tenant %s: %s",
+        integration_type, ctx.tenant_id, body.config,
+    )
+
+    return IntegrationResponse(
+        success=True,
+        message=f"{meta['name']} configuration updated.",
+        integration=summary,
+    )
+
+
+@router.post("/{integration_type}/activate", response_model=IntegrationResponse)
+async def activate_integration(
+    integration_type: str,
+    ctx: TenantContext = Depends(get_tenant_context),
+):
+    """Activate (enable) an integration."""
+    if integration_type not in _INTEGRATION_META:
+        raise HTTPException(status_code=404, detail=f"Unknown integration: {integration_type}")
+
+    meta = _INTEGRATION_META[integration_type]
+
+    if not _tier_meets_gate(ctx.tier, meta["tier_gate"]):
+        raise HTTPException(
+            status_code=403,
+            detail=f"{meta['name']} requires {meta['tier_gate']} tier or above.",
+        )
+
+    processor = _get_config_processor()
+    updates = {
+        meta["enable_field"]: True,
+        meta["status_field"]: "connected",
+    }
+    result = await processor.update_config(
+        tenant_id=ctx.tenant_id,
+        tier=ctx.tier,
+        updates=updates,
+        actor=f"admin:{ctx.tenant_id}",
+    )
+
+    if not result or not result.success:
+        raise HTTPException(status_code=500, detail="Failed to activate integration.")
+
+    cfg_result = await processor.get_resolved_config(ctx.tenant_id, ctx.tier)
+    config = cfg_result.config if cfg_result else {}
+    summary = _build_summary(integration_type, meta, config, ctx.tier)
+
+    logger.info("Integration %s activated for tenant %s", integration_type, ctx.tenant_id)
+
+    return IntegrationResponse(
+        success=True,
+        message=f"{meta['name']} activated.",
+        integration=summary,
+    )
+
+
+@router.post("/{integration_type}/deactivate", response_model=IntegrationResponse)
+async def deactivate_integration(
+    integration_type: str,
+    ctx: TenantContext = Depends(get_tenant_context),
+):
+    """Deactivate (disable) an integration."""
+    if integration_type not in _INTEGRATION_META:
+        raise HTTPException(status_code=404, detail=f"Unknown integration: {integration_type}")
+
+    meta = _INTEGRATION_META[integration_type]
+
+    processor = _get_config_processor()
+    updates = {
+        meta["enable_field"]: False,
+        meta["status_field"]: "disconnected",
+    }
+    result = await processor.update_config(
+        tenant_id=ctx.tenant_id,
+        tier=ctx.tier,
+        updates=updates,
+        actor=f"admin:{ctx.tenant_id}",
+    )
+
+    if not result or not result.success:
+        raise HTTPException(status_code=500, detail="Failed to deactivate integration.")
+
+    cfg_result = await processor.get_resolved_config(ctx.tenant_id, ctx.tier)
+    config = cfg_result.config if cfg_result else {}
+    summary = _build_summary(integration_type, meta, config, ctx.tier)
+
+    logger.info("Integration %s deactivated for tenant %s", integration_type, ctx.tenant_id)
+
+    return IntegrationResponse(
+        success=True,
+        message=f"{meta['name']} deactivated.",
+        integration=summary,
+    )
+
+
+@router.delete("/{integration_type}", response_model=IntegrationResponse)
+async def disconnect_integration(
+    integration_type: str,
+    ctx: TenantContext = Depends(get_tenant_context),
+):
+    """Disconnect an integration — disables it and clears connection status."""
+    if integration_type not in _INTEGRATION_META:
+        raise HTTPException(status_code=404, detail=f"Unknown integration: {integration_type}")
+
+    meta = _INTEGRATION_META[integration_type]
+
+    processor = _get_config_processor()
+    updates = {
+        meta["enable_field"]: False,
+        meta["status_field"]: None,  # clear connection status
+    }
+    result = await processor.update_config(
+        tenant_id=ctx.tenant_id,
+        tier=ctx.tier,
+        updates=updates,
+        actor=f"admin:{ctx.tenant_id}",
+    )
+
+    if not result or not result.success:
+        raise HTTPException(status_code=500, detail="Failed to disconnect integration.")
+
+    # Optionally remove stored credentials from Key Vault
+    try:
+        from src.multi_tenant.tenant_secret_service import get_secret_service
+        secret_svc = get_secret_service()
+        if secret_svc:
+            secret_type = f"{integration_type}_api_key"
+            await secret_svc.delete_secret(ctx.tenant_id, secret_type)
+    except Exception:
+        logger.warning(
+            "Could not remove credentials for %s on tenant %s — may not exist.",
+            integration_type, ctx.tenant_id,
+        )
+
+    cfg_result = await processor.get_resolved_config(ctx.tenant_id, ctx.tier)
+    config = cfg_result.config if cfg_result else {}
+    summary = _build_summary(integration_type, meta, config, ctx.tier)
+
+    logger.info("Integration %s disconnected for tenant %s", integration_type, ctx.tenant_id)
+
+    return IntegrationResponse(
+        success=True,
+        message=f"{meta['name']} disconnected.",
+        integration=summary,
+    )

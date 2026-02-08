@@ -683,7 +683,7 @@ class TestCrossLayerIntegration:
         assert "CUSTOMER CONTEXT" not in critic_prompt
         assert "premium line" not in critic_prompt
         # But safety rules are present
-        assert "ABSOLUTE" in critic_prompt or "CANNOT BE OVERRIDDEN" in critic_prompt
+        assert "BLOCK ONLY these specific violations:" in critic_prompt
 
     # --- CL-10: Explainability trace completeness ---
 

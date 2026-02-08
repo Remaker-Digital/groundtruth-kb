@@ -343,8 +343,9 @@ class ChatPipeline:
         )
         tier = tenant.tier or TenantTier.STARTER
 
-        # Store tenant_id for knowledge retrieval (used by _call_knowledge_retrieval_direct)
+        # Store tenant_id and preferences for knowledge retrieval
         self._current_tenant_id = tenant_id
+        self._current_preferences = preferences
 
         try:
             # ---------------------------------------------------------------
@@ -566,8 +567,13 @@ class ChatPipeline:
             # ---------------------------------------------------------------
             yield stage_event("critic-supervisor", "started")
 
+            # Extract KB article titles so Critic knows the response
+            # was generated from legitimate product knowledge.
+            knowledge_titles = [s.get("title", "") for s in sources if s.get("title")]
+
             approved, safe_text, critic_result = await self._validate_with_critic(
                 tenant_id, conversation_id, full_response, customer_message, budget,
+                knowledge_titles=knowledge_titles,
             )
 
             trace.set_critic_result(
@@ -582,6 +588,14 @@ class ChatPipeline:
             )
 
             if approved:
+                # Append source citations if enabled (RAG Phase 1)
+                prefs = getattr(self, "_current_preferences", None)
+                if prefs and prefs.cite_sources_in_response and sources:
+                    source_titles = [s.get("title", "") for s in sources if s.get("title")]
+                    if source_titles:
+                        citation_line = "\n\nSources: " + ", ".join(source_titles)
+                        safe_text = safe_text + citation_line
+
                 # Record AI message with the (possibly modified) approved text
                 message_id = await self._session.add_ai_message(
                     tenant_id=tenant_id,
@@ -885,11 +899,39 @@ class ChatPipeline:
             if not vectorizer._configured:
                 raise RuntimeError("KnowledgeVectorizer not configured")
 
+            # Read retrieval params from tenant preferences (RAG Phase 1)
+            prefs = getattr(self, "_current_preferences", None)
+            top_k = 5
+            vector_weight = 0.7
+            bm25_weight = 0.3
+            entry_type = None
+
+            if prefs:
+                if prefs.retrieval_top_k is not None:
+                    top_k = max(1, min(prefs.retrieval_top_k, 20))
+                if prefs.retrieval_vector_weight is not None:
+                    vector_weight = max(0.0, min(prefs.retrieval_vector_weight, 1.0))
+                if prefs.retrieval_bm25_weight is not None:
+                    bm25_weight = max(0.0, min(prefs.retrieval_bm25_weight, 1.0))
+
+                # Intent-to-source routing: map resolved intent to entry_type filter
+                if prefs.intent_source_mapping and intent in prefs.intent_source_mapping:
+                    entry_type = prefs.intent_source_mapping[intent]
+
             results = await vectorizer.search(
                 tenant_id=tenant_id,
                 query=message,
-                top_k=5,
+                top_k=top_k,
+                entry_type=entry_type,
+                vector_weight=vector_weight,
+                bm25_weight=bm25_weight,
             )
+
+            # Apply minimum relevance score filter (RAG Phase 1)
+            min_score = 0.1
+            if prefs and prefs.retrieval_min_score is not None:
+                min_score = max(0.0, min(prefs.retrieval_min_score, 1.0))
+            results = [r for r in results if r.get("score", 0) >= min_score]
 
             formatted = KnowledgeVectorizer.format_for_pipeline(results)
 
@@ -1073,6 +1115,7 @@ class ChatPipeline:
         response_text: str,
         customer_message: str,
         budget: PipelineTimeoutBudget,
+        knowledge_titles: list[str] | None = None,
     ) -> tuple[bool, str, Any]:
         """Validate the generated response via the Critic (fail-closed).
 
@@ -1101,6 +1144,7 @@ class ChatPipeline:
             return await self._validate_with_critic_direct(
                 tenant_id, conversation_id, response_text,
                 customer_message, budget,
+                knowledge_titles=knowledge_titles,
             )
 
         # Option 3: Fail-closed — no Critic available
@@ -1123,6 +1167,7 @@ class ChatPipeline:
         response_text: str,
         customer_message: str,
         budget: PipelineTimeoutBudget,
+        knowledge_titles: list[str] | None = None,
     ) -> tuple[bool, str, Any]:
         """Validate response using Azure OpenAI GPT-4o-mini directly.
 
@@ -1140,18 +1185,36 @@ class ChatPipeline:
         start_time = time.monotonic()
 
         try:
+            # Build KB context line so Critic knows which articles
+            # informed the response (prevents false-positive blocking
+            # of legitimate product feature descriptions).
+            kb_context_line = ""
+            if knowledge_titles:
+                titles_str = ", ".join(f'"{t}"' for t in knowledge_titles[:10])
+                kb_context_line = (
+                    f"\nKNOWLEDGE BASE ARTICLES USED:\n{titles_str}\n"
+                    "The response above was generated from these knowledge base "
+                    "articles, which are curated by the merchant. Content derived "
+                    "from knowledge base articles is legitimate product information "
+                    "and should NOT be flagged as hallucination or internal details.\n"
+                )
+
             critic_user_prompt = (
                 "Review the following AI-generated customer service response.\n\n"
                 f"CUSTOMER MESSAGE:\n{customer_message}\n\n"
-                f"AI RESPONSE:\n{response_text}\n\n"
-                "Evaluate this response and return a JSON object with:\n"
-                '- "verdict": "approved" if safe to deliver, "rejected" if unsafe, '
-                '"modified" if approved with changes\n'
-                '- "flags": array of any safety concerns (e.g., "potential_hallucination", '
-                '"pii_detected", "brand_safety_risk")\n'
-                '- "modified_response": if verdict is "modified", provide the corrected text\n'
-                '- "reasoning": brief explanation of your decision\n\n'
-                "Apply the safety rules from your system prompt strictly."
+                f"AI RESPONSE:\n{response_text}\n"
+                f"{kb_context_line}\n"
+                "Return a JSON object with:\n"
+                '- "verdict": "approved", "rejected", or "modified"\n'
+                '- "flags": array of concerns (empty array if none)\n'
+                '- "modified_response": corrected text if verdict is "modified"\n'
+                '- "reasoning": brief explanation\n\n'
+                "DEFAULT TO APPROVED.  Only reject if the response contains "
+                "one of the specific violations listed in your system prompt "
+                "(PII, literal secrets, medical/legal/financial advice, hate "
+                "speech, or policy contradictions).  Describing product "
+                "features, technology, architecture, or capabilities is "
+                "never a violation."
             )
 
             # Get the immutable Critic system prompt

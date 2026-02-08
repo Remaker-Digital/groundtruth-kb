@@ -158,14 +158,15 @@ SEED_ARTICLES: list[dict] = [
         "entry_type": "product",
         "title": "Six Specialized AI Agents",
         "content": (
-            "Agent Red is powered by six AI agents that work together: "
-            "1) Intent Classification (GPT-4o-mini, 98% accuracy, 17 intents), "
-            "2) Knowledge Retrieval (text-embedding-3-large, 100% retrieval), "
-            "3) Response Generation (GPT-4o, 88.4% quality), "
-            "4) Escalation (GPT-4o-mini, 100% precision/recall), "
-            "5) Analytics (performance monitoring), "
-            "6) Critic/Supervisor (fail-closed content safety, 0% FP, 100% TP). "
-            "All six agents run in every conversation."
+            "Agent Red is powered by six specialized AI agents that work together: "
+            "1) Intent Classification (98% accuracy across 17 intent categories), "
+            "2) Knowledge Retrieval (100% retrieval accuracy using advanced AI search), "
+            "3) Response Generation (88.4% quality score with streaming delivery), "
+            "4) Escalation Detection (100% precision and recall for human handoff), "
+            "5) Analytics (real-time performance monitoring), "
+            "6) Safety Supervisor (fail-closed content safety with zero false positives). "
+            "All six agents run in every conversation to deliver fast, accurate, "
+            "and safe responses."
         ),
         "tags": ["features", "agents", "ai", "pipeline", "safety"],
         "is_active": True,
@@ -187,11 +188,11 @@ SEED_ARTICLES: list[dict] = [
         "entry_type": "product",
         "title": "Persistent Customer Memory — Layer 2: Conversation Memory",
         "content": (
-            "Layer 2 (available on all tiers): Vectorized transcripts of past "
-            "conversations enable semantic search across a customer's full "
-            "interaction history. History depth: Starter 90 days, Professional "
-            "365 days, Enterprise unlimited. Uses text-embedding-3-large with "
-            "3072-dimensional embeddings and Cosmos DB DiskANN vector index."
+            "Layer 2 (available on all tiers): Past conversations are converted "
+            "into AI-searchable vectors, enabling semantic search across a "
+            "customer's full interaction history. The AI can find relevant past "
+            "interactions even when the exact words differ. History depth varies "
+            "by tier: Starter 90 days, Professional 365 days, Enterprise unlimited."
         ),
         "tags": ["features", "memory", "personalization", "layer-2", "vector"],
         "is_active": True,
@@ -458,12 +459,13 @@ SEED_ARTICLES: list[dict] = [
         "entry_type": "policy",
         "title": "Data Security and Encryption",
         "content": (
-            "PII tokenization (UUID tokens, Key Vault storage). Encryption at "
-            "rest (CMK RSA-2048, 90-day rotation). TLS in transit. gRPC+TLS "
-            "agent communication. Cosmos DB tenant_id partition key isolation. "
-            "TenantScopedRepository validation on every read/write. NATS "
-            "topic namespacing ({tenant_id}.{agent}). Per-tenant Key Vault "
-            "secrets (tenant-{id}-{type})."
+            "Agent Red uses multiple layers of security: PII (personally "
+            "identifiable information) is tokenized before processing. All data "
+            "is encrypted at rest with customer-managed keys and 90-day automatic "
+            "rotation. All communications use TLS encryption in transit. Each "
+            "merchant's data is completely isolated — no merchant can ever access "
+            "another merchant's data. Secrets are stored in a dedicated secure vault "
+            "per tenant."
         ),
         "tags": ["security", "encryption", "pii", "isolation"],
         "is_active": True,
@@ -472,11 +474,13 @@ SEED_ARTICLES: list[dict] = [
         "entry_type": "policy",
         "title": "Data Retention Policies",
         "content": (
-            "Three-tier retention: Hot (Cosmos DB, tier-based depth: Trial 14d, "
-            "Starter 90d, Professional 365d, Enterprise unlimited), Warm (Blob "
-            "Cool, Parquet, 90 days), Cold (Blob Archive, 7+ years). Audit logs: "
-            "append-only, 1-year retention. Cosmos DB continuous 7-day PITR. "
-            "Archival daily at 04:00 UTC, retention enforcement at 03:00 UTC."
+            "Three-tier data retention: Active data is kept based on your tier "
+            "(Trial 14 days, Starter 90 days, Professional 365 days, Enterprise "
+            "unlimited). Archived data is stored in a cost-efficient warm tier for "
+            "90 days, then moved to cold storage for 7+ years. Audit logs are "
+            "append-only with 1-year retention. Continuous point-in-time recovery "
+            "with 7-day backup window. Daily automated archival and retention "
+            "enforcement."
         ),
         "tags": ["security", "retention", "data", "archival", "backup"],
         "is_active": True,

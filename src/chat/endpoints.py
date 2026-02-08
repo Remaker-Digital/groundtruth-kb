@@ -43,6 +43,8 @@ from src.chat.models import (
     ConversationStateResponse,
     EndConversationRequest,
     EndConversationResponse,
+    IssueReportRequest,
+    IssueReportResponse,
     SendMessageRequest,
     SendMessageResponse,
     WebSocketMessage,
@@ -342,6 +344,53 @@ async def stream_response(
     # Load tenant + preferences for pipeline context
     tenant_doc, prefs_doc = await _load_tenant_context(ctx)
 
+    # --- Test Mode routing (C2) ---
+    # If test mode is active, deterministically assign this conversation
+    # to test or production config using SHA-256 hash of session seed +
+    # conversation_id. Test conversations get AI behaviour overrides applied.
+    is_test_mode = False
+    if prefs_doc.test_mode_enabled and prefs_doc.test_mode_overrides:
+        from src.multi_tenant.test_mode_service import (
+            TestModeService,
+            get_test_mode_service,
+        )
+
+        if TestModeService.should_use_test_config(
+            session_id=conversation_id,
+            seed=prefs_doc.test_mode_assignment_seed,
+            percentage=prefs_doc.test_mode_percentage,
+        ):
+            is_test_mode = True
+            test_svc = get_test_mode_service()
+            prefs_doc = PreferencesDocument(
+                **test_svc.apply_test_overrides(
+                    prefs_doc.model_dump(), prefs_doc.test_mode_overrides,
+                ),
+            )
+            logger.info(
+                "Test Mode: conversation %s routed to test config "
+                "(seed=%d, pct=%d%%)",
+                conversation_id,
+                prefs_doc.test_mode_assignment_seed,
+                prefs_doc.test_mode_percentage,
+            )
+
+    # Tag conversation as test mode if assigned
+    if is_test_mode:
+        try:
+            from src.multi_tenant.repository import ConversationRepository
+
+            conv_repo = ConversationRepository()
+            await conv_repo.patch(
+                ctx.tenant_id,
+                conversation_id,
+                [{"op": "set", "path": "/is_test_mode", "value": True}],
+            )
+        except Exception:
+            logger.debug(
+                "Failed to tag conversation %s as test mode", conversation_id,
+            )
+
     # Extract customer_id from conversation state
     customer_id: str | None = None
     for msg in reversed(state.messages):
@@ -519,6 +568,120 @@ async def end_conversation(
             status_code=409,
             detail=f"Conversation is not active (status={exc.status})",
         )
+
+
+# ---------------------------------------------------------------------------
+# POST /api/chat/conversations/{conversation_id}/issue — Report an issue
+# ---------------------------------------------------------------------------
+
+
+@router.post(
+    "/conversations/{conversation_id}/issue",
+    response_model=IssueReportResponse,
+    summary="Report an issue with the conversation",
+    description=(
+        "Allows the customer to report an issue with the AI conversation "
+        "to the merchant. This is a structured feedback mechanism — NOT a "
+        "bug report to Agent Red (C7)."
+    ),
+    responses={
+        404: {"description": "Conversation not found"},
+        503: {"description": "Chat service not initialized"},
+    },
+)
+async def report_issue(
+    conversation_id: str,
+    request: IssueReportRequest,
+    ctx: TenantContext = Depends(get_tenant_context),
+) -> IssueReportResponse:
+    """Report an issue with an active or ended conversation.
+
+    Stores the issue as a system message on the conversation and
+    creates an audit log entry for the merchant to review.
+    """
+    import uuid
+    from datetime import datetime, timezone
+
+    session = _get_session()
+
+    # Verify conversation exists for this tenant
+    try:
+        state = await session.get_state(
+            tenant_id=ctx.tenant_id,
+            conversation_id=conversation_id,
+        )
+    except ConversationNotFoundError:
+        raise HTTPException(status_code=404, detail="Conversation not found")
+
+    # Generate issue ID
+    issue_id = f"issue_{uuid.uuid4().hex[:12]}"
+
+    # Store as a system message on the conversation
+    from src.chat.models import ChatMessage, MessageRole
+
+    issue_message = ChatMessage(
+        role=MessageRole.SYSTEM,
+        content=f"[Issue Report] Type: {request.issue_type} | Details: {request.details}",
+        timestamp=datetime.now(timezone.utc).isoformat(),
+        message_id=issue_id,
+        metadata={
+            "type": "issue_report",
+            "issue_type": request.issue_type,
+            "details": request.details,
+        },
+    )
+
+    # Persist via conversation repository (best-effort — don't fail the request)
+    try:
+        if session._conversation_repo:
+            await session._conversation_repo.patch(
+                ctx.tenant_id,
+                conversation_id,
+                [
+                    {
+                        "op": "add",
+                        "path": "/messages/-",
+                        "value": issue_message.model_dump(mode="json"),
+                    }
+                ],
+            )
+    except Exception:
+        logger.warning(
+            "Failed to persist issue report: conv=%s issue=%s",
+            conversation_id,
+            issue_id,
+        )
+
+    # Audit log entry
+    try:
+        from src.multi_tenant.repository import AuditLogRepository
+        from src.multi_tenant.cosmos_schema import AuditEventType
+
+        audit_repo = AuditLogRepository()
+        await audit_repo.log_event(
+            tenant_id=ctx.tenant_id,
+            event_type=AuditEventType.SECURITY_EVENT,
+            actor_id=f"customer:{conversation_id}",
+            resource_type="conversation",
+            resource_id=conversation_id,
+            details={
+                "action": "issue_reported",
+                "issue_id": issue_id,
+                "issue_type": request.issue_type,
+                "details": request.details[:500],
+            },
+        )
+    except Exception:
+        logger.warning(
+            "Failed to write audit log for issue report: conv=%s",
+            conversation_id,
+        )
+
+    return IssueReportResponse(
+        conversation_id=conversation_id,
+        issue_id=issue_id,
+        accepted=True,
+    )
 
 
 # ---------------------------------------------------------------------------

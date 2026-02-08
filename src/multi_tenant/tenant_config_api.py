@@ -13,7 +13,19 @@ Endpoints:
     GET    /api/config/schema/{step} — Fields for a specific onboarding step
     GET    /api/config/versions     — Version history
     GET    /api/config/versions/{version} — Specific historical version
+    GET    /api/config/named        — List named configurations (C3)
+    POST   /api/config/named        — Save current config as named (C3)
+    POST   /api/config/named/{name}/activate — Activate a named config (C3)
+    DELETE /api/config/named/{name} — Delete a named config (C3)
+    GET    /api/config/widget-appearances           — List named appearances (C4)
+    POST   /api/config/widget-appearances           — Save appearance as named (C4)
+    POST   /api/config/widget-appearances/{name}/activate — Activate appearance (C4)
+    DELETE /api/config/widget-appearances/{name}    — Delete appearance (C4)
     POST   /api/config/rollback     — Roll back to a previous version
+    GET    /api/config/test-mode              — Test Mode status (C2)
+    POST   /api/config/test-mode/activate     — Activate Test Mode (C2)
+    POST   /api/config/test-mode/deactivate   — Deactivate Test Mode (C2)
+    PUT    /api/config/test-mode/percentage   — Update routing percentage (C2)
 
 All endpoints derive tenant_id and tier from the authenticated TenantContext
 — never from query parameters.  Tenant isolation is enforced at every level:
@@ -51,6 +63,7 @@ from src.multi_tenant.tenant_config_processor import (
     ConfigRollbackResult,
     ConfigUpdateResult,
     ConfigVersionInfo,
+    NamedConfigSummary,
     get_config_processor,
 )
 from src.multi_tenant.tenant_config_schema import (
@@ -158,6 +171,32 @@ class ConfigRollbackResponse(BaseModel):
     from_version: int = 0
     to_version: int = 0
     new_version: int = 0
+    message: str = ""
+
+
+class NamedConfigSaveRequest(BaseModel):
+    """Request body for saving a named configuration."""
+
+    name: str = Field(
+        description="Configuration name (e.g. 'Holiday Mode', 'Sale Mode')",
+        min_length=1,
+        max_length=64,
+    )
+
+
+class NamedConfigListResponse(BaseModel):
+    """Response listing named configurations."""
+
+    tenant_id: str
+    configs: list[NamedConfigSummary]
+    total: int = 0
+
+
+class NamedConfigDeleteResponse(BaseModel):
+    """Response for named config deletion."""
+
+    success: bool
+    name: str
     message: str = ""
 
 
@@ -715,7 +754,329 @@ async def get_config_version(
 
 
 # ---------------------------------------------------------------------------
-# 10. POST /api/config/rollback — Roll back to a previous version
+# 10. GET /api/config/named — List named configurations (C3)
+# ---------------------------------------------------------------------------
+
+@router.get(
+    "/named",
+    response_model=NamedConfigListResponse,
+    summary="List named configurations",
+    description="Returns all named configurations for the tenant. Named configs are saved snapshots that can be activated to switch the live AI behavior.",
+)
+async def list_named_configs(
+    ctx: TenantContext = Depends(get_tenant_context),
+) -> NamedConfigListResponse:
+    """List all named configurations for the tenant."""
+    processor = get_config_processor()
+    configs = await processor.list_named_configs(ctx.tenant_id)
+
+    return NamedConfigListResponse(
+        tenant_id=ctx.tenant_id,
+        configs=configs,
+        total=len(configs),
+    )
+
+
+# ---------------------------------------------------------------------------
+# 11. POST /api/config/named — Save current config as named (C3)
+# ---------------------------------------------------------------------------
+
+@router.post(
+    "/named",
+    response_model=ConfigUpdateResponse,
+    summary="Save configuration as named",
+    description="Saves the current resolved configuration as a named snapshot. Use names like 'Holiday Mode', 'Sale Mode', etc.",
+    responses={
+        400: {"description": "Invalid or missing name"},
+    },
+)
+async def save_named_config(
+    body: NamedConfigSaveRequest,
+    ctx: TenantContext = Depends(get_tenant_context),
+) -> ConfigUpdateResponse:
+    """Save the current configuration as a named snapshot."""
+    processor = get_config_processor()
+    tier = _resolve_tier(ctx)
+    actor = _derive_actor(ctx)
+
+    if not body.name.strip():
+        raise HTTPException(status_code=400, detail="Configuration name is required")
+
+    result = await processor.save_named_config(
+        tenant_id=ctx.tenant_id,
+        tier=tier,
+        name=body.name.strip(),
+        actor=actor,
+    )
+
+    if not result.success:
+        raise HTTPException(
+            status_code=422,
+            detail={
+                "success": False,
+                "errors": result.validation.errors,
+            },
+        )
+
+    return ConfigUpdateResponse(
+        success=result.success,
+        version=result.version,
+        resolved_config=result.resolved_config,
+    )
+
+
+# ---------------------------------------------------------------------------
+# 12. POST /api/config/named/{name}/activate — Activate a named config (C3)
+# ---------------------------------------------------------------------------
+
+@router.post(
+    "/named/{name}/activate",
+    response_model=ConfigUpdateResponse,
+    summary="Activate named configuration",
+    description="Activates a named configuration, making it the current live config. Creates a new version with the named config's stored values.",
+    responses={
+        404: {"description": "Named configuration not found"},
+    },
+)
+async def activate_named_config(
+    name: str,
+    ctx: TenantContext = Depends(get_tenant_context),
+) -> ConfigUpdateResponse:
+    """Activate a named configuration as the current live config."""
+    processor = get_config_processor()
+    tier = _resolve_tier(ctx)
+    actor = _derive_actor(ctx)
+
+    result = await processor.activate_named_config(
+        tenant_id=ctx.tenant_id,
+        tier=tier,
+        name=name,
+        actor=actor,
+    )
+
+    if not result.success:
+        raise HTTPException(
+            status_code=404,
+            detail=f"Named configuration '{name}' not found",
+        )
+
+    return ConfigUpdateResponse(
+        success=result.success,
+        version=result.version,
+        resolved_config=result.resolved_config,
+    )
+
+
+# ---------------------------------------------------------------------------
+# 13. DELETE /api/config/named/{name} — Delete a named config (C3)
+# ---------------------------------------------------------------------------
+
+@router.delete(
+    "/named/{name}",
+    response_model=NamedConfigDeleteResponse,
+    summary="Delete named configuration",
+    description="Deletes a named configuration. The 'Default' configuration cannot be deleted. The underlying version history is preserved.",
+    responses={
+        400: {"description": "Cannot delete Default configuration"},
+        404: {"description": "Named configuration not found"},
+    },
+)
+async def delete_named_config(
+    name: str,
+    ctx: TenantContext = Depends(get_tenant_context),
+) -> NamedConfigDeleteResponse:
+    """Delete a named configuration."""
+    if name.lower() == "default":
+        raise HTTPException(
+            status_code=400,
+            detail="Cannot delete the Default configuration",
+        )
+
+    processor = get_config_processor()
+    actor = _derive_actor(ctx)
+
+    deleted = await processor.delete_named_config(
+        tenant_id=ctx.tenant_id,
+        name=name,
+        actor=actor,
+    )
+
+    if not deleted:
+        raise HTTPException(
+            status_code=404,
+            detail=f"Named configuration '{name}' not found",
+        )
+
+    return NamedConfigDeleteResponse(
+        success=True,
+        name=name,
+        message=f"Configuration '{name}' deleted",
+    )
+
+
+# ---------------------------------------------------------------------------
+# 14. GET /api/config/widget-appearances — List named widget appearances (C4)
+# ---------------------------------------------------------------------------
+
+@router.get(
+    "/widget-appearances",
+    response_model=NamedConfigListResponse,
+    summary="List named widget appearances",
+    description="Returns all named widget appearances. These are saved snapshots of widget_* visual fields that can be switched independently from AI behavior configs.",
+)
+async def list_widget_appearances(
+    ctx: TenantContext = Depends(get_tenant_context),
+) -> NamedConfigListResponse:
+    """List all named widget appearances for the tenant."""
+    processor = get_config_processor()
+    appearances = await processor.list_named_appearances(ctx.tenant_id)
+
+    return NamedConfigListResponse(
+        tenant_id=ctx.tenant_id,
+        configs=appearances,
+        total=len(appearances),
+    )
+
+
+# ---------------------------------------------------------------------------
+# 15. POST /api/config/widget-appearances — Save current appearance as named (C4)
+# ---------------------------------------------------------------------------
+
+@router.post(
+    "/widget-appearances",
+    response_model=ConfigUpdateResponse,
+    summary="Save widget appearance as named",
+    description="Saves the current widget appearance fields as a named snapshot. Only widget_* visual/behavior fields are included.",
+    responses={
+        400: {"description": "Invalid or missing name"},
+    },
+)
+async def save_widget_appearance(
+    body: NamedConfigSaveRequest,
+    ctx: TenantContext = Depends(get_tenant_context),
+) -> ConfigUpdateResponse:
+    """Save the current widget appearance as a named snapshot."""
+    processor = get_config_processor()
+    tier = _resolve_tier(ctx)
+    actor = _derive_actor(ctx)
+
+    if not body.name.strip():
+        raise HTTPException(status_code=400, detail="Appearance name is required")
+
+    result = await processor.save_named_appearance(
+        tenant_id=ctx.tenant_id,
+        tier=tier,
+        name=body.name.strip(),
+        actor=actor,
+    )
+
+    if not result.success:
+        raise HTTPException(
+            status_code=422,
+            detail={
+                "success": False,
+                "errors": result.validation.errors,
+            },
+        )
+
+    return ConfigUpdateResponse(
+        success=result.success,
+        version=result.version,
+        resolved_config=result.resolved_config,
+    )
+
+
+# ---------------------------------------------------------------------------
+# 16. POST /api/config/widget-appearances/{name}/activate (C4)
+# ---------------------------------------------------------------------------
+
+@router.post(
+    "/widget-appearances/{name}/activate",
+    response_model=ConfigUpdateResponse,
+    summary="Activate named widget appearance",
+    description="Activates a named widget appearance, applying its widget_* field values to the current live config.",
+    responses={
+        404: {"description": "Named appearance not found"},
+    },
+)
+async def activate_widget_appearance(
+    name: str,
+    ctx: TenantContext = Depends(get_tenant_context),
+) -> ConfigUpdateResponse:
+    """Activate a named widget appearance."""
+    processor = get_config_processor()
+    tier = _resolve_tier(ctx)
+    actor = _derive_actor(ctx)
+
+    result = await processor.activate_named_appearance(
+        tenant_id=ctx.tenant_id,
+        tier=tier,
+        name=name,
+        actor=actor,
+    )
+
+    if not result.success:
+        raise HTTPException(
+            status_code=404,
+            detail=f"Named appearance '{name}' not found",
+        )
+
+    return ConfigUpdateResponse(
+        success=result.success,
+        version=result.version,
+        resolved_config=result.resolved_config,
+    )
+
+
+# ---------------------------------------------------------------------------
+# 17. DELETE /api/config/widget-appearances/{name} (C4)
+# ---------------------------------------------------------------------------
+
+@router.delete(
+    "/widget-appearances/{name}",
+    response_model=NamedConfigDeleteResponse,
+    summary="Delete named widget appearance",
+    description="Deletes a named widget appearance. The 'Default' appearance cannot be deleted.",
+    responses={
+        400: {"description": "Cannot delete Default appearance"},
+        404: {"description": "Named appearance not found"},
+    },
+)
+async def delete_widget_appearance(
+    name: str,
+    ctx: TenantContext = Depends(get_tenant_context),
+) -> NamedConfigDeleteResponse:
+    """Delete a named widget appearance."""
+    if name.lower() == "default":
+        raise HTTPException(
+            status_code=400,
+            detail="Cannot delete the Default appearance",
+        )
+
+    processor = get_config_processor()
+    actor = _derive_actor(ctx)
+
+    deleted = await processor.delete_named_appearance(
+        tenant_id=ctx.tenant_id,
+        name=name,
+        actor=actor,
+    )
+
+    if not deleted:
+        raise HTTPException(
+            status_code=404,
+            detail=f"Named appearance '{name}' not found",
+        )
+
+    return NamedConfigDeleteResponse(
+        success=True,
+        name=name,
+        message=f"Appearance '{name}' deleted",
+    )
+
+
+# ---------------------------------------------------------------------------
+# 18. POST /api/config/rollback — Roll back to a previous version
 # ---------------------------------------------------------------------------
 
 @router.post(
@@ -761,6 +1122,149 @@ async def rollback_config(
         to_version=result.to_version,
         new_version=result.new_version,
         message=result.message,
+    )
+
+
+# ---------------------------------------------------------------------------
+# 19. GET /api/config/test-mode — Test Mode status (C2)
+# ---------------------------------------------------------------------------
+
+@router.get(
+    "/test-mode",
+    summary="Get Test Mode status",
+    description="Returns the current Test Mode state: enabled/disabled, percentage, overrides, activation time.",
+    tags=["Test Mode"],
+)
+async def get_test_mode_status(
+    ctx: TenantContext = Depends(get_tenant_context),
+) -> dict[str, Any]:
+    """Return Test Mode status for the current tenant."""
+    from .test_mode_service import get_test_mode_service
+
+    service = get_test_mode_service()
+    return await service.get_status(ctx.tenant_id)
+
+
+# ---------------------------------------------------------------------------
+# 20. POST /api/config/test-mode/activate (C2)
+# ---------------------------------------------------------------------------
+
+class TestModeActivateRequest(BaseModel):
+    overrides: dict[str, Any] = Field(
+        description="AI behaviour field deltas to apply during test mode",
+    )
+    percentage: int = Field(
+        default=10,
+        ge=1,
+        le=50,
+        description="Percentage of sessions routed to test config (1-50)",
+    )
+
+@router.post(
+    "/test-mode/activate",
+    summary="Activate Test Mode",
+    description="Activates Test Mode with the given AI-behaviour overrides and routing percentage.",
+    tags=["Test Mode"],
+)
+async def activate_test_mode(
+    body: TestModeActivateRequest,
+    ctx: TenantContext = Depends(get_tenant_context),
+) -> dict[str, Any]:
+    """Activate Test Mode."""
+    from .test_mode_service import get_test_mode_service
+
+    service = get_test_mode_service()
+    tier = _resolve_tier(ctx)
+    actor = _derive_actor(ctx)
+
+    result = await service.activate(
+        tenant_id=ctx.tenant_id,
+        tier=tier,
+        overrides=body.overrides,
+        percentage=body.percentage,
+        actor=actor,
+    )
+
+    if not result.get("success"):
+        raise HTTPException(status_code=422, detail=result.get("error", "Activation failed"))
+
+    return result
+
+
+# ---------------------------------------------------------------------------
+# 21. POST /api/config/test-mode/deactivate (C2)
+# ---------------------------------------------------------------------------
+
+class TestModeDeactivateRequest(BaseModel):
+    action: str = Field(
+        default="abandon",
+        pattern=r"^(rollout|abandon)$",
+        description="'rollout' merges test overrides into production; 'abandon' discards them.",
+    )
+
+@router.post(
+    "/test-mode/deactivate",
+    summary="Deactivate Test Mode",
+    description="Deactivates Test Mode. 'rollout' merges overrides into production config. 'abandon' discards them.",
+    tags=["Test Mode"],
+)
+async def deactivate_test_mode(
+    body: TestModeDeactivateRequest,
+    ctx: TenantContext = Depends(get_tenant_context),
+) -> dict[str, Any]:
+    """Deactivate Test Mode (rollout or abandon)."""
+    from .test_mode_service import get_test_mode_service
+
+    service = get_test_mode_service()
+    tier = _resolve_tier(ctx)
+    actor = _derive_actor(ctx)
+
+    result = await service.deactivate(
+        tenant_id=ctx.tenant_id,
+        tier=tier,
+        action=body.action,
+        actor=actor,
+    )
+
+    if not result.get("success"):
+        raise HTTPException(status_code=400, detail=result.get("error", "Deactivation failed"))
+
+    return result
+
+
+# ---------------------------------------------------------------------------
+# 22. PUT /api/config/test-mode/percentage (C2)
+# ---------------------------------------------------------------------------
+
+class TestModePercentageRequest(BaseModel):
+    percentage: int = Field(
+        ge=1,
+        le=50,
+        description="New routing percentage (1-50)",
+    )
+
+@router.put(
+    "/test-mode/percentage",
+    summary="Update Test Mode percentage",
+    description="Change the percentage of sessions routed to test config while Test Mode is active.",
+    tags=["Test Mode"],
+)
+async def update_test_mode_percentage(
+    body: TestModePercentageRequest,
+    ctx: TenantContext = Depends(get_tenant_context),
+) -> dict[str, Any]:
+    """Update the test mode routing percentage."""
+    from .test_mode_service import get_test_mode_service
+
+    service = get_test_mode_service()
+    tier = _resolve_tier(ctx)
+    actor = _derive_actor(ctx)
+
+    return await service.update_percentage(
+        tenant_id=ctx.tenant_id,
+        tier=tier,
+        percentage=body.percentage,
+        actor=actor,
     )
 
 

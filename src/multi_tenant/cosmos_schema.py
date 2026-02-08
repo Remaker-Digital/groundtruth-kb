@@ -138,6 +138,7 @@ class ConversationStatus(str, Enum):
     ACTIVE = "active"
     COMPLETED = "completed"
     ESCALATED = "escalated"
+    RESOLVED = "resolved"
     TIMED_OUT = "timed_out"
     ERROR = "error"
 
@@ -313,6 +314,12 @@ class ConversationDocument(BaseModel):
     first_chunk_at: str | None = Field(
         default=None,
         description="ISO 8601 timestamp when first AI token was delivered to client",
+    )
+
+    # Test Mode (C2 — controlled rollout)
+    is_test_mode: bool = Field(
+        default=False,
+        description="Whether this conversation was routed to the test AI configuration",
     )
 
     # TTL — no default TTL; conversations persist in hot storage until
@@ -613,6 +620,16 @@ class PreferencesDocument(BaseModel):
     tenant_id: str = Field(description="Partition key")
     version: int = Field(description="Config version number (monotonically increasing)")
     is_current: bool = Field(default=True, description="Whether this is the active config version")
+    config_name: str | None = Field(
+        default=None,
+        description="Named configuration label (e.g. 'Default', 'Holiday Mode'). "
+                    "'Default' is the undeletable initial production config.",
+    )
+    appearance_name: str | None = Field(
+        default=None,
+        description="Named widget appearance label (e.g. 'Default', 'Dark Theme'). "
+                    "'Default' is the undeletable initial widget appearance.",
+    )
 
     # Brand & tone (onboarding step 1)
     brand_name: str | None = Field(default=None, description="Merchant's brand display name")
@@ -663,6 +680,19 @@ class PreferencesDocument(BaseModel):
     widget_show_branding: bool | None = Field(default=None, description="Show 'Powered by Agent Red' badge")
     widget_mobile_enabled: bool | None = Field(default=None, description="Show widget on mobile devices")
     widget_dark_mode: bool | None = Field(default=None, description="Use dark color scheme")
+    widget_color_mode: str | None = Field(default=None, description="light | dark | auto")
+    widget_header_gradient_end: str | None = Field(default=None, description="Hex color for header gradient end (#RRGGBB)")
+    widget_font_family: str | None = Field(default=None, description="CSS font-family value")
+    widget_border_radius: int | None = Field(default=None, description="Border radius for widget panels (px)")
+    widget_launcher_size: int | None = Field(default=None, description="Launcher button diameter (px)")
+    widget_launcher_icon: str | None = Field(default=None, description="chat | headset | help | custom")
+    widget_header_title: str | None = Field(default=None, description="Widget header title text")
+    widget_header_subtitle: str | None = Field(default=None, description="Widget header subtitle text")
+    widget_agent_bubble_color: str | None = Field(default=None, description="Hex color for agent message bubble background (#RRGGBB)")
+    widget_agent_bubble_text_color: str | None = Field(default=None, description="Hex color for agent message bubble text (#RRGGBB)")
+    widget_customer_bubble_color: str | None = Field(default=None, description="Hex color for customer message bubble background (#RRGGBB)")
+    widget_customer_bubble_text_color: str | None = Field(default=None, description="Hex color for customer message bubble text (#RRGGBB)")
+    widget_launcher_shape: str | None = Field(default=None, description="circle | rounded-square | pill")
 
     # Behavior
     widget_offline_message: str | None = Field(default=None, description="Message when team is offline")
@@ -674,8 +704,14 @@ class PreferencesDocument(BaseModel):
     widget_chat_rating_enabled: bool | None = Field(default=None, description="Post-chat thumbs up/down rating")
     widget_sound_enabled: bool | None = Field(default=None, description="Notification sound for new messages")
     widget_file_upload_enabled: bool | None = Field(default=None, description="Allow visitor file attachments")
+    widget_greeting_enabled: bool | None = Field(default=None, description="Show greeting message on open")
+    widget_greeting_message: str | None = Field(default=None, description="Greeting message text")
+    widget_pre_chat_form_enabled: bool | None = Field(default=None, description="Show pre-chat form before conversation")
+    widget_pre_chat_fields: list[str] = Field(default_factory=list, description="Pre-chat form field names (name, email, phone, etc.)")
+    widget_offline_form_enabled: bool | None = Field(default=None, description="Show offline contact form")
 
     # Content and targeting
+    widget_key: str | None = Field(default=None, description="Publishable widget key (pk_live_...) for widget authentication")
     widget_header_text: str | None = Field(default=None, description="Custom widget header/title text")
     widget_input_placeholder: str | None = Field(default=None, description="Message input placeholder text")
     widget_page_rules: list[str] = Field(default_factory=list, description="URL patterns for page visibility rules")
@@ -710,6 +746,93 @@ class PreferencesDocument(BaseModel):
     fine_tuning_ab_experiment_id: str | None = Field(
         default=None,
         description="Currently active A/B experiment ID (if any)",
+    )
+
+    # Test Mode (C2 — controlled rollout)
+    test_mode_enabled: bool = Field(
+        default=False,
+        description="Whether Test Mode is active for this tenant",
+    )
+    test_mode_percentage: int = Field(
+        default=10,
+        description="Percentage of sessions routed to test config (1-50)",
+    )
+    test_mode_overrides: dict[str, Any] = Field(
+        default_factory=dict,
+        description="AI behavior field deltas applied to test sessions (keys = field names)",
+    )
+    test_mode_assignment_seed: int = Field(
+        default=0,
+        description="Seed for deterministic session assignment (SHA-256 hash)",
+    )
+    test_mode_activated_at: str | None = Field(
+        default=None,
+        description="ISO 8601 timestamp when Test Mode was last activated",
+    )
+
+    # Integrations (onboarding step 7 — C10)
+    shopify_sync_enabled: bool = Field(
+        default=True,
+        description="Auto-sync product data from Shopify store",
+    )
+    zendesk_escalation_enabled: bool = Field(
+        default=False,
+        description="Create Zendesk tickets on escalation (Professional+)",
+    )
+    mailchimp_segment_sync: bool = Field(
+        default=False,
+        description="Sync Mailchimp segments for personalization (Professional+)",
+    )
+    google_analytics_enabled: bool = Field(
+        default=False,
+        description="Export conversation events to GA4 (Professional+)",
+    )
+    # Integration connection metadata (not directly configurable — set by integration flow)
+    shopify_integration_status: str | None = Field(
+        default=None,
+        description="connected | disconnected | error",
+    )
+    zendesk_integration_status: str | None = Field(
+        default=None,
+        description="connected | disconnected | error",
+    )
+    mailchimp_integration_status: str | None = Field(
+        default=None,
+        description="connected | disconnected | error",
+    )
+    google_analytics_integration_status: str | None = Field(
+        default=None,
+        description="connected | disconnected | error",
+    )
+
+    # Retrieval tuning (RAG Phase 1)
+    retrieval_top_k: int | None = Field(
+        default=None,
+        description="Number of KB results to retrieve (1-20, default 5)",
+    )
+    retrieval_vector_weight: float | None = Field(
+        default=None,
+        description="Weight for vector similarity in hybrid search (0.0-1.0, default 0.7)",
+    )
+    retrieval_bm25_weight: float | None = Field(
+        default=None,
+        description="Weight for BM25 keyword matching in hybrid search (0.0-1.0, default 0.3)",
+    )
+    retrieval_min_score: float | None = Field(
+        default=None,
+        description="Minimum relevance score to include a result (0.0-1.0, default 0.1)",
+    )
+
+    # Intent-to-source routing (RAG Phase 1)
+    intent_source_mapping: dict[str, str] | None = Field(
+        default=None,
+        description="Maps intent names to KB entry_type filters, e.g. {'refund': 'policy', 'product_info': 'product'}",
+    )
+
+    # Source citation (RAG Phase 1)
+    cite_sources_in_response: bool = Field(
+        default=False,
+        description="When enabled, append source titles to AI responses",
     )
 
     # Metadata

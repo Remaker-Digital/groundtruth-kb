@@ -13,10 +13,11 @@
 ## Progress Overview
 
 ```mermaid
-pie title Work Item Status (WI #101-226)
+pie title Work Item Status (WI #101-238)
     "Complete" : 81
     "Partially Complete" : 4
-    "Remaining" : 5
+    "Remaining (1.0)" : 5
+    "Backlog (1.1)" : 12
 ```
 
 ```mermaid
@@ -118,10 +119,10 @@ gantt
 
 | # | Work Item | Priority | Status | Rationale |
 |---|-----------|----------|--------|-----------|
-| 119 | Add TenantTier.TRIAL to enum and TIER_DEFAULTS | High | ✅ Complete | TenantTier.TRIAL with 25 conv, 2 rpm, 1 concurrent, 7-day history |
+| 119 | Add TenantTier.TRIAL to enum and TIER_DEFAULTS | High | ✅ Complete | TenantTier.TRIAL with 50 conv, 5 rpm, 2 concurrent, 14-day history |
 | 120 | Implement trial provisioning flow (14-day trial) | High | ✅ Complete | trial_management.py — TrialManager.create_trial() |
 | 121 | Implement trial expiry mechanism | High | ✅ Complete | Expiry scanner, GRACE_PERIOD → DEACTIVATED transitions |
-| 122 | Implement trial conversation cap (25 conversations) | Medium | ✅ Complete | ConversationMeter respects trial tier limits |
+| 122 | Implement trial conversation cap (50 conversations) | Medium | ✅ Complete | ConversationMeter respects trial tier limits |
 | 123 | Implement trial model routing (GPT-4o-mini) | Medium | ✅ Complete | Trial tier model routing in SystemPromptBuilder |
 | 124 | Implement trial → paid conversion flow | High | ✅ Complete | Data preservation, tier upgrade, billing start |
 | 125 | Implement demo data seeder | Medium | ✅ Complete | Sample conversations, profiles, usage data |
@@ -425,6 +426,49 @@ These 63 new work items complement the existing 100 work items in `docs/Master-P
 | WI | Title | Priority | Estimate |
 |----|-------|----------|----------|
 | #226 | Admin contextual tooltips with docs links | P1 | 3-4 days |
+
+---
+
+## Agent Red 1.1 — Widget Enhancement Phases 3-5
+
+> **Source:** `docs/CHAT-WIDGET-ENHANCEMENT-IMPLEMENTATION-PLAN-PROPOSAL.md` (UX designer proposal, 2026-02-07)
+> **Dependency:** Phase 1 (schema alignment) and Phase 2 (visual expansion) completed in 1.0
+> **Priority:** Post-launch — deferred from 1.0
+
+### Phase 3 — Mobile & Layout Controls
+
+Provide per-device widget configuration so merchants can tailor the mobile UX without CSS hacks.
+
+| WI | Title | Priority | Estimate | Details |
+|----|-------|----------|----------|---------|
+| #227 | Mobile position + offset config fields | P2 | 1 day | `widget_mobile_position`, `widget_mobile_offset_x`, `widget_mobile_offset_y` in schema + runtime + admin |
+| #228 | Mobile fullscreen mode | P2 | 1 day | `widget_mobile_fullscreen` — panel takes full viewport on mobile devices |
+| #229 | Panel width/height config | P3 | 0.5 day | `widget_panel_width`, `widget_panel_height` — desktop panel dimensions |
+| #230 | Mobile layout switching in runtime | P2 | 1.5 days | Launcher + panel responsive layout based on mobile config fields |
+
+### Phase 4 — Targeting and Rules Engine
+
+Match advanced targeting behavior (Tidio, Intercom) with structured rulesets evaluated at widget init.
+
+| WI | Title | Priority | Estimate | Details |
+|----|-------|----------|----------|---------|
+| #231 | Targeting rules schema (`widget_rules`) | P2 | 1 day | Structured ruleset model: URL include/exclude, referrer, UTM, time-on-page, scroll depth, exit-intent |
+| #232 | Lightweight rule evaluator in widget | P2 | 2 days | Client-side rule engine evaluating conditions at init and on page events |
+| #233 | Targeting rules admin UI | P2 | 1.5 days | Rule builder in WidgetConfigurator with condition/action pairs |
+| #234 | Exit-intent and scroll-depth triggers | P3 | 1 day | Browser event listeners for exit-intent (mouseleave) and scroll percentage |
+
+### Phase 5 — Localization & Runtime JS API
+
+Enable multi-language support and per-page programmatic overrides.
+
+| WI | Title | Priority | Estimate | Details |
+|----|-------|----------|----------|---------|
+| #235 | Locale packs infrastructure | P2 | 1.5 days | `widget_locale` field (auto/en/es/fr-ca/...), locale file loading, fallback chain |
+| #236 | Localized header/offline text per locale | P2 | 1 day | Per-locale overrides for user-visible strings (header, offline message, placeholder) |
+| #237 | Runtime JS API: setTheme/setLocale | P2 | 1 day | `window.AgentRed.setTheme({...})`, `setLocale(locale)` for per-page overrides |
+| #238 | Runtime JS API: setConfigPartial/setTargetingRules | P3 | 1 day | `setConfigPartial({...})`, `setTargetingRules(rules)` for advanced JS integrations |
+
+**Total Phase 3-5 estimate:** ~13 development days
 
 ---
 

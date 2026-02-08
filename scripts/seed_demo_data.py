@@ -165,7 +165,7 @@ CONVERSATION_TEMPLATES = [
         "topic": "trial",
         "messages": [
             {"role": "customer", "content": "How does the free trial work?"},
-            {"role": "agent", "content": "Our 14-day free trial includes:\n\n- Full Professional-tier features\n- 25 conversations to test with real customers\n- Complete Setup Wizard walkthrough\n- Demo data pre-loaded so you can explore the dashboard\n- No credit card required to start\n\nDuring the trial, you'll see exactly how the AI handles your customers, including the memory system and safety validation. At the end of 14 days, you choose a plan or the trial expires naturally - no surprise charges.\n\nWant to start your trial now?"},
+            {"role": "agent", "content": "Our 14-day free trial includes:\n\n- 50 conversations to test with real customers\n- Layer 1 Persistent Customer Memory\n- Full admin dashboard access\n- Demo data pre-loaded so you can explore immediately\n- No credit card required to start\n\nDuring the trial, you'll see exactly how the AI handles your customers, including the memory system and safety validation. At the end of 14 days, you choose a plan or the trial expires naturally - no surprise charges. Your configuration and knowledge base are preserved when you upgrade.\n\nWant to start your trial now?"},
         ],
         "agents": ["intent-classifier", "knowledge-retrieval", "response-generator", "critic-supervisor"],
         "status": "active",

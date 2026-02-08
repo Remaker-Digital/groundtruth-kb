@@ -202,6 +202,36 @@ class EndConversationRequest(BaseModel):
     )
 
 
+class IssueReportRequest(BaseModel):
+    """Request body for POST /api/chat/conversations/{conversation_id}/issue.
+
+    Allows the customer to report an issue with the AI conversation
+    to the merchant. This is NOT a bug report to Agent Red — it's a
+    structured feedback mechanism from end customers to the merchant.
+
+    C7: Report an Issue widget button.
+    """
+
+    issue_type: str = Field(
+        min_length=1,
+        max_length=100,
+        description="Category of the issue (e.g. 'wrong_information', 'rude_response', 'not_helpful', 'other')",
+    )
+    details: str = Field(
+        default="",
+        max_length=2000,
+        description="Free-text description of the issue",
+    )
+
+
+class IssueReportResponse(BaseModel):
+    """Response body for POST /api/chat/conversations/{conversation_id}/issue."""
+
+    conversation_id: str = Field(description="Conversation the issue was reported on")
+    issue_id: str = Field(description="Assigned issue identifier")
+    accepted: bool = Field(default=True, description="Whether the report was accepted")
+
+
 # ---------------------------------------------------------------------------
 # Response models
 # ---------------------------------------------------------------------------

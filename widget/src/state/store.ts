@@ -43,7 +43,8 @@ export type WidgetView =
   | 'prechat'          // Pre-chat form (if configured)
   | 'conversation'     // Active chat
   | 'rating'           // Post-chat rating prompt
-  | 'offline_form';    // Leave-a-message form
+  | 'offline_form'     // Leave-a-message form
+  | 'issue_report';    // Report an issue form (C7)
 
 // ---------------------------------------------------------------------------
 // Store state

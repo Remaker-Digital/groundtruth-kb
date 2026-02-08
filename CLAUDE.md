@@ -809,6 +809,7 @@ E:\Claude-Playground\CLAUDE-PROJECTS\Agent Red Customer Engagement\
 | UI-UX-COMPETITIVE-ANALYSIS.md | docs/research/ | 5-competitor feature matrix (Tidio, Gorgias, Zendesk, Intercom, Re:amaze) across 10 dimensions — **ALL PRICING VERIFIED 2026-02-01** |
 | DEPLOYMENT-RUNBOOK.md | docs/operations/ | Deployment procedure, DR Option A, maintenance runbook |
 | OPTION-C-UPGRADE-PATH.md | docs/operations/ | Geo-replication trigger criteria, migration steps, cost impact |
+| **SHOPIFY-APP-REVIEW-PREFLIGHT-CHECKLIST.md** | **docs/operations/** | **Copy-of-record** for Shopify App Store submission — canonical checklist (all other checklists defer to this document) |
 
 ---
 
@@ -1410,7 +1411,7 @@ Implemented 20+ work items across 3 sessions. Major deliverables:
 
 - [x] **WI #164-169/#182: Chat API (Phase 3.0 Build Phase 1)** — `src/chat/` package (4 modules, ~1,700 lines). models.py (StreamEvent SSE format, 7 event types), session.py (ConversationSession lifecycle), pipeline.py (6-agent orchestrator with stream-then-validate), endpoints.py (6 routes: start, message, SSE stream, state, end, WebSocket).
 - [x] **WI #170: Widget key authentication** — `pk_live_{hash}_{random}` publishable keys scoped to `/api/chat/*`. Third auth path in auth.py. find_by_widget_key_hash() in TenantRepository.
-- [x] **WI #119: Trial tier** — TenantTier.TRIAL enum, TIER_DEFAULTS for trial (25 conv, 2 rpm, 1 concurrent, 7-day history, Layer 1 only), TrialConfigDocument schema, trial-aware provisioning in provisioning.py.
+- [x] **WI #119: Trial tier** — TenantTier.TRIAL enum, TIER_DEFAULTS for trial (50 conv, 5 rpm, 2 concurrent, 14-day history, Layer 1 only), TrialConfigDocument schema, trial-aware provisioning in provisioning.py.
 - [x] **WI #171: Admin Conversation Inbox API** — `admin_conversation_api.py` (5 endpoints: list, detail, messages, assign, notes).
 - [x] **WI #175: Admin Knowledge Base API** — `admin_knowledge_api.py` (5 endpoints: CRUD + search).
 - [x] **WI #176-178: Admin Analytics API** — `admin_analytics_api.py` (3 endpoints: summary, intents, gaps).

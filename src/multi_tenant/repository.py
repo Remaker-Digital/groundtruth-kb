@@ -1705,6 +1705,68 @@ class PreferencesRepository(TenantScopedRepository):
             max_items=max_items,
         )
 
+    async def list_named(
+        self, tenant_id: str,
+    ) -> list[dict[str, Any]]:
+        """List all preference versions that have a config_name."""
+        return await self.query(
+            tenant_id=tenant_id,
+            query_text=(
+                "SELECT * FROM c "
+                "WHERE c.config_name != null "
+                "ORDER BY c.version DESC"
+            ),
+            max_items=50,
+        )
+
+    async def get_by_name(
+        self, tenant_id: str, config_name: str,
+    ) -> dict[str, Any] | None:
+        """Get a preference version by config_name."""
+        results = await self.query(
+            tenant_id=tenant_id,
+            query_text=(
+                "SELECT * FROM c "
+                "WHERE c.config_name = @config_name "
+                "ORDER BY c.version DESC"
+            ),
+            parameters=[{"name": "@config_name", "value": config_name}],
+            max_items=1,
+        )
+        return results[0] if results else None
+
+    # ---- Named widget appearance queries (C4) ----
+
+    async def list_named_appearances(
+        self, tenant_id: str,
+    ) -> list[dict[str, Any]]:
+        """List all preference versions that have an appearance_name."""
+        return await self.query(
+            tenant_id=tenant_id,
+            query_text=(
+                "SELECT * FROM c "
+                "WHERE c.appearance_name != null "
+                "ORDER BY c.version DESC"
+            ),
+            max_items=50,
+        )
+
+    async def get_by_appearance_name(
+        self, tenant_id: str, appearance_name: str,
+    ) -> dict[str, Any] | None:
+        """Get a preference version by appearance_name."""
+        results = await self.query(
+            tenant_id=tenant_id,
+            query_text=(
+                "SELECT * FROM c "
+                "WHERE c.appearance_name = @appearance_name "
+                "ORDER BY c.version DESC"
+            ),
+            parameters=[{"name": "@appearance_name", "value": appearance_name}],
+            max_items=1,
+        )
+        return results[0] if results else None
+
 
 # ---------------------------------------------------------------------------
 # Collection 8: TeamMemberRepository (WI #179)

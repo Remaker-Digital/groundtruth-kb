@@ -36,6 +36,7 @@ import { WidgetPage } from './pages/Widget';
 import { BillingPage } from './pages/Billing';
 import { TeamPage } from './pages/Team';
 import { OnboardingPage } from './pages/Onboarding';
+import { IntegrationsPage } from './pages/Integrations';
 
 // ---------------------------------------------------------------------------
 // Agent Red brand theme — copied from prototype/src/main.tsx
@@ -162,6 +163,7 @@ const App: React.FC = () => {
             <Route path="/widget" element={<WidgetPage />} />
             <Route path="/billing" element={<BillingPage />} />
             <Route path="/team" element={<TeamPage />} />
+            <Route path="/integrations" element={<IntegrationsPage />} />
             <Route path="/onboarding" element={<OnboardingPage />} />
             <Route path="*" element={<Navigate to="/" replace />} />
           </Routes>

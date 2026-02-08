@@ -144,8 +144,12 @@ scripts/generate-exec-summary-pdf.mjs
 # =============================================================================
 local/
 scratch/
+scratchpad/
 temp/
 tmp/
+
+# Test fixture binary files (uploaded documents for RAG testing)
+tests/rag-documents-upload/
 
 # =============================================================================
 # CLI Tools (downloaded binaries)

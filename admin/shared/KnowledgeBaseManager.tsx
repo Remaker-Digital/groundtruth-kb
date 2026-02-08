@@ -372,19 +372,21 @@ const FileUploadZone: React.FC<FileUploadZoneProps> = ({ onFileSelected, uploadi
 // ---------------------------------------------------------------------------
 
 interface URLImportFormProps {
-  onImport: (url: string) => void;
+  onImport: (url: string, crawl: boolean, maxPages: number) => void;
   importing: boolean;
   error: string | null;
 }
 
 const URLImportForm: React.FC<URLImportFormProps> = ({ onImport, importing, error }) => {
   const [url, setUrl] = useState('');
+  const [crawl, setCrawl] = useState(false);
+  const [maxPages, setMaxPages] = useState(10);
 
   const handleSubmit = useCallback(() => {
     const trimmed = url.trim();
     if (!trimmed) return;
-    onImport(trimmed);
-  }, [url, onImport]);
+    onImport(trimmed, crawl, maxPages);
+  }, [url, crawl, maxPages, onImport]);
 
   return (
     <div>
@@ -408,8 +410,58 @@ const URLImportForm: React.FC<URLImportFormProps> = ({ onImport, importing, erro
           {importing ? 'Importing...' : 'Import'}
         </button>
       </div>
-      <span style={{ display: 'block', fontSize: '12px', color: COLOR_TEXT_SECONDARY, marginTop: '4px' }}>
-        We'll extract text content from the page and create knowledge base entries.
+
+      {/* Import mode: single page vs crawl */}
+      <div style={{ marginTop: '12px', display: 'flex', gap: '16px', alignItems: 'center' }}>
+        <label style={{ display: 'flex', alignItems: 'center', gap: '6px', fontSize: '13px', color: COLOR_TEXT, cursor: 'pointer' }}>
+          <input
+            type="radio"
+            name="crawl_mode"
+            checked={!crawl}
+            onChange={() => setCrawl(false)}
+            disabled={importing}
+            style={{ accentColor: BRAND_PRIMARY }}
+          />
+          Single page
+        </label>
+        <label style={{ display: 'flex', alignItems: 'center', gap: '6px', fontSize: '13px', color: COLOR_TEXT, cursor: 'pointer' }}>
+          <input
+            type="radio"
+            name="crawl_mode"
+            checked={crawl}
+            onChange={() => setCrawl(true)}
+            disabled={importing}
+            style={{ accentColor: BRAND_PRIMARY }}
+          />
+          Crawl site
+          <HelpTooltip text="Follow links on the same domain and import multiple pages automatically." />
+        </label>
+
+        {crawl && (
+          <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+            <label style={{ fontSize: '12px', color: COLOR_TEXT_SECONDARY, whiteSpace: 'nowrap' as const }}>
+              Max pages:
+            </label>
+            <input
+              type="number"
+              value={maxPages}
+              onChange={(e) => {
+                const v = parseInt(e.target.value, 10);
+                if (!isNaN(v)) setMaxPages(Math.max(1, Math.min(50, v)));
+              }}
+              min={1}
+              max={50}
+              disabled={importing}
+              style={inputStyle({ width: '70px', padding: '4px 8px', fontSize: '13px' })}
+            />
+          </div>
+        )}
+      </div>
+
+      <span style={{ display: 'block', fontSize: '12px', color: COLOR_TEXT_SECONDARY, marginTop: '8px' }}>
+        {crawl
+          ? `We'll follow same-domain links and import up to ${maxPages} pages.`
+          : "We'll extract text content from the page and create knowledge base entries."}
       </span>
       {error && (
         <div style={{
@@ -498,6 +550,10 @@ const ArticleEditor: React.FC<ArticleEditorProps> = ({
       content: content.trim(),
       category: resolvedCategory,
       status,
+      // Backend requires entry_type — default to 'custom' for manual articles
+      entry_type: 'custom',
+      // Pass category as metadata for backend storage
+      metadata: { category: resolvedCategory },
     });
   }, [article.id, title, content, category, newCategory, showNewCategory, status, onSave]);
 
@@ -886,11 +942,12 @@ export const KnowledgeBaseManager: React.FC<BaseComponentProps> = ({
   );
 
   const handleUrlImport = useCallback(
-    async (url: string) => {
-      const result = await importUrl(url);
+    async (url: string, crawl: boolean, maxPages: number) => {
+      const result = await importUrl(url, undefined, crawl, maxPages);
       if (result) {
         setUploadResult(result);
-        onNotify(`Imported ${result.entries_created} entries from URL`, 'success');
+        const label = crawl ? `Crawled and imported ${result.entries_created} entries` : `Imported ${result.entries_created} entries from URL`;
+        onNotify(label, 'success');
       } else {
         onNotify('URL import failed', 'error');
       }

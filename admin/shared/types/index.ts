@@ -29,7 +29,19 @@ export interface TenantContext {
 // Config
 // ---------------------------------------------------------------------------
 
-export type ConfigFieldType = 'string' | 'number' | 'boolean' | 'select' | 'textarea' | 'color' | 'json';
+export type ConfigFieldType = 'string' | 'number' | 'integer' | 'float' | 'boolean' | 'select' | 'textarea' | 'color' | 'json' | 'object';
+
+/** Validation constraints for a config field. */
+export interface ValidationRule {
+  required?: boolean;
+  minLength?: number;
+  maxLength?: number;
+  minValue?: number;
+  maxValue?: number;
+  pattern?: string;
+  allowedValues?: string[];
+  maxItems?: number;
+}
 
 export interface ConfigField {
   key: string;
@@ -46,6 +58,8 @@ export interface ConfigField {
   tierGate?: TenantTier;
   stepOrder: number;
   group: string;
+  /** Validation constraints from the backend config schema. */
+  validation?: ValidationRule;
 }
 
 export interface ConfigVersion {
@@ -190,6 +204,7 @@ export interface KBArticle {
   content: string;
   category: string;
   status: KBArticleStatus;
+  entryType?: string;
   is_active?: boolean;
   createdAt: string;
   updatedAt: string;
@@ -273,6 +288,34 @@ export interface TeamMember {
   updatedAt: string;
   lastLoginAt: string | null;
   invitedBy: string | null;
+}
+
+// ---------------------------------------------------------------------------
+// Integrations (C10)
+// ---------------------------------------------------------------------------
+
+export type IntegrationType = 'shopify' | 'zendesk' | 'mailchimp' | 'google_analytics';
+export type IntegrationStatus = 'connected' | 'disconnected' | 'error' | null;
+
+export interface IntegrationSummary {
+  type: IntegrationType;
+  name: string;
+  description: string;
+  icon: string;
+  enabled: boolean;
+  status: IntegrationStatus;
+  tierGate: string | null;
+  tierMet: boolean;
+}
+
+export interface IntegrationDetail extends IntegrationSummary {
+  configFields: Array<{ key: string; label: string; type: string }>;
+}
+
+export interface IntegrationResponse {
+  success: boolean;
+  message: string;
+  integration: IntegrationSummary | null;
 }
 
 // ---------------------------------------------------------------------------

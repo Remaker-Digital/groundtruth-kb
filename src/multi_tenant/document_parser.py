@@ -67,6 +67,8 @@ CHARS_PER_TOKEN = 4  # approximation for English text
 # URL scraping
 URL_FETCH_TIMEOUT = 30  # seconds
 MAX_URL_REDIRECTS = 5
+CRAWL_DEFAULT_MAX_PAGES = 10
+CRAWL_MAX_PAGES_HARD_LIMIT = 50
 
 
 # ---------------------------------------------------------------------------
@@ -712,6 +714,135 @@ async def parse_url(
             source_url=url,
             error=f"HTML parsing failed: {exc}",
         )
+
+
+# ---------------------------------------------------------------------------
+# URL crawling — multi-page import (C5)
+# ---------------------------------------------------------------------------
+
+
+async def crawl_url(
+    start_url: str,
+    max_pages: int = CRAWL_DEFAULT_MAX_PAGES,
+    chunk_size: int = DEFAULT_CHUNK_SIZE,
+    chunk_overlap: int = DEFAULT_CHUNK_OVERLAP,
+) -> list[ParseResult]:
+    """Crawl a website starting from *start_url*, following same-domain links.
+
+    Fetches the start page, extracts all ``<a href="...">`` links on the
+    same domain, then recursively follows them up to *max_pages* total pages.
+
+    Each successfully fetched page is parsed independently via :func:`parse_url`
+    and returned as a separate :class:`ParseResult`.  Pages that fail to fetch
+    or parse are silently skipped (logged as warnings).
+
+    Args:
+        start_url: The seed URL to begin crawling from.
+        max_pages: Maximum number of pages to fetch (1-50).  Clamped to
+            ``CRAWL_MAX_PAGES_HARD_LIMIT``.
+        chunk_size: Target chunk size in tokens for each page's text.
+        chunk_overlap: Overlap between consecutive chunks in tokens.
+
+    Returns:
+        A list of :class:`ParseResult` instances, one per successfully
+        parsed page.  The first element is always the start page (if it
+        succeeded).
+    """
+    try:
+        from bs4 import BeautifulSoup  # noqa: F811
+    except ImportError:
+        return [
+            ParseResult(
+                source_type="url",
+                source_url=start_url,
+                error="URL crawling requires 'beautifulsoup4'. Install: pip install beautifulsoup4>=4.12.0",
+            )
+        ]
+
+    import httpx
+    from urllib.parse import urljoin, urlparse
+
+    max_pages = max(1, min(max_pages, CRAWL_MAX_PAGES_HARD_LIMIT))
+    start_parsed = urlparse(start_url)
+    base_domain = start_parsed.netloc.lower()
+
+    visited: set[str] = set()
+    queue: list[str] = [start_url]
+    results: list[ParseResult] = []
+
+    async with httpx.AsyncClient(
+        follow_redirects=True,
+        max_redirects=MAX_URL_REDIRECTS,
+        timeout=URL_FETCH_TIMEOUT,
+    ) as client:
+        while queue and len(results) < max_pages:
+            url = queue.pop(0)
+            # Normalise for dedup (strip fragment)
+            normalised = urlparse(url)._replace(fragment="").geturl()
+            if normalised in visited:
+                continue
+            visited.add(normalised)
+
+            try:
+                response = await client.get(url)
+                response.raise_for_status()
+            except Exception as fetch_exc:
+                logger.warning("Crawl: failed to fetch %s: %s", url, fetch_exc)
+                continue
+
+            content_type = response.headers.get("content-type", "")
+            if "text/html" not in content_type and "application/xhtml" not in content_type:
+                logger.debug("Crawl: skipping non-HTML %s (%s)", url, content_type)
+                continue
+
+            if len(response.content) > MAX_URL_SIZE:
+                logger.warning("Crawl: page too large %s (%d bytes)", url, len(response.content))
+                continue
+
+            html = response.text
+
+            # --- Extract same-domain links for the queue ---
+            try:
+                soup = BeautifulSoup(html, "html.parser")
+                for anchor in soup.find_all("a", href=True):
+                    href = anchor["href"]
+                    absolute = urljoin(url, href)
+                    link_parsed = urlparse(absolute)
+                    # Same domain only, HTTP(S) only, strip fragment for dedup
+                    if (
+                        link_parsed.scheme in ("http", "https")
+                        and link_parsed.netloc.lower() == base_domain
+                    ):
+                        clean = link_parsed._replace(fragment="").geturl()
+                        if clean not in visited:
+                            queue.append(clean)
+            except Exception as link_exc:
+                logger.warning("Crawl: link extraction error on %s: %s", url, link_exc)
+
+            # --- Parse this page ---
+            page_result = await parse_url(
+                url,
+                chunk_size=chunk_size,
+                chunk_overlap=chunk_overlap,
+            )
+            if page_result.success:
+                results.append(page_result)
+                logger.info(
+                    "Crawl: parsed %s (%d chunks, %d chars)",
+                    url,
+                    len(page_result.chunks),
+                    page_result.total_chars,
+                )
+            else:
+                logger.warning("Crawl: parse failed for %s: %s", url, page_result.error)
+
+    logger.info(
+        "Crawl complete: start=%s pages_fetched=%d/%d",
+        start_url,
+        len(results),
+        max_pages,
+    )
+    return results
 
 
 # ---------------------------------------------------------------------------

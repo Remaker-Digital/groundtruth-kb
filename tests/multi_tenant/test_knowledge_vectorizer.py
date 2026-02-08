@@ -901,23 +901,31 @@ class TestPipelineIntegration:
         # Mock the vectorizer singleton
         mock_vectorizer = AsyncMock(spec=KnowledgeVectorizer)
         mock_vectorizer._configured = True
-        mock_vectorizer.search = AsyncMock(return_value=[
+        search_results = [
             {
                 "id": "kb-001",
                 "title": "Return Policy",
                 "content": "30 day returns.",
                 "entry_type": "policy",
+                "score": 0.85,
                 "rrf_score": 0.85,
                 "vector_rank": 1,
                 "bm25_rank": 1,
                 "vector_similarity": 0.90,
                 "bm25_score": 4.0,
             },
-        ])
+        ]
+        mock_vectorizer.search = AsyncMock(return_value=search_results)
 
         with patch(
             "src.multi_tenant.knowledge_vectorizer.get_knowledge_vectorizer",
             return_value=mock_vectorizer,
+        ), patch(
+            "src.multi_tenant.knowledge_vectorizer.KnowledgeVectorizer.format_for_pipeline",
+            return_value={
+                "context": "Return Policy: 30 day returns.",
+                "sources": [{"title": "Return Policy"}],
+            },
         ):
             result = await pipeline._call_knowledge_retrieval_direct(
                 message="How do I return an item?",

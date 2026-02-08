@@ -24,7 +24,8 @@
 9. [Performance & Load Tests (~30 Tests)](#9-performance--load-tests-30-tests)
 10. [Trial / Demo Environment Tests (~20 Tests)](#10-trial--demo-environment-tests-20-tests)
 11. [UI-Type × Task-Type Validation Tests (~100 Tests)](#11-ui-type--task-type-validation-tests-100-tests)
-12. [Summary & Metrics](#12-summary--metrics)
+12. [Launch UI Tests — Manual Browser Workflows (~93 Steps)](#12-launch-ui-tests--manual-browser-workflows-93-steps)
+13. [Summary & Metrics](#13-summary--metrics)
 
 ---
 
@@ -1304,7 +1305,46 @@ These are infrastructure-as-code validation tests (run via `terraform validate` 
 
 ---
 
-## 12. Summary & Metrics
+## 12. Launch UI Tests — Manual Browser Workflows (~93 Steps)
+
+Manual, browser-based end-to-end workflow tests executed in Chrome against the live
+production backend. These tests validate the complete merchant journey and must pass
+before Shopify App Store submission.
+
+Full test specifications with prerequisites, capability dependencies, and step-by-step
+procedures are maintained in dedicated documents under `docs/tests/`.
+
+### 12.1 Standalone Admin (LUIT-SA) — 93 Steps
+
+**Document:** `docs/tests/LAUNCH-UI-TEST-STANDALONE-ADMIN.md`
+
+| Section | Steps | Scope |
+|---------|-------|-------|
+| Authentication | LUIT-SA-01 to SA-04 (4) | Password gate, API key login, dashboard landing |
+| Dashboard | LUIT-SA-05 to SA-08 (4) | Tenant data, branding, Test Mode toggle, chat widget |
+| Knowledge Base | LUIT-SA-09 to SA-18 (10) | CRUD, file upload (PDF/DOCX/CSV/TXT), URL import |
+| Analytics | LUIT-SA-19 to SA-23 (5) | Charts, time period, Test Mode filter |
+| Configuration | LUIT-SA-24 to SA-34 (11) | Named configs, save/restore/delete, branding toggle |
+| Widget Appearance | LUIT-SA-35 to SA-41 (7) | Named appearances, preview, save/restore/delete |
+| Inbox | LUIT-SA-42 to SA-47 (6) | Filters, assignment, escalation, search, resolve |
+| Billing | LUIT-SA-48 to SA-50 (3) | Usage data, Stripe test checkout |
+| Team | LUIT-SA-51 to SA-53 (3) | Delete, invite team members |
+| Integrations | LUIT-SA-54 to SA-56 (3) | Configure, activate, delete integrations |
+| Setup Wizard | LUIT-SA-57 to SA-70 (14) | All steps, validation, help, tooltips, escalation |
+| Chat Pre-Test-Mode | LUIT-SA-71 to SA-75 (5) | KB hit, streaming, escalation, inbox verification |
+| Review & Test Mode | LUIT-SA-76 to SA-83 (8) | Test population %, activation, input locking |
+| Chat During Test Mode | LUIT-SA-84 to SA-87 (4) | Verify AI under test config, Test Mode tagging |
+| Test Mode Deactivation | LUIT-SA-88 to SA-90 (3) | Roll-out/Abandon, wizard redirect |
+| Session Management | LUIT-SA-91 to SA-93 (3) | Refresh persistence, logout, password gate |
+
+**Capability dependencies (16 items):** See full document for implementation status of
+each required capability (C1-C16). Test is blocked until all dependencies are implemented.
+
+**Launch UI Test Subtotal: 93 steps**
+
+---
+
+## 13. Summary & Metrics
 
 ### Test Count by Priority
 
@@ -1319,7 +1359,8 @@ These are infrastructure-as-code validation tests (run via `terraform validate` 
 | — | Performance & load | 30 | ❌ Not started |
 | — | Trial / demo environment | 20 | ❌ Not started |
 | — | UI-type × task-type | 100 | ❌ Not started |
-| **Total** | | **~880** | |
+| — | Launch UI (manual browser) | 93 | ❌ Not started (16 capability dependencies) |
+| **Total** | | **~973** | |
 
 ### Test Count by Module Under Test
 

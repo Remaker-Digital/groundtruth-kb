@@ -168,13 +168,10 @@ export const ApiKeyLogin: React.FC<ApiKeyLoginProps> = ({ onLogin }) => {
   const brandBlock = (
     <div style={{ textAlign: 'center', marginBottom: '32px' }}>
       <img
-        src="/admin/standalone/icon-master.svg"
+        src="/admin/standalone/primary-logo-no-wordmark.svg"
         alt="Agent Red"
-        style={{ width: '48px', height: '48px', marginBottom: '16px' }}
+        style={{ width: '200px', height: 'auto', marginBottom: '16px' }}
       />
-      <h1 style={{ margin: '0 0 4px', fontSize: '20px', fontWeight: 600, color: '#f5f5f5' }}>
-        Agent Red
-      </h1>
       <p style={{ margin: 0, fontSize: '14px', color: '#a0a0a0' }}>
         Customer Experience Admin
       </p>

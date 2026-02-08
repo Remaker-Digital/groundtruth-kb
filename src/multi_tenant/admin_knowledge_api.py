@@ -52,7 +52,7 @@ logger = logging.getLogger(__name__)
 # Valid entry types
 # ---------------------------------------------------------------------------
 
-VALID_ENTRY_TYPES = {"product", "faq", "policy", "custom"}
+VALID_ENTRY_TYPES = {"product", "faq", "policy", "custom", "article"}
 
 
 # ---------------------------------------------------------------------------
@@ -104,7 +104,8 @@ class CreateKnowledgeEntryRequest(BaseModel):
     model_config = ConfigDict(alias_generator=to_camel, populate_by_name=True)
 
     entry_type: str = Field(
-        description="Entry type: product, faq, policy, or custom",
+        default="article",
+        description="Entry type: product, faq, policy, article, or custom",
     )
     title: str = Field(
         min_length=1,
@@ -203,6 +204,16 @@ class URLImportRequest(BaseModel):
     entry_type: str = Field(
         default="custom",
         description="Entry type for imported content",
+    )
+    crawl: bool = Field(
+        default=False,
+        description="If true, follow same-domain links and import multiple pages",
+    )
+    max_pages: int = Field(
+        default=10,
+        ge=1,
+        le=50,
+        description="Maximum number of pages to crawl (1-50)",
     )
 
 
@@ -837,7 +848,10 @@ async def import_knowledge_from_url(
     Scrapes the page, extracts main text content, and creates KB entries.
     Navigation, scripts, and non-content elements are stripped.
 
-    Maximum page size: 4 MB.
+    When ``crawl`` is true, follows same-domain links starting from the
+    given URL and imports up to ``max_pages`` pages (default 10, max 50).
+
+    Maximum page size: 4 MB per page.
     """
     repo = _get_repo()
 
@@ -855,25 +869,69 @@ async def import_knowledge_from_url(
             detail="URL must start with http:// or https://",
         )
 
-    # Parse the URL
-    from src.multi_tenant.document_parser import chunks_to_kb_entries, parse_url
+    from src.multi_tenant.document_parser import chunks_to_kb_entries, crawl_url, parse_url
 
-    parse_result = await parse_url(url)
+    all_entries: list[dict[str, Any]] = []
+    total_chars = 0
+    source_type = "url"
 
-    if not parse_result.success:
-        raise HTTPException(
-            status_code=422,
-            detail=f"URL import failed: {parse_result.error}",
+    if request.crawl:
+        # ---- Crawl mode: follow same-domain links ----
+        crawl_results = await crawl_url(
+            start_url=url,
+            max_pages=request.max_pages,
         )
 
-    # Convert chunks to KB entries
-    entries = chunks_to_kb_entries(
-        parse_result=parse_result,
-        tenant_id=ctx.tenant_id,
-        default_entry_type=request.entry_type,
-    )
+        if not crawl_results:
+            raise HTTPException(
+                status_code=422,
+                detail="Crawl completed but no pages could be parsed. "
+                "Check that the URL is reachable and contains HTML content.",
+            )
 
-    if not entries:
+        for page_result in crawl_results:
+            page_entries = chunks_to_kb_entries(
+                parse_result=page_result,
+                tenant_id=ctx.tenant_id,
+                default_entry_type=request.entry_type,
+            )
+            all_entries.extend(page_entries)
+            total_chars += page_result.total_chars
+
+        logger.info(
+            "URL crawl: url=%s pages=%d entries=%d chars=%d tenant=%s",
+            url,
+            len(crawl_results),
+            len(all_entries),
+            total_chars,
+            ctx.tenant_id[:8],
+        )
+    else:
+        # ---- Single page mode ----
+        parse_result = await parse_url(url)
+
+        if not parse_result.success:
+            raise HTTPException(
+                status_code=422,
+                detail=f"URL import failed: {parse_result.error}",
+            )
+
+        all_entries = chunks_to_kb_entries(
+            parse_result=parse_result,
+            tenant_id=ctx.tenant_id,
+            default_entry_type=request.entry_type,
+        )
+        total_chars = parse_result.total_chars
+
+        logger.info(
+            "URL imported: url=%s entries=%d chars=%d tenant=%s",
+            url,
+            len(all_entries),
+            total_chars,
+            ctx.tenant_id[:8],
+        )
+
+    if not all_entries:
         raise HTTPException(
             status_code=422,
             detail="No content could be extracted from the URL.",
@@ -883,35 +941,27 @@ async def import_knowledge_from_url(
     entry_ids: list[str] = []
     from src.multi_tenant.cosmos_schema import KnowledgeBaseDocument
 
-    for entry_dict in entries:
+    for entry_dict in all_entries:
         doc = KnowledgeBaseDocument(**entry_dict)
         await repo.create(ctx.tenant_id, doc)
         entry_ids.append(entry_dict["id"])
 
-    parent_id = entries[0].get("parent_entry_id") if len(entries) > 1 else None
-
-    logger.info(
-        "URL imported: url=%s entries=%d chars=%d tenant=%s",
-        url,
-        len(entries),
-        parse_result.total_chars,
-        ctx.tenant_id[:8],
-    )
+    parent_id = all_entries[0].get("parent_entry_id") if len(all_entries) > 1 else None
 
     # Trigger batch embedding (non-blocking, best-effort)
     if _knowledge_vectorizer:
         try:
-            await _knowledge_vectorizer.embed_batch(ctx.tenant_id, entries)
+            await _knowledge_vectorizer.embed_batch(ctx.tenant_id, all_entries)
         except Exception as embed_exc:
             logger.warning(
                 "Batch embedding after URL import failed (non-blocking): %s", embed_exc
             )
 
     return UploadResultResponse(
-        source_type=parse_result.source_type,
+        source_type=source_type,
         source_url=url,
-        entries_created=len(entries),
-        total_chars=parse_result.total_chars,
+        entries_created=len(all_entries),
+        total_chars=total_chars,
         entry_ids=entry_ids,
         parent_entry_id=parent_id,
     )

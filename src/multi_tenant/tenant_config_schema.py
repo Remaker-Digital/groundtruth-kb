@@ -574,6 +574,125 @@ def _build_field_registry() -> dict[str, ConfigFieldDefinition]:
         injected_in_prompt=True,
     ))
 
+    # --- Retrieval tuning (RAG Phase 1) ---
+
+    fields.append(ConfigFieldDefinition(
+        field_name="retrieval_top_k",
+        display_name="Results to Retrieve",
+        field_type=ConfigFieldType.INTEGER,
+        validation=ValidationRule(min_value=1, max_value=20),
+        platform_default=5,
+        onboarding_step=OnboardingStep.KNOWLEDGE_BASE,
+        step_order=3,
+        tooltip="How many knowledge base results the AI considers per query.",
+        description=(
+            "Higher values give the AI more context to draw from but may "
+            "include less relevant results. Lower values focus on the most "
+            "relevant matches. Default: 5."
+        ),
+        doc_link=f"{DOCS_BASE_URL}/configuration/knowledge-base#retrieval-tuning",
+        affects_agents=["knowledge-retrieval"],
+        injected_in_prompt=False,
+    ))
+
+    fields.append(ConfigFieldDefinition(
+        field_name="retrieval_vector_weight",
+        display_name="Semantic Search Weight",
+        field_type=ConfigFieldType.FLOAT,
+        validation=ValidationRule(min_value=0.0, max_value=1.0),
+        platform_default=0.7,
+        onboarding_step=OnboardingStep.KNOWLEDGE_BASE,
+        step_order=4,
+        tooltip="How much to weight meaning-based search vs keyword matching.",
+        description=(
+            "Controls the balance between semantic similarity (understands "
+            "meaning) and keyword matching (exact words). Higher values "
+            "favor semantic understanding. Default: 0.7 (70% semantic)."
+        ),
+        doc_link=f"{DOCS_BASE_URL}/configuration/knowledge-base#retrieval-tuning",
+        affects_agents=["knowledge-retrieval"],
+        injected_in_prompt=False,
+    ))
+
+    fields.append(ConfigFieldDefinition(
+        field_name="retrieval_bm25_weight",
+        display_name="Keyword Match Weight",
+        field_type=ConfigFieldType.FLOAT,
+        validation=ValidationRule(min_value=0.0, max_value=1.0),
+        platform_default=0.3,
+        onboarding_step=OnboardingStep.KNOWLEDGE_BASE,
+        step_order=5,
+        tooltip="How much to weight keyword matching in search results.",
+        description=(
+            "Complements semantic search weight. Higher values favor exact "
+            "keyword matches. Useful when your knowledge base uses specific "
+            "terminology customers search for. Default: 0.3 (30% keywords)."
+        ),
+        doc_link=f"{DOCS_BASE_URL}/configuration/knowledge-base#retrieval-tuning",
+        affects_agents=["knowledge-retrieval"],
+        injected_in_prompt=False,
+    ))
+
+    fields.append(ConfigFieldDefinition(
+        field_name="retrieval_min_score",
+        display_name="Minimum Relevance Score",
+        field_type=ConfigFieldType.FLOAT,
+        validation=ValidationRule(min_value=0.0, max_value=1.0),
+        platform_default=0.1,
+        onboarding_step=OnboardingStep.KNOWLEDGE_BASE,
+        step_order=6,
+        tooltip="Minimum relevance score for a result to be included.",
+        description=(
+            "Results below this threshold are discarded. Higher values "
+            "mean stricter filtering — the AI only uses highly relevant "
+            "content. Lower values include more results but may reduce "
+            "answer precision. Default: 0.1."
+        ),
+        doc_link=f"{DOCS_BASE_URL}/configuration/knowledge-base#retrieval-tuning",
+        affects_agents=["knowledge-retrieval"],
+        injected_in_prompt=False,
+    ))
+
+    fields.append(ConfigFieldDefinition(
+        field_name="cite_sources_in_response",
+        display_name="Cite Sources in Responses",
+        field_type=ConfigFieldType.BOOLEAN,
+        validation=ValidationRule(),
+        platform_default=False,
+        onboarding_step=OnboardingStep.KNOWLEDGE_BASE,
+        step_order=7,
+        tooltip="Append source article titles to AI responses.",
+        description=(
+            "When enabled, the AI appends a 'Sources:' line to its "
+            "responses listing the knowledge base articles it referenced. "
+            "Helps customers verify information and builds trust."
+        ),
+        doc_link=f"{DOCS_BASE_URL}/configuration/knowledge-base#source-citation",
+        affects_agents=["response-generator"],
+        injected_in_prompt=False,
+    ))
+
+    fields.append(ConfigFieldDefinition(
+        field_name="intent_source_mapping",
+        display_name="Intent-to-Source Routing",
+        field_type=ConfigFieldType.OBJECT,
+        validation=ValidationRule(),
+        platform_default=None,
+        onboarding_step=OnboardingStep.KNOWLEDGE_BASE,
+        step_order=8,
+        tier_gate=TierGate.PROFESSIONAL_PLUS,
+        tooltip="Route specific question types to specific knowledge sources.",
+        description=(
+            "Maps customer intent categories to knowledge base entry types. "
+            "For example: {\"refund\": \"policy\", \"product_info\": \"product\"}. "
+            "When set, the AI only searches the specified source type for "
+            "that intent, improving relevance. Leave empty for automatic routing."
+        ),
+        doc_link=f"{DOCS_BASE_URL}/configuration/knowledge-base#intent-routing",
+        affects_agents=["knowledge-retrieval"],
+        injected_in_prompt=False,
+    ))
+
     # ===================================================================
     # Step 5: Business Policies
     # ===================================================================
@@ -1234,7 +1353,258 @@ def _build_field_registry() -> dict[str, ConfigFieldDefinition]:
         affects_agents=[],
     ))
 
+    fields.append(ConfigFieldDefinition(
+        field_name="widget_color_mode",
+        display_name="Color Mode",
+        field_type=ConfigFieldType.ENUM,
+        validation=ValidationRule(
+            allowed_values=["light", "dark", "auto"],
+        ),
+        platform_default="auto",
+        onboarding_step=OnboardingStep.WIDGET_APPEARANCE,
+        step_order=24,
+        tooltip="Widget color scheme: light, dark, or auto (follows visitor's OS preference).",
+        description=(
+            "Controls the overall color scheme. 'auto' detects the visitor's OS "
+            "dark mode preference. Supersedes the Dark Mode toggle when set to "
+            "'light' or 'dark'."
+        ),
+        doc_link=f"{DOCS_BASE_URL}/configuration/widget-appearance#color-mode",
+        affects_agents=[],
+    ))
+
+    fields.append(ConfigFieldDefinition(
+        field_name="widget_header_gradient_end",
+        display_name="Header Gradient End Color",
+        field_type=ConfigFieldType.STRING,
+        validation=ValidationRule(
+            pattern=r"^#[0-9A-Fa-f]{6}$",
+        ),
+        platform_default=None,
+        onboarding_step=OnboardingStep.WIDGET_APPEARANCE,
+        step_order=25,
+        tooltip="End color for the header gradient. Start color is your primary color.",
+        description=(
+            "Creates a linear gradient from your primary color to this color "
+            "in the widget header. Leave blank for a solid primary color header."
+        ),
+        placeholder="#8B1520",
+        doc_link=f"{DOCS_BASE_URL}/configuration/widget-appearance#header-gradient",
+        affects_agents=[],
+    ))
+
+    fields.append(ConfigFieldDefinition(
+        field_name="widget_font_family",
+        display_name="Font Family",
+        field_type=ConfigFieldType.STRING,
+        validation=ValidationRule(
+            max_length=200,
+        ),
+        platform_default="Inter, system-ui, sans-serif",
+        onboarding_step=OnboardingStep.WIDGET_APPEARANCE,
+        step_order=26,
+        tooltip="CSS font-family for widget text.",
+        description=(
+            "The font stack used in the widget. Defaults to Inter. "
+            "Use any web-safe font or Google Font that is loaded on your storefront."
+        ),
+        placeholder="Inter, system-ui, sans-serif",
+        doc_link=f"{DOCS_BASE_URL}/configuration/widget-appearance#font",
+        affects_agents=[],
+    ))
+
+    fields.append(ConfigFieldDefinition(
+        field_name="widget_border_radius",
+        display_name="Border Radius",
+        field_type=ConfigFieldType.INTEGER,
+        validation=ValidationRule(
+            min_value=0,
+            max_value=32,
+        ),
+        platform_default=8,
+        onboarding_step=OnboardingStep.WIDGET_APPEARANCE,
+        step_order=27,
+        tooltip="Corner rounding for the widget panel and inputs (px).",
+        description=(
+            "Controls how rounded corners are on the widget panel, input fields, "
+            "and message bubbles. 0 = square corners, 16 = very rounded."
+        ),
+        doc_link=f"{DOCS_BASE_URL}/configuration/widget-appearance#border-radius",
+        affects_agents=[],
+    ))
+
+    fields.append(ConfigFieldDefinition(
+        field_name="widget_launcher_size",
+        display_name="Launcher Button Size",
+        field_type=ConfigFieldType.INTEGER,
+        validation=ValidationRule(
+            min_value=40,
+            max_value=80,
+        ),
+        platform_default=60,
+        onboarding_step=OnboardingStep.WIDGET_APPEARANCE,
+        step_order=28,
+        tooltip="Diameter of the floating launcher button (px).",
+        description=(
+            "The size of the circular chat button in the corner of the page. "
+            "40px = compact, 60px = standard, 80px = large."
+        ),
+        doc_link=f"{DOCS_BASE_URL}/configuration/widget-appearance#launcher-size",
+        affects_agents=[],
+    ))
+
+    fields.append(ConfigFieldDefinition(
+        field_name="widget_launcher_icon",
+        display_name="Launcher Icon",
+        field_type=ConfigFieldType.ENUM,
+        validation=ValidationRule(
+            allowed_values=["chat", "headset", "help", "custom"],
+        ),
+        platform_default="chat",
+        onboarding_step=OnboardingStep.WIDGET_APPEARANCE,
+        step_order=29,
+        tooltip="Icon displayed on the launcher button.",
+        description=(
+            "The icon inside the floating launcher button. "
+            "'chat' = speech bubble, 'headset' = support headset, "
+            "'help' = question mark, 'custom' = use your logo."
+        ),
+        doc_link=f"{DOCS_BASE_URL}/configuration/widget-appearance#launcher-icon",
+        affects_agents=[],
+    ))
+
+    fields.append(ConfigFieldDefinition(
+        field_name="widget_header_title",
+        display_name="Header Title",
+        field_type=ConfigFieldType.STRING,
+        validation=ValidationRule(
+            max_length=100,
+        ),
+        platform_default=None,
+        onboarding_step=OnboardingStep.WIDGET_APPEARANCE,
+        step_order=30,
+        tooltip="Title text displayed in the widget header.",
+        description=(
+            "The main title shown at the top of the chat panel. "
+            "If blank, defaults to 'Support' or your agent display name."
+        ),
+        placeholder="e.g. Support, Chat with us",
+        doc_link=f"{DOCS_BASE_URL}/configuration/widget-appearance#header-title",
+        affects_agents=[],
+    ))
+
+    fields.append(ConfigFieldDefinition(
+        field_name="widget_header_subtitle",
+        display_name="Header Subtitle",
+        field_type=ConfigFieldType.STRING,
+        validation=ValidationRule(
+            max_length=200,
+        ),
+        platform_default=None,
+        onboarding_step=OnboardingStep.WIDGET_APPEARANCE,
+        step_order=31,
+        tooltip="Subtitle text below the header title.",
+        description=(
+            "A short description shown below the header title. "
+            "Use it to set response time expectations."
+        ),
+        placeholder="e.g. We typically reply within minutes",
+        doc_link=f"{DOCS_BASE_URL}/configuration/widget-appearance#header-subtitle",
+        affects_agents=[],
+    ))
+
     # --- 9B: Behavior controls ---
+
+    fields.append(ConfigFieldDefinition(
+        field_name="widget_greeting_enabled",
+        display_name="Greeting Message",
+        field_type=ConfigFieldType.BOOLEAN,
+        validation=ValidationRule(),
+        platform_default=True,
+        onboarding_step=OnboardingStep.WIDGET_APPEARANCE,
+        step_order=32,
+        tooltip="Show a greeting message when the widget opens.",
+        description=(
+            "When enabled, a welcome message appears at the top of the "
+            "conversation when the visitor opens the chat widget."
+        ),
+        doc_link=f"{DOCS_BASE_URL}/configuration/widget-appearance#greeting",
+        affects_agents=[],
+    ))
+
+    fields.append(ConfigFieldDefinition(
+        field_name="widget_greeting_message",
+        display_name="Greeting Text",
+        field_type=ConfigFieldType.TEXT,
+        validation=ValidationRule(
+            max_length=500,
+        ),
+        platform_default="Hi there! How can I help you today?",
+        onboarding_step=OnboardingStep.WIDGET_APPEARANCE,
+        step_order=33,
+        tooltip="The greeting text displayed when chat opens.",
+        description=(
+            "Customize the welcome message visitors see. "
+            "Supports template variables: {{brand_name}}, {{agent_name}}."
+        ),
+        placeholder="e.g. Hi there! How can I help you today?",
+        doc_link=f"{DOCS_BASE_URL}/configuration/widget-appearance#greeting-text",
+        affects_agents=[],
+    ))
+
+    fields.append(ConfigFieldDefinition(
+        field_name="widget_pre_chat_form_enabled",
+        display_name="Pre-Chat Form",
+        field_type=ConfigFieldType.BOOLEAN,
+        validation=ValidationRule(),
+        platform_default=False,
+        onboarding_step=OnboardingStep.WIDGET_APPEARANCE,
+        step_order=34,
+        tooltip="Collect visitor info before starting a conversation.",
+        description=(
+            "When enabled, visitors must fill in selected fields (name, email, "
+            "phone, etc.) before they can start chatting."
+        ),
+        doc_link=f"{DOCS_BASE_URL}/configuration/widget-appearance#pre-chat-form",
+        affects_agents=[],
+    ))
+
+    fields.append(ConfigFieldDefinition(
+        field_name="widget_pre_chat_fields",
+        display_name="Pre-Chat Form Fields",
+        field_type=ConfigFieldType.STRING_LIST,
+        validation=ValidationRule(
+            max_items=6,
+            allowed_values=["name", "email", "phone", "company", "order_number", "subject"],
+        ),
+        platform_default=[],
+        onboarding_step=OnboardingStep.WIDGET_APPEARANCE,
+        step_order=35,
+        tooltip="Which fields to show in the pre-chat form.",
+        description=(
+            "Select the fields visitors must complete before chatting. "
+            "'name' and 'email' are most common."
+        ),
+        doc_link=f"{DOCS_BASE_URL}/configuration/widget-appearance#pre-chat-fields",
+        affects_agents=[],
+    ))
+
+    fields.append(ConfigFieldDefinition(
+        field_name="widget_offline_form_enabled",
+        display_name="Offline Contact Form",
+        field_type=ConfigFieldType.BOOLEAN,
+        validation=ValidationRule(),
+        platform_default=True,
+        onboarding_step=OnboardingStep.WIDGET_APPEARANCE,
+        step_order=36,
+        tooltip="Show a leave-a-message form when all agents are offline.",
+        description=(
+            "When enabled and all human agents are offline, visitors can "
+            "leave a message with their email for follow-up."
+        ),
+        doc_link=f"{DOCS_BASE_URL}/configuration/widget-appearance#offline-form",
+        affects_agents=[],
+    ))
 
     fields.append(ConfigFieldDefinition(
         field_name="widget_offline_message",

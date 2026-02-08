@@ -83,6 +83,7 @@ export interface DesignTokens {
 
   // Sizing
   launcherSize: string;
+  launcherBorderRadius: string;
   panelWidth: string;
   panelHeight: string;
   headerHeight: string;
@@ -117,6 +118,19 @@ export interface WidgetConfig {
   widget_show_branding?: boolean | null;
   widget_mobile_enabled?: boolean | null;
   widget_dark_mode?: boolean | null;
+  widget_color_mode?: 'light' | 'dark' | 'auto' | null;
+  widget_header_gradient_end?: string | null;
+  widget_font_family?: string | null;
+  widget_border_radius?: number | null;
+  widget_launcher_size?: number | null;
+  widget_launcher_icon?: 'chat' | 'headset' | 'help' | 'custom' | null;
+  widget_header_title?: string | null;
+  widget_header_subtitle?: string | null;
+  widget_agent_bubble_color?: string | null;
+  widget_agent_bubble_text_color?: string | null;
+  widget_customer_bubble_color?: string | null;
+  widget_customer_bubble_text_color?: string | null;
+  widget_launcher_shape?: 'circle' | 'rounded-square' | 'pill' | null;
   widget_offline_message?: string | null;
   widget_auto_open?: boolean | null;
   widget_auto_open_delay?: number | null;
@@ -126,6 +140,11 @@ export interface WidgetConfig {
   widget_chat_rating_enabled?: boolean | null;
   widget_sound_enabled?: boolean | null;
   widget_file_upload_enabled?: boolean | null;
+  widget_greeting_enabled?: boolean | null;
+  widget_greeting_message?: string | null;
+  widget_pre_chat_form_enabled?: boolean | null;
+  widget_pre_chat_fields?: string[] | null;
+  widget_offline_form_enabled?: boolean | null;
   widget_header_text?: string | null;
   widget_input_placeholder?: string | null;
   widget_page_rules?: string[] | null;
@@ -185,7 +204,14 @@ function contrastText(bgHex: string): string {
 export function resolveTokens(config: WidgetConfig): DesignTokens {
   const primary = config.widget_primary_color || DEFAULTS.primaryColor;
   const bg = config.widget_background_color || DEFAULTS.backgroundColor;
-  const isDark = config.widget_dark_mode === true;
+  // color_mode supersedes dark_mode boolean when set
+  const isDark = config.widget_color_mode === 'dark'
+    || (config.widget_color_mode === 'auto' && typeof window !== 'undefined' && window.matchMedia?.('(prefers-color-scheme: dark)').matches)
+    || (config.widget_color_mode == null && config.widget_dark_mode === true);
+  const customFont = config.widget_font_family;
+  const customRadius = config.widget_border_radius;
+  const customLauncherSize = config.widget_launcher_size;
+  const launcherShape = config.widget_launcher_shape || 'circle';
 
   // Shared structural tokens (Zapier-derived)
   const base: Omit<DesignTokens,
@@ -197,7 +223,7 @@ export function resolveTokens(config: WidgetConfig): DesignTokens {
     | 'colorError' | 'colorSuccess' | 'colorOverlay'
   > = {
     // Typography — Inter (brand), JetBrains Mono (code)
-    fontFamily: "'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif",
+    fontFamily: customFont || "'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif",
     fontFamilyMono: "'JetBrains Mono', 'Fira Code', 'Cascadia Code', monospace",
     fontSizeXs: '11px',
     fontSizeSm: '12px',
@@ -224,7 +250,7 @@ export function resolveTokens(config: WidgetConfig): DesignTokens {
     space12: '48px',
 
     // Borders (Zapier: subtle, 1px, medium radius)
-    borderRadius: '8px',
+    borderRadius: customRadius != null ? `${customRadius}px` : '8px',
     borderRadiusSm: '4px',
     borderRadiusLg: '12px',
     borderRadiusFull: '9999px',
@@ -236,7 +262,10 @@ export function resolveTokens(config: WidgetConfig): DesignTokens {
     shadowLg: '0 8px 24px rgba(0,0,0,0.15)',
 
     // Sizing
-    launcherSize: '60px',
+    launcherSize: customLauncherSize != null ? `${customLauncherSize}px` : '60px',
+    launcherBorderRadius: launcherShape === 'rounded-square' ? '16px'
+      : launcherShape === 'pill' ? '28px'
+      : '9999px', // circle (default)
     panelWidth: '380px',
     panelHeight: '520px',
     headerHeight: '64px',
@@ -268,10 +297,10 @@ export function resolveTokens(config: WidgetConfig): DesignTokens {
       colorText: '#F0F0F0',
       colorTextSecondary: '#AAAAAA',
       colorTextMuted: '#777777',
-      colorAgentBubble: '#2A2A2A',
-      colorAgentBubbleText: '#F0F0F0',
-      colorCustomerBubble: primary,
-      colorCustomerBubbleText: contrastText(primary),
+      colorAgentBubble: config.widget_agent_bubble_color || '#2A2A2A',
+      colorAgentBubbleText: config.widget_agent_bubble_text_color || '#F0F0F0',
+      colorCustomerBubble: config.widget_customer_bubble_color || primary,
+      colorCustomerBubbleText: config.widget_customer_bubble_text_color || contrastText(config.widget_customer_bubble_color || primary),
       colorError: '#EF4444',
       colorSuccess: '#22C55E',
       colorOverlay: 'rgba(0, 0, 0, 0.6)',
@@ -290,10 +319,10 @@ export function resolveTokens(config: WidgetConfig): DesignTokens {
     colorText: '#1A1A1A',
     colorTextSecondary: '#6B6B6B',
     colorTextMuted: '#9A9A9A',
-    colorAgentBubble: '#F0F0F2',
-    colorAgentBubbleText: '#1A1A1A',
-    colorCustomerBubble: primary,
-    colorCustomerBubbleText: contrastText(primary),
+    colorAgentBubble: config.widget_agent_bubble_color || '#F0F0F2',
+    colorAgentBubbleText: config.widget_agent_bubble_text_color || '#1A1A1A',
+    colorCustomerBubble: config.widget_customer_bubble_color || primary,
+    colorCustomerBubbleText: config.widget_customer_bubble_text_color || contrastText(config.widget_customer_bubble_color || primary),
     colorError: '#DC2626',
     colorSuccess: '#16A34A',
     colorOverlay: 'rgba(0, 0, 0, 0.4)',

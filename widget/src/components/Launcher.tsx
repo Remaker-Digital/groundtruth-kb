@@ -26,6 +26,7 @@ interface LauncherProps {
   offsetY: number;
   isOpen: boolean;
   unreadCount: number;
+  launcherIcon: 'chat' | 'headset' | 'help';
   onClick: () => void;
 }
 
@@ -40,8 +41,12 @@ export const Launcher: FunctionComponent<LauncherProps> = ({
   offsetY,
   isOpen,
   unreadCount,
+  launcherIcon,
   onClick,
 }) => {
+  const LauncherIconComponent = launcherIcon === 'headset' ? HeadsetIcon
+    : launcherIcon === 'help' ? HelpIcon
+    : ChatIcon;
   const positionStyle = position === 'bottom-right'
     ? { right: `${offsetX}px`, left: 'auto' }
     : { left: `${offsetX}px`, right: 'auto' };
@@ -59,7 +64,7 @@ export const Launcher: FunctionComponent<LauncherProps> = ({
         zIndex: tokens.zIndexLauncher,
         width: tokens.launcherSize,
         height: tokens.launcherSize,
-        borderRadius: tokens.borderRadiusFull,
+        borderRadius: tokens.launcherBorderRadius,
         backgroundColor: tokens.colorPrimary,
         color: tokens.colorPrimaryText,
         border: 'none',
@@ -80,8 +85,8 @@ export const Launcher: FunctionComponent<LauncherProps> = ({
         (e.currentTarget as HTMLElement).style.backgroundColor = tokens.colorPrimary;
       }}
     >
-      {/* Chat icon (open state) / Close icon (closed state) */}
-      {isOpen ? <CloseIcon size={24} /> : <ChatIcon size={28} />}
+      {/* Launcher icon (open state shows close) */}
+      {isOpen ? <CloseIcon size={24} /> : <LauncherIconComponent size={28} />}
 
       {/* Unread badge */}
       {!isOpen && unreadCount > 0 && (
@@ -129,6 +134,43 @@ function ChatIcon({ size }: { size: number }) {
       stroke-linejoin="round"
     >
       <path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z" />
+    </svg>
+  );
+}
+
+function HeadsetIcon({ size }: { size: number }) {
+  return (
+    <svg
+      width={size}
+      height={size}
+      viewBox="0 0 24 24"
+      fill="none"
+      stroke="currentColor"
+      stroke-width="2"
+      stroke-linecap="round"
+      stroke-linejoin="round"
+    >
+      <path d="M3 18v-6a9 9 0 0 1 18 0v6" />
+      <path d="M21 19a2 2 0 0 1-2 2h-1a2 2 0 0 1-2-2v-3a2 2 0 0 1 2-2h3zM3 19a2 2 0 0 0 2 2h1a2 2 0 0 0 2-2v-3a2 2 0 0 0-2-2H3z" />
+    </svg>
+  );
+}
+
+function HelpIcon({ size }: { size: number }) {
+  return (
+    <svg
+      width={size}
+      height={size}
+      viewBox="0 0 24 24"
+      fill="none"
+      stroke="currentColor"
+      stroke-width="2"
+      stroke-linecap="round"
+      stroke-linejoin="round"
+    >
+      <circle cx="12" cy="12" r="10" />
+      <path d="M9.09 9a3 3 0 0 1 5.83 1c0 2-3 3-3 3" />
+      <line x1="12" y1="17" x2="12.01" y2="17" />
     </svg>
   );
 }

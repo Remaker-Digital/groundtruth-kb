@@ -240,6 +240,7 @@ export const KnowledgeBasePage: React.FC = () => {
       category: form.category,
       content: form.content,
       status: form.status as KBArticleStatus,
+      entryType: 'article',
     };
     if (editingArticle) articleData.id = editingArticle.id;
 

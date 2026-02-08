@@ -139,3 +139,16 @@ export async function submitRating(
   });
   return resp.ok;
 }
+
+/** Report an issue with the conversation (C7). */
+export async function reportIssue(
+  conversationId: string,
+  issueType: string,
+  details: string,
+): Promise<boolean> {
+  const resp = await request('POST', `/api/chat/conversations/${conversationId}/issue`, {
+    issue_type: issueType,
+    details,
+  });
+  return resp.ok;
+}

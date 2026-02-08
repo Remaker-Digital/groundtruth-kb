@@ -175,6 +175,7 @@ async function init(
         offsetY: config.widget_offset_y ?? 20,
         isOpen: state.view !== 'closed',
         unreadCount: state.unreadCount,
+        launcherIcon: (config.widget_launcher_icon as 'chat' | 'headset' | 'help') || 'chat',
         onClick: toggleWidget,
       }),
       shadowRoot,

@@ -22,6 +22,8 @@ import {
   usePolling,
   useConversationMessages,
   useAssignConversation,
+  useEscalateConversation,
+  useResolveConversation,
   useTeamMembers,
 } from './hooks';
 import { HelpTooltip } from './HelpTooltip';
@@ -47,6 +49,7 @@ const STATUS_COLORS: Record<string, string> = {
   active: COLOR_SUCCESS,
   ended: COLOR_GRAY,
   escalated: COLOR_DANGER,
+  resolved: '#6f42c1',
   idle: '#e36209',
   timed_out: '#e36209',
   error: COLOR_DANGER,
@@ -56,6 +59,7 @@ const STATUS_LABELS: Record<string, string> = {
   active: 'Active',
   ended: 'Ended',
   escalated: 'Escalated',
+  resolved: 'Resolved',
   idle: 'Idle',
   timed_out: 'Timed Out',
   error: 'Error',
@@ -596,6 +600,12 @@ export const ConversationInbox: React.FC<BaseComponentProps> = ({
   // Assign conversation
   const { assign, loading: assigning } = useAssignConversation(apiFetch);
 
+  // Escalate conversation
+  const { escalate, loading: escalating } = useEscalateConversation(apiFetch);
+
+  // Resolve conversation
+  const { resolve, loading: resolving } = useResolveConversation(apiFetch);
+
   // Auto-scroll to bottom of messages when selected or messages change
   useEffect(() => {
     if (messagesEndRef.current) {
@@ -622,6 +632,34 @@ export const ConversationInbox: React.FC<BaseComponentProps> = ({
     onNotify('Note added successfully', 'success');
     refetchMessages();
   }, [onNotify, refetchMessages]);
+
+  const handleEscalate = useCallback(
+    async (conversationId: string) => {
+      try {
+        await escalate(conversationId);
+        onNotify('Conversation escalated to human support', 'success');
+        refetchInbox();
+      } catch (err: unknown) {
+        const msg = err instanceof Error ? err.message : 'Escalation failed';
+        onNotify(msg, 'error');
+      }
+    },
+    [escalate, onNotify, refetchInbox],
+  );
+
+  const handleResolve = useCallback(
+    async (conversationId: string) => {
+      try {
+        await resolve(conversationId);
+        onNotify('Conversation marked as resolved', 'success');
+        refetchInbox();
+      } catch (err: unknown) {
+        const msg = err instanceof Error ? err.message : 'Failed to resolve conversation';
+        onNotify(msg, 'error');
+      }
+    },
+    [resolve, onNotify, refetchInbox],
+  );
 
   // Group messages by date for day separators
   const groupedMessages: Array<{ dateLabel: string; messages: ConversationMessage[] }> = [];
@@ -753,6 +791,46 @@ export const ConversationInbox: React.FC<BaseComponentProps> = ({
                 )}
               </div>
               <div style={{ display: 'flex', gap: '8px' }}>
+                {selectedConversation?.status !== 'escalated' && selectedConversation?.status !== 'resolved' && (
+                  <button
+                    disabled={escalating}
+                    onClick={() => selectedId && handleEscalate(selectedId)}
+                    style={{
+                      padding: '6px 12px',
+                      border: `1px solid ${COLOR_DANGER}`,
+                      borderRadius: BORDER_RADIUS,
+                      backgroundColor: COLOR_WHITE,
+                      color: COLOR_DANGER,
+                      fontSize: '12px',
+                      fontFamily: FONT_FAMILY,
+                      cursor: escalating ? 'not-allowed' : 'pointer',
+                      fontWeight: 500,
+                      opacity: escalating ? 0.7 : 1,
+                    }}
+                  >
+                    {escalating ? 'Escalating...' : 'Escalate'}
+                  </button>
+                )}
+                {selectedConversation?.status !== 'resolved' && (
+                  <button
+                    disabled={resolving}
+                    onClick={() => selectedId && handleResolve(selectedId)}
+                    style={{
+                      padding: '6px 12px',
+                      border: '1px solid #6f42c1',
+                      borderRadius: BORDER_RADIUS,
+                      backgroundColor: COLOR_WHITE,
+                      color: '#6f42c1',
+                      fontSize: '12px',
+                      fontFamily: FONT_FAMILY,
+                      cursor: resolving ? 'not-allowed' : 'pointer',
+                      fontWeight: 500,
+                      opacity: resolving ? 0.7 : 1,
+                    }}
+                  >
+                    {resolving ? 'Resolving...' : 'Mark Resolved'}
+                  </button>
+                )}
                 <button
                   onClick={() => setShowAssignModal(true)}
                   style={{

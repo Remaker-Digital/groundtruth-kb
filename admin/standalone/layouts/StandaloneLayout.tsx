@@ -52,8 +52,18 @@ interface TenantContext {
   hasStripeBilling: boolean;
 }
 
+interface TestModeState {
+  enabled: boolean;
+  percentage: number;
+  overrides: Record<string, unknown>;
+  activatedAt: string | null;
+  overrideFieldCount: number;
+}
+
 interface AppContextValue {
   tenantContext: TenantContext | null;
+  testMode: TestModeState | null;
+  refetchTestMode: () => void;
   apiFetch: (path: string, init?: RequestInit) => Promise<Response>;
   onNotify: (message: string, type: 'success' | 'error' | 'warning' | 'info') => void;
   loading: boolean;
@@ -124,6 +134,11 @@ const Icons = {
       <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z" /><polyline points="14 2 14 8 20 8" /><line x1="16" y1="13" x2="8" y2="13" /><line x1="16" y1="17" x2="8" y2="17" /><polyline points="10 9 9 9 8 9" />
     </svg>
   ),
+  integrations: () => (
+    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+      <path d="M10 13a5 5 0 0 0 7.54.54l3-3a5 5 0 0 0-7.07-7.07l-1.72 1.71" /><path d="M14 11a5 5 0 0 0-7.54-.54l-3 3a5 5 0 0 0 7.07 7.07l1.71-1.71" />
+    </svg>
+  ),
 };
 
 type NavPage = {
@@ -141,6 +156,7 @@ const navItems: NavPage[] = [
   { path: '/configuration', label: 'Configuration', icon: 'config' },
   { path: '/widget', label: 'Widget', icon: 'widget' },
   { path: '/team', label: 'Team', icon: 'team' },
+  { path: '/integrations', label: 'Integrations', icon: 'integrations' },
   { path: '/billing', label: 'Billing', icon: 'billing' },
   { path: '/onboarding', label: 'Setup Wizard', icon: 'onboarding' },
 ];
@@ -237,6 +253,35 @@ export const StandaloneLayout: React.FC<StandaloneLayoutProps> = ({
     return () => { cancelled = true; };
   }, [apiFetch, onLogout]);
 
+  // ---- Test Mode status polling (C1) --------------------------------------
+
+  const [testMode, setTestMode] = useState<TestModeState | null>(null);
+
+  const refetchTestMode = useCallback(async () => {
+    try {
+      const resp = await apiFetch('/api/config/test-mode');
+      if (!resp.ok) return;
+      const data = await resp.json();
+      setTestMode({
+        enabled: data.enabled ?? false,
+        percentage: data.percentage ?? 10,
+        overrides: data.overrides ?? {},
+        activatedAt: data.activated_at ?? null,
+        overrideFieldCount: data.override_field_count ?? 0,
+      });
+    } catch {
+      // silently ignore — test mode indicator won't show
+    }
+  }, [apiFetch]);
+
+  useEffect(() => {
+    if (!tenantContext) return;
+    refetchTestMode();
+    // Poll every 30 seconds to keep indicator up to date
+    const interval = setInterval(refetchTestMode, 30_000);
+    return () => clearInterval(interval);
+  }, [tenantContext, refetchTestMode]);
+
   // ---- Chat widget injection (auto-embed for admin users) ----------------
 
   useEffect(() => {
@@ -296,6 +341,8 @@ export const StandaloneLayout: React.FC<StandaloneLayoutProps> = ({
 
   const contextValue: AppContextValue = {
     tenantContext,
+    testMode,
+    refetchTestMode,
     apiFetch,
     onNotify,
     loading,
@@ -351,6 +398,29 @@ export const StandaloneLayout: React.FC<StandaloneLayoutProps> = ({
                 <Badge variant="light" color="green" size="sm" tt="capitalize">
                   {tenantContext.tier}
                 </Badge>
+              )}
+              {/* Test Mode indicator (C1) */}
+              {testMode?.enabled && (
+                <Tooltip
+                  label={`Test Mode active — ${testMode.percentage}% of sessions routed to test config (${testMode.overrideFieldCount} field${testMode.overrideFieldCount !== 1 ? 's' : ''} overridden)`}
+                  position="bottom"
+                  multiline
+                  w={260}
+                >
+                  <Badge
+                    variant="light"
+                    color="orange"
+                    size="sm"
+                    style={{ cursor: 'default' }}
+                    leftSection={
+                      <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+                        <path d="M14.7 6.3a1 1 0 0 0 0 1.4l1.6 1.6a1 1 0 0 0 1.4 0l3.77-3.77a6 6 0 0 1-7.94 7.94l-6.91 6.91a2.12 2.12 0 0 1-3-3l6.91-6.91a6 6 0 0 1 7.94-7.94l-3.76 3.76z" />
+                      </svg>
+                    }
+                  >
+                    Test Mode {testMode.percentage}%
+                  </Badge>
+                </Tooltip>
               )}
               {/* Dark mode toggle */}
               <ActionIcon

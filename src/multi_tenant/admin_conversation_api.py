@@ -1,4 +1,4 @@
-"""Admin Conversation Inbox API — merchant conversation management (WI #171).
+"""Admin Conversation Inbox API — merchant conversation management (WI #171, C8, C9).
 
 Provides REST endpoints for the merchant admin dashboard's Conversation
 Inbox component:
@@ -7,6 +7,8 @@ Inbox component:
     GET  /api/admin/conversations/{id}         — Full conversation detail
     GET  /api/admin/conversations/{id}/messages — Message history
     POST /api/admin/conversations/{id}/assign  — Assign to human agent
+    POST /api/admin/conversations/{id}/escalate — Escalate to human support (C8)
+    POST /api/admin/conversations/{id}/resolve — Mark as resolved (C9)
     POST /api/admin/conversations/{id}/notes   — Add internal note
 
 All endpoints derive tenant_id from the authenticated TenantContext — never
@@ -152,6 +154,26 @@ class AssignAgentResponse(BaseModel):
     assigned_at: str
 
 
+class EscalateConversationResponse(BaseModel):
+    """Response for successful conversation escalation."""
+
+    model_config = ConfigDict(alias_generator=to_camel, populate_by_name=True)
+
+    conversation_id: str
+    status: str
+    escalated_at: str
+
+
+class ResolveConversationResponse(BaseModel):
+    """Response for successful conversation resolution."""
+
+    model_config = ConfigDict(alias_generator=to_camel, populate_by_name=True)
+
+    conversation_id: str
+    status: str
+    resolved_at: str
+
+
 class AddNoteRequest(BaseModel):
     """Request body for POST /api/admin/conversations/{id}/notes."""
 
@@ -280,7 +302,7 @@ router = APIRouter(prefix="/api/admin/conversations", tags=["admin-inbox"])
 async def list_conversations(
     status: str | None = Query(
         None,
-        description="Filter by status (active, completed, escalated, timed_out, error)",
+        description="Filter by status (active, completed, escalated, resolved, timed_out, error)",
     ),
     customer_id: str | None = Query(
         None,
@@ -521,6 +543,144 @@ async def assign_agent(
         conversation_id=conversation_id,
         assigned_to=request.agent_id,
         assigned_at=now,
+    )
+
+
+# ---------------------------------------------------------------------------
+# POST /api/admin/conversations/{conversation_id}/escalate — Escalate
+# ---------------------------------------------------------------------------
+
+
+@router.post(
+    "/{conversation_id}/escalate",
+    response_model=EscalateConversationResponse,
+    summary="Escalate conversation to human support",
+    description="Marks a conversation as escalated, flagging it for human agent attention. The AI agent stops responding and the conversation appears in the escalated queue.",
+    responses={
+        404: {"description": "Conversation not found"},
+        409: {"description": "Conversation already escalated or resolved"},
+        503: {"description": "Admin conversation services not initialized"},
+    },
+)
+async def escalate_conversation(
+    conversation_id: str,
+    ctx: TenantContext = Depends(get_tenant_context),
+) -> EscalateConversationResponse:
+    """Escalate a conversation to human support.
+
+    Marks the conversation as ESCALATED. The AI agent will stop responding
+    and the conversation appears in the escalated queue for human pickup.
+    """
+    repo = _get_repo()
+
+    doc = await _read_conversation(repo, ctx.tenant_id, conversation_id)
+
+    current_status = doc.get("status")
+    if current_status in (
+        ConversationStatus.ESCALATED.value,
+        ConversationStatus.RESOLVED.value,
+    ):
+        raise HTTPException(
+            status_code=409,
+            detail=f"Conversation is already {current_status}",
+        )
+
+    now = datetime.now(timezone.utc).isoformat()
+    doc_id = doc.get("id", conversation_id)
+
+    try:
+        await repo.patch(
+            tenant_id=ctx.tenant_id,
+            document_id=doc_id,
+            operations=[
+                {"op": "set", "path": "/status", "value": ConversationStatus.ESCALATED.value},
+                {"op": "set", "path": "/escalated_at", "value": now},
+            ],
+        )
+    except DocumentNotFoundError:
+        raise HTTPException(
+            status_code=404,
+            detail=f"Conversation {conversation_id} not found",
+        )
+
+    logger.info(
+        "Conversation escalated: conv=%s tenant=%s",
+        conversation_id,
+        ctx.tenant_id[:8],
+    )
+
+    return EscalateConversationResponse(
+        conversation_id=conversation_id,
+        status=ConversationStatus.ESCALATED.value,
+        escalated_at=now,
+    )
+
+
+# ---------------------------------------------------------------------------
+# POST /api/admin/conversations/{conversation_id}/resolve — Mark resolved
+# ---------------------------------------------------------------------------
+
+
+@router.post(
+    "/{conversation_id}/resolve",
+    response_model=ResolveConversationResponse,
+    summary="Mark conversation as resolved",
+    description="Marks a conversation as resolved, indicating the customer's issue has been addressed. Removes it from the active/escalated queues.",
+    responses={
+        404: {"description": "Conversation not found"},
+        409: {"description": "Conversation already resolved"},
+        503: {"description": "Admin conversation services not initialized"},
+    },
+)
+async def resolve_conversation(
+    conversation_id: str,
+    ctx: TenantContext = Depends(get_tenant_context),
+) -> ResolveConversationResponse:
+    """Mark a conversation as resolved.
+
+    Sets the conversation status to RESOLVED, removing it from the
+    active and escalated queues. Resolved conversations remain visible
+    in the inbox with a 'Resolved' badge for reference.
+    """
+    repo = _get_repo()
+
+    doc = await _read_conversation(repo, ctx.tenant_id, conversation_id)
+
+    current_status = doc.get("status")
+    if current_status == ConversationStatus.RESOLVED.value:
+        raise HTTPException(
+            status_code=409,
+            detail="Conversation is already resolved",
+        )
+
+    now = datetime.now(timezone.utc).isoformat()
+    doc_id = doc.get("id", conversation_id)
+
+    try:
+        await repo.patch(
+            tenant_id=ctx.tenant_id,
+            document_id=doc_id,
+            operations=[
+                {"op": "set", "path": "/status", "value": ConversationStatus.RESOLVED.value},
+                {"op": "set", "path": "/resolved_at", "value": now},
+            ],
+        )
+    except DocumentNotFoundError:
+        raise HTTPException(
+            status_code=404,
+            detail=f"Conversation {conversation_id} not found",
+        )
+
+    logger.info(
+        "Conversation resolved: conv=%s tenant=%s",
+        conversation_id,
+        ctx.tenant_id[:8],
+    )
+
+    return ResolveConversationResponse(
+        conversation_id=conversation_id,
+        status=ConversationStatus.RESOLVED.value,
+        resolved_at=now,
     )
 
 

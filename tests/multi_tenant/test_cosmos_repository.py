@@ -612,9 +612,9 @@ class TestEnumCompleteness:
 
     @pytest.mark.unit
     def test_conversation_status_values(self):
-        """CR-20 supplement: ConversationStatus has 5 values."""
+        """CR-20 supplement: ConversationStatus has 6 values (incl. resolved, C9)."""
         values = {s.value for s in ConversationStatus}
-        assert values == {"active", "completed", "escalated", "timed_out", "error"}
+        assert values == {"active", "completed", "escalated", "resolved", "timed_out", "error"}
 
     @pytest.mark.unit
     def test_audit_event_type_values(self):

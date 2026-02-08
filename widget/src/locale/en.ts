@@ -39,6 +39,18 @@ export interface Locale {
   fieldInvalidEmail: string;
   fileTooLarge: string;
   fileUploading: string;
+  reportIssue: string;
+  issueReportTitle: string;
+  issueReportDescription: string;
+  issueTypeWrongInfo: string;
+  issueTypeRudeResponse: string;
+  issueTypeNotHelpful: string;
+  issueTypeOther: string;
+  issueDetailsPlaceholder: string;
+  issueSubmit: string;
+  issueSubmitting: string;
+  issueSubmitSuccess: string;
+  issueCancel: string;
 }
 
 export const en: Locale = {
@@ -70,4 +82,16 @@ export const en: Locale = {
   fieldInvalidEmail: 'Please enter a valid email',
   fileTooLarge: 'File must be under 10MB',
   fileUploading: 'Uploading...',
+  reportIssue: 'Report an issue',
+  issueReportTitle: 'Report an Issue',
+  issueReportDescription: 'Let us know if something went wrong with this conversation.',
+  issueTypeWrongInfo: 'Wrong information',
+  issueTypeRudeResponse: 'Rude response',
+  issueTypeNotHelpful: 'Not helpful',
+  issueTypeOther: 'Other',
+  issueDetailsPlaceholder: 'Please describe the issue...',
+  issueSubmit: 'Submit Report',
+  issueSubmitting: 'Submitting...',
+  issueSubmitSuccess: 'Thank you! Your report has been submitted.',
+  issueCancel: 'Cancel',
 };

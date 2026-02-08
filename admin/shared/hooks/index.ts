@@ -25,6 +25,9 @@ import type {
   TeamMember,
   OnboardingStepConfig,
   PaginatedList,
+  IntegrationSummary,
+  IntegrationDetail,
+  IntegrationResponse,
 } from '../types/index';
 
 // ---------------------------------------------------------------------------
@@ -109,7 +112,7 @@ export function useUpdateConfig(apiFetch: ApiFetch) {
         const resp = await apiFetch('/api/config', {
           method: 'PUT',
           headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify(changes),
+          body: JSON.stringify({ fields: changes }),
         });
         if (!resp.ok) throw new Error(`${resp.status}`);
         return await resp.json();
@@ -125,6 +128,344 @@ export function useUpdateConfig(apiFetch: ApiFetch) {
   );
 
   return { updateConfig, loading, error };
+}
+
+// ---------------------------------------------------------------------------
+// Named Configuration hooks (C3)
+// ---------------------------------------------------------------------------
+
+export interface NamedConfigSummary {
+  name: string;
+  version: number;
+  isActive: boolean;
+  isDefault: boolean;
+  createdAt: string;
+  createdBy: string | null;
+  fieldCount: number;
+}
+
+export function useNamedConfigs(apiFetch: ApiFetch) {
+  return useApi<{ configs: NamedConfigSummary[]; total: number }>(
+    apiFetch,
+    '/api/config/named',
+  );
+}
+
+export function useSaveNamedConfig(apiFetch: ApiFetch) {
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+
+  const saveNamed = useCallback(
+    async (name: string): Promise<ConfigUpdateResult | null> => {
+      setLoading(true);
+      setError(null);
+      try {
+        const resp = await apiFetch('/api/config/named', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ name }),
+        });
+        if (!resp.ok) {
+          const body = await resp.json().catch(() => ({ detail: `${resp.status}` }));
+          throw new Error(body.detail || `Save failed: ${resp.status}`);
+        }
+        return await resp.json();
+      } catch (err: unknown) {
+        const msg = err instanceof Error ? err.message : 'Save failed';
+        setError(msg);
+        return null;
+      } finally {
+        setLoading(false);
+      }
+    },
+    [apiFetch],
+  );
+
+  return { saveNamed, loading, error };
+}
+
+export function useActivateNamedConfig(apiFetch: ApiFetch) {
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+
+  const activateNamed = useCallback(
+    async (name: string): Promise<ConfigUpdateResult | null> => {
+      setLoading(true);
+      setError(null);
+      try {
+        const resp = await apiFetch(`/api/config/named/${encodeURIComponent(name)}/activate`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({}),
+        });
+        if (!resp.ok) {
+          const body = await resp.json().catch(() => ({ detail: `${resp.status}` }));
+          throw new Error(body.detail || `Activate failed: ${resp.status}`);
+        }
+        return await resp.json();
+      } catch (err: unknown) {
+        const msg = err instanceof Error ? err.message : 'Activate failed';
+        setError(msg);
+        return null;
+      } finally {
+        setLoading(false);
+      }
+    },
+    [apiFetch],
+  );
+
+  return { activateNamed, loading, error };
+}
+
+export function useDeleteNamedConfig(apiFetch: ApiFetch) {
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+
+  const deleteNamed = useCallback(
+    async (name: string): Promise<boolean> => {
+      setLoading(true);
+      setError(null);
+      try {
+        const resp = await apiFetch(`/api/config/named/${encodeURIComponent(name)}`, {
+          method: 'DELETE',
+        });
+        if (!resp.ok) {
+          const body = await resp.json().catch(() => ({ detail: `${resp.status}` }));
+          throw new Error(body.detail || `Delete failed: ${resp.status}`);
+        }
+        return true;
+      } catch (err: unknown) {
+        const msg = err instanceof Error ? err.message : 'Delete failed';
+        setError(msg);
+        return false;
+      } finally {
+        setLoading(false);
+      }
+    },
+    [apiFetch],
+  );
+
+  return { deleteNamed, loading, error };
+}
+
+// ---------------------------------------------------------------------------
+// Widget Appearance hooks (C4 — Named widget appearance lifecycle)
+// ---------------------------------------------------------------------------
+
+export function useWidgetAppearances(apiFetch: ApiFetch) {
+  return useApi<{ configs: NamedConfigSummary[] }>(apiFetch, '/api/config/widget-appearances');
+}
+
+export function useSaveWidgetAppearance(apiFetch: ApiFetch) {
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+
+  const saveAppearance = useCallback(
+    async (name: string): Promise<boolean> => {
+      setLoading(true);
+      setError(null);
+      try {
+        const res = await apiFetch('/api/config/widget-appearances', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ name }),
+        });
+        if (!res.ok) {
+          const body = await res.json().catch(() => ({}));
+          setError(body.detail ?? 'Failed to save widget appearance');
+          return false;
+        }
+        return true;
+      } catch {
+        setError('Network error saving widget appearance');
+        return false;
+      } finally {
+        setLoading(false);
+      }
+    },
+    [apiFetch],
+  );
+
+  return { saveAppearance, loading, error };
+}
+
+export function useActivateWidgetAppearance(apiFetch: ApiFetch) {
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+
+  const activateAppearance = useCallback(
+    async (name: string): Promise<boolean> => {
+      setLoading(true);
+      setError(null);
+      try {
+        const res = await apiFetch(`/api/config/widget-appearances/${encodeURIComponent(name)}/activate`, {
+          method: 'POST',
+        });
+        if (!res.ok) {
+          const body = await res.json().catch(() => ({}));
+          setError(body.detail ?? 'Failed to activate widget appearance');
+          return false;
+        }
+        return true;
+      } catch {
+        setError('Network error activating widget appearance');
+        return false;
+      } finally {
+        setLoading(false);
+      }
+    },
+    [apiFetch],
+  );
+
+  return { activateAppearance, loading, error };
+}
+
+export function useDeleteWidgetAppearance(apiFetch: ApiFetch) {
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+
+  const deleteAppearance = useCallback(
+    async (name: string): Promise<boolean> => {
+      setLoading(true);
+      setError(null);
+      try {
+        const res = await apiFetch(`/api/config/widget-appearances/${encodeURIComponent(name)}`, {
+          method: 'DELETE',
+        });
+        if (!res.ok) {
+          const body = await res.json().catch(() => ({}));
+          setError(body.detail ?? 'Failed to delete widget appearance');
+          return false;
+        }
+        return true;
+      } catch {
+        setError('Network error deleting widget appearance');
+        return false;
+      } finally {
+        setLoading(false);
+      }
+    },
+    [apiFetch],
+  );
+
+  return { deleteAppearance, loading, error };
+}
+
+// ---------------------------------------------------------------------------
+// Test Mode hooks (C1, C2)
+// ---------------------------------------------------------------------------
+
+/** Current test mode status. */
+export interface TestModeStatus {
+  enabled: boolean;
+  percentage: number;
+  overrides: Record<string, unknown>;
+  assignment_seed: number;
+  activated_at: string | null;
+  override_field_count: number;
+}
+
+export function useTestModeStatus(apiFetch: ApiFetch) {
+  return useApi<TestModeStatus>(apiFetch, '/api/config/test-mode');
+}
+
+export function useActivateTestMode(apiFetch: ApiFetch) {
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+
+  const activate = useCallback(
+    async (overrides: Record<string, unknown>, percentage = 10): Promise<boolean> => {
+      setLoading(true);
+      setError(null);
+      try {
+        const res = await apiFetch('/api/config/test-mode/activate', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ overrides, percentage }),
+        });
+        if (!res.ok) {
+          const body = await res.json().catch(() => ({}));
+          setError(body.detail ?? 'Failed to activate test mode');
+          return false;
+        }
+        return true;
+      } catch {
+        setError('Network error activating test mode');
+        return false;
+      } finally {
+        setLoading(false);
+      }
+    },
+    [apiFetch],
+  );
+
+  return { activate, loading, error };
+}
+
+export function useDeactivateTestMode(apiFetch: ApiFetch) {
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+
+  const deactivate = useCallback(
+    async (action: 'rollout' | 'abandon'): Promise<boolean> => {
+      setLoading(true);
+      setError(null);
+      try {
+        const res = await apiFetch('/api/config/test-mode/deactivate', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ action }),
+        });
+        if (!res.ok) {
+          const body = await res.json().catch(() => ({}));
+          setError(body.detail ?? 'Failed to deactivate test mode');
+          return false;
+        }
+        return true;
+      } catch {
+        setError('Network error deactivating test mode');
+        return false;
+      } finally {
+        setLoading(false);
+      }
+    },
+    [apiFetch],
+  );
+
+  return { deactivate, loading, error };
+}
+
+export function useUpdateTestModePercentage(apiFetch: ApiFetch) {
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+
+  const updatePercentage = useCallback(
+    async (percentage: number): Promise<boolean> => {
+      setLoading(true);
+      setError(null);
+      try {
+        const res = await apiFetch('/api/config/test-mode/percentage', {
+          method: 'PUT',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ percentage }),
+        });
+        if (!res.ok) {
+          const body = await res.json().catch(() => ({}));
+          setError(body.detail ?? 'Failed to update test percentage');
+          return false;
+        }
+        return true;
+      } catch {
+        setError('Network error updating test percentage');
+        return false;
+      } finally {
+        setLoading(false);
+      }
+    },
+    [apiFetch],
+  );
+
+  return { updatePercentage, loading, error };
 }
 
 // ---------------------------------------------------------------------------
@@ -203,6 +544,60 @@ export function useAssignConversation(apiFetch: ApiFetch) {
   );
 
   return { assign, loading };
+}
+
+export function useEscalateConversation(apiFetch: ApiFetch) {
+  const [loading, setLoading] = useState(false);
+
+  const escalate = useCallback(
+    async (conversationId: string) => {
+      setLoading(true);
+      try {
+        const resp = await apiFetch(`/api/admin/conversations/${conversationId}/escalate`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({}),
+        });
+        if (!resp.ok) {
+          const body = await resp.json().catch(() => ({ detail: `${resp.status}` }));
+          throw new Error(body.detail || `Escalation failed: ${resp.status}`);
+        }
+        return await resp.json();
+      } finally {
+        setLoading(false);
+      }
+    },
+    [apiFetch],
+  );
+
+  return { escalate, loading };
+}
+
+export function useResolveConversation(apiFetch: ApiFetch) {
+  const [loading, setLoading] = useState(false);
+
+  const resolve = useCallback(
+    async (conversationId: string) => {
+      setLoading(true);
+      try {
+        const resp = await apiFetch(`/api/admin/conversations/${conversationId}/resolve`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({}),
+        });
+        if (!resp.ok) {
+          const body = await resp.json().catch(() => ({ detail: `${resp.status}` }));
+          throw new Error(body.detail || `Resolve failed: ${resp.status}`);
+        }
+        return await resp.json();
+      } finally {
+        setLoading(false);
+      }
+    },
+    [apiFetch],
+  );
+
+  return { resolve, loading };
 }
 
 // ---------------------------------------------------------------------------
@@ -301,14 +696,19 @@ export function useImportUrl(apiFetch: ApiFetch) {
   const [error, setError] = useState<string | null>(null);
 
   const importUrl = useCallback(
-    async (url: string, entryType?: string): Promise<KBUploadResult | null> => {
+    async (url: string, entryType?: string, crawl?: boolean, maxPages?: number): Promise<KBUploadResult | null> => {
       setLoading(true);
       setError(null);
       try {
+        const payload: Record<string, unknown> = { url, entry_type: entryType };
+        if (crawl) {
+          payload.crawl = true;
+          if (maxPages != null) payload.max_pages = maxPages;
+        }
         const resp = await apiFetch('/api/admin/knowledge/import-url', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ url, entry_type: entryType }),
+          body: JSON.stringify(payload),
         });
         if (!resp.ok) {
           const body = await resp.json().catch(() => ({ detail: `${resp.status}` }));
@@ -455,10 +855,12 @@ export function useInviteTeamMember(apiFetch: ApiFetch) {
       setLoading(true);
       setError(null);
       try {
+        // Backend expects display_name (required, min_length=1), not name
+        const display_name = name?.trim() || email.split('@')[0];
         const resp = await apiFetch('/api/admin/team', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ email, role, name }),
+          body: JSON.stringify({ email, role, display_name }),
         });
         if (!resp.ok) throw new Error(`${resp.status}`);
         return await resp.json();
@@ -491,6 +893,115 @@ export function usePackBalance(apiFetch: ApiFetch, customerId: string) {
     `/api/packs/balance/${customerId}`,
     !!customerId,
   );
+}
+
+// ---------------------------------------------------------------------------
+// Integration hooks (C10)
+// ---------------------------------------------------------------------------
+
+export function useIntegrations(apiFetch: ApiFetch) {
+  return useApi<IntegrationSummary[]>(apiFetch, '/api/admin/integrations');
+}
+
+export function useIntegrationDetail(apiFetch: ApiFetch, type: string) {
+  return useApi<IntegrationDetail>(apiFetch, `/api/admin/integrations/${type}`, !!type);
+}
+
+export function useActivateIntegration(apiFetch: ApiFetch) {
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+
+  const activate = useCallback(
+    async (type: string): Promise<IntegrationResponse | null> => {
+      setLoading(true);
+      setError(null);
+      try {
+        const resp = await apiFetch(`/api/admin/integrations/${type}/activate`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({}),
+        });
+        if (!resp.ok) {
+          const data = await resp.json().catch(() => ({}));
+          throw new Error(data.detail || `${resp.status}`);
+        }
+        return await resp.json();
+      } catch (err: unknown) {
+        const msg = err instanceof Error ? err.message : 'Activation failed';
+        setError(msg);
+        return null;
+      } finally {
+        setLoading(false);
+      }
+    },
+    [apiFetch],
+  );
+
+  return { activate, loading, error };
+}
+
+export function useDeactivateIntegration(apiFetch: ApiFetch) {
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+
+  const deactivate = useCallback(
+    async (type: string): Promise<IntegrationResponse | null> => {
+      setLoading(true);
+      setError(null);
+      try {
+        const resp = await apiFetch(`/api/admin/integrations/${type}/deactivate`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({}),
+        });
+        if (!resp.ok) {
+          const data = await resp.json().catch(() => ({}));
+          throw new Error(data.detail || `${resp.status}`);
+        }
+        return await resp.json();
+      } catch (err: unknown) {
+        const msg = err instanceof Error ? err.message : 'Deactivation failed';
+        setError(msg);
+        return null;
+      } finally {
+        setLoading(false);
+      }
+    },
+    [apiFetch],
+  );
+
+  return { deactivate, loading, error };
+}
+
+export function useDisconnectIntegration(apiFetch: ApiFetch) {
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+
+  const disconnect = useCallback(
+    async (type: string): Promise<IntegrationResponse | null> => {
+      setLoading(true);
+      setError(null);
+      try {
+        const resp = await apiFetch(`/api/admin/integrations/${type}`, {
+          method: 'DELETE',
+        });
+        if (!resp.ok) {
+          const data = await resp.json().catch(() => ({}));
+          throw new Error(data.detail || `${resp.status}`);
+        }
+        return await resp.json();
+      } catch (err: unknown) {
+        const msg = err instanceof Error ? err.message : 'Disconnect failed';
+        setError(msg);
+        return null;
+      } finally {
+        setLoading(false);
+      }
+    },
+    [apiFetch],
+  );
+
+  return { disconnect, loading, error };
 }
 
 // ---------------------------------------------------------------------------

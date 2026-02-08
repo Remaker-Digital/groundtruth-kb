@@ -31,11 +31,13 @@ import { InputBar } from './InputBar';
 import { PreChatForm } from './PreChatForm';
 import { ChatRating } from './ChatRating';
 import { OfflineForm } from './OfflineForm';
+import { IssueReport } from './IssueReport';
 import {
   startConversation as apiStartConversation,
   sendMessage as apiSendMessage,
   endConversation as apiEndConversation,
   submitRating as apiSubmitRating,
+  reportIssue as apiReportIssue,
   getTransportConfig,
 } from '@/transport/http';
 import { SSEConnection } from '@/transport/sse';
@@ -278,6 +280,27 @@ export const Panel: FunctionComponent<PanelProps> = ({
     // For now the OfflineForm handles its own success state internally.
   }, []);
 
+  /** Open the issue report form (C7). */
+  const handleOpenIssueReport = useCallback(() => {
+    const store = getStore();
+    store.setState({ view: 'issue_report' });
+  }, []);
+
+  /** Submit an issue report (C7). */
+  const handleIssueSubmit = useCallback(async (issueType: string, details: string) => {
+    const store = getStore();
+    const { conversationId } = store.getState();
+    if (conversationId) {
+      await apiReportIssue(conversationId, issueType, details);
+    }
+  }, []);
+
+  /** Cancel issue report and return to conversation (C7). */
+  const handleIssueCancel = useCallback(() => {
+    const store = getStore();
+    store.setState({ view: 'conversation' });
+  }, []);
+
   // Cleanup SSE on unmount
   useEffect(() => {
     return () => {
@@ -351,6 +374,53 @@ export const Panel: FunctionComponent<PanelProps> = ({
             agentAvatarUrl={agentAvatarUrl}
             greetingMessage={greetingMessage}
           />
+
+          {/* Report an Issue link (C7) — shown when conversation has messages */}
+          {state.messages.length > 0 && (
+            <div
+              style={{
+                display: 'flex',
+                justifyContent: 'center',
+                padding: `${tokens.space1} ${tokens.space4}`,
+                flexShrink: 0,
+              }}
+            >
+              <button
+                type="button"
+                onClick={handleOpenIssueReport}
+                style={{
+                  display: 'inline-flex',
+                  alignItems: 'center',
+                  gap: tokens.space1,
+                  padding: `${tokens.space1} ${tokens.space2}`,
+                  fontSize: tokens.fontSizeXs,
+                  fontFamily: tokens.fontFamily,
+                  color: tokens.colorTextSecondary,
+                  backgroundColor: 'transparent',
+                  border: 'none',
+                  cursor: 'pointer',
+                  opacity: 0.7,
+                }}
+              >
+                {/* Flag icon */}
+                <svg
+                  width={12}
+                  height={12}
+                  viewBox="0 0 24 24"
+                  fill="none"
+                  stroke="currentColor"
+                  stroke-width="2"
+                  stroke-linecap="round"
+                  stroke-linejoin="round"
+                >
+                  <path d="M4 15s1-1 4-1 5 2 8 2 4-1 4-1V3s-1 1-4 1-5-2-8-2-4 1-4 1z" />
+                  <line x1="4" y1="22" x2="4" y2="15" />
+                </svg>
+                {locale.reportIssue}
+              </button>
+            </div>
+          )}
+
           <InputBar
             tokens={tokens}
             locale={locale}
@@ -382,6 +452,17 @@ export const Panel: FunctionComponent<PanelProps> = ({
           locale={locale}
           onSubmit={handleRatingSubmit}
           onNewConversation={handleNewConversation}
+          isLoading={state.isLoading}
+        />
+      )}
+
+      {/* Issue report form (C7) */}
+      {state.view === 'issue_report' && (
+        <IssueReport
+          tokens={tokens}
+          locale={locale}
+          onSubmit={handleIssueSubmit}
+          onCancel={handleIssueCancel}
           isLoading={state.isLoading}
         />
       )}
