@@ -306,6 +306,7 @@ export interface IntegrationSummary {
   status: IntegrationStatus;
   tierGate: string | null;
   tierMet: boolean;
+  comingSoon: boolean;
 }
 
 export interface IntegrationDetail extends IntegrationSummary {

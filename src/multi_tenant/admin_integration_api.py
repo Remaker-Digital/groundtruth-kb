@@ -47,6 +47,7 @@ _INTEGRATION_META: dict[str, dict[str, Any]] = {
         "enable_field": "shopify_sync_enabled",
         "status_field": "shopify_integration_status",
         "tier_gate": None,  # available on all tiers
+        "coming_soon": False,
         "config_fields": [
             {"key": "shopify_sync_enabled", "label": "Product Sync", "type": "boolean"},
         ],
@@ -58,6 +59,7 @@ _INTEGRATION_META: dict[str, dict[str, Any]] = {
         "enable_field": "zendesk_escalation_enabled",
         "status_field": "zendesk_integration_status",
         "tier_gate": "professional",
+        "coming_soon": True,
         "config_fields": [
             {"key": "zendesk_escalation_enabled", "label": "Auto-create Tickets", "type": "boolean"},
         ],
@@ -69,6 +71,7 @@ _INTEGRATION_META: dict[str, dict[str, Any]] = {
         "enable_field": "mailchimp_segment_sync",
         "status_field": "mailchimp_integration_status",
         "tier_gate": "professional",
+        "coming_soon": True,
         "config_fields": [
             {"key": "mailchimp_segment_sync", "label": "Segment Sync", "type": "boolean"},
         ],
@@ -80,6 +83,7 @@ _INTEGRATION_META: dict[str, dict[str, Any]] = {
         "enable_field": "google_analytics_enabled",
         "status_field": "google_analytics_integration_status",
         "tier_gate": "professional",
+        "coming_soon": True,
         "config_fields": [
             {"key": "google_analytics_enabled", "label": "Event Export", "type": "boolean"},
         ],
@@ -109,6 +113,10 @@ class IntegrationSummary(BaseModel):
     tier_met: bool = Field(
         default=True,
         description="Whether the current tenant tier meets the gate",
+    )
+    coming_soon: bool = Field(
+        default=False,
+        description="Whether this integration is not yet implemented (backend stub only)",
     )
 
 
@@ -177,6 +185,7 @@ def _build_summary(
         status=config.get(status_field),
         tier_gate=meta["tier_gate"],
         tier_met=_tier_meets_gate(tenant_tier, meta["tier_gate"]),
+        coming_soon=bool(meta.get("coming_soon", False)),
     )
 
 
@@ -293,6 +302,12 @@ async def activate_integration(
         raise HTTPException(status_code=404, detail=f"Unknown integration: {integration_type}")
 
     meta = _INTEGRATION_META[integration_type]
+
+    if meta.get("coming_soon"):
+        raise HTTPException(
+            status_code=400,
+            detail=f"{meta['name']} is coming soon and cannot be activated yet.",
+        )
 
     if not _tier_meets_gate(ctx.tier, meta["tier_gate"]):
         raise HTTPException(

@@ -134,6 +134,19 @@ const tierBadgeStyle: React.CSSProperties = {
   border: '1px solid #E5A10044',
 };
 
+const comingSoonBadgeStyle: React.CSSProperties = {
+  display: 'inline-flex',
+  alignItems: 'center',
+  gap: 4,
+  padding: '2px 8px',
+  borderRadius: 10,
+  fontSize: 11,
+  fontWeight: 600,
+  background: '#6366f122',
+  color: '#818cf8',
+  border: '1px solid #6366f144',
+};
+
 const btnPrimaryStyle: React.CSSProperties = {
   padding: '6px 14px',
   borderRadius: 6,
@@ -206,7 +219,12 @@ const IntegrationCard: React.FC<IntegrationCardProps> = ({
                 {statusLabel}
               </span>
             )}
-            {!integration.tierMet && integration.tierGate && (
+            {integration.comingSoon && (
+              <span style={comingSoonBadgeStyle}>
+                Coming Soon
+              </span>
+            )}
+            {!integration.comingSoon && !integration.tierMet && integration.tierGate && (
               <span style={tierBadgeStyle}>
                 {String.fromCodePoint(0x2B06)} {integration.tierGate} tier
               </span>
@@ -220,7 +238,11 @@ const IntegrationCard: React.FC<IntegrationCardProps> = ({
 
       {/* Actions */}
       <div style={{ display: 'flex', gap: 8, alignItems: 'center', flexWrap: 'wrap' }}>
-        {!integration.tierMet ? (
+        {integration.comingSoon ? (
+          <span style={{ fontSize: 12, color: '#818cf8' }}>
+            This integration is under development and will be available soon.
+          </span>
+        ) : !integration.tierMet ? (
           <span style={{ fontSize: 12, color: '#E5A100' }}>
             Upgrade to {integration.tierGate} to use this integration
           </span>
