@@ -1,5 +1,18 @@
 # Agent Red Customer Experience — Deployment, DR & Maintenance Runbook
 
+---
+> **⚠️ DEPRECATED — DO NOT USE FOR PRODUCTION OPERATIONS**
+>
+> This document contains **stale AGNTCY-era resource names** (e.g., `agntcy-prod-rg`, `acragntcycsprodrc6vcp`) that point to legacy resources, NOT the current Agent Red production environment.
+>
+> **Use these documents instead:**
+> - **Upgrades:** `docs/operations/UPGRADE-RUNBOOK-1.0-TO-1.1.md` (canonical upgrade reference)
+> - **Releases:** `docs/operations/RELEASE-MANAGEMENT.md` (branching, staging, versioning)
+> - **Resource names:** See Appendix: Resource Reference in the Upgrade Runbook
+>
+> This file is retained for historical reference only. Last valid: January 2026.
+---
+
 Operational procedures for deploying, recovering, and maintaining the Agent Red Customer Experience production environment.
 
 **Work Items:** WI #148 (Deployment), WI #149 (Disaster Recovery), WI #150 (Maintenance)

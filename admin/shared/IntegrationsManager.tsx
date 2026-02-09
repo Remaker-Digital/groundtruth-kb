@@ -50,31 +50,31 @@ const INTEGRATION_LOGO_MAP: Record<string, string> = {
 // Fallback inline SVG icons (used if logo image fails to load)
 const IntegrationIcons: Record<string, React.FC> = {
   shopify: () => (
-    <svg width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5">
+    <svg width="80" height="80" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5">
       <path d="M15.5 2.5L14 10l-3.5-1L7 17.5l-2-1L3 22h18l-2-8-3.5 1L15.5 2.5z" />
     </svg>
   ),
   zendesk: () => (
-    <svg width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5">
+    <svg width="80" height="80" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5">
       <circle cx="12" cy="12" r="9" />
       <path d="M8 15l4-6 4 6" />
     </svg>
   ),
   mailchimp: () => (
-    <svg width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5">
+    <svg width="80" height="80" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5">
       <path d="M4 4h16c1.1 0 2 .9 2 2v12c0 1.1-.9 2-2 2H4c-1.1 0-2-.9-2-2V6c0-1.1.9-2 2-2z" />
       <polyline points="22,6 12,13 2,6" />
     </svg>
   ),
   google_analytics: () => (
-    <svg width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5">
+    <svg width="80" height="80" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5">
       <line x1="18" y1="20" x2="18" y2="10" />
       <line x1="12" y1="20" x2="12" y2="4" />
       <line x1="6" y1="20" x2="6" y2="14" />
     </svg>
   ),
   stripe: () => (
-    <svg width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5">
+    <svg width="80" height="80" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5">
       <rect x="1" y="4" width="22" height="16" rx="2" ry="2" />
       <line x1="1" y1="10" x2="23" y2="10" />
     </svg>
@@ -111,9 +111,9 @@ const cardHeaderStyle: React.CSSProperties = {
 };
 
 const iconContainerStyle: React.CSSProperties = {
-  width: 48,
-  height: 48,
-  borderRadius: 8,
+  width: 150,
+  height: 150,
+  borderRadius: 12,
   background: '#141414',
   border: '1px solid #272727',
   display: 'flex',
@@ -225,7 +225,7 @@ const IntegrationCard: React.FC<IntegrationCardProps & { isDark?: boolean; baseP
             <img
               src={logoPath}
               alt={`${integration.name} logo`}
-              style={{ width: 30, height: 30, objectFit: 'contain' }}
+              style={{ width: 120, height: 120, objectFit: 'contain' }}
               onError={() => setLogoError(true)}
             />
           ) : (

@@ -1649,6 +1649,32 @@ async def _startup_test_mode_service() -> None:
         )
 
 
+@app.on_event("startup")
+async def _startup_migration_check() -> None:
+    """Check for unapplied schema migrations (warning only, no auto-apply).
+
+    Logs a WARNING if migrations exist that haven't been applied.
+    Migrations must be applied manually via: python -m src.migrations.apply
+    """
+    try:
+        from src.migrations.apply import MigrationRunner
+        from src.multi_tenant.cosmos_client import get_cosmos_manager
+
+        cosmos = get_cosmos_manager()
+        runner = MigrationRunner(cosmos)
+        pending = await runner.check_pending()
+        if pending:
+            logger.warning(
+                "Schema migrations pending: %s. "
+                "Run 'python -m src.migrations.apply' to apply.",
+                [m.VERSION for m in pending],
+            )
+        else:
+            logger.info("Schema migrations: all up to date.")
+    except Exception as exc:
+        logger.warning("Migration check skipped: %s", exc)
+
+
 # ---------------------------------------------------------------------------
 # Health endpoints
 # ---------------------------------------------------------------------------

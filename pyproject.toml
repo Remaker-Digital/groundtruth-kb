@@ -18,6 +18,9 @@ markers = [
     "e2e: end-to-end tests requiring full application stack",
     "slow: tests that take >2 seconds",
     "security: adversarial and security-focused tests",
+    "tier0: blocking regression tests — must pass for every deployment",
+    "tier1: pre-launch gate regression tests — must pass before traffic cutover",
+    "tier2: post-deploy smoke tests — performance and latency validation",
 ]
 filterwarnings = [
     "ignore::DeprecationWarning:pkg_resources",
