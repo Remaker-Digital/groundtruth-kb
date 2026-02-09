@@ -151,14 +151,14 @@ type NavPage = {
 const navItems: NavPage[] = [
   { path: '/', label: 'Dashboard', icon: 'dashboard' },
   { path: '/inbox', label: 'Inbox', icon: 'inbox' },
-  { path: '/knowledge-base', label: 'Knowledge Base', icon: 'knowledge' },
+  { path: '/knowledge-base', label: 'Knowledge base', icon: 'knowledge' },
   { path: '/analytics', label: 'Analytics', icon: 'analytics' },
   { path: '/configuration', label: 'Configuration', icon: 'config' },
   { path: '/widget', label: 'Widget', icon: 'widget' },
   { path: '/team', label: 'Team', icon: 'team' },
   { path: '/integrations', label: 'Integrations', icon: 'integrations' },
   { path: '/billing', label: 'Billing', icon: 'billing' },
-  { path: '/onboarding', label: 'Setup Wizard', icon: 'onboarding' },
+  { path: '/onboarding', label: 'Setup wizard', icon: 'onboarding' },
 ];
 
 // ---------------------------------------------------------------------------
@@ -206,10 +206,17 @@ export const StandaloneLayout: React.FC<StandaloneLayoutProps> = ({
         warning: 'yellow',
         info: 'blue',
       };
+      const titleMap: Record<string, string> = {
+        success: 'Success',
+        error: 'Error',
+        warning: 'Warning',
+        info: 'Info',
+      };
       notifications.show({
+        title: titleMap[type] || 'Notice',
         message,
         color: colorMap[type] || 'blue',
-        autoClose: 5000,
+        autoClose: type === 'error' ? 8000 : 5000,
       });
     },
     [],
@@ -297,7 +304,7 @@ export const StandaloneLayout: React.FC<StandaloneLayoutProps> = ({
         const resp = await apiFetch('/api/config');
         if (!resp.ok) return;
         const cfg = await resp.json();
-        const widgetKey = cfg?.preferences?.widget_key || cfg?.widget_key;
+        const widgetKey = cfg?.config?.widget_key || cfg?.preferences?.widget_key || cfg?.widget_key;
         if (!widgetKey) {
           console.warn('[AgentRed Admin] No widget key found in tenant config — chat widget not loaded.');
           return;

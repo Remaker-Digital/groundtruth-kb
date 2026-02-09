@@ -173,7 +173,7 @@ function widgetConfigToApiFields(wc: WidgetConfig): Record<string, unknown> {
 
 function SectionHeader({ children }: { children: React.ReactNode }) {
   return (
-    <Text size="sm" fw={700} tt="uppercase" c="dimmed" mb={4}>
+    <Text size="sm" fw={700} c="dimmed" mb={4}>
       {children}
     </Text>
   );
@@ -611,7 +611,7 @@ export function WidgetPage() {
 
       {/* Page header */}
       <div>
-        <Title order={2}>Widget Configurator</Title>
+        <Title order={2}>Widget configurator</Title>
         <Text c="dimmed" size="sm">
           Customize how your chat widget looks and behaves
         </Text>
@@ -628,26 +628,26 @@ export function WidgetPage() {
               <Divider mb="md" />
               <Stack gap="sm">
                 <ColorField
-                  label="Primary Color"
+                  label="Primary color"
                   value={config.primaryColor}
                   onChange={(val) => update('primaryColor', val)}
                   swatches={[BRAND_RED, '#2563EB', '#059669', '#7C3AED', '#D97706', '#DB2777', '#000000', '#FFFFFF']}
                 />
                 <ColorField
-                  label="Header Gradient End"
+                  label="Header gradient end"
                   value={config.headerGradientEnd}
                   onChange={(val) => update('headerGradientEnd', val)}
                   swatches={['#8B1520', '#1E40AF', '#047857', '#5B21B6', '#B45309', '#BE185D', '#1F2937', '#374151']}
                 />
                 <Select
-                  label="Font Family"
+                  label="Font family"
                   data={FONT_OPTIONS}
                   value={config.fontFamily}
                   onChange={(val) => update('fontFamily', val || DEFAULT_WIDGET_CONFIG.fontFamily)}
                 />
                 <div>
                   <Text size="sm" fw={500} mb={4}>
-                    Border Radius ({config.borderRadius}px)
+                    Border radius ({config.borderRadius}px)
                   </Text>
                   <Slider
                     min={0}
@@ -666,7 +666,7 @@ export function WidgetPage() {
                 </div>
                 <div style={{ marginTop: 8 }}>
                   <Text size="sm" fw={500} mb={4}>
-                    Launcher Size ({config.launcherSize}px)
+                    Launcher size ({config.launcherSize}px)
                   </Text>
                   <Slider
                     min={48}
@@ -683,7 +683,7 @@ export function WidgetPage() {
                   />
                 </div>
                 <Select
-                  label="Launcher Icon"
+                  label="Launcher icon"
                   data={ICON_OPTIONS}
                   value={config.launcherIcon}
                   onChange={(val) => update('launcherIcon', (val as WidgetConfig['launcherIcon']) || 'chat')}
@@ -698,15 +698,15 @@ export function WidgetPage() {
                     value={config.position}
                     onChange={(val) => update('position', val as WidgetConfig['position'])}
                     data={[
-                      { label: 'Bottom Right', value: 'bottom-right' },
-                      { label: 'Bottom Left', value: 'bottom-left' },
+                      { label: 'Bottom right', value: 'bottom-right' },
+                      { label: 'Bottom left', value: 'bottom-left' },
                     ]}
                     color="brand"
                   />
                 </div>
                 <div>
                   <Text size="sm" fw={500} mb={6}>
-                    Color Mode
+                    Color mode
                   </Text>
                   <SegmentedControl
                     fullWidth
@@ -735,7 +735,7 @@ export function WidgetPage() {
                   color="brand"
                 />
                 <NumberInput
-                  label="Auto-open Delay (seconds)"
+                  label="Auto-open delay (seconds)"
                   value={config.autoOpenDelay}
                   onChange={(val) => update('autoOpenDelay', typeof val === 'number' ? val : 5)}
                   min={1}
@@ -751,7 +751,7 @@ export function WidgetPage() {
                 />
                 <div>
                   <Textarea
-                    label="Greeting Message"
+                    label="Greeting message"
                     value={config.greetingMessage}
                     onChange={(e) => update('greetingMessage', e.currentTarget.value)}
                     disabled={!config.greetingEnabled}
@@ -795,7 +795,7 @@ export function WidgetPage() {
                 {config.preChatFormEnabled && (
                   <div>
                     <Text size="sm" fw={500} mb={6}>
-                      Pre-chat Fields
+                      Pre-chat fields
                     </Text>
                     <Chip.Group
                       multiple
@@ -833,19 +833,19 @@ export function WidgetPage() {
               <Divider mb="md" />
               <Stack gap="sm">
                 <TextInput
-                  label="Header Title"
+                  label="Header title"
                   value={config.headerTitle}
                   onChange={(e) => update('headerTitle', e.currentTarget.value)}
                   placeholder="Support"
                 />
                 <TextInput
-                  label="Header Subtitle"
+                  label="Header subtitle"
                   value={config.headerSubtitle}
                   onChange={(e) => update('headerSubtitle', e.currentTarget.value)}
                   placeholder="We typically reply within minutes"
                 />
                 <TextInput
-                  label="Input Placeholder"
+                  label="Input placeholder"
                   value={config.inputPlaceholder}
                   onChange={(e) => update('inputPlaceholder', e.currentTarget.value)}
                   placeholder="Type your message..."
@@ -856,10 +856,10 @@ export function WidgetPage() {
             {/* Action buttons */}
             <Group justify="flex-end" gap="sm">
               <Button variant="default" onClick={resetDefaults}>
-                Reset to Defaults
+                Reset to defaults
               </Button>
               <Button color="brand" onClick={handleSave} loading={saving}>
-                Save Changes
+                Save changes
               </Button>
             </Group>
           </Stack>
@@ -869,7 +869,7 @@ export function WidgetPage() {
         <Box style={{ flex: '0 0 calc(45% - 16px)', position: 'sticky', top: 16 }}>
           <Paper p="md" radius="md" withBorder>
             <Text size="sm" fw={600} mb="sm">
-              Live Preview
+              Live preview
             </Text>
             <WidgetPreview config={config} />
           </Paper>

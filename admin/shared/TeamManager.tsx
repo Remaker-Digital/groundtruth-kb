@@ -645,7 +645,7 @@ export const TeamManager: React.FC<BaseComponentProps> = ({
           marginBottom: 16,
         }}>
           <div>
-            <h3 style={s.sectionTitle}>Team Members<HelpTooltip text="Manage who can access your Agent Red admin dashboard and what they can do." /></h3>
+            <h3 style={s.sectionTitle}>Team members<HelpTooltip text="Manage who can access your Agent Red admin dashboard and what they can do." /></h3>
             <p style={s.sectionDescription}>
               {activeCount} active member{activeCount !== 1 ? 's' : ''} of {totalCount} total.
               Manage roles and access for your support team.
@@ -655,7 +655,7 @@ export const TeamManager: React.FC<BaseComponentProps> = ({
             style={s.inviteButton}
             onClick={() => setShowInviteForm(!showInviteForm)}
           >
-            {showInviteForm ? 'Cancel' : '+ Invite Member'}
+            {showInviteForm ? 'Cancel' : '+ Invite member'}
           </button>
         </div>
 
@@ -667,7 +667,7 @@ export const TeamManager: React.FC<BaseComponentProps> = ({
             color: '#374151',
             marginBottom: 8,
           }}>
-            Role Permissions
+            Role permissions
           </div>
           {ROLES.map((role) => (
             <div key={role.value} style={s.roleCard}>
@@ -698,7 +698,7 @@ export const TeamManager: React.FC<BaseComponentProps> = ({
               color: '#111827',
               marginBottom: 12,
             }}>
-              Invite New Team Member
+              Invite new team member
               <HelpTooltip text="Send an invitation to a new team member. They will receive an email with access instructions." />
             </div>
             <div style={s.formRow}>
@@ -747,7 +747,7 @@ export const TeamManager: React.FC<BaseComponentProps> = ({
                 disabled={inviting}
                 onClick={handleInvite}
               >
-                {inviting ? 'Inviting...' : 'Send Invite'}
+                {inviting ? 'Inviting...' : 'Send invite'}
               </button>
             </div>
             {inviteError && (
@@ -891,7 +891,7 @@ export const TeamManager: React.FC<BaseComponentProps> = ({
           }}
         >
           <div style={s.modal} onClick={(e) => e.stopPropagation()}>
-            <h4 style={s.modalTitle}>Remove Team Member</h4>
+            <h4 style={s.modalTitle}>Remove team member</h4>
             <p style={s.modalBody}>
               Are you sure you want to remove <strong>{confirmMember.displayName || confirmMember.email}</strong> ({confirmMember.email})?
               They will no longer have access to the admin dashboard or be able to handle
@@ -916,7 +916,7 @@ export const TeamManager: React.FC<BaseComponentProps> = ({
                 onClick={handleConfirmAction}
                 disabled={actionLoading}
               >
-                {actionLoading ? 'Removing...' : 'Remove Member'}
+                {actionLoading ? 'Removing...' : 'Remove member'}
               </button>
             </div>
           </div>
@@ -932,7 +932,7 @@ export const TeamManager: React.FC<BaseComponentProps> = ({
           }}
         >
           <div style={s.editModal} onClick={(e) => e.stopPropagation()}>
-            <h4 style={s.modalTitle}>Edit Team Member</h4>
+            <h4 style={s.modalTitle}>Edit team member</h4>
             <p style={{
               fontSize: 13,
               color: '#6B7280',
@@ -1010,7 +1010,7 @@ export const TeamManager: React.FC<BaseComponentProps> = ({
                 onClick={handleSaveEdit}
                 disabled={editLoading}
               >
-                {editLoading ? 'Saving...' : 'Save Changes'}
+                {editLoading ? 'Saving...' : 'Save changes'}
               </button>
             </div>
           </div>

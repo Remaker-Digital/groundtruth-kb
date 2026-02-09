@@ -1,6 +1,6 @@
 // © 2026 Remaker Digital, a DBA of VanDusen & Palmeter, LLC. All rights reserved.
 
-import React, { useState, useCallback, useMemo } from 'react';
+import React, { useState, useCallback, useMemo, useEffect } from 'react';
 import {
   Paper,
   Stepper,
@@ -43,6 +43,40 @@ import { useNavigate } from 'react-router-dom';
 
 const BRAND_RED = '#ff3621';
 
+const WIZARD_STORAGE_KEY = 'agentred-onboarding-wizard-state';
+
+/** Load wizard state from localStorage. */
+function loadWizardState(): {
+  activeStep: number;
+  localValues: Record<string, Record<string, unknown>>;
+  completedOverrides: Record<string, boolean>;
+  escalationThreshold: number;
+  widgetConfig: Record<string, unknown>;
+} | null {
+  try {
+    const raw = localStorage.getItem(WIZARD_STORAGE_KEY);
+    if (!raw) return null;
+    return JSON.parse(raw);
+  } catch {
+    return null;
+  }
+}
+
+/** Save wizard state to localStorage. */
+function saveWizardState(state: {
+  activeStep: number;
+  localValues: Record<string, Record<string, unknown>>;
+  completedOverrides: Record<string, boolean>;
+  escalationThreshold: number;
+  widgetConfig: Record<string, unknown>;
+}) {
+  try {
+    localStorage.setItem(WIZARD_STORAGE_KEY, JSON.stringify(state));
+  } catch {
+    // Silently ignore — localStorage may be unavailable
+  }
+}
+
 // ---------------------------------------------------------------------------
 // Escalation categories (same definitions as Configuration.tsx)
 // ---------------------------------------------------------------------------
@@ -81,13 +115,13 @@ const ESCALATION_CATEGORIES: EscalationCategory[] = [
   },
   {
     id: 'technical',
-    label: 'Technical Assistance',
+    label: 'Technical assistance',
     description: 'Integration issues, API questions, advanced configuration',
     defaultKeywords: ['api', 'integration', 'webhook', 'developer', 'sdk', 'technical', 'configuration', 'setup'],
   },
   {
     id: 'general',
-    label: 'General Inquiry',
+    label: 'General inquiry',
     description: 'Complaints, legal, safety, or anything not matching other categories',
     defaultKeywords: ['complaint', 'manager', 'supervisor', 'lawyer', 'legal', 'sue', 'safety', 'harassment', 'fraud'],
   },
@@ -137,8 +171,8 @@ const WIDGET_PRESET_COLORS = [
 ];
 
 const WIDGET_POSITION_OPTIONS = [
-  { value: 'bottom-right', label: 'Bottom Right' },
-  { value: 'bottom-left', label: 'Bottom Left' },
+  { value: 'bottom-right', label: 'Bottom right' },
+  { value: 'bottom-left', label: 'Bottom left' },
 ];
 
 // ---------------------------------------------------------------------------
@@ -203,7 +237,7 @@ function makeGoLiveStep(nextId: number): LocalStep {
   return {
     id: nextId,
     step: 'go_live',
-    title: 'Go Live',
+    title: 'Go live',
     description: 'Review your setup and activate your AI agent',
     completed: false,
     fields: [],
@@ -222,18 +256,21 @@ export function OnboardingPage() {
   const computedColorScheme = useComputedColorScheme('dark');
   const isDark = computedColorScheme === 'dark';
 
-  const [activeStep, setActiveStep] = useState(0);
-  const [localValues, setLocalValues] = useState<Record<string, Record<string, unknown>>>({});
-  const [completedOverrides, setCompletedOverrides] = useState<Record<string, boolean>>({});
+  // Restore wizard state from localStorage if available
+  const savedState = useMemo(() => loadWizardState(), []);
+
+  const [activeStep, setActiveStep] = useState(savedState?.activeStep ?? 0);
+  const [localValues, setLocalValues] = useState<Record<string, Record<string, unknown>>>(savedState?.localValues ?? {});
+  const [completedOverrides, setCompletedOverrides] = useState<Record<string, boolean>>(savedState?.completedOverrides ?? {});
 
   // Escalation categories state (for the escalation_rules step)
   const [escalationCats, setEscalationCats] = useState<EscalationCategoriesState>(defaultEscalationCategories());
   const [expandedCats, setExpandedCats] = useState<Record<string, boolean>>({});
   const [kwInputs, setKwInputs] = useState<Record<string, string>>({});
-  const [escalationThreshold, setEscalationThreshold] = useState(0.7);
+  const [escalationThreshold, setEscalationThreshold] = useState(savedState?.escalationThreshold ?? 0.7);
 
   // Widget config state (for the widget_appearance step)
-  const [widgetConfig, setWidgetConfig] = useState({
+  const defaultWidgetConfig = {
     widgetColor: '#ff3621',
     widgetBackground: '#ffffff',
     widgetPosition: 'bottom-right',
@@ -246,7 +283,23 @@ export function OnboardingPage() {
     greetingMessage: 'Hi there! How can I help you today?',
     colorMode: 'auto',
     showBranding: true,
-  });
+  };
+  const [widgetConfig, setWidgetConfig] = useState(
+    savedState?.widgetConfig
+      ? { ...defaultWidgetConfig, ...savedState.widgetConfig }
+      : defaultWidgetConfig,
+  );
+
+  // Persist wizard state to localStorage on changes
+  useEffect(() => {
+    saveWizardState({
+      activeStep,
+      localValues,
+      completedOverrides,
+      escalationThreshold,
+      widgetConfig,
+    });
+  }, [activeStep, localValues, completedOverrides, escalationThreshold, widgetConfig]);
 
   // ---- Map API steps to local format + append Go Live step ----------------
 
@@ -526,7 +579,7 @@ export function OnboardingPage() {
     <Stack gap="md">
       {/* Threshold slider */}
       <div>
-        <Text size="sm" fw={500} mb={8}>Escalation Threshold</Text>
+        <Text size="sm" fw={500} mb={8}>Escalation threshold</Text>
         <MantineSlider
           value={escalationThreshold}
           onChange={setEscalationThreshold}
@@ -582,7 +635,7 @@ export function OnboardingPage() {
             <Collapse in={isExp}>
               <Stack gap="sm" mt="sm">
                 <TextInput
-                  label="Notification Email"
+                  label="Notification email"
                   placeholder={`${cat.id}@yourcompany.com`}
                   size="sm"
                   value={cfg.email}
@@ -675,7 +728,7 @@ export function OnboardingPage() {
             <Stack gap="md">
               {/* Primary Color */}
               <div>
-                <Text size="sm" fw={500} mb={6}>Widget Color</Text>
+                <Text size="sm" fw={500} mb={6}>Widget color</Text>
                 <ColorPicker
                   value={widgetConfig.widgetColor}
                   onChange={(val) => updateWidget('widgetColor', val)}
@@ -695,7 +748,7 @@ export function OnboardingPage() {
 
               {/* Background Color */}
               <div>
-                <Text size="sm" fw={500} mb={6}>Widget Background</Text>
+                <Text size="sm" fw={500} mb={6}>Widget background</Text>
                 <ColorPicker
                   value={widgetConfig.widgetBackground}
                   onChange={(val) => updateWidget('widgetBackground', val)}
@@ -746,7 +799,7 @@ export function OnboardingPage() {
 
               {/* Border Radius */}
               <div>
-                <Text size="sm" fw={500} mb={6}>Border Radius: {widgetConfig.borderRadius}px</Text>
+                <Text size="sm" fw={500} mb={6}>Border radius: {widgetConfig.borderRadius}px</Text>
                 <MantineSlider
                   value={widgetConfig.borderRadius}
                   onChange={(val) => updateWidget('borderRadius', val)}
@@ -758,7 +811,7 @@ export function OnboardingPage() {
 
               {/* Color Mode */}
               <div>
-                <Text size="sm" fw={500} mb={6}>Color Mode</Text>
+                <Text size="sm" fw={500} mb={6}>Color mode</Text>
                 <SegmentedControl
                   data={[
                     { value: 'light', label: 'Light' },
@@ -775,19 +828,19 @@ export function OnboardingPage() {
 
               {/* Agent info */}
               <TextInput
-                label="Agent Display Name"
+                label="Agent display name"
                 value={widgetConfig.agentDisplayName}
                 onChange={(e) => updateWidget('agentDisplayName', e.currentTarget.value)}
                 size="sm"
               />
               <TextInput
-                label="Agent Title"
+                label="Agent title"
                 value={widgetConfig.agentTitle}
                 onChange={(e) => updateWidget('agentTitle', e.currentTarget.value)}
                 size="sm"
               />
               <Textarea
-                label="Greeting Message"
+                label="Greeting message"
                 value={widgetConfig.greetingMessage}
                 onChange={(e) => updateWidget('greetingMessage', e.currentTarget.value)}
                 size="sm"
@@ -808,7 +861,7 @@ export function OnboardingPage() {
 
           {/* Live Preview */}
           <div style={{ width: 320, flexShrink: 0 }}>
-            <Text size="xs" fw={500} c="dimmed" mb={8}>Live Preview</Text>
+            <Text size="xs" fw={500} c="dimmed" mb={8}>Live preview</Text>
             <Paper
               radius={widgetConfig.borderRadius}
               style={{
@@ -934,11 +987,12 @@ export function OnboardingPage() {
   const { activate: activateIntegration, loading: activatingInteg } = useActivateIntegration(apiFetch);
   const { deactivate: deactivateIntegration, loading: deactivatingInteg } = useDeactivateIntegration(apiFetch);
 
-  const INTEG_ICONS: Record<string, string> = {
-    shopify: '\uD83D\uDED2',
-    zendesk: '\uD83C\uDFAB',
-    mailchimp: '\uD83D\uDCE7',
-    google_analytics: '\uD83D\uDCCA',
+  const INTEG_LOGO_MAP: Record<string, string> = {
+    shopify: 'shopify-logo',
+    zendesk: 'zendesk-logo',
+    mailchimp: 'mailchimp-logo',
+    google_analytics: 'google-analytics-logo',
+    stripe: 'stripe-logo',
   };
 
   const TIER_ORDER_MAP: Record<string, number> = { trial: 0, starter: 1, professional: 2, enterprise: 3 };
@@ -998,7 +1052,9 @@ export function OnboardingPage() {
 
         <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(280px, 1fr))', gap: 12 }}>
           {items.map((integ) => {
-            const icon = INTEG_ICONS[integ.type] ?? '\u{1F517}';
+            const logoStem = INTEG_LOGO_MAP[integ.type];
+            const logoSuffix = isDark ? 'dark' : 'light';
+            const logoPath = logoStem ? `/admin/standalone/integration-logos/${logoStem}-${logoSuffix}.svg` : null;
             const statusColor =
               integ.status === 'connected' ? '#0D7C3E'
               : integ.status === 'error' ? '#D32F2F'
@@ -1016,7 +1072,15 @@ export function OnboardingPage() {
               >
                 <Group justify="space-between" mb={6}>
                   <Group gap="sm">
-                    <span style={{ fontSize: 20 }}>{icon}</span>
+                    {logoPath ? (
+                      <img
+                        src={logoPath}
+                        alt={`${integ.name} logo`}
+                        style={{ width: 22, height: 22, objectFit: 'contain' }}
+                      />
+                    ) : (
+                      <span style={{ fontSize: 20 }}>{String.fromCodePoint(0x1F517)}</span>
+                    )}
                     <Text size="sm" fw={600}>{integ.name}</Text>
                   </Group>
                   <Badge
@@ -1092,7 +1156,7 @@ export function OnboardingPage() {
     return (
       <Stack gap="lg">
         <Text fw={600} size="lg">
-          Review & Activate
+          Review & activate
         </Text>
         <Text size="sm" c="dimmed">
           Review your setup before activating your AI agent.
@@ -1104,7 +1168,7 @@ export function OnboardingPage() {
         {completedSteps.length > 0 && (
           <Stack gap="xs">
             <Text size="sm" fw={500} c="green">
-              Completed Steps
+              Completed steps
             </Text>
             {completedSteps.map((step) => (
               <Group key={step.id} gap="sm">
@@ -1145,7 +1209,7 @@ export function OnboardingPage() {
         {incompleteSteps.length > 0 && (
           <Stack gap="xs">
             <Text size="sm" fw={500} c="yellow.8">
-              Incomplete Steps
+              Incomplete steps
             </Text>
             {incompleteSteps.map((step) => (
               <Group key={step.id} gap="sm">
@@ -1201,11 +1265,13 @@ export function OnboardingPage() {
           size="lg"
           disabled={!allComplete}
           fullWidth
-          onClick={() =>
-            onNotify('Your AI agent is now live and responding to customers.', 'success')
-          }
+          onClick={() => {
+            onNotify('Your AI agent is now live and responding to customers.', 'success');
+            // Clear wizard persistence — setup is complete
+            try { localStorage.removeItem(WIZARD_STORAGE_KEY); } catch { /* ignore */ }
+          }}
         >
-          Activate AI Agent
+          Activate AI agent
         </Button>
       </Stack>
     );
@@ -1217,7 +1283,7 @@ export function OnboardingPage() {
     return (
       <Stack gap="lg">
         <div>
-          <Title order={2}>Setup Wizard</Title>
+          <Title order={2}>Setup wizard</Title>
           <Text c="dimmed" size="sm">
             Complete these steps to get your AI agent ready
           </Text>
@@ -1240,7 +1306,7 @@ export function OnboardingPage() {
     return (
       <Stack gap="lg">
         <div>
-          <Title order={2}>Setup Wizard</Title>
+          <Title order={2}>Setup wizard</Title>
           <Text c="dimmed" size="sm">
             Complete these steps to get your AI agent ready
           </Text>
@@ -1262,7 +1328,7 @@ export function OnboardingPage() {
     return (
       <Stack gap="lg">
         <div>
-          <Title order={2}>Setup Wizard</Title>
+          <Title order={2}>Setup wizard</Title>
           <Text c="dimmed" size="sm">
             Complete these steps to get your AI agent ready
           </Text>
@@ -1280,7 +1346,7 @@ export function OnboardingPage() {
     <Stack gap="lg">
       {/* Page header */}
       <div>
-        <Title order={2}>Setup Wizard</Title>
+        <Title order={2}>Setup wizard</Title>
         <Text c="dimmed" size="sm">
           Complete these steps to get your AI agent ready
         </Text>
@@ -1330,6 +1396,7 @@ export function OnboardingPage() {
                 key={step.id}
                 label={step.title}
                 description={step.completed ? 'Completed' : step.description}
+                completed={step.completed}
                 completedIcon={
                   <svg
                     width="14"
@@ -1408,7 +1475,7 @@ export function OnboardingPage() {
                       onClick={handleCompleteStep}
                       loading={saving}
                     >
-                      Complete Step
+                      Complete step
                     </Button>
                   )}
                   {activeStep < totalSteps - 1 && (

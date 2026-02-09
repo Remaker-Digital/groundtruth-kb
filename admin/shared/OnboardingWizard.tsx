@@ -87,17 +87,17 @@ const BASE_STEP_ORDER: OnboardingStep[] = [
 ];
 
 const STEP_LABELS: Record<string, string> = {
-  mode_selection: 'Mode Selection',
-  brand_and_tone: 'Brand & Tone',
-  ai_behavior: 'AI Behavior',
-  escalation: 'Escalation Rules',
+  mode_selection: 'Mode selection',
+  brand_and_tone: 'Brand & tone',
+  ai_behavior: 'AI behavior',
+  escalation: 'Escalation rules',
   integrations: 'Integrations',
-  knowledge_base: 'Knowledge Base',
-  response_policies: 'Response Policies',
-  customer_memory: 'Customer Memory',
+  knowledge_base: 'Knowledge base',
+  response_policies: 'Response policies',
+  customer_memory: 'Customer memory',
   notifications: 'Notifications',
-  widget_appearance: 'Widget Appearance',
-  review_and_launch: 'Review & Launch',
+  widget_appearance: 'Widget appearance',
+  review_and_launch: 'Review & launch',
 };
 
 const STEP_DESCRIPTIONS: Record<string, string> = {

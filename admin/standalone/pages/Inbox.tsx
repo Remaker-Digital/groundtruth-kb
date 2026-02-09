@@ -464,9 +464,29 @@ export function InboxPage() {
               </Box>
             )}
             {!convResult.loading && !convResult.error && filteredConversations.length === 0 && (
-              <Text size="sm" c="dimmed" ta="center" py="xl">
-                No conversations found
-              </Text>
+              <Box py={40} px="sm" ta="center">
+                <svg
+                  width="48"
+                  height="48"
+                  viewBox="0 0 24 24"
+                  fill="none"
+                  stroke={isDark ? '#5C5C5C' : '#adb5bd'}
+                  strokeWidth="1.5"
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                  style={{ margin: '0 auto 12px', display: 'block', opacity: 0.7 }}
+                >
+                  <path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z" />
+                </svg>
+                <Text size="sm" fw={500} c="dimmed" mb={4}>
+                  {search || filter !== 'all' ? 'No matching conversations' : 'No conversations yet'}
+                </Text>
+                <Text size="xs" c="dimmed">
+                  {search || filter !== 'all'
+                    ? 'Try adjusting your search or filter.'
+                    : 'Conversations will appear here once customers start chatting with your AI agent.'}
+                </Text>
+              </Box>
             )}
             {filteredConversations.map((conv) => (
               <ConversationItem
@@ -691,8 +711,8 @@ export function InboxPage() {
 
                 {/* Conversation info */}
                 <Box p="md">
-                  <Text size="xs" fw={600} tt="uppercase" c="dimmed" mb={8}>
-                    Conversation Info
+                  <Text size="xs" fw={600} c="dimmed" mb={8}>
+                    Conversation info
                   </Text>
                   <Stack gap={6}>
                     <Group gap={8} wrap="nowrap">
@@ -739,8 +759,8 @@ export function InboxPage() {
 
                 {/* Customer profile placeholder */}
                 <Box p="md">
-                  <Text size="xs" fw={600} tt="uppercase" c="dimmed" mb={8}>
-                    Customer Profile
+                  <Text size="xs" fw={600} c="dimmed" mb={8}>
+                    Customer profile
                   </Text>
                   <Text size="xs" c="dimmed" fs="italic">
                     Customer details will be available once the customer profile API is connected.

@@ -1,7 +1,7 @@
 // © 2026 Remaker Digital, a DBA of VanDusen & Palmeter, LLC. All rights reserved.
 
 /**
- * Billing & Usage page — Standalone admin.
+ * Billing & usage page — Standalone admin.
  *
  * Adapted from the prototype BillingPage with API hooks replacing mock data.
  * Uses flat UsageDashboard + DailyVolume API types from shared hooks.
@@ -97,7 +97,7 @@ function UsageStat({ label, value, subtext, progress, progressColor = BRAND_RED,
     <Paper p="lg" radius="md" withBorder>
       <Group justify="space-between" align="flex-start" wrap="nowrap">
         <Stack gap={4} style={{ flex: 1 }}>
-          <Text size="xs" c="dimmed" tt="uppercase" fw={600}>
+          <Text size="xs" c="dimmed" fw={600}>
             {label}
           </Text>
           <Text size="xl" fw={700} lh={1}>
@@ -277,7 +277,7 @@ export const BillingPage: React.FC = () => {
     return (
       <Stack gap="lg">
         <div>
-          <Title order={2}>Billing & Usage</Title>
+          <Title order={2}>Billing & usage</Title>
           <Text c="dimmed" size="sm">Manage your subscription and monitor usage</Text>
         </div>
         <Group justify="center" py="xl">
@@ -293,7 +293,7 @@ export const BillingPage: React.FC = () => {
     <Stack gap="lg">
       {/* Page header */}
       <div>
-        <Title order={2}>Billing & Usage</Title>
+        <Title order={2}>Billing & usage</Title>
         <Text c="dimmed" size="sm">
           Manage your subscription and monitor usage
         </Text>
@@ -312,7 +312,7 @@ export const BillingPage: React.FC = () => {
           <Stack gap={6}>
             <Group gap="sm" align="center">
               <Text size="lg" fw={700}>
-                Current Plan
+                Current plan
               </Text>
               <Badge color={tierBadgeColor} variant="filled" size="lg" tt="capitalize">
                 {tierLabel}
@@ -323,11 +323,11 @@ export const BillingPage: React.FC = () => {
             </Group>
             <Group gap="lg">
               <div>
-                <Text size="xs" c="dimmed">Included Conversations</Text>
+                <Text size="xs" c="dimmed">Included conversations</Text>
                 <Text size="md" fw={600}>{formatNumber(includedAllowance)}/mo</Text>
               </div>
               <div>
-                <Text size="xs" c="dimmed">Used This Period</Text>
+                <Text size="xs" c="dimmed">Used this period</Text>
                 <Text size="md" fw={600}>{formatNumber(totalConversations)}</Text>
               </div>
               <div>
@@ -338,7 +338,7 @@ export const BillingPage: React.FC = () => {
           </Stack>
           {tenantContext?.hasStripeBilling && (
             <Button color="brand" onClick={handleManageSubscription}>
-              Manage Subscription
+              Manage subscription
             </Button>
           )}
         </Group>
@@ -347,7 +347,7 @@ export const BillingPage: React.FC = () => {
       {/* Usage Overview - 4 cards */}
       <SimpleGrid cols={{ base: 1, xs: 2, md: 4 }} spacing="md">
         <UsageStat
-          label="Conversations Used"
+          label="Conversations used"
           value={`${formatNumber(totalConversations)} / ${formatNumber(includedAllowance)}`}
           subtext={`${Math.round(usagePercent)}% of included allowance`}
           progress={usagePercent}
@@ -355,12 +355,12 @@ export const BillingPage: React.FC = () => {
           progressColor={BRAND_RED}
         />
         <UsageStat
-          label="Pack Balance"
+          label="Pack balance"
           value={formatNumber(packBalance)}
           subtext="remaining conversations"
         />
         <UsageStat
-          label="Current Overage"
+          label="Current overage"
           value={formatCurrency(estimatedOverageCost)}
           subtext={overageConversations > 0
             ? `${formatNumber(overageConversations)} overage conversations`
@@ -368,7 +368,7 @@ export const BillingPage: React.FC = () => {
           }
         />
         <UsageStat
-          label="Estimated Overage Cost"
+          label="Estimated overage cost"
           value={formatCurrency(estimatedOverageCost)}
           subtext="Additional charges this period"
         />
@@ -376,7 +376,7 @@ export const BillingPage: React.FC = () => {
 
       {/* Active Alerts */}
       {(usage.data?.activeAlerts ?? []).length > 0 && (
-        <Alert color="yellow" variant="light" title="Usage Alerts">
+        <Alert color="yellow" variant="light" title="Usage alerts">
           <Stack gap={4}>
             {(usage.data?.activeAlerts ?? []).map((alert, i) => (
               <Text key={i} size="sm">{alert}</Text>
@@ -388,7 +388,7 @@ export const BillingPage: React.FC = () => {
       {/* Usage Chart */}
       <Paper p="lg" radius="md" withBorder>
         <Text fw={600} mb="md">
-          Daily Usage (30 days)
+          Daily usage (30 days)
         </Text>
         {dailyVolume.loading && !chartData.length ? (
           <Group justify="center" py="xl">
@@ -484,7 +484,7 @@ export const BillingPage: React.FC = () => {
       {/* Conversation Packs */}
       <div>
         <Text size="lg" fw={600} mb={4}>
-          Conversation Packs
+          Conversation packs
         </Text>
         <Text size="sm" c="dimmed" mb="md">
           Pre-purchase conversations at a discounted rate. Packs are valid for 90 days.
@@ -519,20 +519,20 @@ export const BillingPage: React.FC = () => {
         <Paper p="lg" radius="md" withBorder>
           <Group justify="space-between" align="center">
             <div>
-              <Text fw={600}>Invoices & Payment Methods</Text>
+              <Text fw={600}>Invoices & payment methods</Text>
               <Text size="sm" c="dimmed">
                 View invoice history, update payment methods, and manage your subscription through Stripe.
               </Text>
             </div>
             <Button color="brand" size="md" onClick={handleManageBilling}>
-              Manage Billing
+              Manage billing
             </Button>
           </Group>
         </Paper>
       ) : (
         <Paper p="lg" radius="md" withBorder>
           <div>
-            <Text fw={600}>Billing Management</Text>
+            <Text fw={600}>Billing management</Text>
             <Text size="sm" c="dimmed">
               Your subscription is managed directly. Contact support for billing changes.
             </Text>

@@ -52,7 +52,7 @@ interface StatCardProps {
 function StatCard({ label, value, loading }: StatCardProps) {
   return (
     <Paper p="lg" radius="md" withBorder>
-      <Text size="xs" c="dimmed" tt="uppercase" fw={600} mb={4}>
+      <Text size="xs" c="dimmed" fw={600} mb={4}>
         {label}
       </Text>
       {loading ? (
@@ -134,27 +134,27 @@ export function DashboardPage() {
       {/* Stat cards — 5 cards, 3 columns */}
       <SimpleGrid cols={{ base: 1, xs: 2, md: 3 }} spacing="md">
         <StatCard
-          label="Total Conversations"
+          label="Total conversations"
           value={(s?.totalConversations ?? 0).toLocaleString()}
           loading={summaryLoading}
         />
         <StatCard
-          label="Avg Response Time"
+          label="Avg response time"
           value={formatResponseTime(s?.avgResponseTime)}
           loading={summaryLoading}
         />
         <StatCard
-          label="Resolution Rate"
+          label="Resolution rate"
           value={s?.resolutionRate != null ? `${(s.resolutionRate * 100).toFixed(1)}%` : '--'}
           loading={summaryLoading}
         />
         <StatCard
-          label="Customer Satisfaction"
+          label="Customer satisfaction"
           value={formatSatisfaction(s?.customerSatisfaction)}
           loading={summaryLoading}
         />
         <StatCard
-          label="Escalation Rate"
+          label="Escalation rate"
           value={s?.escalationRate != null ? `${(s.escalationRate * 100).toFixed(1)}%` : '--'}
           loading={summaryLoading}
         />
@@ -163,7 +163,7 @@ export function DashboardPage() {
       {/* Conversation volume chart */}
       <Paper p="lg" radius="md" withBorder>
         <Text fw={600} mb="md">
-          Daily Conversation Volume (30 days)
+          Daily conversation volume (30 days)
         </Text>
         {dailyVolume.loading ? (
           <Skeleton height={320} />
@@ -253,7 +253,7 @@ export function DashboardPage() {
         {/* Recent Conversations */}
         <Paper p="lg" radius="md" withBorder>
           <Text fw={600} mb="md">
-            Recent Conversations
+            Recent conversations
           </Text>
           {conversations.loading ? (
             <Stack gap="xs">
@@ -317,7 +317,7 @@ export function DashboardPage() {
         {/* Top Intents */}
         <Paper p="lg" radius="md" withBorder>
           <Text fw={600} mb="md">
-            Top Intents
+            Top intents
           </Text>
           {intents.loading ? (
             <Stack gap="xs">

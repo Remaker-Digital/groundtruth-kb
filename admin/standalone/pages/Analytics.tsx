@@ -72,7 +72,7 @@ interface StatCardProps {
 function StatCard({ label, value, detail }: StatCardProps) {
   return (
     <Paper p="lg" radius="md" withBorder>
-      <Text size="xs" c="dimmed" tt="uppercase" fw={600} mb={4}>
+      <Text size="xs" c="dimmed" fw={600} mb={4}>
         {label}
       </Text>
       <Text size="xl" fw={700} lh={1}>
@@ -183,16 +183,16 @@ export const AnalyticsPage: React.FC = () => {
       {/* Stat cards — 5 cards, no deltas */}
       <SimpleGrid cols={{ base: 1, xs: 2, md: 3 }} spacing="md">
         <StatCard
-          label="Total Conversations"
+          label="Total conversations"
           value={(s?.totalConversations ?? 0).toLocaleString()}
           detail={s ? `Billable: ${(s.billableConversations ?? 0).toLocaleString()}` : undefined}
         />
         <StatCard
-          label="Avg Response Time"
+          label="Avg response time"
           value={s?.avgResponseTime != null ? `${s.avgResponseTime}s` : '--'}
         />
         <StatCard
-          label="Resolution Rate"
+          label="Resolution rate"
           value={s?.resolutionRate != null ? `${(s.resolutionRate * 100).toFixed(1)}%` : '--'}
           detail={
             s != null
@@ -201,11 +201,11 @@ export const AnalyticsPage: React.FC = () => {
           }
         />
         <StatCard
-          label="Customer Satisfaction"
+          label="Customer satisfaction"
           value={s?.customerSatisfaction != null ? `${s.customerSatisfaction}/5` : '--'}
         />
         <StatCard
-          label="Escalation Rate"
+          label="Escalation rate"
           value={s != null ? `${(s.escalationRate * 100).toFixed(1)}%` : '--'}
           detail={
             s != null
@@ -218,7 +218,7 @@ export const AnalyticsPage: React.FC = () => {
       {/* Full-width area chart — 2 series: Total (red) + Billable (blue) */}
       <Paper p="lg" radius="md" withBorder>
         <Group justify="space-between" mb="md">
-          <Text fw={600}>Conversation Volume</Text>
+          <Text fw={600}>Conversation volume</Text>
           <Text size="xs" c="dimmed">
             {period === '7d'
               ? 'Last 7 days'
@@ -321,7 +321,7 @@ export const AnalyticsPage: React.FC = () => {
       {/* Intent Breakdown Table — 3 columns: Intent, Count, Distribution */}
       <Paper p="lg" radius="md" withBorder>
         <Text fw={600} mb="md">
-          Intent Breakdown
+          Intent breakdown
         </Text>
         {intentList.length > 0 ? (
           <Table striped highlightOnHover>
@@ -372,7 +372,7 @@ export const AnalyticsPage: React.FC = () => {
       <Paper p="lg" radius="md" withBorder>
         <Group justify="space-between" mb="md">
           <div>
-            <Text fw={600}>Knowledge Gaps</Text>
+            <Text fw={600}>Knowledge gaps</Text>
             <Text size="xs" c="dimmed">
               Conversations where the AI could not fully resolve the customer query
             </Text>

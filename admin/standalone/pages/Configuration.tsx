@@ -38,13 +38,29 @@ import {
   useComputedColorScheme,
 } from '@mantine/core';
 import { useAppContext } from '../layouts/StandaloneLayout';
-import { useConfig, useUpdateConfig } from '../../shared/hooks/index';
+import { useConfig, useUpdateConfig, useTestModeStatus, useActivateTestMode, useDeactivateTestMode, useUpdateTestModePercentage } from '../../shared/hooks/index';
+import type { TestModeStatus } from '../../shared/hooks/index';
 
 // ---------------------------------------------------------------------------
 // Constants
 // ---------------------------------------------------------------------------
 
 const BRAND_RED = '#ff3621';
+
+/** AI behaviour fields eligible for test-mode overrides (mirrors backend _AI_BEHAVIOR_FIELDS). */
+const TEST_MODE_OVERRIDE_FIELDS: { key: string; label: string; type: 'text' | 'number' | 'boolean' | 'select'; options?: { value: string; label: string }[] }[] = [
+  { key: 'brand_voice', label: 'Brand voice', type: 'text' },
+  { key: 'response_length', label: 'Response length', type: 'select', options: [{ value: 'concise', label: 'Concise' }, { value: 'moderate', label: 'Moderate' }, { value: 'detailed', label: 'Detailed' }] },
+  { key: 'formality_level', label: 'Formality', type: 'select', options: [{ value: 'casual', label: 'Casual' }, { value: 'professional', label: 'Professional' }, { value: 'formal', label: 'Formal' }] },
+  { key: 'escalation_threshold', label: 'Escalation threshold', type: 'number' },
+  { key: 'custom_instructions', label: 'Custom instructions', type: 'text' },
+  { key: 'memory_enabled', label: 'Memory enabled', type: 'boolean' },
+  { key: 'retrieval_top_k', label: 'Retrieval top K', type: 'number' },
+  { key: 'retrieval_vector_weight', label: 'Vector weight', type: 'number' },
+  { key: 'retrieval_bm25_weight', label: 'BM25 weight', type: 'number' },
+  { key: 'retrieval_min_score', label: 'Min relevance score', type: 'number' },
+  { key: 'cite_sources_in_response', label: 'Cite sources', type: 'boolean' },
+];
 
 // ---------------------------------------------------------------------------
 // Escalation categories — each has its own email + keyword set
@@ -84,13 +100,13 @@ const ESCALATION_CATEGORIES: EscalationCategory[] = [
   },
   {
     id: 'technical',
-    label: 'Technical Assistance',
+    label: 'Technical assistance',
     description: 'Integration issues, API questions, advanced configuration',
     defaultKeywords: ['api', 'integration', 'webhook', 'developer', 'sdk', 'technical', 'configuration', 'setup'],
   },
   {
     id: 'general',
-    label: 'General Inquiry',
+    label: 'General inquiry',
     description: 'Complaints, legal, safety, or anything not matching other categories',
     defaultKeywords: ['complaint', 'manager', 'supervisor', 'lawyer', 'legal', 'sue', 'safety', 'harassment', 'fraud'],
   },
@@ -370,6 +386,91 @@ export const ConfigurationPage: React.FC = () => {
   // Keyword input buffers (one per category)
   const [keywordInputs, setKeywordInputs] = useState<Record<string, string>>({});
 
+  // ---- Test Mode state ---------------------------------------------------
+  const testModeStatus = useTestModeStatus(apiFetch);
+  const { activate: activateTestMode, loading: activating, error: activateError } = useActivateTestMode(apiFetch);
+  const { deactivate: deactivateTestMode, loading: deactivating, error: deactivateError } = useDeactivateTestMode(apiFetch);
+  const { updatePercentage, loading: updatingPct, error: pctError } = useUpdateTestModePercentage(apiFetch);
+
+  const tmStatus: TestModeStatus | null = testModeStatus.data ?? null;
+  const tmEnabled = tmStatus?.enabled ?? false;
+
+  const [tmOverrides, setTmOverrides] = useState<Record<string, unknown>>({});
+  const [tmPercentage, setTmPercentage] = useState(10);
+  const [tmPanelExpanded, setTmPanelExpanded] = useState(false);
+
+  // Sync percentage from server when status loads
+  useEffect(() => {
+    if (tmStatus) {
+      setTmPercentage(tmStatus.percentage);
+      if (tmStatus.enabled && Object.keys(tmStatus.overrides).length > 0) {
+        setTmOverrides(tmStatus.overrides);
+      }
+    }
+  }, [tmStatus]);
+
+  const handleActivateTestMode = async () => {
+    const activeOverrides: Record<string, unknown> = {};
+    for (const [key, val] of Object.entries(tmOverrides)) {
+      if (val !== undefined && val !== '' && val !== null) {
+        activeOverrides[key] = val;
+      }
+    }
+    if (Object.keys(activeOverrides).length === 0) {
+      onNotify('Add at least one override field to activate test mode.', 'error');
+      return;
+    }
+    const ok = await activateTestMode(activeOverrides, tmPercentage);
+    if (ok) {
+      onNotify(`Test mode activated for ${tmPercentage}% of sessions.`, 'success');
+      testModeStatus.refetch();
+    } else {
+      onNotify(activateError || 'Failed to activate test mode.', 'error');
+    }
+  };
+
+  const handleDeactivateTestMode = async (action: 'rollout' | 'abandon') => {
+    const ok = await deactivateTestMode(action);
+    if (ok) {
+      onNotify(
+        action === 'rollout'
+          ? 'Test overrides rolled out to production.'
+          : 'Test overrides discarded.',
+        'success',
+      );
+      setTmOverrides({});
+      testModeStatus.refetch();
+      if (action === 'rollout') configResult.refetch();
+    } else {
+      onNotify(deactivateError || 'Failed to deactivate test mode.', 'error');
+    }
+  };
+
+  const handleUpdateTestPercentage = async (pct: number) => {
+    setTmPercentage(pct);
+    if (tmEnabled) {
+      const ok = await updatePercentage(pct);
+      if (ok) {
+        onNotify(`Test traffic updated to ${pct}%.`, 'success');
+        testModeStatus.refetch();
+      } else {
+        onNotify(pctError || 'Failed to update percentage.', 'error');
+      }
+    }
+  };
+
+  const setOverrideField = (key: string, value: unknown) => {
+    setTmOverrides((prev) => ({ ...prev, [key]: value }));
+  };
+
+  const removeOverrideField = (key: string) => {
+    setTmOverrides((prev) => {
+      const next = { ...prev };
+      delete next[key];
+      return next;
+    });
+  };
+
   // Initialize form from loaded config
   useEffect(() => {
     if (configResult.data?.config) {
@@ -514,7 +615,7 @@ export const ConfigurationPage: React.FC = () => {
             loading={saving}
             onClick={handleSave}
           >
-            Save Changes
+            Save changes
           </Button>
         </Group>
       </Group>
@@ -533,16 +634,16 @@ export const ConfigurationPage: React.FC = () => {
           <Stack gap="lg">
             {/* Brand & Persona */}
             <Paper p="lg" radius="md" withBorder>
-              <Text fw={600} mb="md">Brand & Persona</Text>
+              <Text fw={600} mb="md">Brand & persona</Text>
               <Stack gap="md">
                 <TextInput
-                  label="Brand Name"
+                  label="Brand name"
                   placeholder="Your store or brand name"
                   value={form.brandName}
                   onChange={(e) => updateField('brandName', e.currentTarget.value)}
                 />
                 <Textarea
-                  label="Brand Voice"
+                  label="Brand voice"
                   placeholder="Describe the personality and tone of your AI agent..."
                   value={form.brandVoice}
                   onChange={(e) => updateField('brandVoice', e.currentTarget.value)}
@@ -561,7 +662,7 @@ export const ConfigurationPage: React.FC = () => {
                     onChange={(val) => updateField('formality', val || 'professional')}
                   />
                   <Select
-                    label="Response Length"
+                    label="Response length"
                     data={[
                       { value: 'concise', label: 'Concise' },
                       { value: 'moderate', label: 'Moderate' },
@@ -579,7 +680,7 @@ export const ConfigurationPage: React.FC = () => {
               <Text fw={600} mb="md">Policies</Text>
               <Stack gap="md">
                 <NumberInput
-                  label="Return Window"
+                  label="Return window"
                   suffix=" days"
                   value={form.returnWindow}
                   onChange={(val) => updateField('returnWindow', Number(val) || 30)}
@@ -587,7 +688,7 @@ export const ConfigurationPage: React.FC = () => {
                   max={365}
                 />
                 <Textarea
-                  label="Refund Policy"
+                  label="Refund policy"
                   placeholder="Describe your refund policy..."
                   value={form.refundPolicy}
                   onChange={(e) => updateField('refundPolicy', e.currentTarget.value)}
@@ -595,7 +696,7 @@ export const ConfigurationPage: React.FC = () => {
                   autosize
                 />
                 <Textarea
-                  label="Shipping Policy"
+                  label="Shipping policy"
                   placeholder="Describe your shipping policy..."
                   value={form.shippingPolicy}
                   onChange={(e) => updateField('shippingPolicy', e.currentTarget.value)}
@@ -617,7 +718,7 @@ export const ConfigurationPage: React.FC = () => {
                 {/* Global threshold slider */}
                 <div>
                   <Text size="sm" fw={500} mb={8}>
-                    Escalation Threshold
+                    Escalation threshold
                   </Text>
                   <Slider
                     value={form.escalationThreshold}
@@ -693,7 +794,7 @@ export const ConfigurationPage: React.FC = () => {
                         <Stack gap="sm" mt="sm">
                           {/* Notification email */}
                           <TextInput
-                            label="Notification Email"
+                            label="Notification email"
                             placeholder={`${cat.id}@yourcompany.com`}
                             size="sm"
                             value={catConfig.email}
@@ -770,7 +871,7 @@ export const ConfigurationPage: React.FC = () => {
                 {/* Global escalation settings */}
                 <Group grow>
                   <NumberInput
-                    label="Idle Timeout"
+                    label="Idle timeout"
                     suffix=" minutes"
                     value={form.idleTimeoutMinutes}
                     onChange={(val) => updateField('idleTimeoutMinutes', Number(val) || 30)}
@@ -778,7 +879,7 @@ export const ConfigurationPage: React.FC = () => {
                     max={120}
                   />
                   <NumberInput
-                    label="Max Turns"
+                    label="Max turns"
                     value={form.maxTurns}
                     onChange={(val) => updateField('maxTurns', Number(val) || 50)}
                     min={5}
@@ -790,7 +891,7 @@ export const ConfigurationPage: React.FC = () => {
 
             {/* Custom Instructions */}
             <Paper p="lg" radius="md" withBorder>
-              <Text fw={600} mb="md">Custom Instructions</Text>
+              <Text fw={600} mb="md">Custom instructions</Text>
               <Textarea
                 placeholder="Provide advisory instructions for the AI agent..."
                 value={form.customInstructions}
@@ -810,14 +911,14 @@ export const ConfigurationPage: React.FC = () => {
               <Text fw={600} mb="md">Language</Text>
               <Stack gap="md">
                 <Select
-                  label="Primary Language"
+                  label="Primary language"
                   data={LANGUAGES}
                   value={form.primaryLanguage}
                   onChange={(val) => updateField('primaryLanguage', val || 'en')}
                 />
                 <div>
                   <Text size="sm" fw={500} mb={8}>
-                    Supported Languages
+                    Supported languages
                   </Text>
                   <Chip.Group
                     multiple
@@ -834,6 +935,198 @@ export const ConfigurationPage: React.FC = () => {
                   </Chip.Group>
                 </div>
               </Stack>
+            </Paper>
+
+            {/* Test mode */}
+            <Paper p="lg" radius="md" withBorder>
+              <Group justify="space-between" mb="xs">
+                <Group gap="sm">
+                  <Text fw={600}>Test mode</Text>
+                  {tmEnabled ? (
+                    <Badge size="sm" variant="filled" color="orange">Active</Badge>
+                  ) : (
+                    <Badge size="sm" variant="light" color="gray">Inactive</Badge>
+                  )}
+                </Group>
+                <ActionIcon
+                  variant="subtle"
+                  size="sm"
+                  onClick={() => setTmPanelExpanded((p) => !p)}
+                  color="gray"
+                >
+                  {tmPanelExpanded ? <ChevronUpIcon /> : <ChevronDownIcon />}
+                </ActionIcon>
+              </Group>
+              <Text size="xs" c="dimmed" mb="md">
+                Route a percentage of sessions to an alternate AI configuration
+                to test changes before going live.
+              </Text>
+
+              {tmEnabled && !tmPanelExpanded && (
+                <Group gap="xs">
+                  <Text size="sm" c="dimmed">
+                    {tmPercentage}% of sessions · {tmStatus?.override_field_count ?? 0} override{(tmStatus?.override_field_count ?? 0) !== 1 ? 's' : ''}
+                  </Text>
+                </Group>
+              )}
+
+              <Collapse in={tmPanelExpanded}>
+                <Stack gap="md">
+                  {/* Traffic percentage */}
+                  <div>
+                    <Text size="sm" fw={500} mb={8}>
+                      Test traffic percentage
+                    </Text>
+                    <Slider
+                      value={tmPercentage}
+                      onChange={(val) => setTmPercentage(val)}
+                      onChangeEnd={(val) => handleUpdateTestPercentage(val)}
+                      min={1}
+                      max={50}
+                      step={1}
+                      marks={[
+                        { value: 1, label: '1%' },
+                        { value: 10, label: '10%' },
+                        { value: 25, label: '25%' },
+                        { value: 50, label: '50%' },
+                      ]}
+                      label={(val) => `${val}%`}
+                      color="orange"
+                      mb="lg"
+                      disabled={updatingPct}
+                    />
+                  </div>
+
+                  {/* Override fields */}
+                  <div>
+                    <Text size="sm" fw={500} mb={8}>
+                      Configuration overrides
+                    </Text>
+                    <Stack gap="xs">
+                      {TEST_MODE_OVERRIDE_FIELDS.map((field) => {
+                        const isActive = tmOverrides[field.key] !== undefined;
+                        return (
+                          <Paper
+                            key={field.key}
+                            p="xs"
+                            radius="sm"
+                            style={{
+                              backgroundColor: isDark
+                                ? (isActive ? '#1f1f1f' : '#141414')
+                                : (isActive ? '#f0f0f0' : '#f8f9fa'),
+                              border: `1px solid ${isDark ? '#272727' : '#dee2e6'}`,
+                            }}
+                          >
+                            <Group justify="space-between" wrap="nowrap">
+                              <Group gap="xs" wrap="nowrap" style={{ flex: 1, minWidth: 0 }}>
+                                <Switch
+                                  size="xs"
+                                  color="orange"
+                                  checked={isActive}
+                                  onChange={(e) => {
+                                    if (e.currentTarget.checked) {
+                                      // Set a sensible default
+                                      if (field.type === 'boolean') setOverrideField(field.key, false);
+                                      else if (field.type === 'number') setOverrideField(field.key, 0);
+                                      else if (field.type === 'select') setOverrideField(field.key, field.options?.[0]?.value ?? '');
+                                      else setOverrideField(field.key, '');
+                                    } else {
+                                      removeOverrideField(field.key);
+                                    }
+                                  }}
+                                  disabled={tmEnabled}
+                                />
+                                <Text size="xs" fw={500}>{field.label}</Text>
+                              </Group>
+                              {isActive && (
+                                <Box style={{ width: 160 }}>
+                                  {field.type === 'text' && (
+                                    <TextInput
+                                      size="xs"
+                                      value={String(tmOverrides[field.key] ?? '')}
+                                      onChange={(e) => setOverrideField(field.key, e.currentTarget.value)}
+                                      disabled={tmEnabled}
+                                    />
+                                  )}
+                                  {field.type === 'number' && (
+                                    <NumberInput
+                                      size="xs"
+                                      value={Number(tmOverrides[field.key] ?? 0)}
+                                      onChange={(val) => setOverrideField(field.key, val)}
+                                      step={0.05}
+                                      min={0}
+                                      max={10}
+                                      disabled={tmEnabled}
+                                    />
+                                  )}
+                                  {field.type === 'select' && (
+                                    <Select
+                                      size="xs"
+                                      data={field.options ?? []}
+                                      value={String(tmOverrides[field.key] ?? '')}
+                                      onChange={(val) => setOverrideField(field.key, val ?? '')}
+                                      allowDeselect={false}
+                                      disabled={tmEnabled}
+                                    />
+                                  )}
+                                  {field.type === 'boolean' && (
+                                    <Switch
+                                      size="xs"
+                                      color="orange"
+                                      checked={Boolean(tmOverrides[field.key])}
+                                      onChange={(e) => setOverrideField(field.key, e.currentTarget.checked)}
+                                      disabled={tmEnabled}
+                                    />
+                                  )}
+                                </Box>
+                              )}
+                            </Group>
+                          </Paper>
+                        );
+                      })}
+                    </Stack>
+                  </div>
+
+                  {/* Action buttons */}
+                  {!tmEnabled ? (
+                    <Button
+                      color="orange"
+                      onClick={handleActivateTestMode}
+                      loading={activating}
+                      disabled={Object.keys(tmOverrides).length === 0}
+                      fullWidth
+                    >
+                      Activate test mode
+                    </Button>
+                  ) : (
+                    <Group grow>
+                      <Button
+                        color="green"
+                        variant="light"
+                        onClick={() => handleDeactivateTestMode('rollout')}
+                        loading={deactivating}
+                      >
+                        Roll out to production
+                      </Button>
+                      <Button
+                        color="red"
+                        variant="light"
+                        onClick={() => handleDeactivateTestMode('abandon')}
+                        loading={deactivating}
+                      >
+                        Discard changes
+                      </Button>
+                    </Group>
+                  )}
+
+                  {/* Error display */}
+                  {(activateError || deactivateError || pctError) && (
+                    <Text size="xs" c="red">
+                      {activateError || deactivateError || pctError}
+                    </Text>
+                  )}
+                </Stack>
+              </Collapse>
             </Paper>
           </Stack>
         </Grid.Col>

@@ -73,12 +73,12 @@ const CONFIG_GROUPS: ConfigGroup[] = [
   },
   {
     key: 'ai_behavior',
-    label: 'AI Behavior',
+    label: 'AI behavior',
     description: 'Response formality, length limits, and model behavior.',
   },
   {
     key: 'escalation',
-    label: 'Escalation Rules',
+    label: 'Escalation rules',
     description: 'When and how conversations are escalated to human agents.',
   },
   {
@@ -88,17 +88,17 @@ const CONFIG_GROUPS: ConfigGroup[] = [
   },
   {
     key: 'knowledge_base',
-    label: 'Knowledge Base',
+    label: 'Knowledge base',
     description: 'FAQs, product information, and policy documents.',
   },
   {
     key: 'response_policies',
-    label: 'Response Policies',
+    label: 'Response policies',
     description: 'Business policies, return windows, support hours.',
   },
   {
     key: 'customer_memory',
-    label: 'Customer Memory',
+    label: 'Customer memory',
     description: 'How the AI remembers customers across conversations.',
   },
   {
@@ -108,7 +108,7 @@ const CONFIG_GROUPS: ConfigGroup[] = [
   },
   {
     key: 'widget_appearance',
-    label: 'Widget Appearance',
+    label: 'Widget appearance',
     description: 'Chat widget colors, position, and storefront behavior.',
   },
 ];
@@ -1240,7 +1240,7 @@ export const ConfigEditor: React.FC<BaseComponentProps> = ({
             onClick={handleSave}
             disabled={saving || updateLoading || !hasUnsavedChanges}
           >
-            {saving ? 'Saving...' : 'Save Changes'}
+            {saving ? 'Saving...' : 'Save changes'}
           </button>
 
           <button
@@ -1258,7 +1258,7 @@ export const ConfigEditor: React.FC<BaseComponentProps> = ({
 
       {/* Named configuration bar */}
       <div style={s.namedConfigBar}>
-        <span style={s.namedConfigLabel}>Active Configuration:</span>
+        <span style={s.namedConfigLabel}>Active configuration:</span>
         <span style={s.namedConfigName}>{activeConfigName}</span>
 
         {/* Config selector dropdown */}
@@ -1419,7 +1419,7 @@ export const ConfigEditor: React.FC<BaseComponentProps> = ({
 
         {/* Version history sidebar */}
         <div style={s.sidebar}>
-          <h3 style={s.sidebarTitle}>Version History</h3>
+          <h3 style={s.sidebarTitle}>Version history</h3>
 
           {versionsLoading ? (
             <div style={{ fontSize: 13, color: '#888' }}>Loading versions...</div>
@@ -1501,7 +1501,7 @@ export const ConfigEditor: React.FC<BaseComponentProps> = ({
           }}
         >
           <div style={s.modalContent}>
-            <h3 style={s.modalTitle}>Save Configuration As</h3>
+            <h3 style={s.modalTitle}>Save configuration as</h3>
             <p style={{ fontSize: 13, color: '#666', margin: '0 0 16px 0' }}>
               Save the current configuration as a named snapshot. You can switch between
               saved configurations at any time.
@@ -1547,7 +1547,7 @@ export const ConfigEditor: React.FC<BaseComponentProps> = ({
                   savingNamed
                 }
               >
-                {savingNamed ? 'Saving...' : 'Save Configuration'}
+                {savingNamed ? 'Saving...' : 'Save configuration'}
               </button>
             </div>
           </div>

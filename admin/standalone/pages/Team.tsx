@@ -138,6 +138,9 @@ export const TeamPage: React.FC = () => {
   // Local role overrides (visual-only — no API endpoint for role update)
   const [roleOverrides, setRoleOverrides] = useState<Record<string, TeamRole>>({});
 
+  // Confirmation modal state for destructive actions
+  const [confirmRemove, setConfirmRemove] = useState<{ id: string; email: string } | null>(null);
+
   // Invite modal state
   const [inviteModalOpen, setInviteModalOpen] = useState(false);
   const [inviteEmail, setInviteEmail] = useState('');
@@ -251,7 +254,7 @@ export const TeamPage: React.FC = () => {
           </Text>
         </div>
         <Button color={BRAND_RED} onClick={() => setInviteModalOpen(true)}>
-          Invite Member
+          Invite member
         </Button>
       </Group>
 
@@ -270,7 +273,7 @@ export const TeamPage: React.FC = () => {
                 <Table.Th>Member</Table.Th>
                 <Table.Th>Role</Table.Th>
                 <Table.Th>Status</Table.Th>
-                <Table.Th>Last Active</Table.Th>
+                <Table.Th>Last active</Table.Th>
                 <Table.Th ta="right">Actions</Table.Th>
               </Table.Tr>
             </Table.Thead>
@@ -370,7 +373,7 @@ export const TeamPage: React.FC = () => {
                                 variant="subtle"
                                 color="red"
                                 size="sm"
-                                onClick={() => handleRemove(member.id, member.email)}
+                                onClick={() => setConfirmRemove({ id: member.id, email: member.email })}
                               >
                                 <svg
                                   width="14"
@@ -408,7 +411,7 @@ export const TeamPage: React.FC = () => {
         <Accordion.Item value="permissions">
           <Accordion.Control>
             <Text fw={600} size="sm">
-              Roles & Permissions
+              Roles & permissions
             </Text>
           </Accordion.Control>
           <Accordion.Panel>
@@ -438,13 +441,48 @@ export const TeamPage: React.FC = () => {
         </Accordion.Item>
       </Accordion>
 
+      {/* Confirm Remove Modal */}
+      <Modal
+        opened={!!confirmRemove}
+        onClose={() => setConfirmRemove(null)}
+        title={
+          <Text fw={600} size="lg">
+            Remove team member
+          </Text>
+        }
+        centered
+        size="sm"
+      >
+        <Stack gap="md">
+          <Text size="sm">
+            Are you sure you want to remove <Text component="span" fw={600}>{confirmRemove?.email}</Text> from the team? This action cannot be undone.
+          </Text>
+          <Group justify="flex-end" mt="sm">
+            <Button variant="default" onClick={() => setConfirmRemove(null)}>
+              Cancel
+            </Button>
+            <Button
+              color="red"
+              onClick={() => {
+                if (confirmRemove) {
+                  handleRemove(confirmRemove.id, confirmRemove.email);
+                  setConfirmRemove(null);
+                }
+              }}
+            >
+              Remove
+            </Button>
+          </Group>
+        </Stack>
+      </Modal>
+
       {/* Invite Modal */}
       <Modal
         opened={inviteModalOpen}
         onClose={closeInviteModal}
         title={
           <Text fw={600} size="lg">
-            Invite Team Member
+            Invite team member
           </Text>
         }
         centered
@@ -499,7 +537,7 @@ export const TeamPage: React.FC = () => {
               disabled={!inviteEmail.trim() || !inviteRole}
               loading={inviting}
             >
-              Send Invite
+              Send invite
             </Button>
           </Group>
         </Stack>

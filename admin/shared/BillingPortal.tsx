@@ -545,11 +545,11 @@ export const BillingPortal: React.FC<BillingPortalProps> = ({
       <div style={styles.card}>
         <h3 style={styles.sectionTitle}>Subscription</h3>
         <div style={styles.row}>
-          <span style={styles.label}>Current Plan <HelpTooltip text="Your active subscription tier and billing status." /></span>
+          <span style={styles.label}>Current plan <HelpTooltip text="Your active subscription tier and billing status." /></span>
           <span style={styles.badge(tierDisplay.color)}>{tierDisplay.label}</span>
         </div>
         <div style={styles.row}>
-          <span style={styles.label}>Billing Channel</span>
+          <span style={styles.label}>Billing channel</span>
           <span style={styles.value}>
             {tenantContext.billingChannel === 'shopify' ? 'Shopify' : 'Stripe'}
           </span>
@@ -562,7 +562,7 @@ export const BillingPortal: React.FC<BillingPortalProps> = ({
         </div>
         {billing.data && (billing.data as Record<string, unknown>).renewal_date ? (
           <div style={styles.row}>
-            <span style={styles.label}>Next Renewal</span>
+            <span style={styles.label}>Next renewal</span>
             <span style={styles.value}>
               {formatDate((billing.data as Record<string, unknown>).renewal_date as string)}
             </span>
@@ -574,15 +574,15 @@ export const BillingPortal: React.FC<BillingPortalProps> = ({
             onClick={onManageBilling}
           >
             {tenantContext.billingChannel === 'shopify'
-              ? 'Manage Shopify Billing'
-              : 'Manage Billing in Stripe'}
+              ? 'Manage Shopify billing'
+              : 'Manage billing in Stripe'}
           </button>
         </div>
       </div>
 
       {/* Usage Summary Card */}
       <div style={styles.card}>
-        <h3 style={styles.sectionTitle}>Usage This Period <HelpTooltip text="Conversation usage for the current monthly billing cycle." /></h3>
+        <h3 style={styles.sectionTitle}>Usage this period <HelpTooltip text="Conversation usage for the current monthly billing cycle." /></h3>
 
         {usage.data ? (
           <>
@@ -592,19 +592,19 @@ export const BillingPortal: React.FC<BillingPortalProps> = ({
                 <p style={styles.statValue}>
                   {formatNumber(usage.data.totalConversations)}
                 </p>
-                <p style={styles.statLabel}>Total Conversations</p>
+                <p style={styles.statLabel}>Total conversations</p>
               </div>
               <div style={styles.statBox}>
                 <p style={styles.statValue}>
                   {formatNumber(usage.data.remainingIncluded)}
                 </p>
-                <p style={styles.statLabel}>Included Remaining</p>
+                <p style={styles.statLabel}>Included remaining</p>
               </div>
               <div style={styles.statBox}>
                 <p style={styles.statValue}>
                   {formatNumber(usage.data.packBalance)}
                 </p>
-                <p style={styles.statLabel}>Pack Balance</p>
+                <p style={styles.statLabel}>Pack balance</p>
               </div>
               <div style={styles.statBox}>
                 <p style={{
@@ -647,7 +647,7 @@ export const BillingPortal: React.FC<BillingPortalProps> = ({
                 border: '1px solid #FECACA',
               }}>
                 <span style={{ ...styles.label, color: '#991B1B' }}>
-                  Estimated Overage Cost
+                  Estimated overage cost
                 </span>
                 <span style={{ ...styles.value, color: '#DC2626' }}>
                   {formatCurrency(usage.data.estimatedOverageCost)}
@@ -664,7 +664,7 @@ export const BillingPortal: React.FC<BillingPortalProps> = ({
 
       {/* Conversation Packs Card */}
       <div style={styles.card}>
-        <h3 style={styles.sectionTitle}>Conversation Packs <HelpTooltip text="Pre-purchase conversation credits at a discount. Packs are consumed before overage billing and expire after 90 days." /></h3>
+        <h3 style={styles.sectionTitle}>Conversation packs <HelpTooltip text="Pre-purchase conversation credits at a discount. Packs are consumed before overage billing and expire after 90 days." /></h3>
         <p style={{
           fontSize: 13,
           color: '#6B7280',
@@ -685,7 +685,7 @@ export const BillingPortal: React.FC<BillingPortalProps> = ({
             marginBottom: 16,
           }}>
             <div style={styles.row}>
-              <span style={{ ...styles.label, color: '#166534' }}>Active Pack Balance</span>
+              <span style={{ ...styles.label, color: '#166534' }}>Active pack balance</span>
               <span style={{ ...styles.value, color: '#166534' }}>
                 {formatNumber(packs.data.balance)} conversations
               </span>
@@ -735,7 +735,7 @@ export const BillingPortal: React.FC<BillingPortalProps> = ({
       {/* Upgrade Tier Section */}
       {upgradeTiers.length > 0 && (
         <div style={styles.card}>
-          <h3 style={styles.sectionTitle}>Upgrade Plan <HelpTooltip text="Compare features and pricing across all tiers. Annual billing saves 17%." /></h3>
+          <h3 style={styles.sectionTitle}>Upgrade plan <HelpTooltip text="Compare features and pricing across all tiers. Annual billing saves 17%." /></h3>
           <p style={{
             fontSize: 13,
             color: '#6B7280',
@@ -752,7 +752,7 @@ export const BillingPortal: React.FC<BillingPortalProps> = ({
 
               return (
                 <div key={tier.tier} style={styles.tierCard(isCurrent)}>
-                  {isCurrent && <span style={styles.tierBadge}>Current Plan</span>}
+                  {isCurrent && <span style={styles.tierBadge}>Current plan</span>}
                   <p style={styles.tierName}>{display.label}</p>
                   <p style={styles.tierPrice}>
                     {tier.price} <span style={{ fontSize: 12, color: '#9CA3AF' }}>

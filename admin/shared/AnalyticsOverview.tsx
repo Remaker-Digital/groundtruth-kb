@@ -569,26 +569,26 @@ export const AnalyticsOverview: React.FC<BaseComponentProps> = ({
             }}
           >
             <SummaryCard
-              label="Total Conversations"
+              label="Total conversations"
               value={formatNumber(summary.totalConversations)}
               accentColor="#3b82f6"
               tooltip="All conversations (billable and non-billable) in the selected period."
             />
             <SummaryCard
-              label="Avg Response Time"
+              label="Avg response time"
               value={formatMs(summary.avgResponseTime)}
               subtext={summary.avgResponseTime != null ? (summary.avgResponseTime <= 2000 ? 'Within SLA' : 'Above P95 target') : undefined}
               accentColor={summary.avgResponseTime != null ? (summary.avgResponseTime <= 2000 ? COLOR_SUCCESS : COLOR_WARNING) : COLOR_GRAY}
               tooltip="Average time from customer message to AI response (P50)."
             />
             <SummaryCard
-              label="Resolution Rate"
+              label="Resolution rate"
               value={formatPercent(summary.resolutionRate)}
               accentColor={summary.resolutionRate != null ? (summary.resolutionRate >= 0.8 ? COLOR_SUCCESS : COLOR_WARNING) : COLOR_GRAY}
               tooltip="Percentage of conversations resolved without escalation to a human agent."
             />
             <SummaryCard
-              label="Escalation Rate"
+              label="Escalation rate"
               value={formatPercent(summary.escalationRate)}
               accentColor={escalationColor(summary.escalationRate)}
               tooltip="Percentage of conversations escalated to human agents."
@@ -598,7 +598,7 @@ export const AnalyticsOverview: React.FC<BaseComponentProps> = ({
               value={summary.customerSatisfaction != null ? summary.customerSatisfaction.toFixed(1) : '--'}
               subtext={summary.customerSatisfaction != null ? 'out of 5.0' : 'No ratings yet'}
               accentColor={csatColor(summary.customerSatisfaction)}
-              tooltip="Customer Satisfaction score based on thumbs up/down ratings."
+              tooltip="Customer satisfaction score based on thumbs up/down ratings."
             />
           </div>
         )}
@@ -614,7 +614,7 @@ export const AnalyticsOverview: React.FC<BaseComponentProps> = ({
           }}
         >
           <SectionHeader
-            title="Intent Breakdown"
+            title="Intent breakdown"
             subtitle="Top customer intents by conversation count"
             tooltip="Distribution of customer query categories detected by the Intent Classifier."
           />
@@ -642,7 +642,7 @@ export const AnalyticsOverview: React.FC<BaseComponentProps> = ({
           }}
         >
           <SectionHeader
-            title="Knowledge Gaps"
+            title="Knowledge gaps"
             subtitle="Queries the AI could not resolve — consider adding KB articles for these topics"
             tooltip="Conversations where the AI could not find a confident answer in the Knowledge Base."
           />

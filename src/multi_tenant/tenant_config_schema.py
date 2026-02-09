@@ -246,7 +246,7 @@ def _build_field_registry() -> dict[str, ConfigFieldDefinition]:
 
     fields.append(ConfigFieldDefinition(
         field_name="brand_name",
-        display_name="Brand Name",
+        display_name="Brand name",
         field_type=ConfigFieldType.STRING,
         validation=ValidationRule(
             min_length=1,
@@ -274,7 +274,7 @@ def _build_field_registry() -> dict[str, ConfigFieldDefinition]:
 
     fields.append(ConfigFieldDefinition(
         field_name="brand_voice",
-        display_name="Brand Voice",
+        display_name="Brand voice",
         field_type=ConfigFieldType.STRING,
         validation=ValidationRule(
             max_length=MAX_BRAND_VOICE_LENGTH,
@@ -297,7 +297,7 @@ def _build_field_registry() -> dict[str, ConfigFieldDefinition]:
 
     fields.append(ConfigFieldDefinition(
         field_name="greeting_message",
-        display_name="Greeting Message",
+        display_name="Greeting message",
         field_type=ConfigFieldType.TEXT,
         validation=ValidationRule(
             max_length=MAX_GREETING_LENGTH,
@@ -319,7 +319,7 @@ def _build_field_registry() -> dict[str, ConfigFieldDefinition]:
 
     fields.append(ConfigFieldDefinition(
         field_name="farewell_message",
-        display_name="Farewell Message",
+        display_name="Farewell message",
         field_type=ConfigFieldType.TEXT,
         validation=ValidationRule(
             max_length=MAX_FAREWELL_LENGTH,
@@ -344,7 +344,7 @@ def _build_field_registry() -> dict[str, ConfigFieldDefinition]:
 
     fields.append(ConfigFieldDefinition(
         field_name="primary_language",
-        display_name="Primary Language",
+        display_name="Primary language",
         field_type=ConfigFieldType.ENUM,
         validation=ValidationRule(
             allowed_values=_SUPPORTED_LANGUAGES,
@@ -369,7 +369,7 @@ def _build_field_registry() -> dict[str, ConfigFieldDefinition]:
 
     fields.append(ConfigFieldDefinition(
         field_name="additional_languages",
-        display_name="Additional Languages",
+        display_name="Additional languages",
         field_type=ConfigFieldType.STRING_LIST,
         validation=ValidationRule(
             max_items=MAX_ADDITIONAL_LANGUAGES,
@@ -399,7 +399,7 @@ def _build_field_registry() -> dict[str, ConfigFieldDefinition]:
 
     fields.append(ConfigFieldDefinition(
         field_name="auto_detect_language",
-        display_name="Auto-Detect Language",
+        display_name="Auto-detect language",
         field_type=ConfigFieldType.BOOLEAN,
         validation=ValidationRule(),
         platform_default=True,
@@ -422,7 +422,7 @@ def _build_field_registry() -> dict[str, ConfigFieldDefinition]:
 
     fields.append(ConfigFieldDefinition(
         field_name="response_length",
-        display_name="Response Length",
+        display_name="Response length",
         field_type=ConfigFieldType.ENUM,
         validation=ValidationRule(
             allowed_values=["concise", "standard", "detailed"],
@@ -443,7 +443,7 @@ def _build_field_registry() -> dict[str, ConfigFieldDefinition]:
 
     fields.append(ConfigFieldDefinition(
         field_name="formality_level",
-        display_name="Formality Level",
+        display_name="Formality level",
         field_type=ConfigFieldType.ENUM,
         validation=ValidationRule(
             allowed_values=["casual", "balanced", "formal"],
@@ -465,7 +465,7 @@ def _build_field_registry() -> dict[str, ConfigFieldDefinition]:
 
     fields.append(ConfigFieldDefinition(
         field_name="emoji_usage",
-        display_name="Emoji Usage",
+        display_name="Emoji usage",
         field_type=ConfigFieldType.ENUM,
         validation=ValidationRule(
             allowed_values=["none", "minimal", "moderate"],
@@ -486,7 +486,7 @@ def _build_field_registry() -> dict[str, ConfigFieldDefinition]:
 
     fields.append(ConfigFieldDefinition(
         field_name="fallback_message",
-        display_name="Fallback Message",
+        display_name="Fallback message",
         field_type=ConfigFieldType.TEXT,
         validation=ValidationRule(
             max_length=MAX_FALLBACK_LENGTH,
@@ -513,7 +513,7 @@ def _build_field_registry() -> dict[str, ConfigFieldDefinition]:
 
     fields.append(ConfigFieldDefinition(
         field_name="knowledge_scope",
-        display_name="Knowledge Scope",
+        display_name="Knowledge scope",
         field_type=ConfigFieldType.ENUM,
         validation=ValidationRule(
             allowed_values=["products_only", "products_and_faqs", "full"],
@@ -535,7 +535,7 @@ def _build_field_registry() -> dict[str, ConfigFieldDefinition]:
 
     fields.append(ConfigFieldDefinition(
         field_name="product_recommendation_enabled",
-        display_name="Product Recommendations",
+        display_name="Product recommendations",
         field_type=ConfigFieldType.BOOLEAN,
         validation=ValidationRule(),
         platform_default=True,
@@ -555,7 +555,7 @@ def _build_field_registry() -> dict[str, ConfigFieldDefinition]:
 
     fields.append(ConfigFieldDefinition(
         field_name="out_of_stock_behavior",
-        display_name="Out of Stock Behavior",
+        display_name="Out of stock behavior",
         field_type=ConfigFieldType.ENUM,
         validation=ValidationRule(
             allowed_values=["inform", "suggest_alternatives", "collect_email"],
@@ -578,7 +578,7 @@ def _build_field_registry() -> dict[str, ConfigFieldDefinition]:
 
     fields.append(ConfigFieldDefinition(
         field_name="retrieval_top_k",
-        display_name="Results to Retrieve",
+        display_name="Results to retrieve",
         field_type=ConfigFieldType.INTEGER,
         validation=ValidationRule(min_value=1, max_value=20),
         platform_default=5,
@@ -597,7 +597,7 @@ def _build_field_registry() -> dict[str, ConfigFieldDefinition]:
 
     fields.append(ConfigFieldDefinition(
         field_name="retrieval_vector_weight",
-        display_name="Semantic Search Weight",
+        display_name="Semantic search weight",
         field_type=ConfigFieldType.FLOAT,
         validation=ValidationRule(min_value=0.0, max_value=1.0),
         platform_default=0.7,
@@ -616,7 +616,7 @@ def _build_field_registry() -> dict[str, ConfigFieldDefinition]:
 
     fields.append(ConfigFieldDefinition(
         field_name="retrieval_bm25_weight",
-        display_name="Keyword Match Weight",
+        display_name="Keyword match weight",
         field_type=ConfigFieldType.FLOAT,
         validation=ValidationRule(min_value=0.0, max_value=1.0),
         platform_default=0.3,
@@ -635,7 +635,7 @@ def _build_field_registry() -> dict[str, ConfigFieldDefinition]:
 
     fields.append(ConfigFieldDefinition(
         field_name="retrieval_min_score",
-        display_name="Minimum Relevance Score",
+        display_name="Minimum relevance score",
         field_type=ConfigFieldType.FLOAT,
         validation=ValidationRule(min_value=0.0, max_value=1.0),
         platform_default=0.1,
@@ -655,7 +655,7 @@ def _build_field_registry() -> dict[str, ConfigFieldDefinition]:
 
     fields.append(ConfigFieldDefinition(
         field_name="cite_sources_in_response",
-        display_name="Cite Sources in Responses",
+        display_name="Cite sources in responses",
         field_type=ConfigFieldType.BOOLEAN,
         validation=ValidationRule(),
         platform_default=False,
@@ -674,7 +674,7 @@ def _build_field_registry() -> dict[str, ConfigFieldDefinition]:
 
     fields.append(ConfigFieldDefinition(
         field_name="intent_source_mapping",
-        display_name="Intent-to-Source Routing",
+        display_name="Intent-to-source routing",
         field_type=ConfigFieldType.OBJECT,
         validation=ValidationRule(),
         platform_default=None,
@@ -699,7 +699,7 @@ def _build_field_registry() -> dict[str, ConfigFieldDefinition]:
 
     fields.append(ConfigFieldDefinition(
         field_name="return_policy",
-        display_name="Return Policy",
+        display_name="Return policy",
         field_type=ConfigFieldType.TEXT,
         validation=ValidationRule(
             max_length=MAX_POLICY_TEXT_LENGTH,
@@ -722,7 +722,7 @@ def _build_field_registry() -> dict[str, ConfigFieldDefinition]:
 
     fields.append(ConfigFieldDefinition(
         field_name="shipping_info",
-        display_name="Shipping Information",
+        display_name="Shipping information",
         field_type=ConfigFieldType.TEXT,
         validation=ValidationRule(
             max_length=MAX_POLICY_TEXT_LENGTH,
@@ -745,7 +745,7 @@ def _build_field_registry() -> dict[str, ConfigFieldDefinition]:
 
     fields.append(ConfigFieldDefinition(
         field_name="warranty_info",
-        display_name="Warranty Information",
+        display_name="Warranty information",
         field_type=ConfigFieldType.TEXT,
         validation=ValidationRule(
             max_length=MAX_POLICY_TEXT_LENGTH,
@@ -766,7 +766,7 @@ def _build_field_registry() -> dict[str, ConfigFieldDefinition]:
 
     fields.append(ConfigFieldDefinition(
         field_name="support_hours",
-        display_name="Support Hours",
+        display_name="Support hours",
         field_type=ConfigFieldType.TEXT,
         validation=ValidationRule(
             max_length=500,
@@ -788,7 +788,7 @@ def _build_field_registry() -> dict[str, ConfigFieldDefinition]:
 
     fields.append(ConfigFieldDefinition(
         field_name="custom_policies",
-        display_name="Additional Policies",
+        display_name="Additional policies",
         field_type=ConfigFieldType.TEXT,
         validation=ValidationRule(
             max_length=MAX_POLICY_TEXT_LENGTH,
@@ -813,7 +813,7 @@ def _build_field_registry() -> dict[str, ConfigFieldDefinition]:
 
     fields.append(ConfigFieldDefinition(
         field_name="escalation_threshold",
-        display_name="Escalation Threshold",
+        display_name="Escalation threshold",
         field_type=ConfigFieldType.FLOAT,
         validation=ValidationRule(
             min_value=0.0,
@@ -842,7 +842,7 @@ def _build_field_registry() -> dict[str, ConfigFieldDefinition]:
 
     fields.append(ConfigFieldDefinition(
         field_name="escalation_keywords",
-        display_name="Escalation Keywords",
+        display_name="Escalation keywords",
         field_type=ConfigFieldType.STRING_LIST,
         validation=ValidationRule(
             max_items=MAX_ESCALATION_KEYWORDS_COUNT,
@@ -866,7 +866,7 @@ def _build_field_registry() -> dict[str, ConfigFieldDefinition]:
 
     fields.append(ConfigFieldDefinition(
         field_name="escalation_email",
-        display_name="Escalation Notification Email",
+        display_name="Escalation notification email",
         field_type=ConfigFieldType.STRING,
         validation=ValidationRule(
             max_length=254,
@@ -889,7 +889,7 @@ def _build_field_registry() -> dict[str, ConfigFieldDefinition]:
 
     fields.append(ConfigFieldDefinition(
         field_name="max_ai_turns_before_escalation",
-        display_name="Max AI Turns Before Escalation",
+        display_name="Max AI turns before escalation",
         field_type=ConfigFieldType.INTEGER,
         validation=ValidationRule(
             min_value=1,
@@ -916,7 +916,7 @@ def _build_field_registry() -> dict[str, ConfigFieldDefinition]:
 
     fields.append(ConfigFieldDefinition(
         field_name="shopify_sync_enabled",
-        display_name="Shopify Product Sync",
+        display_name="Shopify product sync",
         field_type=ConfigFieldType.BOOLEAN,
         validation=ValidationRule(),
         platform_default=True,
@@ -934,7 +934,7 @@ def _build_field_registry() -> dict[str, ConfigFieldDefinition]:
 
     fields.append(ConfigFieldDefinition(
         field_name="zendesk_escalation_enabled",
-        display_name="Zendesk Ticket Creation",
+        display_name="Zendesk ticket creation",
         field_type=ConfigFieldType.BOOLEAN,
         validation=ValidationRule(),
         platform_default=False,
@@ -953,7 +953,7 @@ def _build_field_registry() -> dict[str, ConfigFieldDefinition]:
 
     fields.append(ConfigFieldDefinition(
         field_name="mailchimp_segment_sync",
-        display_name="Mailchimp Segment Sync",
+        display_name="Mailchimp segment sync",
         field_type=ConfigFieldType.BOOLEAN,
         validation=ValidationRule(),
         platform_default=False,
@@ -972,7 +972,7 @@ def _build_field_registry() -> dict[str, ConfigFieldDefinition]:
 
     fields.append(ConfigFieldDefinition(
         field_name="google_analytics_enabled",
-        display_name="Google Analytics Export",
+        display_name="Google Analytics export",
         field_type=ConfigFieldType.BOOLEAN,
         validation=ValidationRule(),
         platform_default=False,
@@ -995,7 +995,7 @@ def _build_field_registry() -> dict[str, ConfigFieldDefinition]:
 
     fields.append(ConfigFieldDefinition(
         field_name="memory_enabled",
-        display_name="Conversation Memory",
+        display_name="Conversation memory",
         field_type=ConfigFieldType.BOOLEAN,
         validation=ValidationRule(),
         platform_default=True,
@@ -1015,7 +1015,7 @@ def _build_field_registry() -> dict[str, ConfigFieldDefinition]:
 
     fields.append(ConfigFieldDefinition(
         field_name="pattern_learning_enabled",
-        display_name="Pattern Learning (Layer 3)",
+        display_name="Pattern learning (Layer 3)",
         field_type=ConfigFieldType.BOOLEAN,
         validation=ValidationRule(),
         platform_default=True,
@@ -1035,7 +1035,7 @@ def _build_field_registry() -> dict[str, ConfigFieldDefinition]:
 
     fields.append(ConfigFieldDefinition(
         field_name="dedicated_model_enabled",
-        display_name="Dedicated Model Training (Layer 4)",
+        display_name="Dedicated model training (Layer 4)",
         field_type=ConfigFieldType.BOOLEAN,
         validation=ValidationRule(),
         platform_default=False,
@@ -1055,7 +1055,7 @@ def _build_field_registry() -> dict[str, ConfigFieldDefinition]:
 
     fields.append(ConfigFieldDefinition(
         field_name="data_retention_days",
-        display_name="Conversation Data Retention",
+        display_name="Conversation data retention",
         field_type=ConfigFieldType.INTEGER,
         validation=ValidationRule(
             min_value=30,
@@ -1082,7 +1082,7 @@ def _build_field_registry() -> dict[str, ConfigFieldDefinition]:
 
     fields.append(ConfigFieldDefinition(
         field_name="consent_collection_enabled",
-        display_name="Collect Customer Consent",
+        display_name="Collect customer consent",
         field_type=ConfigFieldType.BOOLEAN,
         validation=ValidationRule(),
         platform_default=True,
@@ -1116,7 +1116,7 @@ def _build_field_registry() -> dict[str, ConfigFieldDefinition]:
 
     fields.append(ConfigFieldDefinition(
         field_name="widget_primary_color",
-        display_name="Widget Color",
+        display_name="Widget color",
         field_type=ConfigFieldType.STRING,
         validation=ValidationRule(
             pattern=HEX_COLOR_PATTERN,
@@ -1137,7 +1137,7 @@ def _build_field_registry() -> dict[str, ConfigFieldDefinition]:
 
     fields.append(ConfigFieldDefinition(
         field_name="widget_background_color",
-        display_name="Widget Background",
+        display_name="Widget background",
         field_type=ConfigFieldType.STRING,
         validation=ValidationRule(
             pattern=HEX_COLOR_PATTERN,
@@ -1157,7 +1157,7 @@ def _build_field_registry() -> dict[str, ConfigFieldDefinition]:
 
     fields.append(ConfigFieldDefinition(
         field_name="widget_position",
-        display_name="Widget Position",
+        display_name="Widget position",
         field_type=ConfigFieldType.ENUM,
         validation=ValidationRule(
             allowed_values=["bottom-right", "bottom-left"],
@@ -1177,7 +1177,7 @@ def _build_field_registry() -> dict[str, ConfigFieldDefinition]:
 
     fields.append(ConfigFieldDefinition(
         field_name="widget_offset_x",
-        display_name="Horizontal Offset",
+        display_name="Horizontal offset",
         field_type=ConfigFieldType.INTEGER,
         validation=ValidationRule(
             min_value=0,
@@ -1198,7 +1198,7 @@ def _build_field_registry() -> dict[str, ConfigFieldDefinition]:
 
     fields.append(ConfigFieldDefinition(
         field_name="widget_offset_y",
-        display_name="Vertical Offset",
+        display_name="Vertical offset",
         field_type=ConfigFieldType.INTEGER,
         validation=ValidationRule(
             min_value=0,
@@ -1218,7 +1218,7 @@ def _build_field_registry() -> dict[str, ConfigFieldDefinition]:
 
     fields.append(ConfigFieldDefinition(
         field_name="widget_agent_avatar_url",
-        display_name="Agent Avatar",
+        display_name="Agent avatar",
         field_type=ConfigFieldType.STRING,
         validation=ValidationRule(
             max_length=500,
@@ -1238,7 +1238,7 @@ def _build_field_registry() -> dict[str, ConfigFieldDefinition]:
 
     fields.append(ConfigFieldDefinition(
         field_name="widget_agent_display_name",
-        display_name="Agent Display Name",
+        display_name="Agent display name",
         field_type=ConfigFieldType.STRING,
         validation=ValidationRule(
             max_length=MAX_AGENT_DISPLAY_NAME_LENGTH,
@@ -1259,7 +1259,7 @@ def _build_field_registry() -> dict[str, ConfigFieldDefinition]:
 
     fields.append(ConfigFieldDefinition(
         field_name="widget_agent_title",
-        display_name="Agent Title",
+        display_name="Agent title",
         field_type=ConfigFieldType.STRING,
         validation=ValidationRule(
             max_length=MAX_AGENT_TITLE_LENGTH,
@@ -1280,7 +1280,7 @@ def _build_field_registry() -> dict[str, ConfigFieldDefinition]:
 
     fields.append(ConfigFieldDefinition(
         field_name="widget_logo_url",
-        display_name="Widget Logo",
+        display_name="Widget logo",
         field_type=ConfigFieldType.STRING,
         validation=ValidationRule(
             max_length=500,
@@ -1319,7 +1319,7 @@ def _build_field_registry() -> dict[str, ConfigFieldDefinition]:
 
     fields.append(ConfigFieldDefinition(
         field_name="widget_mobile_enabled",
-        display_name="Show on Mobile",
+        display_name="Show on mobile",
         field_type=ConfigFieldType.BOOLEAN,
         validation=ValidationRule(),
         platform_default=True,
@@ -1337,7 +1337,7 @@ def _build_field_registry() -> dict[str, ConfigFieldDefinition]:
 
     fields.append(ConfigFieldDefinition(
         field_name="widget_dark_mode",
-        display_name="Dark Mode",
+        display_name="Dark mode",
         field_type=ConfigFieldType.BOOLEAN,
         validation=ValidationRule(),
         platform_default=False,
@@ -1355,7 +1355,7 @@ def _build_field_registry() -> dict[str, ConfigFieldDefinition]:
 
     fields.append(ConfigFieldDefinition(
         field_name="widget_color_mode",
-        display_name="Color Mode",
+        display_name="Color mode",
         field_type=ConfigFieldType.ENUM,
         validation=ValidationRule(
             allowed_values=["light", "dark", "auto"],
@@ -1375,7 +1375,7 @@ def _build_field_registry() -> dict[str, ConfigFieldDefinition]:
 
     fields.append(ConfigFieldDefinition(
         field_name="widget_header_gradient_end",
-        display_name="Header Gradient End Color",
+        display_name="Header gradient end color",
         field_type=ConfigFieldType.STRING,
         validation=ValidationRule(
             pattern=r"^#[0-9A-Fa-f]{6}$",
@@ -1395,7 +1395,7 @@ def _build_field_registry() -> dict[str, ConfigFieldDefinition]:
 
     fields.append(ConfigFieldDefinition(
         field_name="widget_font_family",
-        display_name="Font Family",
+        display_name="Font family",
         field_type=ConfigFieldType.STRING,
         validation=ValidationRule(
             max_length=200,
@@ -1415,7 +1415,7 @@ def _build_field_registry() -> dict[str, ConfigFieldDefinition]:
 
     fields.append(ConfigFieldDefinition(
         field_name="widget_border_radius",
-        display_name="Border Radius",
+        display_name="Border radius",
         field_type=ConfigFieldType.INTEGER,
         validation=ValidationRule(
             min_value=0,
@@ -1435,7 +1435,7 @@ def _build_field_registry() -> dict[str, ConfigFieldDefinition]:
 
     fields.append(ConfigFieldDefinition(
         field_name="widget_launcher_size",
-        display_name="Launcher Button Size",
+        display_name="Launcher button size",
         field_type=ConfigFieldType.INTEGER,
         validation=ValidationRule(
             min_value=40,
@@ -1455,7 +1455,7 @@ def _build_field_registry() -> dict[str, ConfigFieldDefinition]:
 
     fields.append(ConfigFieldDefinition(
         field_name="widget_launcher_icon",
-        display_name="Launcher Icon",
+        display_name="Launcher icon",
         field_type=ConfigFieldType.ENUM,
         validation=ValidationRule(
             allowed_values=["chat", "headset", "help", "custom"],
@@ -1475,7 +1475,7 @@ def _build_field_registry() -> dict[str, ConfigFieldDefinition]:
 
     fields.append(ConfigFieldDefinition(
         field_name="widget_header_title",
-        display_name="Header Title",
+        display_name="Header title",
         field_type=ConfigFieldType.STRING,
         validation=ValidationRule(
             max_length=100,
@@ -1495,7 +1495,7 @@ def _build_field_registry() -> dict[str, ConfigFieldDefinition]:
 
     fields.append(ConfigFieldDefinition(
         field_name="widget_header_subtitle",
-        display_name="Header Subtitle",
+        display_name="Header subtitle",
         field_type=ConfigFieldType.STRING,
         validation=ValidationRule(
             max_length=200,
@@ -1517,7 +1517,7 @@ def _build_field_registry() -> dict[str, ConfigFieldDefinition]:
 
     fields.append(ConfigFieldDefinition(
         field_name="widget_greeting_enabled",
-        display_name="Greeting Message",
+        display_name="Greeting message",
         field_type=ConfigFieldType.BOOLEAN,
         validation=ValidationRule(),
         platform_default=True,
@@ -1534,7 +1534,7 @@ def _build_field_registry() -> dict[str, ConfigFieldDefinition]:
 
     fields.append(ConfigFieldDefinition(
         field_name="widget_greeting_message",
-        display_name="Greeting Text",
+        display_name="Greeting text",
         field_type=ConfigFieldType.TEXT,
         validation=ValidationRule(
             max_length=500,
@@ -1554,7 +1554,7 @@ def _build_field_registry() -> dict[str, ConfigFieldDefinition]:
 
     fields.append(ConfigFieldDefinition(
         field_name="widget_pre_chat_form_enabled",
-        display_name="Pre-Chat Form",
+        display_name="Pre-chat form",
         field_type=ConfigFieldType.BOOLEAN,
         validation=ValidationRule(),
         platform_default=False,
@@ -1571,7 +1571,7 @@ def _build_field_registry() -> dict[str, ConfigFieldDefinition]:
 
     fields.append(ConfigFieldDefinition(
         field_name="widget_pre_chat_fields",
-        display_name="Pre-Chat Form Fields",
+        display_name="Pre-chat form fields",
         field_type=ConfigFieldType.STRING_LIST,
         validation=ValidationRule(
             max_items=6,
@@ -1591,7 +1591,7 @@ def _build_field_registry() -> dict[str, ConfigFieldDefinition]:
 
     fields.append(ConfigFieldDefinition(
         field_name="widget_offline_form_enabled",
-        display_name="Offline Contact Form",
+        display_name="Offline contact form",
         field_type=ConfigFieldType.BOOLEAN,
         validation=ValidationRule(),
         platform_default=True,
@@ -1608,7 +1608,7 @@ def _build_field_registry() -> dict[str, ConfigFieldDefinition]:
 
     fields.append(ConfigFieldDefinition(
         field_name="widget_offline_message",
-        display_name="Offline Message",
+        display_name="Offline message",
         field_type=ConfigFieldType.TEXT,
         validation=ValidationRule(
             max_length=MAX_OFFLINE_MESSAGE_LENGTH,
@@ -1631,7 +1631,7 @@ def _build_field_registry() -> dict[str, ConfigFieldDefinition]:
 
     fields.append(ConfigFieldDefinition(
         field_name="widget_auto_open",
-        display_name="Auto-Open Widget",
+        display_name="Auto-open widget",
         field_type=ConfigFieldType.BOOLEAN,
         validation=ValidationRule(),
         platform_default=False,
@@ -1649,7 +1649,7 @@ def _build_field_registry() -> dict[str, ConfigFieldDefinition]:
 
     fields.append(ConfigFieldDefinition(
         field_name="widget_auto_open_delay",
-        display_name="Auto-Open Delay (seconds)",
+        display_name="Auto-open delay (seconds)",
         field_type=ConfigFieldType.INTEGER,
         validation=ValidationRule(
             min_value=1,
@@ -1670,7 +1670,7 @@ def _build_field_registry() -> dict[str, ConfigFieldDefinition]:
 
     fields.append(ConfigFieldDefinition(
         field_name="widget_operating_hours",
-        display_name="Operating Hours",
+        display_name="Operating hours",
         field_type=ConfigFieldType.OBJECT,
         validation=ValidationRule(),
         platform_default=None,
@@ -1689,7 +1689,7 @@ def _build_field_registry() -> dict[str, ConfigFieldDefinition]:
 
     fields.append(ConfigFieldDefinition(
         field_name="widget_offline_behavior",
-        display_name="Offline Behavior",
+        display_name="Offline behavior",
         field_type=ConfigFieldType.ENUM,
         validation=ValidationRule(
             allowed_values=["ai_only", "show_form", "hide_widget"],
@@ -1709,7 +1709,7 @@ def _build_field_registry() -> dict[str, ConfigFieldDefinition]:
 
     fields.append(ConfigFieldDefinition(
         field_name="widget_prechat_form",
-        display_name="Pre-Chat Form",
+        display_name="Pre-chat form",
         field_type=ConfigFieldType.OBJECT,
         validation=ValidationRule(),
         platform_default=None,
@@ -1729,7 +1729,7 @@ def _build_field_registry() -> dict[str, ConfigFieldDefinition]:
 
     fields.append(ConfigFieldDefinition(
         field_name="widget_chat_rating_enabled",
-        display_name="Post-Chat Rating",
+        display_name="Post-chat rating",
         field_type=ConfigFieldType.BOOLEAN,
         validation=ValidationRule(),
         platform_default=False,
@@ -1747,7 +1747,7 @@ def _build_field_registry() -> dict[str, ConfigFieldDefinition]:
 
     fields.append(ConfigFieldDefinition(
         field_name="widget_sound_enabled",
-        display_name="Notification Sound",
+        display_name="Notification sound",
         field_type=ConfigFieldType.BOOLEAN,
         validation=ValidationRule(),
         platform_default=True,
@@ -1765,7 +1765,7 @@ def _build_field_registry() -> dict[str, ConfigFieldDefinition]:
 
     fields.append(ConfigFieldDefinition(
         field_name="widget_file_upload_enabled",
-        display_name="File Uploads",
+        display_name="File uploads",
         field_type=ConfigFieldType.BOOLEAN,
         validation=ValidationRule(),
         platform_default=True,
@@ -1786,7 +1786,7 @@ def _build_field_registry() -> dict[str, ConfigFieldDefinition]:
 
     fields.append(ConfigFieldDefinition(
         field_name="widget_header_text",
-        display_name="Widget Header Text",
+        display_name="Widget header text",
         field_type=ConfigFieldType.STRING,
         validation=ValidationRule(
             max_length=MAX_WIDGET_TITLE_LENGTH,
@@ -1807,7 +1807,7 @@ def _build_field_registry() -> dict[str, ConfigFieldDefinition]:
 
     fields.append(ConfigFieldDefinition(
         field_name="widget_input_placeholder",
-        display_name="Input Placeholder",
+        display_name="Input placeholder",
         field_type=ConfigFieldType.STRING,
         validation=ValidationRule(
             max_length=MAX_PLACEHOLDER_TEXT_LENGTH,
@@ -1828,7 +1828,7 @@ def _build_field_registry() -> dict[str, ConfigFieldDefinition]:
 
     fields.append(ConfigFieldDefinition(
         field_name="widget_page_rules",
-        display_name="Page Visibility Rules",
+        display_name="Page visibility rules",
         field_type=ConfigFieldType.STRING_LIST,
         validation=ValidationRule(
             max_items=MAX_PAGE_RULES_COUNT,
@@ -1863,7 +1863,7 @@ def _build_field_registry() -> dict[str, ConfigFieldDefinition]:
 
     fields.append(ConfigFieldDefinition(
         field_name="custom_instructions",
-        display_name="Custom AI Instructions",
+        display_name="Custom AI instructions",
         field_type=ConfigFieldType.TEXT,
         validation=ValidationRule(
             max_length=MAX_CUSTOM_INSTRUCTIONS_LENGTH,
@@ -1887,7 +1887,7 @@ def _build_field_registry() -> dict[str, ConfigFieldDefinition]:
 
     fields.append(ConfigFieldDefinition(
         field_name="test_mode_enabled",
-        display_name="Test Mode",
+        display_name="Test mode",
         field_type=ConfigFieldType.BOOLEAN,
         validation=ValidationRule(),
         platform_default=False,

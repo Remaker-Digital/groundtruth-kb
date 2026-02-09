@@ -29,6 +29,7 @@ from typing import Any
 from fastapi import APIRouter, Depends, HTTPException
 from pydantic import BaseModel, Field
 
+from src.multi_tenant.cosmos_schema import TenantTier
 from src.multi_tenant.middleware import get_tenant_context, TenantContext
 
 logger = logging.getLogger(__name__)
@@ -97,6 +98,9 @@ _INTEGRATION_META: dict[str, dict[str, Any]] = {
 
 class IntegrationSummary(BaseModel):
     """Summary of one integration returned in the list endpoint."""
+
+    model_config = {"populate_by_name": True}
+
     type: str = Field(description="Integration key (shopify, zendesk, etc.)")
     name: str = Field(description="Human-readable name")
     description: str
@@ -108,14 +112,20 @@ class IntegrationSummary(BaseModel):
     )
     tier_gate: str | None = Field(
         default=None,
+        alias="tierGate",
+        serialization_alias="tierGate",
         description="Minimum tier required (null = all tiers)",
     )
     tier_met: bool = Field(
         default=True,
+        alias="tierMet",
+        serialization_alias="tierMet",
         description="Whether the current tenant tier meets the gate",
     )
     coming_soon: bool = Field(
         default=False,
+        alias="comingSoon",
+        serialization_alias="comingSoon",
         description="Whether this integration is not yet implemented (backend stub only)",
     )
 
@@ -205,7 +215,7 @@ async def list_integrations(
 ):
     """List all available integrations with their current status."""
     processor = _get_config_processor()
-    cfg_result = await processor.get_resolved_config(ctx.tenant_id, ctx.tier)
+    cfg_result = await processor.get_config(ctx.tenant_id, TenantTier(ctx.tier))
     config = cfg_result.config if cfg_result else {}
 
     return [
@@ -225,7 +235,7 @@ async def get_integration(
 
     meta = _INTEGRATION_META[integration_type]
     processor = _get_config_processor()
-    cfg_result = await processor.get_resolved_config(ctx.tenant_id, ctx.tier)
+    cfg_result = await processor.get_config(ctx.tenant_id, TenantTier(ctx.tier))
     config = cfg_result.config if cfg_result else {}
 
     summary = _build_summary(integration_type, meta, config, ctx.tier)
@@ -276,7 +286,7 @@ async def update_integration(
         raise HTTPException(status_code=500, detail="Failed to update integration config.")
 
     # Re-read to get updated summary
-    cfg_result = await processor.get_resolved_config(ctx.tenant_id, ctx.tier)
+    cfg_result = await processor.get_config(ctx.tenant_id, TenantTier(ctx.tier))
     config = cfg_result.config if cfg_result else {}
     summary = _build_summary(integration_type, meta, config, ctx.tier)
 
@@ -330,7 +340,7 @@ async def activate_integration(
     if not result or not result.success:
         raise HTTPException(status_code=500, detail="Failed to activate integration.")
 
-    cfg_result = await processor.get_resolved_config(ctx.tenant_id, ctx.tier)
+    cfg_result = await processor.get_config(ctx.tenant_id, TenantTier(ctx.tier))
     config = cfg_result.config if cfg_result else {}
     summary = _build_summary(integration_type, meta, config, ctx.tier)
 
@@ -369,7 +379,7 @@ async def deactivate_integration(
     if not result or not result.success:
         raise HTTPException(status_code=500, detail="Failed to deactivate integration.")
 
-    cfg_result = await processor.get_resolved_config(ctx.tenant_id, ctx.tier)
+    cfg_result = await processor.get_config(ctx.tenant_id, TenantTier(ctx.tier))
     config = cfg_result.config if cfg_result else {}
     summary = _build_summary(integration_type, meta, config, ctx.tier)
 
@@ -421,7 +431,7 @@ async def disconnect_integration(
             integration_type, ctx.tenant_id,
         )
 
-    cfg_result = await processor.get_resolved_config(ctx.tenant_id, ctx.tier)
+    cfg_result = await processor.get_config(ctx.tenant_id, TenantTier(ctx.tier))
     config = cfg_result.config if cfg_result else {}
     summary = _build_summary(integration_type, meta, config, ctx.tier)
 

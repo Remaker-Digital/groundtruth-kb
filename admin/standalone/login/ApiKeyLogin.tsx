@@ -197,7 +197,7 @@ export const ApiKeyLogin: React.FC<ApiKeyLoginProps> = ({ onLogin }) => {
                 marginBottom: '6px',
               }}
             >
-              API Key
+              API key
             </label>
             <input
               id="api-key"
@@ -218,7 +218,7 @@ export const ApiKeyLogin: React.FC<ApiKeyLoginProps> = ({ onLogin }) => {
             )}
 
             <button type="submit" disabled={loading} style={primaryBtnStyle(loading)}>
-              {loading ? 'Verifying...' : 'Sign In'}
+              {loading ? 'Verifying...' : 'Sign in'}
             </button>
           </form>
 
@@ -251,7 +251,7 @@ export const ApiKeyLogin: React.FC<ApiKeyLoginProps> = ({ onLogin }) => {
           {brandBlock}
 
           <h2 style={{ margin: '0 0 8px', fontSize: '16px', fontWeight: 600, color: '#f5f5f5' }}>
-            Request New API Key
+            Request new API key
           </h2>
           <p style={{ margin: '0 0 20px', fontSize: '13px', color: '#a0a0a0', lineHeight: '1.5' }}>
             Enter the email address associated with your account.
@@ -269,7 +269,7 @@ export const ApiKeyLogin: React.FC<ApiKeyLoginProps> = ({ onLogin }) => {
                 marginBottom: '6px',
               }}
             >
-              Email Address
+              Email address
             </label>
             <input
               id="reset-email"
@@ -290,7 +290,7 @@ export const ApiKeyLogin: React.FC<ApiKeyLoginProps> = ({ onLogin }) => {
             )}
 
             <button type="submit" disabled={loading} style={primaryBtnStyle(loading)}>
-              {loading ? 'Requesting...' : 'Request New API Key'}
+              {loading ? 'Requesting...' : 'Request new API key'}
             </button>
           </form>
 
@@ -334,7 +334,7 @@ export const ApiKeyLogin: React.FC<ApiKeyLoginProps> = ({ onLogin }) => {
           </div>
 
           <h2 style={{ margin: '0 0 8px', fontSize: '16px', fontWeight: 600, color: '#f5f5f5' }}>
-            Check Your Email
+            Check your email
           </h2>
           <p style={{ margin: '0 0 8px', fontSize: '14px', color: '#e0e0e0', lineHeight: '1.5' }}>
             If an account with <strong style={{ color: '#f5f5f5' }}>{email}</strong> exists,
@@ -356,7 +356,7 @@ export const ApiKeyLogin: React.FC<ApiKeyLoginProps> = ({ onLogin }) => {
             marginTop: '0',
           }}
         >
-          Back to Sign In
+          Back to sign in
         </button>
 
         <div style={{ marginTop: '16px', textAlign: 'center' }}>

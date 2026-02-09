@@ -44,11 +44,11 @@ const STALENESS_BADGE_STYLES: Record<string, { bg: string; color: string; label:
   fresh: { bg: '#dcffe4', color: COLOR_SUCCESS, label: 'Fresh' },
   aging: { bg: '#fff8c5', color: COLOR_WARNING, label: 'Aging' },
   stale: { bg: '#ffeef0', color: COLOR_DANGER, label: 'Stale' },
-  very_stale: { bg: '#ffeef0', color: COLOR_DANGER, label: 'Very Stale' },
+  very_stale: { bg: '#ffeef0', color: COLOR_DANGER, label: 'Very stale' },
 };
 
 const ALL_STATUSES: Array<{ value: '' | KBArticleStatus; label: string }> = [
-  { value: '', label: 'All Statuses' },
+  { value: '', label: 'All statuses' },
   { value: 'draft', label: 'Draft' },
   { value: 'published', label: 'Published' },
   { value: 'archived', label: 'Archived' },
@@ -563,10 +563,10 @@ const ArticleEditor: React.FC<ArticleEditorProps> = ({
     <div style={{ padding: '24px' }}>
       <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '24px' }}>
         <h2 style={{ margin: 0, fontSize: '18px', fontWeight: 600, color: COLOR_TEXT }}>
-          {isNew ? 'New Article' : 'Edit Article'}
+          {isNew ? 'New article' : 'Edit article'}
         </h2>
         <button onClick={onCancel} style={buttonStyle('secondary')}>
-          Back to List
+          Back to list
         </button>
       </div>
 
@@ -734,7 +734,7 @@ const ArticleEditor: React.FC<ArticleEditorProps> = ({
                 }}
                 style={buttonStyle('danger', deleting)}
               >
-                {deleting ? 'Deleting...' : 'Confirm Delete'}
+                {deleting ? 'Deleting...' : 'Confirm delete'}
               </button>
               <button
                 onClick={() => setConfirmDelete(false)}
@@ -754,7 +754,7 @@ const ArticleEditor: React.FC<ArticleEditorProps> = ({
             onClick={handleSubmit}
             style={buttonStyle('primary', !canSave || saving)}
           >
-            {saving ? 'Saving...' : isNew ? 'Create Article' : 'Save Changes'}
+            {saving ? 'Saving...' : isNew ? 'Create article' : 'Save changes'}
           </button>
         </div>
       </div>
@@ -1079,7 +1079,7 @@ export const KnowledgeBaseManager: React.FC<BaseComponentProps> = ({
               <HelpTooltip text="Upload PDF, DOCX, CSV, or TXT files to automatically create knowledge base entries." />
             </h2>
             <button onClick={() => { setView('list'); refetchKB(); }} style={buttonStyle('secondary')}>
-              Back to List
+              Back to list
             </button>
           </div>
 
@@ -1106,7 +1106,7 @@ export const KnowledgeBaseManager: React.FC<BaseComponentProps> = ({
                       transition: 'all 0.15s ease',
                     }}
                   >
-                    {tab === 'file' ? 'Upload File' : 'Import URL'}
+                    {tab === 'file' ? 'Upload file' : 'Import URL'}
                   </button>
                 ))}
               </div>
@@ -1231,7 +1231,7 @@ export const KnowledgeBaseManager: React.FC<BaseComponentProps> = ({
           onChange={(e) => setCategoryFilter(e.target.value)}
           style={inputStyle({ width: '180px', flex: 'none' })}
         >
-          <option value="">All Categories</option>
+          <option value="">All categories</option>
           {categories.map((cat) => (
             <option key={cat} value={cat}>{cat}</option>
           ))}

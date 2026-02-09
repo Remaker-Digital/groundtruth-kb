@@ -535,13 +535,13 @@ interface SummaryCardsProps {
 const SummaryCards: React.FC<SummaryCardsProps> = ({ usage }) => (
   <div style={st.cardsRow}>
     <div style={st.card}>
-      <p style={st.cardLabel}>Remaining Included<HelpTooltip text="Conversations used from your plan's included monthly allowance." /></p>
+      <p style={st.cardLabel}>Remaining included<HelpTooltip text="Conversations used from your plan's included monthly allowance." /></p>
       <p style={st.cardValue}>{formatNumber(usage.remainingIncluded)}</p>
       <p style={st.cardSub}>of {formatNumber(usage.includedAllowance)}</p>
     </div>
 
     <div style={st.card}>
-      <p style={st.cardLabel}>Pack Balance<HelpTooltip text="Remaining pre-purchased conversation credits (FIFO, 90-day validity)." /></p>
+      <p style={st.cardLabel}>Pack balance<HelpTooltip text="Remaining pre-purchased conversation credits (FIFO, 90-day validity)." /></p>
       <p style={st.cardValue}>{formatNumber(usage.packBalance)}</p>
       <p style={st.cardSub}>pre-purchased conversations</p>
     </div>
@@ -564,7 +564,7 @@ const SummaryCards: React.FC<SummaryCardsProps> = ({ usage }) => (
     </div>
 
     <div style={st.card}>
-      <p style={st.cardLabel}>Overage Reported</p>
+      <p style={st.cardLabel}>Overage reported</p>
       <p style={st.cardValue}>{formatNumber(usage.overageReported)}</p>
       <p style={st.cardSub}>reported to billing</p>
     </div>
@@ -925,7 +925,7 @@ export const UsageDashboard: React.FC<BaseComponentProps> = ({
       {/* Header */}
       <div style={st.header}>
         <div>
-          <h2 style={st.title}>Usage Dashboard</h2>
+          <h2 style={st.title}>Usage dashboard</h2>
           <p style={st.subtitle}>
             {tenantContext.tier} tier &middot;{' '}
             {usage?.billingPeriod ?? 'current period'}
@@ -937,7 +937,7 @@ export const UsageDashboard: React.FC<BaseComponentProps> = ({
           value={billingPeriod ?? ''}
           onChange={handlePeriodChange}
         >
-          <option value="">Current Period</option>
+          <option value="">Current period</option>
           {periodOptions.map((opt) => (
             <option key={opt.value} value={opt.value}>
               {opt.label}
@@ -948,7 +948,7 @@ export const UsageDashboard: React.FC<BaseComponentProps> = ({
 
       {/* Section 1: Usage Summary */}
       <div style={st.section}>
-        <h3 style={st.sectionTitle}>Usage Summary</h3>
+        <h3 style={st.sectionTitle}>Usage summary</h3>
 
         {usage ? (
           <>
@@ -965,7 +965,7 @@ export const UsageDashboard: React.FC<BaseComponentProps> = ({
 
       {/* Section 2: Daily Volume Chart */}
       <div style={st.section}>
-        <h3 style={st.sectionTitle}>Daily Volume<HelpTooltip text="Total and billable conversations per day for the selected billing period." /></h3>
+        <h3 style={st.sectionTitle}>Daily volume<HelpTooltip text="Total and billable conversations per day for the selected billing period." /></h3>
 
         {dailyLoading && days.length === 0 ? (
           <div style={{ padding: 24, textAlign: 'center', color: '#888', fontSize: 14 }}>

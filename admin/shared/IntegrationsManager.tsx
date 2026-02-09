@@ -38,7 +38,16 @@ const STATUS_LABELS: Record<string, string> = {
   error: 'Error',
 };
 
-// Integration icons (inline SVG for each service)
+// Integration logo mapping: type → filename stem (without -dark/-light suffix)
+const INTEGRATION_LOGO_MAP: Record<string, string> = {
+  shopify: 'shopify-logo',
+  zendesk: 'zendesk-logo',
+  mailchimp: 'mailchimp-logo',
+  google_analytics: 'google-analytics-logo',
+  stripe: 'stripe-logo',
+};
+
+// Fallback inline SVG icons (used if logo image fails to load)
 const IntegrationIcons: Record<string, React.FC> = {
   shopify: () => (
     <svg width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5">
@@ -62,6 +71,12 @@ const IntegrationIcons: Record<string, React.FC> = {
       <line x1="18" y1="20" x2="18" y2="10" />
       <line x1="12" y1="20" x2="12" y2="4" />
       <line x1="6" y1="20" x2="6" y2="14" />
+    </svg>
+  ),
+  stripe: () => (
+    <svg width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5">
+      <rect x="1" y="4" width="22" height="16" rx="2" ry="2" />
+      <line x1="1" y1="10" x2="23" y2="10" />
     </svg>
   ),
 };
@@ -180,25 +195,42 @@ const btnDangerStyle: React.CSSProperties = {
   color: '#D32F2F',
 };
 
-const IntegrationCard: React.FC<IntegrationCardProps> = ({
+const IntegrationCard: React.FC<IntegrationCardProps & { isDark?: boolean; basePath?: string }> = ({
   integration,
   onActivate,
   onDeactivate,
   onDisconnect,
   activating,
   deactivating,
+  isDark = true,
+  basePath = '',
 }) => {
   const [showConfirm, setShowConfirm] = useState(false);
+  const [logoError, setLogoError] = useState(false);
   const IconComponent = IntegrationIcons[integration.icon] || IntegrationIcons.shopify;
   const statusColor = STATUS_COLORS[integration.status || 'disconnected'] || '#787878';
   const statusLabel = STATUS_LABELS[integration.status || 'disconnected'] || 'Not Configured';
+
+  // Resolve logo path: dark variant for dark mode, light for light mode
+  const logoStem = INTEGRATION_LOGO_MAP[integration.icon] || INTEGRATION_LOGO_MAP[integration.type];
+  const logoSuffix = isDark ? 'dark' : 'light';
+  const logoPath = logoStem ? `${basePath}/integration-logos/${logoStem}-${logoSuffix}.svg` : null;
 
   return (
     <div style={cardStyle}>
       {/* Header: icon + name + status */}
       <div style={cardHeaderStyle}>
         <div style={iconContainerStyle}>
-          <IconComponent />
+          {logoPath && !logoError ? (
+            <img
+              src={logoPath}
+              alt={`${integration.name} logo`}
+              style={{ width: 30, height: 30, objectFit: 'contain' }}
+              onError={() => setLogoError(true)}
+            />
+          ) : (
+            <IconComponent />
+          )}
         </div>
         <div style={{ flex: 1 }}>
           <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
@@ -298,10 +330,12 @@ const IntegrationCard: React.FC<IntegrationCardProps> = ({
 // Main component
 // ---------------------------------------------------------------------------
 
-export const IntegrationsManager: React.FC<BaseComponentProps> = ({
+export const IntegrationsManager: React.FC<BaseComponentProps & { isDark?: boolean; basePath?: string }> = ({
   tenantContext,
   apiFetch,
   onNotify,
+  isDark = true,
+  basePath = '',
 }) => {
   const { data: integrations, loading, error, refetch } = useIntegrations(apiFetch);
   const { activate, loading: activating } = useActivateIntegration(apiFetch);
@@ -400,6 +434,8 @@ export const IntegrationsManager: React.FC<BaseComponentProps> = ({
             onDisconnect={handleDisconnect}
             activating={activating && actionTarget === integration.type}
             deactivating={deactivating && actionTarget === integration.type}
+            isDark={isDark}
+            basePath={basePath}
           />
         ))}
       </div>

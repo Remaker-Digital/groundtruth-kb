@@ -57,7 +57,7 @@ const stalenessLabelMap: Record<string, string> = {
   fresh: 'Fresh',
   aging: 'Aging',
   stale: 'Stale',
-  very_stale: 'Very Stale',
+  very_stale: 'Very stale',
 };
 
 // ---------------------------------------------------------------------------
@@ -349,7 +349,7 @@ export const KnowledgeBasePage: React.FC = () => {
     return (
       <Stack gap="lg">
         <div>
-          <Title order={2}>Knowledge Base</Title>
+          <Title order={2}>Knowledge base</Title>
           <Text c="dimmed" size="sm">Manage articles your AI uses to answer customers</Text>
         </div>
         <Paper p="xl" radius="md" withBorder>
@@ -366,7 +366,7 @@ export const KnowledgeBasePage: React.FC = () => {
     <Stack gap="lg">
       {/* Page header */}
       <div>
-        <Title order={2}>Knowledge Base</Title>
+        <Title order={2}>Knowledge base</Title>
         <Text c="dimmed" size="sm">
           Manage articles your AI uses to answer customers
         </Text>
@@ -422,7 +422,7 @@ export const KnowledgeBasePage: React.FC = () => {
               color={BRAND_RED}
               onClick={handleAddArticle}
             >
-              Add Article
+              Add article
             </Button>
           </Group>
         </Group>
@@ -431,19 +431,19 @@ export const KnowledgeBasePage: React.FC = () => {
       {/* Summary stats -- 4 cards: Total, Published, Draft, Needs Attention */}
       <SimpleGrid cols={{ base: 1, xs: 4 }} spacing="md">
         <Paper p="md" radius="md" withBorder>
-          <Text size="xs" c="dimmed" tt="uppercase" fw={600} mb={4}>Total Articles</Text>
+          <Text size="xs" c="dimmed" fw={600} mb={4}>Total articles</Text>
           <Text size="xl" fw={700} lh={1}>{stats.total}</Text>
         </Paper>
         <Paper p="md" radius="md" withBorder>
-          <Text size="xs" c="dimmed" tt="uppercase" fw={600} mb={4}>Published</Text>
+          <Text size="xs" c="dimmed" fw={600} mb={4}>Published</Text>
           <Text size="xl" fw={700} lh={1} c="green">{stats.published}</Text>
         </Paper>
         <Paper p="md" radius="md" withBorder>
-          <Text size="xs" c="dimmed" tt="uppercase" fw={600} mb={4}>Draft</Text>
+          <Text size="xs" c="dimmed" fw={600} mb={4}>Draft</Text>
           <Text size="xl" fw={700} lh={1} c="yellow.7">{stats.draft}</Text>
         </Paper>
         <Paper p="md" radius="md" withBorder>
-          <Text size="xs" c="dimmed" tt="uppercase" fw={600} mb={4}>Needs Attention</Text>
+          <Text size="xs" c="dimmed" fw={600} mb={4}>Needs attention</Text>
           <Text size="xl" fw={700} lh={1} c="red">
             {(stalenessData?.staleCount ?? 0) + (stalenessData?.veryStaleCount ?? 0)}
           </Text>
@@ -459,7 +459,7 @@ export const KnowledgeBasePage: React.FC = () => {
               <Table.Th>Category</Table.Th>
               <Table.Th>Status</Table.Th>
               <Table.Th>Freshness</Table.Th>
-              <Table.Th>Last Updated</Table.Th>
+              <Table.Th>Last updated</Table.Th>
               <Table.Th style={{ textAlign: 'right' }}>Actions</Table.Th>
             </Table.Tr>
           </Table.Thead>
@@ -521,7 +521,7 @@ export const KnowledgeBasePage: React.FC = () => {
       <Modal
         opened={modalOpened}
         onClose={closeModal}
-        title={<Text fw={600} size="lg">{editingArticle ? 'Edit Article' : 'Add Article'}</Text>}
+        title={<Text fw={600} size="lg">{editingArticle ? 'Edit article' : 'Add article'}</Text>}
         size="lg"
         radius="md"
       >
@@ -534,7 +534,7 @@ export const KnowledgeBasePage: React.FC = () => {
           <Group justify="flex-end" mt="md">
             <Button variant="default" onClick={closeModal}>Cancel</Button>
             <Button color={BRAND_RED} onClick={handleSave} disabled={!form.title.trim() || !form.content.trim()} loading={saving}>
-              {editingArticle ? 'Save Changes' : 'Create Article'}
+              {editingArticle ? 'Save changes' : 'Create article'}
             </Button>
           </Group>
         </Stack>
@@ -544,14 +544,14 @@ export const KnowledgeBasePage: React.FC = () => {
       <Modal
         opened={importModalOpened}
         onClose={() => { closeImportModal(); setUploadResult(null); }}
-        title={<Text fw={600} size="lg">Import Content</Text>}
+        title={<Text fw={600} size="lg">Import content</Text>}
         size="lg"
         radius="md"
       >
         {uploadResult ? (
           <Stack gap="md" ta="center" py="lg">
             <Text size="xl">{String.fromCodePoint(0x2705)}</Text>
-            <Title order={3}>Import Successful</Title>
+            <Title order={3}>Import successful</Title>
             <Text c="dimmed">
               Created {uploadResult.entries_created} {uploadResult.entries_created === 1 ? 'entry' : 'entries'} from{' '}
               {uploadResult.source_filename || uploadResult.source_url || 'document'}{' '}
@@ -559,14 +559,14 @@ export const KnowledgeBasePage: React.FC = () => {
             </Text>
             <Group justify="center" mt="md">
               <Button color={BRAND_RED} onClick={handleImportDone}>
-                Back to Knowledge Base
+                Back to knowledge base
               </Button>
             </Group>
           </Stack>
         ) : (
           <Tabs defaultValue="file">
             <Tabs.List mb="lg">
-              <Tabs.Tab value="file">Upload File</Tabs.Tab>
+              <Tabs.Tab value="file">Upload file</Tabs.Tab>
               <Tabs.Tab value="url">Import URL</Tabs.Tab>
             </Tabs.List>
 

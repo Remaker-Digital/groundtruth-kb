@@ -478,6 +478,20 @@ async def get_config_diff(
 # 5b. GET /api/config/onboarding — All onboarding steps at once
 # ---------------------------------------------------------------------------
 
+# Step labels for UI display — sentence case (only first word capitalised)
+_STEP_LABELS: dict[OnboardingStep, str] = {
+    OnboardingStep.BRAND_AND_TONE: "Brand and tone",
+    OnboardingStep.LANGUAGES: "Languages",
+    OnboardingStep.RESPONSE_STYLE: "Response style",
+    OnboardingStep.KNOWLEDGE_BASE: "Knowledge base",
+    OnboardingStep.BUSINESS_POLICIES: "Business policies",
+    OnboardingStep.ESCALATION_RULES: "Escalation rules",
+    OnboardingStep.INTEGRATIONS: "Integrations",
+    OnboardingStep.MEMORY_AND_PRIVACY: "Memory and privacy",
+    OnboardingStep.WIDGET_APPEARANCE: "Widget appearance",
+    OnboardingStep.REVIEW_AND_LAUNCH: "Review and launch",
+}
+
 # Step descriptions for UI display
 _STEP_DESCRIPTIONS: dict[OnboardingStep, str] = {
     OnboardingStep.BRAND_AND_TONE: "Set your brand name, voice, and greeting messages.",
@@ -532,7 +546,7 @@ async def get_onboarding_steps(
             if gate_rank.get(f.tier_gate, 0) <= rank
         ]
 
-        step_name_label = step.name.lower().replace("_", " ").title()
+        step_name_label = _STEP_LABELS.get(step, step.name.lower().replace("_", " "))
 
         field_responses = [
             OnboardingFieldResponse(
@@ -672,7 +686,7 @@ async def get_step_fields(
         for f in available_fields
     ]
 
-    step_name = onboarding_step.name.lower().replace("_", " ").title()
+    step_name = _STEP_LABELS.get(onboarding_step, onboarding_step.name.lower().replace("_", " "))
 
     return StepFieldsResponse(
         step_number=step,

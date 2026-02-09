@@ -1008,7 +1008,7 @@ const WidgetPreview: React.FC<PreviewProps> = ({ config, st }) => {
 
   return (
     <div>
-      <p style={st.previewTitle}>Live Preview</p>
+      <p style={st.previewTitle}>Live preview</p>
       <div style={st.previewFrame(isDark)}>
         {/* Mini widget panel */}
         <div style={{
@@ -1580,7 +1580,7 @@ export const WidgetConfigurator: React.FC<BaseComponentProps> = ({
                 Discard
               </button>
               <button style={s.saveButton} onClick={handleSave} disabled={saving}>
-                {saving ? 'Saving...' : 'Save Changes'}
+                {saving ? 'Saving...' : 'Save changes'}
               </button>
             </div>
           </div>
@@ -1588,7 +1588,7 @@ export const WidgetConfigurator: React.FC<BaseComponentProps> = ({
 
         {/* Named Appearance Bar (C4) */}
         <div style={s.appearanceBar}>
-          <span style={s.appearanceLabel}>Selected Appearance:</span>
+          <span style={s.appearanceLabel}>Selected appearance:</span>
           <span style={s.appearanceName}>{activeAppearanceName}</span>
 
           {/* Switch to a different named appearance */}
@@ -1618,7 +1618,7 @@ export const WidgetConfigurator: React.FC<BaseComponentProps> = ({
             onClick={() => { setSaveAsName(''); setShowSaveAsModal(true); }}
             disabled={savingAppearance}
           >
-            Save As...
+            Save as...
           </button>
 
           {/* Restore to Default (only visible when non-Default is active) */}
@@ -1661,8 +1661,8 @@ export const WidgetConfigurator: React.FC<BaseComponentProps> = ({
             onClick={(e) => { if (e.target === e.currentTarget) setShowSaveAsModal(false); }}
           >
             <div style={s.modalContent}>
-              <h3 style={s.modalTitle}>Save Widget Appearance As</h3>
-              <Field st={s} label="Appearance Name" description="Choose a descriptive name for this set of widget settings.">
+              <h3 style={s.modalTitle}>Save widget appearance as</h3>
+              <Field st={s} label="Appearance name" description="Choose a descriptive name for this set of widget settings.">
                 <input
                   type="text"
                   style={s.input}
@@ -1694,7 +1694,7 @@ export const WidgetConfigurator: React.FC<BaseComponentProps> = ({
                   onClick={handleSaveAppearance}
                   disabled={!saveAsName.trim() || savingAppearance}
                 >
-                  {savingAppearance ? 'Saving...' : 'Save Appearance'}
+                  {savingAppearance ? 'Saving...' : 'Save appearance'}
                 </button>
               </div>
             </div>
@@ -1722,51 +1722,51 @@ export const WidgetConfigurator: React.FC<BaseComponentProps> = ({
             <h4 style={s.sectionTitle}>Colors</h4>
             <ColorPickerField
               st={s}
-              label="Widget Primary Color"
+              label="Widget primary color"
               description="Header background, send button, and customer message bubbles."
               value={localConfig.widget_primary_color}
               onChange={(v) => updateField('widget_primary_color', v)}
             />
             <ColorPickerField
               st={s}
-              label="Chat Background Color"
+              label="Chat background color"
               description="Background of the conversation panel. White is recommended."
               value={localConfig.widget_background_color}
               onChange={(v) => updateField('widget_background_color', v)}
             />
             <ToggleField
               st={s}
-              label="Dark Mode"
+              label="Dark mode"
               description="Use a dark color scheme. Your primary color is still used for accents."
               value={localConfig.widget_dark_mode}
               onChange={(v) => updateField('widget_dark_mode', v)}
             />
 
-            <h4 style={s.sectionTitle}>Message Bubble Colors</h4>
+            <h4 style={s.sectionTitle}>Message bubble colors</h4>
             <ColorPickerField
               st={s}
-              label="Agent Bubble Color"
+              label="Agent bubble color"
               description="Background of AI / agent messages. Leave blank for default."
               value={localConfig.widget_agent_bubble_color}
               onChange={(v) => updateField('widget_agent_bubble_color', v)}
             />
             <ColorPickerField
               st={s}
-              label="Agent Bubble Text Color"
+              label="Agent bubble text color"
               description="Text color in agent messages. Leave blank for auto-contrast."
               value={localConfig.widget_agent_bubble_text_color}
               onChange={(v) => updateField('widget_agent_bubble_text_color', v)}
             />
             <ColorPickerField
               st={s}
-              label="Customer Bubble Color"
+              label="Customer bubble color"
               description="Background of customer messages. Defaults to your primary color."
               value={localConfig.widget_customer_bubble_color}
               onChange={(v) => updateField('widget_customer_bubble_color', v)}
             />
             <ColorPickerField
               st={s}
-              label="Customer Bubble Text Color"
+              label="Customer bubble text color"
               description="Text color in customer messages. Leave blank for auto-contrast."
               value={localConfig.widget_customer_bubble_text_color}
               onChange={(v) => updateField('widget_customer_bubble_text_color', v)}
@@ -1775,7 +1775,7 @@ export const WidgetConfigurator: React.FC<BaseComponentProps> = ({
             <h4 style={s.sectionTitle}>Launcher</h4>
             <Field
               st={s}
-              label="Launcher Shape"
+              label="Launcher shape"
               description="Shape of the floating launcher button."
             >
               <select
@@ -1784,13 +1784,13 @@ export const WidgetConfigurator: React.FC<BaseComponentProps> = ({
                 onChange={(e) => updateField('widget_launcher_shape', e.target.value as 'circle' | 'rounded-square' | 'pill')}
               >
                 <option value="circle">Circle</option>
-                <option value="rounded-square">Rounded Square</option>
+                <option value="rounded-square">Rounded square</option>
                 <option value="pill">Pill</option>
               </select>
             </Field>
             <Field
               st={s}
-              label="Launcher Icon"
+              label="Launcher icon"
               description="Icon displayed on the launcher button."
             >
               <select
@@ -1798,16 +1798,16 @@ export const WidgetConfigurator: React.FC<BaseComponentProps> = ({
                 value={localConfig.widget_launcher_icon}
                 onChange={(e) => updateField('widget_launcher_icon', e.target.value as 'chat' | 'headset' | 'help')}
               >
-                <option value="chat">Chat Bubble</option>
+                <option value="chat">Chat bubble</option>
                 <option value="headset">Headset</option>
-                <option value="help">Help / Question Mark</option>
+                <option value="help">Help / question mark</option>
               </select>
             </Field>
 
-            <h4 style={s.sectionTitle}>Position & Layout</h4>
+            <h4 style={s.sectionTitle}>Position & layout</h4>
             <Field
               st={s}
-              label="Widget Position"
+              label="Widget position"
               description="Which corner of the screen the launcher appears in."
             >
               <select
@@ -1815,12 +1815,12 @@ export const WidgetConfigurator: React.FC<BaseComponentProps> = ({
                 value={localConfig.widget_position}
                 onChange={(e) => updateField('widget_position', e.target.value as 'bottom-right' | 'bottom-left')}
               >
-                <option value="bottom-right">Bottom Right</option>
-                <option value="bottom-left">Bottom Left</option>
+                <option value="bottom-right">Bottom right</option>
+                <option value="bottom-left">Bottom left</option>
               </select>
             </Field>
             <div style={{ display: 'flex', gap: 16 }}>
-              <Field st={s} label="Horizontal Offset (px)" description="Distance from screen edge.">
+              <Field st={s} label="Horizontal offset (px)" description="Distance from screen edge.">
                 <input
                   type="number"
                   style={s.numberInput}
@@ -1830,7 +1830,7 @@ export const WidgetConfigurator: React.FC<BaseComponentProps> = ({
                   onChange={(e) => updateField('widget_offset_x', Math.max(0, Math.min(100, Number(e.target.value))))}
                 />
               </Field>
-              <Field st={s} label="Vertical Offset (px)" description="Distance from bottom edge.">
+              <Field st={s} label="Vertical offset (px)" description="Distance from bottom edge.">
                 <input
                   type="number"
                   style={s.numberInput}
@@ -1842,10 +1842,10 @@ export const WidgetConfigurator: React.FC<BaseComponentProps> = ({
               </Field>
             </div>
 
-            <h4 style={s.sectionTitle}>Agent Identity</h4>
+            <h4 style={s.sectionTitle}>Agent identity</h4>
             <Field
               st={s}
-              label="Agent Display Name"
+              label="Agent display name"
               description="Name shown in the widget header and message bubbles."
             >
               <input
@@ -1859,7 +1859,7 @@ export const WidgetConfigurator: React.FC<BaseComponentProps> = ({
             </Field>
             <Field
               st={s}
-              label="Agent Title"
+              label="Agent title"
               description="Subtitle under the agent name (e.g. Customer Support)."
             >
               <input
@@ -1873,7 +1873,7 @@ export const WidgetConfigurator: React.FC<BaseComponentProps> = ({
             </Field>
             <Field
               st={s}
-              label="Agent Avatar URL"
+              label="Agent avatar URL"
               description="URL of a square image (200x200px recommended). PNG, JPG, or WebP."
             >
               <input
@@ -1887,7 +1887,7 @@ export const WidgetConfigurator: React.FC<BaseComponentProps> = ({
             </Field>
             <Field
               st={s}
-              label="Widget Logo URL"
+              label="Widget logo URL"
               description="Company logo in the header (120x40px landscape recommended)."
             >
               <input
@@ -1900,7 +1900,7 @@ export const WidgetConfigurator: React.FC<BaseComponentProps> = ({
               />
             </Field>
 
-            <h4 style={s.sectionTitle}>Display Options</h4>
+            <h4 style={s.sectionTitle}>Display options</h4>
             <ToggleField
               st={s}
               label="Show 'Powered by Agent Red'"
@@ -1920,7 +1920,7 @@ export const WidgetConfigurator: React.FC<BaseComponentProps> = ({
             />
             <ToggleField
               st={s}
-              label="Show on Mobile"
+              label="Show on mobile"
               description="Hide widget on screens narrower than 768px when disabled."
               value={localConfig.widget_mobile_enabled}
               onChange={(v) => updateField('widget_mobile_enabled', v)}
@@ -1936,7 +1936,7 @@ export const WidgetConfigurator: React.FC<BaseComponentProps> = ({
             <h4 style={s.sectionTitle}>Auto-Open</h4>
             <ToggleField
               st={s}
-              label="Auto-Open Widget"
+              label="Auto-open widget"
               description="Open the widget automatically after a delay. Use sparingly."
               value={localConfig.widget_auto_open}
               onChange={(v) => updateField('widget_auto_open', v)}
@@ -1944,7 +1944,7 @@ export const WidgetConfigurator: React.FC<BaseComponentProps> = ({
             {localConfig.widget_auto_open && (
               <Field
                 st={s}
-                label="Auto-Open Delay (seconds)"
+                label="Auto-open delay (seconds)"
                 description="How long to wait before auto-opening (1-120 seconds)."
               >
                 <input
@@ -1958,10 +1958,10 @@ export const WidgetConfigurator: React.FC<BaseComponentProps> = ({
               </Field>
             )}
 
-            <h4 style={s.sectionTitle}>Offline Settings</h4>
+            <h4 style={s.sectionTitle}>Offline settings</h4>
             <Field
               st={s}
-              label="Offline Behavior"
+              label="Offline behavior"
               description="What happens when your team is offline."
             >
               <select
@@ -1970,13 +1970,13 @@ export const WidgetConfigurator: React.FC<BaseComponentProps> = ({
                 onChange={(e) => updateField('widget_offline_behavior', e.target.value as 'ai_only' | 'show_form' | 'hide_widget')}
               >
                 <option value="ai_only">AI Only (recommended)</option>
-                <option value="show_form">Show Leave-a-Message Form</option>
-                <option value="hide_widget">Hide Widget</option>
+                <option value="show_form">Show leave-a-message form</option>
+                <option value="hide_widget">Hide widget</option>
               </select>
             </Field>
             <Field
               st={s}
-              label="Offline Message"
+              label="Offline message"
               description="Displayed when human agents are offline. AI remains available 24/7."
             >
               <textarea
@@ -1988,33 +1988,33 @@ export const WidgetConfigurator: React.FC<BaseComponentProps> = ({
               />
             </Field>
 
-            <h4 style={s.sectionTitle}>Notifications & Attachments</h4>
+            <h4 style={s.sectionTitle}>Notifications & attachments</h4>
             <ToggleField
               st={s}
-              label="Notification Sound"
+              label="Notification sound"
               description="Play a subtle sound when new messages arrive and widget is minimized."
               value={localConfig.widget_sound_enabled}
               onChange={(v) => updateField('widget_sound_enabled', v)}
             />
             <ToggleField
               st={s}
-              label="File Uploads"
+              label="File uploads"
               description="Allow visitors to attach images and files (PNG, JPG, PDF, up to 10MB)."
               value={localConfig.widget_file_upload_enabled}
               onChange={(v) => updateField('widget_file_upload_enabled', v)}
             />
             <ToggleField
               st={s}
-              label="Post-Chat Rating"
+              label="Post-chat rating"
               description="Show thumbs up/down prompt after conversations end. Tracked in Analytics."
               value={localConfig.widget_chat_rating_enabled}
               onChange={(v) => updateField('widget_chat_rating_enabled', v)}
             />
 
-            <h4 style={s.sectionTitle}>Pre-Chat Form</h4>
+            <h4 style={s.sectionTitle}>Pre-chat form</h4>
             <Field
               st={s}
-              label="Pre-Chat Form Configuration (JSON)"
+              label="Pre-chat form configuration (JSON)"
               description='Collect visitor information before chat starts. Format: {"enabled": true, "fields": [{"name": "email", "label": "Email", "type": "email", "required": true}]}'
             >
               <textarea
@@ -2033,10 +2033,10 @@ export const WidgetConfigurator: React.FC<BaseComponentProps> = ({
               )}
             </Field>
 
-            <h4 style={s.sectionTitle}>Operating Hours</h4>
+            <h4 style={s.sectionTitle}>Operating hours</h4>
             <Field
               st={s}
-              label="Operating Hours (JSON)"
+              label="Operating hours (JSON)"
               description='Schedule with timezone and per-day ranges. Format: {"timezone": "America/New_York", "schedule": {"monday": [{"start": "09:00", "end": "17:00"}]}}'
             >
               <textarea
@@ -2062,10 +2062,10 @@ export const WidgetConfigurator: React.FC<BaseComponentProps> = ({
         {/* ============================================================ */}
         {activeTab === 'content' && (
           <div style={s.card}>
-            <h4 style={s.sectionTitle}>Header & Input Text</h4>
+            <h4 style={s.sectionTitle}>Header & input text</h4>
             <Field
               st={s}
-              label="Widget Header Text"
+              label="Widget header text"
               description="Custom title at the top of the widget. Defaults to 'Chat with us'."
             >
               <input
@@ -2079,7 +2079,7 @@ export const WidgetConfigurator: React.FC<BaseComponentProps> = ({
             </Field>
             <Field
               st={s}
-              label="Input Placeholder"
+              label="Input placeholder"
               description="Grey hint text in the message input box."
             >
               <input
@@ -2092,7 +2092,7 @@ export const WidgetConfigurator: React.FC<BaseComponentProps> = ({
               />
             </Field>
 
-            <h4 style={s.sectionTitle}>Page Visibility Rules</h4>
+            <h4 style={s.sectionTitle}>Page visibility rules</h4>
             <p style={s.pageRuleDesc}>
               Control which pages show the widget. Prefix with + to include or - to exclude.
               Examples: +/products/*, -/checkout, -/admin/*. If empty, the widget appears on all pages.
@@ -2120,7 +2120,7 @@ export const WidgetConfigurator: React.FC<BaseComponentProps> = ({
 
             {localConfig.widget_page_rules.length < 20 && (
               <button style={s.addButton} onClick={addPageRule}>
-                + Add Rule
+                + Add rule
               </button>
             )}
 

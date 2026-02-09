@@ -61,7 +61,7 @@ const STATUS_LABELS: Record<string, string> = {
   escalated: 'Escalated',
   resolved: 'Resolved',
   idle: 'Idle',
-  timed_out: 'Timed Out',
+  timed_out: 'Timed out',
   error: 'Error',
 };
 
@@ -304,7 +304,7 @@ const AssignModal: React.FC<AssignModalProps> = ({ conversationId, members, onAs
         onClick={(e) => e.stopPropagation()}
       >
         <h3 style={{ margin: '0 0 16px 0', fontSize: '16px', fontWeight: 600, color: COLOR_TEXT, display: 'inline-flex', alignItems: 'center' }}>
-          Assign Conversation
+          Assign conversation
           <HelpTooltip text="Assign this conversation to a team member for follow-up." />
         </h3>
         <select
@@ -433,7 +433,7 @@ const NoteModal: React.FC<NoteModalProps> = ({ conversationId, apiFetch, onClose
         onClick={(e) => e.stopPropagation()}
       >
         <h3 style={{ margin: '0 0 16px 0', fontSize: '16px', fontWeight: 600, color: COLOR_TEXT, display: 'inline-flex', alignItems: 'center' }}>
-          Add Internal Note
+          Add internal note
           <HelpTooltip text="Private notes visible only to your team, not to customers." />
         </h3>
         <textarea
@@ -485,7 +485,7 @@ const NoteModal: React.FC<NoteModalProps> = ({ conversationId, apiFetch, onClose
               opacity: saving ? 0.7 : 1,
             }}
           >
-            {saving ? 'Saving...' : 'Save Note'}
+            {saving ? 'Saving...' : 'Save note'}
           </button>
         </div>
       </div>
@@ -828,7 +828,7 @@ export const ConversationInbox: React.FC<BaseComponentProps> = ({
                       opacity: resolving ? 0.7 : 1,
                     }}
                   >
-                    {resolving ? 'Resolving...' : 'Mark Resolved'}
+                    {resolving ? 'Resolving...' : 'Mark resolved'}
                   </button>
                 )}
                 <button
@@ -861,7 +861,7 @@ export const ConversationInbox: React.FC<BaseComponentProps> = ({
                     fontWeight: 500,
                   }}
                 >
-                  Add Note
+                  Add note
                 </button>
               </div>
             </div>
