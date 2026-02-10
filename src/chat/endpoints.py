@@ -407,6 +407,9 @@ async def stream_response(
         except (ValueError, TypeError):
             pass
 
+    # Extract conversation history for multi-turn context
+    conversation_history = _extract_conversation_history(state, max_messages=20)
+
     async def event_generator():
         sse_mgr.connect(ctx.tenant_id, conversation_id, tab_id=tab_id)
         try:
@@ -424,6 +427,7 @@ async def stream_response(
                 tenant=tenant_doc,
                 preferences=prefs_doc,
                 customer_id=customer_id,
+                conversation_history=conversation_history,
             )
 
             async for sse_text in sse_mgr.wrap_stream(
@@ -811,3 +815,50 @@ def _extract_last_customer_message(state: ConversationStateResponse) -> str | No
         if msg.role.value == "customer":
             return msg.content
     return None
+
+
+def _extract_conversation_history(
+    state: ConversationStateResponse,
+    max_messages: int = 20,
+) -> list[dict[str, str]]:
+    """Extract prior conversation messages for multi-turn context.
+
+    Returns a list of {"role": "user"|"assistant", "content": "..."} dicts
+    suitable for inclusion in an OpenAI chat completion request.
+
+    Excludes the LAST customer message (which is passed separately as the
+    current turn) and caps at ``max_messages`` most recent messages to
+    stay within token budget (~10 turns of conversation).
+
+    Maps widget roles to OpenAI roles:
+        customer → user
+        ai       → assistant
+        system   → (skipped — system messages are UI chrome, not conversation)
+    """
+    if not state.messages:
+        return []
+
+    # Find and exclude the last customer message (it's the current turn)
+    all_msgs = list(state.messages)
+    last_customer_idx = None
+    for i in range(len(all_msgs) - 1, -1, -1):
+        if all_msgs[i].role.value == "customer":
+            last_customer_idx = i
+            break
+
+    # Build history from all messages except the last customer message
+    history: list[dict[str, str]] = []
+    for i, msg in enumerate(all_msgs):
+        if i == last_customer_idx:
+            continue  # Skip the current turn's message
+        if msg.role.value == "customer":
+            history.append({"role": "user", "content": msg.content})
+        elif msg.role.value == "ai":
+            history.append({"role": "assistant", "content": msg.content})
+        # Skip "system" role messages — they are UI-level, not conversation
+
+    # Cap to the most recent messages
+    if len(history) > max_messages:
+        history = history[-max_messages:]
+
+    return history

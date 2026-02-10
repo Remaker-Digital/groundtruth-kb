@@ -316,13 +316,14 @@ export const StandaloneLayout: React.FC<StandaloneLayoutProps> = ({
     // Resolve API base URL — same origin as admin or explicit VITE_API_URL
     const apiUrl = API_BASE_URL || window.location.origin;
 
-    // Fetch the tenant's widget key from the config endpoint
+    // Fetch the tenant's widget key and appearance config from the config endpoint
     async function injectWidget() {
       try {
         const resp = await apiFetch('/api/config');
         if (!resp.ok) return;
         const cfg = await resp.json();
-        const widgetKey = cfg?.config?.widget_key || cfg?.preferences?.widget_key || cfg?.widget_key;
+        const config = cfg?.config || {};
+        const widgetKey = config.widget_key || cfg?.preferences?.widget_key || cfg?.widget_key;
         if (!widgetKey) {
           console.warn('[AgentRed Admin] No widget key found in tenant config — chat widget not loaded.');
           return;
@@ -338,10 +339,25 @@ export const StandaloneLayout: React.FC<StandaloneLayoutProps> = ({
         script.setAttribute('data-auto-open-delay', '0');
         script.setAttribute('data-context', 'admin');
         script.setAttribute('data-greeting',
-          'Hi! I\u2019m your Agent Red AI assistant. Ask me anything about managing your store, configuring the widget, or understanding your analytics.');
-        script.setAttribute('data-header-text', 'Agent Red Assistant');
-        script.setAttribute('data-agent-name', 'Agent Red AI');
+          config.greeting_message
+            || 'Hi! I\u2019m your Agent Red AI assistant. Ask me anything about managing your store, configuring the widget, or understanding your analytics.');
+        script.setAttribute('data-header-text', config.widget_header_text || 'Agent Red Assistant');
+        script.setAttribute('data-agent-name', config.widget_agent_display_name || 'Agent Red AI');
         script.setAttribute('data-sound-enabled', 'false');
+
+        // Pass widget appearance fields so the widget renders with tenant
+        // brand colors immediately (without waiting for its own /api/config fetch)
+        const appearanceMap: Array<[string, string]> = [
+          ['data-color', 'widget_primary_color'],
+          ['data-position', 'widget_position'],
+        ];
+        for (const [dataAttr, configKey] of appearanceMap) {
+          const val = config[configKey];
+          if (val != null && typeof val === 'string' && val.length > 0) {
+            script.setAttribute(dataAttr, val);
+          }
+        }
+
         document.body.appendChild(script);
       } catch (err) {
         console.warn('[AgentRed Admin] Could not load chat widget:', err);

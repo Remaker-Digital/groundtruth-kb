@@ -133,7 +133,7 @@ export const IssueReport: FunctionComponent<IssueReportProps> = ({
             color: tokens.colorPrimary,
             backgroundColor: 'transparent',
             border: `1px solid ${tokens.colorPrimary}`,
-            borderRadius: tokens.borderRadiusMd,
+            borderRadius: tokens.borderRadius,
             cursor: 'pointer',
           }}
         >
@@ -200,7 +200,7 @@ export const IssueReport: FunctionComponent<IssueReportProps> = ({
                 ? `${tokens.colorPrimary}15`
                 : tokens.colorSurface,
               border: `1px solid ${selectedType === value ? tokens.colorPrimary : tokens.colorBorder}`,
-              borderRadius: tokens.borderRadiusMd,
+              borderRadius: tokens.borderRadius,
               cursor: 'pointer',
               textAlign: 'left',
               transition: 'all 0.15s ease',
@@ -248,7 +248,7 @@ export const IssueReport: FunctionComponent<IssueReportProps> = ({
           color: tokens.colorText,
           backgroundColor: tokens.colorSurface,
           border: `1px solid ${tokens.colorBorder}`,
-          borderRadius: tokens.borderRadiusMd,
+          borderRadius: tokens.borderRadius,
           resize: 'vertical',
           minHeight: '80px',
           maxHeight: '160px',
@@ -277,7 +277,7 @@ export const IssueReport: FunctionComponent<IssueReportProps> = ({
             color: tokens.colorText,
             backgroundColor: tokens.colorSurface,
             border: `1px solid ${tokens.colorBorder}`,
-            borderRadius: tokens.borderRadiusMd,
+            borderRadius: tokens.borderRadius,
             cursor: 'pointer',
           }}
         >
@@ -299,7 +299,7 @@ export const IssueReport: FunctionComponent<IssueReportProps> = ({
               ? `${tokens.colorPrimary}80`
               : tokens.colorPrimary,
             border: 'none',
-            borderRadius: tokens.borderRadiusMd,
+            borderRadius: tokens.borderRadius,
             cursor: !selectedType || isLoading ? 'not-allowed' : 'pointer',
             opacity: isLoading ? 0.7 : 1,
           }}

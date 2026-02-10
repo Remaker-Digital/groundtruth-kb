@@ -109,16 +109,23 @@ export async function startConversation(
   return resp.ok && resp.data ? resp.data.conversation_id : null;
 }
 
+/** Result of sending a customer message. */
+export interface SendMessageResult {
+  ok: boolean;
+  /** HTTP status code — 409 means conversation is no longer active (e.g. escalated). */
+  status: number;
+}
+
 /** Send a customer message. */
 export async function sendMessage(
   conversationId: string,
   content: string,
-): Promise<boolean> {
+): Promise<SendMessageResult> {
   const resp = await request('POST', '/api/chat/message', {
     conversation_id: conversationId,
     content,
   });
-  return resp.ok;
+  return { ok: resp.ok, status: resp.status };
 }
 
 /** End a conversation. */

@@ -1,0 +1,42 @@
+#!/usr/bin/env python3
+"""Quick Azure OpenAI connectivity test."""
+import asyncio
+import os
+import sys
+from pathlib import Path
+
+if sys.platform == "win32":
+    sys.stdout.reconfigure(encoding="utf-8", errors="replace")
+
+# Load .env.local
+env_path = Path(__file__).parent.parent / ".env.local"
+if env_path.exists():
+    for line in env_path.read_text().splitlines():
+        line = line.strip()
+        if line and not line.startswith("#") and "=" in line:
+            k, v = line.split("=", 1)
+            os.environ.setdefault(k.strip(), v.strip())
+
+
+async def main():
+    from openai import AsyncAzureOpenAI
+
+    client = AsyncAzureOpenAI(
+        azure_endpoint=os.environ["AZURE_OPENAI_ENDPOINT"],
+        api_key=os.environ["AZURE_OPENAI_API_KEY"],
+        api_version=os.environ.get("AZURE_OPENAI_API_VERSION", "2024-02-15-preview"),
+    )
+
+    print("Testing Azure OpenAI connectivity...")
+    resp = await client.chat.completions.create(
+        model="gpt-4o-mini",
+        messages=[{"role": "user", "content": "Say hello in exactly 5 words."}],
+        max_tokens=20,
+    )
+    print(f"Response: {resp.choices[0].message.content}")
+    print("Azure OpenAI: OK")
+    await client.close()
+
+
+if __name__ == "__main__":
+    asyncio.run(main())

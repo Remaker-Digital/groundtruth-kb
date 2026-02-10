@@ -44,9 +44,27 @@ def prod_url():
     return PROD_URL
 
 
+def _check_production_reachable() -> bool:
+    """Quick connectivity check — returns False if production is unreachable."""
+    try:
+        with httpx.Client(timeout=5.0) as c:
+            resp = c.get(f"{PROD_URL}/health")
+            return resp.status_code == 200
+    except (httpx.ConnectError, httpx.ConnectTimeout, httpx.ReadTimeout, Exception):
+        return False
+
+
 @pytest.fixture(scope="session")
 def client():
-    """Shared httpx client for all regression tests."""
+    """Shared httpx client for all regression tests.
+
+    Skips the entire session if the production endpoint is unreachable.
+    """
+    if not _check_production_reachable():
+        pytest.skip(
+            f"Production endpoint unreachable at {PROD_URL} — "
+            "skipping regression tests (API Gateway may be down or subscription suspended)"
+        )
     with httpx.Client(base_url=PROD_URL, timeout=30.0, follow_redirects=True) as c:
         yield c
 

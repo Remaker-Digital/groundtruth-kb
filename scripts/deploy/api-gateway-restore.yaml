@@ -1,0 +1,92 @@
+properties:
+  managedEnvironmentId: /subscriptions/828eb521-88bb-4b01-ac3e-7ba779c55212/resourceGroups/agentred-prod-rg/providers/Microsoft.App/managedEnvironments/agent-red-cae
+  workloadProfileName: Consumption
+  configuration:
+    activeRevisionsMode: Single
+    ingress:
+      external: true
+      targetPort: 8000
+      transport: auto
+      traffic:
+        - latestRevision: true
+          weight: 100
+    registries:
+      - server: acragentredeastus2.azurecr.io
+        identity: system
+    secrets:
+      - name: azure-openai-api-key
+        value: PLACEHOLDER_OPENAI_KEY
+      - name: cosmos-db-key
+        value: PLACEHOLDER_COSMOS_KEY
+      - name: shopify-api-key
+        value: PLACEHOLDER_SHOPIFY_KEY
+      - name: shopify-api-secret
+        value: PLACEHOLDER_SHOPIFY_SECRET
+      - name: admin-preview-password
+        value: PLACEHOLDER_ADMIN_PASSWORD
+  template:
+    containers:
+      - name: api-gateway
+        image: acragentredeastus2.azurecr.io/api-gateway:v1.14.0
+        resources:
+          cpu: 0.5
+          memory: 1Gi
+        env:
+          - name: ENVIRONMENT
+            value: production
+          - name: AZURE_OPENAI_ENDPOINT
+            value: https://aoai-agentred-eastus2.openai.azure.com/
+          - name: AZURE_OPENAI_API_KEY
+            secretRef: azure-openai-api-key
+          - name: COSMOS_DB_ENDPOINT
+            value: https://cosmos-agentred-eastus2.documents.azure.com:443/
+          - name: COSMOS_DB_KEY
+            secretRef: cosmos-db-key
+          - name: COSMOS_DB_DATABASE
+            value: agentred
+          - name: COSMOS_USE_MANAGED_ID
+            value: "true"
+          - name: AZURE_KEYVAULT_URL
+            value: https://kv-agentred-eastus2.vault.azure.net/
+          - name: KEY_VAULT_URL
+            value: https://kv-agentred-eastus2.vault.azure.net/
+          - name: USE_AZURE_OPENAI
+            value: "true"
+          - name: USE_REAL_APIS
+            value: "true"
+          - name: USE_AGENT_CONTAINERS
+            value: "false"
+          - name: NATS_URL
+            value: nats://agent-red-nats.internal.lemonriver-f59f94b7.eastus2.azurecontainerapps.io:4222
+          - name: GRACEFUL_SHUTDOWN_TIMEOUT
+            value: "60"
+          - name: SHOPIFY_API_KEY
+            secretRef: shopify-api-key
+          - name: SHOPIFY_API_SECRET
+            secretRef: shopify-api-secret
+          - name: ADMIN_PREVIEW_PASSWORD
+            secretRef: admin-preview-password
+        probes:
+          - type: liveness
+            httpGet:
+              path: /health
+              port: 8000
+            initialDelaySeconds: 10
+            periodSeconds: 30
+            timeoutSeconds: 5
+            failureThreshold: 3
+          - type: readiness
+            httpGet:
+              path: /ready
+              port: 8000
+            periodSeconds: 15
+            timeoutSeconds: 5
+            failureThreshold: 3
+    scale:
+      minReplicas: 2
+      maxReplicas: 8
+      rules:
+        - name: http-concurrent
+          http:
+            metadata:
+              concurrentRequests: "50"

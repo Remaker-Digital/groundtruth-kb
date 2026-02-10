@@ -895,7 +895,7 @@ class KnowledgeVectorizer:
     @staticmethod
     def format_for_pipeline(
         results: list[dict[str, Any]],
-        max_chars: int = 2500,
+        max_chars: int = 4000,
     ) -> dict[str, Any]:
         """Format search results for the chat pipeline.
 

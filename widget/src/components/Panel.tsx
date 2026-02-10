@@ -214,9 +214,21 @@ export const Panel: FunctionComponent<PanelProps> = ({
       timestamp: Date.now(),
     });
 
-    const ok = await apiSendMessage(conversationId, content);
-    if (!ok) {
-      store.setState({ error: 'Failed to send message' });
+    const result = await apiSendMessage(conversationId, content);
+    if (!result.ok) {
+      if (result.status === 409) {
+        // Conversation is no longer active (e.g. escalated to human agent).
+        // Show a system message and disable further input.
+        store.addMessage({
+          id: `msg_${Date.now()}_system`,
+          role: 'system',
+          content: 'This conversation has been transferred to a human agent. Please wait for a support team member to respond.',
+          timestamp: Date.now(),
+        });
+        store.setState({ error: null });
+      } else {
+        store.setState({ error: 'Failed to send message' });
+      }
       return;
     }
 

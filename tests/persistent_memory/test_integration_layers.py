@@ -392,7 +392,7 @@ class TestCrossLayerIntegration:
 
         # Should produce a valid prompt (platform base + tier + merchant config)
         assert prompt
-        assert "customer service response agent" in prompt.lower()
+        assert "customer service agent" in prompt.lower()
 
         # Trace should show empty profile, no memory signals
         trace_builder = DecisionTraceBuilder(
@@ -651,7 +651,7 @@ class TestCrossLayerIntegration:
         )
 
         # Layer 1: Platform base
-        assert "customer service response agent" in prompt.lower()
+        assert "customer service agent" in prompt.lower()
         assert "RULES" in prompt
 
         # Layer 2: Tier capabilities

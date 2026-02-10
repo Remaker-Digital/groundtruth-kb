@@ -380,43 +380,50 @@ https://agentredcx.com/docs/changelog
    - read_customers — to personalize responses with customer context
    - read_inventory — to check stock availability
 3. Approve the OAuth permissions to complete installation
-4. The app redirects to the Agent Red onboarding flow
+4. The app automatically configures a chat widget on your storefront
 
-## Testing the Core Experience
+## Testing the Chat Widget
 
-### Test 1: Automated Customer Response
+The chat widget appears as a floating button in the bottom-right corner
+of your storefront. Click it to open the conversation panel.
+
+### Test 1: Knowledge Base Response
+1. Visit your storefront (not the Shopify admin)
+2. Click the chat widget button to open it
+3. Send: "What pricing plans do you offer?"
+4. Expected: The AI responds with information from the store's
+   knowledge base (product info, FAQs, policies). Response streams
+   in real-time within 2-5 seconds.
+
+### Test 2: Conversational Greeting
+1. Send: "Hello, can you help me?"
+2. Expected: The AI responds with a friendly greeting and offers
+   to help with questions about the store's products and services.
+
+### Test 3: Escalation to Human Agent
+1. Send: "I need to speak to a real person about an issue"
+2. Expected: The AI recognises this as an escalation request and
+   responds with a message indicating a human agent will be
+   connected. Further messages show a notice that the conversation
+   has been transferred.
+
+### Test 4: Multi-Turn Conversation
+1. Start a new conversation by refreshing the page
+2. Send: "What is your return policy?"
+3. Wait for the AI response
+4. Send: "How long do I have to return an item?"
+5. Expected: The AI maintains conversation context and provides
+   a coherent follow-up response related to the initial question.
+
+### Test 5: Widget Customisation (Admin Panel)
 1. Open the Agent Red dashboard from your Shopify admin
-2. Navigate to the test chat interface
-3. Send: "Where is my order #1001?"
-4. Expected: The AI retrieves order #1001 from Shopify and responds with
-   tracking status within 2 seconds
-
-### Test 2: Product Knowledge
-1. Send: "Do you have any blue t-shirts in stock?"
-2. Expected: The AI searches your Shopify product catalog and responds
-   with matching products and availability
-
-### Test 3: Escalation
-1. Send: "I want to speak to a manager about a billing dispute"
-2. Expected: The AI identifies this as an escalation-required case
-   and offers to connect the customer with a human agent
-
-### Test 4: Persistent Memory
-1. Send: "My name is Alex and I prefer email communication"
-2. Close the conversation
-3. Start a new conversation
-4. Send: "Hi, I have a question about returns"
-5. Expected: The AI greets the customer by name and notes their
-   communication preference from the prior interaction
-
-### Test 5: Brand Voice
-1. Navigate to Settings > Brand Voice
-2. Set tone to "Casual" and personality to "Friendly"
-3. Return to test chat and send any question
-4. Expected: Response tone reflects the casual/friendly configuration
+2. Review the dashboard showing conversation analytics, knowledge
+   base management, and widget configuration options
+3. Expected: The embedded admin panel loads within the Shopify admin
+   iframe with Polaris styling. Dashboard shows usage metrics.
 
 ## Billing Test
-1. Navigate to Settings > Billing
+1. Navigate to Settings > Billing in the Agent Red admin panel
 2. Confirm the 14-day free trial is active
 3. Verify the subscription plan matches the selected tier
 4. Verify usage counter shows conversations consumed

@@ -318,6 +318,7 @@ class ChatPipeline:
         tenant: TenantDocument,
         preferences: PreferencesDocument,
         customer_id: str | None = None,
+        conversation_history: list[dict[str, str]] | None = None,
     ) -> AsyncGenerator[StreamEvent, None]:
         """Execute the full pipeline for a customer message.
 
@@ -331,6 +332,9 @@ class ChatPipeline:
             tenant: Tenant document (for prompt builder).
             preferences: Resolved merchant preferences.
             customer_id: Optional customer identifier for profile lookup.
+            conversation_history: Prior messages as list of
+                {"role": "user"|"assistant", "content": "..."} dicts
+                for multi-turn context. Most recent last. Capped by caller.
 
         Yields:
             StreamEvent objects (stage, token, validated/retracted, done/error).
@@ -489,8 +493,14 @@ class ChatPipeline:
                 return
 
             # Process KR result
+            # For greeting intents, clear knowledge context so the
+            # response generator focuses on being warm and natural
+            # instead of dumping product information into a "hello".
             knowledge_context = knowledge_result.get("context", "")
             sources = knowledge_result.get("sources", [])
+            if intent == "greeting":
+                knowledge_context = ""
+                sources = []
             for source in sources:
                 trace.add_knowledge_source(
                     entry_id=source.get("id", ""),
@@ -515,6 +525,11 @@ class ChatPipeline:
             # ---------------------------------------------------------------
             # Phase 3: Response Generation (streamed)
             # ---------------------------------------------------------------
+            logger.info(
+                "RG input: conv=%s intent=%s knowledge_len=%d sources=%d",
+                conversation_id, intent,
+                len(knowledge_context), len(sources),
+            )
             yield stage_event("response-generator", "started")
             rg_start = time.monotonic()
 
@@ -529,6 +544,7 @@ class ChatPipeline:
                     system_prompt=prompts[AgentRole.RESPONSE_GENERATOR],
                     budget=budget,
                     model=response_model,
+                    conversation_history=conversation_history,
                 ):
                     full_response += chunk
                     sequence += 1
@@ -928,12 +944,31 @@ class ChatPipeline:
             )
 
             # Apply minimum relevance score filter (RAG Phase 1)
+            # NOTE: hybrid search results use "rrf_score" as the key,
+            # vector-only use "similarity", and format_for_pipeline
+            # normalises to "score" in its output. We check all three
+            # keys with appropriate fallback order.
             min_score = 0.1
             if prefs and prefs.retrieval_min_score is not None:
                 min_score = max(0.0, min(prefs.retrieval_min_score, 1.0))
-            results = [r for r in results if r.get("score", 0) >= min_score]
+            results = [
+                r for r in results
+                if r.get("rrf_score", r.get("similarity", r.get("score", 0))) >= min_score
+            ]
 
             formatted = KnowledgeVectorizer.format_for_pipeline(results)
+
+            # Diagnostic: log the formatted knowledge context that will
+            # be injected into the response generator's system message.
+            ctx = formatted.get("context", "")
+            src = formatted.get("sources", [])
+            logger.info(
+                "KR formatted: %d sources, context_len=%d, "
+                "sources=%s, context_preview='%.500s'",
+                len(src), len(ctx),
+                [(s.get("title", "?"), round(s.get("score", 0), 3)) for s in src[:5]],
+                ctx[:500],
+            )
 
             # Add token tracking fields for pipeline compatibility
             formatted.setdefault("tokens_input", 0)
@@ -944,8 +979,99 @@ class ChatPipeline:
         except Exception as exc:
             logger.warning(
                 "Hybrid KB retrieval unavailable (%s) — "
-                "returning empty knowledge context",
+                "falling back to keyword search via KnowledgeBaseRepository",
                 exc,
+            )
+
+        # -----------------------------------------------------------------
+        # FALLBACK: keyword search via KnowledgeBaseRepository
+        # If vectorizer is not configured, unavailable, or throws, use the
+        # pipeline's own kb_repo to list articles and score by keyword overlap.
+        # This guarantees KB content is available even without embeddings.
+        # -----------------------------------------------------------------
+        try:
+            kb_repo = getattr(self, "_kb_repo", None)
+            if not kb_repo:
+                logger.warning("No KnowledgeBaseRepository available for fallback")
+                return {"context": "", "sources": [], "model": AZURE_EMBEDDING_MODEL}
+
+            articles = await kb_repo.list_active(tenant_id)
+            if not articles:
+                logger.info("No active KB articles found for tenant %s", tenant_id)
+                return {"context": "", "sources": [], "model": AZURE_EMBEDDING_MODEL}
+
+            # Improved keyword scoring with title-boost and stopword removal
+            _STOP = {
+                "a", "an", "the", "is", "are", "was", "were", "be", "been",
+                "being", "have", "has", "had", "do", "does", "did", "will",
+                "would", "could", "should", "may", "might", "can", "shall",
+                "of", "in", "to", "for", "with", "on", "at", "by", "from",
+                "and", "or", "but", "not", "no", "so", "if", "as", "it",
+                "its", "this", "that", "what", "which", "who", "how",
+                "your", "you", "my", "me", "i", "we", "our", "they",
+                "their", "them", "he", "she", "his", "her",
+            }
+            query_words = {
+                w for w in message.lower().split() if w not in _STOP and len(w) > 1
+            }
+            if not query_words:
+                query_words = set(message.lower().split())
+
+            scored: list[tuple[float, dict[str, Any]]] = []
+            for article in articles:
+                title = (article.get("title") or "").lower()
+                content = (article.get("content") or "").lower()
+
+                title_words = {w for w in title.split() if w not in _STOP}
+                content_words = set(content.split())
+
+                # Title match counts 3x — titles are curated labels
+                title_overlap = len(query_words & title_words)
+                content_overlap = len(query_words & content_words)
+                score = (title_overlap * 3.0 + content_overlap) / max(len(query_words), 1)
+
+                if score > 0:
+                    scored.append((score, article))
+
+            # Sort by score descending, take top 5
+            scored.sort(key=lambda x: x[0], reverse=True)
+            top_results = scored[:5]
+
+            if not top_results:
+                # No keyword match — return all articles (limited) as general context
+                top_results = [(0.5, a) for a in articles[:5]]
+
+            # Format for pipeline
+            context_parts: list[str] = []
+            sources: list[dict[str, str]] = []
+            for _score, article in top_results:
+                title = article.get("title", "Untitled")
+                content = article.get("content", "")
+                context_parts.append(f"### {title}\n{content}")
+                sources.append({
+                    "id": article.get("id", ""),
+                    "title": title,
+                    "entry_type": article.get("entry_type", ""),
+                })
+
+            context = "\n\n".join(context_parts)
+            logger.info(
+                "KB fallback keyword search returned %d results for tenant %s",
+                len(top_results), tenant_id,
+            )
+            return {
+                "context": context,
+                "sources": sources,
+                "model": "keyword-fallback",
+                "tokens_input": 0,
+                "tokens_output": 0,
+            }
+
+        except Exception as fallback_exc:
+            logger.warning(
+                "KB fallback keyword search also failed (%s) — "
+                "returning empty knowledge context",
+                fallback_exc,
             )
             return {"context": "", "sources": [], "model": AZURE_EMBEDDING_MODEL}
 
@@ -978,6 +1104,7 @@ class ChatPipeline:
         system_prompt: str,
         budget: PipelineTimeoutBudget,
         model: str = "gpt-4o",
+        conversation_history: list[dict[str, str]] | None = None,
     ) -> AsyncGenerator[str, None]:
         """Generate a streaming AI response.
 
@@ -998,6 +1125,7 @@ class ChatPipeline:
             async for chunk in self._call_response_generator_stream_direct(
                 customer_message, intent, knowledge_context,
                 system_prompt, budget, model,
+                conversation_history=conversation_history,
             ):
                 yield chunk
 
@@ -1009,6 +1137,7 @@ class ChatPipeline:
         system_prompt: str,
         budget: PipelineTimeoutBudget,
         model: str = "gpt-4o",
+        conversation_history: list[dict[str, str]] | None = None,
     ) -> AsyncGenerator[str, None]:
         """Stream response from Azure OpenAI directly.
 
@@ -1016,6 +1145,9 @@ class ChatPipeline:
         The system_prompt (assembled by SystemPromptBuilder) is passed
         as a separate system message to enable Azure OpenAI's automatic
         prompt prefix caching (WI #135).
+
+        Conversation history (prior turns) is included as alternating
+        user/assistant messages so the model has full multi-turn context.
         """
         if not self._openai_client:
             logger.warning(
@@ -1024,29 +1156,85 @@ class ChatPipeline:
             yield "I'm sorry, but I'm unable to generate a response right now. Please try again shortly."
             return
 
-        # Build user message with knowledge context
-        user_content_parts: list[str] = []
-        if knowledge_context:
-            user_content_parts.append(
-                f"RELEVANT KNOWLEDGE:\n{knowledge_context}\n"
+        # Build the messages array with full conversation context.
+        #
+        # Architecture: knowledge context is appended to the system prompt
+        # as a clearly delimited reference section.  This keeps it in
+        # a single system message (some models handle one system message
+        # better than two) and places it right before the conversation,
+        # exploiting the model's recency bias.
+        effective_system = system_prompt
+        if knowledge_context and intent != "greeting":
+            effective_system = (
+                f"{system_prompt}\n\n"
+                "═══════════════════════════════════════════\n"
+                "VERIFIED KNOWLEDGE BASE — USE THIS DATA\n"
+                "═══════════════════════════════════════════\n"
+                "The articles below contain VERIFIED, ACCURATE information.\n"
+                "You MUST incorporate specific details from them into your "
+                "response: exact dollar amounts, tier names, feature lists, "
+                "quantities, percentages, and policy terms.\n"
+                "Include ALL relevant items — if there are multiple tiers, "
+                "list ALL of them.  If there are multiple features, list ALL.\n"
+                "NEVER say \"check our website\" or \"contact sales\" when the "
+                "answer is right here.\n\n"
+                f"{knowledge_context}\n\n"
+                "═══════════════════════════════════════════\n"
+                "END OF KNOWLEDGE BASE\n"
+                "═══════════════════════════════════════════"
             )
-        user_content_parts.append(
-            f"CUSTOMER INTENT: {intent}\n\n"
-            f"CUSTOMER MESSAGE: {customer_message}"
-        )
-        user_content = "\n".join(user_content_parts)
+
+        messages: list[dict[str, str]] = [
+            {"role": "system", "content": effective_system},
+        ]
+
+        # Include conversation history for multi-turn context.
+        # Prior turns are inserted as alternating user/assistant messages
+        # so the model sees the full conversation flow. Capped to last 20
+        # messages (~10 turns) by the caller to stay within token budget.
+        if conversation_history:
+            messages.extend(conversation_history)
+
+        # Build the current user message — keep it clean and simple.
+        # Knowledge context is already in the system message above.
+        if intent == "greeting":
+            user_content = (
+                f"{customer_message}\n\n"
+                "[Respond warmly and naturally to this greeting. "
+                "Be friendly and conversational. Ask how you can help.]"
+            )
+        else:
+            user_content = customer_message
+
+        messages.append({"role": "user", "content": user_content})
+
+        # Diagnostic: log the full message structure sent to the model
+        # so we can verify knowledge context is reaching the API call.
+        if knowledge_context:
+            logger.info(
+                "RG messages: %d msgs, effective_system=%d chars, "
+                "knowledge_context=%d chars, user='%s', "
+                "knowledge_preview='%.500s'",
+                len(messages),
+                len(effective_system),
+                len(knowledge_context),
+                user_content[:120],
+                knowledge_context[:500],
+            )
 
         remaining_ms = budget.remaining_ms
         # Azure OpenAI SDK uses seconds for timeout
         timeout_seconds = max(0.5, remaining_ms / 1000)
 
+        # Use lower temperature when knowledge context is available
+        # (factual queries) to reduce hallucination.  Higher temperature
+        # for greetings and general conversation to keep things natural.
+        temperature = 0.3 if knowledge_context else 0.7
+
         stream = await self._openai_client.chat.completions.create(
             model=model,
-            messages=[
-                {"role": "system", "content": system_prompt},
-                {"role": "user", "content": user_content},
-            ],
-            temperature=0.7,
+            messages=messages,
+            temperature=temperature,
             max_tokens=1024,
             stream=True,
             timeout=timeout_seconds,
@@ -1211,8 +1399,10 @@ class ChatPipeline:
                 '- "reasoning": brief explanation\n\n'
                 "DEFAULT TO APPROVED.  Only reject if the response contains "
                 "one of the specific violations listed in your system prompt "
-                "(PII, literal secrets, medical/legal/financial advice, hate "
-                "speech, or policy contradictions).  Describing product "
+                "(cross-customer PII leakage, literal secrets, medical/legal/"
+                "financial advice, hate speech, or policy contradictions).  "
+                "Using the customer's own name or preferences back to them "
+                "is NORMAL and must be approved.  Describing product "
                 "features, technology, architecture, or capabilities is "
                 "never a violation."
             )

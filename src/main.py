@@ -86,8 +86,32 @@ from fastapi.responses import JSONResponse  # noqa: E402
 
 @app.exception_handler(Exception)
 async def _global_exception_handler(request: Request, exc: Exception) -> JSONResponse:
-    """Catch and log unhandled exceptions to aid production debugging."""
+    """Catch and log unhandled exceptions to aid production debugging.
+
+    RuntimeErrors from uninitialized CosmosManager are converted to 503
+    (Service Unavailable) rather than 500, allowing clients to distinguish
+    between transient infrastructure issues and genuine code bugs.
+
+    All error responses include the X-API-Version header for consistency
+    with normal responses (exception handlers bypass middleware).
+    """
+    from src.multi_tenant.api_versioning import API_VERSION
+
     _logger = logging.getLogger("src.main")
+    _version_headers = {"X-API-Version": API_VERSION}
+
+    # CosmosManager not initialized → 503 Service Unavailable
+    if isinstance(exc, RuntimeError) and "not initialized" in str(exc):
+        _logger.warning(
+            "Service unavailable (backing store not initialized): path=%s method=%s error=%s",
+            request.url.path, request.method, exc,
+        )
+        return JSONResponse(
+            status_code=503,
+            content={"error": "Service temporarily unavailable. Database not initialized."},
+            headers=_version_headers,
+        )
+
     _logger.error(
         "Unhandled exception: path=%s method=%s error=%s\n%s",
         request.url.path, request.method, exc,
@@ -96,6 +120,7 @@ async def _global_exception_handler(request: Request, exc: Exception) -> JSONRes
     return JSONResponse(
         status_code=500,
         content={"error": "Internal server error."},
+        headers=_version_headers,
     )
 
 
