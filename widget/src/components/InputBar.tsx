@@ -233,7 +233,7 @@ export const InputBar: FunctionComponent<InputBarProps> = ({
           }}
         >
           <a
-            href="https://remakerdigital.com"
+            href="https://agentredcx.com"
             target="_blank"
             rel="noopener noreferrer"
             style={{

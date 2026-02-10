@@ -219,7 +219,7 @@ Quick reference for Agent Red's compliance with each major requirement area:
 | Billing API | ✅ Implemented | `shopify_billing.py` — `appSubscriptionCreate`, usage records |
 | App Bridge | ✅ Current | CDN script in `admin/shopify/index.html` |
 | Session tokens | ✅ Implemented | JWT HS256 verification in `auth.py` |
-| Privacy policy | ⏳ Pending | URL needed (iubenda — see Legal section in CLAUDE.md) |
+| Privacy policy | ✅ Ready | `https://www.iubenda.com/privacy-policy/51316355` |
 | App icon | ⏳ Pending | 1200×1200 — owner/designer task |
 | Screenshots | ⏳ Pending | 1600×900 — owner/designer task |
 | Submission screencast | ⏳ Pending | Owner/designer task |

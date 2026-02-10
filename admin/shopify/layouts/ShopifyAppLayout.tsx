@@ -59,6 +59,8 @@ export function useAppContext(): AppContextValue {
 // ---------------------------------------------------------------------------
 
 const API_BASE_URL = import.meta.env.VITE_API_URL || '';
+const STANDALONE_ADMIN_URL = `${API_BASE_URL || ''}/admin/standalone/`;
+const DOCS_URL = 'https://agentredcx.com';
 
 // ---------------------------------------------------------------------------
 // Component
@@ -246,7 +248,36 @@ export const ShopifyAppLayout: React.FC<ShopifyAppLayoutProps> = ({
           </div>
         )}
 
-        {!loading && !error && children}
+        {!loading && !error && (
+          <>
+            {/* Cross-navigation: standalone admin + docs */}
+            <div style={{
+              display: 'flex',
+              justifyContent: 'flex-end',
+              gap: 12,
+              padding: '8px 16px 0',
+              fontSize: 13,
+            }}>
+              <a
+                href={DOCS_URL}
+                target="_blank"
+                rel="noopener noreferrer"
+                style={{ color: '#2c6ecb', textDecoration: 'none' }}
+              >
+                Documentation ↗
+              </a>
+              <a
+                href={STANDALONE_ADMIN_URL}
+                target="_blank"
+                rel="noopener noreferrer"
+                style={{ color: '#2c6ecb', textDecoration: 'none' }}
+              >
+                Open full admin ↗
+              </a>
+            </div>
+            {children}
+          </>
+        )}
       </Frame>
     </AppContext.Provider>
   );

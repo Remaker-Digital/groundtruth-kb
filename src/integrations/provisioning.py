@@ -169,6 +169,7 @@ class TenantLookupResponse(BaseModel):
     tier: str | None = None
     billing_channel: BillingChannel | None = None
     has_stripe_billing: bool = False
+    shopify_shop_domain: str | None = None
 
 
 # ---------------------------------------------------------------------------
@@ -629,6 +630,7 @@ async def lookup_tenant_endpoint(
                 tier=doc.get("tier"),
                 billing_channel=doc.get("billing_channel"),
                 has_stripe_billing=bool(doc.get("stripe_customer_id")),
+                shopify_shop_domain=doc.get("shopify_shop_domain"),
             )
         raise HTTPException(status_code=401, detail="Invalid API key.")
 
@@ -654,6 +656,7 @@ async def lookup_tenant_endpoint(
                 tier=doc.get("tier"),
                 billing_channel=doc.get("billing_channel"),
                 has_stripe_billing=bool(doc.get("stripe_customer_id")),
+                shopify_shop_domain=doc.get("shopify_shop_domain"),
             )
         return TenantLookupResponse(found=False)
 
@@ -664,6 +667,7 @@ async def lookup_tenant_endpoint(
         tier=tenant.tier,
         billing_channel=tenant.billing_channel,
         has_stripe_billing=bool(tenant.stripe_customer_id),
+        shopify_shop_domain=tenant.shopify_shop_domain,
     )
 
 

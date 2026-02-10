@@ -478,7 +478,7 @@ https://agentredcx.com/docs/changelog
 - [x] Session token authentication for embedded app — JWT HS256 in `auth.py`, App Bridge in `admin/shopify`
 - [x] App Bridge Save Bar API integration — `useSaveBar.ts` hook
 - [ ] Performance validation (<500ms P95 responses)
-- [ ] Privacy policy hosted at public URL
+- [x] Privacy policy hosted at public URL — `https://www.iubenda.com/privacy-policy/51316355`
 - [ ] Test credentials prepared for review team
 
 ### Dashboard Configuration
@@ -487,8 +487,8 @@ https://agentredcx.com/docs/changelog
 - [ ] Pricing plans configured (3 tiers + annual variants)
 - [ ] Free trial set to 14 days
 - [ ] OAuth scopes configured (read_orders, read_products, read_customers, read_inventory)
-- [ ] GDPR webhook URLs registered
-- [ ] Privacy policy URL registered
+- [x] GDPR webhook URLs registered — production FQDN in `shopify.app.toml`
+- [x] Privacy policy URL registered — `https://www.iubenda.com/privacy-policy/51316355`
 
 ---
 
