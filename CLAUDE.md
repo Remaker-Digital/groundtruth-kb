@@ -944,9 +944,9 @@ The owner values active feedback on their communication effectiveness. When proc
 - [x] Contact — new page with form, channels, partner program teaser
 - [x] Content README index updated
 
-**Website hosting strategy (decided 2026-02-03):**
-- **1.0:** Agent Red pages within https://remakerdigital.com ("Applications" category). Opportunistic — not blocking 1.0 release.
-- **1.1:** Standalone Agent Red website on Azure. Dedicated web presence with full polish.
+**Website hosting strategy (decided 2026-02-09):**
+- **1.0:** Documentation site at https://agentredcx.com — GitHub Pages + Docusaurus. Domain registered at Namecheap, DNS configured, GitHub Actions auto-deploy on push. HTTPS pending GitHub certificate provisioning.
+- **Future:** Full marketing website with landing pages, case studies, and demo scheduler.
 
 **Remaker Digital storefront strategy (decided 2026-02-03):**
 - Create a Remaker Digital Shopify storefront as dual-purpose: (1) sell Agent Red subscriptions via Stripe-direct, (2) deploy Agent Red as the store's own chat system as a live product demo.

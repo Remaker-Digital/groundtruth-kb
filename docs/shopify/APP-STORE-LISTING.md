@@ -280,27 +280,23 @@ support@remakerdigital.com
 
 ### Support URL
 ```
-https://docs.agentred.com
+https://agentredcx.com
 ```
-*(Placeholder — update with actual docs-site URL when deployed)*
 
 ### Privacy Policy URL
 ```
-https://remakerdigital.com/privacy
+https://www.iubenda.com/privacy-policy/51316355
 ```
-*(Placeholder — update with actual hosted privacy policy URL)*
 
 ### FAQ URL
 ```
-https://docs.agentred.com/faq
+https://agentredcx.com/docs/intro
 ```
-*(Placeholder — update when FAQ page is published)*
 
 ### Changelog URL
 ```
-https://docs.agentred.com/changelog
+https://agentredcx.com/docs/changelog
 ```
-*(Placeholder — update when changelog is published)*
 
 ---
 

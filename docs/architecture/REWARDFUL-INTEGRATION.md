@@ -81,7 +81,7 @@ For cross-domain tracking (if marketing site and app are on different domains):
 ```html
 <script async src='https://r.wdfl.co/rw.js'
   data-rewardful='YOUR_API_KEY'
-  data-domains='agentred.ai,app.agentred.ai'>
+  data-domains='agentredcx.com'>
 </script>
 ```
 

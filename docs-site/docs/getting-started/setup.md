@@ -9,7 +9,7 @@ description: What you need to get Agent Red running — account provisioning, AP
 This guide walks through the steps to go from a new Agent Red account to handling your first automated customer conversation. Each section describes what happens, what you need to provide, and what configuration options are available.
 
 :::info Early Access
-Agent Red is preparing for public launch. The setup process described here reflects the planned onboarding flow. If you have early access, [contact us](https://agentred.com/contact) for personalized onboarding assistance.
+Agent Red is preparing for public launch. The setup process described here reflects the planned onboarding flow. If you have early access, [contact us](https://agentredcx.com/docs/intro) for personalized onboarding assistance.
 :::
 
 ## Setup overview
@@ -38,7 +38,7 @@ When you subscribe to an Agent Red plan (Starter, Professional, or Enterprise), 
 | Tenant namespace | Isolated environment for your data, agents, and configuration |
 | Cosmos DB partition | Your data is stored in a dedicated partition with tenant-level isolation |
 | Agent instances | Six AI agents deployed and configured for your account |
-| API endpoint | A unique API endpoint for your tenant (e.g., `https://api.agentred.com/v1/tenant-acme`) |
+| API endpoint | A unique API endpoint for your tenant (e.g., `https://agent-red-api-gateway.lemonriver-f59f94b7.eastus2.azurecontainerapps.io/api/v1/tenant-acme`) |
 | Dashboard access | Web portal for configuration, analytics, and conversation monitoring |
 
 ### What you need to provide
@@ -74,7 +74,7 @@ Each tenant receives an API key for authenticating requests to the Agent Red API
 ### Authentication format
 
 ```bash
-curl -X POST https://api.agentred.com/v1/conversations \
+curl -X POST https://agent-red-api-gateway.lemonriver-f59f94b7.eastus2.azurecontainerapps.io/api/chat/conversations \
   -H "Authorization: Bearer YOUR_API_KEY" \
   -H "Content-Type: application/json" \
   -d '{"message": "Where is my order #12345?"}'

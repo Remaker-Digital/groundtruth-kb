@@ -398,7 +398,7 @@ sequenceDiagram
 - Conversation transcripts are cleansed of PII before vectorization
 - Fine-tuned models (Layer 4) are per-customer only — one customer's data never trains another customer's model
 
-See the [Privacy Policy](https://agentred.com/privacy) for full details on data handling and retention.
+See the [Privacy Policy](https://www.iubenda.com/privacy-policy/51316355) for full details on data handling and retention.
 
 ## Next steps
 

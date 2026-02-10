@@ -131,7 +131,7 @@ pie title Phase Completion Status
 | Write about page | ✅ Done |
 | Write contact page | ✅ Done |
 | Host within remakerdigital.com (Applications category) | 📋 1.0 — opportunistic, not blocking |
-| Standalone agentred.com website on Azure | 📋 1.1 release |
+| Standalone agentredcx.com website (GitHub Pages + Docusaurus) | ✅ Done — deployed, DNS configured |
 
 #### 1.4 Public Documentation
 
