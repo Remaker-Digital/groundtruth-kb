@@ -100,6 +100,10 @@ const config = {
                 to: '/getting-started/overview',
               },
               {
+                label: 'Admin guide',
+                to: '/admin-guide',
+              },
+              {
                 label: 'Shopify integration',
                 to: '/integrations/shopify',
               },
