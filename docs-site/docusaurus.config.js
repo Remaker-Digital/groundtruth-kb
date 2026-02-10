@@ -4,8 +4,8 @@ import {themes as prismThemes} from 'prism-react-renderer';
 
 /** @type {import('@docusaurus/types').Config} */
 const config = {
-  title: 'Agent Red Documentation',
-  tagline: 'AI-Powered Customer Experience Platform',
+  title: 'Agent Red Customer Experience',
+  tagline: 'AI-powered customer service that remembers every shopper',
   favicon: 'img/favicon.ico',
 
   future: {
@@ -13,12 +13,14 @@ const config = {
     // in Docusaurus 3.9.x. Re-enable when migrating to Docusaurus 4.
   },
 
-  // Production URL — update when domain is finalized
-  url: 'https://docs.agentred.com',
+  // Production URL
+  url: 'https://agentredcx.com',
   baseUrl: '/',
 
   organizationName: 'mike-remakerdigital',
   projectName: 'agent-red',
+  trailingSlash: false,
+  deploymentBranch: 'gh-pages',
 
   onBrokenLinks: 'throw',
   onBrokenMarkdownLinks: 'throw',
@@ -63,10 +65,11 @@ const config = {
       },
       navbar: {
         title: 'Agent Red',
-        // logo: {
-        //   alt: 'Agent Red Logo',
-        //   src: 'img/logo.svg',
-        // },
+        logo: {
+          alt: 'Agent Red Logo',
+          src: 'img/logo.svg',
+          srcDark: 'img/logo-dark.svg',
+        },
         items: [
           {
             type: 'docSidebar',
@@ -75,8 +78,13 @@ const config = {
             label: 'Documentation',
           },
           {
-            href: 'https://agentred.com',
-            label: 'Website',
+            to: '/changelog',
+            label: 'Changelog',
+            position: 'left',
+          },
+          {
+            href: 'https://apps.shopify.com/agent-red-customer-experience',
+            label: 'Install on Shopify',
             position: 'right',
           },
         ],
@@ -88,12 +96,16 @@ const config = {
             title: 'Documentation',
             items: [
               {
-                label: 'Getting Started',
+                label: 'Getting started',
                 to: '/getting-started/overview',
               },
               {
-                label: 'Integrations',
+                label: 'Shopify integration',
                 to: '/integrations/shopify',
+              },
+              {
+                label: 'Billing',
+                to: '/billing/billable-conversation-spec',
               },
             ],
           },
@@ -101,25 +113,34 @@ const config = {
             title: 'Product',
             items: [
               {
-                label: 'Website',
-                href: 'https://agentred.com',
+                label: 'Changelog',
+                to: '/changelog',
               },
               {
-                label: 'Pricing',
-                href: 'https://agentred.com/pricing',
+                label: 'Install on Shopify',
+                href: 'https://apps.shopify.com/agent-red-customer-experience',
               },
             ],
           },
           {
-            title: 'Company',
+            title: 'Legal',
             items: [
               {
-                label: 'About',
-                href: 'https://agentred.com/about',
+                label: 'Privacy policy',
+                href: 'https://www.iubenda.com/privacy-policy/51316355',
               },
               {
-                label: 'Contact',
-                href: 'https://agentred.com/contact',
+                label: 'Terms of service',
+                to: '/legal/terms',
+              },
+            ],
+          },
+          {
+            title: 'Support',
+            items: [
+              {
+                label: 'Contact us',
+                href: 'mailto:support@remakerdigital.com',
               },
             ],
           },
@@ -130,7 +151,7 @@ const config = {
         theme: {light: 'base', dark: 'dark'},
         options: {
           themeVariables: {
-            primaryColor: '#DC2626',
+            primaryColor: '#ff3621',
             primaryTextColor: '#ffffff',
             primaryBorderColor: '#991B1B',
             lineColor: '#64748B',

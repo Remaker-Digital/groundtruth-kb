@@ -4,26 +4,28 @@ sidebar_position: 1
 title: Welcome
 ---
 
-# Agent Red Documentation
+# Agent Red Customer Experience
 
-Agent Red Customer Experience is an AI-powered customer service platform that automates support conversations across your e-commerce channels. Built on a proven open-source foundation with six specialized AI agents, Agent Red delivers accurate, context-aware responses at scale.
+Agent Red is an AI-powered customer service platform that automates support conversations across your e-commerce channels. Built on a proven open-source foundation with six specialized AI agents, Agent Red delivers accurate, context-aware responses at scale.
 
 ## What you'll find here
 
-- **[Getting Started](/getting-started/overview)** — Understand what Agent Red does, how it works, and how to set up your first deployment.
-- **[Integrations](/integrations/shopify)** — Connect Agent Red to Shopify, Zendesk, Mailchimp, and Google Analytics.
+- **[Getting started](/getting-started/overview)** — Understand what Agent Red does, how it works, and how to set up your first deployment.
+- **[Integrations](/integrations/shopify)** — Connect Agent Red to Shopify and other platforms.
+- **[Billing](/billing/billable-conversation-spec)** — How conversations are metered and billed.
+- **[Changelog](/changelog)** — What's new in each release.
 
 ## Key capabilities
 
 | Capability | Description |
 |------------|-------------|
-| **Intent Classification** | Routes customer queries across 17 intent categories with 98% accuracy |
-| **Knowledge Retrieval** | Searches products, FAQs, and policies using vector embeddings |
-| **Response Generation** | Crafts personalized, brand-consistent replies powered by GPT-4o |
-| **Escalation Detection** | Identifies conversations requiring human intervention |
+| **Intent classification** | Routes customer queries across 17 intent categories |
+| **Knowledge retrieval** | Searches products, FAQs, and policies using hybrid vector + keyword search |
+| **Response generation** | Crafts personalized, brand-consistent replies powered by GPT-4o |
+| **Escalation detection** | Identifies conversations requiring human intervention |
 | **Analytics** | Monitors conversation quality, resolution rates, and AI performance |
-| **Content Safety** | Validates every response before delivery to customers |
-| **Persistent Customer Memory** | Builds customer context, conversation history, and learned preferences across sessions |
+| **Content safety** | Validates every response before delivery to customers |
+| **Persistent customer memory** | Builds customer context, conversation history, and learned preferences across sessions |
 
 ## Platform tiers
 
@@ -33,13 +35,12 @@ Agent Red Customer Experience is an AI-powered customer service platform that au
 | Professional | 5,000/month | $399/month |
 | Enterprise | 20,000/month | $999/month |
 
-All tiers include the full six-agent pipeline. See [pricing](https://agentred.com/pricing) for details on overage rates and add-on modules.
+All tiers include the full six-agent pipeline and a 14-day free trial. Install from the [Shopify App Store](https://apps.shopify.com/agent-red-customer-experience).
 
 ## Need help?
 
-- **Sales & onboarding:** [contact@agentred.com](mailto:contact@agentred.com)
-- **Technical support:** Available on Professional and Enterprise tiers
-- **Enterprise inquiries:** [Contact us](https://agentred.com/contact)
+- **Support:** [support@remakerdigital.com](mailto:support@remakerdigital.com)
+- **Install:** [Shopify App Store](https://apps.shopify.com/agent-red-customer-experience)
 
 ---
 

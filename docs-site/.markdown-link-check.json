@@ -3,8 +3,8 @@
     { "pattern": "^https?://localhost" },
     { "pattern": "^https?://127\\.0\\.0\\.1" },
     { "pattern": "^mailto:" },
-    { "pattern": "^https?://docs\\.agentred\\.com" },
-    { "pattern": "^https?://agentred\\.com" }
+    { "pattern": "^https?://agentredcx\\.com" },
+    { "pattern": "^https?://apps\\.shopify\\.com" }
   ],
   "timeout": "10s",
   "retryOn429": true,

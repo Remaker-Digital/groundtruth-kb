@@ -1,12 +1,8 @@
 /**
  * Agent Red Customer Experience — Docusaurus theme overrides.
  *
- * Brand colors from branding/guidelines/BRAND-GUIDELINES.md:
- *   Crimson Red #DC2626 (primary)
- *   Deep Navy   #0F172A (dark bg)
- *   Slate Gray  #334155 (text)
- *   Cool Gray   #94A3B8 (secondary text)
- *
+ * Brand primary: #ff3621 (orange-red)
+ * Dark bg: #0F172A (deep navy)
  * Typography: Inter (body), JetBrains Mono (code)
  *
  * (c) 2026 Remaker Digital, a DBA of VanDusen & Palmeter, LLC. All rights reserved.
@@ -16,36 +12,36 @@
 
 /* ---------- Light mode ---------- */
 :root {
-  --ifm-color-primary: #DC2626;
-  --ifm-color-primary-dark: #c62222;
-  --ifm-color-primary-darker: #bb2020;
-  --ifm-color-primary-darkest: #9a1a1a;
-  --ifm-color-primary-light: #e04040;
-  --ifm-color-primary-lighter: #e34d4d;
-  --ifm-color-primary-lightest: #e97272;
+  --ifm-color-primary: #ff3621;
+  --ifm-color-primary-dark: #e62c17;
+  --ifm-color-primary-darker: #d92914;
+  --ifm-color-primary-darkest: #b32211;
+  --ifm-color-primary-light: #ff5240;
+  --ifm-color-primary-lighter: #ff604f;
+  --ifm-color-primary-lightest: #ff8a7e;
 
   --ifm-font-family-base: 'Inter', system-ui, -apple-system, sans-serif;
   --ifm-font-family-monospace: 'JetBrains Mono', 'Fira Code', monospace;
   --ifm-code-font-size: 90%;
   --ifm-heading-font-weight: 600;
 
-  --docusaurus-highlighted-code-line-bg: rgba(220, 38, 38, 0.08);
+  --docusaurus-highlighted-code-line-bg: rgba(255, 54, 33, 0.08);
 }
 
 /* ---------- Dark mode ---------- */
 [data-theme='dark'] {
-  --ifm-color-primary: #F87171;
-  --ifm-color-primary-dark: #f65252;
-  --ifm-color-primary-darker: #f54242;
-  --ifm-color-primary-darkest: #f21414;
-  --ifm-color-primary-light: #fa9090;
-  --ifm-color-primary-lighter: #fba0a0;
-  --ifm-color-primary-lightest: #fdc8c8;
+  --ifm-color-primary: #ff6b5a;
+  --ifm-color-primary-dark: #ff4d38;
+  --ifm-color-primary-darker: #ff3e27;
+  --ifm-color-primary-darkest: #e61e06;
+  --ifm-color-primary-light: #ff897c;
+  --ifm-color-primary-lighter: #ff988d;
+  --ifm-color-primary-lightest: #ffc5bf;
 
   --ifm-background-color: #0F172A;
   --ifm-background-surface-color: #1E293B;
 
-  --docusaurus-highlighted-code-line-bg: rgba(248, 113, 113, 0.15);
+  --docusaurus-highlighted-code-line-bg: rgba(255, 107, 90, 0.15);
 }
 
 /* ---------- Navbar ---------- */
