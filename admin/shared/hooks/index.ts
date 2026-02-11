@@ -890,16 +890,34 @@ export function useConflictScan(apiFetch: ApiFetch) {
 // Analytics hooks
 // ---------------------------------------------------------------------------
 
-export function useAnalyticsSummary(apiFetch: ApiFetch) {
-  return useApi<AnalyticsSummary>(apiFetch, '/api/analytics/summary');
+/** Test mode filter for analytics: undefined = all, true = test only, false = production only. */
+export type TestModeFilter = boolean | undefined;
+
+export function useAnalyticsSummary(apiFetch: ApiFetch, isTestMode?: TestModeFilter) {
+  const params = new URLSearchParams();
+  if (isTestMode === true) params.set('is_test_mode', 'true');
+  else if (isTestMode === false) params.set('is_test_mode', 'false');
+  const qs = params.toString();
+  const path = qs ? `/api/analytics/summary?${qs}` : '/api/analytics/summary';
+  return useApi<AnalyticsSummary>(apiFetch, path);
 }
 
-export function useIntentBreakdown(apiFetch: ApiFetch) {
-  return useApi<{ intents: IntentBreakdown[] }>(apiFetch, '/api/analytics/intents');
+export function useIntentBreakdown(apiFetch: ApiFetch, isTestMode?: TestModeFilter) {
+  const params = new URLSearchParams();
+  if (isTestMode === true) params.set('is_test_mode', 'true');
+  else if (isTestMode === false) params.set('is_test_mode', 'false');
+  const qs = params.toString();
+  const path = qs ? `/api/analytics/intents?${qs}` : '/api/analytics/intents';
+  return useApi<{ intents: IntentBreakdown[] }>(apiFetch, path);
 }
 
-export function useKnowledgeGaps(apiFetch: ApiFetch) {
-  return useApi<{ gaps: KnowledgeGap[] }>(apiFetch, '/api/analytics/gaps');
+export function useKnowledgeGaps(apiFetch: ApiFetch, isTestMode?: TestModeFilter) {
+  const params = new URLSearchParams();
+  if (isTestMode === true) params.set('is_test_mode', 'true');
+  else if (isTestMode === false) params.set('is_test_mode', 'false');
+  const qs = params.toString();
+  const path = qs ? `/api/analytics/gaps?${qs}` : '/api/analytics/gaps';
+  return useApi<{ gaps: KnowledgeGap[] }>(apiFetch, path);
 }
 
 // ---------------------------------------------------------------------------

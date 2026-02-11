@@ -518,7 +518,7 @@ class TestResetE2EKeyLifecycle:
 
         captured_key: str | None = None
 
-        async def _capture_email(to: str, key: str, name: str | None = None) -> bool:
+        async def _capture_email(to: str, key: str, name: str | None = None, admin_login_url: str | None = None) -> bool:
             nonlocal captured_key
             captured_key = key
             return True

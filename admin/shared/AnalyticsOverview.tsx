@@ -438,25 +438,26 @@ const KnowledgeGapsTable: React.FC<KnowledgeGapsTableProps> = ({ gaps }) => {
 // Main component
 // ---------------------------------------------------------------------------
 
-export const AnalyticsOverview: React.FC<BaseComponentProps> = ({
+export const AnalyticsOverview: React.FC<BaseComponentProps & { isTestMode?: boolean }> = ({
   tenantContext,
   apiFetch,
   onNotify,
+  isTestMode,
 }) => {
-  // Data hooks
+  // Data hooks — pass test mode filter
   const {
     data: summary,
     loading: summaryLoading,
     error: summaryError,
     refetch: refetchSummary,
-  } = useAnalyticsSummary(apiFetch);
+  } = useAnalyticsSummary(apiFetch, isTestMode);
 
   const {
     data: intentData,
     loading: intentsLoading,
     error: intentsError,
     refetch: refetchIntents,
-  } = useIntentBreakdown(apiFetch);
+  } = useIntentBreakdown(apiFetch, isTestMode);
   const intents = intentData?.intents ?? [];
 
   const {
@@ -464,7 +465,7 @@ export const AnalyticsOverview: React.FC<BaseComponentProps> = ({
     loading: gapsLoading,
     error: gapsError,
     refetch: refetchGaps,
-  } = useKnowledgeGaps(apiFetch);
+  } = useKnowledgeGaps(apiFetch, isTestMode);
   const gaps = gapsData?.gaps ?? [];
 
   // Determine overall loading state for the initial load

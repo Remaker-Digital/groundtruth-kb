@@ -877,8 +877,16 @@ class ConversationRepository(TenantScopedRepository):
         tenant_id: str,
         since: str,
         until: str | None = None,
+        is_test_mode: bool | None = None,
     ) -> list[dict[str, Any]]:
         """Count conversations grouped by status in a date range.
+
+        Args:
+            tenant_id: Tenant partition key.
+            since: Start timestamp (ISO 8601, inclusive).
+            until: End timestamp (ISO 8601, exclusive).
+            is_test_mode: Filter by test mode flag (None = all,
+                True = test only, False = production only).
 
         Returns list of {status, count} dicts.
         """
@@ -892,6 +900,11 @@ class ConversationRepository(TenantScopedRepository):
             query_text += " AND c.started_at < @until"
             params.append({"name": "@until", "value": until})
 
+        if is_test_mode is True:
+            query_text += " AND c.is_test_mode = true"
+        elif is_test_mode is False:
+            query_text += " AND (NOT IS_DEFINED(c.is_test_mode) OR c.is_test_mode = false)"
+
         query_text += " GROUP BY c.status"
 
         return await self.query(tenant_id, query_text, params)
@@ -901,8 +914,16 @@ class ConversationRepository(TenantScopedRepository):
         tenant_id: str,
         since: str,
         until: str | None = None,
+        is_test_mode: bool | None = None,
     ) -> dict[str, Any]:
         """Compute aggregate conversation metrics for a date range.
+
+        Args:
+            tenant_id: Tenant partition key.
+            since: Start timestamp (ISO 8601, inclusive).
+            until: End timestamp (ISO 8601, exclusive).
+            is_test_mode: Filter by test mode flag (None = all,
+                True = test only, False = production only).
 
         Returns a dict with total, billable, avg_turns, avg_messages,
         escalated, critic_passed, critic_failed counts.
@@ -924,6 +945,11 @@ class ConversationRepository(TenantScopedRepository):
             query_text += " AND c.started_at < @until"
             params.append({"name": "@until", "value": until})
 
+        if is_test_mode is True:
+            query_text += " AND c.is_test_mode = true"
+        elif is_test_mode is False:
+            query_text += " AND (NOT IS_DEFINED(c.is_test_mode) OR c.is_test_mode = false)"
+
         results = await self.query(tenant_id, query_text, params)
         if results:
             return results[0]
@@ -938,8 +964,16 @@ class ConversationRepository(TenantScopedRepository):
         tenant_id: str,
         since: str,
         until: str | None = None,
+        is_test_mode: bool | None = None,
     ) -> list[dict[str, Any]]:
         """List all conversations with their agents_invoked for intent analysis.
+
+        Args:
+            tenant_id: Tenant partition key.
+            since: Start timestamp (ISO 8601, inclusive).
+            until: End timestamp (ISO 8601, exclusive).
+            is_test_mode: Filter by test mode flag (None = all,
+                True = test only, False = production only).
 
         Returns conversation docs with only the fields needed for
         agent/intent frequency analysis: conversation_id, agents_invoked,
@@ -956,6 +990,11 @@ class ConversationRepository(TenantScopedRepository):
             query_text += " AND c.started_at < @until"
             params.append({"name": "@until", "value": until})
 
+        if is_test_mode is True:
+            query_text += " AND c.is_test_mode = true"
+        elif is_test_mode is False:
+            query_text += " AND (NOT IS_DEFINED(c.is_test_mode) OR c.is_test_mode = false)"
+
         return await self.query(tenant_id, query_text, params)
 
     async def list_gap_conversations(
@@ -964,8 +1003,17 @@ class ConversationRepository(TenantScopedRepository):
         since: str,
         until: str | None = None,
         limit: int = 50,
+        is_test_mode: bool | None = None,
     ) -> list[dict[str, Any]]:
         """List conversations that represent potential knowledge gaps.
+
+        Args:
+            tenant_id: Tenant partition key.
+            since: Start timestamp (ISO 8601, inclusive).
+            until: End timestamp (ISO 8601, exclusive).
+            limit: Maximum number of results.
+            is_test_mode: Filter by test mode flag (None = all,
+                True = test only, False = production only).
 
         Returns conversations with escalated or error status — these
         indicate the AI couldn't resolve the customer's issue.
@@ -983,6 +1031,11 @@ class ConversationRepository(TenantScopedRepository):
         if until is not None:
             query_text += " AND c.started_at < @until"
             params.append({"name": "@until", "value": until})
+
+        if is_test_mode is True:
+            query_text += " AND c.is_test_mode = true"
+        elif is_test_mode is False:
+            query_text += " AND (NOT IS_DEFINED(c.is_test_mode) OR c.is_test_mode = false)"
 
         query_text += " ORDER BY c.started_at DESC"
         params.append({"name": "@limit", "value": limit})

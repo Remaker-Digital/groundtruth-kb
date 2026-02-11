@@ -204,6 +204,7 @@ async def _send_api_key_email(
     to_email: str,
     raw_key: str,
     tenant_name: str | None = None,
+    admin_login_url: str | None = None,
 ) -> bool:
     """Send the new API key to the merchant via SMTP.
 
@@ -251,14 +252,18 @@ async def _send_api_key_email(
     be shown again.
   </p>
   <hr style="border:none;border-top:1px solid #272727;margin:24px 0;" />
-  <p style="margin:0 0 8px;font-size:13px;color:#ff6b6b;font-weight:500;">
-    Did you not request this reset?
-  </p>
-  <p style="margin:0;font-size:13px;color:#A0A0A0;line-height:1.5;">
-    If you did not request a key reset, someone may have access to your email.
-    Please contact <a href="mailto:support@agentred.com" style="color:#ff3621;text-decoration:none;">support@agentred.com</a>
-    immediately to secure your account.
-  </p>
+  <div style="background:#2a1a1a;border:1px solid #4a2020;border-radius:8px;padding:16px;">
+    <p style="margin:0 0 8px;font-size:13px;color:#ff6b6b;font-weight:600;">
+      Did not request this?
+    </p>
+    <p style="margin:0 0 12px;font-size:13px;color:#A0A0A0;line-height:1.5;">
+      If you did not request a key reset, someone may have access to your email.
+      Request a new API key immediately to invalidate this one and secure your account.
+    </p>
+    <a href="{admin_login_url or 'mailto:support@agentred.com'}" style="display:inline-block;padding:10px 24px;background:#ff3621;color:#ffffff;font-size:13px;font-weight:600;text-decoration:none;border-radius:6px;">
+      Request a New API Key
+    </a>
+  </div>
   <hr style="border:none;border-top:1px solid #272727;margin:24px 0;" />
   <p style="margin:0;font-size:11px;color:#787878;text-align:center;">
     Agent Red Customer Experience &mdash; A product of Remaker Digital
@@ -273,7 +278,9 @@ async def _send_api_key_email(
         f"Your previous key has been invalidated.\n\n"
         f"Your New API Key:\n{raw_key}\n\n"
         f"Copy this key and use it to sign in. This key will not be shown again.\n\n"
-        f"If you did not request this reset, contact support@agentred.com immediately.\n"
+        f"If you did not request this reset, request a new API key immediately to\n"
+        f"invalidate this one and secure your account:\n"
+        f"{admin_login_url or 'Contact support@agentred.com'}\n"
     )
 
     try:
@@ -653,8 +660,14 @@ async def reset_api_key_via_email(
         ],
     )
 
+    # Build self-service re-reset URL for the security notification in the email.
+    # If the admin didn't request this, they can click through to request a new key.
+    scheme = request.headers.get("x-forwarded-proto", request.url.scheme)
+    host = request.headers.get("host", request.url.hostname or "localhost")
+    admin_login_url = f"{scheme}://{host}/admin/standalone/"
+
     # Send the new key via email
-    email_sent = await _send_api_key_email(email, raw_key, tenant_name)
+    email_sent = await _send_api_key_email(email, raw_key, tenant_name, admin_login_url)
 
     await _log_audit(
         tenant_id,

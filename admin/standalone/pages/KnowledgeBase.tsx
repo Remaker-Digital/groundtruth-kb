@@ -20,6 +20,9 @@ import {
   Center,
   Tabs,
   Progress,
+  Alert,
+  Accordion,
+  Tooltip,
 } from '@mantine/core';
 import { useDisclosure } from '@mantine/hooks';
 import { useAppContext } from '../layouts/StandaloneLayout';
@@ -115,6 +118,66 @@ const CheckIcon = () => (
   </svg>
 );
 
+const ScanIcon = () => (
+  <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+    <path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z" />
+    <line x1="12" y1="8" x2="12" y2="12" />
+    <line x1="12" y1="16" x2="12.01" y2="16" />
+  </svg>
+);
+
+const AlertTriangleIcon = () => (
+  <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+    <path d="M10.29 3.86L1.82 18a2 2 0 001.71 3h16.94a2 2 0 001.71-3L13.71 3.86a2 2 0 00-3.42 0z" />
+    <line x1="12" y1="9" x2="12" y2="13" />
+    <line x1="12" y1="17" x2="12.01" y2="17" />
+  </svg>
+);
+
+// ---------------------------------------------------------------------------
+// Conflict scan types
+// ---------------------------------------------------------------------------
+
+interface ConflictPair {
+  entryAId: string;
+  entryATitle: string;
+  entryBId: string;
+  entryBTitle: string;
+  conflictType: string;
+  severity: string;
+  embeddingSimilarity: number;
+  contentOverlap: number;
+  titleSimilarity: number;
+  conflictingFacts: string[];
+  resolution: string;
+}
+
+interface ScanResult {
+  tenantId: string;
+  scannedAt: string;
+  totalEntriesScanned: number;
+  entriesWithEmbeddings: number;
+  entriesWithoutEmbeddings: number;
+  conflicts: ConflictPair[];
+  highCount: number;
+  mediumCount: number;
+  lowCount: number;
+  scanDurationMs: number;
+}
+
+const severityColorMap: Record<string, string> = {
+  high: 'red',
+  medium: 'orange',
+  low: 'yellow',
+};
+
+const conflictTypeLabel: Record<string, string> = {
+  near_duplicate: 'Near duplicate',
+  conflicting: 'Conflicting information',
+  topical_overlap: 'Topical overlap',
+  similar_titles: 'Similar titles',
+};
+
 // ---------------------------------------------------------------------------
 // Form state
 // ---------------------------------------------------------------------------
@@ -181,6 +244,12 @@ export const KnowledgeBasePage: React.FC = () => {
   const [uploadResult, setUploadResult] = useState<KBUploadResult | null>(null);
   const [dragOver, setDragOver] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
+
+  // Conflict scan state
+  const [scanModalOpened, { open: openScanModal, close: closeScanModal }] = useDisclosure(false);
+  const [scanning, setScanning] = useState(false);
+  const [scanResult, setScanResult] = useState<ScanResult | null>(null);
+  const [scanError, setScanError] = useState<string | null>(null);
 
   // Filter articles
   const filteredArticles = useMemo(() => {
@@ -335,6 +404,39 @@ export const KnowledgeBasePage: React.FC = () => {
     }
   }, [exportCSV, onNotify]);
 
+  const handleScan = useCallback(async (force = false) => {
+    setScanning(true);
+    setScanError(null);
+    try {
+      const qs = force ? '?force=true' : '';
+      const resp = await apiFetch(`/api/admin/knowledge/scan${qs}`, { method: 'POST' });
+      if (resp.ok) {
+        const data: ScanResult = await resp.json();
+        setScanResult(data);
+        openScanModal();
+        const total = data.highCount + data.mediumCount + data.lowCount;
+        if (total > 0) {
+          onNotify(`Scan found ${total} issue${total === 1 ? '' : 's'} (${data.highCount} high, ${data.mediumCount} medium, ${data.lowCount} low)`, 'warning');
+        } else {
+          onNotify('No conflicts or duplicates found', 'success');
+        }
+      } else if (resp.status === 503) {
+        setScanError('Conflict scanner is not available. This feature requires embedding support.');
+        onNotify('Conflict scanner not available', 'error');
+      } else {
+        const text = await resp.text().catch(() => 'Unknown error');
+        setScanError(text);
+        onNotify('Scan failed', 'error');
+      }
+    } catch (err) {
+      const msg = err instanceof Error ? err.message : 'Network error';
+      setScanError(msg);
+      onNotify('Scan failed: ' + msg, 'error');
+    } finally {
+      setScanning(false);
+    }
+  }, [apiFetch, onNotify, openScanModal]);
+
   // Loading state
   if (kbResult.loading && articles.length === 0) {
     return (
@@ -401,6 +503,15 @@ export const KnowledgeBasePage: React.FC = () => {
             />
           </Group>
           <Group gap="sm">
+            <Button
+              leftSection={<ScanIcon />}
+              variant="default"
+              onClick={() => handleScan(false)}
+              loading={scanning}
+              disabled={articles.length === 0}
+            >
+              Scan for conflicts
+            </Button>
             <Button
               leftSection={<DownloadIcon />}
               variant="default"
@@ -649,6 +760,166 @@ export const KnowledgeBasePage: React.FC = () => {
               </Stack>
             </Tabs.Panel>
           </Tabs>
+        )}
+      </Modal>
+
+      {/* Conflict Scan Results Modal */}
+      <Modal
+        opened={scanModalOpened}
+        onClose={closeScanModal}
+        title={<Text fw={600} size="lg">Conflict scan results</Text>}
+        size="xl"
+        radius="md"
+      >
+        {scanError && (
+          <Alert color="red" title="Scan error" mb="md">
+            {scanError}
+          </Alert>
+        )}
+
+        {scanResult && (
+          <Stack gap="md">
+            {/* Summary stats */}
+            <SimpleGrid cols={{ base: 2, xs: 4 }} spacing="sm">
+              <Paper p="sm" radius="md" withBorder>
+                <Text size="xs" c="dimmed" fw={600}>Entries scanned</Text>
+                <Text size="lg" fw={700}>{scanResult.totalEntriesScanned}</Text>
+              </Paper>
+              <Paper p="sm" radius="md" withBorder>
+                <Text size="xs" c="dimmed" fw={600}>With embeddings</Text>
+                <Text size="lg" fw={700}>{scanResult.entriesWithEmbeddings}</Text>
+              </Paper>
+              <Paper p="sm" radius="md" withBorder>
+                <Text size="xs" c="dimmed" fw={600}>Scan time</Text>
+                <Text size="lg" fw={700}>{scanResult.scanDurationMs < 1000 ? `${scanResult.scanDurationMs}ms` : `${(scanResult.scanDurationMs / 1000).toFixed(1)}s`}</Text>
+              </Paper>
+              <Paper p="sm" radius="md" withBorder>
+                <Text size="xs" c="dimmed" fw={600}>Issues found</Text>
+                <Text size="lg" fw={700} c={scanResult.highCount > 0 ? 'red' : scanResult.mediumCount > 0 ? 'orange' : 'green'}>
+                  {scanResult.highCount + scanResult.mediumCount + scanResult.lowCount}
+                </Text>
+              </Paper>
+            </SimpleGrid>
+
+            {/* Severity breakdown */}
+            {(scanResult.highCount > 0 || scanResult.mediumCount > 0 || scanResult.lowCount > 0) && (
+              <Group gap="sm">
+                {scanResult.highCount > 0 && (
+                  <Badge size="lg" color="red" variant="light">
+                    {scanResult.highCount} high severity
+                  </Badge>
+                )}
+                {scanResult.mediumCount > 0 && (
+                  <Badge size="lg" color="orange" variant="light">
+                    {scanResult.mediumCount} medium
+                  </Badge>
+                )}
+                {scanResult.lowCount > 0 && (
+                  <Badge size="lg" color="yellow" variant="light">
+                    {scanResult.lowCount} low
+                  </Badge>
+                )}
+              </Group>
+            )}
+
+            {/* No issues state */}
+            {scanResult.conflicts.length === 0 && (
+              <Alert color="green" title="All clear" variant="light">
+                No conflicts, duplicates, or overlapping content detected in your knowledge base.
+              </Alert>
+            )}
+
+            {/* Conflict list */}
+            {scanResult.conflicts.length > 0 && (
+              <Accordion variant="separated" radius="md">
+                {scanResult.conflicts.map((conflict, idx) => (
+                  <Accordion.Item key={`${conflict.entryAId}-${conflict.entryBId}-${idx}`} value={`conflict-${idx}`}>
+                    <Accordion.Control>
+                      <Group gap="sm" wrap="nowrap">
+                        <Badge size="sm" color={severityColorMap[conflict.severity] || 'gray'} variant="filled" style={{ flexShrink: 0 }}>
+                          {conflict.severity.toUpperCase()}
+                        </Badge>
+                        <Badge size="sm" color="gray" variant="light" style={{ flexShrink: 0 }}>
+                          {conflictTypeLabel[conflict.conflictType] || conflict.conflictType}
+                        </Badge>
+                        <Text size="sm" truncate="end" style={{ flex: 1 }}>
+                          {conflict.entryATitle} &harr; {conflict.entryBTitle}
+                        </Text>
+                      </Group>
+                    </Accordion.Control>
+                    <Accordion.Panel>
+                      <Stack gap="sm">
+                        <SimpleGrid cols={2} spacing="sm">
+                          <Paper p="sm" radius="sm" withBorder>
+                            <Text size="xs" c="dimmed" fw={600} mb={4}>Article A</Text>
+                            <Text size="sm" fw={500}>{conflict.entryATitle}</Text>
+                          </Paper>
+                          <Paper p="sm" radius="sm" withBorder>
+                            <Text size="xs" c="dimmed" fw={600} mb={4}>Article B</Text>
+                            <Text size="sm" fw={500}>{conflict.entryBTitle}</Text>
+                          </Paper>
+                        </SimpleGrid>
+
+                        <Group gap="lg">
+                          <Tooltip label="How similar the article content embeddings are (0-1)">
+                            <Text size="xs" c="dimmed">
+                              Embedding similarity: <Text span fw={600}>{(conflict.embeddingSimilarity * 100).toFixed(1)}%</Text>
+                            </Text>
+                          </Tooltip>
+                          <Tooltip label="Percentage of overlapping content between the two articles">
+                            <Text size="xs" c="dimmed">
+                              Content overlap: <Text span fw={600}>{(conflict.contentOverlap * 100).toFixed(1)}%</Text>
+                            </Text>
+                          </Tooltip>
+                          <Tooltip label="How similar the article titles are (0-1)">
+                            <Text size="xs" c="dimmed">
+                              Title similarity: <Text span fw={600}>{(conflict.titleSimilarity * 100).toFixed(1)}%</Text>
+                            </Text>
+                          </Tooltip>
+                        </Group>
+
+                        {conflict.conflictingFacts.length > 0 && (
+                          <Alert color="orange" variant="light" title="Conflicting facts" icon={<AlertTriangleIcon />}>
+                            <Stack gap={4}>
+                              {conflict.conflictingFacts.map((fact, fi) => (
+                                <Text key={fi} size="sm">{fact}</Text>
+                              ))}
+                            </Stack>
+                          </Alert>
+                        )}
+
+                        <Paper p="sm" radius="sm" style={{ backgroundColor: 'var(--mantine-color-dark-7)' }}>
+                          <Text size="xs" c="dimmed" fw={600} mb={4}>Suggested resolution</Text>
+                          <Text size="sm">{conflict.resolution}</Text>
+                        </Paper>
+                      </Stack>
+                    </Accordion.Panel>
+                  </Accordion.Item>
+                ))}
+              </Accordion>
+            )}
+
+            {/* Footer actions */}
+            <Group justify="space-between" mt="sm">
+              <Text size="xs" c="dimmed">
+                Scanned at {(() => {
+                  try { return new Date(scanResult.scannedAt).toLocaleString(); }
+                  catch { return scanResult.scannedAt; }
+                })()}
+                {scanResult.entriesWithoutEmbeddings > 0 && (
+                  <> &middot; {scanResult.entriesWithoutEmbeddings} entries skipped (no embeddings)</>
+                )}
+              </Text>
+              <Group gap="sm">
+                <Button variant="default" size="sm" onClick={() => handleScan(true)} loading={scanning}>
+                  Re-scan (force)
+                </Button>
+                <Button color={BRAND_RED} size="sm" onClick={closeScanModal}>
+                  Close
+                </Button>
+              </Group>
+            </Group>
+          </Stack>
         )}
       </Modal>
     </Stack>

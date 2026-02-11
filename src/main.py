@@ -530,6 +530,100 @@ def _validate_reset_token(token: str) -> bool:
     return True
 
 
+def _send_admin_password_changed_email(to_email: str, forgot_password_url: str) -> bool:
+    """Send a confirmation email after a successful password reset.
+
+    Security best practice: notify the admin that their password was changed,
+    and provide a self-service recovery link in case they did not initiate it.
+    """
+    import smtplib
+    from email.mime.multipart import MIMEMultipart
+    from email.mime.text import MIMEText
+
+    smtp_host = os.environ.get("SMTP_HOST", "")
+    smtp_port = int(os.environ.get("SMTP_PORT", "587"))
+    smtp_user = os.environ.get("SMTP_USERNAME", "")
+    smtp_pass = os.environ.get("SMTP_PASSWORD", "")
+    sender = os.environ.get("SMTP_FROM_ADDRESS", "noreply@agentred.com")
+
+    if not smtp_host:
+        logger.warning("SMTP_HOST not configured — cannot send password changed confirmation email")
+        return False
+
+    subject = "Your Agent Red Admin Password Has Been Reset"
+
+    html_body = f"""\
+<!DOCTYPE html>
+<html>
+<head><meta charset="utf-8"/></head>
+<body style="margin:0;padding:0;background:#0a0a0a;font-family:Inter,system-ui,sans-serif;">
+<div style="max-width:560px;margin:40px auto;padding:40px;background:#1f1f1f;border-radius:12px;border:1px solid #272727;">
+  <div style="text-align:center;margin-bottom:24px;">
+    <h1 style="margin:0;font-size:20px;color:#F5F5F5;">Agent Red</h1>
+    <p style="margin:4px 0 0;font-size:14px;color:#A0A0A0;">Customer Experience</p>
+  </div>
+  <h2 style="margin:0 0 16px;font-size:16px;color:#F5F5F5;">Password Reset Successful</h2>
+  <p style="margin:0 0 16px;font-size:14px;color:#E0E0E0;line-height:1.6;">
+    Your admin password has been reset successfully. You are now signed in.
+  </p>
+  <hr style="border:none;border-top:1px solid #272727;margin:24px 0;" />
+  <div style="background:#2a1a1a;border:1px solid #4a2020;border-radius:8px;padding:16px;margin:0 0 16px;">
+    <p style="margin:0 0 8px;font-size:13px;color:#ff6b6b;font-weight:600;">
+      Did not make this change?
+    </p>
+    <p style="margin:0 0 12px;font-size:13px;color:#A0A0A0;line-height:1.5;">
+      If you did not reset your password, someone may have access to your account.
+      Reset your password immediately to secure your account.
+    </p>
+    <a href="{forgot_password_url}" style="display:inline-block;padding:10px 24px;background:#ff3621;color:#ffffff;font-size:13px;font-weight:600;text-decoration:none;border-radius:6px;">
+      Reset Password
+    </a>
+  </div>
+  <hr style="border:none;border-top:1px solid #272727;margin:24px 0;" />
+  <p style="margin:0;font-size:11px;color:#787878;text-align:center;">
+    Agent Red Customer Experience &mdash; A product of Remaker Digital
+  </p>
+</div>
+</body>
+</html>"""
+
+    plain_body = (
+        f"Agent Red Admin Password Reset Successful\n\n"
+        f"Your admin password has been reset successfully. You are now signed in.\n\n"
+        f"If you did not reset your password, someone may have access to your account.\n"
+        f"Reset your password immediately: {forgot_password_url}\n"
+    )
+
+    try:
+        msg = MIMEMultipart("alternative")
+        msg["From"] = f"Agent Red <{sender}>"
+        msg["To"] = to_email
+        msg["Subject"] = subject
+        msg.attach(MIMEText(plain_body, "plain"))
+        msg.attach(MIMEText(html_body, "html"))
+
+        if smtp_port == 465:
+            with smtplib.SMTP_SSL(smtp_host, smtp_port, timeout=10.0) as server:
+                if smtp_user and smtp_pass:
+                    server.login(smtp_user, smtp_pass)
+                server.send_message(msg)
+        else:
+            with smtplib.SMTP(smtp_host, smtp_port, timeout=10.0) as server:
+                server.ehlo()
+                if smtp_port != 25:
+                    server.starttls()
+                if smtp_user and smtp_pass:
+                    server.login(smtp_user, smtp_pass)
+                server.send_message(msg)
+
+        logger.info("Admin password changed confirmation email sent to %s", to_email)
+        return True
+
+    except Exception:
+        logger.exception("Failed to send admin password changed confirmation email to %s", to_email)
+        return False
+
+
 def _send_admin_reset_email(to_email: str, reset_url: str) -> bool:
     """Send a password reset email via SMTP.
 
@@ -778,6 +872,15 @@ if _admin_standalone_dist.is_dir():
             _admin_used_reset_nonces.add(nonce)
 
         logger.info("Admin password reset: auto-login via session cookie")
+
+        # Send password-changed confirmation email (non-blocking best-effort).
+        # Includes a "Reset Password" recovery link in case the admin did not
+        # initiate this change (security best practice, WI #203 UX review).
+        if _ADMIN_RESET_EMAIL:
+            scheme = request.headers.get("x-forwarded-proto", request.url.scheme)
+            host = request.headers.get("host", request.url.hostname or "localhost")
+            forgot_url = f"{scheme}://{host}/admin/standalone/_forgot-password"
+            _send_admin_password_changed_email(_ADMIN_RESET_EMAIL, forgot_url)
 
         # Auto-login: set the session cookie and redirect to admin dashboard.
         response = StarletteResponse(

@@ -113,12 +113,16 @@ function formatLastSeen(dateStr: string): string {
 export const AnalyticsPage: React.FC = () => {
   const { apiFetch } = useAppContext();
   const [period, setPeriod] = useState('30d');
+  const [modeFilter, setModeFilter] = useState<'all' | 'production' | 'test'>('all');
 
-  // API hooks
-  const summary = useAnalyticsSummary(apiFetch);
+  // Convert UI filter to API parameter
+  const isTestMode = modeFilter === 'test' ? true : modeFilter === 'production' ? false : undefined;
+
+  // API hooks — pass test mode filter
+  const summary = useAnalyticsSummary(apiFetch, isTestMode);
   const dailyVolume = useDailyVolume(apiFetch);
-  const intents = useIntentBreakdown(apiFetch);
-  const gaps = useKnowledgeGaps(apiFetch);
+  const intents = useIntentBreakdown(apiFetch, isTestMode);
+  const gaps = useKnowledgeGaps(apiFetch, isTestMode);
 
   // Dark mode chart colors — Mazel design revision (2026-02-03 mockup)
   const computedColorScheme = useComputedColorScheme('dark');
@@ -142,7 +146,7 @@ export const AnalyticsPage: React.FC = () => {
 
   return (
     <Stack gap="lg">
-      {/* Page header with period selector */}
+      {/* Page header with mode filter + period selector */}
       <Group justify="space-between" align="flex-end">
         <div>
           <Title order={2}>Analytics</Title>
@@ -150,18 +154,51 @@ export const AnalyticsPage: React.FC = () => {
             Performance metrics and intent analysis
           </Text>
         </div>
-        <SegmentedControl
-          value={period}
-          onChange={setPeriod}
-          data={[
-            { label: '7d', value: '7d' },
-            { label: '14d', value: '14d' },
-            { label: '30d', value: '30d' },
-            { label: '90d', value: '90d' },
-          ]}
-          size="sm"
-        />
+        <Group gap="md">
+          <SegmentedControl
+            value={modeFilter}
+            onChange={(val) => setModeFilter(val as 'all' | 'production' | 'test')}
+            data={[
+              { label: 'All', value: 'all' },
+              { label: 'Production', value: 'production' },
+              { label: 'Test', value: 'test' },
+            ]}
+            size="sm"
+          />
+          <SegmentedControl
+            value={period}
+            onChange={setPeriod}
+            data={[
+              { label: '7d', value: '7d' },
+              { label: '14d', value: '14d' },
+              { label: '30d', value: '30d' },
+              { label: '90d', value: '90d' },
+            ]}
+            size="sm"
+          />
+        </Group>
       </Group>
+
+      {/* Test mode filter indicator */}
+      {modeFilter !== 'all' && (
+        <Paper p="xs" radius="md" withBorder style={{
+          borderColor: modeFilter === 'test' ? 'rgba(255, 152, 0, 0.3)' : undefined,
+          background: modeFilter === 'test'
+            ? 'linear-gradient(135deg, rgba(255, 152, 0, 0.08) 0%, rgba(255, 87, 34, 0.04) 100%)'
+            : undefined,
+        }}>
+          <Group gap="xs" justify="center">
+            <Badge size="sm" variant="light" color={modeFilter === 'test' ? 'orange' : 'blue'}>
+              {modeFilter === 'test' ? 'Test mode' : 'Production'}
+            </Badge>
+            <Text size="xs" c="dimmed">
+              {modeFilter === 'test'
+                ? 'Showing metrics from test configuration sessions only'
+                : 'Showing metrics from production sessions only'}
+            </Text>
+          </Group>
+        </Paper>
+      )}
 
       {/* Loading indicator */}
       {isLoading && (

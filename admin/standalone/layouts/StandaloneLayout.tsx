@@ -156,6 +156,11 @@ const Icons = {
       <path d="M3 9l9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z" /><polyline points="9 22 9 12 15 12 15 22" />
     </svg>
   ),
+  quickactions: () => (
+    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+      <polygon points="13 2 3 14 12 14 11 22 21 10 12 10 13 2" />
+    </svg>
+  ),
 };
 
 type NavPage = {
@@ -172,6 +177,7 @@ const navItems: NavPage[] = [
   { path: '/analytics', label: 'Analytics', icon: 'analytics' },
   { path: '/configuration', label: 'Configuration', icon: 'config' },
   { path: '/widget', label: 'Widget', icon: 'widget' },
+  { path: '/quick-actions', label: 'Quick actions', icon: 'quickactions' },
   { path: '/team', label: 'Team', icon: 'team' },
   { path: '/integrations', label: 'Integrations', icon: 'integrations' },
   { path: '/billing', label: 'Billing', icon: 'billing' },
@@ -319,7 +325,7 @@ export const StandaloneLayout: React.FC<StandaloneLayoutProps> = ({
     // Fetch the tenant's widget key and appearance config from the config endpoint
     async function injectWidget() {
       try {
-        const resp = await apiFetch('/api/config');
+        const resp = await apiFetch('/api/config?page_type=all');
         if (!resp.ok) return;
         const cfg = await resp.json();
         const config = cfg?.config || {};
@@ -654,6 +660,61 @@ export const StandaloneLayout: React.FC<StandaloneLayoutProps> = ({
 
         {/* ---- Main content ---- */}
         <AppShell.Main>
+          {/* Test Mode sticky banner (C1) — visible on all pages when active */}
+          {testMode?.enabled && (
+            <Box
+              px="md"
+              py={8}
+              mb="md"
+              style={{
+                background: 'linear-gradient(135deg, rgba(255, 152, 0, 0.12) 0%, rgba(255, 87, 34, 0.08) 100%)',
+                border: '1px solid rgba(255, 152, 0, 0.25)',
+                borderRadius: 8,
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'space-between',
+                gap: 12,
+                flexWrap: 'wrap',
+              }}
+            >
+              <Group gap={10} style={{ flex: 1 }}>
+                <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#ff9800" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                  <path d="M14.7 6.3a1 1 0 0 0 0 1.4l1.6 1.6a1 1 0 0 0 1.4 0l3.77-3.77a6 6 0 0 1-7.94 7.94l-6.91 6.91a2.12 2.12 0 0 1-3-3l6.91-6.91a6 6 0 0 1 7.94-7.94l-3.76 3.76z" />
+                </svg>
+                <Text size="sm" fw={500} c="orange.3">
+                  Test mode active
+                </Text>
+                <Text size="xs" c="dimmed">
+                  {testMode.percentage}% of customer sessions are receiving your test configuration
+                  ({testMode.overrideFieldCount} field{testMode.overrideFieldCount !== 1 ? 's' : ''} overridden)
+                </Text>
+              </Group>
+              <Group gap={8} style={{ flexShrink: 0 }}>
+                {location.pathname !== '/configuration' && (
+                  <Text
+                    size="xs"
+                    fw={600}
+                    c="orange.4"
+                    style={{ cursor: 'pointer', textDecoration: 'underline', textUnderlineOffset: 2 }}
+                    onClick={() => navigate('/configuration')}
+                  >
+                    Manage test
+                  </Text>
+                )}
+                {location.pathname !== '/analytics' && (
+                  <Text
+                    size="xs"
+                    fw={600}
+                    c="dimmed"
+                    style={{ cursor: 'pointer', textDecoration: 'underline', textUnderlineOffset: 2 }}
+                    onClick={() => navigate('/analytics')}
+                  >
+                    View analytics
+                  </Text>
+                )}
+              </Group>
+            </Box>
+          )}
           {error && (
             <Box p="md" c="red">
               Failed to load: {error}

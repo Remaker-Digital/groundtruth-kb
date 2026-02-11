@@ -225,12 +225,19 @@ async def get_analytics_summary(
         None,
         description="End date (ISO 8601). Defaults to now.",
     ),
+    is_test_mode: bool | None = Query(
+        None,
+        description="Filter by test mode: true = test only, false = production only, omit = all.",
+    ),
     ctx: TenantContext = Depends(get_tenant_context),
 ) -> AnalyticsSummaryResponse:
     """Get aggregated conversation metrics for a date range.
 
     Returns total/billable counts, average turns/messages, status breakdown,
     escalation rate, and Critic pass rate.
+
+    Use ``is_test_mode`` to compare production vs test configuration
+    performance side by side.
     """
     repo = _get_repo()
 
@@ -242,12 +249,14 @@ async def get_analytics_summary(
         tenant_id=ctx.tenant_id,
         since=effective_since,
         until=effective_until,
+        is_test_mode=is_test_mode,
     )
 
     status_counts = await repo.count_by_status(
         tenant_id=ctx.tenant_id,
         since=effective_since,
         until=effective_until,
+        is_test_mode=is_test_mode,
     )
 
     total = metrics.get("total", 0) or 0
@@ -320,6 +329,10 @@ async def get_intent_distribution(
         None,
         description="End date (ISO 8601). Defaults to now.",
     ),
+    is_test_mode: bool | None = Query(
+        None,
+        description="Filter by test mode: true = test only, false = production only, omit = all.",
+    ),
     ctx: TenantContext = Depends(get_tenant_context),
 ) -> IntentsResponse:
     """Get agent/intent invocation distribution for a date range.
@@ -327,6 +340,9 @@ async def get_intent_distribution(
     Counts how many conversations invoked each agent in the 6-agent
     pipeline. Useful for understanding which pipeline stages are most
     active and identifying routing patterns.
+
+    Use ``is_test_mode`` to compare intent distribution between
+    production and test configurations.
     """
     repo = _get_repo()
 
@@ -337,6 +353,7 @@ async def get_intent_distribution(
         tenant_id=ctx.tenant_id,
         since=effective_since,
         until=effective_until,
+        is_test_mode=is_test_mode,
     )
 
     total = len(conversations)
@@ -391,6 +408,10 @@ async def get_knowledge_gaps(
         description="End date (ISO 8601). Defaults to now.",
     ),
     limit: int = Query(50, ge=1, le=200, description="Max gap entries (default 50)"),
+    is_test_mode: bool | None = Query(
+        None,
+        description="Filter by test mode: true = test only, false = production only, omit = all.",
+    ),
     ctx: TenantContext = Depends(get_tenant_context),
 ) -> GapsResponse:
     """Get knowledge gap report — conversations the AI couldn't resolve.
@@ -399,6 +420,9 @@ async def get_knowledge_gaps(
     cases where the AI was unable to satisfy the customer's request.
     Useful for identifying missing knowledge base content, common
     failure patterns, and training data opportunities.
+
+    Use ``is_test_mode`` to isolate gaps from test configuration
+    conversations vs production.
     """
     repo = _get_repo()
 
@@ -410,6 +434,7 @@ async def get_knowledge_gaps(
         since=effective_since,
         until=effective_until,
         limit=limit,
+        is_test_mode=is_test_mode,
     )
 
     escalated_count = sum(

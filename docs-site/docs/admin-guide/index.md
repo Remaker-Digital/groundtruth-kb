@@ -41,6 +41,8 @@ Every configuration change is versioned automatically. You can view past version
 | [Custom instructions](./custom-instructions.md) | Advanced: direct system prompt injection for specific behaviors |
 | [Quick action prompts](./quick-actions.md) | Pre-defined prompt buttons in the widget greeting area |
 | [Knowledge base management](./knowledge-base-management.md) | Creating, editing, uploading, and organizing knowledge articles |
+| [Conflict scanner](./conflict-scanner.md) | Detect duplicate and conflicting knowledge base articles |
+| [Test mode](./test-mode.md) | A/B test AI configuration changes on a percentage of sessions |
 
 ## Settings that affect AI prompts
 
