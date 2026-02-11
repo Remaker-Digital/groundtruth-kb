@@ -33,11 +33,11 @@ Prompt text supports template variables that are replaced at runtime with page-s
 
 | Variable | Replaced with | Available on |
 |---|---|---|
-| `{{product_name}}` | The current product title | Product pages |
-| `{{collection_name}}` | The current collection title | Collection pages |
-| `{{page_handle}}` | The current page handle | All pages |
+| `\{\{product_name\}\}` | The current product title | Product pages |
+| `\{\{collection_name\}\}` | The current collection title | Collection pages |
+| `\{\{page_handle\}\}` | The current page handle | All pages |
 
-**Example:** A prompt with the text `Tell me about {{product_name}}` on a product page for "Classic Leather Wallet" becomes `Tell me about Classic Leather Wallet` when the customer clicks it.
+**Example:** A prompt with the text `Tell me about \{\{product_name\}\}` on a product page for "Classic Leather Wallet" becomes `Tell me about Classic Leather Wallet` when the customer clicks it.
 
 ## Page type assignment
 
@@ -58,7 +58,7 @@ Each prompt can be assigned to one or more page types. The widget only shows pro
 
 - **Keep labels short.** Buttons with more than 5-6 words wrap awkwardly on mobile.
 - **Limit to 3-4 prompts per page type.** More than that overwhelms the greeting area and pushes the input field down.
-- **Use template variables on product pages.** A generic "Tell me about this product" is less engaging than "Tell me about {{product_name}}".
+- **Use template variables on product pages.** A generic "Tell me about this product" is less engaging than "Tell me about \{\{product_name\}\}".
 - **Test on mobile.** The greeting area has limited vertical space. Verify that your prompts display correctly on small screens.
 - **Review analytics.** If a prompt is rarely clicked, replace it with something more relevant to what customers actually ask about.
 

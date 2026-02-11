@@ -19,7 +19,7 @@ All notable changes to Agent Red Customer Experience are documented here.
 
 ### Widget
 - Quick Action prompt buttons: configurable pill buttons in the widget greeting area that send pre-defined prompts
-- Template variable substitution (`{{product_name}}`, `{{collection_name}}`, `{{page_handle}}`) for page-aware prompts
+- Template variable substitution (`\{\{product_name\}\}`, `\{\{collection_name\}\}`, `\{\{page_handle\}\}`) for page-aware prompts
 - Improved panel drop-shadow (dual-layer) for visibility on busy storefront backgrounds
 
 ### Admin dashboard
