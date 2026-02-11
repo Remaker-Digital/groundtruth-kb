@@ -34,6 +34,8 @@ import {
 import { useDisclosure } from '@mantine/hooks';
 import { notifications } from '@mantine/notifications';
 
+import type { TenantTier, TenantStatus, BillingChannel } from '../../shared/types';
+
 // ---------------------------------------------------------------------------
 // Types
 // ---------------------------------------------------------------------------
@@ -46,9 +48,9 @@ interface StandaloneLayoutProps {
 
 interface TenantContext {
   tenantId: string;
-  tier: string;
-  status: string;
-  billingChannel: string;
+  tier: TenantTier;
+  status: TenantStatus;
+  billingChannel: BillingChannel;
   hasStripeBilling: boolean;
   shopDomain?: string;
 }
@@ -264,9 +266,9 @@ export const StandaloneLayout: React.FC<StandaloneLayoutProps> = ({
         if (!cancelled) {
           setTenantContext({
             tenantId: data.tenant_id,
-            tier: data.tier,
-            status: data.status,
-            billingChannel: data.billing_channel || 'stripe',
+            tier: data.tier as TenantTier,
+            status: data.status as TenantStatus,
+            billingChannel: (data.billing_channel || 'stripe') as BillingChannel,
             hasStripeBilling: data.has_stripe_billing ?? false,
             shopDomain: data.shopify_shop_domain || undefined,
           });

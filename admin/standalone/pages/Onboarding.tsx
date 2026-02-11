@@ -1396,7 +1396,6 @@ export function OnboardingPage() {
                 key={step.id}
                 label={step.title}
                 description={step.completed ? 'Completed' : step.description}
-                completed={step.completed}
                 completedIcon={
                   <svg
                     width="14"

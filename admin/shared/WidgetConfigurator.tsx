@@ -977,6 +977,16 @@ interface PreviewProps {
 
 const WidgetPreview: React.FC<PreviewProps> = ({ config, st }) => {
   const isDark = config.widget_dark_mode;
+  // Contrast check: compute luminance for text readability
+  const hexToLum = (hex: string): number => {
+    const c = hex.replace('#', '');
+    if (c.length !== 6) return 0.5;
+    const r = parseInt(c.substring(0, 2), 16) / 255;
+    const g = parseInt(c.substring(2, 4), 16) / 255;
+    const b = parseInt(c.substring(4, 6), 16) / 255;
+    return 0.2126 * r + 0.7152 * g + 0.0722 * b;
+  };
+
   const primaryColor = config.widget_primary_color || '#ff3621';
   const bgColor = isDark ? '#1A1A2E' : (config.widget_background_color || '#FFFFFF');
   const textColor = isDark ? '#E5E7EB' : '#111827';
@@ -995,15 +1005,6 @@ const WidgetPreview: React.FC<PreviewProps> = ({ config, st }) => {
   const placeholder = config.widget_input_placeholder || 'Type a message...';
   const position = config.widget_position || 'bottom-right';
 
-  // Contrast check: compute luminance for text readability
-  const hexToLum = (hex: string): number => {
-    const c = hex.replace('#', '');
-    if (c.length !== 6) return 0.5;
-    const r = parseInt(c.substring(0, 2), 16) / 255;
-    const g = parseInt(c.substring(2, 4), 16) / 255;
-    const b = parseInt(c.substring(4, 6), 16) / 255;
-    return 0.2126 * r + 0.7152 * g + 0.0722 * b;
-  };
   const headerTextColor = hexToLum(primaryColor) > 0.5 ? '#111827' : '#FFFFFF';
 
   return (

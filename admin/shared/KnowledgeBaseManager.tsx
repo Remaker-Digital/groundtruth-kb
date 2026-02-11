@@ -552,9 +552,7 @@ const ArticleEditor: React.FC<ArticleEditorProps> = ({
       category: resolvedCategory,
       status,
       // Backend requires entry_type — default to 'custom' for manual articles
-      entry_type: 'custom',
-      // Pass category as metadata for backend storage
-      metadata: { category: resolvedCategory },
+      entryType: 'custom',
     });
   }, [article.id, title, content, category, newCategory, showNewCategory, status, onSave]);
 

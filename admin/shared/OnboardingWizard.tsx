@@ -1776,7 +1776,7 @@ export const OnboardingWizard: React.FC<OnboardingWizardProps> = ({
       ) : currentStepKey === 'review_and_launch' ? (
         <ReviewAndLaunchStep
           apiFetch={apiFetch}
-          config={fullConfig?.preferences ?? {}}
+          config={fullConfig?.config ?? {}}
           wizardMode={wizardMode}
           testPercentage={testPercentage}
           onTestPercentageChange={setTestPercentage}
@@ -1786,7 +1786,7 @@ export const OnboardingWizard: React.FC<OnboardingWizardProps> = ({
           onActivateTest={async () => {
             // Collect AI-behaviour field deltas from current config
             const overrides: Record<string, unknown> = {};
-            const prefs = fullConfig?.preferences ?? {};
+            const prefs = fullConfig?.config ?? {};
             for (const key of AI_BEHAVIOR_FIELD_KEYS) {
               if (key in prefs) overrides[key] = (prefs as Record<string, unknown>)[key];
             }

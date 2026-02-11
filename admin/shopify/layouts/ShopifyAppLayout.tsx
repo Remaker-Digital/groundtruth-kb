@@ -155,6 +155,7 @@ export const ShopifyAppLayout: React.FC<ShopifyAppLayoutProps> = ({
             tier: data.tier,
             status: data.status,
             billingChannel: 'shopify',
+            hasStripeBilling: false,
             shopDomain: shopifyConfig.shop,
           });
           setLoading(false);
