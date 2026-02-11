@@ -301,6 +301,7 @@ _admin_standalone_dist = (
     pathlib.Path(__file__).resolve().parent.parent / "admin" / "standalone" / "dist"
 )
 _ADMIN_INITIAL_PASSWORD = os.environ.get("ADMIN_PREVIEW_PASSWORD", "")
+_ADMIN_RESET_EMAIL = os.environ.get("ADMIN_RESET_EMAIL", "").strip().lower()
 _ADMIN_COOKIE_NAME = "agentred_admin"
 # Mutable password hash — allows runtime password changes.  Falls back to env var.
 # Deterministic token derived from the password so all gateway replicas agree.
@@ -319,6 +320,13 @@ _admin_cookie_value: str = (
 )
 # Store the current active password for comparison during password change
 _admin_current_password: str = _ADMIN_INITIAL_PASSWORD
+
+# Password reset token state (in-memory, single active token)
+import time as _time  # noqa: E402
+
+_admin_reset_token: str = ""
+_admin_reset_token_expires: float = 0.0
+_admin_reset_rate_limit: dict[str, list[float]] = {}
 
 _STANDALONE_SHARED_STYLES = """
   * { box-sizing: border-box; margin: 0; padding: 0; }
@@ -348,6 +356,11 @@ _STANDALONE_SHARED_STYLES = """
 
 _LOGO_DATA_URI = "data:image/png;base64,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"
 
+_STANDALONE_FORGOT_LINK = (
+    f'  <a href="/admin/standalone/_forgot-password" class="link">Forgot your password?</a>'
+    if _ADMIN_RESET_EMAIL
+    else ""
+)
 _STANDALONE_LOGIN_HTML = f"""<!DOCTYPE html>
 <html lang="en">
 <head>
@@ -366,39 +379,209 @@ _STANDALONE_LOGIN_HTML = f"""<!DOCTYPE html>
     <input id="pw" type="password" name="password" placeholder="Enter your password" autofocus required/>
     <button type="submit">Sign In</button>
   </form>
-  <a href="/admin/standalone/_change-password" class="link">Change password</a>
+{_STANDALONE_FORGOT_LINK}
 </div>
 </body>
 </html>"""
 
-_STANDALONE_CHANGE_PW_HTML = f"""<!DOCTYPE html>
+_STANDALONE_FORGOT_PW_HTML = f"""<!DOCTYPE html>
 <html lang="en">
 <head>
 <meta charset="utf-8"/>
 <meta name="viewport" content="width=device-width, initial-scale=1"/>
-<title>Agent Red — Change Password</title>
+<title>Agent Red — Forgot Password</title>
 <style>{_STANDALONE_SHARED_STYLES}</style>
 </head>
 <body>
 <div class="card">
   <img src="{_LOGO_DATA_URI}" alt="Agent Red" width="200" height="49" class="logo" />
-  <h1>Change Password</h1>
-  <p class="subtitle">Enter your current password and choose a new one.</p>
-  <div class="error" id="err">Current password is incorrect.</div>
-  <div class="success" id="ok">Password changed successfully!</div>
-  <form method="POST" action="/admin/standalone/_change-password">
-    <label for="current">Current Password</label>
-    <input id="current" type="password" name="current_password" placeholder="Current password" autofocus required/>
-    <label for="new">New Password</label>
-    <input id="new" type="password" name="new_password" placeholder="New password" required minlength="6"/>
-    <label for="confirm">Confirm New Password</label>
-    <input id="confirm" type="password" name="confirm_password" placeholder="Confirm new password" required minlength="6"/>
-    <button type="submit">Change Password</button>
+  <h1>Forgot password</h1>
+  <p class="subtitle">Enter your email address and we'll send you a link to reset your password.</p>
+  <div class="error" id="err">Please enter a valid email address.</div>
+  <form method="POST" action="/admin/standalone/_forgot-password">
+    <label for="email">Email address</label>
+    <input id="email" type="email" name="email" placeholder="you@company.com" autofocus required/>
+    <button type="submit">Send reset link</button>
   </form>
   <a href="/admin/standalone/" class="link">Back to sign in</a>
 </div>
 </body>
 </html>"""
+
+_STANDALONE_FORGOT_PW_SENT_HTML = f"""<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8"/>
+<meta name="viewport" content="width=device-width, initial-scale=1"/>
+<title>Agent Red — Check Your Email</title>
+<style>{_STANDALONE_SHARED_STYLES}</style>
+</head>
+<body>
+<div class="card">
+  <img src="{_LOGO_DATA_URI}" alt="Agent Red" width="200" height="49" class="logo" />
+  <div style="font-size:32px;margin-bottom:12px;">&#9993;</div>
+  <h1>Check your email</h1>
+  <p class="subtitle">If that email matches our records, we've sent a password reset link. The link expires in 15 minutes.</p>
+  <p style="font-size:13px;color:#a0a0a0;line-height:1.5;margin-top:12px;">
+    Don't see it? Check your spam folder.
+  </p>
+  <a href="/admin/standalone/" class="link">Back to sign in</a>
+</div>
+</body>
+</html>"""
+
+_STANDALONE_RESET_PW_HTML = f"""<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8"/>
+<meta name="viewport" content="width=device-width, initial-scale=1"/>
+<title>Agent Red — Set New Password</title>
+<style>{_STANDALONE_SHARED_STYLES}</style>
+</head>
+<body>
+<div class="card">
+  <img src="{_LOGO_DATA_URI}" alt="Agent Red" width="200" height="49" class="logo" />
+  <h1>Set new password</h1>
+  <p class="subtitle">Choose a new password for admin access.</p>
+  <div class="error" id="err">Passwords do not match.</div>
+  <div class="success" id="ok">Password changed successfully!</div>
+  <form method="POST" action="/admin/standalone/_reset-password">
+    <input type="hidden" name="token" value="{{token}}"/>
+    <label for="new">New password</label>
+    <input id="new" type="password" name="new_password" placeholder="New password" autofocus required minlength="6"/>
+    <label for="confirm">Confirm new password</label>
+    <input id="confirm" type="password" name="confirm_password" placeholder="Confirm new password" required minlength="6"/>
+    <button type="submit">Set password</button>
+  </form>
+  <a href="/admin/standalone/" class="link">Back to sign in</a>
+</div>
+</body>
+</html>"""
+
+_STANDALONE_RESET_INVALID_HTML = f"""<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8"/>
+<meta name="viewport" content="width=device-width, initial-scale=1"/>
+<title>Agent Red — Invalid Link</title>
+<style>{_STANDALONE_SHARED_STYLES}</style>
+</head>
+<body>
+<div class="card">
+  <img src="{_LOGO_DATA_URI}" alt="Agent Red" width="200" height="49" class="logo" />
+  <h1>Invalid or expired link</h1>
+  <p class="subtitle">This password reset link is no longer valid. It may have expired or already been used.</p>
+  <a href="/admin/standalone/_forgot-password" class="link">Request a new link</a>
+</div>
+</body>
+</html>"""
+
+
+def _validate_reset_token(token: str) -> bool:
+    """Check if a reset token is valid and not expired."""
+    if not token or not _admin_reset_token:
+        return False
+    if token != _admin_reset_token:
+        return False
+    if _time.time() > _admin_reset_token_expires:
+        return False
+    return True
+
+
+def _send_admin_reset_email(to_email: str, reset_url: str) -> bool:
+    """Send a password reset email via SMTP.
+
+    Reuses the same SMTP env vars as admin_apikey_api.py.
+    """
+    import smtplib
+    from email.mime.multipart import MIMEMultipart
+    from email.mime.text import MIMEText
+
+    smtp_host = os.environ.get("SMTP_HOST", "")
+    smtp_port = int(os.environ.get("SMTP_PORT", "587"))
+    smtp_user = os.environ.get("SMTP_USERNAME", "")
+    smtp_pass = os.environ.get("SMTP_PASSWORD", "")
+    sender = os.environ.get("SMTP_FROM_ADDRESS", "noreply@agentred.com")
+
+    if not smtp_host:
+        logger.warning("SMTP_HOST not configured — cannot send password reset email")
+        return False
+
+    subject = "Reset Your Agent Red Admin Password"
+
+    html_body = f"""\
+<!DOCTYPE html>
+<html>
+<head><meta charset="utf-8"/></head>
+<body style="margin:0;padding:0;background:#0a0a0a;font-family:Inter,system-ui,sans-serif;">
+<div style="max-width:560px;margin:40px auto;padding:40px;background:#1f1f1f;border-radius:12px;border:1px solid #272727;">
+  <div style="text-align:center;margin-bottom:24px;">
+    <h1 style="margin:0;font-size:20px;color:#F5F5F5;">Agent Red</h1>
+    <p style="margin:4px 0 0;font-size:14px;color:#A0A0A0;">Customer Experience</p>
+  </div>
+  <h2 style="margin:0 0 16px;font-size:16px;color:#F5F5F5;">Password Reset</h2>
+  <p style="margin:0 0 16px;font-size:14px;color:#E0E0E0;line-height:1.6;">
+    We received a request to reset the admin password. Click the button below to choose a new password.
+  </p>
+  <div style="text-align:center;margin:24px 0;">
+    <a href="{reset_url}" style="display:inline-block;padding:12px 32px;background:#ff3621;color:#ffffff;font-size:14px;font-weight:600;text-decoration:none;border-radius:8px;">
+      Reset Password
+    </a>
+  </div>
+  <p style="margin:16px 0 0;font-size:13px;color:#A0A0A0;line-height:1.5;">
+    This link expires in 15 minutes. If you did not request this, you can safely ignore this email.
+  </p>
+  <hr style="border:none;border-top:1px solid #272727;margin:24px 0;" />
+  <p style="margin:0 0 8px;font-size:13px;color:#A0A0A0;line-height:1.5;">
+    If the button doesn't work, copy and paste this link into your browser:
+  </p>
+  <p style="margin:0;font-family:'JetBrains Mono',monospace;font-size:11px;color:#787878;word-break:break-all;">
+    {reset_url}
+  </p>
+  <hr style="border:none;border-top:1px solid #272727;margin:24px 0;" />
+  <p style="margin:0;font-size:11px;color:#787878;text-align:center;">
+    Agent Red Customer Experience &mdash; A product of Remaker Digital
+  </p>
+</div>
+</body>
+</html>"""
+
+    plain_body = (
+        f"Agent Red Admin Password Reset\n\n"
+        f"We received a request to reset the admin password.\n\n"
+        f"Click this link to choose a new password:\n{reset_url}\n\n"
+        f"This link expires in 15 minutes.\n"
+        f"If you did not request this, you can safely ignore this email.\n"
+    )
+
+    try:
+        msg = MIMEMultipart("alternative")
+        msg["From"] = f"Agent Red <{sender}>"
+        msg["To"] = to_email
+        msg["Subject"] = subject
+        msg.attach(MIMEText(plain_body, "plain"))
+        msg.attach(MIMEText(html_body, "html"))
+
+        if smtp_port == 465:
+            with smtplib.SMTP_SSL(smtp_host, smtp_port, timeout=10.0) as server:
+                if smtp_user and smtp_pass:
+                    server.login(smtp_user, smtp_pass)
+                server.send_message(msg)
+        else:
+            with smtplib.SMTP(smtp_host, smtp_port, timeout=10.0) as server:
+                server.ehlo()
+                if smtp_port != 25:
+                    server.starttls()
+                if smtp_user and smtp_pass:
+                    server.login(smtp_user, smtp_pass)
+                server.send_message(msg)
+
+        logger.info("Admin password reset email sent to %s", to_email)
+        return True
+
+    except Exception:
+        logger.exception("Failed to send admin password reset email to %s", to_email)
+        return False
 
 
 if _admin_standalone_dist.is_dir():
@@ -440,46 +623,102 @@ if _admin_standalone_dist.is_dir():
         )
         return HTMLResponse(content=error_html, status_code=403)
 
-    @app.get("/admin/standalone/_change-password", include_in_schema=False)
-    async def _admin_change_password_form(request: Request) -> HTMLResponse:
-        """Show the change password form."""
-        return HTMLResponse(content=_STANDALONE_CHANGE_PW_HTML)
+    # ---- Forgot password flow (email-based reset) --------------------------
 
-    @app.post("/admin/standalone/_change-password", include_in_schema=False)
-    async def _admin_change_password(request: Request) -> StarletteResponse:
-        """Process password change: verify current, set new."""
-        global _admin_current_password, _admin_cookie_value, _admin_password_hash
+    @app.get("/admin/standalone/_forgot-password", include_in_schema=False)
+    async def _admin_forgot_password_form(request: Request) -> HTMLResponse:
+        """Show the forgot password form (enter email)."""
+        return HTMLResponse(content=_STANDALONE_FORGOT_PW_HTML)
+
+    @app.post("/admin/standalone/_forgot-password", include_in_schema=False)
+    async def _admin_forgot_password(request: Request) -> HTMLResponse:
+        """Process forgot-password: validate email, send reset link."""
+        global _admin_reset_token, _admin_reset_token_expires, _admin_reset_rate_limit
+
         form = await request.form()
-        current = str(form.get("current_password", ""))
+        email = str(form.get("email", "")).strip().lower()
+
+        # Rate limit: 3 requests per 5 min per IP
+        client_ip = request.client.host if request.client else "unknown"
+        now = _time.time()
+        window = 300  # 5 minutes
+        hits = _admin_reset_rate_limit.get(client_ip, [])
+        hits = [t for t in hits if now - t < window]
+        if len(hits) >= 3:
+            rate_html = _STANDALONE_FORGOT_PW_HTML.replace(
+                'Please enter a valid email address.',
+                'Too many requests. Please wait a few minutes and try again.',
+            ).replace(
+                'class="error" id="err"', 'class="error" id="err" style="display:block"',
+            )
+            return HTMLResponse(content=rate_html, status_code=429)
+        hits.append(now)
+        _admin_reset_rate_limit[client_ip] = hits
+
+        # Validate email format
+        if not email or "@" not in email:
+            error_html = _STANDALONE_FORGOT_PW_HTML.replace(
+                'class="error" id="err"', 'class="error" id="err" style="display:block"',
+            )
+            return HTMLResponse(content=error_html, status_code=400)
+
+        # Check if email matches the configured reset email
+        if _ADMIN_RESET_EMAIL and email == _ADMIN_RESET_EMAIL:
+            # Generate token and send email
+            _admin_reset_token = _secrets.token_urlsafe(32)
+            _admin_reset_token_expires = now + 900  # 15 minutes
+
+            # Build reset URL
+            scheme = request.headers.get("x-forwarded-proto", request.url.scheme)
+            host = request.headers.get("host", request.url.netloc)
+            reset_url = f"{scheme}://{host}/admin/standalone/_reset-password?token={_admin_reset_token}"
+
+            _send_admin_reset_email(email, reset_url)
+
+        # Always return success page (prevents email enumeration)
+        return HTMLResponse(content=_STANDALONE_FORGOT_PW_SENT_HTML)
+
+    @app.get("/admin/standalone/_reset-password", include_in_schema=False)
+    async def _admin_reset_password_form(request: Request) -> HTMLResponse:
+        """Show the set-new-password form if the token is valid."""
+        token = request.query_params.get("token", "")
+        if not _validate_reset_token(token):
+            return HTMLResponse(content=_STANDALONE_RESET_INVALID_HTML, status_code=400)
+        # Inject token into the hidden field
+        form_html = _STANDALONE_RESET_PW_HTML.replace("{{token}}", token)
+        return HTMLResponse(content=form_html)
+
+    @app.post("/admin/standalone/_reset-password", include_in_schema=False)
+    async def _admin_reset_password(request: Request) -> StarletteResponse:
+        """Process password reset: validate token, set new password."""
+        global _admin_current_password, _admin_cookie_value, _admin_password_hash
+        global _admin_reset_token, _admin_reset_token_expires
+
+        form = await request.form()
+        token = str(form.get("token", ""))
         new_pw = str(form.get("new_password", ""))
         confirm = str(form.get("confirm_password", ""))
 
-        # Validate current password
-        if current != _admin_current_password or not _admin_current_password:
-            error_html = _STANDALONE_CHANGE_PW_HTML.replace(
-                'class="error" id="err"', 'class="error" id="err" style="display:block"',
-            )
-            return HTMLResponse(content=error_html, status_code=403)
+        # Validate token
+        if not _validate_reset_token(token):
+            return HTMLResponse(content=_STANDALONE_RESET_INVALID_HTML, status_code=400)
 
-        # Validate new passwords match
+        # Validate passwords match
         if new_pw != confirm:
-            mismatch_html = _STANDALONE_CHANGE_PW_HTML.replace(
-                'Current password is incorrect.',
-                'New passwords do not match.',
-            ).replace(
+            form_html = _STANDALONE_RESET_PW_HTML.replace("{{token}}", token).replace(
                 'class="error" id="err"', 'class="error" id="err" style="display:block"',
             )
-            return HTMLResponse(content=mismatch_html, status_code=400)
+            return HTMLResponse(content=form_html, status_code=400)
 
         # Validate minimum length
         if len(new_pw) < 6:
-            short_html = _STANDALONE_CHANGE_PW_HTML.replace(
-                'Current password is incorrect.',
-                'New password must be at least 6 characters.',
+            form_html = _STANDALONE_RESET_PW_HTML.replace("{{token}}", token).replace(
+                'Passwords do not match.',
+                'Password must be at least 6 characters.',
             ).replace(
                 'class="error" id="err"', 'class="error" id="err" style="display:block"',
             )
-            return HTMLResponse(content=short_html, status_code=400)
+            return HTMLResponse(content=form_html, status_code=400)
 
         # Update the password (in-memory — persists until container restart)
         _admin_current_password = new_pw
@@ -488,14 +727,17 @@ if _admin_standalone_dist.is_dir():
             f"agentred-admin:{new_pw}".encode(),
         ).hexdigest()
 
-        logger.info("Admin password changed successfully (in-memory update)")
+        # Invalidate the token (single-use)
+        _admin_reset_token = ""
+        _admin_reset_token_expires = 0.0
 
-        # Show success, then redirect to sign-in with new cookie
-        success_html = _STANDALONE_CHANGE_PW_HTML.replace(
+        logger.info("Admin password reset via email link (in-memory update)")
+
+        # Show success
+        success_html = _STANDALONE_RESET_PW_HTML.replace("{{token}}", "").replace(
             'class="success" id="ok"', 'class="success" id="ok" style="display:block"',
         )
         response = HTMLResponse(content=success_html)
-        # Invalidate old session cookie so they must sign in with new password
         response.delete_cookie(_ADMIN_COOKIE_NAME)
         return response
 
