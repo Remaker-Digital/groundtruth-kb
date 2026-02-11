@@ -310,6 +310,10 @@ _admin_password_hash: str = (
     if _ADMIN_INITIAL_PASSWORD
     else ""
 )
+# Immutable HMAC key for reset tokens — derived from the env var password and NEVER
+# changes at runtime.  This ensures all replicas always agree on the signing key,
+# even after an in-memory password change on a single replica.
+_ADMIN_HMAC_KEY: str = _admin_password_hash
 
 def _compute_cookie_value(password: str) -> str:
     """Derive a deterministic cookie token from a password."""
@@ -483,13 +487,14 @@ def _generate_reset_token(ttl: int = 900) -> str:
     """Create an HMAC-signed reset token valid for *ttl* seconds.
 
     Format: ``<nonce>.<expiry_ts>.<hmac_hex>``
-    Any replica sharing the same ``_admin_password_hash`` can validate it.
+    Signed with ``_ADMIN_HMAC_KEY`` (immutable, derived from env var) so any
+    replica can validate — even after an in-memory password change.
     """
     nonce = _secrets.token_urlsafe(16)
     expiry = str(int(_time.time() + ttl))
     payload = f"{nonce}.{expiry}"
     sig = _hmac.new(
-        _admin_password_hash.encode(), payload.encode(), "sha256",
+        _ADMIN_HMAC_KEY.encode(), payload.encode(), "sha256",
     ).hexdigest()
     return f"{payload}.{sig}"
 
@@ -498,8 +503,9 @@ def _validate_reset_token(token: str) -> bool:
     """Validate an HMAC-signed reset token.
 
     Checks signature, expiry, and best-effort single-use nonce tracking.
+    Uses ``_ADMIN_HMAC_KEY`` (immutable) so validation works on any replica.
     """
-    if not token or not _admin_password_hash:
+    if not token or not _ADMIN_HMAC_KEY:
         return False
     parts = token.split(".")
     if len(parts) != 3:
@@ -508,7 +514,7 @@ def _validate_reset_token(token: str) -> bool:
     # Recompute HMAC
     payload = f"{nonce}.{expiry_str}"
     expected = _hmac.new(
-        _admin_password_hash.encode(), payload.encode(), "sha256",
+        _ADMIN_HMAC_KEY.encode(), payload.encode(), "sha256",
     ).hexdigest()
     if not _hmac.compare_digest(sig, expected):
         return False
@@ -725,8 +731,7 @@ if _admin_standalone_dist.is_dir():
 
     @app.post("/admin/standalone/_reset-password", include_in_schema=False)
     async def _admin_reset_password(request: Request) -> StarletteResponse:
-        """Process password reset: validate token, set new password."""
-        global _admin_current_password, _admin_cookie_value, _admin_password_hash
+        """Process password reset: validate token, auto-login user."""
 
         form = await request.form()
         token = str(form.get("token", ""))
@@ -754,26 +759,39 @@ if _admin_standalone_dist.is_dir():
             )
             return HTMLResponse(content=form_html, status_code=400)
 
-        # Update the password (in-memory — persists until container restart)
-        _admin_current_password = new_pw
-        _admin_cookie_value = _compute_cookie_value(new_pw)
-        _admin_password_hash = hashlib.sha256(
-            f"agentred-admin:{new_pw}".encode(),
-        ).hexdigest()
+        # Multi-replica safety: Do NOT change the password in-memory.
+        # With minReplicas > 1, an in-memory password change only affects
+        # THIS replica — the other replica(s) keep the env var password,
+        # causing 50% login failures and cookie mismatches.
+        #
+        # Instead: auto-login the user by setting the session cookie (derived
+        # from the env var password, identical on all replicas) and redirect
+        # to the admin dashboard.  The user gets a 7-day authenticated session
+        # without needing to know the password.
+        #
+        # To change the actual admin password, update the ADMIN_PREVIEW_PASSWORD
+        # env var on the Container App (triggers rolling restart of all replicas).
 
         # Mark nonce as used (best-effort single-use per replica)
         nonce = token.split(".")[0] if "." in token else ""
         if nonce:
             _admin_used_reset_nonces.add(nonce)
 
-        logger.info("Admin password reset via email link (in-memory update)")
+        logger.info("Admin password reset: auto-login via session cookie")
 
-        # Show success
-        success_html = _STANDALONE_RESET_PW_HTML.replace("{{token}}", "").replace(
-            'class="success" id="ok"', 'class="success" id="ok" style="display:block"',
+        # Auto-login: set the session cookie and redirect to admin dashboard.
+        response = StarletteResponse(
+            status_code=303,
+            headers={"location": "/admin/standalone/"},
         )
-        response = HTMLResponse(content=success_html)
-        response.delete_cookie(_ADMIN_COOKIE_NAME)
+        response.set_cookie(
+            _ADMIN_COOKIE_NAME,
+            _admin_cookie_value,
+            httponly=True,
+            secure=True,
+            samesite="lax",
+            max_age=86400 * 7,  # 7 days
+        )
         return response
 
     # IMPORTANT: Register explicit root routes BEFORE the StaticFiles mount.

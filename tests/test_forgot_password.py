@@ -18,13 +18,19 @@ import pytest
 
 @pytest.fixture(autouse=True)
 def _ensure_password_hash():
-    """Ensure _admin_password_hash is set for HMAC token tests."""
+    """Ensure _admin_password_hash and _ADMIN_HMAC_KEY are set for HMAC token tests."""
     import src.main as m
-    original = m._admin_password_hash
-    if not original:
-        m._admin_password_hash = m.hashlib.sha256(b"agentred-admin:testpw").hexdigest()
+    original_hash = m._admin_password_hash
+    original_hmac_key = m._ADMIN_HMAC_KEY
+    if not original_hash:
+        h = m.hashlib.sha256(b"agentred-admin:testpw").hexdigest()
+        m._admin_password_hash = h
+        m._ADMIN_HMAC_KEY = h
+    elif not original_hmac_key:
+        m._ADMIN_HMAC_KEY = original_hash
     yield
-    m._admin_password_hash = original
+    m._admin_password_hash = original_hash
+    m._ADMIN_HMAC_KEY = original_hmac_key
     m._admin_used_reset_nonces.clear()
 
 
@@ -120,12 +126,15 @@ def standalone_client():
     # Ensure admin password is set for testing
     original_pw = main_mod._ADMIN_INITIAL_PASSWORD
     original_hash = main_mod._admin_password_hash
+    original_hmac_key = main_mod._ADMIN_HMAC_KEY
     original_email = main_mod._ADMIN_RESET_EMAIL
 
-    main_mod._ADMIN_INITIAL_PASSWORD = "testpassword"
-    main_mod._admin_password_hash = main_mod.hashlib.sha256(
+    test_hash = main_mod.hashlib.sha256(
         b"agentred-admin:testpassword",
     ).hexdigest()
+    main_mod._ADMIN_INITIAL_PASSWORD = "testpassword"
+    main_mod._admin_password_hash = test_hash
+    main_mod._ADMIN_HMAC_KEY = test_hash
     main_mod._admin_current_password = "testpassword"
     main_mod._admin_cookie_value = main_mod._compute_cookie_value("testpassword")
     main_mod._ADMIN_RESET_EMAIL = "admin@test.com"
@@ -137,6 +146,7 @@ def standalone_client():
     # Restore
     main_mod._ADMIN_INITIAL_PASSWORD = original_pw
     main_mod._admin_password_hash = original_hash
+    main_mod._ADMIN_HMAC_KEY = original_hmac_key
     main_mod._ADMIN_RESET_EMAIL = original_email
     main_mod._admin_used_reset_nonces.clear()
     main_mod._admin_reset_rate_limit.clear()
@@ -205,7 +215,7 @@ class TestForgotPasswordEndpoints:
             assert resp.status_code == 429
 
     def test_reset_password_with_valid_token(self, standalone_client):
-        """Full flow: generate token, GET form, POST new password."""
+        """Full flow: generate token, GET form, POST new password -> auto-login."""
         from src.main import _generate_reset_token
         token = _generate_reset_token(ttl=60)
 
@@ -216,12 +226,15 @@ class TestForgotPasswordEndpoints:
         assert resp.status_code == 200
         assert token in resp.text or "new_password" in resp.text.lower()
 
-        # POST the new password
+        # POST the new password -> auto-login redirect with cookie
         resp = standalone_client.post(
             "/admin/standalone/_reset-password",
             data={"token": token, "new_password": "newpass123", "confirm_password": "newpass123"},
+            follow_redirects=False,
         )
-        assert resp.status_code == 200
+        assert resp.status_code == 303
+        assert resp.headers.get("location") == "/admin/standalone/"
+        assert "agentred_admin=" in resp.headers.get("set-cookie", "")
 
     def test_reset_password_with_invalid_token(self, standalone_client):
         """Reset with invalid token returns 400."""
@@ -257,12 +270,13 @@ class TestForgotPasswordEndpoints:
         from src.main import _generate_reset_token
         token = _generate_reset_token(ttl=60)
 
-        # First use succeeds
+        # First use succeeds (303 redirect = auto-login)
         resp = standalone_client.post(
             "/admin/standalone/_reset-password",
             data={"token": token, "new_password": "newpass123", "confirm_password": "newpass123"},
+            follow_redirects=False,
         )
-        assert resp.status_code == 200
+        assert resp.status_code == 303
 
         # Second use fails (nonce tracked)
         resp = standalone_client.post(
