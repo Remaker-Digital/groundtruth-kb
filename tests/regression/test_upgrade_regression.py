@@ -169,9 +169,13 @@ class TestTier0StaticAssets:
         assert "text/html" in content_type
 
     @pytest.mark.tier0
-    def test_t0_14_openapi_docs_accessible(self, client):
-        """OpenAPI documentation should be accessible."""
-        r = client.get("/docs")
+    def test_t0_14_openapi_schema_accessible(self, client):
+        """OpenAPI schema should always be accessible (/openapi.json).
+
+        Note: /docs and /redoc are disabled in production (ENVIRONMENT=production)
+        but /openapi.json is always available.
+        """
+        r = client.get("/openapi.json")
         assert r.status_code == 200
 
 
@@ -504,9 +508,19 @@ class TestTier2Consistency:
 
         # Circuit breakers all CLOSED
         if "circuit_breakers" in data:
-            for name, state in data["circuit_breakers"].items():
-                assert state in ("CLOSED", "HALF_OPEN"), \
-                    f"Circuit breaker {name} is {state}"
+            cb = data["circuit_breakers"]
+            # Top-level: {"healthy": bool, "any_open": bool, "services": {...}}
+            if "services" in cb:
+                for name, svc in cb["services"].items():
+                    state = svc.get("state", svc) if isinstance(svc, dict) else svc
+                    assert state in ("closed", "CLOSED", "HALF_OPEN", "half_open"), \
+                        f"Circuit breaker {name} is {state}"
+            else:
+                # Flat structure fallback
+                for name, state in cb.items():
+                    if isinstance(state, str):
+                        assert state in ("CLOSED", "HALF_OPEN"), \
+                            f"Circuit breaker {name} is {state}"
 
     @pytest.mark.tier2
     def test_t2_08_semantic_cache_functional(self, client):

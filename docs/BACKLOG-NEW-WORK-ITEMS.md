@@ -4,7 +4,7 @@
 > **Project:** Agent Red Customer Experience
 > **Owner:** Remaker Digital (DBA of VanDusen & Palmeter, LLC)
 > **Created:** 2026-01-31
-> **Last Updated:** 2026-02-05
+> **Last Updated:** 2026-02-10
 > **Numbering:** Continues from Master Plan Review WI #1-100
 > **Review Status:** Updated with completion statuses from 2026-01-31 and 2026-02-01 implementation sprints
 
@@ -13,8 +13,8 @@
 ## Progress Overview
 
 ```mermaid
-pie title Work Item Status (WI #101-238)
-    "Complete" : 81
+pie title Work Item Status (WI #101-239)
+    "Complete" : 82
     "Partially Complete" : 4
     "Remaining (1.0)" : 5
     "Backlog (1.1)" : 12
@@ -58,6 +58,9 @@ gantt
     WI #209-213 (KB vectorization) :done, 2026-02-05, 1d
     WI #214-218 (doc upload)       :done, 2026-02-05, 1d
     WI #219-222 (staleness)        :done, 2026-02-05, 1d
+
+    section KB Quality
+    WI #239 (conflict scanner)     :done, 2026-02-10, 1d
     WI #223-225 (semantic cache)   :done, 2026-02-05, 1d
 ```
 
@@ -399,12 +402,29 @@ These 63 new work items complement the existing 100 work items in `docs/Master-P
 | Security Hardening | 7 | 7 | 0 | #157-163 |
 | Launch Preparation | 9 | 0 | 9 | #196-204 |
 | **RAG Infrastructure** | **17** | **17** | **0** | **#209-225** |
+| KB Quality Tools | 1 | 1 | 0 | #239 |
 | Admin UX Polish | 1 | 0 | 1 | #226 |
-| **Total** | **90** | **78** | **12** | **#101-226** |
+| **Total** | **92** | **80** | **12** | **#101-239** |
 
 ---
 
-## 12. Admin UX Polish (WI #226+)
+## 12. KB Quality Tools (WI #239)
+
+**NEW — Added 2026-02-10.** On-demand knowledge base conflict and duplication scanner. Prevents inconsistent AI responses caused by duplicate or conflicting KB entries — the #1 root cause of response quality issues. Part of the ongoing chat quality testing lifecycle.
+
+| # | Work Item | Priority | Status | Rationale |
+|---|-----------|----------|--------|-----------|
+| 239 | KB Conflict/Duplication Scanner — 4-phase detection (embedding similarity, title trigrams, content overlap, factual conflict regex), severity classification, admin UI button, scan caching, documentation | P1 | ✅ Complete | `kb_conflict_scanner.py` (~705 lines), 2 API endpoints (POST /scan, GET /scan/result), admin UI in KnowledgeBaseManager.tsx, 85 tests, docs at `docs-site/docs/admin-guide/conflict-scanner.md` |
+
+**Quality testing protocol:** Scanner should be run as part of every quality cycle:
+1. Before/after KB changes (uploads, edits, bulk imports) → verify no new conflicts
+2. Before chat quality testing (`scripts/test_chat_battery.py`) → fix all HIGH conflicts first
+3. When AI responses are inconsistent → re-scan to identify KB root cause
+4. Periodic (weekly/monthly) → as part of KB maintenance alongside staleness review
+
+---
+
+## 13. Admin UX Polish (WI #226+)
 
 ### Contextual Tooltips (WI #226) — Priority: P1
 

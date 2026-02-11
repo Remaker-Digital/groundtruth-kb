@@ -1042,12 +1042,18 @@ async def _startup_admin_knowledge_services() -> None:
         staleness_svc = get_staleness_service()
         staleness_svc.configure(kb_repo=kb_repo, vectorizer=active_vectorizer)
 
+        # Configure conflict scanner
+        from src.multi_tenant.kb_conflict_scanner import get_conflict_scanner
+        scanner = get_conflict_scanner()
+        scanner.configure(kb_repo=kb_repo)
+
         configure_admin_knowledge_services(
             knowledge_repo=kb_repo,
             knowledge_vectorizer=active_vectorizer,
             staleness_service=staleness_svc,
+            conflict_scanner=scanner,
         )
-        logger.info("Admin knowledge base API initialized (8 endpoints, vectorization+staleness enabled)")
+        logger.info("Admin knowledge base API initialized (10 endpoints, vectorization+staleness+scanner enabled)")
     except Exception:
         logger.warning(
             "Admin knowledge base initialization failed — admin endpoints "

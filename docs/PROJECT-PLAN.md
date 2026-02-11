@@ -4,7 +4,7 @@
 > **Release:** Launch 1.0
 > **Timeline:** Q1 2026 (8-12 weeks)
 > **Budget:** $500-1,000/month operational
-> **Last Updated:** 2026-02-03
+> **Last Updated:** 2026-02-10
 
 ---
 
@@ -205,6 +205,7 @@ pie title Phase Completion Status
 | Archival pipeline (#153) | ✅ Done — archival_pipeline.py (~750 lines) |
 | Cost model calculator (#155) | ✅ Done — cost_model.py (~370 lines) |
 | Alert delivery (#192) | ✅ Done — alert_delivery.py (~695 lines) |
+| KB conflict/duplication scanner (#239) | ✅ Done — kb_conflict_scanner.py (~705 lines), 85 tests, docs page |
 
 #### 2.5 Persistent Customer Memory
 **Status:** ALL 4 LAYERS COMPLETE — 6 modules, 111 passing tests. Launch pillar differentiator.
@@ -286,7 +287,7 @@ flowchart LR
 ---
 
 ### Phase 4: Testing & QA
-**Status:** ALL PRIORITIES COMPLETE — 1,277 tests (1,235 unit + 42 integration), 0 failures ✅
+**Status:** ALL PRIORITIES COMPLETE — 1,974 tests (1,889 unit + 42 integration + 43 regression), 0 failures ✅
 
 ```mermaid
 xychart-beta
@@ -309,12 +310,14 @@ xychart-beta
 | Conftest smoke + health + pre-existing | 97 | ✅ Complete |
 | Integration — real Stripe test mode (20 tests) | 20 | ✅ Complete |
 | Integration — real Azure services (22 tests: OpenAI, Cosmos DB, Key Vault, E2E) | 22 | ✅ Complete |
+| KB Conflict Scanner (similarity, overlap, classification, full scan, caching) | 85 | ✅ Complete |
 
 | Metric | Value |
 |--------|-------|
-| Unit tests | 1,235 |
+| Unit tests | 1,889 |
 | Integration tests (real services) | 42 |
-| Total tests | 1,277 |
+| Regression tests | 43 |
+| Total tests | 1,974 |
 | Failures | 0 |
 | CI pipeline | GitHub Actions (Python 3.12/3.14) |
 
@@ -408,7 +411,7 @@ xychart-beta
 |------|--------|-------------|------------|
 | Timeline slip | High | Medium | MVP scope, aggressive optimization |
 | Budget overrun | Medium | Low | Cost model validated ($252-436/mo infra) |
-| Multi-tenant complexity | High | Low | 41 modules complete, 1,277 tests passing |
+| Multi-tenant complexity | High | Low | 42+ modules complete, 1,974 tests passing |
 | Shopify App Store rejection | Medium | Medium | GDPR webhooks, session tokens, Save Bar all implemented |
 | Creative asset delays | Medium | High | App Store submission blocked on icon/screenshots |
 
@@ -423,7 +426,7 @@ xychart-beta
 | Website content ready | Yes | ✅ |
 | Documentation published | Yes | ✅ |
 | Legal documents drafted | Yes | ✅ |
-| Multi-tenant infrastructure | Yes | ✅ (41 modules, 1,277 tests) |
+| Multi-tenant infrastructure | Yes | ✅ (42+ modules, 1,974 tests) |
 | Chat widget functional | Yes | ✅ (20 files, build validated) |
 | Admin dashboard functional | Yes | ✅ (2 shells, build validated) |
 | E-commerce billing functional | Yes | ✅ (dual-channel) |
@@ -489,7 +492,7 @@ flowchart LR
 | **M4: Website Ready** | Marketing site content (6 pages) | ✅ Complete |
 | **M5: Backend Complete** | Multi-tenant (41 modules), billing (11 modules), memory (6 modules) | ✅ Complete |
 | **M6: Frontend Complete** | Chat API, widget, Shopify extension, admin (2 shells), prototype approved | ✅ Complete |
-| **M7: Testing Complete** | 1,277 tests (P0-P3 + security + perf + 42 integration), CI pipeline | ✅ Complete |
+| **M7: Testing Complete** | 1,974 tests (P0-P3 + security + perf + 42 integration + 43 regression + 85 scanner), CI pipeline | ✅ Complete |
 | **M8: Production Deployment** | Azure deployment, storefront setup, UX evaluation | 🔄 In Progress |
 | **M9: GA Launch** | App Store listed, first trial signup, 48hr stability | 📋 Pending |
 
@@ -510,6 +513,7 @@ flowchart LR
 | 1.8.0 | 2026-01-30 | Phase 2.5 Persistent Customer Memory added |
 | 2.0.0 | 2026-02-02 | **Major update:** Phase 2.1-2.2 complete (38 multi_tenant modules, 11 integration modules). Phase 2.5 Layers 1-2 complete. Phase 3.0 ALL BUILD PHASES complete (chat API, widget, admin shells). 999 tests passing. Operational readiness, security hardening, pipeline optimization, trial environment all complete. PROJECT-PLAN restructured to reflect actual phase completion. |
 | 3.0.0 | 2026-02-03 | **Launch preparation update:** Phase 2.5 ALL 4 LAYERS COMPLETE (6 modules, 111 tests). Test suite updated: 1,235 unit + 42 integration = 1,277 total, 0 failures. P3, adversarial, performance tests all complete. Cosmos DB 10 containers initialized and verified. Prototype approved by owner (frozen as production reference). Remaker Digital storefront strategy approved (dual-purpose: sales + live demo). UX consultant (Mazel) engaged. New WIs #196-204 added for launch preparation. Phase 6 restructured: Infrastructure, Storefront, App Store, Creative Assets, Launch Readiness. No beta/soft launch — 1.0 is full GA release. |
+| 3.1.0 | 2026-02-10 | **KB quality tools:** KB Conflict/Duplication Scanner (WI #239) — `kb_conflict_scanner.py` (~705 lines), 4-phase detection algorithm, 2 API endpoints, admin UI, 85 tests, documentation page. Test suite: 1,889 unit + 42 integration + 43 regression = 1,974 total, 0 failures. Scanner role in ongoing chat quality testing lifecycle documented across memory files and project docs. |
 
 ---
 

@@ -74,14 +74,18 @@ interface AgentRedSDK {
   }
 
   const widgetKey = scriptTag.getAttribute('data-widget-key');
-  const apiBaseUrl = scriptTag.getAttribute('data-api-url') || 'https://api.agentred.io';
+  const apiBaseUrl = scriptTag.getAttribute('data-api-url') || 'https://agent-red-api-gateway.lemonriver-f59f94b7.eastus2.azurecontainerapps.io';
 
   if (!widgetKey) {
     console.warn('[AgentRed] data-widget-key attribute is required.');
     return;
   }
 
-  // Read inline overrides from data attributes (set by Shopify Liquid template)
+  // Read inline overrides from data attributes (set by Shopify Liquid template).
+  // Only non-empty attributes are included — the Liquid template omits attributes
+  // that match platform defaults, so API-fetched config is the source of truth
+  // and data attributes only override when the merchant explicitly changed a value
+  // in the Shopify theme editor.
   const dataOverrides: Record<string, string | boolean> = {};
   const attrMap: Record<string, string> = {
     'data-color': 'widget_primary_color',
@@ -98,7 +102,7 @@ interface AgentRedSDK {
   };
   for (const [attr, configKey] of Object.entries(attrMap)) {
     const val = scriptTag.getAttribute(attr);
-    if (val !== null) {
+    if (val !== null && val !== '') {
       // Convert boolean-like strings
       if (val === 'true') dataOverrides[configKey] = true;
       else if (val === 'false') dataOverrides[configKey] = false;
@@ -130,10 +134,13 @@ async function init(
     console.warn('[AgentRed] Failed to fetch widget configuration. Widget will not load.');
     return;
   }
-  // Merge data-attribute overrides from the script tag (Shopify Liquid template)
-  // These take precedence over API-fetched config so merchants can configure
-  // basic settings directly in the Shopify theme editor.
-  const config: WidgetConfig = dataOverrides
+  // Merge data-attribute overrides from the script tag (Shopify Liquid template).
+  // These take precedence over API-fetched config only when the merchant has
+  // explicitly changed a setting in the Shopify theme editor. The Liquid template
+  // omits attributes that match platform defaults, so this merge only applies
+  // merchant-intentional overrides.
+  const hasOverrides = dataOverrides && Object.keys(dataOverrides).length > 0;
+  const config: WidgetConfig = hasOverrides
     ? { ...fetchedConfig, ...dataOverrides } as WidgetConfig
     : fetchedConfig;
 

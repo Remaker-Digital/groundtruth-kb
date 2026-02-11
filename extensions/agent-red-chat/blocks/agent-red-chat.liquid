@@ -28,9 +28,9 @@
     src="{{ 'agent-red-widget.iife.js' | asset_url }}"
     defer
     data-widget-key="{{ block.settings.widget_key }}"
-    data-api-url="{{ block.settings.api_url | default: 'https://api.agentred.io' }}"
-    data-color="{{ block.settings.primary_color }}"
-    data-position="{{ block.settings.position }}"
+    data-api-url="{{ block.settings.api_url }}"
+    {% if block.settings.primary_color != '#ff3621' %}data-color="{{ block.settings.primary_color }}"{% endif %}
+    {% if block.settings.position != 'bottom-right' %}data-position="{{ block.settings.position }}"{% endif %}
     {% if block.settings.auto_open %}data-auto-open="true"{% endif %}
     {% if block.settings.auto_open_delay > 0 %}data-auto-open-delay="{{ block.settings.auto_open_delay }}"{% endif %}
     {% unless block.settings.mobile_enabled %}data-mobile-enabled="false"{% endunless %}

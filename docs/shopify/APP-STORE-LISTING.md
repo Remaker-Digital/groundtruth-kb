@@ -1,8 +1,14 @@
 # Shopify App Store Listing — Agent Red Customer Experience
 
-> **Status:** Draft — Pending owner review
+> **Status:** Draft — Accuracy-reviewed 2026-02-11 (see Accuracy Review Notes below)
 > **Created:** 2026-01-30
 > **Purpose:** All copywriting content for Shopify App Store submission
+>
+> **⚠️ Accuracy Review (2026-02-11):** All claims in this listing have been
+> verified against the actual codebase. Inaccurate claims (unimplemented features,
+> unsubstantiated statistics) have been corrected. Shopify explicitly prohibits
+> unsubstantiated claims, performance guarantees, and misrepresented features
+> in App Store listings.
 
 This document contains every text field required for the Shopify App Store listing, organized by section. Character limits are noted for each field. Creative/design assets are listed with specifications but require separate production.
 
@@ -54,20 +60,14 @@ AI support agents that remember every customer conversation
 *(59 characters)*
 
 **Alternates (for A/B testing later):**
-- `Six AI agents resolve 70% of support without your team` (56 chars)
+- `Six AI agents handle support so your team doesn't have to` (58 chars)
 - `AI customer support with persistent conversation memory` (55 chars)
 
 ### App Introduction
 **100-character limit**
 
 ```
-Resolve 70% of customer conversations instantly with six AI agents that learn from every interaction.
-```
-*(101 characters — needs trim)*
-
-Trimmed version:
-```
-Resolve 70% of support conversations instantly with six AI agents that learn from every interaction.
+Six specialized AI agents work together to resolve support conversations and remember every customer.
 ```
 *(100 characters — exact fit)*
 
@@ -77,11 +77,11 @@ Resolve 70% of support conversations instantly with six AI agents that learn fro
 ```
 Agent Red replaces your support queue with six specialized AI agents working together. Each agent handles one job — classifying intent, retrieving knowledge, generating responses, catching safety issues, escalating to humans, and tracking analytics.
 
-The result: instant responses under 2 seconds, 98% intent accuracy, and a 70% automation rate. Your team handles the conversations that need a human touch. The AI handles everything else.
+Every conversation builds on the last. Agent Red remembers returning customers, their preferences, and past interactions — so they never have to repeat themselves.
 
 Pricing starts at $149/month with 1,000 included conversations.
 ```
-*(489 characters)*
+*(473 characters)*
 
 ### Full Description (Detailed Description)
 **2,800-character limit — Markdown supported**
@@ -95,8 +95,8 @@ Growing stores face a support dilemma: hire more agents and watch costs climb, o
 
 Agent Red uses six specialized AI agents instead of one generic chatbot. Each agent is purpose-built for a specific task:
 
-- **Intent Classification** identifies what customers need across 17 categories with 98% accuracy
-- **Knowledge Retrieval** searches your products, FAQs, and policies with real-time Shopify sync
+- **Intent Classification** identifies what customers need across 17 categories
+- **Knowledge Retrieval** searches your products, FAQs, and policies using hybrid AI search
 - **Response Generation** crafts personalized replies that match your brand voice
 - **Critic/Supervisor** validates every response for safety and accuracy before sending
 - **Escalation** detects cases that need human attention and routes them with full context
@@ -110,30 +110,30 @@ Your customers never repeat themselves. Your support quality improves with every
 
 ## Built for Shopify Merchants
 
-- Real-time access to orders, products, customers, and inventory from your Shopify store
-- Automated order status lookups and tracking updates
-- Product recommendations based on browsing and purchase history
-- Zendesk integration for seamless human handoffs (Professional plan and above)
+- Knowledge base powered by your product catalog, FAQs, and store policies
+- Hybrid retrieval combining keyword search and AI-powered semantic matching
+- Brand voice customization — set the tone, personality, and formality of responses
+- Intelligent escalation routes complex issues to your team with full conversation context
 
 ## Transparent Pricing
 
 Three tiers, all with the same AI engine. Pay a platform fee plus usage for conversations beyond your included allowance:
 
 - **Starter ($149/mo):** 1,000 conversations included
-- **Professional ($399/mo):** 5,000 conversations included, cross-session memory, Zendesk
-- **Enterprise ($999/mo):** 20,000 conversations included, all integrations, dedicated support
+- **Professional ($399/mo):** 5,000 conversations included, cross-session memory
+- **Enterprise ($999/mo):** 20,000 conversations included, dedicated support, full API access
 
 14-day free trial on all plans. Annual billing saves 17%.
 
 ## Security & Compliance
 
-TLS 1.3 encryption, PII tokenization for all customer data, GDPR and CCPA compliant. Enterprise plans include SSO (SAML/OIDC) and full API access.
+HTTPS encryption, PII tokenization for all customer data, GDPR and CCPA compliant with data export and deletion support. Enterprise plans include full API access.
 
 ## Who Is Agent Red For?
 
-E-commerce teams processing 500+ support conversations per month who want enterprise-grade AI support without enterprise pricing. Agent Red delivers 2-13x better value per interaction than comparable platforms.
+E-commerce teams processing 500+ support conversations per month who want AI-powered support without enterprise pricing. Agent Red offers significantly lower per-conversation costs compared to comparable platforms.
 ```
-*(2,293 characters)*
+*(~2,200 characters — within 2,800 limit)*
 
 ---
 
@@ -176,34 +176,34 @@ Same AI engine on every plan — pay only for the conversations you use
 
 ### Core AI Capabilities
 1. `Six specialized AI agents working in concert for every conversation` (69 chars)
-2. `98% intent classification accuracy across 17 customer intent categories` (71 chars)
-3. `Sub-2-second response times at the 95th percentile` (51 chars)
-4. `70% automation rate — most conversations resolved without human help` (68 chars)
-5. `Brand voice customization for tone, personality, and formality` (62 chars)
+2. `Intent classification across 17 customer intent categories` (58 chars)
+3. `Hybrid knowledge retrieval combining keyword and semantic AI search` (66 chars)
+4. `Brand voice customization for tone, personality, and formality` (62 chars)
+5. `Configurable AI behavior — response length, escalation rules, policies` (70 chars)
 
 ### Persistent Customer Memory
 6. `Customer context injection — purchase history and preferences in every reply` (76 chars)
 7. `Conversation memory with semantic search across full interaction history` (71 chars)
 8. `Cross-session learning adapts to each customer over time (Professional+)` (72 chars)
 
-### Shopify Integration
-9. `Real-time order lookups, product search, and inventory status from Shopify` (74 chars)
-10. `Automated order tracking updates and shipping status responses` (62 chars)
-11. `Customer profile sync for personalized support interactions` (59 chars)
+### Knowledge Base & Content
+9. `Document upload support — PDF, DOCX, CSV, TXT, and HTML parsing` (63 chars)
+10. `Knowledge base conflict scanner detects duplicates and contradictions` (68 chars)
+11. `Staleness detection and automatic re-embedding for outdated content` (66 chars)
 
 ### Safety & Escalation
 12. `Critic agent validates every response before it reaches the customer` (68 chars)
 13. `Intelligent escalation with full conversation context to your team` (66 chars)
-14. `Zendesk ticket creation with automatic context transfer (Professional+)` (71 chars)
+14. `Fail-closed safety — blocked responses never reach customers` (60 chars)
 
-### Analytics & Insights
-15. `Real-time dashboard for resolution rates, CSAT, and response quality` (68 chars)
-16. `Trend analysis and volume forecasting for support planning` (58 chars)
+### Analytics & Admin
+15. `Real-time dashboard for conversation volume, usage, and billing` (63 chars)
+16. `Conversation inbox with assignment, notes, and message history` (62 chars)
 
 ### Security & Compliance
-17. `TLS 1.3 encryption and PII tokenization for all customer data` (62 chars)
+17. `HTTPS encryption and PII tokenization for all customer data` (60 chars)
 18. `GDPR and CCPA compliant with data export and deletion support` (61 chars)
-19. `Enterprise SSO via SAML and OIDC (Enterprise plan)` (50 chars)
+19. `Full API access and audit logging (Enterprise plan)` (51 chars)
 
 ---
 
@@ -263,11 +263,13 @@ Support > Helpdesk
 
 *Up to 6 integrations listed. Do not include Shopify itself.*
 
-1. **Zendesk** — Automatic ticket creation and escalation with full conversation context
-2. **Mailchimp** — Campaign history lookup and customer segment awareness (Enterprise)
-3. **Google Analytics** — Event tracking, conversation attribution, and custom reports (Enterprise)
-4. **Stripe** — Direct billing channel for non-Shopify merchants
-5. **Azure OpenAI Service** — Enterprise-grade AI infrastructure
+1. **Stripe** — Direct billing channel for non-Shopify merchants
+2. **Azure OpenAI Service** — Enterprise-grade AI infrastructure (GPT-4o, GPT-4o-mini)
+
+*Planned integrations (not yet available):*
+- **Zendesk** — Ticket creation and escalation (coming soon)
+- **Mailchimp** — Customer segment awareness (coming soon)
+- **Google Analytics** — Event tracking and attribution (coming soon)
 
 ---
 
@@ -354,7 +356,7 @@ https://agentredcx.com/docs/changelog
 2. Solution: Six specialized AI agents, not one chatbot (20s)
 3. Demo: Knowledge retrieval + response generation in action (30s)
 4. Differentiator: Persistent Customer Memory — customers never repeat themselves (20s)
-5. Results: 70% automation, <2s responses, enterprise quality at startup pricing (15s)
+5. Results: Fast responses, persistent memory, enterprise quality at startup pricing (15s)
 6. Pricing: Transparent, usage-based, 14-day free trial (10s)
 7. CTA: Install from Shopify App Store (10s)
 
@@ -496,6 +498,32 @@ of your storefront. Click it to open the conversation panel.
 - [ ] OAuth scopes configured (read_orders, read_products, read_customers, read_inventory)
 - [x] GDPR webhook URLs registered — production FQDN in `shopify.app.toml`
 - [x] Privacy policy URL registered — `https://www.iubenda.com/privacy-policy/51316355`
+
+---
+
+## Accuracy Review Notes (2026-02-11)
+
+The following claims were identified as inaccurate during a full codebase verification
+and corrected in this revision:
+
+| Original Claim | Issue | Correction |
+|----------------|-------|------------|
+| "98% intent classification accuracy" | AGNTCY baseline measured 94.0% (47/50); no Agent Red evaluation achieved 98% | Removed numeric claim |
+| "70% automation rate" | No supporting data; aspirational figure with no empirical basis | Removed entirely |
+| "Sub-2-second response times at P95" | SLA target exists but pipeline budget is 30s; cold-start 3-8s | Removed from listing (kept in SLA docs) |
+| "Real-time order lookups from Shopify" | Pipeline does NOT call Shopify APIs for orders; KB search only | Replaced with actual KB features |
+| "Automated order tracking updates" | Not implemented | Removed |
+| "Zendesk ticket creation" | Not implemented; marked `coming_soon` in codebase | Moved to "planned" section |
+| "Mailchimp campaign history lookup" | Not implemented; marked `coming_soon` | Moved to "planned" section |
+| "Google Analytics event tracking" | Not implemented; marked `coming_soon` | Moved to "planned" section |
+| "Enterprise SSO via SAML and OIDC" | Not implemented; zero code references | Removed |
+| "TLS 1.3 encryption" | Not explicitly configured; Azure platform default | Changed to "HTTPS encryption" |
+| "2-13x better value" | Outdated; verified figure is 4-21x (2026-02-01) | Removed numeric comparison |
+| "Customer profile sync" | Shopify customer data not synced into chat pipeline | Removed |
+
+**Shopify policy reminder:** Shopify App Store requirements explicitly prohibit
+unsubstantiated claims, performance guarantees, and statistics in listing content.
+All remaining claims in this document are verifiable against the source code.
 
 ---
 

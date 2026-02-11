@@ -14,7 +14,8 @@
 
 import React, { useState, useCallback, useMemo, useRef } from 'react';
 import type { BaseComponentProps, KBArticle, KBArticleStatus, KBUploadResult } from './types';
-import { useKnowledgeBase, useKBArticle, useSaveKBArticle, useUploadFile, useImportUrl, useExportCSV, useStalenessSummary, useVerifyEntry } from './hooks';
+import { useKnowledgeBase, useKBArticle, useSaveKBArticle, useUploadFile, useImportUrl, useExportCSV, useStalenessSummary, useVerifyEntry, useConflictScan } from './hooks';
+import type { ConflictPair, ScanResult } from './hooks';
 import { HelpTooltip } from './HelpTooltip';
 
 // ---------------------------------------------------------------------------
@@ -892,6 +893,11 @@ export const KnowledgeBaseManager: React.FC<BaseComponentProps> = ({
   const { data: stalenessData, refetch: refetchStaleness } = useStalenessSummary(apiFetch);
   const { verify, loading: verifying } = useVerifyEntry(apiFetch);
 
+  // Conflict scanner hooks
+  const { scan: runConflictScan, result: scanResult, loading: scanning, error: scanError } = useConflictScan(apiFetch);
+  const [showScanResults, setShowScanResults] = useState(false);
+  const [dismissedPairs, setDismissedPairs] = useState<Set<string>>(new Set());
+
   // Extract categories from articles for the filter dropdown and editor
   const categories = useMemo(() => extractCategories(articles), [articles]);
 
@@ -1165,6 +1171,16 @@ export const KnowledgeBaseManager: React.FC<BaseComponentProps> = ({
         </div>
         <div style={{ display: 'flex', gap: '8px' }}>
           <button
+            onClick={async () => {
+              const res = await runConflictScan(true);
+              if (res) setShowScanResults(true);
+            }}
+            disabled={scanning || articles.length < 2}
+            style={buttonStyle('secondary', scanning || articles.length < 2)}
+          >
+            {scanning ? 'Scanning...' : 'Scan for conflicts'}
+          </button>
+          <button
             onClick={handleExport}
             disabled={exporting || articles.length === 0}
             style={buttonStyle('secondary', exporting || articles.length === 0)}
@@ -1201,6 +1217,124 @@ export const KnowledgeBaseManager: React.FC<BaseComponentProps> = ({
             {stalenessData.freshCount} fresh, {stalenessData.agingCount} aging, {stalenessData.staleCount} stale
             {stalenessData.veryStaleCount > 0 && `, ${stalenessData.veryStaleCount} very stale`}
           </span>
+        </div>
+      )}
+
+      {/* Conflict scan results panel */}
+      {showScanResults && scanResult && (
+        <div style={{
+          padding: '16px 20px',
+          borderBottom: `1px solid ${COLOR_BORDER}`,
+          backgroundColor: COLOR_LIGHT_GRAY,
+        }}>
+          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '12px' }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
+              <span style={{ fontWeight: 600, fontSize: '14px', color: COLOR_TEXT }}>
+                Conflict scan results
+              </span>
+              {scanResult.highCount > 0 && (
+                <span style={{ padding: '2px 8px', borderRadius: '10px', fontSize: '12px', fontWeight: 600, backgroundColor: '#ffeef0', color: COLOR_DANGER }}>
+                  {scanResult.highCount} high
+                </span>
+              )}
+              {scanResult.mediumCount > 0 && (
+                <span style={{ padding: '2px 8px', borderRadius: '10px', fontSize: '12px', fontWeight: 600, backgroundColor: '#fff8c5', color: COLOR_WARNING }}>
+                  {scanResult.mediumCount} medium
+                </span>
+              )}
+              {scanResult.lowCount > 0 && (
+                <span style={{ padding: '2px 8px', borderRadius: '10px', fontSize: '12px', fontWeight: 600, backgroundColor: COLOR_LIGHT_GRAY, color: COLOR_GRAY }}>
+                  {scanResult.lowCount} low
+                </span>
+              )}
+              {scanResult.conflicts.length === 0 && (
+                <span style={{ fontSize: '13px', color: COLOR_SUCCESS, fontWeight: 600 }}>
+                  No conflicts found
+                </span>
+              )}
+              <span style={{ fontSize: '12px', color: COLOR_TEXT_SECONDARY }}>
+                {scanResult.totalEntriesScanned} entries scanned in {scanResult.scanDurationMs}ms
+                {scanResult.entriesWithoutEmbeddings > 0 && ` (${scanResult.entriesWithoutEmbeddings} not yet embedded)`}
+              </span>
+            </div>
+            <button
+              onClick={() => setShowScanResults(false)}
+              style={{ background: 'none', border: 'none', cursor: 'pointer', color: COLOR_GRAY, fontSize: '16px', padding: '4px' }}
+            >
+              {String.fromCodePoint(0x2715)}
+            </button>
+          </div>
+
+          {scanResult.conflicts.filter(c => !dismissedPairs.has(`${c.entryAId}-${c.entryBId}`)).map((conflict, idx) => {
+            const pairKey = `${conflict.entryAId}-${conflict.entryBId}`;
+            const severityColors: Record<string, { bg: string; color: string }> = {
+              high: { bg: '#ffeef0', color: COLOR_DANGER },
+              medium: { bg: '#fff8c5', color: COLOR_WARNING },
+              low: { bg: COLOR_LIGHT_GRAY, color: COLOR_GRAY },
+            };
+            const sev = severityColors[conflict.severity] || severityColors.low;
+            const typeLabels: Record<string, string> = {
+              near_duplicate: 'Near-duplicate',
+              conflicting: 'Conflicting info',
+              topical_overlap: 'Topical overlap',
+              similar_titles: 'Similar titles',
+            };
+            return (
+              <div
+                key={pairKey}
+                style={{
+                  padding: '12px 16px',
+                  marginBottom: '8px',
+                  borderRadius: BORDER_RADIUS,
+                  border: `1px solid ${COLOR_BORDER}`,
+                  backgroundColor: COLOR_WHITE,
+                }}
+              >
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
+                  <div style={{ flex: 1 }}>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '6px' }}>
+                      <span style={{ padding: '2px 8px', borderRadius: '10px', fontSize: '11px', fontWeight: 600, backgroundColor: sev.bg, color: sev.color }}>
+                        {conflict.severity.toUpperCase()}
+                      </span>
+                      <span style={{ fontSize: '12px', color: COLOR_TEXT_SECONDARY, fontWeight: 500 }}>
+                        {typeLabels[conflict.conflictType] || conflict.conflictType}
+                      </span>
+                      <span style={{ fontSize: '11px', color: COLOR_TEXT_SECONDARY }}>
+                        Similarity: {Math.round(conflict.embeddingSimilarity * 100)}% | Overlap: {Math.round(conflict.contentOverlap * 100)}%
+                      </span>
+                    </div>
+                    <div style={{ fontSize: '13px', color: COLOR_TEXT, marginBottom: '4px' }}>
+                      <strong>{conflict.entryATitle}</strong>
+                      <span style={{ color: COLOR_TEXT_SECONDARY, margin: '0 6px' }}>vs</span>
+                      <strong>{conflict.entryBTitle}</strong>
+                    </div>
+                    {conflict.conflictingFacts.length > 0 && (
+                      <div style={{ fontSize: '12px', color: COLOR_DANGER, marginBottom: '4px' }}>
+                        {conflict.conflictingFacts.map((fact, fi) => (
+                          <div key={fi}>{String.fromCodePoint(0x26A0)} {fact}</div>
+                        ))}
+                      </div>
+                    )}
+                    <div style={{ fontSize: '12px', color: COLOR_TEXT_SECONDARY, lineHeight: '1.5' }}>
+                      {conflict.resolution}
+                    </div>
+                  </div>
+                  <button
+                    onClick={() => setDismissedPairs(prev => new Set([...prev, pairKey]))}
+                    style={{ background: 'none', border: 'none', cursor: 'pointer', color: COLOR_GRAY, fontSize: '12px', padding: '4px 8px', marginLeft: '12px', whiteSpace: 'nowrap' }}
+                  >
+                    Dismiss
+                  </button>
+                </div>
+              </div>
+            );
+          })}
+
+          {scanError && (
+            <div style={{ fontSize: '13px', color: COLOR_DANGER, marginTop: '8px' }}>
+              Scan error: {scanError}
+            </div>
+          )}
         </div>
       )}
 

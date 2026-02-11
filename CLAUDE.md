@@ -596,7 +596,7 @@ E:\Claude-Playground\CLAUDE-PROJECTS\Agent Red Customer Engagement\
 │   │   ├── conversation_vectorizer.py # Layer 2 vectorization pipeline, semantic search
 │   │   ├── response_explainability.py # Per-response decision trace, explainability framework
 │   │   ├── admin_conversation_api.py # Conversation inbox admin API (5 endpoints)
-│   │   ├── admin_knowledge_api.py  # Knowledge base CRUD admin API (5 endpoints)
+│   │   ├── admin_knowledge_api.py  # Knowledge base CRUD + upload + scan admin API (13 endpoints)
 │   │   ├── admin_analytics_api.py  # Analytics summary/intents/gaps admin API (3 endpoints)
 │   │   ├── admin_team_api.py       # Team member management admin API (5 endpoints)
 │   │   ├── admin_gdpr_api.py       # GDPR data export/deletion/consent admin API (5 endpoints)
@@ -619,7 +619,8 @@ E:\Claude-Playground\CLAUDE-PROJECTS\Agent Red Customer Engagement\
 │   │   ├── knowledge_vectorizer.py # KB embedding pipeline, hybrid search (BM25+vector+RRF) (~520 lines)
 │   │   ├── document_parser.py     # Document upload parsing: PDF, DOCX, CSV, TXT, HTML (~480 lines)
 │   │   ├── staleness_service.py   # KB entry staleness detection + scoring (~540 lines)
-│   │   └── semantic_cache.py      # 3-tier semantic cache: embedding, search, response (~530 lines)
+│   │   ├── semantic_cache.py      # 3-tier semantic cache: embedding, search, response (~530 lines)
+│   │   └── kb_conflict_scanner.py # KB conflict/duplication scanner: 4-phase detection, on-demand admin tool (~705 lines)
 │   ├── chat/                       # Chat API (Phase 3.0 — IMPLEMENTED)
 │   │   ├── __init__.py
 │   │   ├── models.py              # Request/response Pydantic models + StreamEvent SSE format (~200 lines)
@@ -664,7 +665,8 @@ E:\Claude-Playground\CLAUDE-PROJECTS\Agent Red Customer Engagement\
 │   │   ├── test_archival_pipeline.py # 15 archival pipeline tests
 │   │   ├── test_semantic_cache.py # 72 semantic cache tests (TTL, LRU, similarity, integration)
 │   │   ├── test_admin_apikey.py  # 36 API key management tests (generate, rotate, revoke, audit)
-│   │   └── test_apikey_reset.py # 32 API key reset/request tests (public endpoint, rate limiting, email)
+│   │   ├── test_apikey_reset.py # 32 API key reset/request tests (public endpoint, rate limiting, email)
+│   │   └── test_kb_conflict_scanner.py # 85 KB conflict scanner tests (similarity, overlap, classification, full scan)
 │   └── integrations/               # Billing integration tests (109 tests)
 │       ├── test_provisioning_webhooks.py # 38 tenant lifecycle + webhook tests
 │       ├── test_http_billing.py    # 35 HTTP billing endpoint tests (§4.1)
@@ -1018,7 +1020,7 @@ The owner values active feedback on their communication effectiveness. When proc
 | `/api/config` | tenant_config_api | GET/PUT/PATCH/POST/DELETE config, onboarding wizard, preview, reset, history, diff (10 endpoints) |
 | `/api/chat` | chat endpoints | POST /conversations, POST /message, GET /stream/{id}, GET /conversations/{id}, POST /conversations/{id}/end, WS /ws/{id} |
 | `/api/admin/conversations` | admin_conversation_api | GET list, GET /{id}, GET /{id}/messages, POST /{id}/assign, POST /{id}/notes |
-| `/api/admin/knowledge` | admin_knowledge_api | GET list, POST create, GET /{id}, PUT /{id}, DELETE /{id}, POST /upload, POST /bulk-import, GET /bulk-export, POST /{id}/verify, POST /{id}/re-embed, GET /stale |
+| `/api/admin/knowledge` | admin_knowledge_api | GET list, POST create, GET /{id}, PUT /{id}, DELETE /{id}, POST /upload, POST /bulk-import, GET /bulk-export, POST /{id}/verify, POST /{id}/re-embed, GET /stale, POST /scan, GET /scan/result |
 | `/api/analytics` | admin_analytics_api | GET /summary, GET /intents, GET /gaps |
 | `/api/admin/team` | admin_team_api | GET list, POST invite, GET /{id}, PUT /{id}, DELETE /{id} |
 | `/api/admin/gdpr` | admin_gdpr_api | POST /export, POST /delete, GET /consent/{id}, PUT /consent/{id}, GET /consent |

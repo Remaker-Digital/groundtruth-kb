@@ -58,7 +58,7 @@ async def chat(message: str, conv_id: str | None = None) -> tuple[str, str, list
                 return f"(message rejected: {msg_data})", conv_id, []
 
         # Brief pause then read SSE (buffered events will be replayed)
-        await asyncio.sleep(0.3)
+        await asyncio.sleep(0.5)
 
         tokens = []
         stages = []
@@ -131,9 +131,10 @@ async def chat(message: str, conv_id: str | None = None) -> tuple[str, str, list
         response = "".join(tokens)
 
         # If we got no tokens, the pipeline may have completed before
-        # our SSE connection.  Retrieve the conversation state to get
-        # the response from the message history as a fallback.
+        # our SSE connection.  Wait briefly for persistence, then retrieve
+        # the conversation state to get the response from message history.
         if not tokens and conv_id:
+            await asyncio.sleep(3)
             try:
                 async with session.get(
                     f"{API}/api/chat/conversations/{conv_id}",
@@ -142,7 +143,7 @@ async def chat(message: str, conv_id: str | None = None) -> tuple[str, str, list
                     if resp.status == 200:
                         state_data = await resp.json()
                         for msg in reversed(state_data.get("messages", [])):
-                            if msg.get("role") == "assistant":
+                            if msg.get("role") in ("assistant", "ai"):
                                 response = msg.get("content", "")
                                 break
             except Exception:

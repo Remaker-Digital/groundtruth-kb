@@ -252,6 +252,41 @@ class StaleEntriesResponse(BaseModel):
     threshold: float
 
 
+class ConflictPairResponse(BaseModel):
+    """A pair of KB entries with a detected conflict."""
+
+    model_config = ConfigDict(alias_generator=to_camel, populate_by_name=True)
+
+    entry_a_id: str
+    entry_a_title: str
+    entry_b_id: str
+    entry_b_title: str
+    conflict_type: str = Field(description="near_duplicate | conflicting | topical_overlap | similar_titles")
+    severity: str = Field(description="high | medium | low")
+    embedding_similarity: float
+    content_overlap: float
+    title_similarity: float
+    conflicting_facts: list[str] = Field(default_factory=list)
+    resolution: str
+
+
+class ScanResultResponse(BaseModel):
+    """Result of a full KB conflict scan."""
+
+    model_config = ConfigDict(alias_generator=to_camel, populate_by_name=True)
+
+    tenant_id: str
+    scanned_at: str
+    total_entries_scanned: int
+    entries_with_embeddings: int
+    entries_without_embeddings: int
+    conflicts: list[ConflictPairResponse]
+    high_count: int
+    medium_count: int
+    low_count: int
+    scan_duration_ms: int
+
+
 # ---------------------------------------------------------------------------
 # Service accessor
 # ---------------------------------------------------------------------------
@@ -259,12 +294,14 @@ class StaleEntriesResponse(BaseModel):
 _knowledge_repo: KnowledgeBaseRepository | None = None
 _knowledge_vectorizer: Any = None  # KnowledgeVectorizer (optional)
 _staleness_service: Any = None  # StalenessService (optional)
+_conflict_scanner: Any = None  # KBConflictScanner (optional)
 
 
 def configure_admin_knowledge_services(
     knowledge_repo: KnowledgeBaseRepository,
     knowledge_vectorizer: Any = None,
     staleness_service: Any = None,
+    conflict_scanner: Any = None,
 ) -> None:
     """Wire the admin knowledge API to its backing repository and vectorizer.
 
@@ -277,15 +314,17 @@ def configure_admin_knowledge_services(
         knowledge_vectorizer: Optional KnowledgeVectorizer for auto-embedding.
         staleness_service: Optional StalenessService for freshness tracking.
     """
-    global _knowledge_repo, _knowledge_vectorizer, _staleness_service
+    global _knowledge_repo, _knowledge_vectorizer, _staleness_service, _conflict_scanner
     _knowledge_repo = knowledge_repo
     _knowledge_vectorizer = knowledge_vectorizer
     _staleness_service = staleness_service
+    _conflict_scanner = conflict_scanner
     vectorizer_status = "enabled" if knowledge_vectorizer else "disabled"
     staleness_status = "enabled" if staleness_service else "disabled"
+    scanner_status = "enabled" if conflict_scanner else "disabled"
     logger.info(
-        "Admin knowledge base API services configured (vectorization=%s, staleness=%s)",
-        vectorizer_status, staleness_status,
+        "Admin knowledge base API services configured (vectorization=%s, staleness=%s, scanner=%s)",
+        vectorizer_status, staleness_status, scanner_status,
     )
 
 
@@ -413,6 +452,160 @@ async def list_knowledge_entries(
         limit=limit,
         articles=entries,
     )
+
+
+# ---------------------------------------------------------------------------
+# GET /api/admin/knowledge/export — CSV export (WI #217)
+# IMPORTANT: Registered BEFORE /{entry_id} to avoid path parameter shadowing.
+# ---------------------------------------------------------------------------
+
+
+@router.get(
+    "/export",
+    summary="Export knowledge base as CSV",
+    description="Exports all knowledge base entries as a downloadable CSV file with columns for id, type, title, content, tags, language, active status, source info, and timestamps.",
+    responses={
+        503: {"description": "Knowledge base services not initialized"},
+    },
+)
+async def export_knowledge_entries(
+    ctx: TenantContext = Depends(get_tenant_context),
+) -> StreamingResponse:
+    """Export all knowledge base entries as CSV.
+
+    Columns: id, entry_type, title, content, tags, language, is_active,
+    source_type, source_filename, source_url, created_at, updated_at.
+    """
+    repo = _get_repo()
+
+    entries = await repo.list_filtered(
+        tenant_id=ctx.tenant_id,
+        offset=0,
+        limit=10000,  # Practical upper bound
+    )
+
+    output = io.StringIO()
+    writer = csv.writer(output)
+
+    # Header
+    writer.writerow([
+        "id",
+        "entry_type",
+        "title",
+        "content",
+        "tags",
+        "language",
+        "is_active",
+        "source_type",
+        "source_filename",
+        "source_url",
+        "created_at",
+        "updated_at",
+    ])
+
+    for entry in entries:
+        tags_str = ";".join(entry.get("tags", []))
+        writer.writerow([
+            entry.get("id", ""),
+            entry.get("entry_type", ""),
+            entry.get("title", ""),
+            entry.get("content", ""),
+            tags_str,
+            entry.get("language", "en"),
+            entry.get("is_active", True),
+            entry.get("source_type", "manual"),
+            entry.get("source_filename", ""),
+            entry.get("source_url", ""),
+            entry.get("created_at", ""),
+            entry.get("updated_at", ""),
+        ])
+
+    logger.info(
+        "KB export: entries=%d tenant=%s",
+        len(entries),
+        ctx.tenant_id[:8],
+    )
+
+    return StreamingResponse(
+        iter([output.getvalue()]),
+        media_type="text/csv",
+        headers={"Content-Disposition": "attachment; filename=knowledge-base-export.csv"},
+    )
+
+
+# ---------------------------------------------------------------------------
+# GET /api/admin/knowledge/staleness — Staleness summary (WI #221)
+# IMPORTANT: Registered BEFORE /{entry_id} to avoid path parameter shadowing.
+# ---------------------------------------------------------------------------
+
+
+@router.get(
+    "/staleness",
+    response_model=StalenessSummaryResponse,
+    summary="Get content staleness summary",
+    description="Returns a summary of content staleness across the knowledge base, including counts of fresh, aging, stale, and very stale entries with the average staleness score.",
+    responses={
+        503: {"description": "Staleness service not initialized"},
+    },
+)
+async def get_staleness_summary(
+    ctx: TenantContext = Depends(get_tenant_context),
+) -> StalenessSummaryResponse:
+    """Get a summary of content staleness across the knowledge base.
+
+    Returns counts of fresh, aging, stale, and very stale entries
+    along with the average staleness score.
+    """
+    if _staleness_service is None:
+        raise HTTPException(status_code=503, detail="Staleness service not initialised")
+
+    summary = await _staleness_service.get_summary(ctx.tenant_id)
+    return StalenessSummaryResponse(**summary)
+
+
+# ---------------------------------------------------------------------------
+# GET /api/admin/knowledge/stale — List stale entries (WI #221)
+# IMPORTANT: Registered BEFORE /{entry_id} to avoid path parameter shadowing.
+# ---------------------------------------------------------------------------
+
+
+@router.get(
+    "/stale",
+    response_model=StaleEntriesResponse,
+    summary="List stale knowledge entries",
+    description="Lists knowledge base entries above the staleness threshold. Default threshold is 0.6, returning stale and very stale entries.",
+    responses={
+        503: {"description": "Staleness service not initialized"},
+    },
+)
+async def list_stale_entries(
+    threshold: float = Query(
+        0.6,
+        ge=0.0,
+        le=1.0,
+        description="Minimum staleness score to include",
+    ),
+    ctx: TenantContext = Depends(get_tenant_context),
+) -> StaleEntriesResponse:
+    """List knowledge base entries above the staleness threshold.
+
+    Default threshold is 0.6 (stale + very stale entries).
+    """
+    if _staleness_service is None:
+        raise HTTPException(status_code=503, detail="Staleness service not initialised")
+
+    stale = await _staleness_service.list_stale(ctx.tenant_id, threshold=threshold)
+    entries = [
+        StalenessScoreResponse(
+            id=e["id"],
+            staleness_score=e["staleness_score"],
+            staleness_category=e["staleness_category"],
+            last_verified_at=e.get("last_verified_at"),
+            embedded_at=e.get("embedded_at"),
+        )
+        for e in stale
+    ]
+    return StaleEntriesResponse(entries=entries, threshold=threshold)
 
 
 # ---------------------------------------------------------------------------
@@ -968,157 +1161,6 @@ async def import_knowledge_from_url(
 
 
 # ---------------------------------------------------------------------------
-# GET /api/admin/knowledge/export — CSV export (WI #217)
-# ---------------------------------------------------------------------------
-
-
-@router.get(
-    "/export",
-    summary="Export knowledge base as CSV",
-    description="Exports all knowledge base entries as a downloadable CSV file with columns for id, type, title, content, tags, language, active status, source info, and timestamps.",
-    responses={
-        503: {"description": "Knowledge base services not initialized"},
-    },
-)
-async def export_knowledge_entries(
-    ctx: TenantContext = Depends(get_tenant_context),
-) -> StreamingResponse:
-    """Export all knowledge base entries as CSV.
-
-    Columns: id, entry_type, title, content, tags, language, is_active,
-    source_type, source_filename, source_url, created_at, updated_at.
-    """
-    repo = _get_repo()
-
-    entries = await repo.list_filtered(
-        tenant_id=ctx.tenant_id,
-        offset=0,
-        limit=10000,  # Practical upper bound
-    )
-
-    output = io.StringIO()
-    writer = csv.writer(output)
-
-    # Header
-    writer.writerow([
-        "id",
-        "entry_type",
-        "title",
-        "content",
-        "tags",
-        "language",
-        "is_active",
-        "source_type",
-        "source_filename",
-        "source_url",
-        "created_at",
-        "updated_at",
-    ])
-
-    for entry in entries:
-        tags_str = ";".join(entry.get("tags", []))
-        writer.writerow([
-            entry.get("id", ""),
-            entry.get("entry_type", ""),
-            entry.get("title", ""),
-            entry.get("content", ""),
-            tags_str,
-            entry.get("language", "en"),
-            entry.get("is_active", True),
-            entry.get("source_type", "manual"),
-            entry.get("source_filename", ""),
-            entry.get("source_url", ""),
-            entry.get("created_at", ""),
-            entry.get("updated_at", ""),
-        ])
-
-    logger.info(
-        "KB export: entries=%d tenant=%s",
-        len(entries),
-        ctx.tenant_id[:8],
-    )
-
-    return StreamingResponse(
-        iter([output.getvalue()]),
-        media_type="text/csv",
-        headers={"Content-Disposition": "attachment; filename=knowledge-base-export.csv"},
-    )
-
-
-# ---------------------------------------------------------------------------
-# GET /api/admin/knowledge/staleness — Staleness summary (WI #221)
-# ---------------------------------------------------------------------------
-
-
-@router.get(
-    "/staleness",
-    response_model=StalenessSummaryResponse,
-    summary="Get content staleness summary",
-    description="Returns a summary of content staleness across the knowledge base, including counts of fresh, aging, stale, and very stale entries with the average staleness score.",
-    responses={
-        503: {"description": "Staleness service not initialized"},
-    },
-)
-async def get_staleness_summary(
-    ctx: TenantContext = Depends(get_tenant_context),
-) -> StalenessSummaryResponse:
-    """Get a summary of content staleness across the knowledge base.
-
-    Returns counts of fresh, aging, stale, and very stale entries
-    along with the average staleness score.
-    """
-    if _staleness_service is None:
-        raise HTTPException(status_code=503, detail="Staleness service not initialised")
-
-    summary = await _staleness_service.get_summary(ctx.tenant_id)
-    return StalenessSummaryResponse(**summary)
-
-
-# ---------------------------------------------------------------------------
-# GET /api/admin/knowledge/stale — List stale entries (WI #221)
-# ---------------------------------------------------------------------------
-
-
-@router.get(
-    "/stale",
-    response_model=StaleEntriesResponse,
-    summary="List stale knowledge entries",
-    description="Lists knowledge base entries above the staleness threshold. Default threshold is 0.6, returning stale and very stale entries.",
-    responses={
-        503: {"description": "Staleness service not initialized"},
-    },
-)
-async def list_stale_entries(
-    threshold: float = Query(
-        0.6,
-        ge=0.0,
-        le=1.0,
-        description="Minimum staleness score to include",
-    ),
-    ctx: TenantContext = Depends(get_tenant_context),
-) -> StaleEntriesResponse:
-    """List knowledge base entries above the staleness threshold.
-
-    Default threshold is 0.6 (stale + very stale entries).
-    """
-    if _staleness_service is None:
-        raise HTTPException(status_code=503, detail="Staleness service not initialised")
-
-    stale = await _staleness_service.list_stale(ctx.tenant_id, threshold=threshold)
-    entries = [
-        StalenessScoreResponse(
-            id=e["id"],
-            staleness_score=e["staleness_score"],
-            staleness_category=e["staleness_category"],
-            last_verified_at=e.get("last_verified_at"),
-            embedded_at=e.get("embedded_at"),
-        )
-        for e in stale
-    ]
-    return StaleEntriesResponse(entries=entries, threshold=threshold)
-
-
-# ---------------------------------------------------------------------------
 # POST /api/admin/knowledge/{entry_id}/verify — Mark as verified (WI #221)
 # ---------------------------------------------------------------------------
 
@@ -1154,3 +1196,132 @@ async def verify_knowledge_entry(
         raise
 
     return StalenessScoreResponse(**result)
+
+
+# ---------------------------------------------------------------------------
+# POST /api/admin/knowledge/scan — Trigger conflict scan
+# ---------------------------------------------------------------------------
+
+
+@router.post(
+    "/scan",
+    response_model=ScanResultResponse,
+    summary="Scan for conflicts and duplicates",
+    description=(
+        "Runs an on-demand scan of all active knowledge base entries to "
+        "identify near-duplicates, conflicting information, topical overlaps, "
+        "and similar titles. Results are cached for 5 minutes."
+    ),
+    responses={
+        503: {"description": "Conflict scanner not initialized"},
+    },
+)
+async def scan_for_conflicts(
+    force: bool = Query(
+        False,
+        description="If true, bypass the 5-minute cache and re-scan",
+    ),
+    ctx: TenantContext = Depends(get_tenant_context),
+) -> ScanResultResponse:
+    """Scan the knowledge base for conflicts and duplicates.
+
+    Analyses all active entries using embedding similarity, title comparison,
+    content overlap, and factual conflict detection. No external API calls —
+    uses pre-computed embeddings only.
+    """
+    if _conflict_scanner is None:
+        raise HTTPException(
+            status_code=503,
+            detail="Conflict scanner not initialised",
+        )
+
+    result = await _conflict_scanner.scan(ctx.tenant_id, force=force)
+
+    return ScanResultResponse(
+        tenant_id=result.tenant_id,
+        scanned_at=result.scanned_at,
+        total_entries_scanned=result.total_entries_scanned,
+        entries_with_embeddings=result.entries_with_embeddings,
+        entries_without_embeddings=result.entries_without_embeddings,
+        conflicts=[
+            ConflictPairResponse(
+                entry_a_id=c.entry_a_id,
+                entry_a_title=c.entry_a_title,
+                entry_b_id=c.entry_b_id,
+                entry_b_title=c.entry_b_title,
+                conflict_type=c.conflict_type.value,
+                severity=c.severity.value,
+                embedding_similarity=round(c.embedding_similarity, 3),
+                content_overlap=round(c.content_overlap, 3),
+                title_similarity=round(c.title_similarity, 3),
+                conflicting_facts=c.conflicting_facts,
+                resolution=c.resolution,
+            )
+            for c in result.conflicts
+        ],
+        high_count=result.high_count,
+        medium_count=result.medium_count,
+        low_count=result.low_count,
+        scan_duration_ms=result.scan_duration_ms,
+    )
+
+
+# ---------------------------------------------------------------------------
+# GET /api/admin/knowledge/scan/result — Get cached scan result
+# ---------------------------------------------------------------------------
+
+
+@router.get(
+    "/scan/result",
+    response_model=ScanResultResponse,
+    summary="Get last scan result",
+    description="Returns the most recent conflict scan result if still cached (5-minute TTL). Returns 404 if no recent scan exists.",
+    responses={
+        404: {"description": "No recent scan result available"},
+        503: {"description": "Conflict scanner not initialized"},
+    },
+)
+async def get_scan_result(
+    ctx: TenantContext = Depends(get_tenant_context),
+) -> ScanResultResponse:
+    """Get the cached result of the most recent conflict scan."""
+    if _conflict_scanner is None:
+        raise HTTPException(
+            status_code=503,
+            detail="Conflict scanner not initialised",
+        )
+
+    result = _conflict_scanner.get_cached_result(ctx.tenant_id)
+    if result is None:
+        raise HTTPException(
+            status_code=404,
+            detail="No recent scan result. Run POST /api/admin/knowledge/scan first.",
+        )
+
+    return ScanResultResponse(
+        tenant_id=result.tenant_id,
+        scanned_at=result.scanned_at,
+        total_entries_scanned=result.total_entries_scanned,
+        entries_with_embeddings=result.entries_with_embeddings,
+        entries_without_embeddings=result.entries_without_embeddings,
+        conflicts=[
+            ConflictPairResponse(
+                entry_a_id=c.entry_a_id,
+                entry_a_title=c.entry_a_title,
+                entry_b_id=c.entry_b_id,
+                entry_b_title=c.entry_b_title,
+                conflict_type=c.conflict_type.value,
+                severity=c.severity.value,
+                embedding_similarity=round(c.embedding_similarity, 3),
+                content_overlap=round(c.content_overlap, 3),
+                title_similarity=round(c.title_similarity, 3),
+                conflicting_facts=c.conflicting_facts,
+                resolution=c.resolution,
+            )
+            for c in result.conflicts
+        ],
+        high_count=result.high_count,
+        medium_count=result.medium_count,
+        low_count=result.low_count,
+        scan_duration_ms=result.scan_duration_ms,
+    )

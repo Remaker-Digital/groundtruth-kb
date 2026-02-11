@@ -4,7 +4,7 @@
 > **Project:** Agent Red Customer Experience
 > **Owner:** Remaker Digital (DBA of VanDusen & Palmeter, LLC)
 > **Created:** 2026-01-31
-> **Last Updated:** 2026-02-02
+> **Last Updated:** 2026-02-10
 > **Baseline:** 125 tests passing (audit date: 2026-01-31)
 > **Current:** 999 tests passing, 0 warnings (as of 2026-02-01)
 > **Original Target:** ~750-875 tests at launch readiness — **EXCEEDED**
@@ -25,6 +25,7 @@
 10. [Trial / Demo Environment Tests (~20 Tests)](#10-trial--demo-environment-tests-20-tests)
 11. [UI-Type × Task-Type Validation Tests (~100 Tests)](#11-ui-type--task-type-validation-tests-100-tests)
 12. [Launch UI Tests — Manual Browser Workflows (~93 Steps)](#12-launch-ui-tests--manual-browser-workflows-93-steps)
+12.5. [KB Conflict Scanner Tests (85 Tests)](#125-kb-conflict-scanner-tests--testsmulti_tenanttest_kb_conflict_scannerpy-85-tests)
 13. [Summary & Metrics](#13-summary--metrics)
 
 ---
@@ -1341,6 +1342,38 @@ procedures are maintained in dedicated documents under `docs/tests/`.
 each required capability (C1-C16). Test is blocked until all dependencies are implemented.
 
 **Launch UI Test Subtotal: 93 steps**
+
+---
+
+## 12.5. KB Conflict Scanner Tests — `tests/multi_tenant/test_kb_conflict_scanner.py` (85 tests)
+
+**Added: 2026-02-10.** On-demand knowledge base conflict and duplication scanner (WI #239). Part of the ongoing chat quality testing lifecycle — prevents inconsistent AI responses by detecting duplicate, conflicting, or overlapping KB entries.
+
+| Test Class | Count | Description |
+|------------|-------|-------------|
+| TestConstants | 7 | Scanner threshold constants, severity/type enums, cache TTL, max conflicts |
+| TestEnumsAndDataClasses | 4 | ConflictType, ConflictSeverity, ConflictPair, ScanResult dataclasses |
+| TestNormalizeTitle | 5 | Title normalization (lowercase, strip punctuation, collapse whitespace) |
+| TestTrigrams | 4 | Character trigram generation for Jaccard similarity |
+| TestTitleSimilarity | 8 | Exact match, near match, different titles, empty titles, case insensitive |
+| TestExtractSentences | 4 | Sentence extraction from content (period-delimited) |
+| TestContentOverlap | 6 | High/medium/low/zero overlap, empty content, single sentence |
+| TestFactualConflictDetection | 9 | Numeric, date, email, boolean contradictions, no conflicts, mixed |
+| TestResolutionGeneration | 6 | Resolution text for all 4 conflict types + severity combinations |
+| TestClassifyConflict | 7 | Near-duplicate, conflicting, topical overlap, similar titles, no conflict |
+| TestFullScan | 10 | Duplicates detected, clean KB, empty KB, single entry, no embeddings, cross-type skip, large KB |
+| TestScanCache | 5 | Cache hit, force bypass, TTL expiry, tenant isolation |
+| TestScannerConfiguration | 6 | Service init, singleton, configure(), custom thresholds |
+| TestSingleton | 2 | Module-level singleton pattern |
+| TestPairDeduplication | 1 | (A,B) and (B,A) deduplicated |
+| TestMaxConflictsLimit | 1 | Output capped at MAX_CONFLICTS_REPORTED |
+| **Subtotal** | **85** | |
+
+**Role in quality testing lifecycle:**
+- Run BEFORE/AFTER KB changes (uploads, edits, imports) to verify no new conflicts
+- Run BEFORE `scripts/test_chat_battery.py` — fix all HIGH conflicts first
+- Run when AI responses inconsistent — scanner identifies KB root cause
+- Part of periodic (weekly/monthly) KB maintenance alongside staleness review
 
 ---
 

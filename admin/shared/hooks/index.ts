@@ -823,6 +823,70 @@ export function useVerifyEntry(apiFetch: ApiFetch) {
 }
 
 // ---------------------------------------------------------------------------
+// KB Conflict Scanner hooks
+// ---------------------------------------------------------------------------
+
+export interface ConflictPair {
+  entryAId: string;
+  entryATitle: string;
+  entryBId: string;
+  entryBTitle: string;
+  conflictType: 'near_duplicate' | 'conflicting' | 'topical_overlap' | 'similar_titles';
+  severity: 'high' | 'medium' | 'low';
+  embeddingSimilarity: number;
+  contentOverlap: number;
+  titleSimilarity: number;
+  conflictingFacts: string[];
+  resolution: string;
+}
+
+export interface ScanResult {
+  tenantId: string;
+  scannedAt: string;
+  totalEntriesScanned: number;
+  entriesWithEmbeddings: number;
+  entriesWithoutEmbeddings: number;
+  conflicts: ConflictPair[];
+  highCount: number;
+  mediumCount: number;
+  lowCount: number;
+  scanDurationMs: number;
+}
+
+export function useConflictScan(apiFetch: ApiFetch) {
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+  const [result, setResult] = useState<ScanResult | null>(null);
+
+  const scan = useCallback(
+    async (force = false): Promise<ScanResult | null> => {
+      setLoading(true);
+      setError(null);
+      try {
+        const resp = await apiFetch(`/api/admin/knowledge/scan?force=${force}`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({}),
+        });
+        if (!resp.ok) throw new Error(`${resp.status}`);
+        const data = await resp.json();
+        setResult(data);
+        return data;
+      } catch (err: unknown) {
+        const msg = err instanceof Error ? err.message : 'Scan failed';
+        setError(msg);
+        return null;
+      } finally {
+        setLoading(false);
+      }
+    },
+    [apiFetch],
+  );
+
+  return { scan, result, loading, error };
+}
+
+// ---------------------------------------------------------------------------
 // Analytics hooks
 // ---------------------------------------------------------------------------
 
