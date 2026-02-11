@@ -9,6 +9,59 @@ All notable changes to Agent Red Customer Experience are documented here.
 
 ---
 
+## v1.17.0 — 2026-02-11
+
+### Admin security
+- Email-based forgot-password flow replaces the old change-password endpoint
+- HMAC-signed reset tokens work across multiple replicas without shared state
+- 15-minute token expiry, single-use enforcement, rate limiting (3 requests per 5 minutes)
+- Branded HTML email with reset link delivered via SMTP (Titan Email)
+
+### Widget
+- Quick Action prompt buttons: configurable pill buttons in the widget greeting area that send pre-defined prompts
+- Template variable substitution (`{{product_name}}`, `{{collection_name}}`, `{{page_handle}}`) for page-aware prompts
+- Improved panel drop-shadow (dual-layer) for visibility on busy storefront backgrounds
+
+### Admin dashboard
+- Quick Action CRUD: 8-endpoint API for creating, editing, ordering, and assigning prompts to page types
+- Conversation search endpoint (previously returned 405)
+- Fixed audit log 500 error (Cosmos DB query initialization)
+- Fixed customer profile list 503 error
+
+### Logo
+- Fixed corrupted logo on forgot-password pages (replaced invalid PNG data URI with SVG)
+
+---
+
+## v1.15.2 — 2026-02-10
+
+### Bug fixes
+- Fixed FastAPI route ordering: static routes (`/stale`, `/export`, `/staleness`) now registered before the `/{entry_id}` catch-all in the knowledge base API
+- Widget config loading: Shopify Liquid template no longer overrides API-fetched tenant configuration with default values
+- Widget default API URL corrected to production FQDN
+
+### Infrastructure
+- API Gateway restored after Azure subscription suspension and recovery
+- Admin UI validation: 86/86 endpoints passing
+
+---
+
+## v1.14.0 — 2026-02-09
+
+### Bug fixes
+- Fixed hybrid search score filtering: `rrf_score` key mismatch caused all search results to be filtered out by the minimum score check
+- Improved Critic prompt engineering to reduce false blocks on product feature descriptions
+
+### Knowledge base
+- Conflict scanner: 4-phase detection (embedding similarity, title trigrams, content overlap, factual conflict regex) with HIGH/MEDIUM/LOW severity ratings
+- Admin UI "Scan for conflicts" button in the knowledge base manager toolbar
+
+### App Store preparation
+- Listing accuracy review: 8 inaccurate claims corrected to verifiable facts
+- Non-disruptive upgrade infrastructure: automated upgrade/rollback scripts with 43-test regression suite
+
+---
+
 ## v1.0.0 — 2026-02-09
 
 **Initial release**

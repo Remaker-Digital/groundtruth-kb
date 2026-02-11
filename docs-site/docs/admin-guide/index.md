@@ -39,6 +39,7 @@ Every configuration change is versioned automatically. You can view past version
 | [Widget appearance](./widget-appearance.md) | Colors, position, launcher, dark mode, mobile behavior |
 | [Widget behavior](./widget-behavior.md) | Auto-open, offline mode, pre-chat forms, rating, sound |
 | [Custom instructions](./custom-instructions.md) | Advanced: direct system prompt injection for specific behaviors |
+| [Quick action prompts](./quick-actions.md) | Pre-defined prompt buttons in the widget greeting area |
 | [Knowledge base management](./knowledge-base-management.md) | Creating, editing, uploading, and organizing knowledge articles |
 
 ## Settings that affect AI prompts
