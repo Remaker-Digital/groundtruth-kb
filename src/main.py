@@ -452,7 +452,7 @@ _STANDALONE_RESET_PW_HTML = f"""<!DOCTYPE html>
   <div class="error" id="err">Passwords do not match.</div>
   <div class="success" id="ok">Password changed successfully!</div>
   <form method="POST" action="/admin/standalone/_reset-password">
-    <input type="hidden" name="token" value="{{token}}"/>
+    <input type="hidden" name="token" value="{{{{token}}}}"/>
     <label for="new">New password</label>
     <input id="new" type="password" name="new_password" placeholder="New password" autofocus required minlength="6"/>
     <label for="confirm">Confirm new password</label>
