@@ -266,10 +266,10 @@ export function resolveTokens(config: WidgetConfig): DesignTokens {
     borderRadiusFull: '9999px',
     borderWidth: '1px',
 
-    // Shadows (Zapier: minimal, functional)
-    shadowSm: '0 1px 2px rgba(0,0,0,0.05)',
-    shadowMd: '0 4px 12px rgba(0,0,0,0.1)',
-    shadowLg: '0 8px 24px rgba(0,0,0,0.15)',
+    // Shadows — layered for visible depth separation on any background
+    shadowSm: '0 1px 3px rgba(0,0,0,0.08), 0 1px 2px rgba(0,0,0,0.06)',
+    shadowMd: '0 4px 6px rgba(0,0,0,0.07), 0 2px 4px rgba(0,0,0,0.12)',
+    shadowLg: '0 10px 25px rgba(0,0,0,0.15), 0 4px 10px rgba(0,0,0,0.12)',
 
     // Sizing
     launcherSize: customLauncherSize != null ? `${customLauncherSize}px` : '60px',
