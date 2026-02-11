@@ -602,6 +602,81 @@ class MemoryVectorDocument(BaseModel):
 
 
 # ---------------------------------------------------------------------------
+# Quick Action models (WI #226-229 — Contextual Quick Action Prompt Buttons)
+# ---------------------------------------------------------------------------
+
+
+class QuickActionPrompt(BaseModel):
+    """A single quick action prompt button configuration.
+
+    Stored as a list inside PreferencesDocument.quick_actions. Merchants
+    create these in the admin dashboard and assign them to page types.
+
+    The prompt_template supports {{variable}} placeholders that the widget
+    resolves at click time using page context (e.g. {{product_title}}).
+    """
+
+    id: str = Field(description="Unique ID (uuid4)")
+    label: str = Field(
+        description="Button text shown to customer (e.g. 'What's on sale?')",
+    )
+    prompt_template: str = Field(
+        description="Hidden prompt sent to AI, with {{variable}} placeholders. "
+        "Supported variables: {{page_type}}, {{page_title}}, {{page_url}}, "
+        "{{page_handle}}, {{product_title}}, {{collection_title}}",
+    )
+    icon: str | None = Field(
+        default=None,
+        description="Optional emoji or icon identifier for the button",
+    )
+    is_active: bool = Field(default=True, description="Whether this action is available")
+    sort_order: int = Field(default=0, description="Display priority (lower = first)")
+    created_at: str = Field(
+        default_factory=lambda: datetime.now(timezone.utc).isoformat(),
+        description="Creation timestamp (ISO 8601)",
+    )
+    updated_at: str = Field(
+        default_factory=lambda: datetime.now(timezone.utc).isoformat(),
+        description="Last update timestamp (ISO 8601)",
+    )
+
+
+# Valid page types for quick action assignments
+VALID_PAGE_TYPES = {
+    "home", "product", "collection", "cart", "search",
+    "blog", "page", "all", "other",
+}
+
+
+class QuickActionPageAssignment(BaseModel):
+    """Maps quick actions to specific page types with 2 slot positions.
+
+    Each page type (or specific page handle) gets up to 2 quick action
+    buttons. The widget requests its page context at boot, and the server
+    returns the matching assignment's actions.
+
+    Priority: specific handle match > page type match > "all" fallback.
+    """
+
+    page_type: str = Field(
+        description="Page type: home, product, collection, cart, search, blog, page, all, other",
+    )
+    page_handle: str | None = Field(
+        default=None,
+        description="Specific page handle (e.g. product slug). "
+        "null = applies to all pages of this type.",
+    )
+    slot_1_action_id: str | None = Field(
+        default=None,
+        description="Quick action ID for slot 1 (left/top button)",
+    )
+    slot_2_action_id: str | None = Field(
+        default=None,
+        description="Quick action ID for slot 2 (right/bottom button)",
+    )
+
+
+# ---------------------------------------------------------------------------
 # Document models — Collection 7: preferences
 # ---------------------------------------------------------------------------
 
@@ -833,6 +908,20 @@ class PreferencesDocument(BaseModel):
     cite_sources_in_response: bool = Field(
         default=False,
         description="When enabled, append source titles to AI responses",
+    )
+
+    # Quick Action Prompt Buttons (WI #226-229)
+    quick_actions: list[dict[str, Any]] = Field(
+        default_factory=list,
+        description="Quick action prompt button definitions (QuickActionPrompt dicts)",
+    )
+    quick_action_assignments: list[dict[str, Any]] = Field(
+        default_factory=list,
+        description="Page-to-quick-action slot assignments (QuickActionPageAssignment dicts)",
+    )
+    widget_quick_actions_enabled: bool = Field(
+        default=True,
+        description="Whether quick action buttons are shown in the widget",
     )
 
     # Metadata
@@ -1239,6 +1328,8 @@ TIER_DEFAULTS: dict[str, dict[str, Any]] = {
         "memory_layers": [1],           # Layer 1 only (basic profile)
         "overage_rate": 0.0,            # No overage — hard cap at 50
         "trial_duration_days": 14,      # 14-day trial period
+        "max_quick_actions": 2,         # Quick action prompt limit
+        "max_quick_action_assignments": 2,
     },
     TenantTier.STARTER.value: {
         "included_conversations": 1_000,
@@ -1248,6 +1339,8 @@ TIER_DEFAULTS: dict[str, dict[str, Any]] = {
         "history_depth_days": 90,       # Layer 2 retention
         "memory_layers": [1, 2],        # Layers available
         "overage_rate": 0.04,
+        "max_quick_actions": 5,
+        "max_quick_action_assignments": 10,
     },
     TenantTier.PROFESSIONAL.value: {
         "included_conversations": 5_000,
@@ -1257,6 +1350,8 @@ TIER_DEFAULTS: dict[str, dict[str, Any]] = {
         "history_depth_days": 365,
         "memory_layers": [1, 2, 3],
         "overage_rate": 0.025,
+        "max_quick_actions": 20,
+        "max_quick_action_assignments": 50,
     },
     TenantTier.ENTERPRISE.value: {
         "included_conversations": 20_000,
@@ -1266,6 +1361,8 @@ TIER_DEFAULTS: dict[str, dict[str, Any]] = {
         "history_depth_days": None,     # Unlimited
         "memory_layers": [1, 2, 3, 4],
         "overage_rate": 0.015,
+        "max_quick_actions": 50,
+        "max_quick_action_assignments": 200,
     },
 }
 

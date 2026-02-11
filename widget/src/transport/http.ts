@@ -91,10 +91,35 @@ async function request<T>(
 // API methods
 // ---------------------------------------------------------------------------
 
-/** Fetch the widget configuration for this tenant. */
-export async function fetchWidgetConfig(): Promise<WidgetConfig | null> {
-  const resp = await request<{ config: WidgetConfig }>('GET', '/api/config');
-  return resp.ok && resp.data ? resp.data.config : null;
+/**
+ * Fetch the widget configuration for this tenant.
+ *
+ * When `pageType` is provided, the server includes contextual quick action
+ * buttons assigned to that page type in the response (WI #227).
+ */
+export async function fetchWidgetConfig(
+  pageType?: string,
+  pageHandle?: string,
+): Promise<WidgetConfig | null> {
+  let path = '/api/config';
+  const params: string[] = [];
+  if (pageType) params.push(`page_type=${encodeURIComponent(pageType)}`);
+  if (pageHandle) params.push(`page_handle=${encodeURIComponent(pageHandle)}`);
+  if (params.length > 0) path += `?${params.join('&')}`;
+
+  const resp = await request<{
+    config: WidgetConfig;
+    quick_actions?: Array<{ id: string; label: string; prompt_template: string; icon?: string | null }>;
+  }>('GET', path);
+
+  if (!resp.ok || !resp.data) return null;
+
+  // Merge quick_actions from response root into the config object
+  const cfg = resp.data.config;
+  if (resp.data.quick_actions) {
+    cfg.widget_quick_actions = resp.data.quick_actions;
+  }
+  return cfg;
 }
 
 /** Start a new conversation. Returns conversation_id. */

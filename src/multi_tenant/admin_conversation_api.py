@@ -4,6 +4,7 @@ Provides REST endpoints for the merchant admin dashboard's Conversation
 Inbox component:
 
     GET  /api/admin/conversations              — List with filtering & pagination
+    POST /api/admin/conversations/search       — Full-text search across messages & notes
     GET  /api/admin/conversations/{id}         — Full conversation detail
     GET  /api/admin/conversations/{id}/messages — Message history
     POST /api/admin/conversations/{id}/assign  — Assign to human agent
@@ -201,6 +202,63 @@ class AddNoteResponse(BaseModel):
     created_at: str
 
 
+class SearchConversationsRequest(BaseModel):
+    """Request body for POST /api/admin/conversations/search."""
+
+    model_config = ConfigDict(alias_generator=to_camel, populate_by_name=True)
+
+    query: str = Field(
+        min_length=1,
+        max_length=500,
+        description="Search text (matched against messages, customer name, and internal notes)",
+    )
+    status: str | None = Field(
+        default=None,
+        description="Optional status filter (active, completed, escalated, resolved, timed_out, error)",
+    )
+    since: str | None = Field(
+        default=None,
+        description="Start date filter (ISO 8601, inclusive)",
+    )
+    until: str | None = Field(
+        default=None,
+        description="End date filter (ISO 8601, exclusive)",
+    )
+    limit: int = Field(
+        default=50,
+        ge=1,
+        le=200,
+        description="Max results to return (default 50, max 200)",
+    )
+
+
+class SearchResultEntry(BaseModel):
+    """A single conversation match from a search."""
+
+    model_config = ConfigDict(alias_generator=to_camel, populate_by_name=True)
+
+    conversation_id: str
+    customer_id: str | None = None
+    customer_name: str | None = None
+    status: str | None = None
+    started_at: str | None = None
+    last_activity_at: str | None = None
+    message_count: int = 0
+    snippet: str = Field(description="Excerpt from the matching content")
+    matched_in: str = Field(description="Where the match was found: messages, notes, or customer_name")
+
+
+class SearchConversationsResponse(BaseModel):
+    """Response for conversation search."""
+
+    model_config = ConfigDict(alias_generator=to_camel, populate_by_name=True)
+
+    tenant_id: str
+    query: str
+    total_results: int
+    results: list[SearchResultEntry]
+
+
 # ---------------------------------------------------------------------------
 # Service accessor
 # ---------------------------------------------------------------------------
@@ -391,6 +449,182 @@ async def list_conversations(
         limit=limit,
         conversations=conversations,
     )
+
+
+# ---------------------------------------------------------------------------
+# POST /api/admin/conversations/search — Full-text search
+# ---------------------------------------------------------------------------
+
+
+@router.post(
+    "/search",
+    response_model=SearchConversationsResponse,
+    summary="Search conversations",
+    description=(
+        "Full-text search across conversation messages, customer names, and "
+        "internal notes. Returns matching conversations with a content snippet "
+        "showing where the match was found."
+    ),
+    responses={
+        400: {"description": "Invalid search query or status filter"},
+        503: {"description": "Admin conversation services not initialized"},
+    },
+)
+async def search_conversations(
+    request: SearchConversationsRequest,
+    ctx: TenantContext = Depends(get_tenant_context),
+) -> SearchConversationsResponse:
+    """Search conversations by text content.
+
+    Searches across message content, customer names, and internal notes
+    using case-insensitive substring matching. Results are ordered by
+    most recent activity first.
+    """
+    repo = _get_repo()
+
+    # Validate status if provided
+    if request.status is not None:
+        try:
+            ConversationStatus(request.status)
+        except ValueError:
+            valid = [s.value for s in ConversationStatus]
+            raise HTTPException(
+                status_code=400,
+                detail=f"Invalid status '{request.status}'. Valid values: {valid}",
+            )
+
+    search_term = request.query.strip()
+
+    # Build Cosmos DB query for full-text search across conversation content.
+    # We search in: customer_name, messages[].content, internal_notes[].content.
+    # CONTAINS() is case-insensitive in Cosmos DB NoSQL API with 4th param true.
+    conditions = ["c.tenant_id = @tenant_id"]
+    parameters: list[dict[str, Any]] = [
+        {"name": "@tenant_id", "value": ctx.tenant_id},
+        {"name": "@search_term", "value": search_term},
+    ]
+
+    if request.status:
+        conditions.append("c.status = @status")
+        parameters.append({"name": "@status", "value": request.status})
+
+    if request.since:
+        conditions.append("c.started_at >= @since")
+        parameters.append({"name": "@since", "value": request.since})
+
+    if request.until:
+        conditions.append("c.started_at < @until")
+        parameters.append({"name": "@until", "value": request.until})
+
+    # Match on customer_name OR any message content OR any internal note
+    search_condition = (
+        "(CONTAINS(c.customer_name, @search_term, true)"
+        " OR EXISTS("
+        "   SELECT VALUE m FROM m IN c.messages"
+        "   WHERE CONTAINS(m.content, @search_term, true)"
+        " )"
+        " OR EXISTS("
+        "   SELECT VALUE n FROM n IN c.internal_notes"
+        "   WHERE CONTAINS(n.content, @search_term, true)"
+        " ))"
+    )
+    conditions.append(search_condition)
+
+    query_text = (
+        f"SELECT * FROM c WHERE {' AND '.join(conditions)}"
+        " ORDER BY c.last_activity_at DESC"
+        f" OFFSET 0 LIMIT {request.limit}"
+    )
+
+    try:
+        raw_results = await repo.query(
+            tenant_id=ctx.tenant_id,
+            query_text=query_text,
+            parameters=parameters,
+        )
+    except Exception:
+        logger.warning(
+            "Conversation search failed: tenant=%s query=%s",
+            ctx.tenant_id[:8],
+            search_term[:20],
+            exc_info=True,
+        )
+        raw_results = []
+
+    # Build results with match snippets
+    results: list[SearchResultEntry] = []
+    for doc in raw_results:
+        snippet, matched_in = _extract_search_snippet(doc, search_term)
+        results.append(
+            SearchResultEntry(
+                conversation_id=doc.get("conversation_id", doc.get("id", "")),
+                customer_id=doc.get("customer_id"),
+                customer_name=doc.get("customer_name"),
+                status=doc.get("status"),
+                started_at=doc.get("started_at"),
+                last_activity_at=doc.get("last_activity_at"),
+                message_count=doc.get("message_count", 0),
+                snippet=snippet,
+                matched_in=matched_in,
+            )
+        )
+
+    return SearchConversationsResponse(
+        tenant_id=ctx.tenant_id,
+        query=search_term,
+        total_results=len(results),
+        results=results,
+    )
+
+
+def _extract_search_snippet(
+    doc: dict[str, Any],
+    search_term: str,
+    max_snippet_len: int = 120,
+) -> tuple[str, str]:
+    """Extract a content snippet showing where the search term matched.
+
+    Returns (snippet, matched_in) where matched_in is one of:
+    'customer_name', 'messages', or 'notes'.
+    """
+    term_lower = search_term.lower()
+
+    # Check customer_name first
+    customer_name = doc.get("customer_name", "") or ""
+    if term_lower in customer_name.lower():
+        return (customer_name[:max_snippet_len], "customer_name")
+
+    # Check messages
+    for msg in doc.get("messages", []):
+        content = msg.get("content", "") or ""
+        if term_lower in content.lower():
+            # Extract snippet around the match
+            idx = content.lower().index(term_lower)
+            start = max(0, idx - 40)
+            end = min(len(content), idx + len(search_term) + 80)
+            snippet = content[start:end]
+            if start > 0:
+                snippet = "…" + snippet
+            if end < len(content):
+                snippet = snippet + "…"
+            return (snippet[:max_snippet_len], "messages")
+
+    # Check internal notes
+    for note in doc.get("internal_notes", []):
+        content = note.get("content", "") or ""
+        if term_lower in content.lower():
+            idx = content.lower().index(term_lower)
+            start = max(0, idx - 40)
+            end = min(len(content), idx + len(search_term) + 80)
+            snippet = content[start:end]
+            if start > 0:
+                snippet = "…" + snippet
+            if end < len(content):
+                snippet = snippet + "…"
+            return (snippet[:max_snippet_len], "notes")
+
+    # Fallback — shouldn't happen but safe
+    return ("", "messages")
 
 
 # ---------------------------------------------------------------------------

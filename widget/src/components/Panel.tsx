@@ -41,6 +41,7 @@ import {
   getTransportConfig,
 } from '@/transport/http';
 import { SSEConnection } from '@/transport/sse';
+import { detectPageContext, resolveTemplate } from '@/utils/templateVars';
 
 // ---------------------------------------------------------------------------
 // Props (passed from the iframe bootstrap)
@@ -128,6 +129,7 @@ export const Panel: FunctionComponent<PanelProps> = ({
   const showBranding = config.widget_show_branding !== false;
   const fileUploadEnabled = config.widget_file_upload_enabled === true;
   const chatRatingEnabled = config.widget_chat_rating_enabled !== false;
+  const quickActions = config.widget_quick_actions || [];
 
   // ---- Conversation lifecycle ---------------------------------------------
 
@@ -237,6 +239,13 @@ export const Panel: FunctionComponent<PanelProps> = ({
     // new message needs a fresh SSE connection to receive the AI response.
     connectSSE(conversationId);
   }, [connectSSE]);
+
+  /** Handle quick action button click — resolve template vars and send (WI #228). */
+  const handleQuickAction = useCallback((promptTemplate: string) => {
+    const context = detectPageContext();
+    const resolvedPrompt = resolveTemplate(promptTemplate, context);
+    handleSend(resolvedPrompt);
+  }, [handleSend]);
 
   /** End the current conversation. */
   /** End the current conversation (wired to Header close). */
@@ -385,6 +394,8 @@ export const Panel: FunctionComponent<PanelProps> = ({
             agentName={agentName}
             agentAvatarUrl={agentAvatarUrl}
             greetingMessage={greetingMessage}
+            quickActions={quickActions}
+            onQuickAction={handleQuickAction}
           />
 
           {/* Report an Issue link (C7) — shown when conversation has messages */}

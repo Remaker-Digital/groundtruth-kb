@@ -300,8 +300,8 @@ async def export_audit_events(
         "customer_id", "trace_id", "details",
     ])
 
+    import json
     for e in events_raw:
-        import json
         writer.writerow([
             e.get("id", ""),
             e.get("event_type", ""),

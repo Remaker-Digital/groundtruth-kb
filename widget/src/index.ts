@@ -33,6 +33,7 @@ import { en } from '@/locale/en';
 import type { Locale } from '@/locale/en';
 import { createStore } from '@/state/store';
 import { configureTransport, fetchWidgetConfig } from '@/transport/http';
+import { detectPageContext } from '@/utils/templateVars';
 import { Launcher } from '@/components/Launcher';
 import { Panel } from '@/components/Panel';
 
@@ -128,8 +129,11 @@ async function init(
   _apiBaseUrl: string,
   dataOverrides?: Record<string, string | boolean>,
 ): Promise<void> {
-  // Fetch widget configuration from the API
-  const fetchedConfig = await fetchWidgetConfig();
+  // Detect page context for quick action filtering (WI #227)
+  const pageCtx = detectPageContext();
+
+  // Fetch widget configuration from the API (with page context for quick actions)
+  const fetchedConfig = await fetchWidgetConfig(pageCtx.page_type, pageCtx.page_handle);
   if (!fetchedConfig) {
     console.warn('[AgentRed] Failed to fetch widget configuration. Widget will not load.');
     return;

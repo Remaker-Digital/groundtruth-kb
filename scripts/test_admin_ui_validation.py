@@ -495,7 +495,7 @@ async def test_conversation_endpoints(client: httpx.AsyncClient) -> list[TestRes
         client, "POST", "/api/admin/conversations/search",
         json_body={"query": "test"},
         category=cat, name="POST /api/admin/conversations/search",
-        expected=[200, 400, 404, 405],
+        expected=[200, 400, 404],
     ))
 
     return results

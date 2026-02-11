@@ -17,10 +17,11 @@
 
 import { FunctionComponent, JSX } from 'preact';
 import { useRef, useEffect, useState, useCallback } from 'preact/hooks';
-import type { DesignTokens } from '@/theme/tokens';
+import type { DesignTokens, QuickActionButton } from '@/theme/tokens';
 import type { Locale } from '@/locale/en';
 import type { Message } from '@/state/store';
 import { MessageBubble, TypingIndicator } from './MessageBubble';
+import { QuickActions } from './QuickActions';
 
 // ---------------------------------------------------------------------------
 // Props
@@ -34,6 +35,10 @@ interface MessageListProps {
   agentName: string;
   agentAvatarUrl: string | null;
   greetingMessage: string | null;
+  /** Quick action prompt buttons for the greeting area (WI #228). */
+  quickActions?: QuickActionButton[];
+  /** Callback when a quick action button is clicked. */
+  onQuickAction?: (promptTemplate: string) => void;
 }
 
 // ---------------------------------------------------------------------------
@@ -89,6 +94,8 @@ export const MessageList: FunctionComponent<MessageListProps> = ({
   agentName,
   agentAvatarUrl,
   greetingMessage,
+  quickActions,
+  onQuickAction,
 }) => {
   const scrollRef = useRef<HTMLDivElement>(null);
   const [isAtBottom, setIsAtBottom] = useState(true);
@@ -249,6 +256,16 @@ export const MessageList: FunctionComponent<MessageListProps> = ({
             >
               {greetingMessage}
             </div>
+
+            {/* Quick action prompt buttons (WI #228) */}
+            {quickActions && quickActions.length > 0 && onQuickAction && (
+              <QuickActions
+                tokens={tokens}
+                actions={quickActions}
+                onAction={onQuickAction}
+                disabled={false}
+              />
+            )}
           </div>
         )}
 

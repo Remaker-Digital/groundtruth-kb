@@ -151,6 +151,16 @@ export interface WidgetConfig {
   // Non-widget fields used for display
   brand_name?: string | null;
   greeting_message?: string | null;
+  // Quick action buttons for the current page context (WI #228)
+  widget_quick_actions?: QuickActionButton[] | null;
+}
+
+/** Quick action prompt button from the server (WI #228). */
+export interface QuickActionButton {
+  id: string;
+  label: string;
+  prompt_template: string;
+  icon?: string | null;
 }
 
 // ---------------------------------------------------------------------------

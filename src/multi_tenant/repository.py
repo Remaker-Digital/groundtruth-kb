@@ -1767,6 +1767,173 @@ class PreferencesRepository(TenantScopedRepository):
         )
         return results[0] if results else None
 
+    # ---- Quick Action Prompt methods (WI #226-229) ----
+
+    async def get_quick_actions(self, tenant_id: str) -> list[dict[str, Any]]:
+        """Get all quick action prompts for a tenant.
+
+        Reads the current preferences document and returns the
+        quick_actions array.
+        """
+        current = await self.get_current(tenant_id)
+        if not current:
+            return []
+        return current.get("quick_actions", [])
+
+    async def upsert_quick_action(
+        self, tenant_id: str, action: dict[str, Any],
+    ) -> dict[str, Any]:
+        """Create or update a quick action in the current preferences.
+
+        Uses read-modify-write on the quick_actions array within the
+        current preferences document. If the action ID exists, replaces
+        it; otherwise appends.
+        """
+        current = await self.get_current(tenant_id)
+        if not current:
+            raise DocumentNotFoundError(
+                self._collection_name, "current", tenant_id,
+            )
+
+        actions: list[dict[str, Any]] = current.get("quick_actions", [])
+
+        # Find and replace existing, or append new
+        found = False
+        for i, existing in enumerate(actions):
+            if existing.get("id") == action["id"]:
+                actions[i] = action
+                found = True
+                break
+        if not found:
+            actions.append(action)
+
+        await self.patch(
+            tenant_id=tenant_id,
+            document_id=current["id"],
+            operations=[{"op": "set", "path": "/quick_actions", "value": actions}],
+        )
+        return action
+
+    async def delete_quick_action(
+        self, tenant_id: str, action_id: str,
+    ) -> bool:
+        """Remove a quick action from the current preferences.
+
+        Also removes any page assignment references to this action ID.
+        Returns True if the action was found and removed.
+        """
+        current = await self.get_current(tenant_id)
+        if not current:
+            return False
+
+        actions: list[dict[str, Any]] = current.get("quick_actions", [])
+        original_len = len(actions)
+        actions = [a for a in actions if a.get("id") != action_id]
+
+        if len(actions) == original_len:
+            return False  # Not found
+
+        # Also clean up assignments referencing this action
+        assignments: list[dict[str, Any]] = current.get(
+            "quick_action_assignments", [],
+        )
+        for assignment in assignments:
+            if assignment.get("slot_1_action_id") == action_id:
+                assignment["slot_1_action_id"] = None
+            if assignment.get("slot_2_action_id") == action_id:
+                assignment["slot_2_action_id"] = None
+
+        await self.patch(
+            tenant_id=tenant_id,
+            document_id=current["id"],
+            operations=[
+                {"op": "set", "path": "/quick_actions", "value": actions},
+                {"op": "set", "path": "/quick_action_assignments", "value": assignments},
+            ],
+        )
+        return True
+
+    async def get_page_assignments(
+        self, tenant_id: str,
+    ) -> list[dict[str, Any]]:
+        """Get all page-to-quick-action assignments for a tenant."""
+        current = await self.get_current(tenant_id)
+        if not current:
+            return []
+        return current.get("quick_action_assignments", [])
+
+    async def upsert_page_assignment(
+        self, tenant_id: str, assignment: dict[str, Any],
+    ) -> dict[str, Any]:
+        """Create or update a page assignment.
+
+        Matches on page_type + page_handle combination. If a matching
+        assignment exists, replaces it; otherwise appends.
+        """
+        current = await self.get_current(tenant_id)
+        if not current:
+            raise DocumentNotFoundError(
+                self._collection_name, "current", tenant_id,
+            )
+
+        assignments: list[dict[str, Any]] = current.get(
+            "quick_action_assignments", [],
+        )
+
+        # Find and replace existing (match on page_type + page_handle)
+        found = False
+        for i, existing in enumerate(assignments):
+            if (
+                existing.get("page_type") == assignment["page_type"]
+                and existing.get("page_handle") == assignment.get("page_handle")
+            ):
+                assignments[i] = assignment
+                found = True
+                break
+        if not found:
+            assignments.append(assignment)
+
+        await self.patch(
+            tenant_id=tenant_id,
+            document_id=current["id"],
+            operations=[
+                {"op": "set", "path": "/quick_action_assignments", "value": assignments},
+            ],
+        )
+        return assignment
+
+    async def delete_page_assignment(
+        self, tenant_id: str, page_type: str, page_handle: str | None = None,
+    ) -> bool:
+        """Remove a page assignment. Returns True if found and removed."""
+        current = await self.get_current(tenant_id)
+        if not current:
+            return False
+
+        assignments: list[dict[str, Any]] = current.get(
+            "quick_action_assignments", [],
+        )
+        original_len = len(assignments)
+        assignments = [
+            a for a in assignments
+            if not (
+                a.get("page_type") == page_type
+                and a.get("page_handle") == page_handle
+            )
+        ]
+
+        if len(assignments) == original_len:
+            return False
+
+        await self.patch(
+            tenant_id=tenant_id,
+            document_id=current["id"],
+            operations=[
+                {"op": "set", "path": "/quick_action_assignments", "value": assignments},
+            ],
+        )
+        return True
+
 
 # ---------------------------------------------------------------------------
 # Collection 8: TeamMemberRepository (WI #179)
@@ -2020,44 +2187,128 @@ class AuditLogRepository(PlatformScopedRepository):
         )
         return result
 
-    async def query_by_tenant(
+    def _build_audit_query(
         self,
         tenant_id: str,
-        time_partition: str,
-        event_type: AuditEventType | None = None,
-        max_items: int = 100,
-    ) -> list[dict[str, Any]]:
-        """Query audit events for a tenant within a time partition.
+        date_from: str | None = None,
+        date_to: str | None = None,
+        event_type: str | None = None,
+        customer_id: str | None = None,
+    ) -> tuple[str, list[dict[str, Any]]]:
+        """Build a WHERE clause and params for audit log queries.
 
-        Args:
-            tenant_id: Tenant to filter for.
-            time_partition: YYYY-MM partition to query.
-            event_type: Optional event type filter.
-            max_items: Maximum results.
+        Returns (where_clause, params) — caller prepends SELECT and appends
+        ORDER BY / OFFSET / LIMIT as needed.
         """
-        query_text = "SELECT * FROM c WHERE c.tenant_id = @tenant_id"
+        clauses = ["c.tenant_id = @tenant_id"]
         params: list[dict[str, Any]] = [
             {"name": "@tenant_id", "value": tenant_id},
         ]
 
+        if date_from:
+            clauses.append("c.timestamp >= @date_from")
+            params.append({"name": "@date_from", "value": date_from})
+        if date_to:
+            clauses.append("c.timestamp <= @date_to")
+            params.append({"name": "@date_to", "value": date_to})
         if event_type:
-            query_text += " AND c.event_type = @event_type"
-            params.append({"name": "@event_type", "value": event_type.value})
+            clauses.append("c.event_type = @event_type")
+            params.append({"name": "@event_type", "value": event_type})
+        if customer_id:
+            clauses.append("c.customer_id = @customer_id")
+            params.append({"name": "@customer_id", "value": customer_id})
 
-        query_text += " ORDER BY c.timestamp DESC"
+        where = " AND ".join(clauses)
+        return where, params
+
+    async def query_by_tenant(
+        self,
+        tenant_id: str,
+        offset: int = 0,
+        limit: int = 100,
+        date_from: str | None = None,
+        date_to: str | None = None,
+        event_type: str | None = None,
+        customer_id: str | None = None,
+    ) -> list[dict[str, Any]]:
+        """Query audit events for a tenant with filtering and pagination.
+
+        Uses cross-partition query to span multiple time partitions
+        (e.g. a date range from Jan to Feb). The composite index on
+        (tenant_id ASC, timestamp DESC) keeps this efficient.
+
+        Args:
+            tenant_id: Tenant to filter for.
+            offset: Pagination offset.
+            limit: Page size.
+            date_from: Start date (ISO 8601 string, inclusive).
+            date_to: End date (ISO 8601 string, inclusive).
+            event_type: Optional event type filter (string value).
+            customer_id: Optional customer ID filter (exact match).
+        """
+        where, params = self._build_audit_query(
+            tenant_id=tenant_id,
+            date_from=date_from,
+            date_to=date_to,
+            event_type=event_type,
+            customer_id=customer_id,
+        )
+
+        query_text = (
+            f"SELECT * FROM c WHERE {where} "
+            f"ORDER BY c.timestamp DESC "
+            f"OFFSET @offset LIMIT @limit"
+        )
+        params.append({"name": "@offset", "value": offset})
+        params.append({"name": "@limit", "value": limit})
 
         items: list[dict[str, Any]] = []
         async for item in self._container.query_items(
             query=query_text,
             parameters=params,
-            partition_key=time_partition,
-            max_item_count=max_items,
+            enable_cross_partition_query=True,
         ):
             items.append(item)
-            if len(items) >= max_items:
-                break
 
         return items
+
+    async def count_by_tenant(
+        self,
+        tenant_id: str,
+        date_from: str | None = None,
+        date_to: str | None = None,
+        event_type: str | None = None,
+        customer_id: str | None = None,
+    ) -> int:
+        """Count audit events matching the given filters.
+
+        Uses the same cross-partition query approach as query_by_tenant.
+
+        Args:
+            tenant_id: Tenant to filter for.
+            date_from: Start date (ISO 8601 string, inclusive).
+            date_to: End date (ISO 8601 string, inclusive).
+            event_type: Optional event type filter (string value).
+            customer_id: Optional customer ID filter (exact match).
+        """
+        where, params = self._build_audit_query(
+            tenant_id=tenant_id,
+            date_from=date_from,
+            date_to=date_to,
+            event_type=event_type,
+            customer_id=customer_id,
+        )
+
+        query_text = f"SELECT VALUE COUNT(1) FROM c WHERE {where}"
+
+        async for item in self._container.query_items(
+            query=query_text,
+            parameters=params,
+            enable_cross_partition_query=True,
+        ):
+            return item  # COUNT returns a single integer value
+
+        return 0
 
     async def query_by_event_type(
         self,

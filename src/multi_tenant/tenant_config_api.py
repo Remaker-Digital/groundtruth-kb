@@ -51,7 +51,7 @@ from __future__ import annotations
 import logging
 from typing import Any
 
-from fastapi import APIRouter, Depends, HTTPException
+from fastapi import APIRouter, Depends, HTTPException, Query
 from pydantic import BaseModel, ConfigDict, Field
 from pydantic.alias_generators import to_camel
 
@@ -107,6 +107,15 @@ class ConfigRollbackRequest(BaseModel):
     )
 
 
+class QuickActionForWidget(BaseModel):
+    """Minimal quick action shape served to the widget."""
+
+    id: str
+    label: str
+    prompt_template: str
+    icon: str | None = None
+
+
 class ConfigResponse(BaseModel):
     """Standard config read response."""
 
@@ -115,6 +124,7 @@ class ConfigResponse(BaseModel):
     version: int
     config: dict[str, Any]
     from_cache: bool = False
+    quick_actions: list[QuickActionForWidget] | None = None
 
 
 class ConfigUpdateResponse(BaseModel):
@@ -263,6 +273,119 @@ def _resolve_tier(ctx: TenantContext) -> TenantTier:
 
 
 # ---------------------------------------------------------------------------
+# Quick action resolution (WI #227 — widget page-filtered quick actions)
+# ---------------------------------------------------------------------------
+
+_quick_action_repo: Any | None = None
+
+
+def configure_quick_action_serving(prefs_repo: Any) -> None:
+    """Wire the config API to PreferencesRepository for quick action serving.
+
+    Called during app startup.  When not configured, GET /api/config simply
+    returns ``quick_actions: null`` (backward compatible).
+    """
+    global _quick_action_repo
+    _quick_action_repo = prefs_repo
+    logger.info("Quick action serving configured for GET /api/config")
+
+
+async def _resolve_quick_actions(
+    tenant_id: str,
+    config: dict[str, Any],
+    page_type: str,
+    page_handle: str | None,
+) -> list[QuickActionForWidget]:
+    """Resolve quick action buttons for a specific page context.
+
+    Priority:
+      1. Specific handle match  (page_type + page_handle)
+      2. Page-type-level match  (page_type, page_handle=null)
+      3. "all" fallback         (page_type="all")
+      4. Empty list             (no buttons)
+
+    Only active actions are returned.  If ``widget_quick_actions_enabled``
+    is False in the config, returns empty.
+    """
+    if _quick_action_repo is None:
+        return []
+
+    # Check global toggle
+    if not config.get("widget_quick_actions_enabled", True):
+        return []
+
+    try:
+        actions = await _quick_action_repo.get_quick_actions(tenant_id)
+        assignments = await _quick_action_repo.get_page_assignments(tenant_id)
+    except Exception:
+        logger.warning(
+            "Quick action resolution failed for tenant=%s",
+            tenant_id[:8], exc_info=True,
+        )
+        return []
+
+    if not actions or not assignments:
+        return []
+
+    # Build action lookup (active only)
+    action_map: dict[str, dict[str, Any]] = {}
+    for a in actions:
+        if a.get("is_active", True):
+            action_map[a.get("id", "")] = a
+
+    if not action_map:
+        return []
+
+    # Find matching assignment: specific handle > page type > "all"
+    match: dict[str, Any] | None = None
+
+    # Pass 1: exact handle match
+    if page_handle:
+        for asgn in assignments:
+            if (
+                asgn.get("page_type") == page_type
+                and asgn.get("page_handle") == page_handle
+            ):
+                match = asgn
+                break
+
+    # Pass 2: page type (no handle)
+    if match is None:
+        for asgn in assignments:
+            if (
+                asgn.get("page_type") == page_type
+                and not asgn.get("page_handle")
+            ):
+                match = asgn
+                break
+
+    # Pass 3: "all" fallback
+    if match is None:
+        for asgn in assignments:
+            if asgn.get("page_type") == "all" and not asgn.get("page_handle"):
+                match = asgn
+                break
+
+    if match is None:
+        return []
+
+    # Collect slot actions
+    result: list[QuickActionForWidget] = []
+    for slot_key in ("slot_1_action_id", "slot_2_action_id"):
+        action_id = match.get(slot_key)
+        if action_id and action_id in action_map:
+            a = action_map[action_id]
+            result.append(QuickActionForWidget(
+                id=a.get("id", ""),
+                label=a.get("label", ""),
+                prompt_template=a.get("prompt_template", ""),
+                icon=a.get("icon"),
+            ))
+
+    return result
+
+
+# ---------------------------------------------------------------------------
 # Router
 # ---------------------------------------------------------------------------
 
@@ -277,9 +400,17 @@ router = APIRouter(prefix="/api/config", tags=["configuration"])
     "",
     response_model=ConfigResponse,
     summary="Get current resolved configuration",
-    description="Returns the tenant's configuration with all inheritance applied: platform defaults, tier defaults, and tenant overrides. Result may come from a 60-second cache.",
+    description="Returns the tenant's configuration with all inheritance applied: platform defaults, tier defaults, and tenant overrides. Result may come from a 60-second cache. Optionally includes quick action buttons for the specified page context.",
 )
 async def get_config(
+    page_type: str | None = Query(
+        None,
+        description="Page type for quick action filtering (e.g. product, collection, home)",
+    ),
+    page_handle: str | None = Query(
+        None,
+        description="Specific page handle for targeted quick action matching",
+    ),
     ctx: TenantContext = Depends(get_tenant_context),
 ) -> ConfigResponse:
     """Get the fully resolved current configuration.
@@ -288,11 +419,22 @@ async def get_config(
     platform defaults → tier defaults → tenant overrides.
 
     The result may come from a 60-second in-memory cache.
+
+    When ``page_type`` is provided, quick actions assigned to that page
+    are included in the response.  The widget uses these to render
+    contextual prompt buttons in the greeting area.
     """
     processor = get_config_processor()
     tier = _resolve_tier(ctx)
 
     result = await processor.get_config(ctx.tenant_id, tier)
+
+    # --- Quick action resolution (WI #227) ---
+    quick_actions: list[QuickActionForWidget] | None = None
+    if page_type is not None:
+        quick_actions = await _resolve_quick_actions(
+            ctx.tenant_id, result.config, page_type, page_handle,
+        )
 
     return ConfigResponse(
         tenant_id=result.tenant_id,
@@ -300,6 +442,7 @@ async def get_config(
         version=result.version,
         config=result.config,
         from_cache=result.from_cache,
+        quick_actions=quick_actions,
     )
 
 

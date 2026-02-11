@@ -38,6 +38,19 @@
     {% if block.settings.greeting_message != blank %}data-greeting="{{ block.settings.greeting_message | escape }}"{% endif %}
     {% if block.settings.header_text != blank %}data-header-text="{{ block.settings.header_text | escape }}"{% endif %}
     {% if block.settings.agent_name != blank %}data-agent-name="{{ block.settings.agent_name | escape }}"{% endif %}
+    {% comment %} Page context for quick action template variables (WI #228b) {% endcomment %}
+    data-page-type="{{ template.name | default: 'other' }}"
+    {% if product %}
+      data-page-handle="{{ product.handle }}"
+      data-product-title="{{ product.title | escape }}"
+    {% elsif collection %}
+      data-page-handle="{{ collection.handle }}"
+      data-collection-title="{{ collection.title | escape }}"
+    {% elsif page %}
+      data-page-handle="{{ page.handle }}"
+    {% elsif blog %}
+      data-page-handle="{{ blog.handle }}"
+    {% endif %}
   ></script>
 {% endif %}
 

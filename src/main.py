@@ -65,6 +65,7 @@ app = FastAPI(
         {"name": "trial", "description": "Trial tier lifecycle management"},
         {"name": "security", "description": "API key and widget key rotation"},
         {"name": "admin-integrations", "description": "Third-party integration management"},
+        {"name": "admin-quick-actions", "description": "Quick action prompt button management"},
     ],
     responses={
         401: {"description": "Authentication required or invalid credentials"},
@@ -178,6 +179,7 @@ from src.multi_tenant.security_hardening import rotation_router  # noqa: E402
 from src.multi_tenant.admin_customer_profile_api import router as admin_profile_router  # noqa: E402
 from src.multi_tenant.admin_apikey_api import router as admin_apikey_router  # noqa: E402
 from src.multi_tenant.admin_integration_api import router as admin_integration_router  # noqa: E402
+from src.multi_tenant.admin_quick_action_api import router as admin_quick_action_router  # noqa: E402
 
 app.include_router(provisioning_router)
 app.include_router(checkout_router)
@@ -201,6 +203,7 @@ app.include_router(rotation_router)
 app.include_router(admin_profile_router)
 app.include_router(admin_apikey_router)
 app.include_router(admin_integration_router)
+app.include_router(admin_quick_action_router)
 
 # ---------------------------------------------------------------------------
 # Shopify Embedded Admin SPA (static files + catch-all for SPA routing)
@@ -1288,6 +1291,39 @@ async def _startup_admin_audit_services() -> None:
 
 
 # ---------------------------------------------------------------------------
+# Admin Quick Action API (WI #226-229)
+# ---------------------------------------------------------------------------
+
+from src.multi_tenant.admin_quick_action_api import configure_admin_quick_action_services  # noqa: E402
+from src.multi_tenant.tenant_config_api import configure_quick_action_serving  # noqa: E402
+
+
+@app.on_event("startup")
+async def _startup_admin_quick_action_services() -> None:
+    """Initialize the Admin Quick Action API and config-serving integration.
+
+    Wires PreferencesRepository into:
+      1. Admin CRUD endpoints (/api/admin/quick-actions)
+      2. Config serving (GET /api/config quick_actions field)
+
+    Non-fatal: admin endpoints return 503 if initialization fails;
+    config serving returns quick_actions: null.
+    """
+    try:
+        from src.multi_tenant.repository import PreferencesRepository
+
+        prefs_repo = PreferencesRepository()
+        configure_admin_quick_action_services(prefs_repo=prefs_repo)
+        configure_quick_action_serving(prefs_repo=prefs_repo)
+        logger.info("Admin quick action API initialized (8 endpoints + config serving)")
+    except Exception:
+        logger.warning(
+            "Admin quick action initialization failed — quick action endpoints "
+            "will return 503 until dependencies are available."
+        )
+
+
+# ---------------------------------------------------------------------------
 # Admin Customer Profile API (WI #142)
 # ---------------------------------------------------------------------------
 
@@ -1303,8 +1339,12 @@ async def _startup_admin_profile_services() -> None:
     """
     try:
         from src.multi_tenant.customer_profile_service import get_profile_service
+        from src.multi_tenant.repository import CustomerProfileRepository
 
-        configure_admin_profile_services(profile_service=get_profile_service())
+        configure_admin_profile_services(
+            profile_service=get_profile_service(),
+            profile_repo=CustomerProfileRepository(),
+        )
         logger.info("Admin customer profile API initialized (5 endpoints)")
     except Exception:
         logger.warning(

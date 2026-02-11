@@ -1850,6 +1850,24 @@ def _build_field_registry() -> dict[str, ConfigFieldDefinition]:
         affects_agents=[],
     ))
 
+    fields.append(ConfigFieldDefinition(
+        field_name="widget_quick_actions_enabled",
+        display_name="Quick action buttons",
+        field_type=ConfigFieldType.BOOLEAN,
+        platform_default=True,
+        onboarding_step=OnboardingStep.WIDGET_APPEARANCE,
+        step_order=24,
+        tooltip="Show contextual quick action prompt buttons in the chat greeting area.",
+        description=(
+            "When enabled, up to 2 quick action prompt buttons appear below "
+            "the greeting message. Buttons are configured in the Quick Actions "
+            "section and can be assigned to specific page types (product, "
+            "collection, home, etc.) for contextual relevance."
+        ),
+        doc_link=f"{DOCS_BASE_URL}/configuration/widget-appearance#quick-actions",
+        affects_agents=[],
+    ))
+
     # ===================================================================
     # Step 10: Review & Launch (renumbered from 9)
     # This step shows a review of all configured settings.
