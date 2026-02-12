@@ -58,6 +58,13 @@ const PAGE_TYPES = [
   { value: 'other', label: 'Other' },
 ];
 
+const STARTER_EXAMPLES = [
+  { icon: '📦', label: 'Track my order', prompt: 'I want to track my recent order. Can you help me find the status?' },
+  { icon: '🔄', label: 'Return policy', prompt: 'What is your return and exchange policy? How do I start a return?' },
+  { icon: '💡', label: 'Product recommendations', prompt: 'Can you recommend products based on what I\'m looking at? {{product_title}}' },
+  { icon: '❓', label: 'Help with my order', prompt: 'I need help with an issue related to my order. Can you assist?' },
+];
+
 const TEMPLATE_VARS = [
   { var: '{{page_type}}', desc: 'Current page type (home, product, etc.)' },
   { var: '{{page_handle}}', desc: 'URL slug or Shopify handle' },
@@ -264,6 +271,30 @@ export const QuickActionsPage: React.FC = () => {
     }
   }, [apiFetch, onNotify, fetchActions, fetchAssignments]);
 
+  // ---- Create from starter example -------------------------------------------
+
+  const handleCreateStarter = useCallback(async (starter: { icon: string; label: string; prompt: string }, index: number) => {
+    try {
+      const resp = await apiFetch('/api/admin/quick-actions', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          label: starter.label,
+          prompt_template: starter.prompt,
+          icon: starter.icon,
+          is_active: true,
+          sort_order: index,
+        }),
+      });
+      if (!resp.ok) throw new Error(`Create failed: ${resp.status}`);
+      onNotify(`Created "${starter.label}"`, 'success');
+      await fetchActions();
+    } catch (err) {
+      const msg = err instanceof Error ? err.message : 'Create failed';
+      onNotify(msg, 'error');
+    }
+  }, [apiFetch, onNotify, fetchActions]);
+
   // ---- Assignment inline save -----------------------------------------------
 
   const handleInlineAssignmentSave = useCallback(async (
@@ -456,9 +487,28 @@ export const QuickActionsPage: React.FC = () => {
                     {actions.length === 0 && (
                       <Table.Tr>
                         <Table.Td colSpan={6}>
-                          <Text ta="center" c="dimmed" py="xl" size="sm">
-                            No quick actions yet. Create your first prompt button to get started.
-                          </Text>
+                          <Stack gap="md" py="lg" px="md" align="center">
+                            <Text ta="center" c="dimmed" size="sm">
+                              No quick actions yet. Start with one of these examples or create your own.
+                            </Text>
+                            <Group gap="sm" wrap="wrap" justify="center">
+                              {STARTER_EXAMPLES.map((starter, idx) => (
+                                <Button
+                                  key={starter.label}
+                                  variant="light"
+                                  color="gray"
+                                  size="sm"
+                                  leftSection={<span>{starter.icon}</span>}
+                                  onClick={() => handleCreateStarter(starter, idx)}
+                                >
+                                  {starter.label}
+                                </Button>
+                              ))}
+                            </Group>
+                            <Text ta="center" c="dimmed" size="xs">
+                              Click any example to add it, then customize the prompt template
+                            </Text>
+                          </Stack>
                         </Table.Td>
                       </Table.Tr>
                     )}
@@ -667,24 +717,30 @@ export const QuickActionsPage: React.FC = () => {
               ))}
             </Group>
           </div>
-          <Group grow>
+          <div>
             <TextInput
               label="Icon (optional)"
-              description="Emoji or icon identifier"
-              placeholder="e.g. 🚀"
+              description="Single emoji displayed before the button label. Click one below or paste your own."
+              placeholder="e.g. 📦"
               maxLength={50}
               value={formIcon}
               onChange={(e) => setFormIcon(e.currentTarget.value)}
             />
-            <NumberInput
-              label="Sort order"
-              description="Lower numbers appear first"
-              min={0}
-              max={999}
-              value={formSortOrder}
-              onChange={(val) => setFormSortOrder(typeof val === 'number' ? val : 0)}
-            />
-          </Group>
+            <Group gap={4} mt={6} wrap="wrap">
+              {['📦', '🔄', '💡', '❓', '🛒', '💬', '🏷️', '🚚', '⭐', '🔍', '💰', '🎁'].map((emoji) => (
+                <Button
+                  key={emoji}
+                  size="compact-xs"
+                  variant={formIcon === emoji ? 'filled' : 'light'}
+                  color={formIcon === emoji ? 'red' : 'gray'}
+                  style={{ fontSize: 16, padding: '2px 6px', minWidth: 32 }}
+                  onClick={() => setFormIcon(emoji)}
+                >
+                  {emoji}
+                </Button>
+              ))}
+            </Group>
+          </div>
           <Switch
             label="Active"
             description="Inactive quick actions won't appear in the widget"

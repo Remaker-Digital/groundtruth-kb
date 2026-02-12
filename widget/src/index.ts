@@ -95,7 +95,7 @@ interface AgentRedSDK {
     'data-auto-open-delay': 'widget_auto_open_delay',
     'data-mobile-enabled': 'widget_mobile_enabled',
     'data-sound-enabled': 'widget_sound_enabled',
-    'data-greeting': 'greeting_message',
+    'data-greeting': 'widget_greeting_message',
     'data-header-text': 'widget_header_text',
     'data-agent-name': 'widget_agent_display_name',
     'data-context': 'widget_context',

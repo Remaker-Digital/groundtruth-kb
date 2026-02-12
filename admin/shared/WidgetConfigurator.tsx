@@ -76,7 +76,8 @@ interface WidgetConfig {
   widget_chat_rating_enabled: boolean;
   widget_sound_enabled: boolean;
   widget_file_upload_enabled: boolean;
-  // Content / Targeting (3)
+  // Content / Targeting (4)
+  widget_greeting_message: string;
   widget_header_text: string;
   widget_input_placeholder: string;
   widget_page_rules: string[];
@@ -110,6 +111,7 @@ const DEFAULT_CONFIG: WidgetConfig = {
   widget_chat_rating_enabled: false,
   widget_sound_enabled: true,
   widget_file_upload_enabled: true,
+  widget_greeting_message: '',
   widget_header_text: '',
   widget_input_placeholder: '',
   widget_page_rules: [],
@@ -970,12 +972,19 @@ const ToggleField: React.FC<ToggleFieldProps> = ({ label, description, value, on
 // Sub-component: Live Preview
 // ---------------------------------------------------------------------------
 
+interface QuickActionPreview {
+  id: string;
+  label: string;
+  icon: string | null;
+}
+
 interface PreviewProps {
   config: WidgetConfig;
   st: Styles;
+  quickActions?: QuickActionPreview[];
 }
 
-const WidgetPreview: React.FC<PreviewProps> = ({ config, st }) => {
+const WidgetPreview: React.FC<PreviewProps> = ({ config, st, quickActions }) => {
   const isDark = config.widget_dark_mode;
   // Contrast check: compute luminance for text readability
   const hexToLum = (hex: string): number => {
@@ -1125,9 +1134,42 @@ const WidgetPreview: React.FC<PreviewProps> = ({ config, st }) => {
                 maxWidth: '75%',
                 lineHeight: 1.4,
               }}>
-                Hi there! How can I help you today?
+                {config.widget_greeting_message || 'Hi there! How can I help you today?'}
               </div>
             </div>
+
+            {/* Quick action pills (WI #245) */}
+            {quickActions && quickActions.length > 0 && (
+              <div style={{
+                display: 'flex',
+                flexDirection: 'column',
+                alignItems: 'center',
+                gap: 6,
+                marginTop: 4,
+                marginBottom: 4,
+              }}>
+                {quickActions.slice(0, 2).map((qa) => (
+                  <div
+                    key={qa.id}
+                    style={{
+                      display: 'inline-flex',
+                      alignItems: 'center',
+                      gap: 4,
+                      padding: '5px 12px',
+                      borderRadius: 16,
+                      border: `1px solid ${isDark ? '#374151' : '#E5E7EB'}`,
+                      background: isDark ? '#2A2A2A' : '#F7F7F8',
+                      fontSize: 12,
+                      color: textColor,
+                      cursor: 'default',
+                    }}
+                  >
+                    {qa.icon && <span>{qa.icon}</span>}
+                    <span>{qa.label}</span>
+                  </div>
+                ))}
+              </div>
+            )}
 
             {/* Customer message */}
             <div style={{
@@ -1350,6 +1392,9 @@ export const WidgetConfigurator: React.FC<BaseComponentProps> = ({
   const [savedConfig, setSavedConfig] = useState<WidgetConfig>(DEFAULT_CONFIG);
   const [jsonErrors, setJsonErrors] = useState<Record<string, string>>({});
 
+  // Quick actions for preview (WI #245)
+  const [previewQuickActions, setPreviewQuickActions] = useState<QuickActionPreview[]>([]);
+
   // Detect dark mode from Mantine color scheme attribute
   const isDarkMode = typeof document !== 'undefined'
     && document.documentElement.getAttribute('data-mantine-color-scheme') === 'dark';
@@ -1392,6 +1437,27 @@ export const WidgetConfigurator: React.FC<BaseComponentProps> = ({
       setSavedConfig(extracted);
     }
   }, [config.data]);
+
+  // Fetch quick actions for preview (WI #245)
+  useEffect(() => {
+    (async () => {
+      try {
+        const resp = await apiFetch('/api/admin/quick-actions');
+        if (resp.ok) {
+          const data = await resp.json();
+          const actions = (data.actions || [])
+            .filter((a: { isActive?: boolean; is_active?: boolean }) => a.isActive || a.is_active)
+            .slice(0, 2)
+            .map((a: { id: string; label: string; icon?: string | null }) => ({
+              id: a.id,
+              label: a.label,
+              icon: a.icon || null,
+            }));
+          setPreviewQuickActions(actions);
+        }
+      } catch { /* preview is non-critical */ }
+    })();
+  }, [apiFetch]);
 
   // Change tracking
   const pendingChanges = useMemo(
@@ -2063,7 +2129,20 @@ export const WidgetConfigurator: React.FC<BaseComponentProps> = ({
         {/* ============================================================ */}
         {activeTab === 'content' && (
           <div style={s.card}>
-            <h4 style={s.sectionTitle}>Header & input text</h4>
+            <h4 style={s.sectionTitle}>Greeting & content</h4>
+            <Field
+              st={s}
+              label="Greeting message"
+              description="Welcome message shown when a visitor opens the chat. Leave blank to hide."
+            >
+              <textarea
+                style={s.textarea}
+                value={localConfig.widget_greeting_message}
+                placeholder="e.g. Hi there! How can I help you today?"
+                maxLength={500}
+                onChange={(e) => updateField('widget_greeting_message', e.target.value)}
+              />
+            </Field>
             <Field
               st={s}
               label="Widget header text"
@@ -2136,7 +2215,7 @@ export const WidgetConfigurator: React.FC<BaseComponentProps> = ({
 
       {/* Preview panel */}
       <div style={s.previewPanel}>
-        <WidgetPreview config={localConfig} st={s} />
+        <WidgetPreview config={localConfig} st={s} quickActions={previewQuickActions} />
       </div>
     </div>
   );

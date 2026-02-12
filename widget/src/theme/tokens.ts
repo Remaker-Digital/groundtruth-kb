@@ -154,7 +154,6 @@ export interface WidgetConfig {
   widget_panel_width?: 'compact' | 'standard' | 'wide' | null;
   // Non-widget fields used for display
   brand_name?: string | null;
-  greeting_message?: string | null;
   // Quick action buttons for the current page context (WI #228)
   widget_quick_actions?: QuickActionButton[] | null;
 }

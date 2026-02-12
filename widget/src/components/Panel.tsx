@@ -125,7 +125,7 @@ export const Panel: FunctionComponent<PanelProps> = ({
   const agentTitle = config.widget_agent_title || '';
   const agentAvatarUrl = config.widget_agent_avatar_url || null;
   const logoUrl = config.widget_logo_url || null;
-  const greetingMessage = config.greeting_message || null;
+  const greetingMessage = config.widget_greeting_message || null;
   const showBranding = config.widget_show_branding !== false;
   const fileUploadEnabled = config.widget_file_upload_enabled === true;
   const chatRatingEnabled = config.widget_chat_rating_enabled !== false;
