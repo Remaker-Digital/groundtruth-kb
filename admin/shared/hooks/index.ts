@@ -23,7 +23,6 @@ import type {
   IntentBreakdown,
   KnowledgeGap,
   TeamMember,
-  OnboardingStepConfig,
   PaginatedList,
   IntegrationSummary,
   IntegrationDetail,
@@ -352,45 +351,58 @@ export function useDeleteWidgetAppearance(apiFetch: ApiFetch) {
 }
 
 // ---------------------------------------------------------------------------
-// Test Mode hooks (C1, C2)
+// Activation hooks (Save → Activate model)
 // ---------------------------------------------------------------------------
 
-/** Current test mode status. */
-export interface TestModeStatus {
-  enabled: boolean;
-  percentage: number;
-  overrides: Record<string, unknown>;
-  assignment_seed: number;
-  activated_at: string | null;
-  override_field_count: number;
+/** Lightweight activation status for polling. */
+export interface ActivationStatus {
+  has_pending_changes: boolean;
+  active_version: number;
+  active_activated_at: string | null;
+  draft_version: number | null;
 }
 
-export function useTestModeStatus(apiFetch: ApiFetch) {
-  return useApi<TestModeStatus>(apiFetch, '/api/config/test-mode');
+/** Full draft state including diff vs active. */
+export interface DraftState {
+  has_pending_changes: boolean;
+  active_version: number;
+  active_activated_at: string | null;
+  draft_version: number | null;
+  changed_fields: string[];
+  draft_config: Record<string, unknown>;
+  active_config: Record<string, unknown>;
 }
 
-export function useActivateTestMode(apiFetch: ApiFetch) {
+export function useActivationStatus(apiFetch: ApiFetch) {
+  return useApi<ActivationStatus>(apiFetch, '/api/config/activation-status');
+}
+
+export function useDraftState(apiFetch: ApiFetch) {
+  return useApi<DraftState>(apiFetch, '/api/config/draft');
+}
+
+export function useActivateDraft(apiFetch: ApiFetch) {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
   const activate = useCallback(
-    async (overrides: Record<string, unknown>, percentage = 10): Promise<boolean> => {
+    async (): Promise<boolean> => {
       setLoading(true);
       setError(null);
       try {
-        const res = await apiFetch('/api/config/test-mode/activate', {
+        const res = await apiFetch('/api/config/draft/activate', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ overrides, percentage }),
+          body: '{}',
         });
         if (!res.ok) {
           const body = await res.json().catch(() => ({}));
-          setError(body.detail ?? 'Failed to activate test mode');
+          setError(body.detail?.errors?.[0]?.message ?? body.detail ?? 'Activation failed');
           return false;
         }
         return true;
       } catch {
-        setError('Network error activating test mode');
+        setError('Network error during activation');
         return false;
       } finally {
         setLoading(false);
@@ -402,28 +414,28 @@ export function useActivateTestMode(apiFetch: ApiFetch) {
   return { activate, loading, error };
 }
 
-export function useDeactivateTestMode(apiFetch: ApiFetch) {
+export function useDiscardDraft(apiFetch: ApiFetch) {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
-  const deactivate = useCallback(
-    async (action: 'rollout' | 'abandon'): Promise<boolean> => {
+  const discard = useCallback(
+    async (): Promise<boolean> => {
       setLoading(true);
       setError(null);
       try {
-        const res = await apiFetch('/api/config/test-mode/deactivate', {
+        const res = await apiFetch('/api/config/draft/discard', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ action }),
+          body: '{}',
         });
         if (!res.ok) {
           const body = await res.json().catch(() => ({}));
-          setError(body.detail ?? 'Failed to deactivate test mode');
+          setError(body.detail ?? 'Failed to discard draft');
           return false;
         }
         return true;
       } catch {
-        setError('Network error deactivating test mode');
+        setError('Network error discarding draft');
         return false;
       } finally {
         setLoading(false);
@@ -432,31 +444,31 @@ export function useDeactivateTestMode(apiFetch: ApiFetch) {
     [apiFetch],
   );
 
-  return { deactivate, loading, error };
+  return { discard, loading, error };
 }
 
-export function useUpdateTestModePercentage(apiFetch: ApiFetch) {
+export function useRestorePrevious(apiFetch: ApiFetch) {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
-  const updatePercentage = useCallback(
-    async (percentage: number): Promise<boolean> => {
+  const restore = useCallback(
+    async (): Promise<boolean> => {
       setLoading(true);
       setError(null);
       try {
-        const res = await apiFetch('/api/config/test-mode/percentage', {
-          method: 'PUT',
+        const res = await apiFetch('/api/config/restore', {
+          method: 'POST',
           headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ percentage }),
+          body: '{}',
         });
         if (!res.ok) {
           const body = await res.json().catch(() => ({}));
-          setError(body.detail ?? 'Failed to update test percentage');
+          setError(body.detail ?? 'Failed to restore previous configuration');
           return false;
         }
         return true;
       } catch {
-        setError('Network error updating test percentage');
+        setError('Network error restoring configuration');
         return false;
       } finally {
         setLoading(false);
@@ -465,15 +477,7 @@ export function useUpdateTestModePercentage(apiFetch: ApiFetch) {
     [apiFetch],
   );
 
-  return { updatePercentage, loading, error };
-}
-
-// ---------------------------------------------------------------------------
-// Onboarding hooks
-// ---------------------------------------------------------------------------
-
-export function useOnboardingSteps(apiFetch: ApiFetch) {
-  return useApi<{ steps: OnboardingStepConfig[] }>(apiFetch, '/api/config/onboarding');
+  return { restore, loading, error };
 }
 
 // ---------------------------------------------------------------------------

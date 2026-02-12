@@ -16,7 +16,7 @@ This document provides context and guidance for AI assistants working on the Age
 | **Brand Name** | Agent Red Customer Experience |
 | **Release** | Launch 1.0 |
 | **Type** | Commercial SaaS Product |
-| **Status** | Pre-submission validation COMPLETE — production v1.15.2, 1,974 tests (0 failures), chat quality 12/12, admin UI 86/86. Remaining: creative assets (owner/designer) for Shopify App Store submission. |
+| **Status** | Save→Activate architecture COMPLETE — production v1.20.1 (session 8 + 9 changes not yet deployed), 2,301 tests (0 failures), chat quality 12/12, admin UI 86/86. Remaining: deploy v1.22.0, creative assets (owner/designer) for Shopify App Store submission. |
 | **Owner** | Remaker Digital (DBA of VanDusen & Palmeter, LLC) |
 
 ---
@@ -127,7 +127,7 @@ There is no shortcut. All interaction between projects occurs through AGNTCY's p
 | Key Vault | kv-agentred-eastus2 | RBAC-enabled |
 | Container Registry | acragentredeastus2 | 9 repositories |
 | Container App Env | agent-red-cae | Domain: `lemonriver-f59f94b7.eastus2.azurecontainerapps.io` |
-| API Gateway | agent-red-api-gateway | v1.15.2, FQDN: `agent-red-api-gateway.lemonriver-f59f94b7.eastus2.azurecontainerapps.io` |
+| API Gateway | agent-red-api-gateway | v1.20.1 (deployed), FQDN: `agent-red-api-gateway.lemonriver-f59f94b7.eastus2.azurecontainerapps.io` |
 | NATS | agent-red-nats | Internal: `agent-red-nats.internal.lemonriver-f59f94b7.eastus2.azurecontainerapps.io:4222` |
 
 **9 Container Apps deployed.** 27 RBAC assignments (9 AcrPull + 9 KV + 9 Cosmos DB). Terraform state clean. NATS connected=false (lazy init — expected).
@@ -353,7 +353,7 @@ E:\Claude-Playground\CLAUDE-PROJECTS\Agent Red Customer Engagement\
 │   │   ├── shopify_client.py       # Async Shopify GraphQL API client (httpx)
 │   │   ├── shopify_billing.py      # Shopify Billing API (subscriptions + usage charges)
 │   │   └── shopify_gdpr_webhooks.py # Shopify GDPR mandatory webhooks (3 endpoints, HMAC verification)
-│   ├── multi_tenant/               # Multi-tenant infrastructure (46 modules, ~37,000 lines)
+│   ├── multi_tenant/               # Multi-tenant infrastructure (47 modules, ~38,000 lines)
 │   │   ├── __init__.py             # Package init with import hints
 │   │   ├── cosmos_schema.py        # 9 collections, 12 document models, 8 enums, tier defaults (incl. trial)
 │   │   ├── cosmos_client.py        # CosmosManager singleton (lazy init, Managed Identity, health)
@@ -385,6 +385,7 @@ E:\Claude-Playground\CLAUDE-PROJECTS\Agent Red Customer Engagement\
 │   │   ├── security_middleware.py  # Body size limit, JSON depth, security headers, SLA latency recording
 │   │   ├── api_versioning.py       # API version headers middleware (X-API-Version)
 │   │   ├── structured_logging.py   # JSON structured logging (prod) + colored dev formatter
+│   │   ├── activation_service.py   # Save→Activate two-phase commit: draft, activate, restore (~757 lines)
 │   │   ├── trial_management.py     # Trial tier lifecycle, expiry, conversion, demo data (~1,200 lines)
 │   │   ├── security_hardening.py   # Input sanitization, CORS, CSP, session validation (~570 lines)
 │   │   ├── data_retention.py       # Tier-based data retention enforcement (~380 lines)
@@ -415,7 +416,7 @@ E:\Claude-Playground\CLAUDE-PROJECTS\Agent Red Customer Engagement\
 │   ├── ai-features/                # Advanced AI (Phase 2.5)
 │   └── white-label/                # Customization (future)
 │
-├── tests/                          # Test suites (1,889 unit + 42 integration + 43 regression = 1,974 total)
+├── tests/                          # Test suites (2,031 unit + 42 integration + 73 regression = 2,301 total, 0 failures)
 │   ├── conftest.py                 # Shared fixtures: TestClient, MockCosmos, MockNATS, MockKV, auth helpers
 │   ├── test_conftest_smoke.py      # Fixture smoke tests
 │   ├── test_health.py              # Health/ready endpoint tests
@@ -432,7 +433,7 @@ E:\Claude-Playground\CLAUDE-PROJECTS\Agent Red Customer Engagement\
 ├── prototype/                      # Admin dashboard prototype (Mantine + Polaris, owner-approved)
 ├── extensions/                     # Shopify Theme App Extension
 ├── admin/                          # Admin dashboard frontends
-│   ├── shared/                     # 9 shared components + hooks + types (~5,400 lines)
+│   ├── shared/                     # 11 shared components + hooks + types (~6,250 lines, incl. ActivationBanner/Dialog/RestoreDialog)
 │   ├── shopify/                    # Shopify embedded admin (Polaris + App Bridge, ~2,700 lines)
 │   └── standalone/                 # Standalone admin (API key login, ~2,800 lines)
 │
@@ -490,8 +491,8 @@ E:\Claude-Playground\CLAUDE-PROJECTS\Agent Red Customer Engagement\
 ```
 Continue work on Agent Red Customer Experience commercial project.
 Location: E:\Claude-Playground\CLAUDE-PROJECTS\Agent Red Customer Engagement
-Key files: CLAUDE.md, memory/MEMORY.md, docs/operations/SHOPIFY-APP-REVIEW-PREFLIGHT-CHECKLIST.md
-Current status: Pre-submission validation COMPLETE. Production v1.15.2 healthy. 1,974 tests (0 failures). Chat quality 12/12, admin UI 86/86, E2E 60/60. All core phases complete. Remaining: creative assets (icon, screenshots, screencast) for Shopify App Store submission + P1 manual tests (Chrome incognito, plan upgrade/downgrade, billing flow).
+Key files: CLAUDE.md, memory/MEMORY.md, memory/activation-model.md, docs/operations/SHOPIFY-APP-REVIEW-PREFLIGHT-CHECKLIST.md
+Current status: Save→Activate architecture COMPLETE. Production v1.20.1 healthy (session 8+9 changes NOT yet deployed). 2,301 tests (0 failures). Chat quality 12/12, admin UI 86/86, E2E 60/60. P0: deploy v1.22.0 then creative assets for Shopify App Store submission.
 ```
 
 ### Referencing AGNTCY
@@ -550,33 +551,37 @@ The owner values active feedback on their communication effectiveness. When proc
 
 ---
 
-## Remaining Work (Priority Order, as of 2026-02-11)
+## Remaining Work (Priority Order, as of 2026-02-12)
 
-### P0 — Blocking Submission (Owner/Designer Tasks)
-1. App icon (1200×1200 JPEG/PNG) — designer
-2. Screenshots (3-6 at 1600×900, at least one showing actual app UI) — designer
-3. Submission screencast (install → features → billing → uninstall) — owner
-4. Remove storefront password on blanco-9939
-5. Storefront content refinement (product descriptions, company pages)
-6. Lighthouse performance test (must not reduce score by >10 points)
+### P0 — Deploy & Validate
+1. Build and deploy v1.22.0 (session 8 role model + session 9 Save→Activate + deploy safeguards)
+2. Verify /health 200, run Tier 0 regression, verify team members and activation flow
 
-### P1 — Should Fix Before Submission
-7. Chrome incognito session token test
-8. Plan upgrade/downgrade E2E test
-9. Test billing flow (test: true → false)
-10. Fix audit log 500 (Cosmos DB query initialization)
+### P1 — Blocking Submission (Owner/Designer Tasks)
+3. App icon (1200×1200 JPEG/PNG) — designer
+4. Screenshots (3-6 at 1600×900, at least one showing actual app UI) — designer
+5. Submission screencast (install → features → billing → uninstall) — owner
+6. Remove storefront password on blanco-9939
+7. Storefront content refinement (product descriptions, company pages)
+8. Lighthouse performance test (must not reduce score by >10 points)
 
-### P2 — Nice to Have
-11. Feature/promotional video for listing
-12. UX consultant evaluation (WI #203)
+### P2 — Should Fix Before Submission
+9. Chrome incognito session token test
+10. Plan upgrade/downgrade E2E test
+11. Test billing flow (test: true → false)
 
-### P3 — Post-Launch
-13. Blocked capabilities C1-C16 (42 UI steps)
-14. Customer context pre-computation (#138)
-15. Azure OpenAI PTU investigation (#139)
-16. Persistent Memory metrics dashboard
-17. 5 A/B production tests (Decision #32)
-18. Zendesk/Mailchimp/GA4 backend API clients
+### P3 — Nice to Have
+12. Feature/promotional video for listing
+13. UX consultant evaluation (WI #203)
+
+### P4 — Post-Launch
+14. Blocked capabilities C1-C16 (42 UI steps)
+15. Widget-side config reads (WI #250, #252, #254, #257)
+16. Code modularization (OnboardingWizard removed; Configuration.tsx, StandaloneLayout.tsx still large)
+17. Customer context pre-computation (#138)
+18. Azure OpenAI PTU investigation (#139)
+19. Persistent Memory metrics dashboard
+20. Zendesk/Mailchimp/GA4 backend API clients
 
 ---
 
@@ -600,5 +605,5 @@ The owner values active feedback on their communication effectiveness. When proc
 ---
 
 *© 2026 Remaker Digital, a DBA of VanDusen & Palmeter, LLC. All rights reserved.*
-*Last Updated: 2026-02-11*
-*Version: 34.0.0*
+*Last Updated: 2026-02-12*
+*Version: 35.0.0*

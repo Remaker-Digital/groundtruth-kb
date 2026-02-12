@@ -1,31 +1,35 @@
 """Configuration API — RESTful endpoints for tenant configuration management.
 
 Work Item #65 (Decision #22): Layer 3 of the 5-layer tenant configuration
-system — 10 RESTful endpoints wrapping the TenantConfigProcessor.
+system — RESTful endpoints wrapping TenantConfigProcessor + ActivationService.
+
+Save → Activate model: config changes are saved as drafts and only go live
+when explicitly activated.  All four configuration domains (Agent Config,
+Quick Actions, Widget Config, Knowledge Base validation) activate atomically.
 
 Endpoints:
-    GET    /api/config              — Current resolved config
-    PUT    /api/config              — Partial config update
+    GET    /api/config              — Current resolved config (active or draft)
+    PUT    /api/config              — Save config changes to draft
     POST   /api/config/validate     — Dry-run validation (no persist)
-    POST   /api/config/reset        — Reset to tier defaults
+    POST   /api/config/reset        — Reset to tier defaults (creates draft)
     GET    /api/config/diff         — Overrides vs. tier defaults
     GET    /api/config/schema       — Field metadata for UI rendering
-    GET    /api/config/schema/{step} — Fields for a specific onboarding step
     GET    /api/config/versions     — Version history
     GET    /api/config/versions/{version} — Specific historical version
     GET    /api/config/named        — List named configurations (C3)
     POST   /api/config/named        — Save current config as named (C3)
-    POST   /api/config/named/{name}/activate — Activate a named config (C3)
+    POST   /api/config/named/{name}/activate — Load named config as draft (C3)
     DELETE /api/config/named/{name} — Delete a named config (C3)
     GET    /api/config/widget-appearances           — List named appearances (C4)
     POST   /api/config/widget-appearances           — Save appearance as named (C4)
-    POST   /api/config/widget-appearances/{name}/activate — Activate appearance (C4)
+    POST   /api/config/widget-appearances/{name}/activate — Load appearance as draft (C4)
     DELETE /api/config/widget-appearances/{name}    — Delete appearance (C4)
-    POST   /api/config/rollback     — Roll back to a previous version
-    GET    /api/config/test-mode              — Test Mode status (C2)
-    POST   /api/config/test-mode/activate     — Activate Test Mode (C2)
-    POST   /api/config/test-mode/deactivate   — Deactivate Test Mode (C2)
-    PUT    /api/config/test-mode/percentage   — Update routing percentage (C2)
+    POST   /api/config/rollback     — Load previous version as draft
+    GET    /api/config/activation-status  — Lightweight activation state check
+    GET    /api/config/draft              — Full draft state + diff vs active
+    POST   /api/config/draft/activate    — Validate and activate the draft
+    POST   /api/config/draft/discard     — Discard all draft changes
+    POST   /api/config/restore           — Restore previous activation snapshot
 
 All endpoints derive tenant_id and tier from the authenticated TenantContext
 — never from query parameters.  Tenant isolation is enforced at every level:
@@ -33,13 +37,14 @@ auth middleware → processor → repository.
 
 Architecture references:
     - Decision #22: 5-layer tenant configuration management
-    - Work Item #65: Configuration API (10 endpoints)
+    - Work Item #65: Configuration API
     - Work Item #64: TenantConfigProcessor (upstream dependency)
     - Work Item #63: tenant_config_schema (upstream dependency)
 
 Dependencies:
     - tenant_config_processor.py: get_config_processor
-    - tenant_config_schema.py: export_schema_for_api, get_fields_by_step, OnboardingStep
+    - activation_service.py: get_activation_service
+    - tenant_config_schema.py: export_schema_for_api
     - middleware.py: get_tenant_context
     - auth.py: TenantContext
 
@@ -52,25 +57,21 @@ import logging
 from typing import Any
 
 from fastapi import APIRouter, Depends, HTTPException, Query
-from pydantic import BaseModel, ConfigDict, Field
-from pydantic.alias_generators import to_camel
+from pydantic import BaseModel, Field
 
+from src.multi_tenant.activation_service import (
+    get_activation_service,
+)
 from src.multi_tenant.auth import TenantContext
 from src.multi_tenant.cosmos_schema import TenantTier
 from src.multi_tenant.middleware import get_tenant_context
 from src.multi_tenant.tenant_config_processor import (
-    ConfigReadResult,
-    ConfigRollbackResult,
-    ConfigUpdateResult,
     ConfigVersionInfo,
     NamedConfigSummary,
     get_config_processor,
 )
 from src.multi_tenant.tenant_config_schema import (
-    OnboardingStep,
-    TierGate,
     export_schema_for_api,
-    get_fields_by_step,
     resolve_defaults,
 )
 
@@ -125,6 +126,7 @@ class ConfigResponse(BaseModel):
     config: dict[str, Any]
     from_cache: bool = False
     quick_actions: list[QuickActionForWidget] | None = None
+    state: str = "active"
 
 
 class ConfigUpdateResponse(BaseModel):
@@ -136,6 +138,7 @@ class ConfigUpdateResponse(BaseModel):
     warnings: list[dict[str, str]] = Field(default_factory=list)
     changes: dict[str, Any] = Field(default_factory=dict)
     resolved_config: dict[str, Any] = Field(default_factory=dict)
+    state: str = "active"
 
 
 class ConfigValidateResponse(BaseModel):
@@ -210,49 +213,51 @@ class NamedConfigDeleteResponse(BaseModel):
     message: str = ""
 
 
-class StepFieldsResponse(BaseModel):
-    """Response containing fields for a specific onboarding step."""
+class ActivationStatusResponse(BaseModel):
+    """Lightweight activation state for the admin banner."""
 
-    step_number: int
-    step_name: str
-    fields: list[dict[str, Any]]
-    total_fields: int = 0
-
-
-class OnboardingFieldResponse(BaseModel):
-    """A single config field for onboarding step rendering."""
-
-    model_config = ConfigDict(alias_generator=to_camel, populate_by_name=True)
-
-    key: str
-    label: str
-    description: str
-    type: str
-    default_value: Any = None
-    current_value: Any = None
-    tier_gate: str | None = None
-    step_order: int = 0
-    group: str = ""
+    has_pending_changes: bool
+    active_version: int = 0
+    active_activated_at: str | None = None
+    draft_version: int | None = None
 
 
-class OnboardingStepResponse(BaseModel):
-    """A single onboarding step with its fields."""
+class DraftStateResponse(BaseModel):
+    """Full draft state including diff vs active."""
 
-    model_config = ConfigDict(alias_generator=to_camel, populate_by_name=True)
+    has_pending_changes: bool
+    active_version: int = 0
+    active_activated_at: str | None = None
+    draft_version: int | None = None
+    changed_fields: list[str] = Field(default_factory=list)
+    draft_config: dict[str, Any] = Field(default_factory=dict)
+    active_config: dict[str, Any] = Field(default_factory=dict)
 
-    step: str
-    label: str
-    description: str
-    fields: list[OnboardingFieldResponse]
-    is_complete: bool = False
+
+class ActivateResponse(BaseModel):
+    """Response for draft activation."""
+
+    success: bool
+    version: int = 0
+    activated_at: str | None = None
+    errors: list[dict[str, str]] = Field(default_factory=list)
+    warnings: list[dict[str, str]] = Field(default_factory=list)
 
 
-class OnboardingResponse(BaseModel):
-    """Full onboarding wizard data — all steps at once."""
+class RestoreResponse(BaseModel):
+    """Response for restoring previous configuration."""
 
-    model_config = ConfigDict(alias_generator=to_camel, populate_by_name=True)
+    success: bool
+    restored_version: int = 0
+    restored_activated_at: str | None = None
+    error: str | None = None
 
-    steps: list[OnboardingStepResponse]
+
+class DiscardResponse(BaseModel):
+    """Response for discarding a draft."""
+
+    success: bool
+    message: str = ""
 
 
 # ---------------------------------------------------------------------------
@@ -315,8 +320,9 @@ async def _resolve_quick_actions(
         return []
 
     try:
-        actions = await _quick_action_repo.get_quick_actions(tenant_id)
-        assignments = await _quick_action_repo.get_page_assignments(tenant_id)
+        # Widget serves from active config only (not draft)
+        actions = await _quick_action_repo.get_quick_actions_active(tenant_id)
+        assignments = await _quick_action_repo.get_page_assignments_active(tenant_id)
     except Exception:
         logger.warning(
             "Quick action resolution failed for tenant=%s",
@@ -400,9 +406,17 @@ router = APIRouter(prefix="/api/config", tags=["configuration"])
     "",
     response_model=ConfigResponse,
     summary="Get current resolved configuration",
-    description="Returns the tenant's configuration with all inheritance applied: platform defaults, tier defaults, and tenant overrides. Result may come from a 60-second cache. Optionally includes quick action buttons for the specified page context.",
+    description=(
+        "Returns the tenant's active configuration with all inheritance applied. "
+        "Pass ``state=draft`` to retrieve the draft instead (for admin editing). "
+        "Optionally includes quick action buttons for the specified page context."
+    ),
 )
 async def get_config(
+    state: str | None = Query(
+        None,
+        description="Config state to fetch: 'draft' for pending changes, default returns active",
+    ),
     page_type: str | None = Query(
         None,
         description="Page type for quick action filtering (e.g. product, collection, home)",
@@ -415,18 +429,44 @@ async def get_config(
 ) -> ConfigResponse:
     """Get the fully resolved current configuration.
 
-    Returns the tenant's configuration with all inheritance applied:
-    platform defaults → tier defaults → tenant overrides.
+    By default, returns the active (live) configuration — this is what
+    the chat pipeline and widget use.
 
-    The result may come from a 60-second in-memory cache.
+    When ``state=draft`` is provided, returns the draft configuration
+    (for admin editing).  Falls back to the active config if no draft
+    exists.
 
     When ``page_type`` is provided, quick actions assigned to that page
-    are included in the response.  The widget uses these to render
-    contextual prompt buttons in the greeting area.
+    are included in the response (always from active config for the widget).
     """
     processor = get_config_processor()
     tier = _resolve_tier(ctx)
 
+    if state == "draft":
+        # Admin UI requesting draft for editing
+        activation_svc = get_activation_service()
+        draft_state = await activation_svc.get_draft_state(ctx.tenant_id, tier)
+        if draft_state.has_pending_changes:
+            return ConfigResponse(
+                tenant_id=ctx.tenant_id,
+                tier=tier.value,
+                version=draft_state.draft_version or 0,
+                config=draft_state.draft_config,
+                from_cache=False,
+                state="draft",
+            )
+        # No draft — fall through to active
+        result = await processor.get_config(ctx.tenant_id, tier)
+        return ConfigResponse(
+            tenant_id=result.tenant_id,
+            tier=result.tier,
+            version=result.version,
+            config=result.config,
+            from_cache=result.from_cache,
+            state="active",
+        )
+
+    # Default: active config (pipeline, widget, admin)
     result = await processor.get_config(ctx.tenant_id, tier)
 
     # --- Quick action resolution (WI #227) ---
@@ -443,6 +483,7 @@ async def get_config(
         config=result.config,
         from_cache=result.from_cache,
         quick_actions=quick_actions,
+        state="active",
     )
 
 
@@ -453,8 +494,12 @@ async def get_config(
 @router.put(
     "",
     response_model=ConfigUpdateResponse,
-    summary="Update tenant configuration",
-    description="Applies partial configuration changes. Only provided fields are updated; omitted fields retain their current values. Returns validation errors if any field fails validation or tier gating.",
+    summary="Save configuration changes to draft",
+    description=(
+        "Saves partial configuration changes to the draft layer. Changes do "
+        "NOT go live until explicitly activated via POST /draft/activate. "
+        "Returns validation errors if any field fails validation or tier gating."
+    ),
     responses={
         400: {"description": "No configuration fields provided"},
         422: {"description": "Validation errors in submitted fields"},
@@ -464,58 +509,52 @@ async def update_config(
     body: ConfigUpdateRequest,
     ctx: TenantContext = Depends(get_tenant_context),
 ) -> ConfigUpdateResponse:
-    """Update tenant configuration with partial changes.
+    """Save configuration changes to draft.
 
     Accepts a dict of field_name → new_value. Only provided fields are
     changed; omitted fields retain their current values.
 
-    The update is validated, merged with existing config, persisted as
-    a new version, and an audit event is logged.
+    Changes are saved to a draft document — the live pipeline config is
+    NOT affected.  Call POST /api/config/draft/activate to promote the
+    draft to active.
 
     Returns validation errors if any field fails validation or tier gating.
     """
-    processor = get_config_processor()
-    tier = _resolve_tier(ctx)
-
     if not body.fields:
         raise HTTPException(
             status_code=400,
             detail="No configuration fields provided",
         )
 
-    # Derive actor from auth context
+    tier = _resolve_tier(ctx)
     actor = _derive_actor(ctx)
+    activation_svc = get_activation_service()
 
-    result = await processor.update_config(
+    result = await activation_svc.save_draft(
         tenant_id=ctx.tenant_id,
         tier=tier,
         changes=body.fields,
         actor=actor,
     )
 
-    status_code = 200 if result.success else 422
-
-    response = ConfigUpdateResponse(
-        success=result.success,
-        version=result.version,
-        errors=result.validation.errors,
-        warnings=result.validation.warnings,
-        changes=result.changes,
-        resolved_config=result.resolved_config,
-    )
-
     if not result.success:
-        # Return 422 with validation errors in the body
         raise HTTPException(
             status_code=422,
             detail={
                 "success": False,
-                "errors": result.validation.errors,
-                "warnings": result.validation.warnings,
+                "errors": result.errors,
+                "warnings": result.warnings,
             },
         )
 
-    return response
+    return ConfigUpdateResponse(
+        success=result.success,
+        version=result.version,
+        errors=result.errors,
+        warnings=result.warnings,
+        changes=result.changes,
+        state="draft",
+    )
 
 
 # ---------------------------------------------------------------------------
@@ -557,22 +596,25 @@ async def validate_config_endpoint(
 @router.post(
     "/reset",
     response_model=ConfigUpdateResponse,
-    summary="Reset configuration to defaults",
-    description="Resets all configuration to tier defaults. Creates a new version with only default values and clears all tenant overrides.",
+    summary="Reset configuration to tier defaults (draft)",
+    description=(
+        "Creates a draft from tier defaults, discarding any existing draft. "
+        "Does NOT immediately reset the live config — activate to apply."
+    ),
 )
 async def reset_config(
     ctx: TenantContext = Depends(get_tenant_context),
 ) -> ConfigUpdateResponse:
-    """Reset all configuration to tier defaults.
+    """Reset configuration to tier defaults (as draft).
 
-    Creates a new version with only default values. All tenant overrides
-    are cleared. This action is logged in the audit trail.
+    Creates a draft containing tier defaults.  The active (live) config
+    is not affected until ``POST /api/config/draft/activate`` is called.
     """
-    processor = get_config_processor()
     tier = _resolve_tier(ctx)
     actor = _derive_actor(ctx)
+    activation_svc = get_activation_service()
 
-    result = await processor.reset_to_defaults(
+    result = await activation_svc.reinitialize_to_defaults(
         tenant_id=ctx.tenant_id,
         tier=tier,
         actor=actor,
@@ -582,7 +624,7 @@ async def reset_config(
         success=result.success,
         version=result.version,
         changes=result.changes,
-        resolved_config=result.resolved_config,
+        state="draft",
     )
 
 
@@ -617,104 +659,6 @@ async def get_config_diff(
     )
 
 
-# ---------------------------------------------------------------------------
-# 5b. GET /api/config/onboarding — All onboarding steps at once
-# ---------------------------------------------------------------------------
-
-# Step labels for UI display — sentence case (only first word capitalised)
-_STEP_LABELS: dict[OnboardingStep, str] = {
-    OnboardingStep.BRAND_AND_TONE: "Brand and tone",
-    OnboardingStep.LANGUAGES: "Languages",
-    OnboardingStep.RESPONSE_STYLE: "Response style",
-    OnboardingStep.KNOWLEDGE_BASE: "Knowledge base",
-    OnboardingStep.BUSINESS_POLICIES: "Business policies",
-    OnboardingStep.ESCALATION_RULES: "Escalation rules",
-    OnboardingStep.INTEGRATIONS: "Integrations",
-    OnboardingStep.MEMORY_AND_PRIVACY: "Memory and privacy",
-    OnboardingStep.WIDGET_APPEARANCE: "Widget appearance",
-    OnboardingStep.REVIEW_AND_LAUNCH: "Review and launch",
-}
-
-# Step descriptions for UI display
-_STEP_DESCRIPTIONS: dict[OnboardingStep, str] = {
-    OnboardingStep.BRAND_AND_TONE: "Set your brand name, voice, and greeting messages.",
-    OnboardingStep.LANGUAGES: "Configure primary and additional languages.",
-    OnboardingStep.RESPONSE_STYLE: "Control response length, formality, and emoji usage.",
-    OnboardingStep.KNOWLEDGE_BASE: "Configure knowledge scope and product recommendations.",
-    OnboardingStep.BUSINESS_POLICIES: "Add return, shipping, warranty, and support policies.",
-    OnboardingStep.ESCALATION_RULES: "Set escalation thresholds, keywords, and notifications.",
-    OnboardingStep.INTEGRATIONS: "Enable Shopify sync, Zendesk, Mailchimp, and GA4.",
-    OnboardingStep.MEMORY_AND_PRIVACY: "Configure customer memory layers and data retention.",
-    OnboardingStep.WIDGET_APPEARANCE: "Customize widget colors, position, and behavior.",
-    OnboardingStep.REVIEW_AND_LAUNCH: "Review all settings and launch your AI agent.",
-}
-
-
-@router.get(
-    "/onboarding",
-    response_model=OnboardingResponse,
-    summary="Get onboarding wizard steps",
-    description="Returns all onboarding steps with their tier-filtered fields, current defaults, and completion flags for the wizard UI.",
-)
-async def get_onboarding_steps(
-    ctx: TenantContext = Depends(get_tenant_context),
-) -> OnboardingResponse:
-    """Get all onboarding steps with their fields for the wizard UI.
-
-    Returns every step in order, each with its tier-filtered fields,
-    current defaults, and a completion flag (always False for now —
-    completion tracking is a future enhancement).
-    """
-    tier = _resolve_tier(ctx)
-
-    # Get current resolved config to populate currentValue
-    processor = get_config_processor()
-    config_result = await processor.get_config(ctx.tenant_id, tier)
-    current_config = config_result.config if config_result else {}
-
-    # Tier ranking for field filtering
-    tier_rank = {TenantTier.STARTER: 0, TenantTier.PROFESSIONAL: 1, TenantTier.ENTERPRISE: 2}
-    gate_rank = {TierGate.ALL: 0, TierGate.PROFESSIONAL_PLUS: 1, TierGate.ENTERPRISE_ONLY: 2}
-    rank = tier_rank.get(tier, 0)
-
-    defaults = resolve_defaults(tier)
-
-    steps: list[OnboardingStepResponse] = []
-    for step in OnboardingStep:
-        fields = get_fields_by_step(step)
-
-        # Filter by tier gate
-        available_fields = [
-            f for f in fields
-            if gate_rank.get(f.tier_gate, 0) <= rank
-        ]
-
-        step_name_label = _STEP_LABELS.get(step, step.name.lower().replace("_", " "))
-
-        field_responses = [
-            OnboardingFieldResponse(
-                key=f.field_name,
-                label=f.display_name,
-                description=f.description or f.tooltip,
-                type=f.field_type.value,
-                default_value=defaults.get(f.field_name),
-                current_value=current_config.get(f.field_name, defaults.get(f.field_name)),
-                tier_gate=f.tier_gate.value if f.tier_gate != TierGate.ALL else None,
-                step_order=f.step_order,
-                group=step_name_label,
-            )
-            for f in available_fields
-        ]
-
-        steps.append(OnboardingStepResponse(
-            step=step.name.lower(),
-            label=step_name_label,
-            description=_STEP_DESCRIPTIONS.get(step, ""),
-            fields=field_responses,
-            is_complete=False,
-        ))
-
-    return OnboardingResponse(steps=steps)
 
 
 # ---------------------------------------------------------------------------
@@ -725,7 +669,7 @@ async def get_onboarding_steps(
     "/schema",
     response_model=ConfigSchemaResponse,
     summary="Get configuration field schema",
-    description="Returns field metadata (types, validation rules, defaults, tooltips) organized by onboarding step. Fields are filtered by the tenant's tier.",
+    description="Returns field metadata (types, validation rules, defaults, tooltips) organized by configuration section. Fields are filtered by the tenant's tier.",
 )
 async def get_config_schema(
     ctx: TenantContext = Depends(get_tenant_context),
@@ -733,7 +677,7 @@ async def get_config_schema(
     """Get the configuration field schema for the tenant's tier.
 
     Returns field metadata (types, validation rules, defaults, tooltips,
-    doc links) organized by onboarding step. Used by the Merchant
+    doc links) organized by configuration section. Used by the Merchant
     Configuration UI to render forms dynamically.
 
     Fields are filtered by the tenant's tier — Starter tenants don't
@@ -750,93 +694,6 @@ async def get_config_schema(
     )
 
 
-# ---------------------------------------------------------------------------
-# 7. GET /api/config/schema/{step} — Fields for a specific onboarding step
-# ---------------------------------------------------------------------------
-
-@router.get(
-    "/schema/{step}",
-    response_model=StepFieldsResponse,
-    summary="Get fields for onboarding step",
-    description="Returns configuration fields for a specific onboarding step (1-9), filtered by the tenant's tier.",
-    responses={
-        400: {"description": "Invalid step number (must be 1-9)"},
-    },
-)
-async def get_step_fields(
-    step: int,
-    ctx: TenantContext = Depends(get_tenant_context),
-) -> StepFieldsResponse:
-    """Get configuration fields for a specific onboarding step.
-
-    Step numbers (1-9):
-        1. Brand & Tone
-        2. Languages
-        3. Response Style
-        4. Knowledge Base
-        5. Business Policies
-        6. Escalation Rules
-        7. Integrations
-        8. Memory & Privacy
-        9. Review & Launch
-    """
-    # Validate step number
-    try:
-        onboarding_step = OnboardingStep(step)
-    except ValueError:
-        raise HTTPException(  # noqa: B904
-            status_code=400,
-            detail=f"Invalid step number: {step}. Must be 1-9.",
-        )
-
-    tier = _resolve_tier(ctx)
-
-    # Get fields for this step
-    fields = get_fields_by_step(onboarding_step)
-
-    # Filter by tier gate
-    tier_rank = {TenantTier.STARTER: 0, TenantTier.PROFESSIONAL: 1, TenantTier.ENTERPRISE: 2}
-    gate_rank = {TierGate.ALL: 0, TierGate.PROFESSIONAL_PLUS: 1, TierGate.ENTERPRISE_ONLY: 2}
-    rank = tier_rank.get(tier, 0)
-
-    available_fields = [
-        f for f in fields
-        if gate_rank.get(f.tier_gate, 0) <= rank
-    ]
-
-    # Build response
-    defaults = resolve_defaults(tier)
-
-    field_dicts = [
-        {
-            "field_name": f.field_name,
-            "display_name": f.display_name,
-            "field_type": f.field_type.value,
-            "default": defaults.get(f.field_name),
-            "validation": {
-                k: v
-                for k, v in f.validation.model_dump().items()
-                if v is not None
-            },
-            "tooltip": f.tooltip,
-            "description": f.description,
-            "placeholder": f.placeholder,
-            "doc_link": f.doc_link,
-            "affects_agents": f.affects_agents,
-            "injected_in_prompt": f.injected_in_prompt,
-            "tier_gate": f.tier_gate.value,
-        }
-        for f in available_fields
-    ]
-
-    step_name = _STEP_LABELS.get(onboarding_step, onboarding_step.name.lower().replace("_", " "))
-
-    return StepFieldsResponse(
-        step_number=step,
-        step_name=step_name,
-        fields=field_dicts,
-        total_fields=len(field_dicts),
-    )
 
 
 # ---------------------------------------------------------------------------
@@ -989,8 +846,11 @@ async def save_named_config(
 @router.post(
     "/named/{name}/activate",
     response_model=ConfigUpdateResponse,
-    summary="Activate named configuration",
-    description="Activates a named configuration, making it the current live config. Creates a new version with the named config's stored values.",
+    summary="Load named configuration as draft",
+    description=(
+        "Loads a named configuration's values into the draft layer. "
+        "Does NOT go live until activated via POST /draft/activate."
+    ),
     responses={
         404: {"description": "Named configuration not found"},
     },
@@ -999,28 +859,43 @@ async def activate_named_config(
     name: str,
     ctx: TenantContext = Depends(get_tenant_context),
 ) -> ConfigUpdateResponse:
-    """Activate a named configuration as the current live config."""
+    """Load a named configuration as a draft.
+
+    Retrieves the stored named config and saves its values into the
+    draft layer.  The active (live) config is not affected until the
+    draft is explicitly activated.
+    """
     processor = get_config_processor()
     tier = _resolve_tier(ctx)
     actor = _derive_actor(ctx)
+    activation_svc = get_activation_service()
 
-    result = await processor.activate_named_config(
+    # Retrieve the named config's stored values
+    result = await processor.get_named_config_values(
         tenant_id=ctx.tenant_id,
         tier=tier,
         name=name,
-        actor=actor,
     )
 
-    if not result.success:
+    if result is None:
         raise HTTPException(
             status_code=404,
             detail=f"Named configuration '{name}' not found",
         )
 
+    # Save those values as a draft
+    draft_result = await activation_svc.save_draft(
+        tenant_id=ctx.tenant_id,
+        tier=tier,
+        changes=result,
+        actor=actor,
+    )
+
     return ConfigUpdateResponse(
-        success=result.success,
-        version=result.version,
-        resolved_config=result.resolved_config,
+        success=draft_result.success,
+        version=draft_result.version,
+        changes=draft_result.changes,
+        state="draft",
     )
 
 
@@ -1150,8 +1025,11 @@ async def save_widget_appearance(
 @router.post(
     "/widget-appearances/{name}/activate",
     response_model=ConfigUpdateResponse,
-    summary="Activate named widget appearance",
-    description="Activates a named widget appearance, applying its widget_* field values to the current live config.",
+    summary="Load named widget appearance as draft",
+    description=(
+        "Loads a named widget appearance's widget_* field values into the "
+        "draft layer. Does NOT go live until activated via POST /draft/activate."
+    ),
     responses={
         404: {"description": "Named appearance not found"},
     },
@@ -1160,28 +1038,43 @@ async def activate_widget_appearance(
     name: str,
     ctx: TenantContext = Depends(get_tenant_context),
 ) -> ConfigUpdateResponse:
-    """Activate a named widget appearance."""
+    """Load a named widget appearance into the draft layer.
+
+    Retrieves the stored appearance values and saves them into the
+    draft.  The active (live) config is not affected until the
+    draft is explicitly activated.
+    """
     processor = get_config_processor()
     tier = _resolve_tier(ctx)
     actor = _derive_actor(ctx)
+    activation_svc = get_activation_service()
 
-    result = await processor.activate_named_appearance(
+    # Retrieve the named appearance's stored values
+    result = await processor.get_named_appearance_values(
         tenant_id=ctx.tenant_id,
         tier=tier,
         name=name,
-        actor=actor,
     )
 
-    if not result.success:
+    if result is None:
         raise HTTPException(
             status_code=404,
             detail=f"Named appearance '{name}' not found",
         )
 
+    # Save those values as a draft
+    draft_result = await activation_svc.save_draft(
+        tenant_id=ctx.tenant_id,
+        tier=tier,
+        changes=result,
+        actor=actor,
+    )
+
     return ConfigUpdateResponse(
-        success=result.success,
-        version=result.version,
-        resolved_config=result.resolved_config,
+        success=draft_result.success,
+        version=draft_result.version,
+        changes=draft_result.changes,
+        state="draft",
     )
 
 
@@ -1239,8 +1132,12 @@ async def delete_widget_appearance(
 @router.post(
     "/rollback",
     response_model=ConfigRollbackResponse,
-    summary="Roll back to previous version",
-    description="Creates a new version with the contents of the target version. No versions are deleted and full history is preserved.",
+    summary="Load previous version as draft",
+    description=(
+        "Creates a draft from the contents of a target historical version. "
+        "Does NOT go live until activated via POST /draft/activate. "
+        "No versions are deleted and full history is preserved."
+    ),
     responses={
         404: {"description": "Target version not found"},
     },
@@ -1249,179 +1146,254 @@ async def rollback_config(
     body: ConfigRollbackRequest,
     ctx: TenantContext = Depends(get_tenant_context),
 ) -> ConfigRollbackResponse:
-    """Roll back configuration to a previous version.
+    """Load a historical version as a draft.
 
-    Creates a NEW version with the contents of the target version.
+    Retrieves the contents of the target version and saves them as
+    a draft.  The active (live) config is not affected until the
+    draft is explicitly activated.
+
     No versions are deleted — full history is preserved.
-
-    The rollback is logged in the audit trail.
     """
     processor = get_config_processor()
     tier = _resolve_tier(ctx)
     actor = _derive_actor(ctx)
+    activation_svc = get_activation_service()
 
-    result = await processor.rollback(
+    # Get the target version's content
+    version_result = await processor.get_version(
+        ctx.tenant_id, tier, body.target_version,
+    )
+    if version_result is None:
+        raise HTTPException(
+            status_code=404,
+            detail=f"Configuration version {body.target_version} not found",
+        )
+
+    # Save version content as a draft
+    draft_result = await activation_svc.save_draft(
         tenant_id=ctx.tenant_id,
         tier=tier,
-        target_version=body.target_version,
+        changes=version_result.config,
+        actor=actor,
+    )
+
+    # Get current active version for response
+    current = await processor.get_config(ctx.tenant_id, tier)
+
+    return ConfigRollbackResponse(
+        success=draft_result.success,
+        from_version=current.version,
+        to_version=body.target_version,
+        new_version=draft_result.version,
+        message=(
+            f"Version {body.target_version} loaded as draft. "
+            f"Activate to apply."
+        ),
+    )
+
+
+# ---------------------------------------------------------------------------
+# 19. GET /api/config/activation-status — Lightweight activation state
+# ---------------------------------------------------------------------------
+
+@router.get(
+    "/activation-status",
+    response_model=ActivationStatusResponse,
+    summary="Get activation status",
+    description=(
+        "Returns a lightweight summary of the activation state: whether "
+        "there are pending draft changes, the active version and activation "
+        "time, and the draft version if any."
+    ),
+)
+async def get_activation_status(
+    ctx: TenantContext = Depends(get_tenant_context),
+) -> ActivationStatusResponse:
+    """Lightweight activation state check for the admin banner.
+
+    Designed to be polled frequently (every 30 seconds) by the frontend
+    to determine whether the activation banner should be shown.
+    """
+    tier = _resolve_tier(ctx)
+    activation_svc = get_activation_service()
+
+    draft_state = await activation_svc.get_draft_state(ctx.tenant_id, tier)
+
+    return ActivationStatusResponse(
+        has_pending_changes=draft_state.has_pending_changes,
+        active_version=draft_state.active_version,
+        active_activated_at=draft_state.active_activated_at,
+        draft_version=draft_state.draft_version,
+    )
+
+
+# ---------------------------------------------------------------------------
+# 20. GET /api/config/draft — Full draft state + diff vs active
+# ---------------------------------------------------------------------------
+
+@router.get(
+    "/draft",
+    response_model=DraftStateResponse,
+    summary="Get draft state",
+    description=(
+        "Returns the full draft state including the draft config, active "
+        "config, and a list of fields that differ between them."
+    ),
+)
+async def get_draft_state(
+    ctx: TenantContext = Depends(get_tenant_context),
+) -> DraftStateResponse:
+    """Get the full draft state for the activation dialog.
+
+    Returns draft config, active config, and the list of changed fields
+    so the frontend can render a meaningful diff.
+    """
+    tier = _resolve_tier(ctx)
+    activation_svc = get_activation_service()
+
+    draft_state = await activation_svc.get_draft_state(ctx.tenant_id, tier)
+
+    return DraftStateResponse(
+        has_pending_changes=draft_state.has_pending_changes,
+        active_version=draft_state.active_version,
+        active_activated_at=draft_state.active_activated_at,
+        draft_version=draft_state.draft_version,
+        changed_fields=draft_state.changed_fields,
+        draft_config=draft_state.draft_config,
+        active_config=draft_state.active_config,
+    )
+
+
+# ---------------------------------------------------------------------------
+# 21. POST /api/config/draft/activate — Validate and activate the draft
+# ---------------------------------------------------------------------------
+
+@router.post(
+    "/draft/activate",
+    response_model=ActivateResponse,
+    summary="Activate draft configuration",
+    description=(
+        "Validates the draft and promotes it to active. The previous active "
+        "config becomes 'previous' (available for restore). Fails if "
+        "hard-block validation errors exist (e.g. missing brand_name)."
+    ),
+    responses={
+        422: {"description": "Validation errors prevent activation"},
+    },
+)
+async def activate_draft(
+    ctx: TenantContext = Depends(get_tenant_context),
+) -> ActivateResponse:
+    """Validate and activate the draft configuration.
+
+    On success, the draft becomes the live config and the previous
+    active config is preserved for one-level undo via POST /restore.
+    """
+    tier = _resolve_tier(ctx)
+    actor = _derive_actor(ctx)
+    activation_svc = get_activation_service()
+
+    result = await activation_svc.activate(
+        tenant_id=ctx.tenant_id,
+        tier=tier,
         actor=actor,
     )
 
     if not result.success:
         raise HTTPException(
-            status_code=404,
-            detail=result.message,
+            status_code=422,
+            detail={
+                "success": False,
+                "errors": result.errors,
+                "warnings": result.warnings,
+            },
         )
 
-    return ConfigRollbackResponse(
+    return ActivateResponse(
         success=result.success,
-        from_version=result.from_version,
-        to_version=result.to_version,
-        new_version=result.new_version,
-        message=result.message,
+        version=result.version,
+        activated_at=result.activated_at,
+        errors=result.errors,
+        warnings=result.warnings,
     )
 
 
 # ---------------------------------------------------------------------------
-# 19. GET /api/config/test-mode — Test Mode status (C2)
+# 22. POST /api/config/draft/discard — Discard all draft changes
 # ---------------------------------------------------------------------------
-
-@router.get(
-    "/test-mode",
-    summary="Get Test Mode status",
-    description="Returns the current Test Mode state: enabled/disabled, percentage, overrides, activation time.",
-    tags=["Test Mode"],
-)
-async def get_test_mode_status(
-    ctx: TenantContext = Depends(get_tenant_context),
-) -> dict[str, Any]:
-    """Return Test Mode status for the current tenant."""
-    from .test_mode_service import get_test_mode_service
-
-    service = get_test_mode_service()
-    return await service.get_status(ctx.tenant_id)
-
-
-# ---------------------------------------------------------------------------
-# 20. POST /api/config/test-mode/activate (C2)
-# ---------------------------------------------------------------------------
-
-class TestModeActivateRequest(BaseModel):
-    overrides: dict[str, Any] = Field(
-        description="AI behaviour field deltas to apply during test mode",
-    )
-    percentage: int = Field(
-        default=10,
-        ge=1,
-        le=50,
-        description="Percentage of sessions routed to test config (1-50)",
-    )
 
 @router.post(
-    "/test-mode/activate",
-    summary="Activate Test Mode",
-    description="Activates Test Mode with the given AI-behaviour overrides and routing percentage.",
-    tags=["Test Mode"],
+    "/draft/discard",
+    response_model=DiscardResponse,
+    summary="Discard draft changes",
+    description="Deletes the draft document. The active config is unchanged.",
 )
-async def activate_test_mode(
-    body: TestModeActivateRequest,
+async def discard_draft(
     ctx: TenantContext = Depends(get_tenant_context),
-) -> dict[str, Any]:
-    """Activate Test Mode."""
-    from .test_mode_service import get_test_mode_service
+) -> DiscardResponse:
+    """Discard all pending draft changes.
 
-    service = get_test_mode_service()
-    tier = _resolve_tier(ctx)
+    The active (live) config is not affected.
+    """
     actor = _derive_actor(ctx)
+    activation_svc = get_activation_service()
 
-    result = await service.activate(
+    discarded = await activation_svc.discard_draft(
         tenant_id=ctx.tenant_id,
-        tier=tier,
-        overrides=body.overrides,
-        percentage=body.percentage,
         actor=actor,
     )
 
-    if not result.get("success"):
-        raise HTTPException(status_code=422, detail=result.get("error", "Activation failed"))
-
-    return result
-
-
-# ---------------------------------------------------------------------------
-# 21. POST /api/config/test-mode/deactivate (C2)
-# ---------------------------------------------------------------------------
-
-class TestModeDeactivateRequest(BaseModel):
-    action: str = Field(
-        default="abandon",
-        pattern=r"^(rollout|abandon)$",
-        description="'rollout' merges test overrides into production; 'abandon' discards them.",
+    return DiscardResponse(
+        success=True,
+        message="Draft discarded" if discarded else "No draft to discard",
     )
+
+
+# ---------------------------------------------------------------------------
+# 23. POST /api/config/restore — Restore previous activation snapshot
+# ---------------------------------------------------------------------------
 
 @router.post(
-    "/test-mode/deactivate",
-    summary="Deactivate Test Mode",
-    description="Deactivates Test Mode. 'rollout' merges overrides into production config. 'abandon' discards them.",
-    tags=["Test Mode"],
+    "/restore",
+    response_model=RestoreResponse,
+    summary="Restore previous configuration",
+    description=(
+        "Swaps the active config with the previous activation snapshot. "
+        "The current active config becomes 'previous' and the previous "
+        "becomes 'active'. Any pending draft is discarded."
+    ),
+    responses={
+        400: {"description": "No previous configuration to restore"},
+    },
 )
-async def deactivate_test_mode(
-    body: TestModeDeactivateRequest,
+async def restore_previous(
     ctx: TenantContext = Depends(get_tenant_context),
-) -> dict[str, Any]:
-    """Deactivate Test Mode (rollout or abandon)."""
-    from .test_mode_service import get_test_mode_service
+) -> RestoreResponse:
+    """Restore the previous activation snapshot.
 
-    service = get_test_mode_service()
+    One-level undo: the current active becomes previous, and the
+    previous becomes active.  Any pending draft is discarded.
+    """
     tier = _resolve_tier(ctx)
     actor = _derive_actor(ctx)
+    activation_svc = get_activation_service()
 
-    result = await service.deactivate(
+    result = await activation_svc.restore_previous(
         tenant_id=ctx.tenant_id,
         tier=tier,
-        action=body.action,
         actor=actor,
     )
 
-    if not result.get("success"):
-        raise HTTPException(status_code=400, detail=result.get("error", "Deactivation failed"))
+    if not result.success:
+        raise HTTPException(
+            status_code=400,
+            detail=result.error or "No previous configuration to restore",
+        )
 
-    return result
-
-
-# ---------------------------------------------------------------------------
-# 22. PUT /api/config/test-mode/percentage (C2)
-# ---------------------------------------------------------------------------
-
-class TestModePercentageRequest(BaseModel):
-    percentage: int = Field(
-        ge=1,
-        le=50,
-        description="New routing percentage (1-50)",
-    )
-
-@router.put(
-    "/test-mode/percentage",
-    summary="Update Test Mode percentage",
-    description="Change the percentage of sessions routed to test config while Test Mode is active.",
-    tags=["Test Mode"],
-)
-async def update_test_mode_percentage(
-    body: TestModePercentageRequest,
-    ctx: TenantContext = Depends(get_tenant_context),
-) -> dict[str, Any]:
-    """Update the test mode routing percentage."""
-    from .test_mode_service import get_test_mode_service
-
-    service = get_test_mode_service()
-    tier = _resolve_tier(ctx)
-    actor = _derive_actor(ctx)
-
-    return await service.update_percentage(
-        tenant_id=ctx.tenant_id,
-        tier=tier,
-        percentage=body.percentage,
-        actor=actor,
+    return RestoreResponse(
+        success=result.success,
+        restored_version=result.restored_version,
+        restored_activated_at=result.restored_activated_at,
     )
 
 

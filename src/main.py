@@ -2115,32 +2115,38 @@ async def _startup_alert_delivery() -> None:
 
 
 # ---------------------------------------------------------------------------
-# Test Mode service wiring (C2)
+# Activation service wiring (Save → Activate model)
 # ---------------------------------------------------------------------------
 
 
 @app.on_event("startup")
-async def _startup_test_mode_service() -> None:
-    """Wire TestModeService with config processor + preferences repo.
+async def _startup_activation_service() -> None:
+    """Wire ActivationService with repos + config processor.
 
-    Required for C2 — controlled rollout routing. The service uses
-    the config processor for persisting test mode state changes and
-    the preferences repository for reading current state.
+    Required for the Save → Activate configuration lifecycle. The service
+    manages draft/active/previous config states, validation, and activation.
     """
     try:
-        from src.multi_tenant.repository import PreferencesRepository
+        from src.multi_tenant.activation_service import get_activation_service
+        from src.multi_tenant.repository import (
+            AuditLogRepository,
+            KnowledgeBaseRepository,
+            PreferencesRepository,
+        )
         from src.multi_tenant.tenant_config_processor import get_config_processor
-        from src.multi_tenant.test_mode_service import get_test_mode_service
 
-        service = get_test_mode_service()
-        processor = get_config_processor()
-        prefs_repo = PreferencesRepository()
-        service.configure(processor=processor, repo=prefs_repo)
-        logger.info("TestModeService configured with processor + preferences repo")
+        service = get_activation_service()
+        service.configure(
+            prefs_repo=PreferencesRepository(),
+            audit_repo=AuditLogRepository(),
+            kb_repo=KnowledgeBaseRepository(),
+            config_processor=get_config_processor(),
+        )
+        logger.info("ActivationService configured (Save → Activate model)")
     except Exception as exc:
         logger.warning(
-            "TestModeService configuration failed — test mode will be "
-            "unavailable until dependencies are ready. Error: %s",
+            "ActivationService configuration failed — draft/activate features "
+            "will be unavailable until dependencies are ready. Error: %s",
             exc,
         )
 

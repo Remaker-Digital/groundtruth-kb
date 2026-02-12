@@ -12,15 +12,15 @@
  *   - Reset to tier defaults
  *
  * API endpoints consumed:
- *   GET    /api/config            — Current resolved config
- *   PUT    /api/config            — Partial config update
+ *   GET    /api/config            — Current resolved config (active or draft)
+ *   PUT    /api/config            — Save changes to draft (not live until activated)
  *   GET    /api/config/versions   — Version history list
- *   POST   /api/config/rollback   — Roll back to a specific version
- *   POST   /api/config/reset      — Reset all overrides to tier defaults
+ *   POST   /api/config/rollback   — Create draft from historical version
+ *   POST   /api/config/reset      — Create draft from tier defaults
  *   GET    /api/config/diff       — Diff current overrides vs defaults
  *   GET    /api/config/named      — List named configurations
  *   POST   /api/config/named      — Save current config as named snapshot
- *   POST   /api/config/named/{name}/activate — Activate a named config
+ *   POST   /api/config/named/{name}/activate — Load named config as draft
  *   DELETE /api/config/named/{name}          — Delete a named config
  *
  * Props (from shell):
@@ -971,7 +971,7 @@ export const ConfigEditor: React.FC<BaseComponentProps> = ({
       const result = await updateConfig(changes);
       if (result?.success) {
         onNotify(
-          `Configuration saved (${result.changes?.length ?? changedKeys.length} field${changedKeys.length === 1 ? '' : 's'} updated).`,
+          `Changes saved to draft (${result.changes?.length ?? changedKeys.length} field${changedKeys.length === 1 ? '' : 's'}) — activate to go live.`,
           'success',
         );
         setOriginalValues({ ...editedValues });
@@ -1020,7 +1020,7 @@ export const ConfigEditor: React.FC<BaseComponentProps> = ({
         const body = await resp.text().catch(() => '');
         throw new Error(`${resp.status}: ${body}`);
       }
-      onNotify('Configuration reset to tier defaults.', 'success');
+      onNotify('Draft reset to tier defaults — activate to go live.', 'success');
       refetchConfig();
       refetchVersions();
     } catch (err: unknown) {
@@ -1084,7 +1084,7 @@ export const ConfigEditor: React.FC<BaseComponentProps> = ({
         const body = await resp.text().catch(() => '');
         throw new Error(`${resp.status}: ${body}`);
       }
-      onNotify(`Configuration rolled back to version ${selectedVersion}.`, 'success');
+      onNotify(`Draft set to version ${selectedVersion} — activate to go live.`, 'success');
       setSelectedVersion(null);
       setDiffData(null);
       refetchConfig();
@@ -1211,7 +1211,24 @@ export const ConfigEditor: React.FC<BaseComponentProps> = ({
       {/* Header */}
       <div style={s.header}>
         <div>
-          <h2 style={s.title}>Agent configuration</h2>
+          <h2 style={s.title}>
+            Agent configuration
+            {configData && configData.fromCache === false && (
+              <span style={{
+                display: 'inline-block',
+                marginLeft: 10,
+                padding: '2px 8px',
+                fontSize: 11,
+                fontWeight: 600,
+                color: '#f59e0b',
+                backgroundColor: '#fef3c7',
+                borderRadius: 4,
+                verticalAlign: 'middle',
+              }}>
+                DRAFT
+              </span>
+            )}
+          </h2>
           {configData && (
             <p style={{ fontSize: 13, color: '#888', margin: '4px 0 0 0' }}>
               Version {configData.version} &middot; {tenantContext.tier} tier

@@ -1,0 +1,757 @@
+"""ActivationService — Save → Activate configuration lifecycle manager.
+
+Replaces the wizard (OnboardingWizard) and test mode (TestModeService) with
+a two-phase commit model for tenant configuration:
+
+    1. DRAFT   — admin saves changes; chat pipeline is unaffected
+    2. ACTIVE  — merchant explicitly activates; pipeline reads new config
+    3. PREVIOUS — the prior activation snapshot (one-level undo via Restore)
+
+All four configuration domains activate atomically:
+    - Agent Configuration (brand, tone, escalation, custom instructions)
+    - Quick Actions (prompts, page assignments)
+    - Widget Configuration (appearance, behavior, targeting)
+    - Knowledge Base (validated at activation, not snapshotted)
+
+Lifecycle:
+    save_draft(changes)        → persist to draft
+    activate()                 → validate → promote draft to active
+    restore_previous()         → swap active ↔ previous
+    discard_draft()            → delete draft
+    reinitialize_to_defaults() → superadmin nuclear reset
+
+Architecture:
+    - Draft and active configs are both PreferencesDocument instances
+      in the ``preferences`` collection, distinguished by ``config_state``
+    - The chat pipeline always reads ``config_state='active'`` via
+      ``PreferencesRepository.get_active()``
+    - Draft reads bypass the 60-second cache (admin-only, low frequency)
+    - Activation snapshots are stored permanently for future history UI
+
+© 2026 Remaker Digital, a DBA of VanDusen & Palmeter, LLC. All rights reserved.
+"""
+
+from __future__ import annotations
+
+import asyncio
+import logging
+from dataclasses import dataclass, field
+from datetime import datetime, timezone
+from typing import Any
+
+from src.multi_tenant.cosmos_schema import (
+    AuditEventType,
+    ConfigState,
+    PreferencesDocument,
+    TenantTier,
+)
+from src.multi_tenant.tenant_config_schema import (
+    resolve_defaults,
+    validate_config,
+)
+
+logger = logging.getLogger(__name__)
+
+
+# ---------------------------------------------------------------------------
+# Result types
+# ---------------------------------------------------------------------------
+
+
+@dataclass
+class DraftSaveResult:
+    """Result of a save_draft() operation."""
+
+    success: bool
+    version: int = 0
+    errors: list[dict[str, str]] = field(default_factory=list)
+    warnings: list[dict[str, str]] = field(default_factory=list)
+    changes: dict[str, Any] = field(default_factory=dict)
+    state: str = "draft"
+
+
+@dataclass
+class ActivationResult:
+    """Result of an activate() operation."""
+
+    success: bool
+    version: int = 0
+    activated_at: str | None = None
+    errors: list[dict[str, str]] = field(default_factory=list)
+    warnings: list[dict[str, str]] = field(default_factory=list)
+
+
+@dataclass
+class RestoreResult:
+    """Result of a restore_previous() operation."""
+
+    success: bool
+    restored_version: int = 0
+    restored_activated_at: str | None = None
+    error: str | None = None
+
+
+@dataclass
+class DraftState:
+    """Current draft state for the activation banner."""
+
+    has_pending_changes: bool
+    active_version: int = 0
+    active_activated_at: str | None = None
+    draft_version: int | None = None
+    changed_fields: list[str] = field(default_factory=list)
+    draft_config: dict[str, Any] = field(default_factory=dict)
+    active_config: dict[str, Any] = field(default_factory=dict)
+
+
+@dataclass
+class ValidationResult:
+    """Result of activation validation."""
+
+    can_activate: bool
+    hard_errors: list[dict[str, str]] = field(default_factory=list)
+    warnings: list[dict[str, str]] = field(default_factory=list)
+
+
+# ---------------------------------------------------------------------------
+# Fields excluded from draft diff (metadata, not merchant config)
+# ---------------------------------------------------------------------------
+
+_METADATA_FIELDS = frozenset({
+    "id", "tenant_id", "version", "is_current", "config_state",
+    "config_name", "appearance_name", "created_at", "created_by",
+    "activated_at", "activated_by", "widget_key",
+})
+
+
+# ---------------------------------------------------------------------------
+# ActivationService
+# ---------------------------------------------------------------------------
+
+
+class ActivationService:
+    """Manages the Save → Activate configuration lifecycle.
+
+    Singleton service wired at application startup.
+    """
+
+    def __init__(self) -> None:
+        self._prefs_repo: Any = None
+        self._audit_repo: Any = None
+        self._kb_repo: Any = None
+        self._config_processor: Any = None
+        self._lock = asyncio.Lock()
+
+    def configure(
+        self,
+        prefs_repo: Any,
+        audit_repo: Any,
+        kb_repo: Any | None = None,
+        config_processor: Any | None = None,
+    ) -> None:
+        """Wire dependencies (called at startup)."""
+        self._prefs_repo = prefs_repo
+        self._audit_repo = audit_repo
+        self._kb_repo = kb_repo
+        self._config_processor = config_processor
+        logger.info("ActivationService configured")
+
+    @property
+    def _is_configured(self) -> bool:
+        return self._prefs_repo is not None
+
+    # ------------------------------------------------------------------
+    # Lazy migration of pre-config_state documents
+    # ------------------------------------------------------------------
+
+    async def _ensure_config_state(
+        self, doc: dict[str, Any], tenant_id: str,
+    ) -> dict[str, Any]:
+        """Backfill config_state on old documents that lack the field.
+
+        Old documents have ``is_current=True`` but no ``config_state``.
+        On first encounter, patch them to ``config_state='active'`` and
+        set ``activated_at`` to now (best approximation).
+        """
+        if "config_state" not in doc or doc.get("config_state") is None:
+            now = datetime.now(timezone.utc).isoformat()
+            await self._prefs_repo.patch(
+                tenant_id=tenant_id,
+                document_id=doc["id"],
+                operations=[
+                    {"op": "set", "path": "/config_state", "value": ConfigState.ACTIVE.value},
+                    {"op": "set", "path": "/activated_at", "value": now},
+                ],
+            )
+            doc["config_state"] = ConfigState.ACTIVE.value
+            doc["activated_at"] = now
+            logger.info(
+                "Lazy-migrated preferences document %s to config_state='active'",
+                doc["id"],
+            )
+        return doc
+
+    # ------------------------------------------------------------------
+    # Save Draft
+    # ------------------------------------------------------------------
+
+    async def save_draft(
+        self,
+        tenant_id: str,
+        tier: TenantTier,
+        changes: dict[str, Any],
+        actor: str = "admin",
+    ) -> DraftSaveResult:
+        """Persist configuration changes to the draft layer.
+
+        If a draft already exists, merges changes into it.
+        If no draft exists, creates one by copying the active config
+        and applying changes on top.
+
+        Args:
+            tenant_id: Tenant partition key.
+            tier: Subscription tier (for validation and defaults).
+            changes: Partial config dict (only changed fields).
+            actor: Who made the change (for audit).
+
+        Returns:
+            DraftSaveResult with validation status and draft state.
+        """
+        if not self._is_configured:
+            return DraftSaveResult(
+                success=False,
+                errors=[{"field": "_system", "message": "Service not configured"}],
+            )
+
+        # Validate the incoming changes
+        validation = validate_config(changes, tier)
+        if validation.errors:
+            return DraftSaveResult(
+                success=False,
+                errors=validation.errors,
+                warnings=validation.warnings,
+            )
+
+        async with self._lock:
+            # Get the active config (with lazy migration)
+            active = await self._prefs_repo.get_active(tenant_id)
+            if active:
+                active = await self._ensure_config_state(active, tenant_id)
+
+            # Get existing draft (if any)
+            draft = await self._prefs_repo.get_draft(tenant_id)
+
+            if draft is not None:
+                # Merge changes into existing draft
+                for key, value in changes.items():
+                    draft[key] = value
+
+                # Patch the existing draft document
+                operations = [
+                    {"op": "set", "path": f"/{key}", "value": value}
+                    for key, value in changes.items()
+                ]
+                await self._prefs_repo.patch(
+                    tenant_id=tenant_id,
+                    document_id=draft["id"],
+                    operations=operations,
+                )
+
+                logger.info(
+                    "Updated draft for tenant=%s: %d fields changed",
+                    tenant_id[:8], len(changes),
+                )
+
+                return DraftSaveResult(
+                    success=True,
+                    version=draft.get("version", 0),
+                    changes=changes,
+                    warnings=validation.warnings,
+                    state="draft",
+                )
+            else:
+                # Create new draft from active config + changes
+                base_config: dict[str, Any] = {}
+                active_version = 0
+
+                if active:
+                    active_version = active.get("version", 0)
+                    # Copy all PreferencesDocument fields from active
+                    for key, value in active.items():
+                        if key not in ("id", "_rid", "_self", "_etag", "_attachments", "_ts"):
+                            base_config[key] = value
+
+                # Apply changes on top
+                for key, value in changes.items():
+                    base_config[key] = value
+
+                # Create draft document
+                draft_version = active_version + 1
+                now = datetime.now(timezone.utc).isoformat()
+
+                base_config.update({
+                    "id": f"{tenant_id}:{draft_version}",
+                    "tenant_id": tenant_id,
+                    "version": draft_version,
+                    "is_current": False,
+                    "config_state": ConfigState.DRAFT.value,
+                    "created_at": now,
+                    "created_by": actor,
+                    "activated_at": None,
+                    "activated_by": None,
+                })
+
+                await self._prefs_repo.create(tenant_id, base_config)
+
+                logger.info(
+                    "Created draft v%d for tenant=%s from active v%d with %d changes",
+                    draft_version, tenant_id[:8], active_version, len(changes),
+                )
+
+                return DraftSaveResult(
+                    success=True,
+                    version=draft_version,
+                    changes=changes,
+                    warnings=validation.warnings,
+                    state="draft",
+                )
+
+    # ------------------------------------------------------------------
+    # Draft State (for activation banner)
+    # ------------------------------------------------------------------
+
+    async def get_draft_state(
+        self, tenant_id: str, tier: TenantTier,
+    ) -> DraftState:
+        """Return the current draft state for the activation banner.
+
+        Includes the diff between draft and active configs.
+        """
+        if not self._is_configured:
+            return DraftState(has_pending_changes=False)
+
+        active = await self._prefs_repo.get_active(tenant_id)
+        draft = await self._prefs_repo.get_draft(tenant_id)
+
+        if draft is None:
+            return DraftState(
+                has_pending_changes=False,
+                active_version=active.get("version", 0) if active else 0,
+                active_activated_at=active.get("activated_at") if active else None,
+            )
+
+        # Compute changed fields (draft vs active)
+        changed_fields: list[str] = []
+        active_config = active or {}
+        for key in draft:
+            if key in _METADATA_FIELDS:
+                continue
+            if key.startswith("_"):
+                continue
+            if draft.get(key) != active_config.get(key):
+                changed_fields.append(key)
+
+        return DraftState(
+            has_pending_changes=True,
+            active_version=active.get("version", 0) if active else 0,
+            active_activated_at=active.get("activated_at") if active else None,
+            draft_version=draft.get("version", 0),
+            changed_fields=changed_fields,
+            draft_config={k: draft.get(k) for k in changed_fields},
+            active_config={k: active_config.get(k) for k in changed_fields},
+        )
+
+    async def has_pending_changes(self, tenant_id: str) -> bool:
+        """Lightweight check: does a draft exist for this tenant?"""
+        if not self._is_configured:
+            return False
+        draft = await self._prefs_repo.get_draft(tenant_id)
+        return draft is not None
+
+    # ------------------------------------------------------------------
+    # Validate for Activation
+    # ------------------------------------------------------------------
+
+    async def validate_for_activation(
+        self, tenant_id: str, tier: TenantTier,
+    ) -> ValidationResult:
+        """Run activation validation rules.
+
+        Hard blocks (activation fails):
+            - brand_name is non-empty
+            - widget_key exists
+
+        Warnings (activation proceeds):
+            - brand_voice not explicitly set (defaults to 'friendly')
+            - fewer than 1 published KB article
+        """
+        draft = await self._prefs_repo.get_draft(tenant_id)
+        if draft is None:
+            return ValidationResult(
+                can_activate=False,
+                hard_errors=[{"field": "_system", "message": "No draft to activate"}],
+            )
+
+        hard_errors: list[dict[str, str]] = []
+        warnings: list[dict[str, str]] = []
+
+        # Hard block: brand_name
+        brand_name = draft.get("brand_name")
+        if not brand_name or not str(brand_name).strip():
+            hard_errors.append({
+                "field": "brand_name",
+                "message": "Brand name is required before activation",
+                "page": "agent-configuration",
+            })
+
+        # Hard block: widget_key
+        widget_key = draft.get("widget_key")
+        if not widget_key:
+            hard_errors.append({
+                "field": "widget_key",
+                "message": "Widget key is missing (set during provisioning)",
+                "page": "system",
+            })
+
+        # Warning: brand_voice
+        brand_voice = draft.get("brand_voice")
+        if not brand_voice or not str(brand_voice).strip():
+            warnings.append({
+                "field": "brand_voice",
+                "message": "Brand voice is not set — will default to 'friendly'",
+                "page": "agent-configuration",
+            })
+
+        # Warning: KB articles
+        if self._kb_repo is not None:
+            try:
+                articles = await self._kb_repo.query(
+                    tenant_id=tenant_id,
+                    query_text=(
+                        "SELECT VALUE COUNT(1) FROM c "
+                        "WHERE c.is_active = true"
+                    ),
+                    max_items=1,
+                )
+                kb_count = articles[0] if articles else 0
+                if kb_count < 1:
+                    warnings.append({
+                        "field": "knowledge_base",
+                        "message": "No published knowledge base articles — AI will use "
+                                   "general knowledge only",
+                        "page": "knowledge-base",
+                    })
+            except Exception:
+                logger.debug("KB count check failed during validation", exc_info=True)
+
+        return ValidationResult(
+            can_activate=len(hard_errors) == 0,
+            hard_errors=hard_errors,
+            warnings=warnings,
+        )
+
+    # ------------------------------------------------------------------
+    # Activate
+    # ------------------------------------------------------------------
+
+    async def activate(
+        self,
+        tenant_id: str,
+        tier: TenantTier,
+        actor: str = "admin",
+    ) -> ActivationResult:
+        """Validate and promote the draft to active.
+
+        Transition:
+            1. Validate draft
+            2. Mark current 'previous' → cleared (bare version)
+            3. Mark current 'active' → 'previous'
+            4. Promote draft → 'active' (set activated_at, activated_by)
+            5. Invalidate config cache
+            6. Audit log
+
+        Returns:
+            ActivationResult with success status and any validation errors.
+        """
+        if not self._is_configured:
+            return ActivationResult(
+                success=False,
+                errors=[{"field": "_system", "message": "Service not configured"}],
+            )
+
+        # Validate
+        validation = await self.validate_for_activation(tenant_id, tier)
+        if not validation.can_activate:
+            return ActivationResult(
+                success=False,
+                errors=validation.hard_errors,
+                warnings=validation.warnings,
+            )
+
+        async with self._lock:
+            draft = await self._prefs_repo.get_draft(tenant_id)
+            if draft is None:
+                return ActivationResult(
+                    success=False,
+                    errors=[{"field": "_system", "message": "No draft to activate"}],
+                )
+
+            active = await self._prefs_repo.get_active(tenant_id)
+            if active:
+                active = await self._ensure_config_state(active, tenant_id)
+
+            previous = await self._prefs_repo.get_previous(tenant_id)
+
+            now = datetime.now(timezone.utc).isoformat()
+
+            # Step 1: Clear any existing 'previous' document
+            if previous:
+                await self._prefs_repo.patch(
+                    tenant_id=tenant_id,
+                    document_id=previous["id"],
+                    operations=[
+                        {"op": "set", "path": "/config_state", "value": "archived"},
+                    ],
+                )
+
+            # Step 2: Demote current 'active' → 'previous'
+            if active:
+                await self._prefs_repo.patch(
+                    tenant_id=tenant_id,
+                    document_id=active["id"],
+                    operations=[
+                        {"op": "set", "path": "/config_state", "value": ConfigState.PREVIOUS.value},
+                        {"op": "set", "path": "/is_current", "value": False},
+                    ],
+                )
+
+            # Step 3: Promote draft → 'active'
+            await self._prefs_repo.patch(
+                tenant_id=tenant_id,
+                document_id=draft["id"],
+                operations=[
+                    {"op": "set", "path": "/config_state", "value": ConfigState.ACTIVE.value},
+                    {"op": "set", "path": "/is_current", "value": True},
+                    {"op": "set", "path": "/activated_at", "value": now},
+                    {"op": "set", "path": "/activated_by", "value": actor},
+                ],
+            )
+
+            # Step 4: Invalidate config cache
+            if self._config_processor is not None:
+                self._config_processor._invalidate_cache(tenant_id)
+
+            # Step 5: Audit log
+            if self._audit_repo is not None:
+                try:
+                    await self._audit_repo.log_event(
+                        event_type=AuditEventType.CONFIG_UPDATED,
+                        tenant_id=tenant_id,
+                        actor=actor,
+                        actor_type="user" if actor.startswith("user:") else "system",
+                        payload={
+                            "action": "config_activated",
+                            "draft_version": draft.get("version", 0),
+                            "previous_active_version": active.get("version", 0) if active else 0,
+                        },
+                    )
+                except Exception:
+                    logger.warning("Audit log failed for activation", exc_info=True)
+
+            logger.info(
+                "Activated config v%d for tenant=%s (previous: v%d)",
+                draft.get("version", 0),
+                tenant_id[:8],
+                active.get("version", 0) if active else 0,
+            )
+
+            return ActivationResult(
+                success=True,
+                version=draft.get("version", 0),
+                activated_at=now,
+                warnings=validation.warnings,
+            )
+
+    # ------------------------------------------------------------------
+    # Restore Previous
+    # ------------------------------------------------------------------
+
+    async def restore_previous(
+        self,
+        tenant_id: str,
+        tier: TenantTier,
+        actor: str = "admin",
+    ) -> RestoreResult:
+        """Restore the previous activation snapshot.
+
+        Swap: current active becomes previous, previous becomes active.
+        Any existing draft is discarded.
+        """
+        if not self._is_configured:
+            return RestoreResult(success=False, error="Service not configured")
+
+        async with self._lock:
+            active = await self._prefs_repo.get_active(tenant_id)
+            previous = await self._prefs_repo.get_previous(tenant_id)
+
+            if previous is None:
+                return RestoreResult(
+                    success=False,
+                    error="No previous configuration to restore",
+                )
+
+            now = datetime.now(timezone.utc).isoformat()
+
+            # Discard any draft first
+            draft = await self._prefs_repo.get_draft(tenant_id)
+            if draft:
+                await self._prefs_repo.patch(
+                    tenant_id=tenant_id,
+                    document_id=draft["id"],
+                    operations=[
+                        {"op": "set", "path": "/config_state", "value": "discarded"},
+                        {"op": "set", "path": "/is_current", "value": False},
+                    ],
+                )
+
+            # Demote current active → previous
+            if active:
+                await self._prefs_repo.patch(
+                    tenant_id=tenant_id,
+                    document_id=active["id"],
+                    operations=[
+                        {"op": "set", "path": "/config_state", "value": ConfigState.PREVIOUS.value},
+                        {"op": "set", "path": "/is_current", "value": False},
+                    ],
+                )
+
+            # Promote previous → active
+            await self._prefs_repo.patch(
+                tenant_id=tenant_id,
+                document_id=previous["id"],
+                operations=[
+                    {"op": "set", "path": "/config_state", "value": ConfigState.ACTIVE.value},
+                    {"op": "set", "path": "/is_current", "value": True},
+                    {"op": "set", "path": "/activated_at", "value": now},
+                    {"op": "set", "path": "/activated_by", "value": f"restore:{actor}"},
+                ],
+            )
+
+            # Invalidate cache
+            if self._config_processor is not None:
+                self._config_processor._invalidate_cache(tenant_id)
+
+            # Audit log
+            if self._audit_repo is not None:
+                try:
+                    await self._audit_repo.log_event(
+                        event_type=AuditEventType.CONFIG_UPDATED,
+                        tenant_id=tenant_id,
+                        actor=actor,
+                        actor_type="user",
+                        payload={
+                            "action": "config_restored",
+                            "restored_version": previous.get("version", 0),
+                            "demoted_version": active.get("version", 0) if active else 0,
+                        },
+                    )
+                except Exception:
+                    logger.warning("Audit log failed for restore", exc_info=True)
+
+            logger.info(
+                "Restored config v%d for tenant=%s",
+                previous.get("version", 0),
+                tenant_id[:8],
+            )
+
+            return RestoreResult(
+                success=True,
+                restored_version=previous.get("version", 0),
+                restored_activated_at=now,
+            )
+
+    # ------------------------------------------------------------------
+    # Discard Draft
+    # ------------------------------------------------------------------
+
+    async def discard_draft(
+        self,
+        tenant_id: str,
+        actor: str = "admin",
+    ) -> bool:
+        """Discard the current draft (mark as discarded).
+
+        Returns True if a draft was found and discarded.
+        """
+        if not self._is_configured:
+            return False
+
+        draft = await self._prefs_repo.get_draft(tenant_id)
+        if draft is None:
+            return False
+
+        await self._prefs_repo.patch(
+            tenant_id=tenant_id,
+            document_id=draft["id"],
+            operations=[
+                {"op": "set", "path": "/config_state", "value": "discarded"},
+                {"op": "set", "path": "/is_current", "value": False},
+            ],
+        )
+
+        logger.info(
+            "Discarded draft v%d for tenant=%s",
+            draft.get("version", 0),
+            tenant_id[:8],
+        )
+        return True
+
+    # ------------------------------------------------------------------
+    # Reinitialize to Defaults (superadmin only)
+    # ------------------------------------------------------------------
+
+    async def reinitialize_to_defaults(
+        self,
+        tenant_id: str,
+        tier: TenantTier,
+        actor: str = "superadmin",
+    ) -> DraftSaveResult:
+        """Create a fresh draft from tier defaults.
+
+        Superadmin-only nuclear option for support escalations.
+        Discards any existing draft first.
+        """
+        if not self._is_configured:
+            return DraftSaveResult(
+                success=False,
+                errors=[{"field": "_system", "message": "Service not configured"}],
+            )
+
+        # Discard existing draft
+        await self.discard_draft(tenant_id, actor)
+
+        # Get tier defaults as changes
+        defaults = resolve_defaults(tier)
+
+        # Preserve widget_key from active config (it's set during provisioning)
+        active = await self._prefs_repo.get_active(tenant_id)
+        if active and active.get("widget_key"):
+            defaults["widget_key"] = active["widget_key"]
+
+        return await self.save_draft(tenant_id, tier, defaults, actor)
+
+
+# ---------------------------------------------------------------------------
+# Module-level singleton
+# ---------------------------------------------------------------------------
+
+_service: ActivationService | None = None
+
+
+def get_activation_service() -> ActivationService:
+    """Return the module-level ActivationService singleton."""
+    global _service  # noqa: PLW0603
+    if _service is None:
+        _service = ActivationService()
+        logger.info("ActivationService initialised (not yet configured)")
+    return _service

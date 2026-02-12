@@ -109,14 +109,6 @@ export type OnboardingStep =
   | 'customer_memory'
   | 'notifications';
 
-export interface OnboardingStepConfig {
-  step: OnboardingStep;
-  label: string;
-  description: string;
-  fields: ConfigField[];
-  isComplete: boolean;
-}
-
 // ---------------------------------------------------------------------------
 // Usage & Billing
 // ---------------------------------------------------------------------------

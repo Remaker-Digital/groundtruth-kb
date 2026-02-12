@@ -172,6 +172,9 @@ def mock_prefs_repo():
     repo.get_page_assignments = AsyncMock(side_effect=_get_page_assignments)
     repo.upsert_page_assignment = AsyncMock(side_effect=_upsert_page_assignment)
     repo.delete_page_assignment = AsyncMock(side_effect=_delete_page_assignment)
+    # Active-only readers used by widget serving (_resolve_quick_actions)
+    repo.get_quick_actions_active = AsyncMock(side_effect=_get_quick_actions)
+    repo.get_page_assignments_active = AsyncMock(side_effect=_get_page_assignments)
     return repo
 
 

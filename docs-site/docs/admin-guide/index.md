@@ -24,6 +24,10 @@ When you change a setting, your value takes priority over the platform and tier 
 
 Every configuration change is versioned automatically. You can view past versions, compare changes, and roll back to a previous configuration from the Configuration page in the admin console.
 
+:::tip Save and activate
+Configuration changes use a two-phase commit model. When you save a setting, it is stored as a **draft** and does not affect your live AI agent. Changes only go live when you explicitly **activate** from the activation banner. This lets you edit multiple settings across different pages, review everything in one place, and go live with confidence. See [Save and activate](./save-and-activate.md) for the full workflow.
+:::
+
 ## Configuration sections
 
 | Section | What it controls |
@@ -42,7 +46,7 @@ Every configuration change is versioned automatically. You can view past version
 | [Quick action prompts](./quick-actions.md) | Pre-defined prompt buttons in the widget greeting area |
 | [Knowledge base management](./knowledge-base-management.md) | Creating, editing, uploading, and organizing knowledge articles |
 | [Conflict scanner](./conflict-scanner.md) | Detect duplicate and conflicting knowledge base articles |
-| [Test mode](./test-mode.md) | A/B test AI configuration changes on a percentage of sessions |
+| [Save and activate](./save-and-activate.md) | Draft, review, and activate configuration changes |
 | [Team management](./team-management.md) | Invite team members, assign roles, and control admin console access |
 
 ## Settings that affect AI prompts

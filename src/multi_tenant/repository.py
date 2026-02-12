@@ -1732,23 +1732,72 @@ class MemoryVectorRepository(TenantScopedRepository):
 
 
 class PreferencesRepository(TenantScopedRepository):
-    """Repository for the preferences collection (versioned config)."""
+    """Repository for the preferences collection (versioned config).
+
+    Save → Activate model:
+        - get_active()   reads the live config (chat pipeline, widget)
+        - get_draft()    reads the draft config (admin UI edits)
+        - get_previous() reads the previous activation (for Restore)
+        - get_current()  backward-compat alias for get_active()
+    """
 
     def __init__(self) -> None:
         super().__init__(COLLECTION_PREFERENCES)
 
-    async def get_current(self, tenant_id: str) -> dict[str, Any] | None:
-        """Get the current (active) preferences version."""
+    # ---- Save → Activate state queries ----
+
+    async def get_active(self, tenant_id: str) -> dict[str, Any] | None:
+        """Get the currently activated preferences (config_state='active').
+
+        Backward-compatible: also matches old documents with
+        ``is_current=true`` that predate the config_state field.
+        """
         results = await self.query(
             tenant_id=tenant_id,
             query_text=(
                 "SELECT * FROM c "
-                "WHERE c.is_current = true "
+                "WHERE (c.config_state = 'active' "
+                "       OR (c.is_current = true "
+                "           AND NOT IS_DEFINED(c.config_state))) "
                 "ORDER BY c.version DESC"
             ),
             max_items=1,
         )
         return results[0] if results else None
+
+    async def get_draft(self, tenant_id: str) -> dict[str, Any] | None:
+        """Get the current draft preferences (config_state='draft')."""
+        results = await self.query(
+            tenant_id=tenant_id,
+            query_text=(
+                "SELECT * FROM c "
+                "WHERE c.config_state = 'draft' "
+                "ORDER BY c.version DESC"
+            ),
+            max_items=1,
+        )
+        return results[0] if results else None
+
+    async def get_previous(self, tenant_id: str) -> dict[str, Any] | None:
+        """Get the previous activation snapshot (config_state='previous')."""
+        results = await self.query(
+            tenant_id=tenant_id,
+            query_text=(
+                "SELECT * FROM c "
+                "WHERE c.config_state = 'previous' "
+                "ORDER BY c.version DESC"
+            ),
+            max_items=1,
+        )
+        return results[0] if results else None
+
+    async def get_current(self, tenant_id: str) -> dict[str, Any] | None:
+        """Get the current (active) preferences version.
+
+        Backward-compatible alias for ``get_active()``.  All existing
+        callers (pipeline, widget, test mode removal) continue to work.
+        """
+        return await self.get_active(tenant_id)
 
     async def create_version(
         self, tenant_id: str, preferences: PreferencesDocument,
@@ -1853,34 +1902,54 @@ class PreferencesRepository(TenantScopedRepository):
         return results[0] if results else None
 
     # ---- Quick Action Prompt methods (WI #226-229) ----
+    #
+    # Quick action CRUD operates on the DRAFT document under the
+    # Save → Activate model.  If no draft exists, reads from active
+    # for display purposes.  Write operations target the draft.
+
+    async def _get_draft_or_active(self, tenant_id: str) -> dict[str, Any] | None:
+        """Get draft if it exists, otherwise active.  For quick action reads."""
+        draft = await self.get_draft(tenant_id)
+        if draft is not None:
+            return draft
+        return await self.get_active(tenant_id)
 
     async def get_quick_actions(self, tenant_id: str) -> list[dict[str, Any]]:
         """Get all quick action prompts for a tenant.
 
-        Reads the current preferences document and returns the
-        quick_actions array.
+        Reads from draft (if exists) or active preferences document.
         """
-        current = await self.get_current(tenant_id)
-        if not current:
+        doc = await self._get_draft_or_active(tenant_id)
+        if not doc:
             return []
-        return current.get("quick_actions", [])
+        return doc.get("quick_actions", [])
+
+    async def get_quick_actions_active(self, tenant_id: str) -> list[dict[str, Any]]:
+        """Get quick actions from the ACTIVE config only (for widget serving)."""
+        active = await self.get_active(tenant_id)
+        if not active:
+            return []
+        return active.get("quick_actions", [])
 
     async def upsert_quick_action(
         self, tenant_id: str, action: dict[str, Any],
     ) -> dict[str, Any]:
-        """Create or update a quick action in the current preferences.
+        """Create or update a quick action in the draft preferences.
 
         Uses read-modify-write on the quick_actions array within the
-        current preferences document. If the action ID exists, replaces
-        it; otherwise appends.
+        draft document. If no draft exists, patches the active document's
+        quick_actions as a draft edit — the ActivationService is responsible
+        for creating the full draft document before this is called.
         """
-        current = await self.get_current(tenant_id)
-        if not current:
+        target = await self.get_draft(tenant_id)
+        if not target:
+            target = await self.get_active(tenant_id)
+        if not target:
             raise DocumentNotFoundError(
-                self._collection_name, "current", tenant_id,
+                self._collection_name, "draft_or_active", tenant_id,
             )
 
-        actions: list[dict[str, Any]] = current.get("quick_actions", [])
+        actions: list[dict[str, Any]] = target.get("quick_actions", [])
 
         # Find and replace existing, or append new
         found = False
@@ -1894,7 +1963,7 @@ class PreferencesRepository(TenantScopedRepository):
 
         await self.patch(
             tenant_id=tenant_id,
-            document_id=current["id"],
+            document_id=target["id"],
             operations=[{"op": "set", "path": "/quick_actions", "value": actions}],
         )
         return action
@@ -1902,16 +1971,18 @@ class PreferencesRepository(TenantScopedRepository):
     async def delete_quick_action(
         self, tenant_id: str, action_id: str,
     ) -> bool:
-        """Remove a quick action from the current preferences.
+        """Remove a quick action from the draft preferences.
 
         Also removes any page assignment references to this action ID.
         Returns True if the action was found and removed.
         """
-        current = await self.get_current(tenant_id)
-        if not current:
+        target = await self.get_draft(tenant_id)
+        if not target:
+            target = await self.get_active(tenant_id)
+        if not target:
             return False
 
-        actions: list[dict[str, Any]] = current.get("quick_actions", [])
+        actions: list[dict[str, Any]] = target.get("quick_actions", [])
         original_len = len(actions)
         actions = [a for a in actions if a.get("id") != action_id]
 
@@ -1919,7 +1990,7 @@ class PreferencesRepository(TenantScopedRepository):
             return False  # Not found
 
         # Also clean up assignments referencing this action
-        assignments: list[dict[str, Any]] = current.get(
+        assignments: list[dict[str, Any]] = target.get(
             "quick_action_assignments", [],
         )
         for assignment in assignments:
@@ -1930,7 +2001,7 @@ class PreferencesRepository(TenantScopedRepository):
 
         await self.patch(
             tenant_id=tenant_id,
-            document_id=current["id"],
+            document_id=target["id"],
             operations=[
                 {"op": "set", "path": "/quick_actions", "value": actions},
                 {"op": "set", "path": "/quick_action_assignments", "value": assignments},
@@ -1942,26 +2013,37 @@ class PreferencesRepository(TenantScopedRepository):
         self, tenant_id: str,
     ) -> list[dict[str, Any]]:
         """Get all page-to-quick-action assignments for a tenant."""
-        current = await self.get_current(tenant_id)
-        if not current:
+        doc = await self._get_draft_or_active(tenant_id)
+        if not doc:
             return []
-        return current.get("quick_action_assignments", [])
+        return doc.get("quick_action_assignments", [])
+
+    async def get_page_assignments_active(
+        self, tenant_id: str,
+    ) -> list[dict[str, Any]]:
+        """Get page assignments from the ACTIVE config only (for widget serving)."""
+        active = await self.get_active(tenant_id)
+        if not active:
+            return []
+        return active.get("quick_action_assignments", [])
 
     async def upsert_page_assignment(
         self, tenant_id: str, assignment: dict[str, Any],
     ) -> dict[str, Any]:
-        """Create or update a page assignment.
+        """Create or update a page assignment in the draft preferences.
 
         Matches on page_type + page_handle combination. If a matching
         assignment exists, replaces it; otherwise appends.
         """
-        current = await self.get_current(tenant_id)
-        if not current:
+        target = await self.get_draft(tenant_id)
+        if not target:
+            target = await self.get_active(tenant_id)
+        if not target:
             raise DocumentNotFoundError(
-                self._collection_name, "current", tenant_id,
+                self._collection_name, "draft_or_active", tenant_id,
             )
 
-        assignments: list[dict[str, Any]] = current.get(
+        assignments: list[dict[str, Any]] = target.get(
             "quick_action_assignments", [],
         )
 
@@ -1980,7 +2062,7 @@ class PreferencesRepository(TenantScopedRepository):
 
         await self.patch(
             tenant_id=tenant_id,
-            document_id=current["id"],
+            document_id=target["id"],
             operations=[
                 {"op": "set", "path": "/quick_action_assignments", "value": assignments},
             ],
@@ -1990,12 +2072,14 @@ class PreferencesRepository(TenantScopedRepository):
     async def delete_page_assignment(
         self, tenant_id: str, page_type: str, page_handle: str | None = None,
     ) -> bool:
-        """Remove a page assignment. Returns True if found and removed."""
-        current = await self.get_current(tenant_id)
-        if not current:
+        """Remove a page assignment from draft. Returns True if found and removed."""
+        target = await self.get_draft(tenant_id)
+        if not target:
+            target = await self.get_active(tenant_id)
+        if not target:
             return False
 
-        assignments: list[dict[str, Any]] = current.get(
+        assignments: list[dict[str, Any]] = target.get(
             "quick_action_assignments", [],
         )
         original_len = len(assignments)
@@ -2012,7 +2096,7 @@ class PreferencesRepository(TenantScopedRepository):
 
         await self.patch(
             tenant_id=tenant_id,
-            document_id=current["id"],
+            document_id=target["id"],
             operations=[
                 {"op": "set", "path": "/quick_action_assignments", "value": assignments},
             ],

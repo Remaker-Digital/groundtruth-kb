@@ -19,6 +19,7 @@ import React, { createContext, useCallback, useContext, useEffect, useState } fr
 import { useLocation } from 'react-router-dom';
 import { Frame, Loading, Banner } from '@shopify/polaris';
 import type { TenantContext } from '../../shared/types';
+import ActivationBanner from '../../shared/ActivationBanner';
 
 // ---------------------------------------------------------------------------
 // Types
@@ -276,6 +277,10 @@ export const ShopifyAppLayout: React.FC<ShopifyAppLayoutProps> = ({
                 Open full admin ↗
               </a>
             </div>
+            <ActivationBanner
+              apiFetch={apiFetch}
+              onNotify={onNotify}
+            />
             {children}
           </>
         )}

@@ -294,6 +294,9 @@ def _config_to_preferences(
         tenant_id=tenant_id,
         version=version,
         is_current=True,
+        config_state="active",
+        activated_at=now,
+        activated_by=created_by,
         created_at=now,
         created_by=created_by,
         **prefs_kwargs,
@@ -895,6 +898,60 @@ class TenantConfigProcessor:
             version=new_version,
             resolved_config=resolved,
         )
+
+    async def get_named_config_values(
+        self,
+        tenant_id: str,
+        tier: TenantTier,
+        name: str,
+    ) -> dict[str, Any] | None:
+        """Return the stored config values for a named configuration.
+
+        Used by the activation flow to load a named config as a draft
+        without activating it immediately.
+
+        Returns:
+            Dict of config field_name → value, or None if not found.
+        """
+        if not self._is_configured:
+            return None
+
+        named_doc = await self._prefs_repo.get_by_name(tenant_id, name)
+        if named_doc is None:
+            return None
+
+        defaults = resolve_defaults(tier)
+        stored = _preferences_to_config(named_doc)
+        return {**defaults, **stored}
+
+    async def get_named_appearance_values(
+        self,
+        tenant_id: str,
+        tier: TenantTier,
+        name: str,
+    ) -> dict[str, Any] | None:
+        """Return widget_* field values for a named appearance.
+
+        Used by the activation flow to load an appearance as a draft
+        without activating it immediately.
+
+        Returns:
+            Dict of widget field_name → value, or None if not found.
+        """
+        if not self._is_configured:
+            return None
+
+        appearance_doc = await self._prefs_repo.get_by_appearance_name(tenant_id, name)
+        if appearance_doc is None:
+            return None
+
+        widget_overrides: dict[str, Any] = {}
+        for fname in _WIDGET_APPEARANCE_FIELDS:
+            val = appearance_doc.get(fname)
+            if val is not None:
+                widget_overrides[fname] = val
+
+        return widget_overrides
 
     async def delete_named_config(
         self,

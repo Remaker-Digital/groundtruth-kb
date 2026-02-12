@@ -271,19 +271,20 @@ class TestConfigurationAPI:
         assert data["config"]["brand_name"] == "Test Brand"
 
     def test_tc12_put_config_updates_fields(self, starter_client):
-        """TC-12: PUT /api/config applies partial update."""
-        mock_result = ConfigUpdateResult(
+        """TC-12: PUT /api/config saves to draft via activation service."""
+        from src.multi_tenant.activation_service import DraftSaveResult
+
+        mock_result = DraftSaveResult(
             success=True,
             version=2,
-            validation=ConfigValidationResult(valid=True),
-            changes={"brand_name": {"old": "Old", "new": "New"}},
-            resolved_config={"brand_name": "New"},
+            changes={"brand_name": "New"},
+            state="draft",
         )
 
-        with patch("src.multi_tenant.tenant_config_api.get_config_processor") as mock_get:
-            mock_processor = MagicMock()
-            mock_processor.update_config = AsyncMock(return_value=mock_result)
-            mock_get.return_value = mock_processor
+        with patch("src.multi_tenant.tenant_config_api.get_activation_service") as mock_get:
+            mock_svc = MagicMock()
+            mock_svc.save_draft = AsyncMock(return_value=mock_result)
+            mock_get.return_value = mock_svc
 
             resp = starter_client.put("/api/config", json={"fields": {"brand_name": "New"}})
 
@@ -311,18 +312,20 @@ class TestConfigurationAPI:
         assert data["valid"] is True
 
     def test_tc14_reset_endpoint_clears_overrides(self, starter_client):
-        """TC-14: POST /api/config/reset clears all tenant overrides."""
-        mock_result = ConfigUpdateResult(
+        """TC-14: POST /api/config/reset creates draft from tier defaults."""
+        from src.multi_tenant.activation_service import DraftSaveResult
+
+        mock_result = DraftSaveResult(
             success=True,
             version=3,
             changes={},
-            resolved_config=resolve_defaults(TenantTier.STARTER),
+            state="draft",
         )
 
-        with patch("src.multi_tenant.tenant_config_api.get_config_processor") as mock_get:
-            mock_processor = MagicMock()
-            mock_processor.reset_to_defaults = AsyncMock(return_value=mock_result)
-            mock_get.return_value = mock_processor
+        with patch("src.multi_tenant.tenant_config_api.get_activation_service") as mock_get:
+            mock_svc = MagicMock()
+            mock_svc.reinitialize_to_defaults = AsyncMock(return_value=mock_result)
+            mock_get.return_value = mock_svc
 
             resp = starter_client.post("/api/config/reset")
 
@@ -391,21 +394,42 @@ class TestConfigurationAPI:
         assert data["versions"][0]["is_current"] is True
 
     def test_tc18_rollback_endpoint_restores_version(self, starter_client):
-        """TC-18: POST /api/config/rollback restores a previous version."""
-        from src.multi_tenant.tenant_config_processor import ConfigRollbackResult
+        """TC-18: POST /api/config/rollback loads version as draft."""
+        from src.multi_tenant.activation_service import DraftSaveResult
 
-        mock_result = ConfigRollbackResult(
+        mock_version_config = ConfigReadResult(
+            tenant_id=STARTER_TENANT_ID,
+            tier="starter",
+            version=1,
+            config={"brand_name": "Old Name"},
+            from_cache=False,
+        )
+        mock_draft_result = DraftSaveResult(
             success=True,
-            from_version=3,
-            to_version=1,
-            new_version=4,
-            message="Rolled back to version 1",
+            version=4,
+            changes={"brand_name": "Old Name"},
+            state="draft",
+        )
+        mock_current = ConfigReadResult(
+            tenant_id=STARTER_TENANT_ID,
+            tier="starter",
+            version=3,
+            config={"brand_name": "Current"},
+            from_cache=False,
         )
 
-        with patch("src.multi_tenant.tenant_config_api.get_config_processor") as mock_get:
+        with (
+            patch("src.multi_tenant.tenant_config_api.get_config_processor") as mock_proc_get,
+            patch("src.multi_tenant.tenant_config_api.get_activation_service") as mock_svc_get,
+        ):
             mock_processor = MagicMock()
-            mock_processor.rollback = AsyncMock(return_value=mock_result)
-            mock_get.return_value = mock_processor
+            mock_processor.get_version = AsyncMock(return_value=mock_version_config)
+            mock_processor.get_config = AsyncMock(return_value=mock_current)
+            mock_proc_get.return_value = mock_processor
+
+            mock_svc = MagicMock()
+            mock_svc.save_draft = AsyncMock(return_value=mock_draft_result)
+            mock_svc_get.return_value = mock_svc
 
             resp = starter_client.post("/api/config/rollback", json={"target_version": 1})
 
@@ -455,22 +479,21 @@ class TestConfigAuthEnforcement:
 
     def test_tc21_tier_gating_in_validation(self, starter_client):
         """TC-21: Starter tenant cannot set Professional+ fields."""
-        # custom_instructions is PROFESSIONAL_PLUS
-        mock_result = ConfigUpdateResult(
+        from src.multi_tenant.activation_service import DraftSaveResult
+
+        # custom_instructions is PROFESSIONAL_PLUS — save_draft returns error
+        mock_result = DraftSaveResult(
             success=False,
-            validation=ConfigValidationResult(
-                valid=False,
-                errors=[{
-                    "field_name": "custom_instructions",
-                    "message": "Field 'custom_instructions' requires pro+ tier or higher",
-                }],
-            ),
+            errors=[{
+                "field": "custom_instructions",
+                "message": "Field 'custom_instructions' requires pro+ tier or higher",
+            }],
         )
 
-        with patch("src.multi_tenant.tenant_config_api.get_config_processor") as mock_get:
-            mock_processor = MagicMock()
-            mock_processor.update_config = AsyncMock(return_value=mock_result)
-            mock_get.return_value = mock_processor
+        with patch("src.multi_tenant.tenant_config_api.get_activation_service") as mock_get:
+            mock_svc = MagicMock()
+            mock_svc.save_draft = AsyncMock(return_value=mock_result)
+            mock_get.return_value = mock_svc
 
             resp = starter_client.put(
                 "/api/config",

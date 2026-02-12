@@ -16,7 +16,7 @@
  *   - useUpdateConfig: saves changed widget fields via PUT /api/config
  *   - useWidgetAppearances: GET /api/config/widget-appearances (C4)
  *   - useSaveWidgetAppearance: POST /api/config/widget-appearances (C4)
- *   - useActivateWidgetAppearance: POST /api/config/widget-appearances/{name}/activate (C4)
+ *   - useActivateWidgetAppearance: POST /api/config/widget-appearances/{name}/activate (C4, saves as draft)
  *   - useDeleteWidgetAppearance: DELETE /api/config/widget-appearances/{name} (C4)
  *
  * Architecture references:
@@ -1426,7 +1426,7 @@ export const WidgetConfigurator: React.FC<BaseComponentProps> = ({
     const result = await updateConfig(pendingChanges);
     if (result?.success) {
       setSavedConfig(localConfig);
-      onNotify(`Saved ${changeCount} widget setting${changeCount > 1 ? 's' : ''} successfully.`, 'success');
+      onNotify(`${changeCount} widget setting${changeCount > 1 ? 's' : ''} saved to draft — activate to go live.`, 'success');
     } else {
       onNotify(saveError || 'Failed to save widget settings.', 'error');
     }

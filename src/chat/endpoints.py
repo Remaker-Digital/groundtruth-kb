@@ -344,52 +344,28 @@ async def stream_response(
     # Load tenant + preferences for pipeline context
     tenant_doc, prefs_doc = await _load_tenant_context(ctx)
 
-    # --- Test Mode routing (C2) ---
-    # If test mode is active, deterministically assign this conversation
-    # to test or production config using SHA-256 hash of session seed +
-    # conversation_id. Test conversations get AI behaviour overrides applied.
-    is_test_mode = False
-    if prefs_doc.test_mode_enabled and prefs_doc.test_mode_overrides:
-        from src.multi_tenant.test_mode_service import (
-            TestModeService,
-            get_test_mode_service,
+    # --- "Not configured" guard ---
+    # If the tenant has never activated their configuration, return an
+    # error event so the widget can show a friendly message.  Auto-activated
+    # new tenants (provisioned with activated_at) won't trigger this.
+    if not getattr(prefs_doc, "activated_at", None):
+        logger.info(
+            "Tenant %s has not activated config — returning not_configured",
+            ctx.tenant_id[:8],
         )
+        import json as _json
 
-        if TestModeService.should_use_test_config(
-            session_id=conversation_id,
-            seed=prefs_doc.test_mode_assignment_seed,
-            percentage=prefs_doc.test_mode_percentage,
-        ):
-            is_test_mode = True
-            test_svc = get_test_mode_service()
-            prefs_doc = PreferencesDocument(
-                **test_svc.apply_test_overrides(
-                    prefs_doc.model_dump(), prefs_doc.test_mode_overrides,
-                ),
-            )
-            logger.info(
-                "Test Mode: conversation %s routed to test config "
-                "(seed=%d, pct=%d%%)",
-                conversation_id,
-                prefs_doc.test_mode_assignment_seed,
-                prefs_doc.test_mode_percentage,
+        async def _not_configured_stream():
+            yield (
+                f"event: error\n"
+                f"data: {_json.dumps({'type': 'not_configured', 'message': 'This store has not been configured yet.'})}\n\n"
             )
 
-    # Tag conversation as test mode if assigned
-    if is_test_mode:
-        try:
-            from src.multi_tenant.repository import ConversationRepository
-
-            conv_repo = ConversationRepository()
-            await conv_repo.patch(
-                ctx.tenant_id,
-                conversation_id,
-                [{"op": "set", "path": "/is_test_mode", "value": True}],
-            )
-        except Exception:
-            logger.debug(
-                "Failed to tag conversation %s as test mode", conversation_id,
-            )
+        return StreamingResponse(
+            _not_configured_stream(),
+            media_type="text/event-stream",
+            headers={"Cache-Control": "no-cache"},
+        )
 
     # Extract customer_id from conversation state
     customer_id: str | None = None

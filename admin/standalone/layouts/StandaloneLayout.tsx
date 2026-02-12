@@ -38,6 +38,7 @@ import { useDisclosure } from '@mantine/hooks';
 import { notifications } from '@mantine/notifications';
 
 import type { TenantTier, TenantStatus, BillingChannel, TeamRole } from '../../shared/types';
+import ActivationBanner from '../../shared/ActivationBanner';
 
 // ---------------------------------------------------------------------------
 // Types
@@ -58,20 +59,10 @@ interface TenantContext {
   shopDomain?: string;
 }
 
-interface TestModeState {
-  enabled: boolean;
-  percentage: number;
-  overrides: Record<string, unknown>;
-  activatedAt: string | null;
-  overrideFieldCount: number;
-}
-
 interface AppContextValue {
   tenantContext: TenantContext | null;
   /** Caller's role from /api/admin/team/whoami. Null until resolved. */
   userRole: TeamRole | null;
-  testMode: TestModeState | null;
-  refetchTestMode: () => void;
   apiFetch: (path: string, init?: RequestInit) => Promise<Response>;
   onNotify: (message: string, type: 'success' | 'error' | 'warning' | 'info') => void;
   loading: boolean;
@@ -138,11 +129,6 @@ const Icons = {
       <path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2" /><circle cx="9" cy="7" r="4" /><path d="M23 21v-2a4 4 0 0 0-3-3.87" /><path d="M16 3.13a4 4 0 0 1 0 7.75" />
     </svg>
   ),
-  onboarding: () => (
-    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-      <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z" /><polyline points="14 2 14 8 20 8" /><line x1="16" y1="13" x2="8" y2="13" /><line x1="16" y1="17" x2="8" y2="17" /><polyline points="10 9 9 9 8 9" />
-    </svg>
-  ),
   integrations: () => (
     <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
       <path d="M10 13a5 5 0 0 0 7.54.54l3-3a5 5 0 0 0-7.07-7.07l-1.72 1.71" /><path d="M14 11a5 5 0 0 0-7.54-.54l-3 3a5 5 0 0 0 7.07 7.07l1.71-1.71" />
@@ -197,7 +183,6 @@ const navItems: NavPage[] = [
   { path: '/integrations', label: 'Integrations', icon: 'integrations', roles: ['superadmin', 'admin'] },
   { path: '/memory-privacy', label: 'Memory & privacy', icon: 'memory', roles: ['superadmin', 'admin'] },
   { path: '/billing', label: 'Billing', icon: 'billing', roles: ['superadmin', 'admin'] },
-  { path: '/onboarding', label: 'Setup wizard', icon: 'onboarding', roles: ['superadmin', 'admin'] },
 ];
 
 // ---------------------------------------------------------------------------
@@ -321,35 +306,6 @@ export const StandaloneLayout: React.FC<StandaloneLayoutProps> = ({
       });
   }, [tenantContext, apiFetch]);
 
-  // ---- Test Mode status polling (C1) --------------------------------------
-
-  const [testMode, setTestMode] = useState<TestModeState | null>(null);
-
-  const refetchTestMode = useCallback(async () => {
-    try {
-      const resp = await apiFetch('/api/config/test-mode');
-      if (!resp.ok) return;
-      const data = await resp.json();
-      setTestMode({
-        enabled: data.enabled ?? false,
-        percentage: data.percentage ?? 10,
-        overrides: data.overrides ?? {},
-        activatedAt: data.activated_at ?? null,
-        overrideFieldCount: data.override_field_count ?? 0,
-      });
-    } catch {
-      // silently ignore — test mode indicator won't show
-    }
-  }, [apiFetch]);
-
-  useEffect(() => {
-    if (!tenantContext) return;
-    refetchTestMode();
-    // Poll every 30 seconds to keep indicator up to date
-    const interval = setInterval(refetchTestMode, 30_000);
-    return () => clearInterval(interval);
-  }, [tenantContext, refetchTestMode]);
-
   // ---- Activation status check (WI #291) -----------------------------------
 
   const [isActivated, setIsActivated] = useState<boolean | null>(null); // null = unknown
@@ -381,12 +337,6 @@ export const StandaloneLayout: React.FC<StandaloneLayoutProps> = ({
     setShowWelcome(false);
     try { localStorage.setItem('agentred-welcome-dismissed', '1'); } catch { /* ignore */ }
   }, []);
-
-  const goToWizard = useCallback(() => {
-    setShowWelcome(false);
-    try { localStorage.setItem('agentred-welcome-dismissed', '1'); } catch { /* ignore */ }
-    navigate('/onboarding');
-  }, [navigate]);
 
   // ---- Chat widget injection (auto-embed for admin users) ----------------
 
@@ -464,8 +414,6 @@ export const StandaloneLayout: React.FC<StandaloneLayoutProps> = ({
   const contextValue: AppContextValue = {
     tenantContext,
     userRole,
-    testMode,
-    refetchTestMode,
     apiFetch,
     onNotify,
     loading,
@@ -554,9 +502,9 @@ export const StandaloneLayout: React.FC<StandaloneLayoutProps> = ({
                 </Badge>
               )}
               {/* Inactive indicator (WI #291) — shown when system not yet activated */}
-              {isActivated === false && !testMode?.enabled && (
+              {isActivated === false && (
                 <Tooltip
-                  label="Your AI assistant is not yet active. Complete the Setup Wizard to go live."
+                  label="Your AI assistant is not yet active. Configure your agent and activate to go live."
                   position="bottom"
                   multiline
                   w={240}
@@ -565,33 +513,9 @@ export const StandaloneLayout: React.FC<StandaloneLayoutProps> = ({
                     variant="light"
                     color="yellow"
                     size="sm"
-                    style={{ cursor: 'pointer' }}
-                    onClick={() => navigate('/onboarding')}
+                    style={{ cursor: 'default' }}
                   >
                     Inactive
-                  </Badge>
-                </Tooltip>
-              )}
-              {/* Test Mode indicator (C1) */}
-              {testMode?.enabled && (
-                <Tooltip
-                  label={`Test Mode active — ${testMode.percentage}% of sessions routed to test config (${testMode.overrideFieldCount} field${testMode.overrideFieldCount !== 1 ? 's' : ''} overridden)`}
-                  position="bottom"
-                  multiline
-                  w={260}
-                >
-                  <Badge
-                    variant="light"
-                    color="orange"
-                    size="sm"
-                    style={{ cursor: 'default' }}
-                    leftSection={
-                      <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
-                        <path d="M14.7 6.3a1 1 0 0 0 0 1.4l1.6 1.6a1 1 0 0 0 1.4 0l3.77-3.77a6 6 0 0 1-7.94 7.94l-6.91 6.91a2.12 2.12 0 0 1-3-3l6.91-6.91a6 6 0 0 1 7.94-7.94l-3.76 3.76z" />
-                      </svg>
-                    }
-                  >
-                    Test Mode {testMode.percentage}%
                   </Badge>
                 </Tooltip>
               )}
@@ -755,61 +679,6 @@ export const StandaloneLayout: React.FC<StandaloneLayoutProps> = ({
 
         {/* ---- Main content ---- */}
         <AppShell.Main>
-          {/* Test Mode sticky banner (C1) — visible on all pages when active */}
-          {testMode?.enabled && (
-            <Box
-              px="md"
-              py={8}
-              mb="md"
-              style={{
-                background: 'linear-gradient(135deg, rgba(255, 152, 0, 0.12) 0%, rgba(255, 87, 34, 0.08) 100%)',
-                border: '1px solid rgba(255, 152, 0, 0.25)',
-                borderRadius: 8,
-                display: 'flex',
-                alignItems: 'center',
-                justifyContent: 'space-between',
-                gap: 12,
-                flexWrap: 'wrap',
-              }}
-            >
-              <Group gap={10} style={{ flex: 1 }}>
-                <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#ff9800" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                  <path d="M14.7 6.3a1 1 0 0 0 0 1.4l1.6 1.6a1 1 0 0 0 1.4 0l3.77-3.77a6 6 0 0 1-7.94 7.94l-6.91 6.91a2.12 2.12 0 0 1-3-3l6.91-6.91a6 6 0 0 1 7.94-7.94l-3.76 3.76z" />
-                </svg>
-                <Text size="sm" fw={500} c="orange.3">
-                  Test mode active
-                </Text>
-                <Text size="xs" c="dimmed">
-                  {testMode.percentage}% of customer sessions are receiving your test configuration
-                  ({testMode.overrideFieldCount} field{testMode.overrideFieldCount !== 1 ? 's' : ''} overridden)
-                </Text>
-              </Group>
-              <Group gap={8} style={{ flexShrink: 0 }}>
-                {location.pathname !== '/configuration' && (
-                  <Text
-                    size="xs"
-                    fw={600}
-                    c="orange.4"
-                    style={{ cursor: 'pointer', textDecoration: 'underline', textUnderlineOffset: 2 }}
-                    onClick={() => navigate('/configuration')}
-                  >
-                    Manage test
-                  </Text>
-                )}
-                {location.pathname !== '/' && (
-                  <Text
-                    size="xs"
-                    fw={600}
-                    c="dimmed"
-                    style={{ cursor: 'pointer', textDecoration: 'underline', textUnderlineOffset: 2 }}
-                    onClick={() => navigate('/')}
-                  >
-                    View analytics
-                  </Text>
-                )}
-              </Group>
-            </Box>
-          )}
           {error && (
             <Box p="md" c="red">
               Failed to load: {error}
@@ -820,7 +689,15 @@ export const StandaloneLayout: React.FC<StandaloneLayoutProps> = ({
               Loading...
             </Box>
           )}
-          {!loading && !error && children}
+          {!loading && !error && (
+            <>
+              <ActivationBanner
+                apiFetch={apiFetch}
+                onNotify={onNotify}
+              />
+              {children}
+            </>
+          )}
         </AppShell.Main>
       </AppShell>
 
@@ -838,15 +715,12 @@ export const StandaloneLayout: React.FC<StandaloneLayoutProps> = ({
       >
         <Stack gap="md">
           <Text size="sm">
-            Your AI customer service assistant is not yet active. Complete the Setup Wizard to
-            configure your agent and go live.
+            Your AI customer service assistant is not yet active. Configure your agent on the
+            Agent Configuration page, then activate your changes to go live.
           </Text>
           <Group justify="flex-end">
             <Button variant="default" onClick={dismissWelcome}>
               Dismiss
-            </Button>
-            <Button color="#ff3621" onClick={goToWizard}>
-              Go to Setup Wizard
             </Button>
           </Group>
         </Stack>

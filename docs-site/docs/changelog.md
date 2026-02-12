@@ -9,6 +9,46 @@ All notable changes to Agent Red Customer Experience are documented here.
 
 ---
 
+## v1.22.0 — 2026-02-12 (unreleased)
+
+### Save and activate
+
+Configuration changes now use a two-phase commit model. Saving a setting writes to a draft — the live AI agent is unaffected until you explicitly activate.
+
+- **Draft layer:** All configuration saves go to a draft. Multiple pages can be edited before activation.
+- **Activation banner:** Persistent banner in the admin console shows when draft changes are pending, with Activate and Discard actions.
+- **Activation dialog:** Review all pending changes grouped by category, see validation results, and go live with one click.
+- **Restore:** One-level undo — swap the active configuration with the previous activation snapshot.
+- **Atomic activation:** Agent Configuration, Quick Actions, and Widget Configuration activate together. Knowledge Base is validated but not snapshotted.
+- **Validation:** Brand name and widget key are required. Activation is blocked if validation fails.
+
+### New frontend components
+- `ActivationBanner` — polls activation status every 30 seconds, shows Activate/Discard actions
+- `ActivationDialog` — validation display, change summary, activate confirmation
+- `RestoreDialog` — previous configuration details and restore confirmation
+
+### API endpoints
+- `GET /api/config/activation-status` — lightweight activation state for the banner
+- `GET /api/config/draft` — full draft state with change diff for the activation dialog
+- `POST /api/config/draft/activate` — validate and promote draft to active
+- `POST /api/config/draft/discard` — delete all draft changes
+- `POST /api/config/restore` — swap active with previous activation snapshot
+
+### Removed
+- **Onboarding wizard** — replaced by direct page editing combined with the activation workflow
+- **Test mode A/B routing** — replaced by the draft/activate model (edit freely, activate when ready)
+- `OnboardingWizard.tsx` and `Onboarding.tsx` deleted
+- `test_mode_service.py` and its test suite deleted
+
+### Migration
+- Lazy migration from the old `PreferencesDocument` format: existing tenants are upgraded to the new `config_state` model on first access with no downtime
+
+### Tests
+- 176 new tests: 94 activation service, 52 config API activation, 30 migration compatibility
+- Total test suite: 2,301 passed, 0 failures
+
+---
+
 ## v1.21.0 — 2026-02-12 (unreleased)
 
 ### Team management and role-based access

@@ -172,6 +172,23 @@ class PiiClassification(str, Enum):
     SENSITIVE = "sensitive"   # Special category (health, financial)
 
 
+class ConfigState(str, Enum):
+    """Activation state of a preferences document.
+
+    The Save → Activate model stores configuration in three states:
+    - DRAFT:    saved changes not yet live (admin UI writes here)
+    - ACTIVE:   the configuration the chat pipeline reads
+    - PREVIOUS: the activation snapshot before the current one (for Restore)
+
+    Documents without a config_state field are treated as ACTIVE for
+    backward compatibility with pre-migration data.
+    """
+
+    DRAFT = "draft"
+    ACTIVE = "active"
+    PREVIOUS = "previous"
+
+
 # ---------------------------------------------------------------------------
 # Document models — Collection 1: tenants
 # ---------------------------------------------------------------------------
@@ -695,6 +712,21 @@ class PreferencesDocument(BaseModel):
     tenant_id: str = Field(description="Partition key")
     version: int = Field(description="Config version number (monotonically increasing)")
     is_current: bool = Field(default=True, description="Whether this is the active config version")
+    config_state: str = Field(
+        default="active",
+        description="Activation lifecycle state: draft | active | previous. "
+                    "Documents without this field are treated as 'active' for "
+                    "backward compatibility.",
+    )
+    activated_at: str | None = Field(
+        default=None,
+        description="ISO 8601 timestamp of when this config was activated (set "
+                    "on state transition to 'active')",
+    )
+    activated_by: str | None = Field(
+        default=None,
+        description="Actor who activated this config version",
+    )
     config_name: str | None = Field(
         default=None,
         description="Named configuration label (e.g. 'Default', 'Holiday Mode'). "
@@ -821,28 +853,6 @@ class PreferencesDocument(BaseModel):
     fine_tuning_ab_experiment_id: str | None = Field(
         default=None,
         description="Currently active A/B experiment ID (if any)",
-    )
-
-    # Test Mode (C2 — controlled rollout)
-    test_mode_enabled: bool = Field(
-        default=False,
-        description="Whether Test Mode is active for this tenant",
-    )
-    test_mode_percentage: int = Field(
-        default=10,
-        description="Percentage of sessions routed to test config (1-50)",
-    )
-    test_mode_overrides: dict[str, Any] = Field(
-        default_factory=dict,
-        description="AI behavior field deltas applied to test sessions (keys = field names)",
-    )
-    test_mode_assignment_seed: int = Field(
-        default=0,
-        description="Seed for deterministic session assignment (SHA-256 hash)",
-    )
-    test_mode_activated_at: str | None = Field(
-        default=None,
-        description="ISO 8601 timestamp when Test Mode was last activated",
     )
 
     # Integrations (onboarding step 7 — C10)
@@ -1282,6 +1292,10 @@ def get_collection_configs() -> list[CollectionConfig]:
                 "compositeIndexes": [
                     [
                         {"path": "/is_current", "order": "ascending"},
+                        {"path": "/version", "order": "descending"},
+                    ],
+                    [
+                        {"path": "/config_state", "order": "ascending"},
                         {"path": "/version", "order": "descending"},
                     ],
                 ],
