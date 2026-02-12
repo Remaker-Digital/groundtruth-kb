@@ -3,11 +3,13 @@
 Provides REST endpoints for the merchant admin dashboard's TeamManager
 component:
 
-    GET    /api/team              — List team members with filtering & pagination
-    GET    /api/team/{member_id}  — Get single team member
-    POST   /api/team              — Invite / create team member
-    PUT    /api/team/{member_id}  — Update team member (role, settings)
-    DELETE /api/team/{member_id}  — Deactivate team member
+    GET    /api/admin/team              — List team members with filtering & pagination
+    GET    /api/admin/team/whoami       — Get caller identity and role
+    GET    /api/admin/team/{member_id}  — Get single team member
+    POST   /api/admin/team              — Create team member (with per-user API key)
+    PUT    /api/admin/team/{member_id}  — Update team member (role, settings)
+    DELETE /api/admin/team/{member_id}  — Deactivate team member
+    POST   /api/admin/team/{member_id}/rotate-key — Rotate user API key
 
 All endpoints derive tenant_id from the authenticated TenantContext — never
 from query parameters. Widget key authentication is NOT accepted on these
@@ -37,7 +39,8 @@ from fastapi import APIRouter, Depends, HTTPException, Query
 from pydantic import BaseModel, ConfigDict, Field
 from pydantic.alias_generators import to_camel
 
-from src.multi_tenant.auth import TenantContext
+from src.multi_tenant.auth import TenantContext, generate_user_api_key, hash_api_key
+from src.multi_tenant.cosmos_schema import ESCALATION_CATEGORIES, TeamMemberRole
 from src.multi_tenant.middleware import get_tenant_context
 from src.multi_tenant.repository import DocumentNotFoundError, TeamMemberRepository
 
@@ -48,7 +51,9 @@ logger = logging.getLogger(__name__)
 # Valid roles
 # ---------------------------------------------------------------------------
 
-VALID_ROLES = {"owner", "admin", "agent", "viewer"}
+VALID_ROLES = {r.value for r in TeamMemberRole}
+# Roles that cannot be assigned via the API (auto-provisioned only)
+PROTECTED_ROLES = {"superadmin"}
 
 
 # ---------------------------------------------------------------------------
@@ -67,7 +72,15 @@ class TeamMemberResponse(BaseModel):
     display_name: str
     role: str
     is_active: bool = True
+    escalation_categories: list[str] = Field(default_factory=list)
     max_concurrent_conversations: int = 5
+    user_api_key_prefix: str | None = Field(
+        default=None, description="First 12 chars of the API key for display (ar_user_rema...)"
+    )
+    user_api_key: str | None = Field(
+        default=None,
+        description="Full API key — returned ONCE on creation or rotation, never stored",
+    )
     created_at: str
     updated_at: str
     last_login_at: str | None = None
@@ -94,7 +107,7 @@ class CreateTeamMemberRequest(BaseModel):
     email: str = Field(
         min_length=3,
         max_length=320,
-        description="Team member email address (unique within tenant)",
+        description="Team member email address (unique within tenant, immutable after creation)",
     )
     display_name: str = Field(
         min_length=1,
@@ -102,13 +115,18 @@ class CreateTeamMemberRequest(BaseModel):
         description="Display name shown in inbox and notes",
     )
     role: str = Field(
-        description="Permission role: owner, admin, agent, or viewer",
+        description="Permission role: admin, escalation_agent, or viewer",
+    )
+    escalation_categories: list[str] = Field(
+        default_factory=list,
+        description="Escalation categories for escalation_agent role: "
+        "service, support, sales, account, technical_assistance, general_inquiry",
     )
     max_concurrent_conversations: int = Field(
         default=5,
         ge=1,
         le=50,
-        description="Max simultaneous escalated conversations (agent role)",
+        description="Max simultaneous escalated conversations (escalation_agent role)",
     )
 
 
@@ -125,7 +143,11 @@ class UpdateTeamMemberRequest(BaseModel):
     )
     role: str | None = Field(
         default=None,
-        description="Permission role: admin, agent, or viewer",
+        description="Permission role: admin, escalation_agent, or viewer",
+    )
+    escalation_categories: list[str] | None = Field(
+        default=None,
+        description="Escalation categories (escalation_agent role only)",
     )
     max_concurrent_conversations: int | None = Field(
         default=None,
@@ -177,6 +199,28 @@ def _get_repo() -> TeamMemberRepository:
     return _team_repo
 
 
+def _build_member_response(doc: dict[str, Any], tenant_id: str) -> TeamMemberResponse:
+    """Build a TeamMemberResponse from a Cosmos DB document.
+
+    Centralises field extraction so all endpoints return consistent data.
+    """
+    return TeamMemberResponse(
+        id=doc.get("id", ""),
+        tenant_id=tenant_id,
+        email=doc.get("email", ""),
+        display_name=doc.get("display_name", ""),
+        role=doc.get("role", "viewer"),
+        is_active=doc.get("is_active", True),
+        escalation_categories=doc.get("escalation_categories", []),
+        max_concurrent_conversations=doc.get("max_concurrent_conversations", 5),
+        user_api_key_prefix=doc.get("user_api_key_prefix"),
+        created_at=doc.get("created_at", ""),
+        updated_at=doc.get("updated_at", ""),
+        last_login_at=doc.get("last_login_at"),
+        invited_by=doc.get("invited_by"),
+    )
+
+
 # ---------------------------------------------------------------------------
 # Router
 # ---------------------------------------------------------------------------
@@ -202,7 +246,7 @@ router = APIRouter(prefix="/api/admin/team", tags=["admin-team"])
 async def list_team_members(
     role: str | None = Query(
         None,
-        description="Filter by role (owner, admin, agent, viewer)",
+        description="Filter by role (superadmin, admin, escalation_agent, viewer)",
     ),
     is_active: bool | None = Query(
         None,
@@ -216,6 +260,8 @@ async def list_team_members(
 
     Supports filtering by role and active status.
     Results are ordered by most recently updated first.
+
+    Superadmin members are only visible to other superadmins.
     """
     repo = _get_repo()
 
@@ -224,6 +270,14 @@ async def list_team_members(
         raise HTTPException(
             status_code=400,
             detail=f"Invalid role '{role}'. Valid values: {sorted(VALID_ROLES)}",
+        )
+
+    # Non-superadmins cannot filter by or see superadmin members
+    caller_is_superadmin = getattr(ctx, "team_member_role", None) == TeamMemberRole.SUPERADMIN
+    if role == "superadmin" and not caller_is_superadmin:
+        raise HTTPException(
+            status_code=400,
+            detail="Invalid role filter 'superadmin'.",
         )
 
     total_count = await repo.count_members(
@@ -240,22 +294,13 @@ async def list_team_members(
         limit=limit,
     )
 
-    members = [
-        TeamMemberResponse(
-            id=m.get("id", ""),
-            tenant_id=ctx.tenant_id,
-            email=m.get("email", ""),
-            display_name=m.get("display_name", ""),
-            role=m.get("role", "viewer"),
-            is_active=m.get("is_active", True),
-            max_concurrent_conversations=m.get("max_concurrent_conversations", 5),
-            created_at=m.get("created_at", ""),
-            updated_at=m.get("updated_at", ""),
-            last_login_at=m.get("last_login_at"),
-            invited_by=m.get("invited_by"),
-        )
-        for m in members_raw
-    ]
+    # Filter out superadmin members for non-superadmin callers
+    if not caller_is_superadmin:
+        members_raw = [m for m in members_raw if m.get("role") != "superadmin"]
+        # Adjust count (superadmins excluded from visible list)
+        total_count = len(members_raw) if offset == 0 else total_count
+
+    members = [_build_member_response(m, ctx.tenant_id) for m in members_raw]
 
     return TeamListResponse(
         tenant_id=ctx.tenant_id,
@@ -263,6 +308,58 @@ async def list_team_members(
         offset=offset,
         limit=limit,
         members=members,
+    )
+
+
+# ---------------------------------------------------------------------------
+# GET /api/admin/team/whoami — Caller identity (must be before /{member_id})
+# ---------------------------------------------------------------------------
+
+
+class WhoamiResponse(BaseModel):
+    """Response for GET /api/admin/team/whoami."""
+
+    model_config = ConfigDict(alias_generator=to_camel, populate_by_name=True)
+
+    tenant_id: str
+    role: str | None = None
+    team_member_id: str | None = None
+    email: str | None = None
+    auth_method: str = Field(
+        default="tenant_api_key",
+        description="How the caller authenticated: 'user_api_key' or 'tenant_api_key'.",
+    )
+
+
+@router.get(
+    "/whoami",
+    response_model=WhoamiResponse,
+    status_code=200,
+    summary="Get caller identity",
+    description="Returns the authenticated caller's role and identity. Used by the admin frontend to determine nav visibility and permissions.",
+)
+async def whoami(
+    ctx: TenantContext = Depends(get_tenant_context),
+) -> WhoamiResponse:
+    """Return the caller's identity based on their API key.
+
+    For per-user API keys: returns role, member ID, and email.
+    For legacy tenant API keys: returns role=admin (implicit).
+    """
+    if ctx.team_member_role is not None:
+        return WhoamiResponse(
+            tenant_id=ctx.tenant_id,
+            role=ctx.team_member_role.value,
+            team_member_id=ctx.team_member_id,
+            email=ctx.team_member_email,
+            auth_method="user_api_key",
+        )
+
+    # Legacy tenant API key — treated as admin
+    return WhoamiResponse(
+        tenant_id=ctx.tenant_id,
+        role="admin",
+        auth_method="tenant_api_key",
     )
 
 
@@ -296,19 +393,12 @@ async def get_team_member(
             detail=f"Team member {member_id} not found",
         )
 
-    return TeamMemberResponse(
-        id=doc.get("id", ""),
-        tenant_id=ctx.tenant_id,
-        email=doc.get("email", ""),
-        display_name=doc.get("display_name", ""),
-        role=doc.get("role", "viewer"),
-        is_active=doc.get("is_active", True),
-        max_concurrent_conversations=doc.get("max_concurrent_conversations", 5),
-        created_at=doc.get("created_at", ""),
-        updated_at=doc.get("updated_at", ""),
-        last_login_at=doc.get("last_login_at"),
-        invited_by=doc.get("invited_by"),
-    )
+    # Superadmin records hidden from non-superadmins
+    caller_is_superadmin = getattr(ctx, "team_member_role", None) == TeamMemberRole.SUPERADMIN
+    if doc.get("role") == "superadmin" and not caller_is_superadmin:
+        raise HTTPException(status_code=404, detail=f"Team member {member_id} not found")
+
+    return _build_member_response(doc, ctx.tenant_id)
 
 
 # ---------------------------------------------------------------------------
@@ -321,9 +411,9 @@ async def get_team_member(
     response_model=TeamMemberResponse,
     status_code=201,
     summary="Create team member",
-    description="Creates a new team member who is immediately active and can access the admin dashboard based on their assigned role.",
+    description="Creates a new team member with a per-user API key. The member is immediately active. The raw API key is returned ONCE in the response.",
     responses={
-        400: {"description": "Invalid role or attempt to create owner"},
+        400: {"description": "Invalid role, protected role, or invalid escalation categories"},
         409: {"description": "Team member with this email already exists"},
         503: {"description": "Team management services not initialized"},
     },
@@ -332,10 +422,12 @@ async def create_team_member(
     request: CreateTeamMemberRequest,
     ctx: TenantContext = Depends(get_tenant_context),
 ) -> TeamMemberResponse:
-    """Create a new team member.
+    """Create a new team member with a per-user API key.
 
     The member is immediately active and can access the admin dashboard
-    based on their assigned role.
+    based on their assigned role. A unique API key (ar_user_...) is
+    generated and returned ONCE in the response — it cannot be retrieved
+    again, only rotated.
     """
     repo = _get_repo()
 
@@ -346,13 +438,29 @@ async def create_team_member(
             detail=f"Invalid role '{request.role}'. Valid values: {sorted(VALID_ROLES)}",
         )
 
-    # Cannot create a second owner
-    if request.role == "owner":
+    # Protected roles cannot be created via API
+    if request.role in PROTECTED_ROLES:
         raise HTTPException(
             status_code=400,
-            detail="Cannot create a team member with the 'owner' role. "
-            "Each tenant has exactly one owner set during provisioning.",
+            detail=f"Cannot create a team member with the '{request.role}' role. "
+            "This role is auto-provisioned only.",
         )
+
+    # Validate escalation_categories
+    if request.escalation_categories:
+        invalid_cats = [c for c in request.escalation_categories if c not in ESCALATION_CATEGORIES]
+        if invalid_cats:
+            raise HTTPException(
+                status_code=400,
+                detail=f"Invalid escalation categories: {invalid_cats}. "
+                f"Valid values: {ESCALATION_CATEGORIES}",
+            )
+        # Only escalation_agent role may have categories
+        if request.role != "escalation_agent":
+            raise HTTPException(
+                status_code=400,
+                detail="escalation_categories can only be set for the 'escalation_agent' role.",
+            )
 
     # Check for duplicate email within tenant
     existing = await repo.find_by_email(ctx.tenant_id, request.email)
@@ -366,6 +474,11 @@ async def create_team_member(
     # Document ID = tenant_id:email for deterministic lookup
     member_id = f"{ctx.tenant_id}:{request.email}"
 
+    # Generate per-user API key
+    raw_api_key = generate_user_api_key(ctx.tenant_id)
+    key_hash = hash_api_key(raw_api_key)
+    key_prefix = raw_api_key[:12] + "..."
+
     from src.multi_tenant.cosmos_schema import TeamMemberDocument
 
     doc = TeamMemberDocument(
@@ -375,7 +488,10 @@ async def create_team_member(
         display_name=request.display_name,
         role=request.role,
         is_active=True,
+        escalation_categories=request.escalation_categories,
         max_concurrent_conversations=request.max_concurrent_conversations,
+        user_api_key_hash=key_hash,
+        user_api_key_prefix=key_prefix,
         created_at=now,
         updated_at=now,
         invited_by=ctx.user_id,
@@ -384,24 +500,17 @@ async def create_team_member(
     await repo.create(ctx.tenant_id, doc)
 
     logger.info(
-        "Team member created: email=%s role=%s tenant=%s",
+        "Team member created: email=%s role=%s tenant=%s key_prefix=%s",
         request.email,
         request.role,
         ctx.tenant_id[:8],
+        key_prefix,
     )
 
-    return TeamMemberResponse(
-        id=member_id,
-        tenant_id=ctx.tenant_id,
-        email=request.email,
-        display_name=request.display_name,
-        role=request.role,
-        is_active=True,
-        max_concurrent_conversations=request.max_concurrent_conversations,
-        created_at=now,
-        updated_at=now,
-        invited_by=ctx.user_id,
-    )
+    response = _build_member_response(doc.model_dump(), ctx.tenant_id)
+    # Attach the raw API key — returned ONCE, never stored or retrievable
+    response.user_api_key = raw_api_key
+    return response
 
 
 # ---------------------------------------------------------------------------
@@ -413,9 +522,9 @@ async def create_team_member(
     "/{member_id}",
     response_model=TeamMemberResponse,
     summary="Update team member",
-    description="Updates an existing team member. Only provided fields are updated; omitted fields retain their current values. The owner role cannot be changed.",
+    description="Updates an existing team member. Only provided fields are updated; omitted fields retain their current values. Superadmin members can only be modified by other superadmins.",
     responses={
-        400: {"description": "Invalid role, attempt to change owner role, or attempt to promote to owner"},
+        400: {"description": "Invalid role, protected role assignment, or invalid escalation categories"},
         404: {"description": "Team member not found"},
         503: {"description": "Team management services not initialized"},
     },
@@ -428,7 +537,8 @@ async def update_team_member(
     """Update an existing team member.
 
     Only provided fields are updated. Omitted fields retain their
-    current values. The owner role cannot be changed.
+    current values. Protected roles (superadmin) cannot be modified
+    except by another superadmin.
     """
     repo = _get_repo()
 
@@ -437,6 +547,14 @@ async def update_team_member(
         raise HTTPException(
             status_code=400,
             detail=f"Invalid role '{request.role}'. Valid values: {sorted(VALID_ROLES)}",
+        )
+
+    # Cannot promote anyone to a protected role via API
+    if request.role is not None and request.role in PROTECTED_ROLES:
+        raise HTTPException(
+            status_code=400,
+            detail=f"Cannot assign the '{request.role}' role via update. "
+            "This role is auto-provisioned only.",
         )
 
     # Read existing document to verify it exists
@@ -448,19 +566,28 @@ async def update_team_member(
             detail=f"Team member {member_id} not found",
         )
 
-    # Cannot change owner role
-    if existing.get("role") == "owner" and request.role is not None and request.role != "owner":
-        raise HTTPException(
-            status_code=400,
-            detail="Cannot change the owner's role. Transfer ownership first.",
-        )
+    # Superadmin members can only be modified by superadmins
+    existing_role = existing.get("role", "")
+    caller_is_superadmin = getattr(ctx, "team_member_role", None) == TeamMemberRole.SUPERADMIN
+    if existing_role in PROTECTED_ROLES and not caller_is_superadmin:
+        raise HTTPException(status_code=404, detail=f"Team member {member_id} not found")
 
-    # Cannot promote to owner
-    if request.role == "owner":
-        raise HTTPException(
-            status_code=400,
-            detail="Cannot promote a team member to 'owner' via update.",
-        )
+    # Validate escalation_categories if provided
+    if request.escalation_categories is not None:
+        invalid_cats = [c for c in request.escalation_categories if c not in ESCALATION_CATEGORIES]
+        if invalid_cats:
+            raise HTTPException(
+                status_code=400,
+                detail=f"Invalid escalation categories: {invalid_cats}. "
+                f"Valid values: {ESCALATION_CATEGORIES}",
+            )
+        # Determine the effective role after update
+        effective_role = request.role if request.role is not None else existing_role
+        if effective_role != "escalation_agent":
+            raise HTTPException(
+                status_code=400,
+                detail="escalation_categories can only be set for the 'escalation_agent' role.",
+            )
 
     # Build patch operations from provided fields
     now = datetime.now(timezone.utc).isoformat()
@@ -472,6 +599,11 @@ async def update_team_member(
         operations.append({"op": "set", "path": "/display_name", "value": request.display_name})
     if request.role is not None:
         operations.append({"op": "set", "path": "/role", "value": request.role})
+        # Clear escalation_categories when changing away from escalation_agent
+        if request.role != "escalation_agent" and request.escalation_categories is None:
+            operations.append({"op": "set", "path": "/escalation_categories", "value": []})
+    if request.escalation_categories is not None:
+        operations.append({"op": "set", "path": "/escalation_categories", "value": request.escalation_categories})
     if request.max_concurrent_conversations is not None:
         operations.append({"op": "set", "path": "/max_concurrent_conversations", "value": request.max_concurrent_conversations})
     if request.is_active is not None:
@@ -489,6 +621,10 @@ async def update_team_member(
         updated["display_name"] = request.display_name
     if request.role is not None:
         updated["role"] = request.role
+        if request.role != "escalation_agent" and request.escalation_categories is None:
+            updated["escalation_categories"] = []
+    if request.escalation_categories is not None:
+        updated["escalation_categories"] = request.escalation_categories
     if request.max_concurrent_conversations is not None:
         updated["max_concurrent_conversations"] = request.max_concurrent_conversations
     if request.is_active is not None:
@@ -501,19 +637,7 @@ async def update_team_member(
         ctx.tenant_id[:8],
     )
 
-    return TeamMemberResponse(
-        id=member_id,
-        tenant_id=ctx.tenant_id,
-        email=updated.get("email", ""),
-        display_name=updated.get("display_name", ""),
-        role=updated.get("role", "viewer"),
-        is_active=updated.get("is_active", True),
-        max_concurrent_conversations=updated.get("max_concurrent_conversations", 5),
-        created_at=updated.get("created_at", ""),
-        updated_at=now,
-        last_login_at=updated.get("last_login_at"),
-        invited_by=updated.get("invited_by"),
-    )
+    return _build_member_response(updated, ctx.tenant_id)
 
 
 # ---------------------------------------------------------------------------
@@ -525,9 +649,9 @@ async def update_team_member(
     "/{member_id}",
     response_model=DeactivateTeamMemberResponse,
     summary="Deactivate team member",
-    description="Sets is_active to false so the member can no longer access the admin dashboard. The record is preserved for audit purposes. The tenant owner cannot be deactivated.",
+    description="Sets is_active to false so the member can no longer access the admin dashboard. The record is preserved for audit purposes. Superadmin members cannot be deactivated.",
     responses={
-        400: {"description": "Cannot deactivate the tenant owner"},
+        400: {"description": "Cannot deactivate a superadmin member"},
         404: {"description": "Team member not found"},
         503: {"description": "Team management services not initialized"},
     },
@@ -542,7 +666,7 @@ async def deactivate_team_member(
     dashboard or handle escalated conversations. The record is preserved
     for audit purposes and can be reactivated via PUT with is_active=true.
 
-    The tenant owner cannot be deactivated.
+    Superadmin members cannot be deactivated (except by other superadmins).
     """
     repo = _get_repo()
 
@@ -555,11 +679,16 @@ async def deactivate_team_member(
             detail=f"Team member {member_id} not found",
         )
 
-    # Cannot deactivate the owner
-    if existing.get("role") == "owner":
+    # Superadmins cannot be deactivated except by other superadmins
+    existing_role = existing.get("role", "")
+    caller_is_superadmin = getattr(ctx, "team_member_role", None) == TeamMemberRole.SUPERADMIN
+    if existing_role in PROTECTED_ROLES:
+        if not caller_is_superadmin:
+            # Hide the existence of superadmin from non-superadmins
+            raise HTTPException(status_code=404, detail=f"Team member {member_id} not found")
         raise HTTPException(
             status_code=400,
-            detail="Cannot deactivate the tenant owner.",
+            detail="Cannot deactivate a superadmin member.",
         )
 
     await repo.deactivate(ctx.tenant_id, member_id)
@@ -575,4 +704,90 @@ async def deactivate_team_member(
     return DeactivateTeamMemberResponse(
         id=member_id,
         deactivated_at=now,
+    )
+
+
+# ---------------------------------------------------------------------------
+# POST /api/team/{member_id}/rotate-key — Rotate user API key
+# ---------------------------------------------------------------------------
+
+
+class RotateKeyResponse(BaseModel):
+    """Response for successful key rotation."""
+
+    model_config = ConfigDict(alias_generator=to_camel, populate_by_name=True)
+
+    id: str
+    user_api_key: str = Field(description="New API key — returned ONCE")
+    user_api_key_prefix: str = Field(description="Prefix for display")
+    rotated_at: str
+
+
+@router.post(
+    "/{member_id}/rotate-key",
+    response_model=RotateKeyResponse,
+    summary="Rotate user API key",
+    description="Generates a new API key for the team member, invalidating the previous key. "
+    "The new key is returned ONCE and cannot be retrieved again.",
+    responses={
+        404: {"description": "Team member not found"},
+        400: {"description": "Cannot rotate superadmin key via API"},
+        503: {"description": "Team management services not initialized"},
+    },
+)
+async def rotate_user_api_key(
+    member_id: str,
+    ctx: TenantContext = Depends(get_tenant_context),
+) -> RotateKeyResponse:
+    """Rotate a team member's API key.
+
+    Generates a new key and invalidates the old one. The new key is
+    returned ONCE in the response. Only admins and superadmins can
+    rotate other members' keys. Members can rotate their own key
+    (identified by team_member_id on ctx).
+    """
+    repo = _get_repo()
+
+    try:
+        existing = await repo.read(ctx.tenant_id, member_id)
+    except DocumentNotFoundError:
+        raise HTTPException(
+            status_code=404,
+            detail=f"Team member {member_id} not found",
+        )
+
+    # Superadmin key rotation only by superadmin
+    existing_role = existing.get("role", "")
+    caller_is_superadmin = getattr(ctx, "team_member_role", None) == TeamMemberRole.SUPERADMIN
+    if existing_role in PROTECTED_ROLES and not caller_is_superadmin:
+        raise HTTPException(status_code=404, detail=f"Team member {member_id} not found")
+
+    # Generate new key
+    raw_api_key = generate_user_api_key(ctx.tenant_id)
+    key_hash = hash_api_key(raw_api_key)
+    key_prefix = raw_api_key[:12] + "..."
+    now = datetime.now(timezone.utc).isoformat()
+
+    await repo.patch(
+        tenant_id=ctx.tenant_id,
+        document_id=member_id,
+        operations=[
+            {"op": "set", "path": "/user_api_key_hash", "value": key_hash},
+            {"op": "set", "path": "/user_api_key_prefix", "value": key_prefix},
+            {"op": "set", "path": "/updated_at", "value": now},
+        ],
+    )
+
+    logger.info(
+        "API key rotated: member=%s tenant=%s new_prefix=%s",
+        member_id,
+        ctx.tenant_id[:8],
+        key_prefix,
+    )
+
+    return RotateKeyResponse(
+        id=member_id,
+        user_api_key=raw_api_key,
+        user_api_key_prefix=key_prefix,
+        rotated_at=now,
     )

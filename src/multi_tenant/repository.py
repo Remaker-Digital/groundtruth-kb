@@ -375,6 +375,38 @@ class TenantScopedRepository:
 
         return items
 
+    async def cross_partition_query(
+        self,
+        query_text: str,
+        parameters: list[dict[str, Any]] | None = None,
+        max_items: int | None = None,
+    ) -> list[dict[str, Any]]:
+        """Execute a cross-partition SQL query (auth-time lookups only).
+
+        WARNING: This bypasses tenant isolation by design. It should ONLY
+        be used for authentication-time lookups where the tenant is not
+        yet known (e.g., resolving a per-user API key to a team member).
+
+        The query MUST filter on an indexed field (e.g., user_api_key_hash)
+        to avoid full collection scans.
+        """
+        items: list[dict[str, Any]] = []
+        kwargs: dict[str, Any] = {
+            "query": query_text,
+            "enable_cross_partition_query": True,
+        }
+        if parameters:
+            kwargs["parameters"] = parameters
+        if max_items:
+            kwargs["max_item_count"] = max_items
+
+        async for item in self._container.query_items(**kwargs):
+            items.append(item)
+            if max_items and len(items) >= max_items:
+                break
+
+        return items
+
     async def query_count(
         self,
         tenant_id: str,
@@ -2097,7 +2129,7 @@ class TeamMemberRepository(TenantScopedRepository):
     async def list_active_agents(
         self, tenant_id: str,
     ) -> list[dict[str, Any]]:
-        """List active team members with the agent role.
+        """List active team members with the escalation_agent role.
 
         Used for escalation routing — returns agents who can handle
         escalated conversations.
@@ -2106,9 +2138,49 @@ class TeamMemberRepository(TenantScopedRepository):
             tenant_id=tenant_id,
             query_text=(
                 "SELECT * FROM c "
-                "WHERE c.role = 'agent' AND c.is_active = true "
+                "WHERE c.role IN ('agent', 'escalation_agent') AND c.is_active = true "
                 "ORDER BY c.max_concurrent_conversations DESC"
             ),
+        )
+
+    async def find_by_user_api_key_hash(
+        self, key_hash: str,
+    ) -> dict[str, Any] | None:
+        """Find a team member by their per-user API key hash.
+
+        This is a cross-partition query (searches all tenants) because
+        at auth time we don't yet know which tenant the key belongs to.
+
+        Returns the team member document or None.
+        """
+        results = await self.cross_partition_query(
+            query_text=(
+                "SELECT * FROM c "
+                "WHERE c.user_api_key_hash = @key_hash "
+                "AND c.is_active = true"
+            ),
+            parameters=[{"name": "@key_hash", "value": key_hash}],
+            max_items=1,
+        )
+        return results[0] if results else None
+
+    async def list_agents_for_category(
+        self, tenant_id: str, category: str,
+    ) -> list[dict[str, Any]]:
+        """List active escalation agents assigned to a specific category.
+
+        Used for escalation email routing — returns agents whose
+        escalation_categories list contains the given category.
+        """
+        return await self.query(
+            tenant_id=tenant_id,
+            query_text=(
+                "SELECT * FROM c "
+                "WHERE c.role IN ('agent', 'escalation_agent') "
+                "AND c.is_active = true "
+                "AND ARRAY_CONTAINS(c.escalation_categories, @category)"
+            ),
+            parameters=[{"name": "@category", "value": category}],
         )
 
 

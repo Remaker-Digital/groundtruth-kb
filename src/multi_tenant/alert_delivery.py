@@ -60,6 +60,7 @@ class AlertType(str, Enum):
     API_KEY_GENERATED = "api_key_generated"
     TEAM_INVITE = "team_invite"
     OUTAGE_NOTIFICATION = "outage_notification"
+    ESCALATION = "escalation"
 
 
 class AlertSeverity(str, Enum):
@@ -83,6 +84,7 @@ _DEFAULT_SEVERITY: dict[AlertType, AlertSeverity] = {
     AlertType.API_KEY_GENERATED: AlertSeverity.INFO,
     AlertType.TEAM_INVITE: AlertSeverity.INFO,
     AlertType.OUTAGE_NOTIFICATION: AlertSeverity.CRITICAL,
+    AlertType.ESCALATION: AlertSeverity.WARNING,
 }
 
 
@@ -487,6 +489,18 @@ def _render_email(alert: Alert) -> tuple[str, str]:
             '<strong style="color:#1e40af">Getting Started:</strong>'
             '<p style="color:#1e40af;margin:8px 0 0">Log in to the Agent Red admin dashboard with your '
             'email address to access your team workspace.</p></div>'
+        ),
+        # Escalation
+        AlertType.ESCALATION: (
+            '<h2 style="margin:0 0 16px;color:#111827;font-size:20px">Customer Escalation</h2>'
+            '<div style="display:inline-block;padding:4px 12px;border-radius:12px;'
+            f'background:{badge_color};color:#fff;font-size:12px;font-weight:600">'
+            '{severity}</div>'
+            '<p style="color:#374151;line-height:1.6;margin:16px 0">{message}</p>'
+            '<div style="background:#fef3c7;border:1px solid #fcd34d;border-radius:6px;padding:16px;margin:16px 0">'
+            '<strong style="color:#92400e">Action Required:</strong>'
+            '<p style="color:#92400e;margin:8px 0 0">A customer conversation has been escalated and needs your attention. '
+            'Log in to the Agent Red admin dashboard to view the conversation.</p></div>'
         ),
         # Outage / SLA
         AlertType.OUTAGE_NOTIFICATION: (
@@ -1176,6 +1190,63 @@ async def send_outage_alert(
     return await service.deliver_alert(alert)
 
 
+async def send_escalation_alert(
+    tenant_id: str,
+    conversation_id: str,
+    reason: str,
+    urgency: str = "medium",
+    context_summary: str = "",
+    recipient_emails: list[str] | None = None,
+) -> DeliveryResult | None:
+    """Create and deliver an ESCALATION alert.
+
+    Called by the chat pipeline when a conversation is escalated to
+    a human agent. Optionally targets specific team member emails.
+
+    Args:
+        tenant_id: Tenant where the escalation occurred.
+        conversation_id: The escalated conversation ID.
+        reason: Why the conversation was escalated.
+        urgency: Urgency level from escalation handler (low/medium/high).
+        context_summary: Brief context for the human agent.
+        recipient_emails: Specific team member emails to notify.
+            If None, falls back to the tenant's notification email.
+
+    Returns:
+        DeliveryResult, or None if no service is configured.
+    """
+    service = get_alert_service()
+    if service is None:
+        return None
+
+    severity = {
+        "high": AlertSeverity.CRITICAL,
+        "medium": AlertSeverity.WARNING,
+        "low": AlertSeverity.INFO,
+    }.get(urgency, AlertSeverity.WARNING)
+
+    alert = create_alert(
+        tenant_id=tenant_id,
+        alert_type=AlertType.ESCALATION,
+        title=f"Customer escalation: {reason[:80]}",
+        message=(
+            f"{context_summary or reason}\n\n"
+            f"Conversation: {conversation_id}\n"
+            f"Urgency: {urgency}"
+        ),
+        severity=severity,
+        metadata={
+            "conversation_id": conversation_id,
+            "escalation_reason": reason,
+            "urgency": urgency,
+            "context_summary": context_summary,
+            "recipient_emails": recipient_emails or [],
+        },
+    )
+
+    return await service.deliver_alert(alert)
+
+
 # ---------------------------------------------------------------------------
 # Module singleton
 # ---------------------------------------------------------------------------
@@ -1212,7 +1283,10 @@ def configure_alert_service(service: AlertDeliveryService) -> None:
     """
     global _alert_service
     _alert_service = service
-    logger.info(
-        "Alert delivery service configured with channels: %s",
-        service.get_registered_channels(),
-    )
+    if service is not None:
+        logger.info(
+            "Alert delivery service configured with channels: %s",
+            service.get_registered_channels(),
+        )
+    else:
+        logger.info("Alert delivery service cleared")

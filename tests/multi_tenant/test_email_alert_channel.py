@@ -33,6 +33,7 @@ from src.multi_tenant.alert_delivery import (
     configure_alert_service,
     create_alert,
     send_api_key_alert,
+    send_escalation_alert,
     send_outage_alert,
     send_team_invite_alert,
 )
@@ -173,8 +174,8 @@ class TestNewAlertTypes:
         assert alert.severity == AlertSeverity.CRITICAL
 
     def test_total_alert_types(self):
-        """All 11 alert types accounted for."""
-        assert len(AlertType) == 11
+        """All 12 alert types accounted for."""
+        assert len(AlertType) == 12
 
 
 # ---------------------------------------------------------------------------
@@ -523,3 +524,123 @@ class TestNotificationEmailField:
         from src.multi_tenant.tenant_config_processor import _PREFS_DIRECT_FIELDS
 
         assert "notification_email" in _PREFS_DIRECT_FIELDS
+
+
+# ---------------------------------------------------------------------------
+# Escalation alert
+# ---------------------------------------------------------------------------
+
+
+class TestEscalationAlert:
+    """Test ESCALATION alert type and send_escalation_alert convenience."""
+
+    def test_escalation_alert_type_exists(self):
+        assert AlertType.ESCALATION == "escalation"
+
+    def test_escalation_default_severity(self):
+        alert = create_alert(
+            tenant_id="t1",
+            alert_type=AlertType.ESCALATION,
+            title="Escalation test",
+            message="test",
+        )
+        assert alert.severity == AlertSeverity.WARNING
+
+    def test_escalation_email_template_renders(self):
+        alert = create_alert(
+            tenant_id="t1",
+            alert_type=AlertType.ESCALATION,
+            title="Customer escalation: refund request",
+            message="Customer wants a refund for order #123",
+        )
+        subject, html = _render_email(alert)
+        assert "Customer Escalation" in html
+        assert "Action Required" in html
+        assert "[Agent Red]" in subject
+
+    @pytest.mark.asyncio
+    async def test_send_escalation_alert_calls_service(self):
+        mock_service = MagicMock(spec=AlertDeliveryService)
+        mock_service.deliver_alert = AsyncMock()
+        configure_alert_service(mock_service)
+
+        await send_escalation_alert(
+            tenant_id="t1",
+            conversation_id="conv-123",
+            reason="Customer requested refund",
+            urgency="high",
+            context_summary="Order #456, wants full refund",
+        )
+
+        mock_service.deliver_alert.assert_called_once()
+        alert = mock_service.deliver_alert.call_args[0][0]
+        assert alert.alert_type == AlertType.ESCALATION
+        assert alert.severity == AlertSeverity.CRITICAL  # high urgency
+        assert "conv-123" in alert.metadata["conversation_id"]
+        assert alert.metadata["urgency"] == "high"
+
+        configure_alert_service(None)
+
+    @pytest.mark.asyncio
+    async def test_send_escalation_alert_returns_none_without_service(self):
+        configure_alert_service(None)
+        result = await send_escalation_alert(
+            tenant_id="t1",
+            conversation_id="conv-1",
+            reason="test",
+        )
+        assert result is None
+
+    @pytest.mark.asyncio
+    async def test_send_escalation_alert_medium_urgency(self):
+        mock_service = MagicMock(spec=AlertDeliveryService)
+        mock_service.deliver_alert = AsyncMock()
+        configure_alert_service(mock_service)
+
+        await send_escalation_alert(
+            tenant_id="t1",
+            conversation_id="conv-1",
+            reason="General inquiry",
+            urgency="medium",
+        )
+
+        alert = mock_service.deliver_alert.call_args[0][0]
+        assert alert.severity == AlertSeverity.WARNING
+
+        configure_alert_service(None)
+
+    @pytest.mark.asyncio
+    async def test_send_escalation_alert_low_urgency(self):
+        mock_service = MagicMock(spec=AlertDeliveryService)
+        mock_service.deliver_alert = AsyncMock()
+        configure_alert_service(mock_service)
+
+        await send_escalation_alert(
+            tenant_id="t1",
+            conversation_id="conv-1",
+            reason="Information request",
+            urgency="low",
+        )
+
+        alert = mock_service.deliver_alert.call_args[0][0]
+        assert alert.severity == AlertSeverity.INFO
+
+        configure_alert_service(None)
+
+    @pytest.mark.asyncio
+    async def test_send_escalation_alert_includes_recipient_emails(self):
+        mock_service = MagicMock(spec=AlertDeliveryService)
+        mock_service.deliver_alert = AsyncMock()
+        configure_alert_service(mock_service)
+
+        await send_escalation_alert(
+            tenant_id="t1",
+            conversation_id="conv-1",
+            reason="test",
+            recipient_emails=["agent1@example.com", "agent2@example.com"],
+        )
+
+        alert = mock_service.deliver_alert.call_args[0][0]
+        assert alert.metadata["recipient_emails"] == ["agent1@example.com", "agent2@example.com"]
+
+        configure_alert_service(None)

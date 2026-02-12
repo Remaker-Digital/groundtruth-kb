@@ -36,18 +36,18 @@ import { HelpTooltip } from './HelpTooltip';
 // ---------------------------------------------------------------------------
 
 const ROLES: Array<{ value: TeamRole; label: string; description: string }> = [
-  { value: 'owner', label: 'Owner', description: 'Full access to all settings, billing, and team management' },
+  { value: 'superadmin', label: 'Superadmin', description: 'Full access — hidden safety-net account, auto-provisioned' },
   { value: 'admin', label: 'Admin', description: 'Configuration, team management, and analytics access' },
-  { value: 'agent', label: 'Escalation agent', description: 'Conversation inbox and knowledge base access' },
+  { value: 'escalation_agent', label: 'Escalation agent', description: 'Read-only Inbox access for handling escalated conversations' },
   { value: 'viewer', label: 'Viewer', description: 'Read-only access to analytics and conversations' },
 ];
 
-const INVITABLE_ROLES = ROLES.filter((r) => r.value !== 'owner');
+const INVITABLE_ROLES = ROLES.filter((r) => r.value !== 'superadmin');
 
 const ROLE_COLORS: Record<string, { bg: string; text: string }> = {
-  owner: { bg: '#FEF2F2', text: '#991B1B' },
+  superadmin: { bg: '#FEF2F2', text: '#991B1B' },
   admin: { bg: '#EDE9FE', text: '#5B21B6' },
-  agent: { bg: '#DBEAFE', text: '#1E40AF' },
+  escalation_agent: { bg: '#DBEAFE', text: '#1E40AF' },
   viewer: { bg: '#F3F4F6', text: '#374151' },
 };
 
@@ -456,7 +456,7 @@ export const TeamManager: React.FC<BaseComponentProps> = ({
   // State
   const [inviteEmail, setInviteEmail] = useState('');
   const [inviteName, setInviteName] = useState('');
-  const [inviteRole, setInviteRole] = useState<TeamRole>('agent');
+  const [inviteRole, setInviteRole] = useState<TeamRole>('escalation_agent');
   const [showInviteForm, setShowInviteForm] = useState(false);
 
   // Confirmation dialog
@@ -466,7 +466,7 @@ export const TeamManager: React.FC<BaseComponentProps> = ({
 
   // Edit dialog
   const [editMember, setEditMember] = useState<TeamMember | null>(null);
-  const [editRole, setEditRole] = useState<TeamRole>('agent');
+  const [editRole, setEditRole] = useState<TeamRole>('escalation_agent');
   const [editActive, setEditActive] = useState(true);
   const [editCategories, setEditCategories] = useState<string[]>([]);
   const [editLoading, setEditLoading] = useState(false);
@@ -500,7 +500,7 @@ export const TeamManager: React.FC<BaseComponentProps> = ({
       onNotify(`Invited ${inviteEmail.trim()} as ${inviteRole}.`, 'success');
       setInviteEmail('');
       setInviteName('');
-      setInviteRole('agent');
+      setInviteRole('escalation_agent');
       setShowInviteForm(false);
       team.refetch();
     } else {
@@ -531,7 +531,7 @@ export const TeamManager: React.FC<BaseComponentProps> = ({
       if (isNowActive !== wasActive) body.is_active = isNowActive;
       // Include categories if role is agent and categories changed (WI #279)
       const origCats = editMember.escalationCategories || [];
-      const catsChanged = editRole === 'agent' && (
+      const catsChanged = editRole === 'escalation_agent' && (
         editCategories.length !== origCats.length ||
         editCategories.some((c) => !origCats.includes(c))
       );
@@ -860,7 +860,7 @@ export const TeamManager: React.FC<BaseComponentProps> = ({
               </thead>
               <tbody>
                 {members.map((member) => {
-                  const isOwner = member.role === 'owner';
+                  const isOwner = member.role === 'superadmin';
                   const isDisabled = !member.isActive;
                   const memberStatus = member.isActive ? 'active' : 'disabled';
                   const statusInfo = STATUS_DISPLAY[memberStatus] || STATUS_DISPLAY.active;
@@ -906,7 +906,7 @@ export const TeamManager: React.FC<BaseComponentProps> = ({
                           </select>
                         )}
                         {/* Escalation category chips (WI #279) — only for agent role */}
-                        {member.role === 'agent' && (
+                        {member.role === 'escalation_agent' && (
                           <div style={{ display: 'flex', flexWrap: 'wrap', gap: 4, marginTop: 6 }}>
                             {ESCALATION_CATEGORIES.map((cat) => {
                               const isSelected = (member.escalationCategories || []).includes(cat.id);
@@ -1085,7 +1085,7 @@ export const TeamManager: React.FC<BaseComponentProps> = ({
             </div>
 
             {/* Escalation categories — visible only for agent role (WI #279) */}
-            {editRole === 'agent' && (
+            {editRole === 'escalation_agent' && (
               <div style={{ marginBottom: 16 }}>
                 <label style={s.formLabel}>
                   Escalation categories

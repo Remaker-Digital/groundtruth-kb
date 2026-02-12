@@ -54,17 +54,22 @@ The confidence level below which the AI escalates instead of responding. The esc
 |---|---|
 | **Field** | `escalation_keywords` |
 | **Type** | Tag list (up to 30 keywords, each up to 50 characters) |
-| **Default** | None |
+| **Default** | 9 built-in keywords (see below) |
 | **Affects** | Escalation handler |
 
 Words or phrases that immediately trigger escalation, regardless of the confidence score. When a customer message contains any of these keywords (case-insensitive), the conversation is escalated.
 
-**Common escalation keywords:**
-- `speak to a human` / `talk to a person` / `real person`
-- `manager` / `supervisor`
-- `lawyer` / `legal` / `sue`
-- `cancel my account` / `close my account`
-- `report` / `complaint` / `BBB`
+**Default keywords (included automatically):**
+
+`speak to a person`, `human agent`, `talk to a human`, `manager`, `supervisor`, `complaint`, `lawyer`, `refund`, `cancel my subscription`
+
+You can add, remove, or replace these defaults. If you clear the list entirely, only the confidence threshold and turn limit will trigger escalation.
+
+**Additional keywords to consider:**
+- `real person` / `talk to a person`
+- `legal` / `sue`
+- `close my account` / `cancel my account`
+- `BBB` / `report`
 
 **Tips:**
 - Keep the list focused on high-intent phrases. Adding too many common words (like "problem" or "help") will cause unnecessary escalation.
@@ -73,20 +78,32 @@ Words or phrases that immediately trigger escalation, regardless of the confiden
 
 ---
 
-## Escalation notification email
+## Escalation notifications
 
-| | |
-|---|---|
-| **Field** | `escalation_notification_email` |
-| **Type** | Email address |
-| **Default** | None |
-| **Affects** | Escalation handler |
+When a conversation is escalated, Agent Red sends email notifications to team members assigned to the matching escalation category. This replaces the previous single-email-address approach with role-based routing.
 
-An email address that receives a notification when a conversation is escalated. The notification includes the customer's name (if known), the conversation summary, and a link to the conversation in the admin Inbox.
+**How it works:**
 
-**If not set:** Escalated conversations appear in the admin Inbox but no email notification is sent. Team members must check the Inbox manually or rely on the dashboard alert indicators.
+1. The AI detects an escalation trigger (keyword, threshold, or turn limit).
+2. The escalation handler determines the reason and urgency level (high, medium, or low).
+3. Agent Red queries the Team for active escalation agents assigned to a matching category.
+4. Each matching agent receives an email notification with:
+   - Customer name (if known)
+   - Escalation reason
+   - Urgency level
+   - Direct link to the conversation in the admin Inbox
 
-**Tip:** Use a team email alias (e.g., `support@yourstore.com`) rather than a personal email so that the notification reaches whoever is on shift.
+**Urgency levels and severity:**
+
+| Urgency | Severity | When |
+|---|---|---|
+| High | Critical | Customer explicitly requests escalation, legal threats, cancellation |
+| Medium | Warning | Confidence threshold breach, repeated clarification requests |
+| Low | Informational | Turn limit reached, idle timeout |
+
+**If no escalation agents are configured:** Escalated conversations appear in the Inbox but no email notification is sent. Admins and superadmins should check the Inbox regularly.
+
+**To configure escalation agents:** Go to [Team management](./team-management.md) and invite team members with the Escalation agent role.
 
 ---
 
@@ -120,8 +137,8 @@ Forces escalation after the conversation reaches this many back-and-forth exchan
 
 1. The AI sends a handoff message to the customer explaining that a human agent will take over.
 2. The conversation appears in the admin Inbox with an "Escalated" status badge.
-3. If an escalation email is configured, a notification is sent.
-4. If Zendesk integration is enabled, a ticket is created in your Zendesk instance (Professional+ only).
+3. Escalation agents assigned to the matching category receive an email notification with a link to the conversation.
+4. If Zendesk integration is enabled (coming soon), a ticket is created in your Zendesk instance (Professional+ only).
 5. The AI does not send further responses in the conversation unless a team member explicitly reassigns it back to the AI.
 
 ---

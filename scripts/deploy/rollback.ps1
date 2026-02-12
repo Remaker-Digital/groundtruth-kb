@@ -41,6 +41,22 @@ Write-Host "║  Target image: $Image" -ForegroundColor Red
 Write-Host "╚══════════════════════════════════════════════════════════════╝" -ForegroundColor Red
 Write-Host ""
 
+# Step 0: Verify rollback image exists in ACR
+Write-Host "[0/4] Verifying rollback image exists in ACR..." -ForegroundColor Yellow
+$imageParts = $Image -split ":"
+$repoName = ($imageParts[0] -split "/")[-1]
+$tagName = $imageParts[1]
+if ($repoName -and $tagName) {
+    $tagCheck = az acr repository show-tags --name acragentredeastus2 --repository $repoName --query "[?@=='$tagName']" -o tsv 2>&1
+    if ($tagCheck -ne $tagName) {
+        Write-Host "ERROR: Image tag '$tagName' not found in ACR repository '$repoName'." -ForegroundColor Red
+        Write-Host "  Available tags:" -ForegroundColor Yellow
+        az acr repository show-tags --name acragentredeastus2 --repository $repoName --top 5 --orderby time_desc -o tsv 2>&1 | ForEach-Object { Write-Host "    $_" -ForegroundColor Gray }
+        exit 1
+    }
+    Write-Host "  Image verified in ACR" -ForegroundColor Green
+}
+
 # Step 1: Deploy rollback image
 Write-Host "[1/4] Deploying rollback image..." -ForegroundColor Yellow
 az containerapp update `

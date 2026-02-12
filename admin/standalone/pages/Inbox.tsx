@@ -99,12 +99,6 @@ const SearchIcon = () => (
   </svg>
 );
 
-const SendIcon = () => (
-  <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-    <line x1="22" y1="2" x2="11" y2="13" />
-    <polygon points="22 2 15 22 11 13 2 9 22 2" />
-  </svg>
-);
 
 const UserAssignIcon = () => (
   <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
@@ -620,40 +614,6 @@ export function InboxPage() {
           </Box>
         </ScrollArea>
 
-        {/* Message input */}
-        <Box
-          px="md"
-          py="sm"
-          style={{
-            background: panelBg,
-            borderTop: `1px solid ${borderColor}`,
-          }}
-        >
-          <Group gap={8} wrap="nowrap">
-            <TextInput
-              placeholder="Type a message..."
-              size="sm"
-              disabled
-              style={{ flex: 1 }}
-              styles={{
-                input: {
-                  borderColor: isDark ? '#272727' : 'var(--mantine-color-gray-3)',
-                },
-              }}
-            />
-            <Tooltip label="Send">
-              <ActionIcon
-                size="lg"
-                variant="filled"
-                color="brand"
-                disabled
-                radius="md"
-              >
-                <SendIcon />
-              </ActionIcon>
-            </Tooltip>
-          </Group>
-        </Box>
       </Box>
 
       {/* ================================================================= */}

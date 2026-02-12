@@ -164,6 +164,38 @@ try {
     Log "WARN" "Could not capture pre-upgrade metrics from /ready"
 }
 
+# Verify admin SPA builds exist (required for frontend changes to take effect)
+Log "INFO" "Checking admin SPA build artifacts..."
+$missingDists = @()
+foreach ($spa in @("admin\standalone\dist", "admin\shopify\dist", "widget\dist")) {
+    $distPath = "$PROJECT_ROOT\$spa"
+    if (-not (Test-Path $distPath)) {
+        $missingDists += $spa
+        Log "WARN" "MISSING: $spa — frontend changes will NOT be included in this deploy"
+    } else {
+        $distAge = (Get-Date) - (Get-Item $distPath).LastWriteTime
+        if ($distAge.TotalHours -gt 24) {
+            Log "WARN" "$spa is $([math]::Round($distAge.TotalHours, 1)) hours old — may be stale. Run 'npm run build' in the respective directory."
+        } else {
+            Log "PASS" "$spa exists (built $([math]::Round($distAge.TotalMinutes, 0)) min ago)"
+        }
+    }
+}
+if ($missingDists.Count -gt 0) {
+    Log "WARN" "Missing dist directories: $($missingDists -join ', '). Build them first if this deploy includes frontend changes."
+}
+
+# Check if version tag already exists in ACR (prevent accidental overwrite)
+if (-not $SkipBuild) {
+    Log "INFO" "Checking if ${IMAGE_NAME}:$Version already exists in ACR..."
+    $existingTags = az acr repository show-tags --name $ACR --repository $IMAGE_NAME --query "[?@=='$($Version)']" -o tsv 2>&1
+    if ($existingTags -and $existingTags -eq $Version) {
+        Log "WARN" "Image ${IMAGE_NAME}:$Version already exists in ACR. The build will overwrite it."
+        Log "WARN" "If this is unintentional, press Ctrl+C within 5 seconds..."
+        if (-not $DryRun) { Start-Sleep -Seconds 5 }
+    }
+}
+
 Log "PASS" "Phase 1 complete — pre-flight checks passed"
 
 # ═══════════════════════════════════════════════════════════════════════════════
@@ -188,21 +220,44 @@ if ($SkipBuild) {
         Copy-Item -Recurse "$PROJECT_ROOT\src" "$BUILD_CONTEXT_DIR\src"
         Copy-Item -Recurse "$PROJECT_ROOT\config" "$BUILD_CONTEXT_DIR\config"
 
-        # Admin SPAs (pre-built)
+        # Admin SPAs (pre-built) — abort if standalone is missing (required for admin UI)
+        if (-not (Test-Path "$PROJECT_ROOT\admin\standalone\dist")) {
+            Abort "admin/standalone/dist is missing. Run 'cd admin/standalone && npm run build' before deploying."
+        }
+        New-Item -ItemType Directory -Path "$BUILD_CONTEXT_DIR\admin\standalone" -Force | Out-Null
+        Copy-Item -Recurse "$PROJECT_ROOT\admin\standalone\dist" "$BUILD_CONTEXT_DIR\admin\standalone\dist"
+
         if (Test-Path "$PROJECT_ROOT\admin\shopify\dist") {
             New-Item -ItemType Directory -Path "$BUILD_CONTEXT_DIR\admin\shopify" -Force | Out-Null
             Copy-Item -Recurse "$PROJECT_ROOT\admin\shopify\dist" "$BUILD_CONTEXT_DIR\admin\shopify\dist"
-        }
-        if (Test-Path "$PROJECT_ROOT\admin\standalone\dist") {
-            New-Item -ItemType Directory -Path "$BUILD_CONTEXT_DIR\admin\standalone" -Force | Out-Null
-            Copy-Item -Recurse "$PROJECT_ROOT\admin\standalone\dist" "$BUILD_CONTEXT_DIR\admin\standalone\dist"
+        } else {
+            Log "WARN" "admin/shopify/dist missing — Shopify embedded admin will not be updated"
         }
 
         # Widget bundle
         if (Test-Path "$PROJECT_ROOT\widget\dist") {
             New-Item -ItemType Directory -Path "$BUILD_CONTEXT_DIR\widget" -Force | Out-Null
             Copy-Item -Recurse "$PROJECT_ROOT\widget\dist" "$BUILD_CONTEXT_DIR\widget\dist"
+        } else {
+            Log "WARN" "widget/dist missing — widget bundle will not be updated"
         }
+
+        # Source integrity check: verify critical files made it into the build context
+        $criticalFiles = @(
+            "src\main.py",
+            "src\multi_tenant\cosmos_schema.py",
+            "src\multi_tenant\auth.py",
+            "src\multi_tenant\middleware.py",
+            "src\chat\pipeline.py",
+            "Dockerfile",
+            "requirements.txt"
+        )
+        foreach ($f in $criticalFiles) {
+            if (-not (Test-Path "$BUILD_CONTEXT_DIR\$f")) {
+                Abort "Critical file missing from build context: $f"
+            }
+        }
+        Log "PASS" "Build context integrity verified ($($criticalFiles.Count) critical files present)"
 
         $contextSize = (Get-ChildItem -Recurse $BUILD_CONTEXT_DIR | Measure-Object -Property Length -Sum).Sum / 1MB
         Log "INFO" "Build context size: $([math]::Round($contextSize, 1)) MB"
@@ -222,6 +277,13 @@ if ($SkipBuild) {
             Abort "ACR build failed or did not succeed (status: $buildRun). Check ACR portal."
         }
         Log "PASS" "Image built and pushed: ${ACR_LOGIN_SERVER}/${IMAGE_NAME}:$Version"
+
+        # Verify image is actually in ACR
+        $verifyTag = az acr repository show-tags --name $ACR --repository $IMAGE_NAME --query "[?@=='$($Version)']" -o tsv 2>&1
+        if ($verifyTag -ne $Version) {
+            Abort "Image tag $Version not found in ACR after build. Check ACR portal for build status."
+        }
+        Log "PASS" "Verified ${IMAGE_NAME}:$Version exists in ACR"
 
         # Cleanup build context
         Remove-Item -Recurse -Force $BUILD_CONTEXT_DIR -ErrorAction SilentlyContinue

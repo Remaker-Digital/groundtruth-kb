@@ -43,6 +43,7 @@ Every configuration change is versioned automatically. You can view past version
 | [Knowledge base management](./knowledge-base-management.md) | Creating, editing, uploading, and organizing knowledge articles |
 | [Conflict scanner](./conflict-scanner.md) | Detect duplicate and conflicting knowledge base articles |
 | [Test mode](./test-mode.md) | A/B test AI configuration changes on a percentage of sessions |
+| [Team management](./team-management.md) | Invite team members, assign roles, and control admin console access |
 
 ## Settings that affect AI prompts
 

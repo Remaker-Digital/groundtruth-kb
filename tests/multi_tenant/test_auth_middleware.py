@@ -32,12 +32,13 @@ from src.multi_tenant.auth import (
     validate_tenant_status,
     verify_api_key,
 )
-from src.multi_tenant.cosmos_schema import TIER_DEFAULTS, TenantStatus, TenantTier
+from src.multi_tenant.cosmos_schema import TIER_DEFAULTS, TeamMemberRole, TenantStatus, TenantTier
 from src.multi_tenant.middleware import (
     RateLimitMiddleware,
     TenantAuthMiddleware,
     configure_tenant_resolution,
     get_tenant_context,
+    require_role,
     require_tier,
 )
 
@@ -373,8 +374,139 @@ class TestRequireTier:
 
 
 # ===================================================================
+# middleware.py — require_role (Role-Based Access Control)
+# ===================================================================
+
+
+class TestRequireRole:
+    """MW-04: Role enforcement dependency factory."""
+
+    def _admin_user_context(self) -> TenantContext:
+        return TenantContext(
+            tenant_id="t-001",
+            tier=TenantTier.STARTER,
+            status=TenantStatus.ACTIVE,
+            auth_method="user_api_key",
+            team_member_role=TeamMemberRole.ADMIN,
+            team_member_id="t-001:admin@test.com",
+            team_member_email="admin@test.com",
+        )
+
+    def _superadmin_context(self) -> TenantContext:
+        return TenantContext(
+            tenant_id="t-001",
+            tier=TenantTier.STARTER,
+            status=TenantStatus.ACTIVE,
+            auth_method="user_api_key",
+            team_member_role=TeamMemberRole.SUPERADMIN,
+            team_member_id="t-001:sa@test.com",
+            team_member_email="sa@test.com",
+        )
+
+    def _escalation_agent_context(self) -> TenantContext:
+        return TenantContext(
+            tenant_id="t-001",
+            tier=TenantTier.STARTER,
+            status=TenantStatus.ACTIVE,
+            auth_method="user_api_key",
+            team_member_role=TeamMemberRole.ESCALATION_AGENT,
+            team_member_id="t-001:agent@test.com",
+            team_member_email="agent@test.com",
+        )
+
+    def _viewer_context(self) -> TenantContext:
+        return TenantContext(
+            tenant_id="t-001",
+            tier=TenantTier.STARTER,
+            status=TenantStatus.ACTIVE,
+            auth_method="user_api_key",
+            team_member_role=TeamMemberRole.VIEWER,
+            team_member_id="t-001:viewer@test.com",
+            team_member_email="viewer@test.com",
+        )
+
+    @pytest.mark.asyncio
+    async def test_admin_allowed_for_admin_route(self):
+        dep = require_role(TeamMemberRole.SUPERADMIN, TeamMemberRole.ADMIN)
+        req = _make_request(tenant_context=self._admin_user_context())
+        result = await dep(req)
+        assert result.team_member_role == TeamMemberRole.ADMIN
+
+    @pytest.mark.asyncio
+    async def test_superadmin_allowed_for_admin_route(self):
+        dep = require_role(TeamMemberRole.SUPERADMIN, TeamMemberRole.ADMIN)
+        req = _make_request(tenant_context=self._superadmin_context())
+        result = await dep(req)
+        assert result.team_member_role == TeamMemberRole.SUPERADMIN
+
+    @pytest.mark.asyncio
+    async def test_viewer_blocked_for_admin_route(self):
+        from fastapi import HTTPException
+
+        dep = require_role(TeamMemberRole.SUPERADMIN, TeamMemberRole.ADMIN)
+        req = _make_request(tenant_context=self._viewer_context())
+        with pytest.raises(HTTPException) as exc_info:
+            await dep(req)
+        assert exc_info.value.status_code == 403
+
+    @pytest.mark.asyncio
+    async def test_escalation_agent_blocked_for_admin_route(self):
+        from fastapi import HTTPException
+
+        dep = require_role(TeamMemberRole.SUPERADMIN, TeamMemberRole.ADMIN)
+        req = _make_request(tenant_context=self._escalation_agent_context())
+        with pytest.raises(HTTPException) as exc_info:
+            await dep(req)
+        assert exc_info.value.status_code == 403
+
+    @pytest.mark.asyncio
+    async def test_escalation_agent_allowed_for_inbox_route(self):
+        dep = require_role(
+            TeamMemberRole.SUPERADMIN,
+            TeamMemberRole.ADMIN,
+            TeamMemberRole.ESCALATION_AGENT,
+            TeamMemberRole.VIEWER,
+        )
+        req = _make_request(tenant_context=self._escalation_agent_context())
+        result = await dep(req)
+        assert result.team_member_role == TeamMemberRole.ESCALATION_AGENT
+
+    @pytest.mark.asyncio
+    async def test_tenant_key_treated_as_admin(self):
+        """Legacy tenant API keys (no team_member_role) should be treated as admin."""
+        dep = require_role(TeamMemberRole.SUPERADMIN, TeamMemberRole.ADMIN)
+        ctx = _starter_context()  # No team_member_role set
+        req = _make_request(tenant_context=ctx)
+        result = await dep(req)
+        assert result.tenant_id == "t-001"
+
+    @pytest.mark.asyncio
+    async def test_tenant_key_blocked_when_admin_not_allowed(self):
+        """Tenant key should fail if ADMIN is not in the allowed set."""
+        from fastapi import HTTPException
+
+        dep = require_role(TeamMemberRole.ESCALATION_AGENT)
+        ctx = _starter_context()
+        req = _make_request(tenant_context=ctx)
+        with pytest.raises(HTTPException) as exc_info:
+            await dep(req)
+        assert exc_info.value.status_code == 403
+
+    @pytest.mark.asyncio
+    async def test_no_context_raises_401(self):
+        from fastapi import HTTPException
+
+        dep = require_role(TeamMemberRole.ADMIN)
+        req = _make_request()  # No tenant context
+        with pytest.raises(HTTPException) as exc_info:
+            await dep(req)
+        assert exc_info.value.status_code == 401
+
+
+# ===================================================================
 # middleware.py — RateLimitMiddleware._get_limit
 # ===================================================================
+
 
 class TestRateLimitGetLimit:
     """MW-03: Rate limit resolution from tenant tier."""

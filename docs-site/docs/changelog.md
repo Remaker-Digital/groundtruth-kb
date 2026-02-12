@@ -9,6 +9,43 @@ All notable changes to Agent Red Customer Experience are documented here.
 
 ---
 
+## v1.21.0 — 2026-02-12 (unreleased)
+
+### Team management and role-based access
+- 4-role system: superadmin, admin, escalation agent, and viewer
+- Per-user API keys with automatic role resolution on login
+- Role-based sidebar navigation and page access control
+- Superadmin is hidden from other users and cannot be deleted
+- Escalation agents see only the Inbox, filtered to their assigned categories
+
+### Escalation notifications
+- AI pipeline escalation events trigger email notifications to matching escalation agents
+- Urgency-to-severity mapping: high (critical), medium (warning), low (informational)
+
+### Configuration
+- Escalation keywords now ship with 9 sensible defaults for new tenants
+
+### Deployment safeguards
+- Upgrade script: SPA dist freshness check, ACR tag validation, source integrity verification
+- Rollback script: verifies image tag exists in ACR before deploying
+
+### Observability
+- Debug logging for authentication routing and role access decisions
+- Info logging for escalation alert events
+
+---
+
+## v1.20.1 — 2026-02-12
+
+### Admin dashboard
+- 46 UX work items: sidebar renames, page reordering, tooltips, widget controls
+- Wizard redesign: mode selector, step restructure, Go Live checklists
+- Memory and Privacy page with 4-layer memory controls and privacy accordion
+- Dashboard and Analytics merged into single Dashboard view
+- Draggable chat panel with cross-frame positioning
+
+---
+
 ## v1.20.0 — 2026-02-11
 
 ### Admin dashboard

@@ -51,13 +51,20 @@ from src.multi_tenant.auth import (
     extract_bearer_token,
     extract_shop_domain,
     is_auth_exempt,
+    is_user_api_key,
     is_widget_key_allowed_path,
     validate_tenant_status,
     verify_api_key,
     verify_shopify_session_token,
+    verify_user_api_key,
     verify_widget_key,
 )
-from src.multi_tenant.cosmos_schema import TIER_DEFAULTS, TenantStatus, TenantTier
+from src.multi_tenant.cosmos_schema import (
+    TIER_DEFAULTS,
+    TeamMemberRole,
+    TenantStatus,
+    TenantTier,
+)
 
 from datetime import datetime, timezone
 
@@ -75,12 +82,14 @@ logger = logging.getLogger(__name__)
 _resolve_by_shop_domain: Callable | None = None
 _resolve_by_api_key_hash: Callable | None = None
 _resolve_by_widget_key_hash: Callable | None = None
+_resolve_by_user_api_key_hash: Callable | None = None
 
 
 def configure_tenant_resolution(
     resolve_by_shop_domain: Callable,
     resolve_by_api_key_hash: Callable,
     resolve_by_widget_key_hash: Callable | None = None,
+    resolve_by_user_api_key_hash: Callable | None = None,
 ) -> None:
     """Configure the tenant resolution functions.
 
@@ -95,11 +104,16 @@ def configure_tenant_resolution(
         resolve_by_widget_key_hash: Async function that accepts a widget
             key hash string and returns a tenant dict or None.
             Optional — widget key auth is disabled if not provided.
+        resolve_by_user_api_key_hash: Async function that accepts a user
+            API key hash and returns {team_member, tenant} or None.
+            Optional — per-user auth is disabled if not provided.
     """
-    global _resolve_by_shop_domain, _resolve_by_api_key_hash, _resolve_by_widget_key_hash
+    global _resolve_by_shop_domain, _resolve_by_api_key_hash
+    global _resolve_by_widget_key_hash, _resolve_by_user_api_key_hash
     _resolve_by_shop_domain = resolve_by_shop_domain
     _resolve_by_api_key_hash = resolve_by_api_key_hash
     _resolve_by_widget_key_hash = resolve_by_widget_key_hash
+    _resolve_by_user_api_key_hash = resolve_by_user_api_key_hash
     logger.info("Tenant resolution functions configured")
 
 
@@ -291,7 +305,19 @@ class TenantAuthMiddleware(BaseHTTPMiddleware):
         )
 
     async def _auth_api_key(self, api_key: str) -> TenantContext:
-        """Authenticate via API key."""
+        """Authenticate via API key (tenant key or per-user key).
+
+        Detects the key type by prefix:
+        - ar_user_* → per-user API key → resolves to team member + tenant
+        - ar_live_* or other → tenant API key → resolves to tenant only
+        """
+        # Route per-user keys through the user auth flow
+        if is_user_api_key(api_key) and _resolve_by_user_api_key_hash is not None:
+            logger.debug("Auth routing: per-user API key detected (prefix=%s...)", api_key[:12])
+            return await self._auth_user_api_key(api_key)
+
+        # Tenant-level API key (legacy flow)
+        logger.debug("Auth routing: tenant API key detected (prefix=%s...)", api_key[:8])
         if _resolve_by_api_key_hash is None:
             raise AuthenticationError(
                 "Tenant resolution not configured.", status_code=500,
@@ -309,6 +335,50 @@ class TenantAuthMiddleware(BaseHTTPMiddleware):
             status=status,
             auth_method="api_key",
             trial_expires_at=trial_expires_at,
+        )
+
+    async def _auth_user_api_key(self, api_key: str) -> TenantContext:
+        """Authenticate via per-user API key.
+
+        Resolves the key to a specific team member and their tenant.
+        Populates user identity fields on TenantContext.
+        """
+        if _resolve_by_user_api_key_hash is None:
+            raise AuthenticationError(
+                "Per-user authentication not configured.", status_code=500,
+            )
+
+        result = await verify_user_api_key(api_key, _resolve_by_user_api_key_hash)
+
+        tenant = result["tenant"]
+        member = result["team_member"]
+
+        tenant_id, status, tier, trial_expires_at = self._resolve_tenant_fields(tenant)
+        validate_tenant_status(tenant_id, status)
+        self._check_trial_expiry(tenant_id, tier, trial_expires_at)
+
+        # Resolve role
+        role_str = member.get("role", "viewer")
+        try:
+            role = TeamMemberRole(role_str)
+        except ValueError:
+            role = TeamMemberRole.VIEWER
+
+        logger.debug(
+            "Per-user auth resolved: tenant=%s email=%s role=%s member_id=%s",
+            tenant_id, member.get("email"), role.value, member.get("id"),
+        )
+
+        return TenantContext(
+            tenant_id=tenant_id,
+            tier=tier,
+            status=status,
+            auth_method="user_api_key",
+            trial_expires_at=trial_expires_at,
+            team_member_id=member.get("id"),
+            team_member_email=member.get("email"),
+            team_member_role=role,
+            escalation_categories=tuple(member.get("escalation_categories", [])),
         )
 
     async def _auth_widget_key(
@@ -414,6 +484,65 @@ def require_tier(minimum_tier: TenantTier) -> Callable:
         return ctx
 
     return dependency
+
+
+def require_role(*allowed_roles: TeamMemberRole) -> Callable:
+    """FastAPI dependency factory: enforce role-based access control.
+
+    Usage:
+        @router.get("/admin-only")
+        async def handler(
+            ctx: TenantContext = Depends(require_role(TeamMemberRole.SUPERADMIN, TeamMemberRole.ADMIN)),
+        ):
+            ...
+
+    Allows requests from users with any of the listed roles.
+
+    Tenant-level API keys (ar_live_) are treated as ADMIN role for
+    backward compatibility (widget, webhooks, and legacy admin access).
+    """
+    allowed = set(allowed_roles)
+
+    async def dependency(request: Request) -> TenantContext:
+        ctx = await get_tenant_context(request)
+
+        # Tenant-level keys (ar_live_) have no per-user role — treat as admin
+        caller_role = getattr(ctx, "team_member_role", None)
+        if caller_role is None:
+            # Legacy tenant API key or Shopify JWT — allow if ADMIN is in allowed set
+            if TeamMemberRole.ADMIN in allowed:
+                return ctx
+            raise HTTPException(
+                status_code=403,
+                detail="Insufficient permissions. Per-user API key required.",
+            )
+
+        if caller_role not in allowed:
+            logger.debug(
+                "Role access denied: tenant=%s email=%s role=%s required=%s path=%s",
+                ctx.tenant_id,
+                getattr(ctx, "team_member_email", "?"),
+                caller_role.value,
+                ", ".join(r.value for r in allowed),
+                getattr(request, "url", "?"),
+            )
+            raise HTTPException(
+                status_code=403,
+                detail=f"Insufficient permissions. Required role: {', '.join(r.value for r in allowed)}.",
+            )
+
+        return ctx
+
+    return dependency
+
+
+def require_write_role() -> Callable:
+    """FastAPI dependency: require a role that can write (superadmin or admin).
+
+    Convenience wrapper for the most common write-access check.
+    Viewers and escalation agents are read-only.
+    """
+    return require_role(TeamMemberRole.SUPERADMIN, TeamMemberRole.ADMIN)
 
 
 # ---------------------------------------------------------------------------

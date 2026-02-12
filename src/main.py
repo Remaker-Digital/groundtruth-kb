@@ -1064,21 +1064,48 @@ async def _startup_cosmos_db() -> None:
 async def _startup_tenant_resolution() -> None:
     """Configure tenant resolution functions for auth middleware.
 
-    Wires TenantRepository lookup methods into the auth middleware so
-    that Shopify session tokens, API keys, and publishable widget keys
-    can resolve to tenant documents in Cosmos DB.
+    Wires TenantRepository and TeamMemberRepository lookup methods into
+    the auth middleware so that Shopify session tokens, API keys,
+    publishable widget keys, and per-user API keys can resolve to
+    tenant/team-member documents in Cosmos DB.
     """
     try:
         tenant_repo = TenantRepository()
+
+        # Per-user API key resolution: looks up team member by key hash,
+        # then fetches the associated tenant document.
+        from src.multi_tenant.repository import TeamMemberRepository
+        team_repo = TeamMemberRepository()
+
+        async def resolve_user_api_key(key_hash: str) -> dict | None:
+            """Resolve a per-user API key hash to team member + tenant."""
+            member = await team_repo.find_by_user_api_key_hash(key_hash)
+            if member is None:
+                return None
+            # Fetch the tenant document for this team member
+            try:
+                tenant = await tenant_repo.read(
+                    tenant_id=member["tenant_id"],
+                    document_id=member["tenant_id"],
+                )
+            except Exception:
+                logger.warning(
+                    "User API key resolved to member %s but tenant %s not found",
+                    member.get("email"), member.get("tenant_id"),
+                )
+                return None
+            return {"team_member": member, "tenant": tenant}
+
         configure_tenant_resolution(
             resolve_by_shop_domain=tenant_repo.find_by_shopify_domain,
             resolve_by_api_key_hash=tenant_repo.find_by_api_key_hash,
             resolve_by_widget_key_hash=tenant_repo.find_by_widget_key_hash,
+            resolve_by_user_api_key_hash=resolve_user_api_key,
         )
         # Also wire Cosmos DB fallback for /api/tenants/lookup endpoint
         from src.integrations.provisioning import configure_tenant_lookup_repo
         configure_tenant_lookup_repo(tenant_repo)
-        logger.info("Tenant resolution configured (Cosmos DB-backed, triple auth)")
+        logger.info("Tenant resolution configured (Cosmos DB-backed, quad auth)")
     except Exception:
         logger.warning(
             "Tenant resolution configuration failed — auth middleware will "

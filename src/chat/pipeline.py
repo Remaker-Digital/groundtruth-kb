@@ -1528,6 +1528,9 @@ class ChatPipeline:
         """Handle escalation: call Escalation agent, update session."""
         yield stage_event("escalation-handler", "started")
 
+        urgency = "medium"
+        context_summary = ""
+
         try:
             esc_result = await budget.execute_with_budget(
                 "escalation-handler",
@@ -1535,6 +1538,8 @@ class ChatPipeline:
             )
 
             reason = esc_result.get("reason", "Customer requested human agent")
+            urgency = esc_result.get("urgency", "medium")
+            context_summary = esc_result.get("context_summary", "")
             trace.add_stage(
                 "escalation-handler",
                 model=esc_result.get("model", "gpt-4o-mini"),
@@ -1556,6 +1561,26 @@ class ChatPipeline:
             conversation_id=conversation_id,
             escalation_reason=reason,
         )
+
+        # Fire-and-forget: notify assigned escalation agents
+        try:
+            from src.multi_tenant.alert_delivery import send_escalation_alert
+
+            logger.info(
+                "Firing escalation alert: tenant=%s conversation=%s reason=%s urgency=%s",
+                tenant_id, conversation_id, reason[:80], urgency,
+            )
+            asyncio.ensure_future(
+                send_escalation_alert(
+                    tenant_id=tenant_id,
+                    conversation_id=conversation_id,
+                    reason=reason,
+                    urgency=urgency,
+                    context_summary=context_summary,
+                )
+            )
+        except Exception:
+            logger.debug("Escalation alert skipped (alert service not configured)")
 
         # Yield escalation system message as a token event
         escalation_msg = (

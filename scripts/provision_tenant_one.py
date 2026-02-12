@@ -247,6 +247,54 @@ async def provision(dry_run: bool = True, seed_kb: bool = False) -> None:
         else:
             print(f"[ERROR] Failed to create preferences: {e}")
 
+    # Create superadmin team member for the tenant owner
+    from src.multi_tenant.auth import generate_user_api_key, hash_api_key
+    from src.multi_tenant.cosmos_schema import TeamMemberDocument, TeamMemberRole
+    from src.multi_tenant.repository import TeamMemberRepository
+
+    team_repo = TeamMemberRepository()
+    superadmin_email = CUSTOMER_EMAIL
+    superadmin_member_id = f"{TENANT_ID}:{superadmin_email}"
+    superadmin_api_key = generate_user_api_key(TENANT_ID)
+    superadmin_key_hash = hash_api_key(superadmin_api_key)
+    superadmin_key_prefix = superadmin_api_key[:12] + "..."
+
+    superadmin_doc = TeamMemberDocument(
+        id=superadmin_member_id,
+        tenant_id=TENANT_ID,
+        email=superadmin_email,
+        display_name="Owner",
+        role=TeamMemberRole.SUPERADMIN,
+        is_active=True,
+        escalation_categories=[],
+        max_concurrent_conversations=0,
+        user_api_key_hash=superadmin_key_hash,
+        user_api_key_prefix=superadmin_key_prefix,
+        created_at=now,
+        updated_at=now,
+        last_login_at=None,
+        invited_by="system",
+    )
+
+    try:
+        await team_repo.create(TENANT_ID, superadmin_doc)
+        print("[OK] Superadmin team member created.")
+    except (DocumentConflictError, Exception) as e:
+        if "Conflict" in str(e) or "409" in str(e) or "already exists" in str(e):
+            await team_repo.upsert(TENANT_ID, superadmin_doc)
+            print("[OK] Superadmin team member updated (upsert).")
+        else:
+            print(f"[ERROR] Failed to create superadmin: {e}")
+
+    print()
+    print("-" * 65)
+    print("  SUPERADMIN USER API KEY (save this — shown only once)")
+    print("-" * 65)
+    print()
+    print(f"  Email:          {superadmin_email}")
+    print(f"  Role:           superadmin")
+    print(f"  User API Key:   {superadmin_api_key}")
+    print(f"  Key Prefix:     {superadmin_key_prefix}")
     print()
 
     # Optionally seed knowledge base

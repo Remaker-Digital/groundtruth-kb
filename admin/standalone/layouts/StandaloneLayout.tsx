@@ -37,7 +37,7 @@ import {
 import { useDisclosure } from '@mantine/hooks';
 import { notifications } from '@mantine/notifications';
 
-import type { TenantTier, TenantStatus, BillingChannel } from '../../shared/types';
+import type { TenantTier, TenantStatus, BillingChannel, TeamRole } from '../../shared/types';
 
 // ---------------------------------------------------------------------------
 // Types
@@ -68,6 +68,8 @@ interface TestModeState {
 
 interface AppContextValue {
   tenantContext: TenantContext | null;
+  /** Caller's role from /api/admin/team/whoami. Null until resolved. */
+  userRole: TeamRole | null;
   testMode: TestModeState | null;
   refetchTestMode: () => void;
   apiFetch: (path: string, init?: RequestInit) => Promise<Response>;
@@ -180,20 +182,22 @@ type NavPage = {
   label: string;
   icon: keyof typeof Icons;
   badge?: number;
+  /** Roles that can see this nav item. Omit = all roles. */
+  roles?: TeamRole[];
 };
 
 const navItems: NavPage[] = [
-  { path: '/', label: 'Dashboard', icon: 'dashboard' },
+  { path: '/', label: 'Dashboard', icon: 'dashboard', roles: ['superadmin', 'admin', 'viewer'] },
   { path: '/inbox', label: 'Inbox', icon: 'inbox' },
-  { path: '/team', label: 'Team', icon: 'team' },
-  { path: '/configuration', label: 'Agent configuration', icon: 'config' },
-  { path: '/knowledge-base', label: 'Knowledge base', icon: 'knowledge' },
-  { path: '/quick-actions', label: 'Quick actions', icon: 'quickactions' },
-  { path: '/widget', label: 'Widget configuration', icon: 'widget' },
-  { path: '/integrations', label: 'Integrations', icon: 'integrations' },
-  { path: '/memory-privacy', label: 'Memory & privacy', icon: 'memory' },
-  { path: '/billing', label: 'Billing', icon: 'billing' },
-  { path: '/onboarding', label: 'Setup wizard', icon: 'onboarding' },
+  { path: '/team', label: 'Team', icon: 'team', roles: ['superadmin', 'admin'] },
+  { path: '/configuration', label: 'Agent configuration', icon: 'config', roles: ['superadmin', 'admin'] },
+  { path: '/knowledge-base', label: 'Knowledge base', icon: 'knowledge', roles: ['superadmin', 'admin', 'viewer'] },
+  { path: '/quick-actions', label: 'Quick actions', icon: 'quickactions', roles: ['superadmin', 'admin'] },
+  { path: '/widget', label: 'Widget configuration', icon: 'widget', roles: ['superadmin', 'admin'] },
+  { path: '/integrations', label: 'Integrations', icon: 'integrations', roles: ['superadmin', 'admin'] },
+  { path: '/memory-privacy', label: 'Memory & privacy', icon: 'memory', roles: ['superadmin', 'admin'] },
+  { path: '/billing', label: 'Billing', icon: 'billing', roles: ['superadmin', 'admin'] },
+  { path: '/onboarding', label: 'Setup wizard', icon: 'onboarding', roles: ['superadmin', 'admin'] },
 ];
 
 // ---------------------------------------------------------------------------
@@ -295,6 +299,27 @@ export const StandaloneLayout: React.FC<StandaloneLayoutProps> = ({
     resolveTenant();
     return () => { cancelled = true; };
   }, [apiFetch, onLogout]);
+
+  // ---- Caller role resolution (whoami) ------------------------------------
+
+  const [userRole, setUserRole] = useState<TeamRole | null>(null);
+
+  useEffect(() => {
+    if (!tenantContext) return;
+    apiFetch('/api/admin/team/whoami')
+      .then(async (resp) => {
+        if (!resp.ok) {
+          // Fallback: treat as admin (legacy tenant API key or endpoint not deployed yet)
+          setUserRole('admin');
+          return;
+        }
+        const data = await resp.json();
+        setUserRole((data.role as TeamRole) || 'admin');
+      })
+      .catch(() => {
+        setUserRole('admin'); // Graceful fallback
+      });
+  }, [tenantContext, apiFetch]);
 
   // ---- Test Mode status polling (C1) --------------------------------------
 
@@ -438,6 +463,7 @@ export const StandaloneLayout: React.FC<StandaloneLayoutProps> = ({
 
   const contextValue: AppContextValue = {
     tenantContext,
+    userRole,
     testMode,
     refetchTestMode,
     apiFetch,
@@ -633,7 +659,7 @@ export const StandaloneLayout: React.FC<StandaloneLayoutProps> = ({
         {/* ---- Navbar ---- */}
         <AppShell.Navbar p="xs">
           <AppShell.Section grow>
-            {navItems.map((item) => {
+            {navItems.filter((item) => !item.roles || !userRole || item.roles.includes(userRole)).map((item) => {
               const IconComponent = Icons[item.icon];
               const isActive = location.pathname === item.path
                 || (item.path !== '/' && location.pathname.startsWith(item.path));

@@ -999,12 +999,32 @@ class AuditLogDocument(BaseModel):
 
 
 class TeamMemberRole(str, Enum):
-    """Team member roles within a tenant."""
+    """Team member roles within a tenant.
 
-    OWNER = "owner"        # Full access, cannot be removed
-    ADMIN = "admin"        # Full access, can manage team
-    AGENT = "agent"        # Can handle escalated conversations
-    VIEWER = "viewer"      # Read-only dashboard access
+    Role hierarchy (highest to lowest):
+        superadmin — Hidden from other users, cannot be deleted/disabled.
+                     Auto-created during provisioning. Safety net against lockout.
+        admin      — Full dashboard access, can manage team (except superadmin).
+        escalation_agent — Read-only Inbox access only. Receives escalation
+                     email notifications for assigned categories. No config access.
+        viewer     — Read-only access to all dashboard pages.
+    """
+
+    SUPERADMIN = "superadmin"              # Hidden, undeletable, auto-provisioned
+    ADMIN = "admin"                        # Full access, can manage team
+    ESCALATION_AGENT = "escalation_agent"  # Read-only Inbox, escalation email target
+    VIEWER = "viewer"                      # Read-only dashboard access
+
+
+# Escalation categories that can be assigned to escalation agents
+ESCALATION_CATEGORIES = [
+    "service",
+    "support",
+    "sales",
+    "account",
+    "technical_assistance",
+    "general_inquiry",
+]
 
 
 class TeamMemberDocument(BaseModel):
@@ -1013,19 +1033,39 @@ class TeamMemberDocument(BaseModel):
     Stores merchant team members who can access the admin dashboard
     and/or handle escalated conversations.
 
+    Per-user API key auth: each team member has a unique API key
+    (ar_user_{prefix}_{random}) that resolves to their identity and role.
+    The key hash is stored here for lookup.
+
     Partition key: /tenant_id
     """
 
     id: str = Field(description="Document ID (= tenant_id:email)")
     tenant_id: str = Field(description="Partition key")
-    email: str = Field(description="Team member email (unique within tenant)")
+    email: str = Field(description="Team member email (unique within tenant, immutable by self)")
     display_name: str = Field(description="Display name shown in inbox/notes")
     role: TeamMemberRole = Field(description="Permission role")
+
+    # Per-user API key authentication
+    user_api_key_hash: str | None = Field(
+        default=None,
+        description="SHA-256 hash of the team member's personal API key (ar_user_...)",
+    )
+    user_api_key_prefix: str | None = Field(
+        default=None,
+        description="First 12 chars of the API key for display (ar_user_rema...)",
+    )
 
     # Status
     is_active: bool = Field(default=True, description="Whether member has access")
 
-    # Agent-specific (for human-agent escalation)
+    # Escalation agent configuration
+    escalation_categories: list[str] = Field(
+        default_factory=list,
+        description="Escalation categories this agent handles: "
+        "service, support, sales, account, technical_assistance, general_inquiry. "
+        "Only applicable when role = escalation_agent.",
+    )
     max_concurrent_conversations: int = Field(
         default=5,
         description="Max simultaneous escalated conversations this agent can handle",

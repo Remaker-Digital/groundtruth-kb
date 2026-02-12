@@ -33,6 +33,7 @@ from __future__ import annotations
 import logging
 import time
 import uuid
+from datetime import datetime, timezone
 from enum import Enum
 from typing import Any
 
@@ -282,6 +283,72 @@ def provision_tenant(
     )
 
     return tenant
+
+
+async def auto_provision_superadmin(
+    tenant_id: str,
+    customer_email: str,
+) -> str | None:
+    """Create a superadmin team member for a newly provisioned tenant.
+
+    Called after tenant provisioning to ensure the tenant owner has
+    a per-user API key with superadmin privileges.
+
+    Args:
+        tenant_id: The new tenant's ID.
+        customer_email: The tenant owner's email address.
+
+    Returns:
+        The raw API key (shown once) or None if provisioning failed.
+    """
+    if not customer_email:
+        logger.warning("No customer email — skipping superadmin provisioning for %s", tenant_id)
+        return None
+
+    try:
+        from src.multi_tenant.auth import generate_user_api_key, hash_api_key
+        from src.multi_tenant.cosmos_schema import TeamMemberDocument, TeamMemberRole
+        from src.multi_tenant.repository import TeamMemberRepository
+
+        repo = TeamMemberRepository()
+        member_id = f"{tenant_id}:{customer_email}"
+        raw_key = generate_user_api_key(tenant_id)
+        key_hash = hash_api_key(raw_key)
+        key_prefix = raw_key[:12] + "..."
+
+        now_iso = datetime.now(timezone.utc).isoformat()
+
+        doc = TeamMemberDocument(
+            id=member_id,
+            tenant_id=tenant_id,
+            email=customer_email,
+            display_name="Owner",
+            role=TeamMemberRole.SUPERADMIN,
+            is_active=True,
+            escalation_categories=[],
+            max_concurrent_conversations=0,
+            user_api_key_hash=key_hash,
+            user_api_key_prefix=key_prefix,
+            created_at=now_iso,
+            updated_at=now_iso,
+            invited_by="system",
+        )
+
+        await repo.create(tenant_id, doc)
+        logger.info(
+            "Superadmin auto-provisioned: tenant=%s email=%s prefix=%s",
+            tenant_id[:8],
+            customer_email,
+            key_prefix,
+        )
+        return raw_key
+    except Exception as exc:
+        logger.error(
+            "Failed to auto-provision superadmin for tenant %s: %s",
+            tenant_id,
+            exc,
+        )
+        return None
 
 
 def activate_tenant(

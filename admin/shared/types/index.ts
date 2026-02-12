@@ -279,7 +279,7 @@ export interface KnowledgeGap {
 // Team
 // ---------------------------------------------------------------------------
 
-export type TeamRole = 'owner' | 'admin' | 'agent' | 'viewer';
+export type TeamRole = 'superadmin' | 'admin' | 'escalation_agent' | 'viewer';
 
 export interface TeamMember {
   id: string;
@@ -289,8 +289,12 @@ export interface TeamMember {
   role: string;
   isActive: boolean;
   maxConcurrentConversations: number;
-  /** Escalation categories this agent handles (WI #279). Only relevant for role = 'agent'. */
+  /** Escalation categories this agent handles (WI #279). Only relevant for role = 'escalation_agent'. */
   escalationCategories?: string[];
+  /** API key prefix for display (ar_user_rema...). Never the full key. */
+  userApiKeyPrefix?: string | null;
+  /** Full API key — only returned ONCE on creation or rotation. */
+  userApiKey?: string | null;
   createdAt: string;
   updatedAt: string;
   lastLoginAt: string | null;

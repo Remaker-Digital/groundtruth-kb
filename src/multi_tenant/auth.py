@@ -54,7 +54,7 @@ from jwt.exceptions import (
     PyJWTError,
 )
 
-from src.multi_tenant.cosmos_schema import TenantStatus, TenantTier
+from src.multi_tenant.cosmos_schema import TeamMemberRole, TenantStatus, TenantTier
 
 logger = logging.getLogger(__name__)
 
@@ -74,6 +74,9 @@ JWT_REQUIRED_CLAIMS = ["iss", "dest", "sub", "jti", "sid", "exp", "nbf", "iat", 
 
 # API key header name
 API_KEY_HEADER = "X-API-Key"
+
+# Per-user API key prefix (distinguishes user keys from tenant keys)
+USER_API_KEY_PREFIX = "ar_user_"
 
 # Publishable widget key (Decision UI-6)
 WIDGET_KEY_HEADER = "X-Widget-Key"
@@ -131,12 +134,18 @@ class TenantContext:
         shop_domain: Shopify shop domain (Shopify auth only).
         user_id: Shopify merchant user ID (Shopify auth only).
         session_id: Shopify session ID (Shopify auth only).
+
+    Per-user identity (populated for user_api_key auth):
+        team_member_id: Document ID of the authenticated team member.
+        team_member_email: Email address of the authenticated team member.
+        team_member_role: Role of the authenticated team member.
+        escalation_categories: Categories assigned to escalation agents.
     """
 
     tenant_id: str
     tier: TenantTier | None = None
     status: TenantStatus = TenantStatus.ACTIVE
-    auth_method: str = "api_key"  # "shopify_session", "api_key", or "widget_key"
+    auth_method: str = "api_key"  # "shopify_session", "api_key", "user_api_key", "widget_key"
 
     # Widget key auth (Decision UI-6) — scoped to /api/chat/* only
     is_widget_auth: bool = False
@@ -148,6 +157,12 @@ class TenantContext:
     shop_domain: str | None = None
     user_id: str | None = None
     session_id: str | None = None
+
+    # Per-user identity (populated for user_api_key auth)
+    team_member_id: str | None = None
+    team_member_email: str | None = None
+    team_member_role: TeamMemberRole | None = None
+    escalation_categories: tuple[str, ...] = ()
 
 
 # ---------------------------------------------------------------------------
@@ -339,6 +354,86 @@ async def verify_api_key(
         raise AuthenticationError("Invalid API key.")
 
     return tenant
+
+
+# ---------------------------------------------------------------------------
+# Per-user API key generation and verification
+# ---------------------------------------------------------------------------
+
+
+def generate_user_api_key(tenant_id: str) -> str:
+    """Generate a new per-user API key.
+
+    Format: ar_user_{tenant_prefix}_{random}
+    Example: ar_user_rema_yZR6wMzdVDlVJhbdRPW1Vh01TkytKcQ3
+
+    The tenant prefix (first 4 chars of tenant_id) makes keys
+    visually distinguishable per tenant. The random suffix provides
+    cryptographic strength.
+
+    Args:
+        tenant_id: The tenant identifier (used for prefix).
+
+    Returns:
+        The raw API key string (must be sent to user, never stored).
+    """
+    import secrets
+
+    prefix = tenant_id[:4].replace("-", "")
+    random_part = secrets.token_urlsafe(24)
+    return f"{USER_API_KEY_PREFIX}{prefix}_{random_part}"
+
+
+def is_user_api_key(api_key: str) -> bool:
+    """Check if an API key is a per-user key (vs tenant key).
+
+    User keys start with 'ar_user_', tenant keys start with 'ar_live_'.
+    """
+    return api_key.startswith(USER_API_KEY_PREFIX)
+
+
+async def verify_user_api_key(
+    api_key: str,
+    lookup_fn: Any,
+) -> dict[str, Any]:
+    """Verify a per-user API key and resolve to a team member + tenant.
+
+    Args:
+        api_key: The raw per-user API key (ar_user_...).
+        lookup_fn: Async function that accepts a user API key hash
+            and returns a dict with team member + tenant data, or None.
+            Expected return: {
+                "team_member": TeamMemberDocument dict,
+                "tenant": TenantDocument dict,
+            }
+
+    Returns:
+        Dict with team_member and tenant data.
+
+    Raises:
+        AuthenticationError: If the key is invalid, member is inactive,
+            or no matching team member found.
+    """
+    if not api_key:
+        raise AuthenticationError("API key is required.")
+
+    key_hash = hash_api_key(api_key)
+    result = await lookup_fn(key_hash)
+
+    if result is None:
+        logger.warning("User API key authentication failed: no matching team member")
+        raise AuthenticationError("Invalid API key.")
+
+    # Verify team member is active
+    member = result.get("team_member", {})
+    if not member.get("is_active", False):
+        logger.warning(
+            "User API key auth failed: member %s is inactive",
+            member.get("email", "unknown"),
+        )
+        raise AuthenticationError("Account is disabled. Contact your administrator.")
+
+    return result
 
 
 # ---------------------------------------------------------------------------

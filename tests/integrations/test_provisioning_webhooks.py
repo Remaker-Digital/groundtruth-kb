@@ -26,6 +26,7 @@ from src.integrations.provisioning import (
     _stripe_index,
     _tenants,
     activate_tenant,
+    auto_provision_superadmin,
     deactivate_tenant,
     flag_payment_issue,
     get_tenant,
@@ -645,3 +646,57 @@ class TestHandlePaymentSucceeded:
         result = await handle_payment_succeeded(event)
         assert result["action"] == "payment_succeeded"
         assert result.get("usage_reset") is not True
+
+
+# ---------------------------------------------------------------------------
+# Superadmin auto-provisioning
+# ---------------------------------------------------------------------------
+
+
+class TestAutoProvisionSuperadmin:
+    """Test auto_provision_superadmin utility."""
+
+    @pytest.mark.asyncio
+    async def test_creates_superadmin_member(self):
+        mock_repo = AsyncMock()
+        with patch("src.multi_tenant.repository.TeamMemberRepository", return_value=mock_repo):
+            key = await auto_provision_superadmin("tenant-001", "owner@example.com")
+        assert key is not None
+        assert key.startswith("ar_user_")
+        mock_repo.create.assert_called_once()
+        args = mock_repo.create.call_args
+        assert args[0][0] == "tenant-001"  # tenant_id
+        doc = args[0][1]
+        assert doc.email == "owner@example.com"
+        assert doc.role.value == "superadmin"
+        assert doc.invited_by == "system"
+
+    @pytest.mark.asyncio
+    async def test_returns_none_without_email(self):
+        key = await auto_provision_superadmin("tenant-001", "")
+        assert key is None
+
+    @pytest.mark.asyncio
+    async def test_returns_none_on_failure(self):
+        mock_repo = AsyncMock()
+        mock_repo.create.side_effect = RuntimeError("Cosmos unavailable")
+        with patch("src.multi_tenant.repository.TeamMemberRepository", return_value=mock_repo):
+            key = await auto_provision_superadmin("tenant-001", "owner@example.com")
+        assert key is None
+
+    @pytest.mark.asyncio
+    async def test_key_hash_stored(self):
+        mock_repo = AsyncMock()
+        with patch("src.multi_tenant.repository.TeamMemberRepository", return_value=mock_repo):
+            key = await auto_provision_superadmin("tenant-001", "owner@example.com")
+        doc = mock_repo.create.call_args[0][1]
+        assert doc.user_api_key_hash is not None
+        assert doc.user_api_key_prefix == key[:12] + "..."
+
+    @pytest.mark.asyncio
+    async def test_member_id_format(self):
+        mock_repo = AsyncMock()
+        with patch("src.multi_tenant.repository.TeamMemberRepository", return_value=mock_repo):
+            await auto_provision_superadmin("tenant-001", "owner@example.com")
+        doc = mock_repo.create.call_args[0][1]
+        assert doc.id == "tenant-001:owner@example.com"
