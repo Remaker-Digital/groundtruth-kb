@@ -197,7 +197,7 @@ async function init(
   }
 
   /** Clamp a position within the viewport. */
-  function clampToViewport(left: number, top: number, w: number, h: number): { left: number; top: number } {
+  function clampToViewport(left: number, top: number, w: number, _h: number): { left: number; top: number } {
     const vw = window.innerWidth;
     const vh = window.innerHeight;
     const minVisible = 60; // at least 60px of the panel must remain visible
