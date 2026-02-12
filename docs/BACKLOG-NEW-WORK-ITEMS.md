@@ -4,7 +4,7 @@
 > **Project:** Agent Red Customer Experience
 > **Owner:** Remaker Digital (DBA of VanDusen & Palmeter, LLC)
 > **Created:** 2026-01-31
-> **Last Updated:** 2026-02-10
+> **Last Updated:** 2026-02-11
 > **Numbering:** Continues from Master Plan Review WI #1-100
 > **Review Status:** Updated with completion statuses from 2026-01-31 and 2026-02-01 implementation sprints
 
@@ -13,11 +13,11 @@
 ## Progress Overview
 
 ```mermaid
-pie title Work Item Status (WI #101-239)
-    "Complete" : 82
+pie title Work Item Status (WI #101-294)
+    "Complete" : 84
     "Partially Complete" : 4
     "Remaining (1.0)" : 5
-    "Backlog (1.1)" : 12
+    "Backlog (1.1)" : 64
 ```
 
 ```mermaid
@@ -489,6 +489,360 @@ Enable multi-language support and per-page programmatic overrides.
 | #238 | Runtime JS API: setConfigPartial/setTargetingRules | P3 | 1 day | `setConfigPartial({...})`, `setTargetingRules(rules)` for advanced JS integrations |
 
 **Total Phase 3-5 estimate:** ~13 development days
+
+---
+
+## 14. Widget & Quick Actions UX Fixes (WI #240-245)
+
+**NEW — Added 2026-02-11.** UX issues identified during manual QA of the production standalone admin (v1.20.0). These affect merchant onboarding flow and widget configurator usability. Grouped as a single batch for the next update cycle.
+
+| WI | Title | Priority | Estimate | Details |
+|----|-------|----------|----------|---------|
+| #240 | Widget does not apply saved color configuration | P1 | 1 day | Widget ignores color settings saved via the Widget page in admin. After saving a new primary color or header gradient, the live widget preview and storefront widget do not reflect the change. Likely a config delivery or widget init issue — widget may not be re-fetching updated config from `/api/config`. |
+| #241 | Widget does not display custom greeting message | P1 | 0.5 day | The greeting message configured in admin (e.g., "Hi there! How can I help you today \<FIRST_NAME\>?") is not rendered in the widget. Widget shows default greeting instead of the merchant-customized one. Related to #240 — config delivery gap. |
+| #242 | Quick actions page has no starter examples on first visit | P2 | 0.5 day | When a merchant first visits the Quick Actions page, the prompt library is empty with no guidance on what to create. Add 3-4 pre-populated example quick actions (e.g., "Track my order", "Return policy", "Product recommendations") that merchants can activate, customize, or delete. |
+| #243 | Quick action "Icon" field lacks guidance | P2 | 0.5 day | The "Icon (optional)" input on the Create Quick Action dialog shows only a rocket emoji placeholder. No guidance on what format to use (emoji, icon name, URL), where to find icons, or what renders in the widget. Add helper text, an emoji picker or dropdown of common icons, and a visual preview. |
+| #244 | Quick action "Sort order" field is redundant | P2 | 0.5 day | The per-prompt "Sort order" field is unnecessary because ordering is already set per-page via the Page Assignments tab (Slot 1, Slot 2). Remove "Sort order" from the Create/Edit dialog or repurpose it as a global library ordering for the admin list view only (not affecting widget display). |
+| #245 | Quick actions not previewable in admin widget | P1 | 1 day | Quick actions created in the admin do not appear in the live widget preview on the Widget page or in the floating widget on the admin itself. Merchants cannot verify their quick actions without visiting the storefront. The admin widget preview should render active quick actions as pill buttons in the greeting area, matching storefront behavior. |
+
+**Total estimate:** ~4 days
+
+**Dependency notes:**
+- WI #240 and #241 likely share a root cause (config delivery pipeline from admin save → widget load). Fix together.
+- WI #245 requires the widget preview component (`WidgetConfigurator.tsx`) to fetch and render quick action data.
+
+---
+
+## 15. Standalone Admin Test Mode Integration (WI #246-248)
+
+**NEW — Added 2026-02-11.** The standalone admin's `Onboarding.tsx` is a separate implementation from the shared `OnboardingWizard.tsx`. All test mode features (Mode Selection Step 0, AI field locking, Review & Launch with activation/rollout/abandon, global banner) were built in the shared component but the standalone page never adopted them. **This blocks Mazel's UX evaluation of test mode in the standalone admin.**
+
+**Root cause:** Two divergent onboarding implementations. The Shopify admin uses the shared `OnboardingWizard` (which has test mode). The standalone admin uses its own Mantine-based `Onboarding.tsx` (which does not).
+
+**Recommended approach:** Replace the standalone `Onboarding.tsx` with the shared `OnboardingWizard` component wrapped in minimal Mantine layout chrome. The shared component is framework-agnostic (inline styles) and already works in both shells. This eliminates the divergence permanently.
+
+| WI | Title | Priority | Estimate | Details |
+|----|-------|----------|----------|---------|
+| #246 | Replace standalone Onboarding with shared OnboardingWizard | P0 | 1.5 days | Replace `admin/standalone/pages/Onboarding.tsx` with a thin wrapper that renders the shared `OnboardingWizard` with standalone-specific props (`apiFetch`, `tenantContext`, `onComplete`, `hasProductionConfig`, `testModeStatus`). Must pass test mode hooks and config through. Verify all 9+ wizard steps render correctly with Mantine AppShell chrome. |
+| #247 | Add test mode banner to StandaloneLayout | P0 | 0.5 day | `StandaloneLayout.tsx` must fetch test mode status (`useTestModeStatus`) and render the amber "Test Mode Active" banner in the header area when `enabled === true`. Must also pass `testModeStatus` and `onTestModeChange` to child pages/wizard. |
+| #248 | Test mode E2E validation in standalone admin | P1 | 0.5 day | Manual + automated test: activate test mode via wizard → verify banner appears → verify field locking on config pages → verify analytics filter works → rollout/abandon → verify banner disappears. |
+
+**Total estimate:** ~2.5 days
+
+**Impact:** Blocks Mazel's UX evaluation (WI #203). Without this, the test mode feature is only testable in the Shopify embedded admin, not the standalone admin that Mazel is using.
+
+## 16. Widget & Chat UI Controls (WI #249-257)
+
+**NEW — Added 2026-02-11.** Nine UX issues identified during owner manual review of the Widget admin page and live chat UI. These affect both the admin-side Widget configurator controls and the runtime chat widget behavior.
+
+| WI | Title | Priority | Scope | Details |
+|----|-------|----------|-------|---------|
+| #249 | Widget drop-shadow control | P2 | Admin + Widget | No visible admin control for the chat panel drop-shadow. Add a shadow intensity selector (none / subtle / standard / heavy) to Widget admin page and pass to widget via config. |
+| #250 | Widget launcher icon and agent avatar customization | P2 | Admin + Widget | No controls for changing the floating launcher icon or the "AR" agent avatar in the chat header. Add image upload or icon-picker for both. Launcher icon should support custom SVG/PNG; header avatar should support uploaded image or initials fallback. |
+| #251 | Pre-chat form and offline form explanations | P1 | Admin | The "Pre-chat form" and "Offline form" toggles on the Widget page have no description or tooltip explaining what they do. Add descriptive helper text (e.g., "Collect visitor name and email before starting a conversation" / "Show a contact form when no agents are available"). |
+| #252 | Chat UI resizable width | P2 | Widget | The chat panel has a fixed narrow width (~320px). Add a drag handle on the left edge allowing horizontal resize, or provide width presets (compact / standard / wide) configurable in admin. Persist user preference in localStorage. |
+| #253 | Chat UI draggable/repositionable | P3 | Widget | The chat panel cannot be click-dragged to other regions of the browser window. Add drag-to-reposition capability on the header bar. Persist position in localStorage per session. |
+| #254 | Auto-open per page via Quick Actions config | P2 | Admin + Widget | Auto-open should be configurable per page type (product, collection, homepage, etc.) as part of the Quick Actions page assignment configuration, not just a global toggle. Extend `QuickActionPageAssignment` model to include `auto_open: boolean` and `auto_open_delay_ms: number`. |
+| #255 | Chat input area height (3 text lines) | P1 | Widget | The chat input area is a single-line field. Increase default height to 3 lines of text (auto-grow up to ~5 lines). Use a `<textarea>` with `rows=3` and auto-resize behavior. |
+| #256 | Chat display area scroll controls | P1 | Widget | The chat message area has no visible scroll indicators or scroll-to-bottom button. Add: (1) subtle scrollbar styling, (2) a "scroll to bottom" floating button when user scrolls up, (3) auto-scroll to bottom on new messages. |
+| #257 | Launcher position offset controls | P1 | Admin + Widget | Configuring the launcher position should include numeric controls for vertical (Y) and horizontal (X) offset from browser edges. Add two `NumberInput` fields (px) to the Widget admin page next to the position selector. Pass values to widget via config data attributes. |
+
+**Notes:**
+- WI #255, #256, #257 are the highest-impact improvements — they affect core usability of the chat experience.
+- WI #251 is a quick fix (add tooltip/description text to existing toggles).
+- WI #252 and #253 are enhancement features that improve power-user experience but are not critical for launch.
+- WI #254 extends the Quick Actions data model; coordinate with WI #226-229 (Quick Actions CRUD).
+
+**Total estimate:** ~6-8 days
+
+## 17. Dashboard UX Improvements (WI #258-259)
+
+**NEW — Added 2026-02-11.** Two UX issues identified during owner manual review of the Dashboard page.
+
+| WI | Title | Priority | Scope | Details |
+|----|-------|----------|-------|---------|
+| #258 | Display storefront name prominently on Dashboard | P1 | Admin | The Dashboard page should display the merchant's storefront name (e.g., "blanco-9939" or custom store name) in large type above the "Dashboard" heading. Source from `tenantContext.shopDomain` (strip `.myshopify.com` suffix) or a `store_name` config field if available. Gives the merchant immediate confirmation of which store they're managing. |
+| #259 | Dashboard metric cards: help tooltips with doc links | P1 | Admin | Each dashboard metric card (Total conversations, Avg response time, Resolution rate, Customer satisfaction, Escalation rate) and each dashboard section (Daily conversation volume, Recent conversations, Top intents) should include a help icon tooltip that explains what the metric means and links to the relevant documentation page on agentredcx.com. Use the existing `HelpTooltip` component pattern with `docLink` prop. |
+
+**Notes:**
+- WI #258 is a quick win — the `shopDomain` is already available in the layout context; just render it as a heading.
+- WI #259 requires defining tooltip copy for 8 metrics/sections and linking to the appropriate docs-site pages (some may need to be created under `docs-site/docs/admin-guide/`).
+
+**Total estimate:** ~1.5 days
+
+## 18. Knowledge Base Toolbar Tooltips (WI #260)
+
+**NEW — Added 2026-02-11.** Identified during owner manual review of the Knowledge Base page.
+
+| WI | Title | Priority | Scope | Details |
+|----|-------|----------|-------|---------|
+| #260 | KB toolbar buttons: help tooltips with doc links | P1 | Admin | The "Scan for conflicts", "Export CSV", and "Import" toolbar buttons on the Knowledge Base page should have on-hover tooltips explaining what each action does, with links to the relevant documentation pages (conflict scanner guide, KB import/export guide). Use the existing `HelpTooltip` or Mantine `Tooltip` pattern. |
+
+**Notes:**
+- Quick fix — wrap existing buttons with `Tooltip` components and add `docLink` references.
+- Doc pages: `docs-site/docs/admin-guide/conflict-scanner.md` (exists), import/export guide (may need creation).
+
+**Total estimate:** ~0.5 day
+
+## 19. Analytics Page Help Tooltips (WI #261)
+
+**NEW — Added 2026-02-11.** Identified during owner manual review of the Analytics page.
+
+| WI | Title | Priority | Scope | Details |
+|----|-------|----------|-------|---------|
+| #261 | Analytics metric cards and sections: help tooltips with doc links | P1 | Admin | Each Analytics metric card (Total conversations, Avg response time, Resolution rate, Customer satisfaction, Escalation rate) and each section (Conversation volume chart, Recent conversations, Intents breakdown, Knowledge gaps) should include a help icon tooltip explaining what the metric measures and linking to the relevant analytics documentation page on agentredcx.com. Same pattern as WI #259 (Dashboard tooltips). |
+
+**Notes:**
+- Coordinate with WI #259 — both Dashboard and Analytics share several identical metrics (Total conversations, Avg response time, Resolution rate, Customer satisfaction, Escalation rate). Define tooltip copy once in a shared constants file and reuse across both pages.
+- Analytics-specific sections (Intents breakdown, Knowledge gaps) need their own tooltip copy.
+- Doc page: `docs-site/docs/admin-guide/analytics.md` (may need creation or expansion).
+
+**Total estimate:** ~0.5 day
+
+## 20. Configuration Page UX Improvements (WI #262-267)
+
+**NEW — Added 2026-02-11.** Six issues identified during owner manual review of the Configuration page.
+
+| WI | Title | Priority | Scope | Details |
+|----|-------|----------|-------|---------|
+| #262 | Rename "Configuration" to "Agent configuration" | P1 | Admin | Page title, sidebar nav label, and breadcrumbs should read "Agent configuration" instead of "Configuration" to clarify that this configures the AI agent's behavior, not the app itself. Update in both standalone (`Configuration.tsx`, `StandaloneLayout.tsx` nav) and Shopify admin. |
+| #263 | Configuration section help tooltips with doc links | P1 | Admin | Each configuration section (Brand & persona, Policies, Escalation, Custom instructions, Language, Test mode) should include a help icon tooltip explaining what the section controls and linking to the relevant documentation page on agentredcx.com. Same `HelpTooltip` pattern as WI #259/#261. |
+| #264 | Escalation threshold slider label alignment | P1 | Admin | The "Conservative" and "Aggressive" labels on the escalation threshold slider extend beyond the slider width. Left-justify "Conservative" and right-justify "Aggressive" so neither label overflows the slider control bounds. Apply to both Configuration page and Onboarding wizard escalation step. |
+| #265 | Named configuration save/restore | P2 | Admin + API | Configurations should be nameable. Add ability to save the current configuration with a user-defined name, and select/apply a previously saved named configuration from a dropdown list. Backend: extend `tenant_config_api.py` named configs endpoint (already has version history infrastructure). Frontend: add "Save as..." button and named config selector to Configuration page header. |
+| #266 | Delete saved configurations | P2 | Admin + API | Add ability to delete previously saved named configurations from the list. Backend: `DELETE /api/config/named/{name}` endpoint. Frontend: delete icon/button on each item in the named configs list with confirmation dialog. |
+| #267 | Saved configuration date-stamp | P2 | Admin + API | Each previously saved named configuration should display a date-stamp indicating when it was last applied (not just when it was saved). Backend: track `last_applied_at` timestamp on named configs. Frontend: render relative timestamp (e.g., "Applied 3 days ago") next to each saved config in the list. |
+
+**Notes:**
+- WI #262 and #264 are quick cosmetic fixes.
+- WI #263 follows the same pattern as #259 and #261 — define tooltip copy, wire up `HelpTooltip`.
+- WI #265-267 form a feature group (named config management). The backend already has config version history (`tenant_config_api.py` with 12+ endpoints including named configs). The frontend needs a config selector UI and the API needs `last_applied_at` tracking.
+
+**Total estimate:** ~4-5 days (quick fixes: ~1 day; named config feature: ~3-4 days)
+
+## 21. Widget Configuration Page UX (WI #268-272)
+
+**NEW — Added 2026-02-11.** Five issues identified during owner manual review of the Widget page.
+
+| WI | Title | Priority | Scope | Details |
+|----|-------|----------|-------|---------|
+| #268 | Rename "Widget" nav/page to "Widget configuration" | P1 | Admin | Sidebar nav label and page title should read "Widget configuration" instead of "Widget configurator" / "Widget". Clarifies purpose. Update in both standalone (`StandaloneLayout.tsx` nav, `WidgetConfigurator.tsx` title) and Shopify admin. |
+| #269 | Rename color fields: "Header left color" / "Header right color" | P1 | Admin | "Primary color" should be renamed "Header left color". "Header gradient end" should be renamed "Header right color". These labels accurately describe what each color controls (left and right sides of the gradient header bar). Update in `WidgetConfigurator.tsx`. |
+| #270 | Gradient enable/disable toggle (default: off) | P1 | Admin + Widget | Add a toggle switch "Enable header gradient" between the two color pickers. When off (default), the entire header uses the "Header left color" as a solid fill. When on, the header renders a left-to-right gradient from left color to right color. The "Header right color" picker should be visually disabled/hidden when gradient is off. Update config schema, admin UI, and widget rendering. |
+| #271 | Side-by-side color pickers for header colors | P1 | Admin | The "Header left color" and "Header right color" pickers are currently stacked vertically. Place them side-by-side in a two-column layout (using `Group grow` or CSS grid) so the merchant can see both colors at once and compare them against the live preview. |
+| #272 | Widget page section help tooltips with doc links | P1 | Admin | Each section of the Widget configuration page (Appearance, Content, Behavior) should include a help icon tooltip with a link to the relevant documentation. Same `HelpTooltip` pattern as WI #259/#261/#263. |
+
+**Notes:**
+- WI #268, #269, #271 are quick label/layout changes in `WidgetConfigurator.tsx`.
+- WI #270 requires a new config field (`header_gradient_enabled: boolean`, default `false`) in the tenant config schema, admin UI toggle, and widget CSS rendering logic. The widget currently always renders a gradient — needs conditional `background` vs `linear-gradient`.
+- WI #272 follows the established tooltip pattern.
+
+**Total estimate:** ~2 days
+
+## 22. Quick Actions Page UX (WI #273-274)
+
+**NEW — Added 2026-02-11.** Two issues identified during owner manual review of the Quick Actions page.
+
+| WI | Title | Priority | Scope | Details |
+|----|-------|----------|-------|---------|
+| #273 | Page assignments: single-column list instead of dropdown | P1 | Admin | The "Page assignments" tab currently uses a "Page type" dropdown to select one page at a time. Replace with a single-column list showing all available page types (homepage, product, collection, cart, blog, etc.) with toggle switches or checkboxes next to each. This lets the merchant see all pages at a glance and assign the quick action to multiple pages without repeated dropdown interactions. |
+| #274 | Template variables inline below prompt input | P1 | Admin | The "Template variables" tab should be removed. Instead, display clickable template variable chips (`{{product_title}}`, `{{collection_name}}`, etc.) directly below the "Prompt template" textarea in the Create/Edit quick action dialog — using the same pattern as the greeting message template variables on the Widget configuration page. Clicking a chip inserts the variable at the cursor position. |
+
+**Notes:**
+- WI #273 changes the Page Assignments tab layout from a form-per-page-type pattern to a checklist grid. Consider showing the current prompt assignment status (assigned/not assigned) for each page type inline.
+- WI #274 eliminates the "Template variables" tab entirely and moves the content inline. The Widget page already has this pattern implemented — reuse the same chip-click-to-insert approach from `WidgetConfigurator.tsx` greeting message section.
+- These two changes together simplify the Quick Actions page from 3 tabs to 2 tabs (or even 1 tab if page assignments are shown inline per prompt).
+
+**Total estimate:** ~1.5 days
+
+## 23. Team Page UX (WI #275-280)
+
+**NEW — Added 2026-02-11.** Six issues identified during owner manual review of the Team page.
+
+| WI | Title | Priority | Scope | Details |
+|----|-------|----------|-------|---------|
+| #275 | Role selector replaces textual role badges, move out of Actions column | P1 | Admin | The role dropdown selector currently sits in the "Actions" column alongside edit/delete icons. Move the role selector to replace the static "Role" badge column — the badge should become the selector itself (e.g., a styled `Select` or `SegmentedControl` inline in the Role column). Remove the separate role selector from Actions. |
+| #276 | Rename "Member" column to "Team member" | P1 | Admin | Column heading "Member" should read "Team member" for clarity. Quick label change in the Team page component. |
+| #277 | "Roles & permissions" as tooltip on Role column header | P1 | Admin | The "Roles & permissions" explanatory section currently takes up page real estate. Move it to an on-hover tooltip (or `HelpTooltip` with doc link) on the "Role" column header. This keeps the information accessible but doesn't consume layout space. |
+| #278 | Rename "Agent" role to "Escalation agent" | P1 | Admin + API | The role label "Agent" should be renamed to "Escalation agent" throughout the UI to clearly distinguish it from the AI agent. Update in the Team page component, role selector options, role badges, and any API response display. Backend `team_member` schema may need a display_name mapping if the stored value remains `agent`. |
+| #279 | Escalation category assignment per team member | P2 | Admin + API | When a team member has the "Escalation agent" role, show a multi-select for escalation categories (Sales, Support, Service, Account, Technical assistance, General inquiry) — matching the categories from the Configuration escalation section. This determines which escalation types route to that agent. Backend: add `escalation_categories: string[]` field to team member schema. Frontend: show category chips/checkboxes when role is "Escalation agent", hidden otherwise. |
+| #280 | Enable/disable toggle per team member | P1 | Admin + API | Add a toggle switch in each team member row to enable/disable the member (matching the existing `status: active/disabled` field). Currently status is shown as a badge but there is no inline toggle to change it — the merchant must use a separate action. The toggle should directly call `PATCH /api/admin/team/{id}` with `{ status: "active" }` or `{ status: "disabled" }`. |
+
+**Notes:**
+- WI #275-278, #280 are UI changes in the Team page component (`admin/shared/` or standalone `Team.tsx`).
+- WI #279 is the most significant — it ties team members to escalation categories, creating a routing relationship. This should coordinate with the escalation categories defined in Configuration (WI #264 slider, same category list). Consider a shared constants file for the 6 category definitions.
+- WI #280 replaces the current read-only status badge with an interactive toggle, which is a better UX pattern for enable/disable.
+
+**Total estimate:** ~3-4 days
+
+## 24. Billing & Usage Page UX (WI #281-282)
+
+**NEW — Added 2026-02-11.** Two issues identified during owner manual review of the Billing & usage page.
+
+| WI | Title | Priority | Scope | Details |
+|----|-------|----------|-------|---------|
+| #281 | Billing metric cards and sections: help tooltips with doc links | P1 | Admin | Each Billing metric card (Current plan, Conversations used, Pack balance, Current overage, Estimated overage cost) and each section (Daily usage chart) should include a help icon tooltip explaining what the metric means and linking to the relevant billing documentation page on agentredcx.com. Same `HelpTooltip` pattern as WI #259/#261/#263. |
+| #282 | "Purchase" button hover color consistency | P1 | Admin | The on-hover background color for the "Purchase" conversation pack buttons should match the sidebar nav item hover color for visual consistency. Currently uses a different hover state. Update the button `styles` or `variant` prop to use the same hover background as `NavLink` items in `StandaloneLayout.tsx` (likely `rgba(255, 255, 255, 0.06)` or similar from the dark theme). |
+
+**Notes:**
+- WI #281 follows the established tooltip pattern (same as #259, #261, #263, #272).
+- WI #282 is a quick CSS fix — identify the sidebar hover color from `StandaloneLayout.tsx` NavLink styles and apply it to the Purchase button hover state.
+
+**Total estimate:** ~0.5 day
+
+## 25. Sidebar Navigation Reorder & Analytics Merge (WI #283-284)
+
+**NEW — Added 2026-02-11.** Owner-directed restructuring of the sidebar navigation order and merging of Analytics into Dashboard.
+
+### WI #283 — Merge Analytics into Dashboard (remove Analytics page)
+
+**Priority:** P1 | **Scope:** Admin (standalone + Shopify)
+
+The Analytics page should be removed as a separate page. All analytics content (metric cards with time-range selector, conversation volume chart, intents breakdown, knowledge gaps) should be merged into the Dashboard page below the existing summary cards. The Dashboard becomes the single combined view of performance overview + detailed analytics.
+
+**Implementation:**
+- Move all Analytics sections (7d/14d/30d/90d selector, detailed metric cards with sub-labels, conversation volume chart, intents breakdown, knowledge gaps) into `Dashboard.tsx` below the existing summary cards
+- Remove `AnalyticsPage` component, route, and import from `index.tsx`
+- Remove "Analytics" nav item from `StandaloneLayout.tsx` and Shopify admin nav
+- Ensure the Dashboard time-range selector controls both the summary cards and the merged analytics sections
+- Update WI #259 (Dashboard tooltips) to cover the merged analytics content
+
+### WI #284 — Reorder sidebar navigation
+
+**Priority:** P1 | **Scope:** Admin (standalone + Shopify)
+
+New sidebar order (owner-approved):
+
+| # | Label | Route | Notes |
+|---|-------|-------|-------|
+| 1 | Dashboard | `/` | Combined dashboard + analytics (WI #283) |
+| 2 | Inbox | `/inbox` | Unchanged |
+| 3 | Team | `/team` | Moved up from position 8 |
+| 4 | Agent configuration | `/configuration` | Renamed per WI #262 |
+| 5 | Knowledge base | `/knowledge-base` | Unchanged |
+| 6 | Quick actions | `/quick-actions` | Unchanged |
+| 7 | Widget configuration | `/widget` | Renamed per WI #268 |
+| 8 | Integrations | `/integrations` | Unchanged |
+| 9 | Billing | `/billing` | Unchanged |
+| 10 | Setup wizard | `/onboarding` | Moved down from position 9 |
+| 11 | Documentation | external link | Unchanged (bottom) |
+
+**Implementation:**
+- Reorder the `NavLink` items in `StandaloneLayout.tsx` nav section
+- Reorder equivalent nav in Shopify admin layout
+- Update nav labels for "Agent configuration" (WI #262) and "Widget configuration" (WI #268)
+- Remove "Analytics" nav item (WI #283)
+
+**Notes:**
+- WI #283 is the larger effort (merging two page components). WI #284 is a quick reorder of NavLink items.
+- These two WIs supersede the current Analytics-related tooltip WI #261 — those tooltips should be applied to the merged Dashboard instead.
+- The Shopify embedded admin nav should follow the same order.
+
+**Total estimate:** ~2-3 days (merge: ~2 days; reorder: ~0.5 day)
+
+## 26. Setup Wizard Architectural Redesign (WI #285-294)
+
+**NEW — Added 2026-02-11.** Owner-directed fundamental redesign of the Setup Wizard purpose, flow, and step structure. The wizard serves two distinct modes: (A) first-time activation checklist, and (B) test mode configuration for A/B testing AI behavior. This replaces the current 10-step onboarding wizard with a streamlined flow that mirrors the sidebar pages.
+
+### Design Principles
+
+1. **The Wizard is not a replacement for pages** — it is a checklist (initial setup) or a focused override editor (test mode).
+2. **Each wizard step maps to a sidebar page** — the step exposes the same fields as the corresponding page.
+3. **Initial setup mode:** All fields visible; mandatory fields highlighted; "Go live" shows completion checklist.
+4. **Test mode:** Only AI-behavior fields visible; locked to overrides only; "Go live" shows diff against standard config.
+5. **Post-activation, the wizard is a test-mode-only tool.** Standard mode configuration changes are made directly on sidebar pages with immediate-commit (save = active). The wizard does not provide a second Standard mode editing path after initial activation.
+6. **Merchants making comprehensive cross-page changes should use Test mode** for atomic rollout, rather than editing multiple sidebar pages sequentially.
+
+### Post-Activation Wizard Behavior (Decision: Option 1 — Confirmed 2026-02-11)
+
+After initial activation, when the admin opens the Setup Wizard:
+- **Step 0 (Mode):** Standard mode is shown as active but not editable through the wizard. A message reads: "Standard mode is active. Edit your configuration using the sidebar pages. To test AI behavior changes, switch to Test mode."
+- **Test mode toggle** is available — switching to Test mode reveals the AI-behavior steps.
+- **If test mode is already active:** The wizard opens showing the current test overrides with options to modify fields, adjust percentage, rollout to production, or abandon.
+
+**Rationale:** Test mode already provides atomic multi-page changes. A second Standard mode wizard path would create UX confusion (two ways to edit the same config). Staged-commit for sidebar pages is deferred as a post-launch enhancement if merchant feedback indicates the immediate-commit inconsistency window is a real problem.
+
+### Wizard Steps (New Structure)
+
+| Step | Label | Initial Setup | Test Mode | Maps To |
+|------|-------|:---:|:---:|---------|
+| 0 | Mode selection | Always visible | Always visible | — (toggle: Standard / Test) |
+| 1 | Team | Visible | Hidden | Team page |
+| 2 | Agent configuration | Visible (all fields) | Visible (AI fields only, lockable) | Agent configuration page |
+| 3 | Knowledge base | Visible | Hidden | Knowledge base page |
+| 4 | Quick actions | Visible | Visible (AI prompt fields only) | Quick actions page |
+| 5 | Widget configuration | Visible | Hidden | Widget configuration page |
+| 6 | Integrations | Visible | Hidden | Integrations page |
+| 7 | Go live | Visible (completion checklist) | Visible (diff checklist) | — |
+
+### Work Items
+
+| WI | Title | Priority | Scope | Details |
+|----|-------|----------|-------|---------|
+| #285 | Wizard mode selector: Standard / Test toggle (Step 0) | P1 | Admin | First step is always a toggle between "Primary configuration" (initial setup) and "Test group configuration" (A/B test). When Test is selected, steps 1, 3, 5, 6 are hidden. When Standard is selected, all steps visible. Replaces the current test mode toggle that was embedded in the old wizard. |
+| #286 | Remove wizard steps that belong on dedicated pages | P1 | Admin | Remove from the wizard: "Brand & tone" (→ Agent configuration page), "Languages" (→ Agent configuration page, except in test mode), "Response style" (→ Agent configuration page, except in test mode), "Knowledge base" (→ Knowledge base page), "Business policies" (→ Agent configuration page), "Escalation rules" (→ Team page), "Integrations" (→ Integrations page), "Memory and privacy" (→ new dedicated page, see WI #290), "Widget appearance" (→ Widget configuration page). The wizard steps should reference the sidebar pages, not duplicate their content. |
+| #287 | Wizard steps mirror sidebar pages with full field access | P1 | Admin | Each remaining wizard step should expose the complete set of fields/inputs from the corresponding page. In initial setup mode, the wizard step IS the page content (all fields accessible). In test mode, only AI-behavior fields are editable. Implementation: reuse the shared page components within the wizard step containers. |
+| #288 | "Go live" — Initial setup completion checklist | P1 | Admin | In Standard mode, "Go live" shows a checklist of mandatory inputs required for activation. Completed items shown green; incomplete shown amber with link to the relevant step. Advisory items (Knowledge base populated, Integrations connected, Team members added) shown as recommended but not blocking. "Activate standard mode" button enabled only when all mandatory items are complete. |
+| #289 | "Go live" — Test mode diff checklist | P1 | Admin | In Test mode, "Go live" shows a diff-style checklist of values that have been changed from the Standard mode configuration. Each changed field shows: field name, standard value, test value. Merchant can easily see exactly what differs for the test group. "Activate test mode" button with percentage selector. |
+| #290 | New sidebar page: "Memory and privacy" | P2 | Admin + API | "Memory and privacy" should be removed from the wizard and become a dedicated page accessible via the sidebar menu. Contains: customer memory layer configuration (Layers 1-4), data retention settings, GDPR consent management, PII scrubbing rules. Add route `/memory-privacy`, nav item, and page component. Position in sidebar TBD (likely between Integrations and Billing). |
+| #291 | "Inactive" system state indicator in nav bar | P1 | Admin | When the system has not yet been activated (no "Go live" completed), the nav bar should show an "Inactive" badge (same position as the "Test Mode" indicator). Clicking "Inactive" navigates to the Setup Wizard. After activation, the indicator disappears (or shows "Active" briefly, then hides). |
+| #292 | Welcome message popup for first-time merchants | P1 | Admin | On first login (no config version exists), display a welcome modal/popup: "Welcome to Agent Red! Your AI assistant is not yet active. Complete the Setup Wizard to activate." Dismiss button closes it. "Go to Setup Wizard" button navigates to `/onboarding`. Show only once (persist dismissal in localStorage or tenant config). |
+| #293 | Rename "Review and launch" to "Custom AI instructions" | P1 | Admin | The current "Review and launch" step should be renamed to "Custom AI instructions" and should NOT include a test-mode toggle (that's now Step 0). This step provides a textarea for free-form advisory instructions to the AI, matching the "Custom instructions" section currently on the Configuration page. |
+| #294 | Relocate fields from removed wizard steps to their target pages | P1 | Admin | Ensure all fields removed from the wizard (WI #286) are present on their target pages: (a) Brand & tone, Languages, Response style, Business policies → Agent configuration page; (b) Escalation rules → Team page (coordinate with WI #279 escalation category assignment); (c) Memory and privacy → new page (WI #290); (d) Widget appearance → Widget configuration page (already there). Verify no fields are lost in the migration. |
+
+### Superseded Work Items
+
+- **WI #246-248** (standalone wizard replacement): WI #246 is complete (shared wizard wrapper). WI #285-294 will further modify the shared `OnboardingWizard.tsx` component.
+- **WI #261** (Analytics tooltips): Superseded by WI #283 (merge into Dashboard) + WI #259.
+- The current shared `OnboardingWizard.tsx` step definitions (`STEP_LABELS`, `STEP_DESCRIPTIONS`) will need to be rewritten to match the new structure.
+
+### Example Flow: Initial Setup
+
+1. Merchant subscribes → accesses admin → sees "Inactive" badge in nav (WI #291)
+2. Welcome popup appears (WI #292) → merchant clicks "Go to Setup Wizard"
+3. **Step 0 (Mode):** Toggle shows "Primary configuration" selected (default)
+4. **Step 1 (Team):** Merchant adds team members and assigns escalation categories
+5. **Step 2 (Agent configuration):** Full config fields (brand, voice, formality, policies, etc.)
+6. **Step 3 (Knowledge base):** Upload/create KB articles
+7. **Step 4 (Quick actions):** Create contextual prompt buttons
+8. **Step 5 (Widget configuration):** Customize colors, position, greeting
+9. **Step 6 (Integrations):** Enable Shopify sync, etc.
+10. **Step 7 (Go live):** Completion checklist — mandatory items green, advisory items noted
+11. Merchant clicks "Activate standard mode" → system activates → "Inactive" badge disappears → widget goes live
+
+### Example Flow: Test Mode (Detailed — Owner-Approved Scenario)
+
+1. Admin selects "Setup wizard" from sidebar
+2. **Step 0 (Mode):** Admin toggles to "Test group configuration"
+3. Steps 1 (Team), 3 (Knowledge base), 5 (Widget configuration), 6 (Integrations) are hidden — only AI-behavior steps remain
+4. **Step 2 (Agent configuration):** Only AI-behavior fields are editable (formality, response length, custom instructions, retrieval weights, etc.). Non-AI fields are visible but locked/greyed out for reference.
+5. Admin modifies several AI-behavior fields (e.g., changes formality from "Professional" to "Casual", response length from "Moderate" to "Concise")
+6. **Admin skips a step** (e.g., skips Quick actions) and proceeds directly to "Go live"
+7. **Step 7 (Go live — diff checklist):** Shows a checklist of all AI-behavior fields:
+   - **Green checkmark (✓):** Fields that have been changed from Standard mode values. Each shows: field name, standard value → test value (e.g., "Formality: Professional → Casual")
+   - **Yellow X (✗):** Fields the admin intended to change but did not yet modify (still matching Standard mode). This serves as a visual reminder of unchanged fields.
+   - The admin notices that one setting they intended to change still shows a yellow X
+8. **Admin clicks the incomplete step** in the wizard sidebar to return to it
+9. Admin makes the overlooked change, then returns to "Go live"
+10. The previously yellow-X item now shows a **green checkmark** — the diff is live and reactive
+11. Admin selects the **test traffic percentage** (e.g., 15% of new sessions) via a slider or numeric input
+12. Admin clicks **"Activate test mode"**
+13. Test mode activates:
+    - The mode indicator in the sticky nav bar switches from "Inactive" / blank to **"Test mode 15%"** (amber badge, same as current `TestModeState` indicator)
+    - The percentage and override count are shown in the badge tooltip
+    - The wizard returns to Step 0 with the toggle showing "Test group configuration" selected
+
+**Key UX behaviors validated by this scenario:**
+- The "Go live" diff checklist is **reactive** — it updates in real-time as the admin navigates between steps and makes changes
+- Skipping steps is allowed — the checklist catches any gaps
+- The diff shows **both directions**: what was changed (green ✓) and what was not changed (yellow ✗)
+- After activation, the nav bar indicator immediately reflects the new test mode state
+- The wizard is re-enterable — selecting it again shows the current mode and allows further adjustments
+
+**Total estimate:** ~8-12 days
+
+**Notes:**
+- This is the largest single redesign in the backlog. Recommend breaking implementation into phases: (1) new step structure + mode toggle, (2) field relocation to pages, (3) Go Live checklists, (4) Inactive state + welcome popup.
+- The shared `OnboardingWizard.tsx` is the primary file affected (~2,000 lines). The page components (Agent configuration, Team, etc.) will also need field additions per WI #294.
 
 ---
 

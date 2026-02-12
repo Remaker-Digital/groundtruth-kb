@@ -9,7 +9,26 @@ All notable changes to Agent Red Customer Experience are documented here.
 
 ---
 
-## v1.17.0 — 2026-02-11
+## v1.20.0 — 2026-02-11
+
+### Admin dashboard
+- Test mode A/B rollout engine with 7-priority implementation
+- Unified onboarding wizard: standalone admin now uses the shared `OnboardingWizard` component (previously had a separate 1,497-line implementation)
+- Test mode banner in standalone admin header (polls every 30s, amber badge)
+- Fixed TypeScript build errors in both admin SPAs (standalone + Shopify)
+
+---
+
+## v1.18.2 — 2026-02-11
+
+### Admin security
+- Immutable HMAC signing key for multi-replica password reset tokens
+- Fixed f-string token placeholder: `\{\{token\}\}` in hidden form fields now renders correctly
+- Auto-login cookie set on successful password reset
+
+---
+
+## v1.18.0 — 2026-02-11
 
 ### Admin security
 - Email-based forgot-password flow replaces the old change-password endpoint
@@ -30,6 +49,10 @@ All notable changes to Agent Red Customer Experience are documented here.
 
 ### Logo
 - Fixed corrupted logo on forgot-password pages (replaced invalid PNG data URI with SVG)
+
+### Documentation
+- Docs site deployed to agentredcx.com (Docusaurus + GitHub Pages)
+- MDX escaping fixes for template variable documentation
 
 ---
 

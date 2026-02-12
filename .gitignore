@@ -118,6 +118,7 @@ override.tf.json
 *.log
 *.tmp
 *.temp
+temp_*
 *.bak
 *.backup
 *.build-timestamp
