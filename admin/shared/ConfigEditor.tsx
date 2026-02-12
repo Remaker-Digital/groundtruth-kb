@@ -1211,7 +1211,7 @@ export const ConfigEditor: React.FC<BaseComponentProps> = ({
       {/* Header */}
       <div style={s.header}>
         <div>
-          <h2 style={s.title}>Configuration</h2>
+          <h2 style={s.title}>Agent configuration</h2>
           {configData && (
             <p style={{ fontSize: 13, color: '#888', margin: '4px 0 0 0' }}>
               Version {configData.version} &middot; {tenantContext.tier} tier

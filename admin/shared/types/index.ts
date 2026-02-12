@@ -94,15 +94,20 @@ export interface ConfigUpdateResult {
 // ---------------------------------------------------------------------------
 
 export type OnboardingStep =
-  | 'brand_and_tone'
+  | 'mode_selection'
+  | 'team'
   | 'ai_behavior'
-  | 'escalation'
-  | 'integrations'
   | 'knowledge_base'
+  | 'quick_actions'
+  | 'widget_appearance'
+  | 'integrations'
+  | 'go_live'
+  // Legacy keys — retained for review summary grouping and backward compatibility
+  | 'brand_and_tone'
+  | 'escalation'
   | 'response_policies'
   | 'customer_memory'
-  | 'notifications'
-  | 'widget_appearance';
+  | 'notifications';
 
 export interface OnboardingStepConfig {
   step: OnboardingStep;
@@ -284,11 +289,30 @@ export interface TeamMember {
   role: string;
   isActive: boolean;
   maxConcurrentConversations: number;
+  /** Escalation categories this agent handles (WI #279). Only relevant for role = 'agent'. */
+  escalationCategories?: string[];
   createdAt: string;
   updatedAt: string;
   lastLoginAt: string | null;
   invitedBy: string | null;
 }
+
+/** Escalation category definition — shared between Configuration and Team pages (WI #279). */
+export interface EscalationCategoryDef {
+  id: string;
+  label: string;
+  description: string;
+}
+
+/** Standard escalation categories — same list used in Configuration and Team management. */
+export const ESCALATION_CATEGORIES: EscalationCategoryDef[] = [
+  { id: 'sales', label: 'Sales', description: 'Purchase decisions, pricing questions, product comparisons' },
+  { id: 'support', label: 'Support', description: 'Product issues, troubleshooting, how-to questions' },
+  { id: 'service', label: 'Service', description: 'Returns, refunds, exchanges, order modifications' },
+  { id: 'account', label: 'Account', description: 'Account access, billing, subscription management' },
+  { id: 'technical', label: 'Technical assistance', description: 'Integration issues, API questions, advanced configuration' },
+  { id: 'general', label: 'General inquiry', description: 'Complaints, legal, safety, or anything not matching other categories' },
+];
 
 // ---------------------------------------------------------------------------
 // Integrations (C10)

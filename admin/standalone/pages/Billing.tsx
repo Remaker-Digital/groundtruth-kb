@@ -39,6 +39,7 @@ import {
 } from 'recharts';
 import { useAppContext } from '../layouts/StandaloneLayout';
 import { useUsageDashboard, useDailyVolume } from '../../shared/hooks/index';
+import { HelpTooltip } from '../../shared/HelpTooltip';
 
 // ---------------------------------------------------------------------------
 // Constants
@@ -90,15 +91,16 @@ interface UsageStatProps {
   progress?: number;
   progressColor?: string;
   ring?: boolean;
+  tooltip?: string;
 }
 
-function UsageStat({ label, value, subtext, progress, progressColor = BRAND_RED, ring }: UsageStatProps) {
+function UsageStat({ label, value, subtext, progress, progressColor = BRAND_RED, ring, tooltip }: UsageStatProps) {
   return (
     <Paper p="lg" radius="md" withBorder>
       <Group justify="space-between" align="flex-start" wrap="nowrap">
         <Stack gap={4} style={{ flex: 1 }}>
           <Text size="xs" c="dimmed" fw={600}>
-            {label}
+            {label}{tooltip && <HelpTooltip text={tooltip} />}
           </Text>
           <Text size="xl" fw={700} lh={1}>
             {value}
@@ -175,6 +177,8 @@ function PackCard({ conversations, price, effectiveRate, onPurchase, purchasing 
         onClick={onPurchase}
         loading={purchasing}
         disabled={purchasing}
+        onMouseEnter={(e) => { (e.currentTarget as HTMLElement).style.background = 'rgba(255, 255, 255, 0.06)'; }}
+        onMouseLeave={(e) => { (e.currentTarget as HTMLElement).style.background = ''; }}
       >
         Purchase
       </Button>
@@ -312,7 +316,7 @@ export const BillingPage: React.FC = () => {
           <Stack gap={6}>
             <Group gap="sm" align="center">
               <Text size="lg" fw={700}>
-                Current plan
+                Current plan<HelpTooltip text="Your active subscription tier determines your included monthly conversations, overage rate, and available features." />
               </Text>
               <Badge color={tierBadgeColor} variant="filled" size="lg" tt="capitalize">
                 {tierLabel}
@@ -348,6 +352,7 @@ export const BillingPage: React.FC = () => {
       <SimpleGrid cols={{ base: 1, xs: 2, md: 4 }} spacing="md">
         <UsageStat
           label="Conversations used"
+          tooltip="Total conversations this billing period vs. your plan's included monthly allowance."
           value={`${formatNumber(totalConversations)} / ${formatNumber(includedAllowance)}`}
           subtext={`${Math.round(usagePercent)}% of included allowance`}
           progress={usagePercent}
@@ -356,11 +361,13 @@ export const BillingPage: React.FC = () => {
         />
         <UsageStat
           label="Pack balance"
+          tooltip="Remaining conversations from pre-purchased packs. Packs are used after your included allowance is depleted and before overage billing begins."
           value={formatNumber(packBalance)}
           subtext="remaining conversations"
         />
         <UsageStat
           label="Current overage"
+          tooltip="Conversations beyond your included allowance and pack balance. Overage is billed at your plan's per-conversation rate."
           value={formatCurrency(estimatedOverageCost)}
           subtext={overageConversations > 0
             ? `${formatNumber(overageConversations)} overage conversations`
@@ -369,6 +376,7 @@ export const BillingPage: React.FC = () => {
         />
         <UsageStat
           label="Estimated overage cost"
+          tooltip="Projected additional charges for overage conversations this billing period."
           value={formatCurrency(estimatedOverageCost)}
           subtext="Additional charges this period"
         />
@@ -388,7 +396,7 @@ export const BillingPage: React.FC = () => {
       {/* Usage Chart */}
       <Paper p="lg" radius="md" withBorder>
         <Text fw={600} mb="md">
-          Daily usage (30 days)
+          Daily usage (30 days)<HelpTooltip text="Number of billable conversations per day over the last 30 days. Helps identify usage trends and peak periods." />
         </Text>
         {dailyVolume.loading && !chartData.length ? (
           <Group justify="center" py="xl">
@@ -484,7 +492,7 @@ export const BillingPage: React.FC = () => {
       {/* Conversation Packs */}
       <div>
         <Text size="lg" fw={600} mb={4}>
-          Conversation packs
+          Conversation packs<HelpTooltip text="Pre-purchase conversation bundles at discounted rates. Pack conversations are consumed after your included allowance and before overage billing. Valid for 90 days, FIFO usage order." />
         </Text>
         <Text size="sm" c="dimmed" mb="md">
           Pre-purchase conversations at a discounted rate. Packs are valid for 90 days.

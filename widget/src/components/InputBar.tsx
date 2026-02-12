@@ -26,8 +26,8 @@ import type { Locale } from '@/locale/en';
 // ---------------------------------------------------------------------------
 
 const MAX_MESSAGE_LENGTH = 2000;
-const MIN_TEXTAREA_HEIGHT = 44;
-const MAX_TEXTAREA_HEIGHT = 120;
+const MIN_TEXTAREA_HEIGHT = 66; // ~3 lines of text (WI #255)
+const MAX_TEXTAREA_HEIGHT = 140; // ~5 lines of text
 
 // ---------------------------------------------------------------------------
 // Props
@@ -157,7 +157,7 @@ export const InputBar: FunctionComponent<InputBarProps> = ({
           onKeyDown={handleKeyDown}
           placeholder={placeholder}
           disabled={disabled}
-          rows={2}
+          rows={3}
           aria-label={placeholder}
           style={{
             flex: 1,

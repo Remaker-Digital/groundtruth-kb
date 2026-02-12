@@ -29,7 +29,7 @@ import { StandaloneLayout } from './layouts/StandaloneLayout';
 import { ApiKeyLogin } from './login/ApiKeyLogin';
 import { DashboardPage } from './pages/Dashboard';
 import { InboxPage } from './pages/Inbox';
-import { AnalyticsPage } from './pages/Analytics';
+
 import { ConfigurationPage } from './pages/Configuration';
 import { KnowledgeBasePage } from './pages/KnowledgeBase';
 import { WidgetPage } from './pages/Widget';
@@ -38,6 +38,7 @@ import { TeamPage } from './pages/Team';
 import { OnboardingPage } from './pages/Onboarding';
 import { IntegrationsPage } from './pages/Integrations';
 import { QuickActionsPage } from './pages/QuickActions';
+import { MemoryPrivacyPage } from './pages/MemoryPrivacy';
 
 // ---------------------------------------------------------------------------
 // Agent Red brand theme — copied from prototype/src/main.tsx
@@ -158,7 +159,7 @@ const App: React.FC = () => {
           <Routes>
             <Route path="/" element={<DashboardPage />} />
             <Route path="/inbox" element={<InboxPage />} />
-            <Route path="/analytics" element={<AnalyticsPage />} />
+            <Route path="/analytics" element={<Navigate to="/" replace />} />
             <Route path="/configuration" element={<ConfigurationPage />} />
             <Route path="/knowledge-base" element={<KnowledgeBasePage />} />
             <Route path="/widget" element={<WidgetPage />} />
@@ -166,6 +167,7 @@ const App: React.FC = () => {
             <Route path="/billing" element={<BillingPage />} />
             <Route path="/team" element={<TeamPage />} />
             <Route path="/integrations" element={<IntegrationsPage />} />
+            <Route path="/memory-privacy" element={<MemoryPrivacyPage />} />
             <Route path="/onboarding" element={<OnboardingPage />} />
             <Route path="*" element={<Navigate to="/" replace />} />
           </Routes>

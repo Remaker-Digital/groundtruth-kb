@@ -23,6 +23,9 @@ import {
 } from '@mantine/core';
 import { useAppContext } from '../layouts/StandaloneLayout';
 import { useConfig, useUpdateConfig } from '../../shared/hooks/index';
+import { HelpTooltip } from '../../shared/HelpTooltip';
+
+const DOCS_BASE = 'https://agentredcx.com/docs/admin-guide';
 
 // ---------------------------------------------------------------------------
 // Constants
@@ -70,11 +73,16 @@ function renderGreetingPreview(msg: string): string {
 interface WidgetConfig {
   primaryColor: string;
   headerGradientEnd: string;
+  headerGradientEnabled: boolean;
   fontFamily: string;
   borderRadius: number;
   launcherSize: number;
   launcherIcon: 'chat' | 'headset' | 'help' | 'custom';
   position: 'bottom-right' | 'bottom-left';
+  positionOffsetX: number;
+  positionOffsetY: number;
+  shadowIntensity: 'none' | 'subtle' | 'standard' | 'heavy';
+  panelWidth: 'compact' | 'standard' | 'wide';
   colorMode: 'light' | 'dark' | 'auto';
   autoOpen: boolean;
   autoOpenDelay: number;
@@ -87,16 +95,23 @@ interface WidgetConfig {
   headerTitle: string;
   headerSubtitle: string;
   inputPlaceholder: string;
+  agentAvatarUrl: string;
+  agentDisplayName: string;
 }
 
 const DEFAULT_WIDGET_CONFIG: WidgetConfig = {
   primaryColor: BRAND_RED,
   headerGradientEnd: '#8B1520',
+  headerGradientEnabled: false,
   fontFamily: 'Inter, system-ui, sans-serif',
   borderRadius: 16,
   launcherSize: 60,
   launcherIcon: 'chat',
   position: 'bottom-right',
+  positionOffsetX: 20,
+  positionOffsetY: 20,
+  shadowIntensity: 'standard',
+  panelWidth: 'standard',
   colorMode: 'dark',
   autoOpen: false,
   autoOpenDelay: 5,
@@ -109,6 +124,8 @@ const DEFAULT_WIDGET_CONFIG: WidgetConfig = {
   headerTitle: 'Support',
   headerSubtitle: 'We typically reply within minutes',
   inputPlaceholder: 'Type your message...',
+  agentAvatarUrl: '',
+  agentDisplayName: '',
 };
 
 // ---------------------------------------------------------------------------
@@ -121,11 +138,16 @@ function configToWidgetConfig(cfg: Record<string, unknown>): Partial<WidgetConfi
 
   if (cfg.widget_primary_color != null) partial.primaryColor = String(cfg.widget_primary_color);
   if (cfg.widget_header_gradient_end != null) partial.headerGradientEnd = String(cfg.widget_header_gradient_end);
+  if (cfg.widget_header_gradient_enabled != null) partial.headerGradientEnabled = Boolean(cfg.widget_header_gradient_enabled);
   if (cfg.widget_font_family != null) partial.fontFamily = String(cfg.widget_font_family);
   if (cfg.widget_border_radius != null) partial.borderRadius = Number(cfg.widget_border_radius);
   if (cfg.widget_launcher_size != null) partial.launcherSize = Number(cfg.widget_launcher_size);
   if (cfg.widget_launcher_icon != null) partial.launcherIcon = String(cfg.widget_launcher_icon) as WidgetConfig['launcherIcon'];
   if (cfg.widget_position != null) partial.position = String(cfg.widget_position) as WidgetConfig['position'];
+  if (cfg.widget_position_offset_x != null) partial.positionOffsetX = Number(cfg.widget_position_offset_x);
+  if (cfg.widget_position_offset_y != null) partial.positionOffsetY = Number(cfg.widget_position_offset_y);
+  if (cfg.widget_shadow_intensity != null) partial.shadowIntensity = String(cfg.widget_shadow_intensity) as WidgetConfig['shadowIntensity'];
+  if (cfg.widget_panel_width != null) partial.panelWidth = String(cfg.widget_panel_width) as WidgetConfig['panelWidth'];
   if (cfg.widget_color_mode != null) partial.colorMode = String(cfg.widget_color_mode) as WidgetConfig['colorMode'];
   if (cfg.widget_auto_open != null) partial.autoOpen = Boolean(cfg.widget_auto_open);
   if (cfg.widget_auto_open_delay != null) partial.autoOpenDelay = Number(cfg.widget_auto_open_delay);
@@ -138,6 +160,8 @@ function configToWidgetConfig(cfg: Record<string, unknown>): Partial<WidgetConfi
   if (cfg.widget_header_title != null) partial.headerTitle = String(cfg.widget_header_title);
   if (cfg.widget_header_subtitle != null) partial.headerSubtitle = String(cfg.widget_header_subtitle);
   if (cfg.widget_input_placeholder != null) partial.inputPlaceholder = String(cfg.widget_input_placeholder);
+  if (cfg.widget_agent_avatar_url != null) partial.agentAvatarUrl = String(cfg.widget_agent_avatar_url);
+  if (cfg.widget_agent_display_name != null) partial.agentDisplayName = String(cfg.widget_agent_display_name);
 
   return partial;
 }
@@ -147,11 +171,16 @@ function widgetConfigToApiFields(wc: WidgetConfig): Record<string, unknown> {
   return {
     widget_primary_color: wc.primaryColor,
     widget_header_gradient_end: wc.headerGradientEnd,
+    widget_header_gradient_enabled: wc.headerGradientEnabled,
     widget_font_family: wc.fontFamily,
     widget_border_radius: wc.borderRadius,
     widget_launcher_size: wc.launcherSize,
     widget_launcher_icon: wc.launcherIcon,
     widget_position: wc.position,
+    widget_position_offset_x: wc.positionOffsetX,
+    widget_position_offset_y: wc.positionOffsetY,
+    widget_shadow_intensity: wc.shadowIntensity,
+    widget_panel_width: wc.panelWidth,
     widget_color_mode: wc.colorMode,
     widget_auto_open: wc.autoOpen,
     widget_auto_open_delay: wc.autoOpenDelay,
@@ -164,6 +193,8 @@ function widgetConfigToApiFields(wc: WidgetConfig): Record<string, unknown> {
     widget_header_title: wc.headerTitle,
     widget_header_subtitle: wc.headerSubtitle,
     widget_input_placeholder: wc.inputPlaceholder,
+    widget_agent_avatar_url: wc.agentAvatarUrl || null,
+    widget_agent_display_name: wc.agentDisplayName || null,
   };
 }
 
@@ -171,10 +202,11 @@ function widgetConfigToApiFields(wc: WidgetConfig): Record<string, unknown> {
 // SectionHeader
 // ---------------------------------------------------------------------------
 
-function SectionHeader({ children }: { children: React.ReactNode }) {
+function SectionHeader({ children, tooltip, docLink }: { children: React.ReactNode; tooltip?: string; docLink?: string }) {
   return (
     <Text size="sm" fw={700} c="dimmed" mb={4}>
       {children}
+      {tooltip && <HelpTooltip text={tooltip} docLink={docLink} />}
     </Text>
   );
 }
@@ -242,6 +274,26 @@ function ColorField({
 }
 
 // ---------------------------------------------------------------------------
+// Shadow intensity -> CSS box-shadow
+// ---------------------------------------------------------------------------
+
+function shadowCss(intensity: WidgetConfig['shadowIntensity'], isDark: boolean): string {
+  switch (intensity) {
+    case 'none': return 'none';
+    case 'subtle': return isDark
+      ? '0 4px 12px rgba(0,0,0,0.20)'
+      : '0 4px 12px rgba(0,0,0,0.08)';
+    case 'standard': return isDark
+      ? '0 10px 25px rgba(0,0,0,0.30), 0 4px 10px rgba(0,0,0,0.20)'
+      : '0 10px 25px rgba(0,0,0,0.15), 0 4px 10px rgba(0,0,0,0.10)';
+    case 'heavy': return isDark
+      ? '0 16px 40px rgba(0,0,0,0.45), 0 6px 16px rgba(0,0,0,0.30)'
+      : '0 16px 40px rgba(0,0,0,0.25), 0 6px 16px rgba(0,0,0,0.15)';
+    default: return '0 10px 25px rgba(0,0,0,0.15), 0 4px 10px rgba(0,0,0,0.10)';
+  }
+}
+
+// ---------------------------------------------------------------------------
 // Launcher icon SVGs for the preview
 // ---------------------------------------------------------------------------
 
@@ -277,6 +329,26 @@ function LauncherIcon({ icon, size }: { icon: string; size: number }) {
 // ---------------------------------------------------------------------------
 // Live Preview Component
 // ---------------------------------------------------------------------------
+
+/** Resolve panel width preset to pixel value (preview scale). */
+function resolvePreviewPanelWidth(preset: WidgetConfig['panelWidth']): number {
+  switch (preset) {
+    case 'compact': return 300;
+    case 'wide': return 400;
+    case 'standard':
+    default: return 350;
+  }
+}
+
+/** Resolve panel width preset to real widget pixel value. */
+function resolvePanelWidthPx(preset: WidgetConfig['panelWidth']): string {
+  switch (preset) {
+    case 'compact': return '320px';
+    case 'wide': return '440px';
+    case 'standard':
+    default: return '380px';
+  }
+}
 
 function WidgetPreview({ config }: { config: WidgetConfig }) {
   const isRight = config.position === 'bottom-right';
@@ -341,10 +413,10 @@ function WidgetPreview({ config }: { config: WidgetConfig }) {
           position: 'absolute',
           bottom: 80,
           [isRight ? 'right' : 'left']: 16,
-          width: 350,
+          width: resolvePreviewPanelWidth(config.panelWidth),
           height: 440,
           borderRadius: config.borderRadius,
-          boxShadow: dk ? '0 8px 32px rgba(0,0,0,0.4)' : '0 8px 32px rgba(0,0,0,0.18)',
+          boxShadow: shadowCss(config.shadowIntensity, dk),
           background: panelBg,
           display: 'flex',
           flexDirection: 'column',
@@ -356,7 +428,9 @@ function WidgetPreview({ config }: { config: WidgetConfig }) {
         {/* Header */}
         <Box
           style={{
-            background: `linear-gradient(135deg, ${config.primaryColor} 0%, ${config.headerGradientEnd} 100%)`,
+            background: config.headerGradientEnabled
+              ? `linear-gradient(135deg, ${config.primaryColor} 0%, ${config.headerGradientEnd} 100%)`
+              : config.primaryColor,
             padding: '16px 18px',
             color: '#fff',
             flexShrink: 0,
@@ -374,9 +448,18 @@ function WidgetPreview({ config }: { config: WidgetConfig }) {
                 justifyContent: 'center',
                 fontSize: 14,
                 fontWeight: 700,
+                overflow: 'hidden',
               }}
             >
-              AR
+              {config.agentAvatarUrl ? (
+                <img
+                  src={config.agentAvatarUrl}
+                  alt="Agent"
+                  style={{ width: '100%', height: '100%', objectFit: 'cover' }}
+                />
+              ) : (
+                (config.agentDisplayName || config.headerTitle || 'AR').slice(0, 2).toUpperCase()
+              )}
             </Box>
             <div>
               <Text size="sm" fw={700} c="#fff" lh={1.3}>
@@ -419,9 +502,18 @@ function WidgetPreview({ config }: { config: WidgetConfig }) {
                   fontSize: 10,
                   fontWeight: 700,
                   flexShrink: 0,
+                  overflow: 'hidden',
                 }}
               >
-                AR
+                {config.agentAvatarUrl ? (
+                  <img
+                    src={config.agentAvatarUrl}
+                    alt=""
+                    style={{ width: '100%', height: '100%', objectFit: 'cover' }}
+                  />
+                ) : (
+                  (config.agentDisplayName || 'AR').slice(0, 2).toUpperCase()
+                )}
               </Box>
               <Box
                 style={{
@@ -543,8 +635,8 @@ function WidgetPreview({ config }: { config: WidgetConfig }) {
       <Box
         style={{
           position: 'absolute',
-          bottom: 20,
-          [isRight ? 'right' : 'left']: 20,
+          bottom: Math.round(config.positionOffsetY * 0.5),
+          [isRight ? 'right' : 'left']: Math.round(config.positionOffsetX * 0.5),
           width: config.launcherSize,
           height: config.launcherSize,
           borderRadius: '50%',
@@ -611,7 +703,7 @@ export function WidgetPage() {
 
       {/* Page header */}
       <div>
-        <Title order={2}>Widget configurator</Title>
+        <Title order={2}>Widget configuration</Title>
         <Text c="dimmed" size="sm">
           Customize how your chat widget looks and behaves
         </Text>
@@ -624,20 +716,33 @@ export function WidgetPage() {
           <Stack gap="md">
             {/* Appearance Section */}
             <Paper p="lg" radius="md" withBorder>
-              <SectionHeader>Appearance</SectionHeader>
+              <SectionHeader tooltip="Colors, position, size, and visual style of the chat widget on your storefront." docLink={`${DOCS_BASE}/widget`}>Appearance</SectionHeader>
               <Divider mb="md" />
               <Stack gap="sm">
-                <ColorField
-                  label="Primary color"
-                  value={config.primaryColor}
-                  onChange={(val) => update('primaryColor', val)}
-                  swatches={[BRAND_RED, '#2563EB', '#059669', '#7C3AED', '#D97706', '#DB2777', '#000000', '#FFFFFF']}
-                />
-                <ColorField
-                  label="Header gradient end"
-                  value={config.headerGradientEnd}
-                  onChange={(val) => update('headerGradientEnd', val)}
-                  swatches={['#8B1520', '#1E40AF', '#047857', '#5B21B6', '#B45309', '#BE185D', '#1F2937', '#374151']}
+                {/* Header color pickers — side-by-side (WI #271) */}
+                <Group grow align="flex-start" gap="md">
+                  <ColorField
+                    label="Header left color"
+                    value={config.primaryColor}
+                    onChange={(val) => update('primaryColor', val)}
+                    swatches={[BRAND_RED, '#2563EB', '#059669', '#7C3AED', '#D97706', '#DB2777', '#000000', '#FFFFFF']}
+                  />
+                  <div style={{ opacity: config.headerGradientEnabled ? 1 : 0.4, pointerEvents: config.headerGradientEnabled ? 'auto' : 'none' }}>
+                    <ColorField
+                      label="Header right color"
+                      value={config.headerGradientEnd}
+                      onChange={(val) => update('headerGradientEnd', val)}
+                      swatches={['#8B1520', '#1E40AF', '#047857', '#5B21B6', '#B45309', '#BE185D', '#1F2937', '#374151']}
+                    />
+                  </div>
+                </Group>
+                {/* Gradient toggle (WI #270) */}
+                <Switch
+                  label="Enable header gradient"
+                  description="When off, the header uses a solid color. When on, it blends left and right colors."
+                  checked={config.headerGradientEnabled}
+                  onChange={(e) => update('headerGradientEnabled', e.currentTarget.checked)}
+                  color="brand"
                 />
                 <Select
                   label="Font family"
@@ -703,6 +808,30 @@ export function WidgetPage() {
                     ]}
                     color="brand"
                   />
+                  <Group grow mt={8}>
+                    <NumberInput
+                      label="Horizontal offset"
+                      description="Distance from edge (px)"
+                      size="xs"
+                      min={0}
+                      max={200}
+                      step={4}
+                      suffix=" px"
+                      value={config.positionOffsetX}
+                      onChange={(val) => update('positionOffsetX', typeof val === 'number' ? val : 20)}
+                    />
+                    <NumberInput
+                      label="Vertical offset"
+                      description="Distance from bottom (px)"
+                      size="xs"
+                      min={0}
+                      max={200}
+                      step={4}
+                      suffix=" px"
+                      value={config.positionOffsetY}
+                      onChange={(val) => update('positionOffsetY', typeof val === 'number' ? val : 20)}
+                    />
+                  </Group>
                 </div>
                 <div>
                   <Text size="sm" fw={500} mb={6}>
@@ -720,12 +849,45 @@ export function WidgetPage() {
                     color="brand"
                   />
                 </div>
+                <div>
+                  <Text size="sm" fw={500} mb={6}>
+                    Panel width <HelpTooltip text="Set the chat panel width. Compact (320px) works well on smaller screens; Wide (440px) shows more content." />
+                  </Text>
+                  <SegmentedControl
+                    fullWidth
+                    value={config.panelWidth}
+                    onChange={(val) => update('panelWidth', val as WidgetConfig['panelWidth'])}
+                    data={[
+                      { label: 'Compact', value: 'compact' },
+                      { label: 'Standard', value: 'standard' },
+                      { label: 'Wide', value: 'wide' },
+                    ]}
+                    color="brand"
+                  />
+                </div>
+                <div>
+                  <Text size="sm" fw={500} mb={6}>
+                    Panel shadow
+                  </Text>
+                  <SegmentedControl
+                    fullWidth
+                    value={config.shadowIntensity}
+                    onChange={(val) => update('shadowIntensity', val as WidgetConfig['shadowIntensity'])}
+                    data={[
+                      { label: 'None', value: 'none' },
+                      { label: 'Subtle', value: 'subtle' },
+                      { label: 'Standard', value: 'standard' },
+                      { label: 'Heavy', value: 'heavy' },
+                    ]}
+                    color="brand"
+                  />
+                </div>
               </Stack>
             </Paper>
 
             {/* Behavior Section */}
             <Paper p="lg" radius="md" withBorder>
-              <SectionHeader>Behavior</SectionHeader>
+              <SectionHeader tooltip="Auto-open timing, sound notifications, pre-chat form fields, and idle timeout." docLink={`${DOCS_BASE}/widget`}>Behavior</SectionHeader>
               <Divider mb="md" />
               <Stack gap="sm">
                 <Switch
@@ -788,6 +950,7 @@ export function WidgetPage() {
                 <Divider variant="dashed" />
                 <Switch
                   label="Pre-chat form"
+                  description="Collect visitor name and email before starting a conversation."
                   checked={config.preChatFormEnabled}
                   onChange={(e) => update('preChatFormEnabled', e.currentTarget.checked)}
                   color="brand"
@@ -814,6 +977,7 @@ export function WidgetPage() {
                 )}
                 <Switch
                   label="Offline form"
+                  description="Show a contact form when no agents are available or outside business hours."
                   checked={config.offlineFormEnabled}
                   onChange={(e) => update('offlineFormEnabled', e.currentTarget.checked)}
                   color="brand"
@@ -829,7 +993,7 @@ export function WidgetPage() {
 
             {/* Content Section */}
             <Paper p="lg" radius="md" withBorder>
-              <SectionHeader>Content</SectionHeader>
+              <SectionHeader tooltip="Header text, greeting message, agent identity, and placeholder text shown in the widget." docLink={`${DOCS_BASE}/widget`}>Content</SectionHeader>
               <Divider mb="md" />
               <Stack gap="sm">
                 <TextInput
@@ -850,6 +1014,41 @@ export function WidgetPage() {
                   onChange={(e) => update('inputPlaceholder', e.currentTarget.value)}
                   placeholder="Type your message..."
                 />
+                <Divider label="Agent identity" labelPosition="left" my={4} />
+                <TextInput
+                  label="Agent display name"
+                  description="Name shown in chat header and greeting. Leave empty for default."
+                  value={config.agentDisplayName}
+                  onChange={(e) => update('agentDisplayName', e.currentTarget.value)}
+                  placeholder="Agent Red"
+                />
+                <TextInput
+                  label="Agent avatar URL"
+                  description="Image URL for the agent avatar in chat. Leave empty for initials fallback."
+                  value={config.agentAvatarUrl}
+                  onChange={(e) => update('agentAvatarUrl', e.currentTarget.value)}
+                  placeholder="https://example.com/avatar.png"
+                />
+                {config.agentAvatarUrl && (
+                  <Group gap="sm" align="center">
+                    <div style={{
+                      width: 36,
+                      height: 36,
+                      borderRadius: '50%',
+                      overflow: 'hidden',
+                      border: '1px solid #272727',
+                      flexShrink: 0,
+                    }}>
+                      <img
+                        src={config.agentAvatarUrl}
+                        alt="Avatar preview"
+                        style={{ width: '100%', height: '100%', objectFit: 'cover' }}
+                        onError={(e) => { (e.currentTarget as HTMLImageElement).style.display = 'none'; }}
+                      />
+                    </div>
+                    <Text size="xs" c="dimmed">Avatar preview</Text>
+                  </Group>
+                )}
               </Stack>
             </Paper>
 

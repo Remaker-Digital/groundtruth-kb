@@ -30,6 +30,8 @@ interface HeaderProps {
   logoUrl: string | null;
   headerText: string | null;
   onClose: () => void;
+  /** Enable drag-to-reposition by mousedown on header (WI #253). */
+  onDragStart?: (e: MouseEvent) => void;
 }
 
 // ---------------------------------------------------------------------------
@@ -45,6 +47,7 @@ export const Header: FunctionComponent<HeaderProps> = ({
   logoUrl,
   headerText,
   onClose,
+  onDragStart,
 }) => {
   const displayTitle = headerText || locale.headerTitle;
 
@@ -59,6 +62,14 @@ export const Header: FunctionComponent<HeaderProps> = ({
         padding: `0 ${tokens.space4}`,
         flexShrink: 0,
         position: 'relative',
+        cursor: onDragStart ? 'grab' : undefined,
+        userSelect: onDragStart ? 'none' : undefined,
+      }}
+      onMouseDown={(e) => {
+        // Only start drag on left-click and if target is not the close button
+        if (onDragStart && e.button === 0 && !(e.target as HTMLElement).closest('button')) {
+          onDragStart(e as unknown as MouseEvent);
+        }
       }}
     >
       {/* Agent avatar */}

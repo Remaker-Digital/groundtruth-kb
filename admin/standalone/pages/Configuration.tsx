@@ -38,8 +38,11 @@ import {
   useComputedColorScheme,
 } from '@mantine/core';
 import { useAppContext } from '../layouts/StandaloneLayout';
-import { useConfig, useUpdateConfig, useTestModeStatus, useActivateTestMode, useDeactivateTestMode, useUpdateTestModePercentage } from '../../shared/hooks/index';
-import type { TestModeStatus } from '../../shared/hooks/index';
+import { useConfig, useUpdateConfig, useConfigVersions, useNamedConfigs, useSaveNamedConfig, useActivateNamedConfig, useDeleteNamedConfig, useTestModeStatus, useActivateTestMode, useDeactivateTestMode, useUpdateTestModePercentage } from '../../shared/hooks/index';
+import type { TestModeStatus, NamedConfigSummary } from '../../shared/hooks/index';
+import { HelpTooltip } from '../../shared/HelpTooltip';
+
+const DOCS_BASE = 'https://agentredcx.com/docs/admin-guide';
 
 // ---------------------------------------------------------------------------
 // Constants
@@ -225,6 +228,24 @@ const ResetIcon = () => (
   </svg>
 );
 
+const TrashIcon = () => (
+  <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+    <polyline points="3 6 5 6 21 6" /><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2" />
+  </svg>
+);
+
+const BookmarkIcon = () => (
+  <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+    <path d="m19 21-7-4-7 4V5a2 2 0 0 1 2-2h10a2 2 0 0 1 2 2z" />
+  </svg>
+);
+
+const CheckCircleIcon = () => (
+  <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+    <path d="M22 11.08V12a10 10 0 1 1-5.93-9.14" /><polyline points="22 4 12 14.01 9 11.01" />
+  </svg>
+);
+
 // ---------------------------------------------------------------------------
 // Preview response generator
 // ---------------------------------------------------------------------------
@@ -255,6 +276,22 @@ function getPreviewResponse(formality: string, responseLength: string, brandName
 // ---------------------------------------------------------------------------
 // Helpers
 // ---------------------------------------------------------------------------
+
+/** Format a date string as a short date-stamp (WI #267). */
+function formatConfigDate(dateStr: string | null | undefined): string {
+  if (!dateStr) return '--';
+  try {
+    return new Date(dateStr).toLocaleDateString('en-US', {
+      month: 'short',
+      day: 'numeric',
+      year: 'numeric',
+      hour: '2-digit',
+      minute: '2-digit',
+    });
+  } catch {
+    return dateStr;
+  }
+}
 
 /** Safely cast a config record value to string. */
 function str(val: unknown, fallback = ''): string {
@@ -391,6 +428,55 @@ export const ConfigurationPage: React.FC = () => {
   const { activate: activateTestMode, loading: activating, error: activateError } = useActivateTestMode(apiFetch);
   const { deactivate: deactivateTestMode, loading: deactivating, error: deactivateError } = useDeactivateTestMode(apiFetch);
   const { updatePercentage, loading: updatingPct, error: pctError } = useUpdateTestModePercentage(apiFetch);
+
+  // ---- Named Config state (WI #265-267) -----------------------------------
+  const namedConfigs = useNamedConfigs(apiFetch);
+  const { saveNamed, loading: savingNamed, error: saveNamedError } = useSaveNamedConfig(apiFetch);
+  const { activateNamed, loading: activatingNamed, error: activateNamedError } = useActivateNamedConfig(apiFetch);
+  const { deleteNamed, loading: deletingNamed, error: deleteNamedError } = useDeleteNamedConfig(apiFetch);
+
+  const [showSaveDialog, setShowSaveDialog] = useState(false);
+  const [saveConfigName, setSaveConfigName] = useState('');
+  const [confirmDeleteName, setConfirmDeleteName] = useState<string | null>(null);
+
+  const handleSaveNamed = async () => {
+    const name = saveConfigName.trim();
+    if (!name) {
+      onNotify('Enter a name for this configuration.', 'warning');
+      return;
+    }
+    const result = await saveNamed(name);
+    if (result) {
+      onNotify(`Configuration saved as "${name}".`, 'success');
+      setSaveConfigName('');
+      setShowSaveDialog(false);
+      namedConfigs.refetch();
+    } else {
+      onNotify(saveNamedError || 'Failed to save named configuration.', 'error');
+    }
+  };
+
+  const handleActivateNamed = async (name: string) => {
+    const result = await activateNamed(name);
+    if (result) {
+      onNotify(`"${name}" is now the active configuration.`, 'success');
+      namedConfigs.refetch();
+      configResult.refetch();
+    } else {
+      onNotify(activateNamedError || 'Failed to activate configuration.', 'error');
+    }
+  };
+
+  const handleDeleteNamed = async (name: string) => {
+    const ok = await deleteNamed(name);
+    if (ok) {
+      onNotify(`Deleted configuration "${name}".`, 'success');
+      setConfirmDeleteName(null);
+      namedConfigs.refetch();
+    } else {
+      onNotify(deleteNamedError || 'Failed to delete configuration.', 'error');
+    }
+  };
 
   const tmStatus: TestModeStatus | null = testModeStatus.data ?? null;
   const tmEnabled = tmStatus?.enabled ?? false;
@@ -594,7 +680,7 @@ export const ConfigurationPage: React.FC = () => {
       {/* Page header with action buttons */}
       <Group justify="space-between" align="flex-start" wrap="wrap">
         <div>
-          <Title order={2}>Configuration</Title>
+          <Title order={2}>Agent configuration</Title>
           <Text c="dimmed" size="sm">
             Fine-tune your AI agent's behavior
           </Text>
@@ -634,7 +720,7 @@ export const ConfigurationPage: React.FC = () => {
           <Stack gap="lg">
             {/* Brand & Persona */}
             <Paper p="lg" radius="md" withBorder>
-              <Text fw={600} mb="md">Brand & persona</Text>
+              <Text fw={600} mb="md">Brand & persona <HelpTooltip text="Set your AI agent's name, greeting, personality tone, and formality level." docLink={`${DOCS_BASE}/agent-configuration`} /></Text>
               <Stack gap="md">
                 <TextInput
                   label="Brand name"
@@ -677,7 +763,7 @@ export const ConfigurationPage: React.FC = () => {
 
             {/* Policies */}
             <Paper p="lg" radius="md" withBorder>
-              <Text fw={600} mb="md">Policies</Text>
+              <Text fw={600} mb="md">Policies <HelpTooltip text="Control how the AI handles refunds, returns, and other business rules." docLink={`${DOCS_BASE}/agent-configuration`} /></Text>
               <Stack gap="md">
                 <NumberInput
                   label="Return window"
@@ -708,7 +794,7 @@ export const ConfigurationPage: React.FC = () => {
 
             {/* Escalation */}
             <Paper p="lg" radius="md" withBorder>
-              <Text fw={600} mb="xs">Escalation</Text>
+              <Text fw={600} mb="xs">Escalation <HelpTooltip text="Configure when and how conversations are handed off to human team members." docLink={`${DOCS_BASE}/agent-configuration`} /></Text>
               <Text size="xs" c="dimmed" mb="md">
                 Configure escalation categories, notification emails, and trigger keywords.
                 Each category routes to a different team email with its own keyword set.
@@ -727,9 +813,9 @@ export const ConfigurationPage: React.FC = () => {
                     max={1}
                     step={0.05}
                     marks={[
-                      { value: 0, label: 'Conservative' },
+                      { value: 0, label: <span style={{ position: 'relative', left: '50%' }}>Conservative</span> },
                       { value: 0.5, label: '0.5' },
-                      { value: 1, label: 'Aggressive' },
+                      { value: 1, label: <span style={{ position: 'relative', right: '50%' }}>Aggressive</span> },
                     ]}
                     label={(val) => val.toFixed(2)}
                     color={BRAND_RED}
@@ -891,7 +977,7 @@ export const ConfigurationPage: React.FC = () => {
 
             {/* Custom Instructions */}
             <Paper p="lg" radius="md" withBorder>
-              <Text fw={600} mb="md">Custom instructions</Text>
+              <Text fw={600} mb="md">Custom instructions <HelpTooltip text="Free-form instructions injected into every AI response. Use this for brand-specific rules or response guidelines." docLink={`${DOCS_BASE}/agent-configuration`} /></Text>
               <Textarea
                 placeholder="Provide advisory instructions for the AI agent..."
                 value={form.customInstructions}
@@ -908,7 +994,7 @@ export const ConfigurationPage: React.FC = () => {
 
             {/* Language */}
             <Paper p="lg" radius="md" withBorder>
-              <Text fw={600} mb="md">Language</Text>
+              <Text fw={600} mb="md">Language <HelpTooltip text="Set the primary response language and additional supported languages for multilingual customers." docLink={`${DOCS_BASE}/agent-configuration`} /></Text>
               <Stack gap="md">
                 <Select
                   label="Primary language"
@@ -941,7 +1027,7 @@ export const ConfigurationPage: React.FC = () => {
             <Paper p="lg" radius="md" withBorder>
               <Group justify="space-between" mb="xs">
                 <Group gap="sm">
-                  <Text fw={600}>Test mode</Text>
+                  <Text fw={600}>Test mode <HelpTooltip text="Route a percentage of live customer sessions to a separate test configuration to validate changes before full rollout." docLink={`${DOCS_BASE}/test-mode`} /></Text>
                   {tmEnabled ? (
                     <Badge size="sm" variant="filled" color="orange">Active</Badge>
                   ) : (
@@ -1127,6 +1213,159 @@ export const ConfigurationPage: React.FC = () => {
                   )}
                 </Stack>
               </Collapse>
+            </Paper>
+            {/* Saved configurations (WI #265-267) */}
+            <Paper p="lg" radius="md" withBorder>
+              <Group justify="space-between" mb="xs">
+                <Text fw={600}>Saved configurations <HelpTooltip text="Save named snapshots of your configuration to compare, revert, or switch between setups." docLink={`${DOCS_BASE}/agent-configuration`} /></Text>
+                <Button
+                  size="xs"
+                  variant="light"
+                  color={BRAND_RED}
+                  leftSection={<BookmarkIcon />}
+                  onClick={() => setShowSaveDialog(true)}
+                >
+                  Save current
+                </Button>
+              </Group>
+              <Text size="xs" c="dimmed" mb="md">
+                Save named snapshots of your current settings. Activate a saved
+                configuration to apply it instantly.
+              </Text>
+
+              {/* Save dialog */}
+              {showSaveDialog && (
+                <Paper
+                  p="sm"
+                  radius="sm"
+                  mb="md"
+                  style={{
+                    backgroundColor: isDark ? '#141414' : '#f8f9fa',
+                    border: `1px solid ${isDark ? '#272727' : '#dee2e6'}`,
+                  }}
+                >
+                  <Group gap="sm" wrap="nowrap">
+                    <TextInput
+                      size="xs"
+                      placeholder="Configuration name (e.g. Holiday mode)"
+                      value={saveConfigName}
+                      onChange={(e) => setSaveConfigName(e.currentTarget.value)}
+                      onKeyDown={(e) => {
+                        if (e.key === 'Enter') handleSaveNamed();
+                        if (e.key === 'Escape') { setShowSaveDialog(false); setSaveConfigName(''); }
+                      }}
+                      style={{ flex: 1 }}
+                      autoFocus
+                    />
+                    <Button
+                      size="xs"
+                      color={BRAND_RED}
+                      onClick={handleSaveNamed}
+                      loading={savingNamed}
+                    >
+                      Save
+                    </Button>
+                    <Button
+                      size="xs"
+                      variant="default"
+                      onClick={() => { setShowSaveDialog(false); setSaveConfigName(''); }}
+                    >
+                      Cancel
+                    </Button>
+                  </Group>
+                </Paper>
+              )}
+
+              {/* Config list */}
+              {namedConfigs.loading && !namedConfigs.data ? (
+                <Text size="xs" c="dimmed">Loading...</Text>
+              ) : (namedConfigs.data?.configs ?? []).length === 0 ? (
+                <Text size="xs" c="dimmed" ta="center" py="md">
+                  No saved configurations yet.
+                </Text>
+              ) : (
+                <Stack gap={6}>
+                  {(namedConfigs.data?.configs ?? []).map((cfg: NamedConfigSummary) => (
+                    <Paper
+                      key={cfg.name}
+                      p="xs"
+                      radius="sm"
+                      style={{
+                        backgroundColor: isDark
+                          ? (cfg.isActive ? '#1f1f1f' : '#141414')
+                          : (cfg.isActive ? '#f0f0f0' : '#f8f9fa'),
+                        border: `1px solid ${cfg.isActive ? BRAND_RED : (isDark ? '#272727' : '#dee2e6')}`,
+                      }}
+                    >
+                      {confirmDeleteName === cfg.name ? (
+                        /* Delete confirmation inline */
+                        <Group justify="space-between" wrap="nowrap">
+                          <Text size="xs">Delete &ldquo;{cfg.name}&rdquo;?</Text>
+                          <Group gap={6}>
+                            <Button
+                              size="compact-xs"
+                              color="red"
+                              variant="light"
+                              onClick={() => handleDeleteNamed(cfg.name)}
+                              loading={deletingNamed}
+                            >
+                              Delete
+                            </Button>
+                            <Button
+                              size="compact-xs"
+                              variant="default"
+                              onClick={() => setConfirmDeleteName(null)}
+                            >
+                              Cancel
+                            </Button>
+                          </Group>
+                        </Group>
+                      ) : (
+                        <Group justify="space-between" wrap="nowrap">
+                          <div style={{ minWidth: 0, flex: 1 }}>
+                            <Group gap={6} wrap="nowrap">
+                              <Text size="sm" fw={600} truncate>{cfg.name}</Text>
+                              {cfg.isActive && (
+                                <Badge size="xs" variant="filled" color={BRAND_RED}>Active</Badge>
+                              )}
+                            </Group>
+                            <Text size="xs" c="dimmed">
+                              v{cfg.version} &middot; {cfg.fieldCount} fields &middot; {formatConfigDate(cfg.createdAt)}
+                            </Text>
+                          </div>
+                          <Group gap={4} wrap="nowrap">
+                            {!cfg.isActive && (
+                              <Tooltip label="Activate this configuration">
+                                <ActionIcon
+                                  size="sm"
+                                  variant="light"
+                                  color="green"
+                                  onClick={() => handleActivateNamed(cfg.name)}
+                                  loading={activatingNamed}
+                                >
+                                  <CheckCircleIcon />
+                                </ActionIcon>
+                              </Tooltip>
+                            )}
+                            {!cfg.isDefault && (
+                              <Tooltip label="Delete this configuration">
+                                <ActionIcon
+                                  size="sm"
+                                  variant="light"
+                                  color="red"
+                                  onClick={() => setConfirmDeleteName(cfg.name)}
+                                >
+                                  <TrashIcon />
+                                </ActionIcon>
+                              </Tooltip>
+                            )}
+                          </Group>
+                        </Group>
+                      )}
+                    </Paper>
+                  ))}
+                </Stack>
+              )}
             </Paper>
           </Stack>
         </Grid.Col>

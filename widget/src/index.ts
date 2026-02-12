@@ -174,6 +174,47 @@ async function init(
   // Resolve tokens for launcher
   const tokens = resolveTokens(config);
 
+  // ---- Drag-to-reposition state (WI #253) ----------------------------------
+
+  const DRAG_STORAGE_KEY = 'ar_panel_position';
+
+  /** Load persisted panel position from sessionStorage. */
+  function loadDragPosition(): { left: number; top: number } | null {
+    try {
+      const raw = sessionStorage.getItem(DRAG_STORAGE_KEY);
+      if (!raw) return null;
+      const pos = JSON.parse(raw);
+      if (typeof pos.left === 'number' && typeof pos.top === 'number') return pos;
+    } catch { /* ignore */ }
+    return null;
+  }
+
+  /** Save panel position to sessionStorage. */
+  function saveDragPosition(left: number, top: number): void {
+    try {
+      sessionStorage.setItem(DRAG_STORAGE_KEY, JSON.stringify({ left, top }));
+    } catch { /* ignore */ }
+  }
+
+  /** Clamp a position within the viewport. */
+  function clampToViewport(left: number, top: number, w: number, h: number): { left: number; top: number } {
+    const vw = window.innerWidth;
+    const vh = window.innerHeight;
+    const minVisible = 60; // at least 60px of the panel must remain visible
+    return {
+      left: Math.max(-w + minVisible, Math.min(vw - minVisible, left)),
+      top: Math.max(0, Math.min(vh - minVisible, top)),
+    };
+  }
+
+  /** Apply a left/top position to the panel iframe, clearing bottom/right anchoring. */
+  function applyDragPosition(iframe: HTMLIFrameElement, left: number, top: number): void {
+    iframe.style.left = `${left}px`;
+    iframe.style.top = `${top}px`;
+    iframe.style.right = 'auto';
+    iframe.style.bottom = 'auto';
+  }
+
   // ---- Launcher rendering -------------------------------------------------
 
   function renderLauncher() {
@@ -182,8 +223,8 @@ async function init(
       h(Launcher, {
         tokens,
         position: config.widget_position || 'bottom-right',
-        offsetX: config.widget_offset_x ?? 20,
-        offsetY: config.widget_offset_y ?? 20,
+        offsetX: config.widget_position_offset_x ?? config.widget_offset_x ?? 20,
+        offsetY: config.widget_position_offset_y ?? config.widget_offset_y ?? 20,
         isOpen: state.view !== 'closed',
         unreadCount: state.unreadCount,
         launcherIcon: (config.widget_launcher_icon as 'chat' | 'headset' | 'help') || 'chat',
@@ -202,8 +243,8 @@ async function init(
   function createPanelIframe(): HTMLIFrameElement {
     const iframe = document.createElement('iframe');
     const position = config.widget_position || 'bottom-right';
-    const offsetX = config.widget_offset_x ?? 20;
-    const offsetY = config.widget_offset_y ?? 20;
+    const offsetX = config.widget_position_offset_x ?? config.widget_offset_x ?? 20;
+    const offsetY = config.widget_position_offset_y ?? config.widget_offset_y ?? 20;
     const launcherSize = 60;
     const gap = 12;
 
@@ -253,9 +294,93 @@ async function init(
     return iframe;
   }
 
+  // ---- Drag message handler (WI #253) -------------------------------------
+
+  let dragOverlay: HTMLDivElement | null = null;
+  let dragStartLeft = 0;
+  let dragStartTop = 0;
+  let dragStartScreenX = 0;
+  let dragStartScreenY = 0;
+
+  function onDragMove(ev: MouseEvent) {
+    if (!panelIframe) return;
+    const dx = ev.screenX - dragStartScreenX;
+    const dy = ev.screenY - dragStartScreenY;
+    const w = panelIframe.offsetWidth;
+    const h = panelIframe.offsetHeight;
+    const { left, top } = clampToViewport(dragStartLeft + dx, dragStartTop + dy, w, h);
+    applyDragPosition(panelIframe, left, top);
+  }
+
+  function onDragEnd() {
+    document.removeEventListener('mousemove', onDragMove);
+    document.removeEventListener('mouseup', onDragEnd);
+
+    // Remove the transparent overlay
+    if (dragOverlay) {
+      dragOverlay.remove();
+      dragOverlay = null;
+    }
+
+    // Re-enable transition after drag
+    if (panelIframe) {
+      panelIframe.style.transition = `opacity ${tokens.transitionNormal}, transform ${tokens.transitionNormal}`;
+      // Save position
+      const left = parseInt(panelIframe.style.left, 10);
+      const top = parseInt(panelIframe.style.top, 10);
+      if (!isNaN(left) && !isNaN(top)) {
+        saveDragPosition(left, top);
+      }
+    }
+  }
+
+  window.addEventListener('message', (ev) => {
+    if (!ev.data || typeof ev.data.type !== 'string') return;
+
+    if (ev.data.type === 'ar:drag-start' && panelIframe) {
+      // Record the iframe's current position in viewport pixels
+      const rect = panelIframe.getBoundingClientRect();
+      dragStartLeft = rect.left;
+      dragStartTop = rect.top;
+      dragStartScreenX = ev.data.screenX;
+      dragStartScreenY = ev.data.screenY;
+
+      // Disable CSS transition during drag for instant feedback
+      panelIframe.style.transition = 'none';
+
+      // Switch from bottom/right anchoring to left/top so deltas work correctly
+      applyDragPosition(panelIframe, rect.left, rect.top);
+
+      // Create a transparent overlay covering the whole viewport.
+      // This captures mousemove/mouseup events that would otherwise be
+      // swallowed by the iframe (the mouse moves over the iframe during drag).
+      dragOverlay = document.createElement('div');
+      dragOverlay.style.cssText = [
+        'position: fixed',
+        'inset: 0',
+        `z-index: ${tokens.zIndexPanel + 1}`,
+        'cursor: grabbing',
+        'user-select: none',
+      ].join('; ');
+      document.body.appendChild(dragOverlay);
+
+      document.addEventListener('mousemove', onDragMove);
+      document.addEventListener('mouseup', onDragEnd);
+    }
+  });
+
   function showPanel() {
     if (!panelIframe) {
       panelIframe = createPanelIframe();
+
+      // Restore persisted drag position from sessionStorage (WI #253)
+      const saved = loadDragPosition();
+      if (saved) {
+        const w = panelIframe.offsetWidth || parseInt(tokens.panelWidth, 10);
+        const h = panelIframe.offsetHeight || parseInt(tokens.panelHeight, 10);
+        const { left, top } = clampToViewport(saved.left, saved.top, w, h);
+        applyDragPosition(panelIframe, left, top);
+      }
     }
 
     // Double-rAF ensures the browser has painted the initial opacity:0 state
@@ -367,6 +492,7 @@ async function init(
         panelIframe = null;
       }
       shadowHost.remove();
+      try { sessionStorage.removeItem(DRAG_STORAGE_KEY); } catch { /* ignore */ }
       delete (window as unknown as Record<string, unknown>).AgentRed;
     },
   };

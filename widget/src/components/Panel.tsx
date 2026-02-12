@@ -322,6 +322,23 @@ export const Panel: FunctionComponent<PanelProps> = ({
     store.setState({ view: 'conversation' });
   }, []);
 
+  // ---- Drag-to-reposition (WI #253) ----------------------------------------
+
+  /**
+   * Initiate drag from the header. Posts the initial screen coordinates to the
+   * parent frame, which takes over mousemove/mouseup handling via an overlay.
+   * This avoids cross-frame coordinate feedback issues.
+   */
+  const handleDragStart = useCallback((e: MouseEvent) => {
+    e.preventDefault();
+    // Use screenX/Y which are consistent across frames
+    window.parent.postMessage({
+      type: 'ar:drag-start',
+      screenX: e.screenX,
+      screenY: e.screenY,
+    }, '*');
+  }, []);
+
   // Cleanup SSE on unmount
   useEffect(() => {
     return () => {
@@ -373,6 +390,7 @@ export const Panel: FunctionComponent<PanelProps> = ({
         logoUrl={logoUrl}
         headerText={config.widget_header_text || null}
         onClose={() => { handleEndConversation(); onClose(); }}
+        onDragStart={handleDragStart}
       />
 
       {/* Connection status banner */}

@@ -16,7 +16,7 @@
  * Architecture: WI #226-229
  */
 
-import React, { useState, useCallback, useEffect } from 'react';
+import React, { useState, useCallback, useEffect, useRef } from 'react';
 import {
   Paper,
   Table,
@@ -37,7 +37,6 @@ import {
   Loader,
   Alert,
   Tabs,
-  Code,
 } from '@mantine/core';
 import { useAppContext } from '../layouts/StandaloneLayout';
 
@@ -90,6 +89,8 @@ interface PageAssignment {
   slot2ActionId: string | null;
   slot1Action: QuickAction | null;
   slot2Action: QuickAction | null;
+  autoOpen?: boolean;
+  autoOpenDelayMs?: number;
 }
 
 // ---------------------------------------------------------------------------
@@ -134,12 +135,8 @@ export const QuickActionsPage: React.FC = () => {
   const [formSortOrder, setFormSortOrder] = useState<number>(0);
   const [saving, setSaving] = useState(false);
 
-  // Assignment modal
-  const [assignModalOpen, setAssignModalOpen] = useState(false);
-  const [assignPageType, setAssignPageType] = useState<string | null>('all');
-  const [assignSlot1, setAssignSlot1] = useState<string | null>(null);
-  const [assignSlot2, setAssignSlot2] = useState<string | null>(null);
-  const [savingAssign, setSavingAssign] = useState(false);
+  // Prompt textarea ref (for cursor-position variable insertion)
+  const promptRef = useRef<HTMLTextAreaElement>(null);
 
   // Confirm delete
   const [confirmDelete, setConfirmDelete] = useState<{ id: string; label: string } | null>(null);
@@ -267,68 +264,107 @@ export const QuickActionsPage: React.FC = () => {
     }
   }, [apiFetch, onNotify, fetchActions, fetchAssignments]);
 
-  // ---- Assignment CRUD -----------------------------------------------------
+  // ---- Assignment inline save -----------------------------------------------
 
-  const openCreateAssignment = useCallback(() => {
-    setAssignPageType('all');
-    setAssignSlot1(null);
-    setAssignSlot2(null);
-    setAssignModalOpen(true);
-  }, []);
+  const handleInlineAssignmentSave = useCallback(async (
+    pageType: string,
+    slot: 'slot1' | 'slot2',
+    actionId: string | null,
+  ) => {
+    // Find existing assignment for this page type
+    const existing = assignments.find((a) => a.pageType === pageType);
+    const slot1 = slot === 'slot1' ? actionId : (existing?.slot1ActionId ?? null);
+    const slot2 = slot === 'slot2' ? actionId : (existing?.slot2ActionId ?? null);
 
-  const openEditAssignment = useCallback((assignment: PageAssignment) => {
-    setAssignPageType(assignment.pageType);
-    setAssignSlot1(assignment.slot1ActionId);
-    setAssignSlot2(assignment.slot2ActionId);
-    setAssignModalOpen(true);
-  }, []);
+    // If both slots are now empty, delete the assignment
+    if (!slot1 && !slot2) {
+      try {
+        const resp = await apiFetch(`/api/admin/quick-actions/assignments/${pageType}`, {
+          method: 'DELETE',
+        });
+        if (!resp.ok && resp.status !== 404) throw new Error(`Delete failed: ${resp.status}`);
+        await fetchAssignments();
+      } catch (err) {
+        const msg = err instanceof Error ? err.message : 'Save failed';
+        onNotify(msg, 'error');
+      }
+      return;
+    }
 
-  const closeAssignModal = useCallback(() => {
-    setAssignModalOpen(false);
-  }, []);
-
-  const handleSaveAssignment = useCallback(async () => {
-    if (!assignPageType) return;
-    setSavingAssign(true);
     try {
       const resp = await apiFetch('/api/admin/quick-actions/assignments', {
         method: 'PUT',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
-          page_type: assignPageType,
+          page_type: pageType,
           page_handle: null,
-          slot_1_action_id: assignSlot1,
-          slot_2_action_id: assignSlot2,
+          slot_1_action_id: slot1,
+          slot_2_action_id: slot2,
         }),
       });
       if (!resp.ok) {
         const errText = await resp.text().catch(() => '');
         throw new Error(`Save failed: ${resp.status} ${errText}`);
       }
-      onNotify(`Assignment for "${assignPageType}" saved`, 'success');
-      closeAssignModal();
       await fetchAssignments();
     } catch (err) {
       const msg = err instanceof Error ? err.message : 'Save failed';
       onNotify(msg, 'error');
-    } finally {
-      setSavingAssign(false);
     }
-  }, [assignPageType, assignSlot1, assignSlot2, apiFetch, onNotify, closeAssignModal, fetchAssignments]);
+  }, [assignments, apiFetch, onNotify, fetchAssignments]);
 
-  const handleDeleteAssignment = useCallback(async (pageType: string) => {
+  // ---- Auto-open toggle per page (WI #254) ----------------------------------
+
+  const handleAutoOpenToggle = useCallback(async (
+    pageType: string,
+    autoOpen: boolean,
+  ) => {
+    const existing = assignments.find((a) => a.pageType === pageType);
     try {
-      const resp = await apiFetch(`/api/admin/quick-actions/assignments/${pageType}`, {
-        method: 'DELETE',
+      const resp = await apiFetch('/api/admin/quick-actions/assignments', {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          page_type: pageType,
+          page_handle: null,
+          slot_1_action_id: existing?.slot1ActionId ?? null,
+          slot_2_action_id: existing?.slot2ActionId ?? null,
+          auto_open: autoOpen,
+          auto_open_delay_ms: existing?.autoOpenDelayMs ?? 3000,
+        }),
       });
-      if (!resp.ok) throw new Error(`Delete failed: ${resp.status}`);
-      onNotify(`Assignment for "${pageType}" removed`, 'success');
+      if (!resp.ok) throw new Error(`Save failed: ${resp.status}`);
       await fetchAssignments();
     } catch (err) {
-      const msg = err instanceof Error ? err.message : 'Delete failed';
+      const msg = err instanceof Error ? err.message : 'Save failed';
       onNotify(msg, 'error');
     }
-  }, [apiFetch, onNotify, fetchAssignments]);
+  }, [assignments, apiFetch, onNotify, fetchAssignments]);
+
+  // ---- Insert template variable at cursor ----------------------------------
+
+  const insertTemplateVar = useCallback((token: string) => {
+    const ta = promptRef.current;
+    if (!ta) {
+      // Fallback: append to end
+      const needsSpace = formPrompt.length > 0 && !formPrompt.endsWith(' ');
+      setFormPrompt(formPrompt + (needsSpace ? ' ' : '') + token);
+      return;
+    }
+    const start = ta.selectionStart ?? formPrompt.length;
+    const end = ta.selectionEnd ?? start;
+    const before = formPrompt.slice(0, start);
+    const after = formPrompt.slice(end);
+    const needsSpace = before.length > 0 && !before.endsWith(' ') && !before.endsWith('\n');
+    const newValue = before + (needsSpace ? ' ' : '') + token + after;
+    setFormPrompt(newValue);
+    // Restore cursor after the inserted token
+    requestAnimationFrame(() => {
+      const pos = before.length + (needsSpace ? 1 : 0) + token.length;
+      ta.focus();
+      ta.setSelectionRange(pos, pos);
+    });
+  }, [formPrompt]);
 
   // ---- Action select data --------------------------------------------------
 
@@ -388,8 +424,7 @@ export const QuickActionsPage: React.FC = () => {
       <Tabs defaultValue="prompts" variant="outline">
         <Tabs.List>
           <Tabs.Tab value="prompts">Prompt library ({actions.length})</Tabs.Tab>
-          <Tabs.Tab value="assignments">Page assignments ({assignments.length})</Tabs.Tab>
-          <Tabs.Tab value="variables">Template variables</Tabs.Tab>
+          <Tabs.Tab value="assignments">Page assignments</Tabs.Tab>
         </Tabs.List>
 
         {/* ================================================================= */}
@@ -491,7 +526,7 @@ export const QuickActionsPage: React.FC = () => {
         </Tabs.Panel>
 
         {/* ================================================================= */}
-        {/* TAB: Page Assignments                                             */}
+        {/* TAB: Page Assignments — inline list of all page types            */}
         {/* ================================================================= */}
 
         <Tabs.Panel value="assignments" pt="md">
@@ -499,98 +534,76 @@ export const QuickActionsPage: React.FC = () => {
             <Alert color="blue" variant="light" title="How page assignments work">
               <Text size="sm">
                 Each page type can have up to 2 quick action buttons (slot 1 and slot 2).
-                The "All pages" assignment serves as a fallback when no specific page type
-                assignment is configured. Specific page types (product, collection, etc.)
-                take priority over "All pages".
+                The "All pages" row serves as a fallback when no specific page type
+                assignment is configured. Specific page types take priority.
               </Text>
             </Alert>
 
-            <Group justify="flex-end">
-              <Button color={BRAND_RED} onClick={openCreateAssignment}>
-                Add page assignment
-              </Button>
-            </Group>
-
             <Paper radius="md" withBorder>
-              <Table.ScrollContainer minWidth={500}>
+              <Table.ScrollContainer minWidth={680}>
                 <Table verticalSpacing="sm" horizontalSpacing="md">
                   <Table.Thead>
                     <Table.Tr>
-                      <Table.Th>Page type</Table.Th>
+                      <Table.Th w={180}>Page type</Table.Th>
                       <Table.Th>Slot 1</Table.Th>
                       <Table.Th>Slot 2</Table.Th>
-                      <Table.Th w={100} ta="right">Actions</Table.Th>
+                      <Table.Th w={100}>
+                        <Tooltip label="Auto-open the widget on this page type" position="top">
+                          <Text component="span" size="sm" fw={600} style={{ cursor: 'help' }}>
+                            Auto-open
+                          </Text>
+                        </Tooltip>
+                      </Table.Th>
                     </Table.Tr>
                   </Table.Thead>
                   <Table.Tbody>
-                    {assignments.length === 0 && (
-                      <Table.Tr>
-                        <Table.Td colSpan={4}>
-                          <Text ta="center" c="dimmed" py="xl" size="sm">
-                            No page assignments yet. Add an assignment to control which quick actions
-                            appear on each page type.
-                          </Text>
-                        </Table.Td>
-                      </Table.Tr>
-                    )}
-                    {assignments.map((assign) => (
-                      <Table.Tr key={assign.pageType}>
-                        <Table.Td>
-                          <Badge
-                            variant="light"
-                            color={assign.pageType === 'all' ? 'blue' : 'gray'}
-                            size="sm"
-                            tt="capitalize"
-                          >
-                            {assign.pageType === 'all' ? 'All pages (fallback)' : assign.pageType}
-                          </Badge>
-                        </Table.Td>
-                        <Table.Td>
-                          {assign.slot1Action ? (
-                            <Text size="sm">
-                              {assign.slot1Action.icon ? `${assign.slot1Action.icon} ` : ''}
-                              {assign.slot1Action.label}
-                            </Text>
-                          ) : (
-                            <Text size="sm" c="dimmed">Empty</Text>
-                          )}
-                        </Table.Td>
-                        <Table.Td>
-                          {assign.slot2Action ? (
-                            <Text size="sm">
-                              {assign.slot2Action.icon ? `${assign.slot2Action.icon} ` : ''}
-                              {assign.slot2Action.label}
-                            </Text>
-                          ) : (
-                            <Text size="sm" c="dimmed">Empty</Text>
-                          )}
-                        </Table.Td>
-                        <Table.Td>
-                          <Group gap="xs" justify="flex-end">
-                            <Tooltip label="Edit" position="left">
-                              <ActionIcon
-                                variant="subtle"
-                                color="gray"
-                                size="sm"
-                                onClick={() => openEditAssignment(assign)}
-                              >
-                                <EditIcon />
-                              </ActionIcon>
-                            </Tooltip>
-                            <Tooltip label="Remove" position="left">
-                              <ActionIcon
-                                variant="subtle"
-                                color="red"
-                                size="sm"
-                                onClick={() => handleDeleteAssignment(assign.pageType)}
-                              >
-                                <TrashIcon />
-                              </ActionIcon>
-                            </Tooltip>
-                          </Group>
-                        </Table.Td>
-                      </Table.Tr>
-                    ))}
+                    {PAGE_TYPES.map((pt) => {
+                      const assign = assignments.find((a) => a.pageType === pt.value);
+                      return (
+                        <Table.Tr key={pt.value}>
+                          <Table.Td>
+                            <Badge
+                              variant="light"
+                              color={pt.value === 'all' ? 'blue' : 'gray'}
+                              size="sm"
+                            >
+                              {pt.label}
+                            </Badge>
+                          </Table.Td>
+                          <Table.Td>
+                            <Select
+                              size="xs"
+                              placeholder="None"
+                              data={actionSelectData}
+                              value={assign?.slot1ActionId ?? null}
+                              onChange={(val) => handleInlineAssignmentSave(pt.value, 'slot1', val)}
+                              clearable
+                              styles={{ input: { minHeight: 30, fontSize: 13 } }}
+                            />
+                          </Table.Td>
+                          <Table.Td>
+                            <Select
+                              size="xs"
+                              placeholder="None"
+                              data={actionSelectData}
+                              value={assign?.slot2ActionId ?? null}
+                              onChange={(val) => handleInlineAssignmentSave(pt.value, 'slot2', val)}
+                              clearable
+                              styles={{ input: { minHeight: 30, fontSize: 13 } }}
+                            />
+                          </Table.Td>
+                          <Table.Td>
+                            <Switch
+                              size="xs"
+                              color={BRAND_RED}
+                              checked={assign?.autoOpen ?? false}
+                              onChange={(e) => handleAutoOpenToggle(pt.value, e.currentTarget.checked)}
+                              aria-label={`Auto-open on ${pt.label}`}
+                            />
+                          </Table.Td>
+                        </Table.Tr>
+                      );
+                    })}
                   </Table.Tbody>
                 </Table>
               </Table.ScrollContainer>
@@ -598,50 +611,6 @@ export const QuickActionsPage: React.FC = () => {
           </Stack>
         </Tabs.Panel>
 
-        {/* ================================================================= */}
-        {/* TAB: Template Variables                                           */}
-        {/* ================================================================= */}
-
-        <Tabs.Panel value="variables" pt="md">
-          <Stack gap="md">
-            <Alert color="blue" variant="light" title="Template variable substitution">
-              <Text size="sm">
-                Use double-curly-brace placeholders in your prompt templates.
-                These are replaced with page context values when the customer
-                clicks a quick action button.
-              </Text>
-            </Alert>
-
-            <Paper radius="md" withBorder>
-              <Table verticalSpacing="sm" horizontalSpacing="md">
-                <Table.Thead>
-                  <Table.Tr>
-                    <Table.Th w={220}>Variable</Table.Th>
-                    <Table.Th>Description</Table.Th>
-                  </Table.Tr>
-                </Table.Thead>
-                <Table.Tbody>
-                  {TEMPLATE_VARS.map((tv) => (
-                    <Table.Tr key={tv.var}>
-                      <Table.Td>
-                        <Code>{tv.var}</Code>
-                      </Table.Td>
-                      <Table.Td>
-                        <Text size="sm">{tv.desc}</Text>
-                      </Table.Td>
-                    </Table.Tr>
-                  ))}
-                </Table.Tbody>
-              </Table>
-            </Paper>
-
-            <Text size="sm" c="dimmed">
-              Example: "Tell me about {'{{product_title}}'}" becomes
-              "Tell me about Classic Running Shoes" on a product page.
-              Unresolved variables are left as-is.
-            </Text>
-          </Stack>
-        </Tabs.Panel>
       </Tabs>
 
       {/* ================================================================= */}
@@ -669,17 +638,35 @@ export const QuickActionsPage: React.FC = () => {
             value={formLabel}
             onChange={(e) => setFormLabel(e.currentTarget.value)}
           />
-          <Textarea
-            label="Prompt template"
-            description="Hidden prompt sent to AI when clicked. Use {{variable}} for page context."
-            placeholder="e.g. Tell me about {{product_title}} and its key features"
-            required
-            maxLength={2000}
-            minRows={3}
-            maxRows={8}
-            value={formPrompt}
-            onChange={(e) => setFormPrompt(e.currentTarget.value)}
-          />
+          <div>
+            <Textarea
+              ref={promptRef}
+              label="Prompt template"
+              description="Hidden prompt sent to AI when clicked. Click a variable below to insert it."
+              placeholder="e.g. Tell me about {{product_title}} and its key features"
+              required
+              maxLength={2000}
+              minRows={3}
+              maxRows={8}
+              value={formPrompt}
+              onChange={(e) => setFormPrompt(e.currentTarget.value)}
+            />
+            <Group gap={6} mt={6} wrap="wrap">
+              {TEMPLATE_VARS.map((tv) => (
+                <Button
+                  key={tv.var}
+                  size="compact-xs"
+                  variant="light"
+                  color="gray"
+                  style={{ fontSize: 11, fontFamily: "'JetBrains Mono', monospace" }}
+                  title={tv.desc}
+                  onClick={() => insertTemplateVar(tv.var)}
+                >
+                  {tv.var}
+                </Button>
+              ))}
+            </Group>
+          </div>
           <Group grow>
             <TextInput
               label="Icon (optional)"
@@ -738,64 +725,6 @@ export const QuickActionsPage: React.FC = () => {
               loading={saving}
             >
               {editingAction ? 'Save changes' : 'Create'}
-            </Button>
-          </Group>
-        </Stack>
-      </Modal>
-
-      {/* ================================================================= */}
-      {/* Assignment Modal                                                  */}
-      {/* ================================================================= */}
-
-      <Modal
-        opened={assignModalOpen}
-        onClose={closeAssignModal}
-        title={
-          <Text fw={600} size="lg">
-            Page assignment
-          </Text>
-        }
-        centered
-        size="md"
-      >
-        <Stack gap="md">
-          <Select
-            label="Page type"
-            description="Which page type this assignment applies to"
-            data={PAGE_TYPES}
-            value={assignPageType}
-            onChange={setAssignPageType}
-            allowDeselect={false}
-          />
-          <Select
-            label="Slot 1 — Quick action"
-            description="First quick action button"
-            placeholder="Select a quick action..."
-            data={actionSelectData}
-            value={assignSlot1}
-            onChange={setAssignSlot1}
-            clearable
-          />
-          <Select
-            label="Slot 2 — Quick action"
-            description="Second quick action button"
-            placeholder="Select a quick action..."
-            data={actionSelectData}
-            value={assignSlot2}
-            onChange={setAssignSlot2}
-            clearable
-          />
-          <Group justify="flex-end" mt="sm">
-            <Button variant="default" onClick={closeAssignModal}>
-              Cancel
-            </Button>
-            <Button
-              color={BRAND_RED}
-              onClick={handleSaveAssignment}
-              disabled={!assignPageType}
-              loading={savingAssign}
-            >
-              Save assignment
             </Button>
           </Group>
         </Stack>

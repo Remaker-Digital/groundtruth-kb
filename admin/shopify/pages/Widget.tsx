@@ -17,7 +17,7 @@ export const WidgetPage: React.FC = () => {
   if (!tenantContext) return null;
 
   return (
-    <Page title="Widget Appearance">
+    <Page title="Widget configuration">
       <WidgetConfigurator
         tenantContext={tenantContext}
         apiFetch={apiFetch}

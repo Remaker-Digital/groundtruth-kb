@@ -846,4 +846,23 @@ After initial activation, when the admin opens the Setup Wizard:
 
 ---
 
+## Section 27: Multi-User Admin Access (Post-Launch)
+
+### WI #295 — Multi-user admin access with magic link authentication
+- **Priority:** P3 (post-launch, based on customer demand)
+- **Scope:** Standalone admin only (Shopify merchants use Shopify's native staff accounts)
+- **Description:** Replace single shared API key with per-user accounts. Passwordless magic link auth (SendGrid transactional email) eliminates password custodianship. Includes: invite flow, JWT session tokens with short expiry + refresh, role-based route guards (admin vs read-only vs escalation-only), last-login tracking, active/inactive status, admin controls (resend invite, deactivate, delete user).
+- **Components required:**
+  - User credential storage (Cosmos DB per-tenant user records)
+  - Login flow (magic link email → JWT session)
+  - Transactional email integration (SendGrid, ~$0/mo at low volume)
+  - Password-free lifecycle (invite → magic link → session → expiry → re-auth)
+  - Activity tracking (last login timestamp, inactive flagging)
+  - Admin controls UI (invite, resend, deactivate, delete)
+  - RBAC enforcement on API routes
+- **Rationale:** At launch, each tenant is typically one person. Multi-user is an enterprise feature. Building auth wrong creates security risk. Passwordless magic links avoid password custodianship entirely.
+- **Estimate:** ~5-8 days
+
+---
+
 *© 2026 Remaker Digital, a DBA of VanDusen & Palmeter, LLC. All rights reserved.*

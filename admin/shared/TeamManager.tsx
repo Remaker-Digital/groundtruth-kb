@@ -27,6 +27,7 @@
 
 import React, { useState, useCallback } from 'react';
 import type { BaseComponentProps, TeamMember, TeamRole } from './types';
+import { ESCALATION_CATEGORIES } from './types';
 import { useTeamMembers, useInviteTeamMember } from './hooks';
 import { HelpTooltip } from './HelpTooltip';
 
@@ -37,7 +38,7 @@ import { HelpTooltip } from './HelpTooltip';
 const ROLES: Array<{ value: TeamRole; label: string; description: string }> = [
   { value: 'owner', label: 'Owner', description: 'Full access to all settings, billing, and team management' },
   { value: 'admin', label: 'Admin', description: 'Configuration, team management, and analytics access' },
-  { value: 'agent', label: 'Agent', description: 'Conversation inbox and knowledge base access' },
+  { value: 'agent', label: 'Escalation agent', description: 'Conversation inbox and knowledge base access' },
   { value: 'viewer', label: 'Viewer', description: 'Read-only access to analytics and conversations' },
 ];
 
@@ -467,6 +468,7 @@ export const TeamManager: React.FC<BaseComponentProps> = ({
   const [editMember, setEditMember] = useState<TeamMember | null>(null);
   const [editRole, setEditRole] = useState<TeamRole>('agent');
   const [editActive, setEditActive] = useState(true);
+  const [editCategories, setEditCategories] = useState<string[]>([]);
   const [editLoading, setEditLoading] = useState(false);
 
   // Data hooks
@@ -514,6 +516,7 @@ export const TeamManager: React.FC<BaseComponentProps> = ({
     setEditMember(member);
     setEditRole(member.role as TeamRole);
     setEditActive(member.isActive);
+    setEditCategories(member.escalationCategories || []);
   }, []);
 
   const handleSaveEdit = useCallback(async () => {
@@ -526,6 +529,13 @@ export const TeamManager: React.FC<BaseComponentProps> = ({
       const isNowActive = editActive;
       const wasActive = editMember.isActive;
       if (isNowActive !== wasActive) body.is_active = isNowActive;
+      // Include categories if role is agent and categories changed (WI #279)
+      const origCats = editMember.escalationCategories || [];
+      const catsChanged = editRole === 'agent' && (
+        editCategories.length !== origCats.length ||
+        editCategories.some((c) => !origCats.includes(c))
+      );
+      if (catsChanged) body.escalation_categories = editCategories;
 
       if (Object.keys(body).length === 0) {
         setEditMember(null);
@@ -598,6 +608,71 @@ export const TeamManager: React.FC<BaseComponentProps> = ({
     } catch (err: unknown) {
       const msg = err instanceof Error ? err.message : 'Reactivation failed';
       onNotify(`Failed to reactivate: ${msg}`, 'error');
+    }
+  }, [apiFetch, onNotify, team]);
+
+  // -------------------------------------------------------------------------
+  // Inline role change (WI #275)
+  // -------------------------------------------------------------------------
+
+  const handleInlineRoleChange = useCallback(async (member: TeamMember, newRole: TeamRole) => {
+    if (newRole === member.role) return;
+    try {
+      const resp = await apiFetch(`/api/admin/team/${member.id}`, {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ role: newRole }),
+      });
+      if (!resp.ok) throw new Error(`${resp.status}`);
+      onNotify(`Changed ${member.email} role to ${(ROLES.find((r) => r.value === newRole) || ROLES[3]).label}.`, 'success');
+      team.refetch();
+    } catch (err: unknown) {
+      const msg = err instanceof Error ? err.message : 'Role update failed';
+      onNotify(`Failed to update role: ${msg}`, 'error');
+    }
+  }, [apiFetch, onNotify, team]);
+
+  // -------------------------------------------------------------------------
+  // Inline status toggle (WI #280)
+  // -------------------------------------------------------------------------
+
+  const handleInlineToggle = useCallback(async (member: TeamMember) => {
+    const newActive = !member.isActive;
+    try {
+      const resp = await apiFetch(`/api/admin/team/${member.id}`, {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ is_active: newActive }),
+      });
+      if (!resp.ok) throw new Error(`${resp.status}`);
+      onNotify(`${member.email} ${newActive ? 'enabled' : 'disabled'}.`, 'success');
+      team.refetch();
+    } catch (err: unknown) {
+      const msg = err instanceof Error ? err.message : 'Toggle failed';
+      onNotify(`Failed to update status: ${msg}`, 'error');
+    }
+  }, [apiFetch, onNotify, team]);
+
+  // -------------------------------------------------------------------------
+  // Inline escalation category toggle (WI #279)
+  // -------------------------------------------------------------------------
+
+  const handleCategoryToggle = useCallback(async (member: TeamMember, categoryId: string) => {
+    const current = member.escalationCategories || [];
+    const next = current.includes(categoryId)
+      ? current.filter((c) => c !== categoryId)
+      : [...current, categoryId];
+    try {
+      const resp = await apiFetch(`/api/admin/team/${member.id}`, {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ escalation_categories: next }),
+      });
+      if (!resp.ok) throw new Error(`${resp.status}`);
+      team.refetch();
+    } catch (err: unknown) {
+      const msg = err instanceof Error ? err.message : 'Category update failed';
+      onNotify(`Failed to update categories: ${msg}`, 'error');
     }
   }, [apiFetch, onNotify, team]);
 
@@ -775,7 +850,7 @@ export const TeamManager: React.FC<BaseComponentProps> = ({
             <table style={s.table}>
               <thead>
                 <tr>
-                  <th style={s.th}>Member</th>
+                  <th style={s.th}>Team member</th>
                   <th style={s.th}>Role<HelpTooltip text="Controls what actions a team member can perform. Owner has full access; Viewer is read-only." /></th>
                   <th style={s.th}>Status</th>
                   <th style={s.th}>Joined</th>
@@ -802,19 +877,88 @@ export const TeamManager: React.FC<BaseComponentProps> = ({
                         </div>
                       </td>
 
-                      {/* Role badge */}
+                      {/* Role selector (WI #275) + escalation categories (WI #279) */}
                       <td style={s.td}>
-                        <span style={s.roleBadge(member.role)}>
-                          {(ROLES.find((r) => r.value === member.role) || ROLES[3]).label}
-                        </span>
+                        {isOwner ? (
+                          <span style={s.roleBadge(member.role)}>
+                            {(ROLES.find((r) => r.value === member.role) || ROLES[3]).label}
+                          </span>
+                        ) : (
+                          <select
+                            value={member.role}
+                            onChange={(e) => handleInlineRoleChange(member, e.target.value as TeamRole)}
+                            style={{
+                              padding: '3px 8px',
+                              borderRadius: 12,
+                              fontSize: 12,
+                              fontWeight: 600,
+                              border: '1px solid #e1e4e8',
+                              background: (ROLE_COLORS[member.role] || ROLE_COLORS.viewer).bg,
+                              color: (ROLE_COLORS[member.role] || ROLE_COLORS.viewer).text,
+                              cursor: 'pointer',
+                              outline: 'none',
+                              appearance: 'auto' as React.CSSProperties['appearance'],
+                            }}
+                          >
+                            {INVITABLE_ROLES.map((r) => (
+                              <option key={r.value} value={r.value}>{r.label}</option>
+                            ))}
+                          </select>
+                        )}
+                        {/* Escalation category chips (WI #279) — only for agent role */}
+                        {member.role === 'agent' && (
+                          <div style={{ display: 'flex', flexWrap: 'wrap', gap: 4, marginTop: 6 }}>
+                            {ESCALATION_CATEGORIES.map((cat) => {
+                              const isSelected = (member.escalationCategories || []).includes(cat.id);
+                              return (
+                                <button
+                                  key={cat.id}
+                                  type="button"
+                                  title={cat.description}
+                                  onClick={() => handleCategoryToggle(member, cat.id)}
+                                  style={{
+                                    padding: '1px 8px',
+                                    borderRadius: 10,
+                                    fontSize: 11,
+                                    fontWeight: 500,
+                                    border: `1px solid ${isSelected ? '#93C5FD' : '#E5E7EB'}`,
+                                    background: isSelected ? '#DBEAFE' : '#F9FAFB',
+                                    color: isSelected ? '#1E40AF' : '#9CA3AF',
+                                    cursor: 'pointer',
+                                    outline: 'none',
+                                    lineHeight: '18px',
+                                    whiteSpace: 'nowrap',
+                                    transition: 'all 0.15s ease',
+                                  }}
+                                >
+                                  {cat.label}
+                                </button>
+                              );
+                            })}
+                          </div>
+                        )}
                       </td>
 
-                      {/* Status */}
+                      {/* Status toggle (WI #280) */}
                       <td style={s.td}>
-                        <span style={s.statusDot(statusInfo.color)}>
-                          <span style={s.dot(statusInfo.color)} />
-                          {statusInfo.label}
-                        </span>
+                        {isOwner ? (
+                          <span style={s.statusDot(statusInfo.color)}>
+                            <span style={s.dot(statusInfo.color)} />
+                            {statusInfo.label}
+                          </span>
+                        ) : (
+                          <label style={{ display: 'inline-flex', alignItems: 'center', gap: 6, cursor: 'pointer' }}>
+                            <input
+                              type="checkbox"
+                              checked={member.isActive}
+                              onChange={() => handleInlineToggle(member)}
+                              style={{ accentColor: '#059669', width: 16, height: 16, cursor: 'pointer' }}
+                            />
+                            <span style={{ fontSize: 12, color: member.isActive ? '#059669' : '#9CA3AF', fontWeight: 500 }}>
+                              {member.isActive ? 'Active' : 'Disabled'}
+                            </span>
+                          </label>
+                        )}
                       </td>
 
                       {/* Joined */}
@@ -832,23 +976,7 @@ export const TeamManager: React.FC<BaseComponentProps> = ({
                       {/* Actions */}
                       <td style={{ ...s.td, textAlign: 'right' }}>
                         <div style={{ ...s.actionRow, justifyContent: 'flex-end' }}>
-                          {!isOwner && !isDisabled && (
-                            <button
-                              style={s.actionButton('edit')}
-                              onClick={() => openEdit(member)}
-                            >
-                              Edit
-                            </button>
-                          )}
-                          {isDisabled && (
-                            <button
-                              style={s.actionButton('enable')}
-                              onClick={() => handleReactivate(member)}
-                            >
-                              Reactivate
-                            </button>
-                          )}
-                          {!isOwner && !isDisabled && (
+                          {!isOwner && (
                             <button
                               style={s.actionButton('remove')}
                               onClick={() => {
@@ -955,6 +1083,56 @@ export const TeamManager: React.FC<BaseComponentProps> = ({
                 ))}
               </select>
             </div>
+
+            {/* Escalation categories — visible only for agent role (WI #279) */}
+            {editRole === 'agent' && (
+              <div style={{ marginBottom: 16 }}>
+                <label style={s.formLabel}>
+                  Escalation categories
+                  <HelpTooltip text="Select which types of escalated conversations this agent handles. Unselected categories will route to other available agents." />
+                </label>
+                <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6, marginTop: 8 }}>
+                  {ESCALATION_CATEGORIES.map((cat) => {
+                    const isSelected = editCategories.includes(cat.id);
+                    return (
+                      <label
+                        key={cat.id}
+                        title={cat.description}
+                        style={{
+                          display: 'inline-flex',
+                          alignItems: 'center',
+                          gap: 5,
+                          padding: '4px 10px',
+                          borderRadius: 14,
+                          fontSize: 12,
+                          fontWeight: 500,
+                          border: `1px solid ${isSelected ? '#93C5FD' : '#E5E7EB'}`,
+                          background: isSelected ? '#DBEAFE' : '#F9FAFB',
+                          color: isSelected ? '#1E40AF' : '#6B7280',
+                          cursor: 'pointer',
+                          transition: 'all 0.15s ease',
+                          userSelect: 'none',
+                        }}
+                      >
+                        <input
+                          type="checkbox"
+                          checked={isSelected}
+                          onChange={() => {
+                            setEditCategories((prev) =>
+                              prev.includes(cat.id)
+                                ? prev.filter((c) => c !== cat.id)
+                                : [...prev, cat.id],
+                            );
+                          }}
+                          style={{ accentColor: '#3B82F6', width: 14, height: 14 }}
+                        />
+                        {cat.label}
+                      </label>
+                    );
+                  })}
+                </div>
+              </div>
+            )}
 
             <div style={{ marginBottom: 20 }}>
               <label style={s.formLabel}>Status</label>

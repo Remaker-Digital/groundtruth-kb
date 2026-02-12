@@ -49,6 +49,7 @@ import {
 } from './hooks';
 import type { TestModeStatus } from './hooks';
 import { HelpTooltip } from './HelpTooltip';
+import { TeamManager } from './TeamManager';
 
 // ---------------------------------------------------------------------------
 // Step metadata — display labels for each onboarding step
@@ -74,55 +75,85 @@ const AI_BEHAVIOR_FIELD_KEYS: ReadonlySet<string> = new Set([
   'cite_sources_in_response',
 ]);
 
-const BASE_STEP_ORDER: OnboardingStep[] = [
-  'brand_and_tone',
+/**
+ * Wizard step structure (WI #286 redesign — 8 steps):
+ *   0: Mode selection       — Standard / Test toggle (always visible)
+ *   1: Team                 — Team member management (hidden in test mode)
+ *   2: Agent configuration  — AI behaviour fields (full in setup, AI-only in test)
+ *   3: Knowledge base       — KB articles (hidden in test mode)
+ *   4: Quick actions         — Prompt buttons (hidden in test mode)
+ *   5: Widget configuration — Widget appearance (hidden in test mode)
+ *   6: Integrations         — Service connections (hidden in test mode)
+ *   7: Go live              — Completion/diff checklist
+ *
+ * In test mode, steps 1, 3, 5, 6 are hidden. Step 2 shows AI fields only.
+ * Step 4 shows prompt template field only.
+ */
+
+/** Steps visible during initial setup (Standard mode). */
+const SETUP_STEP_ORDER: OnboardingStep[] = [
+  'team',
   'ai_behavior',
-  'escalation',
-  'integrations',
   'knowledge_base',
-  'response_policies',
-  'customer_memory',
-  'notifications',
+  'quick_actions',
   'widget_appearance',
+  'integrations',
+];
+
+/** Steps visible during test mode — only AI-behaviour steps. */
+const TEST_MODE_STEP_ORDER: OnboardingStep[] = [
+  'ai_behavior',
+  'quick_actions',
 ];
 
 const STEP_LABELS: Record<string, string> = {
   mode_selection: 'Mode selection',
-  brand_and_tone: 'Brand & tone',
-  ai_behavior: 'AI behavior',
-  escalation: 'Escalation rules',
-  integrations: 'Integrations',
+  team: 'Team',
+  ai_behavior: 'Agent configuration',
   knowledge_base: 'Knowledge base',
+  quick_actions: 'Quick actions',
+  widget_appearance: 'Widget configuration',
+  integrations: 'Integrations',
+  go_live: 'Go live',
+  // Legacy keys kept for review summary grouping
+  brand_and_tone: 'Brand & tone',
+  escalation: 'Escalation rules',
   response_policies: 'Response policies',
   customer_memory: 'Customer memory',
   notifications: 'Notifications',
-  widget_appearance: 'Widget appearance',
-  review_and_launch: 'Review & launch',
+  review_and_launch: 'Custom AI instructions',
 };
 
 const STEP_DESCRIPTIONS: Record<string, string> = {
   mode_selection:
-    'Choose whether to modify your live Production config or create a Test Mode variant for controlled rollout.',
-  brand_and_tone:
-    'Set your brand name, voice, and personality so the AI represents your business authentically.',
+    'Choose whether to modify your live configuration or create a Test Mode variant for controlled rollout.',
+  team:
+    'Add team members and assign escalation categories so conversations reach the right people.',
   ai_behavior:
-    'Configure how the AI responds: formality, response length, and model behavior.',
-  escalation:
-    'Define when and how conversations are escalated to human agents.',
-  integrations:
-    'Connect your Shopify store, Zendesk, Mailchimp, and other services.',
+    'Configure your AI assistant\'s personality, response style, retrieval settings, and custom instructions.',
   knowledge_base:
     'Upload FAQs, product information, and policies for the AI to reference.',
+  quick_actions:
+    'Create contextual prompt buttons that help customers start conversations quickly.',
+  widget_appearance:
+    'Customize the chat widget colors, position, and behavior on your storefront.',
+  integrations:
+    'Connect your Shopify store, Zendesk, Mailchimp, and other services.',
+  go_live:
+    'Review your configuration and activate your AI assistant.',
+  // Legacy keys kept for review summary
+  brand_and_tone:
+    'Set your brand name, voice, and personality so the AI represents your business authentically.',
+  escalation:
+    'Define when and how conversations are escalated to human agents.',
   response_policies:
     'Set business policies like return windows, shipping info, and support hours.',
   customer_memory:
     'Configure how the AI remembers customers across conversations.',
   notifications:
     'Set up alert thresholds and notification preferences.',
-  widget_appearance:
-    'Customize the chat widget colors, position, and behavior on your storefront.',
   review_and_launch:
-    'Review your configuration and activate your AI assistant.',
+    'Add free-form advisory instructions for the AI to follow across all conversations.',
 };
 
 // ---------------------------------------------------------------------------
@@ -1133,7 +1164,7 @@ function groupConfigForReview(
 
   // Build output in step order
   const result: Array<{ step: string; label: string; fields: Array<{ key: string; value: string }> }> = [];
-  const displayOrder = [...BASE_STEP_ORDER, 'general'];
+  const displayOrder = [...SETUP_STEP_ORDER, 'general'];
   for (const step of displayOrder) {
     if (grouped[step] && grouped[step].length > 0) {
       const label = step === 'general' ? 'General' : (STEP_LABELS[step] ?? step);
@@ -1165,7 +1196,7 @@ function formatFieldLabel(key: string): string {
     .join(' ');
 }
 
-interface ReviewAndLaunchStepProps {
+interface GoLiveStepProps {
   apiFetch: (path: string, init?: RequestInit) => Promise<Response>;
   config: Record<string, unknown>;
   wizardMode: WizardMode;
@@ -1178,9 +1209,122 @@ interface ReviewAndLaunchStepProps {
   onRollout: () => Promise<void>;
   onAbandon: () => Promise<void>;
   onFinishProduction: () => void;
+  /** Navigate to a specific wizard step by key. */
+  onGoToStep?: (stepKey: string) => void;
+  /** Which wizard steps have been completed. */
+  completedSteps: Set<number>;
+  /** Full ordered step keys in the wizard. */
+  stepOrder: string[];
 }
 
-const ReviewAndLaunchStep: React.FC<ReviewAndLaunchStepProps> = ({
+// ---------------------------------------------------------------------------
+// Checklist item types for Go Live (WI #288 + #289)
+// ---------------------------------------------------------------------------
+
+interface ChecklistItem {
+  label: string;
+  description: string;
+  status: 'complete' | 'incomplete' | 'advisory';
+  /** Step key to navigate to when clicked. */
+  stepKey?: string;
+}
+
+/** Build the initial-setup completion checklist (WI #288). */
+function buildSetupChecklist(
+  config: Record<string, unknown>,
+  completedSteps: Set<number>,
+  stepOrder: string[],
+): ChecklistItem[] {
+  const items: ChecklistItem[] = [];
+
+  // Mandatory items
+  const hasCompanyName = !!config['company_name'];
+  items.push({
+    label: 'Company name',
+    description: hasCompanyName ? `Set to "${config['company_name']}"` : 'Required — identifies your brand to customers.',
+    status: hasCompanyName ? 'complete' : 'incomplete',
+    stepKey: 'ai_behavior',
+  });
+
+  const hasBrandVoice = !!config['brand_voice'];
+  items.push({
+    label: 'Brand voice',
+    description: hasBrandVoice ? `Set to "${config['brand_voice']}"` : 'Required — defines your AI assistant\'s personality.',
+    status: hasBrandVoice ? 'complete' : 'incomplete',
+    stepKey: 'ai_behavior',
+  });
+
+  // Advisory items
+  const teamStepIdx = stepOrder.indexOf('team');
+  const teamCompleted = teamStepIdx >= 0 && completedSteps.has(teamStepIdx);
+  items.push({
+    label: 'Team members',
+    description: teamCompleted ? 'At least one team member configured.' : 'Recommended — add team members for escalation.',
+    status: teamCompleted ? 'complete' : 'advisory',
+    stepKey: 'team',
+  });
+
+  const kbStepIdx = stepOrder.indexOf('knowledge_base');
+  const kbCompleted = kbStepIdx >= 0 && completedSteps.has(kbStepIdx);
+  items.push({
+    label: 'Knowledge base',
+    description: kbCompleted ? 'Knowledge base articles added.' : 'Recommended — upload FAQs and product info for better answers.',
+    status: kbCompleted ? 'complete' : 'advisory',
+    stepKey: 'knowledge_base',
+  });
+
+  const intStepIdx = stepOrder.indexOf('integrations');
+  const intCompleted = intStepIdx >= 0 && completedSteps.has(intStepIdx);
+  items.push({
+    label: 'Integrations',
+    description: intCompleted ? 'Integrations configured.' : 'Recommended — connect Shopify and other services.',
+    status: intCompleted ? 'complete' : 'advisory',
+    stepKey: 'integrations',
+  });
+
+  const widgetStepIdx = stepOrder.indexOf('widget_appearance');
+  const widgetCompleted = widgetStepIdx >= 0 && completedSteps.has(widgetStepIdx);
+  items.push({
+    label: 'Widget appearance',
+    description: widgetCompleted ? 'Widget customized.' : 'Recommended — customize colors and position.',
+    status: widgetCompleted ? 'complete' : 'advisory',
+    stepKey: 'widget_appearance',
+  });
+
+  return items;
+}
+
+/** Build the test-mode diff checklist (WI #289). */
+function buildTestDiffChecklist(
+  config: Record<string, unknown>,
+): Array<{ key: string; label: string; standardValue: string; testValue: string; changed: boolean }> {
+  const items: Array<{ key: string; label: string; standardValue: string; testValue: string; changed: boolean }> = [];
+
+  for (const key of AI_BEHAVIOR_FIELD_KEYS) {
+    const standardVal = config[key];
+    const testKey = `test_mode_${key}`;
+    const testVal = config[testKey];
+
+    // Only show fields that exist in the config
+    if (!(key in config)) continue;
+
+    const standardStr = formatConfigValue(standardVal);
+    const testStr = testVal !== undefined ? formatConfigValue(testVal) : standardStr;
+    const changed = testVal !== undefined && testStr !== standardStr;
+
+    items.push({
+      key,
+      label: formatFieldLabel(key),
+      standardValue: standardStr,
+      testValue: testStr,
+      changed,
+    });
+  }
+
+  return items;
+}
+
+const GoLiveStep: React.FC<GoLiveStepProps> = ({
   config,
   wizardMode,
   testPercentage,
@@ -1192,21 +1336,22 @@ const ReviewAndLaunchStep: React.FC<ReviewAndLaunchStepProps> = ({
   onRollout,
   onAbandon,
   onFinishProduction,
+  onGoToStep,
+  completedSteps,
+  stepOrder,
 }) => {
-  const [expandedSections, setExpandedSections] = useState<Set<string>>(
-    () => new Set(BASE_STEP_ORDER),
+  // WI #288: Build setup checklist for Standard mode
+  const setupChecklist = useMemo(
+    () => buildSetupChecklist(config, completedSteps, stepOrder),
+    [config, completedSteps, stepOrder],
   );
+  const mandatoryComplete = setupChecklist
+    .filter((item) => item.status !== 'advisory')
+    .every((item) => item.status === 'complete');
 
-  const toggleSection = useCallback((step: string) => {
-    setExpandedSections((prev) => {
-      const next = new Set(prev);
-      if (next.has(step)) next.delete(step);
-      else next.add(step);
-      return next;
-    });
-  }, []);
-
-  const grouped = useMemo(() => groupConfigForReview(config), [config]);
+  // WI #289: Build diff checklist for Test mode
+  const testDiffItems = useMemo(() => buildTestDiffChecklist(config), [config]);
+  const changedCount = testDiffItems.filter((item) => item.changed).length;
 
   return (
     <div>
@@ -1219,68 +1364,180 @@ const ReviewAndLaunchStep: React.FC<ReviewAndLaunchStepProps> = ({
             <line x1="12" y1="17" x2="12.01" y2="17" />
           </svg>
           <div>
-            <strong>Test Mode is active.</strong> You can roll out (merge to production) or abandon (discard) the test configuration.
+            <strong>Test mode is active.</strong> You can roll out (merge to production) or abandon (discard) the test configuration.
           </div>
         </div>
       )}
 
-      {/* Config summary sections */}
-      <div style={{ marginBottom: 24 }}>
-        <div style={{ fontSize: 14, fontWeight: 500, color: '#888', marginBottom: 12 }}>
-          Configuration Summary
-        </div>
-
-        {grouped.length === 0 && (
-          <div style={styles.emptyStep}>
-            No configuration values have been set yet.
+      {/* ── WI #288: Standard mode — Completion checklist ── */}
+      {wizardMode === 'production' && !isTestModeActive && (
+        <div style={{ marginBottom: 24 }}>
+          <div style={{ fontSize: 14, fontWeight: 500, color: '#888', marginBottom: 12 }}>
+            Activation checklist
           </div>
-        )}
 
-        {grouped.map(({ step, label, fields }) => (
-          <div key={step} style={reviewStyles.section}>
+          {setupChecklist.map((item) => {
+            const iconColor =
+              item.status === 'complete' ? '#16a34a'
+                : item.status === 'incomplete' ? '#f59e0b'
+                : '#666';
+            const icon =
+              item.status === 'complete' ? '\u2713'
+                : item.status === 'incomplete' ? '\u2717'
+                : '\u2022';
+            const isClickable = item.status !== 'complete' && item.stepKey && onGoToStep;
+
+            return (
+              <div
+                key={item.label}
+                style={{
+                  display: 'flex',
+                  alignItems: 'flex-start',
+                  gap: 10,
+                  padding: '10px 12px',
+                  borderRadius: 6,
+                  marginBottom: 4,
+                  cursor: isClickable ? 'pointer' : 'default',
+                  transition: 'background-color 0.15s',
+                }}
+                onClick={() => {
+                  if (isClickable && item.stepKey) onGoToStep(item.stepKey);
+                }}
+                onMouseEnter={(e) => {
+                  if (isClickable) (e.currentTarget as HTMLElement).style.backgroundColor = 'rgba(255,255,255,0.04)';
+                }}
+                onMouseLeave={(e) => {
+                  (e.currentTarget as HTMLElement).style.backgroundColor = 'transparent';
+                }}
+              >
+                <span style={{
+                  color: iconColor,
+                  fontSize: 16,
+                  fontWeight: 700,
+                  width: 22,
+                  textAlign: 'center',
+                  flexShrink: 0,
+                  lineHeight: '1.4',
+                }}>
+                  {icon}
+                </span>
+                <div style={{ flex: 1, minWidth: 0 }}>
+                  <div style={{
+                    fontSize: 14,
+                    fontWeight: 500,
+                    color: item.status === 'complete' ? '#e0e0e0' : '#f5f5f5',
+                  }}>
+                    {item.label}
+                    {item.status === 'advisory' && (
+                      <span style={{
+                        fontSize: 11,
+                        fontWeight: 400,
+                        color: '#888',
+                        marginLeft: 6,
+                      }}>
+                        (recommended)
+                      </span>
+                    )}
+                  </div>
+                  <div style={{ fontSize: 12, color: '#888', marginTop: 2 }}>
+                    {item.description}
+                  </div>
+                </div>
+                {isClickable && (
+                  <span style={{ color: '#888', fontSize: 12, flexShrink: 0, marginTop: 2 }}>
+                    Go to step →
+                  </span>
+                )}
+              </div>
+            );
+          })}
+
+          {!mandatoryComplete && (
+            <div style={{
+              marginTop: 12,
+              padding: '10px 14px',
+              borderRadius: 6,
+              backgroundColor: 'rgba(245, 158, 11, 0.08)',
+              border: '1px solid rgba(245, 158, 11, 0.2)',
+              fontSize: 13,
+              color: '#f59e0b',
+            }}>
+              Complete all required items above before activating.
+            </div>
+          )}
+
+          <button
+            style={{
+              ...reviewStyles.activateBtn('production'),
+              marginTop: 16,
+              ...((!mandatoryComplete) ? { opacity: 0.5, cursor: 'not-allowed' } : {}),
+            }}
+            onClick={onFinishProduction}
+            disabled={!mandatoryComplete}
+          >
+            Activate standard mode
+          </button>
+        </div>
+      )}
+
+      {/* ── WI #289: Test mode — Diff checklist ── */}
+      {wizardMode === 'test' && !isTestModeActive && (
+        <div style={{ marginBottom: 24 }}>
+          <div style={{ fontSize: 14, fontWeight: 500, color: '#888', marginBottom: 4 }}>
+            AI behavior changes
+          </div>
+          <div style={{ fontSize: 12, color: '#666', marginBottom: 12 }}>
+            {changedCount > 0
+              ? `${changedCount} field${changedCount === 1 ? '' : 's'} changed from standard configuration.`
+              : 'No fields have been changed from the standard configuration yet.'}
+          </div>
+
+          {testDiffItems.map((item) => (
             <div
-              style={reviewStyles.sectionHeader}
-              onClick={() => toggleSection(step)}
-              role="button"
-              tabIndex={0}
-              onKeyDown={(e) => {
-                if (e.key === 'Enter' || e.key === ' ') {
-                  e.preventDefault();
-                  toggleSection(step);
-                }
+              key={item.key}
+              style={{
+                display: 'flex',
+                alignItems: 'flex-start',
+                gap: 10,
+                padding: '8px 12px',
+                borderRadius: 6,
+                marginBottom: 4,
+                borderLeft: `3px solid ${item.changed ? '#16a34a' : '#444'}`,
               }}
             >
-              <span style={reviewStyles.sectionTitle}>
-                {label}
-                <span style={{ color: '#666', fontWeight: 400, marginLeft: 8, fontSize: 12 }}>
-                  ({fields.length} {fields.length === 1 ? 'field' : 'fields'})
-                </span>
+              <span style={{
+                color: item.changed ? '#16a34a' : '#f59e0b',
+                fontSize: 14,
+                fontWeight: 700,
+                width: 18,
+                textAlign: 'center',
+                flexShrink: 0,
+                lineHeight: '1.5',
+              }}>
+                {item.changed ? '\u2713' : '\u2717'}
               </span>
-              <span style={{ color: '#888', fontSize: 12 }}>
-                {expandedSections.has(step) ? '\u25B2' : '\u25BC'}
-              </span>
-            </div>
-
-            {expandedSections.has(step) && (
-              <div style={reviewStyles.sectionBody}>
-                {fields.map(({ key, value }) => (
-                  <div key={key} style={reviewStyles.fieldRow}>
-                    <span style={reviewStyles.fieldLabel}>{formatFieldLabel(key)}</span>
-                    <span style={reviewStyles.fieldValue}>{value}</span>
+              <div style={{ flex: 1, minWidth: 0 }}>
+                <div style={{ fontSize: 13, fontWeight: 500, color: '#e0e0e0' }}>
+                  {item.label}
+                </div>
+                {item.changed ? (
+                  <div style={{ fontSize: 12, color: '#888', marginTop: 2 }}>
+                    <span style={{ color: '#888', textDecoration: 'line-through' }}>{item.standardValue}</span>
+                    <span style={{ color: '#666', margin: '0 6px' }}>→</span>
+                    <span style={{ color: '#16a34a', fontWeight: 500 }}>{item.testValue}</span>
                   </div>
-                ))}
+                ) : (
+                  <div style={{ fontSize: 12, color: '#666', marginTop: 2 }}>
+                    Unchanged: {item.standardValue}
+                  </div>
+                )}
               </div>
-            )}
-          </div>
-        ))}
-      </div>
+            </div>
+          ))}
 
-      {/* Test Mode controls */}
-      {wizardMode === 'test' && !isTestModeActive && (
-        <>
           <div style={reviewStyles.testPercentageRow}>
             <label style={{ fontSize: 14, fontWeight: 500, color: '#F5F5F5', flexShrink: 0 }}>
-              Test Population:
+              Test population:
             </label>
             <input
               type="number"
@@ -1302,14 +1559,19 @@ const ReviewAndLaunchStep: React.FC<ReviewAndLaunchStepProps> = ({
           <button
             style={{
               ...reviewStyles.activateBtn('test'),
-              ...(activatingTest ? { opacity: 0.6, cursor: 'not-allowed' } : {}),
+              ...(activatingTest || changedCount === 0 ? { opacity: 0.6, cursor: 'not-allowed' } : {}),
             }}
             onClick={onActivateTest}
-            disabled={activatingTest}
+            disabled={activatingTest || changedCount === 0}
           >
-            {activatingTest ? 'Activating...' : `Activate AI Agent Test (${testPercentage}%)`}
+            {activatingTest ? 'Activating...' : `Activate test mode (${testPercentage}%)`}
           </button>
-        </>
+          {changedCount === 0 && (
+            <div style={{ fontSize: 12, color: '#888', marginTop: 6 }}>
+              Change at least one AI behavior field before activating test mode.
+            </div>
+          )}
+        </div>
       )}
 
       {/* Roll-out / Abandon controls when test is already active */}
@@ -1324,7 +1586,7 @@ const ReviewAndLaunchStep: React.FC<ReviewAndLaunchStepProps> = ({
             onClick={onRollout}
             disabled={deactivatingTest}
           >
-            {deactivatingTest ? 'Processing...' : 'Roll Out to Production'}
+            {deactivatingTest ? 'Processing...' : 'Roll out to production'}
           </button>
           <button
             style={{
@@ -1334,19 +1596,9 @@ const ReviewAndLaunchStep: React.FC<ReviewAndLaunchStepProps> = ({
             onClick={onAbandon}
             disabled={deactivatingTest}
           >
-            Abandon Test
+            Abandon test
           </button>
         </div>
-      )}
-
-      {/* Production activation */}
-      {wizardMode === 'production' && !isTestModeActive && (
-        <button
-          style={reviewStyles.activateBtn('production')}
-          onClick={onFinishProduction}
-        >
-          Activate AI Agent
-        </button>
       )}
     </div>
   );
@@ -1441,13 +1693,21 @@ export const OnboardingWizard: React.FC<OnboardingWizardProps> = ({
   const STEP_ORDER: string[] = useMemo(() => {
     const steps: string[] = [];
     if (showModeSelector) steps.push('mode_selection');
-    steps.push(...BASE_STEP_ORDER);
-    steps.push('review_and_launch');
+    const modeSteps = wizardMode === 'test' ? TEST_MODE_STEP_ORDER : SETUP_STEP_ORDER;
+    steps.push(...modeSteps);
+    steps.push('go_live');
     return steps;
-  }, [showModeSelector]);
+  }, [showModeSelector, wizardMode]);
+
+  // Clamp step index when step order shrinks (e.g. switching production → test mode)
+  useEffect(() => {
+    if (currentStepIndex >= STEP_ORDER.length) {
+      setCurrentStepIndex(STEP_ORDER.length - 1);
+    }
+  }, [STEP_ORDER.length, currentStepIndex]);
 
   // Current step key
-  const currentStepKey = STEP_ORDER[currentStepIndex];
+  const currentStepKey = STEP_ORDER[Math.min(currentStepIndex, STEP_ORDER.length - 1)];
 
   // Fetch schema for the current step (step numbers are 1-indexed on the backend).
   // Map our step key to the backend step number.  The backend uses integer step
@@ -1587,23 +1847,44 @@ export const OnboardingWizard: React.FC<OnboardingWizardProps> = ({
     }
   }, [currentFields, fieldValues]);
 
+  // WI #288: Navigate to a specific wizard step by key (from Go Live checklist)
+  const handleGoToStep = useCallback((stepKey: string) => {
+    const idx = STEP_ORDER.indexOf(stepKey);
+    if (idx >= 0) setCurrentStepIndex(idx);
+  }, [STEP_ORDER]);
+
   const handleSave = useCallback(async () => {
     if (saving || updateLoading) return;
 
     // C16: Mode selection — no save, just advance
     if (currentStepKey === 'mode_selection') {
+      // WI #285: Post-activation Standard mode — wizard is read-only, redirect to sidebar
+      if (wizardMode === 'production' && hasProductionConfig) {
+        onNotify('Standard mode is active. Use the sidebar pages to edit your configuration.', 'info');
+        onComplete();
+        return;
+      }
       setCompletedSteps((prev) => new Set(prev).add(currentStepIndex));
       setCurrentStepIndex((i) => i + 1);
       return;
     }
 
-    // C13: Review and Launch — activation handled by ReviewAndLaunchStep buttons,
+    // C13: Go Live — activation handled by GoLiveStep buttons,
     // so the primary nav button just advances / finishes.
-    if (currentStepKey === 'review_and_launch') {
+    if (currentStepKey === 'go_live') {
       // The step's own buttons handle activation. The primary nav button
       // is labelled "Finish Setup" and completes the wizard.
       onNotify('Onboarding complete! Your AI assistant is ready.', 'success');
       onComplete();
+      return;
+    }
+
+    // Team step — managed by embedded TeamManager, no field-level save
+    if (currentStepKey === 'team') {
+      setCompletedSteps((prev) => new Set(prev).add(currentStepIndex));
+      if (currentStepIndex < STEP_ORDER.length - 1) {
+        setCurrentStepIndex((i) => i + 1);
+      }
       return;
     }
 
@@ -1750,31 +2031,85 @@ export const OnboardingWizard: React.FC<OnboardingWizardProps> = ({
       <h3 style={styles.stepLabel}>{STEP_LABELS[currentStepKey]}</h3>
       <p style={styles.stepDescription}>{STEP_DESCRIPTIONS[currentStepKey]}</p>
 
-      {/* C16: Mode Selection step */}
+      {/* C16: Mode Selection step (post-activation — WI #285) */}
       {currentStepKey === 'mode_selection' ? (
         <div style={styles.fieldsContainer}>
-          <div style={{ marginBottom: 16, fontSize: 14, color: '#888' }}>
-            A Production configuration already exists. Choose how you want to proceed:
-          </div>
-          <label style={{ ...styles.checkboxRow, padding: '14px 16px', border: wizardMode === 'production' ? '2px solid #ff3621' : '1px solid #d0d0d0', borderRadius: 8, cursor: 'pointer', background: wizardMode === 'production' ? 'rgba(255, 54, 33, 0.04)' : 'transparent' }}>
-            <input type="radio" name="wizard-mode" value="production" checked={wizardMode === 'production'} onChange={() => setWizardMode('production')} style={{ accentColor: '#ff3621', width: 18, height: 18 }} />
+          {/* Standard mode — read-only after activation */}
+          <div
+            style={{
+              padding: '14px 16px',
+              border: wizardMode === 'production' ? '2px solid #ff3621' : '1px solid #d0d0d0',
+              borderRadius: 8,
+              background: wizardMode === 'production' ? 'rgba(255, 54, 33, 0.04)' : 'transparent',
+              cursor: 'pointer',
+              display: 'flex',
+              alignItems: 'flex-start',
+              gap: 10,
+            }}
+            onClick={() => setWizardMode('production')}
+          >
+            <input
+              type="radio"
+              name="wizard-mode"
+              value="production"
+              checked={wizardMode === 'production'}
+              onChange={() => setWizardMode('production')}
+              style={{ accentColor: '#ff3621', width: 18, height: 18, marginTop: 2 }}
+            />
             <div>
-              <div style={{ fontWeight: 600, fontSize: 15, marginBottom: 2 }}>Production</div>
-              <div style={{ fontSize: 13, color: '#888' }}>Modify your live AI configuration directly.</div>
+              <div style={{ fontWeight: 600, fontSize: 15, marginBottom: 2 }}>
+                Standard mode
+                <span style={{
+                  display: 'inline-block',
+                  marginLeft: 8,
+                  fontSize: 11,
+                  fontWeight: 600,
+                  padding: '2px 8px',
+                  borderRadius: 10,
+                  backgroundColor: '#16a34a',
+                  color: '#fff',
+                  verticalAlign: 'middle',
+                }}>
+                  Active
+                </span>
+              </div>
+              <div style={{ fontSize: 13, color: '#888', lineHeight: '1.5' }}>
+                Standard mode is active. Edit your configuration using the sidebar pages.
+                To test AI behavior changes, switch to Test mode below.
+              </div>
             </div>
-          </label>
-          <label style={{ ...styles.checkboxRow, padding: '14px 16px', border: wizardMode === 'test' ? '2px solid #f59e0b' : '1px solid #d0d0d0', borderRadius: 8, cursor: 'pointer', marginTop: 8, background: wizardMode === 'test' ? 'rgba(245, 158, 11, 0.04)' : 'transparent' }}>
-            <input type="radio" name="wizard-mode" value="test" checked={wizardMode === 'test'} onChange={() => setWizardMode('test')} style={{ accentColor: '#f59e0b', width: 18, height: 18 }} />
+          </div>
+
+          {/* Test mode — selectable toggle */}
+          <label style={{
+            ...styles.checkboxRow,
+            padding: '14px 16px',
+            border: wizardMode === 'test' ? '2px solid #f59e0b' : '1px solid #d0d0d0',
+            borderRadius: 8,
+            cursor: 'pointer',
+            marginTop: 8,
+            background: wizardMode === 'test' ? 'rgba(245, 158, 11, 0.04)' : 'transparent',
+          }}>
+            <input
+              type="radio"
+              name="wizard-mode"
+              value="test"
+              checked={wizardMode === 'test'}
+              onChange={() => setWizardMode('test')}
+              style={{ accentColor: '#f59e0b', width: 18, height: 18 }}
+            />
             <div>
-              <div style={{ fontWeight: 600, fontSize: 15, marginBottom: 2 }}>Test Mode</div>
-              <div style={{ fontSize: 13, color: '#888' }}>Create a test variant — route a percentage of sessions to it for controlled testing.</div>
+              <div style={{ fontWeight: 600, fontSize: 15, marginBottom: 2 }}>Test mode</div>
+              <div style={{ fontSize: 13, color: '#888' }}>
+                Create a test variant — route a percentage of sessions to it for controlled A/B testing of AI behavior.
+              </div>
             </div>
           </label>
         </div>
 
-      /* C13: Review and Launch step */
-      ) : currentStepKey === 'review_and_launch' ? (
-        <ReviewAndLaunchStep
+      /* C13: Go Live step (WI #288 + #289) */
+      ) : currentStepKey === 'go_live' ? (
+        <GoLiveStep
           apiFetch={apiFetch}
           config={fullConfig?.config ?? {}}
           wizardMode={wizardMode}
@@ -1783,6 +2118,9 @@ export const OnboardingWizard: React.FC<OnboardingWizardProps> = ({
           isTestModeActive={isTestModeActive}
           activatingTest={activatingTest}
           deactivatingTest={deactivatingTest}
+          onGoToStep={handleGoToStep}
+          completedSteps={completedSteps}
+          stepOrder={STEP_ORDER}
           onActivateTest={async () => {
             // Collect AI-behaviour field deltas from current config
             const overrides: Record<string, unknown> = {};
@@ -1792,17 +2130,17 @@ export const OnboardingWizard: React.FC<OnboardingWizardProps> = ({
             }
             const ok = await activateTestMode(overrides, testPercentage);
             if (ok) {
-              onNotify(`Test Mode activated — ${testPercentage}% of sessions will use the test config.`, 'success');
+              onNotify(`Test mode activated — ${testPercentage}% of sessions will use the test config.`, 'success');
               refetchTestMode();
               onTestModeChange?.();
             } else {
-              onNotify('Failed to activate Test Mode.', 'error');
+              onNotify('Failed to activate test mode.', 'error');
             }
           }}
           onRollout={async () => {
             const ok = await deactivateTestMode('rollout');
             if (ok) {
-              onNotify('Test Mode rolled out — test overrides merged into production.', 'success');
+              onNotify('Test mode rolled out — test overrides merged into production.', 'success');
               refetchTestMode();
               onTestModeChange?.();
               onComplete();
@@ -1813,7 +2151,7 @@ export const OnboardingWizard: React.FC<OnboardingWizardProps> = ({
           onAbandon={async () => {
             const ok = await deactivateTestMode('abandon');
             if (ok) {
-              onNotify('Test Mode abandoned — test overrides discarded.', 'success');
+              onNotify('Test mode abandoned — test overrides discarded.', 'success');
               refetchTestMode();
               onTestModeChange?.();
             } else {
@@ -1824,6 +2162,14 @@ export const OnboardingWizard: React.FC<OnboardingWizardProps> = ({
             onNotify('Configuration saved! Your AI assistant is live.', 'success');
             onComplete();
           }}
+        />
+
+      /* WI #287: Team step — embeds shared TeamManager */
+      ) : currentStepKey === 'team' ? (
+        <TeamManager
+          tenantContext={tenantContext}
+          apiFetch={apiFetch}
+          onNotify={onNotify}
         />
 
       /* C11: custom integration step */
@@ -1903,8 +2249,8 @@ export const OnboardingWizard: React.FC<OnboardingWizardProps> = ({
               Previous
             </button>
           )}
-          {/* Hide skip on review_and_launch — activation is explicit */}
-          {currentStepKey !== 'review_and_launch' && (
+          {/* Hide skip on go_live — activation is explicit */}
+          {currentStepKey !== 'go_live' && (
             <button
               style={styles.buttonSkip}
               onClick={handleSkip}
@@ -1921,8 +2267,8 @@ export const OnboardingWizard: React.FC<OnboardingWizardProps> = ({
             ...(saving || updateLoading
               ? { opacity: 0.6, cursor: 'not-allowed' }
               : {}),
-            // Test-mode review uses amber
-            ...(currentStepKey === 'review_and_launch' && wizardMode === 'test' && !isTestModeActive
+            // Test-mode go-live uses amber
+            ...(currentStepKey === 'go_live' && wizardMode === 'test' && !isTestModeActive
               ? { backgroundColor: '#f59e0b' }
               : {}),
           }}
@@ -1932,7 +2278,7 @@ export const OnboardingWizard: React.FC<OnboardingWizardProps> = ({
             updateLoading ||
             // Standard field steps require fields; special steps don't
             (currentStepKey !== 'mode_selection' &&
-             currentStepKey !== 'review_and_launch' &&
+             currentStepKey !== 'go_live' &&
              currentStepKey !== 'integrations' &&
              currentFields.length === 0)
           }
@@ -1940,8 +2286,8 @@ export const OnboardingWizard: React.FC<OnboardingWizardProps> = ({
           {saving || updateLoading
             ? 'Saving...'
             : currentStepKey === 'mode_selection'
-              ? 'Continue'
-              : currentStepKey === 'review_and_launch'
+              ? (wizardMode === 'production' && hasProductionConfig ? 'Go to dashboard' : 'Continue')
+              : currentStepKey === 'go_live'
                 ? 'Finish Setup'
                 : currentStepKey === 'integrations'
                   ? 'Continue'

@@ -1168,27 +1168,35 @@ export const KnowledgeBaseManager: React.FC<BaseComponentProps> = ({
           </span>
         </div>
         <div style={{ display: 'flex', gap: '8px' }}>
-          <button
-            onClick={async () => {
-              const res = await runConflictScan(true);
-              if (res) setShowScanResults(true);
-            }}
-            disabled={scanning || articles.length < 2}
-            style={buttonStyle('secondary', scanning || articles.length < 2)}
-          >
-            {scanning ? 'Scanning...' : 'Scan for conflicts'}
-          </button>
-          <button
-            onClick={handleExport}
-            disabled={exporting || articles.length === 0}
-            style={buttonStyle('secondary', exporting || articles.length === 0)}
-          >
-            {exporting ? 'Exporting...' : 'Export CSV'}
-          </button>
-          <button onClick={handleOpenImport} style={buttonStyle('secondary')}>
-            Import
-          </button>
-          <HelpTooltip text="Import multiple articles at once from a CSV file." />
+          <span style={{ display: 'inline-flex', alignItems: 'center', gap: 2 }}>
+            <button
+              onClick={async () => {
+                const res = await runConflictScan(true);
+                if (res) setShowScanResults(true);
+              }}
+              disabled={scanning || articles.length < 2}
+              style={buttonStyle('secondary', scanning || articles.length < 2)}
+            >
+              {scanning ? 'Scanning...' : 'Scan for conflicts'}
+            </button>
+            <HelpTooltip text="Detect duplicate, overlapping, or contradictory knowledge base entries that may cause inconsistent AI responses." docLink="https://agentredcx.com/docs/admin-guide/conflict-scanner" />
+          </span>
+          <span style={{ display: 'inline-flex', alignItems: 'center', gap: 2 }}>
+            <button
+              onClick={handleExport}
+              disabled={exporting || articles.length === 0}
+              style={buttonStyle('secondary', exporting || articles.length === 0)}
+            >
+              {exporting ? 'Exporting...' : 'Export CSV'}
+            </button>
+            <HelpTooltip text="Download all knowledge base entries as a CSV file for backup or editing." docLink="https://agentredcx.com/docs/admin-guide/knowledge-base" />
+          </span>
+          <span style={{ display: 'inline-flex', alignItems: 'center', gap: 2 }}>
+            <button onClick={handleOpenImport} style={buttonStyle('secondary')}>
+              Import
+            </button>
+            <HelpTooltip text="Upload PDF, DOCX, CSV, or TXT files, or import from a URL to bulk-create knowledge base entries." docLink="https://agentredcx.com/docs/admin-guide/knowledge-base" />
+          </span>
           <button onClick={handleOpenNew} style={buttonStyle('primary')}>
             + New Article
           </button>

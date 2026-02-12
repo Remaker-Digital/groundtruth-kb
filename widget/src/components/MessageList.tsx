@@ -24,6 +24,36 @@ import { MessageBubble, TypingIndicator } from './MessageBubble';
 import { QuickActions } from './QuickActions';
 
 // ---------------------------------------------------------------------------
+// Scrollbar styles (injected once into widget shadow DOM)
+// ---------------------------------------------------------------------------
+
+let scrollStyleInjected = false;
+
+function injectScrollbarStyles(): void {
+  if (scrollStyleInjected) return;
+  scrollStyleInjected = true;
+  try {
+    const style = document.createElement('style');
+    style.textContent = `
+      .ar-message-scroll::-webkit-scrollbar { width: 6px; }
+      .ar-message-scroll::-webkit-scrollbar-track { background: transparent; }
+      .ar-message-scroll::-webkit-scrollbar-thumb {
+        background: rgba(128,128,128,0.25);
+        border-radius: 3px;
+      }
+      .ar-message-scroll::-webkit-scrollbar-thumb:hover {
+        background: rgba(128,128,128,0.45);
+      }
+      .ar-message-scroll {
+        scrollbar-width: thin;
+        scrollbar-color: rgba(128,128,128,0.25) transparent;
+      }
+    `;
+    document.head.appendChild(style);
+  } catch { /* Shadow DOM or SSR — ignore */ }
+}
+
+// ---------------------------------------------------------------------------
 // Props
 // ---------------------------------------------------------------------------
 
@@ -100,6 +130,9 @@ export const MessageList: FunctionComponent<MessageListProps> = ({
   const scrollRef = useRef<HTMLDivElement>(null);
   const [isAtBottom, setIsAtBottom] = useState(true);
   const [showScrollBtn, setShowScrollBtn] = useState(false);
+
+  // Inject subtle scrollbar CSS (WI #256)
+  useEffect(() => { injectScrollbarStyles(); }, []);
 
   // Auto-scroll to bottom when new messages arrive (if already at bottom)
   useEffect(() => {
@@ -186,6 +219,7 @@ export const MessageList: FunctionComponent<MessageListProps> = ({
     >
       <div
         ref={scrollRef}
+        className="ar-message-scroll"
         onScroll={handleScroll}
         style={{
           height: '100%',

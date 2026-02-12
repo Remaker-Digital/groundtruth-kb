@@ -190,9 +190,9 @@ export const ShopifyAppLayout: React.FC<ShopifyAppLayoutProps> = ({
       const navItems = [
         { label: 'Dashboard', destination: '/' },
         { label: 'Inbox', destination: '/inbox' },
-        { label: 'Configuration', destination: '/configuration' },
+        { label: 'Agent configuration', destination: '/configuration' },
         { label: 'Knowledge Base', destination: '/knowledge-base' },
-        { label: 'Widget', destination: '/widget' },
+        { label: 'Widget configuration', destination: '/widget' },
         { label: 'Billing', destination: '/billing' },
         { label: 'Settings', destination: '/settings' },
       ];

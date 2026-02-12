@@ -43,7 +43,7 @@ export const ConfigurationPage: React.FC = () => {
   const baseProps = { tenantContext, apiFetch, onNotify };
 
   return (
-    <Page title={showOnboarding ? 'Setup Wizard' : 'Configuration'}>
+    <Page title={showOnboarding ? 'Setup Wizard' : 'Agent configuration'}>
       {showOnboarding ? (
         <OnboardingWizard {...baseProps} onComplete={handleOnboardingComplete} />
       ) : (

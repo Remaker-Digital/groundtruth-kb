@@ -28,6 +28,9 @@ import {
   Burger,
   Tooltip,
   ActionIcon,
+  Modal,
+  Button,
+  Stack,
   useMantineColorScheme,
   useComputedColorScheme,
 } from '@mantine/core';
@@ -163,6 +166,13 @@ const Icons = {
       <polygon points="13 2 3 14 12 14 11 22 21 10 12 10 13 2" />
     </svg>
   ),
+  memory: () => (
+    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+      <path d="M12 2a4 4 0 0 0-4 4v2H6a2 2 0 0 0-2 2v10a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V10a2 2 0 0 0-2-2h-2V6a4 4 0 0 0-4-4z" />
+      <circle cx="12" cy="15" r="2" />
+      <line x1="12" y1="17" x2="12" y2="19" />
+    </svg>
+  ),
 };
 
 type NavPage = {
@@ -175,13 +185,13 @@ type NavPage = {
 const navItems: NavPage[] = [
   { path: '/', label: 'Dashboard', icon: 'dashboard' },
   { path: '/inbox', label: 'Inbox', icon: 'inbox' },
-  { path: '/knowledge-base', label: 'Knowledge base', icon: 'knowledge' },
-  { path: '/analytics', label: 'Analytics', icon: 'analytics' },
-  { path: '/configuration', label: 'Configuration', icon: 'config' },
-  { path: '/widget', label: 'Widget', icon: 'widget' },
-  { path: '/quick-actions', label: 'Quick actions', icon: 'quickactions' },
   { path: '/team', label: 'Team', icon: 'team' },
+  { path: '/configuration', label: 'Agent configuration', icon: 'config' },
+  { path: '/knowledge-base', label: 'Knowledge base', icon: 'knowledge' },
+  { path: '/quick-actions', label: 'Quick actions', icon: 'quickactions' },
+  { path: '/widget', label: 'Widget configuration', icon: 'widget' },
   { path: '/integrations', label: 'Integrations', icon: 'integrations' },
+  { path: '/memory-privacy', label: 'Memory & privacy', icon: 'memory' },
   { path: '/billing', label: 'Billing', icon: 'billing' },
   { path: '/onboarding', label: 'Setup wizard', icon: 'onboarding' },
 ];
@@ -314,6 +324,44 @@ export const StandaloneLayout: React.FC<StandaloneLayoutProps> = ({
     const interval = setInterval(refetchTestMode, 30_000);
     return () => clearInterval(interval);
   }, [tenantContext, refetchTestMode]);
+
+  // ---- Activation status check (WI #291) -----------------------------------
+
+  const [isActivated, setIsActivated] = useState<boolean | null>(null); // null = unknown
+
+  useEffect(() => {
+    if (!tenantContext) return;
+    apiFetch('/api/config')
+      .then(async (resp) => {
+        if (!resp.ok) { setIsActivated(false); return; }
+        const data = await resp.json();
+        setIsActivated(!!data.version && data.version > 0);
+      })
+      .catch(() => setIsActivated(false));
+  }, [tenantContext, apiFetch]);
+
+  // ---- Welcome popup (WI #292) — first-time merchants ---------------------
+
+  const [showWelcome, setShowWelcome] = useState(false);
+
+  useEffect(() => {
+    if (isActivated !== false) return; // Only show when explicitly not activated
+    try {
+      const dismissed = localStorage.getItem('agentred-welcome-dismissed');
+      if (!dismissed) setShowWelcome(true);
+    } catch { /* ignore */ }
+  }, [isActivated]);
+
+  const dismissWelcome = useCallback(() => {
+    setShowWelcome(false);
+    try { localStorage.setItem('agentred-welcome-dismissed', '1'); } catch { /* ignore */ }
+  }, []);
+
+  const goToWizard = useCallback(() => {
+    setShowWelcome(false);
+    try { localStorage.setItem('agentred-welcome-dismissed', '1'); } catch { /* ignore */ }
+    navigate('/onboarding');
+  }, [navigate]);
 
   // ---- Chat widget injection (auto-embed for admin users) ----------------
 
@@ -478,6 +526,25 @@ export const StandaloneLayout: React.FC<StandaloneLayoutProps> = ({
                 <Badge variant="light" color="green" size="sm" tt="capitalize">
                   {tenantContext.tier}
                 </Badge>
+              )}
+              {/* Inactive indicator (WI #291) — shown when system not yet activated */}
+              {isActivated === false && !testMode?.enabled && (
+                <Tooltip
+                  label="Your AI assistant is not yet active. Complete the Setup Wizard to go live."
+                  position="bottom"
+                  multiline
+                  w={240}
+                >
+                  <Badge
+                    variant="light"
+                    color="yellow"
+                    size="sm"
+                    style={{ cursor: 'pointer' }}
+                    onClick={() => navigate('/onboarding')}
+                  >
+                    Inactive
+                  </Badge>
+                </Tooltip>
               )}
               {/* Test Mode indicator (C1) */}
               {testMode?.enabled && (
@@ -703,13 +770,13 @@ export const StandaloneLayout: React.FC<StandaloneLayoutProps> = ({
                     Manage test
                   </Text>
                 )}
-                {location.pathname !== '/analytics' && (
+                {location.pathname !== '/' && (
                   <Text
                     size="xs"
                     fw={600}
                     c="dimmed"
                     style={{ cursor: 'pointer', textDecoration: 'underline', textUnderlineOffset: 2 }}
-                    onClick={() => navigate('/analytics')}
+                    onClick={() => navigate('/')}
                   >
                     View analytics
                   </Text>
@@ -730,6 +797,34 @@ export const StandaloneLayout: React.FC<StandaloneLayoutProps> = ({
           {!loading && !error && children}
         </AppShell.Main>
       </AppShell>
+
+      {/* Welcome popup for first-time merchants (WI #292) */}
+      <Modal
+        opened={showWelcome}
+        onClose={dismissWelcome}
+        title={
+          <Text fw={600} size="lg">
+            Welcome to Agent Red!
+          </Text>
+        }
+        centered
+        size="sm"
+      >
+        <Stack gap="md">
+          <Text size="sm">
+            Your AI customer service assistant is not yet active. Complete the Setup Wizard to
+            configure your agent and go live.
+          </Text>
+          <Group justify="flex-end">
+            <Button variant="default" onClick={dismissWelcome}>
+              Dismiss
+            </Button>
+            <Button color="#ff3621" onClick={goToWizard}>
+              Go to Setup Wizard
+            </Button>
+          </Group>
+        </Stack>
+      </Modal>
     </AppContext.Provider>
   );
 };

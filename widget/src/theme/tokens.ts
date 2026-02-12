@@ -148,6 +148,10 @@ export interface WidgetConfig {
   widget_header_text?: string | null;
   widget_input_placeholder?: string | null;
   widget_page_rules?: string[] | null;
+  widget_shadow_intensity?: 'none' | 'subtle' | 'standard' | 'heavy' | null;
+  widget_position_offset_x?: number | null;
+  widget_position_offset_y?: number | null;
+  widget_panel_width?: 'compact' | 'standard' | 'wide' | null;
   // Non-widget fields used for display
   brand_name?: string | null;
   greeting_message?: string | null;
@@ -208,6 +212,33 @@ function contrastText(bgHex: string): string {
 }
 
 // ---------------------------------------------------------------------------
+// Shadow intensity resolution (WI #249)
+// ---------------------------------------------------------------------------
+
+function resolveShadowLg(
+  intensity: 'none' | 'subtle' | 'standard' | 'heavy',
+  isDark: boolean,
+): string {
+  switch (intensity) {
+    case 'none':
+      return 'none';
+    case 'subtle':
+      return isDark
+        ? '0 4px 12px rgba(0,0,0,0.20)'
+        : '0 4px 12px rgba(0,0,0,0.08)';
+    case 'heavy':
+      return isDark
+        ? '0 16px 40px rgba(0,0,0,0.45), 0 6px 16px rgba(0,0,0,0.30)'
+        : '0 16px 40px rgba(0,0,0,0.25), 0 6px 16px rgba(0,0,0,0.15)';
+    case 'standard':
+    default:
+      return isDark
+        ? '0 10px 25px rgba(0,0,0,0.30), 0 4px 10px rgba(0,0,0,0.20)'
+        : '0 10px 25px rgba(0,0,0,0.15), 0 4px 10px rgba(0,0,0,0.12)';
+  }
+}
+
+// ---------------------------------------------------------------------------
 // Token resolution
 // ---------------------------------------------------------------------------
 
@@ -222,6 +253,8 @@ export function resolveTokens(config: WidgetConfig): DesignTokens {
   const customRadius = config.widget_border_radius;
   const customLauncherSize = config.widget_launcher_size;
   const launcherShape = config.widget_launcher_shape || 'circle';
+  const shadowIntensity = config.widget_shadow_intensity || 'standard';
+  const panelWidthPreset = config.widget_panel_width || 'standard';
 
   // Shared structural tokens (Zapier-derived)
   const base: Omit<DesignTokens,
@@ -269,14 +302,16 @@ export function resolveTokens(config: WidgetConfig): DesignTokens {
     // Shadows — layered for visible depth separation on any background
     shadowSm: '0 1px 3px rgba(0,0,0,0.08), 0 1px 2px rgba(0,0,0,0.06)',
     shadowMd: '0 4px 6px rgba(0,0,0,0.07), 0 2px 4px rgba(0,0,0,0.12)',
-    shadowLg: '0 10px 25px rgba(0,0,0,0.15), 0 4px 10px rgba(0,0,0,0.12)',
+    shadowLg: resolveShadowLg(shadowIntensity, isDark),
 
     // Sizing
     launcherSize: customLauncherSize != null ? `${customLauncherSize}px` : '60px',
     launcherBorderRadius: launcherShape === 'rounded-square' ? '16px'
       : launcherShape === 'pill' ? '28px'
       : '9999px', // circle (default)
-    panelWidth: '380px',
+    panelWidth: panelWidthPreset === 'compact' ? '320px'
+      : panelWidthPreset === 'wide' ? '440px'
+      : '380px',
     panelHeight: '520px',
     headerHeight: '64px',
     inputBarHeight: '56px',
