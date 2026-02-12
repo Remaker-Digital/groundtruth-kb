@@ -1,4 +1,4 @@
-# upgrade.ps1 — Non-disruptive production upgrade for Agent Red API Gateway
+﻿# upgrade.ps1 — Non-disruptive production upgrade for Agent Red API Gateway
 # © 2026 Remaker Digital, a DBA of VanDusen & Palmeter, LLC. All rights reserved.
 #
 # Usage:
@@ -204,7 +204,7 @@ Log "PASS" "Phase 1 complete — pre-flight checks passed"
 Log "PHASE" "═══ PHASE 2: Build and push image ═══"
 
 if ($SkipBuild) {
-    Log "WARN" "Skipping build (--SkipBuild). Image $ACR_LOGIN_SERVER/${IMAGE_NAME}:$Version must already exist in ACR."
+    Log "WARN" "Skipping build (SkipBuild). Image $ACR_LOGIN_SERVER/${IMAGE_NAME}:$Version must already exist in ACR."
 } else {
     # Create minimal build context
     Log "INFO" "Creating build context at $BUILD_CONTEXT_DIR..."
@@ -298,7 +298,7 @@ Log "PASS" "Phase 2 complete — image ready"
 Log "PHASE" "═══ PHASE 3: Pre-upgrade regression tests ═══"
 
 if ($SkipTests) {
-    Log "WARN" "Skipping pre-upgrade regression tests (--SkipTests)"
+    Log "WARN" 'Skipping pre-upgrade regression tests (--SkipTests)'
 } else {
     Log "INFO" "Running regression tests against CURRENT production..."
 
@@ -349,7 +349,7 @@ Log "PASS" "Phase 4 complete — deployment initiated"
 # ═══════════════════════════════════════════════════════════════════════════════
 # PHASE 5: Wait for readiness
 # ═══════════════════════════════════════════════════════════════════════════════
-Log "PHASE" "═══ PHASE 5: Wait for readiness ($HEALTH_WAIT_SECONDS seconds) ═══"
+Log "PHASE" "═══ PHASE 5: Wait for readiness `($HEALTH_WAIT_SECONDS seconds`) ═══"
 
 if ($DryRun) {
     Log "INFO" "[DRY RUN] Would wait $HEALTH_WAIT_SECONDS seconds for new revision to become healthy"
@@ -369,9 +369,9 @@ if ($DryRun) {
             $healthy = $true
             break
         } elseif ($healthOk) {
-            Log "INFO" "Health OK, Ready not yet... (${elapsed}s / ${HEALTH_WAIT_SECONDS}s)"
+            Log "INFO" "Health OK, Ready not yet... [${elapsed}s / ${HEALTH_WAIT_SECONDS}s]"
         } else {
-            Log "INFO" "Waiting for new revision... (${elapsed}s / ${HEALTH_WAIT_SECONDS}s)"
+            Log "INFO" "Waiting for new revision... [${elapsed}s / ${HEALTH_WAIT_SECONDS}s]"
         }
     }
 
@@ -393,11 +393,11 @@ if ($DryRun) {
     Log "INFO" "Image now serving: $currentImageAfter"
 
     if ($currentImageAfter -ne $newImage) {
-        Log "WARN" "Expected $newImage but got $currentImageAfter — revision may still be transitioning"
+        Log "WARN" "Expected $newImage but got $currentImageAfter - revision may still be transitioning"
     }
 }
 
-Log "PASS" "Phase 5 complete — new revision responsive"
+Log "PASS" "Phase 5 complete - new revision responsive"
 
 # ═══════════════════════════════════════════════════════════════════════════════
 # PHASE 6: Post-upgrade regression tests
@@ -405,7 +405,7 @@ Log "PASS" "Phase 5 complete — new revision responsive"
 Log "PHASE" "═══ PHASE 6: Post-upgrade regression tests ═══"
 
 if ($SkipTests) {
-    Log "WARN" "Skipping post-upgrade regression tests (--SkipTests)"
+    Log "WARN" 'Skipping post-upgrade regression tests (--SkipTests)'
 } else {
     Log "INFO" "Running regression tests against NEW production..."
 
