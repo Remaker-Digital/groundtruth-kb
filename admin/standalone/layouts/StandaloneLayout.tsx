@@ -39,6 +39,7 @@ import { notifications } from '@mantine/notifications';
 
 import type { TenantTier, TenantStatus, BillingChannel, TeamRole } from '../../shared/types';
 import ActivationBanner from '../../shared/ActivationBanner';
+import ActivationDialog from '../../shared/ActivationDialog';
 
 // ---------------------------------------------------------------------------
 // Types
@@ -337,6 +338,11 @@ export const StandaloneLayout: React.FC<StandaloneLayoutProps> = ({
     setShowWelcome(false);
     try { localStorage.setItem('agentred-welcome-dismissed', '1'); } catch { /* ignore */ }
   }, []);
+
+  // ---- Activation dialog state (triggered by ActivationBanner) ---------------
+
+  const [showActivationDialog, setShowActivationDialog] = useState(false);
+  const [activationRefreshKey, setActivationRefreshKey] = useState(0);
 
   // ---- Chat widget injection (auto-embed for admin users) ----------------
 
@@ -694,12 +700,27 @@ export const StandaloneLayout: React.FC<StandaloneLayoutProps> = ({
               <ActivationBanner
                 apiFetch={apiFetch}
                 onNotify={onNotify}
+                onActivate={() => setShowActivationDialog(true)}
+                refreshKey={activationRefreshKey}
               />
               {children}
             </>
           )}
         </AppShell.Main>
       </AppShell>
+
+      {/* Activation dialog (triggered by ActivationBanner) */}
+      {showActivationDialog && (
+        <ActivationDialog
+          apiFetch={apiFetch}
+          onNotify={onNotify}
+          onClose={() => setShowActivationDialog(false)}
+          onSuccess={() => {
+            setShowActivationDialog(false);
+            setActivationRefreshKey((k) => k + 1);
+          }}
+        />
+      )}
 
       {/* Welcome popup for first-time merchants (WI #292) */}
       <Modal

@@ -35,7 +35,6 @@ import { KnowledgeBasePage } from './pages/KnowledgeBase';
 import { WidgetPage } from './pages/Widget';
 import { BillingPage } from './pages/Billing';
 import { TeamPage } from './pages/Team';
-import { OnboardingPage } from './pages/Onboarding';
 import { IntegrationsPage } from './pages/Integrations';
 import { QuickActionsPage } from './pages/QuickActions';
 import { MemoryPrivacyPage } from './pages/MemoryPrivacy';
@@ -168,7 +167,6 @@ const App: React.FC = () => {
             <Route path="/team" element={<TeamPage />} />
             <Route path="/integrations" element={<IntegrationsPage />} />
             <Route path="/memory-privacy" element={<MemoryPrivacyPage />} />
-            <Route path="/onboarding" element={<OnboardingPage />} />
             <Route path="*" element={<Navigate to="/" replace />} />
           </Routes>
         </StandaloneLayout>

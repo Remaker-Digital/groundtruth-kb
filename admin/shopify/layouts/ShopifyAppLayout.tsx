@@ -20,6 +20,7 @@ import { useLocation } from 'react-router-dom';
 import { Frame, Loading, Banner } from '@shopify/polaris';
 import type { TenantContext } from '../../shared/types';
 import ActivationBanner from '../../shared/ActivationBanner';
+import ActivationDialog from '../../shared/ActivationDialog';
 
 // ---------------------------------------------------------------------------
 // Types
@@ -79,6 +80,8 @@ export const ShopifyAppLayout: React.FC<ShopifyAppLayoutProps> = ({
     message: string;
     type: 'success' | 'error' | 'warning' | 'info';
   } | null>(null);
+  const [showActivationDialog, setShowActivationDialog] = useState(false);
+  const [activationRefreshKey, setActivationRefreshKey] = useState(0);
 
   // ---- Session token retrieval -------------------------------------------
 
@@ -280,7 +283,20 @@ export const ShopifyAppLayout: React.FC<ShopifyAppLayoutProps> = ({
             <ActivationBanner
               apiFetch={apiFetch}
               onNotify={onNotify}
+              onActivate={() => setShowActivationDialog(true)}
+              refreshKey={activationRefreshKey}
             />
+            {showActivationDialog && (
+              <ActivationDialog
+                apiFetch={apiFetch}
+                onNotify={onNotify}
+                onClose={() => setShowActivationDialog(false)}
+                onSuccess={() => {
+                  setShowActivationDialog(false);
+                  setActivationRefreshKey((k) => k + 1);
+                }}
+              />
+            )}
             {children}
           </>
         )}
