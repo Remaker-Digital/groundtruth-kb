@@ -968,9 +968,17 @@ export function useInviteTeamMember(apiFetch: ApiFetch) {
 // Billing hooks
 // ---------------------------------------------------------------------------
 
-export function useBillingStatus(apiFetch: ApiFetch, channel: 'shopify' | 'stripe') {
-  const path = channel === 'shopify' ? '/api/shopify/billing/status' : '/api/billing/portal';
-  return useApi<Record<string, unknown>>(apiFetch, path);
+export function useBillingStatus(
+  apiFetch: ApiFetch,
+  channel: 'shopify' | 'stripe',
+  shopDomain?: string,
+) {
+  const path =
+    channel === 'shopify'
+      ? `/api/shopify/billing/status?shop=${encodeURIComponent(shopDomain || '')}`
+      : '/api/billing/status';
+  const enabled = channel === 'stripe' || !!shopDomain;
+  return useApi<Record<string, unknown>>(apiFetch, path, enabled);
 }
 
 export function usePackBalance(apiFetch: ApiFetch, customerId: string) {

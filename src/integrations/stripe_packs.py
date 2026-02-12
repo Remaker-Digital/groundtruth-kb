@@ -42,6 +42,7 @@ from fastapi import APIRouter, HTTPException
 from pydantic import BaseModel, Field
 
 from src.integrations.stripe_catalog import load_catalog
+from src.integrations.stripe_portal import _resolve_stripe_customer_id
 
 logger = logging.getLogger(__name__)
 
@@ -87,16 +88,29 @@ router = APIRouter(prefix="/api/packs", tags=["packs"])
 
 
 class PurchasePackRequest(BaseModel):
-    """Request to purchase a conversation pack."""
+    """Request to purchase a conversation pack.
+
+    Provide either ``tenant_id`` (preferred — resolves the Stripe customer
+    via provisioning) or ``stripe_customer_id`` (direct Stripe lookup).
+    If both are supplied, ``stripe_customer_id`` takes precedence.
+    """
 
     pack_id: str = Field(
         ...,
         description="Pack identifier: pack_1k, pack_5k, or pack_20k",
         examples=["pack_1k"],
     )
-    stripe_customer_id: str = Field(
-        ...,
-        description="The Stripe Customer ID (cus_...)",
+    tenant_id: str | None = Field(
+        default=None,
+        description=(
+            "Tenant ID (UUID). The module looks up the Stripe customer ID "
+            "from the provisioning service."
+        ),
+        examples=["550e8400-e29b-41d4-a716-446655440000"],
+    )
+    stripe_customer_id: str | None = Field(
+        default=None,
+        description="Stripe customer ID (cus_...) for direct lookup.",
         examples=["cus_ABC123"],
     )
     success_url: str | None = Field(
@@ -332,6 +346,12 @@ async def purchase_pack_endpoint(body: PurchasePackRequest) -> PurchasePackRespo
 
     pack = catalog.packs[body.pack_id]
 
+    # Resolve Stripe customer ID from tenant_id or stripe_customer_id
+    customer_id = _resolve_stripe_customer_id(
+        tenant_id=body.tenant_id,
+        stripe_customer_id=body.stripe_customer_id,
+    )
+
     # Build redirect URLs
     success_url = body.success_url or (
         f"{_BASE_URL}/api/packs/purchase/success"
@@ -343,7 +363,7 @@ async def purchase_pack_endpoint(body: PurchasePackRequest) -> PurchasePackRespo
     try:
         session = stripe.checkout.Session.create(
             mode="payment",
-            customer=body.stripe_customer_id,
+            customer=customer_id,
             line_items=[
                 {
                     "price": pack.price_id,
@@ -376,7 +396,7 @@ async def purchase_pack_endpoint(body: PurchasePackRequest) -> PurchasePackRespo
         "Pack checkout session created: session=%s pack=%s customer=%s",
         session.id,
         body.pack_id,
-        body.stripe_customer_id,
+        customer_id,
     )
 
     return PurchasePackResponse(

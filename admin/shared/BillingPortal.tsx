@@ -458,7 +458,7 @@ export const BillingPortal: React.FC<BillingPortalProps> = ({
   // Data hooks
   const usage = useUsageDashboard(apiFetch);
   const packs = usePackBalance(apiFetch, tenantContext.tenantId);
-  const billing = useBillingStatus(apiFetch, tenantContext.billingChannel);
+  const billing = useBillingStatus(apiFetch, tenantContext.billingChannel, tenantContext.shopDomain);
 
   // Derived state
   const tierDisplay = TIER_DISPLAY[tenantContext.tier] || TIER_DISPLAY.starter;

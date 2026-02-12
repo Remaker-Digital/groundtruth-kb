@@ -1093,3 +1093,112 @@ class TestTenantEndpoints:
         assert body["tier"] == "professional"
         assert body["billing_channel"] == "stripe"
         assert body["status"] == "provisioning"
+
+
+# ===========================================================================
+# Pack Purchase with tenant_id — HTTP-BILL-36, HTTP-BILL-37
+# ===========================================================================
+
+
+class TestPackPurchaseWithTenantId:
+    """HTTP tests for POST /api/packs/purchase using tenant_id instead of stripe_customer_id."""
+
+    @pytest.mark.unit
+    def test_purchase_pack_with_tenant_id(self, starter_client, mock_stripe_checkout):
+        """HTTP-BILL-36: POST /api/packs/purchase — tenant_id resolves to Stripe customer."""
+        from src.integrations.provisioning import BillingChannel, provision_tenant
+
+        tenant = provision_tenant(
+            billing_channel=BillingChannel.STRIPE,
+            tier="starter",
+            interval="month",
+            stripe_customer_id="cus_tenant_pack_001",
+        )
+
+        resp = starter_client.post(
+            "/api/packs/purchase",
+            json={
+                "pack_id": "pack_1k",
+                "tenant_id": tenant.tenant_id,
+            },
+        )
+        assert resp.status_code == 200
+        body = resp.json()
+        assert body["pack_id"] == "pack_1k"
+        assert body["conversations"] == 1000
+        assert body["checkout_url"]  # Non-empty checkout URL
+        assert body["session_id"] == "cs_test_session_001"
+
+    @pytest.mark.unit
+    def test_purchase_pack_no_identifiers_returns_400(self, starter_client):
+        """HTTP-BILL-37: POST /api/packs/purchase — no tenant_id or stripe_customer_id returns 400."""
+        resp = starter_client.post(
+            "/api/packs/purchase",
+            json={
+                "pack_id": "pack_1k",
+            },
+        )
+        assert resp.status_code == 400
+        assert "tenant_id" in resp.json()["detail"].lower() or "stripe_customer_id" in resp.json()["detail"].lower()
+
+
+# ===========================================================================
+# Billing Status — HTTP-BILL-38, HTTP-BILL-39
+# ===========================================================================
+
+
+class TestBillingStatus:
+    """HTTP tests for GET /api/billing/status — lightweight billing status."""
+
+    @pytest.mark.unit
+    def test_billing_status_with_subscription(self, starter_client):
+        """HTTP-BILL-38: GET /api/billing/status — returns renewal date and plan name."""
+        # Mock the Stripe subscription list
+        mock_sub = MagicMock()
+        mock_sub.status = "active"
+        mock_sub.current_period_end = 1738368000  # 2025-02-01 UTC
+        mock_item = MagicMock()
+        mock_item.price = MagicMock()
+        mock_item.price.product = MagicMock()
+        mock_item.price.product.name = "Agent Red Starter"
+        mock_sub.items = MagicMock()
+        mock_sub.items.data = [mock_item]
+
+        mock_list = MagicMock()
+        mock_list.data = [mock_sub]
+
+        # Patch the resolver so the test tenant resolves to a Stripe customer
+        with patch(
+            "src.integrations.stripe_portal._resolve_stripe_customer_id",
+            return_value="cus_status_001",
+        ):
+            with patch("stripe.Subscription.list", return_value=mock_list):
+                resp = starter_client.get("/api/billing/status")
+
+        assert resp.status_code == 200
+        body = resp.json()
+        assert body["billing_channel"] == "stripe"
+        assert body["status"] == "active"
+        assert body["renewal_date"] is not None
+        assert body["plan_name"] == "Agent Red Starter"
+
+    @pytest.mark.unit
+    def test_billing_status_no_subscription(self, starter_client):
+        """HTTP-BILL-39: GET /api/billing/status — no subscription returns graceful null."""
+        mock_list = MagicMock()
+        mock_list.data = []
+
+        # Patch the resolver so the test tenant resolves to a Stripe customer
+        with patch(
+            "src.integrations.stripe_portal._resolve_stripe_customer_id",
+            return_value="cus_status_nosub",
+        ):
+            with patch("stripe.Subscription.list", return_value=mock_list):
+                resp = starter_client.get("/api/billing/status")
+
+        assert resp.status_code == 200
+        body = resp.json()
+        assert body["billing_channel"] == "stripe"
+        assert body["status"] == "no_subscription"
+        assert body["renewal_date"] is None
+        assert body["plan_name"] is None

@@ -29,10 +29,12 @@ import logging
 import os
 
 import stripe
-from fastapi import APIRouter, HTTPException
+from fastapi import APIRouter, Depends, HTTPException
 from pydantic import BaseModel, Field
 
 from src.integrations.provisioning import get_tenant
+from src.multi_tenant.auth import TenantContext
+from src.multi_tenant.middleware import get_tenant_context
 
 logger = logging.getLogger(__name__)
 
@@ -91,6 +93,26 @@ class PortalResponse(BaseModel):
 
     portal_url: str = Field(description="URL to redirect the customer to.")
     stripe_customer_id: str = Field(description="The Stripe customer ID used.")
+
+
+class BillingStatusResponse(BaseModel):
+    """Lightweight billing status for dashboard display.
+
+    Returned by ``GET /api/billing/status``. Unlike the portal endpoint
+    (POST), this is a read-only status check that does not create a
+    Stripe session.
+    """
+
+    billing_channel: str = Field(description="'stripe' or 'shopify'")
+    status: str = Field(description="Subscription status (active, past_due, etc.)")
+    renewal_date: str | None = Field(
+        default=None,
+        description="ISO-8601 date of next renewal (current_period_end).",
+    )
+    plan_name: str | None = Field(
+        default=None,
+        description="Human-readable plan/product name.",
+    )
 
 
 # ---------------------------------------------------------------------------
@@ -209,4 +231,115 @@ async def create_portal_session(body: PortalRequest) -> PortalResponse:
     return PortalResponse(
         portal_url=session.url,
         stripe_customer_id=customer_id,
+    )
+
+
+# ---------------------------------------------------------------------------
+# Billing status (read-only)
+# ---------------------------------------------------------------------------
+
+
+@router.get(
+    "/status",
+    response_model=BillingStatusResponse,
+    status_code=200,
+    summary="Get billing status",
+    description=(
+        "Returns lightweight billing status for the authenticated tenant, "
+        "including subscription renewal date and plan name. Does not create "
+        "any Stripe sessions."
+    ),
+    responses={
+        400: {"description": "Tenant has no Stripe billing"},
+        404: {"description": "Tenant not found"},
+        502: {"description": "Stripe API error during subscription lookup"},
+    },
+)
+async def billing_status_endpoint(
+    ctx: TenantContext = Depends(get_tenant_context),
+) -> BillingStatusResponse:
+    """Get billing status for the current tenant.
+
+    Looks up the active Stripe subscription and returns renewal date
+    and plan name. Returns ``null`` fields gracefully when no active
+    subscription is found.
+    """
+    # Resolve Stripe customer from authenticated tenant
+    try:
+        customer_id = _resolve_stripe_customer_id(
+            tenant_id=ctx.tenant_id,
+            stripe_customer_id=None,
+        )
+    except HTTPException:
+        # Tenant has no Stripe billing (e.g. Shopify-billed) — graceful fallback
+        return BillingStatusResponse(
+            billing_channel="stripe",
+            status="unknown",
+            renewal_date=None,
+            plan_name=None,
+        )
+
+    # Fetch the most recent active subscription
+    try:
+        subscriptions = stripe.Subscription.list(
+            customer=customer_id,
+            status="active",
+            limit=1,
+        )
+    except stripe.StripeError as exc:
+        logger.error(
+            "Stripe subscription lookup failed: customer=%s error=%s",
+            customer_id,
+            exc,
+        )
+        raise HTTPException(
+            status_code=502,
+            detail="Failed to retrieve billing status from Stripe.",
+        ) from exc
+
+    if not subscriptions.data:
+        return BillingStatusResponse(
+            billing_channel="stripe",
+            status="no_subscription",
+            renewal_date=None,
+            plan_name=None,
+        )
+
+    sub = subscriptions.data[0]
+
+    # Extract plan name from the first line item's product
+    plan_name: str | None = None
+    if sub.items and sub.items.data:
+        item = sub.items.data[0]
+        if hasattr(item, "price") and item.price:
+            # price.product may be a string ID or expanded object
+            product = item.price.product
+            if hasattr(product, "name"):
+                plan_name = product.name
+            elif isinstance(product, str):
+                plan_name = product  # Product ID as fallback
+
+    # Convert period_end to ISO date
+    from datetime import datetime, timezone
+
+    renewal_date: str | None = None
+    if sub.current_period_end:
+        renewal_date = (
+            datetime.fromtimestamp(sub.current_period_end, tz=timezone.utc)
+            .date()
+            .isoformat()
+        )
+
+    logger.info(
+        "Billing status retrieved: customer=%s status=%s renewal=%s",
+        customer_id,
+        sub.status,
+        renewal_date,
+    )
+
+    return BillingStatusResponse(
+        billing_channel="stripe",
+        status=sub.status,
+        renewal_date=renewal_date,
+        plan_name=plan_name,
     )

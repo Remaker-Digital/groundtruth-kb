@@ -12,6 +12,8 @@ import { Page } from '@shopify/polaris';
 import { useAppContext } from '../layouts/ShopifyAppLayout';
 import { BillingPortal } from '../../shared/BillingPortal';
 
+const PACK_ID_MAP: Record<number, string> = { 1000: 'pack_1k', 5000: 'pack_5k', 20000: 'pack_20k' };
+
 export const BillingPage: React.FC = () => {
   const { tenantContext, apiFetch, onNotify } = useAppContext();
 
@@ -31,15 +33,29 @@ export const BillingPage: React.FC = () => {
         const resp = await apiFetch('/api/packs/purchase', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ pack_size: packSize }),
+          body: JSON.stringify({
+            pack_id: PACK_ID_MAP[packSize],
+            tenant_id: tenantContext?.tenantId,
+          }),
         });
         if (!resp.ok) throw new Error('Purchase failed');
-        onNotify(`Conversation pack (${(packSize ?? 0).toLocaleString()}) purchased!`, 'success');
+        const data = await resp.json();
+        if (data.checkout_url) {
+          // Use App Bridge redirect for Shopify embedded context
+          const shopifyBridge = (window as unknown as {
+            shopify?: { redirect: (url: string) => void };
+          }).shopify;
+          if (shopifyBridge?.redirect) {
+            shopifyBridge.redirect(data.checkout_url);
+          } else {
+            window.open(data.checkout_url, '_blank');
+          }
+        }
       } catch {
         onNotify('Failed to purchase pack. Please try again.', 'error');
       }
     },
-    [apiFetch, onNotify],
+    [apiFetch, onNotify, tenantContext],
   );
 
   if (!tenantContext) return null;

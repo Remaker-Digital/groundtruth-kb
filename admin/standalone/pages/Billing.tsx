@@ -226,31 +226,24 @@ export const BillingPage: React.FC = () => {
 
   // --- Callbacks ---
 
-  const handleManageSubscription = useCallback(async () => {
+  const handleOpenPortal = useCallback(async () => {
     try {
       const resp = await apiFetch('/api/billing/portal', { method: 'POST' });
       if (!resp.ok) throw new Error('Failed to create portal session');
       const data = await resp.json();
-      if (data.url) {
-        window.open(data.url, '_blank');
+      if (data.portal_url) {
+        window.open(data.portal_url, '_blank');
       }
     } catch {
       onNotify('Failed to open billing portal. Please try again.', 'error');
     }
   }, [apiFetch, onNotify]);
 
-  const handleManageBilling = useCallback(async () => {
-    try {
-      const resp = await apiFetch('/api/billing/portal', { method: 'POST' });
-      if (!resp.ok) throw new Error('Failed to create portal session');
-      const data = await resp.json();
-      if (data.url) {
-        window.open(data.url, '_blank');
-      }
-    } catch {
-      onNotify('Failed to open billing portal. Please try again.', 'error');
-    }
-  }, [apiFetch, onNotify]);
+  // Alias for backwards-compatible references in the template
+  const handleManageSubscription = handleOpenPortal;
+  const handleManageBilling = handleOpenPortal;
+
+  const PACK_ID_MAP: Record<number, string> = { 1000: 'pack_1k', 5000: 'pack_5k', 20000: 'pack_20k' };
 
   const handlePurchasePack = useCallback(
     async (packSize: number) => {
@@ -259,12 +252,15 @@ export const BillingPage: React.FC = () => {
         const resp = await apiFetch('/api/packs/purchase', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ pack_size: packSize }),
+          body: JSON.stringify({
+            pack_id: PACK_ID_MAP[packSize],
+            tenant_id: tenantContext?.tenantId,
+          }),
         });
         if (!resp.ok) throw new Error('Purchase failed');
         const data = await resp.json();
-        if (data.url) {
-          window.location.href = data.url;
+        if (data.checkout_url) {
+          window.location.href = data.checkout_url;
         }
       } catch {
         onNotify('Failed to start purchase. Please try again.', 'error');
@@ -272,7 +268,7 @@ export const BillingPage: React.FC = () => {
         setTimeout(() => setPurchasingPack(null), 1000);
       }
     },
-    [apiFetch, onNotify],
+    [apiFetch, onNotify, tenantContext],
   );
 
   // --- Loading state ---
