@@ -1,10 +1,10 @@
 /**
- * AnalyticsOverview - Analytics dashboard with summary cards, intent breakdown,
+ * AnalyticsOverview - Analytics dashboard with summary cards, topic breakdown,
  * and knowledge gaps table.
  *
  * Summary cards: total conversations, avg response time, resolution rate,
  *   escalation rate, CSAT.
- * Intent breakdown: horizontal bar chart of top intents by count.
+ * Topic breakdown: horizontal bar chart of top query categories by count.
  * Knowledge gaps: table of unresolved queries with frequency and last-seen date.
  *
  * Framework-agnostic React component — no Polaris, no Tailwind, pure inline styles.
@@ -38,7 +38,20 @@ const BORDER_RADIUS = '6px';
 
 const DOCS_BASE = 'https://agentredcx.com/docs/admin-guide';
 
-// Bar chart color palette — 8 distinct hues for intent bars
+// Map internal agent names to user-facing labels
+const AGENT_LABEL_MAP: Record<string, string> = {
+  'intent-classifier': 'Question routing',
+  'knowledge-retrieval': 'Knowledge lookup',
+  'response-generator': 'Response generation',
+  'critic-supervisor': 'Quality review',
+};
+
+/** Returns a user-facing label for an agent name, falling back to title-case. */
+export function agentDisplayLabel(agent: string): string {
+  return AGENT_LABEL_MAP[agent] ?? agent.replace(/-/g, ' ').replace(/\b\w/g, (c) => c.toUpperCase());
+}
+
+// Bar chart color palette — 8 distinct hues for topic bars
 const BAR_COLORS = [
   '#3b82f6',
   '#10b981',
@@ -230,7 +243,7 @@ const SummaryCard: React.FC<SummaryCardProps> = ({ label, value, subtext, accent
 );
 
 // ---------------------------------------------------------------------------
-// Horizontal bar chart for intents
+// Horizontal bar chart for topics
 // ---------------------------------------------------------------------------
 
 interface IntentBarChartProps {
@@ -247,8 +260,8 @@ const IntentBarChart: React.FC<IntentBarChartProps> = ({ intents }) => {
     return (
       <EmptyState
         icon={String.fromCodePoint(0x1F4CA)}
-        title="No intent data"
-        subtitle="Intent breakdown will appear once conversations are processed."
+        title="No topic data"
+        subtitle="Topic breakdown will appear once conversations are processed."
       />
     );
   }
@@ -273,9 +286,9 @@ const IntentBarChart: React.FC<IntentBarChartProps> = ({ intents }) => {
                 textOverflow: 'ellipsis',
                 whiteSpace: 'nowrap',
               }}
-              title={intent.agent}
+              title={agentDisplayLabel(intent.agent)}
             >
-              {intent.agent}
+              {agentDisplayLabel(intent.agent)}
             </div>
 
             {/* Bar */}
@@ -612,7 +625,7 @@ export const AnalyticsOverview: React.FC<BaseComponentProps & { isTestMode?: boo
           </div>
         )}
 
-        {/* Intent breakdown */}
+        {/* Topic breakdown */}
         <div
           style={{
             marginBottom: '32px',
@@ -623,10 +636,10 @@ export const AnalyticsOverview: React.FC<BaseComponentProps & { isTestMode?: boo
           }}
         >
           <SectionHeader
-            title="Intent breakdown"
-            subtitle="Top customer intents by conversation count"
-            tooltip="Distribution of customer query categories detected by the Intent Classifier."
-            docLink={`${DOCS_BASE}/analytics#intent-breakdown`}
+            title="Topic breakdown"
+            subtitle="Top query categories by conversation count"
+            tooltip="Distribution of customer query categories across your conversations."
+            docLink={`${DOCS_BASE}/analytics#topic-breakdown`}
           />
 
           {intentsError && (

@@ -52,6 +52,7 @@ import {
   useIntentBreakdown,
   useKnowledgeGaps,
 } from '../../shared/hooks/index';
+import { agentDisplayLabel } from '../../shared/AnalyticsOverview';
 
 // ---------------------------------------------------------------------------
 // Constants
@@ -355,16 +356,16 @@ export const AnalyticsPage: React.FC = () => {
         )}
       </Paper>
 
-      {/* Intent Breakdown Table — 3 columns: Intent, Count, Distribution */}
+      {/* Topic Breakdown Table — 3 columns: Topic, Count, Distribution */}
       <Paper p="lg" radius="md" withBorder>
         <Text fw={600} mb="md">
-          Intent breakdown
+          Topic breakdown
         </Text>
         {intentList.length > 0 ? (
           <Table striped highlightOnHover>
             <Table.Thead>
               <Table.Tr>
-                <Table.Th>Intent</Table.Th>
+                <Table.Th>Topic</Table.Th>
                 <Table.Th style={{ width: 80 }}>Count</Table.Th>
                 <Table.Th style={{ width: 200 }}>Distribution</Table.Th>
               </Table.Tr>
@@ -374,7 +375,7 @@ export const AnalyticsPage: React.FC = () => {
                 <Table.Tr key={intent.agent}>
                   <Table.Td>
                     <Text size="sm" fw={500}>
-                      {intent.agent}
+                      {agentDisplayLabel(intent.agent)}
                     </Text>
                   </Table.Td>
                   <Table.Td>
@@ -400,7 +401,7 @@ export const AnalyticsPage: React.FC = () => {
           </Table>
         ) : (
           <Text size="sm" c="dimmed" ta="center" py="md">
-            {intents.loading ? 'Loading intent data...' : 'No intent data available'}
+            {intents.loading ? 'Loading topic data...' : 'No topic data available'}
           </Text>
         )}
       </Paper>

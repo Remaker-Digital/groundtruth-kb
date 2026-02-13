@@ -36,6 +36,7 @@ import {
   useKnowledgeGaps,
 } from '../../shared/hooks/index';
 import { HelpTooltip } from '../../shared/HelpTooltip';
+import { agentDisplayLabel } from '../../shared/AnalyticsOverview';
 
 const BRAND_RED = '#ff3621';
 
@@ -387,10 +388,10 @@ export function DashboardPage() {
           )}
         </Paper>
 
-        {/* Top Intents (compact) */}
+        {/* Top Topics (compact) */}
         <Paper p="lg" radius="md" withBorder>
           <Text fw={600} mb="md">
-            Top intents <HelpTooltip text="Most frequently detected customer intents, ranked by conversation count." docLink={`${DOCS_BASE}/analytics`} />
+            Top topics <HelpTooltip text="Most frequent query categories, ranked by conversation count." docLink={`${DOCS_BASE}/analytics#topic-breakdown`} />
           </Text>
           {intents.loading ? (
             <Stack gap="xs">
@@ -400,7 +401,7 @@ export function DashboardPage() {
             </Stack>
           ) : intentList.length === 0 ? (
             <Text size="sm" c="dimmed" ta="center" py="xl">
-              No intent data available
+              No topic data available
             </Text>
           ) : (
             <Stack gap="xs">
@@ -417,7 +418,7 @@ export function DashboardPage() {
                   <div style={{ flex: 1, minWidth: 0 }}>
                     <Group justify="space-between" mb={4}>
                       <Text size="sm" fw={500}>
-                        {intent.agent}
+                        {agentDisplayLabel(intent.agent)}
                       </Text>
                       <Text size="xs" c="dimmed">
                         {(intent.invocationCount ?? 0).toLocaleString()}
@@ -452,16 +453,16 @@ export function DashboardPage() {
       {/* Divider between overview and detailed analytics */}
       <Divider label="Detailed analytics" labelPosition="center" />
 
-      {/* Intent Breakdown Table — full-width, 3 columns */}
+      {/* Topic Breakdown Table — full-width, 3 columns */}
       <Paper p="lg" radius="md" withBorder>
         <Text fw={600} mb="md">
-          Intent breakdown <HelpTooltip text="Full table of all detected intents with count and distribution percentage." docLink={`${DOCS_BASE}/analytics`} />
+          Topic breakdown <HelpTooltip text="Query categories detected across your conversations, with count and distribution." docLink={`${DOCS_BASE}/analytics#topic-breakdown`} />
         </Text>
         {intentList.length > 0 ? (
           <Table striped highlightOnHover>
             <Table.Thead>
               <Table.Tr>
-                <Table.Th>Intent</Table.Th>
+                <Table.Th>Topic</Table.Th>
                 <Table.Th style={{ width: 80 }}>Count</Table.Th>
                 <Table.Th style={{ width: 200 }}>Distribution</Table.Th>
               </Table.Tr>
@@ -471,7 +472,7 @@ export function DashboardPage() {
                 <Table.Tr key={intent.agent}>
                   <Table.Td>
                     <Text size="sm" fw={500}>
-                      {intent.agent}
+                      {agentDisplayLabel(intent.agent)}
                     </Text>
                   </Table.Td>
                   <Table.Td>
@@ -497,7 +498,7 @@ export function DashboardPage() {
           </Table>
         ) : (
           <Text size="sm" c="dimmed" ta="center" py="md">
-            {intents.loading ? 'Loading intent data...' : 'No intent data available'}
+            {intents.loading ? 'Loading topic data...' : 'No topic data available'}
           </Text>
         )}
       </Paper>
