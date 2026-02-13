@@ -312,7 +312,7 @@ export const BillingPage: React.FC = () => {
           <Stack gap={6}>
             <Group gap="sm" align="center">
               <Text size="lg" fw={700}>
-                Current plan<HelpTooltip text="Your active subscription tier determines your included monthly conversations, overage rate, and available features." />
+                Current plan<HelpTooltip text="Your active subscription tier determines your included monthly conversations, overage rate, and available features." docLink="https://agentredcx.com/docs/billing/overview#your-subscription-plan" />
               </Text>
               <Badge color={tierBadgeColor} variant="filled" size="lg" tt="capitalize">
                 {tierLabel}
@@ -392,7 +392,7 @@ export const BillingPage: React.FC = () => {
       {/* Usage Chart */}
       <Paper p="lg" radius="md" withBorder>
         <Text fw={600} mb="md">
-          Daily usage (30 days)<HelpTooltip text="Number of billable conversations per day over the last 30 days. Helps identify usage trends and peak periods." />
+          Daily usage (30 days)<HelpTooltip text="Number of billable conversations per day over the last 30 days. Helps identify usage trends and peak periods." docLink="https://agentredcx.com/docs/billing/overview#usage-dashboard" />
         </Text>
         {dailyVolume.loading && !chartData.length ? (
           <Group justify="center" py="xl">
@@ -488,7 +488,7 @@ export const BillingPage: React.FC = () => {
       {/* Conversation Packs */}
       <div>
         <Text size="lg" fw={600} mb={4}>
-          Conversation packs<HelpTooltip text="Pre-purchase conversation bundles at discounted rates. Pack conversations are consumed after your included allowance and before overage billing. Valid for 90 days, FIFO usage order." />
+          Conversation packs<HelpTooltip text="Pre-purchase conversation bundles at discounted rates. Pack conversations are consumed after your included allowance and before overage billing. Valid for 90 days, FIFO usage order." docLink="https://agentredcx.com/docs/billing/overview#conversation-packs" />
         </Text>
         <Text size="sm" c="dimmed" mb="md">
           Pre-purchase conversations at a discounted rate. Packs are valid for 90 days.

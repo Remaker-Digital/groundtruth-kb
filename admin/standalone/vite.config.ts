@@ -31,5 +31,17 @@ export default defineConfig({
   },
   server: {
     port: 3300,
+    proxy: {
+      '/api': {
+        target: 'https://agent-red-api-gateway.lemonriver-f59f94b7.eastus2.azurecontainerapps.io',
+        changeOrigin: true,
+        secure: true,
+      },
+      '/widget.js': {
+        target: 'https://agent-red-api-gateway.lemonriver-f59f94b7.eastus2.azurecontainerapps.io',
+        changeOrigin: true,
+        secure: true,
+      },
+    },
   },
 });

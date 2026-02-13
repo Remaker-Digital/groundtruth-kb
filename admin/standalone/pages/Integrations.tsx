@@ -10,7 +10,7 @@
  */
 
 import React from 'react';
-import { Paper, Title, Text, Loader, useComputedColorScheme } from '@mantine/core';
+import { Title, Text, Loader, useComputedColorScheme } from '@mantine/core';
 import { useAppContext } from '../layouts/StandaloneLayout';
 import { IntegrationsManager } from '../../shared/IntegrationsManager';
 
@@ -34,15 +34,13 @@ export const IntegrationsPage: React.FC = () => {
         Connect third-party services to extend your AI agent&apos;s capabilities.
       </Text>
 
-      <Paper p="lg" radius="md" withBorder>
-        <IntegrationsManager
-          tenantContext={tenantContext}
-          apiFetch={apiFetch}
-          onNotify={onNotify}
-          isDark={isDark}
-          basePath="/admin/standalone"
-        />
-      </Paper>
+      <IntegrationsManager
+        tenantContext={tenantContext}
+        apiFetch={apiFetch}
+        onNotify={onNotify}
+        isDark={isDark}
+        basePath="/admin/standalone"
+      />
     </div>
   );
 };

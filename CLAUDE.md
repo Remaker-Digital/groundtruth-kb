@@ -16,7 +16,7 @@ This document provides context and guidance for AI assistants working on the Age
 | **Brand Name** | Agent Red Customer Experience |
 | **Release** | Launch 1.0 |
 | **Type** | Commercial SaaS Product |
-| **Status** | Save→Activate architecture COMPLETE — production v1.20.1 (session 8 + 9 changes not yet deployed), 2,301 tests (0 failures), chat quality 12/12, admin UI 86/86. Remaining: deploy v1.22.0, creative assets (owner/designer) for Shopify App Store submission. |
+| **Status** | Save→Activate architecture COMPLETE — production v1.22.0, session 11 UI polish + tooltip audit NOT YET DEPLOYED (v1.23.0). 2,301 tests (0 failures), chat quality 12/12, admin UI 86/86. P0: deploy v1.23.0, then creative assets (owner/designer) for Shopify App Store submission. |
 | **Owner** | Remaker Digital (DBA of VanDusen & Palmeter, LLC) |
 
 ---
@@ -491,8 +491,8 @@ E:\Claude-Playground\CLAUDE-PROJECTS\Agent Red Customer Engagement\
 ```
 Continue work on Agent Red Customer Experience commercial project.
 Location: E:\Claude-Playground\CLAUDE-PROJECTS\Agent Red Customer Engagement
-Key files: CLAUDE.md, memory/MEMORY.md, memory/activation-model.md, docs/operations/SHOPIFY-APP-REVIEW-PREFLIGHT-CHECKLIST.md
-Current status: Save→Activate architecture COMPLETE. Production v1.20.1 healthy (session 8+9 changes NOT yet deployed). 2,301 tests (0 failures). Chat quality 12/12, admin UI 86/86, E2E 60/60. P0: deploy v1.22.0 then creative assets for Shopify App Store submission.
+Key files: CLAUDE.md, memory/MEMORY.md, memory/admin-ui.md, docs/operations/SHOPIFY-APP-REVIEW-PREFLIGHT-CHECKLIST.md
+Current status: Production v1.22.0 healthy. Session 11 changes (UI polish + tooltip audit + 4 new doc pages) NOT YET DEPLOYED as v1.23.0. 2,301 tests (0 failures). P0: build and deploy v1.23.0, then owner manual UI functional testing on all pages.
 ```
 
 ### Referencing AGNTCY

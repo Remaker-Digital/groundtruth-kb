@@ -169,7 +169,7 @@ export const MemoryPrivacyPage: React.FC = () => {
           Structured customer profiles (preferences, account state, interaction history)
           are injected into every conversation.
         </Text>
-        <HelpTooltip text="Customer context provides the AI with information about each customer's previous interactions, preferences, and account status. This enables personalized responses without customers having to repeat themselves." />
+        <HelpTooltip text="Customer context provides the AI with information about each customer's previous interactions, preferences, and account status. This enables personalized responses without customers having to repeat themselves." docLink="https://agentredcx.com/docs/admin-guide/customer-memory#how-the-layers-work" />
       </Paper>
 
       {/* Layer 2: Conversation memory */}
@@ -192,7 +192,7 @@ export const MemoryPrivacyPage: React.FC = () => {
           Vectorized conversation transcripts enable semantic search across a customer's
           full interaction history.
         </Text>
-        <HelpTooltip text="Conversation memory stores previous chat transcripts as vector embeddings, allowing the AI to find and reference relevant past conversations. This helps provide consistent support across sessions." />
+        <HelpTooltip text="Conversation memory stores previous chat transcripts as vector embeddings, allowing the AI to find and reference relevant past conversations. This helps provide consistent support across sessions." docLink="https://agentredcx.com/docs/admin-guide/customer-memory#memory-enabled" />
       </Paper>
 
       {/* Layer 3: Cross-session learning */}
@@ -219,6 +219,7 @@ export const MemoryPrivacyPage: React.FC = () => {
           The AI extracts and persists behavioral patterns, communication preferences,
           and interaction styles across sessions.
         </Text>
+        <HelpTooltip text="Cross-session learning observes how each customer communicates over time — tone, vocabulary, topic patterns — and adapts future responses to match. Learned patterns decay gradually so the AI stays responsive to changing behavior." docLink="https://agentredcx.com/docs/admin-guide/customer-memory#pattern-learning" />
         {isProOrHigher && crossSessionLearning && (
           <div style={{ marginTop: 12 }}>
             <Text size="sm" fw={500} mb={4}>Pattern decay (days)</Text>
@@ -238,7 +239,7 @@ export const MemoryPrivacyPage: React.FC = () => {
               mb="md"
               disabled={!memoryEnabled}
             />
-            <HelpTooltip text="How long learned patterns remain active before decaying. Shorter values keep the AI more responsive to behavior changes; longer values provide more stable personalization." />
+            <HelpTooltip text="How long learned patterns remain active before decaying. Shorter values keep the AI more responsive to behavior changes; longer values provide more stable personalization." docLink="https://agentredcx.com/docs/admin-guide/customer-memory#pattern-learning" />
           </div>
         )}
       </Paper>
@@ -255,10 +256,11 @@ export const MemoryPrivacyPage: React.FC = () => {
             )}
           </Group>
         </Group>
-        <Text c="dimmed" size="sm">
+        <Text c="dimmed" size="sm" mb="xs">
           Per-customer AI fine-tuning on 1,000+ historical interactions for maximum
           personalization. Available as an Enterprise add-on ($299/month).
         </Text>
+        <HelpTooltip text="Dedicated model training creates a custom AI model for each customer using their historical interactions. This provides the highest level of personalization but requires a large conversation history (1,000+ interactions) and is billed as a separate Enterprise add-on." docLink="https://agentredcx.com/docs/admin-guide/customer-memory#dedicated-model-training" />
         {!isEnterprise && (
           <Alert color="blue" variant="light" mt="md">
             <Text size="sm">Upgrade to Enterprise tier to access dedicated model training.</Text>
@@ -270,7 +272,10 @@ export const MemoryPrivacyPage: React.FC = () => {
       <Accordion variant="separated" radius="md" defaultValue="privacy">
         <Accordion.Item value="privacy">
           <Accordion.Control>
-            <Text fw={600} size="md">Data retention & privacy</Text>
+            <Group gap="xs">
+              <Text fw={600} size="md">Data retention & privacy</Text>
+              <HelpTooltip text="Controls how long customer conversation data is stored, whether personally identifiable information is automatically redacted, and how GDPR data requests are handled. These settings apply to all customers on your account." docLink="https://agentredcx.com/docs/admin-guide/data-retention" />
+            </Group>
           </Accordion.Control>
           <Accordion.Panel>
             <Stack gap="md">

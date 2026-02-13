@@ -37,6 +37,7 @@ import {
   Loader,
   Alert,
   Tabs,
+  useComputedColorScheme,
 } from '@mantine/core';
 import { useAppContext } from '../layouts/StandaloneLayout';
 
@@ -124,6 +125,8 @@ const EditIcon: React.FC = () => (
 
 export const QuickActionsPage: React.FC = () => {
   const { apiFetch, onNotify } = useAppContext();
+  const computedColorScheme = useComputedColorScheme('dark');
+  const isDark = computedColorScheme === 'dark';
 
   // ---- State ---------------------------------------------------------------
 
@@ -759,10 +762,10 @@ export const QuickActionsPage: React.FC = () => {
                 gap: 6,
                 padding: '6px 14px',
                 borderRadius: 20,
-                border: '1px solid #272727',
-                background: '#1f1f1f',
+                border: `1px solid ${isDark ? '#272727' : '#dee2e6'}`,
+                background: isDark ? '#1f1f1f' : '#f1f3f5',
                 fontSize: 13,
-                color: '#E0E0E0',
+                color: isDark ? '#E0E0E0' : '#1f2937',
               }}>
                 {formIcon.trim() && <span>{formIcon.trim()}</span>}
                 <span>{formLabel.trim()}</span>

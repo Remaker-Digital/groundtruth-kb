@@ -545,7 +545,7 @@ export const BillingPortal: React.FC<BillingPortalProps> = ({
       <div style={styles.card}>
         <h3 style={styles.sectionTitle}>Subscription</h3>
         <div style={styles.row}>
-          <span style={styles.label}>Current plan <HelpTooltip text="Your active subscription tier and billing status." /></span>
+          <span style={styles.label}>Current plan <HelpTooltip text="Your active subscription tier and billing status." docLink="https://agentredcx.com/docs/billing/overview#your-subscription-plan" /></span>
           <span style={styles.badge(tierDisplay.color)}>{tierDisplay.label}</span>
         </div>
         <div style={styles.row}>
@@ -572,6 +572,8 @@ export const BillingPortal: React.FC<BillingPortalProps> = ({
           <button
             style={styles.button('primary')}
             onClick={onManageBilling}
+            onMouseEnter={(e) => { (e.currentTarget as HTMLButtonElement).style.background = '#e62e1a'; }}
+            onMouseLeave={(e) => { (e.currentTarget as HTMLButtonElement).style.background = '#ff3621'; }}
           >
             {tenantContext.billingChannel === 'shopify'
               ? 'Manage Shopify billing'
@@ -582,7 +584,7 @@ export const BillingPortal: React.FC<BillingPortalProps> = ({
 
       {/* Usage Summary Card */}
       <div style={styles.card}>
-        <h3 style={styles.sectionTitle}>Usage this period <HelpTooltip text="Conversation usage for the current monthly billing cycle." /></h3>
+        <h3 style={styles.sectionTitle}>Usage this period <HelpTooltip text="Conversation usage for the current monthly billing cycle." docLink="https://agentredcx.com/docs/billing/overview#usage-dashboard" /></h3>
 
         {usage.data ? (
           <>
@@ -664,7 +666,7 @@ export const BillingPortal: React.FC<BillingPortalProps> = ({
 
       {/* Conversation Packs Card */}
       <div style={styles.card}>
-        <h3 style={styles.sectionTitle}>Conversation packs <HelpTooltip text="Pre-purchase conversation credits at a discount. Packs are consumed before overage billing and expire after 90 days." /></h3>
+        <h3 style={styles.sectionTitle}>Conversation packs <HelpTooltip text="Pre-purchase conversation credits at a discount. Packs are consumed before overage billing and expire after 90 days." docLink="https://agentredcx.com/docs/billing/overview#conversation-packs" /></h3>
         <p style={{
           fontSize: 13,
           color: '#6B7280',
@@ -743,7 +745,7 @@ export const BillingPortal: React.FC<BillingPortalProps> = ({
       {/* Upgrade Tier Section */}
       {upgradeTiers.length > 0 && (
         <div style={styles.card}>
-          <h3 style={styles.sectionTitle}>Upgrade plan <HelpTooltip text="Compare features and pricing across all tiers. Annual billing saves 17%." /></h3>
+          <h3 style={styles.sectionTitle}>Upgrade plan <HelpTooltip text="Compare features and pricing across all tiers. Annual billing saves 17%." docLink="https://agentredcx.com/docs/billing/overview#managing-your-subscription" /></h3>
           <p style={{
             fontSize: 13,
             color: '#6B7280',
@@ -775,11 +777,11 @@ export const BillingPortal: React.FC<BillingPortalProps> = ({
                     fontSize: 13,
                   }}>
                     <div>
-                      <span style={styles.label}>Included <HelpTooltip text="Conversations included in your plan's monthly fee." /></span>
+                      <span style={styles.label}>Included <HelpTooltip text="Conversations included in your plan's monthly fee." docLink="https://agentredcx.com/docs/billing/overview#how-conversations-are-billed" /></span>
                       <div style={{ ...styles.value, fontSize: 15 }}>{tier.conversations}</div>
                     </div>
                     <div>
-                      <span style={styles.label}>Overage Rate <HelpTooltip text="Per-conversation charge for usage beyond included allowance and pack balance." /></span>
+                      <span style={styles.label}>Overage Rate <HelpTooltip text="Per-conversation charge for usage beyond included allowance and pack balance." docLink="https://agentredcx.com/docs/billing/overview#how-conversations-are-billed" /></span>
                       <div style={{ ...styles.value, fontSize: 15 }}>{tier.overage}</div>
                     </div>
                   </div>
@@ -803,6 +805,8 @@ export const BillingPortal: React.FC<BillingPortalProps> = ({
                         );
                         onManageBilling();
                       }}
+                      onMouseEnter={(e) => { (e.currentTarget as HTMLButtonElement).style.background = '#e62e1a'; }}
+                      onMouseLeave={(e) => { (e.currentTarget as HTMLButtonElement).style.background = '#ff3621'; }}
                     >
                       Upgrade to {display.label}
                     </button>

@@ -792,6 +792,9 @@ const FieldEditor: React.FC<FieldEditorProps> = ({
     <div style={s.fieldGroup}>
       <label style={s.label}>
         {field.label}
+        {field.validation?.required && (
+          <span style={{ color: '#d73a49', marginLeft: 2 }} title="Required">*</span>
+        )}
         {isLocked && field.tierGate && (
           <span style={s.tierBadge}>{field.tierGate}+</span>
         )}

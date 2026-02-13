@@ -435,7 +435,7 @@ const URLImportForm: React.FC<URLImportFormProps> = ({ onImport, importing, erro
             style={{ accentColor: BRAND_PRIMARY }}
           />
           Crawl site
-          <HelpTooltip text="Follow links on the same domain and import multiple pages automatically." />
+          <HelpTooltip text="Follow links on the same domain and import multiple pages automatically." docLink="https://agentredcx.com/docs/admin-guide/knowledge-base-management#uploading-documents" />
         </label>
 
         {crawl && (
@@ -597,7 +597,7 @@ const ArticleEditor: React.FC<ArticleEditorProps> = ({
           }}
         >
           Title <span style={{ color: COLOR_DANGER }}>*</span>
-          <HelpTooltip text="A clear, descriptive title helps the AI match articles to customer questions." />
+          <HelpTooltip text="A clear, descriptive title helps the AI match articles to customer questions." docLink="https://agentredcx.com/docs/admin-guide/knowledge-base-management#article-structure" />
         </label>
         <input
           type="text"
@@ -1080,7 +1080,7 @@ export const KnowledgeBaseManager: React.FC<BaseComponentProps> = ({
           <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '24px' }}>
             <h2 style={{ margin: 0, fontSize: '18px', fontWeight: 600, color: COLOR_TEXT }}>
               Import Content
-              <HelpTooltip text="Upload PDF, DOCX, CSV, or TXT files to automatically create knowledge base entries." />
+              <HelpTooltip text="Upload PDF, DOCX, CSV, or TXT files to automatically create knowledge base entries." docLink="https://agentredcx.com/docs/admin-guide/knowledge-base-management#uploading-documents" />
             </h2>
             <button onClick={() => { setView('list'); refetchKB(); }} style={buttonStyle('secondary')}>
               Back to list
@@ -1160,7 +1160,7 @@ export const KnowledgeBaseManager: React.FC<BaseComponentProps> = ({
         <div>
           <h2 style={{ margin: 0, fontSize: '18px', fontWeight: 600, color: COLOR_TEXT }}>
             Knowledge Base
-            <HelpTooltip text="Articles, FAQs, and policies that the AI searches to answer customer questions. Keep it accurate and up to date." />
+            <HelpTooltip text="Articles, FAQs, and policies that the AI searches to answer customer questions. Keep it accurate and up to date." docLink="https://agentredcx.com/docs/admin-guide/knowledge-base-management" />
           </h2>
           <span style={{ fontSize: '13px', color: COLOR_TEXT_SECONDARY }}>
             {articles.length} article{articles.length !== 1 ? 's' : ''}
@@ -1477,7 +1477,7 @@ export const KnowledgeBaseManager: React.FC<BaseComponentProps> = ({
                   }}
                 >
                   Category
-                  <HelpTooltip text="Organize articles by topic for easier management. The AI uses categories to narrow searches." />
+                  <HelpTooltip text="Organize articles by topic for easier management. The AI uses categories to narrow searches." docLink="https://agentredcx.com/docs/admin-guide/knowledge-base-management#organizing-with-categories" />
                 </th>
                 <th
                   style={{
@@ -1493,7 +1493,7 @@ export const KnowledgeBaseManager: React.FC<BaseComponentProps> = ({
                   }}
                 >
                   Status
-                  <HelpTooltip text="Draft articles are not used by the AI. Publish when ready." />
+                  <HelpTooltip text="Draft articles are not used by the AI. Publish when ready." docLink="https://agentredcx.com/docs/admin-guide/knowledge-base-management#article-status-lifecycle" />
                 </th>
                 <th
                   style={{
@@ -1509,7 +1509,7 @@ export const KnowledgeBaseManager: React.FC<BaseComponentProps> = ({
                   }}
                 >
                   Freshness
-                  <HelpTooltip text="How recently the article content has been verified. Stale articles may contain outdated information." />
+                  <HelpTooltip text="How recently the article content has been verified. Stale articles may contain outdated information." docLink="https://agentredcx.com/docs/admin-guide/knowledge-base-management#staleness-and-freshness" />
                 </th>
                 <th
                   style={{

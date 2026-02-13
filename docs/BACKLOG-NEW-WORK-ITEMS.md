@@ -863,6 +863,12 @@ After initial activation, when the admin opens the Setup Wizard:
 - **Rationale:** At launch, each tenant is typically one person. Multi-user is an enterprise feature. Building auth wrong creates security risk. Passwordless magic links avoid password custodianship entirely.
 - **Estimate:** ~5-8 days
 
+### WI #296 — AI-generated greeting message option
+- **Priority:** P3 (post-launch enhancement)
+- **Scope:** Widget configuration (standalone + Shopify admin)
+- **Description:** Add an "AI greeting" toggle to the greeting message settings. When enabled, the AI generates a personalized greeting for each new chat session based on the customer's profile context (name, order history, previous interactions) instead of displaying a static template. When disabled, the current static greeting message behavior is preserved. Requires pipeline integration: the greeting is generated as the first agent response before the customer's first message, using the same response generation agent with a greeting-specific prompt.
+- **Estimate:** ~2-3 days
+
 ---
 
 *© 2026 Remaker Digital, a DBA of VanDusen & Palmeter, LLC. All rights reserved.*

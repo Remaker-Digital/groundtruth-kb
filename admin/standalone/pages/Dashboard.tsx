@@ -119,15 +119,13 @@ export function DashboardPage() {
 
   // Analytics filters
   const [period, setPeriod] = useState('30d');
-  const [modeFilter, setModeFilter] = useState<'all' | 'production' | 'test'>('all');
-  const isTestMode = modeFilter === 'test' ? true : modeFilter === 'production' ? false : undefined;
 
   // Data hooks
-  const summary = useAnalyticsSummary(apiFetch, isTestMode);
+  const summary = useAnalyticsSummary(apiFetch);
   const dailyVolume = useDailyVolume(apiFetch);
   const conversations = useInboxConversations(apiFetch);
-  const intents = useIntentBreakdown(apiFetch, isTestMode);
-  const gaps = useKnowledgeGaps(apiFetch, isTestMode);
+  const intents = useIntentBreakdown(apiFetch);
+  const gaps = useKnowledgeGaps(apiFetch);
 
   const computedColorScheme = useComputedColorScheme('dark');
   const isDark = computedColorScheme === 'dark';
@@ -156,9 +154,9 @@ export function DashboardPage() {
       <Group justify="space-between" align="flex-end">
         <div>
           {tenantContext?.shopDomain && (
-            <Text size="lg" fw={700} c="gray.3" mb={2}>
+            <Title order={2} mb={40}>
               {tenantContext.shopDomain.replace('.myshopify.com', '')}
-            </Text>
+            </Title>
           )}
           <Title order={2}>Dashboard</Title>
           <Text c="dimmed" size="sm">
@@ -166,16 +164,6 @@ export function DashboardPage() {
           </Text>
         </div>
         <Group gap="md">
-          <SegmentedControl
-            value={modeFilter}
-            onChange={(val) => setModeFilter(val as 'all' | 'production' | 'test')}
-            data={[
-              { label: 'All', value: 'all' },
-              { label: 'Production', value: 'production' },
-              { label: 'Test', value: 'test' },
-            ]}
-            size="sm"
-          />
           <SegmentedControl
             value={period}
             onChange={setPeriod}
@@ -189,27 +177,6 @@ export function DashboardPage() {
           />
         </Group>
       </Group>
-
-      {/* Test mode filter indicator */}
-      {modeFilter !== 'all' && (
-        <Paper p="xs" radius="md" withBorder style={{
-          borderColor: modeFilter === 'test' ? 'rgba(255, 152, 0, 0.3)' : undefined,
-          background: modeFilter === 'test'
-            ? 'linear-gradient(135deg, rgba(255, 152, 0, 0.08) 0%, rgba(255, 87, 34, 0.04) 100%)'
-            : undefined,
-        }}>
-          <Group gap="xs" justify="center">
-            <Badge size="sm" variant="light" color={modeFilter === 'test' ? 'orange' : 'blue'}>
-              {modeFilter === 'test' ? 'Test mode' : 'Production'}
-            </Badge>
-            <Text size="xs" c="dimmed">
-              {modeFilter === 'test'
-                ? 'Showing metrics from test configuration sessions only'
-                : 'Showing metrics from production sessions only'}
-            </Text>
-          </Group>
-        </Paper>
-      )}
 
       {/* Stat cards — 5 cards with detail sub-labels + help tooltips (WI #259) */}
       <SimpleGrid cols={{ base: 1, xs: 2, md: 3 }} spacing="md">

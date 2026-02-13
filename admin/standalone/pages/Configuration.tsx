@@ -620,13 +620,14 @@ export const ConfigurationPage: React.FC = () => {
           <Stack gap="lg">
             {/* Brand & Persona */}
             <Paper p="lg" radius="md" withBorder>
-              <Text fw={600} mb="md">Brand & persona <HelpTooltip text="Set your AI agent's name, greeting, personality tone, and formality level." docLink={`${DOCS_BASE}/agent-configuration`} /></Text>
+              <Text fw={600} mb="md">Brand & persona <HelpTooltip text="Set your AI agent's name, greeting, personality tone, and formality level." docLink={`${DOCS_BASE}/brand-and-tone`} /></Text>
               <Stack gap="md">
                 <TextInput
                   label="Brand name"
                   placeholder="Your store or brand name"
                   value={form.brandName}
                   onChange={(e) => updateField('brandName', e.currentTarget.value)}
+                  required
                 />
                 <Textarea
                   label="Brand voice"
@@ -663,7 +664,7 @@ export const ConfigurationPage: React.FC = () => {
 
             {/* Policies */}
             <Paper p="lg" radius="md" withBorder>
-              <Text fw={600} mb="md">Policies <HelpTooltip text="Control how the AI handles refunds, returns, and other business rules." docLink={`${DOCS_BASE}/agent-configuration`} /></Text>
+              <Text fw={600} mb="md">Policies <HelpTooltip text="Control how the AI handles refunds, returns, and other business rules." docLink={`${DOCS_BASE}/business-policies`} /></Text>
               <Stack gap="md">
                 <NumberInput
                   label="Return window"
@@ -694,7 +695,7 @@ export const ConfigurationPage: React.FC = () => {
 
             {/* Escalation */}
             <Paper p="lg" radius="md" withBorder>
-              <Text fw={600} mb="xs">Escalation <HelpTooltip text="Configure when and how conversations are handed off to human team members." docLink={`${DOCS_BASE}/agent-configuration`} /></Text>
+              <Text fw={600} mb="xs">Escalation <HelpTooltip text="Configure when and how conversations are handed off to human team members." docLink={`${DOCS_BASE}/escalation-rules`} /></Text>
               <Text size="xs" c="dimmed" mb="md">
                 Configure escalation categories, notification emails, and trigger keywords.
                 Each category routes to a different team email with its own keyword set.
@@ -877,7 +878,7 @@ export const ConfigurationPage: React.FC = () => {
 
             {/* Custom Instructions */}
             <Paper p="lg" radius="md" withBorder>
-              <Text fw={600} mb="md">Custom instructions <HelpTooltip text="Free-form instructions injected into every AI response. Use this for brand-specific rules or response guidelines." docLink={`${DOCS_BASE}/agent-configuration`} /></Text>
+              <Text fw={600} mb="md">Custom instructions <HelpTooltip text="Free-form instructions injected into every AI response. Use this for brand-specific rules or response guidelines." docLink={`${DOCS_BASE}/custom-instructions`} /></Text>
               <Textarea
                 placeholder="Provide advisory instructions for the AI agent..."
                 value={form.customInstructions}
@@ -894,7 +895,7 @@ export const ConfigurationPage: React.FC = () => {
 
             {/* Language */}
             <Paper p="lg" radius="md" withBorder>
-              <Text fw={600} mb="md">Language <HelpTooltip text="Set the primary response language and additional supported languages for multilingual customers." docLink={`${DOCS_BASE}/agent-configuration`} /></Text>
+              <Text fw={600} mb="md">Language <HelpTooltip text="Set the primary response language and additional supported languages for multilingual customers." docLink={`${DOCS_BASE}/languages`} /></Text>
               <Stack gap="md">
                 <Select
                   label="Primary language"
@@ -926,7 +927,7 @@ export const ConfigurationPage: React.FC = () => {
             {/* Saved configurations (WI #265-267) */}
             <Paper p="lg" radius="md" withBorder>
               <Group justify="space-between" mb="xs">
-                <Text fw={600}>Saved configurations <HelpTooltip text="Save named snapshots of your configuration to compare, revert, or switch between setups." docLink={`${DOCS_BASE}/agent-configuration`} /></Text>
+                <Text fw={600}>Saved configurations <HelpTooltip text="Save named snapshots of your configuration to compare, revert, or switch between setups." docLink={`${DOCS_BASE}/save-and-activate`} /></Text>
                 <Button
                   size="xs"
                   variant="light"

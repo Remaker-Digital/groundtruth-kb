@@ -503,31 +503,37 @@ export const KnowledgeBasePage: React.FC = () => {
             />
           </Group>
           <Group gap="sm">
-            <Button
-              leftSection={<ScanIcon />}
-              variant="default"
-              onClick={() => handleScan(false)}
-              loading={scanning}
-              disabled={articles.length === 0}
-            >
-              Scan for conflicts
-            </Button>
-            <Button
-              leftSection={<DownloadIcon />}
-              variant="default"
-              onClick={handleExport}
-              loading={exporting}
-              disabled={articles.length === 0}
-            >
-              Export CSV
-            </Button>
-            <Button
-              leftSection={<UploadIcon />}
-              variant="default"
-              onClick={handleOpenImport}
-            >
-              Import
-            </Button>
+            <Tooltip label="Detect duplicate, overlapping, or contradictory entries that may cause inconsistent AI responses" multiline w={260} withArrow>
+              <Button
+                leftSection={<ScanIcon />}
+                variant="default"
+                onClick={() => handleScan(false)}
+                loading={scanning}
+                disabled={articles.length === 0}
+              >
+                Scan for conflicts
+              </Button>
+            </Tooltip>
+            <Tooltip label="Download all knowledge base entries as a CSV file for backup or editing" multiline w={220} withArrow>
+              <Button
+                leftSection={<DownloadIcon />}
+                variant="default"
+                onClick={handleExport}
+                loading={exporting}
+                disabled={articles.length === 0}
+              >
+                Export CSV
+              </Button>
+            </Tooltip>
+            <Tooltip label="Upload PDF, DOCX, CSV, or TXT files, or import from a URL to bulk-create entries" multiline w={240} withArrow>
+              <Button
+                leftSection={<UploadIcon />}
+                variant="default"
+                onClick={handleOpenImport}
+              >
+                Import
+              </Button>
+            </Tooltip>
             <Button
               leftSection={<PlusIcon />}
               color={BRAND_RED}
@@ -553,12 +559,14 @@ export const KnowledgeBasePage: React.FC = () => {
           <Text size="xs" c="dimmed" fw={600} mb={4}>Draft</Text>
           <Text size="xl" fw={700} lh={1} c="yellow.7">{stats.draft}</Text>
         </Paper>
-        <Paper p="md" radius="md" withBorder>
-          <Text size="xs" c="dimmed" fw={600} mb={4}>Needs attention</Text>
-          <Text size="xl" fw={700} lh={1} c="red">
-            {(stalenessData?.staleCount ?? 0) + (stalenessData?.veryStaleCount ?? 0)}
-          </Text>
-        </Paper>
+        <Tooltip label="Articles marked stale or very stale that should be reviewed for accuracy" multiline w={240} withArrow>
+          <Paper p="md" radius="md" withBorder style={{ cursor: 'help' }}>
+            <Text size="xs" c="dimmed" fw={600} mb={4}>Needs attention</Text>
+            <Text size="xl" fw={700} lh={1} c="red">
+              {(stalenessData?.staleCount ?? 0) + (stalenessData?.veryStaleCount ?? 0)}
+            </Text>
+          </Paper>
+        </Tooltip>
       </SimpleGrid>
 
       {/* Articles table */}
@@ -581,14 +589,22 @@ export const KnowledgeBasePage: React.FC = () => {
                   <Text size="sm" fw={500}>{article.title}</Text>
                 </Table.Td>
                 <Table.Td>
-                  <Badge size="sm" variant="light" color={categoryColorMap[article.category] || 'gray'}>
-                    {article.category}
-                  </Badge>
+                  {article.category ? (
+                    <Badge size="sm" variant="light" color={categoryColorMap[article.category] || 'gray'}>
+                      {article.category}
+                    </Badge>
+                  ) : (
+                    <Text size="xs" c="dimmed">--</Text>
+                  )}
                 </Table.Td>
                 <Table.Td>
-                  <Badge size="sm" variant="light" color={statusColorMap[article.status] || 'gray'}>
-                    {article.status}
-                  </Badge>
+                  {article.status ? (
+                    <Badge size="sm" variant="light" color={statusColorMap[article.status] || 'gray'}>
+                      {article.status}
+                    </Badge>
+                  ) : (
+                    <Text size="xs" c="dimmed">--</Text>
+                  )}
                 </Table.Td>
                 <Table.Td>
                   <Badge size="sm" variant="light" color={stalenessColorMap[article.stalenessCategory ?? ''] || 'gray'}>

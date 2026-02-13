@@ -38,8 +38,9 @@ import { useDisclosure } from '@mantine/hooks';
 import { notifications } from '@mantine/notifications';
 
 import type { TenantTier, TenantStatus, BillingChannel, TeamRole } from '../../shared/types';
-import ActivationBanner from '../../shared/ActivationBanner';
+import type { ActivationStatus } from '../../shared/hooks';
 import ActivationDialog from '../../shared/ActivationDialog';
+import RestoreDialog from '../../shared/RestoreDialog';
 
 // ---------------------------------------------------------------------------
 // Types
@@ -173,14 +174,23 @@ type NavPage = {
   roles?: TeamRole[];
 };
 
-const navItems: NavPage[] = [
+/** Nav items rendered BEFORE the configuration group. */
+const navItemsBefore: NavPage[] = [
   { path: '/', label: 'Dashboard', icon: 'dashboard', roles: ['superadmin', 'admin', 'viewer'] },
   { path: '/inbox', label: 'Inbox', icon: 'inbox' },
-  { path: '/team', label: 'Team', icon: 'team', roles: ['superadmin', 'admin'] },
+  { path: '/team', label: 'Team members', icon: 'team', roles: ['superadmin', 'admin'] },
+];
+
+/** Pages participating in the Save→Activate lifecycle (grouped in sidebar). */
+const configGroupItems: NavPage[] = [
   { path: '/configuration', label: 'Agent configuration', icon: 'config', roles: ['superadmin', 'admin'] },
-  { path: '/knowledge-base', label: 'Knowledge base', icon: 'knowledge', roles: ['superadmin', 'admin', 'viewer'] },
+  { path: '/knowledge-base', label: 'Knowledge base', icon: 'knowledge', roles: ['superadmin', 'admin'] },
   { path: '/quick-actions', label: 'Quick actions', icon: 'quickactions', roles: ['superadmin', 'admin'] },
   { path: '/widget', label: 'Widget configuration', icon: 'widget', roles: ['superadmin', 'admin'] },
+];
+
+/** Nav items rendered AFTER the configuration group. */
+const navItemsAfter: NavPage[] = [
   { path: '/integrations', label: 'Integrations', icon: 'integrations', roles: ['superadmin', 'admin'] },
   { path: '/memory-privacy', label: 'Memory & privacy', icon: 'memory', roles: ['superadmin', 'admin'] },
   { path: '/billing', label: 'Billing', icon: 'billing', roles: ['superadmin', 'admin'] },
@@ -339,10 +349,57 @@ export const StandaloneLayout: React.FC<StandaloneLayoutProps> = ({
     try { localStorage.setItem('agentred-welcome-dismissed', '1'); } catch { /* ignore */ }
   }, []);
 
-  // ---- Activation dialog state (triggered by ActivationBanner) ---------------
+  // ---- Activation state (sidebar config group) --------------------------------
 
   const [showActivationDialog, setShowActivationDialog] = useState(false);
+  const [showRestoreDialog, setShowRestoreDialog] = useState(false);
   const [activationRefreshKey, setActivationRefreshKey] = useState(0);
+  const [activationStatus, setActivationStatus] = useState<ActivationStatus | null>(null);
+  const [discarding, setDiscarding] = useState(false);
+
+  // Poll activation status every 30s (replaces ActivationBanner's internal polling)
+  const fetchActivationStatus = useCallback(async () => {
+    try {
+      const res = await apiFetch('/api/config/activation-status');
+      if (res.ok) {
+        const data: ActivationStatus = await res.json();
+        setActivationStatus(data);
+      }
+    } catch { /* silent — polling failure is non-fatal */ }
+  }, [apiFetch]);
+
+  useEffect(() => {
+    if (!tenantContext) return;
+    fetchActivationStatus();
+    const interval = setInterval(fetchActivationStatus, 30_000);
+    return () => clearInterval(interval);
+  }, [tenantContext, fetchActivationStatus, activationRefreshKey]);
+
+  // Discard all draft changes (confirm → POST → refresh)
+  const handleDiscard = useCallback(async () => {
+    if (!confirm('Discard all draft changes? This cannot be undone.')) return;
+    setDiscarding(true);
+    try {
+      const res = await apiFetch('/api/config/draft/discard', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: '{}',
+      });
+      if (res.ok) {
+        onNotify('Draft changes discarded', 'info');
+        setActivationRefreshKey((k) => k + 1);
+      } else {
+        onNotify('Failed to discard draft', 'error');
+      }
+    } catch {
+      onNotify('Network error discarding draft', 'error');
+    } finally {
+      setDiscarding(false);
+    }
+  }, [apiFetch, onNotify]);
+
+  // Config group visible only for superadmin / admin
+  const canSeeConfigGroup = !userRole || ['superadmin', 'admin'].includes(userRole);
 
   // ---- Chat widget injection (auto-embed for admin users) ----------------
 
@@ -503,9 +560,17 @@ export const StandaloneLayout: React.FC<StandaloneLayoutProps> = ({
                 </Tooltip>
               )}
               {tenantContext && (
-                <Badge variant="light" color="green" size="sm" tt="capitalize">
-                  {tenantContext.tier}
-                </Badge>
+                <Tooltip
+                  label={`Your current plan: ${tenantContext.tier.charAt(0).toUpperCase() + tenantContext.tier.slice(1)}. Plans available: Starter ($149/mo), Professional ($399/mo), Enterprise ($999/mo).`}
+                  position="bottom"
+                  multiline
+                  w={280}
+                  openDelay={300}
+                >
+                  <Badge variant="light" color="green" size="sm" tt="capitalize" style={{ cursor: 'default' }}>
+                    {tenantContext.tier}
+                  </Badge>
+                </Tooltip>
               )}
               {/* Inactive indicator (WI #291) — shown when system not yet activated */}
               {isActivated === false && (
@@ -589,45 +654,186 @@ export const StandaloneLayout: React.FC<StandaloneLayoutProps> = ({
         {/* ---- Navbar ---- */}
         <AppShell.Navbar p="xs">
           <AppShell.Section grow>
-            {navItems.filter((item) => !item.roles || !userRole || item.roles.includes(userRole)).map((item) => {
-              const IconComponent = Icons[item.icon];
-              const isActive = location.pathname === item.path
-                || (item.path !== '/' && location.pathname.startsWith(item.path));
+            {/* --- Before-group items (Dashboard, Inbox, Team members) --- */}
+            {navItemsBefore
+              .filter((item) => !item.roles || !userRole || item.roles.includes(userRole))
+              .map((item) => {
+                const IconComponent = Icons[item.icon];
+                const isActive = location.pathname === item.path
+                  || (item.path !== '/' && location.pathname.startsWith(item.path));
+                return (
+                  <NavLink
+                    key={item.path}
+                    label={item.label}
+                    leftSection={
+                      <ThemeIcon
+                        variant={isActive ? 'filled' : isDark ? 'default' : 'light'}
+                        size="sm"
+                        color={isActive ? 'brand' : 'gray'}
+                        style={!isActive && isDark ? { background: 'transparent', border: 'none' } : undefined}
+                      >
+                        <IconComponent />
+                      </ThemeIcon>
+                    }
+                    rightSection={
+                      item.badge ? (
+                        <Badge size="xs" variant="filled" color="brand" circle>{item.badge}</Badge>
+                      ) : undefined
+                    }
+                    active={isActive}
+                    onClick={() => navigate(item.path)}
+                    styles={{ label: isActive && isDark ? { color: '#F5F5F5' } : undefined }}
+                    style={{
+                      borderRadius: 8,
+                      marginBottom: 2,
+                      ...(isActive && isDark ? { background: '#1f1f1f', border: '1px solid #272727' } : {}),
+                    }}
+                  />
+                );
+              })}
 
-              return (
-                <NavLink
-                  key={item.path}
-                  label={item.label}
-                  leftSection={
-                    <ThemeIcon
-                      variant={isActive ? 'filled' : isDark ? 'default' : 'light'}
-                      size="sm"
-                      color={isActive ? 'brand' : 'gray'}
-                      style={!isActive && isDark ? { background: 'transparent', border: 'none' } : undefined}
-                    >
-                      <IconComponent />
-                    </ThemeIcon>
-                  }
-                  rightSection={
-                    item.badge ? (
-                      <Badge size="xs" variant="filled" color="brand" circle>
-                        {item.badge}
-                      </Badge>
-                    ) : undefined
-                  }
-                  active={isActive}
-                  onClick={() => navigate(item.path)}
-                  styles={{
-                    label: isActive && isDark ? { color: '#F5F5F5' } : undefined,
-                  }}
+            {/* --- Configuration group (Save→Activate lifecycle) --- */}
+            {canSeeConfigGroup && (
+              <Box
+                style={{
+                  border: `1px solid ${isDark ? '#272727' : '#e0e0e0'}`,
+                  borderRadius: 8,
+                  padding: '8px 6px',
+                  margin: '4px 0',
+                  background: isDark ? 'rgba(31, 31, 31, 0.4)' : 'rgba(0, 0, 0, 0.02)',
+                }}
+              >
+                {/* Group header: label + status badge */}
+                <Group justify="space-between" px={10} py={4} pb={6}>
+                  <Text
+                    size="xs"
+                    fw={600}
+                    c="dimmed"
+                    tt="uppercase"
+                    style={{ letterSpacing: '0.5px', fontSize: 10 }}
+                  >
+                    Configuration
+                  </Text>
+                  {activationStatus && (
+                    activationStatus.has_pending_changes ? (
+                      <Badge size="xs" variant="dot" color="orange">Draft</Badge>
+                    ) : (
+                      <Badge size="xs" variant="dot" color="green">Active</Badge>
+                    )
+                  )}
+                </Group>
+
+                {/* Config nav items */}
+                {configGroupItems.map((item) => {
+                  const IconComponent = Icons[item.icon];
+                  const isActive = location.pathname === item.path
+                    || (item.path !== '/' && location.pathname.startsWith(item.path));
+                  return (
+                    <NavLink
+                      key={item.path}
+                      label={item.label}
+                      leftSection={
+                        <ThemeIcon
+                          variant={isActive ? 'filled' : isDark ? 'default' : 'light'}
+                          size="sm"
+                          color={isActive ? 'brand' : 'gray'}
+                          style={!isActive && isDark ? { background: 'transparent', border: 'none' } : undefined}
+                        >
+                          <IconComponent />
+                        </ThemeIcon>
+                      }
+                      active={isActive}
+                      onClick={() => navigate(item.path)}
+                      styles={{ label: isActive && isDark ? { color: '#F5F5F5' } : undefined }}
+                      style={{
+                        borderRadius: 8,
+                        marginBottom: 2,
+                        ...(isActive && isDark ? { background: '#1f1f1f', border: '1px solid #272727' } : {}),
+                      }}
+                    />
+                  );
+                })}
+
+                {/* Action buttons */}
+                <Group
+                  gap={4}
+                  px={4}
+                  pt={6}
+                  pb={2}
                   style={{
-                    borderRadius: 8,
-                    marginBottom: 2,
-                    ...(isActive && isDark ? { background: '#1f1f1f', border: '1px solid #272727' } : {}),
+                    borderTop: `1px solid ${isDark ? '#272727' : '#e0e0e0'}`,
+                    marginTop: 4,
                   }}
-                />
-              );
-            })}
+                >
+                  <Button
+                    size="compact-xs"
+                    variant="filled"
+                    color="brand"
+                    disabled={!activationStatus?.has_pending_changes}
+                    onClick={() => setShowActivationDialog(true)}
+                    style={{ flex: 1 }}
+                  >
+                    Activate
+                  </Button>
+                  <Button
+                    size="compact-xs"
+                    variant="default"
+                    disabled={!activationStatus?.has_pending_changes || discarding}
+                    onClick={handleDiscard}
+                    style={{ flex: 1 }}
+                  >
+                    {discarding ? '\u2026' : 'Discard'}
+                  </Button>
+                  <Button
+                    size="compact-xs"
+                    variant="default"
+                    disabled={!activationStatus || activationStatus.active_version < 2}
+                    onClick={() => setShowRestoreDialog(true)}
+                    style={{ flex: 1 }}
+                  >
+                    Roll back
+                  </Button>
+                </Group>
+              </Box>
+            )}
+
+            {/* --- After-group items (Integrations, Memory, Billing) --- */}
+            {navItemsAfter
+              .filter((item) => !item.roles || !userRole || item.roles.includes(userRole))
+              .map((item) => {
+                const IconComponent = Icons[item.icon];
+                const isActive = location.pathname === item.path
+                  || (item.path !== '/' && location.pathname.startsWith(item.path));
+                return (
+                  <NavLink
+                    key={item.path}
+                    label={item.label}
+                    leftSection={
+                      <ThemeIcon
+                        variant={isActive ? 'filled' : isDark ? 'default' : 'light'}
+                        size="sm"
+                        color={isActive ? 'brand' : 'gray'}
+                        style={!isActive && isDark ? { background: 'transparent', border: 'none' } : undefined}
+                      >
+                        <IconComponent />
+                      </ThemeIcon>
+                    }
+                    rightSection={
+                      item.badge ? (
+                        <Badge size="xs" variant="filled" color="brand" circle>{item.badge}</Badge>
+                      ) : undefined
+                    }
+                    active={isActive}
+                    onClick={() => navigate(item.path)}
+                    styles={{ label: isActive && isDark ? { color: '#F5F5F5' } : undefined }}
+                    style={{
+                      borderRadius: 8,
+                      marginBottom: 2,
+                      ...(isActive && isDark ? { background: '#1f1f1f', border: '1px solid #272727' } : {}),
+                    }}
+                  />
+                );
+              })}
 
             {/* Documentation — external link */}
             <NavLink
@@ -659,7 +865,7 @@ export const StandaloneLayout: React.FC<StandaloneLayoutProps> = ({
             <Box p="xs" style={{ borderTop: isDark ? '1px solid #272727' : '1px solid var(--mantine-color-gray-2)' }}>
               <Group gap={8} justify="center" mb={4}>
                 <img
-                  src="/admin/standalone/remaker-digital-logo.svg"
+                  src={isDark ? '/admin/standalone/remaker-digital-logo-dark.svg' : '/admin/standalone/remaker-digital-logo-light.svg'}
                   alt="Remaker Digital"
                   style={{ height: 22, display: 'block' }}
                 />
@@ -695,21 +901,11 @@ export const StandaloneLayout: React.FC<StandaloneLayoutProps> = ({
               Loading...
             </Box>
           )}
-          {!loading && !error && (
-            <>
-              <ActivationBanner
-                apiFetch={apiFetch}
-                onNotify={onNotify}
-                onActivate={() => setShowActivationDialog(true)}
-                refreshKey={activationRefreshKey}
-              />
-              {children}
-            </>
-          )}
+          {!loading && !error && children}
         </AppShell.Main>
       </AppShell>
 
-      {/* Activation dialog (triggered by ActivationBanner) */}
+      {/* Activation dialog (triggered by sidebar Activate button) */}
       {showActivationDialog && (
         <ActivationDialog
           apiFetch={apiFetch}
@@ -719,6 +915,21 @@ export const StandaloneLayout: React.FC<StandaloneLayoutProps> = ({
             setShowActivationDialog(false);
             setActivationRefreshKey((k) => k + 1);
           }}
+        />
+      )}
+
+      {/* Restore dialog (triggered by sidebar Roll back button) */}
+      {showRestoreDialog && activationStatus && (
+        <RestoreDialog
+          apiFetch={apiFetch}
+          onNotify={onNotify}
+          onClose={() => setShowRestoreDialog(false)}
+          onSuccess={() => {
+            setShowRestoreDialog(false);
+            setActivationRefreshKey((k) => k + 1);
+          }}
+          activeVersion={activationStatus.active_version}
+          activeActivatedAt={activationStatus.active_activated_at}
         />
       )}
 

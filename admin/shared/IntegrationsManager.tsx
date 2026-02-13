@@ -18,7 +18,7 @@ import {
   useDeactivateIntegration,
   useDisconnectIntegration,
 } from './hooks/index';
-import { HelpTooltip } from './HelpTooltip';
+
 
 // ---------------------------------------------------------------------------
 // Constants
@@ -98,22 +98,17 @@ const cardStyle: React.CSSProperties = {
   background: '#1f1f1f',
   border: '1px solid #272727',
   borderRadius: 8,
-  padding: 20,
+  padding: 16,
   display: 'flex',
-  flexDirection: 'column',
-  gap: 12,
-};
-
-const cardHeaderStyle: React.CSSProperties = {
-  display: 'flex',
+  flexDirection: 'row',
   alignItems: 'center',
-  gap: 12,
+  gap: 16,
 };
 
 const iconContainerStyle: React.CSSProperties = {
-  width: 150,
-  height: 150,
-  borderRadius: 12,
+  width: 180,
+  height: 180,
+  borderRadius: 8,
   background: '#141414',
   border: '1px solid #272727',
   display: 'flex',
@@ -121,6 +116,7 @@ const iconContainerStyle: React.CSSProperties = {
   justifyContent: 'center',
   color: '#A0A0A0',
   flexShrink: 0,
+  overflow: 'hidden',
 };
 
 const badgeStyle = (color: string): React.CSSProperties => ({
@@ -162,37 +158,51 @@ const comingSoonBadgeStyle: React.CSSProperties = {
   border: '1px solid #6366f144',
 };
 
-const btnPrimaryStyle: React.CSSProperties = {
+// Button components with hover states
+const btnBase: React.CSSProperties = {
   padding: '6px 14px',
   borderRadius: 6,
-  border: 'none',
   fontSize: 13,
   fontWeight: 500,
   cursor: 'pointer',
-  background: BRAND_PRIMARY,
-  color: '#fff',
+  transition: 'background 150ms ease, border-color 150ms ease',
 };
 
-const btnOutlineStyle: React.CSSProperties = {
-  padding: '6px 14px',
-  borderRadius: 6,
-  border: '1px solid #272727',
-  fontSize: 13,
-  fontWeight: 500,
-  cursor: 'pointer',
-  background: 'transparent',
-  color: '#A0A0A0',
-};
+const HoverButton: React.FC<{
+  variant: 'primary' | 'outline' | 'danger';
+  onClick: () => void;
+  disabled?: boolean;
+  children: React.ReactNode;
+}> = ({ variant, onClick, disabled, children }) => {
+  const [hovered, setHovered] = useState(false);
 
-const btnDangerStyle: React.CSSProperties = {
-  padding: '6px 14px',
-  borderRadius: 6,
-  border: '1px solid #D32F2F44',
-  fontSize: 13,
-  fontWeight: 500,
-  cursor: 'pointer',
-  background: 'transparent',
-  color: '#D32F2F',
+  const styles: Record<string, { base: React.CSSProperties; hover: React.CSSProperties }> = {
+    primary: {
+      base: { ...btnBase, border: 'none', background: BRAND_PRIMARY, color: '#fff' },
+      hover: { background: '#e02e1a' },
+    },
+    outline: {
+      base: { ...btnBase, border: '1px solid #272727', background: 'transparent', color: '#A0A0A0' },
+      hover: { background: '#272727', borderColor: '#3a3a3a' },
+    },
+    danger: {
+      base: { ...btnBase, border: '1px solid #D32F2F44', background: 'transparent', color: '#D32F2F' },
+      hover: { background: '#D32F2F18', borderColor: '#D32F2F66' },
+    },
+  };
+
+  const s = styles[variant];
+  return (
+    <button
+      style={{ ...s.base, ...(hovered && !disabled ? s.hover : {}), opacity: disabled ? 0.6 : 1 }}
+      onClick={onClick}
+      disabled={disabled}
+      onMouseEnter={() => setHovered(true)}
+      onMouseLeave={() => setHovered(false)}
+    >
+      {children}
+    </button>
+  );
 };
 
 const IntegrationCard: React.FC<IntegrationCardProps & { isDark?: boolean; basePath?: string }> = ({
@@ -218,109 +228,109 @@ const IntegrationCard: React.FC<IntegrationCardProps & { isDark?: boolean; baseP
 
   return (
     <div style={cardStyle}>
-      {/* Header: icon + name + status */}
-      <div style={cardHeaderStyle}>
-        <div style={iconContainerStyle}>
-          {logoPath && !logoError ? (
-            <img
-              src={logoPath}
-              alt={`${integration.name} logo`}
-              style={{ width: 120, height: 120, objectFit: 'contain' }}
-              onError={() => setLogoError(true)}
-            />
-          ) : (
-            <IconComponent />
-          )}
-        </div>
-        <div style={{ flex: 1 }}>
-          <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-            <span style={{ fontSize: 15, fontWeight: 600, color: '#F5F5F5' }}>
-              {integration.name}
-            </span>
-            {integration.status && (
-              <span style={badgeStyle(statusColor)}>
-                <span
-                  style={{
-                    width: 6,
-                    height: 6,
-                    borderRadius: '50%',
-                    background: statusColor,
-                    display: 'inline-block',
-                  }}
-                />
-                {statusLabel}
-              </span>
-            )}
-            {integration.comingSoon && (
-              <span style={comingSoonBadgeStyle}>
-                Coming Soon
-              </span>
-            )}
-            {!integration.comingSoon && !integration.tierMet && integration.tierGate && (
-              <span style={tierBadgeStyle}>
-                {String.fromCodePoint(0x2B06)} {integration.tierGate} tier
-              </span>
-            )}
-          </div>
-          <p style={{ margin: '4px 0 0', fontSize: 13, color: '#787878', lineHeight: 1.4 }}>
-            {integration.description}
-          </p>
-        </div>
+      {/* Logo: horizontal rectangle, left side */}
+      <div style={iconContainerStyle}>
+        {logoPath && !logoError ? (
+          <img
+            src={logoPath}
+            alt={`${integration.name} logo`}
+            style={{ objectFit: 'contain', display: 'block' }}
+            onError={() => setLogoError(true)}
+          />
+        ) : (
+          <IconComponent />
+        )}
       </div>
 
-      {/* Actions */}
-      <div style={{ display: 'flex', gap: 8, alignItems: 'center', flexWrap: 'wrap' }}>
-        {integration.comingSoon ? (
-          <span style={{ fontSize: 12, color: '#818cf8' }}>
-            This integration is under development and will be available soon.
+      {/* Right side: name, badges, description, actions */}
+      <div style={{ flex: 1, minWidth: 0 }}>
+        <div style={{ display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap' }}>
+          <span style={{ fontSize: 15, fontWeight: 600, color: '#F5F5F5' }}>
+            {integration.name}
           </span>
-        ) : !integration.tierMet ? (
-          <span style={{ fontSize: 12, color: '#E5A100' }}>
-            Upgrade to {integration.tierGate} to use this integration
-          </span>
-        ) : integration.enabled ? (
-          <>
-            <button
-              style={{ ...btnOutlineStyle, opacity: deactivating ? 0.6 : 1 }}
-              onClick={() => onDeactivate(integration.type)}
-              disabled={deactivating}
-            >
-              {deactivating ? 'Deactivating...' : 'Deactivate'}
-            </button>
-            {showConfirm ? (
-              <div style={{ display: 'flex', gap: 6, alignItems: 'center' }}>
-                <span style={{ fontSize: 12, color: '#D32F2F' }}>Disconnect? This removes credentials.</span>
-                <button
-                  style={btnDangerStyle}
-                  onClick={() => { onDisconnect(integration.type); setShowConfirm(false); }}
-                >
-                  Confirm
-                </button>
-                <button
-                  style={btnOutlineStyle}
-                  onClick={() => setShowConfirm(false)}
-                >
-                  Cancel
-                </button>
-              </div>
-            ) : (
-              <button
-                style={btnDangerStyle}
-                onClick={() => setShowConfirm(true)}
+          {integration.status && (
+            <span style={badgeStyle(statusColor)}>
+              <span
+                style={{
+                  width: 6,
+                  height: 6,
+                  borderRadius: '50%',
+                  background: statusColor,
+                  display: 'inline-block',
+                }}
+              />
+              {statusLabel}
+            </span>
+          )}
+          {integration.comingSoon && (
+            <span style={comingSoonBadgeStyle}>
+              Coming Soon
+            </span>
+          )}
+          {!integration.comingSoon && !integration.tierMet && integration.tierGate && (
+            <span style={tierBadgeStyle}>
+              {String.fromCodePoint(0x2B06)} {integration.tierGate} tier
+            </span>
+          )}
+        </div>
+        <p style={{ margin: '4px 0 8px', fontSize: 13, color: '#787878', lineHeight: 1.4 }}>
+          {integration.description}
+        </p>
+
+        {/* Actions — inline with text */}
+        <div style={{ display: 'flex', gap: 8, alignItems: 'center', flexWrap: 'wrap' }}>
+          {integration.comingSoon ? (
+            <span style={{ fontSize: 12, color: '#818cf8' }}>
+              This integration is under development and will be available soon.
+            </span>
+          ) : !integration.tierMet ? (
+            <span style={{ fontSize: 12, color: '#E5A100' }}>
+              Upgrade to {integration.tierGate} to use this integration
+            </span>
+          ) : integration.enabled ? (
+            <>
+              <HoverButton
+                variant="outline"
+                onClick={() => onDeactivate(integration.type)}
+                disabled={deactivating}
               >
-                Disconnect
-              </button>
-            )}
-          </>
-        ) : (
-          <button
-            style={{ ...btnPrimaryStyle, opacity: activating ? 0.6 : 1 }}
-            onClick={() => onActivate(integration.type)}
-            disabled={activating}
-          >
-            {activating ? 'Activating...' : 'Activate'}
-          </button>
-        )}
+                {deactivating ? 'Deactivating...' : 'Deactivate'}
+              </HoverButton>
+              {showConfirm ? (
+                <div style={{ display: 'flex', gap: 6, alignItems: 'center' }}>
+                  <span style={{ fontSize: 12, color: '#D32F2F' }}>Disconnect? This removes credentials.</span>
+                  <HoverButton
+                    variant="danger"
+                    onClick={() => { onDisconnect(integration.type); setShowConfirm(false); }}
+                  >
+                    Confirm
+                  </HoverButton>
+                  <HoverButton
+                    variant="outline"
+                    onClick={() => setShowConfirm(false)}
+                  >
+                    Cancel
+                  </HoverButton>
+                </div>
+              ) : (
+                <HoverButton
+                  variant="danger"
+                  onClick={() => setShowConfirm(true)}
+                >
+                  Disconnect
+                </HoverButton>
+              )}
+            </>
+          ) : (
+            <HoverButton
+              variant="primary"
+              onClick={() => onActivate(integration.type)}
+              disabled={activating}
+            >
+              {activating ? 'Activating...' : 'Activate'}
+            </HoverButton>
+          )}
+        </div>
       </div>
     </div>
   );
@@ -409,20 +419,6 @@ export const IntegrationsManager: React.FC<BaseComponentProps & { isDark?: boole
 
   return (
     <div style={{ maxWidth: 800 }}>
-      {/* Header */}
-      <div style={{ marginBottom: 20 }}>
-        <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-          <h2 style={{ margin: 0, fontSize: 20, fontWeight: 600, color: '#F5F5F5' }}>
-            Integrations
-          </h2>
-          <HelpTooltip text="Connect third-party services to extend your AI agent's capabilities." />
-        </div>
-        <p style={{ margin: '6px 0 0', fontSize: 14, color: '#787878' }}>
-          Connect and manage external services. Activate integrations to unlock additional capabilities
-          for your AI agent.
-        </p>
-      </div>
-
       {/* Integration cards */}
       <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
         {items.map((integration) => (

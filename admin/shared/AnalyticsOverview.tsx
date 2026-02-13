@@ -36,6 +36,8 @@ const FONT_FAMILY = "'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', Hel
 const FONT_MONO = "'JetBrains Mono', 'SFMono-Regular', Consolas, monospace";
 const BORDER_RADIUS = '6px';
 
+const DOCS_BASE = 'https://agentredcx.com/docs/admin-guide';
+
 // Bar chart color palette — 8 distinct hues for intent bars
 const BAR_COLORS = [
   '#3b82f6',
@@ -179,9 +181,9 @@ const ErrorBanner: React.FC<{ message: string; onRetry?: () => void }> = ({ mess
 // Section header
 // ---------------------------------------------------------------------------
 
-const SectionHeader: React.FC<{ title: string; subtitle?: string; tooltip?: string }> = ({ title, subtitle, tooltip }) => (
+const SectionHeader: React.FC<{ title: string; subtitle?: string; tooltip?: string; docLink?: string }> = ({ title, subtitle, tooltip, docLink }) => (
   <div style={{ marginBottom: '16px' }}>
-    <h3 style={{ margin: 0, fontSize: '16px', fontWeight: 600, color: COLOR_TEXT, display: 'inline-flex', alignItems: 'center', gap: '6px' }}>{title}{tooltip && <HelpTooltip text={tooltip} />}</h3>
+    <h3 style={{ margin: 0, fontSize: '16px', fontWeight: 600, color: COLOR_TEXT, display: 'inline-flex', alignItems: 'center', gap: '6px' }}>{title}{tooltip && <HelpTooltip text={tooltip} docLink={docLink} />}</h3>
     {subtitle && (
       <span style={{ fontSize: '13px', color: COLOR_TEXT_SECONDARY, display: 'block' }}>{subtitle}</span>
     )}
@@ -198,9 +200,10 @@ interface SummaryCardProps {
   subtext?: string;
   accentColor?: string;
   tooltip?: string;
+  docLink?: string;
 }
 
-const SummaryCard: React.FC<SummaryCardProps> = ({ label, value, subtext, accentColor = BRAND_PRIMARY, tooltip }) => (
+const SummaryCard: React.FC<SummaryCardProps> = ({ label, value, subtext, accentColor = BRAND_PRIMARY, tooltip, docLink }) => (
   <div
     style={{
       flex: '1 1 180px',
@@ -213,7 +216,7 @@ const SummaryCard: React.FC<SummaryCardProps> = ({ label, value, subtext, accent
     }}
   >
     <div style={{ fontSize: '12px', fontWeight: 600, color: COLOR_TEXT_SECONDARY, textTransform: 'uppercase', letterSpacing: '0.5px', marginBottom: '8px', display: 'inline-flex', alignItems: 'center', gap: '6px' }}>
-      {label}{tooltip && <HelpTooltip text={tooltip} />}
+      {label}{tooltip && <HelpTooltip text={tooltip} docLink={docLink} />}
     </div>
     <div style={{ fontSize: '28px', fontWeight: 700, color: COLOR_TEXT, lineHeight: 1.1, fontFamily: FONT_MONO }}>
       {value}
@@ -574,6 +577,7 @@ export const AnalyticsOverview: React.FC<BaseComponentProps & { isTestMode?: boo
               value={formatNumber(summary.totalConversations)}
               accentColor="#3b82f6"
               tooltip="All conversations (billable and non-billable) in the selected period."
+              docLink={`${DOCS_BASE}/analytics#key-metrics`}
             />
             <SummaryCard
               label="Avg response time"
@@ -581,18 +585,21 @@ export const AnalyticsOverview: React.FC<BaseComponentProps & { isTestMode?: boo
               subtext={summary.avgResponseTime != null ? (summary.avgResponseTime <= 2000 ? 'Within SLA' : 'Above P95 target') : undefined}
               accentColor={summary.avgResponseTime != null ? (summary.avgResponseTime <= 2000 ? COLOR_SUCCESS : COLOR_WARNING) : COLOR_GRAY}
               tooltip="Average time from customer message to AI response (P50)."
+              docLink={`${DOCS_BASE}/analytics#key-metrics`}
             />
             <SummaryCard
               label="Resolution rate"
               value={formatPercent(summary.resolutionRate)}
               accentColor={summary.resolutionRate != null ? (summary.resolutionRate >= 0.8 ? COLOR_SUCCESS : COLOR_WARNING) : COLOR_GRAY}
               tooltip="Percentage of conversations resolved without escalation to a human agent."
+              docLink={`${DOCS_BASE}/analytics#key-metrics`}
             />
             <SummaryCard
               label="Escalation rate"
               value={formatPercent(summary.escalationRate)}
               accentColor={escalationColor(summary.escalationRate)}
               tooltip="Percentage of conversations escalated to human agents."
+              docLink={`${DOCS_BASE}/analytics#key-metrics`}
             />
             <SummaryCard
               label="CSAT"
@@ -600,6 +607,7 @@ export const AnalyticsOverview: React.FC<BaseComponentProps & { isTestMode?: boo
               subtext={summary.customerSatisfaction != null ? 'out of 5.0' : 'No ratings yet'}
               accentColor={csatColor(summary.customerSatisfaction)}
               tooltip="Customer satisfaction score based on thumbs up/down ratings."
+              docLink={`${DOCS_BASE}/analytics#key-metrics`}
             />
           </div>
         )}
@@ -618,6 +626,7 @@ export const AnalyticsOverview: React.FC<BaseComponentProps & { isTestMode?: boo
             title="Intent breakdown"
             subtitle="Top customer intents by conversation count"
             tooltip="Distribution of customer query categories detected by the Intent Classifier."
+            docLink={`${DOCS_BASE}/analytics#intent-breakdown`}
           />
 
           {intentsError && (
@@ -646,6 +655,7 @@ export const AnalyticsOverview: React.FC<BaseComponentProps & { isTestMode?: boo
             title="Knowledge gaps"
             subtitle="Queries the AI could not resolve — consider adding KB articles for these topics"
             tooltip="Conversations where the AI could not find a confident answer in the Knowledge Base."
+            docLink={`${DOCS_BASE}/analytics#knowledge-gaps`}
           />
 
           {gapsError && (

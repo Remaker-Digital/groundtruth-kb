@@ -195,7 +195,7 @@ const ConversationItem: React.FC<ConversationItemProps> = ({ conversation, isSel
             >
               Billable
             </span>
-            <HelpTooltip text="Whether this conversation counts toward your monthly allowance." />
+            <HelpTooltip text="Whether this conversation counts toward your monthly allowance." docLink="https://agentredcx.com/docs/billing/billable-conversation-spec" />
           </span>
         )}
         {conversation.messageCount} message{conversation.messageCount !== 1 ? 's' : ''}
@@ -305,7 +305,7 @@ const AssignModal: React.FC<AssignModalProps> = ({ conversationId, members, onAs
       >
         <h3 style={{ margin: '0 0 16px 0', fontSize: '16px', fontWeight: 600, color: COLOR_TEXT, display: 'inline-flex', alignItems: 'center' }}>
           Assign conversation
-          <HelpTooltip text="Assign this conversation to a team member for follow-up." />
+          <HelpTooltip text="Assign this conversation to a team member for follow-up." docLink="https://agentredcx.com/docs/admin-guide/conversations#conversation-detail" />
         </h3>
         <select
           value={selectedAgent}
@@ -434,7 +434,7 @@ const NoteModal: React.FC<NoteModalProps> = ({ conversationId, apiFetch, onClose
       >
         <h3 style={{ margin: '0 0 16px 0', fontSize: '16px', fontWeight: 600, color: COLOR_TEXT, display: 'inline-flex', alignItems: 'center' }}>
           Add internal note
-          <HelpTooltip text="Private notes visible only to your team, not to customers." />
+          <HelpTooltip text="Private notes visible only to your team, not to customers." docLink="https://agentredcx.com/docs/admin-guide/conversations#conversation-detail" />
         </h3>
         <textarea
           value={note}
@@ -710,7 +710,7 @@ export const ConversationInbox: React.FC<BaseComponentProps> = ({
         >
           <h2 style={{ margin: 0, fontSize: '16px', fontWeight: 600, color: COLOR_TEXT, display: 'inline-flex', alignItems: 'center' }}>
             Conversations
-            <HelpTooltip text="Real-time list of customer conversations. Filter by status to find active, escalated, or completed chats." />
+            <HelpTooltip text="Real-time list of customer conversations. Filter by status to find active, escalated, or completed chats." docLink="https://agentredcx.com/docs/admin-guide/conversations#conversation-list" />
           </h2>
           <span
             style={{
@@ -786,7 +786,7 @@ export const ConversationInbox: React.FC<BaseComponentProps> = ({
                 {selectedConversation && (
                   <span style={{ marginLeft: '10px', display: 'inline-flex', alignItems: 'center' }}>
                     <StatusBadge status={selectedConversation.status} />
-                    <HelpTooltip text="Filter conversations by their current state." />
+                    <HelpTooltip text="Filter conversations by their current state." docLink="https://agentredcx.com/docs/admin-guide/conversations#conversation-list" />
                   </span>
                 )}
               </div>

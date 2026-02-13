@@ -520,7 +520,7 @@ const UsageMeter: React.FC<UsageMeterProps> = ({ usage }) => {
         >
           {formatNumber(usage.overageConversations)} overage conversation
           {usage.overageConversations === 1 ? '' : 's'} &middot; Estimated
-          cost: {formatCurrency(usage.estimatedOverageCost)}<HelpTooltip text="Projected cost for overage conversations at your tier's per-conversation rate." />
+          cost: {formatCurrency(usage.estimatedOverageCost)}<HelpTooltip text="Projected cost for overage conversations at your tier's per-conversation rate." docLink="https://agentredcx.com/docs/billing/overview#how-conversations-are-billed" />
         </div>
       )}
     </div>
@@ -535,19 +535,19 @@ interface SummaryCardsProps {
 const SummaryCards: React.FC<SummaryCardsProps> = ({ usage }) => (
   <div style={st.cardsRow}>
     <div style={st.card}>
-      <p style={st.cardLabel}>Remaining included<HelpTooltip text="Conversations used from your plan's included monthly allowance." /></p>
+      <p style={st.cardLabel}>Remaining included<HelpTooltip text="Conversations used from your plan's included monthly allowance." docLink="https://agentredcx.com/docs/billing/overview#how-conversations-are-billed" /></p>
       <p style={st.cardValue}>{formatNumber(usage.remainingIncluded)}</p>
       <p style={st.cardSub}>of {formatNumber(usage.includedAllowance)}</p>
     </div>
 
     <div style={st.card}>
-      <p style={st.cardLabel}>Pack balance<HelpTooltip text="Remaining pre-purchased conversation credits (FIFO, 90-day validity)." /></p>
+      <p style={st.cardLabel}>Pack balance<HelpTooltip text="Remaining pre-purchased conversation credits (FIFO, 90-day validity)." docLink="https://agentredcx.com/docs/billing/overview#conversation-packs" /></p>
       <p style={st.cardValue}>{formatNumber(usage.packBalance)}</p>
       <p style={st.cardSub}>pre-purchased conversations</p>
     </div>
 
     <div style={st.card}>
-      <p style={st.cardLabel}>Overage<HelpTooltip text="Conversations beyond your included allowance and pack balance, billed at your tier's overage rate." /></p>
+      <p style={st.cardLabel}>Overage<HelpTooltip text="Conversations beyond your included allowance and pack balance, billed at your tier's overage rate." docLink="https://agentredcx.com/docs/billing/overview#how-conversations-are-billed" /></p>
       <p
         style={{
           ...st.cardValue,
@@ -965,7 +965,7 @@ export const UsageDashboard: React.FC<BaseComponentProps> = ({
 
       {/* Section 2: Daily Volume Chart */}
       <div style={st.section}>
-        <h3 style={st.sectionTitle}>Daily volume<HelpTooltip text="Total and billable conversations per day for the selected billing period." /></h3>
+        <h3 style={st.sectionTitle}>Daily volume<HelpTooltip text="Total and billable conversations per day for the selected billing period." docLink="https://agentredcx.com/docs/billing/overview#usage-dashboard" /></h3>
 
         {dailyLoading && days.length === 0 ? (
           <div style={{ padding: 24, textAlign: 'center', color: '#888', fontSize: 14 }}>
@@ -983,7 +983,7 @@ export const UsageDashboard: React.FC<BaseComponentProps> = ({
       {/* Section 3: Conversation List */}
       <div style={st.section}>
         <div style={st.tableHeaderRow}>
-          <h3 style={st.sectionTitle}>Conversations<HelpTooltip text="Conversations where the AI produced at least one response. Non-billable: test, admin, health-check, and system conversations." /></h3>
+          <h3 style={st.sectionTitle}>Conversations<HelpTooltip text="Conversations where the AI produced at least one response. Non-billable: test, admin, health-check, and system conversations." docLink="https://agentredcx.com/docs/billing/billable-conversation-spec" /></h3>
           <button
             style={{
               ...st.exportBtn,

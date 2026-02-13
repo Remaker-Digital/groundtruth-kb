@@ -14,7 +14,7 @@
  */
 
 import React from 'react';
-import { Paper, Title, Text, Loader, Stack } from '@mantine/core';
+import { Title, Text, Loader, Stack } from '@mantine/core';
 import { useAppContext } from '../layouts/StandaloneLayout';
 import { TeamManager } from '../../shared/TeamManager';
 
@@ -34,18 +34,16 @@ export const TeamPage: React.FC = () => {
 
   return (
     <div style={{ maxWidth: 900, margin: '0 auto' }}>
-      <Title order={2} mb="xs">Team</Title>
+      <Title order={2} mb="xs">Team members</Title>
       <Text size="sm" c="dimmed" mb="lg">
         Manage team members, assign roles, and configure escalation categories.
       </Text>
 
-      <Paper p="lg" radius="md" withBorder>
-        <TeamManager
-          tenantContext={tenantContext}
-          apiFetch={apiFetch}
-          onNotify={onNotify}
-        />
-      </Paper>
+      <TeamManager
+        tenantContext={tenantContext}
+        apiFetch={apiFetch}
+        onNotify={onNotify}
+      />
     </div>
   );
 };
