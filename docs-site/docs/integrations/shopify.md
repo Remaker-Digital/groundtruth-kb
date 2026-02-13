@@ -233,7 +233,7 @@ sequenceDiagram
 | Shipping address (city/state only) | `Austin, TX` | Delivery location confirmation |
 
 :::note Privacy
-Agent Red only accesses the city and state from shipping addresses. Full street addresses are not stored in the knowledge base or exposed in AI responses. Customer email and phone are used for identity matching but are never included in generated responses. See [PII Protection](/getting-started/how-it-works#pii-protection) for details.
+Agent Red only accesses the city and state from shipping addresses. Full street addresses are not stored in the knowledge base or exposed in AI responses. Customer email and phone are used for identity matching but are never included in generated responses. See [PII Protection](/docs/getting-started/how-it-works#pii-protection) for details.
 :::
 
 ## Testing the connection
@@ -289,8 +289,8 @@ The Agent Red dashboard shows real-time sync status:
 
 ## Next steps
 
-- [How It Works](/getting-started/how-it-works) — Understand the full agent pipeline that uses Shopify data.
-- [Initial Setup](/getting-started/setup) — Complete setup guide including knowledge base and go-live steps.
+- [How It Works](/docs/getting-started/how-it-works) — Understand the full agent pipeline that uses Shopify data.
+- [Initial Setup](/docs/getting-started/setup) — Complete setup guide including knowledge base and go-live steps.
 
 ---
 

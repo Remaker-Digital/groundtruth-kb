@@ -60,7 +60,7 @@ If you haven't created any quick actions yet, use the **Load starter prompts** b
 
 1. **Track my order** — Assigned to all pages
 2. **Return policy** — Assigned to all pages
-3. **Tell me about {{product_name}}** — Assigned to product pages (uses template variable)
+3. **Tell me about \{\{product_name\}\}** — Assigned to product pages (uses template variable)
 4. **What's on sale?** — Assigned to collection pages
 
 Starter prompts give you a working baseline that you can customize or replace. They are only loaded once — pressing the button again has no effect if prompts already exist.

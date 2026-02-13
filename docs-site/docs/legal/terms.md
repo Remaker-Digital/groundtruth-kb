@@ -40,7 +40,7 @@ You agree not to:
 - Conversations beyond your included allowance are billed at the overage rate for your tier.
 - Conversation packs, if purchased, are consumed on a first-in-first-out basis and expire after 90 days.
 - All fees are non-refundable except as required by applicable law.
-- See the [billable conversation definition](/billing/billable-conversation-spec) for metering details.
+- See the [billable conversation definition](/docs/billing/billable-conversation-spec) for metering details.
 
 ## 6. Free trial
 

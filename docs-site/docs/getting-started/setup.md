@@ -225,8 +225,8 @@ The Agent Red dashboard provides real-time visibility into:
 
 ## Next steps
 
-- [Shopify Integration](/integrations/shopify) — Detailed Shopify connection guide.
-- [How It Works](/getting-started/how-it-works) — Deep dive into the agent pipeline and communication protocols.
+- [Shopify Integration](/docs/integrations/shopify) — Detailed Shopify connection guide.
+- [How It Works](./how-it-works) — Deep dive into the agent pipeline and communication protocols.
 
 ---
 

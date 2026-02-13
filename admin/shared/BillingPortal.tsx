@@ -594,19 +594,19 @@ export const BillingPortal: React.FC<BillingPortalProps> = ({
                 <p style={styles.statValue}>
                   {formatNumber(usage.data.totalConversations)}
                 </p>
-                <p style={styles.statLabel}>Total conversations <HelpTooltip text="All conversations this billing period, including those covered by your plan allowance and packs." docLink="https://agentredcx.com/docs/admin-guide/billing" /></p>
+                <p style={styles.statLabel}>Total conversations <HelpTooltip text="All conversations this billing period, including those covered by your plan allowance and packs." docLink="https://agentredcx.com/docs/billing/overview" /></p>
               </div>
               <div style={styles.statBox}>
                 <p style={styles.statValue}>
                   {formatNumber(usage.data.remainingIncluded)}
                 </p>
-                <p style={styles.statLabel}>Included remaining <HelpTooltip text="Conversations remaining from your plan's monthly included allowance." docLink="https://agentredcx.com/docs/admin-guide/billing" /></p>
+                <p style={styles.statLabel}>Included remaining <HelpTooltip text="Conversations remaining from your plan's monthly included allowance." docLink="https://agentredcx.com/docs/billing/overview" /></p>
               </div>
               <div style={styles.statBox}>
                 <p style={styles.statValue}>
                   {formatNumber(usage.data.packBalance)}
                 </p>
-                <p style={styles.statLabel}>Pack balance <HelpTooltip text="Pre-purchased conversation credits. Packs are consumed after your included allowance is used, before overage billing." docLink="https://agentredcx.com/docs/admin-guide/billing" /></p>
+                <p style={styles.statLabel}>Pack balance <HelpTooltip text="Pre-purchased conversation credits. Packs are consumed after your included allowance is used, before overage billing." docLink="https://agentredcx.com/docs/billing/overview" /></p>
               </div>
               <div style={styles.statBox}>
                 <p style={{
@@ -615,7 +615,7 @@ export const BillingPortal: React.FC<BillingPortalProps> = ({
                 }}>
                   {formatNumber(usage.data.overageConversations)}
                 </p>
-                <p style={styles.statLabel}>Overage <HelpTooltip text="Conversations beyond your included allowance and pack balance, billed at your tier's overage rate." docLink="https://agentredcx.com/docs/admin-guide/billing" /></p>
+                <p style={styles.statLabel}>Overage <HelpTooltip text="Conversations beyond your included allowance and pack balance, billed at your tier's overage rate." docLink="https://agentredcx.com/docs/billing/overview" /></p>
               </div>
             </div>
 
@@ -649,7 +649,7 @@ export const BillingPortal: React.FC<BillingPortalProps> = ({
                 border: '1px solid #FECACA',
               }}>
                 <span style={{ ...styles.label, color: '#991B1B' }}>
-                  Estimated overage cost <HelpTooltip text="Projected cost based on current overage conversations multiplied by your tier's overage rate." docLink="https://agentredcx.com/docs/admin-guide/billing" />
+                  Estimated overage cost <HelpTooltip text="Projected cost based on current overage conversations multiplied by your tier's overage rate." docLink="https://agentredcx.com/docs/billing/overview" />
                 </span>
                 <span style={{ ...styles.value, color: '#DC2626' }}>
                   {formatCurrency(usage.data.estimatedOverageCost)}

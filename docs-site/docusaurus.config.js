@@ -44,7 +44,7 @@ const config = {
       ({
         docs: {
           sidebarPath: './sidebars.js',
-          routeBasePath: '/', // Docs as the landing page
+          routeBasePath: 'docs',
           showLastUpdateTime: true,
           showLastUpdateAuthor: true,
         },
@@ -78,7 +78,7 @@ const config = {
             label: 'Documentation',
           },
           {
-            to: '/changelog',
+            to: '/docs/changelog',
             label: 'Changelog',
             position: 'left',
           },
@@ -97,19 +97,19 @@ const config = {
             items: [
               {
                 label: 'Getting started',
-                to: '/getting-started/overview',
+                to: '/docs/getting-started/overview',
               },
               {
                 label: 'Admin guide',
-                to: '/admin-guide',
+                to: '/docs/admin-guide',
               },
               {
                 label: 'Shopify integration',
-                to: '/integrations/shopify',
+                to: '/docs/integrations/shopify',
               },
               {
                 label: 'Billing',
-                to: '/billing/billable-conversation-spec',
+                to: '/docs/billing/billable-conversation-spec',
               },
             ],
           },
@@ -118,7 +118,7 @@ const config = {
             items: [
               {
                 label: 'Changelog',
-                to: '/changelog',
+                to: '/docs/changelog',
               },
               {
                 label: 'Install on Shopify',
@@ -135,7 +135,7 @@ const config = {
               },
               {
                 label: 'Terms of service',
-                to: '/legal/terms',
+                to: '/docs/legal/terms',
               },
             ],
           },

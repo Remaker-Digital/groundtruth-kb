@@ -100,8 +100,8 @@ These metrics are from the evaluated open-source foundation that Agent Red build
 
 ## Next steps
 
-- [How It Works](/getting-started/how-it-works) — Deep dive into the six-agent pipeline, communication protocols, and data flow.
-- [Initial Setup](/getting-started/setup) — What you need to get Agent Red running for your store.
+- [How It Works](./how-it-works) — Deep dive into the six-agent pipeline, communication protocols, and data flow.
+- [Initial Setup](./setup) — What you need to get Agent Red running for your store.
 
 ---
 

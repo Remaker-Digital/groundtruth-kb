@@ -5,7 +5,7 @@ title: Welcome
 ---
 
 <div style={{textAlign: 'center', marginBottom: '2rem'}}>
-  <img src="/img/agent-red-logo.svg" alt="Agent Red" style={{height: '240px', marginBottom: '1rem'}} />
+  <img src="/img/agent-red-logo.svg" alt="Agent Red" style={{maxHeight: '240px', marginBottom: '1rem'}} />
   <h1 style={{fontSize: '2.5rem', marginBottom: '0.25rem'}}>Agent Red Customer Experience</h1>
   <p style={{fontSize: '1.1rem', opacity: 0.7}}>
     A product of <a href="https://remakerdigital.com" target="_blank" rel="noopener noreferrer">Remaker Digital</a>
@@ -16,11 +16,11 @@ Agent Red is an AI-powered customer service platform that automates support conv
 
 ## What you'll find here
 
-- **[Getting started](/getting-started/overview)** — Understand what Agent Red does, how it works, and how to set up your first deployment.
-- **[Admin guide](/admin-guide)** — Complete reference for every setting in the admin console — what each input does, how changing it affects system behavior, and best practices.
-- **[Integrations](/integrations/shopify)** — Connect Agent Red to Shopify and other platforms.
-- **[Billing](/billing/billable-conversation-spec)** — How conversations are metered and billed.
-- **[Changelog](/changelog)** — What's new in each release.
+- **[Getting started](/docs/getting-started/overview)** — Understand what Agent Red does, how it works, and how to set up your first deployment.
+- **[Admin guide](/docs/admin-guide)** — Complete reference for every setting in the admin console — what each input does, how changing it affects system behavior, and best practices.
+- **[Integrations](/docs/integrations/shopify)** — Connect Agent Red to Shopify and other platforms.
+- **[Billing](/docs/billing/billable-conversation-spec)** — How conversations are metered and billed.
+- **[Changelog](/docs/changelog)** — What's new in each release.
 
 ## Key capabilities
 

@@ -402,8 +402,8 @@ See the [Privacy Policy](https://www.iubenda.com/privacy-policy/51316355) for fu
 
 ## Next steps
 
-- [Initial Setup](/getting-started/setup) — What you need to get Agent Red running for your store.
-- [Shopify Integration](/integrations/shopify) — Connect your product catalog and order data.
+- [Initial Setup](./setup) — What you need to get Agent Red running for your store.
+- [Shopify Integration](/docs/integrations/shopify) — Connect your product catalog and order data.
 
 ---
 
