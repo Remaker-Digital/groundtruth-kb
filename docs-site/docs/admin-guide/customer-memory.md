@@ -39,7 +39,7 @@ Each layer builds on the previous one. More layers mean more personalized respon
 Controls whether the AI stores and uses customer profiles and conversation history.
 
 **When enabled:**
-- Layer 1: The customer's profile (name, purchase history, preferences, previous questions) is loaded at the start of each conversation and injected into the response generator's system prompt (~250 tokens).
+- Layer 1: The customer's profile (name, purchase history, preferences, previous questions) is loaded at the start of each conversation and injected into the response generator's system prompt (~250 tokens). Profile data is collected from multiple sources including Shopify customer data, asserted identity (see below), and conversation history.
 - Layer 2: Past conversation transcripts are vectorized and searchable. When a customer asks a follow-up question or references a previous interaction, the AI can find relevant context from earlier conversations (~300 tokens).
 
 **When disabled:**
@@ -50,6 +50,25 @@ Controls whether the AI stores and uses customer profiles and conversation histo
 **When to disable:**
 - You are required by regulation to treat every interaction independently (some financial or medical contexts).
 - You want to test the AI's performance without memory influence.
+
+---
+
+## Asserted identity extraction
+
+When a customer mentions their name or email during a conversation (e.g., "My name is Sarah" or "You can reach me at sarah@example.com"), Agent Red automatically extracts this information and stores it on the customer's profile as an **unverified** identity.
+
+**How it works:**
+1. After each customer message, the AI scans for natural language name introductions and email addresses.
+2. Detected identities are stored on the customer profile with an `unverified` status.
+3. The customer's display name in the Inbox updates from a session ID to the asserted name.
+4. Unverified identities are shown with a badge to distinguish them from verified Shopify customer identities.
+
+**Identity hierarchy (highest to lowest):**
+- **Shopify customer name** — Verified through Shopify authentication
+- **Asserted name** — Extracted from conversation (unverified, shown with badge)
+- **Session ID** — System-assigned identifier (always available)
+
+This feature requires no configuration — it activates automatically when Customer Memory is enabled.
 
 ---
 

@@ -29,13 +29,13 @@ The percentage of conversations handed off to a human team member. Monitor this 
 
 The daily breakdown chart shows total and billable conversations over your selected time period (7, 14, 30, or 90 days). Use this to identify peak support hours, seasonal trends, and the impact of marketing campaigns on support volume.
 
-## Top Intents
+## Top Topics
 
-The most frequently detected customer intents, ranked by conversation count. This helps you understand what customers are asking about most often and whether your knowledge base adequately covers those topics.
+The most frequently detected customer topics, ranked by conversation count. This helps you understand what customers are asking about most often and whether your knowledge base adequately covers those areas.
 
-## Intent Breakdown
+## Topic Breakdown
 
-A complete table of all detected intents with conversation count and distribution percentage. Use this to prioritize knowledge base improvements — intents with high volume but low resolution rates are candidates for new or updated articles.
+A complete table of all detected topics with conversation count and distribution percentage. The AI processing pipeline labels each topic with a user-friendly name (e.g., "Question routing", "Knowledge lookup", "Response generation", "Quality review"). Use this to prioritize knowledge base improvements — topics with high volume but low resolution rates are candidates for new or updated articles.
 
 ## Knowledge Gaps
 

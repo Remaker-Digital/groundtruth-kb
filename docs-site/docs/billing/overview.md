@@ -53,6 +53,23 @@ The Billing page shows real-time usage for your current billing period:
 - **Estimated overage cost** — Projected total overage cost based on current usage trends
 - **Daily usage chart** — 30-day view of total and billable conversations per day
 
+## Add-On Modules
+
+Enhance your Agent Red installation with optional add-on modules. Each module is billed monthly and can be added or removed at any time. Available modules depend on your subscription tier.
+
+| Module | Monthly | Available On |
+|--------|---------|--------------|
+| **Multi-Language Pack** | $99 | All tiers |
+| **Advanced Analytics** | $149 | Professional, Enterprise |
+| **Mailchimp Integration** | $49 | Professional, Enterprise |
+| **Google Analytics Integration** | $49 | Professional, Enterprise |
+| **White-Label Package** | $399 | Enterprise only |
+| **Priority Support Upgrade** | $99 | Starter, Professional |
+| **Custom Integration Dev** | $299 | Enterprise only |
+| **Dedicated Model Training** | $299 | Enterprise only |
+
+Modules marked as unavailable for your current tier display an upgrade prompt. To unlock additional modules, upgrade your subscription plan.
+
 ## Managing Your Subscription
 
 Subscription changes (upgrades, downgrades, cancellation) are managed through the billing portal. Contact support for custom Enterprise pricing or volume discounts.

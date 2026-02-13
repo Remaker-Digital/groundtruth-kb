@@ -54,6 +54,17 @@ Each prompt can be assigned to one or more page types. The widget only shows pro
 
 **Tip:** Create general prompts (FAQ, contact info) assigned to `all`, and specific prompts (product questions, size guides) assigned to `product` only.
 
+## Starter prompts
+
+If you haven't created any quick actions yet, use the **Load starter prompts** button to seed your account with four pre-built prompts covering common e-commerce questions:
+
+1. **Track my order** — Assigned to all pages
+2. **Return policy** — Assigned to all pages
+3. **Tell me about {{product_name}}** — Assigned to product pages (uses template variable)
+4. **What's on sale?** — Assigned to collection pages
+
+Starter prompts give you a working baseline that you can customize or replace. They are only loaded once — pressing the button again has no effect if prompts already exist.
+
 ## Best practices
 
 - **Keep labels short.** Buttons with more than 5-6 words wrap awkwardly on mobile.

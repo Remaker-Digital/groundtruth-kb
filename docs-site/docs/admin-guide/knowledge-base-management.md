@@ -181,7 +181,7 @@ Duplication is the most common knowledge base problem and the primary cause of i
 
 2. **Use the policy fields for policies.** Return, shipping, warranty, and support hours should go in the [Business policies](./business-policies.md) fields, not in knowledge base articles. If you put shipping information in both the policy field and a knowledge base article, you have duplication.
 
-3. **Search before creating.** Before creating a new article, search your existing knowledge base for the topic. If an article already exists, edit it instead of creating a new one.
+3. **Search before creating.** Before creating a new article, search your existing knowledge base for the topic. The search bar matches against both article titles and content, so you can find existing articles even if you only remember a phrase from the body. If an article already exists, edit it instead of creating a new one.
 
 4. **Archive, don't duplicate.** When a policy changes, update the existing article instead of creating a new one and leaving the old one published. If you must keep both (for audit purposes), archive the old version.
 
