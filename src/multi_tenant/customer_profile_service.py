@@ -34,6 +34,7 @@ Dependencies:
 from __future__ import annotations
 
 import logging
+import re
 import uuid
 from datetime import datetime, timezone, timedelta
 from typing import Any
@@ -59,6 +60,49 @@ MAX_PURCHASE_HISTORY = 50
 MAX_PRODUCT_QUESTIONS = 30
 MAX_MARKETING_SEGMENTS = 20
 MAX_CART_ITEMS = 25
+
+# Patterns for extracting asserted name from customer messages (Issue #5b)
+_NAME_PATTERNS = [
+    re.compile(r"\bmy name is\s+([A-Z][a-z]+(?:\s+[A-Z][a-z]+)?)", re.IGNORECASE),
+    re.compile(r"\bi'm\s+([A-Z][a-z]+(?:\s+[A-Z][a-z]+)?)\b", re.IGNORECASE),
+    re.compile(r"\bthis is\s+([A-Z][a-z]+(?:\s+[A-Z][a-z]+)?)\b", re.IGNORECASE),
+    re.compile(r"\bcall me\s+([A-Z][a-z]+)\b", re.IGNORECASE),
+    re.compile(r"\bname['s]*\s*(?:is|:)\s*([A-Z][a-z]+(?:\s+[A-Z][a-z]+)?)", re.IGNORECASE),
+]
+
+_EMAIL_PATTERN = re.compile(
+    r"\b([a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,})\b"
+)
+
+
+def extract_identity_from_text(text: str) -> dict[str, str]:
+    """Extract name and/or email from a customer message.
+
+    Returns a dict with optional 'name' and 'email' keys.
+    Only extracts values that look like genuine self-identification,
+    not product names or other entities.
+    """
+    result: dict[str, str] = {}
+
+    # Extract name
+    for pattern in _NAME_PATTERNS:
+        match = pattern.search(text)
+        if match:
+            name = match.group(1).strip()
+            # Basic validation: 2-50 chars, not common words
+            if 2 <= len(name) <= 50 and name.lower() not in (
+                "here", "back", "sorry", "sure", "fine", "good", "great",
+                "interested", "looking", "wondering", "having", "trying",
+            ):
+                result["name"] = name
+                break
+
+    # Extract email
+    email_match = _EMAIL_PATTERN.search(text)
+    if email_match:
+        result["email"] = email_match.group(1)
+
+    return result
 
 
 # ---------------------------------------------------------------------------
@@ -335,6 +379,58 @@ class CustomerProfileService:
                     "Could not update interaction timestamp: tenant=%s customer=%s",
                     tenant_id, customer_id,
                 )
+
+    async def extract_and_store_identity(
+        self,
+        tenant_id: str,
+        customer_id: str,
+        message_text: str,
+    ) -> dict[str, str] | None:
+        """Extract asserted identity from a customer message and persist it.
+
+        Called by the chat pipeline on each incoming customer message.
+        Returns the extracted identity dict if new info was found, else None.
+        """
+        extracted = extract_identity_from_text(message_text)
+        if not extracted:
+            return None
+
+        try:
+            profile = await self.get_or_create(tenant_id, customer_id)
+            existing = profile.asserted_identity or {}
+            changed = False
+
+            # Only update name if not already set or if new extraction is longer
+            if "name" in extracted and (
+                not existing.get("name")
+                or len(extracted["name"]) > len(existing.get("name", ""))
+            ):
+                existing["name"] = extracted["name"]
+                changed = True
+
+            # Only update email if not already set
+            if "email" in extracted and not existing.get("email"):
+                existing["email"] = extracted["email"]
+                changed = True
+
+            if changed:
+                existing["extracted_at"] = datetime.now(timezone.utc).isoformat()
+                existing["source"] = "user_statement"
+                profile.asserted_identity = existing
+                profile.updated_at = datetime.now(timezone.utc).isoformat()
+                if self._configured:
+                    await self._repo.upsert_profile(tenant_id, profile)
+                    logger.info(
+                        "Asserted identity stored: tenant=%s customer=%s fields=%s",
+                        tenant_id, customer_id, list(extracted.keys()),
+                    )
+                return extracted
+        except Exception:
+            logger.debug(
+                "Could not store asserted identity: tenant=%s customer=%s",
+                tenant_id, customer_id, exc_info=True,
+            )
+        return None
 
     # ------------------------------------------------------------------
     # Shopify sync adapter (WI #84)

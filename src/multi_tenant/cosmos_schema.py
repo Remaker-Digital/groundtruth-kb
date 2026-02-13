@@ -477,6 +477,12 @@ class CustomerProfileDocument(BaseModel):
         description="{active: [{product_id, qty}], abandoned: [{product_id, qty, abandoned_at}]}",
     )
 
+    # Data source 7: Asserted identity (Issue #5b — PCM Layer 1)
+    asserted_identity: dict[str, Any] = Field(
+        default_factory=dict,
+        description="{name, email, extracted_at, source}",
+    )
+
     # GDPR consent (inherited from tenant, can be overridden per-customer)
     consent_status: ConsentStatus = Field(
         default=ConsentStatus.NOT_ASKED,

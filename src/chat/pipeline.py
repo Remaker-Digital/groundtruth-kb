@@ -359,6 +359,15 @@ class ChatPipeline:
                 tenant_id, customer_id, tier, customer_message, trace,
             )
 
+            # Extract asserted identity from customer message (Issue #5b)
+            if customer_id and customer_message and self._profile_service:
+                try:
+                    await self._profile_service.extract_and_store_identity(
+                        tenant_id, customer_id, customer_message,
+                    )
+                except Exception:
+                    pass  # Non-fatal — best-effort identity extraction
+
             # Build system prompts for all agents
             prompts = self._prompt_builder.build_all(
                 tenant=tenant,

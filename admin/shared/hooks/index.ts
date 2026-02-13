@@ -550,6 +550,59 @@ export function useAssignConversation(apiFetch: ApiFetch) {
   return { assign, loading };
 }
 
+export interface SearchResult {
+  conversation_id: string;
+  customer_id: string | null;
+  customer_name: string | null;
+  status: string | null;
+  started_at: string | null;
+  last_activity_at: string | null;
+  message_count: number;
+  snippet: string;
+  matched_in: string;
+}
+
+export function useSearchConversations(apiFetch: ApiFetch) {
+  const [loading, setLoading] = useState(false);
+  const [results, setResults] = useState<SearchResult[] | null>(null);
+  const [error, setError] = useState<string | null>(null);
+
+  const search = useCallback(
+    async (query: string, status?: string) => {
+      if (!query.trim()) {
+        setResults(null);
+        return;
+      }
+      setLoading(true);
+      setError(null);
+      try {
+        const resp = await apiFetch('/api/admin/conversations/search', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ query: query.trim(), status, limit: 50 }),
+        });
+        if (!resp.ok) throw new Error(`Search failed: ${resp.status}`);
+        const body = await resp.json();
+        setResults(body.results ?? []);
+      } catch (err: unknown) {
+        const msg = err instanceof Error ? err.message : 'Search failed';
+        setError(msg);
+        setResults(null);
+      } finally {
+        setLoading(false);
+      }
+    },
+    [apiFetch],
+  );
+
+  const clearSearch = useCallback(() => {
+    setResults(null);
+    setError(null);
+  }, []);
+
+  return { search, clearSearch, results, loading, error };
+}
+
 export function useEscalateConversation(apiFetch: ApiFetch) {
   const [loading, setLoading] = useState(false);
 

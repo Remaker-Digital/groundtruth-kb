@@ -44,7 +44,11 @@ from pydantic.alias_generators import to_camel
 from src.multi_tenant.auth import TenantContext
 from src.multi_tenant.cosmos_schema import ConversationStatus
 from src.multi_tenant.middleware import get_tenant_context
-from src.multi_tenant.repository import ConversationRepository, DocumentNotFoundError
+from src.multi_tenant.repository import (
+    ConversationRepository,
+    DocumentNotFoundError,
+    TeamMemberRepository,
+)
 
 logger = logging.getLogger(__name__)
 
@@ -264,17 +268,20 @@ class SearchConversationsResponse(BaseModel):
 # ---------------------------------------------------------------------------
 
 _conversation_repo: ConversationRepository | None = None
+_team_repo: TeamMemberRepository | None = None
 
 
 def configure_admin_conversation_services(
     conversation_repo: ConversationRepository,
+    team_repo: TeamMemberRepository | None = None,
 ) -> None:
     """Wire the admin conversation API to its backing repository.
 
     Called during app startup after ConversationRepository is initialised.
     """
-    global _conversation_repo
+    global _conversation_repo, _team_repo
     _conversation_repo = conversation_repo
+    _team_repo = team_repo
     logger.info("Admin conversation inbox API services configured")
 
 
@@ -842,6 +849,46 @@ async def escalate_conversation(
         conversation_id,
         ctx.tenant_id[:8],
     )
+
+    # Send escalation email to escalation_agent team members (best-effort)
+    try:
+        from src.multi_tenant.alert_delivery import send_escalation_alert
+
+        recipient_emails: list[str] = []
+        if _team_repo is not None:
+            members = await _team_repo.list_members(
+                tenant_id=ctx.tenant_id,
+                role="escalation_agent",
+                is_active=True,
+                limit=100,
+            )
+            recipient_emails = [m["email"] for m in members if m.get("email")]
+            # Also include admins as fallback
+            if not recipient_emails:
+                admins = await _team_repo.list_members(
+                    tenant_id=ctx.tenant_id,
+                    role="admin",
+                    is_active=True,
+                    limit=50,
+                )
+                recipient_emails = [m["email"] for m in admins if m.get("email")]
+
+        customer_name = doc.get("customer_name") or doc.get("customer_id") or "Unknown"
+        await send_escalation_alert(
+            tenant_id=ctx.tenant_id,
+            conversation_id=conversation_id,
+            reason=f"Manual escalation by admin for customer: {customer_name}",
+            urgency="medium",
+            context_summary=f"Conversation with {customer_name} ({doc.get('message_count', 0)} messages) was escalated by an admin.",
+            recipient_emails=recipient_emails or None,
+        )
+    except Exception:
+        logger.warning(
+            "Failed to send escalation alert: conv=%s tenant=%s",
+            conversation_id,
+            ctx.tenant_id[:8],
+            exc_info=True,
+        )
 
     return EscalateConversationResponse(
         conversation_id=conversation_id,

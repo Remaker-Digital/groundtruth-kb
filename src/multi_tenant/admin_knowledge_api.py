@@ -405,7 +405,7 @@ async def list_knowledge_entries(
     search: str | None = Query(
         None,
         max_length=200,
-        description="Search by title (case-insensitive substring match)",
+        description="Search by title or content (case-insensitive substring match)",
     ),
     offset: int = Query(0, ge=0, description="Pagination offset"),
     limit: int = Query(50, ge=1, le=200, description="Page size (max 200)"),

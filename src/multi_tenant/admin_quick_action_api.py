@@ -636,3 +636,73 @@ async def delete_quick_action(
         "Quick action deleted: tenant=%s id=%s",
         ctx.tenant_id[:8], action_id[:8],
     )
+
+
+# ---------------------------------------------------------------------------
+# POST /api/admin/quick-actions/seed — Seed starter quick actions (WI #242)
+# ---------------------------------------------------------------------------
+
+_STARTER_ACTIONS = [
+    {
+        "label": "Track my order",
+        "prompt_template": "I'd like to check on the status of my recent order.",
+        "icon": "\U0001F4E6",
+    },
+    {
+        "label": "Return or exchange",
+        "prompt_template": "I need help with a return or exchange for a product I purchased.",
+        "icon": "\U0001F504",
+    },
+    {
+        "label": "Product question",
+        "prompt_template": "I have a question about one of your products before I make a purchase.",
+        "icon": "\u2753",
+    },
+    {
+        "label": "Shipping info",
+        "prompt_template": "What are your shipping options and delivery timeframes?",
+        "icon": "\U0001F69A",
+    },
+]
+
+
+@router.post(
+    "/seed",
+    summary="Seed starter quick actions",
+    description="Creates 4 example quick actions if none exist. Idempotent — does nothing if quick actions already exist.",
+    responses={
+        200: {"description": "Seed result"},
+        503: {"description": "Quick action services not initialized"},
+    },
+)
+async def seed_quick_actions(
+    ctx: TenantContext = Depends(get_tenant_context),
+) -> dict[str, Any]:
+    """Seed starter quick actions for new tenants (WI #242)."""
+    repo = _get_repo()
+
+    existing = await repo.list_quick_actions(ctx.tenant_id)
+    if existing:
+        return {"seeded": 0, "message": "Quick actions already exist"}
+
+    now = datetime.now(timezone.utc).isoformat()
+    created = []
+    for i, starter in enumerate(_STARTER_ACTIONS):
+        action = {
+            "id": str(uuid.uuid4()),
+            "label": starter["label"],
+            "prompt_template": starter["prompt_template"],
+            "icon": starter.get("icon", ""),
+            "is_active": True,
+            "sort_order": i * 10,
+            "created_at": now,
+            "updated_at": now,
+        }
+        await repo.upsert_quick_action(ctx.tenant_id, action)
+        created.append(action["id"])
+
+    logger.info(
+        "Seeded %d starter quick actions: tenant=%s",
+        len(created), ctx.tenant_id[:8],
+    )
+    return {"seeded": len(created), "ids": created}

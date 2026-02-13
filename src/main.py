@@ -1383,10 +1383,11 @@ async def _startup_admin_inbox_services() -> None:
     Non-fatal: admin endpoints return 503 if initialization fails.
     """
     try:
-        from src.multi_tenant.repository import ConversationRepository
+        from src.multi_tenant.repository import ConversationRepository, TeamMemberRepository
 
         conv_repo = ConversationRepository()
-        configure_admin_conversation_services(conversation_repo=conv_repo)
+        team_repo = TeamMemberRepository()
+        configure_admin_conversation_services(conversation_repo=conv_repo, team_repo=team_repo)
         logger.info("Admin conversation inbox API initialized (5 endpoints)")
     except Exception:
         logger.warning(

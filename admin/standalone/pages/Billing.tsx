@@ -61,6 +61,16 @@ const TIER_BADGE_COLORS: Record<string, string> = {
   enterprise: 'grape',
 };
 
+const ADDON_MODULES = [
+  { id: 'addon_multi_language', label: 'Multi-Language Pack', description: 'Serve customers in Spanish, French, Portuguese, and more with automatic language detection.', price: 99, availableOn: ['starter', 'professional', 'enterprise'], tierLabel: 'All tiers' },
+  { id: 'addon_advanced_analytics', label: 'Advanced Analytics', description: 'Deep conversation analytics, topic clustering, sentiment trends, and exportable reports.', price: 149, availableOn: ['professional', 'enterprise'], tierLabel: 'Pro+' },
+  { id: 'addon_mailchimp', label: 'Mailchimp Integration', description: 'Sync customer interactions and segments directly to your Mailchimp audience lists.', price: 49, availableOn: ['professional', 'enterprise'], tierLabel: 'Pro+' },
+  { id: 'addon_google_analytics', label: 'Google Analytics', description: 'Send conversation events and widget engagement data to your GA4 property.', price: 49, availableOn: ['professional', 'enterprise'], tierLabel: 'Pro+' },
+  { id: 'addon_priority_support', label: 'Priority Support', description: 'Dedicated support channel with 4-hour response SLA and onboarding assistance.', price: 99, availableOn: ['starter', 'professional'], tierLabel: 'Starter/Pro' },
+  { id: 'addon_white_label', label: 'White-Label Package', description: 'Remove all Agent Red branding. Custom domains, CSS theming, co-branding options.', price: 399, availableOn: ['enterprise'], tierLabel: 'Enterprise' },
+  { id: 'addon_custom_integration', label: 'Custom Integration', description: 'Connect to your custom systems with a dedicated integration built by our team.', price: 299, availableOn: ['enterprise'], tierLabel: 'Enterprise' },
+];
+
 // ---------------------------------------------------------------------------
 // Helpers
 // ---------------------------------------------------------------------------
@@ -515,6 +525,51 @@ export const BillingPage: React.FC = () => {
             onPurchase={() => handlePurchasePack(20000)}
             purchasing={purchasingPack === 20000}
           />
+        </SimpleGrid>
+      </div>
+
+      {/* Add-on Modules */}
+      <div>
+        <Text size="lg" fw={600} mb={4}>
+          Add-on modules<HelpTooltip text="Optional feature modules that extend your plan. Add-on subscriptions are billed monthly alongside your base plan." docLink="https://agentredcx.com/docs/billing/overview#add-on-modules" />
+        </Text>
+        <Text size="sm" c="dimmed" mb="md">
+          Enhance your plan with additional capabilities. Billed monthly.
+        </Text>
+        <SimpleGrid cols={{ base: 1, xs: 2, md: 3 }} spacing="md">
+          {ADDON_MODULES.map((addon) => {
+            const tierMet = addon.availableOn.includes(tier);
+            return (
+              <Paper key={addon.id} p="lg" radius="md" withBorder style={{ opacity: tierMet ? 1 : 0.65 }}>
+                <Group justify="space-between" mb={6}>
+                  <Text size="md" fw={600}>{addon.label}</Text>
+                  <Badge color={tierMet ? 'green' : 'gray'} variant="light" size="xs">
+                    {addon.tierLabel}
+                  </Badge>
+                </Group>
+                <Text size="xs" c="dimmed" mb="sm" style={{ minHeight: 36 }}>
+                  {addon.description}
+                </Text>
+                <Text size="lg" fw={700} mb="sm">{formatCurrency(addon.price)}<Text span size="xs" c="dimmed">/mo</Text></Text>
+                {tierMet ? (
+                  <Button
+                    variant="outline"
+                    color="brand"
+                    fullWidth
+                    onClick={() => onNotify('Add-on checkout coming soon.', 'info')}
+                    onMouseEnter={(e) => { (e.currentTarget as HTMLElement).style.background = 'rgba(255, 255, 255, 0.06)'; }}
+                    onMouseLeave={(e) => { (e.currentTarget as HTMLElement).style.background = ''; }}
+                  >
+                    Subscribe
+                  </Button>
+                ) : (
+                  <Button variant="light" color="gray" fullWidth disabled>
+                    Upgrade to {addon.tierLabel.replace('+', '')}
+                  </Button>
+                )}
+              </Paper>
+            );
+          })}
         </SimpleGrid>
       </div>
 

@@ -25,7 +25,9 @@ import {
   useEscalateConversation,
   useResolveConversation,
   useTeamMembers,
+  useSearchConversations,
 } from './hooks';
+import type { SearchResult } from './hooks';
 import { HelpTooltip } from './HelpTooltip';
 
 // ---------------------------------------------------------------------------
@@ -571,7 +573,9 @@ export const ConversationInbox: React.FC<BaseComponentProps> = ({
   const [selectedId, setSelectedId] = useState<string | null>(null);
   const [showAssignModal, setShowAssignModal] = useState(false);
   const [showNoteModal, setShowNoteModal] = useState(false);
+  const [searchQuery, setSearchQuery] = useState('');
   const messagesEndRef = useRef<HTMLDivElement>(null);
+  const searchTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   // Polling: fetch conversation list every 5 seconds
   const {
@@ -596,6 +600,26 @@ export const ConversationInbox: React.FC<BaseComponentProps> = ({
   // Team members (for assign modal)
   const { data: teamData } = useTeamMembers(apiFetch);
   const teamMembers = teamData?.members ?? [];
+
+  // Search
+  const { search: searchConversations, clearSearch, results: searchResults, loading: searchLoading } = useSearchConversations(apiFetch);
+
+  const handleSearchInput = useCallback(
+    (value: string) => {
+      setSearchQuery(value);
+      if (searchTimerRef.current) clearTimeout(searchTimerRef.current);
+      if (!value.trim()) {
+        clearSearch();
+        return;
+      }
+      searchTimerRef.current = setTimeout(() => {
+        searchConversations(value);
+      }, 350);
+    },
+    [searchConversations, clearSearch],
+  );
+
+  const isSearchActive = searchResults !== null;
 
   // Assign conversation
   const { assign, loading: assigning } = useAssignConversation(apiFetch);
@@ -725,29 +749,110 @@ export const ConversationInbox: React.FC<BaseComponentProps> = ({
           </span>
         </div>
 
+        {/* Search bar */}
+        <div style={{ padding: '8px 12px', borderBottom: `1px solid ${COLOR_BORDER}` }}>
+          <div style={{ position: 'relative' }}>
+            <input
+              type="text"
+              value={searchQuery}
+              onChange={(e) => handleSearchInput(e.target.value)}
+              placeholder="Search messages..."
+              style={{
+                width: '100%',
+                padding: '7px 10px 7px 30px',
+                border: `1px solid ${COLOR_BORDER}`,
+                borderRadius: BORDER_RADIUS,
+                fontSize: '13px',
+                fontFamily: FONT_FAMILY,
+                backgroundColor: COLOR_LIGHT_GRAY,
+                boxSizing: 'border-box',
+                outline: 'none',
+              }}
+              onFocus={(e) => { (e.currentTarget as HTMLInputElement).style.borderColor = BRAND_PRIMARY; }}
+              onBlur={(e) => { (e.currentTarget as HTMLInputElement).style.borderColor = COLOR_BORDER; }}
+            />
+            <span style={{ position: 'absolute', left: '9px', top: '50%', transform: 'translateY(-50%)', fontSize: '14px', color: COLOR_TEXT_SECONDARY, pointerEvents: 'none' }}>
+              {searchLoading ? '\u2026' : '\u{1F50D}'}
+            </span>
+            {searchQuery && (
+              <button
+                onClick={() => handleSearchInput('')}
+                style={{ position: 'absolute', right: '6px', top: '50%', transform: 'translateY(-50%)', background: 'none', border: 'none', cursor: 'pointer', color: COLOR_TEXT_SECONDARY, fontSize: '14px', padding: '2px' }}
+              >
+                \u2715
+              </button>
+            )}
+          </div>
+        </div>
+
         {/* Conversation list */}
         <div style={{ flex: 1, overflowY: 'auto' }}>
-          {inboxLoading && conversations.length === 0 && (
-            <LoadingSpinner text="Loading conversations..." />
+          {/* Search results mode */}
+          {isSearchActive && (
+            <>
+              <div style={{ padding: '8px 12px', fontSize: '12px', color: COLOR_TEXT_SECONDARY, borderBottom: `1px solid ${COLOR_BORDER}`, backgroundColor: '#fafbfc' }}>
+                {searchResults.length} result{searchResults.length !== 1 ? 's' : ''} for &ldquo;{searchQuery}&rdquo;
+              </div>
+              {searchResults.length === 0 && !searchLoading && (
+                <EmptyState icon={String.fromCodePoint(0x1F50E)} title="No results" subtitle="Try a different search term." />
+              )}
+              {searchResults.map((sr: SearchResult) => (
+                <div
+                  key={sr.conversation_id}
+                  onClick={() => { setSelectedId(sr.conversation_id); }}
+                  role="button"
+                  tabIndex={0}
+                  onKeyDown={(e) => { if (e.key === 'Enter') setSelectedId(sr.conversation_id); }}
+                  style={{
+                    padding: '10px 14px',
+                    borderBottom: `1px solid ${COLOR_BORDER}`,
+                    backgroundColor: sr.conversation_id === selectedId ? '#f1f5ff' : COLOR_WHITE,
+                    cursor: 'pointer',
+                  }}
+                  onMouseEnter={(e) => { if (sr.conversation_id !== selectedId) (e.currentTarget as HTMLElement).style.backgroundColor = COLOR_LIGHT_GRAY; }}
+                  onMouseLeave={(e) => { (e.currentTarget as HTMLElement).style.backgroundColor = sr.conversation_id === selectedId ? '#f1f5ff' : COLOR_WHITE; }}
+                >
+                  <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '3px' }}>
+                    <span style={{ fontWeight: 600, fontSize: '13px', color: COLOR_TEXT }}>{sr.customer_name || 'Anonymous'}</span>
+                    <StatusBadge status={sr.status} />
+                  </div>
+                  <div style={{ fontSize: '12px', color: COLOR_TEXT_SECONDARY, lineHeight: '1.4', marginBottom: '2px' }}>
+                    {sr.snippet}
+                  </div>
+                  <div style={{ fontSize: '11px', color: COLOR_GRAY }}>
+                    Matched in {sr.matched_in} &middot; {sr.message_count} msg{sr.message_count !== 1 ? 's' : ''}
+                  </div>
+                </div>
+              ))}
+            </>
           )}
-          {inboxError && conversations.length === 0 && (
-            <ErrorBanner message={inboxError} onRetry={refetchInbox} />
+
+          {/* Normal list mode */}
+          {!isSearchActive && (
+            <>
+              {inboxLoading && conversations.length === 0 && (
+                <LoadingSpinner text="Loading conversations..." />
+              )}
+              {inboxError && conversations.length === 0 && (
+                <ErrorBanner message={inboxError} onRetry={refetchInbox} />
+              )}
+              {!inboxLoading && !inboxError && conversations.length === 0 && (
+                <EmptyState
+                  icon={String.fromCodePoint(0x1F4AC)}
+                  title="No conversations yet"
+                  subtitle="Conversations will appear here when customers start chatting."
+                />
+              )}
+              {conversations.map((conv) => (
+                <ConversationItem
+                  key={conv.conversationId}
+                  conversation={conv}
+                  isSelected={conv.conversationId === selectedId}
+                  onClick={() => setSelectedId(conv.conversationId)}
+                />
+              ))}
+            </>
           )}
-          {!inboxLoading && !inboxError && conversations.length === 0 && (
-            <EmptyState
-              icon={String.fromCodePoint(0x1F4AC)}
-              title="No conversations yet"
-              subtitle="Conversations will appear here when customers start chatting."
-            />
-          )}
-          {conversations.map((conv) => (
-            <ConversationItem
-              key={conv.conversationId}
-              conversation={conv}
-              isSelected={conv.conversationId === selectedId}
-              onClick={() => setSelectedId(conv.conversationId)}
-            />
-          ))}
         </div>
       </div>
 

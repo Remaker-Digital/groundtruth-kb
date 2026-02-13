@@ -1434,7 +1434,10 @@ class KnowledgeBaseRepository(TenantScopedRepository):
             params.append({"name": "@is_active", "value": is_active})
 
         if search is not None:
-            conditions.append("CONTAINS(LOWER(c.title), LOWER(@search))")
+            conditions.append(
+                "(CONTAINS(LOWER(c.title), LOWER(@search))"
+                " OR CONTAINS(LOWER(IS_DEFINED(c.content) ? c.content : ''), LOWER(@search)))"
+            )
             params.append({"name": "@search", "value": search})
 
         where_clause = " AND ".join(conditions) if conditions else "1=1"
@@ -1475,7 +1478,10 @@ class KnowledgeBaseRepository(TenantScopedRepository):
             params.append({"name": "@is_active", "value": is_active})
 
         if search is not None:
-            conditions.append("CONTAINS(LOWER(c.title), LOWER(@search))")
+            conditions.append(
+                "(CONTAINS(LOWER(c.title), LOWER(@search))"
+                " OR CONTAINS(LOWER(IS_DEFINED(c.content) ? c.content : ''), LOWER(@search)))"
+            )
             params.append({"name": "@search", "value": search})
 
         where_clause = " AND ".join(conditions) if conditions else "1=1"
