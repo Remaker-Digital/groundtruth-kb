@@ -51,7 +51,7 @@ const RETENTION_OPTIONS = [
 // ---------------------------------------------------------------------------
 
 export const MemoryPrivacyPage: React.FC = () => {
-  const { apiFetch, onNotify, tenantContext } = useAppContext();
+  const { apiFetch, onNotify, tenantContext, refreshActivationStatus } = useAppContext();
   const { data: fullConfig, loading, error } = useConfig(apiFetch);
   const { updateConfig, loading: saving } = useUpdateConfig(apiFetch);
 
@@ -100,13 +100,14 @@ export const MemoryPrivacyPage: React.FC = () => {
     const result = await updateConfig(updates);
     if (result?.success) {
       onNotify('Memory & privacy settings saved.', 'success');
+      refreshActivationStatus();
     } else {
       onNotify(result?.message ?? 'Failed to save settings.', 'error');
     }
   }, [
     memoryEnabled, conversationMemory, crossSessionLearning, retentionDays,
     piiScrubbing, consentRequired, autoDeleteOnRequest, patternDecayDays,
-    updateConfig, onNotify,
+    updateConfig, onNotify, refreshActivationStatus,
   ]);
 
   // Loading state
@@ -149,6 +150,16 @@ export const MemoryPrivacyPage: React.FC = () => {
           Save changes
         </Button>
       </Group>
+
+      {/* Upgrade banner for sub-Professional tiers */}
+      {!isProOrHigher && (
+        <Alert color="blue" variant="light" title="Unlock advanced memory features">
+          <Text size="sm">
+            Cross-session learning and dedicated model training are available on the Professional plan and above.
+            Upgrade your plan to enable AI that learns and adapts to each customer over time.
+          </Text>
+        </Alert>
+      )}
 
       {/* Layer 1: Customer context */}
       <Paper radius="md" withBorder p="lg">

@@ -236,7 +236,7 @@ const CheckCircleIcon = () => (
 // ---------------------------------------------------------------------------
 
 function getPreviewResponse(formality: string, responseLength: string, brandName: string): string {
-  const name = brandName || 'Your Store';
+  const name = brandName || 'the store';
   const styles: Record<string, Record<string, string>> = {
     casual: {
       concise: `Hey! Your ${name} order ships in 2-3 days. Need anything else?`,
@@ -388,7 +388,7 @@ function diffForm(
 // ---------------------------------------------------------------------------
 
 export const ConfigurationPage: React.FC = () => {
-  const { apiFetch, onNotify } = useAppContext();
+  const { apiFetch, onNotify, refreshActivationStatus } = useAppContext();
   const configResult = useConfig(apiFetch);
   const { updateConfig: saveConfig, loading: saving, error: saveError } = useUpdateConfig(apiFetch);
 
@@ -542,6 +542,7 @@ export const ConfigurationPage: React.FC = () => {
       serverFormRef.current = { ...form };
       setHasChanges(false);
       configResult.refetch();
+      refreshActivationStatus();
     } else {
       onNotify(saveError || 'Failed to save configuration.', 'error');
     }
@@ -1040,7 +1041,7 @@ export const ConfigurationPage: React.FC = () => {
                               )}
                             </Group>
                             <Text size="xs" c="dimmed">
-                              v{cfg.version} &middot; {cfg.fieldCount} fields &middot; {formatConfigDate(cfg.createdAt)}
+                              v{cfg.version} &middot; {cfg.fieldCount ?? '--'} fields &middot; {formatConfigDate(cfg.createdAt)}
                             </Text>
                           </div>
                           <Group gap={4} wrap="nowrap">

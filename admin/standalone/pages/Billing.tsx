@@ -519,7 +519,7 @@ export const BillingPage: React.FC = () => {
       </div>
 
       {/* Manage Billing (replaces Invoice History table) — only for Stripe-billed tenants */}
-      {tenantContext?.hasStripeBilling ? (
+      {tenantContext?.hasStripeBilling && (
         <Paper p="lg" radius="md" withBorder>
           <Group justify="space-between" align="center">
             <div>
@@ -532,15 +532,6 @@ export const BillingPage: React.FC = () => {
               Manage billing
             </Button>
           </Group>
-        </Paper>
-      ) : (
-        <Paper p="lg" radius="md" withBorder>
-          <div>
-            <Text fw={600}>Billing management</Text>
-            <Text size="sm" c="dimmed">
-              Your subscription is managed directly. Contact support for billing changes.
-            </Text>
-          </div>
         </Paper>
       )}
     </Stack>

@@ -100,15 +100,6 @@ const SearchIcon = () => (
 );
 
 
-const UserAssignIcon = () => (
-  <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-    <path d="M16 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2" />
-    <circle cx="8.5" cy="7" r="4" />
-    <line x1="20" y1="8" x2="20" y2="14" />
-    <line x1="23" y1="11" x2="17" y2="11" />
-  </svg>
-);
-
 const EscalateIcon = () => (
   <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
     <path d="M10.29 3.86L1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z" />
@@ -141,7 +132,7 @@ function ConversationItem({
   selectedBgColor: string;
   hoverBgColor: string;
 }) {
-  const displayName = conversation.customerName ?? 'Unknown Customer';
+  const displayName = conversation.customerName || conversation.conversationId?.slice(0, 12) || 'Session';
   const initials = getInitials(displayName);
   const color = avatarColor(displayName);
   const isUnread = conversation.status === 'active' || conversation.status === 'escalated';
@@ -363,6 +354,13 @@ export function InboxPage() {
     return true;
   });
 
+  // Clear reader pane when search/filter yields no results (Issue 3a)
+  useEffect(() => {
+    if (filteredConversations.length === 0 && (search || filter !== 'all')) {
+      setSelectedId('');
+    }
+  }, [filteredConversations.length, search, filter]);
+
   // ---- Counts per filter ----
   const counts = {
     all: conversations.length,
@@ -373,7 +371,7 @@ export function InboxPage() {
 
   // ---- Selected conversation ----
   const selectedConversation = conversations.find((c) => c.conversationId === selectedId) ?? null;
-  const selectedDisplayName = selectedConversation?.customerName ?? 'Unknown Customer';
+  const selectedDisplayName = selectedConversation?.customerName || selectedConversation?.conversationId?.slice(0, 12) || 'Session';
 
   const layoutHeight = `calc(100vh - ${HEADER_HEIGHT}px - ${PAGE_PADDING * 2}px)`;
 
@@ -541,11 +539,6 @@ export function InboxPage() {
                 </Text>
               </Box>
               <Group gap={4} style={{ flexShrink: 0 }}>
-                <Tooltip label="Assign to agent">
-                  <ActionIcon variant="subtle" color="gray" size="md">
-                    <UserAssignIcon />
-                  </ActionIcon>
-                </Tooltip>
                 <Tooltip label="Escalate to human">
                   <ActionIcon variant="subtle" color="orange" size="md">
                     <EscalateIcon />

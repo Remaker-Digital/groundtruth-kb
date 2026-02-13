@@ -18,6 +18,7 @@ import {
   useDeactivateIntegration,
   useDisconnectIntegration,
 } from './hooks/index';
+import { HelpTooltip } from './HelpTooltip';
 
 
 // ---------------------------------------------------------------------------
@@ -45,6 +46,28 @@ const INTEGRATION_LOGO_MAP: Record<string, string> = {
   mailchimp: 'mailchimp-logo',
   google_analytics: 'google-analytics-logo',
   stripe: 'stripe-logo',
+};
+
+const DOCS_BASE = 'https://agentredcx.com/docs/admin-guide';
+
+/** Per-integration tooltip text + doc link. */
+const INTEGRATION_TOOLTIPS: Record<string, { text: string; docLink: string }> = {
+  shopify: {
+    text: 'Core commerce integration. Syncs products, orders, and customer data to power AI responses with real-time store information.',
+    docLink: `${DOCS_BASE}/integrations#shopify`,
+  },
+  zendesk: {
+    text: 'Route escalated conversations to Zendesk tickets. Requires Professional tier or above.',
+    docLink: `${DOCS_BASE}/integrations#zendesk`,
+  },
+  mailchimp: {
+    text: 'Sync customer emails and conversation insights to Mailchimp audiences for targeted marketing.',
+    docLink: `${DOCS_BASE}/integrations#mailchimp`,
+  },
+  google_analytics: {
+    text: 'Send conversation events and conversion data to Google Analytics 4 for unified reporting.',
+    docLink: `${DOCS_BASE}/integrations#google-analytics`,
+  },
 };
 
 // Fallback inline SVG icons (used if logo image fails to load)
@@ -245,8 +268,14 @@ const IntegrationCard: React.FC<IntegrationCardProps & { isDark?: boolean; baseP
       {/* Right side: name, badges, description, actions */}
       <div style={{ flex: 1, minWidth: 0 }}>
         <div style={{ display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap' }}>
-          <span style={{ fontSize: 15, fontWeight: 600, color: '#F5F5F5' }}>
+          <span style={{ fontSize: 22, fontWeight: 600, color: '#F5F5F5' }}>
             {integration.name}
+            {INTEGRATION_TOOLTIPS[integration.type] && (
+              <HelpTooltip
+                text={INTEGRATION_TOOLTIPS[integration.type].text}
+                docLink={INTEGRATION_TOOLTIPS[integration.type].docLink}
+              />
+            )}
           </span>
           {integration.status && (
             <span style={badgeStyle(statusColor)}>

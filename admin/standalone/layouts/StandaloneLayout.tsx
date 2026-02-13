@@ -68,6 +68,8 @@ interface AppContextValue {
   apiFetch: (path: string, init?: RequestInit) => Promise<Response>;
   onNotify: (message: string, type: 'success' | 'error' | 'warning' | 'info') => void;
   loading: boolean;
+  /** Trigger an immediate refresh of the sidebar activation status (e.g. after saving a draft). */
+  refreshActivationStatus: () => void;
 }
 
 // ---------------------------------------------------------------------------
@@ -88,6 +90,30 @@ export function useAppContext(): AppContextValue {
 
 const API_BASE_URL = import.meta.env?.VITE_API_URL || '';
 const DOCS_URL = 'https://agentredcx.com';
+
+/** Tier-dependent badge colors for the header plan indicator. */
+const TIER_BADGE_COLORS: Record<string, string> = {
+  trial: 'yellow',
+  starter: 'blue',
+  professional: 'green',
+  enterprise: 'grape',
+};
+
+/** Tier ordering for comparison. Higher index = higher tier. */
+const TIER_ORDER: TenantTier[] = ['trial', 'starter', 'professional', 'enterprise'];
+
+/** Short labels for nav tier badges. */
+const TIER_BADGE_LABELS: Record<TenantTier, string> = {
+  trial: 'Trial',
+  starter: 'Starter+',
+  professional: 'Pro+',
+  enterprise: 'Enterprise',
+};
+
+/** Returns true if the tenant tier meets or exceeds the required minimum. */
+function tierMeetsMin(current: TenantTier, minTier: TenantTier): boolean {
+  return TIER_ORDER.indexOf(current) >= TIER_ORDER.indexOf(minTier);
+}
 
 // SVG Icons — from prototype StandaloneApp.tsx
 const Icons = {
@@ -172,6 +198,8 @@ type NavPage = {
   badge?: number;
   /** Roles that can see this nav item. Omit = all roles. */
   roles?: TeamRole[];
+  /** Minimum tier to use this page (e.g. 'professional'). Shows a small badge in the nav. */
+  minTier?: TenantTier;
 };
 
 /** Nav items rendered BEFORE the configuration group. */
@@ -192,7 +220,7 @@ const configGroupItems: NavPage[] = [
 /** Nav items rendered AFTER the configuration group. */
 const navItemsAfter: NavPage[] = [
   { path: '/integrations', label: 'Integrations', icon: 'integrations', roles: ['superadmin', 'admin'] },
-  { path: '/memory-privacy', label: 'Memory & privacy', icon: 'memory', roles: ['superadmin', 'admin'] },
+  { path: '/memory-privacy', label: 'Memory & privacy', icon: 'memory', roles: ['superadmin', 'admin'], minTier: 'professional' },
   { path: '/billing', label: 'Billing', icon: 'billing', roles: ['superadmin', 'admin'] },
 ];
 
@@ -480,6 +508,7 @@ export const StandaloneLayout: React.FC<StandaloneLayoutProps> = ({
     apiFetch,
     onNotify,
     loading,
+    refreshActivationStatus: fetchActivationStatus,
   };
 
   // ---- Render ------------------------------------------------------------
@@ -567,7 +596,7 @@ export const StandaloneLayout: React.FC<StandaloneLayoutProps> = ({
                   w={280}
                   openDelay={300}
                 >
-                  <Badge variant="light" color="green" size="sm" tt="capitalize" style={{ cursor: 'default' }}>
+                  <Badge variant="light" color={TIER_BADGE_COLORS[tenantContext.tier] ?? 'gray'} size="sm" tt="capitalize" style={{ cursor: 'default' }}>
                     {tenantContext.tier}
                   </Badge>
                 </Tooltip>
@@ -716,7 +745,7 @@ export const StandaloneLayout: React.FC<StandaloneLayoutProps> = ({
                   </Text>
                   {activationStatus && (
                     activationStatus.has_pending_changes ? (
-                      <Badge size="xs" variant="dot" color="orange">Draft</Badge>
+                      <Badge size="xs" variant="dot" color="yellow">Pending</Badge>
                     ) : (
                       <Badge size="xs" variant="dot" color="green">Active</Badge>
                     )
@@ -768,7 +797,7 @@ export const StandaloneLayout: React.FC<StandaloneLayoutProps> = ({
                   <Button
                     size="compact-xs"
                     variant="filled"
-                    color="brand"
+                    color={activationStatus?.has_pending_changes ? 'green' : 'gray'}
                     disabled={!activationStatus?.has_pending_changes}
                     onClick={() => setShowActivationDialog(true)}
                     style={{ flex: 1 }}
@@ -777,7 +806,8 @@ export const StandaloneLayout: React.FC<StandaloneLayoutProps> = ({
                   </Button>
                   <Button
                     size="compact-xs"
-                    variant="default"
+                    variant={activationStatus?.has_pending_changes ? 'light' : 'default'}
+                    color={activationStatus?.has_pending_changes ? 'blue' : undefined}
                     disabled={!activationStatus?.has_pending_changes || discarding}
                     onClick={handleDiscard}
                     style={{ flex: 1 }}
@@ -804,6 +834,8 @@ export const StandaloneLayout: React.FC<StandaloneLayoutProps> = ({
                 const IconComponent = Icons[item.icon];
                 const isActive = location.pathname === item.path
                   || (item.path !== '/' && location.pathname.startsWith(item.path));
+                const currentTier = tenantContext?.tier ?? 'starter';
+                const showTierBadge = item.minTier && !tierMeetsMin(currentTier, item.minTier);
                 return (
                   <NavLink
                     key={item.path}
@@ -821,6 +853,10 @@ export const StandaloneLayout: React.FC<StandaloneLayoutProps> = ({
                     rightSection={
                       item.badge ? (
                         <Badge size="xs" variant="filled" color="brand" circle>{item.badge}</Badge>
+                      ) : showTierBadge ? (
+                        <Badge size="xs" variant="light" color={TIER_BADGE_COLORS[item.minTier!] ?? 'gray'}>
+                          {TIER_BADGE_LABELS[item.minTier!]}
+                        </Badge>
                       ) : undefined
                     }
                     active={isActive}

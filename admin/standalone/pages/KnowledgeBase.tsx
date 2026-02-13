@@ -534,13 +534,15 @@ export const KnowledgeBasePage: React.FC = () => {
                 Import
               </Button>
             </Tooltip>
-            <Button
-              leftSection={<PlusIcon />}
-              color={BRAND_RED}
-              onClick={handleAddArticle}
-            >
-              Add article
-            </Button>
+            <Tooltip label="Create a new knowledge base article. Articles give your AI specific information to reference when answering customer questions." multiline w={260} withArrow>
+              <Button
+                leftSection={<PlusIcon />}
+                color={BRAND_RED}
+                onClick={handleAddArticle}
+              >
+                Add article
+              </Button>
+            </Tooltip>
           </Group>
         </Group>
       </Paper>

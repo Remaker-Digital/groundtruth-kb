@@ -375,6 +375,34 @@ export const QuickActionsPage: React.FC = () => {
     }
   }, [assignments, apiFetch, onNotify, fetchAssignments]);
 
+  // ---- Auto-open delay per page (Issue 14b) ---------------------------------
+
+  const handleAutoOpenDelayChange = useCallback(async (
+    pageType: string,
+    delayMs: number,
+  ) => {
+    const existing = assignments.find((a) => a.pageType === pageType);
+    try {
+      const resp = await apiFetch('/api/admin/quick-actions/assignments', {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          page_type: pageType,
+          page_handle: null,
+          slot_1_action_id: existing?.slot1ActionId ?? null,
+          slot_2_action_id: existing?.slot2ActionId ?? null,
+          auto_open: existing?.autoOpen ?? false,
+          auto_open_delay_ms: delayMs,
+        }),
+      });
+      if (!resp.ok) throw new Error(`Save failed: ${resp.status}`);
+      await fetchAssignments();
+    } catch (err) {
+      const msg = err instanceof Error ? err.message : 'Save failed';
+      onNotify(msg, 'error');
+    }
+  }, [assignments, apiFetch, onNotify, fetchAssignments]);
+
   // ---- Insert template variable at cursor ----------------------------------
 
   const insertTemplateVar = useCallback((token: string) => {
@@ -607,6 +635,13 @@ export const QuickActionsPage: React.FC = () => {
                           </Text>
                         </Tooltip>
                       </Table.Th>
+                      <Table.Th w={120}>
+                        <Tooltip label="Seconds to wait before auto-opening the widget" position="top">
+                          <Text component="span" size="sm" fw={600} style={{ cursor: 'help' }}>
+                            Delay (s)
+                          </Text>
+                        </Tooltip>
+                      </Table.Th>
                     </Table.Tr>
                   </Table.Thead>
                   <Table.Tbody>
@@ -652,6 +687,19 @@ export const QuickActionsPage: React.FC = () => {
                               checked={assign?.autoOpen ?? false}
                               onChange={(e) => handleAutoOpenToggle(pt.value, e.currentTarget.checked)}
                               aria-label={`Auto-open on ${pt.label}`}
+                            />
+                          </Table.Td>
+                          <Table.Td>
+                            <NumberInput
+                              size="xs"
+                              min={1}
+                              max={60}
+                              step={1}
+                              value={Math.round((assign?.autoOpenDelayMs ?? 3000) / 1000)}
+                              onChange={(val) => handleAutoOpenDelayChange(pt.value, (typeof val === 'number' ? val : 3) * 1000)}
+                              disabled={!(assign?.autoOpen)}
+                              styles={{ input: { minHeight: 30, fontSize: 13, width: 70 } }}
+                              suffix="s"
                             />
                           </Table.Td>
                         </Table.Tr>

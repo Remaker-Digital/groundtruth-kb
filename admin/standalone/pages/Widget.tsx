@@ -20,6 +20,7 @@ import {
   Box,
   Divider,
   LoadingOverlay,
+  useComputedColorScheme,
 } from '@mantine/core';
 import { useAppContext } from '../layouts/StandaloneLayout';
 import { useConfig, useUpdateConfig } from '../../shared/hooks/index';
@@ -44,7 +45,6 @@ const ICON_OPTIONS = [
   { value: 'chat', label: 'Chat bubble' },
   { value: 'headset', label: 'Headset' },
   { value: 'help', label: 'Help circle' },
-  { value: 'custom', label: 'Custom' },
 ];
 
 const PRE_CHAT_FIELDS = ['name', 'email', 'phone', 'company'];
@@ -350,9 +350,9 @@ function resolvePanelWidthPx(preset: WidgetConfig['panelWidth']): string {
   }
 }
 
-function WidgetPreview({ config }: { config: WidgetConfig }) {
+function WidgetPreview({ config, adminIsDark }: { config: WidgetConfig; adminIsDark: boolean }) {
   const isRight = config.position === 'bottom-right';
-  const dk = config.colorMode === 'dark';
+  const dk = config.colorMode === 'auto' ? adminIsDark : config.colorMode === 'dark';
 
   // Color tokens — light vs dark widget mode (Mazel design revision 2026-02-03 mockup)
   const panelBg = dk ? '#1f1f1f' : '#fff';
@@ -661,9 +661,12 @@ function WidgetPreview({ config }: { config: WidgetConfig }) {
 // ---------------------------------------------------------------------------
 
 export function WidgetPage() {
-  const { apiFetch, onNotify } = useAppContext();
+  const { apiFetch, onNotify, refreshActivationStatus } = useAppContext();
   const configResult = useConfig(apiFetch);
   const { updateConfig: saveConfig, loading: saving, error: saveError } = useUpdateConfig(apiFetch);
+
+  const computedColorScheme = useComputedColorScheme('dark');
+  const adminIsDark = computedColorScheme === 'dark';
 
   const [config, setConfig] = useState<WidgetConfig>({ ...DEFAULT_WIDGET_CONFIG });
   const [initialized, setInitialized] = useState(false);
@@ -690,6 +693,7 @@ export function WidgetPage() {
     const result = await saveConfig(changes);
     if (result?.success) {
       onNotify('Widget settings saved successfully', 'success');
+      refreshActivationStatus();
     } else if (saveError) {
       onNotify(`Failed to save: ${saveError}`, 'error');
     } else {
@@ -891,21 +895,6 @@ export function WidgetPage() {
               <Divider mb="md" />
               <Stack gap="sm">
                 <Switch
-                  label="Auto-open widget"
-                  checked={config.autoOpen}
-                  onChange={(e) => update('autoOpen', e.currentTarget.checked)}
-                  color="brand"
-                />
-                <NumberInput
-                  label="Auto-open delay (seconds)"
-                  value={config.autoOpenDelay}
-                  onChange={(val) => update('autoOpenDelay', typeof val === 'number' ? val : 5)}
-                  min={1}
-                  max={60}
-                  disabled={!config.autoOpen}
-                />
-                <Divider variant="dashed" />
-                <Switch
                   label="Greeting message"
                   checked={config.greetingEnabled}
                   onChange={(e) => update('greetingEnabled', e.currentTarget.checked)}
@@ -975,13 +964,6 @@ export function WidgetPage() {
                     </Chip.Group>
                   </div>
                 )}
-                <Switch
-                  label="Offline form"
-                  description="Show a contact form when no agents are available or outside business hours."
-                  checked={config.offlineFormEnabled}
-                  onChange={(e) => update('offlineFormEnabled', e.currentTarget.checked)}
-                  color="brand"
-                />
                 <Switch
                   label="Sound notifications"
                   checked={config.soundEnabled}
@@ -1070,7 +1052,7 @@ export function WidgetPage() {
             <Text size="sm" fw={600} mb="sm">
               Live preview
             </Text>
-            <WidgetPreview config={config} />
+            <WidgetPreview config={config} adminIsDark={adminIsDark} />
           </Paper>
         </Box>
       </Group>

@@ -81,6 +81,7 @@ export default function ActivationDialog({
   const [draft, setDraft] = useState<DraftState | null>(null);
   const [loading, setLoading] = useState(true);
   const [activating, setActivating] = useState(false);
+  const [confirmed, setConfirmed] = useState(false);
   const [activateErrors, setActivateErrors] = useState<Array<{ field: string; message: string }>>([]);
   const [activateWarnings, setActivateWarnings] = useState<Array<{ field: string; message: string }>>([]);
 
@@ -216,6 +217,13 @@ export default function ActivationDialog({
                   ))}
                 </div>
               )}
+
+              {/* Confirmation step */}
+              {confirmed && activateErrors.length === 0 && (
+                <div style={confirmSectionStyle}>
+                  Are you sure you want to activate these changes? This will make them live immediately.
+                </div>
+              )}
             </>
           )}
         </div>
@@ -223,16 +231,29 @@ export default function ActivationDialog({
         {/* Footer */}
         <div style={footerStyle}>
           <button onClick={onClose} style={cancelButtonStyle}>Cancel</button>
-          <button
-            onClick={handleActivate}
-            disabled={activating || loading || !draft?.has_pending_changes}
-            style={{
-              ...activateButtonStyle,
-              opacity: (activating || loading || !draft?.has_pending_changes) ? 0.5 : 1,
-            }}
-          >
-            {activating ? 'Activating…' : 'Activate now'}
-          </button>
+          {!confirmed ? (
+            <button
+              onClick={() => setConfirmed(true)}
+              disabled={loading || !draft?.has_pending_changes}
+              style={{
+                ...activateButtonStyle,
+                opacity: (loading || !draft?.has_pending_changes) ? 0.5 : 1,
+              }}
+            >
+              Activate now
+            </button>
+          ) : (
+            <button
+              onClick={handleActivate}
+              disabled={activating}
+              style={{
+                ...confirmButtonStyle,
+                opacity: activating ? 0.5 : 1,
+              }}
+            >
+              {activating ? 'Activating…' : 'Yes, activate'}
+            </button>
+          )}
         </div>
       </div>
     </div>
@@ -392,4 +413,25 @@ const activateButtonStyle: React.CSSProperties = {
   fontSize: '13px',
   fontWeight: 600,
   cursor: 'pointer',
+};
+
+const confirmButtonStyle: React.CSSProperties = {
+  backgroundColor: '#2b8a3e',
+  color: '#fff',
+  border: 'none',
+  borderRadius: '6px',
+  padding: '8px 20px',
+  fontSize: '13px',
+  fontWeight: 600,
+  cursor: 'pointer',
+};
+
+const confirmSectionStyle: React.CSSProperties = {
+  backgroundColor: 'rgba(43, 138, 62, 0.1)',
+  borderRadius: '8px',
+  padding: '12px 16px',
+  marginTop: '12px',
+  color: '#a0d0b0',
+  fontSize: '14px',
+  lineHeight: '1.5',
 };

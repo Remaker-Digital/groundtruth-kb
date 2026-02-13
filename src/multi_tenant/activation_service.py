@@ -232,89 +232,99 @@ class ActivationService:
                 warnings=validation.warnings,
             )
 
-        async with self._lock:
-            # Get the active config (with lazy migration)
-            active = await self._prefs_repo.get_active(tenant_id)
-            if active:
-                active = await self._ensure_config_state(active, tenant_id)
-
-            # Get existing draft (if any)
-            draft = await self._prefs_repo.get_draft(tenant_id)
-
-            if draft is not None:
-                # Merge changes into existing draft
-                for key, value in changes.items():
-                    draft[key] = value
-
-                # Patch the existing draft document
-                operations = [
-                    {"op": "set", "path": f"/{key}", "value": value}
-                    for key, value in changes.items()
-                ]
-                await self._prefs_repo.patch(
-                    tenant_id=tenant_id,
-                    document_id=draft["id"],
-                    operations=operations,
-                )
-
-                logger.info(
-                    "Updated draft for tenant=%s: %d fields changed",
-                    tenant_id[:8], len(changes),
-                )
-
-                return DraftSaveResult(
-                    success=True,
-                    version=draft.get("version", 0),
-                    changes=changes,
-                    warnings=validation.warnings,
-                    state="draft",
-                )
-            else:
-                # Create new draft from active config + changes
-                base_config: dict[str, Any] = {}
-                active_version = 0
-
+        try:
+            async with self._lock:
+                # Get the active config (with lazy migration)
+                active = await self._prefs_repo.get_active(tenant_id)
                 if active:
-                    active_version = active.get("version", 0)
-                    # Copy all PreferencesDocument fields from active
-                    for key, value in active.items():
-                        if key not in ("id", "_rid", "_self", "_etag", "_attachments", "_ts"):
-                            base_config[key] = value
+                    active = await self._ensure_config_state(active, tenant_id)
 
-                # Apply changes on top
-                for key, value in changes.items():
-                    base_config[key] = value
+                # Get existing draft (if any)
+                draft = await self._prefs_repo.get_draft(tenant_id)
 
-                # Create draft document
-                draft_version = active_version + 1
-                now = datetime.now(timezone.utc).isoformat()
+                if draft is not None:
+                    # Merge changes into existing draft
+                    for key, value in changes.items():
+                        draft[key] = value
 
-                base_config.update({
-                    "id": f"{tenant_id}:{draft_version}",
-                    "tenant_id": tenant_id,
-                    "version": draft_version,
-                    "is_current": False,
-                    "config_state": ConfigState.DRAFT.value,
-                    "created_at": now,
-                    "created_by": actor,
-                    "activated_at": None,
-                    "activated_by": None,
-                })
+                    # Patch the existing draft document
+                    operations = [
+                        {"op": "set", "path": f"/{key}", "value": value}
+                        for key, value in changes.items()
+                    ]
+                    await self._prefs_repo.patch(
+                        tenant_id=tenant_id,
+                        document_id=draft["id"],
+                        operations=operations,
+                    )
 
-                await self._prefs_repo.create(tenant_id, base_config)
+                    logger.info(
+                        "Updated draft for tenant=%s: %d fields changed",
+                        tenant_id[:8], len(changes),
+                    )
 
-                logger.info(
-                    "Created draft v%d for tenant=%s from active v%d with %d changes",
-                    draft_version, tenant_id[:8], active_version, len(changes),
-                )
+                    return DraftSaveResult(
+                        success=True,
+                        version=draft.get("version", 0),
+                        changes=changes,
+                        warnings=validation.warnings,
+                        state="draft",
+                    )
+                else:
+                    # Create new draft from active config + changes
+                    base_config: dict[str, Any] = {}
+                    active_version = 0
 
-                return DraftSaveResult(
-                    success=True,
-                    version=draft_version,
-                    changes=changes,
-                    warnings=validation.warnings,
-                    state="draft",
-                )
+                    if active:
+                        active_version = active.get("version", 0)
+                        # Copy all PreferencesDocument fields from active
+                        for key, value in active.items():
+                            if key not in ("id", "_rid", "_self", "_etag", "_attachments", "_ts"):
+                                base_config[key] = value
+
+                    # Apply changes on top
+                    for key, value in changes.items():
+                        base_config[key] = value
+
+                    # Create draft document
+                    draft_version = active_version + 1
+                    now = datetime.now(timezone.utc).isoformat()
+
+                    base_config.update({
+                        "id": f"{tenant_id}:{draft_version}",
+                        "tenant_id": tenant_id,
+                        "version": draft_version,
+                        "is_current": False,
+                        "config_state": ConfigState.DRAFT.value,
+                        "created_at": now,
+                        "created_by": actor,
+                        "activated_at": None,
+                        "activated_by": None,
+                    })
+
+                    await self._prefs_repo.create(tenant_id, base_config)
+
+                    logger.info(
+                        "Created draft v%d for tenant=%s from active v%d with %d changes",
+                        draft_version, tenant_id[:8], active_version, len(changes),
+                    )
+
+                    return DraftSaveResult(
+                        success=True,
+                        version=draft_version,
+                        changes=changes,
+                        warnings=validation.warnings,
+                        state="draft",
+                    )
+        except Exception as exc:
+            logger.error(
+                "Failed to save draft for tenant=%s: %s",
+                tenant_id[:8], exc, exc_info=True,
+            )
+            return DraftSaveResult(
+                success=False,
+                errors=[{"field": "_system", "message": f"Failed to save configuration: {exc}"}],
+            )
 
     # ------------------------------------------------------------------
     # Draft State (for activation banner)
@@ -488,88 +498,98 @@ class ActivationService:
                 warnings=validation.warnings,
             )
 
-        async with self._lock:
-            draft = await self._prefs_repo.get_draft(tenant_id)
-            if draft is None:
-                return ActivationResult(
-                    success=False,
-                    errors=[{"field": "_system", "message": "No draft to activate"}],
-                )
-
-            active = await self._prefs_repo.get_active(tenant_id)
-            if active:
-                active = await self._ensure_config_state(active, tenant_id)
-
-            previous = await self._prefs_repo.get_previous(tenant_id)
-
-            now = datetime.now(timezone.utc).isoformat()
-
-            # Step 1: Clear any existing 'previous' document
-            if previous:
-                await self._prefs_repo.patch(
-                    tenant_id=tenant_id,
-                    document_id=previous["id"],
-                    operations=[
-                        {"op": "set", "path": "/config_state", "value": "archived"},
-                    ],
-                )
-
-            # Step 2: Demote current 'active' → 'previous'
-            if active:
-                await self._prefs_repo.patch(
-                    tenant_id=tenant_id,
-                    document_id=active["id"],
-                    operations=[
-                        {"op": "set", "path": "/config_state", "value": ConfigState.PREVIOUS.value},
-                        {"op": "set", "path": "/is_current", "value": False},
-                    ],
-                )
-
-            # Step 3: Promote draft → 'active'
-            await self._prefs_repo.patch(
-                tenant_id=tenant_id,
-                document_id=draft["id"],
-                operations=[
-                    {"op": "set", "path": "/config_state", "value": ConfigState.ACTIVE.value},
-                    {"op": "set", "path": "/is_current", "value": True},
-                    {"op": "set", "path": "/activated_at", "value": now},
-                    {"op": "set", "path": "/activated_by", "value": actor},
-                ],
-            )
-
-            # Step 4: Invalidate config cache
-            if self._config_processor is not None:
-                self._config_processor._invalidate_cache(tenant_id)
-
-            # Step 5: Audit log
-            if self._audit_repo is not None:
-                try:
-                    await self._audit_repo.log_event(
-                        event_type=AuditEventType.CONFIG_UPDATED,
-                        tenant_id=tenant_id,
-                        actor=actor,
-                        actor_type="user" if actor.startswith("user:") else "system",
-                        payload={
-                            "action": "config_activated",
-                            "draft_version": draft.get("version", 0),
-                            "previous_active_version": active.get("version", 0) if active else 0,
-                        },
+        try:
+            async with self._lock:
+                draft = await self._prefs_repo.get_draft(tenant_id)
+                if draft is None:
+                    return ActivationResult(
+                        success=False,
+                        errors=[{"field": "_system", "message": "No draft to activate"}],
                     )
-                except Exception:
-                    logger.warning("Audit log failed for activation", exc_info=True)
 
-            logger.info(
-                "Activated config v%d for tenant=%s (previous: v%d)",
-                draft.get("version", 0),
-                tenant_id[:8],
-                active.get("version", 0) if active else 0,
+                active = await self._prefs_repo.get_active(tenant_id)
+                if active:
+                    active = await self._ensure_config_state(active, tenant_id)
+
+                previous = await self._prefs_repo.get_previous(tenant_id)
+
+                now = datetime.now(timezone.utc).isoformat()
+
+                # Step 1: Clear any existing 'previous' document
+                if previous:
+                    await self._prefs_repo.patch(
+                        tenant_id=tenant_id,
+                        document_id=previous["id"],
+                        operations=[
+                            {"op": "set", "path": "/config_state", "value": "archived"},
+                        ],
+                    )
+
+                # Step 2: Demote current 'active' → 'previous'
+                if active:
+                    await self._prefs_repo.patch(
+                        tenant_id=tenant_id,
+                        document_id=active["id"],
+                        operations=[
+                            {"op": "set", "path": "/config_state", "value": ConfigState.PREVIOUS.value},
+                            {"op": "set", "path": "/is_current", "value": False},
+                        ],
+                    )
+
+                # Step 3: Promote draft → 'active'
+                await self._prefs_repo.patch(
+                    tenant_id=tenant_id,
+                    document_id=draft["id"],
+                    operations=[
+                        {"op": "set", "path": "/config_state", "value": ConfigState.ACTIVE.value},
+                        {"op": "set", "path": "/is_current", "value": True},
+                        {"op": "set", "path": "/activated_at", "value": now},
+                        {"op": "set", "path": "/activated_by", "value": actor},
+                    ],
+                )
+
+                # Step 4: Invalidate config cache
+                if self._config_processor is not None:
+                    self._config_processor._invalidate_cache(tenant_id)
+
+                # Step 5: Audit log
+                if self._audit_repo is not None:
+                    try:
+                        await self._audit_repo.log_event(
+                            event_type=AuditEventType.CONFIG_UPDATED,
+                            tenant_id=tenant_id,
+                            actor=actor,
+                            actor_type="user" if actor.startswith("user:") else "system",
+                            payload={
+                                "action": "config_activated",
+                                "draft_version": draft.get("version", 0),
+                                "previous_active_version": active.get("version", 0) if active else 0,
+                            },
+                        )
+                    except Exception:
+                        logger.warning("Audit log failed for activation", exc_info=True)
+
+                logger.info(
+                    "Activated config v%d for tenant=%s (previous: v%d)",
+                    draft.get("version", 0),
+                    tenant_id[:8],
+                    active.get("version", 0) if active else 0,
+                )
+
+                return ActivationResult(
+                    success=True,
+                    version=draft.get("version", 0),
+                    activated_at=now,
+                    warnings=validation.warnings,
+                )
+        except Exception as exc:
+            logger.error(
+                "Failed to activate config for tenant=%s: %s",
+                tenant_id[:8], exc, exc_info=True,
             )
-
             return ActivationResult(
-                success=True,
-                version=draft.get("version", 0),
-                activated_at=now,
-                warnings=validation.warnings,
+                success=False,
+                errors=[{"field": "_system", "message": f"Activation failed: {exc}"}],
             )
 
     # ------------------------------------------------------------------
@@ -590,84 +610,94 @@ class ActivationService:
         if not self._is_configured:
             return RestoreResult(success=False, error="Service not configured")
 
-        async with self._lock:
-            active = await self._prefs_repo.get_active(tenant_id)
-            previous = await self._prefs_repo.get_previous(tenant_id)
+        try:
+            async with self._lock:
+                active = await self._prefs_repo.get_active(tenant_id)
+                previous = await self._prefs_repo.get_previous(tenant_id)
 
-            if previous is None:
-                return RestoreResult(
-                    success=False,
-                    error="No previous configuration to restore",
-                )
-
-            now = datetime.now(timezone.utc).isoformat()
-
-            # Discard any draft first
-            draft = await self._prefs_repo.get_draft(tenant_id)
-            if draft:
-                await self._prefs_repo.patch(
-                    tenant_id=tenant_id,
-                    document_id=draft["id"],
-                    operations=[
-                        {"op": "set", "path": "/config_state", "value": "discarded"},
-                        {"op": "set", "path": "/is_current", "value": False},
-                    ],
-                )
-
-            # Demote current active → previous
-            if active:
-                await self._prefs_repo.patch(
-                    tenant_id=tenant_id,
-                    document_id=active["id"],
-                    operations=[
-                        {"op": "set", "path": "/config_state", "value": ConfigState.PREVIOUS.value},
-                        {"op": "set", "path": "/is_current", "value": False},
-                    ],
-                )
-
-            # Promote previous → active
-            await self._prefs_repo.patch(
-                tenant_id=tenant_id,
-                document_id=previous["id"],
-                operations=[
-                    {"op": "set", "path": "/config_state", "value": ConfigState.ACTIVE.value},
-                    {"op": "set", "path": "/is_current", "value": True},
-                    {"op": "set", "path": "/activated_at", "value": now},
-                    {"op": "set", "path": "/activated_by", "value": f"restore:{actor}"},
-                ],
-            )
-
-            # Invalidate cache
-            if self._config_processor is not None:
-                self._config_processor._invalidate_cache(tenant_id)
-
-            # Audit log
-            if self._audit_repo is not None:
-                try:
-                    await self._audit_repo.log_event(
-                        event_type=AuditEventType.CONFIG_UPDATED,
-                        tenant_id=tenant_id,
-                        actor=actor,
-                        actor_type="user",
-                        payload={
-                            "action": "config_restored",
-                            "restored_version": previous.get("version", 0),
-                            "demoted_version": active.get("version", 0) if active else 0,
-                        },
+                if previous is None:
+                    return RestoreResult(
+                        success=False,
+                        error="No previous configuration to restore",
                     )
-                except Exception:
-                    logger.warning("Audit log failed for restore", exc_info=True)
 
-            logger.info(
-                "Restored config v%d for tenant=%s",
-                previous.get("version", 0),
-                tenant_id[:8],
+                now = datetime.now(timezone.utc).isoformat()
+
+                # Discard any draft first
+                draft = await self._prefs_repo.get_draft(tenant_id)
+                if draft:
+                    await self._prefs_repo.patch(
+                        tenant_id=tenant_id,
+                        document_id=draft["id"],
+                        operations=[
+                            {"op": "set", "path": "/config_state", "value": "discarded"},
+                            {"op": "set", "path": "/is_current", "value": False},
+                        ],
+                    )
+
+                # Demote current active → previous
+                if active:
+                    await self._prefs_repo.patch(
+                        tenant_id=tenant_id,
+                        document_id=active["id"],
+                        operations=[
+                            {"op": "set", "path": "/config_state", "value": ConfigState.PREVIOUS.value},
+                            {"op": "set", "path": "/is_current", "value": False},
+                        ],
+                    )
+
+                # Promote previous → active
+                await self._prefs_repo.patch(
+                    tenant_id=tenant_id,
+                    document_id=previous["id"],
+                    operations=[
+                        {"op": "set", "path": "/config_state", "value": ConfigState.ACTIVE.value},
+                        {"op": "set", "path": "/is_current", "value": True},
+                        {"op": "set", "path": "/activated_at", "value": now},
+                        {"op": "set", "path": "/activated_by", "value": f"restore:{actor}"},
+                    ],
+                )
+
+                # Invalidate cache
+                if self._config_processor is not None:
+                    self._config_processor._invalidate_cache(tenant_id)
+
+                # Audit log
+                if self._audit_repo is not None:
+                    try:
+                        await self._audit_repo.log_event(
+                            event_type=AuditEventType.CONFIG_UPDATED,
+                            tenant_id=tenant_id,
+                            actor=actor,
+                            actor_type="user",
+                            payload={
+                                "action": "config_restored",
+                                "restored_version": previous.get("version", 0),
+                                "demoted_version": active.get("version", 0) if active else 0,
+                            },
+                        )
+                    except Exception:
+                        logger.warning("Audit log failed for restore", exc_info=True)
+
+                logger.info(
+                    "Restored config v%d for tenant=%s",
+                    previous.get("version", 0),
+                    tenant_id[:8],
+                )
+
+                return RestoreResult(
+                    success=True,
+                    restored_version=previous.get("version", 0),
+                    restored_activated_at=now,
+                )
+        except Exception as exc:
+            logger.error(
+                "Failed to restore config for tenant=%s: %s",
+                tenant_id[:8], exc, exc_info=True,
             )
-
             return RestoreResult(
-                success=True,
-                restored_version=previous.get("version", 0),
-                restored_activated_at=now,
+                success=False,
+                error=f"Restore failed: {exc}",
             )
 
     # ------------------------------------------------------------------
@@ -686,25 +716,32 @@ class ActivationService:
         if not self._is_configured:
             return False
 
-        draft = await self._prefs_repo.get_draft(tenant_id)
-        if draft is None:
+        try:
+            draft = await self._prefs_repo.get_draft(tenant_id)
+            if draft is None:
+                return False
+
+            await self._prefs_repo.patch(
+                tenant_id=tenant_id,
+                document_id=draft["id"],
+                operations=[
+                    {"op": "set", "path": "/config_state", "value": "discarded"},
+                    {"op": "set", "path": "/is_current", "value": False},
+                ],
+            )
+
+            logger.info(
+                "Discarded draft v%d for tenant=%s",
+                draft.get("version", 0),
+                tenant_id[:8],
+            )
+            return True
+        except Exception as exc:
+            logger.error(
+                "Failed to discard draft for tenant=%s: %s",
+                tenant_id[:8], exc, exc_info=True,
+            )
             return False
-
-        await self._prefs_repo.patch(
-            tenant_id=tenant_id,
-            document_id=draft["id"],
-            operations=[
-                {"op": "set", "path": "/config_state", "value": "discarded"},
-                {"op": "set", "path": "/is_current", "value": False},
-            ],
-        )
-
-        logger.info(
-            "Discarded draft v%d for tenant=%s",
-            draft.get("version", 0),
-            tenant_id[:8],
-        )
-        return True
 
     # ------------------------------------------------------------------
     # Reinitialize to Defaults (superadmin only)
