@@ -37,7 +37,7 @@ from datetime import datetime, timezone
 from enum import Enum
 from typing import Any
 
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, ConfigDict, Field
 
 logger = logging.getLogger(__name__)
 
@@ -161,6 +161,9 @@ class AuditEventType(str, Enum):
     SECURITY_EVENT = "security.event"
     MODEL_DEPLOYED = "model.deployed"
     MODEL_ROLLED_BACK = "model.rolled_back"
+    TEAM_MEMBER_ADDED = "team.member_added"
+    TEAM_MEMBER_REMOVED = "team.member_removed"
+    TEAM_MEMBER_UPDATED = "team.member_updated"
 
 
 class PiiClassification(str, Enum):
@@ -582,6 +585,16 @@ class KnowledgeBaseDocument(BaseModel):
         description="ID of the parent entry when this is a chunk of a larger document",
     )
 
+    # Classification
+    category: str | None = Field(
+        default=None,
+        description="Article category (e.g. Shipping, Returns, Product Info)",
+    )
+    status: str = Field(
+        default="draft",
+        description="Article status: published | draft | archived",
+    )
+
     # Lifecycle
     is_active: bool = Field(default=True, description="Whether entry is searchable")
     created_at: str = Field(description="Creation timestamp")
@@ -697,6 +710,14 @@ class QuickActionPageAssignment(BaseModel):
         default=None,
         description="Quick action ID for slot 2 (right/bottom button)",
     )
+    auto_open: bool = Field(
+        default=False,
+        description="Whether the quick action auto-opens on this page type",
+    )
+    auto_open_delay_ms: int = Field(
+        default=3000,
+        description="Delay in milliseconds before auto-opening (0 = immediate)",
+    )
 
 
 # ---------------------------------------------------------------------------
@@ -713,6 +734,8 @@ class PreferencesDocument(BaseModel):
 
     Partition key: /tenant_id
     """
+
+    model_config = ConfigDict(extra="allow")
 
     id: str = Field(description="Document ID (= tenant_id:version)")
     tenant_id: str = Field(description="Partition key")

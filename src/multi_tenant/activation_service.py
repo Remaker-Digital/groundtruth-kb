@@ -302,7 +302,9 @@ class ActivationService:
                         "activated_by": None,
                     })
 
-                    await self._prefs_repo.create(tenant_id, base_config)
+                    await self._prefs_repo.create(
+                        tenant_id, PreferencesDocument(**base_config),
+                    )
 
                     logger.info(
                         "Created draft v%d for tenant=%s from active v%d with %d changes",
@@ -389,10 +391,10 @@ class ActivationService:
 
         Hard blocks (activation fails):
             - brand_name is non-empty
+            - brand_voice is non-empty
             - widget_key exists
 
         Warnings (activation proceeds):
-            - brand_voice not explicitly set (defaults to 'friendly')
             - fewer than 1 published KB article
         """
         draft = await self._prefs_repo.get_draft(tenant_id)
@@ -423,12 +425,12 @@ class ActivationService:
                 "page": "system",
             })
 
-        # Warning: brand_voice
+        # Hard block: brand_voice (mandatory — session 21)
         brand_voice = draft.get("brand_voice")
         if not brand_voice or not str(brand_voice).strip():
-            warnings.append({
+            hard_errors.append({
                 "field": "brand_voice",
-                "message": "Brand voice is not set — will default to 'friendly'",
+                "message": "Brand voice is required before activation",
                 "page": "agent-configuration",
             })
 
@@ -537,6 +539,7 @@ class ActivationService:
                     )
 
                 # Step 3: Promote draft → 'active'
+                # Clear deactivated_at so widget becomes live immediately.
                 await self._prefs_repo.patch(
                     tenant_id=tenant_id,
                     document_id=draft["id"],
@@ -545,6 +548,7 @@ class ActivationService:
                         {"op": "set", "path": "/is_current", "value": True},
                         {"op": "set", "path": "/activated_at", "value": now},
                         {"op": "set", "path": "/activated_by", "value": actor},
+                        {"op": "set", "path": "/deactivated_at", "value": None},
                     ],
                 )
 
@@ -647,6 +651,7 @@ class ActivationService:
                     )
 
                 # Promote previous → active
+                # Clear deactivated_at so widget becomes live immediately.
                 await self._prefs_repo.patch(
                     tenant_id=tenant_id,
                     document_id=previous["id"],
@@ -655,6 +660,7 @@ class ActivationService:
                         {"op": "set", "path": "/is_current", "value": True},
                         {"op": "set", "path": "/activated_at", "value": now},
                         {"op": "set", "path": "/activated_by", "value": f"restore:{actor}"},
+                        {"op": "set", "path": "/deactivated_at", "value": None},
                     ],
                 )
 
@@ -709,9 +715,16 @@ class ActivationService:
         tenant_id: str,
         actor: str = "admin",
     ) -> bool:
-        """Discard the current draft (mark as discarded).
+        """Discard the current draft (revert to active or reset to initial).
 
-        Returns True if a draft was found and discarded.
+        If an active config exists, the draft is simply removed (set to
+        ``config_state='discarded'``).  The active config remains live.
+
+        If the tenant has **never been activated** (no active document),
+        the draft is reset to its initial empty state so the tenant stays
+        in "Pending" rather than entering a limbo state with no documents.
+
+        Returns True if a draft was found and handled.
         """
         if not self._is_configured:
             return False
@@ -721,20 +734,60 @@ class ActivationService:
             if draft is None:
                 return False
 
-            await self._prefs_repo.patch(
-                tenant_id=tenant_id,
-                document_id=draft["id"],
-                operations=[
-                    {"op": "set", "path": "/config_state", "value": "discarded"},
-                    {"op": "set", "path": "/is_current", "value": False},
-                ],
-            )
+            active = await self._prefs_repo.get_active(tenant_id)
 
-            logger.info(
-                "Discarded draft v%d for tenant=%s",
-                draft.get("version", 0),
-                tenant_id[:8],
-            )
+            if active is not None:
+                # Normal case: active config exists — discard the draft
+                await self._prefs_repo.patch(
+                    tenant_id=tenant_id,
+                    document_id=draft["id"],
+                    operations=[
+                        {"op": "set", "path": "/config_state", "value": "discarded"},
+                        {"op": "set", "path": "/is_current", "value": False},
+                    ],
+                )
+                logger.info(
+                    "Discarded draft v%d for tenant=%s (active exists)",
+                    draft.get("version", 0),
+                    tenant_id[:8],
+                )
+            else:
+                # Never-activated tenant: reset draft to initial empty state
+                # so the tenant stays in "Pending" (draft exists, mandatory
+                # fields empty).  We clear user-editable fields back to
+                # defaults while keeping the document structure.
+                reset_ops = [
+                    # Merchant-configurable fields — reset to empty
+                    # (must match seed_tenant.py Phase 3 defaults)
+                    {"op": "set", "path": "/brand_name", "value": ""},
+                    {"op": "set", "path": "/brand_voice", "value": ""},
+                    {"op": "set", "path": "/brand_tagline", "value": ""},
+                    {"op": "set", "path": "/custom_instructions", "value": ""},
+                    {"op": "set", "path": "/return_policy", "value": ""},
+                    {"op": "set", "path": "/shipping_info", "value": ""},
+                    {"op": "set", "path": "/escalation_keywords", "value": []},
+                    {"op": "set", "path": "/escalation_email", "value": None},
+                    {"op": "set", "path": "/greeting_message", "value": None},
+                    {"op": "set", "path": "/greeting_follow_up", "value": ""},
+                    {"op": "set", "path": "/farewell_message", "value": None},
+                    {"op": "set", "path": "/warranty_info", "value": None},
+                    {"op": "set", "path": "/support_hours", "value": None},
+                    {"op": "set", "path": "/custom_policies", "value": None},
+                    {"op": "set", "path": "/widget_greeting_message", "value": ""},
+                    # Activation metadata
+                    {"op": "set", "path": "/activated_at", "value": None},
+                    {"op": "set", "path": "/activated_by", "value": None},
+                ]
+                await self._prefs_repo.patch(
+                    tenant_id=tenant_id,
+                    document_id=draft["id"],
+                    operations=reset_ops,
+                )
+                logger.info(
+                    "Reset draft to initial state for tenant=%s (never activated)",
+                    tenant_id[:8],
+                )
+
             return True
         except Exception as exc:
             logger.error(

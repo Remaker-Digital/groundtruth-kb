@@ -206,11 +206,11 @@ const HoverButton: React.FC<{
     },
     outline: {
       base: { ...btnBase, border: '1px solid #272727', background: 'transparent', color: '#A0A0A0' },
-      hover: { background: '#272727', borderColor: '#3a3a3a' },
+      hover: { background: '#272727' },
     },
     danger: {
       base: { ...btnBase, border: '1px solid #D32F2F44', background: 'transparent', color: '#D32F2F' },
-      hover: { background: '#D32F2F18', borderColor: '#D32F2F66' },
+      hover: { background: '#D32F2F18' },
     },
   };
 

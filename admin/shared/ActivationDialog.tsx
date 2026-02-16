@@ -36,6 +36,12 @@ interface DraftState {
   active_config: Record<string, unknown>;
 }
 
+interface PreflightResult {
+  can_activate: boolean;
+  hard_errors: Array<{ field: string; message: string; page?: string }>;
+  warnings: Array<{ field: string; message: string; page?: string }>;
+}
+
 interface ActivateResult {
   success: boolean;
   version: number;
@@ -54,6 +60,18 @@ interface ActivationDialogProps {
 // ---------------------------------------------------------------------------
 // Field grouping
 // ---------------------------------------------------------------------------
+
+/** Map page slugs from preflight validation to human-readable labels. */
+function pageLabel(page: string): string {
+  const map: Record<string, string> = {
+    'agent-configuration': 'Agent configuration',
+    'knowledge-base': 'Knowledge base',
+    'quick-actions': 'Quick actions',
+    'widget-configuration': 'Widget configuration',
+    'system': 'System',
+  };
+  return map[page] ?? page.replace(/-/g, ' ').replace(/\b\w/g, c => c.toUpperCase());
+}
 
 /** Map config field prefixes to human-readable group names. */
 function groupField(field: string): string {
@@ -79,21 +97,25 @@ export default function ActivationDialog({
   onSuccess,
 }: ActivationDialogProps) {
   const [draft, setDraft] = useState<DraftState | null>(null);
+  const [preflight, setPreflight] = useState<PreflightResult | null>(null);
   const [loading, setLoading] = useState(true);
   const [activating, setActivating] = useState(false);
   const [confirmed, setConfirmed] = useState(false);
   const [activateErrors, setActivateErrors] = useState<Array<{ field: string; message: string }>>([]);
   const [activateWarnings, setActivateWarnings] = useState<Array<{ field: string; message: string }>>([]);
 
-  // Fetch draft state on mount
+  // Fetch draft state + preflight validation on mount (D35: show errors immediately)
   useEffect(() => {
     let cancelled = false;
     (async () => {
       try {
-        const res = await apiFetch('/api/config/draft');
-        if (res.ok && !cancelled) {
-          const data: DraftState = await res.json();
-          setDraft(data);
+        const [draftRes, preflightRes] = await Promise.all([
+          apiFetch('/api/config/draft'),
+          apiFetch('/api/config/draft/preflight'),
+        ]);
+        if (!cancelled) {
+          if (draftRes.ok) setDraft(await draftRes.json());
+          if (preflightRes.ok) setPreflight(await preflightRes.json());
         }
       } catch {
         // handled
@@ -160,78 +182,96 @@ export default function ActivationDialog({
 
         {/* Content */}
         <div style={bodyStyle}>
-          {loading && <div style={loadingStyle}>Loading draft state…</div>}
+          {loading && <div style={loadingStyle}>Loading…</div>}
 
-          {!loading && !draft?.has_pending_changes && (
-            <div style={emptyStyle}>No pending changes to activate.</div>
+          {/* D35: Preflight hard errors — shown immediately on dialog open */}
+          {!loading && preflight && preflight.hard_errors.length > 0 && (
+            <div style={errorSectionStyle}>
+              <h3 style={{ ...sectionTitleStyle, color: '#ff4444' }}>
+                Required before activation
+              </h3>
+              <div style={{ ...summaryStyle, marginBottom: '12px' }}>
+                The following fields must be configured before your AI assistant can go live:
+              </div>
+              {preflight.hard_errors.map((e, i) => (
+                <div key={i} style={errorItemStyle}>
+                  <strong>{e.page ? pageLabel(e.page) : e.field}:</strong> {e.message}
+                </div>
+              ))}
+            </div>
           )}
 
-          {!loading && draft?.has_pending_changes && (
-            <>
-              {/* Change summary */}
-              <div style={sectionStyle}>
-                <h3 style={sectionTitleStyle}>Changes to activate</h3>
-                <div style={summaryStyle}>
-                  {draft.changed_fields.length} field{draft.changed_fields.length !== 1 ? 's' : ''} changed
-                  {draft.draft_version != null && ` (draft v${draft.draft_version})`}
+          {/* Preflight warnings */}
+          {!loading && preflight && preflight.warnings.length > 0 && (
+            <div style={warningSectionStyle}>
+              <h3 style={{ ...sectionTitleStyle, color: '#ffaa00' }}>
+                Recommendations
+              </h3>
+              {preflight.warnings.map((w, i) => (
+                <div key={i} style={warningItemStyle}>
+                  <strong>{w.page ? pageLabel(w.page) : w.field}:</strong> {w.message}
                 </div>
+              ))}
+            </div>
+          )}
 
-                {Object.entries(groups).map(([group, fields]) => (
-                  <div key={group} style={groupStyle}>
-                    <div style={groupLabelStyle}>{group}</div>
-                    <div style={fieldListStyle}>
-                      {fields.map(f => (
-                        <span key={f} style={fieldChipStyle}>
-                          {f.replace(/_/g, ' ')}
-                        </span>
-                      ))}
-                    </div>
-                  </div>
-                ))}
+          {/* Change summary — only when there are pending changes AND no hard errors */}
+          {!loading && draft?.has_pending_changes && preflight?.can_activate && (
+            <div style={sectionStyle}>
+              <h3 style={sectionTitleStyle}>Changes to activate</h3>
+              <div style={summaryStyle}>
+                {draft.changed_fields.length} field{draft.changed_fields.length !== 1 ? 's' : ''} changed
+                {draft.draft_version != null && ` (draft v${draft.draft_version})`}
               </div>
 
-              {/* Validation errors */}
-              {activateErrors.length > 0 && (
-                <div style={errorSectionStyle}>
-                  <h3 style={{ ...sectionTitleStyle, color: '#ff4444' }}>
-                    ✕ Activation blocked
-                  </h3>
-                  {activateErrors.map((e, i) => (
-                    <div key={i} style={errorItemStyle}>
-                      <strong>{e.field}:</strong> {e.message}
-                    </div>
-                  ))}
+              {Object.entries(groups).map(([group, fields]) => (
+                <div key={group} style={groupStyle}>
+                  <div style={groupLabelStyle}>{group}</div>
+                  <div style={fieldListStyle}>
+                    {fields.map(f => (
+                      <span key={f} style={fieldChipStyle}>
+                        {f.replace(/_/g, ' ')}
+                      </span>
+                    ))}
+                  </div>
                 </div>
-              )}
+              ))}
+            </div>
+          )}
 
-              {/* Warnings */}
-              {activateWarnings.length > 0 && (
-                <div style={warningSectionStyle}>
-                  <h3 style={{ ...sectionTitleStyle, color: '#ffaa00' }}>
-                    ⚠ Warnings
-                  </h3>
-                  {activateWarnings.map((w, i) => (
-                    <div key={i} style={warningItemStyle}>
-                      <strong>{w.field}:</strong> {w.message}
-                    </div>
-                  ))}
+          {/* Post-activate errors (from actual activation attempt) */}
+          {activateErrors.length > 0 && (
+            <div style={errorSectionStyle}>
+              <h3 style={{ ...sectionTitleStyle, color: '#ff4444' }}>
+                Activation blocked
+              </h3>
+              {activateErrors.map((e, i) => (
+                <div key={i} style={errorItemStyle}>
+                  <strong>{e.field}:</strong> {e.message}
                 </div>
-              )}
+              ))}
+            </div>
+          )}
 
-              {/* Confirmation step */}
-              {confirmed && activateErrors.length === 0 && (
-                <div style={confirmSectionStyle}>
-                  Are you sure you want to activate these changes? This will make them live immediately.
-                </div>
-              )}
-            </>
+          {/* No changes and no errors */}
+          {!loading && !draft?.has_pending_changes && preflight?.can_activate && (
+            <div style={emptyStyle}>Configuration is up to date — no changes to activate.</div>
+          )}
+
+          {/* Confirmation step */}
+          {confirmed && preflight?.can_activate && activateErrors.length === 0 && (
+            <div style={confirmSectionStyle}>
+              Are you sure you want to activate these changes? This will make them live immediately.
+            </div>
           )}
         </div>
 
         {/* Footer */}
         <div style={footerStyle}>
-          <button onClick={onClose} style={cancelButtonStyle}>Cancel</button>
-          {!confirmed ? (
+          <button onClick={onClose} style={cancelButtonStyle}>
+            {preflight && !preflight.can_activate ? 'Close' : 'Cancel'}
+          </button>
+          {preflight?.can_activate && !confirmed ? (
             <button
               onClick={() => setConfirmed(true)}
               disabled={loading || !draft?.has_pending_changes}
@@ -242,7 +282,7 @@ export default function ActivationDialog({
             >
               Activate now
             </button>
-          ) : (
+          ) : preflight?.can_activate && confirmed ? (
             <button
               onClick={handleActivate}
               disabled={activating}
@@ -253,7 +293,7 @@ export default function ActivationDialog({
             >
               {activating ? 'Activating…' : 'Yes, activate'}
             </button>
-          )}
+          ) : null}
         </div>
       </div>
     </div>

@@ -393,7 +393,9 @@ class TenantScopedRepository:
         items: list[dict[str, Any]] = []
         kwargs: dict[str, Any] = {
             "query": query_text,
-            "enable_cross_partition_query": True,
+            # Note: In azure-cosmos >=4.9, omitting partition_key
+            # automatically enables cross-partition queries. The older
+            # enable_cross_partition_query kwarg was removed in 4.14+.
         }
         if parameters:
             kwargs["parameters"] = parameters
@@ -989,6 +991,7 @@ class ConversationRepository(TenantScopedRepository):
             "total": 0, "billable": 0, "avg_turns": 0,
             "avg_messages": 0, "escalated": 0,
             "critic_passed": 0, "critic_failed": 0,
+            "avg_response_time": 0, "customer_satisfaction": 0,
         }
 
     async def list_agents_invoked(
@@ -2481,7 +2484,6 @@ class AuditLogRepository(PlatformScopedRepository):
         async for item in self._container.query_items(
             query=query_text,
             parameters=params,
-            enable_cross_partition_query=True,
         ):
             items.append(item)
 
@@ -2519,7 +2521,6 @@ class AuditLogRepository(PlatformScopedRepository):
         async for item in self._container.query_items(
             query=query_text,
             parameters=params,
-            enable_cross_partition_query=True,
         ):
             return item  # COUNT returns a single integer value
 

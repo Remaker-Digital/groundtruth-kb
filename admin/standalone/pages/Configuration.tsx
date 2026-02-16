@@ -3,16 +3,14 @@
 /**
  * Configuration page — Standalone admin.
  *
- * Two-column Mantine v7 layout adapted from the prototype ConfigurationPage.
- * Left column: 5 form sections (Brand & Persona, Policies, Escalation,
- * Custom Instructions, Language).
- * Right column: Preview card showing sample AI response.
+ * Mantine v7 layout with 5 form sections (Brand & Persona, Policies,
+ * Escalation, Custom Instructions, Language).
  *
- * Data flows through useConfig / useUpdateConfig hooks instead of mock data.
- * Defensive Rollout section removed (no rollout API at launch).
+ * Data flows through useConfig / useUpdateConfig hooks. Save creates a
+ * draft; the Activate/Discard/Roll-back controls live in the sidebar.
  */
 
-import React, { useState, useMemo, useEffect, useRef } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import {
   Paper,
   TextInput,
@@ -27,8 +25,6 @@ import {
   Title,
   Text,
   Badge,
-  Grid,
-  Box,
   Loader,
   Alert,
   Switch,
@@ -38,8 +34,7 @@ import {
   useComputedColorScheme,
 } from '@mantine/core';
 import { useAppContext } from '../layouts/StandaloneLayout';
-import { useConfig, useUpdateConfig, useConfigVersions, useNamedConfigs, useSaveNamedConfig, useActivateNamedConfig, useDeleteNamedConfig } from '../../shared/hooks/index';
-import type { NamedConfigSummary } from '../../shared/hooks/index';
+import { useConfig, useUpdateConfig } from '../../shared/hooks/index';
 import { HelpTooltip } from '../../shared/HelpTooltip';
 
 const DOCS_BASE = 'https://agentredcx.com/docs/admin-guide';
@@ -120,15 +115,22 @@ function defaultEscalationCategories(): EscalationCategoriesState {
   return result;
 }
 
+/** Primary language options — only languages with full support. */
+const PRIMARY_LANGUAGES = [
+  { value: 'en', label: 'English' },
+];
+
+/** Supported languages — English (available), Spanish/French (coming soon),
+ *  others planned for the future. */
 const LANGUAGES = [
   { value: 'en', label: 'English' },
-  { value: 'es', label: 'Spanish' },
-  { value: 'fr', label: 'French' },
-  { value: 'de', label: 'German' },
-  { value: 'pt', label: 'Portuguese' },
-  { value: 'ja', label: 'Japanese' },
-  { value: 'zh', label: 'Chinese' },
-  { value: 'ko', label: 'Korean' },
+  { value: 'es', label: 'Spanish (coming soon)' },
+  { value: 'fr', label: 'French (coming soon)' },
+  { value: 'de', label: 'German (planned)', disabled: true },
+  { value: 'pt', label: 'Portuguese (planned)', disabled: true },
+  { value: 'ja', label: 'Japanese (planned)', disabled: true },
+  { value: 'zh', label: 'Chinese (planned)', disabled: true },
+  { value: 'ko', label: 'Korean (planned)', disabled: true },
 ];
 
 // ---------------------------------------------------------------------------
@@ -213,70 +215,9 @@ const ResetIcon = () => (
   </svg>
 );
 
-const TrashIcon = () => (
-  <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-    <polyline points="3 6 5 6 21 6" /><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2" />
-  </svg>
-);
-
-const BookmarkIcon = () => (
-  <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-    <path d="m19 21-7-4-7 4V5a2 2 0 0 1 2-2h10a2 2 0 0 1 2 2z" />
-  </svg>
-);
-
-const CheckCircleIcon = () => (
-  <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-    <path d="M22 11.08V12a10 10 0 1 1-5.93-9.14" /><polyline points="22 4 12 14.01 9 11.01" />
-  </svg>
-);
-
-// ---------------------------------------------------------------------------
-// Preview response generator
-// ---------------------------------------------------------------------------
-
-function getPreviewResponse(formality: string, responseLength: string, brandName: string): string {
-  const name = brandName || 'the store';
-  const styles: Record<string, Record<string, string>> = {
-    casual: {
-      concise: `Hey! Your ${name} order ships in 2-3 days. Need anything else?`,
-      moderate: `Hey there! Great news - your ${name} order is being prepared and will ship within 2-3 business days. You'll get a tracking email as soon as it's on its way. Let me know if there's anything else I can help with!`,
-      detailed: `Hey there! Thanks for reaching out about your order. Here's what's happening: your ${name} order is currently being packed up by our team and should ship within 2-3 business days. Once it ships, you'll get a tracking email with all the details so you can follow along. Standard delivery usually takes about 5-7 business days after that. If you need it faster, I can look into express options for you. Anything else on your mind?`,
-    },
-    professional: {
-      concise: `Your ${name} order will ship within 2-3 business days. You'll receive tracking via email.`,
-      moderate: `Thank you for your inquiry. Your ${name} order is being processed and will ship within 2-3 business days. You will receive a tracking confirmation email once the shipment is dispatched. Please don't hesitate to reach out if you need any further assistance.`,
-      detailed: `Thank you for contacting ${name} support. I'd be happy to help with your order status.\n\nYour order is currently in our processing queue and will ship within 2-3 business days. Once dispatched, you will receive a tracking confirmation email with carrier details and an estimated delivery date. Standard delivery typically takes 5-7 business days.\n\nIf you require expedited shipping, I can explore available options for your location. Is there anything else I can assist you with?`,
-    },
-    formal: {
-      concise: `Your ${name} order is scheduled for dispatch within 2-3 business days. Tracking details will be provided via email.`,
-      moderate: `We appreciate your inquiry regarding your ${name} order. We are pleased to confirm that your order is currently being prepared for dispatch and will be shipped within 2-3 business days. A tracking confirmation will be sent to your registered email address upon dispatch. Should you require any additional assistance, please do not hesitate to contact us.`,
-      detailed: `Dear valued customer,\n\nThank you for contacting ${name} customer support. We appreciate your patience and are pleased to provide the following update regarding your order.\n\nYour order is currently in the fulfillment stage of our processing workflow and is scheduled for dispatch within 2-3 business days. Upon dispatch, a comprehensive tracking confirmation, including carrier information and estimated delivery timeline, will be forwarded to your registered email address.\n\nStandard delivery is estimated at 5-7 business days from the date of dispatch. Should you wish to explore expedited shipping arrangements, we would be happy to present the available options.\n\nPlease do not hesitate to contact us should you require any further assistance.`,
-    },
-  };
-
-  return styles[formality]?.[responseLength] || styles.professional.moderate;
-}
-
 // ---------------------------------------------------------------------------
 // Helpers
 // ---------------------------------------------------------------------------
-
-/** Format a date string as a short date-stamp (WI #267). */
-function formatConfigDate(dateStr: string | null | undefined): string {
-  if (!dateStr) return '--';
-  try {
-    return new Date(dateStr).toLocaleDateString('en-US', {
-      month: 'short',
-      day: 'numeric',
-      year: 'numeric',
-      hour: '2-digit',
-      minute: '2-digit',
-    });
-  } catch {
-    return dateStr;
-  }
-}
 
 /** Safely cast a config record value to string. */
 function str(val: unknown, fallback = ''): string {
@@ -319,24 +260,29 @@ function parseEscalationCategories(raw: unknown): EscalationCategoriesState {
   return defaults;
 }
 
+/** Read a config value trying snake_case first, then camelCase fallback. */
+function cfgVal(cfg: Record<string, unknown>, snake: string, camel: string): unknown {
+  return cfg[snake] !== undefined ? cfg[snake] : cfg[camel];
+}
+
 /** Build form state from the raw config record. */
 function configToForm(cfg: Record<string, unknown> | undefined | null): ConfigFormState {
   if (!cfg) return { ...DEFAULTS, escalationCategories: defaultEscalationCategories() };
   return {
-    brandName: str(cfg.brandName, DEFAULTS.brandName),
-    brandVoice: str(cfg.brandVoice, DEFAULTS.brandVoice),
-    formality: str(cfg.formality, DEFAULTS.formality),
-    responseLength: str(cfg.responseLength, DEFAULTS.responseLength),
-    returnWindow: num(cfg.returnWindow, DEFAULTS.returnWindow),
-    refundPolicy: str(cfg.refundPolicy, DEFAULTS.refundPolicy),
-    shippingPolicy: str(cfg.shippingPolicy, DEFAULTS.shippingPolicy),
-    escalationThreshold: num(cfg.escalationThreshold, DEFAULTS.escalationThreshold),
-    escalationCategories: parseEscalationCategories(cfg.escalationCategories),
-    idleTimeoutMinutes: num(cfg.idleTimeoutMinutes, DEFAULTS.idleTimeoutMinutes),
-    maxTurns: num(cfg.maxTurns, DEFAULTS.maxTurns),
-    customInstructions: str(cfg.customInstructions, DEFAULTS.customInstructions),
-    primaryLanguage: str(cfg.primaryLanguage, DEFAULTS.primaryLanguage),
-    supportedLanguages: strArr(cfg.supportedLanguages, DEFAULTS.supportedLanguages),
+    brandName: str(cfgVal(cfg, 'brand_name', 'brandName'), DEFAULTS.brandName),
+    brandVoice: str(cfgVal(cfg, 'brand_voice', 'brandVoice'), DEFAULTS.brandVoice),
+    formality: str(cfgVal(cfg, 'formality_level', 'formality'), DEFAULTS.formality),
+    responseLength: str(cfgVal(cfg, 'response_length', 'responseLength'), DEFAULTS.responseLength),
+    returnWindow: num(cfgVal(cfg, 'return_window', 'returnWindow'), DEFAULTS.returnWindow),
+    refundPolicy: str(cfgVal(cfg, 'return_policy', 'refundPolicy'), DEFAULTS.refundPolicy),
+    shippingPolicy: str(cfgVal(cfg, 'shipping_info', 'shippingPolicy'), DEFAULTS.shippingPolicy),
+    escalationThreshold: num(cfgVal(cfg, 'escalation_threshold', 'escalationThreshold'), DEFAULTS.escalationThreshold),
+    escalationCategories: parseEscalationCategories(cfg.escalation_categories ?? cfg.escalationCategories),
+    idleTimeoutMinutes: num(cfgVal(cfg, 'idle_timeout_minutes', 'idleTimeoutMinutes'), DEFAULTS.idleTimeoutMinutes),
+    maxTurns: num(cfgVal(cfg, 'max_ai_turns_before_escalation', 'maxTurns'), DEFAULTS.maxTurns),
+    customInstructions: str(cfgVal(cfg, 'custom_instructions', 'customInstructions'), DEFAULTS.customInstructions),
+    primaryLanguage: str(cfgVal(cfg, 'primary_language', 'primaryLanguage'), DEFAULTS.primaryLanguage),
+    supportedLanguages: strArr(cfgVal(cfg, 'additional_languages', 'supportedLanguages'), DEFAULTS.supportedLanguages),
   };
 }
 
@@ -358,15 +304,34 @@ function escalationCategoriesEqual(a: EscalationCategoriesState, b: EscalationCa
 }
 
 /** Compute fields that differ between two form states. */
+/** Map camelCase form keys to snake_case backend field names. */
+const FORM_TO_BACKEND: Record<string, string> = {
+  brandName: 'brand_name',
+  brandVoice: 'brand_voice',
+  formality: 'formality_level',
+  responseLength: 'response_length',
+  returnWindow: 'return_window',
+  refundPolicy: 'return_policy',
+  shippingPolicy: 'shipping_info',
+  escalationThreshold: 'escalation_threshold',
+  escalationCategories: 'escalation_categories',
+  idleTimeoutMinutes: 'idle_timeout_minutes',
+  maxTurns: 'max_ai_turns_before_escalation',
+  customInstructions: 'custom_instructions',
+  primaryLanguage: 'primary_language',
+  supportedLanguages: 'additional_languages',
+};
+
 function diffForm(
   original: ConfigFormState,
   current: ConfigFormState,
 ): Record<string, unknown> {
   const changes: Record<string, unknown> = {};
   for (const key of Object.keys(current) as Array<keyof ConfigFormState>) {
+    const backendKey = FORM_TO_BACKEND[key] || key;
     if (key === 'escalationCategories') {
       if (!escalationCategoriesEqual(original.escalationCategories, current.escalationCategories)) {
-        changes[key] = current.escalationCategories;
+        changes[backendKey] = current.escalationCategories;
       }
       continue;
     }
@@ -374,10 +339,10 @@ function diffForm(
     const curVal = current[key];
     if (Array.isArray(origVal) && Array.isArray(curVal)) {
       if (origVal.length !== curVal.length || origVal.some((v, i) => v !== curVal[i])) {
-        changes[key] = curVal;
+        changes[backendKey] = curVal;
       }
     } else if (origVal !== curVal) {
-      changes[key] = curVal;
+      changes[backendKey] = curVal;
     }
   }
   return changes;
@@ -390,11 +355,10 @@ function diffForm(
 export const ConfigurationPage: React.FC = () => {
   const { apiFetch, onNotify, refreshActivationStatus } = useAppContext();
   const configResult = useConfig(apiFetch);
-  const { updateConfig: saveConfig, loading: saving, error: saveError } = useUpdateConfig(apiFetch);
+  const { updateConfig: saveConfig, loading: saving, error: saveError, clearError: clearSaveError } = useUpdateConfig(apiFetch);
 
   const computedColorScheme = useComputedColorScheme('dark');
   const isDark = computedColorScheme === 'dark';
-  const previewBg = isDark ? 'rgba(255,255,255,0.04)' : '#f8f9fa';
 
   // Form state
   const [form, setForm] = useState<ConfigFormState>({ ...DEFAULTS });
@@ -407,55 +371,6 @@ export const ConfigurationPage: React.FC = () => {
   const [expandedCategories, setExpandedCategories] = useState<Record<string, boolean>>({});
   // Keyword input buffers (one per category)
   const [keywordInputs, setKeywordInputs] = useState<Record<string, string>>({});
-
-  // ---- Named Config state (WI #265-267) -----------------------------------
-  const namedConfigs = useNamedConfigs(apiFetch);
-  const { saveNamed, loading: savingNamed, error: saveNamedError } = useSaveNamedConfig(apiFetch);
-  const { activateNamed, loading: activatingNamed, error: activateNamedError } = useActivateNamedConfig(apiFetch);
-  const { deleteNamed, loading: deletingNamed, error: deleteNamedError } = useDeleteNamedConfig(apiFetch);
-
-  const [showSaveDialog, setShowSaveDialog] = useState(false);
-  const [saveConfigName, setSaveConfigName] = useState('');
-  const [confirmDeleteName, setConfirmDeleteName] = useState<string | null>(null);
-
-  const handleSaveNamed = async () => {
-    const name = saveConfigName.trim();
-    if (!name) {
-      onNotify('Enter a name for this configuration.', 'warning');
-      return;
-    }
-    const result = await saveNamed(name);
-    if (result) {
-      onNotify(`Configuration saved as "${name}".`, 'success');
-      setSaveConfigName('');
-      setShowSaveDialog(false);
-      namedConfigs.refetch();
-    } else {
-      onNotify(saveNamedError || 'Failed to save named configuration.', 'error');
-    }
-  };
-
-  const handleActivateNamed = async (name: string) => {
-    const result = await activateNamed(name);
-    if (result) {
-      onNotify(`"${name}" is now the active configuration.`, 'success');
-      namedConfigs.refetch();
-      configResult.refetch();
-    } else {
-      onNotify(activateNamedError || 'Failed to activate configuration.', 'error');
-    }
-  };
-
-  const handleDeleteNamed = async (name: string) => {
-    const ok = await deleteNamed(name);
-    if (ok) {
-      onNotify(`Deleted configuration "${name}".`, 'success');
-      setConfirmDeleteName(null);
-      namedConfigs.refetch();
-    } else {
-      onNotify(deleteNamedError || 'Failed to delete configuration.', 'error');
-    }
-  };
 
   // Initialize form from loaded config
   useEffect(() => {
@@ -548,12 +463,6 @@ export const ConfigurationPage: React.FC = () => {
     }
   };
 
-  // Preview text
-  const previewText = useMemo(
-    () => getPreviewResponse(form.formality, form.responseLength, form.brandName),
-    [form.formality, form.responseLength, form.brandName],
-  );
-
   // Loading state
   if (configResult.loading && !configResult.data) {
     return (
@@ -579,46 +488,22 @@ export const ConfigurationPage: React.FC = () => {
   return (
     <Stack gap="lg">
       {/* Page header with action buttons */}
-      <Group justify="space-between" align="flex-start" wrap="wrap">
-        <div>
-          <Title order={2}>Agent configuration</Title>
-          <Text c="dimmed" size="sm">
-            Fine-tune your AI agent's behavior
-          </Text>
-        </div>
-        <Group gap="sm">
-          <Button
-            variant="default"
-            leftSection={<UndoIcon />}
-            disabled={!hasChanges || saving}
-            onClick={handleDiscard}
-          >
-            Discard
-          </Button>
-          <Button
-            color={BRAND_RED}
-            leftSection={<SaveIcon />}
-            disabled={!hasChanges}
-            loading={saving}
-            onClick={handleSave}
-          >
-            Save changes
-          </Button>
-        </Group>
-      </Group>
+      <div>
+        <Title order={2}>Agent configuration</Title>
+        <Text c="dimmed" size="sm">
+          Fine-tune your AI agent's behavior
+        </Text>
+      </div>
 
       {/* Save error banner */}
       {saveError && (
-        <Alert color="red" variant="light" title="Save failed" withCloseButton onClose={() => {}}>
+        <Alert color="red" variant="light" title="Save failed" withCloseButton onClose={clearSaveError}>
           <Text size="sm">{saveError}</Text>
         </Alert>
       )}
 
-      {/* Two-column layout */}
-      <Grid gutter="lg">
-        {/* Left column: Configuration form */}
-        <Grid.Col span={{ base: 12, lg: 7 }}>
-          <Stack gap="lg">
+      {/* Configuration form */}
+      <Stack gap="lg">
             {/* Brand & Persona */}
             <Paper p="lg" radius="md" withBorder>
               <Text fw={600} mb="md">Brand & persona <HelpTooltip text="Set your AI agent's name, greeting, personality tone, and formality level." docLink={`${DOCS_BASE}/brand-and-tone`} /></Text>
@@ -637,6 +522,7 @@ export const ConfigurationPage: React.FC = () => {
                   onChange={(e) => updateField('brandVoice', e.currentTarget.value)}
                   minRows={3}
                   autosize
+                  required
                 />
                 <Group grow>
                   <Select
@@ -900,7 +786,7 @@ export const ConfigurationPage: React.FC = () => {
               <Stack gap="md">
                 <Select
                   label="Primary language"
-                  data={LANGUAGES}
+                  data={PRIMARY_LANGUAGES}
                   value={form.primaryLanguage}
                   onChange={(val) => updateField('primaryLanguage', val || 'en')}
                 />
@@ -925,209 +811,20 @@ export const ConfigurationPage: React.FC = () => {
               </Stack>
             </Paper>
 
-            {/* Saved configurations (WI #265-267) */}
-            <Paper p="lg" radius="md" withBorder>
-              <Group justify="space-between" mb="xs">
-                <Text fw={600}>Saved configurations <HelpTooltip text="Save named snapshots of your configuration to compare, revert, or switch between setups." docLink={`${DOCS_BASE}/save-and-activate`} /></Text>
-                <Button
-                  size="xs"
-                  variant="light"
-                  color={BRAND_RED}
-                  leftSection={<BookmarkIcon />}
-                  onClick={() => setShowSaveDialog(true)}
-                >
-                  Save current
-                </Button>
-              </Group>
-              <Text size="xs" c="dimmed" mb="md">
-                Save named snapshots of your current settings. Activate a saved
-                configuration to apply it instantly.
-              </Text>
-
-              {/* Save dialog */}
-              {showSaveDialog && (
-                <Paper
-                  p="sm"
-                  radius="sm"
-                  mb="md"
-                  style={{
-                    backgroundColor: isDark ? '#141414' : '#f8f9fa',
-                    border: `1px solid ${isDark ? '#272727' : '#dee2e6'}`,
-                  }}
-                >
-                  <Group gap="sm" wrap="nowrap">
-                    <TextInput
-                      size="xs"
-                      placeholder="Configuration name (e.g. Holiday mode)"
-                      value={saveConfigName}
-                      onChange={(e) => setSaveConfigName(e.currentTarget.value)}
-                      onKeyDown={(e) => {
-                        if (e.key === 'Enter') handleSaveNamed();
-                        if (e.key === 'Escape') { setShowSaveDialog(false); setSaveConfigName(''); }
-                      }}
-                      style={{ flex: 1 }}
-                      autoFocus
-                    />
-                    <Button
-                      size="xs"
-                      color={BRAND_RED}
-                      onClick={handleSaveNamed}
-                      loading={savingNamed}
-                    >
-                      Save
-                    </Button>
-                    <Button
-                      size="xs"
-                      variant="default"
-                      onClick={() => { setShowSaveDialog(false); setSaveConfigName(''); }}
-                    >
-                      Cancel
-                    </Button>
-                  </Group>
-                </Paper>
-              )}
-
-              {/* Config list */}
-              {namedConfigs.loading && !namedConfigs.data ? (
-                <Text size="xs" c="dimmed">Loading...</Text>
-              ) : (namedConfigs.data?.configs ?? []).length === 0 ? (
-                <Text size="xs" c="dimmed" ta="center" py="md">
-                  No saved configurations yet.
-                </Text>
-              ) : (
-                <Stack gap={6}>
-                  {(namedConfigs.data?.configs ?? []).map((cfg: NamedConfigSummary) => (
-                    <Paper
-                      key={cfg.name}
-                      p="xs"
-                      radius="sm"
-                      style={{
-                        backgroundColor: isDark
-                          ? (cfg.isActive ? '#1f1f1f' : '#141414')
-                          : (cfg.isActive ? '#f0f0f0' : '#f8f9fa'),
-                        border: `1px solid ${cfg.isActive ? BRAND_RED : (isDark ? '#272727' : '#dee2e6')}`,
-                      }}
-                    >
-                      {confirmDeleteName === cfg.name ? (
-                        /* Delete confirmation inline */
-                        <Group justify="space-between" wrap="nowrap">
-                          <Text size="xs">Delete &ldquo;{cfg.name}&rdquo;?</Text>
-                          <Group gap={6}>
-                            <Button
-                              size="compact-xs"
-                              color="red"
-                              variant="light"
-                              onClick={() => handleDeleteNamed(cfg.name)}
-                              loading={deletingNamed}
-                            >
-                              Delete
-                            </Button>
-                            <Button
-                              size="compact-xs"
-                              variant="default"
-                              onClick={() => setConfirmDeleteName(null)}
-                            >
-                              Cancel
-                            </Button>
-                          </Group>
-                        </Group>
-                      ) : (
-                        <Group justify="space-between" wrap="nowrap">
-                          <div style={{ minWidth: 0, flex: 1 }}>
-                            <Group gap={6} wrap="nowrap">
-                              <Text size="sm" fw={600} truncate>{cfg.name}</Text>
-                              {cfg.isActive && (
-                                <Badge size="xs" variant="filled" color={BRAND_RED}>Active</Badge>
-                              )}
-                            </Group>
-                            <Text size="xs" c="dimmed">
-                              v{cfg.version} &middot; {cfg.fieldCount ?? '--'} fields &middot; {formatConfigDate(cfg.createdAt)}
-                            </Text>
-                          </div>
-                          <Group gap={4} wrap="nowrap">
-                            {!cfg.isActive && (
-                              <Tooltip label="Activate this configuration">
-                                <ActionIcon
-                                  size="sm"
-                                  variant="light"
-                                  color="green"
-                                  onClick={() => handleActivateNamed(cfg.name)}
-                                  loading={activatingNamed}
-                                >
-                                  <CheckCircleIcon />
-                                </ActionIcon>
-                              </Tooltip>
-                            )}
-                            {!cfg.isDefault && (
-                              <Tooltip label="Delete this configuration">
-                                <ActionIcon
-                                  size="sm"
-                                  variant="light"
-                                  color="red"
-                                  onClick={() => setConfirmDeleteName(cfg.name)}
-                                >
-                                  <TrashIcon />
-                                </ActionIcon>
-                              </Tooltip>
-                            )}
-                          </Group>
-                        </Group>
-                      )}
-                    </Paper>
-                  ))}
-                </Stack>
-              )}
-            </Paper>
           </Stack>
-        </Grid.Col>
 
-        {/* Right column: Preview */}
-        <Grid.Col span={{ base: 12, lg: 5 }}>
-          <Paper p="lg" radius="md" withBorder>
-            <Text fw={600} mb="xs">Preview</Text>
-            <Text size="xs" c="dimmed" mb="md">
-              How your AI will respond based on current settings
-            </Text>
-            <Paper
-              p="sm"
-              radius="md"
-              style={{
-                backgroundColor: previewBg,
-                borderLeft: `3px solid ${BRAND_RED}`,
-              }}
+          {/* Save draft inputs — persists field edits to draft state */}
+          <Group justify="flex-end">
+            <Button
+              color={BRAND_RED}
+              leftSection={<SaveIcon />}
+              disabled={!hasChanges}
+              loading={saving}
+              onClick={handleSave}
             >
-              <Group gap="xs" mb={8}>
-                <Box
-                  style={{
-                    width: 24,
-                    height: 24,
-                    borderRadius: '50%',
-                    background: BRAND_RED,
-                    display: 'flex',
-                    alignItems: 'center',
-                    justifyContent: 'center',
-                    color: '#fff',
-                    fontSize: 10,
-                    fontWeight: 700,
-                  }}
-                >
-                  AR
-                </Box>
-                <Text size="xs" fw={600}>Agent Red AI</Text>
-                <Badge size="xs" variant="light" color="gray">
-                  {form.formality} / {form.responseLength}
-                </Badge>
-              </Group>
-              <Text size="sm" style={{ whiteSpace: 'pre-wrap', lineHeight: 1.6 }}>
-                {previewText}
-              </Text>
-            </Paper>
-            <Text size="xs" c="dimmed" mt="sm" ta="center">
-              Sample response to: "When will my order ship?"
-            </Text>
-          </Paper>
-        </Grid.Col>
-      </Grid>
+              Save draft inputs
+            </Button>
+          </Group>
     </Stack>
   );
 };

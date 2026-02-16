@@ -434,9 +434,10 @@ class TestFirstSaveDraft:
         # Verify create was called (not patch, since no draft existed)
         prefs_repo.create.assert_called_once()
         created_doc = prefs_repo.create.call_args.args[1]
-        assert created_doc["config_state"] == ConfigState.DRAFT.value
-        assert created_doc["brand_name"] == "Updated Brand"
-        assert created_doc["is_current"] is False
+        # created_doc is now a PreferencesDocument (Pydantic model), use attribute access
+        assert created_doc.config_state == ConfigState.DRAFT.value
+        assert created_doc.model_dump().get("brand_name") == "Updated Brand"
+        assert created_doc.is_current is False
 
 
 # ═══════════════════════════════════════════════════════════════════════════
@@ -547,14 +548,16 @@ class TestMixedDocuments:
             )
 
         created_doc = prefs_repo.create.call_args.args[1]
+        # created_doc is now a PreferencesDocument (Pydantic model)
+        doc_dict = created_doc.model_dump()
         # Fields from old doc are preserved
-        assert created_doc["brand_name"] == "Legacy Store"
-        assert created_doc["brand_voice"] == "professional"
+        assert doc_dict.get("brand_name") == "Legacy Store"
+        assert doc_dict.get("brand_voice") == "professional"
         # Change is applied on top
-        assert created_doc["response_length"] == "detailed"
+        assert doc_dict.get("response_length") == "detailed"
         # New metadata is set
-        assert created_doc["config_state"] == ConfigState.DRAFT.value
-        assert created_doc["is_current"] is False
+        assert created_doc.config_state == ConfigState.DRAFT.value
+        assert created_doc.is_current is False
 
 
 # ═══════════════════════════════════════════════════════════════════════════

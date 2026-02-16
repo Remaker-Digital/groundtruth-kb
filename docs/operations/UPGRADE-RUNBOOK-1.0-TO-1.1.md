@@ -529,7 +529,7 @@ These tests catch performance regressions. Failures warrant investigation but no
 ```bash
 # Configuration (defaults to production FQDN)
 export PROD_URL=https://agent-red-api-gateway.lemonriver-f59f94b7.eastus2.azurecontainerapps.io
-export WIDGET_KEY=pk_live_c79a2bd0_dcbf0c6f
+export WIDGET_KEY=<from .env.local PREVIEW_WIDGET_KEY — rotates on re-seed>
 # Optional: export AGENTRED_API_KEY=<key> for admin API tests
 
 # Tier 0 only (fast, blocking)
@@ -894,7 +894,7 @@ az containerapp revision deactivate \
 
 ### Tier 1 chat tests fail with 401
 
-**Cause:** Widget key `pk_live_c79a2bd0_dcbf0c6f` may not match the widget key hash in Cosmos DB after a migration or data change.
+**Cause:** Widget key (from `.env.local` `PREVIEW_WIDGET_KEY`) may not match the widget key hash in Cosmos DB after a re-seed or migration. Widget keys rotate on every re-seed.
 
 **Fix:** Verify the widget key in Cosmos DB matches the test fixture:
 
@@ -993,7 +993,7 @@ async def up(cosmos_manager: Any) -> None:
 | NATS FQDN | Internal | `agent-red-nats.internal.lemonriver-f59f94b7.eastus2.azurecontainerapps.io:4222` |
 | Static IP | Production | `20.97.131.247` |
 | Current Image | API Gateway | `api-gateway:v1.12.0` |
-| Widget Key | remaker-digital-001 | `pk_live_c79a2bd0_dcbf0c6f` |
+| Widget Key | remaker-digital-001 | See `.env.local` `PREVIEW_WIDGET_KEY` (rotates on re-seed) |
 | Region | All resources | East US 2 |
 
 ### File Locations

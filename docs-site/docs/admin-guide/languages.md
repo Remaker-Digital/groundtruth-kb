@@ -20,7 +20,22 @@ These settings control which languages the AI agent communicates in and whether 
 
 The main language for AI responses. The intent classifier uses this to optimize its accuracy for your primary customer base, and the response generator defaults to this language unless the customer writes in a different supported language.
 
-**Supported languages:** English (`en`), Spanish (`es`), French (`fr`), German (`de`), Portuguese (`pt`), Italian (`it`), Dutch (`nl`), Japanese (`ja`), Korean (`ko`), Chinese Simplified (`zh`).
+**Primary language:** English (`en`) is the only supported primary language at this time.
+
+**Language availability:**
+
+| Language | Status |
+|----------|--------|
+| English (`en`) | Fully supported (primary) |
+| Spanish (`es`) | Coming soon |
+| French (`fr`) | Coming soon |
+| German (`de`) | Planned |
+| Portuguese (`pt`) | Planned |
+| Italian (`it`) | Planned |
+| Dutch (`nl`) | Planned |
+| Japanese (`ja`) | Planned |
+
+Languages marked **Coming soon** are in active development and will be available in a near-term release. Languages marked **Planned** are on the roadmap but do not have a release date yet. Planned languages appear in the admin UI as disabled options.
 
 **What happens when you change it:**
 - New conversations immediately use the new primary language.

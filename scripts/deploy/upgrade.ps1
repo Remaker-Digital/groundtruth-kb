@@ -1,13 +1,18 @@
 ﻿# upgrade.ps1 — Non-disruptive production upgrade for Agent Red API Gateway
+# Type: Repeatable Procedure (see docs/operations/REPEATABLE-PROCEDURES.md)
+# Last verified: 2026-02-14
+# Last corrected: 2026-02-14 — Fixed ACR name reference in prerequisites comment
+#
 # © 2026 Remaker Digital, a DBA of VanDusen & Palmeter, LLC. All rights reserved.
 #
 # Usage:
-#   .\upgrade.ps1 -Version "v1.13.0" [-DryRun] [-SkipBuild] [-SkipTests]
+#   .\upgrade.ps1 -Version "v1.26.0" [-DryRun] [-SkipBuild] [-SkipTests]
 #
 # Prerequisites:
 #   - Azure CLI authenticated (az login)
-#   - ACR access (az acr login --name acragentredeastus2)
+#   - ACR access (az acr login --name acragentredeastus)
 #   - Python 3.12+ with pytest, httpx installed
+#   - Admin UI built: cd admin/standalone && npm run build; cd admin/shopify && npm run build
 #
 # This script implements a 7-phase non-disruptive upgrade:
 #   Phase 1: Pre-flight checks (health, revision count, credential access)
@@ -31,12 +36,12 @@ param(
 )
 
 # ─── Configuration ────────────────────────────────────────────────────────────
-$ACR = "acragentredeastus2"
-$ACR_LOGIN_SERVER = "acragentredeastus2.azurecr.io"
-$RESOURCE_GROUP = "agentred-prod-rg"
+$ACR = "acragentredeastus"
+$ACR_LOGIN_SERVER = "acragentredeastus.azurecr.io"
+$RESOURCE_GROUP = "Agent-Red"
 $CONTAINER_APP = "agent-red-api-gateway"
 $IMAGE_NAME = "api-gateway"
-$PROD_URL = "https://agent-red-api-gateway.lemonriver-f59f94b7.eastus2.azurecontainerapps.io"
+$PROD_URL = "https://agent-red-api-gateway.orangeglacier-f566a4e7.eastus.azurecontainerapps.io"
 $PROJECT_ROOT = (Resolve-Path "$PSScriptRoot\..\..").Path
 $BUILD_CONTEXT_DIR = "$env:TEMP\agentred-build-$(Get-Date -Format 'yyyyMMddHHmmss')"
 $LOG_FILE = "$PROJECT_ROOT\logs\upgrade-$(Get-Date -Format 'yyyyMMdd-HHmmss').log"
@@ -476,3 +481,15 @@ Log "PHASE" ""
 if ($DryRun) {
     Log "WARN" "This was a DRY RUN — no changes were made to production."
 }
+
+# ─── Known Failure Modes ─────────────────────────────────────────────────────
+# See docs/operations/REPEATABLE-PROCEDURES.md Section 2.6
+#
+# | Failure                                    | Classification        | Resolution                                                      |
+# |--------------------------------------------|-----------------------|-----------------------------------------------------------------|
+# | az acr build UnicodeEncodeError on Windows  | Environment (Windows) | © symbol in Dockerfile LABEL causes cp1252 encoding crash.      |
+# |                                            |                       | Build still completes on ACR. Verify with:                      |
+# |                                            |                       |   az acr task list-runs --registry $ACR --top 1 --output table  |
+# | Resource group not found                   | Procedure defect      | Corrected 2026-02-14: was rg-agentred-eastus, now Agent-Red     |
+# | Admin dist/ missing                        | Procedure defect      | Must run npm run build in admin/standalone and admin/shopify     |
+# |                                            |                       | BEFORE running this script. Phase 1 now checks for stale dists. |

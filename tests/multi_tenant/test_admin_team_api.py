@@ -23,7 +23,7 @@ from src.multi_tenant.admin_team_api import (
     PROTECTED_ROLES,
     VALID_ROLES,
     CreateTeamMemberRequest,
-    DeactivateTeamMemberResponse,
+    DeleteTeamMemberResponse,
     RotateKeyResponse,
     TeamListResponse,
     TeamMemberResponse,
@@ -645,8 +645,8 @@ class TestUpdateTeamMember:
 # ---------------------------------------------------------------------------
 
 
-class TestDeactivateTeamMember:
-    """Test DELETE /api/admin/team/{member_id}."""
+class TestDeleteTeamMember:
+    """Test DELETE /api/admin/team/{member_id} (hard delete)."""
 
     @pytest.fixture(autouse=True)
     def setup_mocks(self):
@@ -656,50 +656,50 @@ class TestDeactivateTeamMember:
         configure_admin_team_services(None)
 
     @pytest.mark.asyncio
-    async def test_deactivate_admin(self):
-        from src.multi_tenant.admin_team_api import deactivate_team_member
+    async def test_delete_admin(self):
+        from src.multi_tenant.admin_team_api import delete_team_member
 
         self.repo.read.return_value = _make_member_doc("alice@test.com", "admin")
         ctx = _ctx(role=TeamMemberRole.ADMIN)
-        result = await deactivate_team_member(f"{TENANT_ID}:alice@test.com", ctx=ctx)
+        result = await delete_team_member(f"{TENANT_ID}:alice@test.com", ctx=ctx)
         assert result.id == f"{TENANT_ID}:alice@test.com"
-        self.repo.deactivate.assert_called_once()
+        self.repo.delete.assert_called_once()
 
     @pytest.mark.asyncio
-    async def test_deactivate_superadmin_blocked(self):
+    async def test_delete_superadmin_blocked(self):
         from fastapi import HTTPException
 
-        from src.multi_tenant.admin_team_api import deactivate_team_member
+        from src.multi_tenant.admin_team_api import delete_team_member
 
         self.repo.read.return_value = _make_member_doc("sa@test.com", "superadmin")
         ctx = _ctx(role=TeamMemberRole.SUPERADMIN)
         with pytest.raises(HTTPException) as exc_info:
-            await deactivate_team_member(f"{TENANT_ID}:sa@test.com", ctx=ctx)
+            await delete_team_member(f"{TENANT_ID}:sa@test.com", ctx=ctx)
         assert exc_info.value.status_code == 400
         assert "superadmin" in exc_info.value.detail
 
     @pytest.mark.asyncio
-    async def test_deactivate_superadmin_hidden_from_admin(self):
+    async def test_delete_superadmin_hidden_from_admin(self):
         from fastapi import HTTPException
 
-        from src.multi_tenant.admin_team_api import deactivate_team_member
+        from src.multi_tenant.admin_team_api import delete_team_member
 
         self.repo.read.return_value = _make_member_doc("sa@test.com", "superadmin")
         ctx = _ctx(role=TeamMemberRole.ADMIN)
         with pytest.raises(HTTPException) as exc_info:
-            await deactivate_team_member(f"{TENANT_ID}:sa@test.com", ctx=ctx)
+            await delete_team_member(f"{TENANT_ID}:sa@test.com", ctx=ctx)
         assert exc_info.value.status_code == 404
 
     @pytest.mark.asyncio
-    async def test_deactivate_not_found(self):
+    async def test_delete_not_found(self):
         from fastapi import HTTPException
 
-        from src.multi_tenant.admin_team_api import deactivate_team_member
+        from src.multi_tenant.admin_team_api import delete_team_member
 
         self.repo.read.side_effect = DocumentNotFoundError("team_members", "x", TENANT_ID)
         ctx = _ctx(role=TeamMemberRole.ADMIN)
         with pytest.raises(HTTPException) as exc_info:
-            await deactivate_team_member("nonexistent", ctx=ctx)
+            await delete_team_member("nonexistent", ctx=ctx)
         assert exc_info.value.status_code == 404
 
 

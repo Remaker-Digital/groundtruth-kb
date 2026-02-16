@@ -78,10 +78,13 @@ if _env_local.is_file():
                     os.environ[key] = val
 
 API = os.environ.get(
-    "AGENT_RED_API",
-    "https://agent-red-api-gateway.lemonriver-f59f94b7.eastus2.azurecontainerapps.io",
+    "PROD_URL",
+    "https://agent-red-api-gateway.orangeglacier-f566a4e7.eastus.azurecontainerapps.io",
 )
-WIDGET_KEY = os.environ.get("AGENT_RED_WIDGET_KEY", "pk_live_c79a2bd0_dcbf0c6f")
+# No hardcoded fallback — transient credentials must come from .env.local or env vars.
+WIDGET_KEY = os.environ.get("PREVIEW_WIDGET_KEY") or os.environ.get("AGENT_RED_WIDGET_KEY", "")
+if not WIDGET_KEY:
+    sys.exit("ERROR: PREVIEW_WIDGET_KEY not set. Load .env.local or set env var.")
 
 # LLM-as-judge config (uses same Azure OpenAI as production)
 AZURE_OPENAI_ENDPOINT = os.environ.get("AZURE_OPENAI_ENDPOINT", "")

@@ -48,12 +48,7 @@ import {
   useUpdateConfig,
   useConfigVersions,
   useConfigSchema,
-  useNamedConfigs,
-  useSaveNamedConfig,
-  useActivateNamedConfig,
-  useDeleteNamedConfig,
 } from './hooks';
-import type { NamedConfigSummary } from './hooks';
 
 // ---------------------------------------------------------------------------
 // Group definitions
@@ -508,82 +503,6 @@ const s = {
     marginLeft: 6,
   } as React.CSSProperties,
 
-  // Named config bar
-  namedConfigBar: {
-    display: 'flex',
-    alignItems: 'center',
-    gap: 12,
-    padding: '10px 16px',
-    backgroundColor: '#f9fafb',
-    borderRadius: 8,
-    border: '1px solid #e5e5e5',
-    marginBottom: 20,
-    flexWrap: 'wrap' as const,
-  } as React.CSSProperties,
-
-  namedConfigLabel: {
-    fontSize: 13,
-    fontWeight: 600,
-    color: '#555',
-    whiteSpace: 'nowrap' as const,
-  } as React.CSSProperties,
-
-  namedConfigName: {
-    fontSize: 14,
-    fontWeight: 700,
-    color: '#1a1a1a',
-    padding: '2px 10px',
-    backgroundColor: '#fff',
-    border: '1px solid #d0d0d0',
-    borderRadius: 4,
-  } as React.CSSProperties,
-
-  namedConfigSelect: {
-    padding: '5px 10px',
-    fontSize: 13,
-    border: '1px solid #d0d0d0',
-    borderRadius: 6,
-    backgroundColor: '#fff',
-    color: '#333',
-    cursor: 'pointer',
-  } as React.CSSProperties,
-
-  // Modal overlay
-  modalOverlay: {
-    position: 'fixed' as const,
-    top: 0,
-    left: 0,
-    right: 0,
-    bottom: 0,
-    backgroundColor: 'rgba(0, 0, 0, 0.5)',
-    display: 'flex',
-    alignItems: 'center',
-    justifyContent: 'center',
-    zIndex: 10000,
-  } as React.CSSProperties,
-
-  modalContent: {
-    backgroundColor: '#fff',
-    borderRadius: 12,
-    padding: '24px 28px',
-    width: 400,
-    maxWidth: '90vw',
-    boxShadow: '0 20px 60px rgba(0, 0, 0, 0.2)',
-  } as React.CSSProperties,
-
-  modalTitle: {
-    fontSize: 18,
-    fontWeight: 600,
-    margin: '0 0 16px 0',
-    color: '#1a1a1a',
-  } as React.CSSProperties,
-
-  modalActions: {
-    display: 'flex',
-    justifyContent: 'flex-end',
-    gap: 8,
-    marginTop: 20,
-  } as React.CSSProperties,
 } as const;
 
 // ---------------------------------------------------------------------------
@@ -827,10 +746,6 @@ export const ConfigEditor: React.FC<BaseComponentProps> = ({
   const [diffLoading, setDiffLoading] = useState(false);
   const [rollingBack, setRollingBack] = useState(false);
 
-  // Named config state
-  const [showSaveAsModal, setShowSaveAsModal] = useState(false);
-  const [saveAsName, setSaveAsName] = useState('');
-
   // ---- hooks ----
   const { data: configData, loading: configLoading, error: configError, refetch: refetchConfig } =
     useConfig(apiFetch);
@@ -844,27 +759,6 @@ export const ConfigEditor: React.FC<BaseComponentProps> = ({
     loading: versionsLoading,
     refetch: refetchVersions,
   } = useConfigVersions(apiFetch);
-
-  // Named config hooks
-  const {
-    data: namedConfigsData,
-    loading: namedConfigsLoading,
-    refetch: refetchNamedConfigs,
-  } = useNamedConfigs(apiFetch);
-
-  const { saveNamed, loading: savingNamed } = useSaveNamedConfig(apiFetch);
-  const { activateNamed, loading: activatingNamed } = useActivateNamedConfig(apiFetch);
-  const { deleteNamed, loading: deletingNamed } = useDeleteNamedConfig(apiFetch);
-
-  // Derived named config data
-  const namedConfigs: NamedConfigSummary[] = useMemo(() => {
-    return namedConfigsData?.configs ?? [];
-  }, [namedConfigsData]);
-
-  const activeConfigName: string = useMemo(() => {
-    const active = namedConfigs.find((c) => c.isActive);
-    return active?.name ?? 'Default';
-  }, [namedConfigs]);
 
   // ---- derive all fields from schema ----
   const allFields: ConfigField[] = useMemo(() => {
@@ -1100,74 +994,6 @@ export const ConfigEditor: React.FC<BaseComponentProps> = ({
     }
   }, [rollingBack, selectedVersion, apiFetch, onNotify, refetchConfig, refetchVersions]);
 
-  // ---- Named config handlers ----
-  const handleSaveAs = useCallback(async () => {
-    const name = saveAsName.trim();
-    if (!name || savingNamed) return;
-
-    try {
-      const result = await saveNamed(name);
-      if (result) {
-        onNotify(`Configuration saved as "${name}".`, 'success');
-        setShowSaveAsModal(false);
-        setSaveAsName('');
-        refetchNamedConfigs();
-        refetchConfig();
-        refetchVersions();
-      }
-    } catch (err: unknown) {
-      const msg = err instanceof Error ? err.message : 'Save failed';
-      onNotify(`Failed to save configuration: ${msg}`, 'error');
-    }
-  }, [saveAsName, savingNamed, saveNamed, onNotify, refetchNamedConfigs, refetchConfig, refetchVersions]);
-
-  const handleActivateConfig = useCallback(
-    async (name: string) => {
-      if (activatingNamed) return;
-
-      try {
-        const result = await activateNamed(name);
-        if (result) {
-          onNotify(`Configuration "${name}" activated.`, 'success');
-          refetchNamedConfigs();
-          refetchConfig();
-          refetchVersions();
-        }
-      } catch (err: unknown) {
-        const msg = err instanceof Error ? err.message : 'Activation failed';
-        onNotify(`Failed to activate configuration: ${msg}`, 'error');
-      }
-    },
-    [activatingNamed, activateNamed, onNotify, refetchNamedConfigs, refetchConfig, refetchVersions],
-  );
-
-  const handleDeleteConfig = useCallback(
-    async (name: string) => {
-      if (deletingNamed) return;
-
-      const confirmed = window.confirm(
-        `Delete configuration "${name}"? This removes the name label from the version. The version history itself is preserved.`,
-      );
-      if (!confirmed) return;
-
-      try {
-        const result = await deleteNamed(name);
-        if (result) {
-          onNotify(`Configuration "${name}" deleted.`, 'success');
-          refetchNamedConfigs();
-        }
-      } catch (err: unknown) {
-        const msg = err instanceof Error ? err.message : 'Delete failed';
-        onNotify(`Failed to delete configuration: ${msg}`, 'error');
-      }
-    },
-    [deletingNamed, deleteNamed, onNotify, refetchNamedConfigs],
-  );
-
-  const handleRestoreDefault = useCallback(async () => {
-    await handleActivateConfig('Default');
-  }, [handleActivateConfig]);
-
   const toggleSection = useCallback((groupKey: string) => {
     setCollapsedSections((prev) => {
       const next = new Set(prev);
@@ -1274,80 +1100,6 @@ export const ConfigEditor: React.FC<BaseComponentProps> = ({
             {resetting ? 'Resetting...' : 'Reset to Defaults'}
           </button>
         </div>
-      </div>
-
-      {/* Named configuration bar */}
-      <div style={s.namedConfigBar}>
-        <span style={s.namedConfigLabel}>Active configuration:</span>
-        <span style={s.namedConfigName}>{activeConfigName}</span>
-
-        {/* Config selector dropdown */}
-        {namedConfigs.length > 0 && (
-          <select
-            style={s.namedConfigSelect}
-            value=""
-            onChange={(e) => {
-              const name = e.target.value;
-              if (name) handleActivateConfig(name);
-            }}
-            disabled={activatingNamed}
-          >
-            <option value="">Switch configuration...</option>
-            {namedConfigs
-              .filter((c) => !c.isActive)
-              .map((c) => (
-                <option key={c.name} value={c.name}>
-                  {c.name} (v{c.version})
-                </option>
-              ))}
-          </select>
-        )}
-
-        <button
-          style={s.btnSecondary}
-          onClick={() => {
-            setSaveAsName('');
-            setShowSaveAsModal(true);
-          }}
-        >
-          Save As...
-        </button>
-
-        {activeConfigName !== 'Default' && (
-          <button
-            style={s.btnSmall}
-            onClick={handleRestoreDefault}
-            disabled={activatingNamed}
-          >
-            Restore to Default
-          </button>
-        )}
-
-        {/* Delete non-Default configs */}
-        {namedConfigs.filter((c) => !c.isDefault && !c.isActive).length > 0 && (
-          <select
-            style={{ ...s.namedConfigSelect, color: '#991b1b' }}
-            value=""
-            onChange={(e) => {
-              const name = e.target.value;
-              if (name) handleDeleteConfig(name);
-            }}
-            disabled={deletingNamed}
-          >
-            <option value="">Delete config...</option>
-            {namedConfigs
-              .filter((c) => !c.isDefault)
-              .map((c) => (
-                <option key={c.name} value={c.name}>
-                  {c.name}
-                </option>
-              ))}
-          </select>
-        )}
-
-        {namedConfigsLoading && (
-          <span style={{ fontSize: 12, color: '#888' }}>Loading...</span>
-        )}
       </div>
 
       {/* Update error */}
@@ -1512,67 +1264,6 @@ export const ConfigEditor: React.FC<BaseComponentProps> = ({
         </div>
       </div>
 
-      {/* Save As modal */}
-      {showSaveAsModal && (
-        <div
-          style={s.modalOverlay}
-          onClick={(e) => {
-            if (e.target === e.currentTarget) setShowSaveAsModal(false);
-          }}
-        >
-          <div style={s.modalContent}>
-            <h3 style={s.modalTitle}>Save configuration as</h3>
-            <p style={{ fontSize: 13, color: '#666', margin: '0 0 16px 0' }}>
-              Save the current configuration as a named snapshot. You can switch between
-              saved configurations at any time.
-            </p>
-            <input
-              type="text"
-              style={s.input}
-              placeholder="e.g. Holiday Mode, Sale Config, Test Variant A"
-              value={saveAsName}
-              onChange={(e) => setSaveAsName(e.target.value)}
-              maxLength={64}
-              autoFocus
-              onKeyDown={(e) => {
-                if (e.key === 'Enter' && saveAsName.trim()) handleSaveAs();
-                if (e.key === 'Escape') setShowSaveAsModal(false);
-              }}
-            />
-            {saveAsName.trim().toLowerCase() === 'default' && (
-              <p style={{ fontSize: 12, color: '#991b1b', margin: '8px 0 0 0' }}>
-                "Default" is reserved. Choose a different name.
-              </p>
-            )}
-            <div style={s.modalActions}>
-              <button
-                style={s.btnSecondary}
-                onClick={() => setShowSaveAsModal(false)}
-              >
-                Cancel
-              </button>
-              <button
-                style={{
-                  ...s.btnPrimary,
-                  ...(!saveAsName.trim() ||
-                  saveAsName.trim().toLowerCase() === 'default' ||
-                  savingNamed
-                    ? s.disabled
-                    : {}),
-                }}
-                onClick={handleSaveAs}
-                disabled={
-                  !saveAsName.trim() ||
-                  saveAsName.trim().toLowerCase() === 'default' ||
-                  savingNamed
-                }
-              >
-                {savingNamed ? 'Saving...' : 'Save configuration'}
-              </button>
-            </div>
-          </div>
-        </div>
-      )}
     </div>
   );
 };

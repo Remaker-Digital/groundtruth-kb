@@ -65,11 +65,13 @@ if _env_local.is_file():
 
 BASE_URL = os.environ.get(
     "AGENT_RED_BASE_URL",
-    "https://agent-red-api-gateway.lemonriver-f59f94b7.eastus2.azurecontainerapps.io",
+    "https://agent-red-api-gateway.orangeglacier-f566a4e7.eastus.azurecontainerapps.io",
 )
 
-API_KEY = os.environ.get("ADMIN_PREVIEW_API_KEY", "")
-WIDGET_KEY = os.environ.get("WIDGET_KEY", "pk_live_c79a2bd0_dcbf0c6f")
+API_KEY = os.environ.get("SUPERADMIN_PREVIEW_API_KEY", "")
+WIDGET_KEY = os.environ.get("PREVIEW_WIDGET_KEY", "")
+if not WIDGET_KEY:
+    raise SystemExit("ERROR: PREVIEW_WIDGET_KEY not set. Load .env.local or set env var.")
 
 TIMEOUT = 20  # seconds per request
 

@@ -590,7 +590,7 @@ export const AnalyticsOverview: React.FC<BaseComponentProps & { isTestMode?: boo
               value={formatNumber(summary.totalConversations)}
               accentColor="#3b82f6"
               tooltip="All conversations (billable and non-billable) in the selected period."
-              docLink={`${DOCS_BASE}/analytics#key-metrics`}
+              docLink={`${DOCS_BASE}/analytics#total-conversations`}
             />
             <SummaryCard
               label="Avg response time"
@@ -598,21 +598,21 @@ export const AnalyticsOverview: React.FC<BaseComponentProps & { isTestMode?: boo
               subtext={summary.avgResponseTime != null ? (summary.avgResponseTime <= 2000 ? 'Within SLA' : 'Above P95 target') : undefined}
               accentColor={summary.avgResponseTime != null ? (summary.avgResponseTime <= 2000 ? COLOR_SUCCESS : COLOR_WARNING) : COLOR_GRAY}
               tooltip="Average time from customer message to AI response (P50)."
-              docLink={`${DOCS_BASE}/analytics#key-metrics`}
+              docLink={`${DOCS_BASE}/analytics#average-response-time`}
             />
             <SummaryCard
               label="Resolution rate"
               value={formatPercent(summary.resolutionRate)}
               accentColor={summary.resolutionRate != null ? (summary.resolutionRate >= 0.8 ? COLOR_SUCCESS : COLOR_WARNING) : COLOR_GRAY}
               tooltip="Percentage of conversations resolved without escalation to a human agent."
-              docLink={`${DOCS_BASE}/analytics#key-metrics`}
+              docLink={`${DOCS_BASE}/analytics#resolution-rate`}
             />
             <SummaryCard
               label="Escalation rate"
               value={formatPercent(summary.escalationRate)}
               accentColor={escalationColor(summary.escalationRate)}
               tooltip="Percentage of conversations escalated to human agents."
-              docLink={`${DOCS_BASE}/analytics#key-metrics`}
+              docLink={`${DOCS_BASE}/analytics#escalation-rate`}
             />
             <SummaryCard
               label="CSAT"
@@ -620,7 +620,7 @@ export const AnalyticsOverview: React.FC<BaseComponentProps & { isTestMode?: boo
               subtext={summary.customerSatisfaction != null ? 'out of 5.0' : 'No ratings yet'}
               accentColor={csatColor(summary.customerSatisfaction)}
               tooltip="Customer satisfaction score based on thumbs up/down ratings."
-              docLink={`${DOCS_BASE}/analytics#key-metrics`}
+              docLink={`${DOCS_BASE}/analytics#customer-satisfaction`}
             />
           </div>
         )}

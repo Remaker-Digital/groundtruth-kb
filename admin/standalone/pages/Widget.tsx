@@ -351,6 +351,7 @@ function resolvePanelWidthPx(preset: WidgetConfig['panelWidth']): string {
 }
 
 function WidgetPreview({ config, adminIsDark }: { config: WidgetConfig; adminIsDark: boolean }) {
+  const [chatOpen, setChatOpen] = useState(true);
   const isRight = config.position === 'bottom-right';
   const dk = config.colorMode === 'auto' ? adminIsDark : config.colorMode === 'dark';
 
@@ -408,7 +409,7 @@ function WidgetPreview({ config, adminIsDark }: { config: WidgetConfig; adminIsD
       </Box>
 
       {/* Chat panel */}
-      <Box
+      {chatOpen && <Box
         style={{
           position: 'absolute',
           bottom: 80,
@@ -629,10 +630,11 @@ function WidgetPreview({ config, adminIsDark }: { config: WidgetConfig; adminIsD
             Powered by <span style={{ fontWeight: 600, color: config.primaryColor }}>Agent Red</span>
           </Text>
         </Box>
-      </Box>
+      </Box>}
 
       {/* Launcher button */}
       <Box
+        onClick={() => setChatOpen((o) => !o)}
         style={{
           position: 'absolute',
           bottom: Math.round(config.positionOffsetY * 0.5),
@@ -1040,7 +1042,7 @@ export function WidgetPage() {
                 Reset to defaults
               </Button>
               <Button color="brand" onClick={handleSave} loading={saving}>
-                Save changes
+                Save draft inputs
               </Button>
             </Group>
           </Stack>

@@ -82,6 +82,13 @@ const ArchiveIcon = () => (
   </svg>
 );
 
+const RestoreIcon = () => (
+  <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+    <polyline points="1 4 1 10 7 10" />
+    <path d="M3.51 15a9 9 0 1 0 2.13-9.36L1 10" />
+  </svg>
+);
+
 const PlusIcon = () => (
   <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
     <line x1="12" y1="5" x2="12" y2="19" />
@@ -300,6 +307,16 @@ export const KnowledgeBasePage: React.FC = () => {
       kbResult.refetch();
     } else {
       onNotify(saveError || 'Failed to archive article', 'error');
+    }
+  };
+
+  const handleRestoreArticle = async (article: KBArticle) => {
+    const result = await save({ ...article, status: 'draft' as KBArticleStatus });
+    if (result) {
+      onNotify(`"${article.title}" restored as Draft`, 'success');
+      kbResult.refetch();
+    } else {
+      onNotify(saveError || 'Failed to restore article', 'error');
     }
   };
 
@@ -586,9 +603,9 @@ export const KnowledgeBasePage: React.FC = () => {
           </Table.Thead>
           <Table.Tbody>
             {filteredArticles.map((article) => (
-              <Table.Tr key={article.id}>
+              <Table.Tr key={article.id} style={article.status === 'archived' ? { opacity: 0.5 } : undefined}>
                 <Table.Td>
-                  <Text size="sm" fw={500}>{article.title}</Text>
+                  <Text size="sm" fw={500} td={article.status === 'archived' ? 'line-through' : undefined}>{article.title}</Text>
                 </Table.Td>
                 <Table.Td>
                   {article.category ? (
@@ -626,7 +643,11 @@ export const KnowledgeBasePage: React.FC = () => {
                     <ActionIcon variant="subtle" color="gray" size="sm" onClick={() => handleEditArticle(article)} title="Edit article">
                       <EditIcon />
                     </ActionIcon>
-                    {article.status !== 'archived' && (
+                    {article.status === 'archived' ? (
+                      <ActionIcon variant="subtle" color="blue" size="sm" onClick={() => handleRestoreArticle(article)} title="Restore article" loading={saving}>
+                        <RestoreIcon />
+                      </ActionIcon>
+                    ) : (
                       <ActionIcon variant="subtle" color="gray" size="sm" onClick={() => handleArchiveArticle(article)} title="Archive article" loading={saving}>
                         <ArchiveIcon />
                       </ActionIcon>

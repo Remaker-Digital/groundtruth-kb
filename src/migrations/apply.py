@@ -189,7 +189,6 @@ class MigrationRunner:
             query = "SELECT c.version FROM c WHERE c.success = true"
             items = container.query_items(
                 query=query,
-                enable_cross_partition_query=True,
             )
 
             versions: set[str] = set()

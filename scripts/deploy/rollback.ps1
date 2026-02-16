@@ -1,9 +1,13 @@
 # rollback.ps1 — Emergency rollback for Agent Red API Gateway
+# Type: Repeatable Procedure (see docs/operations/REPEATABLE-PROCEDURES.md)
+# Last verified: 2026-02-14
+# Last corrected: 2026-02-14 — Fixed stale ACR name (was acragentredeastus, now acragentredeastus)
+#
 # © 2026 Remaker Digital, a DBA of VanDusen & Palmeter, LLC. All rights reserved.
 #
 # Usage:
-#   .\rollback.ps1 -Image "acragentredeastus2.azurecr.io/api-gateway:v1.12.0"
-#   .\rollback.ps1 -Version "v1.12.0"
+#   .\rollback.ps1 -Image "acragentredeastus.azurecr.io/api-gateway:v1.25.1"
+#   .\rollback.ps1 -Version "v1.25.1"
 #
 # This script:
 #   1. Deploys the specified image immediately
@@ -16,10 +20,10 @@ param(
     [string]$Version = ""
 )
 
-$ACR_LOGIN_SERVER = "acragentredeastus2.azurecr.io"
-$RESOURCE_GROUP = "agentred-prod-rg"
+$ACR_LOGIN_SERVER = "acragentredeastus.azurecr.io"
+$RESOURCE_GROUP = "Agent-Red"
 $CONTAINER_APP = "agent-red-api-gateway"
-$PROD_URL = "https://agent-red-api-gateway.lemonriver-f59f94b7.eastus2.azurecontainerapps.io"
+$PROD_URL = "https://agent-red-api-gateway.orangeglacier-f566a4e7.eastus.azurecontainerapps.io"
 $PROJECT_ROOT = (Resolve-Path "$PSScriptRoot\..\..").Path
 
 # Resolve image
@@ -29,7 +33,7 @@ if (-not $Image -and $Version) {
 if (-not $Image) {
     Write-Host "ERROR: Provide -Image or -Version" -ForegroundColor Red
     Write-Host "  .\rollback.ps1 -Version v1.12.0"
-    Write-Host "  .\rollback.ps1 -Image acragentredeastus2.azurecr.io/api-gateway:v1.12.0"
+    Write-Host "  .\rollback.ps1 -Image acragentredeastus.azurecr.io/api-gateway:v1.12.0"
     exit 1
 }
 
@@ -47,11 +51,11 @@ $imageParts = $Image -split ":"
 $repoName = ($imageParts[0] -split "/")[-1]
 $tagName = $imageParts[1]
 if ($repoName -and $tagName) {
-    $tagCheck = az acr repository show-tags --name acragentredeastus2 --repository $repoName --query "[?@=='$tagName']" -o tsv 2>&1
+    $tagCheck = az acr repository show-tags --name acragentredeastus --repository $repoName --query "[?@=='$tagName']" -o tsv 2>&1
     if ($tagCheck -ne $tagName) {
         Write-Host "ERROR: Image tag '$tagName' not found in ACR repository '$repoName'." -ForegroundColor Red
         Write-Host "  Available tags:" -ForegroundColor Yellow
-        az acr repository show-tags --name acragentredeastus2 --repository $repoName --top 5 --orderby time_desc -o tsv 2>&1 | ForEach-Object { Write-Host "    $_" -ForegroundColor Gray }
+        az acr repository show-tags --name acragentredeastus --repository $repoName --top 5 --orderby time_desc -o tsv 2>&1 | ForEach-Object { Write-Host "    $_" -ForegroundColor Gray }
         exit 1
     }
     Write-Host "  Image verified in ACR" -ForegroundColor Green
@@ -135,3 +139,12 @@ Write-Host "╠═════════════════════�
 Write-Host "║  Image now serving: $currentImage" -ForegroundColor Green
 Write-Host "║  Tier 0 tests: $(if($testResult -eq 0){'PASSED'}else{'FAILED'})" -ForegroundColor $(if($testResult -eq 0){'Green'}else{'Red'})
 Write-Host "╚══════════════════════════════════════════════════════════════╝" -ForegroundColor Green
+
+# ─── Known Failure Modes ─────────────────────────────────────────────────────
+# See docs/operations/REPEATABLE-PROCEDURES.md Section 2.6
+#
+# | Failure                                   | Classification        | Resolution                                                    |
+# |-------------------------------------------|-----------------------|---------------------------------------------------------------|
+# | ACR name was acragentredeastus2            | Procedure defect      | Corrected 2026-02-14: now acragentredeastus (no trailing "2") |
+# | az containerapp update stderr on Windows   | Environment (Windows) | PowerShell treats az CLI progress output as error stream.     |
+# |                                           |                       | Check exit code / output table — command likely succeeded.    |

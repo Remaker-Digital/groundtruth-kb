@@ -618,13 +618,16 @@ class TestEnumCompleteness:
 
     @pytest.mark.unit
     def test_audit_event_type_values(self):
-        """CR-20 supplement: AuditEventType has 15 values (Decision #13 + WI #120 trial + WI #93 fine-tuning)."""
+        """CR-20 supplement: AuditEventType has 18 values (Decision #13 + WI #120 trial + WI #93 fine-tuning + team audit)."""
         values = {e.value for e in AuditEventType}
-        assert len(values) == 15
+        assert len(values) == 18
         assert "tenant.created" in values
         assert "tenant.provisioned" in values
         assert "security.event" in values
         assert "data.deleted" in values
+        assert "team.member_added" in values
+        assert "team.member_removed" in values
+        assert "team.member_updated" in values
         assert "model.deployed" in values
         assert "model.rolled_back" in values
 

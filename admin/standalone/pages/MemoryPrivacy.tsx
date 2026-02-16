@@ -67,15 +67,15 @@ export const MemoryPrivacyPage: React.FC = () => {
   const [autoDeleteOnRequest, setAutoDeleteOnRequest] = useState(true);
   const [patternDecayDays, setPatternDecayDays] = useState(90);
 
-  // Sync from config when loaded
+  // Sync from config when loaded (field names match backend config registry)
   useEffect(() => {
     if (config) {
       setMemoryEnabled(config.memory_enabled === true);
       setConversationMemory(config.conversation_memory !== false);
-      setCrossSessionLearning(config.cross_session_learning === true);
+      setCrossSessionLearning(config.pattern_learning_enabled === true);
       setRetentionDays(String(config.data_retention_days ?? '90'));
       setPiiScrubbing(config.pii_scrubbing !== false);
-      setConsentRequired(config.consent_required !== false);
+      setConsentRequired(config.consent_collection_enabled !== false);
       setAutoDeleteOnRequest(config.auto_delete_on_request !== false);
       setPatternDecayDays(Number(config.pattern_decay_days ?? 90));
     }
@@ -86,15 +86,12 @@ export const MemoryPrivacyPage: React.FC = () => {
   const isEnterprise = tier === 'enterprise';
 
   const handleSave = useCallback(async () => {
+    // Field names must match backend config field registry
     const updates: Record<string, unknown> = {
       memory_enabled: memoryEnabled,
-      conversation_memory: conversationMemory,
-      cross_session_learning: crossSessionLearning,
+      pattern_learning_enabled: crossSessionLearning,
       data_retention_days: parseInt(retentionDays, 10),
-      pii_scrubbing: piiScrubbing,
-      consent_required: consentRequired,
-      auto_delete_on_request: autoDeleteOnRequest,
-      pattern_decay_days: patternDecayDays,
+      consent_collection_enabled: consentRequired,
     };
 
     const result = await updateConfig(updates);
@@ -135,21 +132,12 @@ export const MemoryPrivacyPage: React.FC = () => {
   return (
     <Stack gap="lg">
       {/* Page header */}
-      <Group justify="space-between" align="flex-start">
-        <div>
-          <Title order={2}>Memory & privacy</Title>
-          <Text c="dimmed" size="sm">
-            Configure how your AI remembers customers and handles their data
-          </Text>
-        </div>
-        <Button
-          color={BRAND_RED}
-          onClick={handleSave}
-          loading={saving}
-        >
-          Save changes
-        </Button>
-      </Group>
+      <div>
+        <Title order={2}>Memory & privacy</Title>
+        <Text c="dimmed" size="sm">
+          Configure how your AI remembers customers and handles their data
+        </Text>
+      </div>
 
       {/* Upgrade banner for sub-Professional tiers */}
       {!isProOrHigher && (
@@ -326,6 +314,17 @@ export const MemoryPrivacyPage: React.FC = () => {
           </Accordion.Panel>
         </Accordion.Item>
       </Accordion>
+
+      {/* Save draft inputs — persists field edits to draft state */}
+      <Group justify="flex-end">
+        <Button
+          color={BRAND_RED}
+          onClick={handleSave}
+          loading={saving}
+        >
+          Save draft inputs
+        </Button>
+      </Group>
     </Stack>
   );
 };

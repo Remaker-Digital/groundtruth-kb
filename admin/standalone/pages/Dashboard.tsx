@@ -1,6 +1,6 @@
 // © 2026 Remaker Digital, a DBA of VanDusen & Palmeter, LLC. All rights reserved.
 
-import React, { useState } from 'react';
+import React, { useMemo, useState } from 'react';
 import {
   Paper,
   Group,
@@ -143,8 +143,24 @@ export function DashboardPage() {
 
   const recentConversations = (conversations.data?.conversations ?? []).slice(0, 5);
   const intentList = intents.data?.intents ?? [];
-  const chartData = dailyVolume.data?.days ?? [];
+  const rawChartData = dailyVolume.data?.days ?? [];
   const gapList = gaps.data?.gaps ?? [];
+
+  // Generate full date range for chart, merging actual data (D7+D8 fix)
+  const chartData = useMemo(() => {
+    const periodDays = period === '7d' ? 7 : period === '14d' ? 14 : period === '90d' ? 90 : 30;
+    const dataByDate: Record<string, typeof rawChartData[0]> = {};
+    for (const d of rawChartData) dataByDate[d.date] = d;
+    const result: typeof rawChartData = [];
+    const today = new Date();
+    for (let i = periodDays - 1; i >= 0; i--) {
+      const dt = new Date(today);
+      dt.setDate(dt.getDate() - i);
+      const dateStr = dt.toISOString().slice(0, 10);
+      result.push(dataByDate[dateStr] ?? { date: dateStr, total: 0, billable: 0 });
+    }
+    return result;
+  }, [rawChartData, period]);
 
   const summaryLoading = summary.loading;
   const s = summary.data;
@@ -182,18 +198,18 @@ export function DashboardPage() {
       {/* Stat cards — 5 cards with detail sub-labels + help tooltips (WI #259) */}
       <SimpleGrid cols={{ base: 1, xs: 2, md: 3 }} spacing="md">
         <StatCard
-          label={<>Total conversations <HelpTooltip text="All conversations started in the selected period, including billable and non-billable." docLink={`${DOCS_BASE}/analytics`} /></>}
+          label={<>Total conversations <HelpTooltip text="All conversations started in the selected period, including billable and non-billable." docLink={`${DOCS_BASE}/analytics#total-conversations`} /></>}
           value={(s?.totalConversations ?? 0).toLocaleString()}
           detail={s ? `Billable: ${(s.billableConversations ?? 0).toLocaleString()}` : undefined}
           loading={summaryLoading}
         />
         <StatCard
-          label={<>Avg response time <HelpTooltip text="Average time for the AI to generate a complete response, measured from message received to response delivered." docLink={`${DOCS_BASE}/analytics`} /></>}
+          label={<>Avg response time <HelpTooltip text="Average time for the AI to generate a complete response, measured from message received to response delivered." docLink={`${DOCS_BASE}/analytics#average-response-time`} /></>}
           value={formatResponseTime(s?.avgResponseTime)}
           loading={summaryLoading}
         />
         <StatCard
-          label={<>Resolution rate <HelpTooltip text="Percentage of conversations resolved by the AI without human escalation." docLink={`${DOCS_BASE}/analytics`} /></>}
+          label={<>Resolution rate <HelpTooltip text="Percentage of conversations resolved by the AI without human escalation." docLink={`${DOCS_BASE}/analytics#resolution-rate`} /></>}
           value={s?.resolutionRate != null ? `${(s.resolutionRate * 100).toFixed(1)}%` : '--'}
           detail={
             s != null
@@ -203,12 +219,12 @@ export function DashboardPage() {
           loading={summaryLoading}
         />
         <StatCard
-          label={<>Customer satisfaction <HelpTooltip text="Average customer rating on a 1-5 scale, collected via post-conversation feedback." docLink={`${DOCS_BASE}/analytics`} /></>}
+          label={<>Customer satisfaction <HelpTooltip text="Average customer rating on a 1-5 scale, collected via post-conversation feedback." docLink={`${DOCS_BASE}/analytics#customer-satisfaction`} /></>}
           value={formatSatisfaction(s?.customerSatisfaction)}
           loading={summaryLoading}
         />
         <StatCard
-          label={<>Escalation rate <HelpTooltip text="Percentage of conversations handed off to a human team member." docLink={`${DOCS_BASE}/analytics`} /></>}
+          label={<>Escalation rate <HelpTooltip text="Percentage of conversations handed off to a human team member." docLink={`${DOCS_BASE}/analytics#escalation-rate`} /></>}
           value={s?.escalationRate != null ? `${(s.escalationRate * 100).toFixed(1)}%` : '--'}
           detail={
             s != null
@@ -222,7 +238,7 @@ export function DashboardPage() {
       {/* Conversation volume chart */}
       <Paper p="lg" radius="md" withBorder>
         <Group justify="space-between" mb="md">
-          <Text fw={600}>Conversation volume <HelpTooltip text="Daily breakdown of total and billable conversations over the selected time period." docLink={`${DOCS_BASE}/analytics`} /></Text>
+          <Text fw={600}>Conversation volume <HelpTooltip text="Daily breakdown of total and billable conversations over the selected time period." docLink={`${DOCS_BASE}/analytics#conversation-volume-chart`} /></Text>
           <Text size="xs" c="dimmed">
             {period === '7d'
               ? 'Last 7 days'
@@ -327,7 +343,7 @@ export function DashboardPage() {
         {/* Recent Conversations */}
         <Paper p="lg" radius="md" withBorder>
           <Text fw={600} mb="md">
-            Recent conversations <HelpTooltip text="The 5 most recent customer conversations with status and assignment info." docLink={`${DOCS_BASE}/conversations`} />
+            Recent conversations <HelpTooltip text="The 5 most recent customer conversations with status and assignment info." docLink={`${DOCS_BASE}/conversations#conversation-list`} />
           </Text>
           {conversations.loading ? (
             <Stack gap="xs">
@@ -507,7 +523,7 @@ export function DashboardPage() {
       <Paper p="lg" radius="md" withBorder>
         <Group justify="space-between" mb="md">
           <div>
-            <Text fw={600}>Knowledge gaps <HelpTooltip text="Conversations where the AI lacked sufficient knowledge to fully resolve the query. Add KB entries to address these gaps." docLink={`${DOCS_BASE}/knowledge-base`} /></Text>
+            <Text fw={600}>Knowledge gaps <HelpTooltip text="Conversations where the AI lacked sufficient knowledge to fully resolve the query. Add KB entries to address these gaps." docLink={`${DOCS_BASE}/analytics#knowledge-gaps`} /></Text>
             <Text size="xs" c="dimmed">
               Conversations where the AI could not fully resolve the customer query
             </Text>

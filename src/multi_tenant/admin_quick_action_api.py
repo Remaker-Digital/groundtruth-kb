@@ -191,6 +191,14 @@ class UpsertPageAssignmentRequest(BaseModel):
         default=None,
         description="Quick action ID for slot 2",
     )
+    auto_open: bool = Field(
+        default=False,
+        description="Whether the quick action auto-opens on this page type",
+    )
+    auto_open_delay_ms: int = Field(
+        default=3000,
+        description="Delay in milliseconds before auto-opening (0 = immediate)",
+    )
 
 
 # ---------------------------------------------------------------------------

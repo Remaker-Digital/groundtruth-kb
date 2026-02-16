@@ -394,3 +394,96 @@ class TestAnalyticsEndpointTestModeFilter:
         assert "errorCount" in data
         assert "gaps" in data
         assert isinstance(data["gaps"], list)
+
+
+# ---------------------------------------------------------------------------
+# D36/D37 regression: zero-conversation defaults must be 0, not 2.3/4.2
+# ---------------------------------------------------------------------------
+
+
+class TestZeroConversationDefaults:
+    """When totalConversations=0, avgResponseTime and customerSatisfaction
+    must both be 0 — not hardcoded non-zero defaults (D36/D37)."""
+
+    @pytest.fixture
+    def zero_conv_client(self):
+        """Client with repo returning zero conversations."""
+        from fastapi import FastAPI
+        from fastapi.testclient import TestClient
+        from src.multi_tenant.admin_analytics_api import (
+            router,
+            configure_admin_analytics_services,
+        )
+        from src.multi_tenant.middleware import get_tenant_context
+
+        repo = AsyncMock(spec=ConversationRepository)
+        # Simulate aggregate_metrics returning the empty-result fallback
+        repo.aggregate_metrics = AsyncMock(return_value={
+            "total": 0, "billable": 0, "avg_turns": 0,
+            "avg_messages": 0, "escalated": 0,
+            "critic_passed": 0, "critic_failed": 0,
+            "avg_response_time": 0, "customer_satisfaction": 0,
+        })
+        repo.count_by_status = AsyncMock(return_value=[])
+        repo.list_agents_invoked = AsyncMock(return_value=[])
+        repo.list_gap_conversations = AsyncMock(return_value=[])
+
+        configure_admin_analytics_services(repo)
+        app = FastAPI()
+        app.include_router(router)
+
+        ctx = _make_tenant_context()
+        app.dependency_overrides[get_tenant_context] = lambda: ctx
+
+        return TestClient(app)
+
+    def test_avg_response_time_zero_when_no_conversations(self, zero_conv_client):
+        """D36: avgResponseTime must be 0 (not 2.3) when totalConversations=0."""
+        resp = zero_conv_client.get("/api/analytics/summary")
+        assert resp.status_code == 200
+        data = resp.json()
+        assert data["totalConversations"] == 0
+        assert data["avgResponseTime"] == 0
+
+    def test_customer_satisfaction_zero_when_no_conversations(self, zero_conv_client):
+        """D37: customerSatisfaction must be 0 (not 4.2) when totalConversations=0."""
+        resp = zero_conv_client.get("/api/analytics/summary")
+        assert resp.status_code == 200
+        data = resp.json()
+        assert data["totalConversations"] == 0
+        assert data["customerSatisfaction"] == 0
+
+    def test_avg_response_time_not_hardcoded_default(self, zero_conv_client):
+        """avgResponseTime must never fall back to 2.3 for empty tenants."""
+        resp = zero_conv_client.get("/api/analytics/summary")
+        data = resp.json()
+        assert data["avgResponseTime"] != 2.3
+
+    def test_customer_satisfaction_not_hardcoded_default(self, zero_conv_client):
+        """customerSatisfaction must never fall back to 4.2 for empty tenants."""
+        resp = zero_conv_client.get("/api/analytics/summary")
+        data = resp.json()
+        assert data["customerSatisfaction"] != 4.2
+
+
+class TestRepositoryEmptyResultFallback:
+    """Verify that aggregate_metrics empty-result dict includes
+    avg_response_time and customer_satisfaction keys."""
+
+    @pytest.mark.asyncio
+    async def test_empty_result_includes_response_time(self):
+        """aggregate_metrics returns avg_response_time=0 when no results."""
+        repo = ConversationRepository()
+        repo.query = AsyncMock(return_value=[])
+        result = await repo.aggregate_metrics(TENANT_ID, SINCE, UNTIL)
+        assert "avg_response_time" in result
+        assert result["avg_response_time"] == 0
+
+    @pytest.mark.asyncio
+    async def test_empty_result_includes_customer_satisfaction(self):
+        """aggregate_metrics returns customer_satisfaction=0 when no results."""
+        repo = ConversationRepository()
+        repo.query = AsyncMock(return_value=[])
+        result = await repo.aggregate_metrics(TENANT_ID, SINCE, UNTIL)
+        assert "customer_satisfaction" in result
+        assert result["customer_satisfaction"] == 0

@@ -37,8 +37,10 @@ Changing the brand name takes effect on new conversations immediately. In-progre
 | **Field** | `brand_voice` |
 | **Type** | Text (up to 200 characters) |
 | **Default** | `friendly and helpful` |
-| **Required** | No |
+| **Required** | Yes (mandatory for activation) |
 | **Affects** | Response generator |
+
+Brand voice is required for activation. If it is empty when you attempt to activate, the activation dialog will show a hard error and the **Activate now** button will be disabled. This was promoted from an optional warning to a mandatory requirement because the brand voice has a significant impact on response quality — without it, the AI falls back to a generic tone that may not represent your brand.
 
 This is a short personality description that controls the AI's communication style — word choice, sentence length, level of warmth, and overall tone. The value is inserted directly into the response generator's system prompt.
 

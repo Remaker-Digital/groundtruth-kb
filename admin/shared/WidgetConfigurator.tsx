@@ -1638,18 +1638,10 @@ export const WidgetConfigurator: React.FC<BaseComponentProps> = ({
     <div style={s.container}>
       {/* Form panel */}
       <div style={s.formPanel}>
-        {/* Save bar */}
+        {/* Unsaved changes indicator */}
         {hasChanges && (
           <div style={s.saveBar}>
             <span>{changeCount} unsaved change{changeCount > 1 ? 's' : ''}</span>
-            <div>
-              <button style={s.discardButton} onClick={handleDiscard} disabled={saving}>
-                Discard
-              </button>
-              <button style={s.saveButton} onClick={handleSave} disabled={saving}>
-                {saving ? 'Saving...' : 'Save changes'}
-              </button>
-            </div>
           </div>
         )}
 
@@ -2211,6 +2203,12 @@ export const WidgetConfigurator: React.FC<BaseComponentProps> = ({
             )}
           </div>
         )}
+        {/* Save draft inputs — persists field edits to draft state */}
+        <div style={{ display: 'flex', justifyContent: 'flex-end', padding: '16px 0' }}>
+          <button style={s.saveButton} onClick={handleSave} disabled={saving || !hasChanges}>
+            {saving ? 'Saving draft...' : 'Save draft inputs'}
+          </button>
+        </div>
       </div>
 
       {/* Preview panel */}

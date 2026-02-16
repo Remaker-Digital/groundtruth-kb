@@ -65,6 +65,7 @@ from src.multi_tenant.cosmos_schema import (
     TenantTier,
 )
 from src.multi_tenant.middleware import get_tenant_context
+from src.multi_tenant.repository import PreferencesRepository
 
 logger = logging.getLogger(__name__)
 
@@ -193,7 +194,32 @@ async def start_conversation(
     If the request includes an ``initial_message``, it is stored as
     the first customer message and the pipeline is triggered. The AI
     response will arrive via the SSE stream endpoint.
+
+    Returns 403 if the tenant's configuration is not active (never
+    activated or explicitly deactivated). This prevents the widget
+    from creating phantom conversation documents.
     """
+    # --- Activation gate ---
+    # Block conversation creation if the tenant has never activated or
+    # has explicitly deactivated their configuration.
+    try:
+        prefs_repo = PreferencesRepository()
+        active_prefs = await prefs_repo.get_active(ctx.tenant_id)
+    except Exception:
+        active_prefs = None
+
+    if not active_prefs or not active_prefs.get("activated_at"):
+        raise HTTPException(
+            status_code=403,
+            detail={"type": "not_active", "message": "This store has not been configured yet."},
+        )
+
+    if active_prefs.get("deactivated_at"):
+        raise HTTPException(
+            status_code=403,
+            detail={"type": "not_active", "message": "Chat is currently disabled for this store."},
+        )
+
     session = _get_session()
 
     try:

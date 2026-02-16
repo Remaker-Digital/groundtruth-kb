@@ -44,6 +44,7 @@ from pydantic import BaseModel, Field
 
 # Cosmos DB fallback for tenant lookup (populated at startup)
 _tenant_repo = None
+_team_repo = None
 
 logger = logging.getLogger(__name__)
 
@@ -602,16 +603,21 @@ def _lookup_tenant(
 # ---------------------------------------------------------------------------
 
 
-def configure_tenant_lookup_repo(tenant_repo: Any) -> None:
-    """Wire Cosmos DB TenantRepository for lookup fallback.
+def configure_tenant_lookup_repo(tenant_repo: Any, team_repo: Any = None) -> None:
+    """Wire Cosmos DB repositories for lookup fallback.
 
     Called from main.py startup to enable /api/tenants/lookup and
     /api/tenants/{tenant_id} to query Cosmos DB when the in-memory
     index has no match (e.g., tenants provisioned via scripts).
+
+    Args:
+        tenant_repo: TenantRepository for tenant API key and ID lookups.
+        team_repo: TeamMemberRepository for per-user API key lookups.
     """
-    global _tenant_repo  # noqa: PLW0603
+    global _tenant_repo, _team_repo  # noqa: PLW0603
     _tenant_repo = tenant_repo
-    logger.info("Tenant lookup Cosmos DB fallback configured")
+    _team_repo = team_repo
+    logger.info("Tenant lookup Cosmos DB fallback configured (team_repo=%s)", "yes" if team_repo else "no")
 
 
 async def _cosmos_lookup(
@@ -635,13 +641,31 @@ async def _cosmos_lookup_by_api_key(api_key: str) -> dict[str, Any] | None:
     """Lookup a tenant in Cosmos DB by API key hash.
 
     Used by the standalone admin login flow — the raw key is hashed
-    with SHA-256 and matched against the api_key_hash field stored
-    in the tenant document.
+    with SHA-256 and matched against the stored hash.
+
+    Supports both key types:
+    - Tenant API keys (ar_*): matched against tenant.api_key_hash
+    - Per-user API keys (ar_user_*): matched against team_member.user_api_key_hash,
+      then resolved to the parent tenant document
     """
+    key_hash = hashlib.sha256(api_key.encode("utf-8")).hexdigest()
+
+    # Per-user API key → resolve via team member → tenant
+    if api_key.startswith("ar_user_") and _team_repo is not None:
+        try:
+            member = await _team_repo.find_by_user_api_key_hash(key_hash)
+            if member and _tenant_repo is not None:
+                tenant_id = member.get("tenant_id")
+                if tenant_id:
+                    return await _tenant_repo.read(tenant_id, tenant_id)
+        except Exception as exc:
+            logger.warning("Cosmos DB user API key lookup failed: %s", exc)
+        return None
+
+    # Tenant API key → direct lookup
     if _tenant_repo is None:
         return None
     try:
-        key_hash = hashlib.sha256(api_key.encode("utf-8")).hexdigest()
         return await _tenant_repo.find_by_api_key_hash(key_hash)
     except Exception as exc:
         logger.warning("Cosmos DB API key lookup failed: %s", exc)

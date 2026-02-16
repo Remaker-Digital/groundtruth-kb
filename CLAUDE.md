@@ -77,6 +77,23 @@ Skip feedback when the message is already clear. Only flag genuine opportunities
 
 **Technical work has elevated priority over creative/content work.** Technical implementation, test case creation, testing/results analysis, and new capabilities are prioritized above creative assets, marketing, and cosmetic work.
 
+### Repeatable Procedures
+
+Some operational tasks are governed by **Repeatable Procedures** — structured SOPs with pinned variables, verification gates, and known failure modes. The specification is defined in `docs/operations/REPEATABLE-PROCEDURES.md`.
+
+When executing a Repeatable Procedure:
+- Follow the steps exactly as written, using the declared variables
+- If an error occurs, classify it as a **procedure defect** or **environment transient** (see spec Section 3)
+- For procedure defects: fix the procedure document before continuing, not just the immediate issue
+- For environment transients: retry, do not modify the procedure
+
+Active procedures:
+- `scripts/deploy/upgrade.ps1` — Production deployment
+- `scripts/deploy/rollback.ps1` — Production rollback
+- `scripts/seed_tenant.py` — Tenant provisioning
+- `docs/operations/CATASTROPHIC-RECOVERY-RUNBOOK.md` — Azure environment setup
+- Inline in spec: Unit test suite, Production regression suite
+
 ### Adding Commercial Features
 
 1. Create features in `src/` exclusively

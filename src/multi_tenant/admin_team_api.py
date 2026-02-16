@@ -8,7 +8,7 @@ component:
     GET    /api/admin/team/{member_id}  — Get single team member
     POST   /api/admin/team              — Create team member (with per-user API key)
     PUT    /api/admin/team/{member_id}  — Update team member (role, settings)
-    DELETE /api/admin/team/{member_id}  — Deactivate team member
+    DELETE /api/admin/team/{member_id}  — Remove team member (hard delete + audit)
     POST   /api/admin/team/{member_id}/rotate-key — Rotate user API key
 
 All endpoints derive tenant_id from the authenticated TenantContext — never
@@ -40,9 +40,9 @@ from pydantic import BaseModel, ConfigDict, Field
 from pydantic.alias_generators import to_camel
 
 from src.multi_tenant.auth import TenantContext, generate_user_api_key, hash_api_key
-from src.multi_tenant.cosmos_schema import ESCALATION_CATEGORIES, TeamMemberRole
+from src.multi_tenant.cosmos_schema import ESCALATION_CATEGORIES, AuditEventType, TeamMemberRole
 from src.multi_tenant.middleware import get_tenant_context
-from src.multi_tenant.repository import DocumentNotFoundError, TeamMemberRepository
+from src.multi_tenant.repository import AuditLogRepository, DocumentNotFoundError, TeamMemberRepository
 
 logger = logging.getLogger(__name__)
 
@@ -161,31 +161,25 @@ class UpdateTeamMemberRequest(BaseModel):
     )
 
 
-class DeactivateTeamMemberResponse(BaseModel):
-    """Response for successful deactivation."""
-
-    model_config = ConfigDict(alias_generator=to_camel, populate_by_name=True)
-
-    id: str
-    deactivated_at: str
-
-
 # ---------------------------------------------------------------------------
 # Service accessor
 # ---------------------------------------------------------------------------
 
 _team_repo: TeamMemberRepository | None = None
+_audit_repo: AuditLogRepository | None = None
 
 
 def configure_admin_team_services(
     team_repo: TeamMemberRepository,
+    audit_repo: AuditLogRepository | None = None,
 ) -> None:
     """Wire the admin team API to its backing repository.
 
     Called during app startup after TeamMemberRepository is initialised.
     """
-    global _team_repo
+    global _team_repo, _audit_repo
     _team_repo = team_repo
+    _audit_repo = audit_repo
     logger.info("Admin team management API services configured")
 
 
@@ -197,6 +191,27 @@ def _get_repo() -> TeamMemberRepository:
             detail="Admin team management services not initialised",
         )
     return _team_repo
+
+
+async def _audit(
+    event_type: AuditEventType,
+    tenant_id: str,
+    actor: str = "admin",
+    payload: dict[str, Any] | None = None,
+) -> None:
+    """Best-effort audit log write — never raises."""
+    if _audit_repo is None:
+        return
+    try:
+        await _audit_repo.log_event(
+            event_type=event_type,
+            tenant_id=tenant_id,
+            actor=actor,
+            actor_type="admin",
+            payload=payload or {},
+        )
+    except Exception:
+        logger.warning("Failed to write audit log: %s", event_type.value, exc_info=True)
 
 
 def _build_member_response(doc: dict[str, Any], tenant_id: str) -> TeamMemberResponse:
@@ -507,6 +522,13 @@ async def create_team_member(
         key_prefix,
     )
 
+    await _audit(
+        AuditEventType.TEAM_MEMBER_ADDED,
+        tenant_id=ctx.tenant_id,
+        actor=getattr(ctx, "team_member_email", "admin"),
+        payload={"email": request.email, "role": request.role, "display_name": request.display_name or ""},
+    )
+
     response = _build_member_response(doc.model_dump(), ctx.tenant_id)
     # Attach the raw API key — returned ONCE, never stored or retrievable
     response.user_api_key = raw_api_key
@@ -637,36 +659,60 @@ async def update_team_member(
         ctx.tenant_id[:8],
     )
 
+    # Build change summary for audit
+    changes: dict[str, Any] = {}
+    if request.role is not None and request.role != existing.get("role"):
+        changes["role"] = {"from": existing.get("role"), "to": request.role}
+    if request.display_name is not None and request.display_name != existing.get("display_name"):
+        changes["display_name"] = {"from": existing.get("display_name"), "to": request.display_name}
+    if request.escalation_categories is not None:
+        changes["escalation_categories"] = request.escalation_categories
+    if changes:
+        await _audit(
+            AuditEventType.TEAM_MEMBER_UPDATED,
+            tenant_id=ctx.tenant_id,
+            actor=getattr(ctx, "team_member_email", "admin"),
+            payload={"member_id": member_id, "email": existing.get("email", ""), "changes": changes},
+        )
+
     return _build_member_response(updated, ctx.tenant_id)
 
 
 # ---------------------------------------------------------------------------
-# DELETE /api/team/{member_id} — Deactivate team member
+# DELETE /api/team/{member_id} — Remove team member (hard delete)
 # ---------------------------------------------------------------------------
+
+
+class DeleteTeamMemberResponse(BaseModel):
+    """Response for successful team member deletion."""
+
+    model_config = ConfigDict(alias_generator=to_camel, populate_by_name=True)
+
+    id: str
+    deleted_at: str
 
 
 @router.delete(
     "/{member_id}",
-    response_model=DeactivateTeamMemberResponse,
-    summary="Deactivate team member",
-    description="Sets is_active to false so the member can no longer access the admin dashboard. The record is preserved for audit purposes. Superadmin members cannot be deactivated.",
+    response_model=DeleteTeamMemberResponse,
+    summary="Remove team member",
+    description="Permanently removes the team member. An audit log entry is created. Superadmin members cannot be removed.",
     responses={
-        400: {"description": "Cannot deactivate a superadmin member"},
+        400: {"description": "Cannot remove a superadmin member"},
         404: {"description": "Team member not found"},
         503: {"description": "Team management services not initialized"},
     },
 )
-async def deactivate_team_member(
+async def delete_team_member(
     member_id: str,
     ctx: TenantContext = Depends(get_tenant_context),
-) -> DeactivateTeamMemberResponse:
-    """Deactivate a team member.
+) -> DeleteTeamMemberResponse:
+    """Permanently remove a team member.
 
-    Sets is_active = false so the member can no longer access the admin
-    dashboard or handle escalated conversations. The record is preserved
-    for audit purposes and can be reactivated via PUT with is_active=true.
+    The Cosmos DB document is deleted. An audit log entry preserves
+    the record of who was removed and by whom.
 
-    Superadmin members cannot be deactivated (except by other superadmins).
+    Superadmin members cannot be removed.
     """
     repo = _get_repo()
 
@@ -679,31 +725,45 @@ async def deactivate_team_member(
             detail=f"Team member {member_id} not found",
         )
 
-    # Superadmins cannot be deactivated except by other superadmins
+    # Superadmins cannot be removed
     existing_role = existing.get("role", "")
     caller_is_superadmin = getattr(ctx, "team_member_role", None) == TeamMemberRole.SUPERADMIN
     if existing_role in PROTECTED_ROLES:
         if not caller_is_superadmin:
-            # Hide the existence of superadmin from non-superadmins
             raise HTTPException(status_code=404, detail=f"Team member {member_id} not found")
         raise HTTPException(
             status_code=400,
-            detail="Cannot deactivate a superadmin member.",
+            detail="Cannot remove a superadmin member.",
         )
 
-    await repo.deactivate(ctx.tenant_id, member_id)
+    # Hard delete the document
+    await repo.delete(ctx.tenant_id, member_id)
 
     now = datetime.now(timezone.utc).isoformat()
 
+    # Audit log (best-effort)
+    await _audit(
+        AuditEventType.TEAM_MEMBER_REMOVED,
+        tenant_id=ctx.tenant_id,
+        actor=getattr(ctx, "team_member_email", "admin"),
+        payload={
+            "member_id": member_id,
+            "email": existing.get("email", ""),
+            "role": existing_role,
+            "display_name": existing.get("display_name", ""),
+        },
+    )
+
     logger.info(
-        "Team member deactivated: id=%s tenant=%s",
+        "Team member removed: id=%s email=%s tenant=%s",
         member_id,
+        existing.get("email", ""),
         ctx.tenant_id[:8],
     )
 
-    return DeactivateTeamMemberResponse(
+    return DeleteTeamMemberResponse(
         id=member_id,
-        deactivated_at=now,
+        deleted_at=now,
     )
 
 

@@ -21,8 +21,27 @@ if sys.platform == "win32":
     sys.stdout.reconfigure(encoding="utf-8", errors="replace")
     sys.stderr.reconfigure(encoding="utf-8", errors="replace")
 
-API = "https://agent-red-api-gateway.lemonriver-f59f94b7.eastus2.azurecontainerapps.io"
-WIDGET_KEY = "pk_live_c79a2bd0_dcbf0c6f"
+# ---------------------------------------------------------------------------
+# Auto-load .env.local (transient credentials must never be hardcoded)
+# ---------------------------------------------------------------------------
+_env_local = Path(__file__).resolve().parent.parent / ".env.local"
+if _env_local.is_file():
+    with open(_env_local) as _f:
+        for _line in _f:
+            _line = _line.strip()
+            if _line and not _line.startswith("#") and "=" in _line:
+                _k, _, _v = _line.partition("=")
+                _k, _v = _k.strip(), _v.strip()
+                if _k and _v and _k not in os.environ:
+                    os.environ[_k] = _v
+
+API = os.environ.get(
+    "PROD_URL",
+    "https://agent-red-api-gateway.orangeglacier-f566a4e7.eastus.azurecontainerapps.io",
+)
+WIDGET_KEY = os.environ.get("PREVIEW_WIDGET_KEY", "")
+if not WIDGET_KEY:
+    sys.exit("ERROR: PREVIEW_WIDGET_KEY not set. Load .env.local or set env var.")
 
 
 async def chat(message: str, conv_id: str | None = None) -> tuple[str, str, list[str]]:

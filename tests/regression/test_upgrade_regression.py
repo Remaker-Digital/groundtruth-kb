@@ -501,9 +501,9 @@ class TestTier2Consistency:
         assert r.status_code == 200
         data = r.json()
 
-        # Key Vault should be healthy
+        # Key Vault should be healthy (or dev_mode for environments without KV)
         if "key_vault" in data:
-            assert data["key_vault"].get("status") in ("healthy", "connected"), \
+            assert data["key_vault"].get("status") in ("healthy", "connected", "dev_mode"), \
                 f"Key Vault: {data['key_vault']}"
 
         # Circuit breakers all CLOSED

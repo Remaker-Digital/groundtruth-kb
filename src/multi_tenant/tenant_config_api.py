@@ -54,6 +54,7 @@ Dependencies:
 from __future__ import annotations
 
 import logging
+from datetime import datetime, timezone
 from typing import Any
 
 from fastapi import APIRouter, Depends, HTTPException, Query
@@ -63,7 +64,7 @@ from src.multi_tenant.activation_service import (
     get_activation_service,
 )
 from src.multi_tenant.auth import TenantContext
-from src.multi_tenant.cosmos_schema import TenantTier
+from src.multi_tenant.cosmos_schema import AuditEventType, TenantTier
 from src.multi_tenant.middleware import get_tenant_context
 from src.multi_tenant.tenant_config_processor import (
     ConfigVersionInfo,
@@ -220,6 +221,8 @@ class ActivationStatusResponse(BaseModel):
     active_version: int = 0
     active_activated_at: str | None = None
     draft_version: int | None = None
+    is_configured: bool = False
+    is_active: bool = False
 
 
 class DraftStateResponse(BaseModel):
@@ -241,6 +244,14 @@ class ActivateResponse(BaseModel):
     version: int = 0
     activated_at: str | None = None
     errors: list[dict[str, str]] = Field(default_factory=list)
+    warnings: list[dict[str, str]] = Field(default_factory=list)
+
+
+class PreflightResponse(BaseModel):
+    """Pre-activation validation result (D35)."""
+
+    can_activate: bool
+    hard_errors: list[dict[str, str]] = Field(default_factory=list)
     warnings: list[dict[str, str]] = Field(default_factory=list)
 
 
@@ -1219,12 +1230,113 @@ async def get_activation_status(
 
     draft_state = await activation_svc.get_draft_state(ctx.tenant_id, tier)
 
+    # A tenant is "configured" only when an active config exists with all
+    # mandatory fields populated (brand_name, brand_voice, widget_key).
+    is_configured = False
+    is_active = False
+    if draft_state.active_version > 0 and draft_state.active_activated_at:
+        active = await activation_svc._prefs_repo.get_active(ctx.tenant_id)
+        if active:
+            brand_name = active.get("brand_name")
+            brand_voice = active.get("brand_voice")
+            widget_key = active.get("widget_key")
+            is_configured = bool(
+                brand_name and str(brand_name).strip()
+                and brand_voice and str(brand_voice).strip()
+                and widget_key
+            )
+            # is_active: config is activated AND not deactivated
+            # deactivated_at on the active config means the merchant
+            # explicitly disabled the widget.
+            is_active = is_configured and not active.get("deactivated_at")
+
     return ActivationStatusResponse(
         has_pending_changes=draft_state.has_pending_changes,
         active_version=draft_state.active_version,
         active_activated_at=draft_state.active_activated_at,
         draft_version=draft_state.draft_version,
+        is_configured=is_configured,
+        is_active=is_active,
     )
+
+
+# ---------------------------------------------------------------------------
+# 19b. POST /api/config/deactivate — Deactivate the live widget
+# ---------------------------------------------------------------------------
+
+
+@router.post(
+    "/deactivate",
+    summary="Deactivate live configuration",
+    description=(
+        "Immediately deactivates the live configuration. The chat widget "
+        "stops serving on the storefront. The active configuration is "
+        "preserved — re-activation is a one-click operation."
+    ),
+    responses={
+        200: {"description": "Configuration deactivated"},
+        409: {"description": "Configuration is not currently active"},
+    },
+)
+async def deactivate_config(
+    ctx: TenantContext = Depends(get_tenant_context),
+) -> dict[str, Any]:
+    """Deactivate the live configuration (widget stops serving)."""
+    activation_svc = get_activation_service()
+
+    active = await activation_svc._prefs_repo.get_active(ctx.tenant_id)
+    if not active:
+        raise HTTPException(
+            status_code=409,
+            detail="No active configuration to deactivate.",
+        )
+
+    if active.get("deactivated_at"):
+        raise HTTPException(
+            status_code=409,
+            detail="Configuration is already deactivated.",
+        )
+
+    now = datetime.now(timezone.utc).isoformat()
+    await activation_svc._prefs_repo.patch(
+        tenant_id=ctx.tenant_id,
+        document_id=active["id"],
+        operations=[
+            {"op": "set", "path": "/deactivated_at", "value": now},
+        ],
+    )
+
+    # Invalidate config cache so pipeline picks up the change immediately
+    if activation_svc._config_processor is not None:
+        activation_svc._config_processor._invalidate_cache(ctx.tenant_id)
+
+    # Audit log
+    if activation_svc._audit_repo is not None:
+        try:
+            await activation_svc._audit_repo.log_event(
+                event_type=AuditEventType.CONFIG_UPDATED,
+                tenant_id=ctx.tenant_id,
+                actor=getattr(ctx, "user_id", "admin"),
+                actor_type="user",
+                payload={
+                    "action": "config_deactivated",
+                    "active_version": active.get("version", 0),
+                    "deactivated_at": now,
+                },
+            )
+        except Exception:
+            logger.warning("Failed to log deactivation audit event", exc_info=True)
+
+    logger.info(
+        "Tenant %s configuration deactivated at %s",
+        ctx.tenant_id[:8], now,
+    )
+
+    return {
+        "success": True,
+        "deactivated_at": now,
+        "message": "Configuration deactivated. Chat widget is no longer serving.",
+    }
 
 
 # ---------------------------------------------------------------------------
@@ -1261,6 +1373,40 @@ async def get_draft_state(
         changed_fields=draft_state.changed_fields,
         draft_config=draft_state.draft_config,
         active_config=draft_state.active_config,
+    )
+
+
+# ---------------------------------------------------------------------------
+# 20b. GET /api/config/draft/preflight — Pre-activation validation (D35)
+# ---------------------------------------------------------------------------
+
+@router.get(
+    "/draft/preflight",
+    response_model=PreflightResponse,
+    summary="Pre-activation validation check",
+    description=(
+        "Runs activation validation rules without activating. Returns hard "
+        "errors (blocking) and warnings so the frontend can show what's "
+        "missing before the admin commits."
+    ),
+)
+async def preflight_check(
+    ctx: TenantContext = Depends(get_tenant_context),
+) -> PreflightResponse:
+    """Dry-run activation validation for the ActivationDialog.
+
+    Called when the dialog opens to immediately show which mandatory fields
+    are missing, without requiring the admin to click through confirmation.
+    """
+    tier = _resolve_tier(ctx)
+    activation_svc = get_activation_service()
+
+    validation = await activation_svc.validate_for_activation(ctx.tenant_id, tier)
+
+    return PreflightResponse(
+        can_activate=validation.can_activate,
+        hard_errors=validation.hard_errors,
+        warnings=validation.warnings,
     )
 
 

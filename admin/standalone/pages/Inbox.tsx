@@ -1,6 +1,6 @@
 // © 2026 Remaker Digital, a DBA of VanDusen & Palmeter, LLC. All rights reserved.
 
-import React, { useState, useRef, useEffect } from 'react';
+import React, { useState, useRef, useEffect, useCallback } from 'react';
 import {
   Paper,
   TextInput,
@@ -17,10 +17,18 @@ import {
   Box,
   Loader,
   useComputedColorScheme,
+  Notification,
 } from '@mantine/core';
 import { useAppContext } from '../layouts/StandaloneLayout';
-import { useInboxConversations, useConversationMessages } from '../../shared/hooks/index';
+import {
+  useInboxConversations,
+  useConversationMessages,
+  useEscalateConversation,
+  useResolveConversation,
+  useSearchConversations,
+} from '../../shared/hooks/index';
 import type { InboxConversation, ConversationMessage } from '../../shared/types/index';
+import type { SearchResult } from '../../shared/hooks/index';
 
 // ---------------------------------------------------------------------------
 // Constants
@@ -312,7 +320,9 @@ export function InboxPage() {
   const [selectedId, setSelectedId] = useState<string>('');
   const [filter, setFilter] = useState('all');
   const [search, setSearch] = useState('');
+  const [notification, setNotification] = useState<{ message: string; color: string } | null>(null);
   const messageEndRef = useRef<HTMLDivElement>(null);
+  const searchTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   // ---- API hooks ----
   const convResult = useInboxConversations(apiFetch);
@@ -320,6 +330,10 @@ export function InboxPage() {
 
   const msgResult = useConversationMessages(apiFetch, selectedId);
   const messages: ConversationMessage[] = msgResult.data?.messages ?? [];
+
+  const { escalate, loading: escalating } = useEscalateConversation(apiFetch);
+  const { resolve, loading: resolving } = useResolveConversation(apiFetch);
+  const { search: searchApi, clearSearch, results: searchResults, loading: searching } = useSearchConversations(apiFetch);
 
   // Auto-select first conversation when list loads
   useEffect(() => {
@@ -333,6 +347,13 @@ export function InboxPage() {
     messageEndRef.current?.scrollIntoView({ behavior: 'smooth' });
   }, [selectedId, messages.length]);
 
+  // Auto-dismiss notification after 4 seconds
+  useEffect(() => {
+    if (!notification) return;
+    const t = setTimeout(() => setNotification(null), 4000);
+    return () => clearTimeout(t);
+  }, [notification]);
+
   // ---- Dark mode colors (Mazel design revision) ----
   const panelBg = isDark ? '#0a0a0a' : '#fff';
   const centerBg = isDark ? '#0a0a0a' : '#fafafa';
@@ -342,24 +363,64 @@ export function InboxPage() {
   const bubbleAgentBg = isDark ? '#1f1f1f' : '#f1f3f5';
   const bubbleCustomerBg = isDark ? '#1f1f1f' : '#f1f3f5';
 
-  // ---- Filtering ----
-  const filteredConversations = conversations.filter((c) => {
-    if (filter !== 'all' && c.status !== filter) return false;
-    if (search) {
-      const q = search.toLowerCase();
-      const name = (c.customerName ?? '').toLowerCase();
-      const id = (c.conversationId ?? '').toLowerCase();
-      return name.includes(q) || id.includes(q);
+  // ---- Debounced backend search ----
+  const handleSearchChange = useCallback(
+    (value: string) => {
+      setSearch(value);
+      if (searchTimerRef.current) clearTimeout(searchTimerRef.current);
+      if (!value.trim()) {
+        clearSearch();
+        return;
+      }
+      searchTimerRef.current = setTimeout(() => {
+        searchApi(value.trim());
+      }, 350);
+    },
+    [searchApi, clearSearch],
+  );
+
+  // ---- Escalate / Resolve handlers ----
+  const handleEscalate = useCallback(async () => {
+    if (!selectedId || escalating) return;
+    try {
+      await escalate(selectedId);
+      setNotification({ message: 'Conversation escalated to human agent.', color: 'orange' });
+      // Brief delay before refetch to allow Cosmos read-after-write propagation
+      setTimeout(() => convResult.refetch(), 500);
+    } catch (err: unknown) {
+      const msg = err instanceof Error ? err.message : 'Escalation failed';
+      setNotification({ message: msg, color: 'red' });
     }
-    return true;
-  });
+  }, [selectedId, escalating, escalate, convResult]);
+
+  const handleResolve = useCallback(async () => {
+    if (!selectedId || resolving) return;
+    try {
+      await resolve(selectedId);
+      setNotification({ message: 'Conversation marked as resolved.', color: 'green' });
+      setTimeout(() => convResult.refetch(), 500);
+    } catch (err: unknown) {
+      const msg = err instanceof Error ? err.message : 'Resolve failed';
+      setNotification({ message: msg, color: 'red' });
+    }
+  }, [selectedId, resolving, resolve, convResult]);
+
+  // ---- Filtering (status filter applied to conversation list; search uses backend) ----
+  const isSearchActive = searchResults !== null;
+  const filteredConversations = isSearchActive
+    ? [] // When searching, we show searchResults instead
+    : conversations.filter((c) => {
+        if (filter !== 'all' && c.status !== filter) return false;
+        return true;
+      });
 
   // Clear reader pane when search/filter yields no results (Issue 3a)
   useEffect(() => {
-    if (filteredConversations.length === 0 && (search || filter !== 'all')) {
+    const hasResults = isSearchActive ? (searchResults?.length ?? 0) > 0 : filteredConversations.length > 0;
+    if (!hasResults && (search || filter !== 'all')) {
       setSelectedId('');
     }
-  }, [filteredConversations.length, search, filter]);
+  }, [isSearchActive, searchResults?.length, filteredConversations.length, search, filter]);
 
   // ---- Counts per filter ----
   const counts = {
@@ -370,7 +431,36 @@ export function InboxPage() {
   };
 
   // ---- Selected conversation ----
-  const selectedConversation = conversations.find((c) => c.conversationId === selectedId) ?? null;
+  // Look up in the inbox list first; fall back to building a partial object
+  // from the search results so clicking a search hit always populates the
+  // center + right panels (the search may return conversations beyond the
+  // first inbox page).
+  const selectedConversation: InboxConversation | null = (() => {
+    const fromInbox = conversations.find((c) => c.conversationId === selectedId);
+    if (fromInbox) return fromInbox;
+    if (isSearchActive && searchResults) {
+      const sr = searchResults.find((r) => r.conversation_id === selectedId);
+      if (sr) {
+        return {
+          conversationId: sr.conversation_id,
+          customerId: sr.customer_id,
+          customerName: sr.customer_name,
+          status: sr.status,
+          assignedTo: null,
+          messageCount: sr.message_count,
+          turnCount: 0,
+          startedAt: sr.started_at,
+          endedAt: null,
+          lastActivityAt: sr.last_activity_at,
+          isBillable: false,
+          agentsInvoked: [],
+          modelUsed: null,
+          criticPassed: null,
+        };
+      }
+    }
+    return null;
+  })();
   const selectedDisplayName = selectedConversation?.customerName || selectedConversation?.conversationId?.slice(0, 12) || 'Session';
 
   const layoutHeight = `calc(100vh - ${HEADER_HEIGHT}px - ${PAGE_PADDING * 2}px)`;
@@ -404,10 +494,10 @@ export function InboxPage() {
         <Box p="sm" pb={0}>
           <TextInput
             placeholder="Search conversations..."
-            leftSection={<SearchIcon />}
+            leftSection={searching ? <Loader size={14} color="gray" /> : <SearchIcon />}
             size="sm"
             value={search}
-            onChange={(e) => setSearch(e.currentTarget.value)}
+            onChange={(e) => handleSearchChange(e.currentTarget.value)}
             styles={{
               input: { borderColor: isDark ? '#272727' : 'var(--mantine-color-gray-3)' },
             }}
@@ -455,7 +545,8 @@ export function InboxPage() {
                 </Text>
               </Box>
             )}
-            {!convResult.loading && !convResult.error && filteredConversations.length === 0 && (
+            {/* Empty state */}
+            {!convResult.loading && !convResult.error && !isSearchActive && filteredConversations.length === 0 && (
               <Box py={40} px="sm" ta="center">
                 <svg
                   width="48"
@@ -471,16 +562,78 @@ export function InboxPage() {
                   <path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z" />
                 </svg>
                 <Text size="sm" fw={500} c="dimmed" mb={4}>
-                  {search || filter !== 'all' ? 'No matching conversations' : 'No conversations yet'}
+                  {filter !== 'all' ? 'No matching conversations' : 'No conversations yet'}
                 </Text>
                 <Text size="xs" c="dimmed">
-                  {search || filter !== 'all'
-                    ? 'Try adjusting your search or filter.'
+                  {filter !== 'all'
+                    ? 'Try adjusting your filter.'
                     : 'Conversations will appear here once customers start chatting with your AI agent.'}
                 </Text>
               </Box>
             )}
-            {filteredConversations.map((conv) => (
+            {/* Search results from backend */}
+            {isSearchActive && !searching && searchResults.length === 0 && (
+              <Box py={40} px="sm" ta="center">
+                <Text size="sm" fw={500} c="dimmed" mb={4}>No matching conversations</Text>
+                <Text size="xs" c="dimmed">Try adjusting your search or filter.</Text>
+              </Box>
+            )}
+            {isSearchActive && searchResults.map((sr: SearchResult) => (
+              <Box
+                key={sr.conversation_id}
+                onClick={() => setSelectedId(sr.conversation_id)}
+                style={{
+                  padding: '10px 12px',
+                  borderRadius: 8,
+                  cursor: 'pointer',
+                  background: sr.conversation_id === selectedId ? selectedBg : 'transparent',
+                  borderLeft: sr.conversation_id === selectedId ? `3px solid ${BRAND_RED}` : '3px solid transparent',
+                  transition: 'background 0.15s',
+                }}
+                onMouseEnter={(e: React.MouseEvent<HTMLDivElement>) => {
+                  if (sr.conversation_id !== selectedId) (e.currentTarget as HTMLDivElement).style.background = hoverBg;
+                }}
+                onMouseLeave={(e: React.MouseEvent<HTMLDivElement>) => {
+                  if (sr.conversation_id !== selectedId) (e.currentTarget as HTMLDivElement).style.background = 'transparent';
+                }}
+              >
+                <Group gap={10} align="flex-start" wrap="nowrap">
+                  <Box style={{ flexShrink: 0 }}>
+                    <Avatar
+                      size={38}
+                      radius="xl"
+                      style={{ background: avatarColor(sr.customer_name ?? sr.conversation_id), color: '#fff', fontWeight: 600, fontSize: 14 }}
+                    >
+                      {getInitials(sr.customer_name ?? sr.conversation_id?.slice(0, 8))}
+                    </Avatar>
+                  </Box>
+                  <Box style={{ flex: 1, minWidth: 0 }}>
+                    <Group justify="space-between" wrap="nowrap" gap={4}>
+                      <Text size="sm" fw={600} truncate style={{ flex: 1 }}>
+                        {sr.customer_name || sr.conversation_id?.slice(0, 12) || 'Session'}
+                      </Text>
+                      <Text size="xs" c="dimmed" style={{ flexShrink: 0 }}>
+                        {timeAgo(sr.last_activity_at ?? sr.started_at)}
+                      </Text>
+                    </Group>
+                    <Text size="xs" c="dimmed" truncate mt={2}>
+                      {sr.snippet}
+                    </Text>
+                    <Group gap={6} mt={4}>
+                      <Badge size="xs" variant="light" color={STATUS_COLORS[sr.status ?? ''] ?? 'gray'} style={{ textTransform: 'capitalize' }}>
+                        {sr.status}
+                      </Badge>
+                      <Badge size="xs" variant="outline" color="gray">
+                        {sr.matched_in}
+                      </Badge>
+                      <Text size="xs" c="dimmed">{sr.message_count} msg</Text>
+                    </Group>
+                  </Box>
+                </Group>
+              </Box>
+            ))}
+            {/* Normal conversation list (not searching) */}
+            {!isSearchActive && filteredConversations.map((conv) => (
               <ConversationItem
                 key={conv.conversationId}
                 conversation={conv}
@@ -539,16 +692,34 @@ export function InboxPage() {
                 </Text>
               </Box>
               <Group gap={4} style={{ flexShrink: 0 }}>
-                <Tooltip label="Escalate to human">
-                  <ActionIcon variant="subtle" color="orange" size="md">
-                    <EscalateIcon />
-                  </ActionIcon>
-                </Tooltip>
-                <Tooltip label="Resolve conversation">
-                  <ActionIcon variant="subtle" color="green" size="md">
-                    <CheckIcon />
-                  </ActionIcon>
-                </Tooltip>
+                {selectedConversation.status !== 'escalated' && selectedConversation.status !== 'resolved' && (
+                  <Tooltip label="Escalate to human">
+                    <ActionIcon
+                      variant="subtle"
+                      color="orange"
+                      size="md"
+                      onClick={handleEscalate}
+                      loading={escalating}
+                      disabled={escalating || resolving}
+                    >
+                      <EscalateIcon />
+                    </ActionIcon>
+                  </Tooltip>
+                )}
+                {selectedConversation.status !== 'resolved' && (
+                  <Tooltip label="Resolve conversation">
+                    <ActionIcon
+                      variant="subtle"
+                      color="green"
+                      size="md"
+                      onClick={handleResolve}
+                      loading={resolving}
+                      disabled={escalating || resolving}
+                    >
+                      <CheckIcon />
+                    </ActionIcon>
+                  </Tooltip>
+                )}
               </Group>
             </Group>
           ) : (
@@ -730,6 +901,25 @@ export function InboxPage() {
           </Stack>
         </ScrollArea>
       </Box>
+
+      {/* Notification toast */}
+      {notification && (
+        <Notification
+          color={notification.color}
+          onClose={() => setNotification(null)}
+          withCloseButton
+          style={{
+            position: 'fixed',
+            bottom: 24,
+            right: 24,
+            zIndex: 1000,
+            maxWidth: 360,
+            boxShadow: '0 4px 12px rgba(0,0,0,0.3)',
+          }}
+        >
+          {notification.message}
+        </Notification>
+      )}
     </Box>
   );
 }

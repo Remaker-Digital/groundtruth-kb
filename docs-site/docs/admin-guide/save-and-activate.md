@@ -47,6 +47,18 @@ Click **Activate** in the banner to open the activation dialog. The dialog shows
 
 When you click **Activate now**, the draft becomes your live configuration. The previous live configuration is saved as a restore point.
 
+### Activation button states
+
+The activation button in the banner uses three color-coded dispositions to communicate readiness at a glance:
+
+| Color | State | Meaning |
+|-------|-------|---------|
+| **Green** | Activate ready | All required fields are present and validation passes. Clicking activates the draft. |
+| **Yellow** | Activate blocked | One or more required fields are missing (brand name, brand voice, or widget key). The button is disabled until the issues are resolved. |
+| **Red** | Deactivate | Shown when the configuration is already active. Clicking deactivates the current live configuration, returning the tenant to a pending (inactive) state. |
+
+The **Deactivate** action is available only when the tenant has an active configuration. It removes the live configuration from production — the widget will stop responding to customers until a new activation is performed. Use this if you need to take the AI agent offline temporarily.
+
 ## Draft indicators
 
 While draft changes exist, the admin console shows visual indicators:
@@ -58,16 +70,17 @@ These indicators disappear once you activate or discard the draft.
 
 ## Activation validation
 
-Before a draft can be activated, Agent Red validates that the configuration is viable. Two fields are required:
+Before a draft can be activated, Agent Red validates that the configuration is viable. Three fields are required:
 
-| Field | Requirement | Why |
-|-------|-------------|-----|
-| **Brand name** | Must be set (not empty) | The AI agent uses your brand name in greetings, responses, and escalation messages. Without it, responses sound generic. |
-| **Widget key** | Must exist for the tenant | The widget key connects the chat widget on your storefront to the correct tenant. Without it, the widget cannot load. |
+| Field | Requirement | Severity | Why |
+|-------|-------------|----------|-----|
+| **Brand name** | Must be set (not empty) | Hard error | The AI agent uses your brand name in greetings, responses, and escalation messages. Without it, responses sound generic. |
+| **Brand voice** | Must be set (not empty) | Hard error | The brand voice controls the AI's communication style. Without it, responses fall back to a generic tone that may not represent your brand. |
+| **Widget key** | Must exist for the tenant | Hard error | The widget key connects the chat widget on your storefront to the correct tenant. Without it, the widget cannot load. |
 
-If either validation fails, the **Activate now** button is disabled and the dialog shows the specific error. Fix the issue, save again, and the validation updates automatically.
+If any validation fails, the **Activate now** button is disabled and the dialog shows the specific error. Fix the issue, save again, and the validation updates automatically.
 
-Additional warnings (non-blocking) may appear for optional fields that improve agent quality, such as an empty brand voice or missing business policies.
+Additional warnings (non-blocking) may appear for optional fields that improve agent quality, such as missing business policies.
 
 ## Restoring previous configuration
 

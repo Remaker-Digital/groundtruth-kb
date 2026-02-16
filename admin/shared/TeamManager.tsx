@@ -510,7 +510,6 @@ export const TeamManager: React.FC<BaseComponentProps> = ({
   // Edit dialog
   const [editMember, setEditMember] = useState<TeamMember | null>(null);
   const [editRole, setEditRole] = useState<TeamRole>('escalation_agent');
-  const [editActive, setEditActive] = useState(true);
   const [editCategories, setEditCategories] = useState<string[]>([]);
   const [editLoading, setEditLoading] = useState(false);
 
@@ -519,7 +518,6 @@ export const TeamManager: React.FC<BaseComponentProps> = ({
   const { invite, loading: inviting, error: inviteError } = useInviteTeamMember(apiFetch);
 
   const members: TeamMember[] = team.data?.members ?? [];
-  const activeCount = members.filter((m) => m.isActive).length;
   const totalCount = members.length;
 
   // -------------------------------------------------------------------------
@@ -558,7 +556,6 @@ export const TeamManager: React.FC<BaseComponentProps> = ({
   const openEdit = useCallback((member: TeamMember) => {
     setEditMember(member);
     setEditRole(member.role as TeamRole);
-    setEditActive(member.isActive);
     setEditCategories(member.escalationCategories || []);
   }, []);
 
@@ -569,9 +566,6 @@ export const TeamManager: React.FC<BaseComponentProps> = ({
     try {
       const body: Record<string, unknown> = {};
       if (editRole !== editMember.role) body.role = editRole;
-      const isNowActive = editActive;
-      const wasActive = editMember.isActive;
-      if (isNowActive !== wasActive) body.is_active = isNowActive;
       // Include categories if role is agent and categories changed (WI #279)
       const origCats = editMember.escalationCategories || [];
       const catsChanged = editRole === 'escalation_agent' && (
@@ -605,7 +599,7 @@ export const TeamManager: React.FC<BaseComponentProps> = ({
     } finally {
       setEditLoading(false);
     }
-  }, [editMember, editRole, editActive, apiFetch, onNotify, team]);
+  }, [editMember, editRole, editCategories, apiFetch, onNotify, team]);
 
   // -------------------------------------------------------------------------
   // Remove / disable handler
@@ -637,23 +631,6 @@ export const TeamManager: React.FC<BaseComponentProps> = ({
     }
   }, [confirmMember, confirmAction, apiFetch, onNotify, team]);
 
-  const handleReactivate = useCallback(async (member: TeamMember) => {
-    try {
-      const resp = await apiFetch(`/api/admin/team/${member.id}`, {
-        method: 'PUT',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ is_active: true }),
-      });
-
-      if (!resp.ok) throw new Error(`${resp.status}`);
-      onNotify(`Reactivated ${member.email}.`, 'success');
-      team.refetch();
-    } catch (err: unknown) {
-      const msg = err instanceof Error ? err.message : 'Reactivation failed';
-      onNotify(`Failed to reactivate: ${msg}`, 'error');
-    }
-  }, [apiFetch, onNotify, team]);
-
   // -------------------------------------------------------------------------
   // Inline role change (WI #275)
   // -------------------------------------------------------------------------
@@ -672,27 +649,6 @@ export const TeamManager: React.FC<BaseComponentProps> = ({
     } catch (err: unknown) {
       const msg = err instanceof Error ? err.message : 'Role update failed';
       onNotify(`Failed to update role: ${msg}`, 'error');
-    }
-  }, [apiFetch, onNotify, team]);
-
-  // -------------------------------------------------------------------------
-  // Inline status toggle (WI #280)
-  // -------------------------------------------------------------------------
-
-  const handleInlineToggle = useCallback(async (member: TeamMember) => {
-    const newActive = !member.isActive;
-    try {
-      const resp = await apiFetch(`/api/admin/team/${member.id}`, {
-        method: 'PUT',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ is_active: newActive }),
-      });
-      if (!resp.ok) throw new Error(`${resp.status}`);
-      onNotify(`${member.email} ${newActive ? 'enabled' : 'disabled'}.`, 'success');
-      team.refetch();
-    } catch (err: unknown) {
-      const msg = err instanceof Error ? err.message : 'Toggle failed';
-      onNotify(`Failed to update status: ${msg}`, 'error');
     }
   }, [apiFetch, onNotify, team]);
 
@@ -849,7 +805,7 @@ export const TeamManager: React.FC<BaseComponentProps> = ({
           margin: 0,
           lineHeight: 1.5,
         }}>
-          {activeCount} active member{activeCount !== 1 ? 's' : ''} of {totalCount} total
+          {totalCount} team member{totalCount !== 1 ? 's' : ''}
         </p>
         <button
           style={s.inviteButton}
@@ -975,7 +931,6 @@ export const TeamManager: React.FC<BaseComponentProps> = ({
                     {roleTooltipOpen && roleTooltipContent}
                   </span>
                 </th>
-                <th style={s.th}>Status</th>
                 <th style={s.th}>Joined</th>
                 <th style={s.th}>Last active</th>
                 <th style={{ ...s.th, textAlign: 'right' }}>Actions</th>
@@ -984,12 +939,9 @@ export const TeamManager: React.FC<BaseComponentProps> = ({
             <tbody>
               {members.map((member) => {
                 const isOwner = member.role === 'superadmin';
-                const isDisabled = !member.isActive;
-                const memberStatus = member.isActive ? 'active' : 'disabled';
-                const statusInfo = STATUS_DISPLAY[memberStatus] || STATUS_DISPLAY.active;
 
                 return (
-                  <tr key={member.id} style={s.tr(isDisabled)}>
+                  <tr key={member.id} style={s.tr(false)}>
                     {/* Member info */}
                     <td style={s.td}>
                       <div style={s.memberInfo}>
@@ -1062,28 +1014,6 @@ export const TeamManager: React.FC<BaseComponentProps> = ({
                       )}
                     </td>
 
-                    {/* Status toggle (WI #280) */}
-                    <td style={s.td}>
-                      {isOwner ? (
-                        <span style={s.statusDot(statusInfo.color)}>
-                          <span style={s.dot(statusInfo.color)} />
-                          {statusInfo.label}
-                        </span>
-                      ) : (
-                        <label style={{ display: 'inline-flex', alignItems: 'center', gap: 6, cursor: 'pointer' }}>
-                          <input
-                            type="checkbox"
-                            checked={member.isActive}
-                            onChange={() => handleInlineToggle(member)}
-                            style={{ accentColor: '#059669', width: 16, height: 16, cursor: 'pointer' }}
-                          />
-                          <span style={{ fontSize: 12, color: member.isActive ? '#059669' : '#9CA3AF', fontWeight: 500 }}>
-                            {member.isActive ? 'Active' : 'Disabled'}
-                          </span>
-                        </label>
-                      )}
-                    </td>
-
                     {/* Joined */}
                     <td style={s.td}>
                       <span style={s.dateText}>{formatDate(member.createdAt)}</span>
@@ -1142,9 +1072,9 @@ export const TeamManager: React.FC<BaseComponentProps> = ({
           <div style={s.modal} onClick={(e) => e.stopPropagation()}>
             <h4 style={s.modalTitle}>Remove team member</h4>
             <p style={s.modalBody}>
-              Are you sure you want to remove <strong>{confirmMember.displayName || confirmMember.email}</strong> ({confirmMember.email})?
-              They will no longer have access to the admin dashboard or be able to handle
-              escalated conversations. This action can be reversed by reactivating the member.
+              Are you sure you want to permanently remove <strong>{confirmMember.displayName || confirmMember.email}</strong> ({confirmMember.email})?
+              Their API key will be revoked and they will lose all access immediately.
+              This action cannot be undone — to restore access, you must re-invite them.
             </p>
             <div style={s.modalActions}>
               <button
@@ -1254,44 +1184,6 @@ export const TeamManager: React.FC<BaseComponentProps> = ({
                 </div>
               </div>
             )}
-
-            <div style={{ marginBottom: 20 }}>
-              <label style={s.formLabel}>Status</label>
-              <div style={{ marginTop: 8, display: 'flex', gap: 16 }}>
-                <label style={{
-                  display: 'flex',
-                  alignItems: 'center',
-                  gap: 6,
-                  cursor: 'pointer',
-                  fontSize: 14,
-                  color: palette.textPrimary,
-                }}>
-                  <input
-                    type="radio"
-                    name="edit-status"
-                    checked={editActive}
-                    onChange={() => setEditActive(true)}
-                  />
-                  Active
-                </label>
-                <label style={{
-                  display: 'flex',
-                  alignItems: 'center',
-                  gap: 6,
-                  cursor: 'pointer',
-                  fontSize: 14,
-                  color: palette.textPrimary,
-                }}>
-                  <input
-                    type="radio"
-                    name="edit-status"
-                    checked={!editActive}
-                    onChange={() => setEditActive(false)}
-                  />
-                  Disabled
-                </label>
-              </div>
-            </div>
 
             <div style={s.modalActions}>
               <button

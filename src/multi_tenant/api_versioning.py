@@ -4,7 +4,8 @@ Adds API version information to all responses via headers. This allows
 clients to detect version changes and handle deprecation notices.
 
 Headers added:
-    X-API-Version: 1.0.0
+    X-API-Version: 1.0.0 (API contract version, changes on breaking changes)
+    X-Product-Version: 1.25.1 (deployment/release version, changes every release)
     X-API-Deprecation-Notice: (only when deprecated paths are accessed)
 
 The version follows semantic versioning. Breaking changes increment the
@@ -33,6 +34,11 @@ logger = logging.getLogger(__name__)
 # ---------------------------------------------------------------------------
 
 API_VERSION = "1.0.0"
+
+# Product release version — updated with each deployment.
+# This is displayed in the admin sidebar footer and returned via
+# the X-Product-Version response header on all API calls.
+PRODUCT_VERSION = "1.31.0"
 
 # Deprecated paths — these still work but clients should migrate.
 # Format: {path_prefix: deprecation_message}
@@ -75,6 +81,7 @@ class ApiVersionMiddleware:
             if message["type"] == "http.response.start":
                 headers = list(message.get("headers", []))
                 headers.append((b"x-api-version", API_VERSION.encode()))
+                headers.append((b"x-product-version", PRODUCT_VERSION.encode()))
 
                 if deprecation_notice:
                     headers.append(

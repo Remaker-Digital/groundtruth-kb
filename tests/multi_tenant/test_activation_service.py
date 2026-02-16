@@ -370,13 +370,13 @@ class TestSaveDraftNewDraft:
         assert result.state == "draft"
         assert result.changes == changes
 
-        # Verify create was called
+        # Verify create was called with a PreferencesDocument
         prefs_repo.create.assert_awaited_once()
         created_doc = prefs_repo.create.call_args[0][1]
-        assert created_doc["config_state"] == ConfigState.DRAFT.value
-        assert created_doc["brand_name"] == "Updated Brand"
-        assert created_doc["is_current"] is False
-        assert created_doc["version"] == 2
+        assert created_doc.config_state == ConfigState.DRAFT.value
+        assert created_doc.brand_name == "Updated Brand"
+        assert created_doc.is_current is False
+        assert created_doc.version == 2
 
     @pytest.mark.asyncio
     async def test_creates_draft_without_active(self):
@@ -394,8 +394,8 @@ class TestSaveDraftNewDraft:
         assert result.version == 1  # 0 + 1
 
         created_doc = prefs_repo.create.call_args[0][1]
-        assert created_doc["brand_name"] == "First Config"
-        assert created_doc["config_state"] == ConfigState.DRAFT.value
+        assert created_doc.brand_name == "First Config"
+        assert created_doc.config_state == ConfigState.DRAFT.value
 
     @pytest.mark.asyncio
     async def test_draft_preserves_active_fields(self):
@@ -412,9 +412,10 @@ class TestSaveDraftNewDraft:
 
         created_doc = prefs_repo.create.call_args[0][1]
         # Active fields should be preserved
-        assert created_doc["brand_name"] == "Original"
-        # Changed field should be updated
-        assert created_doc["primary_color"] == "#ff0000"
+        assert created_doc.brand_name == "Original"
+        # Changed field should be updated — extra fields stored via model_extra
+        doc_dict = created_doc.model_dump()
+        assert doc_dict.get("primary_color") == "#ff0000"
 
     @pytest.mark.asyncio
     async def test_draft_id_format(self):
@@ -428,7 +429,7 @@ class TestSaveDraftNewDraft:
             )
 
         created_doc = prefs_repo.create.call_args[0][1]
-        assert created_doc["id"] == f"{STARTER_TENANT_ID}:4"
+        assert created_doc.id == f"{STARTER_TENANT_ID}:4"
 
     @pytest.mark.asyncio
     async def test_draft_sets_metadata(self):
@@ -443,10 +444,10 @@ class TestSaveDraftNewDraft:
             )
 
         created_doc = prefs_repo.create.call_args[0][1]
-        assert created_doc["created_by"] == "user:mike"
-        assert created_doc["activated_at"] is None
-        assert created_doc["activated_by"] is None
-        assert created_doc["created_at"] is not None
+        assert created_doc.created_by == "user:mike"
+        assert created_doc.activated_at is None
+        assert created_doc.activated_by is None
+        assert created_doc.created_at is not None
 
 
 # =========================================================================
@@ -834,8 +835,8 @@ class TestValidateForActivation:
         assert "widget_key" in error_fields
 
     @pytest.mark.asyncio
-    async def test_warning_no_brand_voice(self):
-        """Missing brand_voice generates a warning but allows activation."""
+    async def test_hard_error_no_brand_voice(self):
+        """Missing brand_voice blocks activation (mandatory — session 21)."""
         draft = _make_draft_doc(brand_voice="")
         service, _, _, _, _ = _make_service(draft=draft, kb_count=5)
 
@@ -843,12 +844,12 @@ class TestValidateForActivation:
             STARTER_TENANT_ID, TenantTier.STARTER,
         )
 
-        assert result.can_activate is True
-        assert any(w["field"] == "brand_voice" for w in result.warnings)
+        assert result.can_activate is False
+        assert any(e["field"] == "brand_voice" for e in result.hard_errors)
 
     @pytest.mark.asyncio
-    async def test_warning_whitespace_brand_voice(self):
-        """Whitespace-only brand_voice generates a warning."""
+    async def test_hard_error_whitespace_brand_voice(self):
+        """Whitespace-only brand_voice blocks activation (mandatory — session 21)."""
         draft = _make_draft_doc(brand_voice="   ")
         service, _, _, _, _ = _make_service(draft=draft, kb_count=5)
 
@@ -856,8 +857,8 @@ class TestValidateForActivation:
             STARTER_TENANT_ID, TenantTier.STARTER,
         )
 
-        assert result.can_activate is True
-        assert any(w["field"] == "brand_voice" for w in result.warnings)
+        assert result.can_activate is False
+        assert any(e["field"] == "brand_voice" for e in result.hard_errors)
 
     @pytest.mark.asyncio
     async def test_warning_no_kb_articles(self):
@@ -1192,9 +1193,22 @@ class TestActivate:
         assert result.success is True
 
     @pytest.mark.asyncio
-    async def test_activate_returns_warnings(self):
-        """Activation result includes validation warnings."""
+    async def test_activate_fails_without_brand_voice(self):
+        """Activation fails when brand_voice is empty (mandatory — session 21)."""
         draft = _make_draft_doc(brand_voice="")
+        service, _, _, _, _ = _make_service(draft=draft, kb_count=0)
+
+        result = await service.activate(
+            STARTER_TENANT_ID, TenantTier.STARTER, "admin",
+        )
+
+        assert result.success is False
+        assert any(e["field"] == "brand_voice" for e in result.errors)
+
+    @pytest.mark.asyncio
+    async def test_activate_returns_warnings(self):
+        """Activation succeeds with warnings (e.g. no KB articles)."""
+        draft = _make_draft_doc()  # brand_voice="friendly" (valid)
         service, _, _, _, _ = _make_service(draft=draft, kb_count=0)
 
         result = await service.activate(
@@ -1400,10 +1414,11 @@ class TestDiscardDraft:
     """Discard the current draft."""
 
     @pytest.mark.asyncio
-    async def test_discard_success(self):
-        """Successfully discards an existing draft."""
+    async def test_discard_success_with_active(self):
+        """Discards draft when active config exists (normal case)."""
+        active = _make_active_doc()
         draft = _make_draft_doc(version=2)
-        service, prefs_repo, _, _, _ = _make_service(draft=draft)
+        service, prefs_repo, _, _, _ = _make_service(active=active, draft=draft)
 
         result = await service.discard_draft(STARTER_TENANT_ID, "admin")
 
@@ -1419,6 +1434,43 @@ class TestDiscardDraft:
         op_map = {op["path"]: op["value"] for op in ops}
         assert op_map.get("/config_state") == "discarded"
         assert op_map.get("/is_current") is False
+
+    @pytest.mark.asyncio
+    async def test_discard_resets_when_never_activated(self):
+        """Resets draft to initial state when no active config exists."""
+        draft = _make_draft_doc(version=1)
+        service, prefs_repo, _, _, _ = _make_service(draft=draft)
+
+        result = await service.discard_draft(STARTER_TENANT_ID, "admin")
+
+        assert result is True
+
+        # Verify draft was reset (not discarded) — brand_name cleared
+        prefs_repo.patch.assert_awaited_once()
+        patch_call = prefs_repo.patch.call_args
+        doc_id = patch_call.kwargs.get("document_id", patch_call[1].get("document_id", ""))
+        assert doc_id == draft["id"]
+
+        ops = patch_call.kwargs.get("operations", patch_call[1].get("operations", []))
+        op_map = {op["path"]: op["value"] for op in ops}
+        # Should reset fields, NOT set config_state to discarded
+        assert "/config_state" not in op_map
+        # All merchant-configurable fields must match seed_tenant.py defaults
+        assert op_map.get("/brand_name") == ""
+        assert op_map.get("/brand_voice") == ""
+        assert op_map.get("/custom_instructions") == ""
+        assert op_map.get("/return_policy") == ""
+        assert op_map.get("/shipping_info") == ""
+        assert op_map.get("/escalation_keywords") == []
+        assert op_map.get("/escalation_email") is None
+        assert op_map.get("/greeting_message") is None
+        assert op_map.get("/farewell_message") is None
+        assert op_map.get("/warranty_info") is None
+        assert op_map.get("/support_hours") is None
+        assert op_map.get("/custom_policies") is None
+        assert op_map.get("/widget_greeting_message") == ""
+        assert op_map.get("/activated_at") is None
+        assert op_map.get("/activated_by") is None
 
     @pytest.mark.asyncio
     async def test_discard_no_draft(self):
@@ -1551,7 +1603,7 @@ class TestReinitializeToDefaults:
 
         # Verify the created document has superadmin as created_by
         created_doc = prefs_repo.create.call_args[0][1]
-        assert created_doc["created_by"] == "superadmin"
+        assert created_doc.created_by == "superadmin"
 
 
 # =========================================================================
@@ -1892,3 +1944,375 @@ class TestEdgeCases:
             for op in first_ops
         )
         assert migrated, "Lazy migration was not applied during activate"
+
+
+# ---------------------------------------------------------------------------
+# D44: Activation clears deactivated_at
+# ---------------------------------------------------------------------------
+
+
+class TestActivateClearsDeactivatedAt:
+    """Ensure activate() sets deactivated_at=None on the promoted draft."""
+
+    @pytest.mark.asyncio
+    async def test_activate_clears_deactivated_at(self) -> None:
+        """After activation, the new active doc must have deactivated_at=None."""
+        svc, prefs_repo, audit_repo, kb_repo, _ = _make_service()
+
+        active_doc = _make_active_doc(PROFESSIONAL_TENANT_ID, version=1)
+        draft_doc = _make_draft_doc(
+            PROFESSIONAL_TENANT_ID, version=2,
+            brand_name="Updated Brand", brand_voice="professional",
+        )
+
+        prefs_repo.get_active.return_value = active_doc
+        prefs_repo.get_draft.return_value = draft_doc
+        prefs_repo.get_previous.return_value = None
+        prefs_repo.patch.return_value = None
+
+        result = await svc.activate(PROFESSIONAL_TENANT_ID, TenantTier.PROFESSIONAL)
+        assert result.success
+
+        # Find the patch call that promotes draft → active
+        promote_calls = [
+            c for c in prefs_repo.patch.call_args_list
+            if c.kwargs.get("document_id", "") == draft_doc["id"]
+        ]
+        assert len(promote_calls) >= 1
+        ops = promote_calls[0].kwargs.get("operations", [])
+        deact_ops = [op for op in ops if op.get("path") == "/deactivated_at"]
+        assert len(deact_ops) == 1
+        assert deact_ops[0]["value"] is None, "activate() must clear deactivated_at"
+
+
+# ---------------------------------------------------------------------------
+# D44: restore_previous clears deactivated_at
+# ---------------------------------------------------------------------------
+
+
+class TestRestorePreviousClearsDeactivatedAt:
+    """Ensure restore_previous() sets deactivated_at=None on the promoted doc."""
+
+    @pytest.mark.asyncio
+    async def test_restore_clears_deactivated_at(self) -> None:
+        """After roll back, the restored doc must have deactivated_at=None."""
+        svc, prefs_repo, audit_repo, kb_repo, _ = _make_service()
+
+        active_doc = _make_active_doc(PROFESSIONAL_TENANT_ID, version=2)
+        active_doc["deactivated_at"] = "2026-02-15T12:00:00Z"
+
+        previous_doc = _make_active_doc(PROFESSIONAL_TENANT_ID, version=1)
+        previous_doc["id"] = f"prefs::{PROFESSIONAL_TENANT_ID}::previous"
+        previous_doc["config_state"] = ConfigState.PREVIOUS.value
+
+        prefs_repo.get_active.return_value = active_doc
+        prefs_repo.get_previous.return_value = previous_doc
+        prefs_repo.get_draft.return_value = None
+        prefs_repo.patch.return_value = None
+
+        result = await svc.restore_previous(
+            PROFESSIONAL_TENANT_ID, TenantTier.PROFESSIONAL,
+        )
+        assert result.success
+
+        # Find the patch call that promotes previous → active
+        promote_calls = [
+            c for c in prefs_repo.patch.call_args_list
+            if c.kwargs.get("document_id", "") == previous_doc["id"]
+        ]
+        assert len(promote_calls) >= 1
+        ops = promote_calls[0].kwargs.get("operations", [])
+        deact_ops = [op for op in ops if op.get("path") == "/deactivated_at"]
+        assert len(deact_ops) == 1
+        assert deact_ops[0]["value"] is None, "restore_previous() must clear deactivated_at"
+
+
+# ---------------------------------------------------------------------------
+# D44: Deactivate endpoint
+# ---------------------------------------------------------------------------
+
+
+class TestDeactivateEndpoint:
+    """Tests for POST /api/config/deactivate."""
+
+    @pytest.mark.asyncio
+    async def test_deactivate_sets_deactivated_at(self) -> None:
+        """Deactivate patches the active doc with deactivated_at timestamp."""
+        from src.multi_tenant.tenant_config_api import deactivate_config
+        from src.multi_tenant.activation_service import ActivationService
+
+        prefs_repo = AsyncMock()
+        audit_repo = AsyncMock()
+        active_doc = _make_active_doc(PROFESSIONAL_TENANT_ID, version=1)
+        prefs_repo.get_active.return_value = active_doc
+        prefs_repo.patch.return_value = None
+
+        svc = ActivationService()
+        svc.configure(prefs_repo, audit_repo)
+
+        # Mock the get_activation_service and get_tenant_context
+        ctx = MagicMock()
+        ctx.tenant_id = PROFESSIONAL_TENANT_ID
+        ctx.user_id = "admin"
+
+        with patch("src.multi_tenant.tenant_config_api.get_activation_service", return_value=svc), \
+             patch("src.multi_tenant.tenant_config_api.get_tenant_context", return_value=ctx):
+            result = await deactivate_config(ctx=ctx)
+
+        assert result["success"] is True
+        assert "deactivated_at" in result
+
+        # Verify patch was called with deactivated_at
+        prefs_repo.patch.assert_called_once()
+        patch_ops = prefs_repo.patch.call_args.kwargs.get("operations", [])
+        deact_ops = [op for op in patch_ops if op.get("path") == "/deactivated_at"]
+        assert len(deact_ops) == 1
+        assert deact_ops[0]["value"] is not None
+
+    @pytest.mark.asyncio
+    async def test_deactivate_409_when_no_active_config(self) -> None:
+        """Deactivate returns 409 when no active config exists."""
+        from fastapi import HTTPException
+        from src.multi_tenant.tenant_config_api import deactivate_config
+        from src.multi_tenant.activation_service import ActivationService
+
+        prefs_repo = AsyncMock()
+        audit_repo = AsyncMock()
+        prefs_repo.get_active.return_value = None
+
+        svc = ActivationService()
+        svc.configure(prefs_repo, audit_repo)
+
+        ctx = MagicMock()
+        ctx.tenant_id = PROFESSIONAL_TENANT_ID
+
+        with patch("src.multi_tenant.tenant_config_api.get_activation_service", return_value=svc), \
+             pytest.raises(HTTPException) as exc_info:
+            await deactivate_config(ctx=ctx)
+
+        assert exc_info.value.status_code == 409
+
+    @pytest.mark.asyncio
+    async def test_deactivate_409_when_already_deactivated(self) -> None:
+        """Deactivate returns 409 when config is already deactivated."""
+        from fastapi import HTTPException
+        from src.multi_tenant.tenant_config_api import deactivate_config
+        from src.multi_tenant.activation_service import ActivationService
+
+        prefs_repo = AsyncMock()
+        audit_repo = AsyncMock()
+        active_doc = _make_active_doc(PROFESSIONAL_TENANT_ID, version=1)
+        active_doc["deactivated_at"] = "2026-02-15T00:00:00Z"
+        prefs_repo.get_active.return_value = active_doc
+
+        svc = ActivationService()
+        svc.configure(prefs_repo, audit_repo)
+
+        ctx = MagicMock()
+        ctx.tenant_id = PROFESSIONAL_TENANT_ID
+
+        with patch("src.multi_tenant.tenant_config_api.get_activation_service", return_value=svc), \
+             pytest.raises(HTTPException) as exc_info:
+            await deactivate_config(ctx=ctx)
+
+        assert exc_info.value.status_code == 409
+
+
+# ---------------------------------------------------------------------------
+# D44: Activation status is_active field
+# ---------------------------------------------------------------------------
+
+
+class TestActivationStatusIsActive:
+    """Tests for the is_active field in activation-status response."""
+
+    @pytest.mark.asyncio
+    async def test_is_active_true_when_configured_and_not_deactivated(self) -> None:
+        """is_active=True when config is activated and not deactivated."""
+        from src.multi_tenant.tenant_config_api import get_activation_status
+        from src.multi_tenant.activation_service import ActivationService
+
+        prefs_repo = AsyncMock()
+        audit_repo = AsyncMock()
+        active_doc = _make_active_doc(PROFESSIONAL_TENANT_ID, version=1)
+        # Ensure activated_at is set and no deactivated_at
+        active_doc.pop("deactivated_at", None)
+
+        draft_state = DraftState(
+            has_pending_changes=False,
+            active_version=1,
+            active_activated_at="2026-02-15T00:00:00Z",
+        )
+
+        svc = ActivationService()
+        svc.configure(prefs_repo, audit_repo)
+        svc.get_draft_state = AsyncMock(return_value=draft_state)
+        prefs_repo.get_active.return_value = active_doc
+
+        ctx = MagicMock()
+        ctx.tenant_id = PROFESSIONAL_TENANT_ID
+        ctx.tier = TenantTier.PROFESSIONAL
+        ctx.status = "active"
+
+        with patch("src.multi_tenant.tenant_config_api.get_activation_service", return_value=svc), \
+             patch("src.multi_tenant.tenant_config_api._resolve_tier", return_value=TenantTier.PROFESSIONAL):
+            result = await get_activation_status(ctx=ctx)
+
+        assert result.is_active is True
+        assert result.is_configured is True
+
+    @pytest.mark.asyncio
+    async def test_is_active_false_when_deactivated(self) -> None:
+        """is_active=False when config has deactivated_at set."""
+        from src.multi_tenant.tenant_config_api import get_activation_status
+        from src.multi_tenant.activation_service import ActivationService
+
+        prefs_repo = AsyncMock()
+        audit_repo = AsyncMock()
+        active_doc = _make_active_doc(PROFESSIONAL_TENANT_ID, version=1)
+        active_doc["deactivated_at"] = "2026-02-15T12:00:00Z"
+
+        draft_state = DraftState(
+            has_pending_changes=False,
+            active_version=1,
+            active_activated_at="2026-02-15T00:00:00Z",
+        )
+
+        svc = ActivationService()
+        svc.configure(prefs_repo, audit_repo)
+        svc.get_draft_state = AsyncMock(return_value=draft_state)
+        prefs_repo.get_active.return_value = active_doc
+
+        ctx = MagicMock()
+        ctx.tenant_id = PROFESSIONAL_TENANT_ID
+        ctx.tier = TenantTier.PROFESSIONAL
+        ctx.status = "active"
+
+        with patch("src.multi_tenant.tenant_config_api.get_activation_service", return_value=svc), \
+             patch("src.multi_tenant.tenant_config_api._resolve_tier", return_value=TenantTier.PROFESSIONAL):
+            result = await get_activation_status(ctx=ctx)
+
+        assert result.is_active is False
+        assert result.is_configured is True
+
+    @pytest.mark.asyncio
+    async def test_is_active_false_when_never_activated(self) -> None:
+        """is_active=False when tenant has never activated."""
+        from src.multi_tenant.tenant_config_api import get_activation_status
+        from src.multi_tenant.activation_service import ActivationService
+
+        prefs_repo = AsyncMock()
+        audit_repo = AsyncMock()
+
+        draft_state = DraftState(
+            has_pending_changes=True,
+            active_version=0,
+            active_activated_at=None,
+        )
+
+        svc = ActivationService()
+        svc.configure(prefs_repo, audit_repo)
+        svc.get_draft_state = AsyncMock(return_value=draft_state)
+
+        ctx = MagicMock()
+        ctx.tenant_id = PROFESSIONAL_TENANT_ID
+        ctx.tier = TenantTier.PROFESSIONAL
+        ctx.status = "active"
+
+        with patch("src.multi_tenant.tenant_config_api.get_activation_service", return_value=svc), \
+             patch("src.multi_tenant.tenant_config_api._resolve_tier", return_value=TenantTier.PROFESSIONAL):
+            result = await get_activation_status(ctx=ctx)
+
+        assert result.is_active is False
+        assert result.is_configured is False
+
+
+# ---------------------------------------------------------------------------
+# D44: Conversation creation gate
+# ---------------------------------------------------------------------------
+
+
+class TestConversationCreationGate:
+    """Tests for the activation gate on POST /api/chat/conversations."""
+
+    @pytest.mark.asyncio
+    async def test_gate_blocks_when_never_activated(self) -> None:
+        """403 returned when tenant has never activated config."""
+        from fastapi import HTTPException
+        from src.chat.endpoints import start_conversation
+        from src.chat.models import ConversationStartRequest
+
+        prefs_repo_mock = AsyncMock()
+        prefs_repo_mock.get_active.return_value = None
+
+        ctx = MagicMock()
+        ctx.tenant_id = PROFESSIONAL_TENANT_ID
+        ctx.tier = TenantTier.PROFESSIONAL
+
+        req = ConversationStartRequest()
+
+        with patch("src.chat.endpoints.PreferencesRepository", return_value=prefs_repo_mock), \
+             pytest.raises(HTTPException) as exc_info:
+            await start_conversation(request=req, ctx=ctx)
+
+        assert exc_info.value.status_code == 403
+        assert exc_info.value.detail["type"] == "not_active"
+
+    @pytest.mark.asyncio
+    async def test_gate_blocks_when_deactivated(self) -> None:
+        """403 returned when tenant config is deactivated."""
+        from fastapi import HTTPException
+        from src.chat.endpoints import start_conversation
+        from src.chat.models import ConversationStartRequest
+
+        active_doc = _make_active_doc(PROFESSIONAL_TENANT_ID, version=1)
+        active_doc["deactivated_at"] = "2026-02-15T12:00:00Z"
+
+        prefs_repo_mock = AsyncMock()
+        prefs_repo_mock.get_active.return_value = active_doc
+
+        ctx = MagicMock()
+        ctx.tenant_id = PROFESSIONAL_TENANT_ID
+        ctx.tier = TenantTier.PROFESSIONAL
+
+        req = ConversationStartRequest()
+
+        with patch("src.chat.endpoints.PreferencesRepository", return_value=prefs_repo_mock), \
+             pytest.raises(HTTPException) as exc_info:
+            await start_conversation(request=req, ctx=ctx)
+
+        assert exc_info.value.status_code == 403
+        assert exc_info.value.detail["type"] == "not_active"
+
+    @pytest.mark.asyncio
+    async def test_gate_allows_when_active(self) -> None:
+        """Conversation creation succeeds when tenant config is active."""
+        from src.chat.endpoints import start_conversation
+        from src.chat.models import ConversationStartRequest, ConversationStartResponse
+
+        active_doc = _make_active_doc(PROFESSIONAL_TENANT_ID, version=1)
+        active_doc.pop("deactivated_at", None)
+
+        prefs_repo_mock = AsyncMock()
+        prefs_repo_mock.get_active.return_value = active_doc
+
+        mock_session = AsyncMock()
+        mock_session.start_conversation.return_value = ConversationStartResponse(
+            conversation_id="conv-123",
+            stream_url="/api/chat/stream/conv-123",
+            ws_url="/ws/chat/conv-123",
+            created_at="2026-02-15T12:00:00Z",
+        )
+
+        ctx = MagicMock()
+        ctx.tenant_id = PROFESSIONAL_TENANT_ID
+        ctx.tier = TenantTier.PROFESSIONAL
+
+        req = ConversationStartRequest()
+
+        with patch("src.chat.endpoints.PreferencesRepository", return_value=prefs_repo_mock), \
+             patch("src.chat.endpoints._get_session", return_value=mock_session):
+            result = await start_conversation(request=req, ctx=ctx)
+
+        assert result.conversation_id == "conv-123"
+        mock_session.start_conversation.assert_called_once()

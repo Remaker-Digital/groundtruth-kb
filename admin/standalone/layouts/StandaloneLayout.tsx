@@ -65,6 +65,8 @@ interface AppContextValue {
   tenantContext: TenantContext | null;
   /** Caller's role from /api/admin/team/whoami. Null until resolved. */
   userRole: TeamRole | null;
+  /** Product version from API X-Product-Version header. Null until first API call completes. */
+  productVersion: string | null;
   apiFetch: (path: string, init?: RequestInit) => Promise<Response>;
   onNotify: (message: string, type: 'success' | 'error' | 'warning' | 'info') => void;
   loading: boolean;
@@ -105,8 +107,8 @@ const TIER_ORDER: TenantTier[] = ['trial', 'starter', 'professional', 'enterpris
 /** Short labels for nav tier badges. */
 const TIER_BADGE_LABELS: Record<TenantTier, string> = {
   trial: 'Trial',
-  starter: 'Starter+',
-  professional: 'Pro+',
+  starter: 'Starter',
+  professional: 'Professional',
   enterprise: 'Enterprise',
 };
 
@@ -241,6 +243,7 @@ export const StandaloneLayout: React.FC<StandaloneLayoutProps> = ({
   const isDark = computedColorScheme === 'dark';
 
   const [tenantContext, setTenantContext] = useState<TenantContext | null>(null);
+  const [productVersion, setProductVersion] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
@@ -302,6 +305,10 @@ export const StandaloneLayout: React.FC<StandaloneLayoutProps> = ({
         }
         const data = await resp.json();
         if (!cancelled) {
+          // Capture product version from response header (set by ApiVersionMiddleware)
+          const pv = resp.headers.get('x-product-version');
+          if (pv) setProductVersion(pv);
+
           setTenantContext({
             tenantId: data.tenant_id,
             tier: data.tier as TenantTier,
@@ -345,42 +352,12 @@ export const StandaloneLayout: React.FC<StandaloneLayoutProps> = ({
       });
   }, [tenantContext, apiFetch]);
 
-  // ---- Activation status check (WI #291) -----------------------------------
-
-  const [isActivated, setIsActivated] = useState<boolean | null>(null); // null = unknown
-
-  useEffect(() => {
-    if (!tenantContext) return;
-    apiFetch('/api/config')
-      .then(async (resp) => {
-        if (!resp.ok) { setIsActivated(false); return; }
-        const data = await resp.json();
-        setIsActivated(!!data.version && data.version > 0);
-      })
-      .catch(() => setIsActivated(false));
-  }, [tenantContext, apiFetch]);
-
-  // ---- Welcome popup (WI #292) — first-time merchants ---------------------
-
-  const [showWelcome, setShowWelcome] = useState(false);
-
-  useEffect(() => {
-    if (isActivated !== false) return; // Only show when explicitly not activated
-    try {
-      const dismissed = localStorage.getItem('agentred-welcome-dismissed');
-      if (!dismissed) setShowWelcome(true);
-    } catch { /* ignore */ }
-  }, [isActivated]);
-
-  const dismissWelcome = useCallback(() => {
-    setShowWelcome(false);
-    try { localStorage.setItem('agentred-welcome-dismissed', '1'); } catch { /* ignore */ }
-  }, []);
-
   // ---- Activation state (sidebar config group) --------------------------------
 
   const [showActivationDialog, setShowActivationDialog] = useState(false);
+  const [showDeactivateDialog, setShowDeactivateDialog] = useState(false);
   const [showRestoreDialog, setShowRestoreDialog] = useState(false);
+  const [deactivating, setDeactivating] = useState(false);
   const [activationRefreshKey, setActivationRefreshKey] = useState(0);
   const [activationStatus, setActivationStatus] = useState<ActivationStatus | null>(null);
   const [discarding, setDiscarding] = useState(false);
@@ -402,6 +379,37 @@ export const StandaloneLayout: React.FC<StandaloneLayoutProps> = ({
     const interval = setInterval(fetchActivationStatus, 30_000);
     return () => clearInterval(interval);
   }, [tenantContext, fetchActivationStatus, activationRefreshKey]);
+
+  // ---- Activation status check (WI #291) -----------------------------------
+  // Derived from activationStatus polling (D34 fix: previously checked version>0
+  // which was true even for DRAFT-state tenants that were never activated).
+  // Now uses is_configured from the activation-status endpoint, which verifies
+  // the active config has all mandatory fields (brand_name, widget_key).
+
+  // D34 re-fix: isActivated = true ONLY when there's an active config
+  // that has been activated AND has all mandatory fields. A fresh tenant
+  // that has never been activated returns false.
+  const isActivated = (
+    activationStatus?.is_configured === true
+    && activationStatus?.active_activated_at != null
+  ) ? true : (activationStatus != null ? false : null);
+
+  // ---- Welcome popup (WI #292) — first-time merchants ---------------------
+
+  const [showWelcome, setShowWelcome] = useState(false);
+
+  useEffect(() => {
+    if (isActivated !== false) return; // Only show when explicitly not activated
+    try {
+      const dismissed = localStorage.getItem('agentred-welcome-dismissed');
+      if (!dismissed) setShowWelcome(true);
+    } catch { /* ignore */ }
+  }, [isActivated]);
+
+  const dismissWelcome = useCallback(() => {
+    setShowWelcome(false);
+    try { localStorage.setItem('agentred-welcome-dismissed', '1'); } catch { /* ignore */ }
+  }, []);
 
   // Discard all draft changes (confirm → POST → refresh)
   const handleDiscard = useCallback(async () => {
@@ -505,6 +513,7 @@ export const StandaloneLayout: React.FC<StandaloneLayoutProps> = ({
   const contextValue: AppContextValue = {
     tenantContext,
     userRole,
+    productVersion,
     apiFetch,
     onNotify,
     loading,
@@ -596,29 +605,13 @@ export const StandaloneLayout: React.FC<StandaloneLayoutProps> = ({
                   w={280}
                   openDelay={300}
                 >
-                  <Badge variant="light" color={TIER_BADGE_COLORS[tenantContext.tier] ?? 'gray'} size="sm" tt="capitalize" style={{ cursor: 'default' }}>
-                    {tenantContext.tier}
+                  <Badge variant="light" color={TIER_BADGE_COLORS[tenantContext.tier] ?? 'gray'} size="sm" style={{ cursor: 'default' }}>
+                    {TIER_BADGE_LABELS[tenantContext.tier] ?? tenantContext.tier}
                   </Badge>
                 </Tooltip>
               )}
-              {/* Inactive indicator (WI #291) — shown when system not yet activated */}
-              {isActivated === false && (
-                <Tooltip
-                  label="Your AI assistant is not yet active. Configure your agent and activate to go live."
-                  position="bottom"
-                  multiline
-                  w={240}
-                >
-                  <Badge
-                    variant="light"
-                    color="yellow"
-                    size="sm"
-                    style={{ cursor: 'default' }}
-                  >
-                    Inactive
-                  </Badge>
-                </Tooltip>
-              )}
+              {/* Inactive badge removed (session 21) — sidebar "Pending" badge already
+                 conveys not-yet-activated state; "Inactive" added no distinct meaning. */}
               {/* Documentation link */}
               <Tooltip label="Documentation" position="bottom">
                 <ActionIcon
@@ -743,11 +736,20 @@ export const StandaloneLayout: React.FC<StandaloneLayoutProps> = ({
                   >
                     Configuration
                   </Text>
+                  {/* D44: Three-state badge.
+                      Green "Active"  = is_active AND no pending changes.
+                      Red "Inactive"  = was active, now deactivated, no pending changes.
+                      Yellow "Pending" = everything else (never activated, or has pending changes). */}
                   {activationStatus && (
-                    activationStatus.has_pending_changes ? (
-                      <Badge size="xs" variant="dot" color="yellow">Pending</Badge>
-                    ) : (
+                    activationStatus.is_active && !activationStatus.has_pending_changes ? (
                       <Badge size="xs" variant="dot" color="green">Active</Badge>
+                    ) : !activationStatus.is_active
+                        && activationStatus.is_configured
+                        && !activationStatus.has_pending_changes
+                        && activationStatus.active_activated_at != null ? (
+                      <Badge size="xs" variant="dot" color="red">Inactive</Badge>
+                    ) : (
+                      <Badge size="xs" variant="dot" color="yellow">Pending</Badge>
                     )
                   )}
                 </Group>
@@ -797,12 +799,32 @@ export const StandaloneLayout: React.FC<StandaloneLayoutProps> = ({
                   <Button
                     size="compact-xs"
                     variant="filled"
-                    color={activationStatus?.has_pending_changes ? 'green' : 'gray'}
-                    disabled={!activationStatus?.has_pending_changes}
-                    onClick={() => setShowActivationDialog(true)}
+                    color={
+                      /* D44: Three-disposition activation control.
+                         Red "Deactivate" = active with no pending changes.
+                         Green "Activate" = ready to activate (pending changes + all mandatory fields,
+                                           OR deactivated with config still complete).
+                         Yellow "Activate" = activation blocked (missing mandatory fields). */
+                      activationStatus?.is_active && !activationStatus?.has_pending_changes
+                        ? 'red'
+                        : activationStatus?.has_pending_changes
+                          ? (activationStatus?.is_configured ? 'green' : 'yellow')
+                          : activationStatus?.is_configured && activationStatus?.active_activated_at != null
+                            ? 'green'   /* deactivated, config complete → one-click re-activate */
+                            : 'yellow'  /* never activated, no changes yet */
+                    }
+                    onClick={() => {
+                      if (activationStatus?.is_active && !activationStatus?.has_pending_changes) {
+                        setShowDeactivateDialog(true);
+                      } else {
+                        setShowActivationDialog(true);
+                      }
+                    }}
                     style={{ flex: 1 }}
                   >
-                    Activate
+                    {activationStatus?.is_active && !activationStatus?.has_pending_changes
+                      ? 'Deactivate'
+                      : 'Activate'}
                   </Button>
                   <Button
                     size="compact-xs"
@@ -910,7 +932,7 @@ export const StandaloneLayout: React.FC<StandaloneLayoutProps> = ({
                 Agent Red Customer Experience
               </Text>
               <Text size="xs" c="dimmed" ta="center" lh={1.3}>
-                v1.0.0
+                v{productVersion || '...'}
               </Text>
               <Text size="xs" c="dimmed" ta="center" lh={1.4} mt={4} style={{ opacity: 0.7, fontSize: 10 }}>
                 Brought to you by remakerdigital.com
@@ -953,6 +975,60 @@ export const StandaloneLayout: React.FC<StandaloneLayoutProps> = ({
           }}
         />
       )}
+
+      {/* Deactivate confirmation dialog (triggered by sidebar Deactivate button) */}
+      <Modal
+        opened={showDeactivateDialog}
+        onClose={() => setShowDeactivateDialog(false)}
+        title="Deactivate Configuration"
+        centered
+        size="sm"
+      >
+        <Stack gap="md">
+          <Text size="sm">
+            Deactivating will <strong>immediately stop the chat widget</strong> on your
+            storefront. Visitors will no longer see the chat widget or be able to start
+            conversations.
+          </Text>
+          <Text size="sm" c="dimmed">
+            Your configuration will be preserved. You can re-activate at any time.
+          </Text>
+          <Group justify="flex-end" gap="sm">
+            <Button
+              variant="default"
+              size="sm"
+              onClick={() => setShowDeactivateDialog(false)}
+            >
+              Cancel
+            </Button>
+            <Button
+              color="red"
+              size="sm"
+              loading={deactivating}
+              onClick={async () => {
+                setDeactivating(true);
+                try {
+                  const res = await apiFetch('/api/config/deactivate', { method: 'POST' });
+                  if (res.ok) {
+                    onNotify({ type: 'success', message: 'Configuration deactivated. Chat widget is offline.' });
+                    setShowDeactivateDialog(false);
+                    setActivationRefreshKey((k) => k + 1);
+                  } else {
+                    const err = await res.json().catch(() => ({}));
+                    onNotify({ type: 'error', message: err.detail || 'Deactivation failed.' });
+                  }
+                } catch {
+                  onNotify({ type: 'error', message: 'Deactivation failed — network error.' });
+                } finally {
+                  setDeactivating(false);
+                }
+              }}
+            >
+              Deactivate
+            </Button>
+          </Group>
+        </Stack>
+      </Modal>
 
       {/* Restore dialog (triggered by sidebar Roll back button) */}
       {showRestoreDialog && activationStatus && (

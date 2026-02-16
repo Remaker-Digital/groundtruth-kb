@@ -188,7 +188,7 @@ az containerapp revision list \
 
 # 4. Smoke test: start a chat conversation (requires widget key)
 curl -sf -X POST \
-  -H "X-Widget-Key: pk_live_c79a2bd0_dcbf0c6f" \
+  -H "X-Widget-Key: ${WIDGET_KEY}" \   # from .env.local PREVIEW_WIDGET_KEY (rotates on re-seed)
   -H "Content-Type: application/json" \
   -d '{}' \
   https://${GW_FQDN}/api/chat/conversations \

@@ -142,6 +142,7 @@ app.add_middleware(
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
+    expose_headers=["X-API-Version", "X-Product-Version", "X-API-Deprecation-Notice"],
 )
 
 # ---------------------------------------------------------------------------
@@ -1104,7 +1105,7 @@ async def _startup_tenant_resolution() -> None:
         )
         # Also wire Cosmos DB fallback for /api/tenants/lookup endpoint
         from src.integrations.provisioning import configure_tenant_lookup_repo
-        configure_tenant_lookup_repo(tenant_repo)
+        configure_tenant_lookup_repo(tenant_repo, team_repo=team_repo)
         logger.info("Tenant resolution configured (Cosmos DB-backed, quad auth)")
     except Exception:
         logger.warning(
@@ -1526,7 +1527,6 @@ async def _startup_embed_unembedded_kb() -> None:
                 "WHERE c.is_active = true "
                 "AND (NOT IS_DEFINED(c.embedding) OR c.embedding = null)"
             ),
-            enable_cross_partition_query=True,
         ):
             tid = item.get("tenant_id")
             if tid:
@@ -1606,11 +1606,12 @@ async def _startup_admin_team_services() -> None:
     Non-fatal: admin endpoints return 503 if initialization fails.
     """
     try:
-        from src.multi_tenant.repository import TeamMemberRepository
+        from src.multi_tenant.repository import AuditLogRepository, TeamMemberRepository
 
         team_repo = TeamMemberRepository()
-        configure_admin_team_services(team_repo=team_repo)
-        logger.info("Admin team management API initialized (5 endpoints)")
+        audit_repo = AuditLogRepository()
+        configure_admin_team_services(team_repo=team_repo, audit_repo=audit_repo)
+        logger.info("Admin team management API initialized (5 endpoints + audit)")
     except Exception:
         logger.warning(
             "Admin team management initialization failed — team endpoints "
@@ -2186,9 +2187,9 @@ async def _startup_migration_check() -> None:
 @app.get("/health", tags=["system"])
 async def health() -> dict:
     """Liveness probe — returns 200 if the process is running."""
-    from src.multi_tenant.api_versioning import API_VERSION
+    from src.multi_tenant.api_versioning import API_VERSION, PRODUCT_VERSION
 
-    return {"status": "healthy", "version": API_VERSION}
+    return {"status": "healthy", "version": API_VERSION, "product_version": PRODUCT_VERSION}
 
 
 @app.get("/ready", tags=["system"])

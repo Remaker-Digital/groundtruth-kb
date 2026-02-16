@@ -20,22 +20,40 @@ Usage:
 """
 
 import os
+from pathlib import Path
+
 import pytest
 import httpx
 
 # © 2026 Remaker Digital, a DBA of VanDusen & Palmeter, LLC. All rights reserved.
 
+# ---------------------------------------------------------------------------
+# Auto-load .env.local (transient credentials must never be hardcoded —
+# see REPEATABLE-PROCEDURES.md Section 7: No Hardcoded Transient Values)
+# ---------------------------------------------------------------------------
+_env_local = Path(__file__).resolve().parent.parent.parent / ".env.local"
+if _env_local.is_file():
+    with open(_env_local) as _f:
+        for _line in _f:
+            _line = _line.strip()
+            if _line and not _line.startswith("#") and "=" in _line:
+                _k, _, _v = _line.partition("=")
+                _k, _v = _k.strip(), _v.strip()
+                if _k and _v and _k not in os.environ:
+                    os.environ[_k] = _v
+
 # Production URL — set via PROD_URL env var or default to production FQDN
 PROD_URL = os.environ.get(
     "PROD_URL",
-    "https://agent-red-api-gateway.lemonriver-f59f94b7.eastus2.azurecontainerapps.io"
+    "https://agent-red-api-gateway.orangeglacier-f566a4e7.eastus.azurecontainerapps.io"
 )
 
-# Widget key for tenant remaker-digital-001 (from MEMORY.md)
-WIDGET_KEY = os.environ.get("WIDGET_KEY", "pk_live_c79a2bd0_dcbf0c6f")
+# Widget key — loaded from .env.local PREVIEW_WIDGET_KEY or WIDGET_KEY env var.
+# No hardcoded fallback: transient credentials must come from env/config.
+WIDGET_KEY = os.environ.get("PREVIEW_WIDGET_KEY") or os.environ.get("WIDGET_KEY", "")
 
 # API key for admin operations (optional — some tests skip without it)
-API_KEY = os.environ.get("AGENTRED_API_KEY", "")
+API_KEY = os.environ.get("SUPERADMIN_PREVIEW_API_KEY") or os.environ.get("AGENTRED_API_KEY", "")
 
 
 @pytest.fixture(scope="session")

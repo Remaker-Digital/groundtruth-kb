@@ -121,6 +121,15 @@ class CreateKnowledgeEntryRequest(BaseModel):
         default_factory=dict,
         description="Type-specific metadata (e.g. product_id, category, price)",
     )
+    category: str | None = Field(
+        default=None,
+        max_length=200,
+        description="Article category (e.g. Shipping, Returns, Product Info)",
+    )
+    status: str = Field(
+        default="draft",
+        description="Article status: published, draft, or archived",
+    )
     tags: list[str] = Field(
         default_factory=list,
         description="Search tags",
@@ -687,9 +696,13 @@ async def create_knowledge_entry(
         title=request.title,
         content=request.content,
         metadata=request.metadata,
+        category=request.category,
+        status=request.status,
         tags=request.tags,
         language=request.language,
-        is_active=True,
+        is_active=(request.status != "archived"),
+        staleness_score=0.0,
+        last_verified_at=now,
         created_at=now,
         updated_at=now,
     )

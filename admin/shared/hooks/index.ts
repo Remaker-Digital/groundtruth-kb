@@ -87,7 +87,7 @@ function useApi<T>(apiFetch: ApiFetch, path: string, enabled = true): UseApiResu
 // ---------------------------------------------------------------------------
 
 export function useConfig(apiFetch: ApiFetch) {
-  return useApi<ConfigReadResult>(apiFetch, '/api/config');
+  return useApi<ConfigReadResult>(apiFetch, '/api/config?state=draft');
 }
 
 export function useConfigSchema(apiFetch: ApiFetch, step?: string) {
@@ -113,7 +113,17 @@ export function useUpdateConfig(apiFetch: ApiFetch) {
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({ fields: changes }),
         });
-        if (!resp.ok) throw new Error(`${resp.status}`);
+        if (!resp.ok) {
+          let detail = `Save failed (HTTP ${resp.status})`;
+          try {
+            const body = await resp.json();
+            if (typeof body?.detail === 'string') detail = body.detail;
+            else if (body?.detail?.errors?.length) {
+              detail = body.detail.errors.map((e: Record<string, string>) => e.message || e.field).join('; ');
+            }
+          } catch { /* response body not JSON */ }
+          throw new Error(detail);
+        }
         return await resp.json();
       } catch (err: unknown) {
         const msg = err instanceof Error ? err.message : 'Update failed';
@@ -126,7 +136,9 @@ export function useUpdateConfig(apiFetch: ApiFetch) {
     [apiFetch],
   );
 
-  return { updateConfig, loading, error };
+  const clearError = useCallback(() => setError(null), []);
+
+  return { updateConfig, loading, error, clearError };
 }
 
 // ---------------------------------------------------------------------------
@@ -360,6 +372,8 @@ export interface ActivationStatus {
   active_version: number;
   active_activated_at: string | null;
   draft_version: number | null;
+  is_configured: boolean;
+  is_active: boolean;
 }
 
 /** Full draft state including diff vs active. */
