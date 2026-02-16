@@ -15,7 +15,7 @@ This document provides active guidance for AI assistants working on the Agent Re
 |-----------|-------|
 | **Project Name** | Agent Red Customer Experience |
 | **Type** | Commercial SaaS Product (Shopify + Standalone) |
-| **Status** | Production v1.32.7 HEALTHY. 2,360 unit tests (0 failures), 172 UI tests (144 PASS, 28 SKIP). AGNTCY Phase 2 pipeline decomposition COMPLETE (session 25). Next: creative assets for Shopify App Store submission. |
+| **Status** | Production v1.34.0 HEALTHY. 2,455 unit tests (0 failures), 178 UI tests. AGNTCY Phase 2 COMPLETE. Session 26: 9 defect fixes, COMPLETED→RESOLVED, operational procedures. Next: functional testing round on v1.34.0. |
 | **Owner** | Remaker Digital (DBA of VanDusen & Palmeter, LLC) |
 
 ### Copyright Notice
@@ -91,7 +91,10 @@ Active procedures:
 - `scripts/deploy/upgrade.ps1` — Production deployment
 - `scripts/deploy/rollback.ps1` — Production rollback
 - `scripts/seed_tenant.py` — Tenant provisioning
+- `docs/operations/initialization-procedure.md` — Tenant initialization (destructive, 10 post-conditions)
+- `docs/operations/upgrade-verification-procedure.md` — Non-disruptive upgrade verification
 - `docs/operations/CATASTROPHIC-RECOVERY-RUNBOOK.md` — Azure environment setup
+- `docs/operations/ui-test-procedure.md` — Admin UI regression tests (178 tests)
 - Inline in spec: Unit test suite, Production regression suite
 - `docs/operations/agntcy-platform-adoption-procedure.md` — AGNTCY platform adoption verification
 
@@ -120,8 +123,9 @@ Active procedures:
 - Next: Phase 3 (MCP Client Framework), Phase 4 (UCP Commerce Protocol) — see `docs/operations/agntcy-platform-adoption-procedure.md`
 
 ### P0 — Owner Functional Review ✅ COMPLETE
-- Full Pages 0-10 UI review: 172 tests, 144 PASS, 28 SKIP (sessions 23-24)
-- D46-D52 defects fixed and deployed as v1.32.7
+- Session 26: 9 defect fixes deployed as v1.34.0, initialization procedure verified
+- Full Pages 0-10 UI review: 178 tests (sessions 23-26)
+- D46-D52 defects fixed (v1.32.7), D53-D67 defects fixed (v1.34.0)
 
 ### Owner/Designer Tasks (blocking Shopify submission)
 1. Screenshots (3-6 at 1600x900, one showing actual app UI) — designer
@@ -132,10 +136,11 @@ Active procedures:
 6. Stripe test→live mode flip (`config/stripe_product_ids.json` mode field + env keys)
 
 ### Known Issues (Non-Blocking, Deferred)
-- D16/D20: KB/QA Save→Activate integration (creating article/action doesn't trigger Pending)
+- D16/D20/D68: KB/QA Save→Activate integration — creating article/action and page assignments bypass draft system
 - D22: Avatar PNG upload (currently URL-based, 5 test assertions blocked)
 - D30: Tier upgrade path on Billing page
-- KB table "--" for Category/Status/Freshness on seeded articles
+- D56/D57: Escalation info display in Inbox and team escalation count (requires backlog #19)
+- Compliance: PII scrubbing (not tenant-aware), consent prompt (no widget UI), GDPR deletion (needs test harness)
 
 ### Post-Launch Backlog
 7. Conversation archival (archived_at flag, filter toggle)
@@ -156,4 +161,4 @@ Active procedures:
 
 *© 2026 Remaker Digital, a DBA of VanDusen & Palmeter, LLC. All rights reserved.*
 *Last Updated: 2026-02-16*
-*Version: 38.0.0*
+*Version: 39.0.0*
