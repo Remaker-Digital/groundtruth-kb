@@ -223,6 +223,7 @@ class ActivationStatusResponse(BaseModel):
     draft_version: int | None = None
     is_configured: bool = False
     is_active: bool = False
+    can_activate: bool = False
 
 
 class DraftStateResponse(BaseModel):
@@ -1250,6 +1251,29 @@ async def get_activation_status(
             # explicitly disabled the widget.
             is_active = is_configured and not active.get("deactivated_at")
 
+    # can_activate: check the relevant config (draft or active) for mandatory
+    # fields so the frontend knows whether the Activate button should be
+    # green (ready) or yellow (blocked).
+    can_activate = False
+    if draft_state.has_pending_changes:
+        # Pending changes exist — check the draft document.
+        doc = await activation_svc._prefs_repo.get_draft(ctx.tenant_id)
+    elif is_configured and not is_active:
+        # Deactivated with complete config — use the active document
+        # (no separate draft exists when there are no pending changes).
+        doc = active if active else None  # type: ignore[assignment]
+    else:
+        doc = None
+    if doc:
+        d_brand = doc.get("brand_name")
+        d_voice = doc.get("brand_voice")
+        d_wkey = doc.get("widget_key")
+        can_activate = bool(
+            d_brand and str(d_brand).strip()
+            and d_voice and str(d_voice).strip()
+            and d_wkey
+        )
+
     return ActivationStatusResponse(
         has_pending_changes=draft_state.has_pending_changes,
         active_version=draft_state.active_version,
@@ -1257,6 +1281,7 @@ async def get_activation_status(
         draft_version=draft_state.draft_version,
         is_configured=is_configured,
         is_active=is_active,
+        can_activate=can_activate,
     )
 
 

@@ -120,17 +120,11 @@ const PRIMARY_LANGUAGES = [
   { value: 'en', label: 'English' },
 ];
 
-/** Supported languages — English (available), Spanish/French (coming soon),
- *  others planned for the future. */
+/** Supported languages — English (available), Spanish/French (coming soon). */
 const LANGUAGES = [
-  { value: 'en', label: 'English' },
-  { value: 'es', label: 'Spanish (coming soon)' },
-  { value: 'fr', label: 'French (coming soon)' },
-  { value: 'de', label: 'German (planned)', disabled: true },
-  { value: 'pt', label: 'Portuguese (planned)', disabled: true },
-  { value: 'ja', label: 'Japanese (planned)', disabled: true },
-  { value: 'zh', label: 'Chinese (planned)', disabled: true },
-  { value: 'ko', label: 'Korean (planned)', disabled: true },
+  { value: 'en', label: 'English', disabled: false },
+  { value: 'es', label: 'Spanish (coming soon)', disabled: true },
+  { value: 'fr', label: 'French (coming soon)', disabled: true },
 ];
 
 // ---------------------------------------------------------------------------
@@ -353,7 +347,7 @@ function diffForm(
 // ---------------------------------------------------------------------------
 
 export const ConfigurationPage: React.FC = () => {
-  const { apiFetch, onNotify, refreshActivationStatus } = useAppContext();
+  const { apiFetch, onNotify, refreshActivationStatus, configRefreshKey } = useAppContext();
   const configResult = useConfig(apiFetch);
   const { updateConfig: saveConfig, loading: saving, error: saveError, clearError: clearSaveError } = useUpdateConfig(apiFetch);
 
@@ -371,6 +365,11 @@ export const ConfigurationPage: React.FC = () => {
   const [expandedCategories, setExpandedCategories] = useState<Record<string, boolean>>({});
   // Keyword input buffers (one per category)
   const [keywordInputs, setKeywordInputs] = useState<Record<string, string>>({});
+
+  // Re-fetch config when sidebar Discard triggers a configRefreshKey change (D50)
+  useEffect(() => {
+    if (configRefreshKey > 0) configResult.refetch();
+  }, [configRefreshKey]); // eslint-disable-line react-hooks/exhaustive-deps
 
   // Initialize form from loaded config
   useEffect(() => {
@@ -452,7 +451,7 @@ export const ConfigurationPage: React.FC = () => {
 
     const result = await saveConfig(changes);
     if (result) {
-      onNotify('Configuration saved successfully.', 'success');
+      onNotify('Draft configuration saved successfully.', 'success');
       // Update server snapshot so discard reflects new saved state
       serverFormRef.current = { ...form };
       setHasChanges(false);
@@ -801,7 +800,14 @@ export const ConfigurationPage: React.FC = () => {
                   >
                     <Group gap="xs" wrap="wrap">
                       {LANGUAGES.map((lang) => (
-                        <Chip key={lang.value} value={lang.value} size="sm" color={BRAND_RED}>
+                        <Chip
+                          key={lang.value}
+                          value={lang.value}
+                          size="sm"
+                          color={BRAND_RED}
+                          disabled={lang.disabled}
+                          styles={lang.disabled ? { label: { opacity: 0.5, cursor: 'not-allowed' } } : undefined}
+                        >
                           {lang.label}
                         </Chip>
                       ))}

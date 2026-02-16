@@ -1492,7 +1492,7 @@ export const WidgetConfigurator: React.FC<BaseComponentProps> = ({
     const result = await updateConfig(pendingChanges);
     if (result?.success) {
       setSavedConfig(localConfig);
-      onNotify(`${changeCount} widget setting${changeCount > 1 ? 's' : ''} saved to draft — activate to go live.`, 'success');
+      onNotify(`${changeCount} widget setting${changeCount > 1 ? 's' : ''} saved to draft — activate to apply.`, 'success');
     } else {
       onNotify(saveError || 'Failed to save widget settings.', 'error');
     }

@@ -191,7 +191,7 @@ export default function ActivationDialog({
                 Required before activation
               </h3>
               <div style={{ ...summaryStyle, marginBottom: '12px' }}>
-                The following fields must be configured before your AI assistant can go live:
+                The following fields must be configured before your AI assistant can be activated:
               </div>
               {preflight.hard_errors.map((e, i) => (
                 <div key={i} style={errorItemStyle}>
@@ -274,10 +274,10 @@ export default function ActivationDialog({
           {preflight?.can_activate && !confirmed ? (
             <button
               onClick={() => setConfirmed(true)}
-              disabled={loading || !draft?.has_pending_changes}
+              disabled={loading}
               style={{
                 ...activateButtonStyle,
-                opacity: (loading || !draft?.has_pending_changes) ? 0.5 : 1,
+                opacity: loading ? 0.5 : 1,
               }}
             >
               Activate now

@@ -3,7 +3,7 @@
 **Type:** Repeatable Procedure
 **Version:** 1.0.0
 **Created:** 2026-02-13 (Session 17)
-**Last Run:** 2026-02-13 (Session 18 — full 10-page review complete)
+**Last Run:** 2026-02-16 (Sessions 23-24 — full Pages 0/0A/0B/1-10 review: 172 tests, 144 PASS, 28 SKIP, 0 FAIL)
 
 ---
 
@@ -83,7 +83,7 @@ Tests the full activation → deactivation → re-activation cycle. Run after Pa
 | 0A.14 | Click Activate (green) to re-activate | Confirmation dialog → confirm → system re-activates; badge returns to green "Active" | |
 | 0A.15 | Widget conversation gate (re-activated) | `POST /api/chat/conversations` returns 200 — conversations work again | |
 | 0A.16 | Make draft change while active | Modify brand_name, save draft → activation control changes from red "Deactivate" to green "Activate" (pending changes with all mandatory fields present) | |
-| 0A.17 | Make draft change that removes mandatory field while active | Clear brand_name in draft, save → activation control changes to yellow "Activate" (pending changes with mandatory field missing) | |
+| 0A.17 | Make draft change that removes mandatory field while active | Clear brand_voice in draft, save → activation control changes to yellow "Activate" (pending changes with mandatory field missing). Note: brand_name has min_length=1 and cannot be saved empty; use brand_voice instead. | |
 | 0A.18 | Sidebar badge during pending changes | Yellow "Pending" (regardless of whether system was previously active) | |
 
 ---
@@ -121,8 +121,8 @@ Run after Page 0A (system is now re-activated with brand_name + brand_voice set)
 | 0B.7 | **Roll back button state** — immediately after Roll back | Roll back remains enabled (the just-restored version is now the latest active, but the one before it is still available as PREVIOUS) — OR disabled if there is no further PREVIOUS state to restore | |
 | 0B.8 | **Deactivate then Discard** — deactivate system (red → confirm), then modify brand_name in draft, save draft, then Discard | Badge changes to Inactive (red) after deactivate; after draft modification, badge changes to Pending (yellow); after Discard, badge returns to Inactive (red) with no pending changes; activation control = green "Activate" (config still complete) | |
 | 0B.9 | **Re-activate after deactivation** — click Activate (green) | System re-activates; badge returns to Active (green); activation control = red "Deactivate" | |
-| 0B.10 | **Clear mandatory field, attempt Activate** — clear brand_name in draft, save draft, click Activate (yellow) | Preflight dialog shows hard error "Brand name is required before activation"; activation blocked | |
-| 0B.11 | **Discard after clearing mandatory field** — click sidebar Discard | Draft reverts; brand_name restored from active config; badge returns to Active (green); activation control returns to red "Deactivate" | |
+| 0B.10 | **Clear mandatory field, attempt Activate** — clear brand_voice in draft, save draft, click Activate (yellow) | Activation control is yellow "Activate" (blocked); clicking it shows preflight dialog with hard error "Brand voice is required before activation"; activation blocked. Note: brand_name has min_length=1 and cannot be saved empty; use brand_voice instead. | |
+| 0B.11 | **Discard after clearing mandatory field** — click sidebar Discard | Draft reverts; brand_voice restored from active config; badge returns to Active (green); activation control returns to red "Deactivate" | |
 | 0B.12 | **Roll back after deactivation** — deactivate system, then click Roll back | Roll back restores previous active config AND system returns to active state (deactivated_at cleared); badge = Active (green) | |
 
 ---
@@ -199,7 +199,7 @@ Run after Page 0A (system is now re-activated with brand_name + brand_voice set)
 | 4.3 | Escalation section renders | Threshold slider (Conservative–Aggressive), 6 category accordions with toggles | PASS |
 | 4.4 | Escalation category expand | Expanding a category shows Notification email, Keywords (chips with ×), Add keyword input, Reset button | PASS |
 | 4.5 | Custom instructions section | Textarea with placeholder, safety note below ("Safety rules always take precedence") | PASS |
-| 4.6 | Language section renders | Primary language dropdown (English only), Supported languages chips: English, Spanish (coming soon), French (coming soon), 5 planned languages (disabled) | |
+| 4.6 | Language section renders | Primary language dropdown (English only), Supported languages chips: English, Spanish (coming soon), French (coming soon). No other languages displayed. | |
 | 4.7 | Idle timeout and Max turns | Numeric inputs with current values (30 minutes, 50 turns) | PASS |
 | 4.8 | Save draft inputs button at bottom | "Save draft inputs" button at bottom of page; no per-page Discard button (sidebar Discard serves that purpose) | |
 | 4.9 | Section tooltips | (?) icons on Brand & persona, Policies (if present), Escalation, Custom instructions, Language | PASS |
@@ -370,6 +370,12 @@ Run after Page 0A (system is now re-activated with brand_name + brand_voice set)
 | D42 | Agent Config | Language section shows 8 languages as all available — only English is currently supported; Spanish/French coming soon, others planned | S21 | Fixed — Primary language: English only; Supported languages: English, Spanish/French (coming soon), 5 others (planned, disabled) | 4.6 |
 | D43 | Dashboard | Dashboard shows 42 stale demo conversations after re-seed — `seed_tenant.py` was previously run with `--demo` and stale data remained because post-seed Key Vault update was not documented | S21 | Procedure defect: (1) Re-seeded without `--demo` to clear stale conversations; (2) Added POST-SEED STEPS to `seed_tenant.py` for mandatory Key Vault update + revision restart; (3) Added pre-flight check to UI test procedure; (4) Added pre-flight assertion: Dashboard must show 0 conversations for initial state | Pre-flight, 1.19, 1.20 |
 | D44 | Widget / Activation | Widget creates phantom conversation shells (54 empty conversations with 0 messages) when tenant has never activated — conversation creation endpoint has no activation gate; activation control has no "Deactivate" disposition for active-with-no-changes state | S22 | (1) Backend gate: `POST /api/chat/conversations` returns 403 when `is_active=false`; (2) New `is_active` field on activation-status; (3) Deactivate action + confirmation dialog; (4) Three-state sidebar badge (Active/Pending/Inactive); (5) Activation control three-disposition model (red/yellow/green) | 0.7, 0.11, 0.16, 0.17, 0A.1–0A.18, 1.14 |
+| D46 | Agent Config | Success message text after save incorrect | S23 | Fixed — updated toast message text | 4.10 |
+| D47 | Agent Config | Language section shows 5 planned languages (German, Portuguese, Japanese, Chinese, Korean) that don't exist — removed entirely; only English + Spanish/French (coming soon) remain | S23 | Fixed — removed 5 planned languages from supportedLanguages UI; kept only en, es (coming soon), fr (coming soon) | 4.6 |
+| D49 | Activation | Activate button disabled in re-activation case after deactivation — button state logic doesn't account for deactivated-with-complete-config | S23 | Fixed — button state now correctly shows green "Activate" when deactivated with all mandatory fields present | 0A.11 |
+| D50 | Configuration | Sidebar Discard doesn't refresh form fields in child pages — Configuration.tsx still shows old values after Discard because React context change doesn't trigger data hook re-fetch | S23 | Fixed — `configRefreshKey` counter in AppContext, incremented in handleDiscard; Configuration.tsx watches with useEffect → `configResult.refetch()` | 0B.3, 0B.4 |
+| D51 | Sidebar | "Deactivate" button text truncated when all three controls visible — flex layout causes text overflow | S23 | Fixed — Button Group uses `wrap="nowrap"`; only Activate/Deactivate button gets `flex: 1`; Discard and Roll back are auto-width | 0A.5 |
+| D52 | Activation | save_draft() throws 409 Conflict when creating new DRAFT after roll-back — stale PREVIOUS document still exists with same ID shape, and `repo.create()` fails on duplicate | S24 | Fixed — activation_service.py line 305 changed from `repo.create()` to `repo.upsert()` (create-or-replace) | 0B.6 |
 
 ---
 

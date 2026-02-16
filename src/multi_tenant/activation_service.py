@@ -302,7 +302,7 @@ class ActivationService:
                         "activated_by": None,
                     })
 
-                    await self._prefs_repo.create(
+                    await self._prefs_repo.upsert(
                         tenant_id, PreferencesDocument(**base_config),
                     )
 
@@ -399,10 +399,17 @@ class ActivationService:
         """
         draft = await self._prefs_repo.get_draft(tenant_id)
         if draft is None:
-            return ValidationResult(
-                can_activate=False,
-                hard_errors=[{"field": "_system", "message": "No draft to activate"}],
-            )
+            # No draft — check if this is a re-activation of a deactivated
+            # config (active doc with deactivated_at set).
+            active = await self._prefs_repo.get_active(tenant_id)
+            if active and active.get("deactivated_at"):
+                # Re-activation: validate the active config instead.
+                draft = active
+            else:
+                return ValidationResult(
+                    can_activate=False,
+                    hard_errors=[{"field": "_system", "message": "No draft to activate"}],
+                )
 
         hard_errors: list[dict[str, str]] = []
         warnings: list[dict[str, str]] = []
@@ -503,7 +510,29 @@ class ActivationService:
         try:
             async with self._lock:
                 draft = await self._prefs_repo.get_draft(tenant_id)
+
+                # Re-activation path: no draft, but active config is
+                # deactivated — just clear deactivated_at.
                 if draft is None:
+                    active = await self._prefs_repo.get_active(tenant_id)
+                    if active and active.get("deactivated_at"):
+                        now = datetime.now(timezone.utc).isoformat()
+                        await self._prefs_repo.patch(
+                            tenant_id=tenant_id,
+                            document_id=active["id"],
+                            operations=[
+                                {"op": "set", "path": "/deactivated_at", "value": None},
+                                {"op": "set", "path": "/activated_at", "value": now},
+                            ],
+                        )
+                        version = active.get("version", 1)
+                        if self._config_processor is not None:
+                            self._config_processor._invalidate_cache(tenant_id)
+                        return ActivationResult(
+                            success=True,
+                            version=version,
+                            activated_at=now,
+                        )
                     return ActivationResult(
                         success=False,
                         errors=[{"field": "_system", "message": "No draft to activate"}],

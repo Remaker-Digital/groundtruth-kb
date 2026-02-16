@@ -374,6 +374,7 @@ export interface ActivationStatus {
   draft_version: number | null;
   is_configured: boolean;
   is_active: boolean;
+  can_activate: boolean;
 }
 
 /** Full draft state including diff vs active. */

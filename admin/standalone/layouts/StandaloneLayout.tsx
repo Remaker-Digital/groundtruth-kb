@@ -72,6 +72,8 @@ interface AppContextValue {
   loading: boolean;
   /** Trigger an immediate refresh of the sidebar activation status (e.g. after saving a draft). */
   refreshActivationStatus: () => void;
+  /** Increments after a discard so child pages can re-fetch their config data. */
+  configRefreshKey: number;
 }
 
 // ---------------------------------------------------------------------------
@@ -361,6 +363,7 @@ export const StandaloneLayout: React.FC<StandaloneLayoutProps> = ({
   const [activationRefreshKey, setActivationRefreshKey] = useState(0);
   const [activationStatus, setActivationStatus] = useState<ActivationStatus | null>(null);
   const [discarding, setDiscarding] = useState(false);
+  const [configRefreshKey, setConfigRefreshKey] = useState(0);
 
   // Poll activation status every 30s (replaces ActivationBanner's internal polling)
   const fetchActivationStatus = useCallback(async () => {
@@ -424,6 +427,7 @@ export const StandaloneLayout: React.FC<StandaloneLayoutProps> = ({
       if (res.ok) {
         onNotify('Draft changes discarded', 'info');
         setActivationRefreshKey((k) => k + 1);
+        setConfigRefreshKey((k) => k + 1);
       } else {
         onNotify('Failed to discard draft', 'error');
       }
@@ -518,6 +522,7 @@ export const StandaloneLayout: React.FC<StandaloneLayoutProps> = ({
     onNotify,
     loading,
     refreshActivationStatus: fetchActivationStatus,
+    configRefreshKey,
   };
 
   // ---- Render ------------------------------------------------------------
@@ -734,7 +739,7 @@ export const StandaloneLayout: React.FC<StandaloneLayoutProps> = ({
                     tt="uppercase"
                     style={{ letterSpacing: '0.5px', fontSize: 10 }}
                   >
-                    Configuration
+                    AI Configuration
                   </Text>
                   {/* D44: Three-state badge.
                       Green "Active"  = is_active AND no pending changes.
@@ -791,6 +796,7 @@ export const StandaloneLayout: React.FC<StandaloneLayoutProps> = ({
                   px={4}
                   pt={6}
                   pb={2}
+                  wrap="nowrap"
                   style={{
                     borderTop: `1px solid ${isDark ? '#272727' : '#e0e0e0'}`,
                     marginTop: 4,
@@ -802,16 +808,13 @@ export const StandaloneLayout: React.FC<StandaloneLayoutProps> = ({
                     color={
                       /* D44: Three-disposition activation control.
                          Red "Deactivate" = active with no pending changes.
-                         Green "Activate" = ready to activate (pending changes + all mandatory fields,
-                                           OR deactivated with config still complete).
+                         Green "Activate" = ready to activate (can_activate from draft preflight).
                          Yellow "Activate" = activation blocked (missing mandatory fields). */
                       activationStatus?.is_active && !activationStatus?.has_pending_changes
                         ? 'red'
-                        : activationStatus?.has_pending_changes
-                          ? (activationStatus?.is_configured ? 'green' : 'yellow')
-                          : activationStatus?.is_configured && activationStatus?.active_activated_at != null
-                            ? 'green'   /* deactivated, config complete → one-click re-activate */
-                            : 'yellow'  /* never activated, no changes yet */
+                        : activationStatus?.can_activate
+                          ? 'green'
+                          : 'yellow'
                     }
                     onClick={() => {
                       if (activationStatus?.is_active && !activationStatus?.has_pending_changes) {
@@ -832,7 +835,6 @@ export const StandaloneLayout: React.FC<StandaloneLayoutProps> = ({
                     color={activationStatus?.has_pending_changes ? 'blue' : undefined}
                     disabled={!activationStatus?.has_pending_changes || discarding}
                     onClick={handleDiscard}
-                    style={{ flex: 1 }}
                   >
                     {discarding ? '\u2026' : 'Discard'}
                   </Button>
@@ -841,7 +843,6 @@ export const StandaloneLayout: React.FC<StandaloneLayoutProps> = ({
                     variant="default"
                     disabled={!activationStatus || activationStatus.active_version < 2}
                     onClick={() => setShowRestoreDialog(true)}
-                    style={{ flex: 1 }}
                   >
                     Roll back
                   </Button>
@@ -1010,15 +1011,15 @@ export const StandaloneLayout: React.FC<StandaloneLayoutProps> = ({
                 try {
                   const res = await apiFetch('/api/config/deactivate', { method: 'POST' });
                   if (res.ok) {
-                    onNotify({ type: 'success', message: 'Configuration deactivated. Chat widget is offline.' });
+                    onNotify('Configuration deactivated. Chat widget is offline.', 'success');
                     setShowDeactivateDialog(false);
                     setActivationRefreshKey((k) => k + 1);
                   } else {
                     const err = await res.json().catch(() => ({}));
-                    onNotify({ type: 'error', message: err.detail || 'Deactivation failed.' });
+                    onNotify(err.detail || 'Deactivation failed.', 'error');
                   }
                 } catch {
-                  onNotify({ type: 'error', message: 'Deactivation failed — network error.' });
+                  onNotify('Deactivation failed — network error.', 'error');
                 } finally {
                   setDeactivating(false);
                 }

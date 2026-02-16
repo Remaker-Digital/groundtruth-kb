@@ -694,7 +694,7 @@ export function WidgetPage() {
     const changes = widgetConfigToApiFields(config);
     const result = await saveConfig(changes);
     if (result?.success) {
-      onNotify('Widget settings saved successfully', 'success');
+      onNotify('Draft widget settings saved successfully.', 'success');
       refreshActivationStatus();
     } else if (saveError) {
       onNotify(`Failed to save: ${saveError}`, 'error');

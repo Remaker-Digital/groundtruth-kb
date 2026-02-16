@@ -96,7 +96,7 @@ export const MemoryPrivacyPage: React.FC = () => {
 
     const result = await updateConfig(updates);
     if (result?.success) {
-      onNotify('Memory & privacy settings saved.', 'success');
+      onNotify('Draft memory & privacy settings saved.', 'success');
       refreshActivationStatus();
     } else {
       onNotify(result?.message ?? 'Failed to save settings.', 'error');

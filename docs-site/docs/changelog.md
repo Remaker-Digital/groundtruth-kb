@@ -9,6 +9,69 @@ All notable changes to Agent Red Customer Experience are documented here.
 
 ---
 
+## v1.32.7 — 2026-02-16
+
+### Widget activation gate
+- **Conversation creation gate:** The chat widget endpoint now returns 403 when the tenant configuration is not active. This prevents phantom conversations from being created before the merchant has completed setup and activated their configuration.
+- **Deactivate action:** Merchants can take their AI agent offline temporarily by clicking "Deactivate" in the sidebar. The widget stops responding immediately.
+- **Re-activation:** One-click re-activation when the configuration is still complete.
+
+### Three-disposition activation control
+The sidebar activation button now uses three color-coded states:
+- **Green (Activate)** — All required fields present, ready to go live
+- **Yellow (Activate, blocked)** — Required fields missing, activation blocked until resolved
+- **Red (Deactivate)** — System is active with no pending changes, click to take offline
+
+### Three-state sidebar badge
+- **Active (green)** — Configuration is live and serving customers
+- **Pending (yellow)** — Changes are pending or setup is incomplete
+- **Inactive (red)** — Configuration was deactivated, widget is offline
+
+### Configuration controls
+- **Discard** now refreshes all form fields across configuration pages immediately (previously required manual page reload)
+- **Roll back** after deactivation re-activates the widget automatically
+- **Brand voice** is now mandatory for activation (alongside brand name and widget key)
+
+### Language support
+- Removed planned languages (German, Portuguese, Japanese, Chinese, Korean) from the admin UI
+- Supported languages: English (primary), Spanish (coming soon), French (coming soon)
+
+### Bug fixes
+- Fixed button text truncation on "Deactivate" when all three sidebar controls are visible
+- Fixed draft save collision (409 error) after roll-back operations
+- Fixed activation button incorrectly disabled during re-activation after deactivation
+- Fixed success message text on configuration save
+- Dashboard metrics (response time, satisfaction) now show 0 instead of placeholder values when no conversations exist
+- Tier badge uses full capitalized names (Professional, not Pro+)
+
+### Tests
+- 2,330 unit tests passed, 0 failures
+- 172 UI regression tests: 144 passed, 28 skipped (require conversation data or deferred features)
+
+---
+
+## v1.25.0 — 2026-02-13
+
+### Inbox content search
+- Search conversations by message content, not just customer name
+- Debounced search with result snippets showing matched text and location
+
+### Knowledge base content search
+- Search articles by title and body content simultaneously
+
+### Escalation email notifications
+- Automatic email alerts when a conversation is escalated to a human agent
+
+### Add-on modules
+- 5 add-on modules displayed on the Billing page with tier-gated availability
+- Tier badges show the minimum required plan for each add-on
+
+### Identity extraction
+- Automatic detection of customer names and email addresses from conversation text
+- Stored in customer profile for personalization
+
+---
+
 ## v1.23.0 — 2026-02-12 (unreleased)
 
 ### Admin UI polish

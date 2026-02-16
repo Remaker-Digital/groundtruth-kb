@@ -15,7 +15,7 @@ This document provides active guidance for AI assistants working on the Agent Re
 |-----------|-------|
 | **Project Name** | Agent Red Customer Experience |
 | **Type** | Commercial SaaS Product (Shopify + Standalone) |
-| **Status** | Production v1.25.0 HEALTHY. 2,305 tests (0 failures). P0: owner functional review, then creative assets for Shopify App Store submission. |
+| **Status** | Production v1.32.7 HEALTHY. 2,330 unit tests (0 failures), 172 UI tests (144 PASS, 28 SKIP). P0 functional review COMPLETE — next: creative assets for Shopify App Store submission. |
 | **Owner** | Remaker Digital (DBA of VanDusen & Palmeter, LLC) |
 
 ### Copyright Notice
@@ -36,7 +36,7 @@ All new work in this repository must include:
 Continue work on Agent Red Customer Experience commercial project.
 Location: E:\Claude-Playground\CLAUDE-PROJECTS\Agent Red Customer Engagement
 Key files: CLAUDE.md, memory/MEMORY.md
-Current status: Production v1.25.0 HEALTHY. 2,311 tests (0 failures). Next: [describe task].
+Current status: Production v1.32.7 HEALTHY. 2,330 unit tests (0 failures). Next: [describe task].
 ```
 
 ### Preferred Way of Working
@@ -110,34 +110,41 @@ Active procedures:
 
 ---
 
-## Remaining Work (Priority Order, as of 2026-02-13)
+## Remaining Work (Priority Order, as of 2026-02-16)
 
-### P0 — Owner Functional Review
-1. Owner production UI re-test with all session 13+14 changes applied
+### P0 — Owner Functional Review ✅ COMPLETE
+- Full Pages 0-10 UI review: 172 tests, 144 PASS, 28 SKIP (sessions 23-24)
+- D46-D52 defects fixed and deployed as v1.32.7
 
 ### Owner/Designer Tasks (blocking Shopify submission)
-2. Screenshots (3-6 at 1600x900, one showing actual app UI) — designer
-3. Submission screencast (install → features → billing → uninstall) — owner
-4. Remove storefront password on blanco-9939 — owner
-5. Configure pricing in Shopify Partners Dashboard — owner
-6. Deploy GDPR webhook URLs (`shopify app deploy`) — owner
-7. Stripe test→live mode flip (`config/stripe_product_ids.json` mode field + env keys)
+1. Screenshots (3-6 at 1600x900, one showing actual app UI) — designer
+2. Submission screencast (install → features → billing → uninstall) — owner
+3. Remove storefront password on blanco-9939 — owner
+4. Configure pricing in Shopify Partners Dashboard — owner
+5. Deploy GDPR webhook URLs (`shopify app deploy`) — owner
+6. Stripe test→live mode flip (`config/stripe_product_ids.json` mode field + env keys)
+
+### Known Issues (Non-Blocking, Deferred)
+- D16/D20: KB/QA Save→Activate integration (creating article/action doesn't trigger Pending)
+- D22: Avatar PNG upload (currently URL-based, 5 test assertions blocked)
+- D30: Tier upgrade path on Billing page
+- KB table "--" for Category/Status/Freshness on seeded articles
 
 ### Post-Launch Backlog
-8. Conversation archival (archived_at flag, filter toggle)
-9. Email verification identity flow
-10. Blocked capabilities C1-C16 (42 UI steps)
-11. Widget phases 3-5: mobile controls, targeting rules, localization
-12. Code modularization (StandaloneLayout.tsx, Configuration.tsx)
-13. Customer context pre-computation (WI #138)
-14. Azure OpenAI PTU investigation (WI #139, defer to 50+ tenants)
-15. Persistent Memory metrics dashboard
-16. Zendesk/Mailchimp/GA4 backend API clients
-17. Multi-user admin magic link auth (WI #295, 5-8 days)
-18. Add-on checkout Stripe integration (currently shows "coming soon" toast)
+7. Conversation archival (archived_at flag, filter toggle)
+8. Email verification identity flow
+9. Blocked capabilities C1-C16 (42 UI steps)
+10. Widget phases 3-5: mobile controls, targeting rules, localization
+11. Code modularization (StandaloneLayout.tsx, Configuration.tsx)
+12. Customer context pre-computation (WI #138)
+13. Azure OpenAI PTU investigation (WI #139, defer to 50+ tenants)
+14. Persistent Memory metrics dashboard
+15. Zendesk/Mailchimp/GA4 backend API clients
+16. Multi-user admin magic link auth (WI #295, 5-8 days)
+17. Add-on checkout Stripe integration (currently shows "coming soon" toast)
 
 ---
 
 *© 2026 Remaker Digital, a DBA of VanDusen & Palmeter, LLC. All rights reserved.*
-*Last Updated: 2026-02-13*
-*Version: 36.0.0*
+*Last Updated: 2026-02-16*
+*Version: 37.0.0*
