@@ -427,7 +427,7 @@ export function InboxPage() {
     all: conversations.length,
     active: conversations.filter((c) => c.status === 'active').length,
     escalated: conversations.filter((c) => c.status === 'escalated').length,
-    idle: conversations.filter((c) => c.status === 'idle').length,
+    resolved: conversations.filter((c) => c.status === 'resolved').length,
   };
 
   // ---- Selected conversation ----
@@ -515,7 +515,7 @@ export function InboxPage() {
               { label: `All (${counts.all})`, value: 'all' },
               { label: `Active (${counts.active})`, value: 'active' },
               { label: `Esc (${counts.escalated})`, value: 'escalated' },
-              { label: `Idle (${counts.idle})`, value: 'idle' },
+              { label: `Resolved (${counts.resolved})`, value: 'resolved' },
             ]}
             styles={{
               root: { background: isDark ? 'rgba(255,255,255,0.04)' : 'var(--mantine-color-gray-0)' },

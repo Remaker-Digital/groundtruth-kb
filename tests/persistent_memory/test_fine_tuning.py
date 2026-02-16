@@ -103,7 +103,7 @@ def _make_conversations(
             "id": cid,
             "tenant_id": TENANT_ENTERPRISE,
             "customer_id": f"cust-{i:04d}",
-            "status": "completed" if completed else "active",
+            "status": "resolved" if completed else "active",
             "is_billable": billable,
             "consent_status": "granted" if consented else "denied",
             "messages": [

@@ -22,14 +22,19 @@ A Repeatable Procedure is **not**:
 |-----------|------|--------|
 | Production deployment | `scripts/deploy/upgrade.ps1` | Active |
 | Production rollback | `scripts/deploy/rollback.ps1` | Active |
-| Tenant provisioning | `scripts/seed_tenant.py` | Active |
+| Tenant initialization | `docs/operations/initialization-procedure.md` | Active |
+| Non-disruptive upgrade verification | `docs/operations/upgrade-verification-procedure.md` | Active |
+| Tenant provisioning (seed script) | `scripts/seed_tenant.py` | Active |
 | Admin UI test | `docs/operations/ui-test-procedure.md` | Active |
 | Unit test suite | *(inline — see Section 5)* | Active |
 | Production regression suite | *(inline — see Section 5)* | Active |
 | Azure environment setup | `docs/operations/CATASTROPHIC-RECOVERY-RUNBOOK.md` | Active |
 | AGNTCY platform adoption | `docs/operations/agntcy-platform-adoption-procedure.md` | Active |
 
-> **Cross-procedure dependency:** The *Admin UI test* procedure depends on *Tenant provisioning*. After running `seed_tenant.py`, the mandatory POST-SEED STEPS (Key Vault update + revision restart) must be completed before the UI test pre-flight will pass. See `seed_tenant.py` header for exact commands.
+> **Cross-procedure dependencies:**
+> - *Admin UI test* depends on *Tenant initialization*. After initialization, all post-conditions (Steps 2-5) must pass before the UI test pre-flight will pass.
+> - *Non-disruptive upgrade verification* wraps *Production deployment* with pre/post data integrity checks.
+> - *Tenant initialization* is destructive. Use *Non-disruptive upgrade verification* when existing data must be preserved.
 
 ---
 

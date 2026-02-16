@@ -255,7 +255,7 @@ export default function ActivationDialog({
 
           {/* No changes and no errors */}
           {!loading && !draft?.has_pending_changes && preflight?.can_activate && (
-            <div style={emptyStyle}>Configuration is up to date — no changes to activate.</div>
+            <div style={emptyStyle}>Draft configuration is ready to activate.</div>
           )}
 
           {/* Confirmation step */}

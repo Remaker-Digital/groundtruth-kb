@@ -74,6 +74,8 @@ class KnowledgeEntryResponse(BaseModel):
     tags: list[str] = Field(default_factory=list)
     language: str = "en"
     is_active: bool = True
+    category: str | None = Field(default=None, description="Article category (e.g. Shipping, Returns, Product Info)")
+    status: str = Field(default="draft", description="Article status: published | draft | archived")
     created_at: str
     updated_at: str
     # Staleness fields (WI #219-221)
@@ -359,7 +361,7 @@ def _build_entry_response(entry: dict[str, Any], tenant_id: str) -> KnowledgeEnt
     from src.multi_tenant.staleness_service import classify_staleness
 
     score = entry.get("staleness_score")
-    category = classify_staleness(score) if score is not None else None
+    staleness_cat = classify_staleness(score) if score is not None else None
 
     return KnowledgeEntryResponse(
         id=entry.get("id", ""),
@@ -371,10 +373,12 @@ def _build_entry_response(entry: dict[str, Any], tenant_id: str) -> KnowledgeEnt
         tags=entry.get("tags", []),
         language=entry.get("language", "en"),
         is_active=entry.get("is_active", True),
+        category=entry.get("category"),
+        status=entry.get("status", "draft"),
         created_at=entry.get("created_at", ""),
         updated_at=entry.get("updated_at", ""),
         staleness_score=score,
-        staleness_category=category,
+        staleness_category=staleness_cat,
         last_verified_at=entry.get("last_verified_at"),
         embedded_at=entry.get("embedded_at"),
         source_type=entry.get("source_type"),

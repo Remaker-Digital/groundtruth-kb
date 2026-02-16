@@ -31,7 +31,7 @@ import type { KBArticle, KBArticleStatus, KBUploadResult } from '../../shared/ty
 
 const BRAND_RED = '#ff3621';
 
-const CATEGORIES = ['All', 'Policies', 'Shipping', 'Products', 'Sales', 'Services'];
+const CATEGORIES = ['All', 'Policies', 'Shipping', 'Products', 'Sales', 'Services', 'FAQ', 'Custom'];
 const STATUSES = ['All', 'Published', 'Draft', 'Archived'];
 const ACCEPTED_FILE_TYPES = '.pdf,.docx,.csv,.txt';
 
@@ -47,6 +47,22 @@ const categoryColorMap: Record<string, string> = {
   Products: 'teal',
   Sales: 'orange',
   Services: 'pink',
+  FAQ: 'cyan',
+  Custom: 'gray',
+};
+
+/** Derive a display-friendly category from entryType when category is null. */
+const entryTypeToCategory: Record<string, string> = {
+  faq: 'FAQ',
+  product: 'Products',
+  policy: 'Policies',
+  custom: 'Custom',
+};
+
+/** Normalize legacy singular category names to canonical plural forms. */
+const normalizeCategory: Record<string, string> = {
+  Product: 'Products',
+  Policy: 'Policies',
 };
 
 const stalenessColorMap: Record<string, string> = {
@@ -259,28 +275,39 @@ export const KnowledgeBasePage: React.FC = () => {
   const [scanError, setScanError] = useState<string | null>(null);
 
   // Filter articles
+  /** Resolve display category: explicit category (normalized) → entryType fallback → null. */
+  const resolveCategory = useCallback((a: KBArticle) => {
+    const raw = a.category || entryTypeToCategory[a.entryType ?? ''] || null;
+    return raw ? (normalizeCategory[raw] || raw) : null;
+  }, []);
+  /** Resolve display status: explicit status → isActive fallback. */
+  const resolveStatus = useCallback((a: KBArticle) => a.status || (a.is_active === false ? 'archived' : 'draft'), []);
+
   const filteredArticles = useMemo(() => {
     return articles.filter((article) => {
       const matchesSearch =
         search === '' ||
         (article.title ?? '').toLowerCase().includes(search.toLowerCase()) ||
         (article.content ?? '').toLowerCase().includes(search.toLowerCase());
+      const cat = resolveCategory(article);
       const matchesCategory =
-        !categoryFilter || categoryFilter === 'All' || article.category === categoryFilter;
+        !categoryFilter || categoryFilter === 'All' || cat === categoryFilter;
+      const st = resolveStatus(article);
       const matchesStatus =
         !statusFilter ||
         statusFilter === 'All' ||
-        article.status === statusFilter.toLowerCase();
+        st === statusFilter.toLowerCase();
       return matchesSearch && matchesCategory && matchesStatus;
     });
-  }, [articles, search, categoryFilter, statusFilter]);
+  }, [articles, search, categoryFilter, statusFilter, resolveCategory, resolveStatus]);
 
   // Summary stats
   const stats = useMemo(() => {
-    const published = articles.filter((a) => a.status === 'published').length;
-    const draft = articles.filter((a) => a.status === 'draft').length;
-    return { total: articles.length, published, draft };
-  }, [articles]);
+    const published = articles.filter((a) => resolveStatus(a) === 'published').length;
+    const draft = articles.filter((a) => resolveStatus(a) === 'draft').length;
+    const archived = articles.filter((a) => resolveStatus(a) === 'archived').length;
+    return { total: articles.length, published, draft, archived };
+  }, [articles, resolveStatus]);
 
   // Handlers
   const handleAddArticle = () => {
@@ -564,8 +591,8 @@ export const KnowledgeBasePage: React.FC = () => {
         </Group>
       </Paper>
 
-      {/* Summary stats -- 4 cards: Total, Published, Draft, Needs Attention */}
-      <SimpleGrid cols={{ base: 1, xs: 4 }} spacing="md">
+      {/* Summary stats -- 5 cards: Total, Published, Draft, Archived, Needs Attention */}
+      <SimpleGrid cols={{ base: 2, xs: 5 }} spacing="md">
         <Paper p="md" radius="md" withBorder>
           <Text size="xs" c="dimmed" fw={600} mb={4}>Total articles</Text>
           <Text size="xl" fw={700} lh={1}>{stats.total}</Text>
@@ -577,6 +604,10 @@ export const KnowledgeBasePage: React.FC = () => {
         <Paper p="md" radius="md" withBorder>
           <Text size="xs" c="dimmed" fw={600} mb={4}>Draft</Text>
           <Text size="xl" fw={700} lh={1} c="yellow.7">{stats.draft}</Text>
+        </Paper>
+        <Paper p="md" radius="md" withBorder>
+          <Text size="xs" c="dimmed" fw={600} mb={4}>Archived</Text>
+          <Text size="xl" fw={700} lh={1} c="dimmed">{stats.archived}</Text>
         </Paper>
         <Tooltip label="Articles marked stale or very stale that should be reviewed for accuracy" multiline w={240} withArrow>
           <Paper p="md" radius="md" withBorder style={{ cursor: 'help' }}>
@@ -603,27 +634,31 @@ export const KnowledgeBasePage: React.FC = () => {
           </Table.Thead>
           <Table.Tbody>
             {filteredArticles.map((article) => (
-              <Table.Tr key={article.id} style={article.status === 'archived' ? { opacity: 0.5 } : undefined}>
+              <Table.Tr key={article.id} style={resolveStatus(article) === 'archived' ? { opacity: 0.5 } : undefined}>
                 <Table.Td>
-                  <Text size="sm" fw={500} td={article.status === 'archived' ? 'line-through' : undefined}>{article.title}</Text>
+                  <Text size="sm" fw={500} td={resolveStatus(article) === 'archived' ? 'line-through' : undefined}>{article.title}</Text>
                 </Table.Td>
                 <Table.Td>
-                  {article.category ? (
-                    <Badge size="sm" variant="light" color={categoryColorMap[article.category] || 'gray'}>
-                      {article.category}
-                    </Badge>
-                  ) : (
-                    <Text size="xs" c="dimmed">--</Text>
-                  )}
+                  {(() => {
+                    const cat = resolveCategory(article);
+                    return cat ? (
+                      <Badge size="sm" variant="light" color={categoryColorMap[cat] || 'gray'}>
+                        {cat}
+                      </Badge>
+                    ) : (
+                      <Text size="xs" c="dimmed">--</Text>
+                    );
+                  })()}
                 </Table.Td>
                 <Table.Td>
-                  {article.status ? (
-                    <Badge size="sm" variant="light" color={statusColorMap[article.status] || 'gray'}>
-                      {article.status}
-                    </Badge>
-                  ) : (
-                    <Text size="xs" c="dimmed">--</Text>
-                  )}
+                  {(() => {
+                    const st = article.status || (article.is_active === false ? 'archived' : 'draft');
+                    return (
+                      <Badge size="sm" variant="light" color={statusColorMap[st] || 'gray'}>
+                        {st}
+                      </Badge>
+                    );
+                  })()}
                 </Table.Td>
                 <Table.Td>
                   <Badge size="sm" variant="light" color={stalenessColorMap[article.stalenessCategory ?? ''] || 'gray'}>
@@ -636,21 +671,29 @@ export const KnowledgeBasePage: React.FC = () => {
                 <Table.Td>
                   <Group gap={4} justify="flex-end" wrap="nowrap">
                     {(article.stalenessCategory === 'stale' || article.stalenessCategory === 'aging' || article.stalenessCategory === 'very_stale') && (
-                      <ActionIcon variant="subtle" color="green" size="sm" onClick={() => handleVerify(article.id)} title="Mark as verified" loading={verifying}>
-                        <CheckIcon />
-                      </ActionIcon>
+                      <Tooltip label="Mark as verified" withArrow>
+                        <ActionIcon variant="subtle" color="green" size="sm" onClick={() => handleVerify(article.id)} loading={verifying}>
+                          <CheckIcon />
+                        </ActionIcon>
+                      </Tooltip>
                     )}
-                    <ActionIcon variant="subtle" color="gray" size="sm" onClick={() => handleEditArticle(article)} title="Edit article">
-                      <EditIcon />
-                    </ActionIcon>
-                    {article.status === 'archived' ? (
-                      <ActionIcon variant="subtle" color="blue" size="sm" onClick={() => handleRestoreArticle(article)} title="Restore article" loading={saving}>
-                        <RestoreIcon />
+                    <Tooltip label="Edit article" withArrow>
+                      <ActionIcon variant="subtle" color="gray" size="sm" onClick={() => handleEditArticle(article)}>
+                        <EditIcon />
                       </ActionIcon>
+                    </Tooltip>
+                    {resolveStatus(article) === 'archived' ? (
+                      <Tooltip label="Restore article" withArrow>
+                        <ActionIcon variant="subtle" color="blue" size="sm" onClick={() => handleRestoreArticle(article)} loading={saving}>
+                          <RestoreIcon />
+                        </ActionIcon>
+                      </Tooltip>
                     ) : (
-                      <ActionIcon variant="subtle" color="gray" size="sm" onClick={() => handleArchiveArticle(article)} title="Archive article" loading={saving}>
-                        <ArchiveIcon />
-                      </ActionIcon>
+                      <Tooltip label="Archive article" withArrow>
+                        <ActionIcon variant="subtle" color="gray" size="sm" onClick={() => handleArchiveArticle(article)} loading={saving}>
+                          <ArchiveIcon />
+                        </ActionIcon>
+                      </Tooltip>
                     )}
                   </Group>
                 </Table.Td>

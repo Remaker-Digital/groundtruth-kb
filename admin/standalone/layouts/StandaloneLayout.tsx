@@ -442,10 +442,27 @@ export const StandaloneLayout: React.FC<StandaloneLayoutProps> = ({
   const canSeeConfigGroup = !userRole || ['superadmin', 'admin'].includes(userRole);
 
   // ---- Chat widget injection (auto-embed for admin users) ----------------
+  // Widget is shown only when the tenant is Active (is_active === true).
+  // Reacts to activation status changes so Activate/Deactivate toggles the
+  // widget immediately without requiring a page refresh. (D53 fix)
 
   useEffect(() => {
-    // Only inject widget once tenant context is resolved and no existing widget
-    if (!tenantContext || document.getElementById('agent-red-admin-widget')) return;
+    if (!tenantContext) return;
+
+    const isActive = activationStatus?.is_active === true;
+
+    // --- Remove widget when not active ---
+    if (!isActive) {
+      const existing = document.getElementById('agent-red-admin-widget');
+      if (existing) existing.remove();
+      const sdk = (window as unknown as Record<string, unknown>).AgentRed as
+        { destroy?: () => void } | undefined;
+      if (sdk?.destroy) sdk.destroy();
+      return;
+    }
+
+    // --- Already injected — nothing to do ---
+    if (document.getElementById('agent-red-admin-widget')) return;
 
     // Resolve API base URL — same origin as admin or explicit VITE_API_URL
     const apiUrl = API_BASE_URL || window.location.origin;
@@ -502,15 +519,13 @@ export const StandaloneLayout: React.FC<StandaloneLayoutProps> = ({
 
     // Cleanup on unmount
     return () => {
-      // Remove widget if it exists
       const existing = document.getElementById('agent-red-admin-widget');
       if (existing) existing.remove();
-      // Destroy SDK if available
       const sdk = (window as unknown as Record<string, unknown>).AgentRed as
         { destroy?: () => void } | undefined;
       if (sdk?.destroy) sdk.destroy();
     };
-  }, [tenantContext, apiFetch]);
+  }, [tenantContext, apiFetch, activationStatus?.is_active]);
 
   // ---- Context value -----------------------------------------------------
 

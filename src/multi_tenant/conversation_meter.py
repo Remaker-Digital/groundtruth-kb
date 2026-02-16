@@ -378,13 +378,13 @@ class ConversationMeter:
         # Map end reason to conversation status
         status_map = {
             ConversationEndReason.IDLE_TIMEOUT: ConversationStatus.TIMED_OUT,
-            ConversationEndReason.CUSTOMER_ENDED: ConversationStatus.COMPLETED,
+            ConversationEndReason.CUSTOMER_ENDED: ConversationStatus.RESOLVED,
             ConversationEndReason.ESCALATED: ConversationStatus.ESCALATED,
-            ConversationEndReason.MAX_TURNS: ConversationStatus.COMPLETED,
+            ConversationEndReason.MAX_TURNS: ConversationStatus.RESOLVED,
             ConversationEndReason.ERROR: ConversationStatus.ERROR,
         }
 
-        status = status_map.get(reason, ConversationStatus.COMPLETED)
+        status = status_map.get(reason, ConversationStatus.RESOLVED)
         await self._conversations.end_conversation(
             tenant_id, conversation_id, status,
         )

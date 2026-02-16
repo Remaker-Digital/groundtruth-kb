@@ -225,7 +225,7 @@ class TestBillableConversationRules:
             )
 
         conv_repo.end_conversation.assert_awaited_once_with(
-            _TENANT_ID, "conv_end_001", ConversationStatus.COMPLETED,
+            _TENANT_ID, "conv_end_001", ConversationStatus.RESOLVED,
         )
         assert result.is_billable is True
 
@@ -605,7 +605,7 @@ class TestDashboardAndAuditTrail:
         conv_repo.read.return_value = {
             "conversation_id": "conv_detail_001",
             "tenant_id": _TENANT_ID,
-            "status": ConversationStatus.COMPLETED.value,
+            "status": ConversationStatus.RESOLVED.value,
             "is_billable": True,
             "message_count": 8,
             "turn_count": 4,

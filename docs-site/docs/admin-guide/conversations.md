@@ -13,7 +13,7 @@ The Inbox provides a real-time view of all customer conversations, with tools to
 The left panel shows all conversations, sorted by most recent activity. Each entry displays:
 
 - **Customer identity** — Displayed using the best available identification: Shopify customer name (verified), asserted name from conversation (unverified, shown with badge), or session ID as fallback
-- **Status badge** — Active, Escalated, Idle, or Resolved
+- **Status badge** — Active, Escalated, or Resolved
 - **Unread indicator** — Red dot for conversations with unread messages
 - **Message count** and last activity timestamp
 
@@ -24,7 +24,7 @@ Use the filter tabs to view conversations by status:
 - **All** — Every conversation regardless of status
 - **Active** — Currently open conversations with recent customer activity
 - **Esc** — Conversations escalated to a human team member
-- **Idle** — Conversations with no activity for a configurable period
+- **Resolved** — Conversations that have been resolved (by agent action, customer ending the chat, or reaching max conversation turns)
 
 ### Search
 

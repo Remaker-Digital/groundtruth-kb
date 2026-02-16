@@ -96,29 +96,29 @@ KNOWN FAILURE MODES:
 Creates all Cosmos DB containers and provisions
 a complete tenant environment with sensible defaults.
 
-Orchestrates 9 phases:
+Orchestrates 8 phases:
     1. Containers   — 10 Cosmos DB containers with indexes
     0. Clean        — Delete ALL existing tenant docs (clean slate)
     2. Tenant       — TenantDocument (active, professional) + API/widget keys
     3. Preferences  — PreferencesDocument v1 (draft config, brand, widget, quick actions)
     4. Team         — 3 TeamMemberDocuments (superadmin + 2 escalation agents)
-    5. Knowledge    — 48 articles via seed_knowledge_base
     6. Platform     — 4 tier_defaults documents
     7. Demo Data    — Conversations, profiles, memory (with --demo flag)
     8. Summary      — Print all credentials, URLs, phase results
+
+NOTE: Phase 5 (KB article seeding) was removed in S26. Initialization produces
+a clean tenant with zero articles. Use seed_knowledge_base.py separately if
+you need to populate KB articles for testing.
 
 Usage:
     # Dry-run preview (no DB writes):
     python scripts/seed_tenant.py
 
-    # Write to DB:
+    # Write to DB (initialization — clean tenant, zero articles):
     python scripts/seed_tenant.py --execute
 
     # Write + seed demo conversations:
     python scripts/seed_tenant.py --execute --demo
-
-    # Write + embed KB vectors:
-    python scripts/seed_tenant.py --execute --embed
 
 Requires Azure credentials in .env.local:
     COSMOS_DB_ENDPOINT, COSMOS_DB_KEY, COSMOS_DB_DATABASE
@@ -892,7 +892,7 @@ async def seed(
     demo: bool = False,
     embed: bool = False,
 ) -> None:
-    """Run all 8 seed phases in sequence."""
+    """Run all seed phases in sequence (initialization)."""
 
     print()
     print("+" + "=" * 63 + "+")
@@ -906,7 +906,8 @@ async def seed(
     await phase_0_clean_partition(dry_run)
     await phase_2_tenant(dry_run)
     await phase_3_preferences(dry_run)
-    await phase_5_knowledge_base(dry_run, embed)
+    # Phase 5 (KB articles) removed — initialization yields zero articles.
+    # Use seed_knowledge_base.py separately if KB data is needed.
     await phase_6_platform_config(dry_run)
     await phase_7_demo_data(dry_run, demo)
     # Phase 4 runs AFTER demo data so team members with API key hashes

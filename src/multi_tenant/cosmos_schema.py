@@ -136,7 +136,6 @@ class ConversationStatus(str, Enum):
     """Conversation lifecycle status."""
 
     ACTIVE = "active"
-    COMPLETED = "completed"
     ESCALATED = "escalated"
     RESOLVED = "resolved"
     TIMED_OUT = "timed_out"

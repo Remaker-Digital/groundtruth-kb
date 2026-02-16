@@ -271,12 +271,12 @@ async def get_analytics_summary(
     critic_pass_rate = (critic_passed / critic_total) if critic_total > 0 else 0.0
 
     # Resolution rate: proportion of non-escalated, non-error conversations
-    completed_count = sum(
+    resolved_count = sum(
         sc.get("count", 0)
         for sc in status_counts
         if sc.get("status") not in ("escalated", "error")
     )
-    resolution_rate = (completed_count / total) if total > 0 else 0.0
+    resolution_rate = (resolved_count / total) if total > 0 else 0.0
 
     status_breakdown = [
         StatusBreakdown(

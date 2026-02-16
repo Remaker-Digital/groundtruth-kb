@@ -744,7 +744,7 @@ export const ConfigurationPage: React.FC = () => {
                 {/* Global escalation settings */}
                 <Group grow>
                   <NumberInput
-                    label="Idle timeout"
+                    label={<>Idle timeout <HelpTooltip text="Minutes of customer inactivity before the conversation is automatically ended and marked as resolved." docLink={`${DOCS_BASE}/escalation-settings`} /></>}
                     suffix=" minutes"
                     value={form.idleTimeoutMinutes}
                     onChange={(val) => updateField('idleTimeoutMinutes', Number(val) || 30)}
@@ -752,7 +752,7 @@ export const ConfigurationPage: React.FC = () => {
                     max={120}
                   />
                   <NumberInput
-                    label="Max turns"
+                    label={<>Max turns <HelpTooltip text="Maximum number of back-and-forth exchanges before the conversation is automatically ended and marked as resolved." docLink={`${DOCS_BASE}/escalation-settings`} /></>}
                     value={form.maxTurns}
                     onChange={(val) => updateField('maxTurns', Number(val) || 50)}
                     min={5}

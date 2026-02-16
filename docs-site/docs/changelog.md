@@ -9,6 +9,38 @@ All notable changes to Agent Red Customer Experience are documented here.
 
 ---
 
+## v1.34.0 — 2026-02-16
+
+### Knowledge base improvements
+- **Category filter fix:** Article categories now match correctly between the table and filter dropdown. Previously, filtering by "Products" returned no results because internal mappings used singular forms.
+- **Archived article stats:** The knowledge base summary cards now include an "Archived" count alongside Total, Published, Draft, and Needs attention.
+- **Action icon tooltips:** All action icons (Edit, Archive, Restore, Verify) now show styled tooltips on hover instead of plain browser tooltips.
+- **Category and status display:** Articles created via the admin console now correctly display their Category and Status values in the table (previously showed "--").
+
+### Quick actions improvements
+- **Auto-open toggle fixed:** The auto-open toggle on page assignments now correctly persists its state. Previously, the API response was missing the auto-open fields, causing the toggle to reset.
+- **Status badge display:** Status badges ("Active", "Inactive") are no longer truncated — the column width has been increased.
+
+### Conversation management
+- **Status consolidation:** The "Completed" conversation status has been renamed to "Resolved" for consistency with the "Resolve" action button. The Inbox filter tabs now show All / Active / Esc / Resolved (replacing the "Idle" tab).
+
+### Agent configuration
+- **Tooltip additions:** Idle timeout and Max conversation turns inputs now have help tooltips explaining their purpose.
+- **Activation dialog:** Updated messaging to "Draft configuration is ready to activate" for clarity.
+
+### Widget
+- **Dynamic injection:** The widget launcher now appears/disappears immediately when the system is activated/deactivated, without requiring a page refresh.
+
+### Operational procedures
+- **Tenant initialization:** New repeatable procedure for provisioning a clean tenant with zero pre-existing data. Includes 10 verification post-conditions.
+- **Non-disruptive upgrade verification:** New repeatable procedure for verifying data preservation during production deployments.
+
+### Tests
+- 2,455 unit tests passed, 0 failures
+- 178 UI regression tests in the repeatable procedure
+
+---
+
 ## v1.32.7-agntcy — 2026-02-16
 
 ### AGNTCY Platform Phase 2: Pipeline Decomposition

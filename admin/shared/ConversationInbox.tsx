@@ -52,7 +52,6 @@ const STATUS_COLORS: Record<string, string> = {
   ended: COLOR_GRAY,
   escalated: COLOR_DANGER,
   resolved: '#6f42c1',
-  idle: '#e36209',
   timed_out: '#e36209',
   error: COLOR_DANGER,
 };
@@ -62,7 +61,6 @@ const STATUS_LABELS: Record<string, string> = {
   ended: 'Ended',
   escalated: 'Escalated',
   resolved: 'Resolved',
-  idle: 'Idle',
   timed_out: 'Timed out',
   error: 'Error',
 };
@@ -112,7 +110,7 @@ function formatDateHeader(ts: string | null): string {
 // ---------------------------------------------------------------------------
 
 const StatusBadge: React.FC<{ status: string | null }> = ({ status }) => {
-  const key = status ?? 'idle';
+  const key = status ?? 'active';
   const color = STATUS_COLORS[key] ?? COLOR_GRAY;
   const label = STATUS_LABELS[key] ?? (status ?? 'Unknown');
   return (
@@ -734,7 +732,7 @@ export const ConversationInbox: React.FC<BaseComponentProps> = ({
         >
           <h2 style={{ margin: 0, fontSize: '16px', fontWeight: 600, color: COLOR_TEXT, display: 'inline-flex', alignItems: 'center' }}>
             Conversations
-            <HelpTooltip text="Real-time list of customer conversations. Filter by status to find active, escalated, or completed chats." docLink="https://agentredcx.com/docs/admin-guide/conversations#conversation-list" />
+            <HelpTooltip text="Real-time list of customer conversations. Filter by status to find active, escalated, or resolved chats." docLink="https://agentredcx.com/docs/admin-guide/conversations#conversation-list" />
           </h2>
           <span
             style={{

@@ -3,7 +3,7 @@
 **Type:** Repeatable Procedure
 **Version:** 1.0.0
 **Created:** 2026-02-13 (Session 17)
-**Last Run:** 2026-02-16 (Sessions 23-24 — full Pages 0/0A/0B/1-10 review: 172 tests, 144 PASS, 28 SKIP, 0 FAIL)
+**Last Run:** 2026-02-16 (Session 26 — 9 defect fixes deployed as v1.34.0; 6 new tests added: 5.18, 5.19, 6.10, 9.12, 9.13, 9.14; initialization procedure executed)
 **Agent Tests Gate:** 101 agent tests in `tests/agents/` must pass before any UI test run (added session 25)
 
 ---
@@ -26,15 +26,14 @@ permanently checked in future runs.
 
 ### Pre-flight
 
-- [ ] If re-seeding tenant: run `seed_tenant.py --execute` **without `--demo`** for clean initial state (includes Phase 0 partition cleanup — deletes all stale data before seeding fresh). Do **not** use `--demo` unless specifically testing with conversation data.
-- [ ] **After re-seeding:** Complete all POST-SEED STEPS in `scripts/seed_tenant.py` (Key Vault update → revision restart → verify authentication → update `.env.local` → update MEMORY.md). Skipping these leaves the admin UI unable to authenticate, causing missing tier badge, missing sidebar data, and broken functionality. See the procedure header in `seed_tenant.py` for exact commands.
+- [ ] **Execute Initialization procedure** (`docs/operations/initialization-procedure.md`). This runs `seed_tenant.py --execute`, updates Key Vault, restarts revision, and verifies all 10 post-conditions (I.1–I.10). Do **not** proceed until all post-conditions pass.
 - [ ] Run agent unit test gate: `python -m pytest tests/agents/ -x -q` — all 101 tests must pass (0 failures)
 - [ ] Run full unit test suite: `python -m pytest tests/ --ignore=tests/integration --ignore=tests/regression -x -q` — 2,360+ tests must pass (0 failures)
 - [ ] Open `ADMIN_URL` in browser (hard-refresh if previously loaded with stale credentials)
 - [ ] Verify page loads without errors (no blank screen, no console errors)
 - [ ] Verify sidebar navigation is fully rendered
 - [ ] Verify tenant name and tier badge (capitalized, e.g. "Professional") are displayed in header
-- [ ] If testing initial provisioned state (Page 0): verify Dashboard shows **0 conversations** (Total conversations = 0, Billable = 0)
+- [ ] Verify Dashboard shows **0 conversations** and **0 knowledge base articles**
 
 ---
 
@@ -88,6 +87,9 @@ Tests the full activation → deactivation → re-activation cycle. Run after Pa
 | 0A.16 | Make draft change while active | Modify brand_name, save draft → activation control changes from red "Deactivate" to green "Activate" (pending changes with all mandatory fields present) | |
 | 0A.17 | Make draft change that removes mandatory field while active | Clear brand_voice in draft, save → activation control changes to yellow "Activate" (pending changes with mandatory field missing). Note: brand_name has min_length=1 and cannot be saved empty; use brand_voice instead. | |
 | 0A.18 | Sidebar badge during pending changes | Yellow "Pending" (regardless of whether system was previously active) | |
+| 0A.19 | Widget launcher visible when Active | Chat bubble (launcher icon) appears in bottom-right corner of all admin pages when system is Active — no page refresh required (D53 regression) | |
+| 0A.20 | Widget launcher hidden when Inactive | After deactivation, chat bubble disappears from admin pages without page refresh (D53 regression) | |
+| 0A.21 | Widget launcher reappears on re-activation | After re-activating from Inactive, chat bubble reappears without page refresh (D53 regression) | |
 
 ---
 
@@ -162,7 +164,7 @@ Run after Page 0A (system is now re-activated with brand_name + brand_voice set)
 | # | Test | Expected | Status |
 |---|------|----------|--------|
 | 2.1 | Three-panel layout renders | Left: conversation list, Center: message thread, Right: customer profile | |
-| 2.2 | Filter tabs show correct counts | All, Active, Esc, Idle — counts match actual conversation statuses | |
+| 2.2 | Filter tabs show correct counts | All, Active, Esc, Resolved — counts match actual conversation statuses (D55 regression: Idle tab replaced with Resolved) | |
 | 2.3 | Conversation list items render | Avatar, name/ID, message count, status badge, timestamp, unread indicator | |
 | 2.4 | Clicking a conversation updates detail panels | Center panel shows messages (or "No messages"), right panel shows conversation info | |
 | 2.5 | Search by customer name | Searching a customer name returns matching conversations | |
@@ -175,6 +177,10 @@ Run after Page 0A (system is now re-activated with brand_name + brand_voice set)
 | 2.12 | Resolve button hidden for resolved conversations | Already-resolved conversations do not show the resolve button | |
 | 2.13 | Search "no results" state | Searching a term with no matches shows "No matching conversations" message | |
 | 2.14 | Message thread renders messages | Selecting a conversation with messages shows the message bubbles with role, content, timestamp | |
+| 2.15 | Resolved filter shows resolved conversations | Resolved tab shows only conversations with "resolved" status; count matches (D55 regression) | |
+| 2.16 | Naturally ended conversations appear as Resolved | Conversations ended by customer or max turns show "Resolved" status badge, not "Completed" (D55 regression) | |
+| 2.17 | Escalated conversation info shows target member | Conversation info card for an escalated conversation displays the assigned team member name (D56 regression) | |
+| 2.18 | Escalated conversation info shows category | Conversation info card for an escalated conversation displays the escalation category (D56 regression) | |
 
 ---
 
@@ -190,6 +196,7 @@ Run after Page 0A (system is now re-activated with brand_name + brand_voice set)
 | 3.6 | Role tooltip | Hovering (?) next to ROLE header shows all 4 role descriptions | PASS |
 | 3.7 | Owner row non-editable | Owner/Superadmin row shows badge instead of dropdown, no delete icon | PASS |
 | 3.8 | Escalation agent categories | Escalation agents show category badges (Sales, Support, Service, Account, etc.) | PASS |
+| 3.9 | Unresolved escalation count column | Team member table includes a column showing the number of unresolved escalations assigned to each member (D57 regression) | |
 
 ---
 
@@ -203,7 +210,7 @@ Run after Page 0A (system is now re-activated with brand_name + brand_voice set)
 | 4.4 | Escalation category expand | Expanding a category shows Notification email, Keywords (chips with ×), Add keyword input, Reset button | PASS |
 | 4.5 | Custom instructions section | Textarea with placeholder, safety note below ("Safety rules always take precedence") | PASS |
 | 4.6 | Language section renders | Primary language dropdown (English only), Supported languages chips: English, Spanish (coming soon), French (coming soon). No other languages displayed. | |
-| 4.7 | Idle timeout and Max turns | Numeric inputs with current values (30 minutes, 50 turns) | PASS |
+| 4.7 | Idle timeout and Max turns | Numeric inputs with current values (30 minutes, 50 turns); each has a (?) tooltip (D58 regression) | |
 | 4.8 | Save draft inputs button at bottom | "Save draft inputs" button at bottom of page; no per-page Discard button (sidebar Discard serves that purpose) | |
 | 4.9 | Section tooltips | (?) icons on Brand & persona, Policies (if present), Escalation, Custom instructions, Language | PASS |
 | 4.10 | Save draft inputs succeeds | Modify brand name, click "Save draft inputs" → success notification, changes persisted on page reload | |
@@ -216,7 +223,7 @@ Run after Page 0A (system is now re-activated with brand_name + brand_voice set)
 
 | # | Test | Expected | Status |
 |---|------|----------|--------|
-| 5.1 | Page renders with stats | Total articles, Published, Draft, Needs attention cards with counts | PASS |
+| 5.1 | Page renders with stats | Total articles, Published, Draft, Archived, Needs attention cards with counts | PASS |
 | 5.2 | Article table renders | Title, Category, Status, Freshness, Last updated, Actions columns | PASS |
 | 5.3 | Freshness badges | Articles show Fresh (green) or Aging (yellow) badges | PASS |
 | 5.4 | Search filters articles | Typing in search box filters articles by title and content | PASS |
@@ -230,6 +237,11 @@ Run after Page 0A (system is now re-activated with brand_name + brand_voice set)
 | 5.12 | Archived article visually distinguished | After archiving, the article row shows a clear visual indicator (e.g. "Archived" status badge, strikethrough, or removed from active list) | |
 | 5.13 | Freshness value meaningful for new articles | Newly created articles show "Fresh" (green), not "--" | |
 | 5.14 | Archived article can be restored | An archived article has a visible control to restore it to its previous status (Published or Draft) | |
+| 5.15 | Action icon tooltips (D60 regression) | Hovering each action icon (Edit, Archive/Restore, Verify) shows a styled Mantine tooltip with arrow, not a plain browser title tooltip | |
+| 5.16 | Archived count in summary stats (D62 regression) | Summary cards show 5 values: Total articles, Published, Draft, Archived, Needs attention — Archived count matches number of archived articles in the table | |
+| 5.17 | Category filter matches resolved category (D63 regression) | Creating an article with Category "Products" then filtering by "Products" returns that article; entryType-derived categories also match filter values | |
+| 5.18 | Archived article shows Category and Status values | After archiving an article, the table row displays the resolved Category (e.g. "Products") and Status ("Archived") — not "--" | |
+| 5.19 | Empty filter state message | Filtering by a category with no matching articles displays "No articles match your filters" message | |
 
 ---
 
@@ -245,6 +257,8 @@ Run after Page 0A (system is now re-activated with brand_name + brand_voice set)
 | 6.6 | Page assignments explanation | Info card explains slot/fallback behavior | PASS |
 | 6.7 | Quick action create triggers Pending config state | After creating a quick action, sidebar config badge changes to "Pending" | |
 | 6.8 | Auto-open toggle functional | Toggling Auto-open on a page assignment row enables/disables auto-open and persists on reload | |
+| 6.9 | Status badge fully visible (D64 regression) | Status badges ("Active", "Inactive") display their full text without truncation | |
+| 6.10 | Page assignments write to draft (SKIP — blocked by D68) | Changing slot assignments, auto-open toggle, or delay should save to draft configuration (not commit immediately); changes only take effect after Activate | |
 
 ---
 
@@ -305,6 +319,9 @@ Run after Page 0A (system is now re-activated with brand_name + brand_voice set)
 | 9.9 | Feature tooltips | (?) icon on each feature card and Data retention section | PASS |
 | 9.10 | Tier-gated features non-toggleable | Features requiring a higher tier than the tenant's current plan (e.g. "Cross-session learning" requires Professional+) must be visually disabled / greyed out and cannot be toggled | PASS |
 | 9.11 | Save draft inputs persists all Memory & Privacy settings | After modifying toggles/sliders and clicking "Save draft inputs", all 8 fields persist correctly on page reload (memory_enabled, pattern_learning_enabled, data_retention_days, consent_collection_enabled, pii_scrubbing, conversation_memory, cross_session_learning, pattern_decay_days) | |
+| 9.12 | PII scrubbing verification (SKIP — blocked: PII scrubber not tenant-config-aware) | Send a test message containing PII (email, phone number); verify that stored conversation transcript has PII tokens replaced with placeholders | |
+| 9.13 | Consent prompt appears (SKIP — blocked: widget consent UI not built) | When consent_collection_enabled=true, the widget must display a consent prompt before the first message; customer cannot send messages until consent is given | |
+| 9.14 | GDPR deletion request (SKIP — blocked: needs test harness for GDPR webhook) | Submit a GDPR "Right to be forgotten" request for a test customer; verify all conversation data, memory vectors, and customer profile are deleted | |
 
 ---
 
@@ -343,7 +360,7 @@ Run after Page 0A (system is now re-activated with brand_name + brand_voice set)
 | D12 | Agent Config | Save fails: "'dict' object has no attribute 'model_dump'" | S18 | BLOCKING — deferred to batch fix | 4.8 |
 | D13 | Agent Config | Discard button non-functional | S18 | Deferred to batch fix | 4.8 |
 | D14 | Agent Config | "Save failed" error banner X close button non-functional | S18 | Deferred to batch fix | — |
-| D15 | Knowledge Base | Created article shows "--" for Category and Status in article table; filters return no results | S18 | Deferred to batch fix | 5.9, 5.10 |
+| D15 | Knowledge Base | Created article shows "--" for Category and Status in article table; filters return no results | S18 | Fixed S26 — added `category`+`status` to `KnowledgeEntryResponse` + `_build_entry_response()`; frontend derives category from `entryType` fallback; status from `isActive` fallback | 5.9, 5.10 |
 | D16 | Knowledge Base | Creating/saving a KB article does not change config state to "Pending" | S18 | Deferred to batch fix | 5.11 |
 | D17 | Knowledge Base | Archived article has no visual distinction — still appears in list identically | S18 | Deferred to batch fix | 5.12 |
 | D18 | Knowledge Base | Freshness shows "--" for newly created article instead of "Fresh" | S18 | Deferred to batch fix | 5.13 |
@@ -379,6 +396,18 @@ Run after Page 0A (system is now re-activated with brand_name + brand_voice set)
 | D50 | Configuration | Sidebar Discard doesn't refresh form fields in child pages — Configuration.tsx still shows old values after Discard because React context change doesn't trigger data hook re-fetch | S23 | Fixed — `configRefreshKey` counter in AppContext, incremented in handleDiscard; Configuration.tsx watches with useEffect → `configResult.refetch()` | 0B.3, 0B.4 |
 | D51 | Sidebar | "Deactivate" button text truncated when all three controls visible — flex layout causes text overflow | S23 | Fixed — Button Group uses `wrap="nowrap"`; only Activate/Deactivate button gets `flex: 1`; Discard and Roll back are auto-width | 0A.5 |
 | D52 | Activation | save_draft() throws 409 Conflict when creating new DRAFT after roll-back — stale PREVIOUS document still exists with same ID shape, and `repo.create()` fails on duplicate | S24 | Fixed — activation_service.py line 305 changed from `repo.create()` to `repo.upsert()` (create-or-replace) | 0B.6 |
+| D53 | Widget | Widget launcher not visible on admin UI after activation — useEffect in StandaloneLayout.tsx ran once on page load and never re-triggered when activation status changed | S26 | Fixed — added `activationStatus?.is_active` to useEffect dependency array; widget injected when Active, removed when Inactive/deactivated | 0A.19, 0A.20, 0A.21 |
+| D54 | Activation | Activation dialog message says "Configuration is up to date — no changes to activate." which is confusing — should say "Draft configuration is ready to activate." | S26 | Fixed — updated message text in ActivationDialog.tsx | 0A.4 |
+| D55 | Inbox | ConversationStatus had both COMPLETED and RESOLVED — "Completed" status should be renamed to "Resolved" for consistency with "Resolve conversation" control. Also: "Idle" filter tab replaced with "Resolved" filter tab. | S26 | Fixed — removed COMPLETED from enum; all conversation end-reasons now map to RESOLVED; Inbox filter tabs: All/Active/Esc/Resolved; fine_tuning query accepts both 'resolved' and 'completed' for backward compat; tooltip updated | 2.2, 2.15, 2.16 |
+| D56 | Inbox | Escalated conversation info card does not show the target team member or escalation category — no `assigned_to` or `escalation_category` data stored on conversation document | S26 | Deferred — requires backlog #19 (category-routed escalation: category/member selection dialog, AI category detection, assigned_to field, resolve permission gate) | 2.17, 2.18 |
+| D57 | Team | Team member table does not show count of unresolved escalations assigned to each member — no `assigned_to` field on conversations to query against | S26 | Deferred — requires backlog #19 (assigned_to field); once available, add column with count of conversations where `assigned_to = member_id AND status = 'escalated'` | 3.9 |
+| D58 | Agent Config | "Idle timeout" and "Max turns" inputs have no tooltips — both need (?) icons explaining their purpose | S26 | Fixed — added HelpTooltip to both NumberInput labels in Configuration.tsx | 4.7 |
+| D60 | Knowledge Base | Action icons (Edit, Archive, Restore, Verify) use native HTML `title` tooltips — should use Mantine `<Tooltip>` with arrow for consistency | S26 | Fixed — upgraded all 4 action icons to `<Tooltip label="..." withArrow>` wrappers | 5.15 |
+| D62 | Knowledge Base | Summary stats missing Archived count — only shows Total/Published/Draft/Needs attention; should include Archived card with count | S26 | Fixed — added 5th card "Archived" (gray) to SimpleGrid; grid cols 4→5 | 5.16 |
+| D63 | Knowledge Base | Category filter returns no results — `entryTypeToCategory` mapped to singular "Product"/"Policy" but filter dropdown uses plural "Products"/"Policies"; also CATEGORIES list had duplicate singular/plural entries; inline category cell didn't use `resolveCategory()` | S26 | Fixed — normalized entryType mapping to plural forms; added `normalizeCategory` map for legacy data; removed duplicate entries from CATEGORIES/categoryColorMap; table cell uses `resolveCategory()` | 5.10, 5.17 |
+| D64 | Quick Actions | Status badges truncated ("Act...") — Status column `w={80}` too narrow for "Active" badge text | S26 | Fixed — Status column widened to `w={100}`; Prompt template column capped at `maxWidth: 300` | 6.9 |
+| D67 | Quick Actions | Auto-open toggle non-functional — `PageAssignmentResponse` model missing `auto_open` and `auto_open_delay_ms` fields; GET endpoint returned assignments without these values, so frontend always saw `undefined` → `false` after refetch | S26 | Fixed — added both fields to response model + builder function; toggle state now round-trips correctly | 6.8 |
+| D68 | Quick Actions | Page assignments (slot changes, auto-open, delay) save directly to assignments document instead of writing to draft configuration — violates Save→Activate model where all AI Configuration pages write to draft and only commit on Activate | S26 | Deferred — architectural change: assignments must be stored in draft preferences, committed on Activate, reverted on Discard; same scope as D16/D20 (KB/QA Save→Activate integration) | 6.7, 6.8 |
 
 ---
 

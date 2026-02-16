@@ -509,8 +509,8 @@ export const QuickActionsPage: React.FC = () => {
                       <Table.Th w={40}>Order</Table.Th>
                       <Table.Th w={50}>Icon</Table.Th>
                       <Table.Th>Label</Table.Th>
-                      <Table.Th>Prompt template</Table.Th>
-                      <Table.Th w={80}>Status</Table.Th>
+                      <Table.Th style={{ maxWidth: 300 }}>Prompt template</Table.Th>
+                      <Table.Th w={100}>Status</Table.Th>
                       <Table.Th w={100} ta="right">Actions</Table.Th>
                     </Table.Tr>
                   </Table.Thead>

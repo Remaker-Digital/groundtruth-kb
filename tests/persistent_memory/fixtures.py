@@ -322,7 +322,7 @@ def make_conversation_doc(
     tenant_id: str = TENANT_STARTER,
     customer_id: str = CUSTOMER_RETURNING,
     conversation_id: str = "conv-001",
-    status: ConversationStatus = ConversationStatus.COMPLETED,
+    status: ConversationStatus = ConversationStatus.RESOLVED,
     days_ago: int = 3,
 ) -> ConversationDocument:
     """Create a conversation document for testing."""

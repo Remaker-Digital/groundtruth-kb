@@ -704,13 +704,13 @@ def _resolve_customer_id(visitor: VisitorIdentity | None) -> str | None:
 def _end_reason_to_status(reason: ConversationEndReason) -> ConversationStatus:
     """Map a ConversationEndReason to the appropriate ConversationStatus."""
     mapping = {
-        ConversationEndReason.CUSTOMER_ENDED: ConversationStatus.COMPLETED,
+        ConversationEndReason.CUSTOMER_ENDED: ConversationStatus.RESOLVED,
         ConversationEndReason.IDLE_TIMEOUT: ConversationStatus.TIMED_OUT,
         ConversationEndReason.ESCALATED: ConversationStatus.ESCALATED,
-        ConversationEndReason.MAX_TURNS: ConversationStatus.COMPLETED,
+        ConversationEndReason.MAX_TURNS: ConversationStatus.RESOLVED,
         ConversationEndReason.ERROR: ConversationStatus.ERROR,
     }
-    return mapping.get(reason, ConversationStatus.COMPLETED)
+    return mapping.get(reason, ConversationStatus.RESOLVED)
 
 
 def _calculate_duration(started_at: str, ended_at: str) -> int | None:

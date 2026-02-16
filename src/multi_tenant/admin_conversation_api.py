@@ -218,7 +218,7 @@ class SearchConversationsRequest(BaseModel):
     )
     status: str | None = Field(
         default=None,
-        description="Optional status filter (active, completed, escalated, resolved, timed_out, error)",
+        description="Optional status filter (active, escalated, resolved, timed_out, error)",
     )
     since: str | None = Field(
         default=None,
@@ -367,7 +367,7 @@ router = APIRouter(prefix="/api/admin/conversations", tags=["admin-inbox"])
 async def list_conversations(
     status: str | None = Query(
         None,
-        description="Filter by status (active, completed, escalated, resolved, timed_out, error)",
+        description="Filter by status (active, escalated, resolved, timed_out, error)",
     ),
     customer_id: str | None = Query(
         None,

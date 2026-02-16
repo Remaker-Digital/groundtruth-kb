@@ -567,7 +567,7 @@ class FineTuningPipelineService:
             try:
                 conversations = await self._conversation_repo.query(
                     tenant_id,
-                    query_filter="c.status = 'completed'",
+                    query_filter="c.status IN ('resolved', 'completed')",
                 )
                 if since:
                     conversations = [

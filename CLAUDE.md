@@ -149,6 +149,8 @@ Active procedures:
 15. Zendesk/Mailchimp/GA4 backend API clients
 16. Multi-user admin magic link auth (WI #295, 5-8 days)
 17. Add-on checkout Stripe integration (currently shows "coming soon" toast)
+18. Crawler/bot conversation protection — User-Agent filtering on conversation creation, `is_crawler` tag + non-billable classification, IP-based rate limiting (5 convos/min/IP/tenant)
+19. Category-routed escalation — Manual: admin selects category or specific team member via dialog; AI-initiated: pipeline detects category from keywords. Routing: lookup `escalation_agent` members whose category badges match, assign one, send targeted email. `assigned_to` field on conversation; only assigned member can Resolve. Mapping configured on Team members page (already seeded with category badges).
 
 ---
 

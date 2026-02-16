@@ -158,6 +158,8 @@ class PageAssignmentResponse(BaseModel):
     slot_2_action_id: str | None = None
     slot_1_action: QuickActionResponse | None = None
     slot_2_action: QuickActionResponse | None = None
+    auto_open: bool = False
+    auto_open_delay_ms: int = 3000
 
 
 class PageAssignmentListResponse(BaseModel):
@@ -292,6 +294,8 @@ def _enrich_assignment(
         slot_2_action_id=slot_2_id,
         slot_1_action=slot_1,
         slot_2_action=slot_2,
+        auto_open=assignment.get("auto_open", False),
+        auto_open_delay_ms=assignment.get("auto_open_delay_ms", 3000),
     )
 
 

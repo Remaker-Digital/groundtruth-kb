@@ -162,7 +162,7 @@ export interface PaginatedList<T> {
 // Conversations (Inbox)
 // ---------------------------------------------------------------------------
 
-export type ConversationStatus = 'active' | 'ended' | 'escalated' | 'idle';
+export type ConversationStatus = 'active' | 'ended' | 'escalated' | 'resolved' | 'timed_out' | 'error';
 
 export interface ConversationMessage {
   messageId: string | null;
