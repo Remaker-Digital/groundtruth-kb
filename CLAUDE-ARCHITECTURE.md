@@ -95,9 +95,28 @@ E:\Claude-Playground\CLAUDE-PROJECTS\Agent Red Customer Engagement\
 │   │   ├── __init__.py
 │   │   ├── models.py              # Request/response Pydantic models + StreamEvent SSE format (~200 lines)
 │   │   ├── session.py             # Conversation lifecycle management (~350 lines)
-│   │   ├── pipeline.py            # 6-agent pipeline orchestrator + SSE streaming (~800 lines)
+│   │   ├── pipeline.py            # 6-agent pipeline orchestrator via A2A agent delegation + SSE streaming (~800 lines)
 │   │   ├── endpoints.py           # 6 FastAPI routes: conversations, message, stream, end, WS (~350 lines)
 │   │   └── sse_manager.py         # SSE connection manager: heartbeat, reconnection, tenant limits (~280 lines)
+│   ├── agents/                    # AGNTCY-compatible agent modules (Phase 2, session 25)
+│   │   ├── __init__.py
+│   │   ├── base.py               # AgentRedBaseAgent ABC + A2A message utilities (~150 lines)
+│   │   ├── intent_classifier.py  # Intent classification agent (~130 lines)
+│   │   ├── knowledge_retrieval.py # Knowledge retrieval agent: hybrid + keyword fallback (~267 lines)
+│   │   ├── response_generator.py # Response generation agent: streaming + non-streaming (~199 lines)
+│   │   ├── escalation_handler.py # Escalation detection agent (~140 lines)
+│   │   ├── analytics_collector.py # Analytics collection agent (~85 lines)
+│   │   ├── critic_supervisor.py  # Critic/supervisor agent: fail-closed validation (~235 lines)
+│   │   └── containers/           # Container deployment infrastructure
+│   │       ├── __init__.py
+│   │       ├── Dockerfile        # Generic Dockerfile with AGENT_MODULE build arg
+│   │       ├── agent_app.py      # FastAPI app factory: health/ready/process + NATS subscription (~221 lines)
+│   │       ├── intent_classifier_app.py     # Container entry point
+│   │       ├── knowledge_retrieval_app.py   # Container entry point
+│   │       ├── response_generator_app.py    # Container entry point
+│   │       ├── escalation_handler_app.py    # Container entry point
+│   │       ├── analytics_collector_app.py   # Container entry point
+│   │       └── critic_supervisor_app.py     # Container entry point
 │   ├── jobs/                       # Scheduled job entry points (Azure Container App Jobs)
 │   │   ├── __init__.py
 │   │   ├── run_retention.py        # Cron entry: data retention enforcement (03:00 UTC daily)
@@ -105,7 +124,7 @@ E:\Claude-Playground\CLAUDE-PROJECTS\Agent Red Customer Engagement\
 │   ├── ai-features/                # Advanced AI (Phase 2.5)
 │   └── white-label/                # Customization (future)
 │
-├── tests/                          # Test suites (2,305 unit + 6 skipped = 2,311 collected, 0 failures)
+├── tests/                          # Test suites (2,360 unit tests, 0 failures)
 │   ├── conftest.py                 # Shared fixtures: TestClient, MockCosmos, MockNATS, MockKV, auth helpers
 │   ├── test_conftest_smoke.py      # Fixture smoke tests
 │   ├── test_health.py              # Health/ready endpoint tests
@@ -115,6 +134,7 @@ E:\Claude-Playground\CLAUDE-PROJECTS\Agent Red Customer Engagement\
 │   ├── security/                   # Adversarial/security tests
 │   ├── performance/                # Performance/load tests + Locust config
 │   ├── chat/                       # SSE/streaming tests
+│   ├── agents/                    # AGNTCY agent module tests (101 tests across 8 files)
 │   ├── regression/                 # 73 regression tests (3-tier upgrade validation)
 │   └── integration/                # Azure service integration tests
 │
@@ -159,4 +179,4 @@ E:\Claude-Playground\CLAUDE-PROJECTS\Agent Red Customer Engagement\
 ---
 
 *© 2026 Remaker Digital, a DBA of VanDusen & Palmeter, LLC. All rights reserved.*
-*Last Updated: 2026-02-13*
+*Last Updated: 2026-02-16*

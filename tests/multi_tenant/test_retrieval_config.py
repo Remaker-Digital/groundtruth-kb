@@ -221,7 +221,12 @@ class TestConfigSchemaRetrievalFields:
 
 
 class TestPipelineRetrievalParams:
-    """Test that pipeline reads retrieval params from preferences."""
+    """Test that pipeline reads retrieval params from preferences.
+
+    After Phase 2.4, _call_knowledge_retrieval_direct() delegates to a
+    KnowledgeRetrievalAgent instance.  Tests inject the agent directly
+    on the bare pipeline object (constructed via __new__ to skip __init__).
+    """
 
     def _make_prefs(self, **overrides):
         defaults = dict(
@@ -229,6 +234,13 @@ class TestPipelineRetrievalParams:
         )
         defaults.update(overrides)
         return PreferencesDocument(**defaults)
+
+    def _attach_kr_agent(self, pipeline, mock_vectorizer):
+        """Create and attach a KnowledgeRetrievalAgent with the mock vectorizer."""
+        from src.agents.knowledge_retrieval import KnowledgeRetrievalAgent
+        agent = KnowledgeRetrievalAgent(knowledge_vectorizer=mock_vectorizer)
+        agent._configured = True
+        pipeline._kr_agent = agent
 
     @pytest.mark.asyncio
     async def test_pipeline_uses_config_top_k(self):
@@ -242,6 +254,7 @@ class TestPipelineRetrievalParams:
         mock_vectorizer = MagicMock()
         mock_vectorizer._configured = True
         mock_vectorizer.search = AsyncMock(return_value=[])
+        self._attach_kr_agent(pipeline, mock_vectorizer)
 
         with patch(
             "src.multi_tenant.knowledge_vectorizer.get_knowledge_vectorizer",
@@ -268,6 +281,7 @@ class TestPipelineRetrievalParams:
         mock_vectorizer = MagicMock()
         mock_vectorizer._configured = True
         mock_vectorizer.search = AsyncMock(return_value=[])
+        self._attach_kr_agent(pipeline, mock_vectorizer)
 
         with patch(
             "src.multi_tenant.knowledge_vectorizer.get_knowledge_vectorizer",
@@ -291,6 +305,7 @@ class TestPipelineRetrievalParams:
         mock_vectorizer = MagicMock()
         mock_vectorizer._configured = True
         mock_vectorizer.search = AsyncMock(return_value=[])
+        self._attach_kr_agent(pipeline, mock_vectorizer)
 
         with patch(
             "src.multi_tenant.knowledge_vectorizer.get_knowledge_vectorizer",
@@ -316,6 +331,7 @@ class TestPipelineRetrievalParams:
         mock_vectorizer = MagicMock()
         mock_vectorizer._configured = True
         mock_vectorizer.search = AsyncMock(return_value=[])
+        self._attach_kr_agent(pipeline, mock_vectorizer)
 
         with patch(
             "src.multi_tenant.knowledge_vectorizer.get_knowledge_vectorizer",
@@ -339,6 +355,7 @@ class TestPipelineRetrievalParams:
         mock_vectorizer = MagicMock()
         mock_vectorizer._configured = True
         mock_vectorizer.search = AsyncMock(return_value=[])
+        self._attach_kr_agent(pipeline, mock_vectorizer)
 
         with patch(
             "src.multi_tenant.knowledge_vectorizer.get_knowledge_vectorizer",
@@ -368,6 +385,12 @@ class TestPipelineIntentRouting:
         defaults.update(overrides)
         return PreferencesDocument(**defaults)
 
+    def _attach_kr_agent(self, pipeline, mock_vectorizer):
+        from src.agents.knowledge_retrieval import KnowledgeRetrievalAgent
+        agent = KnowledgeRetrievalAgent(knowledge_vectorizer=mock_vectorizer)
+        agent._configured = True
+        pipeline._kr_agent = agent
+
     @pytest.mark.asyncio
     async def test_intent_maps_to_entry_type(self):
         """Known intent maps to configured entry_type filter."""
@@ -383,6 +406,7 @@ class TestPipelineIntentRouting:
         mock_vectorizer = MagicMock()
         mock_vectorizer._configured = True
         mock_vectorizer.search = AsyncMock(return_value=[])
+        self._attach_kr_agent(pipeline, mock_vectorizer)
 
         with patch(
             "src.multi_tenant.knowledge_vectorizer.get_knowledge_vectorizer",
@@ -408,6 +432,7 @@ class TestPipelineIntentRouting:
         mock_vectorizer = MagicMock()
         mock_vectorizer._configured = True
         mock_vectorizer.search = AsyncMock(return_value=[])
+        self._attach_kr_agent(pipeline, mock_vectorizer)
 
         with patch(
             "src.multi_tenant.knowledge_vectorizer.get_knowledge_vectorizer",
@@ -430,6 +455,7 @@ class TestPipelineIntentRouting:
         mock_vectorizer = MagicMock()
         mock_vectorizer._configured = True
         mock_vectorizer.search = AsyncMock(return_value=[])
+        self._attach_kr_agent(pipeline, mock_vectorizer)
 
         with patch(
             "src.multi_tenant.knowledge_vectorizer.get_knowledge_vectorizer",
@@ -456,6 +482,12 @@ class TestPipelineMinScoreFilter:
         defaults.update(overrides)
         return PreferencesDocument(**defaults)
 
+    def _attach_kr_agent(self, pipeline, mock_vectorizer):
+        from src.agents.knowledge_retrieval import KnowledgeRetrievalAgent
+        agent = KnowledgeRetrievalAgent(knowledge_vectorizer=mock_vectorizer)
+        agent._configured = True
+        pipeline._kr_agent = agent
+
     @pytest.mark.asyncio
     async def test_results_filtered_by_min_score(self):
         """Results below min_score are excluded."""
@@ -474,6 +506,7 @@ class TestPipelineMinScoreFilter:
         mock_vectorizer = MagicMock()
         mock_vectorizer._configured = True
         mock_vectorizer.search = AsyncMock(return_value=results)
+        self._attach_kr_agent(pipeline, mock_vectorizer)
 
         captured_results = []
 
@@ -517,6 +550,7 @@ class TestPipelineMinScoreFilter:
         mock_vectorizer = MagicMock()
         mock_vectorizer._configured = True
         mock_vectorizer.search = AsyncMock(return_value=results)
+        self._attach_kr_agent(pipeline, mock_vectorizer)
 
         captured_results = []
 

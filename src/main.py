@@ -1247,6 +1247,36 @@ async def _shutdown_nats() -> None:
     logger.info("NATS tenant isolation manager closed")
 
 
+# --- AGNTCY SDK lifecycle ---------------------------------------------------
+from src.multi_tenant.agntcy_sdk_integration import (  # noqa: E402
+    close_agntcy_sdk,
+    get_sdk_status,
+    init_agntcy_sdk,
+)
+
+
+@app.on_event("startup")
+async def _startup_agntcy_sdk() -> None:
+    """Initialize AGNTCY SDK factory and transport on application startup."""
+    try:
+        await init_agntcy_sdk()
+        status = get_sdk_status()
+        logger.info("AGNTCY SDK ready: %s", status)
+    except Exception:
+        # Non-fatal — SDK may not be fully configured during early phases
+        logger.warning(
+            "AGNTCY SDK initialization failed — platform features unavailable. "
+            "This is expected if AGNTCY transport endpoints are not configured."
+        )
+
+
+@app.on_event("shutdown")
+async def _shutdown_agntcy_sdk() -> None:
+    """Shut down AGNTCY SDK transport on application shutdown."""
+    await close_agntcy_sdk()
+    logger.info("AGNTCY SDK shut down")
+
+
 @app.on_event("shutdown")
 async def _shutdown_cosmos_db() -> None:
     """Close the Cosmos DB client on application shutdown."""

@@ -15,7 +15,7 @@ This document provides active guidance for AI assistants working on the Agent Re
 |-----------|-------|
 | **Project Name** | Agent Red Customer Experience |
 | **Type** | Commercial SaaS Product (Shopify + Standalone) |
-| **Status** | Production v1.32.7 HEALTHY. 2,330 unit tests (0 failures), 172 UI tests (144 PASS, 28 SKIP). P0 functional review COMPLETE — next: creative assets for Shopify App Store submission. |
+| **Status** | Production v1.32.7 HEALTHY. 2,360 unit tests (0 failures), 172 UI tests (144 PASS, 28 SKIP). AGNTCY Phase 2 pipeline decomposition COMPLETE (session 25). Next: creative assets for Shopify App Store submission. |
 | **Owner** | Remaker Digital (DBA of VanDusen & Palmeter, LLC) |
 
 ### Copyright Notice
@@ -93,6 +93,7 @@ Active procedures:
 - `scripts/seed_tenant.py` — Tenant provisioning
 - `docs/operations/CATASTROPHIC-RECOVERY-RUNBOOK.md` — Azure environment setup
 - Inline in spec: Unit test suite, Production regression suite
+- `docs/operations/agntcy-platform-adoption-procedure.md` — AGNTCY platform adoption verification
 
 ### Adding Commercial Features
 
@@ -106,11 +107,17 @@ Active procedures:
 
 - Read the public repository at https://github.com/Remaker-Digital/AGNTCY-muti-agent-deployment-customer-service
 - Do **not** reference local AGNTCY files by path — see isolation rules in `CLAUDE-REFERENCE.md`
-- Agent Red bypasses AGNTCY containers (`USE_AGENT_CONTAINERS=false`) and calls Azure OpenAI directly
+- Agent Red uses in-process agent delegation (`USE_AGENT_CONTAINERS=false`); 6 extracted agent modules in `src/agents/` delegate to Azure OpenAI directly
+- AGNTCY Phase 2 complete (session 25): pipeline decomposed into 6 containerized agent modules with A2A protocol; pipeline orchestrator delegates to agent instances
 
 ---
 
 ## Remaining Work (Priority Order, as of 2026-02-16)
+
+### AGNTCY Platform Adoption ✅ Phase 2 COMPLETE
+- Phase 1 (SDK Adoption): agntcy-app-sdk integrated, BaseAgentProtocol implemented (session 25)
+- Phase 2 (Pipeline Decomposition): 6 agents extracted, pipeline rewritten, 100 agent tests, 2,360 total tests (session 25)
+- Next: Phase 3 (MCP Client Framework), Phase 4 (UCP Commerce Protocol) — see `docs/operations/agntcy-platform-adoption-procedure.md`
 
 ### P0 — Owner Functional Review ✅ COMPLETE
 - Full Pages 0-10 UI review: 172 tests, 144 PASS, 28 SKIP (sessions 23-24)
@@ -147,4 +154,4 @@ Active procedures:
 
 *© 2026 Remaker Digital, a DBA of VanDusen & Palmeter, LLC. All rights reserved.*
 *Last Updated: 2026-02-16*
-*Version: 37.0.0*
+*Version: 38.0.0*

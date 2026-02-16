@@ -4,6 +4,7 @@
 **Version:** 1.0.0
 **Created:** 2026-02-13 (Session 17)
 **Last Run:** 2026-02-16 (Sessions 23-24 — full Pages 0/0A/0B/1-10 review: 172 tests, 144 PASS, 28 SKIP, 0 FAIL)
+**Agent Tests Gate:** 101 agent tests in `tests/agents/` must pass before any UI test run (added session 25)
 
 ---
 
@@ -27,6 +28,8 @@ permanently checked in future runs.
 
 - [ ] If re-seeding tenant: run `seed_tenant.py --execute` **without `--demo`** for clean initial state (includes Phase 0 partition cleanup — deletes all stale data before seeding fresh). Do **not** use `--demo` unless specifically testing with conversation data.
 - [ ] **After re-seeding:** Complete all POST-SEED STEPS in `scripts/seed_tenant.py` (Key Vault update → revision restart → verify authentication → update `.env.local` → update MEMORY.md). Skipping these leaves the admin UI unable to authenticate, causing missing tier badge, missing sidebar data, and broken functionality. See the procedure header in `seed_tenant.py` for exact commands.
+- [ ] Run agent unit test gate: `python -m pytest tests/agents/ -x -q` — all 101 tests must pass (0 failures)
+- [ ] Run full unit test suite: `python -m pytest tests/ --ignore=tests/integration --ignore=tests/regression -x -q` — 2,360+ tests must pass (0 failures)
 - [ ] Open `ADMIN_URL` in browser (hard-refresh if previously loaded with stale credentials)
 - [ ] Verify page loads without errors (no blank screen, no console errors)
 - [ ] Verify sidebar navigation is fully rendered

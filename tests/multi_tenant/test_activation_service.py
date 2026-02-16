@@ -158,7 +158,7 @@ def _make_service(
     prefs_repo.get_active = AsyncMock(return_value=active)
     prefs_repo.get_draft = AsyncMock(return_value=draft)
     prefs_repo.get_previous = AsyncMock(return_value=previous)
-    prefs_repo.create = AsyncMock(side_effect=lambda tid, doc: doc)
+    prefs_repo.upsert = AsyncMock(side_effect=lambda tid, doc: doc)
     prefs_repo.patch = AsyncMock(return_value=None)
     prefs_repo.delete_document = AsyncMock(return_value=None)
 
@@ -370,9 +370,9 @@ class TestSaveDraftNewDraft:
         assert result.state == "draft"
         assert result.changes == changes
 
-        # Verify create was called with a PreferencesDocument
-        prefs_repo.create.assert_awaited_once()
-        created_doc = prefs_repo.create.call_args[0][1]
+        # Verify upsert was called with a PreferencesDocument (D52: create→upsert)
+        prefs_repo.upsert.assert_awaited_once()
+        created_doc = prefs_repo.upsert.call_args[0][1]
         assert created_doc.config_state == ConfigState.DRAFT.value
         assert created_doc.brand_name == "Updated Brand"
         assert created_doc.is_current is False
@@ -393,7 +393,7 @@ class TestSaveDraftNewDraft:
         assert result.success is True
         assert result.version == 1  # 0 + 1
 
-        created_doc = prefs_repo.create.call_args[0][1]
+        created_doc = prefs_repo.upsert.call_args[0][1]
         assert created_doc.brand_name == "First Config"
         assert created_doc.config_state == ConfigState.DRAFT.value
 
@@ -410,7 +410,7 @@ class TestSaveDraftNewDraft:
                 STARTER_TENANT_ID, TenantTier.STARTER, changes, "admin",
             )
 
-        created_doc = prefs_repo.create.call_args[0][1]
+        created_doc = prefs_repo.upsert.call_args[0][1]
         # Active fields should be preserved
         assert created_doc.brand_name == "Original"
         # Changed field should be updated — extra fields stored via model_extra
@@ -428,7 +428,7 @@ class TestSaveDraftNewDraft:
                 STARTER_TENANT_ID, TenantTier.STARTER, {"brand_name": "X"}, "admin",
             )
 
-        created_doc = prefs_repo.create.call_args[0][1]
+        created_doc = prefs_repo.upsert.call_args[0][1]
         assert created_doc.id == f"{STARTER_TENANT_ID}:4"
 
     @pytest.mark.asyncio
@@ -443,7 +443,7 @@ class TestSaveDraftNewDraft:
                 {"brand_name": "X"}, "user:mike",
             )
 
-        created_doc = prefs_repo.create.call_args[0][1]
+        created_doc = prefs_repo.upsert.call_args[0][1]
         assert created_doc.created_by == "user:mike"
         assert created_doc.activated_at is None
         assert created_doc.activated_by is None
@@ -475,9 +475,9 @@ class TestSaveDraftUpdateExisting:
         assert result.success is True
         assert result.changes == changes
 
-        # Should patch, not create
+        # Should patch, not upsert (D52: create→upsert)
         prefs_repo.patch.assert_awaited()
-        prefs_repo.create.assert_not_awaited()
+        prefs_repo.upsert.assert_not_awaited()
 
     @pytest.mark.asyncio
     async def test_patch_operations_match_changes(self):
@@ -541,7 +541,7 @@ class TestSaveDraftValidation:
 
         assert result.success is False
         assert len(result.errors) > 0
-        prefs_repo.create.assert_not_awaited()
+        prefs_repo.upsert.assert_not_awaited()
         prefs_repo.patch.assert_not_awaited()
 
     @pytest.mark.asyncio
@@ -1601,8 +1601,8 @@ class TestReinitializeToDefaults:
                     STARTER_TENANT_ID, TenantTier.STARTER,
                 )
 
-        # Verify the created document has superadmin as created_by
-        created_doc = prefs_repo.create.call_args[0][1]
+        # Verify the created document has superadmin as created_by (D52: create→upsert)
+        created_doc = prefs_repo.upsert.call_args[0][1]
         assert created_doc.created_by == "superadmin"
 
 
@@ -1813,8 +1813,8 @@ class TestEdgeCases:
 
         assert result.success is True
 
-        # Cosmos metadata should NOT be in the created draft
-        created_doc = prefs_repo.create.call_args[0][1]
+        # Cosmos metadata should NOT be in the created draft (D52: create→upsert)
+        created_doc = prefs_repo.upsert.call_args[0][1]
         for key in ("_rid", "_self", "_etag", "_attachments", "_ts"):
             assert key not in created_doc
 

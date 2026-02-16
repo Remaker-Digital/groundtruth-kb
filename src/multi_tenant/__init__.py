@@ -23,5 +23,6 @@
 #   from src.multi_tenant.sla_monitoring import SLAMonitoringService, get_sla_monitor
 #   from src.multi_tenant.cost_model import CostModelCalculator, get_cost_calculator
 #   from src.multi_tenant.archival_pipeline import ArchivalPipelineService, get_archival_service
+#   from src.multi_tenant.agntcy_sdk_integration import get_agntcy_factory, init_agntcy_sdk, AgentTopic
 #
 # © 2026 Remaker Digital, a DBA of VanDusen & Palmeter, LLC. All rights reserved.

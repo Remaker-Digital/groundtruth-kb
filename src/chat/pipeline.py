@@ -288,6 +288,23 @@ class ChatPipeline:
         # Knowledge base repository for direct retrieval
         self._kb_repo = kb_repo
 
+        # -------------------------------------------------------------------
+        # Phase 2.4: A2A agent instances (in-process)
+        #
+        # When USE_AGENT_CONTAINERS is False, the pipeline delegates to
+        # extracted agent modules instead of duplicating inline Azure OpenAI
+        # logic. Each agent implements BaseAgentProtocol.process() and
+        # encapsulates the same logic that was previously in
+        # _call_*_direct() methods.
+        # -------------------------------------------------------------------
+        self._ic_agent: Any | None = None
+        self._kr_agent: Any | None = None
+        self._rg_agent: Any | None = None
+        self._esc_agent: Any | None = None
+        self._an_agent: Any | None = None
+        self._cr_agent: Any | None = None
+        self._init_agents()
+
     async def _get_http_client(self) -> httpx.AsyncClient:
         """Lazy-initialize the shared HTTP client with connection pooling."""
         if self._http_client is None or self._http_client.is_closed:
@@ -304,6 +321,33 @@ class ChatPipeline:
         """Close the HTTP client. Called during app shutdown."""
         if self._http_client and not self._http_client.is_closed:
             await self._http_client.aclose()
+
+    def _init_agents(self) -> None:
+        """Initialize in-process A2A agent instances.
+
+        Each agent is configured with the same dependencies that were
+        previously used by the inline _call_*_direct() methods. The agents
+        are only created when USE_AGENT_CONTAINERS is False — when True,
+        the pipeline routes to external containers via HTTP.
+        """
+        if USE_AGENT_CONTAINERS:
+            return
+
+        from src.agents.intent_classifier import IntentClassifierAgent
+        from src.agents.knowledge_retrieval import KnowledgeRetrievalAgent
+        from src.agents.response_generator import ResponseGeneratorAgent
+        from src.agents.escalation_handler import EscalationHandlerAgent
+        from src.agents.analytics_collector import AnalyticsCollectorAgent
+        from src.agents.critic_supervisor import CriticSupervisorAgent
+
+        self._ic_agent = IntentClassifierAgent(openai_client=self._openai_client)
+        self._kr_agent = KnowledgeRetrievalAgent(
+            kb_repo=self._kb_repo,
+        )
+        self._rg_agent = ResponseGeneratorAgent(openai_client=self._openai_client)
+        self._esc_agent = EscalationHandlerAgent(openai_client=self._openai_client)
+        self._an_agent = AnalyticsCollectorAgent()
+        self._cr_agent = CriticSupervisorAgent(openai_client=self._openai_client)
 
     # -------------------------------------------------------------------
     # Main pipeline entry point
@@ -806,55 +850,15 @@ class ChatPipeline:
         message: str,
         system_prompt: str,
     ) -> dict[str, Any]:
-        """Call Azure OpenAI GPT-4o-mini for intent classification.
+        """Classify intent via in-process IntentClassifierAgent (A2A).
 
-        Uses JSON mode to get structured output with intent and confidence.
+        Delegates to the extracted agent module which encapsulates the
+        Azure OpenAI GPT-4o-mini call with JSON mode structured output.
         """
-        if not self._openai_client:
-            logger.warning(
-                "No OpenAI client configured — returning general_inquiry default"
-            )
-            return {"intent": "general_inquiry", "confidence": 0.5, "model": AZURE_IC_MODEL}
-
-        intent_list = ", ".join(INTENT_TAXONOMY)
-        ic_user_prompt = (
-            f"Classify the following customer message into exactly one intent.\n"
-            f"Valid intents: {intent_list}\n\n"
-            f"Respond with a JSON object containing:\n"
-            f'- "intent": one of the valid intents listed above\n'
-            f'- "confidence": a number between 0.0 and 1.0\n'
-            f'- "reasoning": a brief explanation (1 sentence)\n\n'
-            f"Customer message: {message}"
+        return await self._ic_agent.process(
+            {"message": message, "system_prompt": system_prompt},
+            {},
         )
-
-        response = await self._openai_client.chat.completions.create(
-            model=AZURE_IC_MODEL,
-            messages=[
-                {"role": "system", "content": system_prompt},
-                {"role": "user", "content": ic_user_prompt},
-            ],
-            temperature=0.0,
-            max_tokens=150,
-            response_format={"type": "json_object"},
-        )
-
-        content = response.choices[0].message.content or "{}"
-        try:
-            parsed = json.loads(content)
-        except json.JSONDecodeError:
-            parsed = {}
-
-        intent = parsed.get("intent", "general_inquiry")
-        if intent not in INTENT_TAXONOMY:
-            intent = "general_inquiry"
-
-        return {
-            "intent": intent,
-            "confidence": float(parsed.get("confidence", 0.5)),
-            "model": AZURE_IC_MODEL,
-            "tokens_input": response.usage.prompt_tokens if response.usage else 0,
-            "tokens_output": response.usage.completion_tokens if response.usage else 0,
-        }
 
     async def _call_intent_classifier_http(
         self,
@@ -896,193 +900,37 @@ class ChatPipeline:
         intent: str,
         system_prompt: str,
     ) -> dict[str, Any]:
-        """Retrieve knowledge using hybrid vector + BM25 search (WI #211-212).
+        """Retrieve knowledge via in-process KnowledgeRetrievalAgent (A2A).
 
-        Uses the KnowledgeVectorizer for enterprise-grade retrieval:
-        1. Embeds the query via text-embedding-3-large
-        2. Runs DiskANN vector search on Cosmos DB
-        3. Computes BM25 keyword scores
-        4. Fuses results via Reciprocal Rank Fusion (RRF)
-
-        Falls back gracefully:
-        - No vectorizer → BM25-only via vectorizer
-        - No KB repo → empty context
-        - Vectorizer not configured → empty context
+        Delegates to the extracted agent module which encapsulates both
+        hybrid vector + BM25 search and keyword fallback paths.
         """
         tenant_id = getattr(self, "_current_tenant_id", None)
-        if not tenant_id:
-            return {"context": "", "sources": [], "model": AZURE_EMBEDDING_MODEL}
+        prefs = getattr(self, "_current_preferences", None)
 
-        # Use KnowledgeVectorizer for hybrid retrieval (WI #210-212)
-        try:
-            from src.multi_tenant.knowledge_vectorizer import (
-                KnowledgeVectorizer,
-                get_knowledge_vectorizer,
-            )
+        # Build preferences dict for the agent
+        prefs_dict: dict[str, Any] = {}
+        if prefs:
+            if prefs.retrieval_top_k is not None:
+                prefs_dict["retrieval_top_k"] = prefs.retrieval_top_k
+            if prefs.retrieval_vector_weight is not None:
+                prefs_dict["retrieval_vector_weight"] = prefs.retrieval_vector_weight
+            if prefs.retrieval_bm25_weight is not None:
+                prefs_dict["retrieval_bm25_weight"] = prefs.retrieval_bm25_weight
+            if prefs.retrieval_min_score is not None:
+                prefs_dict["retrieval_min_score"] = prefs.retrieval_min_score
+            if prefs.intent_source_mapping:
+                prefs_dict["intent_source_mapping"] = prefs.intent_source_mapping
 
-            vectorizer = get_knowledge_vectorizer()
-            if not vectorizer._configured:
-                raise RuntimeError("KnowledgeVectorizer not configured")
-
-            # Read retrieval params from tenant preferences (RAG Phase 1)
-            prefs = getattr(self, "_current_preferences", None)
-            top_k = 5
-            vector_weight = 0.7
-            bm25_weight = 0.3
-            entry_type = None
-
-            if prefs:
-                if prefs.retrieval_top_k is not None:
-                    top_k = max(1, min(prefs.retrieval_top_k, 20))
-                if prefs.retrieval_vector_weight is not None:
-                    vector_weight = max(0.0, min(prefs.retrieval_vector_weight, 1.0))
-                if prefs.retrieval_bm25_weight is not None:
-                    bm25_weight = max(0.0, min(prefs.retrieval_bm25_weight, 1.0))
-
-                # Intent-to-source routing: map resolved intent to entry_type filter
-                if prefs.intent_source_mapping and intent in prefs.intent_source_mapping:
-                    entry_type = prefs.intent_source_mapping[intent]
-
-            results = await vectorizer.search(
-                tenant_id=tenant_id,
-                query=message,
-                top_k=top_k,
-                entry_type=entry_type,
-                vector_weight=vector_weight,
-                bm25_weight=bm25_weight,
-            )
-
-            # Apply minimum relevance score filter (RAG Phase 1)
-            # NOTE: hybrid search results use "rrf_score" as the key,
-            # vector-only use "similarity", and format_for_pipeline
-            # normalises to "score" in its output. We check all three
-            # keys with appropriate fallback order.
-            min_score = 0.1
-            if prefs and prefs.retrieval_min_score is not None:
-                min_score = max(0.0, min(prefs.retrieval_min_score, 1.0))
-            results = [
-                r for r in results
-                if r.get("rrf_score", r.get("similarity", r.get("score", 0))) >= min_score
-            ]
-
-            formatted = KnowledgeVectorizer.format_for_pipeline(results)
-
-            # Diagnostic: log the formatted knowledge context that will
-            # be injected into the response generator's system message.
-            ctx = formatted.get("context", "")
-            src = formatted.get("sources", [])
-            logger.info(
-                "KR formatted: %d sources, context_len=%d, "
-                "sources=%s, context_preview='%.500s'",
-                len(src), len(ctx),
-                [(s.get("title", "?"), round(s.get("score", 0), 3)) for s in src[:5]],
-                ctx[:500],
-            )
-
-            # Add token tracking fields for pipeline compatibility
-            formatted.setdefault("tokens_input", 0)
-            formatted.setdefault("tokens_output", 0)
-
-            return formatted
-
-        except Exception as exc:
-            logger.warning(
-                "Hybrid KB retrieval unavailable (%s) — "
-                "falling back to keyword search via KnowledgeBaseRepository",
-                exc,
-            )
-
-        # -----------------------------------------------------------------
-        # FALLBACK: keyword search via KnowledgeBaseRepository
-        # If vectorizer is not configured, unavailable, or throws, use the
-        # pipeline's own kb_repo to list articles and score by keyword overlap.
-        # This guarantees KB content is available even without embeddings.
-        # -----------------------------------------------------------------
-        try:
-            kb_repo = getattr(self, "_kb_repo", None)
-            if not kb_repo:
-                logger.warning("No KnowledgeBaseRepository available for fallback")
-                return {"context": "", "sources": [], "model": AZURE_EMBEDDING_MODEL}
-
-            articles = await kb_repo.list_active(tenant_id)
-            if not articles:
-                logger.info("No active KB articles found for tenant %s", tenant_id)
-                return {"context": "", "sources": [], "model": AZURE_EMBEDDING_MODEL}
-
-            # Improved keyword scoring with title-boost and stopword removal
-            _STOP = {
-                "a", "an", "the", "is", "are", "was", "were", "be", "been",
-                "being", "have", "has", "had", "do", "does", "did", "will",
-                "would", "could", "should", "may", "might", "can", "shall",
-                "of", "in", "to", "for", "with", "on", "at", "by", "from",
-                "and", "or", "but", "not", "no", "so", "if", "as", "it",
-                "its", "this", "that", "what", "which", "who", "how",
-                "your", "you", "my", "me", "i", "we", "our", "they",
-                "their", "them", "he", "she", "his", "her",
-            }
-            query_words = {
-                w for w in message.lower().split() if w not in _STOP and len(w) > 1
-            }
-            if not query_words:
-                query_words = set(message.lower().split())
-
-            scored: list[tuple[float, dict[str, Any]]] = []
-            for article in articles:
-                title = (article.get("title") or "").lower()
-                content = (article.get("content") or "").lower()
-
-                title_words = {w for w in title.split() if w not in _STOP}
-                content_words = set(content.split())
-
-                # Title match counts 3x — titles are curated labels
-                title_overlap = len(query_words & title_words)
-                content_overlap = len(query_words & content_words)
-                score = (title_overlap * 3.0 + content_overlap) / max(len(query_words), 1)
-
-                if score > 0:
-                    scored.append((score, article))
-
-            # Sort by score descending, take top 5
-            scored.sort(key=lambda x: x[0], reverse=True)
-            top_results = scored[:5]
-
-            if not top_results:
-                # No keyword match — return all articles (limited) as general context
-                top_results = [(0.5, a) for a in articles[:5]]
-
-            # Format for pipeline
-            context_parts: list[str] = []
-            sources: list[dict[str, str]] = []
-            for _score, article in top_results:
-                title = article.get("title", "Untitled")
-                content = article.get("content", "")
-                context_parts.append(f"### {title}\n{content}")
-                sources.append({
-                    "id": article.get("id", ""),
-                    "title": title,
-                    "entry_type": article.get("entry_type", ""),
-                })
-
-            context = "\n\n".join(context_parts)
-            logger.info(
-                "KB fallback keyword search returned %d results for tenant %s",
-                len(top_results), tenant_id,
-            )
-            return {
-                "context": context,
-                "sources": sources,
-                "model": "keyword-fallback",
-                "tokens_input": 0,
-                "tokens_output": 0,
-            }
-
-        except Exception as fallback_exc:
-            logger.warning(
-                "KB fallback keyword search also failed (%s) — "
-                "returning empty knowledge context",
-                fallback_exc,
-            )
-            return {"context": "", "sources": [], "model": AZURE_EMBEDDING_MODEL}
+        return await self._kr_agent.process(
+            {
+                "message": message,
+                "intent": intent,
+                "tenant_id": tenant_id or "",
+                "preferences": prefs_dict,
+            },
+            {"x-tenant-id": tenant_id or ""},
+        )
 
     async def _call_knowledge_retrieval_http(
         self,
@@ -1148,110 +996,25 @@ class ChatPipeline:
         model: str = "gpt-4o",
         conversation_history: list[dict[str, str]] | None = None,
     ) -> AsyncGenerator[str, None]:
-        """Stream response from Azure OpenAI directly.
+        """Stream response via in-process ResponseGeneratorAgent (A2A).
 
-        Uses the Azure OpenAI SDK's streaming chat completion API.
-        The system_prompt (assembled by SystemPromptBuilder) is passed
-        as a separate system message to enable Azure OpenAI's automatic
-        prompt prefix caching (WI #135).
-
-        Conversation history (prior turns) is included as alternating
-        user/assistant messages so the model has full multi-turn context.
+        Delegates to the extracted agent module's generate_stream() method
+        which encapsulates knowledge context injection, greeting handling,
+        temperature selection, and multi-turn history.
         """
-        if not self._openai_client:
-            logger.warning(
-                "No OpenAI client configured — yielding fallback response"
-            )
-            yield "I'm sorry, but I'm unable to generate a response right now. Please try again shortly."
-            return
-
-        # Build the messages array with full conversation context.
-        #
-        # Architecture: knowledge context is appended to the system prompt
-        # as a clearly delimited reference section.  This keeps it in
-        # a single system message (some models handle one system message
-        # better than two) and places it right before the conversation,
-        # exploiting the model's recency bias.
-        effective_system = system_prompt
-        if knowledge_context and intent != "greeting":
-            effective_system = (
-                f"{system_prompt}\n\n"
-                "═══════════════════════════════════════════\n"
-                "VERIFIED KNOWLEDGE BASE — USE THIS DATA\n"
-                "═══════════════════════════════════════════\n"
-                "The articles below contain VERIFIED, ACCURATE information.\n"
-                "You MUST incorporate specific details from them into your "
-                "response: exact dollar amounts, tier names, feature lists, "
-                "quantities, percentages, and policy terms.\n"
-                "Include ALL relevant items — if there are multiple tiers, "
-                "list ALL of them.  If there are multiple features, list ALL.\n"
-                "NEVER say \"check our website\" or \"contact sales\" when the "
-                "answer is right here.\n\n"
-                f"{knowledge_context}\n\n"
-                "═══════════════════════════════════════════\n"
-                "END OF KNOWLEDGE BASE\n"
-                "═══════════════════════════════════════════"
-            )
-
-        messages: list[dict[str, str]] = [
-            {"role": "system", "content": effective_system},
-        ]
-
-        # Include conversation history for multi-turn context.
-        # Prior turns are inserted as alternating user/assistant messages
-        # so the model sees the full conversation flow. Capped to last 20
-        # messages (~10 turns) by the caller to stay within token budget.
-        if conversation_history:
-            messages.extend(conversation_history)
-
-        # Build the current user message — keep it clean and simple.
-        # Knowledge context is already in the system message above.
-        if intent == "greeting":
-            user_content = (
-                f"{customer_message}\n\n"
-                "[Respond warmly and naturally to this greeting. "
-                "Be friendly and conversational. Ask how you can help.]"
-            )
-        else:
-            user_content = customer_message
-
-        messages.append({"role": "user", "content": user_content})
-
-        # Diagnostic: log the full message structure sent to the model
-        # so we can verify knowledge context is reaching the API call.
-        if knowledge_context:
-            logger.info(
-                "RG messages: %d msgs, effective_system=%d chars, "
-                "knowledge_context=%d chars, user='%s', "
-                "knowledge_preview='%.500s'",
-                len(messages),
-                len(effective_system),
-                len(knowledge_context),
-                user_content[:120],
-                knowledge_context[:500],
-            )
-
         remaining_ms = budget.remaining_ms
-        # Azure OpenAI SDK uses seconds for timeout
         timeout_seconds = max(0.5, remaining_ms / 1000)
 
-        # Use lower temperature when knowledge context is available
-        # (factual queries) to reduce hallucination.  Higher temperature
-        # for greetings and general conversation to keep things natural.
-        temperature = 0.3 if knowledge_context else 0.7
-
-        stream = await self._openai_client.chat.completions.create(
+        async for chunk in self._rg_agent.generate_stream(
+            customer_message=customer_message,
+            intent=intent,
+            knowledge_context=knowledge_context,
+            system_prompt=system_prompt,
             model=model,
-            messages=messages,
-            temperature=temperature,
-            max_tokens=1024,
-            stream=True,
-            timeout=timeout_seconds,
-        )
-
-        async for chunk in stream:
-            if chunk.choices and chunk.choices[0].delta.content:
-                yield chunk.choices[0].delta.content
+            conversation_history=conversation_history,
+            timeout_seconds=timeout_seconds,
+        ):
+            yield chunk
 
     async def _call_response_generator_stream_http(
         self,
@@ -1366,160 +1129,56 @@ class ChatPipeline:
         budget: PipelineTimeoutBudget,
         knowledge_titles: list[str] | None = None,
     ) -> tuple[bool, str, Any]:
-        """Validate response using Azure OpenAI GPT-4o-mini directly.
+        """Validate response via in-process CriticSupervisorAgent (A2A).
 
-        Implements the same fail-closed semantics as CriticPolicy:
-        - Model approves → deliver response
-        - Model rejects → block + use fallback
-        - Call fails → block + use fallback (fail-closed)
+        Delegates to the extracted agent module which encapsulates the
+        fail-closed Critic validation using Azure OpenAI GPT-4o-mini.
 
-        The Critic system prompt is the immutable platform base from
-        SystemPromptBuilder — no tenant config injected (Decision #23).
+        The agent returns a dict; this method adapts it to the
+        (approved, safe_text, CriticResult) tuple expected by the caller.
         """
         from src.multi_tenant.critic_policy import CriticBlockReason, CriticResult, CriticVerdict
 
-        request_id = f"critic-direct-{conversation_id}-{int(time.time() * 1000)}"
-        start_time = time.monotonic()
+        cr_result = await self._cr_agent.process(
+            {
+                "response_text": response_text,
+                "customer_message": customer_message,
+                "knowledge_titles": knowledge_titles or [],
+                "conversation_id": conversation_id,
+            },
+            {},
+        )
 
+        approved = cr_result.get("approved", False)
+        safe_text = cr_result.get("safe_text", SAFE_FALLBACK_MESSAGE)
+
+        # Map agent dict to CriticResult dataclass for pipeline compatibility
+        verdict_str = cr_result.get("verdict", "unavailable")
         try:
-            # Build KB context line so Critic knows which articles
-            # informed the response (prevents false-positive blocking
-            # of legitimate product feature descriptions).
-            kb_context_line = ""
-            if knowledge_titles:
-                titles_str = ", ".join(f'"{t}"' for t in knowledge_titles[:10])
-                kb_context_line = (
-                    f"\nKNOWLEDGE BASE ARTICLES USED:\n{titles_str}\n"
-                    "The response above was generated from these knowledge base "
-                    "articles, which are curated by the merchant. Content derived "
-                    "from knowledge base articles is legitimate product information "
-                    "and should NOT be flagged as hallucination or internal details.\n"
-                )
+            verdict = CriticVerdict(verdict_str)
+        except ValueError:
+            verdict = None
 
-            critic_user_prompt = (
-                "Review the following AI-generated customer service response.\n\n"
-                f"CUSTOMER MESSAGE:\n{customer_message}\n\n"
-                f"AI RESPONSE:\n{response_text}\n"
-                f"{kb_context_line}\n"
-                "Return a JSON object with:\n"
-                '- "verdict": "approved", "rejected", or "modified"\n'
-                '- "flags": array of concerns (empty array if none)\n'
-                '- "modified_response": corrected text if verdict is "modified"\n'
-                '- "reasoning": brief explanation\n\n'
-                "DEFAULT TO APPROVED.  Only reject if the response contains "
-                "one of the specific violations listed in your system prompt "
-                "(cross-customer PII leakage, literal secrets, medical/legal/"
-                "financial advice, hate speech, or policy contradictions).  "
-                "Using the customer's own name or preferences back to them "
-                "is NORMAL and must be approved.  Describing product "
-                "features, technology, architecture, or capabilities is "
-                "never a violation."
-            )
-
-            # Get the immutable Critic system prompt
-            from src.multi_tenant.system_prompt_builder import _PLATFORM_BASE
-            critic_system_prompt = _PLATFORM_BASE.get(
-                AgentRole.CRITIC_SUPERVISOR, ""
-            )
-
-            response = await self._openai_client.chat.completions.create(
-                model=AZURE_CR_MODEL,
-                messages=[
-                    {"role": "system", "content": critic_system_prompt},
-                    {"role": "user", "content": critic_user_prompt},
-                ],
-                temperature=0.0,
-                max_tokens=300,
-                response_format={"type": "json_object"},
-            )
-
-            elapsed = (time.monotonic() - start_time) * 1000
-            content = response.choices[0].message.content or "{}"
-
-            logger.info(
-                "Critic (direct) raw response: conv=%s content=%s",
-                conversation_id[:8], content[:500],
-            )
-
+        block_reason_str = cr_result.get("block_reason")
+        block_reason = None
+        if block_reason_str:
             try:
-                parsed = json.loads(content)
-            except json.JSONDecodeError:
-                logger.warning(
-                    "Critic (direct) JSON parse failed: conv=%s content=%s",
-                    conversation_id[:8], content[:200],
-                )
-                parsed = {}
-
-            verdict_str = parsed.get("verdict", "rejected")
-            reasoning = parsed.get("reasoning", "")
-            try:
-                verdict = CriticVerdict(verdict_str)
+                block_reason = CriticBlockReason(block_reason_str)
             except ValueError:
-                logger.warning(
-                    "Critic (direct) unknown verdict: conv=%s verdict=%s",
-                    conversation_id[:8], verdict_str,
-                )
-                verdict = CriticVerdict.REJECTED
+                block_reason = CriticBlockReason.ERROR
 
-            approved = verdict in (CriticVerdict.APPROVED, CriticVerdict.MODIFIED)
-            flags = parsed.get("flags", [])
-            modified_response = parsed.get("modified_response")
+        result = CriticResult(
+            approved=approved,
+            verdict=verdict,
+            block_reason=block_reason,
+            flags=cr_result.get("flags", []),
+            modified_response=cr_result.get("modified_response"),
+            latency_ms=cr_result.get("latency_ms", 0.0),
+            critic_instance="in-process-agent",
+            request_id=cr_result.get("request_id", f"critic-{conversation_id}"),
+        )
 
-            if verdict == CriticVerdict.MODIFIED and not modified_response:
-                approved = False
-                flags.append("modified_verdict_without_text")
-
-            block_reason = None if approved else CriticBlockReason.REJECTED
-
-            result = CriticResult(
-                approved=approved,
-                verdict=verdict,
-                block_reason=block_reason,
-                flags=flags,
-                modified_response=modified_response if approved else None,
-                latency_ms=elapsed,
-                critic_instance="azure-openai-direct",
-                request_id=request_id,
-            )
-
-            logger.info(
-                "Critic (direct) decision: conv=%s approved=%s verdict=%s "
-                "flags=%s reasoning=%s",
-                conversation_id[:8], approved, verdict_str, flags,
-                reasoning[:200] if reasoning else "none",
-            )
-
-            if approved:
-                safe_text = modified_response or response_text
-                return True, safe_text, result
-            else:
-                logger.warning(
-                    "Critic (direct) rejected response: tenant=%s conv=%s "
-                    "flags=%s reasoning=%s",
-                    tenant_id, conversation_id, flags,
-                    reasoning[:200] if reasoning else "none",
-                )
-                return False, SAFE_FALLBACK_MESSAGE, result
-
-        except Exception as exc:
-            # Fail-closed: any error means block the response
-            elapsed = (time.monotonic() - start_time) * 1000
-            logger.warning(
-                "Critic (direct) call failed — BLOCKING response "
-                "(fail-closed): tenant=%s conv=%s error=%s",
-                tenant_id, conversation_id, exc,
-            )
-            result = CriticResult(
-                approved=False,
-                verdict=None,
-                block_reason=CriticBlockReason.ERROR,
-                flags=["critic_direct_error"],
-                modified_response=None,
-                latency_ms=elapsed,
-                critic_instance="azure-openai-direct",
-                request_id=request_id,
-            )
-            return False, SAFE_FALLBACK_MESSAGE, result
+        return approved, safe_text, result
 
     # -------------------------------------------------------------------
     # Escalation handling
@@ -1615,46 +1274,15 @@ class ChatPipeline:
         message: str,
         system_prompt: str,
     ) -> dict[str, Any]:
-        """Evaluate escalation context using Azure OpenAI GPT-4o-mini."""
-        if not self._openai_client:
-            return {"reason": "Customer requested human agent", "model": AZURE_IC_MODEL}
+        """Evaluate escalation via in-process EscalationHandlerAgent (A2A).
 
-        esc_user_prompt = (
-            "Analyze the following customer message and determine the "
-            "escalation reason. Respond with a JSON object containing:\n"
-            '- "reason": a clear, concise summary of why the customer needs '
-            "human assistance (1-2 sentences)\n"
-            '- "urgency": "low", "medium", or "high"\n'
-            '- "context_summary": brief summary for the human agent\n\n'
-            f"Customer message: {message}"
+        Delegates to the extracted agent module which encapsulates the
+        Azure OpenAI GPT-4o-mini call for escalation analysis.
+        """
+        return await self._esc_agent.process(
+            {"message": message, "system_prompt": system_prompt},
+            {},
         )
-
-        try:
-            response = await self._openai_client.chat.completions.create(
-                model=AZURE_IC_MODEL,
-                messages=[
-                    {"role": "system", "content": system_prompt},
-                    {"role": "user", "content": esc_user_prompt},
-                ],
-                temperature=0.0,
-                max_tokens=200,
-                response_format={"type": "json_object"},
-            )
-
-            content = response.choices[0].message.content or "{}"
-            try:
-                parsed = json.loads(content)
-            except json.JSONDecodeError:
-                parsed = {}
-
-            return {
-                "reason": parsed.get("reason", "Customer requested human agent"),
-                "urgency": parsed.get("urgency", "medium"),
-                "context_summary": parsed.get("context_summary", ""),
-                "model": AZURE_IC_MODEL,
-            }
-        except Exception:
-            return {"reason": "Customer requested human agent", "model": AZURE_IC_MODEL}
 
     async def _call_escalation_handler_http(
         self,
@@ -1689,8 +1317,8 @@ class ChatPipeline:
     ) -> None:
         """Send analytics event asynchronously (non-blocking).
 
-        When USE_AGENT_CONTAINERS is false, analytics are logged locally
-        instead of sending to the AGNTCY analytics container.
+        When USE_AGENT_CONTAINERS is false, delegates to the in-process
+        AnalyticsCollectorAgent. When true, sends to the AGNTCY container.
         """
         try:
             analytics_data = {
@@ -1717,12 +1345,8 @@ class ChatPipeline:
                     timeout=httpx.Timeout(connect=1.0, read=2.0, write=1.0, pool=1.0),
                 )
             else:
-                # Log analytics locally when not using agent containers
-                logger.info(
-                    "Analytics: conv=%s intent=%s stages=%d latency=%.0fms",
-                    conversation_id, intent, len(budget.stages),
-                    budget.elapsed_ms,
-                )
+                # Delegate to in-process AnalyticsCollectorAgent
+                await self._an_agent.process(analytics_data, {})
         except Exception:
             # Analytics is fire-and-forget — never block the pipeline
             logger.debug(

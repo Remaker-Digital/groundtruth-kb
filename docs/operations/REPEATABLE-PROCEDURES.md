@@ -27,6 +27,7 @@ A Repeatable Procedure is **not**:
 | Unit test suite | *(inline — see Section 5)* | Active |
 | Production regression suite | *(inline — see Section 5)* | Active |
 | Azure environment setup | `docs/operations/CATASTROPHIC-RECOVERY-RUNBOOK.md` | Active |
+| AGNTCY platform adoption | `docs/operations/agntcy-platform-adoption-procedure.md` | Active |
 
 > **Cross-procedure dependency:** The *Admin UI test* procedure depends on *Tenant provisioning*. After running `seed_tenant.py`, the mandatory POST-SEED STEPS (Key Vault update + revision restart) must be completed before the UI test pre-flight will pass. See `seed_tenant.py` header for exact commands.
 

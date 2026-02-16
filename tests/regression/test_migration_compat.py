@@ -412,7 +412,7 @@ class TestFirstSaveDraft:
         prefs_repo.get_active = AsyncMock(return_value=old_doc)
         prefs_repo.get_draft = AsyncMock(return_value=None)
         prefs_repo.patch = AsyncMock()
-        prefs_repo.create = AsyncMock()
+        prefs_repo.upsert = AsyncMock()
         svc = _make_service(prefs_repo=prefs_repo)
 
         with patch(
@@ -431,9 +431,9 @@ class TestFirstSaveDraft:
         assert result.version == 4  # active_version (3) + 1
         assert result.state == "draft"
 
-        # Verify create was called (not patch, since no draft existed)
-        prefs_repo.create.assert_called_once()
-        created_doc = prefs_repo.create.call_args.args[1]
+        # Verify upsert was called (not patch, since no draft existed; D52: create→upsert)
+        prefs_repo.upsert.assert_called_once()
+        created_doc = prefs_repo.upsert.call_args.args[1]
         # created_doc is now a PreferencesDocument (Pydantic model), use attribute access
         assert created_doc.config_state == ConfigState.DRAFT.value
         assert created_doc.model_dump().get("brand_name") == "Updated Brand"
@@ -498,7 +498,7 @@ class TestMixedDocuments:
         prefs_repo = AsyncMock()
         prefs_repo.get_active = AsyncMock(return_value=new_active)
         prefs_repo.get_draft = AsyncMock(return_value=None)
-        prefs_repo.create = AsyncMock()
+        prefs_repo.upsert = AsyncMock()
         svc = _make_service(prefs_repo=prefs_repo)
 
         with patch(
@@ -515,10 +515,9 @@ class TestMixedDocuments:
 
         assert result.success is True
 
-        # patch should NOT have been called for backfill — only create for draft
-        # (the old _ensure_config_state path is skipped when config_state exists)
-        # But _ensure_config_state IS called on the active doc; it should be a no-op
-        prefs_repo.create.assert_called_once()
+        # patch should NOT have been called for backfill — only upsert for draft
+        # (D52: create→upsert; the old _ensure_config_state path is skipped when config_state exists)
+        prefs_repo.upsert.assert_called_once()
 
     @pytest.mark.asyncio
     async def test_old_doc_brand_name_preserved_in_draft(self):
@@ -532,7 +531,7 @@ class TestMixedDocuments:
         prefs_repo.get_active = AsyncMock(return_value=old_doc)
         prefs_repo.get_draft = AsyncMock(return_value=None)
         prefs_repo.patch = AsyncMock()
-        prefs_repo.create = AsyncMock()
+        prefs_repo.upsert = AsyncMock()
         svc = _make_service(prefs_repo=prefs_repo)
 
         with patch(
@@ -547,7 +546,7 @@ class TestMixedDocuments:
                 actor="admin",
             )
 
-        created_doc = prefs_repo.create.call_args.args[1]
+        created_doc = prefs_repo.upsert.call_args.args[1]
         # created_doc is now a PreferencesDocument (Pydantic model)
         doc_dict = created_doc.model_dump()
         # Fields from old doc are preserved

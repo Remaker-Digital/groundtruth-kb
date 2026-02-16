@@ -9,6 +9,24 @@ All notable changes to Agent Red Customer Experience are documented here.
 
 ---
 
+## v1.32.7-agntcy — 2026-02-16
+
+### AGNTCY Platform Phase 2: Pipeline Decomposition
+The monolithic AI pipeline has been decomposed into six independent agent modules following the AGNTCY Agent-to-Agent (A2A) protocol. This is an internal architecture improvement with no customer-visible behavior change.
+
+- **Six agent modules** extracted from the monolithic pipeline: Intent Classifier, Knowledge Retrieval, Response Generator, Escalation Handler, Analytics Collector, and Critic/Supervisor
+- **Agent base class** (`AgentRedBaseAgent`) extends the AGNTCY SDK's `BaseAgentProtocol` with standardized message handling, error wrapping, and metadata injection
+- **Container-ready deployment** — each agent has its own Dockerfile and FastAPI app with health/ready probes, enabling independent scaling and fault isolation
+- **Pipeline orchestrator rewrite** — the main pipeline now delegates to agent instances via the A2A protocol interface instead of inline Azure OpenAI calls
+- **101 new agent tests** covering all six agents plus the container app factory
+- **2,360 total unit tests** passed, 0 failures (up from 2,330)
+
+### Tests
+- 2,360 unit tests passed, 0 failures
+- 101 new agent module tests across 8 test files
+
+---
+
 ## v1.32.7 — 2026-02-16
 
 ### Widget activation gate
