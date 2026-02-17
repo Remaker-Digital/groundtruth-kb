@@ -26,7 +26,7 @@ from src.app.lifecycle import (
     register_startup_handlers,
     register_shutdown_handlers,
 )
-from src.app.background import register_idle_scanner
+from src.app.background import register_idle_scanner, register_sla_snapshots
 from src.app.health import register_health_endpoints
 
 # ---------------------------------------------------------------------------
@@ -41,6 +41,7 @@ mount_standalone_admin(app)
 register_startup_handlers(app)
 register_shutdown_handlers(app)
 register_idle_scanner(app)
+register_sla_snapshots(app)
 register_health_endpoints(app)
 
 # ---------------------------------------------------------------------------

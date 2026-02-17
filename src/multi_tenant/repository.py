@@ -31,6 +31,7 @@ from src.multi_tenant.repositories import (  # noqa: F401
     PlatformConfigRepository,
     PlatformScopedRepository,
     PreferencesRepository,
+    SLASnapshotRepository,
     TeamMemberRepository,
     TenantIsolationError,
     TenantRepository,
@@ -54,4 +55,5 @@ __all__ = [
     "TeamMemberRepository",
     "PlatformConfigRepository",
     "AuditLogRepository",
+    "SLASnapshotRepository",
 ]

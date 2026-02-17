@@ -1,7 +1,7 @@
 """Background tasks for Agent Red Customer Experience.
 
-Idle conversation scanner — periodic background task that closes
-conversations exceeding the 30-minute idle timeout.
+- Idle conversation scanner — closes conversations exceeding 30-min idle timeout.
+- SLA snapshot loop — persists hourly SLA snapshots and daily rollups (C-2).
 
 © 2026 Remaker Digital, a DBA of VanDusen & Palmeter, LLC. All rights reserved.
 """
@@ -11,11 +11,14 @@ from __future__ import annotations
 import asyncio
 import logging
 
+from datetime import datetime, timezone
+
 from fastapi import FastAPI
 
 logger = logging.getLogger(__name__)
 
 _idle_scanner_task: asyncio.Task[None] | None = None
+_sla_snapshot_task: asyncio.Task[None] | None = None
 
 
 async def _idle_scanner_loop() -> None:
@@ -79,3 +82,151 @@ def register_idle_scanner(app: FastAPI) -> None:
     """Register idle scanner startup/shutdown handlers on the FastAPI app."""
     app.on_event("startup")(_startup_idle_scanner)
     app.on_event("shutdown")(_shutdown_idle_scanner)
+
+
+# ---------------------------------------------------------------------------
+# SLA snapshot loop (C-2: SLA persistence)
+# ---------------------------------------------------------------------------
+
+# Snapshot interval: 1 hour (3600 seconds)
+_SLA_SNAPSHOT_INTERVAL = 3600
+# Hydration: load last 24 hourly snapshots on startup
+_SLA_HYDRATION_HOURS = 24
+# Daily rollup check: compute once per day at midnight UTC
+_last_rollup_date: str | None = None
+
+
+async def _hydrate_sla_from_cosmos() -> None:
+    """Load the most recent hourly snapshots and replay into the SLA monitor.
+
+    Called once during startup to restore continuity after container restarts.
+    """
+    try:
+        from src.multi_tenant.repositories.sla_snapshots import SLASnapshotRepository
+        from src.multi_tenant.sla_monitoring import get_sla_monitor
+
+        repo = SLASnapshotRepository()
+        snapshots = await repo.get_recent_hourly(hours=_SLA_HYDRATION_HOURS)
+        if snapshots:
+            monitor = get_sla_monitor()
+            injected = monitor.hydrate_from_snapshots(snapshots)
+            logger.info(
+                "SLA hydration complete: %d snapshots → %d synthetic samples",
+                len(snapshots), injected,
+            )
+        else:
+            logger.info("SLA hydration: no snapshots found (first run or empty collection)")
+    except Exception:
+        logger.warning("SLA hydration failed (non-fatal)", exc_info=True)
+
+
+async def _maybe_compute_daily_rollup(
+    repo: object,
+    now_utc: datetime,
+) -> None:
+    """Compute a daily rollup if we've crossed into a new UTC day."""
+    global _last_rollup_date  # noqa: PLW0603
+
+    today = now_utc.strftime("%Y-%m-%d")
+    if _last_rollup_date == today:
+        return
+
+    # Compute rollup for yesterday
+    from datetime import timedelta
+    yesterday = (now_utc - timedelta(days=1)).strftime("%Y-%m-%d")
+
+    try:
+        from src.multi_tenant.sla_monitoring import SLAMonitoringService
+
+        hourly = await repo.get_hourly_for_date(yesterday)  # type: ignore[attr-defined]
+        if hourly:
+            rollup = SLAMonitoringService.compute_daily_rollup(hourly)
+            await repo.save_daily_rollup(  # type: ignore[attr-defined]
+                date=yesterday,
+                platform_metrics=rollup["platform"],
+                per_tenant=rollup["per_tenant"],
+            )
+            logger.info(
+                "SLA daily rollup saved for %s (%d hourly snapshots)",
+                yesterday, len(hourly),
+            )
+        else:
+            logger.debug("No hourly snapshots for %s — skipping daily rollup", yesterday)
+    except Exception:
+        logger.warning("SLA daily rollup failed for %s", yesterday, exc_info=True)
+
+    _last_rollup_date = today
+
+
+async def _sla_snapshot_loop() -> None:
+    """Periodic background task that persists SLA snapshots every hour.
+
+    Also triggers daily rollup computation at the start of each new UTC day.
+    """
+    from src.multi_tenant.repositories.sla_snapshots import SLASnapshotRepository
+    from src.multi_tenant.sla_monitoring import get_sla_monitor
+
+    # Wait 120 seconds after startup to allow metrics to accumulate
+    await asyncio.sleep(120)
+
+    while True:
+        try:
+            now_utc = datetime.now(timezone.utc)
+            monitor = get_sla_monitor()
+            repo = SLASnapshotRepository()
+
+            # 1. Persist hourly snapshot
+            snapshot_data = monitor.create_snapshot_data()
+            period_end = now_utc
+            period_start = now_utc.replace(
+                minute=0, second=0, microsecond=0,
+            )
+
+            await repo.save_hourly_snapshot(
+                timestamp=now_utc,
+                period_start=period_start,
+                period_end=period_end,
+                platform_metrics=snapshot_data["platform"],
+                per_tenant=snapshot_data["per_tenant"],
+            )
+            logger.info(
+                "SLA hourly snapshot saved: %d requests, %.1f%% uptime",
+                snapshot_data["platform"]["total_requests"],
+                snapshot_data["platform"]["uptime_pct"],
+            )
+
+            # 2. Check for daily rollup
+            await _maybe_compute_daily_rollup(repo, now_utc)
+
+        except Exception:
+            logger.warning("SLA snapshot cycle failed (non-fatal)", exc_info=True)
+
+        # Sleep 1 hour
+        await asyncio.sleep(_SLA_SNAPSHOT_INTERVAL)
+
+
+async def _startup_sla_snapshots() -> None:
+    """Hydrate SLA data from Cosmos, then start the snapshot loop."""
+    global _sla_snapshot_task  # noqa: PLW0603
+    await _hydrate_sla_from_cosmos()
+    _sla_snapshot_task = asyncio.create_task(_sla_snapshot_loop())
+    logger.info("SLA snapshot background task started (1-hour interval)")
+
+
+async def _shutdown_sla_snapshots() -> None:
+    """Cancel the SLA snapshot background task."""
+    global _sla_snapshot_task  # noqa: PLW0603
+    if _sla_snapshot_task and not _sla_snapshot_task.done():
+        _sla_snapshot_task.cancel()
+        try:
+            await _sla_snapshot_task
+        except asyncio.CancelledError:
+            pass
+        logger.info("SLA snapshot background task stopped")
+    _sla_snapshot_task = None
+
+
+def register_sla_snapshots(app: FastAPI) -> None:
+    """Register SLA snapshot startup/shutdown handlers on the FastAPI app."""
+    app.on_event("startup")(_startup_sla_snapshots)
+    app.on_event("shutdown")(_shutdown_sla_snapshots)

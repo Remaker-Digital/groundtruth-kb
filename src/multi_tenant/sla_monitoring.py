@@ -30,6 +30,7 @@ import logging
 import time
 from collections import deque
 from dataclasses import dataclass, field
+from datetime import datetime, timezone
 from typing import Any
 
 from src.multi_tenant.cosmos_schema import TenantTier
@@ -118,6 +119,31 @@ class PlatformSLASummary:
     latency: LatencyPercentiles
     per_tier_compliance: dict[str, SLAComplianceResult]
     overall_compliant: bool
+
+
+@dataclass(frozen=True)
+class ErrorBudget:
+    """Error budget status for a tier over a billing period."""
+
+    tier: str
+    period_days: int
+    allowed_downtime_minutes: float
+    actual_downtime_minutes: float
+    budget_remaining: float  # 0.0 to 1.0 (1.0 = full budget, 0.0 = exhausted)
+    budget_consumed_pct: float  # 0.0 to 100.0
+    is_within_budget: bool
+
+
+@dataclass(frozen=True)
+class SLATrendPoint:
+    """A single point in an SLA trend time series."""
+
+    timestamp: str
+    uptime_pct: float
+    p50_ms: float
+    p95_ms: float
+    p99_ms: float
+    total_requests: int
 
 
 # ---------------------------------------------------------------------------
@@ -354,6 +380,305 @@ class SLAMonitoringService:
             self._health_checks.popleft()
 
         return cleaned
+
+    # -------------------------------------------------------------------
+    # Snapshot persistence (C-2)
+    # -------------------------------------------------------------------
+
+    def create_snapshot_data(self) -> dict[str, Any]:
+        """Capture current metrics as a snapshot dict.
+
+        Returns a dict with platform-wide and per-tenant metrics
+        suitable for persisting to Cosmos DB.
+        """
+        latency = self.get_latency_percentiles()
+        uptime = self.get_uptime_pct()
+
+        now = time.monotonic()
+        cutoff = now - LATENCY_WINDOW_SECONDS
+        all_checks = [(ts, ok) for ts, ok in self._health_checks if ts >= cutoff]
+        healthy_count = sum(1 for _, ok in all_checks if ok)
+
+        platform_metrics = {
+            "total_requests": latency.sample_count,
+            "p50_ms": round(latency.p50_ms, 1),
+            "p95_ms": round(latency.p95_ms, 1),
+            "p99_ms": round(latency.p99_ms, 1),
+            "health_checks_total": len(all_checks),
+            "health_checks_healthy": healthy_count,
+            "uptime_pct": round(uptime, 3),
+        }
+
+        per_tenant: dict[str, dict[str, Any]] = {}
+        for tenant_id, samples in self._tenant_samples.items():
+            tenant_latencies = sorted(
+                lat for ts, lat in samples if ts >= cutoff
+            )
+            if not tenant_latencies:
+                continue
+            per_tenant[tenant_id] = {
+                "requests": len(tenant_latencies),
+                "p50_ms": round(_percentile(tenant_latencies, 50), 1),
+                "p95_ms": round(_percentile(tenant_latencies, 95), 1),
+                "p99_ms": round(_percentile(tenant_latencies, 99), 1),
+            }
+
+        return {
+            "platform": platform_metrics,
+            "per_tenant": per_tenant,
+        }
+
+    # -------------------------------------------------------------------
+    # Hydration from persisted snapshots (C-2)
+    # -------------------------------------------------------------------
+
+    def hydrate_from_snapshots(
+        self,
+        snapshots: list[dict[str, Any]],
+    ) -> int:
+        """Restore in-memory state from persisted hourly snapshots.
+
+        Injects synthetic samples into the deques so that percentile
+        calculations produce reasonable results immediately after
+        a container restart.
+
+        Each snapshot's platform and per-tenant request counts are
+        used to create evenly-spaced synthetic latency samples within
+        the snapshot's time window.
+
+        Args:
+            snapshots: List of hourly snapshot documents (newest first).
+
+        Returns:
+            Number of synthetic samples injected.
+        """
+        if not snapshots:
+            return 0
+
+        now = time.monotonic()
+        now_utc = datetime.now(timezone.utc)
+        injected = 0
+
+        for snap in reversed(snapshots):  # Process oldest first
+            ts_str = snap.get("timestamp", "")
+            try:
+                snap_time = datetime.fromisoformat(ts_str.replace("Z", "+00:00"))
+            except (ValueError, AttributeError):
+                continue
+
+            # Compute the monotonic offset for this snapshot's time
+            age_seconds = (now_utc - snap_time).total_seconds()
+            if age_seconds < 0:
+                continue  # Future snapshot — skip
+            mono_base = now - age_seconds
+
+            # Inject platform-wide synthetic samples
+            platform = snap.get("platform", {})
+            p_count = platform.get("total_requests", 0)
+            p50 = platform.get("p50_ms", 0.0)
+            if p_count > 0 and p50 > 0:
+                # Use the median as a representative latency for synthetics
+                for i in range(min(p_count, 100)):
+                    offset = (i / max(p_count, 1)) * 3600
+                    self._platform_samples.append((mono_base + offset, p50))
+                    injected += 1
+
+            # Inject health check synthetics
+            hc_total = platform.get("health_checks_total", 0)
+            hc_healthy = platform.get("health_checks_healthy", 0)
+            for i in range(hc_total):
+                offset = (i / max(hc_total, 1)) * 3600
+                healthy = i < hc_healthy
+                self._health_checks.append((mono_base + offset, healthy))
+
+            # Inject per-tenant synthetic samples
+            per_tenant = snap.get("per_tenant", {})
+            for tenant_id, metrics in per_tenant.items():
+                t_count = metrics.get("requests", 0)
+                t_p50 = metrics.get("p50_ms", 0.0)
+                if t_count > 0 and t_p50 > 0:
+                    if tenant_id not in self._tenant_samples:
+                        self._tenant_samples[tenant_id] = deque(
+                            maxlen=MAX_SAMPLES_PER_TENANT,
+                        )
+                    for i in range(min(t_count, 100)):
+                        offset = (i / max(t_count, 1)) * 3600
+                        self._tenant_samples[tenant_id].append(
+                            (mono_base + offset, t_p50),
+                        )
+                        injected += 1
+
+        logger.info(
+            "SLA hydration: injected %d synthetic samples from %d snapshots",
+            injected, len(snapshots),
+        )
+        return injected
+
+    # -------------------------------------------------------------------
+    # Error budget calculation (C-2)
+    # -------------------------------------------------------------------
+
+    @staticmethod
+    def compute_error_budget(
+        tier: str,
+        daily_snapshots: list[dict[str, Any]],
+        period_days: int = 30,
+    ) -> ErrorBudget:
+        """Compute error budget from daily rollup snapshots.
+
+        Error budget = 1.0 - (actual_downtime / allowed_downtime).
+        A budget_remaining of 1.0 means no downtime consumed.
+        A budget_remaining of 0.0 means the SLA has been fully exhausted.
+
+        Args:
+            tier: Tenant tier to evaluate against.
+            daily_snapshots: List of daily rollup documents.
+            period_days: Billing period length in days.
+
+        Returns:
+            ErrorBudget with remaining budget and consumption metrics.
+        """
+        targets = SLA_TARGETS.get(tier, SLA_TARGETS[TenantTier.STARTER.value])
+        target_uptime = targets["uptime_pct"]
+
+        # Allowed downtime = (1 - target_uptime/100) * period_days * 24 * 60 minutes
+        allowed_downtime_min = (1.0 - target_uptime / 100.0) * period_days * 24 * 60
+
+        # Compute actual downtime from daily snapshots
+        total_downtime_min = 0.0
+        for snap in daily_snapshots:
+            platform = snap.get("platform", {})
+            uptime_pct = platform.get("uptime_pct", 100.0)
+            # Each daily snapshot covers 24 hours = 1440 minutes
+            daily_downtime = (1.0 - uptime_pct / 100.0) * 1440
+            total_downtime_min += daily_downtime
+
+        if allowed_downtime_min > 0:
+            budget_remaining = max(
+                0.0,
+                1.0 - (total_downtime_min / allowed_downtime_min),
+            )
+            budget_consumed = min(
+                100.0,
+                (total_downtime_min / allowed_downtime_min) * 100.0,
+            )
+        else:
+            # 100% uptime target — any downtime exhausts budget
+            budget_remaining = 0.0 if total_downtime_min > 0 else 1.0
+            budget_consumed = 100.0 if total_downtime_min > 0 else 0.0
+
+        return ErrorBudget(
+            tier=tier,
+            period_days=period_days,
+            allowed_downtime_minutes=round(allowed_downtime_min, 2),
+            actual_downtime_minutes=round(total_downtime_min, 2),
+            budget_remaining=round(budget_remaining, 4),
+            budget_consumed_pct=round(budget_consumed, 2),
+            is_within_budget=budget_remaining > 0,
+        )
+
+    @staticmethod
+    def build_trend_series(
+        snapshots: list[dict[str, Any]],
+    ) -> list[SLATrendPoint]:
+        """Convert snapshot documents into a time-series of SLA trend points.
+
+        Args:
+            snapshots: Hourly or daily snapshot documents (any order).
+
+        Returns:
+            List of SLATrendPoint sorted by timestamp ascending.
+        """
+        points: list[SLATrendPoint] = []
+        for snap in snapshots:
+            platform = snap.get("platform", {})
+            points.append(SLATrendPoint(
+                timestamp=snap.get("timestamp", ""),
+                uptime_pct=platform.get("uptime_pct", 100.0),
+                p50_ms=platform.get("p50_ms", 0.0),
+                p95_ms=platform.get("p95_ms", 0.0),
+                p99_ms=platform.get("p99_ms", 0.0),
+                total_requests=platform.get("total_requests", 0),
+            ))
+        points.sort(key=lambda p: p.timestamp)
+        return points
+
+    @staticmethod
+    def compute_daily_rollup(
+        hourly_snapshots: list[dict[str, Any]],
+    ) -> dict[str, Any]:
+        """Aggregate hourly snapshots into a daily rollup.
+
+        Args:
+            hourly_snapshots: List of hourly snapshot documents for one day.
+
+        Returns:
+            Dict with "platform" and "per_tenant" aggregated metrics.
+        """
+        if not hourly_snapshots:
+            return {
+                "platform": {
+                    "total_requests": 0,
+                    "avg_p50_ms": 0.0,
+                    "avg_p95_ms": 0.0,
+                    "avg_p99_ms": 0.0,
+                    "uptime_pct": 100.0,
+                    "hourly_snapshots": 0,
+                },
+                "per_tenant": {},
+            }
+
+        total_requests = 0
+        p50_sum = 0.0
+        p95_sum = 0.0
+        p99_sum = 0.0
+        uptime_sum = 0.0
+        count = len(hourly_snapshots)
+
+        # Per-tenant accumulator
+        tenant_accum: dict[str, dict[str, float]] = {}
+
+        for snap in hourly_snapshots:
+            platform = snap.get("platform", {})
+            total_requests += platform.get("total_requests", 0)
+            p50_sum += platform.get("p50_ms", 0.0)
+            p95_sum += platform.get("p95_ms", 0.0)
+            p99_sum += platform.get("p99_ms", 0.0)
+            uptime_sum += platform.get("uptime_pct", 100.0)
+
+            for tid, metrics in snap.get("per_tenant", {}).items():
+                if tid not in tenant_accum:
+                    tenant_accum[tid] = {
+                        "requests": 0, "p50_sum": 0.0,
+                        "p95_sum": 0.0, "p99_sum": 0.0, "count": 0,
+                    }
+                tenant_accum[tid]["requests"] += metrics.get("requests", 0)
+                tenant_accum[tid]["p50_sum"] += metrics.get("p50_ms", 0.0)
+                tenant_accum[tid]["p95_sum"] += metrics.get("p95_ms", 0.0)
+                tenant_accum[tid]["p99_sum"] += metrics.get("p99_ms", 0.0)
+                tenant_accum[tid]["count"] += 1
+
+        per_tenant: dict[str, dict[str, Any]] = {}
+        for tid, acc in tenant_accum.items():
+            tc = acc["count"] or 1
+            per_tenant[tid] = {
+                "requests": int(acc["requests"]),
+                "avg_p50_ms": round(acc["p50_sum"] / tc, 1),
+                "avg_p95_ms": round(acc["p95_sum"] / tc, 1),
+                "avg_p99_ms": round(acc["p99_sum"] / tc, 1),
+            }
+
+        return {
+            "platform": {
+                "total_requests": total_requests,
+                "avg_p50_ms": round(p50_sum / count, 1),
+                "avg_p95_ms": round(p95_sum / count, 1),
+                "avg_p99_ms": round(p99_sum / count, 1),
+                "uptime_pct": round(uptime_sum / count, 3),
+                "hourly_snapshots": count,
+            },
+            "per_tenant": per_tenant,
+        }
 
 
 # ---------------------------------------------------------------------------

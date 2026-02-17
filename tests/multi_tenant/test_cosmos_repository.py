@@ -701,18 +701,18 @@ class TestCosmosManagerSingleton:
 
 
 class TestCollectionConfigurations:
-    """CR-23: 9 collections with correct partition keys and configs."""
+    """CR-23: Collections with correct partition keys and configs."""
 
     @pytest.mark.unit
     def test_ten_collections_defined(self):
-        """CR-23: ALL_COLLECTIONS has exactly 10 entries."""
-        assert len(ALL_COLLECTIONS) == 10
+        """CR-23: ALL_COLLECTIONS has exactly 11 entries (10 original + sla_snapshots)."""
+        assert len(ALL_COLLECTIONS) == 11
 
     @pytest.mark.unit
     def test_collection_configs_returns_ten(self):
-        """CR-23: get_collection_configs() returns 10 configs."""
+        """CR-23: get_collection_configs() returns 11 configs."""
         configs = get_collection_configs()
-        assert len(configs) == 10
+        assert len(configs) == 11
 
     @pytest.mark.unit
     def test_tenant_scoped_collections_use_tenant_id_partition(self):

@@ -59,6 +59,7 @@ COLLECTION_PREFERENCES = "preferences"
 COLLECTION_PLATFORM_CONFIG = "platform_config"
 COLLECTION_AUDIT_LOG = "audit_log"
 COLLECTION_TEAM_MEMBERS = "team_members"
+COLLECTION_SLA_SNAPSHOTS = "sla_snapshots"
 
 ALL_COLLECTIONS = [
     COLLECTION_TENANTS,
@@ -71,6 +72,7 @@ ALL_COLLECTIONS = [
     COLLECTION_PLATFORM_CONFIG,
     COLLECTION_AUDIT_LOG,
     COLLECTION_TEAM_MEMBERS,
+    COLLECTION_SLA_SNAPSHOTS,
 ]
 
 # Cosmos DB Serverless — no provisioned throughput (pay per RU consumed)
@@ -85,6 +87,7 @@ TTL_USAGE_PERIOD = 35 * 24 * 60 * 60       # 35 days (billing period + buffer)
 TTL_IDEMPOTENCY = 7 * 24 * 60 * 60         # 7 days for idempotency keys
 TTL_AUDIT_LOG = 365 * 24 * 60 * 60         # 1 year (audit log retention)
 TTL_PACK_BALANCE = 90 * 24 * 60 * 60       # 90 days (pack validity)
+TTL_SLA_SNAPSHOTS = 90 * 24 * 60 * 60     # 90 days (SLA trend retention)
 
 
 # ---------------------------------------------------------------------------
@@ -1143,7 +1146,7 @@ class CollectionConfig(BaseModel):
 
 
 def get_collection_configs() -> list[CollectionConfig]:
-    """Return collection configurations for all 10 containers.
+    """Return collection configurations for all 11 containers.
 
     These configs are used by the database initialization utility
     to create containers idempotently.
@@ -1403,6 +1406,27 @@ def get_collection_configs() -> list[CollectionConfig]:
                 ],
             },
         ),
+        # 11. sla_snapshots (C-2: SLA persistence — hourly + daily rollups)
+        CollectionConfig(
+            name=COLLECTION_SLA_SNAPSHOTS,
+            partition_key="/snapshot_type",
+            default_ttl=TTL_SLA_SNAPSHOTS,
+            indexing_policy={
+                "automatic": True,
+                "indexingMode": "consistent",
+                "includedPaths": [{"path": "/*"}],
+                "excludedPaths": [
+                    {"path": "/per_tenant/*"},  # Embedded tenant data excluded from range index
+                    {"path": '/"_etag"/?'},
+                ],
+                "compositeIndexes": [
+                    [
+                        {"path": "/snapshot_type", "order": "ascending"},
+                        {"path": "/timestamp", "order": "descending"},
+                    ],
+                ],
+            },
+        ),
     ]
 
 
@@ -1468,7 +1492,7 @@ async def initialize_database(
     client: Any,
     database_name: str = DATABASE_NAME,
 ) -> dict[str, Any]:
-    """Create the database and all 9 containers if they don't exist.
+    """Create the database and all 11 containers if they don't exist.
 
     This function is idempotent — safe to call on every application
     startup. It uses create_if_not_exists semantics for both the

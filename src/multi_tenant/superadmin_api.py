@@ -11,6 +11,9 @@ Phase 1 (Release-Blocking):
     RB-1: GET /api/superadmin/dashboard        — Provider ops dashboard aggregate
     RB-7: GET /api/superadmin/billing/health   — Billing/metering integrity
 
+Phase 2 (Critical — C-2):
+    C-2:  GET /api/superadmin/sla/trends       — SLA trends + error budget
+
 All endpoints require SUPERADMIN role. Widget keys and tenant-level API keys
 are rejected. Only per-user API keys with SUPERADMIN role are accepted.
 
@@ -178,6 +181,38 @@ class BillingHealthResponse(CamelCaseModel):
     total_tenants: int = 0
     tenants_needing_review: int = 0
     webhook_success_rate: float | None = None
+
+
+class SLATrendPointModel(CamelCaseModel):
+    """Single point in the SLA trend time series."""
+
+    timestamp: str
+    uptime_pct: float
+    p50_ms: float
+    p95_ms: float
+    p99_ms: float
+    total_requests: int
+
+
+class ErrorBudgetModel(CamelCaseModel):
+    """Error budget for a tier over a billing period."""
+
+    tier: str
+    period_days: int
+    allowed_downtime_minutes: float
+    actual_downtime_minutes: float
+    budget_remaining: float
+    budget_consumed_pct: float
+    is_within_budget: bool
+
+
+class SLATrendsResponse(CamelCaseModel):
+    """SLA trends and error budget response."""
+
+    range_days: int
+    trend_points: list[SLATrendPointModel]
+    error_budgets: dict[str, ErrorBudgetModel] = Field(default_factory=dict)
+    generated_at: str
 
 
 # ---------------------------------------------------------------------------
@@ -573,3 +608,87 @@ async def billing_health(
         tenants_needing_review=needs_review_count,
         webhook_success_rate=webhook_rate,
     )
+
+
+# ---------------------------------------------------------------------------
+# C-2: SLA Trends + Error Budget
+# ---------------------------------------------------------------------------
+
+
+@router.get(
+    "/sla/trends",
+    response_model=SLATrendsResponse,
+    summary="SLA trends and error budget",
+    description=(
+        "Historical SLA trends with uptime and latency data points. "
+        "Includes error budget calculation per tier for the specified "
+        "billing period."
+    ),
+    status_code=200,
+)
+async def sla_trends(
+    _ctx: TenantContext = Depends(require_role(TeamMemberRole.SUPERADMIN)),
+    range_days: int = Query(7, ge=1, le=90, description="Trend range in days"),
+    period_days: int = Query(30, ge=1, le=90, description="Error budget billing period"),
+) -> SLATrendsResponse:
+    """Get SLA trends and error budgets.
+
+    Returns hourly or daily trend data depending on range_days:
+    - 1-3 days: hourly data points
+    - 4-90 days: daily rollup data points
+    """
+    try:
+        from src.multi_tenant.repositories.sla_snapshots import SLASnapshotRepository
+        from src.multi_tenant.sla_monitoring import SLAMonitoringService, SLA_TARGETS
+
+        repo = SLASnapshotRepository()
+        now = datetime.now(timezone.utc).isoformat()
+
+        # Fetch snapshots based on range
+        if range_days <= 3:
+            snapshots = await repo.get_recent_hourly(hours=range_days * 24)
+        else:
+            snapshots = await repo.get_recent_daily(days=range_days)
+
+        # Build trend series
+        trend_data = SLAMonitoringService.build_trend_series(snapshots)
+        trend_points = [
+            SLATrendPointModel(
+                timestamp=p.timestamp,
+                uptime_pct=p.uptime_pct,
+                p50_ms=p.p50_ms,
+                p95_ms=p.p95_ms,
+                p99_ms=p.p99_ms,
+                total_requests=p.total_requests,
+            )
+            for p in trend_data
+        ]
+
+        # Compute error budgets per tier
+        daily_for_budget = await repo.get_recent_daily(days=period_days)
+        error_budgets: dict[str, ErrorBudgetModel] = {}
+        for tier_name in SLA_TARGETS:
+            eb = SLAMonitoringService.compute_error_budget(
+                tier=tier_name,
+                daily_snapshots=daily_for_budget,
+                period_days=period_days,
+            )
+            error_budgets[tier_name] = ErrorBudgetModel(
+                tier=eb.tier,
+                period_days=eb.period_days,
+                allowed_downtime_minutes=eb.allowed_downtime_minutes,
+                actual_downtime_minutes=eb.actual_downtime_minutes,
+                budget_remaining=eb.budget_remaining,
+                budget_consumed_pct=eb.budget_consumed_pct,
+                is_within_budget=eb.is_within_budget,
+            )
+
+        return SLATrendsResponse(
+            range_days=range_days,
+            trend_points=trend_points,
+            error_budgets=error_budgets,
+            generated_at=now,
+        )
+    except Exception as exc:
+        logger.warning("SLA trends failed: %s", exc, exc_info=True)
+        raise HTTPException(status_code=503, detail="SLA trend data unavailable")
