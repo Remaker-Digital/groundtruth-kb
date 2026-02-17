@@ -767,8 +767,9 @@ class TestBillingIntegrationReliability:
     def test_stripe_api_error_handling(self, app_client: TestClient):
         """Test handling of Stripe API errors."""
         # Test with invalid price ID by temporarily patching the catalog
-        with patch("src.integrations.stripe_catalog.load_catalog") as mock_catalog:
-            mock_catalog.return_value.get_tier.return_value.monthly_price_id = "price_invalid"
+        with patch("src.integrations.stripe_checkout.load_catalog") as mock_catalog:
+            mock_catalog.return_value.get_tier.return_value.price_id_for_interval.return_value = "price_invalid"
+            mock_catalog.return_value.get_tier.return_value.overage_price_id = "price_overage_invalid"
             mock_catalog.return_value.VALID_TIERS = {"starter"}
             mock_catalog.return_value.VALID_INTERVALS = {"month"}
 

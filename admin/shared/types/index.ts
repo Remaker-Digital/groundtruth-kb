@@ -317,7 +317,7 @@ export const ESCALATION_CATEGORIES: EscalationCategoryDef[] = [
 // Integrations (C10)
 // ---------------------------------------------------------------------------
 
-export type IntegrationType = 'shopify' | 'zendesk' | 'mailchimp' | 'google_analytics';
+export type IntegrationType = 'shopify' | 'zendesk' | 'mailchimp' | 'google_analytics' | 'stripe';
 export type IntegrationStatus = 'connected' | 'disconnected' | 'error' | null;
 
 export interface IntegrationSummary {
