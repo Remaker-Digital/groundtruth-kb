@@ -91,6 +91,7 @@ export const MemoryPrivacyPage: React.FC = () => {
       memory_enabled: memoryEnabled,
       pattern_learning_enabled: crossSessionLearning,
       data_retention_days: parseInt(retentionDays, 10),
+      pii_scrubbing: piiScrubbing,
       consent_collection_enabled: consentRequired,
     };
 

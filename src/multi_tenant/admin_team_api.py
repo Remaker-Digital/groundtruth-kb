@@ -40,9 +40,19 @@ from pydantic import BaseModel, ConfigDict, Field
 from pydantic.alias_generators import to_camel
 
 from src.multi_tenant.auth import TenantContext, generate_user_api_key, hash_api_key
-from src.multi_tenant.cosmos_schema import ESCALATION_CATEGORIES, AuditEventType, TeamMemberRole
+from src.multi_tenant.cosmos_schema import (
+    ESCALATION_CATEGORIES,
+    AuditEventType,
+    ConversationStatus,
+    TeamMemberRole,
+)
 from src.multi_tenant.middleware import get_tenant_context
-from src.multi_tenant.repository import AuditLogRepository, DocumentNotFoundError, TeamMemberRepository
+from src.multi_tenant.repository import (
+    AuditLogRepository,
+    ConversationRepository,
+    DocumentNotFoundError,
+    TeamMemberRepository,
+)
 
 logger = logging.getLogger(__name__)
 
@@ -81,6 +91,7 @@ class TeamMemberResponse(BaseModel):
         default=None,
         description="Full API key — returned ONCE on creation or rotation, never stored",
     )
+    unresolved_escalation_count: int = 0
     created_at: str
     updated_at: str
     last_login_at: str | None = None
@@ -167,19 +178,22 @@ class UpdateTeamMemberRequest(BaseModel):
 
 _team_repo: TeamMemberRepository | None = None
 _audit_repo: AuditLogRepository | None = None
+_conv_repo: ConversationRepository | None = None
 
 
 def configure_admin_team_services(
     team_repo: TeamMemberRepository,
     audit_repo: AuditLogRepository | None = None,
+    conv_repo: ConversationRepository | None = None,
 ) -> None:
     """Wire the admin team API to its backing repository.
 
     Called during app startup after TeamMemberRepository is initialised.
     """
-    global _team_repo, _audit_repo
+    global _team_repo, _audit_repo, _conv_repo
     _team_repo = team_repo
     _audit_repo = audit_repo
+    _conv_repo = conv_repo
     logger.info("Admin team management API services configured")
 
 
@@ -229,6 +243,7 @@ def _build_member_response(doc: dict[str, Any], tenant_id: str) -> TeamMemberRes
         escalation_categories=doc.get("escalation_categories", []),
         max_concurrent_conversations=doc.get("max_concurrent_conversations", 5),
         user_api_key_prefix=doc.get("user_api_key_prefix"),
+        unresolved_escalation_count=doc.get("unresolved_escalation_count", 0),
         created_at=doc.get("created_at", ""),
         updated_at=doc.get("updated_at", ""),
         last_login_at=doc.get("last_login_at"),
@@ -314,6 +329,20 @@ async def list_team_members(
         members_raw = [m for m in members_raw if m.get("role") != "superadmin"]
         # Adjust count (superadmins excluded from visible list)
         total_count = len(members_raw) if offset == 0 else total_count
+
+    # Enrich escalation agents with unresolved escalation counts (D57)
+    if _conv_repo:
+        for m in members_raw:
+            if m.get("role") == "escalation_agent":
+                try:
+                    count = await _conv_repo.count_filtered(
+                        ctx.tenant_id,
+                        status=ConversationStatus.ESCALATED,
+                        assigned_to=m["id"],
+                    )
+                    m["unresolved_escalation_count"] = count
+                except Exception:
+                    m["unresolved_escalation_count"] = 0
 
     members = [_build_member_response(m, ctx.tenant_id) for m in members_raw]
 

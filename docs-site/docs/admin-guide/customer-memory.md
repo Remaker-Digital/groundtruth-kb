@@ -131,6 +131,26 @@ Enables per-customer AI model fine-tuning. When a customer has accumulated 1,000
 
 ---
 
+## PII scrubbing
+
+| | |
+|---|---|
+| **Field** | `pii_scrubbing` |
+| **Type** | Toggle (on/off) |
+| **Default** | Off |
+| **Affects** | Stored conversation transcripts |
+
+When enabled, Agent Red automatically scrubs personally identifiable information (PII) from conversation transcripts before storing them. This includes:
+
+- **Email addresses** — Replaced with `[REDACTED]`
+- **Phone numbers** — Replaced with `[REDACTED]`
+
+PII scrubbing operates at the storage layer only. Live responses delivered to the customer during the conversation are not affected. This means the customer experience is unchanged, but the stored transcript is cleaned for privacy compliance.
+
+Enable PII scrubbing from the **Memory & Privacy** page in the admin console.
+
+---
+
 ## Data retention
 
 | | |

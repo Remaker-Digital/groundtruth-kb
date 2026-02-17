@@ -10,7 +10,7 @@
 #   {"message": str, "system_prompt": str}
 #
 # Output payload:
-#   {"reason": str, "urgency": str, "context_summary": str, "model": str}
+#   {"reason": str, "urgency": str, "context_summary": str, "category": str, "model": str}
 #
 # © 2026 Remaker Digital, a DBA of VanDusen & Palmeter, LLC. All rights reserved.
 
@@ -58,7 +58,7 @@ class EscalationHandlerAgent(AgentRedBaseAgent):
             headers: A2A headers.
 
         Returns:
-            {"reason": str, "urgency": str, "context_summary": str, "model": str}
+            {"reason": str, "urgency": str, "context_summary": str, "category": str, "model": str}
         """
         message = payload.get("message", "")
         system_prompt = payload.get("system_prompt", "")
@@ -68,6 +68,7 @@ class EscalationHandlerAgent(AgentRedBaseAgent):
                 "reason": "Customer requested human agent",
                 "urgency": "medium",
                 "context_summary": "",
+                "category": "general_inquiry",
                 "model": AZURE_IC_MODEL,
             }
 
@@ -77,7 +78,9 @@ class EscalationHandlerAgent(AgentRedBaseAgent):
             '- "reason": a clear, concise summary of why the customer needs '
             "human assistance (1-2 sentences)\n"
             '- "urgency": "low", "medium", or "high"\n'
-            '- "context_summary": brief summary for the human agent\n\n'
+            '- "context_summary": brief summary for the human agent\n'
+            '- "category": one of: service, support, sales, account, '
+            "technical_assistance, general_inquiry\n\n"
             f"Customer message: {message}"
         )
 
@@ -103,6 +106,7 @@ class EscalationHandlerAgent(AgentRedBaseAgent):
                 "reason": parsed.get("reason", "Customer requested human agent"),
                 "urgency": parsed.get("urgency", "medium"),
                 "context_summary": parsed.get("context_summary", ""),
+                "category": parsed.get("category", "general_inquiry"),
                 "model": AZURE_IC_MODEL,
             }
         except Exception:
@@ -110,5 +114,6 @@ class EscalationHandlerAgent(AgentRedBaseAgent):
                 "reason": "Customer requested human agent",
                 "urgency": "medium",
                 "context_summary": "",
+                "category": "general_inquiry",
                 "model": AZURE_IC_MODEL,
             }

@@ -365,6 +365,21 @@ class TestDocumentModelValidation:
         assert doc.agents_invoked == []  # default
         assert doc.messages == []  # default
         assert doc.ended_at is None
+        assert doc.archived_at is None  # WI #7: default
+
+    @pytest.mark.unit
+    def test_conversation_document_archived_at(self):
+        """CR-12b: ConversationDocument with archived_at field."""
+        doc = ConversationDocument(
+            id="conv-archived",
+            tenant_id=_TENANT_A,
+            conversation_id="conv-archived",
+            status=ConversationStatus.RESOLVED,
+            started_at=_NOW,
+            last_activity_at=_NOW,
+            archived_at="2026-02-16T12:00:00+00:00",
+        )
+        assert doc.archived_at == "2026-02-16T12:00:00+00:00"
 
     @pytest.mark.unit
     def test_usage_counter_document_validation(self):

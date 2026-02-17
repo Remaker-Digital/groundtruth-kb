@@ -531,8 +531,11 @@ export function useConversationList(
 // Inbox hooks
 // ---------------------------------------------------------------------------
 
-export function useInboxConversations(apiFetch: ApiFetch) {
-  return useApi<{ conversations: InboxConversation[] }>(apiFetch, '/api/admin/conversations');
+export function useInboxConversations(apiFetch: ApiFetch, archived?: 'only' | 'include') {
+  const url = archived
+    ? `/api/admin/conversations?archived=${archived}`
+    : '/api/admin/conversations';
+  return useApi<{ conversations: InboxConversation[] }>(apiFetch, url);
 }
 
 export function useConversationMessages(apiFetch: ApiFetch, conversationId: string) {
@@ -670,6 +673,54 @@ export function useResolveConversation(apiFetch: ApiFetch) {
   );
 
   return { resolve, loading };
+}
+
+export function useArchiveConversation(apiFetch: ApiFetch) {
+  const [loading, setLoading] = useState(false);
+
+  const archive = useCallback(
+    async (conversationId: string) => {
+      setLoading(true);
+      try {
+        const resp = await apiFetch(`/api/admin/conversations/${conversationId}/archive`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({}),
+        });
+        if (!resp.ok) {
+          const body = await resp.json().catch(() => ({ detail: `${resp.status}` }));
+          throw new Error(body.detail || `Archive failed: ${resp.status}`);
+        }
+        return await resp.json();
+      } finally {
+        setLoading(false);
+      }
+    },
+    [apiFetch],
+  );
+
+  const unarchive = useCallback(
+    async (conversationId: string) => {
+      setLoading(true);
+      try {
+        const resp = await apiFetch(`/api/admin/conversations/${conversationId}/unarchive`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({}),
+        });
+        if (!resp.ok) {
+          const body = await resp.json().catch(() => ({ detail: `${resp.status}` }));
+          throw new Error(body.detail || `Unarchive failed: ${resp.status}`);
+        }
+        return await resp.json();
+      } finally {
+        setLoading(false);
+      }
+    },
+    [apiFetch],
+  );
+
+  return { archive, unarchive, loading };
 }
 
 // ---------------------------------------------------------------------------

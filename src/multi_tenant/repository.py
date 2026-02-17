@@ -616,6 +616,22 @@ class TenantRepository(TenantScopedRepository):
             parameters=[{"name": "@status", "value": status.value}],
         )
 
+    async def list_active_tenant_ids(self) -> list[str]:
+        """List all active tenant IDs (cross-partition).
+
+        Used by the idle conversation scanner to enumerate tenants.
+        Performs a cross-partition query — call infrequently.
+        """
+        ids: list[str] = []
+        async for item in self._container.query_items(
+            query="SELECT c.tenant_id FROM c WHERE c.status = 'active'",
+            max_item_count=100,
+        ):
+            tid = item.get("tenant_id")
+            if tid and tid not in ids:
+                ids.append(tid)
+        return ids
+
     async def update_status(
         self, tenant_id: str, status: TenantStatus,
     ) -> dict[str, Any]:
@@ -781,6 +797,8 @@ class ConversationRepository(TenantScopedRepository):
         since: str | None = None,
         until: str | None = None,
         assigned_to: str | None = None,
+        include_archived: bool = False,
+        archived_only: bool = False,
         offset: int = 0,
         limit: int = 50,
     ) -> list[dict[str, Any]]:
@@ -793,6 +811,8 @@ class ConversationRepository(TenantScopedRepository):
             since: Start timestamp (ISO 8601, inclusive).
             until: End timestamp (ISO 8601, exclusive).
             assigned_to: Filter by assigned human agent ID.
+            include_archived: If True, include archived conversations.
+            archived_only: If True, return only archived conversations.
             offset: Pagination offset.
             limit: Page size.
         """
@@ -819,6 +839,12 @@ class ConversationRepository(TenantScopedRepository):
             conditions.append("c.assigned_to = @assigned_to")
             params.append({"name": "@assigned_to", "value": assigned_to})
 
+        # Archival filter: exclude archived by default
+        if archived_only:
+            conditions.append("IS_DEFINED(c.archived_at) AND c.archived_at != null")
+        elif not include_archived:
+            conditions.append("(NOT IS_DEFINED(c.archived_at) OR c.archived_at = null)")
+
         where_clause = " AND ".join(conditions) if conditions else "1=1"
         params.append({"name": "@offset", "value": offset})
         params.append({"name": "@limit", "value": limit})
@@ -840,6 +866,8 @@ class ConversationRepository(TenantScopedRepository):
         since: str | None = None,
         until: str | None = None,
         assigned_to: str | None = None,
+        include_archived: bool = False,
+        archived_only: bool = False,
     ) -> int:
         """Count conversations matching filters (for pagination metadata)."""
         conditions: list[str] = []
@@ -864,6 +892,12 @@ class ConversationRepository(TenantScopedRepository):
         if assigned_to is not None:
             conditions.append("c.assigned_to = @assigned_to")
             params.append({"name": "@assigned_to", "value": assigned_to})
+
+        # Archival filter: exclude archived by default
+        if archived_only:
+            conditions.append("IS_DEFINED(c.archived_at) AND c.archived_at != null")
+        elif not include_archived:
+            conditions.append("(NOT IS_DEFINED(c.archived_at) OR c.archived_at = null)")
 
         where_clause = " AND ".join(conditions) if conditions else "1=1"
         query_text = f"SELECT VALUE COUNT(1) FROM c WHERE {where_clause}"

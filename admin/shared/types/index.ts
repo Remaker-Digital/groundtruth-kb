@@ -187,6 +187,8 @@ export interface InboxConversation {
   agentsInvoked: string[];
   modelUsed: string | null;
   criticPassed: boolean | null;
+  escalationCategory: string | null;
+  archivedAt: string | null;
 }
 
 // ---------------------------------------------------------------------------
@@ -291,6 +293,7 @@ export interface TeamMember {
   updatedAt: string;
   lastLoginAt: string | null;
   invitedBy: string | null;
+  unresolvedEscalationCount?: number;
 }
 
 /** Escalation category definition — shared between Configuration and Team pages (WI #279). */

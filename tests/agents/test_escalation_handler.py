@@ -237,3 +237,63 @@ class TestEscalationIdentity:
         agent.configure(mock_client)
         assert agent._openai_client is mock_client
         assert agent._configured is True
+
+
+# ---------------------------------------------------------------------------
+# EH-12 to EH-14: Category detection (Backlog #19)
+# ---------------------------------------------------------------------------
+
+
+class TestEscalationCategory:
+    """Category detection in escalation response."""
+
+    @pytest.mark.asyncio
+    async def test_eh_12_category_in_response(self):
+        """Parsed response includes escalation category."""
+        resp = _mock_openai_response(
+            json.dumps({
+                "reason": "Customer wants billing help",
+                "urgency": "medium",
+                "context_summary": "Billing inquiry",
+                "category": "account",
+            })
+        )
+        client = _make_openai_client(resp)
+        agent = EscalationHandlerAgent(openai_client=client)
+
+        result = await agent.process(
+            {"message": "I need help with my account", "system_prompt": ""},
+            {},
+        )
+
+        assert result["category"] == "account"
+
+    @pytest.mark.asyncio
+    async def test_eh_13_category_fallback_no_client(self):
+        """Returns general_inquiry category when no OpenAI client."""
+        agent = EscalationHandlerAgent()  # No client
+
+        result = await agent.process(
+            {"message": "Help!", "system_prompt": ""},
+            {},
+        )
+
+        assert result["category"] == "general_inquiry"
+
+    @pytest.mark.asyncio
+    async def test_eh_14_category_fallback_on_error(self):
+        """Returns general_inquiry category on API error."""
+        client = MagicMock()
+        client.chat = MagicMock()
+        client.chat.completions = MagicMock()
+        client.chat.completions.create = AsyncMock(
+            side_effect=Exception("API error")
+        )
+        agent = EscalationHandlerAgent(openai_client=client)
+
+        result = await agent.process(
+            {"message": "Help!", "system_prompt": ""},
+            {},
+        )
+
+        assert result["category"] == "general_inquiry"

@@ -37,6 +37,10 @@ When a conversation is escalated, agents in the matching category receive an ema
 
 Each escalation agent can be assigned to one or more categories.
 
+#### Workload visibility
+
+The Team page shows an **Escalations** column for escalation agents, displaying the number of currently unresolved escalations assigned to each agent. This helps admins monitor workload distribution and identify agents who may be overloaded.
+
 ---
 
 ## Inviting team members

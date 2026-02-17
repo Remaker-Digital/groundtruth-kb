@@ -74,9 +74,11 @@ class AdminConversationSummary(BaseModel):
     ended_at: str | None = None
     last_activity_at: str | None = None
     assigned_to: str | None = None
+    escalation_category: str | None = None
     agents_invoked: list[str] = Field(default_factory=list)
     model_used: str | None = None
     critic_passed: bool | None = None
+    archived_at: str | None = None
 
 
 class AdminConversationListResponse(BaseModel):
@@ -108,9 +110,11 @@ class AdminConversationDetailResponse(BaseModel):
     ended_at: str | None = None
     last_activity_at: str | None = None
     assigned_to: str | None = None
+    escalation_category: str | None = None
     agents_invoked: list[str] = Field(default_factory=list)
     model_used: str | None = None
     critic_passed: bool | None = None
+    archived_at: str | None = None
     internal_notes: list[dict[str, Any]] = Field(default_factory=list)
 
 
@@ -159,6 +163,21 @@ class AssignAgentResponse(BaseModel):
     assigned_at: str
 
 
+class EscalateConversationRequest(BaseModel):
+    """Optional request body for POST /api/admin/conversations/{id}/escalate."""
+
+    model_config = ConfigDict(alias_generator=to_camel, populate_by_name=True)
+
+    category: str | None = Field(
+        default=None,
+        description="Escalation category (from ESCALATION_CATEGORIES)",
+    )
+    agent_id: str | None = Field(
+        default=None,
+        description="Specific agent to assign (overrides auto-assignment)",
+    )
+
+
 class EscalateConversationResponse(BaseModel):
     """Response for successful conversation escalation."""
 
@@ -167,6 +186,8 @@ class EscalateConversationResponse(BaseModel):
     conversation_id: str
     status: str
     escalated_at: str
+    escalation_category: str | None = None
+    assigned_to: str | None = None
 
 
 class ResolveConversationResponse(BaseModel):
@@ -177,6 +198,15 @@ class ResolveConversationResponse(BaseModel):
     conversation_id: str
     status: str
     resolved_at: str
+
+
+class ArchiveConversationResponse(BaseModel):
+    """Response for successful conversation archive/unarchive."""
+
+    model_config = ConfigDict(alias_generator=to_camel, populate_by_name=True)
+
+    conversation_id: str
+    archived_at: str | None = None
 
 
 class AddNoteRequest(BaseModel):
@@ -385,6 +415,10 @@ async def list_conversations(
         None,
         description="Filter by assigned agent ID",
     ),
+    archived: str | None = Query(
+        None,
+        description="Archive filter: 'only' for archived only, 'include' to include archived, omit to exclude",
+    ),
     offset: int = Query(0, ge=0, description="Pagination offset"),
     limit: int = Query(50, ge=1, le=200, description="Page size (max 200)"),
     ctx: TenantContext = Depends(get_tenant_context),
@@ -408,6 +442,10 @@ async def list_conversations(
                 detail=f"Invalid status '{status}'. Valid values: {valid}",
             )
 
+    # Parse archival filter
+    archived_only = archived == "only"
+    include_archived = archived == "include"
+
     # Get total count and page of results
     total_count = await repo.count_filtered(
         tenant_id=ctx.tenant_id,
@@ -416,6 +454,8 @@ async def list_conversations(
         since=since,
         until=until,
         assigned_to=assigned_to,
+        include_archived=include_archived,
+        archived_only=archived_only,
     )
 
     conversations_raw = await repo.list_filtered(
@@ -425,6 +465,8 @@ async def list_conversations(
         since=since,
         until=until,
         assigned_to=assigned_to,
+        include_archived=include_archived,
+        archived_only=archived_only,
         offset=offset,
         limit=limit,
     )
@@ -442,9 +484,11 @@ async def list_conversations(
             ended_at=c.get("ended_at"),
             last_activity_at=c.get("last_activity_at"),
             assigned_to=c.get("assigned_to"),
+            escalation_category=c.get("escalation_category"),
             agents_invoked=c.get("agents_invoked", []),
             model_used=c.get("model_used"),
             critic_passed=c.get("critic_passed"),
+            archived_at=c.get("archived_at"),
         )
         for c in conversations_raw
     ]
@@ -676,9 +720,11 @@ async def get_conversation_detail(
         ended_at=doc.get("ended_at"),
         last_activity_at=doc.get("last_activity_at"),
         assigned_to=doc.get("assigned_to"),
+        escalation_category=doc.get("escalation_category"),
         agents_invoked=doc.get("agents_invoked", []),
         model_used=doc.get("model_used"),
         critic_passed=doc.get("critic_passed"),
+        archived_at=doc.get("archived_at"),
         internal_notes=doc.get("internal_notes", []),
     )
 
@@ -805,12 +851,15 @@ async def assign_agent(
 )
 async def escalate_conversation(
     conversation_id: str,
+    request: EscalateConversationRequest | None = None,
     ctx: TenantContext = Depends(get_tenant_context),
 ) -> EscalateConversationResponse:
     """Escalate a conversation to human support.
 
-    Marks the conversation as ESCALATED. The AI agent will stop responding
-    and the conversation appears in the escalated queue for human pickup.
+    Marks the conversation as ESCALATED. Optionally sets an escalation
+    category and assigns a specific agent (or auto-assigns the best fit).
+    The AI agent stops responding and the conversation appears in the
+    escalated queue for human pickup.
     """
     repo = _get_repo()
 
@@ -829,14 +878,35 @@ async def escalate_conversation(
     now = datetime.now(timezone.utc).isoformat()
     doc_id = doc.get("id", conversation_id)
 
+    # Determine category and assignment
+    category = (request.category if request else None) or None
+    assigned_to = (request.agent_id if request else None) or None
+
+    # Auto-assign if category given but no explicit agent
+    if category and not assigned_to and _team_repo:
+        try:
+            from src.chat.session import get_conversation_session
+            session = get_conversation_session()
+            assigned_to = await session.find_best_agent_for_category(
+                ctx.tenant_id, category,
+            )
+        except Exception:
+            logger.debug("Auto-assign during manual escalation failed (non-blocking)")
+
+    operations: list[dict[str, Any]] = [
+        {"op": "set", "path": "/status", "value": ConversationStatus.ESCALATED.value},
+        {"op": "set", "path": "/escalated_at", "value": now},
+    ]
+    if category:
+        operations.append({"op": "set", "path": "/escalation_category", "value": category})
+    if assigned_to:
+        operations.append({"op": "set", "path": "/assigned_to", "value": assigned_to})
+
     try:
         await repo.patch(
             tenant_id=ctx.tenant_id,
             document_id=doc_id,
-            operations=[
-                {"op": "set", "path": "/status", "value": ConversationStatus.ESCALATED.value},
-                {"op": "set", "path": "/escalated_at", "value": now},
-            ],
+            operations=operations,
         )
     except DocumentNotFoundError:
         raise HTTPException(
@@ -845,9 +915,11 @@ async def escalate_conversation(
         )
 
     logger.info(
-        "Conversation escalated: conv=%s tenant=%s",
+        "Conversation escalated: conv=%s tenant=%s category=%s assigned=%s",
         conversation_id,
         ctx.tenant_id[:8],
+        category or "none",
+        assigned_to or "unassigned",
     )
 
     # Send escalation email to escalation_agent team members (best-effort)
@@ -881,6 +953,8 @@ async def escalate_conversation(
             urgency="medium",
             context_summary=f"Conversation with {customer_name} ({doc.get('message_count', 0)} messages) was escalated by an admin.",
             recipient_emails=recipient_emails or None,
+            escalation_category=category,
+            assigned_to=assigned_to,
         )
     except Exception:
         logger.warning(
@@ -894,6 +968,8 @@ async def escalate_conversation(
         conversation_id=conversation_id,
         status=ConversationStatus.ESCALATED.value,
         escalated_at=now,
+        escalation_category=category,
+        assigned_to=assigned_to,
     )
 
 
@@ -1027,4 +1103,142 @@ async def add_note(
         conversation_id=conversation_id,
         note_id=note_id,
         created_at=now,
+    )
+
+
+# ---------------------------------------------------------------------------
+# POST /api/admin/conversations/{conversation_id}/archive — Archive conversation
+# ---------------------------------------------------------------------------
+
+
+@router.post(
+    "/{conversation_id}/archive",
+    response_model=ArchiveConversationResponse,
+    summary="Archive a conversation",
+    description="Archives a resolved or timed-out conversation. Archived conversations are hidden from the default inbox view but can be retrieved with the archived filter.",
+    responses={
+        404: {"description": "Conversation not found"},
+        409: {"description": "Conversation must be resolved or timed out to archive"},
+        503: {"description": "Admin conversation services not initialized"},
+    },
+)
+async def archive_conversation(
+    conversation_id: str,
+    ctx: TenantContext = Depends(get_tenant_context),
+) -> ArchiveConversationResponse:
+    """Archive a conversation.
+
+    Only resolved or timed-out conversations can be archived. Archived
+    conversations are excluded from the default inbox listing but remain
+    accessible via the ``?archived=only`` or ``?archived=include`` filter.
+    """
+    repo = _get_repo()
+
+    doc = await _read_conversation(repo, ctx.tenant_id, conversation_id)
+
+    current_status = doc.get("status")
+    if current_status not in (
+        ConversationStatus.RESOLVED.value,
+        ConversationStatus.TIMED_OUT.value,
+    ):
+        raise HTTPException(
+            status_code=409,
+            detail="Only resolved or timed-out conversations can be archived",
+        )
+
+    if doc.get("archived_at") is not None:
+        raise HTTPException(
+            status_code=409,
+            detail="Conversation is already archived",
+        )
+
+    now = datetime.now(timezone.utc).isoformat()
+    doc_id = doc.get("id", conversation_id)
+
+    try:
+        await repo.patch(
+            tenant_id=ctx.tenant_id,
+            document_id=doc_id,
+            operations=[
+                {"op": "set", "path": "/archived_at", "value": now},
+            ],
+        )
+    except DocumentNotFoundError:
+        raise HTTPException(
+            status_code=404,
+            detail=f"Conversation {conversation_id} not found",
+        )
+
+    logger.info(
+        "Conversation archived: conv=%s tenant=%s",
+        conversation_id,
+        ctx.tenant_id[:8],
+    )
+
+    return ArchiveConversationResponse(
+        conversation_id=conversation_id,
+        archived_at=now,
+    )
+
+
+# ---------------------------------------------------------------------------
+# POST /api/admin/conversations/{conversation_id}/unarchive — Unarchive
+# ---------------------------------------------------------------------------
+
+
+@router.post(
+    "/{conversation_id}/unarchive",
+    response_model=ArchiveConversationResponse,
+    summary="Unarchive a conversation",
+    description="Removes a conversation from the archive, restoring it to the default inbox view.",
+    responses={
+        404: {"description": "Conversation not found"},
+        409: {"description": "Conversation is not archived"},
+        503: {"description": "Admin conversation services not initialized"},
+    },
+)
+async def unarchive_conversation(
+    conversation_id: str,
+    ctx: TenantContext = Depends(get_tenant_context),
+) -> ArchiveConversationResponse:
+    """Unarchive a previously archived conversation.
+
+    Clears the ``archived_at`` timestamp, restoring the conversation to
+    the default inbox listing.
+    """
+    repo = _get_repo()
+
+    doc = await _read_conversation(repo, ctx.tenant_id, conversation_id)
+
+    if doc.get("archived_at") is None:
+        raise HTTPException(
+            status_code=409,
+            detail="Conversation is not archived",
+        )
+
+    doc_id = doc.get("id", conversation_id)
+
+    try:
+        await repo.patch(
+            tenant_id=ctx.tenant_id,
+            document_id=doc_id,
+            operations=[
+                {"op": "set", "path": "/archived_at", "value": None},
+            ],
+        )
+    except DocumentNotFoundError:
+        raise HTTPException(
+            status_code=404,
+            detail=f"Conversation {conversation_id} not found",
+        )
+
+    logger.info(
+        "Conversation unarchived: conv=%s tenant=%s",
+        conversation_id,
+        ctx.tenant_id[:8],
+    )
+
+    return ArchiveConversationResponse(
+        conversation_id=conversation_id,
+        archived_at=None,
     )

@@ -265,6 +265,8 @@ class TestPipelineMidStreamErrors:
             customer_id=None,
         )
         session.add_ai_message.return_value = "msg-001"
+        # set_pii_scrubber is synchronous — prevent AsyncMock auto-coroutine
+        session.set_pii_scrubber = MagicMock()
         return session
 
     @pytest.fixture()

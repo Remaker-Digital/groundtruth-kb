@@ -75,6 +75,8 @@ function pageLabel(page: string): string {
 
 /** Map config field prefixes to human-readable group names. */
 function groupField(field: string): string {
+  if (field === 'kb_modified_at') return 'Knowledge base';
+  if (field === 'qa_modified_at') return 'Quick actions';
   if (field.startsWith('widget_')) return 'Widget configuration';
   if (field.startsWith('retrieval_') || field.startsWith('intent_')) return 'Retrieval & intent';
   if (field.startsWith('escalation_')) return 'Escalation rules';
@@ -84,6 +86,13 @@ function groupField(field: string): string {
        'custom_instructions'].includes(field)) return 'Response style';
   if (field.startsWith('memory_') || field.startsWith('data_retention_')) return 'Memory & privacy';
   return 'Agent configuration';
+}
+
+/** Human-readable label for signal fields and config fields. */
+function fieldLabel(field: string): string {
+  if (field === 'kb_modified_at') return 'articles modified';
+  if (field === 'qa_modified_at') return 'prompts or assignments modified';
+  return field.replace(/_/g, ' ');
 }
 
 // ---------------------------------------------------------------------------
@@ -230,7 +239,7 @@ export default function ActivationDialog({
                   <div style={fieldListStyle}>
                     {fields.map(f => (
                       <span key={f} style={fieldChipStyle}>
-                        {f.replace(/_/g, ' ')}
+                        {fieldLabel(f)}
                       </span>
                     ))}
                   </div>

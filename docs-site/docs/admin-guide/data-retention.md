@@ -24,14 +24,14 @@ After the retention period expires, conversation data is permanently deleted dur
 
 ## PII Scrubbing
 
-When enabled, the system automatically detects and redacts personally identifiable information from stored conversations, including:
+When enabled, the system automatically detects and redacts personally identifiable information from stored conversation transcripts, including:
 
 - Email addresses
 - Phone numbers
-- Physical addresses
-- Credit card numbers (partial)
 
-PII is redacted in stored transcripts but is still visible during the live conversation. This protects customer data at rest without affecting the real-time support experience.
+Detected PII is replaced with `[REDACTED]` in stored transcripts. Live responses delivered to the customer during the conversation are not affected — PII scrubbing operates at the storage layer only, so the customer experience is unchanged while stored data is cleaned for privacy compliance.
+
+Enable PII scrubbing from the **Memory & Privacy** page in the admin console.
 
 ## Consent Required
 

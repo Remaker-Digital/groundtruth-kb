@@ -477,8 +477,10 @@ class TestTier2Performance:
     def test_t2_05_widget_js_size_reasonable(self, client):
         """Widget bundle should be under 100KB (production IIFE)."""
         r = client.get("/widget.js")
-        if r.status_code != 200:
-            pytest.skip("widget.js not served")
+        assert r.status_code == 200, (
+            f"widget.js not served (status {r.status_code}) — "
+            "widget delivery is production-critical"
+        )
         size_kb = len(r.content) / 1024
         assert size_kb < 100, f"widget.js is {size_kb:.0f}KB (limit: 100KB)"
 

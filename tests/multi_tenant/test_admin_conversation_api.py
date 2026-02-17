@@ -607,3 +607,188 @@ class TestServiceAccessor:
             assert resp.status_code == 503
         finally:
             mod._conversation_repo = original
+
+
+# ---------------------------------------------------------------------------
+# Escalation category in response models (Backlog #19 / D56)
+# ---------------------------------------------------------------------------
+
+
+class TestEscalationCategoryInResponse:
+    """Verify escalation_category flows through response models."""
+
+    def test_summary_includes_escalation_category(self) -> None:
+        """AdminConversationSummary has escalationCategory in camelCase output."""
+        from src.multi_tenant.admin_conversation_api import AdminConversationSummary
+
+        summary = AdminConversationSummary(
+            conversation_id="conv-001",
+            status="escalated",
+            escalation_category="technical_assistance",
+        )
+        data = summary.model_dump(by_alias=True)
+        assert data["escalationCategory"] == "technical_assistance"
+
+    def test_detail_includes_escalation_category(self) -> None:
+        """AdminConversationDetailResponse has escalationCategory in camelCase output."""
+        from src.multi_tenant.admin_conversation_api import AdminConversationDetailResponse
+
+        detail = AdminConversationDetailResponse(
+            conversation_id="conv-001",
+            tenant_id=TENANT_ID,
+            status="escalated",
+            escalation_category="account",
+        )
+        data = detail.model_dump(by_alias=True)
+        assert data["escalationCategory"] == "account"
+
+    def test_summary_null_category_when_not_escalated(self) -> None:
+        """Non-escalated conversations have null escalationCategory."""
+        from src.multi_tenant.admin_conversation_api import AdminConversationSummary
+
+        summary = AdminConversationSummary(
+            conversation_id="conv-002",
+            status="active",
+        )
+        data = summary.model_dump(by_alias=True)
+        assert data["escalationCategory"] is None
+
+    def test_escalate_response_includes_fields(self) -> None:
+        """EscalateConversationResponse includes category and assigned_to."""
+        from src.multi_tenant.admin_conversation_api import EscalateConversationResponse
+
+        resp = EscalateConversationResponse(
+            conversation_id="conv-001",
+            status="escalated",
+            escalated_at=NOW_ISO,
+            escalation_category="support",
+            assigned_to="agent-42",
+        )
+        data = resp.model_dump(by_alias=True)
+        assert data["escalationCategory"] == "support"
+        assert data["assignedTo"] == "agent-42"
+
+
+# ---------------------------------------------------------------------------
+# Conversation archival (WI #7)
+# ---------------------------------------------------------------------------
+
+
+class TestConversationArchival:
+    """Archive and unarchive endpoints + response model fields."""
+
+    def setup_method(self) -> None:
+        self.app = FastAPI()
+        self.app.include_router(router)
+        self.ctx = _make_tenant_context()
+        self.app.dependency_overrides[get_tenant_context] = lambda: self.ctx
+        self.repo = MockConversationRepo([
+            {
+                **_make_conversation(conversation_id="conv-resolved", status="resolved"),
+                "archived_at": None,
+            },
+            {
+                **_make_conversation(conversation_id="conv-archived", status="resolved"),
+                "archived_at": "2026-01-15T12:00:00+00:00",
+            },
+            {
+                **_make_conversation(conversation_id="conv-active", status="active"),
+            },
+        ])
+        configure_admin_conversation_services(self.repo)
+
+    def test_archive_resolved_conversation(self) -> None:
+        """POST /archive sets archived_at on a resolved conversation."""
+        client = TestClient(self.app)
+        resp = client.post("/api/admin/conversations/conv-resolved/archive")
+        assert resp.status_code == 200
+        data = resp.json()
+        assert data["conversationId"] == "conv-resolved"
+        assert data["archivedAt"] is not None
+
+    def test_archive_rejects_active_conversation(self) -> None:
+        """Cannot archive an active conversation — 409."""
+        client = TestClient(self.app)
+        resp = client.post("/api/admin/conversations/conv-active/archive")
+        assert resp.status_code == 409
+        assert "resolved or timed-out" in resp.json()["detail"].lower()
+
+    def test_archive_rejects_already_archived(self) -> None:
+        """Cannot archive a conversation that is already archived — 409."""
+        client = TestClient(self.app)
+        resp = client.post("/api/admin/conversations/conv-archived/archive")
+        assert resp.status_code == 409
+        assert "already archived" in resp.json()["detail"].lower()
+
+    def test_unarchive_conversation(self) -> None:
+        """POST /unarchive clears archived_at."""
+        client = TestClient(self.app)
+        resp = client.post("/api/admin/conversations/conv-archived/unarchive")
+        assert resp.status_code == 200
+        data = resp.json()
+        assert data["conversationId"] == "conv-archived"
+        assert data["archivedAt"] is None
+
+    def test_unarchive_rejects_not_archived(self) -> None:
+        """Cannot unarchive a conversation that is not archived — 409."""
+        client = TestClient(self.app)
+        resp = client.post("/api/admin/conversations/conv-resolved/unarchive")
+        assert resp.status_code == 409
+        assert "not archived" in resp.json()["detail"].lower()
+
+    def test_archive_not_found(self) -> None:
+        """Archive returns 404 for unknown conversation."""
+        empty_repo = MockConversationRepo([])
+        configure_admin_conversation_services(empty_repo)
+        client = TestClient(self.app)
+        resp = client.post("/api/admin/conversations/does-not-exist/archive")
+        assert resp.status_code == 404
+        configure_admin_conversation_services(self.repo)
+
+    def test_summary_includes_archived_at(self) -> None:
+        """AdminConversationSummary has archivedAt in camelCase output."""
+        from src.multi_tenant.admin_conversation_api import AdminConversationSummary
+
+        summary = AdminConversationSummary(
+            conversation_id="conv-001",
+            status="resolved",
+            archived_at="2026-01-15T12:00:00+00:00",
+        )
+        data = summary.model_dump(by_alias=True)
+        assert data["archivedAt"] == "2026-01-15T12:00:00+00:00"
+
+    def test_summary_null_archived_at(self) -> None:
+        """Non-archived conversations have null archivedAt."""
+        from src.multi_tenant.admin_conversation_api import AdminConversationSummary
+
+        summary = AdminConversationSummary(
+            conversation_id="conv-002",
+            status="active",
+        )
+        data = summary.model_dump(by_alias=True)
+        assert data["archivedAt"] is None
+
+    def test_detail_includes_archived_at(self) -> None:
+        """AdminConversationDetailResponse has archivedAt in camelCase output."""
+        from src.multi_tenant.admin_conversation_api import AdminConversationDetailResponse
+
+        detail = AdminConversationDetailResponse(
+            conversation_id="conv-001",
+            tenant_id=TENANT_ID,
+            status="resolved",
+            archived_at="2026-01-15T12:00:00+00:00",
+        )
+        data = detail.model_dump(by_alias=True)
+        assert data["archivedAt"] == "2026-01-15T12:00:00+00:00"
+
+    def test_archive_response_model(self) -> None:
+        """ArchiveConversationResponse includes conversationId and archivedAt."""
+        from src.multi_tenant.admin_conversation_api import ArchiveConversationResponse
+
+        resp = ArchiveConversationResponse(
+            conversation_id="conv-001",
+            archived_at="2026-01-15T12:00:00+00:00",
+        )
+        data = resp.model_dump(by_alias=True)
+        assert data["conversationId"] == "conv-001"
+        assert data["archivedAt"] == "2026-01-15T12:00:00+00:00"

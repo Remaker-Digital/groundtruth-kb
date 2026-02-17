@@ -2316,3 +2316,111 @@ class TestConversationCreationGate:
 
         assert result.conversation_id == "conv-123"
         mock_session.start_conversation.assert_called_once()
+
+
+# ===========================================================================
+# ensure_draft_for_signal tests (D16/D20/D68)
+# ===========================================================================
+
+
+class TestEnsureDraftForSignal:
+    """Tests for the ensure_draft_for_signal method."""
+
+    @pytest.mark.asyncio
+    async def test_creates_draft_when_none_exists(self):
+        """No draft → creates new draft with signal field."""
+        service, prefs_repo, *_ = _make_service(
+            active=_make_active_doc(),
+            draft=None,
+        )
+
+        result = await service.ensure_draft_for_signal(
+            tenant_id=STARTER_TENANT_ID,
+            tier=TenantTier.STARTER,
+            signal_field="kb_modified_at",
+            actor="admin",
+        )
+
+        assert result.success is True
+        assert result.version == 2  # active is v1 → draft is v2
+        assert "kb_modified_at" in result.changes
+        prefs_repo.upsert.assert_called_once()
+
+    @pytest.mark.asyncio
+    async def test_updates_existing_draft(self):
+        """Draft exists → patches signal field onto existing draft."""
+        service, prefs_repo, *_ = _make_service(
+            active=_make_active_doc(),
+            draft=_make_draft_doc(),
+        )
+
+        result = await service.ensure_draft_for_signal(
+            tenant_id=STARTER_TENANT_ID,
+            tier=TenantTier.STARTER,
+            signal_field="qa_modified_at",
+            actor="user:u-123",
+        )
+
+        assert result.success is True
+        assert "qa_modified_at" in result.changes
+        prefs_repo.patch.assert_called_once()
+        # Should NOT create a new draft
+        prefs_repo.upsert.assert_not_called()
+
+    @pytest.mark.asyncio
+    async def test_not_configured_returns_error(self):
+        """Service not configured → returns error without crashing."""
+        service, *_ = _make_service(configure=False)
+
+        result = await service.ensure_draft_for_signal(
+            tenant_id=STARTER_TENANT_ID,
+            tier=TenantTier.STARTER,
+            signal_field="kb_modified_at",
+        )
+
+        assert result.success is False
+        assert any("not configured" in e.get("message", "").lower()
+                    for e in result.errors)
+
+    @pytest.mark.asyncio
+    async def test_signal_field_in_changed_fields(self):
+        """Signal field appears in get_draft_state changed_fields."""
+        draft = _make_draft_doc()
+        draft["kb_modified_at"] = "2026-02-16T00:00:00Z"
+
+        service, *_ = _make_service(
+            active=_make_active_doc(),
+            draft=draft,
+        )
+
+        state = await service.get_draft_state(STARTER_TENANT_ID, TenantTier.STARTER)
+        assert state is not None
+        assert "kb_modified_at" in state.changed_fields
+
+    @pytest.mark.asyncio
+    async def test_discard_clears_signal_fields(self):
+        """discard_draft (never-activated) resets signal fields to None."""
+        draft = _make_draft_doc(version=1)
+        draft["kb_modified_at"] = "2026-02-16T00:00:00Z"
+        draft["qa_modified_at"] = "2026-02-16T01:00:00Z"
+
+        service, prefs_repo, *_ = _make_service(
+            active=None,  # never-activated → reset branch
+            draft=draft,
+        )
+
+        result = await service.discard_draft(
+            tenant_id=STARTER_TENANT_ID,
+        )
+
+        assert result is True
+        # Check that patch operations include clearing signal fields
+        patch_calls = prefs_repo.patch.call_args_list
+        assert len(patch_calls) >= 1
+        all_ops = []
+        for call in patch_calls:
+            ops = call.kwargs.get("operations", []) or (call.args[2] if len(call.args) > 2 else [])
+            all_ops.extend(ops)
+        signal_paths = [op["path"] for op in all_ops if op.get("path") in ("/kb_modified_at", "/qa_modified_at")]
+        assert "/kb_modified_at" in signal_paths
+        assert "/qa_modified_at" in signal_paths

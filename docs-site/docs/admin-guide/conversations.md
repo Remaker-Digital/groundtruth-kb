@@ -25,6 +25,7 @@ Use the filter tabs to view conversations by status:
 - **Active** — Currently open conversations with recent customer activity
 - **Esc** — Conversations escalated to a human team member
 - **Resolved** — Conversations that have been resolved (by agent action, customer ending the chat, or reaching max conversation turns)
+- **Archived** — Conversations that have been archived for long-term storage
 
 ### Search
 
@@ -42,8 +43,21 @@ Select a conversation to view the full message thread. The detail panel shows:
 
 ### Actions
 
-- **Escalate** — Hand off to a human team member. When you escalate a conversation, Agent Red sends an email notification to all team members with the `escalation_agent` role. If no escalation agents are configured, the notification falls back to team members with the `admin` role. The conversation status changes to Escalated.
+- **Escalate** — Hand off to a human team member. You can optionally select a category (service, support, sales, account, technical assistance, or general inquiry) and a specific team member. When a category is selected without a specific agent, Agent Red automatically assigns the conversation to the escalation agent with the fewest unresolved escalations in that category. Email notification is sent to the assigned agent (or all escalation agents if no specific assignment). The conversation status changes to Escalated.
 - **Resolve** — Mark the conversation as resolved and close it. The conversation status changes to Resolved.
+- **Archive** — Move a resolved or timed-out conversation to the archive for long-term storage. Archived conversations no longer appear in the default list view but remain accessible via the Archived filter tab.
+- **Unarchive** — Restore an archived conversation back to the main list.
+
+### AI-Initiated Escalation
+
+When the AI pipeline detects that a conversation should be escalated (based on confidence thresholds, keyword triggers, or turn limits), it also classifies the conversation into a category. The system then automatically assigns the conversation to the best-fit escalation agent based on category match and current workload. The assigned agent receives a targeted email notification.
+
+### Escalation Details
+
+For escalated conversations, the detail panel shows:
+
+- **Escalation category** — Displayed as a badge (e.g., "support", "sales", "technical assistance")
+- **Assigned to** — The team member assigned to handle the escalation, shown by display name
 
 ## Customer Profile
 

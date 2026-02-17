@@ -41,6 +41,7 @@ from fastapi.responses import StreamingResponse
 from pydantic import BaseModel, ConfigDict, Field
 from pydantic.alias_generators import to_camel
 
+from src.multi_tenant.activation_service import get_activation_service
 from src.multi_tenant.auth import TenantContext
 from src.multi_tenant.middleware import get_tenant_context
 from src.multi_tenant.repository import DocumentNotFoundError, KnowledgeBaseRepository
@@ -387,6 +388,35 @@ def _build_entry_response(entry: dict[str, Any], tenant_id: str) -> KnowledgeEnt
     )
 
 
+async def _signal_kb_draft(ctx: "TenantContext") -> None:
+    """Signal that KB content has changed by touching the draft document.
+
+    Best-effort — failure here must NOT block the KB write that already
+    succeeded.  The signal field ``kb_modified_at`` appears in the
+    Activation Dialog's change summary so the owner knows KB content
+    was modified since the last activation.
+
+    D16 fix — KB Save→Activate integration.
+    """
+    try:
+        from src.multi_tenant.cosmos_schema import TenantTier
+
+        activation_svc = get_activation_service()
+        tier = TenantTier(ctx.tier) if ctx.tier else TenantTier.STARTER
+        await activation_svc.ensure_draft_for_signal(
+            tenant_id=ctx.tenant_id,
+            tier=tier,
+            signal_field="kb_modified_at",
+            actor=f"user:{ctx.user_id}" if ctx.user_id else "admin",
+        )
+    except Exception as exc:  # noqa: BLE001
+        logger.warning(
+            "KB draft signal failed (non-blocking): tenant=%s error=%s",
+            ctx.tenant_id[:8] if ctx.tenant_id else "?",
+            exc,
+        )
+
+
 # ---------------------------------------------------------------------------
 # GET /api/admin/knowledge — List with filtering & pagination
 # ---------------------------------------------------------------------------
@@ -720,6 +750,9 @@ async def create_knowledge_entry(
         ctx.tenant_id[:8],
     )
 
+    # Signal draft that KB content changed (D16 fix)
+    await _signal_kb_draft(ctx)
+
     # Trigger async embedding (WI #210 — non-blocking, best-effort)
     if _knowledge_vectorizer:
         try:
@@ -841,6 +874,9 @@ async def update_knowledge_entry(
         ctx.tenant_id[:8],
     )
 
+    # Signal draft that KB content changed (D16 fix)
+    await _signal_kb_draft(ctx)
+
     # Re-embed if title or content changed (WI #210 — content hash will detect changes)
     if _knowledge_vectorizer and (request.title is not None or request.content is not None):
         try:
@@ -898,6 +934,9 @@ async def delete_knowledge_entry(
         entry_id,
         ctx.tenant_id[:8],
     )
+
+    # Signal draft that KB content changed (D16 fix)
+    await _signal_kb_draft(ctx)
 
     return DeleteKnowledgeEntryResponse(
         id=entry_id,
@@ -1012,6 +1051,9 @@ async def upload_knowledge_document(
         parse_result.total_chars,
         ctx.tenant_id[:8],
     )
+
+    # Signal draft that KB content changed (D16 fix)
+    await _signal_kb_draft(ctx)
 
     # Trigger batch embedding (non-blocking, best-effort)
     if _knowledge_vectorizer:
@@ -1157,6 +1199,9 @@ async def import_knowledge_from_url(
         entry_ids.append(entry_dict["id"])
 
     parent_id = all_entries[0].get("parent_entry_id") if len(all_entries) > 1 else None
+
+    # Signal draft that KB content changed (D16 fix)
+    await _signal_kb_draft(ctx)
 
     # Trigger batch embedding (non-blocking, best-effort)
     if _knowledge_vectorizer:

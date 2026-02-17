@@ -17,7 +17,7 @@ from __future__ import annotations
 import uuid
 from datetime import datetime, timezone
 from typing import Any
-from unittest.mock import AsyncMock
+from unittest.mock import AsyncMock, MagicMock, patch
 
 import pytest
 from fastapi import FastAPI
@@ -108,6 +108,26 @@ def _make_assignment(
 # ---------------------------------------------------------------------------
 # Fixtures
 # ---------------------------------------------------------------------------
+
+
+@pytest.fixture(autouse=True)
+def _mock_activation_service():
+    """Patch get_activation_service for all QA tests.
+
+    The _ensure_qa_draft helper calls get_activation_service() on every
+    write endpoint.  Return a mock whose ensure_draft_for_signal is a
+    no-op AsyncMock so that existing tests pass without an actual
+    ActivationService singleton.
+    """
+    mock_svc = MagicMock()
+    mock_svc.ensure_draft_for_signal = AsyncMock(
+        return_value=MagicMock(success=True, message="ok"),
+    )
+    with patch(
+        "src.multi_tenant.admin_quick_action_api.get_activation_service",
+        return_value=mock_svc,
+    ):
+        yield mock_svc
 
 
 @pytest.fixture()
@@ -837,3 +857,82 @@ class TestConfigSchemaField:
         registry = get_field_registry()
         field = registry["widget_quick_actions_enabled"]
         assert field.onboarding_step == OnboardingStep.WIDGET_APPEARANCE
+
+
+# ===========================================================================
+# Draft Signal Tests (D20 + D68)
+# ===========================================================================
+
+
+class TestQADraftSignal:
+    """Verify that QA write endpoints call ensure_draft_for_signal (D20+D68)."""
+
+    def test_create_quick_action_ensures_draft(
+        self, qa_client, _mock_activation_service,
+    ):
+        """Creating a quick action triggers the qa_modified_at signal."""
+        resp = qa_client.post(
+            "/api/admin/quick-actions",
+            json={"label": "Test", "promptTemplate": "hello"},
+        )
+        assert resp.status_code == 201
+        _mock_activation_service.ensure_draft_for_signal.assert_called()
+        call_kwargs = _mock_activation_service.ensure_draft_for_signal.call_args
+        assert call_kwargs.kwargs.get("signal_field") == "qa_modified_at"
+
+    def test_update_quick_action_ensures_draft(
+        self, qa_client, mock_prefs_repo, _mock_activation_service,
+    ):
+        """Updating a quick action triggers the qa_modified_at signal."""
+        action = _make_action(action_id="act-1")
+        mock_prefs_repo._actions.append(action)
+
+        resp = qa_client.put(
+            "/api/admin/quick-actions/act-1",
+            json={"label": "Updated"},
+        )
+        assert resp.status_code == 200
+        _mock_activation_service.ensure_draft_for_signal.assert_called()
+        call_kwargs = _mock_activation_service.ensure_draft_for_signal.call_args
+        assert call_kwargs.kwargs.get("signal_field") == "qa_modified_at"
+
+    def test_delete_quick_action_ensures_draft(
+        self, qa_client, mock_prefs_repo, _mock_activation_service,
+    ):
+        """Deleting a quick action triggers the qa_modified_at signal."""
+        action = _make_action(action_id="act-2")
+        mock_prefs_repo._actions.append(action)
+
+        resp = qa_client.delete("/api/admin/quick-actions/act-2")
+        assert resp.status_code == 204
+        _mock_activation_service.ensure_draft_for_signal.assert_called()
+
+    def test_upsert_page_assignment_ensures_draft(
+        self, qa_client, mock_prefs_repo, _mock_activation_service,
+    ):
+        """Upserting a page assignment triggers the qa_modified_at signal."""
+        action = _make_action(action_id="act-3")
+        mock_prefs_repo._actions.append(action)
+
+        resp = qa_client.put(
+            "/api/admin/quick-actions/assignments",
+            json={"pageType": "product", "slot1ActionId": "act-3"},
+        )
+        assert resp.status_code == 200
+        _mock_activation_service.ensure_draft_for_signal.assert_called()
+        call_kwargs = _mock_activation_service.ensure_draft_for_signal.call_args
+        assert call_kwargs.kwargs.get("signal_field") == "qa_modified_at"
+
+    def test_delete_page_assignment_ensures_draft(
+        self, qa_client, mock_prefs_repo, _mock_activation_service,
+    ):
+        """Deleting a page assignment triggers the qa_modified_at signal."""
+        mock_prefs_repo._assignments.append(
+            _make_assignment(page_type="product"),
+        )
+
+        resp = qa_client.delete(
+            "/api/admin/quick-actions/assignments/product",
+        )
+        assert resp.status_code == 204
+        _mock_activation_service.ensure_draft_for_signal.assert_called()

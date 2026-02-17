@@ -501,8 +501,8 @@ class TestKeyVaultIntegration:
                 secrets.append(prop.name)
                 if len(secrets) >= 3:
                     break
-            # If we got here without error, connectivity works
-            assert True
+            # Connectivity verified — secrets list returned without error
+            assert isinstance(secrets, list)
         finally:
             await client.close()
             await credential.close()

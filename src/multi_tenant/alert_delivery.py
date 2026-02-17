@@ -1197,6 +1197,8 @@ async def send_escalation_alert(
     urgency: str = "medium",
     context_summary: str = "",
     recipient_emails: list[str] | None = None,
+    escalation_category: str | None = None,
+    assigned_to: str | None = None,
 ) -> DeliveryResult | None:
     """Create and deliver an ESCALATION alert.
 
@@ -1211,6 +1213,8 @@ async def send_escalation_alert(
         context_summary: Brief context for the human agent.
         recipient_emails: Specific team member emails to notify.
             If None, falls back to the tenant's notification email.
+        escalation_category: AI-detected category (from ESCALATION_CATEGORIES).
+        assigned_to: Auto-assigned team member ID.
 
     Returns:
         DeliveryResult, or None if no service is configured.
@@ -1241,6 +1245,8 @@ async def send_escalation_alert(
             "urgency": urgency,
             "context_summary": context_summary,
             "recipient_emails": recipient_emails or [],
+            "escalation_category": escalation_category,
+            "assigned_to": assigned_to,
         },
     )
 

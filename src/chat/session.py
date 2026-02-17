@@ -54,7 +54,12 @@ from src.multi_tenant.cosmos_schema import (
     ConversationStatus,
     TenantTier,
 )
-from src.multi_tenant.repository import ConversationRepository, DocumentNotFoundError
+from src.multi_tenant.gdpr_services import PiiScrubber
+from src.multi_tenant.repository import (
+    ConversationRepository,
+    DocumentNotFoundError,
+    TeamMemberRepository,
+)
 
 logger = logging.getLogger(__name__)
 
@@ -131,9 +136,25 @@ class ConversationSession:
         self,
         conversation_repo: ConversationRepository,
         conversation_meter: ConversationMeter | None = None,
+        team_repo: TeamMemberRepository | None = None,
     ) -> None:
         self._repo = conversation_repo
         self._meter = conversation_meter
+        self._team_repo = team_repo
+        self._pii_scrubber: PiiScrubber | None = None
+
+    def set_pii_scrubber(self, enabled: bool) -> None:
+        """Enable or disable PII scrubbing on stored message content.
+
+        When enabled, customer and AI message content is scrubbed for
+        email addresses and phone numbers before persisting to Cosmos DB.
+        The live response delivered to the customer is NOT affected —
+        only the stored transcript.
+
+        Called by the pipeline at the start of each conversation turn,
+        based on the tenant's ``pii_scrubbing`` config value.
+        """
+        self._pii_scrubber = PiiScrubber() if enabled else None
 
     # -------------------------------------------------------------------
     # Create conversation
@@ -272,9 +293,14 @@ class ConversationSession:
         now = datetime.now(timezone.utc).isoformat()
         message_id = str(uuid.uuid4())
 
+        # PII scrubbing: redact emails/phones from stored transcript
+        stored_content = request.content
+        if self._pii_scrubber:
+            stored_content = self._pii_scrubber.scrub_text(stored_content)
+
         message_dict: dict[str, Any] = {
             "role": MessageRole.CUSTOMER.value,
-            "content": request.content,
+            "content": stored_content,
             "timestamp": now,
             "message_id": message_id,
         }
@@ -342,9 +368,14 @@ class ConversationSession:
         now = datetime.now(timezone.utc).isoformat()
         message_id = str(uuid.uuid4())
 
+        # PII scrubbing: redact emails/phones from stored AI response
+        stored_content = content
+        if self._pii_scrubber:
+            stored_content = self._pii_scrubber.scrub_text(stored_content)
+
         message_dict: dict[str, Any] = {
             "role": MessageRole.AI.value,
-            "content": content,
+            "content": stored_content,
             "timestamp": now,
             "message_id": message_id,
         }
@@ -552,7 +583,74 @@ class ConversationSession:
         )
 
     # -------------------------------------------------------------------
-    # Escalation
+    # Escalation — agent routing
+    # -------------------------------------------------------------------
+
+    async def find_best_agent_for_category(
+        self,
+        tenant_id: str,
+        category: str,
+    ) -> str | None:
+        """Find an active escalation_agent who handles the given category.
+
+        Selects the agent with the fewest unresolved escalations who is
+        still below their ``max_concurrent_conversations`` cap.  Falls
+        back to agents handling ``general_inquiry`` if no exact match.
+
+        Returns the member's document ID, or ``None`` if no suitable
+        agent is available.
+        """
+        if not self._team_repo:
+            logger.debug("No team_repo configured — cannot auto-assign")
+            return None
+
+        members = await self._team_repo.list_members(tenant_id)
+
+        # Filter to active escalation agents who handle this category
+        candidates = [
+            m for m in members
+            if m.get("role") == "escalation_agent"
+            and m.get("is_active", True)
+            and category in (m.get("escalation_categories") or [])
+        ]
+
+        # Fallback: try general_inquiry agents
+        if not candidates and category != "general_inquiry":
+            candidates = [
+                m for m in members
+                if m.get("role") == "escalation_agent"
+                and m.get("is_active", True)
+                and "general_inquiry" in (m.get("escalation_categories") or [])
+            ]
+
+        if not candidates:
+            return None
+
+        # Score each candidate by current workload
+        best_id: str | None = None
+        best_count = float("inf")
+
+        for member in candidates:
+            member_id = member["id"]
+            cap = member.get("max_concurrent_conversations", 5)
+
+            count = await self._repo.count_filtered(
+                tenant_id,
+                status=ConversationStatus.ESCALATED,
+                assigned_to=member_id,
+            )
+
+            if count >= cap:
+                continue  # at capacity
+
+            if count < best_count:
+                best_count = count
+                best_id = member_id
+
+        return best_id
+
+    # -------------------------------------------------------------------
+    # Escalation — conversation state
     # -------------------------------------------------------------------
 
     async def escalate_conversation(
@@ -561,16 +659,22 @@ class ConversationSession:
         conversation_id: str,
         *,
         escalation_reason: str | None = None,
+        escalation_category: str | None = None,
+        assigned_to: str | None = None,
     ) -> None:
         """Escalate a conversation to a human agent.
 
         Sets the conversation status to ESCALATED and appends a system
-        message recording the escalation event.
+        message recording the escalation event.  Optionally sets the
+        escalation category and assigns the conversation to a specific
+        team member.
 
         Args:
             tenant_id: Tenant identifier.
             conversation_id: Conversation to escalate.
             escalation_reason: Optional reason from the Escalation agent.
+            escalation_category: Optional category (from ESCALATION_CATEGORIES).
+            assigned_to: Optional human agent ID for auto-assignment.
         """
         doc = await self._get_active_conversation(tenant_id, conversation_id)
 
@@ -582,7 +686,12 @@ class ConversationSession:
             "message_id": str(uuid.uuid4()),
         }
         if escalation_reason:
-            system_msg["metadata"] = {"escalation_reason": escalation_reason}
+            metadata: dict[str, Any] = {"escalation_reason": escalation_reason}
+            if escalation_category:
+                metadata["escalation_category"] = escalation_category
+            if assigned_to:
+                metadata["assigned_to"] = assigned_to
+            system_msg["metadata"] = metadata
 
         operations: list[dict[str, Any]] = [
             {"op": "set", "path": "/status", "value": ConversationStatus.ESCALATED.value},
@@ -590,14 +699,24 @@ class ConversationSession:
             {"op": "incr", "path": "/message_count", "value": 1},
             {"op": "set", "path": "/last_activity_at", "value": now},
         ]
+        if escalation_category:
+            operations.append(
+                {"op": "set", "path": "/escalation_category", "value": escalation_category}
+            )
+        if assigned_to:
+            operations.append(
+                {"op": "set", "path": "/assigned_to", "value": assigned_to}
+            )
 
         await self._repo.patch(tenant_id, conversation_id, operations)
 
         logger.info(
-            "Conversation escalated: %s (tenant=%s, reason=%s)",
+            "Conversation escalated: %s (tenant=%s, reason=%s, category=%s, assigned=%s)",
             conversation_id,
             tenant_id,
             escalation_reason or "not specified",
+            escalation_category or "none",
+            assigned_to or "unassigned",
         )
 
     # -------------------------------------------------------------------
@@ -675,6 +794,7 @@ def get_conversation_session() -> ConversationSession:
 def configure_conversation_session(
     conversation_repo: ConversationRepository,
     conversation_meter: ConversationMeter | None = None,
+    team_repo: TeamMemberRepository | None = None,
 ) -> ConversationSession:
     """Configure the module-level singleton with explicit dependencies.
 
@@ -685,6 +805,7 @@ def configure_conversation_session(
     _session = ConversationSession(
         conversation_repo=conversation_repo,
         conversation_meter=conversation_meter,
+        team_repo=team_repo,
     )
     return _session
 

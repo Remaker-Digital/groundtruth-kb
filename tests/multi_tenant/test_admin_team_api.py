@@ -868,3 +868,75 @@ class TestWhoami:
         assert "tenantId" in data
         assert "teamMemberId" in data
         assert "authMethod" in data
+
+
+# ---------------------------------------------------------------------------
+# Unresolved escalation count (Backlog #19 / D57)
+# ---------------------------------------------------------------------------
+
+
+class TestUnresolvedEscalationCount:
+    """Verify unresolved_escalation_count enrichment in list endpoint."""
+
+    @pytest.fixture(autouse=True)
+    def setup_mocks(self):
+        self.team_repo = AsyncMock()
+        self.conv_repo = AsyncMock()
+        configure_admin_team_services(self.team_repo, conv_repo=self.conv_repo)
+        yield
+        configure_admin_team_services(None)
+
+    @pytest.mark.asyncio
+    async def test_escalation_agent_has_count(self):
+        """Escalation agent response includes unresolved count."""
+        from src.multi_tenant.admin_team_api import list_team_members
+
+        agent_doc = _make_member_doc(
+            "agent@test.com", "escalation_agent",
+            escalation_categories=["support"],
+        )
+        self.team_repo.count_members.return_value = 1
+        self.team_repo.list_members.return_value = [agent_doc]
+        self.conv_repo.count_filtered.return_value = 3
+
+        ctx = _ctx(role=TeamMemberRole.ADMIN)
+        result = await list_team_members(role=None, is_active=None, offset=0, limit=50, ctx=ctx)
+
+        assert len(result.members) == 1
+        assert result.members[0].unresolved_escalation_count == 3
+
+    @pytest.mark.asyncio
+    async def test_non_agent_has_zero_count(self):
+        """Admin role has 0 unresolved count (not an escalation agent)."""
+        from src.multi_tenant.admin_team_api import list_team_members
+
+        admin_doc = _make_member_doc("admin@test.com", "admin")
+        self.team_repo.count_members.return_value = 1
+        self.team_repo.list_members.return_value = [admin_doc]
+
+        ctx = _ctx(role=TeamMemberRole.ADMIN)
+        result = await list_team_members(role=None, is_active=None, offset=0, limit=50, ctx=ctx)
+
+        assert result.members[0].unresolved_escalation_count == 0
+
+    @pytest.mark.asyncio
+    async def test_count_filters_by_escalated_status(self):
+        """count_filtered is called with status=ESCALATED."""
+        from src.multi_tenant.admin_team_api import list_team_members
+        from src.multi_tenant.cosmos_schema import ConversationStatus
+
+        agent_doc = _make_member_doc(
+            "agent@test.com", "escalation_agent",
+            escalation_categories=["support"],
+        )
+        self.team_repo.count_members.return_value = 1
+        self.team_repo.list_members.return_value = [agent_doc]
+        self.conv_repo.count_filtered.return_value = 0
+
+        ctx = _ctx(role=TeamMemberRole.ADMIN)
+        await list_team_members(role=None, is_active=None, offset=0, limit=50, ctx=ctx)
+
+        self.conv_repo.count_filtered.assert_called_once()
+        call_kwargs = self.conv_repo.count_filtered.call_args
+        assert call_kwargs[1]["status"] == ConversationStatus.ESCALATED
+        assert call_kwargs[1]["assigned_to"] == agent_doc["id"]

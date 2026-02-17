@@ -395,6 +395,10 @@ class ChatPipeline:
         self._current_tenant_id = tenant_id
         self._current_preferences = preferences
 
+        # Configure per-tenant PII scrubbing on stored transcripts
+        pii_enabled = getattr(preferences, "pii_scrubbing", False) is True
+        self._session.set_pii_scrubber(pii_enabled)
+
         try:
             # ---------------------------------------------------------------
             # Phase 0: Load customer context (Layer 1 + Layer 2)
@@ -1208,6 +1212,7 @@ class ChatPipeline:
             reason = esc_result.get("reason", "Customer requested human agent")
             urgency = esc_result.get("urgency", "medium")
             context_summary = esc_result.get("context_summary", "")
+            category = esc_result.get("category", "general_inquiry")
             trace.add_stage(
                 "escalation-handler",
                 model=esc_result.get("model", "gpt-4o-mini"),
@@ -1222,12 +1227,24 @@ class ChatPipeline:
                 conversation_id, exc,
             )
             reason = "Customer requested human agent"
+            category = "general_inquiry"
+
+        # Auto-assign to best-fit team member
+        assigned_agent_id: str | None = None
+        try:
+            assigned_agent_id = await self._session.find_best_agent_for_category(
+                tenant_id, category,
+            )
+        except Exception as exc:
+            logger.warning("Auto-assign failed: %s — proceeding without assignment", exc)
 
         # Escalate the conversation in the session
         await self._session.escalate_conversation(
             tenant_id=tenant_id,
             conversation_id=conversation_id,
             escalation_reason=reason,
+            escalation_category=category,
+            assigned_to=assigned_agent_id,
         )
 
         # Fire-and-forget: notify assigned escalation agents
@@ -1235,8 +1252,9 @@ class ChatPipeline:
             from src.multi_tenant.alert_delivery import send_escalation_alert
 
             logger.info(
-                "Firing escalation alert: tenant=%s conversation=%s reason=%s urgency=%s",
+                "Firing escalation alert: tenant=%s conversation=%s reason=%s urgency=%s category=%s assigned=%s",
                 tenant_id, conversation_id, reason[:80], urgency,
+                category, assigned_agent_id or "unassigned",
             )
             asyncio.ensure_future(
                 send_escalation_alert(
@@ -1245,6 +1263,8 @@ class ChatPipeline:
                     reason=reason,
                     urgency=urgency,
                     context_summary=context_summary,
+                    escalation_category=category,
+                    assigned_to=assigned_agent_id,
                 )
             )
         except Exception:

@@ -9,6 +9,34 @@ All notable changes to Agent Red Customer Experience are documented here.
 
 ---
 
+## v1.35.0 — 2026-02-17
+
+### Category-routed escalation
+- **AI category detection:** The escalation pipeline now classifies conversations into categories (service, support, sales, account, technical assistance, general inquiry) using AI analysis.
+- **Workload-based auto-assignment:** Escalated conversations are automatically assigned to the escalation agent with the fewest unresolved cases in the matching category, respecting per-agent concurrency caps.
+- **Manual category selection:** When manually escalating from the Inbox, you can now select a category and optionally choose a specific team member.
+- **Inbox escalation details:** Escalated conversations display a category badge and the assigned team member's name in the detail pane.
+- **Team workload column:** The Team page now shows an "Escalations" column with the live count of unresolved escalations per agent.
+
+### Conversation archival
+- **Archive and unarchive actions:** Resolved and timed-out conversations can be archived for long-term storage. Archived conversations are hidden from the default list but accessible via the new "Archived" filter tab.
+- **Idle conversation scanner:** Background task automatically closes idle conversations that exceed the 30-minute inactivity timeout, running every 5 minutes across all tenants.
+
+### Save and activate improvements
+- **Knowledge base draft integration (D16):** Creating, updating, or deleting knowledge base articles now triggers the Pending badge, ensuring you see that activation is needed.
+- **Quick action draft integration (D20/D68):** Quick action CRUD and page assignment changes now trigger the Pending badge. Page assignment changes (slot, auto-open, delay) are saved to the draft and only committed on Activate.
+- **Activation dialog grouping:** The change summary groups KB modifications under "Knowledge base" and QA modifications under "Quick actions" with human-readable labels.
+
+### Privacy and compliance
+- **PII scrubbing:** New toggle on the Memory & Privacy page. When enabled, email addresses and phone numbers are automatically scrubbed from stored conversation transcripts (live responses are unaffected).
+
+### Test coverage
+- **52 new tests** from independent test coverage audit (2,477 total, 0 failures)
+- New test files: admin integration API (13), customer profile API (12), security middleware (16), structured logging (11)
+- Fixed regression test collection gap: integration tests now correctly excluded from unit suite
+
+---
+
 ## v1.34.0 — 2026-02-16
 
 ### Knowledge base improvements

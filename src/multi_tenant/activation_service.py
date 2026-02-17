@@ -329,6 +329,124 @@ class ActivationService:
             )
 
     # ------------------------------------------------------------------
+    # Ensure Draft for Signal (KB/QA pending-change notification)
+    # ------------------------------------------------------------------
+
+    async def ensure_draft_for_signal(
+        self,
+        tenant_id: str,
+        tier: TenantTier,
+        signal_field: str,
+        actor: str = "admin",
+    ) -> DraftSaveResult:
+        """Ensure a draft exists and set a lightweight signal field.
+
+        Used by KB and QA APIs to signal "pending changes" to the
+        activation system without going through full config validation
+        (since signal fields are not in the config schema registry).
+
+        The signal field (e.g. ``kb_modified_at``, ``qa_modified_at``)
+        is set to the current ISO timestamp.  Because it is not in
+        ``_METADATA_FIELDS`` and does not start with ``_``, it will
+        appear in the ``changed_fields`` diff returned by
+        ``get_draft_state()``.
+
+        Args:
+            tenant_id: Tenant partition key.
+            tier: Subscription tier.
+            signal_field: Name of the signal field to set.
+            actor: Who made the change (for audit).
+
+        Returns:
+            DraftSaveResult with success status.
+        """
+        if not self._is_configured:
+            return DraftSaveResult(
+                success=False,
+                errors=[{"field": "_system", "message": "Service not configured"}],
+            )
+
+        now = datetime.now(timezone.utc).isoformat()
+
+        try:
+            async with self._lock:
+                active = await self._prefs_repo.get_active(tenant_id)
+                if active:
+                    active = await self._ensure_config_state(active, tenant_id)
+
+                draft = await self._prefs_repo.get_draft(tenant_id)
+
+                if draft is not None:
+                    # Draft exists — update the signal field
+                    await self._prefs_repo.patch(
+                        tenant_id=tenant_id,
+                        document_id=draft["id"],
+                        operations=[
+                            {"op": "set", "path": f"/{signal_field}", "value": now},
+                        ],
+                    )
+                    logger.info(
+                        "Updated %s signal on draft v%d for tenant=%s",
+                        signal_field, draft.get("version", 0), tenant_id[:8],
+                    )
+                    return DraftSaveResult(
+                        success=True,
+                        version=draft.get("version", 0),
+                        changes={signal_field: now},
+                        state="draft",
+                    )
+                else:
+                    # No draft — create one from active + signal
+                    base_config: dict[str, Any] = {}
+                    active_version = 0
+
+                    if active:
+                        active_version = active.get("version", 0)
+                        for key, value in active.items():
+                            if key not in ("id", "_rid", "_self", "_etag", "_attachments", "_ts"):
+                                base_config[key] = value
+
+                    base_config[signal_field] = now
+
+                    draft_version = active_version + 1
+                    base_config.update({
+                        "id": f"{tenant_id}:{draft_version}",
+                        "tenant_id": tenant_id,
+                        "version": draft_version,
+                        "is_current": False,
+                        "config_state": ConfigState.DRAFT.value,
+                        "created_at": now,
+                        "created_by": actor,
+                        "activated_at": None,
+                        "activated_by": None,
+                    })
+
+                    await self._prefs_repo.upsert(
+                        tenant_id, PreferencesDocument(**base_config),
+                    )
+
+                    logger.info(
+                        "Created draft v%d for tenant=%s via %s signal",
+                        draft_version, tenant_id[:8], signal_field,
+                    )
+
+                    return DraftSaveResult(
+                        success=True,
+                        version=draft_version,
+                        changes={signal_field: now},
+                        state="draft",
+                    )
+        except Exception as exc:
+            logger.error(
+                "Failed to create signal draft for tenant=%s: %s",
+                tenant_id[:8], exc, exc_info=True,
+            )
+            return DraftSaveResult(
+                success=False,
+                errors=[{"field": "_system", "message": f"Failed to signal draft: {exc}"}],
+            )
+
+    # ------------------------------------------------------------------
     # Draft State (for activation banner)
     # ------------------------------------------------------------------
 
@@ -806,6 +924,9 @@ class ActivationService:
                     # Activation metadata
                     {"op": "set", "path": "/activated_at", "value": None},
                     {"op": "set", "path": "/activated_by", "value": None},
+                    # KB/QA signal fields
+                    {"op": "set", "path": "/kb_modified_at", "value": None},
+                    {"op": "set", "path": "/qa_modified_at", "value": None},
                 ]
                 await self._prefs_repo.patch(
                     tenant_id=tenant_id,

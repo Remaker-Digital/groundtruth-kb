@@ -111,9 +111,10 @@ When you click **Activate now**, Agent Red promotes all pending changes as a sin
 | **Agent configuration** | Brand name, brand voice, response length, escalation rules, custom instructions | Saved to draft, activated atomically |
 | **Quick actions** | Prompt buttons, page assignments, ordering | Saved to draft, activated atomically |
 | **Widget configuration** | Colors, position, launcher style, dark mode, pre-chat form | Saved to draft, activated atomically |
-| **Knowledge base** | Articles, categories, conflict scan results | Validated at activation time (not snapshotted) |
+| **Knowledge base** | Articles, categories, conflict scan results | Changes trigger Pending badge; validated at activation time |
+| **Quick action assignments** | Page assignments, auto-open, delay | Changes trigger Pending badge; saved to draft |
 
-The knowledge base is validated during activation to ensure there are no critical conflicts, but its content is managed independently — knowledge base articles go live when you save them. The activation step confirms the knowledge base is in a healthy state but does not snapshot or version it.
+Knowledge base and quick action changes now trigger the **Pending** badge on the sidebar. When you create, update, or delete a knowledge base article, or change quick action page assignments, the configuration state updates to Pending — reminding you to activate when ready. The activation dialog groups these changes under "Knowledge base" and "Quick actions" respectively.
 
 ## Common scenarios
 

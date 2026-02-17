@@ -15,7 +15,7 @@ This document provides active guidance for AI assistants working on the Agent Re
 |-----------|-------|
 | **Project Name** | Agent Red Customer Experience |
 | **Type** | Commercial SaaS Product (Shopify + Standalone) |
-| **Status** | Production v1.34.0 HEALTHY. 2,455 unit tests (0 failures), 178 UI tests. AGNTCY Phase 2 COMPLETE. Session 26: 9 defect fixes, COMPLETED→RESOLVED, operational procedures. Next: functional testing round on v1.34.0. |
+| **Status** | Production v1.34.0 HEALTHY. 2,477 unit tests (0 failures), 178 UI tests. AGNTCY Phase 2 COMPLETE. Session 28: Test coverage audit — 52 new tests, 3 trivial fixes. Next: build/deploy cycle. |
 | **Owner** | Remaker Digital (DBA of VanDusen & Palmeter, LLC) |
 
 ### Copyright Notice
@@ -136,10 +136,8 @@ Active procedures:
 6. Stripe test→live mode flip (`config/stripe_product_ids.json` mode field + env keys)
 
 ### Known Issues (Non-Blocking, Deferred)
-- D16/D20/D68: KB/QA Save→Activate integration — creating article/action and page assignments bypass draft system
 - D22: Avatar PNG upload (currently URL-based, 5 test assertions blocked)
 - D30: Tier upgrade path on Billing page
-- D56/D57: Escalation info display in Inbox and team escalation count (requires backlog #19)
 - Compliance: PII scrubbing (not tenant-aware), consent prompt (no widget UI), GDPR deletion (needs test harness)
 
 ### Post-Launch Backlog

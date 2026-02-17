@@ -25,9 +25,11 @@ import {
   useConversationMessages,
   useEscalateConversation,
   useResolveConversation,
+  useArchiveConversation,
   useSearchConversations,
+  useTeamMembers,
 } from '../../shared/hooks/index';
-import type { InboxConversation, ConversationMessage } from '../../shared/types/index';
+import type { InboxConversation, ConversationMessage, TeamMember } from '../../shared/types/index';
 import type { SearchResult } from '../../shared/hooks/index';
 
 // ---------------------------------------------------------------------------
@@ -41,6 +43,7 @@ const PAGE_PADDING = 16;
 const STATUS_COLORS: Record<string, string> = {
   active: 'blue',
   ended: 'green',
+  resolved: 'green',
   escalated: 'red',
   idle: 'yellow',
   timed_out: 'yellow',
@@ -119,6 +122,23 @@ const EscalateIcon = () => (
 const CheckIcon = () => (
   <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
     <polyline points="20 6 9 17 4 12" />
+  </svg>
+);
+
+const ArchiveIcon = () => (
+  <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+    <polyline points="21 8 21 21 3 21 3 8" />
+    <rect x="1" y="3" width="22" height="5" />
+    <line x1="10" y1="12" x2="14" y2="12" />
+  </svg>
+);
+
+const UnarchiveIcon = () => (
+  <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+    <polyline points="21 8 21 21 3 21 3 8" />
+    <rect x="1" y="3" width="22" height="5" />
+    <polyline points="12 15 12 9" />
+    <polyline points="9 12 12 9 15 12" />
   </svg>
 );
 
@@ -325,7 +345,8 @@ export function InboxPage() {
   const searchTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   // ---- API hooks ----
-  const convResult = useInboxConversations(apiFetch);
+  const isArchivedTab = filter === 'archived';
+  const convResult = useInboxConversations(apiFetch, isArchivedTab ? 'only' : undefined);
   const conversations: InboxConversation[] = convResult.data?.conversations ?? [];
 
   const msgResult = useConversationMessages(apiFetch, selectedId);
@@ -333,7 +354,16 @@ export function InboxPage() {
 
   const { escalate, loading: escalating } = useEscalateConversation(apiFetch);
   const { resolve, loading: resolving } = useResolveConversation(apiFetch);
+  const { archive, unarchive, loading: archiving } = useArchiveConversation(apiFetch);
   const { search: searchApi, clearSearch, results: searchResults, loading: searching } = useSearchConversations(apiFetch);
+  const teamResult = useTeamMembers(apiFetch);
+  const memberMap = React.useMemo(() => {
+    const map: Record<string, string> = {};
+    for (const m of (teamResult.data?.members ?? []) as TeamMember[]) {
+      map[m.id] = m.displayName;
+    }
+    return map;
+  }, [teamResult.data]);
 
   // Auto-select first conversation when list loads
   useEffect(() => {
@@ -405,11 +435,37 @@ export function InboxPage() {
     }
   }, [selectedId, resolving, resolve, convResult]);
 
+  const handleArchive = useCallback(async () => {
+    if (!selectedId || archiving) return;
+    try {
+      await archive(selectedId);
+      setNotification({ message: 'Conversation archived.', color: 'gray' });
+      setTimeout(() => convResult.refetch(), 500);
+    } catch (err: unknown) {
+      const msg = err instanceof Error ? err.message : 'Archive failed';
+      setNotification({ message: msg, color: 'red' });
+    }
+  }, [selectedId, archiving, archive, convResult]);
+
+  const handleUnarchive = useCallback(async () => {
+    if (!selectedId || archiving) return;
+    try {
+      await unarchive(selectedId);
+      setNotification({ message: 'Conversation unarchived.', color: 'blue' });
+      setTimeout(() => convResult.refetch(), 500);
+    } catch (err: unknown) {
+      const msg = err instanceof Error ? err.message : 'Unarchive failed';
+      setNotification({ message: msg, color: 'red' });
+    }
+  }, [selectedId, archiving, unarchive, convResult]);
+
   // ---- Filtering (status filter applied to conversation list; search uses backend) ----
   const isSearchActive = searchResults !== null;
   const filteredConversations = isSearchActive
     ? [] // When searching, we show searchResults instead
     : conversations.filter((c) => {
+        // "archived" tab: API already returns only archived conversations
+        if (isArchivedTab) return true;
         if (filter !== 'all' && c.status !== filter) return false;
         return true;
       });
@@ -456,6 +512,8 @@ export function InboxPage() {
           agentsInvoked: [],
           modelUsed: null,
           criticPassed: null,
+          escalationCategory: null,
+          archivedAt: null,
         };
       }
     }
@@ -516,6 +574,7 @@ export function InboxPage() {
               { label: `Active (${counts.active})`, value: 'active' },
               { label: `Esc (${counts.escalated})`, value: 'escalated' },
               { label: `Resolved (${counts.resolved})`, value: 'resolved' },
+              { label: 'Archived', value: 'archived' },
             ]}
             styles={{
               root: { background: isDark ? 'rgba(255,255,255,0.04)' : 'var(--mantine-color-gray-0)' },
@@ -720,6 +779,34 @@ export function InboxPage() {
                     </ActionIcon>
                   </Tooltip>
                 )}
+                {!selectedConversation.archivedAt && (selectedConversation.status === 'resolved' || selectedConversation.status === 'timed_out') && (
+                  <Tooltip label="Archive conversation">
+                    <ActionIcon
+                      variant="subtle"
+                      color="gray"
+                      size="md"
+                      onClick={handleArchive}
+                      loading={archiving}
+                      disabled={archiving}
+                    >
+                      <ArchiveIcon />
+                    </ActionIcon>
+                  </Tooltip>
+                )}
+                {selectedConversation.archivedAt && (
+                  <Tooltip label="Unarchive conversation">
+                    <ActionIcon
+                      variant="subtle"
+                      color="blue"
+                      size="md"
+                      onClick={handleUnarchive}
+                      loading={archiving}
+                      disabled={archiving}
+                    >
+                      <UnarchiveIcon />
+                    </ActionIcon>
+                  </Tooltip>
+                )}
               </Group>
             </Group>
           ) : (
@@ -868,13 +955,37 @@ export function InboxPage() {
                     {selectedConversation.assignedTo && (
                       <Group gap={8} wrap="nowrap">
                         <Text size="xs" c="dimmed" style={{ width: 80, flexShrink: 0 }}>Assigned to</Text>
-                        <Text size="sm">{selectedConversation.assignedTo}</Text>
+                        <Text size="sm">
+                          {memberMap[selectedConversation.assignedTo] || selectedConversation.assignedTo}
+                        </Text>
+                      </Group>
+                    )}
+                    {selectedConversation.escalationCategory && (
+                      <Group gap={8} wrap="nowrap">
+                        <Text size="xs" c="dimmed" style={{ width: 80, flexShrink: 0 }}>Category</Text>
+                        <Badge size="xs" variant="light" color="blue">
+                          {selectedConversation.escalationCategory.replace(/_/g, ' ')}
+                        </Badge>
                       </Group>
                     )}
                     {selectedConversation.status === 'escalated' && (
                       <Badge size="xs" variant="filled" color="red" mt={4}>
                         Escalated
                       </Badge>
+                    )}
+                    {selectedConversation.archivedAt && (
+                      <Group gap={8} wrap="nowrap" mt={4}>
+                        <Badge size="xs" variant="light" color="gray">
+                          Archived
+                        </Badge>
+                        <Text size="xs" c="dimmed">
+                          {new Date(selectedConversation.archivedAt).toLocaleDateString('en-US', {
+                            month: 'short',
+                            day: 'numeric',
+                            year: 'numeric',
+                          })}
+                        </Text>
+                      </Group>
                     )}
                   </Stack>
                 </Box>

@@ -58,6 +58,7 @@ from src.multi_tenant.cosmos_schema import (
     QuickActionPageAssignment,
     QuickActionPrompt,
 )
+from src.multi_tenant.activation_service import get_activation_service
 from src.multi_tenant.middleware import get_tenant_context
 from src.multi_tenant.repository import DocumentNotFoundError
 
@@ -243,6 +244,25 @@ def _get_tier_limit(tier: str | None, key: str) -> int:
     return 5  # Fallback default
 
 
+async def _ensure_qa_draft(ctx: "TenantContext") -> None:
+    """Ensure a draft document exists before any QA write operation.
+
+    This makes the repo methods (which prefer draft-first) naturally
+    write to the draft instead of the active document, and sets the
+    ``qa_modified_at`` signal so the Pending badge appears.
+    """
+    from src.multi_tenant.cosmos_schema import TenantTier
+
+    activation_svc = get_activation_service()
+    tier = TenantTier(ctx.tier) if ctx.tier else TenantTier.STARTER
+    await activation_svc.ensure_draft_for_signal(
+        tenant_id=ctx.tenant_id,
+        tier=tier,
+        signal_field="qa_modified_at",
+        actor=f"user:{ctx.user_id}" if ctx.user_id else "admin",
+    )
+
+
 def _action_dict_to_response(action: dict[str, Any]) -> QuickActionResponse:
     """Convert a raw action dict to a response model."""
     return QuickActionResponse(
@@ -370,6 +390,9 @@ async def create_quick_action(
             f"Upgrade your plan to create more.",
         )
 
+    # Ensure draft exists before QA write (D20 fix)
+    await _ensure_qa_draft(ctx)
+
     now = datetime.now(timezone.utc).isoformat()
     action = QuickActionPrompt(
         id=str(uuid.uuid4()),
@@ -486,6 +509,9 @@ async def upsert_page_assignment(
                 detail=f"Assignment limit reached ({max_assignments} for {ctx.tier} tier).",
             )
 
+    # Ensure draft exists before QA write (D68 fix)
+    await _ensure_qa_draft(ctx)
+
     assignment = QuickActionPageAssignment(
         page_type=body.page_type,
         page_handle=body.page_handle,
@@ -527,6 +553,10 @@ async def delete_page_assignment(
 ) -> None:
     """Delete a page assignment."""
     repo = _get_repo()
+
+    # Ensure draft exists before QA write (D68 fix)
+    await _ensure_qa_draft(ctx)
+
     removed = await repo.delete_page_assignment(
         ctx.tenant_id, page_type, page_handle,
     )
@@ -595,6 +625,9 @@ async def update_quick_action(
     if not action:
         raise HTTPException(status_code=404, detail="Quick action not found")
 
+    # Ensure draft exists before QA write (D20 fix)
+    await _ensure_qa_draft(ctx)
+
     # Apply partial update
     now = datetime.now(timezone.utc).isoformat()
     if body.label is not None:
@@ -639,6 +672,10 @@ async def delete_quick_action(
 ) -> None:
     """Delete a quick action prompt and clean up assignments."""
     repo = _get_repo()
+
+    # Ensure draft exists before QA write (D20 fix)
+    await _ensure_qa_draft(ctx)
+
     removed = await repo.delete_quick_action(ctx.tenant_id, action_id)
 
     if not removed:

@@ -933,6 +933,7 @@ export const TeamManager: React.FC<BaseComponentProps> = ({
                 </th>
                 <th style={s.th}>Joined</th>
                 <th style={s.th}>Last active</th>
+                <th style={s.th}>Escalations</th>
                 <th style={{ ...s.th, textAlign: 'right' }}>Actions</th>
               </tr>
             </thead>
@@ -1024,6 +1025,13 @@ export const TeamManager: React.FC<BaseComponentProps> = ({
                       <span style={s.dateText}>
                         {formatRelativeDate(member.lastLoginAt)}
                       </span>
+                    </td>
+
+                    {/* Unresolved escalation count (D57) */}
+                    <td style={s.td}>
+                      {member.role === 'escalation_agent'
+                        ? (member.unresolvedEscalationCount ?? 0)
+                        : '--'}
                     </td>
 
                     {/* Actions */}

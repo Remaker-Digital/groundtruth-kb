@@ -311,6 +311,10 @@ class ConversationDocument(BaseModel):
 
     # Human agent assignment (WI #171 — admin inbox)
     assigned_to: str | None = Field(default=None, description="Human agent ID (post-escalation)")
+    escalation_category: str | None = Field(
+        default=None,
+        description="Escalation category (from ESCALATION_CATEGORIES) — set during escalation",
+    )
     internal_notes: list[dict[str, Any]] = Field(
         default_factory=list,
         description="Internal merchant notes [{author, content, created_at}]",
@@ -333,6 +337,12 @@ class ConversationDocument(BaseModel):
     first_chunk_at: str | None = Field(
         default=None,
         description="ISO 8601 timestamp when first AI token was delivered to client",
+    )
+
+    # Archival (WI #7 — conversation lifecycle)
+    archived_at: str | None = Field(
+        default=None,
+        description="ISO 8601 timestamp when conversation was archived (null = not archived)",
     )
 
     # Test Mode (C2 — controlled rollout)
