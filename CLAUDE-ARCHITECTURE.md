@@ -41,7 +41,7 @@ E:\Claude-Playground\CLAUDE-PROJECTS\Agent Red Customer Engagement\
 │   │   ├── shopify_client.py       # Async Shopify GraphQL API client (httpx)
 │   │   ├── shopify_billing.py      # Shopify Billing API (subscriptions + usage charges)
 │   │   └── shopify_gdpr_webhooks.py # Shopify GDPR mandatory webhooks (3 endpoints, HMAC verification)
-│   ├── multi_tenant/               # Multi-tenant infrastructure (47 modules, ~38,000 lines)
+│   ├── multi_tenant/               # Multi-tenant infrastructure (51 modules, ~39,500 lines)
 │   │   ├── __init__.py             # Package init with import hints
 │   │   ├── cosmos_schema.py        # 9 collections, 12 document models, 8 enums, tier defaults (incl. trial)
 │   │   ├── cosmos_client.py        # CosmosManager singleton (lazy init, Managed Identity, health)
@@ -91,7 +91,11 @@ E:\Claude-Playground\CLAUDE-PROJECTS\Agent Red Customer Engagement\
 │   │   ├── staleness_service.py   # KB entry staleness detection + scoring (~540 lines)
 │   │   ├── semantic_cache.py      # 3-tier semantic cache: embedding, search, response (~530 lines)
 │   │   ├── kb_conflict_scanner.py # KB conflict/duplication scanner: 4-phase detection (~705 lines)
-│   │   └── superadmin_api.py      # SPA provider ops API: tenant directory, dashboard, billing, deploys (~583 lines)
+│   │   ├── superadmin_api.py      # SPA provider ops API: tenant directory, dashboard, billing, deploys (~583 lines)
+│   │   ├── mcp_client.py          # MCP client: AgentRedMcpClient, config models, shop_domain guard, policy gate, PII scrub (~650 lines, session 36+37)
+│   │   ├── mcp_credential_cache.py # In-memory credential cache: 5-min TTL, double-check locking, Key Vault backend (~270 lines, session 37)
+│   │   ├── mutation_policy.py     # MutationPolicy, MutationRequest, MutationResult, evaluate_request (~230 lines, session 37)
+│   │   └── mutation_executor.py   # Critic-gated 6-stage mutation executor: policy→idempotency→Critic→confirm→execute→log (~310 lines, session 37)
 │   ├── chat/                       # Chat API
 │   │   ├── __init__.py
 │   │   ├── models.py              # Request/response Pydantic models + StreamEvent SSE format (~200 lines)
@@ -103,7 +107,7 @@ E:\Claude-Playground\CLAUDE-PROJECTS\Agent Red Customer Engagement\
 │   │   ├── __init__.py
 │   │   ├── base.py               # AgentRedBaseAgent ABC + A2A message utilities (~150 lines)
 │   │   ├── intent_classifier.py  # Intent classification agent (~130 lines)
-│   │   ├── knowledge_retrieval.py # Knowledge retrieval agent: hybrid + keyword fallback (~267 lines)
+│   │   ├── knowledge_retrieval.py # Knowledge retrieval agent: hybrid + keyword fallback + MCP augmentation (~400 lines, extended session 36-37)
 │   │   ├── response_generator.py # Response generation agent: streaming + non-streaming (~199 lines)
 │   │   ├── escalation_handler.py # Escalation detection agent (~140 lines)
 │   │   ├── analytics_collector.py # Analytics collection agent (~85 lines)
@@ -125,7 +129,7 @@ E:\Claude-Playground\CLAUDE-PROJECTS\Agent Red Customer Engagement\
 │   ├── ai-features/                # Advanced AI (Phase 2.5)
 │   └── white-label/                # Customization (future)
 │
-├── tests/                          # Test suites (2,557 unit tests, 0 failures)
+├── tests/                          # Test suites (2,646 unit tests, 0 failures)
 │   ├── conftest.py                 # Shared fixtures: TestClient, MockCosmos, MockNATS, MockKV, auth helpers
 │   ├── test_conftest_smoke.py      # Fixture smoke tests
 │   ├── test_health.py              # Health/ready endpoint tests
@@ -135,7 +139,7 @@ E:\Claude-Playground\CLAUDE-PROJECTS\Agent Red Customer Engagement\
 │   ├── security/                   # Adversarial/security tests
 │   ├── performance/                # Performance/load tests + Locust config
 │   ├── chat/                       # SSE/streaming tests
-│   ├── agents/                    # AGNTCY agent module tests (101 tests across 8 files)
+│   ├── agents/                    # AGNTCY agent module tests (121 tests across 10 files)
 │   ├── regression/                 # 73 regression tests (3-tier upgrade validation)
 │   └── integration/                # Azure service integration tests
 │
@@ -143,7 +147,7 @@ E:\Claude-Playground\CLAUDE-PROJECTS\Agent Red Customer Engagement\
 ├── prototype/                      # Admin dashboard prototype (Mantine + Polaris, owner-approved)
 ├── extensions/                     # Shopify Theme App Extension
 ├── admin/                          # Admin dashboard frontends
-│   ├── shared/                     # 11 shared components + hooks + types (~6,250 lines)
+│   ├── shared/                     # 12 shared components + hooks + types (~6,500 lines; +McpConfigPanel session 37)
 │   ├── shopify/                    # Shopify embedded admin (Polaris + App Bridge, ~2,700 lines)
 │   └── standalone/                 # Standalone admin (API key login, ~2,800 lines)
 │

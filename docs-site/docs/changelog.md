@@ -9,6 +9,39 @@ All notable changes to Agent Red Customer Experience are documented here.
 
 ---
 
+## v1.39.0 — 2026-02-17
+
+### Stripe MCP integration
+- **AI-powered payment queries:** Agent Red can now answer customer questions about payments, subscriptions, invoices, and refund status by connecting to your Stripe account via the Model Context Protocol (MCP).
+- **Secure credential management:** Stripe API keys are stored in Azure Key Vault with an in-memory credential cache (5-minute TTL) for low-latency access.
+- **Admin UI configuration:** New MCP configuration panel on the Integrations page — enter your Stripe restricted API key, test the connection, and see the available tools.
+- **Read-only safety:** All Stripe queries are read-only. The mutation safety architecture (MutationPolicy, MutationExecutor) is built and tested but not activated — no write operations are permitted.
+
+### Shopify Storefront MCP integration
+- **Live product data:** The Knowledge Retrieval agent can now augment knowledge base results with real-time product data from your Shopify storefront via the Storefront MCP server.
+- **Hybrid retrieval flow:** Knowledge base search results are merged with MCP storefront data when available, with graceful fallback to keyword search when the MCP connection is unavailable.
+- **Shop domain security:** Cross-tenant URL validation ensures each tenant can only access their own storefront data.
+
+### MCP client framework
+- **Model Context Protocol support:** New `AgentRedMcpClient` with HTTP transport, configurable timeouts, and circuit breaker protection for external MCP server connections.
+- **Per-tenant server registry:** Each tenant's MCP server configurations are stored in Cosmos DB and resolved dynamically at query time.
+- **PII scrubbing:** Customer PII is automatically scrubbed from outbound MCP tool arguments before they leave the system.
+
+### Mutation safety architecture
+- **Policy framework:** Per-tenant mutation policies with configurable safety gates (Critic approval, customer confirmation, operation allowlists, per-conversation rate limits).
+- **Critic-gated execution:** Six-stage mutation pipeline with fail-closed Critic validation, idempotency keys for replay prevention, and Cosmos DB audit logging.
+- **Disabled by default:** Mutation execution is built and fully tested but globally disabled. This will be enabled in a future release when the customer confirmation UX is implemented.
+
+### Integration registry
+- **Stripe added:** The Integrations page now shows Stripe (MCP) alongside Shopify, Zendesk, Mailchimp, and Google Analytics.
+- **Dynamic configuration:** Four new admin API endpoints for Stripe credential management, connection testing, tool discovery, and disconnection.
+
+### Tests
+- 2,646 unit tests passed, 0 failures (up from 2,477)
+- 140 new tests across MCP client, credential cache, mutation safety, Stripe integration, and KR+MCP integration
+
+---
+
 ## v1.35.0 — 2026-02-17
 
 ### Category-routed escalation

@@ -130,14 +130,14 @@ class TestListAndGet:
 
     @pytest.mark.asyncio
     async def test_ia_06_list_returns_all_types(self):
-        """List endpoint returns all 4 integration types."""
+        """List endpoint returns all 5 integration types (including Stripe MCP)."""
         from src.multi_tenant.admin_integration_api import list_integrations
 
         processor = _mock_processor()
         with patch("src.multi_tenant.admin_integration_api._get_config_processor", return_value=processor):
             result = await list_integrations(ctx=_ctx())
 
-        assert len(result) == 4
+        assert len(result) == 5
         types = {s.type for s in result}
         assert types == set(INTEGRATION_TYPES)
 

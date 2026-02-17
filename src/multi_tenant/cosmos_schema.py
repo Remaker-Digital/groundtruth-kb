@@ -975,6 +975,33 @@ class PreferencesDocument(BaseModel):
         description="Whether quick action buttons are shown in the widget",
     )
 
+    # MCP Server Configuration (AGNTCY Phase 3)
+    mcp_servers: list[dict[str, Any]] = Field(
+        default_factory=list,
+        description="MCP server configurations [{server_name, server_url, "
+        "server_type, enabled, read_only, shop_domain, tool_allowlist, timeout_ms}]",
+    )
+    mcp_enabled: bool = Field(
+        default=False,
+        description="Master switch for MCP tool augmentation",
+    )
+
+    # Stripe MCP (AGNTCY Phase 3B — Cycle 5)
+    stripe_mcp_enabled: bool = Field(
+        default=False,
+        description="Enable Stripe MCP for AI-powered payment/subscription queries",
+    )
+    stripe_mcp_status: str | None = Field(
+        default=None,
+        description="Stripe MCP connection status: connected | disconnected | None",
+    )
+
+    # Mutation policy (AGNTCY Phase 3B — Cycle 5, disabled by default)
+    mutation_policy: dict[str, Any] | None = Field(
+        default=None,
+        description="MCP mutation policy config (allow_mutations, require_critic_approval, etc.)",
+    )
+
     # Metadata
     created_at: str = Field(description="When this version was created")
     created_by: str | None = Field(default=None, description="Who created this version")

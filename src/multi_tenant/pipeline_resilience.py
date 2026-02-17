@@ -114,6 +114,22 @@ CIRCUIT_BREAKER_CONFIGS: dict[str, dict[str, int | float]] = {
         "window_seconds": 10,
         "recovery_seconds": 5,
     },
+    # MCP Storefront circuit breaker (AGNTCY Phase 3A)
+    # Shopify Storefront MCP is a public endpoint — 3 failures to detect outage,
+    # short recovery to re-probe quickly.
+    "mcp-storefront": {
+        "failure_threshold": 3,
+        "window_seconds": 20,
+        "recovery_seconds": 10,
+    },
+    # MCP Stripe circuit breaker (AGNTCY Phase 3B)
+    # Stripe MCP is an authenticated remote server — slightly more tolerant
+    # window to account for API key issues vs genuine outage.
+    "mcp-stripe": {
+        "failure_threshold": 3,
+        "window_seconds": 30,
+        "recovery_seconds": 15,
+    },
 }
 
 

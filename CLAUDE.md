@@ -15,7 +15,7 @@ This document provides active guidance for AI assistants working on the Agent Re
 |-----------|-------|
 | **Project Name** | Agent Red Customer Experience |
 | **Type** | Commercial SaaS Product (Shopify + Standalone) |
-| **Status** | Production v1.35.0 HEALTHY (Cycle 1 COMPLETE). 2,476 unit tests (0 failures), 178 UI tests. Next: Cycle 2 — P1 Refactoring (R2+R4+R6), target v1.36.0. See `memory/build-deploy-roadmap.md`. |
+| **Status** | Production v1.35.0 HEALTHY. Cycle 5 IMPLEMENTED (AGNTCY Phase 3 COMPLETE — 14/14 assertions). 2,646 unit tests (0 failures), 178 UI tests. Commit pending for v1.39.0. See `memory/build-deploy-roadmap.md`. |
 | **Owner** | Remaker Digital (DBA of VanDusen & Palmeter, LLC) |
 
 ### Copyright Notice
@@ -139,13 +139,18 @@ Full plan: `memory/build-deploy-roadmap.md`
 - **Assessment:** `independent-progress-assments/MCP-SERVER-INTEGRATION-ASSESSMENT-2026-02-17.md`
 - **Architecture:** `memory/mcp-integration.md`
 
-### Cycle 5: v1.39.0 — AGNTCY Phase 3B: Stripe MCP + Mutation Safety + Admin UI (2-3 weeks, MEDIUM-HIGH risk)
-- Stripe MCP (remote `mcp.stripe.com`, per-tenant restricted keys, read-only initially)
-- Mutation safety architecture (MutationPolicy, Critic-gated confirmation, idempotency keys)
-- Admin UI for MCP configuration (Integrations page)
-- **Milestone: AGNTCY Phase 3 COMPLETE** — all 14 assertions verified
+### Cycle 5: v1.39.0 — AGNTCY Phase 3B: Stripe MCP + Mutation Safety + Admin UI ✅ COMPLETE
+- ✅ Stripe MCP (remote `mcp.stripe.com`, per-tenant restricted keys, read-only)
+- ✅ Credential cache (`McpCredentialCache`, 5-min TTL, Key Vault backend)
+- ✅ Mutation safety architecture (MutationPolicy, MutationExecutor — built, NOT activated)
+- ✅ Admin UI for MCP configuration (McpConfigPanel.tsx in IntegrationsManager)
+- ✅ **Milestone: AGNTCY Phase 3 COMPLETE** — all 14 assertions verified (session 37)
 
 ### Completed Milestones
+- ✅ **Cycle 5 Phase 3B** (Session 37): Stripe MCP + mutation safety + Admin UI, 81 new tests → 2,646 total, AGNTCY Phase 3 14/14 PASS
+- ✅ **Cycle 4 Phase 3A** (Session 36): MCP client + Shopify Storefront MVP, 59 tests, assertions 3.1-3.5 + 3.11-3.14
+- ✅ **Cycle 3 SLA Persistence** (Session 35): C-2 SLA persistence, 2,506 tests
+- ✅ **Cycle 2 P1 Refactoring** (Session 34): R2 + R4 + R6, 2,476 tests
 - ✅ **Cycle 1 Deploy v1.35.0** (Session 33): S29-33 shipped, ACR build caw, revision 0000025, Tier 0 17/17 PASS
 - ✅ P0 Refactoring Cycle 1 (Session 31): R1 main.py split, R9a sourcemaps, R7 env loader, R8 CamelCaseModel
 - ✅ Configuration Strategy Compliance (Session 30): 25 files, 4 priority levels
@@ -180,4 +185,4 @@ Full plan: `memory/build-deploy-roadmap.md`
 
 *© 2026 Remaker Digital, a DBA of VanDusen & Palmeter, LLC. All rights reserved.*
 *Last Updated: 2026-02-17*
-*Version: 44.0.0*
+*Version: 45.0.0*

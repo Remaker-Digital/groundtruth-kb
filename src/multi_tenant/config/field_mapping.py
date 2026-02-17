@@ -106,6 +106,13 @@ _PREFS_DIRECT_FIELDS: set[str] = {
     "intent_source_mapping",
     # Source citation (RAG Phase 1)
     "cite_sources_in_response",
+    # MCP Server Configuration (AGNTCY Phase 3)
+    "mcp_servers",
+    "mcp_enabled",
+    # Stripe MCP (AGNTCY Phase 3B — Cycle 5)
+    "stripe_mcp_enabled",
+    "stripe_mcp_status",
+    "mutation_policy",
 }
 
 

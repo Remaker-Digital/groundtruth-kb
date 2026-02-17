@@ -3,7 +3,7 @@ Admin Integration Management API — C10 capability dependency.
 
 Provides endpoints for listing, configuring, activating, deactivating,
 and managing third-party integrations (Shopify, Zendesk, Mailchimp,
-Google Analytics).
+Google Analytics, Stripe MCP).
 
 Integration enable/disable fields are stored in PreferencesDocument.
 Connection status metadata is also stored there.  Actual credential
@@ -17,6 +17,12 @@ Routes:
     POST /api/admin/integrations/{type}/activate   — Activate
     POST /api/admin/integrations/{type}/deactivate — Deactivate
     DELETE /api/admin/integrations/{type}           — Disconnect + remove creds
+
+    # Stripe MCP specific (AGNTCY Phase 3B)
+    POST /api/admin/integrations/stripe/credentials — Store Stripe API key
+    POST /api/admin/integrations/stripe/test        — Test Stripe MCP connection
+    GET  /api/admin/integrations/stripe/tools       — List available Stripe MCP tools
+    DELETE /api/admin/integrations/stripe/credentials — Remove Stripe API key
 
 © 2026 Remaker Digital, a DBA of VanDusen & Palmeter, LLC. All rights reserved.
 """
@@ -38,7 +44,7 @@ logger = logging.getLogger(__name__)
 # Integration registry — static metadata for the 4 supported integrations
 # ---------------------------------------------------------------------------
 
-INTEGRATION_TYPES = ("shopify", "zendesk", "mailchimp", "google_analytics")
+INTEGRATION_TYPES = ("shopify", "zendesk", "mailchimp", "google_analytics", "stripe")
 
 _INTEGRATION_META: dict[str, dict[str, Any]] = {
     "shopify": {
@@ -87,6 +93,18 @@ _INTEGRATION_META: dict[str, dict[str, Any]] = {
         "coming_soon": True,
         "config_fields": [
             {"key": "google_analytics_enabled", "label": "Event Export", "type": "boolean"},
+        ],
+    },
+    "stripe": {
+        "name": "Stripe (MCP)",
+        "description": "AI-powered payment lookup and subscription queries via Stripe MCP.",
+        "icon": "stripe",
+        "enable_field": "stripe_mcp_enabled",
+        "status_field": "stripe_mcp_status",
+        "tier_gate": "professional",
+        "coming_soon": False,
+        "config_fields": [
+            {"key": "stripe_mcp_enabled", "label": "Enable Stripe MCP", "type": "boolean"},
         ],
     },
 }
@@ -141,6 +159,23 @@ class IntegrationUpdateRequest(BaseModel):
         default_factory=dict,
         description="Key-value pairs to update (e.g., {shopify_sync_enabled: true})",
     )
+
+
+class StripeCredentialRequest(BaseModel):
+    """Body for POST /stripe/credentials — store Stripe API key."""
+    api_key: str = Field(
+        description="Stripe restricted API key (rk_live_... or rk_test_...)",
+        min_length=10,
+    )
+
+
+class StripeConnectionTestResult(BaseModel):
+    """Response for POST /stripe/test."""
+    success: bool
+    tool_count: int = Field(default=0, description="Number of available MCP tools")
+    tools: list[str] = Field(default_factory=list, description="Available tool names")
+    error: str | None = None
+    elapsed_ms: float = 0
 
 
 class IntegrationResponse(BaseModel):
@@ -440,5 +475,276 @@ async def disconnect_integration(
     return IntegrationResponse(
         success=True,
         message=f"{meta['name']} disconnected.",
+        integration=summary,
+    )
+
+
+# ---------------------------------------------------------------------------
+# Stripe MCP — credential management + connection test (AGNTCY Phase 3B)
+# ---------------------------------------------------------------------------
+
+
+@router.post("/stripe/credentials", response_model=IntegrationResponse)
+async def store_stripe_credentials(
+    body: StripeCredentialRequest,
+    ctx: TenantContext = Depends(get_tenant_context),
+):
+    """Store a Stripe restricted API key in Key Vault.
+
+    The key is validated by prefix (must start with ``rk_`` or ``sk_``)
+    and stored securely. The Stripe MCP status is updated to "connected".
+    """
+    meta = _INTEGRATION_META["stripe"]
+
+    # Tier gate check
+    if not _tier_meets_gate(ctx.tier, meta["tier_gate"]):
+        raise HTTPException(
+            status_code=403,
+            detail=f"{meta['name']} requires {meta['tier_gate']} tier or above.",
+        )
+
+    # Basic key prefix validation
+    if not (
+        body.api_key.startswith("rk_live_")
+        or body.api_key.startswith("rk_test_")
+        or body.api_key.startswith("sk_live_")
+        or body.api_key.startswith("sk_test_")
+    ):
+        raise HTTPException(
+            status_code=400,
+            detail="Invalid Stripe API key format. Expected rk_live_*, rk_test_*, sk_live_*, or sk_test_* prefix.",
+        )
+
+    # Store in Key Vault
+    try:
+        from src.multi_tenant.tenant_secret_service import (
+            TenantSecretType,
+            get_secret_service,
+        )
+
+        svc = get_secret_service()
+        await svc.initialize()
+        await svc.store_secret(
+            ctx.tenant_id,
+            TenantSecretType.STRIPE_API_KEY,
+            body.api_key,
+        )
+    except Exception as exc:
+        logger.error(
+            "Failed to store Stripe credentials: tenant=%s error=%s",
+            ctx.tenant_id, exc,
+        )
+        raise HTTPException(
+            status_code=500,
+            detail="Failed to store Stripe API key.",
+        )
+
+    # Update connection status
+    processor = _get_config_processor()
+    await processor.update_config(
+        tenant_id=ctx.tenant_id,
+        tier=ctx.tier,
+        updates={
+            "stripe_mcp_enabled": True,
+            "stripe_mcp_status": "connected",
+        },
+        actor=f"admin:{ctx.tenant_id}",
+    )
+
+    # Invalidate credential cache
+    try:
+        from src.multi_tenant.mcp_credential_cache import get_credential_cache
+
+        get_credential_cache().invalidate(ctx.tenant_id, "stripe-api-key")
+    except Exception:
+        pass
+
+    cfg_result = await processor.get_config(ctx.tenant_id, TenantTier(ctx.tier))
+    config = cfg_result.config if cfg_result else {}
+    summary = _build_summary("stripe", meta, config, ctx.tier)
+
+    logger.info("Stripe credentials stored for tenant %s", ctx.tenant_id)
+
+    return IntegrationResponse(
+        success=True,
+        message="Stripe API key saved. Use 'Test Connection' to verify.",
+        integration=summary,
+    )
+
+
+@router.post("/stripe/test", response_model=StripeConnectionTestResult)
+async def test_stripe_connection(
+    ctx: TenantContext = Depends(get_tenant_context),
+):
+    """Test the Stripe MCP connection by connecting and listing tools.
+
+    Requires a stored Stripe API key. Connects to ``mcp.stripe.com``,
+    initializes the session, and returns the list of available tools.
+    """
+    import time
+
+    meta = _INTEGRATION_META["stripe"]
+
+    if not _tier_meets_gate(ctx.tier, meta["tier_gate"]):
+        raise HTTPException(
+            status_code=403,
+            detail=f"{meta['name']} requires {meta['tier_gate']} tier or above.",
+        )
+
+    start = time.monotonic()
+
+    # Retrieve API key from Key Vault
+    try:
+        from src.multi_tenant.tenant_secret_service import (
+            TenantSecretType,
+            get_secret_service,
+        )
+
+        svc = get_secret_service()
+        await svc.initialize()
+        api_key = await svc.get_secret(ctx.tenant_id, TenantSecretType.STRIPE_API_KEY)
+    except Exception as exc:
+        elapsed = (time.monotonic() - start) * 1000
+        return StripeConnectionTestResult(
+            success=False,
+            error=f"Failed to retrieve API key: {str(exc)[:100]}",
+            elapsed_ms=round(elapsed, 1),
+        )
+
+    if not api_key:
+        elapsed = (time.monotonic() - start) * 1000
+        return StripeConnectionTestResult(
+            success=False,
+            error="No Stripe API key stored. Save a key first.",
+            elapsed_ms=round(elapsed, 1),
+        )
+
+    # Connect to Stripe MCP and list tools
+    try:
+        from src.multi_tenant.mcp_client import (
+            AgentRedMcpClient,
+            McpServerConfig,
+        )
+
+        config = McpServerConfig(
+            server_name="stripe",
+            server_url="https://mcp.stripe.com",
+            server_type="stripe",
+            timeout_ms=10_000,  # generous for connection test
+            read_only=True,
+        )
+        client = AgentRedMcpClient(config=config)
+        await client.connect(auth_headers={"Authorization": f"Bearer {api_key}"})
+        tools = client.available_tools
+        tool_names = [t.get("name", "") for t in tools]
+        await client.close()
+
+        elapsed = (time.monotonic() - start) * 1000
+
+        # Update status to connected on success
+        processor = _get_config_processor()
+        await processor.update_config(
+            tenant_id=ctx.tenant_id,
+            tier=ctx.tier,
+            updates={"stripe_mcp_status": "connected"},
+            actor=f"admin:{ctx.tenant_id}",
+        )
+
+        logger.info(
+            "Stripe MCP connection test PASS: tenant=%s tools=%d elapsed=%.0fms",
+            ctx.tenant_id, len(tools), elapsed,
+        )
+
+        return StripeConnectionTestResult(
+            success=True,
+            tool_count=len(tools),
+            tools=tool_names[:20],  # limit to first 20 tool names
+            elapsed_ms=round(elapsed, 1),
+        )
+
+    except Exception as exc:
+        elapsed = (time.monotonic() - start) * 1000
+
+        # Update status to error
+        processor = _get_config_processor()
+        await processor.update_config(
+            tenant_id=ctx.tenant_id,
+            tier=ctx.tier,
+            updates={"stripe_mcp_status": "error"},
+            actor=f"admin:{ctx.tenant_id}",
+        )
+
+        logger.warning(
+            "Stripe MCP connection test FAIL: tenant=%s error=%s elapsed=%.0fms",
+            ctx.tenant_id, exc, elapsed,
+        )
+
+        return StripeConnectionTestResult(
+            success=False,
+            error=str(exc)[:200],
+            elapsed_ms=round(elapsed, 1),
+        )
+
+
+@router.get("/stripe/tools", response_model=StripeConnectionTestResult)
+async def get_stripe_tools(
+    ctx: TenantContext = Depends(get_tenant_context),
+):
+    """Return cached Stripe MCP tools (delegates to test endpoint)."""
+    return await test_stripe_connection(ctx=ctx)
+
+
+@router.delete("/stripe/credentials", response_model=IntegrationResponse)
+async def remove_stripe_credentials(
+    ctx: TenantContext = Depends(get_tenant_context),
+):
+    """Remove Stripe API key from Key Vault and disconnect."""
+    meta = _INTEGRATION_META["stripe"]
+
+    # Delete from Key Vault
+    try:
+        from src.multi_tenant.tenant_secret_service import (
+            TenantSecretType,
+            get_secret_service,
+        )
+
+        svc = get_secret_service()
+        await svc.initialize()
+        await svc.delete_secret(ctx.tenant_id, TenantSecretType.STRIPE_API_KEY)
+    except Exception as exc:
+        logger.warning(
+            "Could not remove Stripe credentials: tenant=%s error=%s",
+            ctx.tenant_id, exc,
+        )
+
+    # Update status
+    processor = _get_config_processor()
+    await processor.update_config(
+        tenant_id=ctx.tenant_id,
+        tier=ctx.tier,
+        updates={
+            "stripe_mcp_enabled": False,
+            "stripe_mcp_status": "disconnected",
+        },
+        actor=f"admin:{ctx.tenant_id}",
+    )
+
+    # Invalidate credential cache
+    try:
+        from src.multi_tenant.mcp_credential_cache import get_credential_cache
+
+        get_credential_cache().clear_tenant(ctx.tenant_id)
+    except Exception:
+        pass
+
+    cfg_result = await processor.get_config(ctx.tenant_id, TenantTier(ctx.tier))
+    config = cfg_result.config if cfg_result else {}
+    summary = _build_summary("stripe", meta, config, ctx.tier)
+
+    logger.info("Stripe credentials removed for tenant %s", ctx.tenant_id)
+
+    return IntegrationResponse(
+        success=True,
+        message="Stripe API key removed and integration disconnected.",
         integration=summary,
     )

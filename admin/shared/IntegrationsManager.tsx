@@ -1,8 +1,9 @@
 /**
  * IntegrationsManager — Shared component for managing third-party integrations.
  *
- * Displays available integrations (Shopify, Zendesk, Mailchimp, Google Analytics)
- * as cards with status badges, activate/deactivate toggles, and disconnect actions.
+ * Displays available integrations (Shopify, Zendesk, Mailchimp, Google Analytics,
+ * Stripe MCP) as cards with status badges, activate/deactivate toggles, and
+ * disconnect actions. Stripe includes MCP credential management panel.
  * Tier-gated integrations show upgrade prompts for lower-tier tenants.
  *
  * C10 capability dependency for Launch UI Test.
@@ -19,6 +20,7 @@ import {
   useDisconnectIntegration,
 } from './hooks/index';
 import { HelpTooltip } from './HelpTooltip';
+import { McpConfigPanel } from './McpConfigPanel';
 
 
 // ---------------------------------------------------------------------------
@@ -228,7 +230,14 @@ const HoverButton: React.FC<{
   );
 };
 
-const IntegrationCard: React.FC<IntegrationCardProps & { isDark?: boolean; basePath?: string }> = ({
+const IntegrationCard: React.FC<IntegrationCardProps & {
+  isDark?: boolean;
+  basePath?: string;
+  apiFetch?: (url: string, options?: RequestInit) => Promise<Response>;
+  tenantId?: string;
+  onNotify?: (message: string, severity: 'success' | 'error' | 'info') => void;
+  onRefetch?: () => void;
+}> = ({
   integration,
   onActivate,
   onDeactivate,
@@ -237,6 +246,10 @@ const IntegrationCard: React.FC<IntegrationCardProps & { isDark?: boolean; baseP
   deactivating,
   isDark = true,
   basePath = '',
+  apiFetch,
+  tenantId,
+  onNotify,
+  onRefetch,
 }) => {
   const [showConfirm, setShowConfirm] = useState(false);
   const [logoError, setLogoError] = useState(false);
@@ -360,6 +373,16 @@ const IntegrationCard: React.FC<IntegrationCardProps & { isDark?: boolean; baseP
             </HoverButton>
           )}
         </div>
+
+        {/* Stripe MCP config panel — shown when Stripe is enabled */}
+        {integration.type === 'stripe' && integration.enabled && apiFetch && tenantId && onNotify && (
+          <McpConfigPanel
+            tenantId={tenantId}
+            apiFetch={apiFetch}
+            onNotify={onNotify}
+            onStatusChange={onRefetch}
+          />
+        )}
       </div>
     </div>
   );
@@ -461,6 +484,10 @@ export const IntegrationsManager: React.FC<BaseComponentProps & { isDark?: boole
             deactivating={deactivating && actionTarget === integration.type}
             isDark={isDark}
             basePath={basePath}
+            apiFetch={apiFetch}
+            tenantId={tenantContext.tenantId}
+            onNotify={onNotify}
+            onRefetch={refetch}
           />
         ))}
       </div>

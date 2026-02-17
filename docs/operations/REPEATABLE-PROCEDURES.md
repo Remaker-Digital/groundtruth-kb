@@ -206,7 +206,7 @@ STEPS:
 
 POSTCONDITIONS:
   [ ] All tests passed (0 failures)
-  [ ] Pass count >= $EXPECTED_MIN_PASS (currently 2,476 unit-only as of session 31)
+  [ ] Pass count >= $EXPECTED_MIN_PASS (currently 2,646 unit-only as of session 37)
   [ ] Skip count <= $EXPECTED_MAX_SKIP (currently 6)
 
 KNOWN FAILURE MODES:

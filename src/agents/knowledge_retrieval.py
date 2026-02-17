@@ -8,11 +8,13 @@
 #
 # Input payload:
 #   {"message": str, "intent": str, "system_prompt": str,
-#    "tenant_id": str, "preferences": dict (optional)}
+#    "tenant_id": str, "preferences": dict (optional),
+#    "mcp_configs": list[dict] (optional), "tenant_shop_domain": str (optional)}
 #
 # Output payload:
 #   {"context": str, "sources": [{"id": str, "title": str, ...}],
-#    "model": str, "tokens_input": int, "tokens_output": int}
+#    "model": str, "tokens_input": int, "tokens_output": int,
+#    "mcp_trace": dict (optional)}
 #
 # © 2026 Remaker Digital, a DBA of VanDusen & Palmeter, LLC. All rights reserved.
 
@@ -20,6 +22,7 @@ from __future__ import annotations
 
 import logging
 import os
+import time
 from typing import Any
 
 from src.agents.base import AgentRedBaseAgent
@@ -47,6 +50,7 @@ class KnowledgeRetrievalAgent(AgentRedBaseAgent):
     """Retrieve relevant knowledge for customer queries.
 
     Primary path: hybrid vector + BM25 via KnowledgeVectorizer.
+    Secondary path (Phase 3): MCP tool augmentation for live storefront data.
     Fallback: keyword overlap search via KnowledgeBaseRepository.
     """
 
@@ -80,16 +84,22 @@ class KnowledgeRetrievalAgent(AgentRedBaseAgent):
     ) -> dict[str, Any]:
         """Retrieve knowledge for a customer message.
 
-        Tries hybrid vector search first; falls back to keyword search.
+        Flow:
+        1. Hybrid vector + BM25 search (primary).
+        2. MCP tool augmentation (secondary, if configured).
+        3. Merge KB + MCP results if both available.
+        4. Keyword fallback (if both primary and MCP are unavailable).
 
         Args:
             payload: {"message": str, "intent": str, "tenant_id": str,
-                      "preferences": dict (optional)}
+                      "preferences": dict, "mcp_configs": list[dict],
+                      "tenant_shop_domain": str | None}
             headers: A2A headers.
 
         Returns:
             {"context": str, "sources": list, "model": str,
-             "tokens_input": int, "tokens_output": int}
+             "tokens_input": int, "tokens_output": int,
+             "mcp_trace": dict (optional)}
         """
         message = payload.get("message", "")
         intent = payload.get("intent", "general_inquiry")
@@ -98,18 +108,31 @@ class KnowledgeRetrievalAgent(AgentRedBaseAgent):
             or payload.get("tenant_id", "")
         )
         prefs = payload.get("preferences", {})
+        mcp_configs = payload.get("mcp_configs", [])
+        tenant_shop_domain = payload.get("tenant_shop_domain")
 
         if not tenant_id:
             return self._empty_result()
 
-        # Try hybrid vector search first
-        result = await self._try_hybrid_search(
+        # Step 1: Try hybrid vector search (primary)
+        kb_result = await self._try_hybrid_search(
             tenant_id, message, intent, prefs,
         )
-        if result is not None:
-            return result
 
-        # Fallback to keyword search
+        # Step 2: Try MCP augmentation (secondary)
+        mcp_result = None
+        if mcp_configs:
+            mcp_result = await self._try_mcp_augmentation(
+                message=message,
+                mcp_configs=mcp_configs,
+                tenant_shop_domain=tenant_shop_domain,
+            )
+
+        # Step 3: Merge results if any are available
+        if kb_result is not None or mcp_result is not None:
+            return self._merge_results(kb_result, mcp_result)
+
+        # Step 4: Keyword fallback (last resort)
         return await self._keyword_fallback(tenant_id, message)
 
     async def _try_hybrid_search(
@@ -180,6 +203,240 @@ class KnowledgeRetrievalAgent(AgentRedBaseAgent):
                 exc,
             )
             return None
+
+    async def _try_mcp_augmentation(
+        self,
+        message: str,
+        mcp_configs: list[dict[str, Any]],
+        tenant_shop_domain: str | None = None,
+    ) -> dict[str, Any] | None:
+        """Attempt MCP tool invocation as secondary knowledge source.
+
+        Connects to configured MCP servers (currently Shopify Storefront only),
+        invokes read-only tools, and formats results as KR-compatible output.
+
+        Returns ``None`` on any error (graceful degradation).
+
+        Timeout: 3,000ms total for all MCP operations.
+        """
+        import asyncio
+
+        _MCP_BUDGET_S = 3.0  # 3,000ms carved from KR's 10,000ms budget
+
+        try:
+            from src.multi_tenant.mcp_client import (
+                create_tenant_mcp_client,
+                parse_mcp_server_configs,
+            )
+
+            configs = parse_mcp_server_configs(mcp_configs)
+            if not configs:
+                return None
+
+            start = time.monotonic()
+            all_results: list[dict[str, Any]] = []
+            tool_traces: list[dict[str, Any]] = []
+            servers_queried: list[str] = []
+
+            for config in configs:
+                # Respect overall MCP budget
+                elapsed = time.monotonic() - start
+                if elapsed >= _MCP_BUDGET_S:
+                    logger.debug("MCP budget exhausted after %.0fms", elapsed * 1000)
+                    break
+
+                try:
+                    client = await create_tenant_mcp_client(
+                        config=config,
+                        tenant_shop_domain=tenant_shop_domain,
+                    )
+                    servers_queried.append(config.server_name)
+
+                    remaining_s = _MCP_BUDGET_S - (time.monotonic() - start)
+                    if remaining_s <= 0:
+                        break
+
+                    # Pass auth_headers if set by create_tenant_mcp_client
+                    connect_kwargs: dict[str, Any] = {}
+                    if hasattr(client, "_auth_headers") and client._auth_headers:
+                        connect_kwargs["auth_headers"] = client._auth_headers
+                    await asyncio.wait_for(
+                        client.connect(**connect_kwargs), timeout=remaining_s,
+                    )
+
+                    # Find a search/query tool from available tools
+                    tool_name = self._find_search_tool(client.available_tools)
+                    if tool_name:
+                        remaining_s = _MCP_BUDGET_S - (time.monotonic() - start)
+                        if remaining_s > 0:
+                            t0 = time.monotonic()
+                            try:
+                                result = await asyncio.wait_for(
+                                    client.call_tool(tool_name, {"query": message}),
+                                    timeout=remaining_s,
+                                )
+                                tool_elapsed = (time.monotonic() - t0) * 1000
+                                tool_traces.append({
+                                    "tool": tool_name,
+                                    "elapsed_ms": round(tool_elapsed, 1),
+                                    "success": True,
+                                    "server": config.server_name,
+                                })
+                                # Extract text content
+                                for item in result.content:
+                                    if item.get("type") == "text" and item.get("text"):
+                                        all_results.append({
+                                            "text": item["text"],
+                                            "server_name": config.server_name,
+                                            "tool_name": tool_name,
+                                        })
+                            except Exception as tool_exc:
+                                tool_elapsed = (time.monotonic() - t0) * 1000
+                                tool_traces.append({
+                                    "tool": tool_name,
+                                    "elapsed_ms": round(tool_elapsed, 1),
+                                    "success": False,
+                                    "error": str(tool_exc)[:100],
+                                    "server": config.server_name,
+                                })
+                    else:
+                        logger.debug(
+                            "No search tool found on %s", config.server_name,
+                        )
+
+                    await client.close()
+
+                except Exception as exc:
+                    logger.debug(
+                        "MCP augmentation failed for %s: %s",
+                        config.server_name, exc,
+                    )
+
+            total_elapsed = (time.monotonic() - start) * 1000
+
+            if not all_results:
+                # No MCP results — still return trace for debugging
+                if tool_traces:
+                    return {
+                        "context": "",
+                        "sources": [],
+                        "model": "mcp",
+                        "tokens_input": 0,
+                        "tokens_output": 0,
+                        "mcp_trace": {
+                            "servers_queried": servers_queried,
+                            "tools_invoked": tool_traces,
+                            "total_elapsed_ms": round(total_elapsed, 1),
+                        },
+                    }
+                return None
+
+            # Format MCP results
+            context_parts: list[str] = []
+            sources: list[dict[str, str]] = []
+            for i, r in enumerate(all_results):
+                context_parts.append(r["text"])
+                sources.append({
+                    "id": f"mcp-{i}",
+                    "title": f"Storefront: {r['tool_name']}",
+                    "source_type": "mcp",
+                    "server_name": r["server_name"],
+                    "tool_name": r["tool_name"],
+                })
+
+            context = "\n\n".join(context_parts)
+            logger.info(
+                "KR MCP augmentation: %d results from %d servers in %.0fms",
+                len(all_results), len(servers_queried), total_elapsed,
+            )
+
+            return {
+                "context": context,
+                "sources": sources,
+                "model": "mcp",
+                "tokens_input": 0,
+                "tokens_output": 0,
+                "mcp_trace": {
+                    "servers_queried": servers_queried,
+                    "tools_invoked": tool_traces,
+                    "total_elapsed_ms": round(total_elapsed, 1),
+                },
+            }
+
+        except Exception as exc:
+            logger.warning("MCP augmentation unavailable (%s)", exc)
+            return None
+
+    @staticmethod
+    def _find_search_tool(available_tools: list[dict[str, Any]]) -> str | None:
+        """Find the best search/query tool from the server's available tools.
+
+        Prefers tools with ``search`` in the name, then ``get``, then ``query``.
+        Returns the tool name or ``None``.
+        """
+        priority_prefixes = ["search_", "find_", "query_", "get_", "list_"]
+        for prefix in priority_prefixes:
+            for tool in available_tools:
+                if tool.get("name", "").lower().startswith(prefix):
+                    return tool["name"]
+        # Fallback: return the first tool if any exist
+        return available_tools[0]["name"] if available_tools else None
+
+    @staticmethod
+    def _merge_results(
+        kb_result: dict[str, Any] | None,
+        mcp_result: dict[str, Any] | None,
+    ) -> dict[str, Any]:
+        """Merge KB search results with MCP tool results.
+
+        KB results come first (primary source). MCP results are appended
+        with a ``### Storefront Data`` header.  Sources are combined.
+
+        Args:
+            kb_result: Output from ``_try_hybrid_search()`` (may be None).
+            mcp_result: Output from ``_try_mcp_augmentation()`` (may be None).
+
+        Returns:
+            Combined result in standard KR output format.
+        """
+        # Start with whichever result is available
+        if kb_result and not mcp_result:
+            return kb_result
+        if mcp_result and not kb_result:
+            return mcp_result
+
+        # Both are available — merge
+        kb_ctx = (kb_result or {}).get("context", "")
+        mcp_ctx = (mcp_result or {}).get("context", "")
+
+        parts: list[str] = []
+        if kb_ctx:
+            parts.append(kb_ctx)
+        if mcp_ctx:
+            parts.append(f"### Storefront Data\n{mcp_ctx}")
+
+        context = "\n\n".join(parts)
+
+        # Merge sources: tag KB sources
+        kb_sources = list((kb_result or {}).get("sources", []))
+        for src in kb_sources:
+            src.setdefault("source_type", "kb")
+        mcp_sources = list((mcp_result or {}).get("sources", []))
+
+        merged: dict[str, Any] = {
+            "context": context,
+            "sources": kb_sources + mcp_sources,
+            "model": (kb_result or {}).get("model", AZURE_EMBEDDING_MODEL),
+            "tokens_input": (kb_result or {}).get("tokens_input", 0),
+            "tokens_output": (kb_result or {}).get("tokens_output", 0),
+        }
+
+        # Include MCP trace if present
+        mcp_trace = (mcp_result or {}).get("mcp_trace")
+        if mcp_trace:
+            merged["mcp_trace"] = mcp_trace
+
+        return merged
 
     async def _keyword_fallback(
         self,

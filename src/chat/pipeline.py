@@ -391,8 +391,9 @@ class ChatPipeline:
         )
         tier = tenant.tier or TenantTier.STARTER
 
-        # Store tenant_id and preferences for knowledge retrieval
+        # Store tenant_id, tenant doc, and preferences for knowledge retrieval
         self._current_tenant_id = tenant_id
+        self._current_tenant = tenant
         self._current_preferences = preferences
 
         # Configure per-tenant PII scrubbing on stored transcripts
@@ -911,6 +912,7 @@ class ChatPipeline:
         """
         tenant_id = getattr(self, "_current_tenant_id", None)
         prefs = getattr(self, "_current_preferences", None)
+        tenant = getattr(self, "_current_tenant", None)
 
         # Build preferences dict for the agent
         prefs_dict: dict[str, Any] = {}
@@ -926,12 +928,29 @@ class ChatPipeline:
             if prefs.intent_source_mapping:
                 prefs_dict["intent_source_mapping"] = prefs.intent_source_mapping
 
+        # Resolve MCP server configurations (AGNTCY Phase 3)
+        import dataclasses as _dc
+
+        mcp_configs: list[dict[str, Any]] = []
+        tenant_shop_domain: str | None = None
+        if prefs and tenant:
+            try:
+                from src.multi_tenant.mcp_client import resolve_mcp_configs
+
+                configs = resolve_mcp_configs(prefs, tenant)
+                mcp_configs = [_dc.asdict(c) for c in configs]
+                tenant_shop_domain = getattr(tenant, "shopify_shop_domain", None)
+            except Exception:
+                logger.debug("MCP config resolution failed", exc_info=True)
+
         return await self._kr_agent.process(
             {
                 "message": message,
                 "intent": intent,
                 "tenant_id": tenant_id or "",
                 "preferences": prefs_dict,
+                "mcp_configs": mcp_configs,
+                "tenant_shop_domain": tenant_shop_domain,
             },
             {"x-tenant-id": tenant_id or ""},
         )

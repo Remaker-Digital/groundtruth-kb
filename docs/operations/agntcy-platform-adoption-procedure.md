@@ -77,7 +77,7 @@ Take the best of both.
 | `WIDGET_KEY` | (from `.env.local` `PREVIEW_WIDGET_KEY`; rotates on every re-seed) | |
 | `SUPERADMIN_KEY` | (from `.env.local` `SUPERADMIN_PREVIEW_API_KEY`; rotates on every re-seed) | |
 | `EXPECTED_AGENTS` | `intent_classifier, knowledge_retrieval, response_generator, escalation_handler, analytics_collector, critic_supervisor` | The 6 AGNTCY agents |
-| `EXPECTED_UNIT_TESTS_MIN` | `2360` | Must not regress from current count |
+| `EXPECTED_UNIT_TESTS_MIN` | `2646` | Must not regress from current count (updated session 37) |
 
 ---
 
@@ -327,6 +327,7 @@ active phase).
 | Date | Operator | Score | PASS | FAIL | SKIP | Phases Active | Notes |
 |------|----------|-------|------|------|------|---------------|-------|
 | 2026-02-16 | Claude (session 25) | 15% | Phase 1: 6/10, Phase 2: partial (2A: 0/6, 2B: 0/7, 2C: 2/10) | — | Phase 3-6: SKIP | Phase 1+2 | Phase 1 SDK adoption complete. Phase 2 code-level decomposition complete (agents extracted, pipeline rewritten, 100 tests). Container images not yet built/pushed to ACR. A2A over NATS not yet operational (using in-process delegation). |
+| 2026-02-17 | Claude (session 37) | — | Phase 3: **14/14** | 0 | Phase 4-6: SKIP | Phase 1+2+3 | **AGNTCY Phase 3 COMPLETE.** Cycle 4 (session 36): MCP client + Shopify Storefront (3.1-3.5, 3.11-3.14). Cycle 5 (session 37): Stripe MCP + credential cache + mutation safety + Admin UI (3.6-3.10). Assertions 3.1 and 3.4 pass with owner-approved relaxation (HTTP transport for external servers, direct `mcp` SDK). 2,646 unit tests, 0 failures. |
 
 ---
 

@@ -1,12 +1,12 @@
 ---
 sidebar_position: 8
 title: Integrations
-description: Connect Agent Red to Shopify, Zendesk, Mailchimp, and Google Analytics.
+description: Connect Agent Red to Shopify, Stripe, Zendesk, Mailchimp, and Google Analytics.
 ---
 
 # Integrations
 
-Agent Red integrates with external platforms to access customer data, route escalations, and track conversation analytics. This page describes each integration toggle and what it controls.
+Agent Red integrates with external platforms to access customer data, process payment inquiries, route escalations, and track conversation analytics. This page describes each integration toggle and what it controls.
 
 ## Shopify sync
 
@@ -34,6 +34,51 @@ Enables synchronization of product catalog, order data, and customer profiles fr
 
 **When to leave it on:**
 Most stores should leave this on. Without Shopify sync, the AI cannot answer product, order, or inventory questions unless you manually create equivalent knowledge base articles.
+
+---
+
+## Stripe (MCP)
+
+| | |
+|---|---|
+| **Field** | `stripe_mcp_enabled` |
+| **Type** | Toggle (on/off) |
+| **Default** | Off |
+| **Tier** | Professional and Enterprise |
+
+Connects Agent Red to your Stripe account via the Model Context Protocol (MCP), enabling the AI to answer customer questions about payments, subscriptions, invoices, and refund status directly from Stripe data.
+
+**How it works:**
+
+Agent Red connects to Stripe's official MCP server (`mcp.stripe.com`) using a restricted API key that you provide. The connection is **read-only** — the AI can look up payment and subscription information but cannot modify anything in your Stripe account.
+
+**Setup:**
+
+1. Navigate to **Integrations** in the admin console
+2. Enable the **Stripe (MCP)** toggle
+3. Enter your Stripe restricted API key (starts with `rk_`)
+4. Click **Save Key**, then **Test Connection**
+5. A successful test shows a green status badge and the number of available tools
+
+**What the AI can answer:**
+
+| Query type | Example questions |
+|---|---|
+| Payment status | "Has my payment gone through?" |
+| Subscription details | "What plan am I on?" "When does my subscription renew?" |
+| Invoice lookup | "Can I see my last invoice?" |
+| Refund status | "Where is my refund?" |
+
+**Security:**
+
+- Your Stripe API key is stored in Azure Key Vault (never in the database)
+- Keys are cached in memory for 5 minutes to reduce Key Vault latency
+- All queries go through the Critic/Supervisor safety validation
+- Connection failures are handled gracefully — the AI responds using knowledge base data when Stripe is unavailable
+
+:::tip Restricted keys only
+Use a Stripe **restricted key** (`rk_`) with read-only permissions for maximum security. Do not use your secret key (`sk_`).
+:::
 
 ---
 
