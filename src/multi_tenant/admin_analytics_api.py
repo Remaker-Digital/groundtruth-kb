@@ -33,8 +33,9 @@ from datetime import datetime, timedelta, timezone
 from typing import Any
 
 from fastapi import APIRouter, Depends, HTTPException, Query
-from pydantic import BaseModel, ConfigDict, Field
-from pydantic.alias_generators import to_camel
+from pydantic import Field
+
+from src.multi_tenant.api_models import CamelCaseModel
 
 from src.multi_tenant.auth import TenantContext
 from src.multi_tenant.middleware import get_tenant_context
@@ -48,19 +49,17 @@ logger = logging.getLogger(__name__)
 # ---------------------------------------------------------------------------
 
 
-class StatusBreakdown(BaseModel):
+class StatusBreakdown(CamelCaseModel):
     """Conversation count for a single status."""
 
-    model_config = ConfigDict(alias_generator=to_camel, populate_by_name=True)
 
     status: str
     count: int
 
 
-class AnalyticsSummaryResponse(BaseModel):
+class AnalyticsSummaryResponse(CamelCaseModel):
     """Aggregated conversation metrics for a date range (WI #176)."""
 
-    model_config = ConfigDict(alias_generator=to_camel, populate_by_name=True)
 
     tenant_id: str
     since: str = Field(description="Start of date range (ISO 8601)")
@@ -99,20 +98,18 @@ class AnalyticsSummaryResponse(BaseModel):
     critic_pass_rate: float = Field(description="Critic pass rate (0.0-1.0)")
 
 
-class IntentEntry(BaseModel):
+class IntentEntry(CamelCaseModel):
     """A single agent/intent with its invocation count."""
 
-    model_config = ConfigDict(alias_generator=to_camel, populate_by_name=True)
 
     agent: str = Field(description="Agent name (e.g. intent-classifier)")
     invocation_count: int = Field(description="Number of conversations invoking this agent")
     percentage: float = Field(description="Percentage of total conversations")
 
 
-class IntentsResponse(BaseModel):
+class IntentsResponse(CamelCaseModel):
     """Top agents/intents by invocation volume (WI #177)."""
 
-    model_config = ConfigDict(alias_generator=to_camel, populate_by_name=True)
 
     tenant_id: str
     since: str
@@ -121,10 +118,9 @@ class IntentsResponse(BaseModel):
     intents: list[IntentEntry] = Field(description="Agents sorted by invocation count (desc)")
 
 
-class GapEntry(BaseModel):
+class GapEntry(CamelCaseModel):
     """A conversation representing a potential knowledge gap."""
 
-    model_config = ConfigDict(alias_generator=to_camel, populate_by_name=True)
 
     conversation_id: str
     status: str
@@ -137,10 +133,9 @@ class GapEntry(BaseModel):
     ended_at: str | None = None
 
 
-class GapsResponse(BaseModel):
+class GapsResponse(CamelCaseModel):
     """Knowledge gap report — conversations the AI couldn't resolve (WI #178)."""
 
-    model_config = ConfigDict(alias_generator=to_camel, populate_by_name=True)
 
     tenant_id: str
     since: str

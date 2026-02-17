@@ -90,7 +90,8 @@ E:\Claude-Playground\CLAUDE-PROJECTS\Agent Red Customer Engagement\
 │   │   ├── document_parser.py     # Document upload parsing: PDF, DOCX, CSV, TXT, HTML (~480 lines)
 │   │   ├── staleness_service.py   # KB entry staleness detection + scoring (~540 lines)
 │   │   ├── semantic_cache.py      # 3-tier semantic cache: embedding, search, response (~530 lines)
-│   │   └── kb_conflict_scanner.py # KB conflict/duplication scanner: 4-phase detection (~705 lines)
+│   │   ├── kb_conflict_scanner.py # KB conflict/duplication scanner: 4-phase detection (~705 lines)
+│   │   └── superadmin_api.py      # SPA provider ops API: tenant directory, dashboard, billing, deploys (~583 lines)
 │   ├── chat/                       # Chat API
 │   │   ├── __init__.py
 │   │   ├── models.py              # Request/response Pydantic models + StreamEvent SSE format (~200 lines)
@@ -124,7 +125,7 @@ E:\Claude-Playground\CLAUDE-PROJECTS\Agent Red Customer Engagement\
 │   ├── ai-features/                # Advanced AI (Phase 2.5)
 │   └── white-label/                # Customization (future)
 │
-├── tests/                          # Test suites (2,477 unit tests, 0 failures)
+├── tests/                          # Test suites (2,557 unit tests, 0 failures)
 │   ├── conftest.py                 # Shared fixtures: TestClient, MockCosmos, MockNATS, MockKV, auth helpers
 │   ├── test_conftest_smoke.py      # Fixture smoke tests
 │   ├── test_health.py              # Health/ready endpoint tests
@@ -179,4 +180,4 @@ E:\Claude-Playground\CLAUDE-PROJECTS\Agent Red Customer Engagement\
 ---
 
 *© 2026 Remaker Digital, a DBA of VanDusen & Palmeter, LLC. All rights reserved.*
-*Last Updated: 2026-02-16*
+*Last Updated: 2026-02-17*

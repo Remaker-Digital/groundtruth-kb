@@ -37,14 +37,14 @@ param(
 $ErrorActionPreference = "Stop"
 
 # Configuration
-$RESOURCE_GROUP = "agentred-prod-rg"
+$RESOURCE_GROUP = "Agent-Red"
 $CONTAINER_APP_NAME = "agent-red-api-gateway"
-$ACR_NAME = "acragentredeastus2"
+$ACR_NAME = "acragentredeastus"
 $ACR_SERVER = "$ACR_NAME.azurecr.io"
 $IMAGE_TAG = if ($SkipBuild) { "v1.14.0" } else { "v1.15.0" }
-$SUBSCRIPTION_ID = "828eb521-88bb-4b01-ac3e-7ba779c55212"
-$KEYVAULT_NAME = "kv-agentred-eastus2"
-$COSMOS_ACCOUNT = "cosmos-agentred-eastus2"
+$SUBSCRIPTION_ID = "4dce2122-690a-4654-b531-cc647db62331"
+$KEYVAULT_NAME = "kv-agentred-eastus"
+$COSMOS_ACCOUNT = "cosmos-agentred-eastus"
 
 Write-Host "=" * 70 -ForegroundColor Cyan
 Write-Host "AGENT RED API GATEWAY RESTORATION" -ForegroundColor Cyan
@@ -189,7 +189,7 @@ Start-Sleep -Seconds 30
 
 # Step 6: Verify health
 Write-Host "`n[6/6] Verifying deployment health..." -ForegroundColor Yellow
-$fqdn = "https://agent-red-api-gateway.lemonriver-f59f94b7.eastus2.azurecontainerapps.io"
+$fqdn = "https://agent-red-api-gateway.orangeglacier-f566a4e7.eastus.azurecontainerapps.io"
 
 try {
     $healthResp = Invoke-RestMethod -Uri "$fqdn/health" -TimeoutSec 10

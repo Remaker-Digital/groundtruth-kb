@@ -75,10 +75,15 @@ interface AgentRedSDK {
   }
 
   const widgetKey = scriptTag.getAttribute('data-widget-key');
-  const apiBaseUrl = scriptTag.getAttribute('data-api-url') || 'https://agent-red-api-gateway.lemonriver-f59f94b7.eastus2.azurecontainerapps.io';
+  const apiBaseUrl = scriptTag.getAttribute('data-api-url');
 
   if (!widgetKey) {
     console.warn('[AgentRed] data-widget-key attribute is required.');
+    return;
+  }
+
+  if (!apiBaseUrl) {
+    console.error('[AgentRed] data-api-url attribute is required. The widget install snippet must include data-api-url.');
     return;
   }
 

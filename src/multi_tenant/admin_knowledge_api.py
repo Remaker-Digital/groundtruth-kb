@@ -38,8 +38,9 @@ from typing import Any
 
 from fastapi import APIRouter, Depends, File, HTTPException, Query, UploadFile
 from fastapi.responses import StreamingResponse
-from pydantic import BaseModel, ConfigDict, Field
-from pydantic.alias_generators import to_camel
+from pydantic import Field
+
+from src.multi_tenant.api_models import CamelCaseModel
 
 from src.multi_tenant.activation_service import get_activation_service
 from src.multi_tenant.auth import TenantContext
@@ -61,10 +62,9 @@ VALID_ENTRY_TYPES = {"product", "faq", "policy", "custom", "article"}
 # ---------------------------------------------------------------------------
 
 
-class KnowledgeEntryResponse(BaseModel):
+class KnowledgeEntryResponse(CamelCaseModel):
     """A single knowledge base entry."""
 
-    model_config = ConfigDict(alias_generator=to_camel, populate_by_name=True)
 
     id: str
     tenant_id: str
@@ -89,10 +89,9 @@ class KnowledgeEntryResponse(BaseModel):
     source_url: str | None = None
 
 
-class KnowledgeListResponse(BaseModel):
+class KnowledgeListResponse(CamelCaseModel):
     """Paginated list of knowledge base entries."""
 
-    model_config = ConfigDict(alias_generator=to_camel, populate_by_name=True)
 
     tenant_id: str
     total_count: int = Field(description="Total matching entries")
@@ -101,10 +100,9 @@ class KnowledgeListResponse(BaseModel):
     articles: list[KnowledgeEntryResponse]
 
 
-class CreateKnowledgeEntryRequest(BaseModel):
+class CreateKnowledgeEntryRequest(CamelCaseModel):
     """Request body for POST /api/admin/knowledge."""
 
-    model_config = ConfigDict(alias_generator=to_camel, populate_by_name=True)
 
     entry_type: str = Field(
         default="article",
@@ -144,10 +142,9 @@ class CreateKnowledgeEntryRequest(BaseModel):
     )
 
 
-class UpdateKnowledgeEntryRequest(BaseModel):
+class UpdateKnowledgeEntryRequest(CamelCaseModel):
     """Request body for PUT /api/admin/knowledge/{id}."""
 
-    model_config = ConfigDict(alias_generator=to_camel, populate_by_name=True)
 
     entry_type: str | None = Field(
         default=None,
@@ -184,19 +181,17 @@ class UpdateKnowledgeEntryRequest(BaseModel):
     )
 
 
-class DeleteKnowledgeEntryResponse(BaseModel):
+class DeleteKnowledgeEntryResponse(CamelCaseModel):
     """Response for successful soft-delete."""
 
-    model_config = ConfigDict(alias_generator=to_camel, populate_by_name=True)
 
     id: str
     deleted_at: str
 
 
-class UploadResultResponse(BaseModel):
+class UploadResultResponse(CamelCaseModel):
     """Response for document upload (WI #214)."""
 
-    model_config = ConfigDict(alias_generator=to_camel, populate_by_name=True)
 
     source_type: str = Field(description="pdf | docx | csv | txt | url")
     source_filename: str | None = Field(default=None, description="Original filename")
@@ -207,10 +202,9 @@ class UploadResultResponse(BaseModel):
     parent_entry_id: str | None = Field(default=None, description="Parent ID for multi-chunk documents")
 
 
-class URLImportRequest(BaseModel):
+class URLImportRequest(CamelCaseModel):
     """Request body for POST /api/admin/knowledge/import-url."""
 
-    model_config = ConfigDict(alias_generator=to_camel, populate_by_name=True)
 
     url: str = Field(description="URL to scrape and import")
     entry_type: str = Field(
@@ -229,10 +223,9 @@ class URLImportRequest(BaseModel):
     )
 
 
-class StalenessScoreResponse(BaseModel):
+class StalenessScoreResponse(CamelCaseModel):
     """Staleness score for a single entry."""
 
-    model_config = ConfigDict(alias_generator=to_camel, populate_by_name=True)
 
     id: str
     staleness_score: float
@@ -241,10 +234,9 @@ class StalenessScoreResponse(BaseModel):
     embedded_at: str | None = None
 
 
-class StalenessSummaryResponse(BaseModel):
+class StalenessSummaryResponse(CamelCaseModel):
     """Summary of staleness across the tenant's KB."""
 
-    model_config = ConfigDict(alias_generator=to_camel, populate_by_name=True)
 
     total_entries: int
     avg_staleness_score: float
@@ -255,19 +247,17 @@ class StalenessSummaryResponse(BaseModel):
     needs_attention: int
 
 
-class StaleEntriesResponse(BaseModel):
+class StaleEntriesResponse(CamelCaseModel):
     """List of stale entries."""
 
-    model_config = ConfigDict(alias_generator=to_camel, populate_by_name=True)
 
     entries: list[StalenessScoreResponse]
     threshold: float
 
 
-class ConflictPairResponse(BaseModel):
+class ConflictPairResponse(CamelCaseModel):
     """A pair of KB entries with a detected conflict."""
 
-    model_config = ConfigDict(alias_generator=to_camel, populate_by_name=True)
 
     entry_a_id: str
     entry_a_title: str
@@ -282,10 +272,9 @@ class ConflictPairResponse(BaseModel):
     resolution: str
 
 
-class ScanResultResponse(BaseModel):
+class ScanResultResponse(CamelCaseModel):
     """Result of a full KB conflict scan."""
 
-    model_config = ConfigDict(alias_generator=to_camel, populate_by_name=True)
 
     tenant_id: str
     scanned_at: str

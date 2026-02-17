@@ -33,15 +33,9 @@ import sys
 project_root = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 sys.path.insert(0, project_root)
 
-# Load .env.local before importing modules that read env vars
-from dotenv import load_dotenv
-
-env_path = os.path.join(project_root, ".env.local")
-if os.path.exists(env_path):
-    load_dotenv(env_path)
-    print(f"[OK] Loaded environment from {env_path}")
-else:
-    print(f"[WARN] .env.local not found at {env_path} — using existing environment")
+# Load .env.local (shared loader — R7 refactoring)
+from scripts._env import load_env_local
+load_env_local()
 
 from src.multi_tenant.cosmos_schema import (
     ALL_COLLECTIONS,

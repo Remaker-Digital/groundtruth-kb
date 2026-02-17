@@ -25,17 +25,12 @@ import time
 project_root = os.path.abspath(os.path.join(os.path.dirname(__file__), "..", ".."))
 sys.path.insert(0, project_root)
 
-from dotenv import load_dotenv
+# Load .env.local (shared loader — R7 refactoring)
+from scripts._env import load_env_local
 
 
 def main() -> None:
-    # Load .env.local from project root
-    env_path = os.path.join(project_root, ".env.local")
-    if not os.path.exists(env_path):
-        print(f"ERROR: {env_path} not found. Copy .env.example to .env.local and fill in credentials.")
-        sys.exit(1)
-
-    load_dotenv(env_path, override=True)
+    load_env_local()
 
     endpoint = os.environ.get("COSMOS_DB_ENDPOINT", "")
     key = os.environ.get("COSMOS_DB_KEY", "")

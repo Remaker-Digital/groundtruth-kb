@@ -17,13 +17,13 @@ variable "subscription_id" {
 variable "resource_group_name" {
   description = "Name of the Azure Resource Group"
   type        = string
-  default     = "agentred-prod-rg"
+  # Required — provide via .tfvars (e.g. "Agent-Red")
 }
 
 variable "location" {
   description = "Azure region for all resources"
   type        = string
-  default     = "eastus2"
+  # Required — provide via .tfvars (e.g. "eastus")
 }
 
 variable "environment" {
@@ -44,7 +44,7 @@ variable "environment" {
 variable "container_registry" {
   description = "Azure Container Registry login server"
   type        = string
-  default     = "acragentredeastus2.azurecr.io"
+  # Required — provide via .tfvars (e.g. "acragentredeastus.azurecr.io")
 }
 
 # ---------------------------------------------------------------------------
@@ -91,7 +91,7 @@ variable "nats_monitoring_endpoint" {
 variable "azure_openai_endpoint" {
   description = "Azure OpenAI Service endpoint URL"
   type        = string
-  default     = "https://aoai-agentred-eastus2.openai.azure.com/"
+  # Required — provide via .tfvars (e.g. "https://agent-red-openai.openai.azure.com/")
 }
 
 # ---------------------------------------------------------------------------
@@ -112,7 +112,7 @@ variable "cosmos_db_database" {
 variable "cosmos_db_account_name" {
   description = "Cosmos DB account name (for data source lookups)"
   type        = string
-  default     = "cosmos-agentred-eastus2"
+  # Required — provide via .tfvars (e.g. "cosmos-agentred-eastus")
 }
 
 variable "manage_cosmos_db_account" {
@@ -154,7 +154,7 @@ variable "archival_storage_account_name" {
 variable "key_vault_url" {
   description = "Azure Key Vault endpoint URL"
   type        = string
-  default     = "https://kv-agentred-eastus2.vault.azure.net/"
+  # Required — provide via .tfvars (e.g. "https://kv-agentred-eastus.vault.azure.net/")
 }
 
 # ---------------------------------------------------------------------------

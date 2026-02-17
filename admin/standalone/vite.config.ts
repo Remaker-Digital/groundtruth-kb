@@ -22,7 +22,7 @@ export default defineConfig({
   base: '/admin/standalone/',
   build: {
     outDir: 'dist',
-    sourcemap: true,
+    sourcemap: false,
     target: 'es2020',
     reportCompressedSize: true,
     rollupOptions: {
@@ -33,14 +33,16 @@ export default defineConfig({
     port: 3300,
     proxy: {
       '/api': {
-        target: 'https://agent-red-api-gateway.lemonriver-f59f94b7.eastus2.azurecontainerapps.io',
+        // Dev proxy target: set VITE_API_URL in .env.local for production FQDN.
+        // Default per REPEATABLE-PROCEDURES.md §7.4 — .env.local takes precedence.
+        target: process.env.VITE_API_URL || 'http://localhost:8000',
         changeOrigin: true,
-        secure: true,
+        secure: !!process.env.VITE_API_URL,
       },
       '/widget.js': {
-        target: 'https://agent-red-api-gateway.lemonriver-f59f94b7.eastus2.azurecontainerapps.io',
+        target: process.env.VITE_API_URL || 'http://localhost:8000',
         changeOrigin: true,
-        secure: true,
+        secure: !!process.env.VITE_API_URL,
       },
     },
   },

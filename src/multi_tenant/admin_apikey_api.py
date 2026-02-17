@@ -44,8 +44,9 @@ from datetime import datetime, timezone
 from typing import Any
 
 from fastapi import APIRouter, Depends, HTTPException, Request
-from pydantic import BaseModel, ConfigDict, Field
-from pydantic.alias_generators import to_camel
+from pydantic import Field
+
+from src.multi_tenant.api_models import CamelCaseModel
 
 from src.multi_tenant.auth import TenantContext, hash_api_key
 from src.multi_tenant.middleware import get_tenant_context
@@ -66,13 +67,9 @@ API_KEY_ALPHABET = string.ascii_letters + string.digits
 # ---------------------------------------------------------------------------
 
 
-class ApiKeyMetadataResponse(BaseModel):
+class ApiKeyMetadataResponse(CamelCaseModel):
     """API key metadata (never includes the raw key)."""
 
-    model_config = ConfigDict(
-        alias_generator=to_camel,
-        populate_by_name=True,
-    )
 
     has_key: bool = Field(description="Whether an API key is currently set")
     key_prefix: str | None = Field(
@@ -86,16 +83,12 @@ class ApiKeyMetadataResponse(BaseModel):
     )
 
 
-class ApiKeyGeneratedResponse(BaseModel):
+class ApiKeyGeneratedResponse(CamelCaseModel):
     """Response returned when a new API key is generated.
 
     The raw key is returned ONCE and never stored or retrievable again.
     """
 
-    model_config = ConfigDict(
-        alias_generator=to_camel,
-        populate_by_name=True,
-    )
 
     api_key: str = Field(description="The raw API key — save this, it cannot be retrieved again")
     key_prefix: str = Field(description="First 12 chars for future identification")
@@ -105,40 +98,28 @@ class ApiKeyGeneratedResponse(BaseModel):
     )
 
 
-class ApiKeyRevokedResponse(BaseModel):
+class ApiKeyRevokedResponse(CamelCaseModel):
     """Confirmation of key revocation."""
 
-    model_config = ConfigDict(
-        alias_generator=to_camel,
-        populate_by_name=True,
-    )
 
     revoked: bool = True
     revoked_at: str = Field(description="ISO 8601 timestamp")
 
 
-class ApiKeyResetRequest(BaseModel):
+class ApiKeyResetRequest(CamelCaseModel):
     """Request body for the public API key reset endpoint."""
 
-    model_config = ConfigDict(
-        alias_generator=to_camel,
-        populate_by_name=True,
-    )
 
     email: str = Field(description="Registered merchant email address")
 
 
-class ApiKeyResetResponse(BaseModel):
+class ApiKeyResetResponse(CamelCaseModel):
     """Response for the API key reset endpoint.
 
     Always returns the same message regardless of whether the email
     was found, to prevent email enumeration attacks.
     """
 
-    model_config = ConfigDict(
-        alias_generator=to_camel,
-        populate_by_name=True,
-    )
 
     message: str = Field(
         default="If an account with that email exists, a new API key has been sent.",

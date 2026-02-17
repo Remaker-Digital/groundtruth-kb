@@ -25,7 +25,6 @@ import logging
 import os
 import time
 import uuid
-from pathlib import Path
 from typing import Any
 
 import pytest
@@ -35,19 +34,9 @@ logger = logging.getLogger(__name__)
 # ---------------------------------------------------------------------------
 # Load .env.local if available
 # ---------------------------------------------------------------------------
-
-_env_local = Path(__file__).resolve().parents[2] / ".env.local"
-if _env_local.exists():
-    for line in _env_local.read_text(encoding="utf-8").splitlines():
-        line = line.strip()
-        if not line or line.startswith("#"):
-            continue
-        if "=" in line:
-            key, _, value = line.partition("=")
-            key = key.strip()
-            value = value.strip()
-            if key and value and key not in os.environ:
-                os.environ[key] = value
+# Load .env.local (shared loader — R7 refactoring)
+from scripts._env import load_env_local
+load_env_local()
 
 
 # ---------------------------------------------------------------------------

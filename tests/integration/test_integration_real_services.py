@@ -26,20 +26,17 @@ from __future__ import annotations
 import json
 import os
 import time
-from pathlib import Path
 from typing import Any
 from unittest.mock import patch
 
 import pytest
 import stripe
 from stripe._webhook import WebhookSignature as _StripeWebhookSignature
-from dotenv import load_dotenv
 from fastapi.testclient import TestClient
 
-# Load .env.local before any environment checks
-_env_local = Path(__file__).resolve().parent.parent / ".env.local"
-if _env_local.exists():
-    load_dotenv(_env_local, override=True)
+# Load .env.local (shared loader — R7 refactoring)
+from scripts._env import load_env_local
+load_env_local(override=True)
 
 from src.integrations.stripe_catalog import load_catalog
 from src.integrations.provisioning import BillingChannel, TenantStatus

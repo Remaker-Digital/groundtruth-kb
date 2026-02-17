@@ -65,23 +65,16 @@ if sys.platform == "win32":
     sys.stdout.reconfigure(encoding="utf-8", errors="replace")
     sys.stderr.reconfigure(encoding="utf-8", errors="replace")
 
-# Auto-load .env.local if present (for Azure OpenAI credentials)
-_env_local = Path(__file__).resolve().parent.parent / ".env.local"
-if _env_local.is_file():
-    with open(_env_local) as f:
-        for line in f:
-            line = line.strip()
-            if line and not line.startswith("#") and "=" in line:
-                key, _, val = line.partition("=")
-                key, val = key.strip(), val.strip()
-                if key and val and key not in os.environ:
-                    os.environ[key] = val
+# Load .env.local (shared loader — R7 refactoring)
+from scripts._env import load_env_local
+load_env_local()
 
+# Default per REPEATABLE-PROCEDURES.md §7.4 — .env.local takes precedence
 API = os.environ.get(
     "PROD_URL",
     "https://agent-red-api-gateway.orangeglacier-f566a4e7.eastus.azurecontainerapps.io",
 )
-# No hardcoded fallback — transient credentials must come from .env.local or env vars.
+# No hardcoded fallback for credentials — transient credentials must come from .env.local or env vars.
 WIDGET_KEY = os.environ.get("PREVIEW_WIDGET_KEY") or os.environ.get("AGENT_RED_WIDGET_KEY", "")
 if not WIDGET_KEY:
     sys.exit("ERROR: PREVIEW_WIDGET_KEY not set. Load .env.local or set env var.")

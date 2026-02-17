@@ -41,8 +41,9 @@ from typing import Any
 
 from fastapi import APIRouter, Depends, HTTPException, Query
 from fastapi.responses import StreamingResponse
-from pydantic import BaseModel, ConfigDict, Field
-from pydantic.alias_generators import to_camel
+from pydantic import Field
+
+from src.multi_tenant.api_models import CamelCaseModel
 
 from src.multi_tenant.auth import TenantContext
 from src.multi_tenant.middleware import get_tenant_context
@@ -55,10 +56,9 @@ logger = logging.getLogger(__name__)
 # ---------------------------------------------------------------------------
 
 
-class UsageDashboardResponse(BaseModel):
+class UsageDashboardResponse(CamelCaseModel):
     """Layer 1: Real-time usage dashboard for the current billing period."""
 
-    model_config = ConfigDict(alias_generator=to_camel, populate_by_name=True)
 
     tenant_id: str
     billing_period: str
@@ -82,30 +82,27 @@ class UsageDashboardResponse(BaseModel):
     )
 
 
-class DailyVolumeEntry(BaseModel):
+class DailyVolumeEntry(CamelCaseModel):
     """A single day's conversation volume."""
 
-    model_config = ConfigDict(alias_generator=to_camel, populate_by_name=True)
 
     date: str = Field(description="Date (YYYY-MM-DD)")
     total: int = Field(description="Total conversations")
     billable: int = Field(description="Billable conversations")
 
 
-class DailyVolumeResponse(BaseModel):
+class DailyVolumeResponse(CamelCaseModel):
     """Daily volume breakdown for chart rendering."""
 
-    model_config = ConfigDict(alias_generator=to_camel, populate_by_name=True)
 
     tenant_id: str
     billing_period: str
     days: list[DailyVolumeEntry]
 
 
-class ConversationSummary(BaseModel):
+class ConversationSummary(CamelCaseModel):
     """Compact conversation record for list endpoints."""
 
-    model_config = ConfigDict(alias_generator=to_camel, populate_by_name=True)
 
     conversation_id: str
     status: str | None = None
@@ -120,10 +117,9 @@ class ConversationSummary(BaseModel):
     critic_passed: bool | None = None
 
 
-class ConversationListResponse(BaseModel):
+class ConversationListResponse(CamelCaseModel):
     """Paginated list of conversations with metadata."""
 
-    model_config = ConfigDict(alias_generator=to_camel, populate_by_name=True)
 
     tenant_id: str
     billing_period: str
@@ -133,10 +129,9 @@ class ConversationListResponse(BaseModel):
     conversations: list[ConversationSummary]
 
 
-class ConversationDetailResponse(BaseModel):
+class ConversationDetailResponse(CamelCaseModel):
     """Full billing detail for a single conversation (Layer 2)."""
 
-    model_config = ConfigDict(alias_generator=to_camel, populate_by_name=True)
 
     conversation_id: str
     tenant_id: str

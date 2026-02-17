@@ -7,7 +7,7 @@ after write operations).
 
 Usage:
     # Set the production URL (or defaults to env var PROD_URL)
-    export PROD_URL=https://agent-red-api-gateway.lemonriver-f59f94b7.eastus2.azurecontainerapps.io
+    export PROD_URL=https://agent-red-api-gateway.orangeglacier-f566a4e7.eastus.azurecontainerapps.io
 
     # Run all regression tests
     python -m pytest tests/regression/ -x -q --tb=short
@@ -20,7 +20,6 @@ Usage:
 """
 
 import os
-from pathlib import Path
 
 import pytest
 import httpx
@@ -31,18 +30,11 @@ import httpx
 # Auto-load .env.local (transient credentials must never be hardcoded —
 # see REPEATABLE-PROCEDURES.md Section 7: No Hardcoded Transient Values)
 # ---------------------------------------------------------------------------
-_env_local = Path(__file__).resolve().parent.parent.parent / ".env.local"
-if _env_local.is_file():
-    with open(_env_local) as _f:
-        for _line in _f:
-            _line = _line.strip()
-            if _line and not _line.startswith("#") and "=" in _line:
-                _k, _, _v = _line.partition("=")
-                _k, _v = _k.strip(), _v.strip()
-                if _k and _v and _k not in os.environ:
-                    os.environ[_k] = _v
+# Load .env.local (shared loader — R7 refactoring)
+from scripts._env import load_env_local
+load_env_local()
 
-# Production URL — set via PROD_URL env var or default to production FQDN
+# Production URL — default per REPEATABLE-PROCEDURES.md §7.4 — .env.local takes precedence
 PROD_URL = os.environ.get(
     "PROD_URL",
     "https://agent-red-api-gateway.orangeglacier-f566a4e7.eastus.azurecontainerapps.io"

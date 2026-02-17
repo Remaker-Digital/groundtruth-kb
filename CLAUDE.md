@@ -15,7 +15,7 @@ This document provides active guidance for AI assistants working on the Agent Re
 |-----------|-------|
 | **Project Name** | Agent Red Customer Experience |
 | **Type** | Commercial SaaS Product (Shopify + Standalone) |
-| **Status** | Production v1.34.0 HEALTHY. 2,477 unit tests (0 failures), 178 UI tests. AGNTCY Phase 2 COMPLETE. Session 28: Test coverage audit — 52 new tests, 3 trivial fixes. Next: build/deploy cycle. |
+| **Status** | Production v1.34.0 HEALTHY. 2,476 unit tests (0 failures), 178 UI tests. AGNTCY Phase 2 COMPLETE. Provider Admin Phase 1 COMPLETE. Config Compliance COMPLETE. P0 Refactoring Cycle 1 COMPLETE. MCP Assessment COMPLETE. Next: 5-cycle roadmap (v1.35.0→v1.39.0). See `memory/build-deploy-roadmap.md`. |
 | **Owner** | Remaker Digital (DBA of VanDusen & Palmeter, LLC) |
 
 ### Copyright Notice
@@ -36,7 +36,7 @@ All new work in this repository must include:
 Continue work on Agent Red Customer Experience commercial project.
 Location: E:\Claude-Playground\CLAUDE-PROJECTS\Agent Red Customer Engagement
 Key files: CLAUDE.md, memory/MEMORY.md
-Current status: Production v1.32.7 HEALTHY. 2,330 unit tests (0 failures). Next: [describe task].
+Current status: Production v1.34.0 HEALTHY. 2,497 unit tests (0 failures). Next: [describe task].
 ```
 
 ### Preferred Way of Working
@@ -115,48 +115,68 @@ Active procedures:
 
 ---
 
-## Remaining Work (Priority Order, as of 2026-02-16)
+## Remaining Work — 5-Cycle Roadmap (Owner-Approved, Session 32)
 
-### AGNTCY Platform Adoption ✅ Phase 2 COMPLETE
-- Phase 1 (SDK Adoption): agntcy-app-sdk integrated, BaseAgentProtocol implemented (session 25)
-- Phase 2 (Pipeline Decomposition): 6 agents extracted, pipeline rewritten, 100 agent tests, 2,360 total tests (session 25)
-- Next: Phase 3 (MCP Client Framework), Phase 4 (UCP Commerce Protocol) — see `docs/operations/agntcy-platform-adoption-procedure.md`
+Full plan: `memory/build-deploy-roadmap.md`
 
-### P0 — Owner Functional Review ✅ COMPLETE
-- Session 26: 9 defect fixes deployed as v1.34.0, initialization procedure verified
-- Full Pages 0-10 UI review: 178 tests (sessions 23-26)
-- D46-D52 defects fixed (v1.32.7), D53-D67 defects fixed (v1.34.0)
+### Cycle 1: v1.35.0 — Ship S30-31 Work (1 day, LOW risk)
+- Deploy existing compliance + P0 refactoring (R1/R7/R8/R9a). No new development.
+
+### Cycle 2: v1.36.0 — P1 Refactoring (4-5 days, MEDIUM risk)
+- **R2:** Repository file split — `repository.py` → `src/multi_tenant/repositories/` (10 domain files + re-export)
+- **R4:** Config processor decomposition — `tenant_config_processor.py` → `src/multi_tenant/config/` (6 files). **Fix latent bug line 1197.**
+- **R6 partial:** Hooks barrel split — `hooks/index.ts` → 6 domain files + re-export barrel
+
+### Cycle 3: v1.37.0 — Provider Admin Phase 2 Start (4-6 days, MEDIUM risk)
+- **C-2:** SLA persistence — new Cosmos collection, hourly snapshots, startup hydration, error budget, trends API
+- **C-1:** Queue depth + job health (if time permits)
+
+### Cycle 4: v1.38.0 — AGNTCY Phase 3A: MCP Client + Shopify Storefront MVP (2-3 weeks, MEDIUM-HIGH risk)
+- MCP client implementation with HTTP transport (relax assertion 3.4 for external servers)
+- Tenant MCP server registry in Cosmos DB PreferencesDocument
+- KR agent MCP integration (secondary source: KB → MCP → keyword fallback)
+- Read-only policy gate, shop_domain guard, credential cache, circuit breaker, PII tokenization
+- **Assessment:** `independent-progress-assments/MCP-SERVER-INTEGRATION-ASSESSMENT-2026-02-17.md`
+- **Architecture:** `memory/mcp-integration.md`
+
+### Cycle 5: v1.39.0 — AGNTCY Phase 3B: Stripe MCP + Mutation Safety + Admin UI (2-3 weeks, MEDIUM-HIGH risk)
+- Stripe MCP (remote `mcp.stripe.com`, per-tenant restricted keys, read-only initially)
+- Mutation safety architecture (MutationPolicy, Critic-gated confirmation, idempotency keys)
+- Admin UI for MCP configuration (Integrations page)
+- **Milestone: AGNTCY Phase 3 COMPLETE** — all 14 assertions verified
+
+### Completed Milestones
+- ✅ P0 Refactoring Cycle 1 (Session 31): R1 main.py split, R9a sourcemaps, R7 env loader, R8 CamelCaseModel
+- ✅ Configuration Strategy Compliance (Session 30): 25 files, 4 priority levels
+- ✅ Provider Admin Phase 1 (Session 29): 5 superadmin endpoints, 20 tests
+- ✅ AGNTCY Phase 2 (Session 25): 6 agents, pipeline decomposition, 100 agent tests
+- ✅ Owner Functional Review (Sessions 23-26): 178 UI tests, D46-D67 fixed, v1.34.0 deployed
+- ✅ MCP Assessment (Session 32): Independent cross-reference, 6 findings, revised sequencing
+
+### Deferred (Post-Cycle 5)
+- **Provider Admin Phase 2 remaining:** C-3 compliance, C-4 secret posture, HV-3 integration reliability, HV-5 status page, RB-5 MFA, RB-4 alerting
+- **Provider Admin Phase 3-4:** Support diagnostics, cost economics, abuse detection, capacity, AIOps, BI
+- **MCP post-Phase 3:** Customer Account MCP (widget OAuth UX), Checkout MCP (AGNTCY Phase 4 / UCP), GA4 MCP (experimental), Zendesk/Klaviyo (no official servers)
+- **Refactoring:** R3 config YAML, R6 full component slices, R9b CDN split, R10 pipeline.py → Phase 3/4
 
 ### Owner/Designer Tasks (blocking Shopify submission)
-1. Screenshots (3-6 at 1600x900, one showing actual app UI) — designer
-2. Submission screencast (install → features → billing → uninstall) — owner
+1. Screenshots (3-6 at 1600x900) — designer
+2. Submission screencast — owner
 3. Remove storefront password on blanco-9939 — owner
 4. Configure pricing in Shopify Partners Dashboard — owner
-5. Deploy GDPR webhook URLs (`shopify app deploy`) — owner
-6. Stripe test→live mode flip (`config/stripe_product_ids.json` mode field + env keys)
-
-### Known Issues (Non-Blocking, Deferred)
-- D22: Avatar PNG upload (currently URL-based, 5 test assertions blocked)
-- D30: Tier upgrade path on Billing page
-- Compliance: PII scrubbing (not tenant-aware), consent prompt (no widget UI), GDPR deletion (needs test harness)
+5. Deploy GDPR webhook URLs — owner
+6. Stripe test→live mode flip
 
 ### Post-Launch Backlog
-7. Conversation archival (archived_at flag, filter toggle)
-8. Email verification identity flow
-9. Blocked capabilities C1-C16 (42 UI steps)
-10. Widget phases 3-5: mobile controls, targeting rules, localization
-11. Code modularization (StandaloneLayout.tsx, Configuration.tsx)
-12. Customer context pre-computation (WI #138)
-13. Azure OpenAI PTU investigation (WI #139, defer to 50+ tenants)
-14. Persistent Memory metrics dashboard
-15. Zendesk/Mailchimp/GA4 backend API clients
-16. Multi-user admin magic link auth (WI #295, 5-8 days)
-17. Add-on checkout Stripe integration (currently shows "coming soon" toast)
-18. Crawler/bot conversation protection — User-Agent filtering on conversation creation, `is_crawler` tag + non-billable classification, IP-based rate limiting (5 convos/min/IP/tenant)
-19. Category-routed escalation — Manual: admin selects category or specific team member via dialog; AI-initiated: pipeline detects category from keywords. Routing: lookup `escalation_agent` members whose category badges match, assign one, send targeted email. `assigned_to` field on conversation; only assigned member can Resolve. Mapping configured on Team members page (already seeded with category badges).
+- Email verification, blocked capabilities C1-C16 (42 UI steps)
+- Widget phases 3-5, multi-user admin auth (WI #295, 5-8 days)
+- Add-on Stripe checkout, customer context pre-computation (WI #138)
+- Azure OpenAI PTU (WI #139), Persistent Memory dashboard
+- D22 avatar PNG upload, D30 tier upgrade path
+- AGNTCY Phase 4 (UCP Commerce Protocol)
 
 ---
 
 *© 2026 Remaker Digital, a DBA of VanDusen & Palmeter, LLC. All rights reserved.*
-*Last Updated: 2026-02-16*
-*Version: 39.0.0*
+*Last Updated: 2026-02-17*
+*Version: 44.0.0*

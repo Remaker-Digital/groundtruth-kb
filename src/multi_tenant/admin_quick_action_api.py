@@ -48,8 +48,9 @@ from datetime import datetime, timezone
 from typing import Any
 
 from fastapi import APIRouter, Depends, HTTPException, Query
-from pydantic import BaseModel, ConfigDict, Field
-from pydantic.alias_generators import to_camel
+from pydantic import Field
+
+from src.multi_tenant.api_models import CamelCaseModel
 
 from src.multi_tenant.auth import TenantContext
 from src.multi_tenant.cosmos_schema import (
@@ -79,10 +80,9 @@ MAX_ICON_LENGTH = 50
 # ---------------------------------------------------------------------------
 
 
-class QuickActionResponse(BaseModel):
+class QuickActionResponse(CamelCaseModel):
     """A single quick action prompt button."""
 
-    model_config = ConfigDict(alias_generator=to_camel, populate_by_name=True)
 
     id: str
     label: str
@@ -94,20 +94,18 @@ class QuickActionResponse(BaseModel):
     updated_at: str
 
 
-class QuickActionListResponse(BaseModel):
+class QuickActionListResponse(CamelCaseModel):
     """List of quick action prompts for a tenant."""
 
-    model_config = ConfigDict(alias_generator=to_camel, populate_by_name=True)
 
     tenant_id: str
     total_count: int
     actions: list[QuickActionResponse]
 
 
-class CreateQuickActionRequest(BaseModel):
+class CreateQuickActionRequest(CamelCaseModel):
     """Request body for POST /api/admin/quick-actions."""
 
-    model_config = ConfigDict(alias_generator=to_camel, populate_by_name=True)
 
     label: str = Field(
         min_length=1,
@@ -128,10 +126,9 @@ class CreateQuickActionRequest(BaseModel):
     sort_order: int = Field(default=0, ge=0, le=999)
 
 
-class UpdateQuickActionRequest(BaseModel):
+class UpdateQuickActionRequest(CamelCaseModel):
     """Request body for PUT /api/admin/quick-actions/{id}."""
 
-    model_config = ConfigDict(alias_generator=to_camel, populate_by_name=True)
 
     label: str | None = Field(
         default=None,
@@ -148,10 +145,9 @@ class UpdateQuickActionRequest(BaseModel):
     sort_order: int | None = Field(default=None, ge=0, le=999)
 
 
-class PageAssignmentResponse(BaseModel):
+class PageAssignmentResponse(CamelCaseModel):
     """A page-to-quick-action slot assignment."""
 
-    model_config = ConfigDict(alias_generator=to_camel, populate_by_name=True)
 
     page_type: str
     page_handle: str | None = None
@@ -163,20 +159,18 @@ class PageAssignmentResponse(BaseModel):
     auto_open_delay_ms: int = 3000
 
 
-class PageAssignmentListResponse(BaseModel):
+class PageAssignmentListResponse(CamelCaseModel):
     """List of page assignments for a tenant."""
 
-    model_config = ConfigDict(alias_generator=to_camel, populate_by_name=True)
 
     tenant_id: str
     total_count: int
     assignments: list[PageAssignmentResponse]
 
 
-class UpsertPageAssignmentRequest(BaseModel):
+class UpsertPageAssignmentRequest(CamelCaseModel):
     """Request body for PUT /api/admin/quick-actions/assignments."""
 
-    model_config = ConfigDict(alias_generator=to_camel, populate_by_name=True)
 
     page_type: str = Field(
         description="Page type: home, product, collection, cart, search, blog, page, all, other",

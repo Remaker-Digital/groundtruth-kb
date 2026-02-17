@@ -23,7 +23,8 @@ param(
 $ACR_LOGIN_SERVER = "acragentredeastus.azurecr.io"
 $RESOURCE_GROUP = "Agent-Red"
 $CONTAINER_APP = "agent-red-api-gateway"
-$PROD_URL = "https://agent-red-api-gateway.orangeglacier-f566a4e7.eastus.azurecontainerapps.io"
+# Rotates if Container App environment changes — override via $env:PROD_URL
+$PROD_URL = if ($env:PROD_URL) { $env:PROD_URL } else { "https://agent-red-api-gateway.orangeglacier-f566a4e7.eastus.azurecontainerapps.io" }
 $PROJECT_ROOT = (Resolve-Path "$PSScriptRoot\..\..").Path
 
 # Resolve image

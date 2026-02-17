@@ -478,19 +478,21 @@ def app_client(
         client.get("/api/...", headers=auth_headers_api_key(TEST_API_KEY_STARTER))
     """
     import src.main as _main_mod
+    import src.app.lifecycle as _lifecycle_mod
+    import src.app.health as _health_mod
     from src.multi_tenant.middleware import configure_tenant_resolution
 
-    # Patch the references that main.py's startup/ready handlers use,
-    # since main.py has already imported these names at module level.
+    # Patch module-level imports in the submodules where startup/ready
+    # handlers actually reference them (R1 refactoring, session 31).
     with (
-        patch.object(_main_mod, "get_nats_manager", return_value=mock_nats),
-        patch.object(_main_mod, "get_secret_service", return_value=mock_keyvault),
-        patch.object(_main_mod, "get_circuit_breaker_registry", return_value=mock_circuit_breakers),
-        patch.object(_main_mod, "init_nats_manager", new_callable=AsyncMock),
-        patch.object(_main_mod, "close_nats_manager", new_callable=AsyncMock),
-        patch.object(_main_mod, "configure_tracing", return_value=None),
-        patch.object(_main_mod, "configure_tenant_logging", return_value=None),
-        patch.object(_main_mod, "TenantRepository", side_effect=Exception("mocked")),
+        patch.object(_health_mod, "get_nats_manager", return_value=mock_nats),
+        patch.object(_lifecycle_mod, "get_secret_service", return_value=mock_keyvault),
+        patch.object(_health_mod, "get_circuit_breaker_registry", return_value=mock_circuit_breakers),
+        patch.object(_lifecycle_mod, "init_nats_manager", new_callable=AsyncMock),
+        patch.object(_lifecycle_mod, "close_nats_manager", new_callable=AsyncMock),
+        patch.object(_lifecycle_mod, "configure_tracing", return_value=None),
+        patch.object(_lifecycle_mod, "configure_tenant_logging", return_value=None),
+        patch.object(_lifecycle_mod, "TenantRepository", side_effect=Exception("mocked")),
     ):
         with TestClient(_main_mod.app, raise_server_exceptions=False) as client:
             # Wire tenant resolvers *after* TestClient startup so they are

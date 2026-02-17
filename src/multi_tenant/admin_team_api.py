@@ -36,8 +36,9 @@ from datetime import datetime, timezone
 from typing import Any
 
 from fastapi import APIRouter, Depends, HTTPException, Query
-from pydantic import BaseModel, ConfigDict, Field
-from pydantic.alias_generators import to_camel
+from pydantic import Field
+
+from src.multi_tenant.api_models import CamelCaseModel
 
 from src.multi_tenant.auth import TenantContext, generate_user_api_key, hash_api_key
 from src.multi_tenant.cosmos_schema import (
@@ -71,10 +72,9 @@ PROTECTED_ROLES = {"superadmin"}
 # ---------------------------------------------------------------------------
 
 
-class TeamMemberResponse(BaseModel):
+class TeamMemberResponse(CamelCaseModel):
     """A single team member."""
 
-    model_config = ConfigDict(alias_generator=to_camel, populate_by_name=True)
 
     id: str
     tenant_id: str
@@ -98,10 +98,9 @@ class TeamMemberResponse(BaseModel):
     invited_by: str | None = None
 
 
-class TeamListResponse(BaseModel):
+class TeamListResponse(CamelCaseModel):
     """Paginated list of team members."""
 
-    model_config = ConfigDict(alias_generator=to_camel, populate_by_name=True)
 
     tenant_id: str
     total_count: int = Field(description="Total matching members")
@@ -110,10 +109,9 @@ class TeamListResponse(BaseModel):
     members: list[TeamMemberResponse]
 
 
-class CreateTeamMemberRequest(BaseModel):
+class CreateTeamMemberRequest(CamelCaseModel):
     """Request body for POST /api/team."""
 
-    model_config = ConfigDict(alias_generator=to_camel, populate_by_name=True)
 
     email: str = Field(
         min_length=3,
@@ -141,10 +139,9 @@ class CreateTeamMemberRequest(BaseModel):
     )
 
 
-class UpdateTeamMemberRequest(BaseModel):
+class UpdateTeamMemberRequest(CamelCaseModel):
     """Request body for PUT /api/team/{member_id}."""
 
-    model_config = ConfigDict(alias_generator=to_camel, populate_by_name=True)
 
     display_name: str | None = Field(
         default=None,
@@ -360,10 +357,9 @@ async def list_team_members(
 # ---------------------------------------------------------------------------
 
 
-class WhoamiResponse(BaseModel):
+class WhoamiResponse(CamelCaseModel):
     """Response for GET /api/admin/team/whoami."""
 
-    model_config = ConfigDict(alias_generator=to_camel, populate_by_name=True)
 
     tenant_id: str
     role: str | None = None
@@ -712,10 +708,9 @@ async def update_team_member(
 # ---------------------------------------------------------------------------
 
 
-class DeleteTeamMemberResponse(BaseModel):
+class DeleteTeamMemberResponse(CamelCaseModel):
     """Response for successful team member deletion."""
 
-    model_config = ConfigDict(alias_generator=to_camel, populate_by_name=True)
 
     id: str
     deleted_at: str
@@ -801,10 +796,9 @@ async def delete_team_member(
 # ---------------------------------------------------------------------------
 
 
-class RotateKeyResponse(BaseModel):
+class RotateKeyResponse(CamelCaseModel):
     """Response for successful key rotation."""
 
-    model_config = ConfigDict(alias_generator=to_camel, populate_by_name=True)
 
     id: str
     user_api_key: str = Field(description="New API key — returned ONCE")

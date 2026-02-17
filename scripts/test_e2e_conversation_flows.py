@@ -31,17 +31,11 @@ if sys.platform == "win32":
 # ---------------------------------------------------------------------------
 # Auto-load .env.local (transient credentials must never be hardcoded)
 # ---------------------------------------------------------------------------
-_env_local = Path(__file__).resolve().parent.parent / ".env.local"
-if _env_local.is_file():
-    with open(_env_local) as _f:
-        for _line in _f:
-            _line = _line.strip()
-            if _line and not _line.startswith("#") and "=" in _line:
-                _k, _, _v = _line.partition("=")
-                _k, _v = _k.strip(), _v.strip()
-                if _k and _v and _k not in os.environ:
-                    os.environ[_k] = _v
+# Load .env.local (shared loader — R7 refactoring)
+from scripts._env import load_env_local
+load_env_local()
 
+# Default per REPEATABLE-PROCEDURES.md §7.4 — .env.local takes precedence
 API = os.environ.get(
     "PROD_URL",
     "https://agent-red-api-gateway.orangeglacier-f566a4e7.eastus.azurecontainerapps.io",

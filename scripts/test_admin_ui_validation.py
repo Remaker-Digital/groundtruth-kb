@@ -48,21 +48,15 @@ import httpx
 # ---------------------------------------------------------------------------
 # Auto-load .env.local
 # ---------------------------------------------------------------------------
-_env_local = Path(__file__).resolve().parent.parent / ".env.local"
-if _env_local.is_file():
-    with open(_env_local) as f:
-        for line in f:
-            line = line.strip()
-            if line and not line.startswith("#") and "=" in line:
-                key, _, val = line.partition("=")
-                key, val = key.strip(), val.strip()
-                if key and val and key not in os.environ:
-                    os.environ[key] = val
+# Load .env.local (shared loader — R7 refactoring)
+from scripts._env import load_env_local
+load_env_local()
 
 # ---------------------------------------------------------------------------
 # Constants
 # ---------------------------------------------------------------------------
 
+# Default per REPEATABLE-PROCEDURES.md §7.4 — .env.local takes precedence
 BASE_URL = os.environ.get(
     "AGENT_RED_BASE_URL",
     "https://agent-red-api-gateway.orangeglacier-f566a4e7.eastus.azurecontainerapps.io",

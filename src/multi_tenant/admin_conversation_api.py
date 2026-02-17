@@ -38,8 +38,9 @@ from datetime import datetime, timezone
 from typing import Any
 
 from fastapi import APIRouter, Depends, HTTPException, Query
-from pydantic import BaseModel, ConfigDict, Field
-from pydantic.alias_generators import to_camel
+from pydantic import Field
+
+from src.multi_tenant.api_models import CamelCaseModel
 
 from src.multi_tenant.auth import TenantContext
 from src.multi_tenant.cosmos_schema import ConversationStatus
@@ -58,10 +59,9 @@ logger = logging.getLogger(__name__)
 # ---------------------------------------------------------------------------
 
 
-class AdminConversationSummary(BaseModel):
+class AdminConversationSummary(CamelCaseModel):
     """Compact conversation record for the admin inbox list view."""
 
-    model_config = ConfigDict(alias_generator=to_camel, populate_by_name=True)
 
     conversation_id: str
     status: str | None = None
@@ -81,10 +81,9 @@ class AdminConversationSummary(BaseModel):
     archived_at: str | None = None
 
 
-class AdminConversationListResponse(BaseModel):
+class AdminConversationListResponse(CamelCaseModel):
     """Paginated list of conversations for the admin inbox."""
 
-    model_config = ConfigDict(alias_generator=to_camel, populate_by_name=True)
 
     tenant_id: str
     total_count: int = Field(description="Total matching conversations")
@@ -93,10 +92,9 @@ class AdminConversationListResponse(BaseModel):
     conversations: list[AdminConversationSummary]
 
 
-class AdminConversationDetailResponse(BaseModel):
+class AdminConversationDetailResponse(CamelCaseModel):
     """Full conversation detail for the admin inbox."""
 
-    model_config = ConfigDict(alias_generator=to_camel, populate_by_name=True)
 
     conversation_id: str
     tenant_id: str
@@ -118,10 +116,9 @@ class AdminConversationDetailResponse(BaseModel):
     internal_notes: list[dict[str, Any]] = Field(default_factory=list)
 
 
-class MessageEntry(BaseModel):
+class MessageEntry(CamelCaseModel):
     """A single message in the conversation transcript."""
 
-    model_config = ConfigDict(alias_generator=to_camel, populate_by_name=True)
 
     role: str
     content: str
@@ -130,10 +127,9 @@ class MessageEntry(BaseModel):
     metadata: dict[str, Any] | None = None
 
 
-class ConversationMessagesResponse(BaseModel):
+class ConversationMessagesResponse(CamelCaseModel):
     """Full message history for a conversation."""
 
-    model_config = ConfigDict(alias_generator=to_camel, populate_by_name=True)
 
     conversation_id: str
     tenant_id: str
@@ -141,10 +137,9 @@ class ConversationMessagesResponse(BaseModel):
     messages: list[MessageEntry]
 
 
-class AssignAgentRequest(BaseModel):
+class AssignAgentRequest(CamelCaseModel):
     """Request body for POST /api/admin/conversations/{id}/assign."""
 
-    model_config = ConfigDict(alias_generator=to_camel, populate_by_name=True)
 
     agent_id: str = Field(
         min_length=1,
@@ -153,20 +148,18 @@ class AssignAgentRequest(BaseModel):
     )
 
 
-class AssignAgentResponse(BaseModel):
+class AssignAgentResponse(CamelCaseModel):
     """Response for successful agent assignment."""
 
-    model_config = ConfigDict(alias_generator=to_camel, populate_by_name=True)
 
     conversation_id: str
     assigned_to: str
     assigned_at: str
 
 
-class EscalateConversationRequest(BaseModel):
+class EscalateConversationRequest(CamelCaseModel):
     """Optional request body for POST /api/admin/conversations/{id}/escalate."""
 
-    model_config = ConfigDict(alias_generator=to_camel, populate_by_name=True)
 
     category: str | None = Field(
         default=None,
@@ -178,10 +171,9 @@ class EscalateConversationRequest(BaseModel):
     )
 
 
-class EscalateConversationResponse(BaseModel):
+class EscalateConversationResponse(CamelCaseModel):
     """Response for successful conversation escalation."""
 
-    model_config = ConfigDict(alias_generator=to_camel, populate_by_name=True)
 
     conversation_id: str
     status: str
@@ -190,29 +182,26 @@ class EscalateConversationResponse(BaseModel):
     assigned_to: str | None = None
 
 
-class ResolveConversationResponse(BaseModel):
+class ResolveConversationResponse(CamelCaseModel):
     """Response for successful conversation resolution."""
 
-    model_config = ConfigDict(alias_generator=to_camel, populate_by_name=True)
 
     conversation_id: str
     status: str
     resolved_at: str
 
 
-class ArchiveConversationResponse(BaseModel):
+class ArchiveConversationResponse(CamelCaseModel):
     """Response for successful conversation archive/unarchive."""
 
-    model_config = ConfigDict(alias_generator=to_camel, populate_by_name=True)
 
     conversation_id: str
     archived_at: str | None = None
 
 
-class AddNoteRequest(BaseModel):
+class AddNoteRequest(CamelCaseModel):
     """Request body for POST /api/admin/conversations/{id}/notes."""
 
-    model_config = ConfigDict(alias_generator=to_camel, populate_by_name=True)
 
     content: str = Field(
         min_length=1,
@@ -226,20 +215,18 @@ class AddNoteRequest(BaseModel):
     )
 
 
-class AddNoteResponse(BaseModel):
+class AddNoteResponse(CamelCaseModel):
     """Response for successfully added note."""
 
-    model_config = ConfigDict(alias_generator=to_camel, populate_by_name=True)
 
     conversation_id: str
     note_id: str
     created_at: str
 
 
-class SearchConversationsRequest(BaseModel):
+class SearchConversationsRequest(CamelCaseModel):
     """Request body for POST /api/admin/conversations/search."""
 
-    model_config = ConfigDict(alias_generator=to_camel, populate_by_name=True)
 
     query: str = Field(
         min_length=1,
@@ -266,10 +253,9 @@ class SearchConversationsRequest(BaseModel):
     )
 
 
-class SearchResultEntry(BaseModel):
+class SearchResultEntry(CamelCaseModel):
     """A single conversation match from a search."""
 
-    model_config = ConfigDict(alias_generator=to_camel, populate_by_name=True)
 
     conversation_id: str
     customer_id: str | None = None
@@ -282,10 +268,9 @@ class SearchResultEntry(BaseModel):
     matched_in: str = Field(description="Where the match was found: messages, notes, or customer_name")
 
 
-class SearchConversationsResponse(BaseModel):
+class SearchConversationsResponse(CamelCaseModel):
     """Response for conversation search."""
 
-    model_config = ConfigDict(alias_generator=to_camel, populate_by_name=True)
 
     tenant_id: str
     query: str

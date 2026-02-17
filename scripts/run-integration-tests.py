@@ -23,14 +23,15 @@ import sys
 from pathlib import Path
 from typing import List, Optional
 
-from dotenv import load_dotenv
+# Load .env.local (shared loader — R7 refactoring)
+from scripts._env import load_env_local
 
 
 def load_test_environment() -> bool:
     """Load test environment configuration."""
     env_file = Path(".env.local")
     if env_file.exists():
-        load_dotenv(env_file)
+        load_env_local()
         print(f"✅ Loaded environment from {env_file}")
         return True
     else:

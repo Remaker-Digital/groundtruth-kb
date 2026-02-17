@@ -28,7 +28,9 @@ PROJECT_ROOT = Path(__file__).resolve().parent.parent
 sys.path.insert(0, str(PROJECT_ROOT))
 
 import stripe
-from dotenv import load_dotenv
+
+# Load .env.local (shared loader — R7 refactoring)
+from scripts._env import load_env_local
 
 
 def load_environment() -> bool:
@@ -39,8 +41,8 @@ def load_environment() -> bool:
         print("   Create .env.local with your Stripe and Shopify credentials")
         print("   See docs/INTEGRATION-TESTING-SETUP.md for details")
         return False
-    
-    load_dotenv(env_file)
+
+    load_env_local()
     print(f"✅ Loaded environment from {env_file}")
     return True
 

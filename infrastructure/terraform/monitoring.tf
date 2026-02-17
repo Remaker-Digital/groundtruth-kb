@@ -27,7 +27,7 @@ variable "enable_monitoring_alerts" {
 variable "alert_email" {
   description = "Email address for alert notifications"
   type        = string
-  default     = "mike@remakerdigital.com"
+  # Required — provide via .tfvars (do not hardcode personal email)
 }
 
 # ---------------------------------------------------------------------------

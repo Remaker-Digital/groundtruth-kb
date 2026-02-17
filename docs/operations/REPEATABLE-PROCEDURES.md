@@ -182,11 +182,12 @@ Some procedures are short enough to define inline rather than in separate files.
 ```
 PROCEDURE: Run Unit Test Suite
 TYPE: Repeatable Procedure
-LAST VERIFIED: 2026-02-14
+LAST VERIFIED: 2026-02-17
+LAST CORRECTED: 2026-02-17 — Updated EXPECTED_MIN_PASS (2500→2400), added --ignore flags for consistency, updated counts (S31)
 
 VARIABLES:
   PROJECT_ROOT = E:\Claude-Playground\CLAUDE-PROJECTS\Agent Red Customer Engagement
-  EXPECTED_MIN_PASS = 2200
+  EXPECTED_MIN_PASS = 2400
   EXPECTED_MAX_SKIP = 10
   EXPECTED_FAILURES = 0
 
@@ -196,8 +197,8 @@ PRECONDITIONS:
   [ ] Working directory is PROJECT_ROOT   — pwd
 
 STEPS:
-  STEP 1: Run pytest
-    ACTION:    python -m pytest tests/ -x -q --tb=short
+  STEP 1: Run pytest (unit tests only, excluding integration/regression/performance)
+    ACTION:    python -m pytest tests/ --ignore=tests/integration --ignore=tests/regression --ignore=tests/performance -x -q --tb=short
     EXPECTED:  Exit code 0, "N passed, M skipped" summary line
     VERIFY:    Parse summary line: passed >= $EXPECTED_MIN_PASS,
                skipped <= $EXPECTED_MAX_SKIP, failed == $EXPECTED_FAILURES
@@ -205,13 +206,14 @@ STEPS:
 
 POSTCONDITIONS:
   [ ] All tests passed (0 failures)
-  [ ] Pass count >= $EXPECTED_MIN_PASS (currently 2,283)
+  [ ] Pass count >= $EXPECTED_MIN_PASS (currently 2,476 unit-only as of session 31)
   [ ] Skip count <= $EXPECTED_MAX_SKIP (currently 6)
 
 KNOWN FAILURE MODES:
   | Failure | Classification | Resolution |
   |---------|---------------|------------|
   | Azure integration test fails (RBAC) | Environment transient | Unrelated to unit tests; skip with -k "not azure_integration" |
+  | Count drift between sessions | Procedure defect (if significant) | Count may vary ±50 due to test collection changes during refactoring. Update EXPECTED_MIN_PASS if sustained. |
 ```
 
 ### Production Regression Suite
@@ -219,7 +221,7 @@ KNOWN FAILURE MODES:
 ```
 PROCEDURE: Run Production Regression Suite
 TYPE: Repeatable Procedure
-LAST VERIFIED: 2026-02-14
+LAST VERIFIED: 2026-02-17
 
 VARIABLES:
   PROJECT_ROOT       = E:\Claude-Playground\CLAUDE-PROJECTS\Agent Red Customer Engagement
@@ -227,7 +229,7 @@ VARIABLES:
   WIDGET_KEY         = (from .env.local PREVIEW_WIDGET_KEY; rotates on every re-seed)
   AGENTRED_API_KEY   = (superadmin user API key — must match .env.local SUPERADMIN_PREVIEW_API_KEY; rotates on every re-seed)
   TIER0_COUNT        = 17
-  TIER1_COUNT        = 16
+  TIER1_COUNT        = 20
   TIER2_COUNT        = 10
 
 PRECONDITIONS:
@@ -246,7 +248,7 @@ STEPS:
 
   STEP 2: Run Tier 1 (Pre-launch gate)
     ACTION:    PROD_URL=$PROD_URL WIDGET_KEY=$WIDGET_KEY AGENTRED_API_KEY=$AGENTRED_API_KEY python -m pytest tests/regression/test_upgrade_regression.py -x -q -m tier1 --tb=short
-    EXPECTED:  16 passed, 0 failed (some may skip if AGENTRED_API_KEY not set)
+    EXPECTED:  20 passed, 0 failed (some may skip if AGENTRED_API_KEY not set)
     VERIFY:    Exit code 0; summary line shows passed >= 10
     ON FAIL:   Investigate. Do not cut traffic until resolved.
 
@@ -354,4 +356,4 @@ When creating or modifying code, test scripts, or documentation:
 ---
 
 *© 2026 Remaker Digital, a DBA of VanDusen & Palmeter, LLC. All rights reserved.*
-*Last Updated: 2026-02-15*
+*Last Updated: 2026-02-17*

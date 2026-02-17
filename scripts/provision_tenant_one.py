@@ -39,28 +39,25 @@ PROJECT_ROOT = Path(__file__).resolve().parent.parent
 if str(PROJECT_ROOT) not in sys.path:
     sys.path.insert(0, str(PROJECT_ROOT))
 
-# Load .env.local
-_env_path = PROJECT_ROOT / ".env.local"
-if _env_path.exists():
-    for line in _env_path.read_text().splitlines():
-        line = line.strip()
-        if line and not line.startswith("#") and "=" in line:
-            key, _, value = line.partition("=")
-            os.environ.setdefault(key.strip(), value.strip())
+# Load .env.local (shared loader — R7 refactoring)
+from scripts._env import load_env_local
+load_env_local()
 
 logging.basicConfig(level=logging.INFO, format="%(levelname)s: %(message)s")
 logger = logging.getLogger(__name__)
 
 # ---------------------------------------------------------------------------
-# Tenant #1 configuration
+# Tenant #1 configuration — override via env vars or .env.local.
+# Defaults are the canonical Remaker Digital test tenant.
+# See REPEATABLE-PROCEDURES.md §7.4 for documented-default policy.
 # ---------------------------------------------------------------------------
 
-TENANT_ID = "remaker-digital-001"
-SHOP_DOMAIN = "blanco-9939.myshopify.com"
-CUSTOMER_EMAIL = "mike@remakerdigital.com"
-TIER = "professional"
-BILLING_CHANNEL = "shopify"
-INTERVAL = "month"
+TENANT_ID = os.environ.get("SEED_TENANT_ID", "remaker-digital-001")
+SHOP_DOMAIN = os.environ.get("SEED_SHOP_DOMAIN", "blanco-9939.myshopify.com")
+CUSTOMER_EMAIL = os.environ.get("SEED_CUSTOMER_EMAIL", "mike@remakerdigital.com")
+TIER = os.environ.get("SEED_TIER", "professional")
+BILLING_CHANNEL = os.environ.get("SEED_BILLING_CHANNEL", "shopify")
+INTERVAL = os.environ.get("SEED_INTERVAL", "month")
 
 
 def generate_api_key() -> str:

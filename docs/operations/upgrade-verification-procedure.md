@@ -91,6 +91,7 @@ Compare every value from Phase A against the current state. **All values must ma
 | C.11 | Widget key still valid | `POST /api/chat/conversations` with widget key returns 200 (if tenant was active) or 403 (if tenant was inactive — same as before) |
 | C.12 | API key still authenticates | `GET /api/config` with `{API_KEY}` returns 200 |
 | C.13 | Regression tests pass | `python -m pytest tests/regression/ -q` — all pass |
+| C.14 | Superadmin API functional | `GET /api/superadmin/tenants` with SPA API key returns 200 with `total >= 1` |
 
 ### Phase D: Failure Response
 

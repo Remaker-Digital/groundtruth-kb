@@ -19,7 +19,7 @@ import pytest
 @pytest.fixture(autouse=True)
 def _ensure_password_hash():
     """Ensure _admin_password_hash and _ADMIN_HMAC_KEY are set for HMAC token tests."""
-    import src.main as m
+    import src.app.standalone_auth as m
     original_hash = m._admin_password_hash
     original_hmac_key = m._ADMIN_HMAC_KEY
     if not original_hash:
@@ -59,7 +59,7 @@ class TestHMACTokenGeneration:
         from src.main import _generate_reset_token, _validate_reset_token
         token = _generate_reset_token(ttl=1)
         # Fast-forward past expiry
-        with patch("src.main._time.time", return_value=time.time() + 10):
+        with patch("src.app.standalone_auth._time.time", return_value=time.time() + 10):
             assert _validate_reset_token(token) is False
 
     def test_validate_tampered_signature(self):
@@ -122,34 +122,36 @@ class TestHMACTokenGeneration:
 def standalone_client():
     """Create a test client with admin password configured."""
     import src.main as main_mod
+    import src.app.standalone_auth as auth_mod
 
-    # Ensure admin password is set for testing
-    original_pw = main_mod._ADMIN_INITIAL_PASSWORD
-    original_hash = main_mod._admin_password_hash
-    original_hmac_key = main_mod._ADMIN_HMAC_KEY
-    original_email = main_mod._ADMIN_RESET_EMAIL
+    # Ensure admin password is set for testing — mutate on the auth module
+    # where the route handlers actually read mutable state.
+    original_pw = auth_mod._ADMIN_INITIAL_PASSWORD
+    original_hash = auth_mod._admin_password_hash
+    original_hmac_key = auth_mod._ADMIN_HMAC_KEY
+    original_email = auth_mod._ADMIN_RESET_EMAIL
 
-    test_hash = main_mod.hashlib.sha256(
+    test_hash = auth_mod.hashlib.sha256(
         b"agentred-admin:testpassword",
     ).hexdigest()
-    main_mod._ADMIN_INITIAL_PASSWORD = "testpassword"
-    main_mod._admin_password_hash = test_hash
-    main_mod._ADMIN_HMAC_KEY = test_hash
-    main_mod._admin_current_password = "testpassword"
-    main_mod._admin_cookie_value = main_mod._compute_cookie_value("testpassword")
-    main_mod._ADMIN_RESET_EMAIL = "admin@test.com"
+    auth_mod._ADMIN_INITIAL_PASSWORD = "testpassword"
+    auth_mod._admin_password_hash = test_hash
+    auth_mod._ADMIN_HMAC_KEY = test_hash
+    auth_mod._admin_current_password = "testpassword"
+    auth_mod._admin_cookie_value = auth_mod._compute_cookie_value("testpassword")
+    auth_mod._ADMIN_RESET_EMAIL = "admin@test.com"
 
     from fastapi.testclient import TestClient
     with TestClient(main_mod.app) as client:
         yield client
 
     # Restore
-    main_mod._ADMIN_INITIAL_PASSWORD = original_pw
-    main_mod._admin_password_hash = original_hash
-    main_mod._ADMIN_HMAC_KEY = original_hmac_key
-    main_mod._ADMIN_RESET_EMAIL = original_email
-    main_mod._admin_used_reset_nonces.clear()
-    main_mod._admin_reset_rate_limit.clear()
+    auth_mod._ADMIN_INITIAL_PASSWORD = original_pw
+    auth_mod._admin_password_hash = original_hash
+    auth_mod._ADMIN_HMAC_KEY = original_hmac_key
+    auth_mod._ADMIN_RESET_EMAIL = original_email
+    auth_mod._admin_used_reset_nonces.clear()
+    auth_mod._admin_reset_rate_limit.clear()
 
 
 class TestForgotPasswordEndpoints:
@@ -163,7 +165,7 @@ class TestForgotPasswordEndpoints:
 
     def test_post_forgot_password_valid_email(self, standalone_client):
         """POST with matching email returns success page (no email enumeration)."""
-        with patch("src.main._send_admin_reset_email", return_value=True) as mock_send:
+        with patch("src.app.standalone_auth._send_admin_reset_email", return_value=True) as mock_send:
             resp = standalone_client.post(
                 "/admin/standalone/_forgot-password",
                 data={"email": "admin@test.com"},
@@ -178,7 +180,7 @@ class TestForgotPasswordEndpoints:
 
     def test_post_forgot_password_wrong_email(self, standalone_client):
         """POST with non-matching email still returns success (anti-enumeration)."""
-        with patch("src.main._send_admin_reset_email") as mock_send:
+        with patch("src.app.standalone_auth._send_admin_reset_email") as mock_send:
             resp = standalone_client.post(
                 "/admin/standalone/_forgot-password",
                 data={"email": "wrong@example.com"},
@@ -196,10 +198,10 @@ class TestForgotPasswordEndpoints:
 
     def test_rate_limit_forgot_password(self, standalone_client):
         """Fourth request within 5 minutes returns 429."""
-        import src.main as main_mod
-        main_mod._admin_reset_rate_limit.clear()
+        import src.app.standalone_auth as auth_mod
+        auth_mod._admin_reset_rate_limit.clear()
 
-        with patch("src.main._send_admin_reset_email", return_value=True):
+        with patch("src.app.standalone_auth._send_admin_reset_email", return_value=True):
             for _ in range(3):
                 resp = standalone_client.post(
                     "/admin/standalone/_forgot-password",

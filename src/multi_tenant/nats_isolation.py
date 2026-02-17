@@ -81,8 +81,9 @@ logger = logging.getLogger(__name__)
 # Constants
 # ---------------------------------------------------------------------------
 
-# NATS server URL (production: NATS JetStream at 10.0.1.5:4222)
-NATS_URL = os.environ.get("NATS_URL", "nats://10.0.1.5:4222")
+# NATS server URL — production value injected via Terraform env var.
+# Development default is localhost; internal VNet IP must not be hardcoded.
+NATS_URL = os.environ.get("NATS_URL", "nats://localhost:4222")
 
 # Agent topic suffixes — matching AGNTCY upstream topic-based routing
 AGENT_TOPICS = (

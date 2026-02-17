@@ -1,5 +1,5 @@
 properties:
-  managedEnvironmentId: /subscriptions/828eb521-88bb-4b01-ac3e-7ba779c55212/resourceGroups/agentred-prod-rg/providers/Microsoft.App/managedEnvironments/agent-red-cae
+  managedEnvironmentId: /subscriptions/4dce2122-690a-4654-b531-cc647db62331/resourceGroups/Agent-Red/providers/Microsoft.App/managedEnvironments/agent-red-env
   workloadProfileName: Consumption
   configuration:
     activeRevisionsMode: Single
@@ -11,7 +11,7 @@ properties:
         - latestRevision: true
           weight: 100
     registries:
-      - server: acragentredeastus2.azurecr.io
+      - server: acragentredeastus.azurecr.io
         identity: system
     secrets:
       - name: azure-openai-api-key
@@ -27,7 +27,7 @@ properties:
   template:
     containers:
       - name: api-gateway
-        image: acragentredeastus2.azurecr.io/api-gateway:v1.14.0
+        image: acragentredeastus.azurecr.io/api-gateway:v1.14.0
         resources:
           cpu: 0.5
           memory: 1Gi
@@ -35,11 +35,11 @@ properties:
           - name: ENVIRONMENT
             value: production
           - name: AZURE_OPENAI_ENDPOINT
-            value: https://aoai-agentred-eastus2.openai.azure.com/
+            value: https://agent-red-openai.openai.azure.com/
           - name: AZURE_OPENAI_API_KEY
             secretRef: azure-openai-api-key
           - name: COSMOS_DB_ENDPOINT
-            value: https://cosmos-agentred-eastus2.documents.azure.com:443/
+            value: https://cosmos-agentred-eastus.documents.azure.com:443/
           - name: COSMOS_DB_KEY
             secretRef: cosmos-db-key
           - name: COSMOS_DB_DATABASE
@@ -47,9 +47,9 @@ properties:
           - name: COSMOS_USE_MANAGED_ID
             value: "true"
           - name: AZURE_KEYVAULT_URL
-            value: https://kv-agentred-eastus2.vault.azure.net/
+            value: https://kv-agentred-eastus.vault.azure.net/
           - name: KEY_VAULT_URL
-            value: https://kv-agentred-eastus2.vault.azure.net/
+            value: https://kv-agentred-eastus.vault.azure.net/
           - name: USE_AZURE_OPENAI
             value: "true"
           - name: USE_REAL_APIS
@@ -57,7 +57,7 @@ properties:
           - name: USE_AGENT_CONTAINERS
             value: "false"
           - name: NATS_URL
-            value: nats://agent-red-nats.internal.lemonriver-f59f94b7.eastus2.azurecontainerapps.io:4222
+            value: nats://agent-red-nats.internal.orangeglacier-f566a4e7.eastus.azurecontainerapps.io:4222
           - name: GRACEFUL_SHUTDOWN_TIMEOUT
             value: "60"
           - name: SHOPIFY_API_KEY

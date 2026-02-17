@@ -46,14 +46,14 @@ param(
 # ============================================================================
 # Configuration
 # ============================================================================
-$RESOURCE_GROUP = "agentred-prod-rg"
-$SOURCE_ACCOUNT = "cosmos-agentred-eastus2"
+$RESOURCE_GROUP = "Agent-Red"
+$SOURCE_ACCOUNT = "cosmos-agentred-eastus"
 $DATABASE_NAME = "agentred"
-$LOCATION = "East US 2"
+$LOCATION = "East US"
 $CONTAINER_APP = "agent-red-api-gateway"
-$PROD_URL = "https://agent-red-api-gateway.lemonriver-f59f94b7.eastus2.azurecontainerapps.io"
+$PROD_URL = "https://agent-red-api-gateway.orangeglacier-f566a4e7.eastus.azurecontainerapps.io"
 $PROJECT_ROOT = (Resolve-Path "$PSScriptRoot\..\..").Path
-$SUBSCRIPTION_ID = "828eb521-88bb-4b01-ac3e-7ba779c55212"
+$SUBSCRIPTION_ID = "4dce2122-690a-4654-b531-cc647db62331"
 
 # All 10 containers in the agentred database
 $ALL_CONTAINERS = @(
