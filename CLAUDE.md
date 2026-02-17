@@ -15,7 +15,7 @@ This document provides active guidance for AI assistants working on the Agent Re
 |-----------|-------|
 | **Project Name** | Agent Red Customer Experience |
 | **Type** | Commercial SaaS Product (Shopify + Standalone) |
-| **Status** | Production v1.34.0 HEALTHY. 2,476 unit tests (0 failures), 178 UI tests. AGNTCY Phase 2 COMPLETE. Provider Admin Phase 1 COMPLETE. Config Compliance COMPLETE. P0 Refactoring Cycle 1 COMPLETE. MCP Assessment COMPLETE. Next: 5-cycle roadmap (v1.35.0→v1.39.0). See `memory/build-deploy-roadmap.md`. |
+| **Status** | Production v1.35.0 HEALTHY (Cycle 1 COMPLETE). 2,476 unit tests (0 failures), 178 UI tests. Next: Cycle 2 — P1 Refactoring (R2+R4+R6), target v1.36.0. See `memory/build-deploy-roadmap.md`. |
 | **Owner** | Remaker Digital (DBA of VanDusen & Palmeter, LLC) |
 
 ### Copyright Notice
@@ -146,6 +146,7 @@ Full plan: `memory/build-deploy-roadmap.md`
 - **Milestone: AGNTCY Phase 3 COMPLETE** — all 14 assertions verified
 
 ### Completed Milestones
+- ✅ **Cycle 1 Deploy v1.35.0** (Session 33): S29-33 shipped, ACR build caw, revision 0000025, Tier 0 17/17 PASS
 - ✅ P0 Refactoring Cycle 1 (Session 31): R1 main.py split, R9a sourcemaps, R7 env loader, R8 CamelCaseModel
 - ✅ Configuration Strategy Compliance (Session 30): 25 files, 4 priority levels
 - ✅ Provider Admin Phase 1 (Session 29): 5 superadmin endpoints, 20 tests
