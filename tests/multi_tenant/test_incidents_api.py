@@ -158,7 +158,7 @@ def superadmin_ctx():
     ctx = MagicMock()
     ctx.tenant_id = "remaker-digital-001"
     ctx.team_member_role = "superadmin"
-    ctx.team_member = {"email": "admin@remaker.com"}
+    ctx.team_member_email = "admin@remaker.com"
     return ctx
 
 

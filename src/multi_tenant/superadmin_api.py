@@ -1375,7 +1375,7 @@ async def create_incident(
     if _incident_repo is None:
         raise HTTPException(status_code=503, detail="Incident service not configured")
 
-    created_by = ctx.team_member.get("email", "superadmin") if ctx.team_member else "superadmin"
+    created_by = ctx.team_member_email or "superadmin"
     doc = await _incident_repo.create_incident(
         title=body.title,
         description=body.description,
@@ -1426,7 +1426,7 @@ async def add_incident_update(
     if existing is None:
         raise HTTPException(status_code=404, detail="Incident not found")
 
-    author = ctx.team_member.get("email", "superadmin") if ctx.team_member else "superadmin"
+    author = ctx.team_member_email or "superadmin"
     doc = await _incident_repo.add_update(
         incident_id=incident_id,
         current_status=existing["status"],
@@ -1461,7 +1461,7 @@ async def resolve_incident(
     if existing["status"] == "resolved":
         raise HTTPException(status_code=400, detail="Incident is already resolved")
 
-    author = ctx.team_member.get("email", "superadmin") if ctx.team_member else "superadmin"
+    author = ctx.team_member_email or "superadmin"
     doc = await _incident_repo.resolve_incident(
         incident_id=incident_id,
         current_status=existing["status"],
@@ -1811,7 +1811,7 @@ async def acknowledge_alert(
     if _alert_history_repo is None:
         raise HTTPException(status_code=503, detail="Alert service not configured")
 
-    ack_by = ctx.team_member.get("email", "superadmin") if ctx.team_member else "superadmin"
+    ack_by = ctx.team_member_email or "superadmin"
     doc = await _alert_history_repo.acknowledge(
         alert_id=alert_id,
         alert_date=alert_date,
@@ -1856,6 +1856,23 @@ def _get_mfa_svc():
     return get_mfa_service()
 
 
+async def _get_team_member(ctx: TenantContext) -> dict[str, Any]:
+    """Fetch the full team member document for the authenticated user.
+
+    MFA endpoints need the full document (mfa_enabled, backup code hashes, etc.)
+    but TenantContext only carries scalar identity fields.
+    """
+    if not ctx.team_member_id:
+        raise HTTPException(status_code=401, detail="No authenticated team member")
+    from src.multi_tenant.repositories.team import TeamMemberRepository
+
+    repo = TeamMemberRepository()
+    try:
+        return await repo.read(ctx.tenant_id, ctx.team_member_id)
+    except Exception:
+        raise HTTPException(status_code=404, detail="Team member not found")
+
+
 @router.get(
     "/mfa/status",
     response_model=MfaStatusResponse,
@@ -1866,15 +1883,14 @@ async def mfa_status(
     ctx: TenantContext = Depends(require_role(TeamMemberRole.SUPERADMIN)),
 ) -> MfaStatusResponse:
     """Get MFA enrollment status for the current authenticated user."""
-    if ctx.team_member is None:
-        raise HTTPException(status_code=401, detail="No authenticated team member")
+    member = await _get_team_member(ctx)
 
     try:
         svc = _get_mfa_svc()
     except RuntimeError:
         raise HTTPException(status_code=503, detail="MFA service not configured")
 
-    status = await svc.get_enrollment_status(ctx.team_member)
+    status = await svc.get_enrollment_status(member)
     return MfaStatusResponse(
         mfa_enabled=status["mfa_enabled"],
         enrolled_at=status.get("enrolled_at"),
@@ -1897,10 +1913,9 @@ async def mfa_enroll(
     confirmed until the user provides their first valid TOTP code via
     the ``/mfa/confirm`` endpoint.
     """
-    if ctx.team_member is None:
-        raise HTTPException(status_code=401, detail="No authenticated team member")
+    member = await _get_team_member(ctx)
 
-    if ctx.team_member.get("mfa_enabled", False):
+    if member.get("mfa_enabled", False):
         raise HTTPException(status_code=409, detail="MFA is already enabled")
 
     try:
@@ -1908,7 +1923,7 @@ async def mfa_enroll(
     except RuntimeError:
         raise HTTPException(status_code=503, detail="MFA service not configured")
 
-    result = await svc.start_enrollment(ctx.team_member)
+    result = await svc.start_enrollment(member)
     return MfaEnrollResponse(
         qr_code_data_url=result["qr_code_data_url"],
         provisioning_uri=result["provisioning_uri"],
@@ -1930,8 +1945,7 @@ async def mfa_confirm(
 
     After this succeeds, MFA is required for all subsequent logins.
     """
-    if ctx.team_member is None:
-        raise HTTPException(status_code=401, detail="No authenticated team member")
+    member = await _get_team_member(ctx)
 
     try:
         svc = _get_mfa_svc()
@@ -1939,7 +1953,7 @@ async def mfa_confirm(
         raise HTTPException(status_code=503, detail="MFA service not configured")
 
     confirmed = await svc.confirm_enrollment(
-        member=ctx.team_member,
+        member=member,
         code=body.code,
         backup_code_hashes=body.backup_code_hashes,
     )
@@ -1964,10 +1978,9 @@ async def mfa_verify(
     The returned token should be included in subsequent requests as
     the ``X-MFA-Token`` header.
     """
-    if ctx.team_member is None:
-        raise HTTPException(status_code=401, detail="No authenticated team member")
+    member = await _get_team_member(ctx)
 
-    if not ctx.team_member.get("mfa_enabled", False):
+    if not member.get("mfa_enabled", False):
         raise HTTPException(status_code=400, detail="MFA is not enabled for this user")
 
     try:
@@ -1975,7 +1988,7 @@ async def mfa_verify(
     except RuntimeError:
         raise HTTPException(status_code=503, detail="MFA service not configured")
 
-    result = await svc.verify_code(ctx.team_member, body.code)
+    result = await svc.verify_code(member, body.code)
     if result is None:
         raise HTTPException(status_code=401, detail="Invalid TOTP code")
 
@@ -1992,10 +2005,9 @@ async def mfa_disable(
     ctx: TenantContext = Depends(require_role(TeamMemberRole.SUPERADMIN)),
 ) -> dict[str, Any]:
     """Disable MFA for the current user. Requires a valid TOTP code."""
-    if ctx.team_member is None:
-        raise HTTPException(status_code=401, detail="No authenticated team member")
+    member = await _get_team_member(ctx)
 
-    if not ctx.team_member.get("mfa_enabled", False):
+    if not member.get("mfa_enabled", False):
         raise HTTPException(status_code=400, detail="MFA is not enabled")
 
     try:
@@ -2003,7 +2015,7 @@ async def mfa_disable(
     except RuntimeError:
         raise HTTPException(status_code=503, detail="MFA service not configured")
 
-    disabled = await svc.disable_mfa(ctx.team_member, body.code)
+    disabled = await svc.disable_mfa(member, body.code)
     if not disabled:
         raise HTTPException(status_code=400, detail="Invalid TOTP code")
 
@@ -2024,10 +2036,9 @@ async def mfa_backup_verify(
 
     Returns an MFA session token and the number of remaining backup codes.
     """
-    if ctx.team_member is None:
-        raise HTTPException(status_code=401, detail="No authenticated team member")
+    member = await _get_team_member(ctx)
 
-    if not ctx.team_member.get("mfa_enabled", False):
+    if not member.get("mfa_enabled", False):
         raise HTTPException(status_code=400, detail="MFA is not enabled for this user")
 
     try:
@@ -2035,7 +2046,7 @@ async def mfa_backup_verify(
     except RuntimeError:
         raise HTTPException(status_code=503, detail="MFA service not configured")
 
-    result = await svc.verify_backup(ctx.team_member, body.code)
+    result = await svc.verify_backup(member, body.code)
     if result is None:
         raise HTTPException(status_code=401, detail="Invalid backup code")
 
