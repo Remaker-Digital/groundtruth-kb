@@ -233,6 +233,14 @@ const Mfa: React.FC<IconProps> = (props) => (
   </svg>
 );
 
+/** Envelope — Email / Magic link confirmation */
+const Email: React.FC<IconProps> = (props) => (
+  <svg {...svgAttrs(props)}>
+    <path d="M4 4h16c1.1 0 2 .9 2 2v12c0 1.1-.9 2-2 2H4c-1.1 0-2-.9-2-2V6c0-1.1.9-2 2-2z" />
+    <polyline points="22,6 12,13 2,6" />
+  </svg>
+);
+
 // ---------------------------------------------------------------------------
 // Utility icons (dark mode toggle, etc.)
 // ---------------------------------------------------------------------------
@@ -296,6 +304,7 @@ export const Icons = {
   diagnostics: Config, // Alias — gear icon for support diagnostics
   cost: Billing, // Alias — same billing icon for cost analytics
   abuse: Alerts, // Alias — same alert icon for abuse detection
+  email: Email,
 
   // Utility
   sun: Sun,

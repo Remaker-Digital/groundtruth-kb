@@ -112,7 +112,7 @@ Compare every value from Phase A against the current state. **All values must ma
 | C.32 | Tier upgrade preview functional | `GET /api/billing/upgrade/preview?target_tier=professional` with API key returns 200 with `direction` field, or 400 if already on professional tier |
 | C.33 | Unit test count gate | `python -m pytest tests/ --co -q 2>&1 | tail -1` shows >= 4000 tests collected |
 | C.34 | Evaluation framework loads | `python -c "from evaluation.pilots.quality_pilot import load_dataset; print(len(load_dataset()))"` prints >= 20 |
-| C.35 | Critic rule integrity | `python -c "from src.multi_tenant.system_prompt_builder import _PLATFORM_BASE; p=_PLATFORM_BASE['critic_supervisor']; assert '(a)' in p and '(b)' in p and '(c)' in p; print('OK')"` prints OK |
+| C.35 | Critic rule integrity | `python -c "from src.multi_tenant.system_prompt_builder import _PLATFORM_BASE, AgentRole; p=_PLATFORM_BASE[AgentRole.CRITIC_SUPERVISOR]; assert '(a)' in p and '(b)' in p and '(c)' in p; print('OK')"` prints OK |
 
 ### Phase D: Failure Response
 

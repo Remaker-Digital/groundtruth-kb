@@ -261,7 +261,7 @@ if ($SkipBuild) {
             "src\multi_tenant\cosmos_schema.py",
             "src\multi_tenant\auth.py",
             "src\multi_tenant\middleware.py",
-            "src\chat\pipeline.py",
+            "src\chat\pipeline\__init__.py",
             "Dockerfile",
             "requirements.txt"
         )

@@ -30,6 +30,8 @@
     "../shared/**/*.tsx"
   ],
   "exclude": [
-    "../shared/theme/**"
+    "../shared/theme/**",
+    "../shared/McpConfigPanel.tsx",
+    "../shared/McpConfigPanel.*"
   ]
 }
