@@ -289,17 +289,18 @@ async def _startup_nats() -> None:
 
 async def _startup_agntcy_sdk() -> None:
     """Initialize AGNTCY SDK factory and transport on application startup."""
-    from src.multi_tenant.agntcy_sdk_integration import (
-        get_sdk_status,
-        init_agntcy_sdk,
-    )
-
     try:
+        from src.multi_tenant.agntcy_sdk_integration import (
+            get_sdk_status,
+            init_agntcy_sdk,
+        )
+
         await init_agntcy_sdk()
         status = get_sdk_status()
         logger.info("AGNTCY SDK ready: %s", status)
     except Exception:
-        # Non-fatal — SDK may not be fully configured during early phases
+        # Non-fatal — SDK may not be fully configured during early phases,
+        # or agntcy_app_sdk version may have breaking API changes
         logger.warning(
             "AGNTCY SDK initialization failed — platform features unavailable. "
             "This is expected if AGNTCY transport endpoints are not configured."

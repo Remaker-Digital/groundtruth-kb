@@ -4,7 +4,7 @@
 # Install: pip install -r requirements.txt
 
 # AGNTCY SDK (upstream open-source dependency)
-agntcy-app-sdk>=0.4.7
+agntcy-app-sdk>=0.4.7,<1.0
 
 # Web framework
 fastapi>=0.115.0
