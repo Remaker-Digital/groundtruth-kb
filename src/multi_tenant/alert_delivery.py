@@ -557,7 +557,7 @@ class EmailAlertChannel(AlertChannel):
     © 2026 Remaker Digital, a DBA of VanDusen & Palmeter, LLC. All rights reserved.
     """
 
-    SENDER_ADDRESS = "noreply@agentred.com"
+    SENDER_ADDRESS = "DoNotReply@7049c840-0df7-4d4c-ae36-6d00bfc459d4.azurecomm.net"
     TIMEOUT_SECONDS = 10.0
 
     def __init__(

@@ -17,7 +17,7 @@
 
 import React, { createContext, useCallback, useContext, useEffect, useState } from 'react';
 import { useLocation } from 'react-router-dom';
-import { Frame, Loading, Banner } from '@shopify/polaris';
+import { Frame, Loading, Banner, Toast } from '@shopify/polaris';
 import type { TenantContext } from '../../shared/types';
 import ActivationBanner from '../../shared/ActivationBanner';
 import ActivationDialog from '../../shared/ActivationDialog';
@@ -227,18 +227,12 @@ export const ShopifyAppLayout: React.FC<ShopifyAppLayoutProps> = ({
         {loading && <Loading />}
 
         {notification && (
-          <div style={{ padding: '16px' }}>
-            <Banner
-              tone={
-                notification.type === 'error' ? 'critical' :
-                notification.type === 'warning' ? 'warning' :
-                notification.type === 'success' ? 'success' : 'info'
-              }
-              onDismiss={() => setNotification(null)}
-            >
-              <p>{notification.message}</p>
-            </Banner>
-          </div>
+          <Toast
+            content={notification.message}
+            error={notification.type === 'error'}
+            onDismiss={() => setNotification(null)}
+            duration={5000}
+          />
         )}
 
         {error && (

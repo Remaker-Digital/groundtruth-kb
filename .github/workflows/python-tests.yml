@@ -1,11 +1,18 @@
 # Python Test CI Pipeline
 #
-# Runs pytest with coverage on every PR and push to main.
+# Runs pytest in parallel shards with merged coverage on every PR and push to main.
 # Fails on test failure or coverage below threshold (pyproject.toml: fail_under=70).
+# Posts coverage diff comment on PRs.
+#
+# Shards:
+#   core         — tests/multi_tenant, tests/migrations, root test files (~1,600 tests)
+#   agents-chat  — tests/agents, tests/chat, tests/persistent_memory (~400 tests)
+#   integrations — tests/integrations, tests/security, tests/performance (~250 tests)
+#   regression   — tests/regression (47 tier 0/1/2 regression tests)
 #
 # Work Items #104 (Test Infrastructure), #105 (Coverage Gate).
 #
-# (c) 2026 Remaker Digital, a DBA of VanDusen & Palmeter, LLC. All rights reserved.
+# © 2026 Remaker Digital, a DBA of VanDusen & Palmeter, LLC. All rights reserved.
 
 name: Python Tests
 
@@ -26,13 +33,26 @@ on:
       - 'pyproject.toml'
   workflow_dispatch:
 
+# Cancel in-progress runs for the same branch/PR
+concurrency:
+  group: tests-${{ github.ref }}
+  cancel-in-progress: true
+
 jobs:
+  # ---------------------------------------------------------------------------
+  # Parallel test shards
+  # ---------------------------------------------------------------------------
   test:
-    name: Tests (Python ${{ matrix.python-version }})
+    name: "${{ matrix.shard }} (py${{ matrix.python-version }})"
     runs-on: ubuntu-latest
     strategy:
       matrix:
         python-version: ['3.12', '3.13']
+        shard:
+          - core
+          - agents-chat
+          - integrations
+          - regression
       fail-fast: false
 
     steps:
@@ -54,110 +74,325 @@ jobs:
           # slim-bindings (gRPC native build) and is not imported by any source module.
           grep -v '^agntcy-app-sdk' requirements.txt > /tmp/requirements-filtered.txt
           pip install -r /tmp/requirements-filtered.txt
-          # Install test-only deps (pytest, pytest-asyncio, pytest-cov)
+          # Install test-only deps
           pip install pytest pytest-asyncio pytest-cov httpx
 
-      - name: Run tests with coverage
+      - name: Resolve test paths
+        id: paths
         run: |
-          python -m pytest tests/ \
+          case "${{ matrix.shard }}" in
+            core)
+              echo "test_args=tests/multi_tenant tests/migrations tests/test_conftest_smoke.py tests/test_cross_module.py tests/test_env_loader.py tests/test_error_handling.py tests/test_forgot_password.py tests/test_health.py tests/test_multi_tenant_isolation_e2e.py" >> "$GITHUB_OUTPUT"
+              ;;
+            agents-chat)
+              echo "test_args=tests/agents tests/chat tests/persistent_memory" >> "$GITHUB_OUTPUT"
+              ;;
+            integrations)
+              echo "test_args=tests/integrations tests/security tests/performance" >> "$GITHUB_OUTPUT"
+              ;;
+            regression)
+              echo "test_args=tests/regression" >> "$GITHUB_OUTPUT"
+              ;;
+          esac
+
+      - name: Run tests (${{ matrix.shard }})
+        run: |
+          python -m pytest ${{ steps.paths.outputs.test_args }} \
             --cov=src \
-            --cov-report=term-missing \
-            --cov-report=xml:coverage.xml \
-            --cov-report=html:htmlcov \
-            --cov-report=json:coverage.json \
-            --cov-fail-under=70 \
-            --junitxml=test-results.xml \
+            --cov-report=xml:coverage-${{ matrix.shard }}.xml \
+            --cov-report=json:coverage-${{ matrix.shard }}.json \
+            --junitxml=test-results-${{ matrix.shard }}.xml \
             --ignore=tests/integration_real_services.py \
             --ignore=tests/integration
 
-      - name: Upload coverage report
+      - name: Upload shard artifacts
         if: always()
         uses: actions/upload-artifact@v4
         with:
-          name: coverage-report-py${{ matrix.python-version }}
+          name: shard-${{ matrix.shard }}-py${{ matrix.python-version }}
           path: |
-            coverage.xml
-            coverage.json
-            test-results.xml
-            htmlcov/
-          retention-days: 30
+            coverage-${{ matrix.shard }}.xml
+            coverage-${{ matrix.shard }}.json
+            test-results-${{ matrix.shard }}.xml
+            .coverage
+          retention-days: 7
 
-      - name: Coverage and test summary
+  # ---------------------------------------------------------------------------
+  # Merge coverage from all shards + generate report
+  # ---------------------------------------------------------------------------
+  coverage:
+    name: "Coverage Report (py${{ matrix.python-version }})"
+    needs: test
+    runs-on: ubuntu-latest
+    if: always()
+    strategy:
+      matrix:
+        python-version: ['3.12']
+      fail-fast: false
+
+    permissions:
+      pull-requests: write
+      contents: read
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up Python ${{ matrix.python-version }}
+        uses: actions/setup-python@v5
+        with:
+          python-version: ${{ matrix.python-version }}
+
+      - name: Install coverage tools
+        run: pip install coverage[toml] pytest-cov
+
+      - name: Download all shard artifacts
+        uses: actions/download-artifact@v4
+        with:
+          pattern: shard-*-py${{ matrix.python-version }}
+          merge-multiple: true
+
+      - name: Merge coverage data
+        run: |
+          # Combine all .coverage.* files using coverage combine
+          # The shard XML/JSON reports are used for the summary
+          python -c "
+          import json, sys, os
+
+          # Merge JSON coverage reports
+          merged = {'meta': {}, 'files': {}, 'totals': {}}
+          total_stmts = 0
+          total_miss = 0
+
+          for f in sorted(os.listdir('.')):
+              if f.startswith('coverage-') and f.endswith('.json'):
+                  with open(f) as fh:
+                      data = json.load(fh)
+                  for path, info in data.get('files', {}).items():
+                      if path not in merged['files']:
+                          merged['files'][path] = info
+                      else:
+                          # Merge: take the better coverage (fewer misses)
+                          existing = merged['files'][path]['summary']
+                          incoming = info['summary']
+                          if incoming.get('missing_lines', 999) < existing.get('missing_lines', 999):
+                              merged['files'][path] = info
+
+          # Recalculate totals
+          for path, info in merged['files'].items():
+              s = info.get('summary', {})
+              total_stmts += s.get('num_statements', 0)
+              total_miss += s.get('missing_lines', 0)
+
+          covered = total_stmts - total_miss
+          pct = (covered / total_stmts * 100) if total_stmts > 0 else 0
+          merged['totals'] = {
+              'num_statements': total_stmts,
+              'missing_lines': total_miss,
+              'covered_lines': covered,
+              'percent_covered': round(pct, 2)
+          }
+
+          with open('coverage-merged.json', 'w') as fh:
+              json.dump(merged, fh, indent=2)
+
+          print(f'Merged coverage: {pct:.1f}% ({covered}/{total_stmts} lines)')
+          "
+
+      - name: Merge test results
+        run: |
+          python -c "
+          import xml.etree.ElementTree as ET
+          import os
+
+          total_tests = 0
+          total_failures = 0
+          total_errors = 0
+          total_time = 0.0
+
+          for f in sorted(os.listdir('.')):
+              if f.startswith('test-results-') and f.endswith('.xml'):
+                  tree = ET.parse(f)
+                  root = tree.getroot()
+                  total_tests += int(root.attrib.get('tests', 0))
+                  total_failures += int(root.attrib.get('failures', 0))
+                  total_errors += int(root.attrib.get('errors', 0))
+                  total_time += float(root.attrib.get('time', 0))
+
+          print(f'Total tests: {total_tests}')
+          print(f'Failures: {total_failures}')
+          print(f'Errors: {total_errors}')
+          print(f'Time: {total_time:.1f}s')
+
+          # Write summary env vars
+          with open(os.environ['GITHUB_ENV'], 'a') as f:
+              f.write(f'TOTAL_TESTS={total_tests}\n')
+              f.write(f'TOTAL_FAILURES={total_failures}\n')
+              f.write(f'TOTAL_ERRORS={total_errors}\n')
+              f.write(f'TOTAL_TIME={total_time:.1f}\n')
+          "
+
+      - name: Check coverage threshold
+        run: |
+          python -c "
+          import json, sys
+          with open('coverage-merged.json') as f:
+              data = json.load(f)
+          pct = data['totals']['percent_covered']
+          print(f'Coverage: {pct:.1f}%')
+          if pct < 70:
+              print(f'FAIL: Coverage {pct:.1f}% is below 70% minimum')
+              sys.exit(1)
+          print(f'PASS: Coverage {pct:.1f}% meets 70% minimum')
+          "
+
+      - name: Generate step summary
         if: always()
         run: |
-          echo "## Test Results (Python ${{ matrix.python-version }})" >> $GITHUB_STEP_SUMMARY
-          echo "" >> $GITHUB_STEP_SUMMARY
+          python -c "
+          import json, os
 
-          # Extract test counts from JUnit XML
-          if [ -f test-results.xml ]; then
-            TESTS=$(grep -oP 'tests="\K[0-9]+' test-results.xml | head -1)
-            FAILURES=$(grep -oP 'failures="\K[0-9]+' test-results.xml | head -1)
-            ERRORS=$(grep -oP 'errors="\K[0-9]+' test-results.xml | head -1)
-            echo "### Tests" >> $GITHUB_STEP_SUMMARY
-            echo "| Metric | Value |" >> $GITHUB_STEP_SUMMARY
-            echo "|--------|-------|" >> $GITHUB_STEP_SUMMARY
-            echo "| Tests run | ${TESTS:-0} |" >> $GITHUB_STEP_SUMMARY
-            echo "| Failures | ${FAILURES:-0} |" >> $GITHUB_STEP_SUMMARY
-            echo "| Errors | ${ERRORS:-0} |" >> $GITHUB_STEP_SUMMARY
-            echo "" >> $GITHUB_STEP_SUMMARY
-          fi
-
-          # Extract coverage percentage from XML
-          if [ -f coverage.xml ]; then
-            COVERAGE=$(python -c "
-          import xml.etree.ElementTree as ET
-          tree = ET.parse('coverage.xml')
-          root = tree.getroot()
-          rate = float(root.attrib.get('line-rate', 0))
-          print(f'{rate * 100:.1f}')
-          " 2>/dev/null || echo "N/A")
-
-            # Determine badge color based on coverage
-            BADGE_COLOR="red"
-            COV_NUM=$(echo "$COVERAGE" | cut -d'.' -f1)
-            if [ "$COV_NUM" -ge 90 ]; then BADGE_COLOR="brightgreen"
-            elif [ "$COV_NUM" -ge 80 ]; then BADGE_COLOR="green"
-            elif [ "$COV_NUM" -ge 70 ]; then BADGE_COLOR="yellowgreen"
-            elif [ "$COV_NUM" -ge 60 ]; then BADGE_COLOR="yellow"
-            elif [ "$COV_NUM" -ge 50 ]; then BADGE_COLOR="orange"
-            fi
-
-            echo "### Coverage" >> $GITHUB_STEP_SUMMARY
-            echo "![Coverage](https://img.shields.io/badge/coverage-${COVERAGE}%25-${BADGE_COLOR})" >> $GITHUB_STEP_SUMMARY
-            echo "" >> $GITHUB_STEP_SUMMARY
-            echo "| Metric | Value |" >> $GITHUB_STEP_SUMMARY
-            echo "|--------|-------|" >> $GITHUB_STEP_SUMMARY
-            echo "| Line coverage | ${COVERAGE}% |" >> $GITHUB_STEP_SUMMARY
-            echo "| Minimum required | 70% |" >> $GITHUB_STEP_SUMMARY
-            echo "| Launch target | 80% |" >> $GITHUB_STEP_SUMMARY
-            echo "" >> $GITHUB_STEP_SUMMARY
-          fi
-
-          # Per-module coverage breakdown from JSON
-          if [ -f coverage.json ]; then
-            echo "### Module Coverage" >> $GITHUB_STEP_SUMMARY
-            echo "" >> $GITHUB_STEP_SUMMARY
-            python -c "
-          import json
-          with open('coverage.json') as f:
+          with open('coverage-merged.json') as f:
               data = json.load(f)
-          files = data.get('files', {})
-          print('| Module | Stmts | Miss | Cover |')
-          print('|--------|-------|------|-------|')
-          # Sort by coverage ascending (worst first)
+
+          totals = data['totals']
+          pct = totals['percent_covered']
+          stmts = totals['num_statements']
+          miss = totals['missing_lines']
+
+          tests = os.environ.get('TOTAL_TESTS', '0')
+          failures = os.environ.get('TOTAL_FAILURES', '0')
+          errors = os.environ.get('TOTAL_ERRORS', '0')
+          elapsed = os.environ.get('TOTAL_TIME', '0')
+
+          # Badge color
+          if pct >= 90: color = 'brightgreen'
+          elif pct >= 80: color = 'green'
+          elif pct >= 70: color = 'yellowgreen'
+          elif pct >= 60: color = 'yellow'
+          elif pct >= 50: color = 'orange'
+          else: color = 'red'
+
+          summary = f'''## Test Results (Merged — 4 shards)
+
+          ![Coverage](https://img.shields.io/badge/coverage-{pct:.1f}%25-{color})
+
+          | Metric | Value |
+          |--------|-------|
+          | Tests run | {tests} |
+          | Failures | {failures} |
+          | Errors | {errors} |
+          | Elapsed | {elapsed}s |
+          | Line coverage | {pct:.1f}% |
+          | Statements | {stmts} |
+          | Missed | {miss} |
+          | Minimum required | 70% |
+          | Launch target | 80% |
+
+          ### Lowest Coverage Modules
+          '''
+
+          # Bottom 10 modules
           entries = []
-          for path, info in files.items():
-              summary = info.get('summary', {})
-              stmts = summary.get('num_statements', 0)
-              miss = summary.get('missing_lines', 0)
-              pct = summary.get('percent_covered', 0)
-              short = path.replace('src/', '')
-              entries.append((pct, short, stmts, miss))
+          for path, info in data.get('files', {}).items():
+              s = info.get('summary', {})
+              entries.append((
+                  s.get('percent_covered', 0),
+                  path.replace('src/', ''),
+                  s.get('num_statements', 0),
+                  s.get('missing_lines', 0)
+              ))
           entries.sort()
-          # Show bottom 10 (lowest coverage)
-          for pct, short, stmts, miss in entries[:10]:
-              print(f'| {short} | {stmts} | {miss} | {pct:.0f}% |')
+
+          summary += '| Module | Stmts | Miss | Cover |\n'
+          summary += '|--------|-------|------|-------|\n'
+          for p, short, st, mi in entries[:10]:
+              summary += f'| {short} | {st} | {mi} | {p:.0f}% |\n'
           if len(entries) > 10:
-              print(f'| ... ({len(entries) - 10} more modules above 70%) | | | |')
-          " >> $GITHUB_STEP_SUMMARY 2>/dev/null || true
-          fi
+              summary += f'| ... ({len(entries) - 10} more) | | | |\n'
+
+          with open(os.environ['GITHUB_STEP_SUMMARY'], 'a') as f:
+              f.write(summary)
+          "
+
+      - name: Comment coverage on PR
+        if: github.event_name == 'pull_request' && always()
+        uses: actions/github-script@v7
+        with:
+          script: |
+            const fs = require('fs');
+            const data = JSON.parse(fs.readFileSync('coverage-merged.json', 'utf8'));
+            const totals = data.totals;
+            const pct = totals.percent_covered.toFixed(1);
+            const stmts = totals.num_statements;
+            const miss = totals.missing_lines;
+            const tests = process.env.TOTAL_TESTS || '0';
+            const failures = process.env.TOTAL_FAILURES || '0';
+
+            let color = 'red';
+            if (pct >= 90) color = 'brightgreen';
+            else if (pct >= 80) color = 'green';
+            else if (pct >= 70) color = 'yellowgreen';
+            else if (pct >= 60) color = 'yellow';
+            else if (pct >= 50) color = 'orange';
+
+            let body = `## 🧪 Test & Coverage Report\n\n`;
+            body += `![Coverage](https://img.shields.io/badge/coverage-${pct}%25-${color})\n\n`;
+            body += `| Metric | Value |\n|--------|-------|\n`;
+            body += `| Tests | ${tests} |\n`;
+            body += `| Failures | ${failures} |\n`;
+            body += `| Coverage | ${pct}% |\n`;
+            body += `| Statements | ${stmts} |\n`;
+            body += `| Missed lines | ${miss} |\n\n`;
+
+            // Bottom 5 modules
+            const entries = Object.entries(data.files || {})
+              .map(([path, info]) => ({
+                path: path.replace('src/', ''),
+                pct: info.summary?.percent_covered || 0,
+                stmts: info.summary?.num_statements || 0,
+                miss: info.summary?.missing_lines || 0
+              }))
+              .sort((a, b) => a.pct - b.pct)
+              .slice(0, 5);
+
+            if (entries.length > 0) {
+              body += `### Lowest Coverage\n`;
+              body += `| Module | Cover |\n|--------|-------|\n`;
+              for (const e of entries) {
+                body += `| ${e.path} | ${e.pct.toFixed(0)}% |\n`;
+              }
+            }
+
+            // Find and update existing comment or create new
+            const { data: comments } = await github.rest.issues.listComments({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              issue_number: context.issue.number,
+            });
+            const marker = '## 🧪 Test & Coverage Report';
+            const existing = comments.find(c => c.body?.startsWith(marker));
+
+            if (existing) {
+              await github.rest.issues.updateComment({
+                owner: context.repo.owner,
+                repo: context.repo.repo,
+                comment_id: existing.id,
+                body,
+              });
+            } else {
+              await github.rest.issues.createComment({
+                owner: context.repo.owner,
+                repo: context.repo.repo,
+                issue_number: context.issue.number,
+                body,
+              });
+            }
+
+      - name: Upload merged coverage
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: coverage-merged-py${{ matrix.python-version }}
+          path: |
+            coverage-merged.json
+          retention-days: 30

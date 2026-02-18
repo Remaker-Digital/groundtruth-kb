@@ -1,9 +1,9 @@
 """Static file serving for Agent Red Customer Experience.
 
-Mounts the Shopify embedded admin SPA and the widget JS bundle endpoint
-on the FastAPI application.
+Mounts the Shopify embedded admin SPA, the provider admin console SPA,
+and the widget JS bundle endpoint on the FastAPI application.
 
-R1 refactoring — session 31.
+R1 refactoring — session 31. Provider admin added — session 39.
 © 2026 Remaker Digital, a DBA of VanDusen & Palmeter, LLC. All rights reserved.
 """
 
@@ -20,10 +20,11 @@ logger = logging.getLogger(__name__)
 
 
 def mount_static_apps(app: FastAPI) -> None:
-    """Mount the Shopify admin SPA and widget JS bundle on *app*.
+    """Mount the admin SPAs and widget JS bundle on *app*.
 
-    This mirrors main.py lines 215-284:
+    Serves:
     - Shopify embedded admin SPA at /admin/shopify
+    - Provider admin console SPA at /admin/provider
     - Widget JS bundle at /widget.js
 
     Path calculations use parent.parent.parent because this module lives
@@ -67,6 +68,43 @@ def mount_static_apps(app: FastAPI) -> None:
         logger.warning(
             "Shopify admin SPA dist directory not found at %s — "
             "embedded admin will not be available", _admin_shopify_dist,
+        )
+
+    # ---------------------------------------------------------------------------
+    # Provider Admin Console SPA (static files + catch-all for SPA routing)
+    # ---------------------------------------------------------------------------
+
+    _admin_provider_dist = pathlib.Path(__file__).resolve().parent.parent.parent / "admin" / "provider" / "dist"
+
+    if _admin_provider_dist.is_dir():
+        # Serve static assets (JS, CSS, sourcemaps) from the Vite build output
+        app.mount(
+            "/admin/provider/assets",
+            StaticFiles(directory=str(_admin_provider_dist / "assets")),
+            name="admin-provider-assets",
+        )
+
+        _PROVIDER_NO_CACHE = {"Cache-Control": "no-cache, no-store, must-revalidate", "Pragma": "no-cache"}
+
+        @app.get("/admin/provider/{full_path:path}", include_in_schema=False)
+        async def _admin_provider_spa(full_path: str) -> FileResponse:
+            """Catch-all route for the provider admin console SPA.
+
+            All client-side routes (/, /tenants, /deployments, /billing, /sla)
+            return the same index.html so React Router can handle routing.
+            """
+            return FileResponse(str(_admin_provider_dist / "index.html"), headers=_PROVIDER_NO_CACHE)
+
+        @app.get("/admin/provider", include_in_schema=False)
+        async def _admin_provider_index() -> FileResponse:
+            """Serve the provider admin console SPA root."""
+            return FileResponse(str(_admin_provider_dist / "index.html"), headers=_PROVIDER_NO_CACHE)
+
+        logger.info("Provider admin console SPA mounted at /admin/provider")
+    else:
+        logger.warning(
+            "Provider admin SPA dist directory not found at %s — "
+            "provider console will not be available", _admin_provider_dist,
         )
 
     # ---------------------------------------------------------------------------

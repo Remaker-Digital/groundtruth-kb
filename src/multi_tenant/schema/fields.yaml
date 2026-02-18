@@ -1,0 +1,1385 @@
+# Tenant configuration field definitions -- 78 fields across 10 onboarding steps.
+#
+# R3 refactoring -- extracted from tenant_config_schema.py (session 39).
+# (c) 2026 Remaker Digital, a DBA of VanDusen & Palmeter, LLC. All rights reserved.
+#
+# Sentinel values:
+#   $SUPPORTED_LANGUAGES -- resolved at load time from models.SUPPORTED_LANGUAGES
+
+fields:
+
+  - field_name: brand_name
+    display_name: Brand name
+    field_type: string
+    validation:
+      min_length: 1
+      max_length: 100
+      required: true
+    platform_default: My Store
+    tier_gate: all
+    onboarding_step: 1
+    step_order: 0
+    tooltip: Your brand name as it appears in customer conversations.
+    description: "The AI agent introduces itself using this name. Appears in greetings, sign-offs, and when referencing your business. Keep it consistent with your storefront branding."
+    placeholder: e.g. Acme Outdoor Gear
+    doc_link: "https://docs.agentred.ai/configuration/brand-tone"
+    affects_agents:
+      - intent-classifier
+      - knowledge-retrieval
+      - response-generator
+      - escalation-handler
+      - analytics-collector
+    pii_classification: none
+    injected_in_prompt: true
+
+  - field_name: brand_voice
+    display_name: Brand voice
+    field_type: string
+    validation:
+      max_length: 200
+    platform_default: friendly and helpful
+    tier_gate: all
+    onboarding_step: 1
+    step_order: 1
+    tooltip: "Describe your brand's personality in a few words."
+    description: "Guides the AI's overall communication style. Examples: 'friendly and casual', 'professional and concise', 'warm and empathetic', 'technical and precise'. This shapes word choice, sentence structure, and tone."
+    placeholder: e.g. friendly and helpful
+    doc_link: "https://docs.agentred.ai/configuration/brand-tone#voice"
+    affects_agents:
+      - response-generator
+    pii_classification: none
+    injected_in_prompt: true
+
+  - field_name: greeting_message
+    display_name: Greeting message
+    field_type: text
+    validation:
+      max_length: 500
+    platform_default: null
+    tier_gate: all
+    onboarding_step: 1
+    step_order: 2
+    tooltip: Optional custom greeting when a customer starts a conversation.
+    description: "If set, this message is sent as the first response when a customer initiates a conversation. Leave blank to let the AI generate a contextual greeting based on your brand voice settings."
+    placeholder: "e.g. Hi there! How can I help you today?"
+    doc_link: "https://docs.agentred.ai/configuration/brand-tone#greeting"
+    affects_agents:
+      - response-generator
+    pii_classification: none
+    injected_in_prompt: true
+
+  - field_name: farewell_message
+    display_name: Farewell message
+    field_type: text
+    validation:
+      max_length: 500
+    platform_default: null
+    tier_gate: all
+    onboarding_step: 1
+    step_order: 3
+    tooltip: Optional sign-off message at end of conversations.
+    description: Sent when a conversation is resolved. Leave blank to let the AI generate an appropriate closing based on the conversation context.
+    placeholder: "e.g. Thanks for reaching out! Have a great day."
+    doc_link: "https://docs.agentred.ai/configuration/brand-tone#farewell"
+    affects_agents:
+      - response-generator
+    pii_classification: none
+    injected_in_prompt: true
+
+  - field_name: primary_language
+    display_name: Primary language
+    field_type: enum
+    validation:
+      allowed_values:
+        - $SUPPORTED_LANGUAGES
+      required: true
+    platform_default: en
+    tier_gate: all
+    onboarding_step: 2
+    step_order: 0
+    tooltip: The main language your AI agent communicates in.
+    description: Sets the default response language. The intent classifier uses this to optimize classification accuracy. Customers writing in other supported languages will still be understood if additional languages are enabled.
+    doc_link: "https://docs.agentred.ai/configuration/languages"
+    affects_agents:
+      - intent-classifier
+      - response-generator
+      - escalation-handler
+    pii_classification: none
+    injected_in_prompt: true
+
+  - field_name: additional_languages
+    display_name: Additional languages
+    field_type: string_list
+    validation:
+      allowed_values:
+        - $SUPPORTED_LANGUAGES
+      max_items: 10
+    platform_default: []
+    tier_defaults:
+      starter: []
+      professional: []
+      enterprise: []
+    tier_gate: all
+    onboarding_step: 2
+    step_order: 1
+    tooltip: Additional languages the AI agent can respond in.
+    description: "The Multi-Language Pack add-on is required for additional languages beyond the primary. When enabled, the AI detects the customer's language and responds accordingly. Supported languages vary by model."
+    doc_link: "https://docs.agentred.ai/configuration/languages#additional"
+    affects_agents:
+      - intent-classifier
+      - response-generator
+      - escalation-handler
+    pii_classification: none
+    injected_in_prompt: true
+
+  - field_name: auto_detect_language
+    display_name: Auto-detect language
+    field_type: boolean
+    validation: {}
+    platform_default: true
+    tier_gate: all
+    onboarding_step: 2
+    step_order: 2
+    tooltip: Automatically detect customer language and respond in kind.
+    description: "When enabled, the AI analyses the customer's first message to detect their language and responds in that language if supported. When disabled, the AI always responds in the primary language."
+    doc_link: "https://docs.agentred.ai/configuration/languages#auto-detect"
+    affects_agents:
+      - intent-classifier
+      - response-generator
+    pii_classification: none
+    injected_in_prompt: true
+
+  - field_name: response_length
+    display_name: Response length
+    field_type: enum
+    validation:
+      allowed_values:
+        - concise
+        - standard
+        - detailed
+    platform_default: standard
+    tier_gate: all
+    onboarding_step: 3
+    step_order: 0
+    tooltip: How long AI responses should be.
+    description: "Concise: 1-2 sentences, direct answers. Standard: 2-4 sentences with context. Detailed: comprehensive responses with explanations and next steps. Affects the Response Generator's output length."
+    doc_link: "https://docs.agentred.ai/configuration/response-style"
+    affects_agents:
+      - response-generator
+    pii_classification: none
+    injected_in_prompt: true
+
+  - field_name: formality_level
+    display_name: Formality level
+    field_type: enum
+    validation:
+      allowed_values:
+        - casual
+        - balanced
+        - formal
+    platform_default: balanced
+    tier_gate: all
+    onboarding_step: 3
+    step_order: 1
+    tooltip: The formality of AI responses.
+    description: "Casual: conversational, contractions, informal phrasing. Balanced: professional but approachable. Formal: no contractions, structured sentences, professional register. Works in combination with your brand voice setting."
+    doc_link: "https://docs.agentred.ai/configuration/response-style#formality"
+    affects_agents:
+      - response-generator
+    pii_classification: none
+    injected_in_prompt: true
+
+  - field_name: emoji_usage
+    display_name: Emoji usage
+    field_type: enum
+    validation:
+      allowed_values:
+        - none
+        - minimal
+        - moderate
+    platform_default: minimal
+    tier_gate: all
+    onboarding_step: 3
+    step_order: 2
+    tooltip: How often the AI uses emojis in responses.
+    description: "None: no emojis at all. Minimal: occasional emoji for friendliness (1-2 per conversation). Moderate: emojis in most responses where appropriate. Does not affect the Critic's content evaluation."
+    doc_link: "https://docs.agentred.ai/configuration/response-style#emoji"
+    affects_agents:
+      - response-generator
+    pii_classification: none
+    injected_in_prompt: true
+
+  - field_name: fallback_message
+    display_name: Fallback message
+    field_type: text
+    validation:
+      max_length: 500
+    platform_default: null
+    tier_gate: all
+    onboarding_step: 3
+    step_order: 3
+    tooltip: Message shown when the AI cannot answer a question.
+    description: "Used when the knowledge base has no relevant information and the AI cannot confidently respond. Leave blank to use the platform default: 'I don't have enough information to answer that. Let me connect you with our support team.'"
+    placeholder: "e.g. I'm not sure about that. Let me find someone who can help."
+    doc_link: "https://docs.agentred.ai/configuration/response-style#fallback"
+    affects_agents:
+      - response-generator
+    pii_classification: none
+    injected_in_prompt: true
+
+  - field_name: knowledge_scope
+    display_name: Knowledge scope
+    field_type: enum
+    validation:
+      allowed_values:
+        - products_only
+        - products_and_faqs
+        - full
+    platform_default: full
+    tier_gate: all
+    onboarding_step: 4
+    step_order: 0
+    tooltip: What types of knowledge the AI can search.
+    description: "Products only: the AI references product catalog data. Products and FAQs: adds FAQ content. Full: products, FAQs, and custom policy documents. Restricting scope can reduce irrelevant responses."
+    doc_link: "https://docs.agentred.ai/configuration/knowledge-base"
+    affects_agents:
+      - knowledge-retrieval
+    pii_classification: none
+    injected_in_prompt: true
+
+  - field_name: product_recommendation_enabled
+    display_name: Product recommendations
+    field_type: boolean
+    validation: {}
+    platform_default: true
+    tier_gate: all
+    onboarding_step: 4
+    step_order: 1
+    tooltip: Allow the AI to suggest related or alternative products.
+    description: "When enabled, the AI may recommend complementary or substitute products during conversations. Uses the knowledge base product catalog for recommendations. Disable if you prefer the AI to only answer direct questions."
+    doc_link: "https://docs.agentred.ai/configuration/knowledge-base#recommendations"
+    affects_agents:
+      - response-generator
+      - knowledge-retrieval
+    pii_classification: none
+    injected_in_prompt: true
+
+  - field_name: out_of_stock_behavior
+    display_name: Out of stock behavior
+    field_type: enum
+    validation:
+      allowed_values:
+        - inform
+        - suggest_alternatives
+        - collect_email
+    platform_default: suggest_alternatives
+    tier_gate: all
+    onboarding_step: 4
+    step_order: 2
+    tooltip: What the AI does when a requested product is out of stock.
+    description: "Inform: tells the customer the item is unavailable. Suggest alternatives: proposes similar in-stock products. Collect email: offers to notify when restocked."
+    doc_link: "https://docs.agentred.ai/configuration/knowledge-base#out-of-stock"
+    affects_agents:
+      - response-generator
+    pii_classification: none
+    injected_in_prompt: true
+
+  - field_name: retrieval_top_k
+    display_name: Results to retrieve
+    field_type: integer
+    validation:
+      min_value: 1.0
+      max_value: 20.0
+    platform_default: 5
+    tier_gate: all
+    onboarding_step: 4
+    step_order: 3
+    tooltip: How many knowledge base results the AI considers per query.
+    description: "Higher values give the AI more context to draw from but may include less relevant results. Lower values focus on the most relevant matches. Default: 5."
+    doc_link: "https://docs.agentred.ai/configuration/knowledge-base#retrieval-tuning"
+    affects_agents:
+      - knowledge-retrieval
+    pii_classification: none
+    injected_in_prompt: false
+
+  - field_name: retrieval_vector_weight
+    display_name: Semantic search weight
+    field_type: float
+    validation:
+      min_value: 0.0
+      max_value: 1.0
+    platform_default: 0.7
+    tier_gate: all
+    onboarding_step: 4
+    step_order: 4
+    tooltip: How much to weight meaning-based search vs keyword matching.
+    description: "Controls the balance between semantic similarity (understands meaning) and keyword matching (exact words). Higher values favor semantic understanding. Default: 0.7 (70% semantic)."
+    doc_link: "https://docs.agentred.ai/configuration/knowledge-base#retrieval-tuning"
+    affects_agents:
+      - knowledge-retrieval
+    pii_classification: none
+    injected_in_prompt: false
+
+  - field_name: retrieval_bm25_weight
+    display_name: Keyword match weight
+    field_type: float
+    validation:
+      min_value: 0.0
+      max_value: 1.0
+    platform_default: 0.3
+    tier_gate: all
+    onboarding_step: 4
+    step_order: 5
+    tooltip: How much to weight keyword matching in search results.
+    description: "Complements semantic search weight. Higher values favor exact keyword matches. Useful when your knowledge base uses specific terminology customers search for. Default: 0.3 (30% keywords)."
+    doc_link: "https://docs.agentred.ai/configuration/knowledge-base#retrieval-tuning"
+    affects_agents:
+      - knowledge-retrieval
+    pii_classification: none
+    injected_in_prompt: false
+
+  - field_name: retrieval_min_score
+    display_name: Minimum relevance score
+    field_type: float
+    validation:
+      min_value: 0.0
+      max_value: 1.0
+    platform_default: 0.1
+    tier_gate: all
+    onboarding_step: 4
+    step_order: 6
+    tooltip: Minimum relevance score for a result to be included.
+    description: "Results below this threshold are discarded. Higher values mean stricter filtering — the AI only uses highly relevant content. Lower values include more results but may reduce answer precision. Default: 0.1."
+    doc_link: "https://docs.agentred.ai/configuration/knowledge-base#retrieval-tuning"
+    affects_agents:
+      - knowledge-retrieval
+    pii_classification: none
+    injected_in_prompt: false
+
+  - field_name: cite_sources_in_response
+    display_name: Cite sources in responses
+    field_type: boolean
+    validation: {}
+    platform_default: false
+    tier_gate: all
+    onboarding_step: 4
+    step_order: 7
+    tooltip: Append source article titles to AI responses.
+    description: "When enabled, the AI appends a 'Sources:' line to its responses listing the knowledge base articles it referenced. Helps customers verify information and builds trust."
+    doc_link: "https://docs.agentred.ai/configuration/knowledge-base#source-citation"
+    affects_agents:
+      - response-generator
+    pii_classification: none
+    injected_in_prompt: false
+
+  - field_name: intent_source_mapping
+    display_name: Intent-to-source routing
+    field_type: object
+    validation: {}
+    platform_default: null
+    tier_gate: pro+
+    onboarding_step: 4
+    step_order: 8
+    tooltip: Route specific question types to specific knowledge sources.
+    description: "Maps customer intent categories to knowledge base entry types. For example: {\"refund\": \"policy\", \"product_info\": \"product\"}. When set, the AI only searches the specified source type for that intent, improving relevance. Leave empty for automatic routing."
+    doc_link: "https://docs.agentred.ai/configuration/knowledge-base#intent-routing"
+    affects_agents:
+      - knowledge-retrieval
+    pii_classification: none
+    injected_in_prompt: false
+
+  - field_name: return_policy
+    display_name: Return policy
+    field_type: text
+    validation:
+      max_length: 2000
+    platform_default: null
+    tier_gate: all
+    onboarding_step: 5
+    step_order: 0
+    tooltip: Your return/refund policy — the AI references this in conversations.
+    description: "Paste or summarise your return/refund policy. The AI uses this text to answer return-related questions accurately. The Critic validates responses don't contradict this policy. Keep it factual and specific (time limits, conditions, process)."
+    placeholder: e.g. 30-day returns on unused items. Refunds processed within 5-7 business days.
+    doc_link: "https://docs.agentred.ai/configuration/policies#returns"
+    affects_agents:
+      - response-generator
+      - critic-supervisor
+    pii_classification: none
+    injected_in_prompt: true
+
+  - field_name: shipping_info
+    display_name: Shipping information
+    field_type: text
+    validation:
+      max_length: 2000
+    platform_default: null
+    tier_gate: all
+    onboarding_step: 5
+    step_order: 1
+    tooltip: Your shipping policy — the AI references this for delivery questions.
+    description: "Summarise your shipping options, timelines, and costs. The AI uses this to answer shipping inquiries. Include: standard/express options, typical delivery times, free shipping thresholds, international availability."
+    placeholder: "e.g. Free shipping on orders over $50. Standard delivery: 3-5 business days."
+    doc_link: "https://docs.agentred.ai/configuration/policies#shipping"
+    affects_agents:
+      - response-generator
+      - critic-supervisor
+    pii_classification: none
+    injected_in_prompt: true
+
+  - field_name: warranty_info
+    display_name: Warranty information
+    field_type: text
+    validation:
+      max_length: 2000
+    platform_default: null
+    tier_gate: all
+    onboarding_step: 5
+    step_order: 2
+    tooltip: Product warranty details for the AI to reference.
+    description: "Describe your warranty coverage, duration, and claim process. Leave blank if not applicable."
+    placeholder: e.g. 1-year manufacturer warranty. Contact us for claims.
+    doc_link: "https://docs.agentred.ai/configuration/policies#warranty"
+    affects_agents:
+      - response-generator
+    pii_classification: none
+    injected_in_prompt: true
+
+  - field_name: support_hours
+    display_name: Support hours
+    field_type: text
+    validation:
+      max_length: 500
+    platform_default: null
+    tier_gate: all
+    onboarding_step: 5
+    step_order: 3
+    tooltip: "Your human support team's business hours."
+    description: The AI references this when suggesting escalation or when customers ask about human agent availability. The AI is always available 24/7 regardless of this setting.
+    placeholder: e.g. Mon-Fri 9am-5pm EST
+    doc_link: "https://docs.agentred.ai/configuration/policies#hours"
+    affects_agents:
+      - response-generator
+      - escalation-handler
+    pii_classification: none
+    injected_in_prompt: true
+
+  - field_name: custom_policies
+    display_name: Additional policies
+    field_type: text
+    validation:
+      max_length: 2000
+    platform_default: null
+    tier_gate: all
+    onboarding_step: 5
+    step_order: 4
+    tooltip: Any other policies the AI should know about.
+    description: "Include additional business rules, loyalty programs, price-match policies, or any other information the AI should reference. This is supplementary to the structured policy fields above."
+    doc_link: "https://docs.agentred.ai/configuration/policies#custom"
+    affects_agents:
+      - response-generator
+    pii_classification: none
+    injected_in_prompt: true
+
+  - field_name: escalation_threshold
+    display_name: Escalation threshold
+    field_type: float
+    validation:
+      min_value: 0.0
+      max_value: 1.0
+    platform_default: 0.7
+    tier_defaults:
+      starter: 0.7
+      professional: 0.6
+      enterprise: 0.5
+    tier_gate: all
+    onboarding_step: 6
+    step_order: 0
+    tooltip: Confidence level below which the AI escalates to a human agent.
+    description: "When the AI's confidence in its response falls below this threshold, it initiates escalation. Lower values mean fewer escalations (the AI handles more). Higher values mean more escalations (more cautious). Professional and Enterprise tiers default lower because they typically have richer knowledge bases."
+    doc_link: "https://docs.agentred.ai/configuration/escalation#threshold"
+    affects_agents:
+      - escalation-handler
+      - response-generator
+    pii_classification: none
+    injected_in_prompt: true
+
+  - field_name: escalation_keywords
+    display_name: Escalation keywords
+    field_type: string_list
+    validation:
+      max_length: 50
+      max_items: 30
+    platform_default:
+      - speak to a person
+      - human agent
+      - talk to a human
+      - manager
+      - supervisor
+      - complaint
+      - lawyer
+      - refund
+      - cancel my subscription
+    tier_gate: all
+    onboarding_step: 6
+    step_order: 1
+    tooltip: Words/phrases that trigger immediate escalation to a human.
+    description: "When a customer message contains any of these keywords or phrases, the conversation is immediately escalated regardless of the AI's confidence score. Use for sensitive topics: 'lawyer', 'sue', 'complaint', 'manager', etc."
+    placeholder: "e.g. lawyer, complaint, manager"
+    doc_link: "https://docs.agentred.ai/configuration/escalation#keywords"
+    affects_agents:
+      - escalation-handler
+      - response-generator
+    pii_classification: none
+    injected_in_prompt: true
+
+  - field_name: escalation_email
+    display_name: Escalation notification email
+    field_type: string
+    validation:
+      max_length: 254
+      pattern: "^[a-zA-Z0-9._%+\\-]+@[a-zA-Z0-9.\\-]+\\.[a-zA-Z]{2,}$"
+    platform_default: null
+    tier_gate: all
+    onboarding_step: 6
+    step_order: 2
+    tooltip: Email address notified when a conversation is escalated.
+    description: "When a conversation escalates to a human agent, a notification is sent to this email. If blank, escalation follows the default workflow (Zendesk ticket, Shopify inbox, etc.)."
+    placeholder: "e.g. support@yourstore.com"
+    doc_link: "https://docs.agentred.ai/configuration/escalation#notifications"
+    affects_agents:
+      - escalation-handler
+    pii_classification: direct
+    injected_in_prompt: false
+
+  - field_name: max_ai_turns_before_escalation
+    display_name: Max AI turns before escalation
+    field_type: integer
+    validation:
+      min_value: 1.0
+      max_value: 50.0
+    platform_default: 10
+    tier_gate: all
+    onboarding_step: 6
+    step_order: 3
+    tooltip: Maximum conversation turns before automatic escalation.
+    description: "If a conversation reaches this many turns without resolution, the AI offers escalation to a human agent. Prevents long loops where the AI cannot resolve the issue. Set higher for complex product domains."
+    doc_link: "https://docs.agentred.ai/configuration/escalation#max-turns"
+    affects_agents:
+      - escalation-handler
+    pii_classification: none
+    injected_in_prompt: true
+
+  - field_name: shopify_sync_enabled
+    display_name: Shopify product sync
+    field_type: boolean
+    validation: {}
+    platform_default: true
+    tier_gate: all
+    onboarding_step: 7
+    step_order: 0
+    tooltip: Automatically sync product data from your Shopify store.
+    description: "When enabled, the knowledge base is automatically updated when products are added, modified, or removed in your Shopify store. Uses Shopify webhooks for real-time sync."
+    doc_link: "https://docs.agentred.ai/integrations/shopify"
+    affects_agents:
+      - knowledge-retrieval
+    pii_classification: none
+    injected_in_prompt: false
+
+  - field_name: zendesk_escalation_enabled
+    display_name: Zendesk ticket creation
+    field_type: boolean
+    validation: {}
+    platform_default: false
+    tier_gate: pro+
+    onboarding_step: 7
+    step_order: 1
+    tooltip: Create Zendesk tickets automatically on escalation.
+    description: "When enabled, escalated conversations automatically create a Zendesk Support ticket with the full conversation transcript and customer context. Requires Zendesk integration setup."
+    doc_link: "https://docs.agentred.ai/integrations/zendesk"
+    affects_agents:
+      - escalation-handler
+    pii_classification: none
+    injected_in_prompt: false
+
+  - field_name: mailchimp_segment_sync
+    display_name: Mailchimp segment sync
+    field_type: boolean
+    validation: {}
+    platform_default: false
+    tier_gate: pro+
+    onboarding_step: 7
+    step_order: 2
+    tooltip: Sync marketing segments from Mailchimp for personalization.
+    description: "Imports customer segments from Mailchimp to enhance the AI's customer context (Layer 1). Enables personalized responses based on campaign membership and engagement data."
+    doc_link: "https://docs.agentred.ai/integrations/mailchimp"
+    affects_agents:
+      - response-generator
+    pii_classification: none
+    injected_in_prompt: false
+
+  - field_name: google_analytics_enabled
+    display_name: Google Analytics export
+    field_type: boolean
+    validation: {}
+    platform_default: false
+    tier_gate: pro+
+    onboarding_step: 7
+    step_order: 3
+    tooltip: Export conversation events to Google Analytics 4.
+    description: "Sends conversation events (start, resolution, escalation, CSAT) to your GA4 property for unified analytics. Requires GA4 integration setup."
+    doc_link: "https://docs.agentred.ai/integrations/google-analytics"
+    affects_agents: []
+    pii_classification: none
+    injected_in_prompt: false
+
+  - field_name: memory_enabled
+    display_name: Conversation memory
+    field_type: boolean
+    validation: {}
+    platform_default: true
+    tier_gate: all
+    onboarding_step: 8
+    step_order: 0
+    tooltip: Enable Layer 2+ memory (remembers past conversations).
+    description: "When enabled, the AI remembers past conversations with each customer and uses that history to provide more personalized responses. Layer 1 (customer profile) is always active. This controls Layers 2-4 (conversation history, learned patterns, dedicated model). Disabling this limits personalization to the current session."
+    doc_link: "https://docs.agentred.ai/configuration/memory-privacy"
+    affects_agents:
+      - response-generator
+      - escalation-handler
+    pii_classification: none
+    injected_in_prompt: false
+
+  - field_name: pattern_learning_enabled
+    display_name: Pattern learning (Layer 3)
+    field_type: boolean
+    validation: {}
+    platform_default: true
+    tier_gate: pro+
+    onboarding_step: 8
+    step_order: 1
+    tooltip: Enable automatic learning of customer communication patterns.
+    description: "The AI analyses completed conversations to learn customer preferences, communication style, and common needs. Extracted patterns are stored with confidence scores and decay over time without reinforcement. Professional and Enterprise tiers only."
+    doc_link: "https://docs.agentred.ai/configuration/memory-privacy#layer3"
+    affects_agents:
+      - response-generator
+    pii_classification: none
+    injected_in_prompt: false
+
+  - field_name: dedicated_model_enabled
+    display_name: Dedicated model training (Layer 4)
+    field_type: boolean
+    validation: {}
+    platform_default: false
+    tier_gate: enterprise
+    onboarding_step: 8
+    step_order: 2
+    tooltip: Train a dedicated AI model on your customer conversations.
+    description: "After 1,000+ conversations, a dedicated GPT-4o-mini model is fine-tuned on your data for maximum personalization. Includes monthly retraining pipeline with quality gates and A/B validation. Enterprise add-on ($299/mo). The Critic still validates all outputs."
+    doc_link: "https://docs.agentred.ai/configuration/memory-privacy#layer4"
+    affects_agents:
+      - response-generator
+    pii_classification: none
+    injected_in_prompt: false
+
+  - field_name: data_retention_days
+    display_name: Conversation data retention
+    field_type: integer
+    validation:
+      min_value: 30.0
+      max_value: 730.0
+    platform_default: 365
+    tier_defaults:
+      starter: 90
+      professional: 365
+      enterprise: 730
+    tier_gate: all
+    onboarding_step: 8
+    step_order: 3
+    tooltip: How long conversation data is retained in hot storage.
+    description: Conversations older than this are archived to warm/cold storage. Affects Layer 2 (conversation history search depth). Tier defaults reflect the included history depth. GDPR data deletion requests override this setting.
+    doc_link: "https://docs.agentred.ai/configuration/memory-privacy#retention"
+    affects_agents: []
+    pii_classification: none
+    injected_in_prompt: false
+
+  - field_name: consent_collection_enabled
+    display_name: Collect customer consent
+    field_type: boolean
+    validation: {}
+    platform_default: true
+    tier_gate: all
+    onboarding_step: 8
+    step_order: 4
+    tooltip: Ask customers for consent before using their data for memory.
+    description: "When enabled, customers are asked for consent before their data is used for Layers 2-4 of Persistent Customer Memory. Required for GDPR compliance in the EU. Layer 1 (basic profile from Shopify) operates under legitimate interest basis and does not require separate consent."
+    doc_link: "https://docs.agentred.ai/configuration/memory-privacy#consent"
+    affects_agents:
+      - response-generator
+    pii_classification: none
+    injected_in_prompt: false
+
+  - field_name: widget_primary_color
+    display_name: Widget color
+    field_type: string
+    validation:
+      pattern: "^#[0-9a-fA-F]{6}$"
+    platform_default: "#ff3621"
+    tier_gate: all
+    onboarding_step: 9
+    step_order: 0
+    tooltip: "The primary color of your chat widget (header, send button, customer message bubbles)."
+    description: "Controls the widget header background, send button, and outgoing customer message bubble color. Use your brand color for consistency. Ensure sufficient contrast against white text (WCAG AA)."
+    placeholder: "#ff3621"
+    doc_link: "https://docs.agentred.ai/configuration/widget-appearance#color"
+    affects_agents: []
+    pii_classification: none
+    injected_in_prompt: false
+
+  - field_name: widget_background_color
+    display_name: Widget background
+    field_type: string
+    validation:
+      pattern: "^#[0-9a-fA-F]{6}$"
+    platform_default: "#FFFFFF"
+    tier_gate: all
+    onboarding_step: 9
+    step_order: 1
+    tooltip: Background color of the conversation panel.
+    description: The background color of the chat conversation area. White is recommended for readability. Dark mode uses a separate toggle.
+    placeholder: "#FFFFFF"
+    doc_link: "https://docs.agentred.ai/configuration/widget-appearance#background"
+    affects_agents: []
+    pii_classification: none
+    injected_in_prompt: false
+
+  - field_name: widget_position
+    display_name: Widget position
+    field_type: enum
+    validation:
+      allowed_values:
+        - bottom-right
+        - bottom-left
+    platform_default: bottom-right
+    tier_gate: all
+    onboarding_step: 9
+    step_order: 2
+    tooltip: Which corner of the screen the chat launcher appears in.
+    description: Bottom-right is standard and expected by most visitors. Use bottom-left only if your site has a conflicting element in the bottom-right corner.
+    doc_link: "https://docs.agentred.ai/configuration/widget-appearance#position"
+    affects_agents: []
+    pii_classification: none
+    injected_in_prompt: false
+
+  - field_name: widget_offset_x
+    display_name: Horizontal offset
+    field_type: integer
+    validation:
+      min_value: 0.0
+      max_value: 100.0
+    platform_default: 20
+    tier_gate: all
+    onboarding_step: 9
+    step_order: 3
+    tooltip: Distance from the screen edge in pixels.
+    description: Horizontal distance from the left or right edge (depending on widget position). Default 20px. Increase if the launcher overlaps other elements on your site.
+    doc_link: "https://docs.agentred.ai/configuration/widget-appearance#offset"
+    affects_agents: []
+    pii_classification: none
+    injected_in_prompt: false
+
+  - field_name: widget_offset_y
+    display_name: Vertical offset
+    field_type: integer
+    validation:
+      min_value: 0.0
+      max_value: 100.0
+    platform_default: 20
+    tier_gate: all
+    onboarding_step: 9
+    step_order: 4
+    tooltip: Distance from the bottom of the screen in pixels.
+    description: Vertical distance from the bottom edge. Default 20px. Increase if the launcher overlaps a sticky footer or cookie banner.
+    doc_link: "https://docs.agentred.ai/configuration/widget-appearance#offset"
+    affects_agents: []
+    pii_classification: none
+    injected_in_prompt: false
+
+  - field_name: widget_agent_avatar_url
+    display_name: Agent avatar
+    field_type: string
+    validation:
+      max_length: 500
+    platform_default: null
+    tier_gate: all
+    onboarding_step: 9
+    step_order: 5
+    tooltip: URL of the avatar image shown in the widget header and message bubbles.
+    description: "Upload a square image (recommended 200×200px) through the Widget Configurator. The URL is stored here after upload. If blank, a default Agent Red avatar is shown. Supported formats: PNG, JPG, WebP."
+    doc_link: "https://docs.agentred.ai/configuration/widget-appearance#avatar"
+    affects_agents: []
+    pii_classification: none
+    injected_in_prompt: false
+
+  - field_name: widget_agent_display_name
+    display_name: Agent display name
+    field_type: string
+    validation:
+      max_length: 100
+    platform_default: null
+    tier_gate: all
+    onboarding_step: 9
+    step_order: 6
+    tooltip: Name shown in the widget header and message bubbles.
+    description: "The name displayed as the AI agent's identity in conversations. If blank, falls back to your brand name. Keep it short and friendly (e.g. 'Support', 'Amy', 'Help Desk')."
+    placeholder: "e.g. Support, Amy, Help Desk"
+    doc_link: "https://docs.agentred.ai/configuration/widget-appearance#agent-name"
+    affects_agents: []
+    pii_classification: none
+    injected_in_prompt: false
+
+  - field_name: widget_agent_title
+    display_name: Agent title
+    field_type: string
+    validation:
+      max_length: 100
+    platform_default: null
+    tier_gate: all
+    onboarding_step: 9
+    step_order: 7
+    tooltip: "Optional subtitle shown below the agent name (e.g. 'Customer Support')."
+    description: "A secondary label shown beneath the agent display name in the widget header. Optional. Examples: 'Customer Support', 'AI Assistant', 'Here to help'."
+    placeholder: e.g. Customer Support
+    doc_link: "https://docs.agentred.ai/configuration/widget-appearance#agent-title"
+    affects_agents: []
+    pii_classification: none
+    injected_in_prompt: false
+
+  - field_name: widget_logo_url
+    display_name: Widget logo
+    field_type: string
+    validation:
+      max_length: 500
+    platform_default: null
+    tier_gate: all
+    onboarding_step: 9
+    step_order: 8
+    tooltip: URL of your company logo displayed in the widget header.
+    description: "Upload your company logo through the Widget Configurator. Recommended dimensions: 120×40px (landscape). Displayed in the widget header area alongside the agent name. If blank, only the agent name and avatar are shown."
+    doc_link: "https://docs.agentred.ai/configuration/widget-appearance#logo"
+    affects_agents: []
+    pii_classification: none
+    injected_in_prompt: false
+
+  - field_name: widget_show_branding
+    display_name: "Show 'Powered by Agent Red'"
+    field_type: boolean
+    validation: {}
+    platform_default: true
+    tier_gate: pro+
+    onboarding_step: 9
+    step_order: 9
+    tooltip: "Display 'Powered by Agent Red' badge in the widget footer."
+    description: Professional and Enterprise tiers can remove the Agent Red branding badge from the widget footer. Starter tier always shows branding.
+    doc_link: "https://docs.agentred.ai/configuration/widget-appearance#branding"
+    affects_agents: []
+    pii_classification: none
+    injected_in_prompt: false
+
+  - field_name: widget_mobile_enabled
+    display_name: Show on mobile
+    field_type: boolean
+    validation: {}
+    platform_default: true
+    tier_gate: all
+    onboarding_step: 9
+    step_order: 10
+    tooltip: Whether to show the chat widget on mobile devices.
+    description: "When disabled, the widget launcher and conversation panel are hidden on screens narrower than 768px. Useful if you have a dedicated mobile app or mobile-specific support channel."
+    doc_link: "https://docs.agentred.ai/configuration/widget-appearance#mobile"
+    affects_agents: []
+    pii_classification: none
+    injected_in_prompt: false
+
+  - field_name: widget_dark_mode
+    display_name: Dark mode
+    field_type: boolean
+    validation: {}
+    platform_default: false
+    tier_gate: all
+    onboarding_step: 9
+    step_order: 11
+    tooltip: Use a dark color scheme for the widget.
+    description: "When enabled, the widget uses a dark background with light text. Your primary color is still used for accents and buttons. Dark mode is not available in most competing products."
+    doc_link: "https://docs.agentred.ai/configuration/widget-appearance#dark-mode"
+    affects_agents: []
+    pii_classification: none
+    injected_in_prompt: false
+
+  - field_name: widget_color_mode
+    display_name: Color mode
+    field_type: enum
+    validation:
+      allowed_values:
+        - light
+        - dark
+        - auto
+    platform_default: auto
+    tier_gate: all
+    onboarding_step: 9
+    step_order: 24
+    tooltip: "Widget color scheme: light, dark, or auto (follows visitor's OS preference)."
+    description: "Controls the overall color scheme. 'auto' detects the visitor's OS dark mode preference. Supersedes the Dark Mode toggle when set to 'light' or 'dark'."
+    doc_link: "https://docs.agentred.ai/configuration/widget-appearance#color-mode"
+    affects_agents: []
+    pii_classification: none
+    injected_in_prompt: false
+
+  - field_name: widget_header_gradient_end
+    display_name: Header gradient end color
+    field_type: string
+    validation:
+      pattern: "^#[0-9A-Fa-f]{6}$"
+    platform_default: null
+    tier_gate: all
+    onboarding_step: 9
+    step_order: 25
+    tooltip: End color for the header gradient. Start color is your primary color.
+    description: Creates a linear gradient from your primary color to this color in the widget header. Leave blank for a solid primary color header.
+    placeholder: "#8B1520"
+    doc_link: "https://docs.agentred.ai/configuration/widget-appearance#header-gradient"
+    affects_agents: []
+    pii_classification: none
+    injected_in_prompt: false
+
+  - field_name: widget_font_family
+    display_name: Font family
+    field_type: string
+    validation:
+      max_length: 200
+    platform_default: "Inter, system-ui, sans-serif"
+    tier_gate: all
+    onboarding_step: 9
+    step_order: 26
+    tooltip: CSS font-family for widget text.
+    description: The font stack used in the widget. Defaults to Inter. Use any web-safe font or Google Font that is loaded on your storefront.
+    placeholder: "Inter, system-ui, sans-serif"
+    doc_link: "https://docs.agentred.ai/configuration/widget-appearance#font"
+    affects_agents: []
+    pii_classification: none
+    injected_in_prompt: false
+
+  - field_name: widget_border_radius
+    display_name: Border radius
+    field_type: integer
+    validation:
+      min_value: 0.0
+      max_value: 32.0
+    platform_default: 8
+    tier_gate: all
+    onboarding_step: 9
+    step_order: 27
+    tooltip: Corner rounding for the widget panel and inputs (px).
+    description: "Controls how rounded corners are on the widget panel, input fields, and message bubbles. 0 = square corners, 16 = very rounded."
+    doc_link: "https://docs.agentred.ai/configuration/widget-appearance#border-radius"
+    affects_agents: []
+    pii_classification: none
+    injected_in_prompt: false
+
+  - field_name: widget_launcher_size
+    display_name: Launcher button size
+    field_type: integer
+    validation:
+      min_value: 40.0
+      max_value: 80.0
+    platform_default: 60
+    tier_gate: all
+    onboarding_step: 9
+    step_order: 28
+    tooltip: Diameter of the floating launcher button (px).
+    description: "The size of the circular chat button in the corner of the page. 40px = compact, 60px = standard, 80px = large."
+    doc_link: "https://docs.agentred.ai/configuration/widget-appearance#launcher-size"
+    affects_agents: []
+    pii_classification: none
+    injected_in_prompt: false
+
+  - field_name: widget_launcher_icon
+    display_name: Launcher icon
+    field_type: enum
+    validation:
+      allowed_values:
+        - chat
+        - headset
+        - help
+        - custom
+    platform_default: chat
+    tier_gate: all
+    onboarding_step: 9
+    step_order: 29
+    tooltip: Icon displayed on the launcher button.
+    description: "The icon inside the floating launcher button. 'chat' = speech bubble, 'headset' = support headset, 'help' = question mark, 'custom' = use your logo."
+    doc_link: "https://docs.agentred.ai/configuration/widget-appearance#launcher-icon"
+    affects_agents: []
+    pii_classification: none
+    injected_in_prompt: false
+
+  - field_name: widget_header_title
+    display_name: Header title
+    field_type: string
+    validation:
+      max_length: 100
+    platform_default: null
+    tier_gate: all
+    onboarding_step: 9
+    step_order: 30
+    tooltip: Title text displayed in the widget header.
+    description: "The main title shown at the top of the chat panel. If blank, defaults to 'Support' or your agent display name."
+    placeholder: "e.g. Support, Chat with us"
+    doc_link: "https://docs.agentred.ai/configuration/widget-appearance#header-title"
+    affects_agents: []
+    pii_classification: none
+    injected_in_prompt: false
+
+  - field_name: widget_header_subtitle
+    display_name: Header subtitle
+    field_type: string
+    validation:
+      max_length: 200
+    platform_default: null
+    tier_gate: all
+    onboarding_step: 9
+    step_order: 31
+    tooltip: Subtitle text below the header title.
+    description: A short description shown below the header title. Use it to set response time expectations.
+    placeholder: e.g. We typically reply within minutes
+    doc_link: "https://docs.agentred.ai/configuration/widget-appearance#header-subtitle"
+    affects_agents: []
+    pii_classification: none
+    injected_in_prompt: false
+
+  - field_name: widget_greeting_enabled
+    display_name: Greeting message
+    field_type: boolean
+    validation: {}
+    platform_default: true
+    tier_gate: all
+    onboarding_step: 9
+    step_order: 32
+    tooltip: Show a greeting message when the widget opens.
+    description: "When enabled, a welcome message appears at the top of the conversation when the visitor opens the chat widget."
+    doc_link: "https://docs.agentred.ai/configuration/widget-appearance#greeting"
+    affects_agents: []
+    pii_classification: none
+    injected_in_prompt: false
+
+  - field_name: widget_greeting_message
+    display_name: Greeting text
+    field_type: text
+    validation:
+      max_length: 500
+    platform_default: "Hi there! How can I help you today?"
+    tier_gate: all
+    onboarding_step: 9
+    step_order: 33
+    tooltip: The greeting text displayed when chat opens.
+    description: "Customize the welcome message visitors see. Supports template variables: {{brand_name}}, {{agent_name}}."
+    placeholder: "e.g. Hi there! How can I help you today?"
+    doc_link: "https://docs.agentred.ai/configuration/widget-appearance#greeting-text"
+    affects_agents: []
+    pii_classification: none
+    injected_in_prompt: false
+
+  - field_name: widget_pre_chat_form_enabled
+    display_name: Pre-chat form
+    field_type: boolean
+    validation: {}
+    platform_default: false
+    tier_gate: all
+    onboarding_step: 9
+    step_order: 34
+    tooltip: Collect visitor info before starting a conversation.
+    description: "When enabled, visitors must fill in selected fields (name, email, phone, etc.) before they can start chatting."
+    doc_link: "https://docs.agentred.ai/configuration/widget-appearance#pre-chat-form"
+    affects_agents: []
+    pii_classification: none
+    injected_in_prompt: false
+
+  - field_name: widget_pre_chat_fields
+    display_name: Pre-chat form fields
+    field_type: string_list
+    validation:
+      allowed_values:
+        - name
+        - email
+        - phone
+        - company
+        - order_number
+        - subject
+      max_items: 6
+    platform_default: []
+    tier_gate: all
+    onboarding_step: 9
+    step_order: 35
+    tooltip: Which fields to show in the pre-chat form.
+    description: "Select the fields visitors must complete before chatting. 'name' and 'email' are most common."
+    doc_link: "https://docs.agentred.ai/configuration/widget-appearance#pre-chat-fields"
+    affects_agents: []
+    pii_classification: none
+    injected_in_prompt: false
+
+  - field_name: widget_offline_form_enabled
+    display_name: Offline contact form
+    field_type: boolean
+    validation: {}
+    platform_default: true
+    tier_gate: all
+    onboarding_step: 9
+    step_order: 36
+    tooltip: Show a leave-a-message form when all agents are offline.
+    description: "When enabled and all human agents are offline, visitors can leave a message with their email for follow-up."
+    doc_link: "https://docs.agentred.ai/configuration/widget-appearance#offline-form"
+    affects_agents: []
+    pii_classification: none
+    injected_in_prompt: false
+
+  - field_name: widget_offline_message
+    display_name: Offline message
+    field_type: text
+    validation:
+      max_length: 500
+    platform_default: null
+    tier_gate: all
+    onboarding_step: 9
+    step_order: 12
+    tooltip: Message displayed when your support team is offline.
+    description: "Shown when all human agents are offline (outside operating hours). The AI agent remains available 24/7. This message appears alongside the AI chat to set expectations about human response times. Leave blank to use the default: 'Our team is currently offline. Our AI assistant is available to help you now.'"
+    placeholder: "e.g. Our team is offline, but our AI assistant is here to help!"
+    doc_link: "https://docs.agentred.ai/configuration/widget-appearance#offline"
+    affects_agents: []
+    pii_classification: none
+    injected_in_prompt: false
+
+  - field_name: widget_auto_open
+    display_name: Auto-open widget
+    field_type: boolean
+    validation: {}
+    platform_default: false
+    tier_gate: all
+    onboarding_step: 9
+    step_order: 13
+    tooltip: Automatically open the widget after a delay.
+    description: "When enabled, the widget opens automatically after the visitor has been on the page for the configured delay period. Use sparingly — auto-opening can feel intrusive if overused."
+    doc_link: "https://docs.agentred.ai/configuration/widget-appearance#auto-open"
+    affects_agents: []
+    pii_classification: none
+    injected_in_prompt: false
+
+  - field_name: widget_auto_open_delay
+    display_name: Auto-open delay (seconds)
+    field_type: integer
+    validation:
+      min_value: 1.0
+      max_value: 120.0
+    platform_default: 5
+    tier_gate: all
+    onboarding_step: 9
+    step_order: 14
+    tooltip: Seconds to wait before auto-opening the widget.
+    description: "Only applies when Auto-Open Widget is enabled. The widget opens after this many seconds on the page. Recommended: 3-10 seconds. Longer delays feel less intrusive."
+    doc_link: "https://docs.agentred.ai/configuration/widget-appearance#auto-open"
+    affects_agents: []
+    pii_classification: none
+    injected_in_prompt: false
+
+  - field_name: widget_operating_hours
+    display_name: Operating hours
+    field_type: object
+    validation: {}
+    platform_default: null
+    tier_gate: all
+    onboarding_step: 9
+    step_order: 15
+    tooltip: "Your team's business hours schedule."
+    description: "Structured schedule with per-day time ranges and timezone. Format: {timezone: 'America/New_York', schedule: {monday: [{start: '09:00', end: '17:00'}], ...}}. When set, the widget shows an online/offline indicator. Leave blank for 'always available'."
+    doc_link: "https://docs.agentred.ai/configuration/widget-appearance#hours"
+    affects_agents: []
+    pii_classification: none
+    injected_in_prompt: false
+
+  - field_name: widget_offline_behavior
+    display_name: Offline behavior
+    field_type: enum
+    validation:
+      allowed_values:
+        - ai_only
+        - show_form
+        - hide_widget
+    platform_default: ai_only
+    tier_gate: all
+    onboarding_step: 9
+    step_order: 16
+    tooltip: What happens when your team is offline.
+    description: "AI only: the AI agent handles all conversations (recommended). Show form: display a 'leave a message' form instead of chat. Hide widget: hide the widget entirely during offline hours."
+    doc_link: "https://docs.agentred.ai/configuration/widget-appearance#offline-behavior"
+    affects_agents: []
+    pii_classification: none
+    injected_in_prompt: false
+
+  - field_name: widget_prechat_form
+    display_name: Pre-chat form
+    field_type: object
+    validation: {}
+    platform_default: null
+    tier_gate: all
+    onboarding_step: 9
+    step_order: 17
+    tooltip: Collect visitor information before starting a conversation.
+    description: "When configured, visitors fill in a form before chatting. Format: {enabled: true, fields: [{name: 'name', label: 'Your Name', type: 'text', required: true}, {name: 'email', label: 'Email', type: 'email', required: true}]}. Supports text, email, phone, and dropdown field types. Maximum 10 fields."
+    doc_link: "https://docs.agentred.ai/configuration/widget-appearance#prechat"
+    affects_agents: []
+    pii_classification: none
+    injected_in_prompt: false
+
+  - field_name: widget_chat_rating_enabled
+    display_name: Post-chat rating
+    field_type: boolean
+    validation: {}
+    platform_default: false
+    tier_gate: all
+    onboarding_step: 9
+    step_order: 18
+    tooltip: Show a thumbs up/down rating prompt after conversations.
+    description: "When enabled, visitors see a satisfaction prompt after the conversation ends. Ratings are tracked in the Analytics dashboard. Negative ratings optionally include a comment field."
+    doc_link: "https://docs.agentred.ai/configuration/widget-appearance#rating"
+    affects_agents: []
+    pii_classification: none
+    injected_in_prompt: false
+
+  - field_name: widget_sound_enabled
+    display_name: Notification sound
+    field_type: boolean
+    validation: {}
+    platform_default: true
+    tier_gate: all
+    onboarding_step: 9
+    step_order: 19
+    tooltip: Play a sound when a new message arrives.
+    description: "A subtle notification sound plays in the visitor's browser when a new agent message arrives and the widget is minimized. Visitors can also mute this from within the widget."
+    doc_link: "https://docs.agentred.ai/configuration/widget-appearance#sound"
+    affects_agents: []
+    pii_classification: none
+    injected_in_prompt: false
+
+  - field_name: widget_file_upload_enabled
+    display_name: File uploads
+    field_type: boolean
+    validation: {}
+    platform_default: true
+    tier_gate: all
+    onboarding_step: 9
+    step_order: 20
+    tooltip: Allow visitors to attach images and files.
+    description: "When enabled, visitors can attach files (images, PDFs, documents) to their messages. Maximum file size: 10MB. Supported formats: PNG, JPG, GIF, PDF, DOC, DOCX, TXT. Disable if file attachments are not relevant to your support workflow."
+    doc_link: "https://docs.agentred.ai/configuration/widget-appearance#files"
+    affects_agents: []
+    pii_classification: none
+    injected_in_prompt: false
+
+  - field_name: widget_header_text
+    display_name: Widget header text
+    field_type: string
+    validation:
+      max_length: 100
+    platform_default: null
+    tier_gate: all
+    onboarding_step: 9
+    step_order: 21
+    tooltip: Custom title shown at the top of the widget.
+    description: "Replaces the default header text. If blank, defaults to 'Chat with us' or the agent display name. Keep it short and action-oriented."
+    placeholder: "e.g. Chat with us, Need help?, Ask a question"
+    doc_link: "https://docs.agentred.ai/configuration/widget-appearance#header"
+    affects_agents: []
+    pii_classification: none
+    injected_in_prompt: false
+
+  - field_name: widget_input_placeholder
+    display_name: Input placeholder
+    field_type: string
+    validation:
+      max_length: 200
+    platform_default: null
+    tier_gate: all
+    onboarding_step: 9
+    step_order: 22
+    tooltip: Placeholder text in the message input field.
+    description: "The grey hint text shown in the empty message input box. If blank, defaults to 'Type a message...'. Use it to guide visitors toward productive queries."
+    placeholder: "e.g. Type a message..., Ask me anything..."
+    doc_link: "https://docs.agentred.ai/configuration/widget-appearance#placeholder"
+    affects_agents: []
+    pii_classification: none
+    injected_in_prompt: false
+
+  - field_name: widget_page_rules
+    display_name: Page visibility rules
+    field_type: string_list
+    validation:
+      max_length: 500
+      max_items: 20
+    platform_default: []
+    tier_gate: all
+    onboarding_step: 9
+    step_order: 23
+    tooltip: Control which pages the widget appears on.
+    description: "List of URL patterns to control widget visibility. Prefix with '+' to include or '-' to exclude. Examples: '+/products/*' (show on product pages), '-/checkout' (hide on checkout), '-/admin/*' (hide on admin). If empty, the widget appears on all pages."
+    placeholder: "e.g. +/products/*, -/checkout, -/admin/*"
+    doc_link: "https://docs.agentred.ai/configuration/widget-appearance#page-rules"
+    affects_agents: []
+    pii_classification: none
+    injected_in_prompt: false
+
+  - field_name: widget_quick_actions_enabled
+    display_name: Quick action buttons
+    field_type: boolean
+    validation: {}
+    platform_default: true
+    tier_gate: all
+    onboarding_step: 9
+    step_order: 24
+    tooltip: Show contextual quick action prompt buttons in the chat greeting area.
+    description: "When enabled, up to 2 quick action prompt buttons appear below the greeting message. Buttons are configured in the Quick Actions section and can be assigned to specific page types (product, collection, home, etc.) for contextual relevance."
+    doc_link: "https://docs.agentred.ai/configuration/widget-appearance#quick-actions"
+    affects_agents: []
+    pii_classification: none
+    injected_in_prompt: false
+
+  - field_name: custom_instructions
+    display_name: Custom AI instructions
+    field_type: text
+    validation:
+      max_length: 4000
+    platform_default: null
+    tier_gate: pro+
+    onboarding_step: 10
+    step_order: 0
+    tooltip: "Advanced: free-form instructions appended to the AI's system prompt."
+    description: "Custom instructions are injected into the Response Generator's system prompt. They are advisory — platform safety rules and the Critic always take precedence. Use for domain-specific guidance the structured fields don't cover. Professional and Enterprise only."
+    placeholder: e.g. Always mention our loyalty program when discussing returns.
+    doc_link: "https://docs.agentred.ai/configuration/advanced#custom-instructions"
+    affects_agents:
+      - response-generator
+    pii_classification: none
+    injected_in_prompt: true
+
+  - field_name: test_mode_enabled
+    display_name: Test mode
+    field_type: boolean
+    validation: {}
+    platform_default: false
+    tier_gate: all
+    onboarding_step: 10
+    step_order: 1
+    tooltip: Enable test mode — conversations are not billed.
+    description: "When test mode is active, conversations are prefixed with 'test_' and excluded from billing. Use this to verify your configuration before going live. Test conversations still flow through the full pipeline including the Critic."
+    doc_link: "https://docs.agentred.ai/configuration/advanced#test-mode"
+    affects_agents: []
+    pii_classification: none
+    injected_in_prompt: false

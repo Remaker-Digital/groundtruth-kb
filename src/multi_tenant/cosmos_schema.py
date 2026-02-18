@@ -60,6 +60,7 @@ COLLECTION_PLATFORM_CONFIG = "platform_config"
 COLLECTION_AUDIT_LOG = "audit_log"
 COLLECTION_TEAM_MEMBERS = "team_members"
 COLLECTION_SLA_SNAPSHOTS = "sla_snapshots"
+COLLECTION_VERIFICATION_TOKENS = "verification_tokens"
 
 ALL_COLLECTIONS = [
     COLLECTION_TENANTS,
@@ -73,6 +74,7 @@ ALL_COLLECTIONS = [
     COLLECTION_AUDIT_LOG,
     COLLECTION_TEAM_MEMBERS,
     COLLECTION_SLA_SNAPSHOTS,
+    COLLECTION_VERIFICATION_TOKENS,
 ]
 
 # Cosmos DB Serverless — no provisioned throughput (pay per RU consumed)
@@ -88,6 +90,7 @@ TTL_IDEMPOTENCY = 7 * 24 * 60 * 60         # 7 days for idempotency keys
 TTL_AUDIT_LOG = 365 * 24 * 60 * 60         # 1 year (audit log retention)
 TTL_PACK_BALANCE = 90 * 24 * 60 * 60       # 90 days (pack validity)
 TTL_SLA_SNAPSHOTS = 90 * 24 * 60 * 60     # 90 days (SLA trend retention)
+TTL_VERIFICATION_TOKEN = 10 * 60           # 10 minutes (email verification link)
 
 
 # ---------------------------------------------------------------------------
@@ -1452,6 +1455,18 @@ def get_collection_configs() -> list[CollectionConfig]:
                         {"path": "/timestamp", "order": "descending"},
                     ],
                 ],
+            },
+        ),
+        # 12. verification_tokens (email verification, magic links — short TTL)
+        CollectionConfig(
+            name=COLLECTION_VERIFICATION_TOKENS,
+            partition_key="/token_type",
+            default_ttl=TTL_VERIFICATION_TOKEN,
+            indexing_policy={
+                "automatic": True,
+                "indexingMode": "consistent",
+                "includedPaths": [{"path": "/*"}],
+                "excludedPaths": [{"path": '/"_etag"/?'}],
             },
         ),
     ]

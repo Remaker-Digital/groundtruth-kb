@@ -37,6 +37,7 @@ from src.multi_tenant.repositories import (  # noqa: F401
     TenantRepository,
     TenantScopedRepository,
     UsageRepository,
+    VerificationTokenRepository,
 )
 
 __all__ = [
@@ -56,4 +57,5 @@ __all__ = [
     "PlatformConfigRepository",
     "AuditLogRepository",
     "SLASnapshotRepository",
+    "VerificationTokenRepository",
 ]

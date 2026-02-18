@@ -57,10 +57,11 @@ COPY src/ ./src/
 COPY config/ ./config/
 
 # --------------------------------------------------------------------------
-# Admin SPAs (pre-built Vite output for embedded + standalone admin)
+# Admin SPAs (pre-built Vite output for embedded + standalone + provider admin)
 # --------------------------------------------------------------------------
 COPY admin/shopify/dist/ ./admin/shopify/dist/
 COPY admin/standalone/dist/ ./admin/standalone/dist/
+COPY admin/provider/dist/ ./admin/provider/dist/
 
 # --------------------------------------------------------------------------
 # Widget bundle (IIFE single-file for embedding via <script> tag)

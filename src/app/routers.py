@@ -35,10 +35,11 @@ from src.multi_tenant.admin_apikey_api import router as admin_apikey_router
 from src.multi_tenant.admin_integration_api import router as admin_integration_router
 from src.multi_tenant.admin_quick_action_api import router as admin_quick_action_router
 from src.multi_tenant.superadmin_api import router as superadmin_router
+from src.multi_tenant.email_verification import router as email_verify_router
 
 
 def register_routers(app: FastAPI) -> None:
-    """Register all 24 API routers on the FastAPI application.
+    """Register all 25 API routers on the FastAPI application.
 
     This mirrors the router registration block from main.py lines 186-209.
     """
@@ -66,3 +67,4 @@ def register_routers(app: FastAPI) -> None:
     app.include_router(admin_integration_router)
     app.include_router(admin_quick_action_router)
     app.include_router(superadmin_router)
+    app.include_router(email_verify_router)

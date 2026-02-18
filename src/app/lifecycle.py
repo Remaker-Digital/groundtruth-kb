@@ -781,14 +781,30 @@ async def _startup_superadmin_services() -> None:
             UsageRepository,
         )
 
+        # Optional services: NATS manager and secret service for Phase 2 endpoints
+        nats_mgr = None
+        try:
+            from src.multi_tenant.nats_isolation import get_nats_manager
+            nats_mgr = get_nats_manager()
+        except Exception:
+            logger.debug("NATS manager not available for superadmin API")
+
+        secret_svc = None
+        try:
+            secret_svc = get_secret_service()
+        except Exception:
+            logger.debug("Secret service not available for superadmin API")
+
         configure_superadmin_services(
             tenant_repo=TenantRepository(),
             audit_repo=AuditLogRepository(),
             conv_repo=ConversationRepository(),
             usage_repo=UsageRepository(),
             prefs_repo=PreferencesRepository(),
+            nats_mgr=nats_mgr,
+            secret_service=secret_svc,
         )
-        logger.info("Superadmin provider operations API initialized (5 endpoints)")
+        logger.info("Superadmin provider operations API initialized (9 endpoints)")
     except Exception:
         logger.warning(
             "Superadmin API initialization failed — provider endpoints "

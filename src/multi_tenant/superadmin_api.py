@@ -5,14 +5,18 @@ to manage and monitor the platform across all tenants. These endpoints perform
 cross-partition queries and aggregate data from multiple services.
 
 Phase 1 (Release-Blocking):
-    RB-2: GET /api/superadmin/tenants         — Tenant directory with filtering
-    RB-2: GET /api/superadmin/tenants/summary  — Tenant distribution summary
-    RB-8: GET /api/superadmin/deployments      — Deployment event history
-    RB-1: GET /api/superadmin/dashboard        — Provider ops dashboard aggregate
-    RB-7: GET /api/superadmin/billing/health   — Billing/metering integrity
+    RB-2: GET /api/superadmin/tenants           — Tenant directory with filtering
+    RB-2: GET /api/superadmin/tenants/summary    — Tenant distribution summary
+    RB-8: GET /api/superadmin/deployments        — Deployment event history
+    RB-1: GET /api/superadmin/dashboard          — Provider ops dashboard aggregate
+    RB-7: GET /api/superadmin/billing/health     — Billing/metering integrity
 
-Phase 2 (Critical — C-2):
-    C-2:  GET /api/superadmin/sla/trends       — SLA trends + error budget
+Phase 2 (Critical):
+    C-2:  GET /api/superadmin/sla/trends         — SLA trends + error budget
+    C-1:  GET /api/superadmin/queues             — Queue depth per tenant (NATS)
+    C-3:  GET /api/superadmin/compliance         — Compliance summary (PII/DSAR/grace)
+    C-4:  GET /api/superadmin/secrets/posture    — Secret inventory per tenant
+    HV-3: GET /api/superadmin/integrations/health — Circuit breakers + MCP status
 
 All endpoints require SUPERADMIN role. Widget keys and tenant-level API keys
 are rejected. Only per-user API keys with SUPERADMIN role are accepted.
@@ -64,6 +68,8 @@ _audit_repo: AuditLogRepository | None = None
 _conv_repo: ConversationRepository | None = None
 _usage_repo: UsageRepository | None = None
 _prefs_repo: PreferencesRepository | None = None
+_nats_mgr: Any = None
+_secret_service: Any = None
 
 
 def configure_superadmin_services(
@@ -72,17 +78,22 @@ def configure_superadmin_services(
     conv_repo: ConversationRepository | None = None,
     usage_repo: UsageRepository | None = None,
     prefs_repo: PreferencesRepository | None = None,
+    nats_mgr: Any = None,
+    secret_service: Any = None,
 ) -> None:
     """Wire repositories into module-level variables.
 
     Called during application startup from main.py.
     """
     global _tenant_repo, _audit_repo, _conv_repo, _usage_repo, _prefs_repo
+    global _nats_mgr, _secret_service
     _tenant_repo = tenant_repo
     _audit_repo = audit_repo
     _conv_repo = conv_repo
     _usage_repo = usage_repo
     _prefs_repo = prefs_repo
+    _nats_mgr = nats_mgr
+    _secret_service = secret_service
     logger.info("Superadmin API services configured")
 
 
@@ -213,6 +224,126 @@ class SLATrendsResponse(CamelCaseModel):
     trend_points: list[SLATrendPointModel]
     error_budgets: dict[str, ErrorBudgetModel] = Field(default_factory=dict)
     generated_at: str
+
+
+# ---------------------------------------------------------------------------
+# C-1: Queue Depth response models
+# ---------------------------------------------------------------------------
+
+
+class TenantQueueInfo(CamelCaseModel):
+    """Per-tenant JetStream queue metrics."""
+
+    tenant_id: str
+    stream_name: str
+    messages: int = 0
+    bytes: int = 0
+    consumer_count: int = 0
+
+
+class QueueDepthResponse(CamelCaseModel):
+    """Aggregate queue depth across all tenants."""
+
+    total_tenants: int = 0
+    total_messages: int = 0
+    total_bytes: int = 0
+    tenants: list[TenantQueueInfo] = Field(default_factory=list)
+    errors: list[dict[str, str]] = Field(default_factory=list)
+
+
+# ---------------------------------------------------------------------------
+# C-3: Compliance Summary response models
+# ---------------------------------------------------------------------------
+
+
+class TenantComplianceInfo(CamelCaseModel):
+    """Per-tenant compliance snapshot."""
+
+    tenant_id: str
+    tier: str | None = None
+    grace_period_ends_at: str | None = None
+    grace_period_active: bool = False
+    pii_scrubbing_enabled: bool = False
+    dsar_request_count: int = 0
+    last_dsar_request: str | None = None
+
+
+class ComplianceSummaryResponse(CamelCaseModel):
+    """Cross-tenant compliance overview."""
+
+    total_tenants: int = 0
+    tenants_with_pii_scrubbing: int = 0
+    tenants_in_grace_period: int = 0
+    total_dsar_requests: int = 0
+    tenants: list[TenantComplianceInfo] = Field(default_factory=list)
+    errors: list[dict[str, str]] = Field(default_factory=list)
+
+
+# ---------------------------------------------------------------------------
+# C-4: Secret Posture response models
+# ---------------------------------------------------------------------------
+
+
+class TenantSecretInfo(CamelCaseModel):
+    """Per-tenant secret inventory."""
+
+    tenant_id: str
+    tier: str | None = None
+    secret_count: int = 0
+    secrets_by_type: dict[str, int] = Field(default_factory=dict)
+    has_shopify: bool = False
+    has_stripe: bool = False
+    has_api_key: bool = False
+    oldest_secret: str | None = None
+    newest_secret: str | None = None
+    disabled_secrets: int = 0
+
+
+class SecretPostureResponse(CamelCaseModel):
+    """Cross-tenant secret posture overview."""
+
+    total_tenants: int = 0
+    total_secrets: int = 0
+    secrets_by_type_global: dict[str, int] = Field(default_factory=dict)
+    tenants_with_shopify: int = 0
+    tenants_with_stripe: int = 0
+    tenants_with_api_key: int = 0
+    tenants: list[TenantSecretInfo] = Field(default_factory=list)
+    errors: list[dict[str, str]] = Field(default_factory=list)
+
+
+# ---------------------------------------------------------------------------
+# HV-3: Integration Reliability response models
+# ---------------------------------------------------------------------------
+
+
+class CircuitBreakerStatus(CamelCaseModel):
+    """Status of a single circuit breaker."""
+
+    service: str
+    state: str
+    failures: int = 0
+    successes: int = 0
+
+
+class McpIntegrationStatus(CamelCaseModel):
+    """MCP server integration status across tenants."""
+
+    server_name: str
+    tenants_enabled: int = 0
+    tenants_connected: int = 0
+    tenants_errored: int = 0
+
+
+class IntegrationHealthResponse(CamelCaseModel):
+    """Cross-service integration health overview."""
+
+    overall_healthy: bool = True
+    circuit_breakers: list[CircuitBreakerStatus] = Field(default_factory=list)
+    any_breaker_open: bool = False
+    nats_connected: bool = False
+    mcp_integrations: list[McpIntegrationStatus] = Field(default_factory=list)
+    errors: list[dict[str, str]] = Field(default_factory=list)
 
 
 # ---------------------------------------------------------------------------
@@ -692,3 +823,412 @@ async def sla_trends(
     except Exception as exc:
         logger.warning("SLA trends failed: %s", exc, exc_info=True)
         raise HTTPException(status_code=503, detail="SLA trend data unavailable")
+
+
+# ---------------------------------------------------------------------------
+# C-1: Queue Depth + Job Health
+# ---------------------------------------------------------------------------
+
+
+@router.get(
+    "/queues",
+    response_model=QueueDepthResponse,
+    summary="Queue depth across all tenants",
+    description=(
+        "Aggregate JetStream queue metrics for all active tenants. "
+        "Returns per-tenant message counts, byte totals, and consumer counts."
+    ),
+    status_code=200,
+)
+async def queue_depth(
+    _ctx: TenantContext = Depends(require_role(TeamMemberRole.SUPERADMIN)),
+) -> QueueDepthResponse:
+    """Get queue depth and job health metrics across all tenants."""
+    if _nats_mgr is None or not _nats_mgr.is_connected:
+        raise HTTPException(status_code=503, detail="NATS is not connected")
+
+    if _tenant_repo is None:
+        raise HTTPException(status_code=503, detail="Service not configured")
+
+    tenant_ids = await _tenant_repo.list_active_tenant_ids()
+    tenants: list[TenantQueueInfo] = []
+    errors: list[dict[str, str]] = []
+    total_messages = 0
+    total_bytes = 0
+
+    for tid in tenant_ids:
+        try:
+            info = await _nats_mgr.get_tenant_stream_info(tid)
+            if info is not None:
+                t = TenantQueueInfo(
+                    tenant_id=tid,
+                    stream_name=info.get("stream_name", ""),
+                    messages=info.get("messages", 0),
+                    bytes=info.get("bytes", 0),
+                    consumer_count=info.get("consumer_count", 0),
+                )
+                tenants.append(t)
+                total_messages += t.messages
+                total_bytes += t.bytes
+        except Exception as exc:
+            errors.append({
+                "tenant_id": tid,
+                "message": f"Failed to get stream info: {exc}",
+            })
+
+    return QueueDepthResponse(
+        total_tenants=len(tenants),
+        total_messages=total_messages,
+        total_bytes=total_bytes,
+        tenants=tenants,
+        errors=errors,
+    )
+
+
+# ---------------------------------------------------------------------------
+# C-3: Compliance Summary
+# ---------------------------------------------------------------------------
+
+
+@router.get(
+    "/compliance",
+    response_model=ComplianceSummaryResponse,
+    summary="Cross-tenant compliance overview",
+    description=(
+        "Compliance posture across all tenants: grace periods, "
+        "PII scrubbing status, and DSAR request history."
+    ),
+    status_code=200,
+)
+async def compliance_summary(
+    _ctx: TenantContext = Depends(require_role(TeamMemberRole.SUPERADMIN)),
+) -> ComplianceSummaryResponse:
+    """Get compliance summary across all tenants."""
+    if _tenant_repo is None:
+        raise HTTPException(status_code=503, detail="Service not configured")
+
+    now = datetime.now(timezone.utc)
+    tenant_ids = await _tenant_repo.list_active_tenant_ids()
+    tenants: list[TenantComplianceInfo] = []
+    errors: list[dict[str, str]] = []
+    pii_count = 0
+    grace_count = 0
+    total_dsar = 0
+
+    for tid in tenant_ids:
+        try:
+            info = TenantComplianceInfo(tenant_id=tid)
+
+            # Read tenant doc for tier + grace period
+            try:
+                tenant_doc = await _tenant_repo.read(tid)
+                if tenant_doc:
+                    info.tier = tenant_doc.get("tier")
+                    gp_end = tenant_doc.get("grace_period_ends_at")
+                    if gp_end:
+                        info.grace_period_ends_at = gp_end
+                        try:
+                            from datetime import datetime as dt
+                            ends_at = dt.fromisoformat(gp_end.replace("Z", "+00:00"))
+                            info.grace_period_active = ends_at > now
+                            if info.grace_period_active:
+                                grace_count += 1
+                        except (ValueError, TypeError):
+                            pass
+            except Exception:
+                pass
+
+            # Read preferences for PII scrubbing
+            if _prefs_repo is not None:
+                try:
+                    prefs = await _prefs_repo.read(tid)
+                    if prefs and prefs.get("pii_scrubbing"):
+                        info.pii_scrubbing_enabled = True
+                        pii_count += 1
+                except Exception:
+                    pass
+
+            # Count DSAR events from audit log
+            if _audit_repo is not None:
+                try:
+                    dsar_count = 0
+                    last_dsar: str | None = None
+                    dsar_types = [
+                        AuditEventType.DATA_EXPORTED.value,
+                        AuditEventType.CONSENT_CHANGED.value,
+                        AuditEventType.DATA_DELETED.value,
+                    ]
+                    dsar_query = (
+                        "SELECT c.timestamp FROM c "
+                        "WHERE c.tenant_id = @tid "
+                        "AND c.event_type IN (@t1, @t2, @t3) "
+                        "ORDER BY c.timestamp DESC"
+                    )
+                    dsar_params = [
+                        {"name": "@tid", "value": tid},
+                        {"name": "@t1", "value": dsar_types[0]},
+                        {"name": "@t2", "value": dsar_types[1]},
+                        {"name": "@t3", "value": dsar_types[2]},
+                    ]
+                    async for item in _audit_repo._container.query_items(
+                        query=dsar_query,
+                        parameters=dsar_params,
+                        max_item_count=100,
+                    ):
+                        dsar_count += 1
+                        if last_dsar is None:
+                            last_dsar = item.get("timestamp")
+
+                    info.dsar_request_count = dsar_count
+                    info.last_dsar_request = last_dsar
+                    total_dsar += dsar_count
+                except Exception:
+                    pass
+
+            tenants.append(info)
+        except Exception as exc:
+            errors.append({
+                "tenant_id": tid,
+                "message": f"Compliance check failed: {exc}",
+            })
+
+    return ComplianceSummaryResponse(
+        total_tenants=len(tenants),
+        tenants_with_pii_scrubbing=pii_count,
+        tenants_in_grace_period=grace_count,
+        total_dsar_requests=total_dsar,
+        tenants=tenants,
+        errors=errors,
+    )
+
+
+# ---------------------------------------------------------------------------
+# C-4: Secret Posture
+# ---------------------------------------------------------------------------
+
+
+@router.get(
+    "/secrets/posture",
+    response_model=SecretPostureResponse,
+    summary="Secret posture across all tenants",
+    description=(
+        "Secret inventory and classification across all tenants. "
+        "Shows which tenants have Shopify, Stripe, and API key secrets."
+    ),
+    status_code=200,
+)
+async def secret_posture(
+    _ctx: TenantContext = Depends(require_role(TeamMemberRole.SUPERADMIN)),
+) -> SecretPostureResponse:
+    """Get secret posture across all tenants."""
+    if _secret_service is None:
+        raise HTTPException(status_code=503, detail="Secret service not configured")
+
+    if _tenant_repo is None:
+        raise HTTPException(status_code=503, detail="Service not configured")
+
+    tenant_ids = await _tenant_repo.list_active_tenant_ids()
+    tenants: list[TenantSecretInfo] = []
+    errors: list[dict[str, str]] = []
+    global_by_type: dict[str, int] = {}
+    total_secrets = 0
+    shopify_count = 0
+    stripe_count = 0
+    api_key_count = 0
+
+    for tid in tenant_ids:
+        try:
+            secrets = await _secret_service.list_tenant_secrets(tid)
+            info = TenantSecretInfo(tenant_id=tid)
+
+            # Get tier from tenant doc
+            try:
+                tenant_doc = await _tenant_repo.read(tid)
+                if tenant_doc:
+                    info.tier = tenant_doc.get("tier")
+            except Exception:
+                pass
+
+            info.secret_count = len(secrets)
+            total_secrets += len(secrets)
+
+            # Classify by type
+            by_type: dict[str, int] = {}
+            oldest: str | None = None
+            newest: str | None = None
+            disabled = 0
+
+            for s in secrets:
+                stype = s.get("type", "unknown")
+                by_type[stype] = by_type.get(stype, 0) + 1
+                global_by_type[stype] = global_by_type.get(stype, 0) + 1
+
+                created = s.get("created")
+                if created:
+                    if oldest is None or created < oldest:
+                        oldest = created
+                    if newest is None or created > newest:
+                        newest = created
+
+                if s.get("enabled") is False:
+                    disabled += 1
+
+                # Classify integration types
+                stype_lower = stype.lower()
+                if "shopify" in stype_lower:
+                    info.has_shopify = True
+                if "stripe" in stype_lower:
+                    info.has_stripe = True
+                if "api_key" in stype_lower or "api-key" in stype_lower:
+                    info.has_api_key = True
+
+            info.secrets_by_type = by_type
+            info.oldest_secret = oldest
+            info.newest_secret = newest
+            info.disabled_secrets = disabled
+
+            if info.has_shopify:
+                shopify_count += 1
+            if info.has_stripe:
+                stripe_count += 1
+            if info.has_api_key:
+                api_key_count += 1
+
+            tenants.append(info)
+        except Exception as exc:
+            errors.append({
+                "tenant_id": tid,
+                "message": f"Secret posture check failed: {exc}",
+            })
+
+    return SecretPostureResponse(
+        total_tenants=len(tenants),
+        total_secrets=total_secrets,
+        secrets_by_type_global=global_by_type,
+        tenants_with_shopify=shopify_count,
+        tenants_with_stripe=stripe_count,
+        tenants_with_api_key=api_key_count,
+        tenants=tenants,
+        errors=errors,
+    )
+
+
+# ---------------------------------------------------------------------------
+# HV-3: Integration Reliability
+# ---------------------------------------------------------------------------
+
+
+@router.get(
+    "/integrations/health",
+    response_model=IntegrationHealthResponse,
+    summary="Integration reliability and health",
+    description=(
+        "Circuit breaker states, NATS connectivity, and MCP integration "
+        "status across all tenants."
+    ),
+    status_code=200,
+)
+async def integration_health(
+    _ctx: TenantContext = Depends(require_role(TeamMemberRole.SUPERADMIN)),
+) -> IntegrationHealthResponse:
+    """Get integration health across all services."""
+    errors: list[dict[str, str]] = []
+    breakers: list[CircuitBreakerStatus] = []
+    any_open = False
+
+    # Circuit breakers
+    try:
+        from src.multi_tenant.pipeline_resilience import ServiceCircuitBreakerRegistry
+
+        registry = ServiceCircuitBreakerRegistry()
+        summary = registry.health_summary()
+        any_open = summary.get("any_open", False)
+        for svc_name, svc_status in summary.get("services", {}).items():
+            breakers.append(CircuitBreakerStatus(
+                service=svc_name,
+                state=svc_status.get("state", "unknown"),
+                failures=svc_status.get("failure_count", 0),
+                successes=svc_status.get("success_count", 0),
+            ))
+    except Exception as exc:
+        errors.append({
+            "subsystem": "circuit_breakers",
+            "message": f"Circuit breaker registry unavailable: {exc}",
+        })
+
+    # NATS connectivity
+    nats_connected = False
+    if _nats_mgr is not None:
+        try:
+            nats_connected = _nats_mgr.is_connected
+        except Exception as exc:
+            errors.append({
+                "subsystem": "nats",
+                "message": f"NATS status check failed: {exc}",
+            })
+
+    # MCP integration status
+    mcp_integrations: list[McpIntegrationStatus] = []
+    if _tenant_repo is not None and _prefs_repo is not None:
+        try:
+            tenant_ids = await _tenant_repo.list_active_tenant_ids()
+
+            storefront_enabled = 0
+            storefront_connected = 0
+            storefront_errored = 0
+            stripe_enabled = 0
+            stripe_connected = 0
+            stripe_errored = 0
+
+            for tid in tenant_ids:
+                try:
+                    prefs = await _prefs_repo.read(tid)
+                    if prefs:
+                        # Shopify Storefront MCP
+                        if prefs.get("mcp_storefront_enabled"):
+                            storefront_enabled += 1
+                            status = prefs.get("mcp_storefront_status", "")
+                            if status == "connected":
+                                storefront_connected += 1
+                            elif status == "error":
+                                storefront_errored += 1
+
+                        # Stripe MCP
+                        if prefs.get("stripe_mcp_enabled"):
+                            stripe_enabled += 1
+                            status = prefs.get("stripe_mcp_status", "")
+                            if status == "connected":
+                                stripe_connected += 1
+                            elif status == "error":
+                                stripe_errored += 1
+                except Exception:
+                    pass
+
+            mcp_integrations.append(McpIntegrationStatus(
+                server_name="shopify-storefront",
+                tenants_enabled=storefront_enabled,
+                tenants_connected=storefront_connected,
+                tenants_errored=storefront_errored,
+            ))
+            mcp_integrations.append(McpIntegrationStatus(
+                server_name="stripe",
+                tenants_enabled=stripe_enabled,
+                tenants_connected=stripe_connected,
+                tenants_errored=stripe_errored,
+            ))
+        except Exception as exc:
+            errors.append({
+                "subsystem": "mcp",
+                "message": f"MCP status check failed: {exc}",
+            })
+
+    overall = (not any_open) and nats_connected
+
+    return IntegrationHealthResponse(
+        overall_healthy=overall,
+        circuit_breakers=breakers,
+        any_breaker_open=any_open,
+        nats_connected=nats_connected,
+        mcp_integrations=mcp_integrations,
+        errors=errors,
+    )
