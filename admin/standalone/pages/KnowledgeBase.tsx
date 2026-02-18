@@ -28,6 +28,7 @@ import { useDisclosure } from '@mantine/hooks';
 import { useAppContext } from '../layouts/StandaloneLayout';
 import { useKnowledgeBase, useSaveKBArticle, useUploadFile, useImportUrl, useExportCSV, useStalenessSummary, useVerifyEntry } from '../../shared/hooks/index';
 import type { KBArticle, KBArticleStatus, KBUploadResult } from '../../shared/types/index';
+import { LoadingState } from '../../shared/LoadingState';
 
 const BRAND_RED = '#ff3621';
 
@@ -483,11 +484,7 @@ export const KnowledgeBasePage: React.FC = () => {
 
   // Loading state
   if (kbResult.loading && articles.length === 0) {
-    return (
-      <Center py="xl">
-        <Loader color={BRAND_RED} />
-      </Center>
-    );
+    return <LoadingState text="Loading knowledge base" />;
   }
 
   // Error state

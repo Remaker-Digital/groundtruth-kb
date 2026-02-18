@@ -21,7 +21,6 @@ import {
   Code,
   CopyButton,
   Group,
-  Loader,
   Modal,
   Paper,
   SimpleGrid,
@@ -31,6 +30,8 @@ import {
   Title,
 } from '@mantine/core';
 import { useProviderContext } from '../layouts/ProviderLayout';
+import { LoadingState } from '../../shared/LoadingState';
+import { HelpTooltip } from '../../shared/HelpTooltip';
 
 // ---------------------------------------------------------------------------
 // Types
@@ -189,11 +190,7 @@ export function MfaSettingsPage() {
 
   // Loading state
   if (loading) {
-    return (
-      <Stack align="center" mt="xl">
-        <Loader color="#ff3621" />
-      </Stack>
-    );
+    return <LoadingState text="Loading MFA settings" />;
   }
 
   if (error) {
@@ -355,7 +352,7 @@ export function MfaSettingsPage() {
     <Stack gap="lg">
       <Title order={3} c="#F5F5F5">
         MFA Settings
-      </Title>
+      </Title><HelpTooltip text="Multi-factor authentication adds a second verification step using a TOTP authenticator app when signing into the Provider Console." />
 
       {status?.mfaEnabled ? (
         <>
@@ -387,7 +384,7 @@ export function MfaSettingsPage() {
               <div>
                 <Text size="xs" c="dimmed">
                   Backup codes remaining
-                </Text>
+                </Text><HelpTooltip text="Single-use codes for signing in when your authenticator app is unavailable. Generate new codes by re-enrolling." />
                 <Text
                   size="sm"
                   c={status.backupCodesRemaining <= 2 ? '#ff6b6b' : '#F5F5F5'}

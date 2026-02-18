@@ -5,6 +5,7 @@ Manager component:
 
     GET    /api/admin/knowledge              — List with filtering & pagination
     GET    /api/admin/knowledge/{id}         — Get single entry
+    GET    /api/admin/knowledge/{id}/chunks  — Chunk preview (C5)
     POST   /api/admin/knowledge              — Create entry
     PUT    /api/admin/knowledge/{id}         — Update entry
     DELETE /api/admin/knowledge/{id}         — Soft-delete entry
@@ -286,6 +287,34 @@ class ScanResultResponse(CamelCaseModel):
     medium_count: int
     low_count: int
     scan_duration_ms: int
+
+
+class ChunkPreviewItem(CamelCaseModel):
+    """A single chunk in the chunk preview response (C5)."""
+
+
+    chunk_index: int
+    title: str
+    text: str
+    char_count: int
+    estimated_tokens: int
+
+
+class ChunkPreviewResponse(CamelCaseModel):
+    """Response for GET /api/admin/knowledge/{entry_id}/chunks (C5).
+
+    Returns a preview of how a KB article would be chunked by the
+    document parser, including per-chunk metadata for visualization.
+    """
+
+
+    entry_id: str
+    title: str
+    total_chars: int
+    total_chunks: int
+    chunk_size: int = Field(description="Target chunk size in tokens")
+    chunk_overlap: int = Field(description="Overlap between chunks in tokens")
+    chunks: list[ChunkPreviewItem]
 
 
 # ---------------------------------------------------------------------------
@@ -671,6 +700,105 @@ async def get_knowledge_entry(
         )
 
     return _build_entry_response(doc, ctx.tenant_id)
+
+
+# ---------------------------------------------------------------------------
+# GET /api/admin/knowledge/{entry_id}/chunks — Chunk preview (C5)
+# ---------------------------------------------------------------------------
+
+
+@router.get(
+    "/{entry_id}/chunks",
+    response_model=ChunkPreviewResponse,
+    summary="Preview KB article chunking",
+    description=(
+        "Returns a preview of how a knowledge base article's content "
+        "would be split into chunks by the document parser. Useful for "
+        "visualizing chunk boundaries, sizes, and overlap before embedding."
+    ),
+    responses={
+        404: {"description": "Knowledge entry not found"},
+        503: {"description": "Knowledge base services not initialized"},
+    },
+)
+async def preview_entry_chunks(
+    entry_id: str,
+    chunk_size: int = Query(
+        None,
+        ge=50,
+        le=2000,
+        description="Target chunk size in tokens (default: parser default, typically 400)",
+    ),
+    chunk_overlap: int = Query(
+        None,
+        ge=0,
+        le=500,
+        description="Overlap between chunks in tokens (default: parser default, typically 50)",
+    ),
+    ctx: TenantContext = Depends(get_tenant_context),
+) -> ChunkPreviewResponse:
+    """Preview how a KB article would be chunked.
+
+    Reads the article content and runs it through the document parser's
+    ``chunk_text()`` function, returning the resulting chunks with
+    per-chunk metadata (index, title, text, char count, estimated tokens).
+
+    Optional ``chunk_size`` and ``chunk_overlap`` parameters allow
+    experimenting with different chunking strategies without persisting
+    any changes.
+    """
+    from src.multi_tenant.document_parser import (
+        CHARS_PER_TOKEN,
+        DEFAULT_CHUNK_OVERLAP,
+        DEFAULT_CHUNK_SIZE,
+        chunk_text,
+    )
+
+    repo = _get_repo()
+
+    try:
+        doc = await repo.read(ctx.tenant_id, entry_id)
+    except DocumentNotFoundError:
+        raise HTTPException(
+            status_code=404,
+            detail=f"Knowledge entry {entry_id} not found",
+        )
+
+    effective_chunk_size = chunk_size if chunk_size is not None else DEFAULT_CHUNK_SIZE
+    effective_chunk_overlap = chunk_overlap if chunk_overlap is not None else DEFAULT_CHUNK_OVERLAP
+
+    content = doc.get("content", "")
+    title = doc.get("title", "")
+
+    chunks = chunk_text(
+        text=content,
+        title=title,
+        chunk_size=effective_chunk_size,
+        chunk_overlap=effective_chunk_overlap,
+    )
+
+    chars_per_tok = CHARS_PER_TOKEN if CHARS_PER_TOKEN > 0 else 4
+
+    preview_items = [
+        ChunkPreviewItem(
+            chunk_index=c.chunk_index,
+            title=c.title,
+            text=c.text,
+            char_count=len(c.text),
+            estimated_tokens=max(1, len(c.text) // chars_per_tok),
+        )
+        for c in chunks
+    ]
+
+    return ChunkPreviewResponse(
+        entry_id=entry_id,
+        title=title,
+        total_chars=len(content),
+        total_chunks=len(preview_items),
+        chunk_size=effective_chunk_size,
+        chunk_overlap=effective_chunk_overlap,
+        chunks=preview_items,
+    )
 
 
 # ---------------------------------------------------------------------------

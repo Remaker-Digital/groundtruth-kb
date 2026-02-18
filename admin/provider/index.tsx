@@ -38,6 +38,9 @@ import { IntegrationHealthPage } from './pages/IntegrationHealth';
 import { StatusPageManagement } from './pages/StatusPage';
 import { AlertConfigPage } from './pages/AlertConfig';
 import { MfaSettingsPage } from './pages/MfaSettings';
+import { SupportDiagnosticsPage } from './pages/SupportDiagnostics';
+import { CostAnalyticsPage } from './pages/CostAnalytics';
+import { AbuseDetectionPage } from './pages/AbuseDetection';
 
 // ---------------------------------------------------------------------------
 // Auth state (sessionStorage — SUPERADMIN key + MFA token)
@@ -145,11 +148,14 @@ const App: React.FC = () => {
             <Route path="/integrations" element={<IntegrationHealthPage />} />
             <Route path="/status" element={<StatusPageManagement />} />
             <Route path="/alerts" element={<AlertConfigPage />} />
+            <Route path="/diagnostics" element={<SupportDiagnosticsPage />} />
             {/* Compliance & Security */}
             <Route path="/compliance" element={<ComplianceDashboardPage />} />
             <Route path="/secrets" element={<SecretPosturePage />} />
             <Route path="/billing" element={<BillingHealthPage />} />
+            <Route path="/costs" element={<CostAnalyticsPage />} />
             <Route path="/sla" element={<SLATrendsPage />} />
+            <Route path="/abuse" element={<AbuseDetectionPage />} />
             {/* Account */}
             <Route path="/mfa" element={<MfaSettingsPage />} />
             <Route path="*" element={<Navigate to="/" replace />} />

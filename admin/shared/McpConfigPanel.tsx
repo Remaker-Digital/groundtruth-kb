@@ -8,17 +8,24 @@
  *   3. Status display — connection status badge from stripe_mcp_status
  *
  * AGNTCY Phase 3B (Cycle 5) — assertion 3.6 (Admin UI).
+ * Migrated to Mantine components (Cycle 10, item 10f).
  *
  * © 2026 Remaker Digital, a DBA of VanDusen & Palmeter, LLC. All rights reserved.
  */
 
 import React, { useCallback, useState } from 'react';
-
-// ---------------------------------------------------------------------------
-// Constants
-// ---------------------------------------------------------------------------
-
-const BRAND_PRIMARY = '#ff3621';
+import {
+  Alert,
+  Badge,
+  Box,
+  Button,
+  Group,
+  Paper,
+  PasswordInput,
+  Stack,
+  Text,
+  Title,
+} from '@mantine/core';
 
 // ---------------------------------------------------------------------------
 // Types
@@ -38,66 +45,6 @@ interface ConnectionTestResult {
   error: string | null;
   elapsed_ms: number;
 }
-
-// ---------------------------------------------------------------------------
-// Styles
-// ---------------------------------------------------------------------------
-
-const panelStyle: React.CSSProperties = {
-  marginTop: 12,
-  padding: 16,
-  background: '#141414',
-  border: '1px solid #272727',
-  borderRadius: 8,
-};
-
-const sectionStyle: React.CSSProperties = {
-  marginBottom: 16,
-};
-
-const labelStyle: React.CSSProperties = {
-  display: 'block',
-  fontSize: 12,
-  fontWeight: 600,
-  color: '#A0A0A0',
-  marginBottom: 6,
-  textTransform: 'uppercase' as const,
-  letterSpacing: '0.04em',
-};
-
-const inputStyle: React.CSSProperties = {
-  width: '100%',
-  padding: '8px 12px',
-  background: '#1f1f1f',
-  border: '1px solid #272727',
-  borderRadius: 6,
-  color: '#F5F5F5',
-  fontSize: 13,
-  fontFamily: 'monospace',
-  outline: 'none',
-  boxSizing: 'border-box' as const,
-};
-
-const btnStyle = (variant: 'primary' | 'outline'): React.CSSProperties => ({
-  padding: '6px 14px',
-  borderRadius: 6,
-  fontSize: 13,
-  fontWeight: 500,
-  cursor: 'pointer',
-  transition: 'background 150ms ease',
-  border: variant === 'primary' ? 'none' : '1px solid #272727',
-  background: variant === 'primary' ? BRAND_PRIMARY : 'transparent',
-  color: variant === 'primary' ? '#fff' : '#A0A0A0',
-});
-
-const statusDotStyle = (color: string): React.CSSProperties => ({
-  width: 8,
-  height: 8,
-  borderRadius: '50%',
-  background: color,
-  display: 'inline-block',
-  marginRight: 6,
-});
 
 // ---------------------------------------------------------------------------
 // Component
@@ -137,7 +84,7 @@ export const McpConfigPanel: React.FC<McpConfigPanelProps> = ({
         const data = await resp.json().catch(() => ({}));
         onNotify(data.detail || 'Failed to save API key.', 'error');
       }
-    } catch (err) {
+    } catch {
       onNotify('Network error saving API key.', 'error');
     } finally {
       setSaving(false);
@@ -162,7 +109,7 @@ export const McpConfigPanel: React.FC<McpConfigPanelProps> = ({
       } else {
         onNotify(data.error || 'Connection test failed.', 'error');
       }
-    } catch (err) {
+    } catch {
       setTestResult({
         success: false,
         tool_count: 0,
@@ -190,111 +137,121 @@ export const McpConfigPanel: React.FC<McpConfigPanelProps> = ({
       } else {
         onNotify('Failed to remove credentials.', 'error');
       }
-    } catch (err) {
+    } catch {
       onNotify('Network error removing credentials.', 'error');
     }
   }, [apiFetch, onNotify, onStatusChange]);
 
   return (
-    <div style={panelStyle}>
-      <div style={{ fontSize: 14, fontWeight: 600, color: '#F5F5F5', marginBottom: 12 }}>
+    <Paper bg="#141414" p="md" radius="sm" mt="sm" withBorder styles={{ root: { borderColor: '#272727' } }}>
+      <Title order={5} c="#F5F5F5" mb="sm">
         Stripe MCP Configuration
-      </div>
+      </Title>
 
       {/* Section 1: Credential Input */}
-      <div style={sectionStyle}>
-        <label style={labelStyle}>Stripe API Key (Restricted)</label>
-        <div style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
-          <input
-            type="password"
-            placeholder="rk_live_... or sk_test_..."
-            value={apiKey}
-            onChange={(e) => setApiKey(e.target.value)}
-            style={{ ...inputStyle, flex: 1 }}
-          />
-          <button
-            style={btnStyle('primary')}
+      <Stack gap="xs" mb="md">
+        <PasswordInput
+          label="Stripe API Key (Restricted)"
+          placeholder="rk_live_... or sk_test_..."
+          value={apiKey}
+          onChange={(e) => setApiKey(e.currentTarget.value)}
+          aria-label="Stripe API key"
+          styles={{
+            label: {
+              fontSize: 12,
+              fontWeight: 600,
+              color: '#A0A0A0',
+              textTransform: 'uppercase',
+              letterSpacing: '0.04em',
+            },
+            input: {
+              backgroundColor: '#1f1f1f',
+              borderColor: '#272727',
+              color: '#F5F5F5',
+              fontFamily: 'monospace',
+            },
+          }}
+        />
+        <Group gap="sm">
+          <Button
+            size="xs"
+            color="#ff3621"
             onClick={handleSaveKey}
             disabled={saving || !apiKey}
+            loading={saving}
+            aria-label="Save Stripe API key"
           >
-            {saving ? 'Saving...' : 'Save Key'}
-          </button>
-        </div>
-        <div style={{ fontSize: 11, color: '#5C5C5C', marginTop: 4 }}>
+            Save Key
+          </Button>
+        </Group>
+        <Text size="xs" c="dimmed">
           Use a restricted key from your Stripe Dashboard for best security.
-        </div>
-      </div>
+        </Text>
+      </Stack>
 
       {/* Section 2: Connection Test */}
-      <div style={sectionStyle}>
-        <div style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
-          <button
-            style={btnStyle('outline')}
-            onClick={handleTestConnection}
-            disabled={testing}
-          >
-            {testing ? 'Testing...' : 'Test Connection'}
-          </button>
-          <button
-            style={{
-              ...btnStyle('outline'),
-              color: '#D32F2F',
-              borderColor: '#D32F2F44',
-            }}
-            onClick={handleRemoveCredentials}
-          >
-            Remove Key
-          </button>
-        </div>
-      </div>
+      <Group gap="sm" mb="md">
+        <Button
+          size="xs"
+          variant="default"
+          onClick={handleTestConnection}
+          disabled={testing}
+          loading={testing}
+          aria-label="Test Stripe connection"
+        >
+          Test Connection
+        </Button>
+        <Button
+          size="xs"
+          variant="outline"
+          color="red"
+          onClick={handleRemoveCredentials}
+          aria-label="Remove Stripe credentials"
+        >
+          Remove Key
+        </Button>
+      </Group>
 
       {/* Section 3: Test Result */}
       {testResult && (
-        <div
-          style={{
-            padding: 12,
-            background: testResult.success ? '#0D7C3E11' : '#D32F2F11',
-            border: `1px solid ${testResult.success ? '#0D7C3E33' : '#D32F2F33'}`,
-            borderRadius: 6,
-          }}
+        <Alert
+          color={testResult.success ? 'green' : 'red'}
+          radius="sm"
+          variant="light"
+          title={
+            <Group gap="xs">
+              <Badge
+                size="sm"
+                variant="dot"
+                color={testResult.success ? 'green' : 'red'}
+              >
+                {testResult.success ? 'Connected' : 'Connection Failed'}
+              </Badge>
+              <Text size="xs" c="dimmed">
+                {testResult.elapsed_ms.toFixed(0)}ms
+              </Text>
+            </Group>
+          }
         >
-          <div style={{ display: 'flex', alignItems: 'center', marginBottom: 4 }}>
-            <span
-              style={statusDotStyle(testResult.success ? '#0D7C3E' : '#D32F2F')}
-            />
-            <span
-              style={{
-                fontSize: 13,
-                fontWeight: 600,
-                color: testResult.success ? '#0D7C3E' : '#D32F2F',
-              }}
-            >
-              {testResult.success ? 'Connected' : 'Connection Failed'}
-            </span>
-            <span style={{ fontSize: 11, color: '#787878', marginLeft: 8 }}>
-              {testResult.elapsed_ms.toFixed(0)}ms
-            </span>
-          </div>
-
           {testResult.success && (
-            <div style={{ fontSize: 12, color: '#A0A0A0' }}>
+            <Text size="sm" c="dimmed">
               {testResult.tool_count} tools available
               {testResult.tools.length > 0 && (
-                <span style={{ color: '#5C5C5C' }}>
-                  {' '}— {testResult.tools.slice(0, 5).join(', ')}
+                <Text span size="xs" c="dimmed">
+                  {' '}&mdash; {testResult.tools.slice(0, 5).join(', ')}
                   {testResult.tools.length > 5 && ` +${testResult.tools.length - 5} more`}
-                </span>
+                </Text>
               )}
-            </div>
+            </Text>
           )}
 
           {testResult.error && (
-            <div style={{ fontSize: 12, color: '#D32F2F', marginTop: 4 }}>
+            <Text size="sm" c="red">
               {testResult.error}
-            </div>
+            </Text>
           )}
-        </div>
+        </Alert>
       )}
-    </div>
+    </Paper>
   );
 };

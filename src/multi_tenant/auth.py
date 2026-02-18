@@ -107,6 +107,7 @@ AUTH_EXEMPT_PREFIXES = (
     "/api/shopify/billing/confirm",
     "/api/tenants/",
     "/api/admin/api-keys/reset",
+    "/api/auth/magic-link",
     "/api/status",
     "/admin/",
 )

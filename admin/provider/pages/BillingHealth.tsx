@@ -14,7 +14,6 @@ import {
   Badge,
   Card,
   Group,
-  Loader,
   Paper,
   Progress,
   SimpleGrid,
@@ -24,6 +23,7 @@ import {
   Title,
 } from '@mantine/core';
 import { useProviderContext } from '../layouts/ProviderLayout';
+import { LoadingState } from '../../shared/LoadingState';
 
 // ---------------------------------------------------------------------------
 // Types
@@ -92,12 +92,7 @@ export function BillingHealthPage() {
   }, [apiFetch, onNotify]);
 
   if (loading) {
-    return (
-      <Stack align="center" mt="xl">
-        <Loader color="red" />
-        <Text c="dimmed" size="sm">Loading billing health...</Text>
-      </Stack>
-    );
+    return <LoadingState text="Loading billing health" />;
   }
 
   if (!data) {

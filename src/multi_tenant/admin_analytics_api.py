@@ -97,6 +97,17 @@ class AnalyticsSummaryResponse(CamelCaseModel):
     critic_failed: int = Field(description="Conversations where Critic rejected")
     critic_pass_rate: float = Field(description="Critic pass rate (0.0-1.0)")
 
+    # First Contact Resolution (CQ-5)
+    fcr_count: int = Field(
+        default=0,
+        description="First Contact Resolution count — resolved conversations "
+        "with no follow-up from the same customer within 72 hours",
+    )
+    fcr_rate: float = Field(
+        default=0.0,
+        description="FCR rate (0.0-1.0)",
+    )
+
 
 class IntentEntry(CamelCaseModel):
     """A single agent/intent with its invocation count."""
@@ -239,7 +250,7 @@ async def get_analytics_summary(
     effective_since = since or _default_since()
     effective_until = until or _default_until()
 
-    # Parallel queries: aggregate metrics + status breakdown
+    # Parallel queries: aggregate metrics + status breakdown + FCR
     metrics = await repo.aggregate_metrics(
         tenant_id=ctx.tenant_id,
         since=effective_since,
@@ -248,6 +259,13 @@ async def get_analytics_summary(
     )
 
     status_counts = await repo.count_by_status(
+        tenant_id=ctx.tenant_id,
+        since=effective_since,
+        until=effective_until,
+        is_test_mode=is_test_mode,
+    )
+
+    fcr_data = await repo.count_fcr(
         tenant_id=ctx.tenant_id,
         since=effective_since,
         until=effective_until,
@@ -298,6 +316,8 @@ async def get_analytics_summary(
         critic_passed=critic_passed,
         critic_failed=critic_failed,
         critic_pass_rate=round(critic_pass_rate, 4),
+        fcr_count=fcr_data.get("fcr_count", 0),
+        fcr_rate=fcr_data.get("fcr_rate", 0.0),
     )
 
 

@@ -48,6 +48,10 @@ Configuration changes use a two-phase commit model. When you save a setting, it 
 | [Conflict scanner](./conflict-scanner.md) | Detect duplicate and conflicting knowledge base articles |
 | [Save and activate](./save-and-activate.md) | Draft, review, and activate configuration changes |
 | [Team management](./team-management.md) | Invite team members, assign roles, and control admin console access |
+| [Analytics](./analytics.md) | Conversation volume, intent breakdown, resolution rates, first-contact resolution |
+| [Data retention](./data-retention.md) | Retention periods, PII scrubbing, consent, automatic deletion |
+| [MFA & security](./mfa-security.md) | Two-factor authentication, magic link login, backup codes |
+| [Provider console](./provider-console.md) | Platform-level dashboard for multi-tenant monitoring and operations |
 
 ## Settings that affect AI prompts
 

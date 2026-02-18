@@ -88,7 +88,7 @@ export {
   useIntentBreakdown,
   useKnowledgeGaps,
 } from './useAnalytics';
-export type { TestModeFilter } from './useAnalytics';
+export type { TestModeFilter, AnalyticsPeriod } from './useAnalytics';
 
 // Team + Billing + Integrations
 export {

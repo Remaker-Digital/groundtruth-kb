@@ -15,7 +15,6 @@ import {
   Card,
   Collapse,
   Group,
-  Loader,
   Paper,
   SimpleGrid,
   Stack,
@@ -26,6 +25,7 @@ import {
 } from '@mantine/core';
 import { useDisclosure } from '@mantine/hooks';
 import { useProviderContext } from '../layouts/ProviderLayout';
+import { LoadingState } from '../../shared/LoadingState';
 
 // ---------------------------------------------------------------------------
 // Types
@@ -101,12 +101,7 @@ export function QueueHealthPage() {
   }, [apiFetch, onNotify]);
 
   if (loading) {
-    return (
-      <Stack align="center" mt="xl">
-        <Loader color="red" />
-        <Text c="dimmed" size="sm">Loading queue health...</Text>
-      </Stack>
-    );
+    return <LoadingState text="Loading queue health" />;
   }
 
   if (!data) {

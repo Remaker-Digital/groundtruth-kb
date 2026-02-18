@@ -5,10 +5,21 @@
  * Validates against /api/superadmin/tenants/summary (requires SUPERADMIN role).
  * After validation, checks MFA status — if enabled, signals mfa_required.
  *
+ * Migrated to Mantine components (Cycle 10, item 10e).
+ *
  * © 2026 Remaker Digital, a DBA of VanDusen & Palmeter, LLC. All rights reserved.
  */
 
 import React, { useState, useCallback } from 'react';
+import {
+  Box,
+  Button,
+  Center,
+  Paper,
+  PasswordInput,
+  Stack,
+  Text,
+} from '@mantine/core';
 
 const API_BASE_URL = import.meta.env?.VITE_API_URL || '';
 
@@ -76,114 +87,65 @@ export const ApiKeyLogin: React.FC<ApiKeyLoginProps> = ({ onLogin }) => {
     [apiKey, onLogin],
   );
 
-  const outerStyle: React.CSSProperties = {
-    minHeight: '100vh',
-    display: 'flex',
-    alignItems: 'center',
-    justifyContent: 'center',
-    backgroundColor: '#0a0a0a',
-    fontFamily: 'Inter, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif',
-  };
-
-  const cardStyle: React.CSSProperties = {
-    width: '100%',
-    maxWidth: '380px',
-    backgroundColor: '#1f1f1f',
-    borderRadius: '12px',
-    border: '1px solid #272727',
-    padding: '40px',
-  };
-
-  const inputStyle = (hasError: boolean): React.CSSProperties => ({
-    width: '100%',
-    padding: '10px 14px',
-    fontSize: '14px',
-    border: `1px solid ${hasError ? '#ff6b6b' : '#272727'}`,
-    borderRadius: '8px',
-    outline: 'none',
-    boxSizing: 'border-box',
-    backgroundColor: '#141414',
-    color: '#e0e0e0',
-    transition: 'border-color 0.15s',
-  });
-
-  const primaryBtnStyle = (disabled: boolean): React.CSSProperties => ({
-    width: '100%',
-    marginTop: '16px',
-    padding: '10px',
-    backgroundColor: disabled ? '#555' : '#ff3621',
-    color: '#ffffff',
-    border: 'none',
-    borderRadius: '8px',
-    fontSize: '14px',
-    fontWeight: 600,
-    cursor: disabled ? 'default' : 'pointer',
-    transition: 'background-color 0.15s',
-  });
-
-  const focusHandler = (e: React.FocusEvent<HTMLInputElement>) => {
-    if (!error) e.target.style.borderColor = '#ff3621';
-  };
-  const blurHandler = (e: React.FocusEvent<HTMLInputElement>) => {
-    if (!error) e.target.style.borderColor = '#272727';
-  };
-
   return (
-    <div style={outerStyle}>
-      <div style={cardStyle}>
-        <div style={{ textAlign: 'center', marginBottom: '32px' }}>
+    <Center mih="100vh" bg="#0a0a0a">
+      <Paper
+        w="100%"
+        maw={380}
+        bg="#1f1f1f"
+        radius="md"
+        p="xl"
+        styles={{ root: { border: '1px solid #272727' } }}
+      >
+        <Stack align="center" gap="xs" mb="xl">
           <img
             src="/admin/provider/primary-logo-no-wordmark.svg"
             alt="Agent Red"
-            style={{ width: '200px', height: 'auto', marginBottom: '16px' }}
+            style={{ width: '200px', height: 'auto' }}
           />
-          <p style={{ margin: 0, fontSize: '14px', color: '#a0a0a0' }}>
+          <Text size="sm" c="dimmed">
             Provider Console
-          </p>
-        </div>
+          </Text>
+        </Stack>
 
         <form onSubmit={handleLogin}>
-          <label
-            htmlFor="api-key"
-            style={{
-              display: 'block',
-              fontSize: '14px',
-              fontWeight: 500,
-              color: '#e0e0e0',
-              marginBottom: '6px',
-            }}
-          >
-            SUPERADMIN API key
-          </label>
-          <input
-            id="api-key"
-            type="password"
-            value={apiKey}
-            onChange={(e) => setApiKey(e.target.value)}
+          <PasswordInput
+            label="SUPERADMIN API key"
             placeholder="Enter your SUPERADMIN API key"
+            value={apiKey}
+            onChange={(e) => setApiKey(e.currentTarget.value)}
+            error={error}
             autoFocus
-            style={inputStyle(!!error)}
-            onFocus={focusHandler}
-            onBlur={blurHandler}
+            aria-label="SUPERADMIN API key"
+            styles={{
+              input: {
+                backgroundColor: '#141414',
+                borderColor: error ? '#ff6b6b' : '#272727',
+                color: '#e0e0e0',
+                '&:focus': { borderColor: '#ff3621' },
+              },
+              label: { color: '#e0e0e0', fontWeight: 500 },
+            }}
           />
 
-          {error && (
-            <p style={{ margin: '8px 0 0', fontSize: '13px', color: '#ff6b6b' }}>
-              {error}
-            </p>
-          )}
-
-          <button type="submit" disabled={loading} style={primaryBtnStyle(loading)}>
-            {loading ? 'Verifying...' : 'Sign in'}
-          </button>
+          <Button
+            type="submit"
+            fullWidth
+            mt="md"
+            loading={loading}
+            color="#ff3621"
+            aria-label="Sign in"
+          >
+            Sign in
+          </Button>
         </form>
 
-        <p style={{ marginTop: '20px', textAlign: 'center', fontSize: '12px', color: '#787878', lineHeight: '1.5' }}>
+        <Text size="xs" c="dimmed" ta="center" mt="lg" lh={1.5}>
           Platform operator access only.
           <br />
           Contact your administrator if you need access.
-        </p>
-      </div>
-    </div>
+        </Text>
+      </Paper>
+    </Center>
   );
 };

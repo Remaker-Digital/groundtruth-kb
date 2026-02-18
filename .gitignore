@@ -43,6 +43,7 @@ htmlcov/
 .tox/
 .nox/
 coverage.xml
+coverage.json
 *.cover
 *.py,cover
 .hypothesis/
@@ -162,6 +163,7 @@ stripe
 # AI Assistant
 # =============================================================================
 .claude/
+.kiro/
 cookies.txt
 
 # =============================================================================

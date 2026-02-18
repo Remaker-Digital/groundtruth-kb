@@ -25,12 +25,12 @@ import {
   Group,
   Accordion,
   Alert,
-  Loader,
   Badge,
 } from '@mantine/core';
 import { useAppContext } from '../layouts/StandaloneLayout';
 import { useConfig, useUpdateConfig } from '../../shared/hooks/index';
 import { HelpTooltip } from '../../shared/HelpTooltip';
+import { LoadingState } from '../../shared/LoadingState';
 
 // ---------------------------------------------------------------------------
 // Constants
@@ -110,12 +110,7 @@ export const MemoryPrivacyPage: React.FC = () => {
 
   // Loading state
   if (loading && !fullConfig) {
-    return (
-      <Stack gap="lg" align="center" py="xl">
-        <Loader size="md" color={BRAND_RED} />
-        <Text c="dimmed" size="sm">Loading memory settings...</Text>
-      </Stack>
-    );
+    return <LoadingState text="Loading memory settings" />;
   }
 
   // Error state

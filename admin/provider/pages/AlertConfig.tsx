@@ -34,6 +34,7 @@ import {
   Title,
 } from '@mantine/core';
 import { useProviderContext } from '../layouts/ProviderLayout';
+import { HelpTooltip } from '../../shared/HelpTooltip';
 
 // ---------------------------------------------------------------------------
 // Types (matches camelCase serialization)
@@ -342,7 +343,7 @@ export function AlertConfigPage() {
   return (
     <Stack gap="lg">
       <Group justify="space-between" align="baseline">
-        <Title order={3} c="#F5F5F5">Alert Configuration</Title>
+        <Title order={3} c="#F5F5F5">Alert Configuration</Title><HelpTooltip text="Define rules that monitor system metrics and trigger alerts when thresholds are exceeded. Rules are evaluated every 5 minutes." />
         <Group gap="sm">
           <Button variant="light" color="orange" size="sm" onClick={handleEvaluate}>
             Evaluate Now
@@ -375,7 +376,7 @@ export function AlertConfigPage() {
                   <Table.Th>Name</Table.Th>
                   <Table.Th>Type</Table.Th>
                   <Table.Th>Condition</Table.Th>
-                  <Table.Th>Cooldown</Table.Th>
+                  <Table.Th>Cooldown<HelpTooltip text="Minimum time between repeated alerts for the same rule. Prevents alert fatigue." /></Table.Th>
                   <Table.Th>Enabled</Table.Th>
                   <Table.Th>Actions</Table.Th>
                 </Table.Tr>
@@ -534,7 +535,7 @@ export function AlertConfigPage() {
             styles={{ input: { backgroundColor: '#141414', borderColor: '#333', color: '#F5F5F5' } }}
           />
 
-          <Text size="sm" fw={600} c="#A0A0A0" tt="uppercase">Condition</Text>
+          <Text size="sm" fw={600} c="#A0A0A0" tt="uppercase">Condition</Text><HelpTooltip text="Define when this rule fires. The metric is compared to the threshold using the selected operator." />
           <Group grow>
             <TextInput
               label="Metric"

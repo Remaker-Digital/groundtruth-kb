@@ -14,7 +14,6 @@ import {
   Badge,
   Card,
   Group,
-  Loader,
   Paper,
   RingProgress,
   SimpleGrid,
@@ -23,6 +22,7 @@ import {
   Title,
 } from '@mantine/core';
 import { useProviderContext } from '../layouts/ProviderLayout';
+import { LoadingState } from '../../shared/LoadingState';
 
 // ---------------------------------------------------------------------------
 // Types (matches IntegrationHealthResponse camelCase serialization)
@@ -102,12 +102,7 @@ export function IntegrationHealthPage() {
   }, [apiFetch, onNotify]);
 
   if (loading) {
-    return (
-      <Stack align="center" mt="xl">
-        <Loader color="red" />
-        <Text c="dimmed" size="sm">Loading integration health...</Text>
-      </Stack>
-    );
+    return <LoadingState text="Loading integration health" />;
   }
 
   if (!data) {

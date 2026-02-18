@@ -13,9 +13,10 @@
  * (c) 2026 Remaker Digital, a DBA of VanDusen & Palmeter, LLC. All rights reserved.
  */
 
-import React, { useMemo } from 'react';
+import React, { useMemo, useState } from 'react';
 import type { BaseComponentProps, IntentBreakdown, KnowledgeGap } from './types';
 import { useAnalyticsSummary, useIntentBreakdown, useKnowledgeGaps } from './hooks';
+import type { AnalyticsPeriod } from './hooks';
 import { HelpTooltip } from './HelpTooltip';
 
 // ---------------------------------------------------------------------------
@@ -454,26 +455,35 @@ const KnowledgeGapsTable: React.FC<KnowledgeGapsTableProps> = ({ gaps }) => {
 // Main component
 // ---------------------------------------------------------------------------
 
+const PERIOD_OPTIONS: { value: AnalyticsPeriod; label: string }[] = [
+  { value: '7d', label: '7 days' },
+  { value: '14d', label: '14 days' },
+  { value: '30d', label: '30 days' },
+  { value: '90d', label: '90 days' },
+];
+
 export const AnalyticsOverview: React.FC<BaseComponentProps & { isTestMode?: boolean }> = ({
   tenantContext,
   apiFetch,
   onNotify,
   isTestMode,
 }) => {
-  // Data hooks — pass test mode filter
+  const [period, setPeriod] = useState<AnalyticsPeriod>('30d');
+
+  // Data hooks — pass test mode filter and period
   const {
     data: summary,
     loading: summaryLoading,
     error: summaryError,
     refetch: refetchSummary,
-  } = useAnalyticsSummary(apiFetch, isTestMode);
+  } = useAnalyticsSummary(apiFetch, isTestMode, period);
 
   const {
     data: intentData,
     loading: intentsLoading,
     error: intentsError,
     refetch: refetchIntents,
-  } = useIntentBreakdown(apiFetch, isTestMode);
+  } = useIntentBreakdown(apiFetch, isTestMode, period);
   const intents = intentData?.intents ?? [];
 
   const {
@@ -481,7 +491,7 @@ export const AnalyticsOverview: React.FC<BaseComponentProps & { isTestMode?: boo
     loading: gapsLoading,
     error: gapsError,
     refetch: refetchGaps,
-  } = useKnowledgeGaps(apiFetch, isTestMode);
+  } = useKnowledgeGaps(apiFetch, isTestMode, period);
   const gaps = gapsData?.gaps ?? [];
 
   // Determine overall loading state for the initial load
@@ -548,26 +558,61 @@ export const AnalyticsOverview: React.FC<BaseComponentProps & { isTestMode?: boo
             </span>
           )}
         </div>
-        <button
-          onClick={() => {
-            refetchSummary();
-            refetchIntents();
-            refetchGaps();
-          }}
-          style={{
-            padding: '6px 14px',
-            border: `1px solid ${COLOR_BORDER}`,
-            borderRadius: BORDER_RADIUS,
-            backgroundColor: COLOR_WHITE,
-            color: COLOR_TEXT,
-            fontSize: '12px',
-            fontFamily: FONT_FAMILY,
-            cursor: 'pointer',
-            fontWeight: 500,
-          }}
-        >
-          Refresh
-        </button>
+        <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+          {/* Period selector */}
+          <div
+            style={{
+              display: 'inline-flex',
+              border: `1px solid ${COLOR_BORDER}`,
+              borderRadius: BORDER_RADIUS,
+              overflow: 'hidden',
+            }}
+            role="group"
+            aria-label="Analytics date range"
+          >
+            {PERIOD_OPTIONS.map((opt) => (
+              <button
+                key={opt.value}
+                onClick={() => setPeriod(opt.value)}
+                aria-pressed={period === opt.value}
+                style={{
+                  padding: '5px 10px',
+                  border: 'none',
+                  borderRight: `1px solid ${COLOR_BORDER}`,
+                  backgroundColor: period === opt.value ? BRAND_PRIMARY : COLOR_WHITE,
+                  color: period === opt.value ? COLOR_WHITE : COLOR_TEXT,
+                  fontSize: '12px',
+                  fontFamily: FONT_FAMILY,
+                  cursor: 'pointer',
+                  fontWeight: period === opt.value ? 600 : 400,
+                  transition: 'background-color 0.15s, color 0.15s',
+                }}
+              >
+                {opt.label}
+              </button>
+            ))}
+          </div>
+          <button
+            onClick={() => {
+              refetchSummary();
+              refetchIntents();
+              refetchGaps();
+            }}
+            style={{
+              padding: '6px 14px',
+              border: `1px solid ${COLOR_BORDER}`,
+              borderRadius: BORDER_RADIUS,
+              backgroundColor: COLOR_WHITE,
+              color: COLOR_TEXT,
+              fontSize: '12px',
+              fontFamily: FONT_FAMILY,
+              cursor: 'pointer',
+              fontWeight: 500,
+            }}
+          >
+            Refresh
+          </button>
+        </div>
       </div>
 
       <div style={{ padding: '20px' }}>

@@ -15,7 +15,6 @@ import {
   Card,
   Code,
   Group,
-  Loader,
   Paper,
   Select,
   SimpleGrid,
@@ -24,6 +23,7 @@ import {
   Title,
 } from '@mantine/core';
 import { useProviderContext } from '../layouts/ProviderLayout';
+import { LoadingState } from '../../shared/LoadingState';
 
 // ---------------------------------------------------------------------------
 // Types
@@ -73,12 +73,7 @@ export function DeploymentHistoryPage() {
   }, [apiFetch, onNotify, limit]);
 
   if (loading) {
-    return (
-      <Stack align="center" mt="xl">
-        <Loader color="red" />
-        <Text c="dimmed" size="sm">Loading deployment history...</Text>
-      </Stack>
-    );
+    return <LoadingState text="Loading deployment history" />;
   }
 
   if (!data) {

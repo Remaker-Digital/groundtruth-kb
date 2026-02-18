@@ -59,6 +59,7 @@ from src.multi_tenant.auth import (
     verify_user_api_key,
     verify_widget_key,
 )
+from src.multi_tenant.magic_link_auth import verify_magic_link_session_token
 from src.multi_tenant.cosmos_schema import (
     TIER_DEFAULTS,
     TeamMemberRole,
@@ -210,6 +211,11 @@ class TenantAuthMiddleware(BaseHTTPMiddleware):
 
         if widget_key:
             return await self._auth_widget_key(widget_key, request.url.path)
+
+        # Try magic link session token (X-Session-Token header)
+        session_token = request.headers.get("X-Session-Token")
+        if session_token:
+            return await self._auth_magic_link_session(session_token)
 
         # No credentials provided
         raise AuthenticationError(
@@ -413,6 +419,51 @@ class TenantAuthMiddleware(BaseHTTPMiddleware):
             auth_method="widget_key",
             is_widget_auth=True,
             trial_expires_at=trial_expires_at,
+        )
+
+    async def _auth_magic_link_session(self, token: str) -> TenantContext:
+        """Authenticate via magic link session JWT.
+
+        The JWT contains tenant_id (sub) and email. We resolve the
+        tenant from the JWT claims and build a TenantContext.
+        """
+        payload = verify_magic_link_session_token(token)
+        if payload is None:
+            raise AuthenticationError(
+                "Invalid or expired session token. Please sign in again.",
+            )
+
+        tenant_id = payload.get("sub")
+        if not tenant_id:
+            raise AuthenticationError("Session token missing tenant ID.")
+
+        # Resolve tenant to get status/tier
+        if _resolve_by_shop_domain is None and _resolve_by_api_key_hash is None:
+            raise AuthenticationError(
+                "Tenant resolution not configured.", status_code=500,
+            )
+
+        # Look up tenant by ID — reuse the existing tenant resolution
+        from src.multi_tenant.repositories import TenantRepository
+
+        tenant_repo = TenantRepository()
+        tenant = await tenant_repo.read(tenant_id)
+        if tenant is None:
+            raise AuthenticationError(
+                f"No tenant found for session token: {tenant_id}",
+            )
+
+        _, status, tier, trial_expires_at = self._resolve_tenant_fields(tenant)
+        validate_tenant_status(tenant_id, status)
+        self._check_trial_expiry(tenant_id, tier, trial_expires_at)
+
+        return TenantContext(
+            tenant_id=tenant_id,
+            tier=tier,
+            status=status,
+            auth_method="magic_link_session",
+            trial_expires_at=trial_expires_at,
+            team_member_email=payload.get("email"),
         )
 
 

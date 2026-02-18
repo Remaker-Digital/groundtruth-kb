@@ -850,3 +850,43 @@ class TestWidgetKeyScoping:
         assert "/health" in exempt
         assert "/ready" in exempt
         assert "/api/webhooks/" in exempt
+
+
+# ===========================================================================
+# §8.7: Critic Jailbreak Coverage (SEC-46 through SEC-48, CQ-3)
+# ===========================================================================
+
+
+class TestCriticJailbreakCoverage:
+    """SEC-46 through SEC-48: Critic system prompt covers adv-030 class
+    of indirect jailbreak compliance patterns."""
+
+    def test_sec_46_rule7_indirect_compliance_language(self):
+        """SEC-46: Rule 7 covers indirect instruction compliance."""
+        from src.multi_tenant.system_prompt_builder import AgentRole, _PLATFORM_BASE
+        prompt = _PLATFORM_BASE[AgentRole.CRITIC_SUPERVISOR]
+
+        # Must mention instructions that override normal behavior
+        assert "override the agent" in prompt.lower() or "override" in prompt.lower()
+        # Must mention off-scope tasks: code, essays, non-CS work
+        assert "generating code" in prompt or "writing essays" in prompt
+        assert "non-customer-service" in prompt
+
+    def test_sec_47_rule7_system_prompt_extraction(self):
+        """SEC-47: Rule 7 covers system prompt extraction attempts."""
+        from src.multi_tenant.system_prompt_builder import AgentRole, _PLATFORM_BASE
+        prompt = _PLATFORM_BASE[AgentRole.CRITIC_SUPERVISOR]
+
+        assert "extract system prompts" in prompt
+        assert "internal instructions" in prompt
+        assert "configuration details" in prompt
+
+    def test_sec_48_rule7_has_three_subrules(self):
+        """SEC-48: Rule 7 has structured sub-rules (a), (b), (c)."""
+        from src.multi_tenant.system_prompt_builder import AgentRole, _PLATFORM_BASE
+        prompt = _PLATFORM_BASE[AgentRole.CRITIC_SUPERVISOR]
+
+        # Three sub-rules provide comprehensive coverage
+        assert "(a)" in prompt
+        assert "(b)" in prompt
+        assert "(c)" in prompt

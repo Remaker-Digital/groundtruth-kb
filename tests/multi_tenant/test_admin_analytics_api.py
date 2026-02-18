@@ -275,6 +275,9 @@ def mock_repo():
          "critic_passed": True, "started_at": NOW.isoformat(),
          "ended_at": NOW.isoformat(), "tenant_id": TENANT_ID},
     ])
+    repo.count_fcr = AsyncMock(return_value={
+        "resolved_count": 0, "fcr_count": 0, "fcr_rate": 0.0,
+    })
     return repo
 
 
@@ -427,6 +430,9 @@ class TestZeroConversationDefaults:
         repo.count_by_status = AsyncMock(return_value=[])
         repo.list_agents_invoked = AsyncMock(return_value=[])
         repo.list_gap_conversations = AsyncMock(return_value=[])
+        repo.count_fcr = AsyncMock(return_value={
+            "resolved_count": 0, "fcr_count": 0, "fcr_rate": 0.0,
+        })
 
         configure_admin_analytics_services(repo)
         app = FastAPI()

@@ -9,6 +9,137 @@ All notable changes to Agent Red Customer Experience are documented here.
 
 ---
 
+## v1.48.0 — 2026-02-18
+
+### Conversation quality infrastructure
+- **Golden dataset (CQ-1):** 25 test scenarios across 10 categories (product inquiry, returns, shipping, billing, escalation, multilingual, edge cases, memory recall, policy enforcement, and multi-turn) for automated response quality evaluation.
+- **Quality pilot framework (CQ-2):** Phase 0 heuristic evaluation framework that scores AI responses on completeness, tone, accuracy, and context retention without requiring external LLM-as-judge dependencies.
+- **Critic rule hardening (CQ-3):** Expanded Critic rule #7 into three sub-rules covering jailbreak prompt detection, role-play manipulation, and instruction override attempts.
+- **DeepEval scaffold (CQ-4):** Graceful degradation adapter for the DeepEval evaluation framework — runs quality tests when DeepEval is installed, skips gracefully when unavailable.
+
+### Test coverage expansion
+- **4 parallel coverage agents** wrote 879 new tests targeting repositories, security/config, chat/integrations, and knowledge/pipeline modules.
+- **Performance validation:** 50-tenant concurrent load testing framework with 12 tests.
+- **4,159 unit tests** passed, 0 failures (up from 3,231).
+
+---
+
+## v1.47.0 — 2026-02-18
+
+### New capabilities
+- **Chunking preview (C5):** Knowledge base articles now show a chunk visualization, letting merchants see exactly how their content will be split for AI retrieval.
+- **Concurrent edit locking (C14):** ETag-based optimistic locking prevents configuration overwrite when multiple team members edit simultaneously. Conflicting saves receive a clear resolution prompt.
+- **Avatar upload (D22):** Team members can upload PNG profile photos via the Team Management page.
+- **Tier upgrade flow (D30):** Self-service plan upgrade via Stripe Checkout with preview (prorated cost, feature comparison) before committing.
+- **Add-on checkout (WI#138):** Purchase add-on modules (e.g., Custom Model Training, Advanced Analytics) through Stripe Checkout sessions.
+- **Memory dashboard (WI#139):** Persistent customer memory dashboard showing memory statistics, per-customer memory details, and memory deletion controls.
+- **First-contact resolution (CQ-5):** FCR proxy metric tracks conversations resolved in a single interaction — visible in the Analytics API summary.
+
+### Verification
+- 7 new upgrade verification assertions (C.26–C.32)
+- 3,231 tests (up from 2,994)
+
+---
+
+## v1.46.0 — 2026-02-18
+
+### Provider admin — Phase 3 & 4
+- **Support diagnostics (HV-1):** Provider console page showing per-tenant diagnostic data — recent errors, configuration health, and resolution suggestions.
+- **Cost analytics (HV-2):** Unit economics dashboard with per-tenant cost breakdown, resource consumption trends, and cost-per-conversation metrics.
+- **Abuse detection (HV-4):** Automated detection of abnormal usage patterns (spike detection, rate abuse, content policy violations) with tenant-level risk scoring.
+
+### CDN static hosting (R9b)
+- Architecture document for splitting widget JavaScript and admin static assets to a CDN origin, reducing API Gateway load and improving global load times.
+
+---
+
+## v1.45.0 — 2026-02-18
+
+### Magic link authentication (WI#295)
+- **Passwordless login:** Team members can sign in via a magic link emailed to their registered address — no password required.
+- **Token security:** HMAC-signed, single-use tokens with 15-minute expiry and rate limiting.
+- **Seamless flow:** Click the link → auto-authenticated → redirected to the admin dashboard.
+
+### Component refactoring (R6)
+- **WidgetConfigurator** split into focused sub-components (appearance, behavior, greeting, pre-chat form).
+- **KnowledgeBaseManager** split into table, editor, conflict scanner, and upload sub-components.
+- **TeamManager** split into member list, role editor, and invitation sub-components.
+
+### New capabilities
+- **Period filtering (C1):** Analytics endpoints and dashboard support custom date range filtering (7d, 30d, 90d, custom).
+- **Escalation UI (C8):** Category assignment and agent reassignment directly from the conversation inbox.
+- **Search and resolve (C9):** Full-text conversation search with bulk resolve actions.
+
+---
+
+## v1.44.0 — 2026-02-18
+
+### UI consistency and accessibility
+- **Shared icon library:** SVG icon components replace emoji characters across all admin surfaces for consistent, accessible rendering.
+- **EmptyState component:** Standardized empty state illustrations and CTAs for pages with no data.
+- **Loading states:** Skeleton loaders replace spinner-only patterns on all data-fetching pages.
+- **Accessibility foundation:** `eslint-plugin-jsx-a11y` enforced in CI; `aria-label` attributes added to all interactive elements.
+
+### Login migration
+- **ApiKeyLogin** and **McpConfigPanel** migrated from custom styling to Mantine component library for visual consistency with the Provider console.
+
+### Design system
+- **Dual-surface design system document:** Codified the visual language for Shopify Polaris (tenant admin) and Mantine (provider admin) surfaces, including color tokens, spacing scale, and component mapping.
+- **HelpTooltip coverage:** Extended tooltip help text to all remaining configuration inputs.
+
+---
+
+## v1.43.0 — 2026-02-17
+
+### Provider admin — Phase 2
+- **4 new SPA pages:** Status Page, Alert Configuration, Compliance Dashboard, Secret Posture — completing the Provider console's operational monitoring suite.
+- **Grouped sidebar navigation:** 4 navigation groups (Overview, Operations, Compliance & Security, Account) with collapsible sections.
+- **Incident management (HV-5):** Full incident lifecycle — create, acknowledge, update, resolve. Public status page at `/api/status` (no authentication required) shows overall system health and active incidents.
+- **Alerting engine (RB-4):** Background alert evaluation loop (5-minute interval) with 6 metric collectors, configurable threshold rules, cooldown enforcement, and severity auto-derivation.
+- **MFA/TOTP (RB-5):** Two-factor authentication for the Provider console — TOTP setup with QR code, 10 backup codes (SHA-256 hashed, single-use), and JWT session tokens with 8-hour lifetime.
+
+### UI quality
+- **Shopify route fix:** Resolved Shopify admin route conflicts with the standalone admin.
+- **Shared theme:** Extracted `agentRedTheme` for consistent Mantine theming across provider and standalone surfaces.
+- **SVG icons:** Replaced emoji-based navigation icons with proper SVG components.
+
+### Tests
+- 2,994 unit tests passed, 0 failures (up from 2,941)
+- Regression: C.15–C.19 assertions added
+
+---
+
+## v1.42.0 — 2026-02-17
+
+### CI/CD pipeline
+- **Parallel test matrix:** GitHub Actions CI runs tests in parallel shards for faster feedback.
+- **Coverage trend:** PR comments include test coverage delta and trend indicators.
+- **Branch protection:** Main branch requires passing CI checks before merge.
+
+### Email integration
+- **Azure Communication Services:** Email infrastructure provisioned for transactional notifications.
+- **Email verification:** Domain verification endpoints with SPF/DKIM/DMARC compliance.
+
+### Provider SPA console — Phase 1
+- **Provider admin scaffold:** Vite + Mantine + Recharts single-page application (818KB / 240KB gzip) mounted at `/admin/provider/`.
+- **API key login:** Provider authentication using API key credentials.
+- **5 data pages:** Health Dashboard, Tenant Directory, Deployment History, Queue Health, Integration Health.
+
+### Refactoring
+- **R10 pipeline decomposition:** Monolithic `pipeline.py` split into 7-file mixin package for maintainability.
+- **R3 config YAML migration:** 78 configuration fields migrated from hardcoded defaults to structured YAML configuration.
+
+### Provider backend endpoints
+- **Queue depth monitoring (C-1):** Real-time queue depth metrics for all background processing queues.
+- **Compliance dashboard (C-3):** Configuration compliance scoring and remediation tracking.
+- **Secret posture (C-4):** Key Vault secret rotation status and expiry monitoring.
+- **Integration reliability (HV-3):** Health check metrics for all external service integrations.
+
+### Tests
+- 2,941 unit tests passed, 0 failures (up from 2,646)
+
+---
+
 ## v1.39.0 — 2026-02-17
 
 ### Stripe MCP integration

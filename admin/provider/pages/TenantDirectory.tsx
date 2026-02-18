@@ -16,7 +16,6 @@ import {
   Badge,
   Card,
   Group,
-  Loader,
   Pagination,
   Paper,
   Select,
@@ -27,6 +26,7 @@ import {
   Title,
 } from '@mantine/core';
 import { useProviderContext } from '../layouts/ProviderLayout';
+import { LoadingState } from '../../shared/LoadingState';
 
 // ---------------------------------------------------------------------------
 // Types
@@ -207,9 +207,7 @@ export function TenantDirectoryPage() {
       {/* Table */}
       <Paper withBorder radius="md" bg="#1f1f1f" style={{ overflow: 'auto' }}>
         {loading ? (
-          <Stack align="center" py="xl">
-            <Loader color="red" size="sm" />
-          </Stack>
+          <LoadingState text="Loading tenants" size={24} />
         ) : (
           <Table striped highlightOnHover>
             <Table.Thead>

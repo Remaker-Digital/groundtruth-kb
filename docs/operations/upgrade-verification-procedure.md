@@ -2,7 +2,7 @@
 
 **Type:** Repeatable Procedure (see `docs/operations/REPEATABLE-PROCEDURES.md`)
 **Last verified:** 2026-02-18
-**Last corrected:** 2026-02-18 — Added C.15-C.19 for Cycle 9 (incidents, alerts, MFA, provider SPA, public status API); updated admin SPA build step to include 3rd SPA (S40)
+**Last corrected:** 2026-02-18 — Added C.33-C.35 for Cycle 14 (unit test count gate, evaluation framework, Critic rule integrity); updated known failure modes
 
 ---
 
@@ -97,6 +97,22 @@ Compare every value from Phase A against the current state. **All values must ma
 | C.17 | Incident endpoints functional | `GET /api/superadmin/incidents` with SPA API key returns 200 |
 | C.18 | Alert endpoints functional | `GET /api/superadmin/alerts/rules` with SPA API key returns 200 |
 | C.19 | MFA endpoint functional | `GET /api/superadmin/mfa/status` with SPA API key returns 200 |
+| C.20 | Magic link request endpoint | `POST /api/auth/magic-link/request` (no auth) with `{"email":"test@test.com"}` returns 200 |
+| C.21 | Analytics period filtering | `GET /api/analytics/summary?since=...&until=...` with API key returns 200 with summary data |
+| C.22 | Archive endpoint functional | `POST /api/admin/conversations/{id}/archive` with API key returns 200 or 404 (valid auth response) |
+| C.23 | Support diagnostics functional | `GET /api/superadmin/diagnostics/{TENANT_ID}` with SPA API key returns 200 with `tenantId` field |
+| C.24 | Cost analytics functional | `GET /api/superadmin/costs?days=30` with SPA API key returns 200 with `totalPlatformCost` field |
+| C.25 | Abuse detection functional | `GET /api/superadmin/abuse/signals` with SPA API key returns 200 with `totalTenantsScanned` field |
+| C.26 | Avatar upload endpoint functional | `POST /api/admin/avatar/upload` with API key and a small PNG file returns 200 with `success` = true and `avatar_url` starting with `data:image/png;base64,` |
+| C.27 | Tier listing endpoint functional | `GET /api/billing/tiers` with API key returns 200 with `current_tier` field and `tiers` array of length 3 |
+| C.28 | Add-on listing endpoint functional | `GET /api/billing/addons` with API key returns 200 with `addons` array and `total` >= 4 |
+| C.29 | Memory stats endpoint functional | `GET /api/admin/memory/stats` with API key returns 200 with `total_vectors` and `memory_enabled` fields |
+| C.30 | Config locking endpoint functional | `GET /api/admin/config/lock/status` with API key returns 200 with `etag` field |
+| C.31 | FCR metric in analytics | `GET /api/analytics/summary` with API key returns 200; response includes `fcr_rate` or `first_contact_resolution` field (may be null if no conversations yet) |
+| C.32 | Tier upgrade preview functional | `GET /api/billing/upgrade/preview?target_tier=professional` with API key returns 200 with `direction` field, or 400 if already on professional tier |
+| C.33 | Unit test count gate | `python -m pytest tests/ --co -q 2>&1 | tail -1` shows >= 4000 tests collected |
+| C.34 | Evaluation framework loads | `python -c "from evaluation.pilots.quality_pilot import load_dataset; print(len(load_dataset()))"` prints >= 20 |
+| C.35 | Critic rule integrity | `python -c "from src.multi_tenant.system_prompt_builder import _PLATFORM_BASE; p=_PLATFORM_BASE['critic_supervisor']; assert '(a)' in p and '(b)' in p and '(c)' in p; print('OK')"` prints OK |
 
 ### Phase D: Failure Response
 
@@ -119,6 +135,24 @@ If any assertion in Phase C fails:
 | Conversation count decreased | Data loss — ROLLBACK | Investigate Cosmos DB partition; likely a code bug in startup |
 | API key returns 401 | Environment transient | Key Vault secret may need revision restart; check key hash in tenant doc |
 | Regression tests fail | Code defect | Fix code, do not deploy until tests pass |
+| /api/status returns 401 | Code defect | Verify `/api/status` is in AUTH_EXEMPT_PREFIXES (hotfix1 pattern) |
+| Superadmin endpoint returns 500 with `enable_cross_partition_query` | Code defect | Remove deprecated kwarg from repository (hotfix2 pattern — SDK 4.14+ removed it) |
+| MFA endpoint returns 500 with `team_member` attribute error | Code defect | Endpoint must fetch full member doc via TeamMemberRepository.read(), not use ctx.team_member (hotfix3 pattern) |
+| Magic link request returns 401 | Code defect | Verify `/api/auth/magic-link` is in AUTH_EXEMPT_PREFIXES in auth.py |
+| X-Session-Token returns 401 | Code defect | Verify middleware imports `verify_magic_link_session_token` and checks header |
+| Diagnostics endpoint returns 500 with `KnowledgeRepository` | Code defect | Import is `KnowledgeBaseRepository` not `KnowledgeRepository` — fix the import in cost_analytics.py |
+| Cost analytics returns import error | Code defect | Verify `cost_analytics.py` registered in routers.py and `KnowledgeBaseRepository` import is correct |
+| Abuse detection missing auth | Code defect | Verify router has `dependencies=[Depends(require_role(TeamMemberRole.SUPERADMIN))]` |
+| Avatar upload returns 500 on save | Environment transient | Config processor not wired — verify `configure_avatar_service()` called during startup |
+| Tier listing returns empty tiers | Code defect | Verify `TIER_FEATURES` dict in tier_upgrade.py has all 3 tiers (starter, professional, enterprise) |
+| Add-on checkout returns 500 with `load_catalog` | Environment transient | Stripe catalog file (`config/stripe_product_ids.json`) missing or malformed; endpoint should return `success: false` with message |
+| Memory stats returns 503 | Environment transient | Memory repo not configured — verify `configure_memory_dashboard()` called during startup; returns zeros gracefully if no repo |
+| Config lock returns 503 | Environment transient | Preferences repo not configured — verify `configure_config_locking()` called during startup |
+| Tier upgrade returns 500 with Stripe error | Environment transient | Stripe API key not set; endpoint catches this and returns `success: false` with informative message |
+| FCR metric missing from analytics | Code defect | Verify `fcr_rate` computed in analytics summary; returns null if no resolved conversations exist |
+| Unit test count below 4000 | Code defect | Coverage regression — verify no test files were deleted; run `pytest --co -q` to count |
+| Evaluation dataset fails to load | Code defect | Verify `evaluation/datasets/response_quality.json` exists and has valid JSON with >= 20 scenarios |
+| Critic rule missing sub-rules | Code defect | Verify rule #7 in `system_prompt_builder.py` has three sub-rules (a), (b), (c) for jailbreak coverage |
 
 ---
 

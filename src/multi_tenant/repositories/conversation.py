@@ -6,7 +6,7 @@ Conversation repository — conversations collection lifecycle and billing queri
 
 from __future__ import annotations
 
-from datetime import datetime, timezone
+from datetime import datetime, timedelta, timezone
 from typing import Any
 
 from src.multi_tenant.cosmos_schema import (
@@ -474,3 +474,193 @@ class ConversationRepository(TenantScopedRepository):
         query_text += " OFFSET 0 LIMIT @limit"
 
         return await self.query(tenant_id, query_text, params)
+
+    # --- First Contact Resolution (CQ-5) ---
+
+    async def count_fcr(
+        self,
+        tenant_id: str,
+        since: str,
+        until: str | None = None,
+        is_test_mode: bool | None = None,
+    ) -> dict[str, Any]:
+        """Count First Contact Resolution conversations.
+
+        FCR proxy: resolved conversations where the same customer_id
+        did not start another conversation within 72 hours of resolution.
+
+        Uses a two-query approach for Cosmos DB compatibility (no self-joins):
+        1. Fetch all resolved conversations in the date range.
+        2. Fetch all conversations that started within the 72h follow-up
+           window and group by customer_id.
+        3. Compute FCR in Python by checking overlap.
+
+        Args:
+            tenant_id: Tenant partition key.
+            since: Start timestamp (ISO 8601, inclusive).
+            until: End timestamp (ISO 8601, exclusive). None = now.
+            is_test_mode: Filter by test mode flag (None = all,
+                True = test only, False = production only).
+
+        Returns:
+            Dict with resolved_count, fcr_count, fcr_rate.
+        """
+        # Step 1: Get all resolved conversations in range
+        resolved_query = (
+            "SELECT c.conversation_id, c.customer_id, c.ended_at "
+            "FROM c "
+            "WHERE c.status = 'resolved' "
+            "AND c.started_at >= @since"
+        )
+        resolved_params: list[dict[str, Any]] = [
+            {"name": "@since", "value": since},
+        ]
+
+        if until is not None:
+            resolved_query += " AND c.started_at < @until"
+            resolved_params.append({"name": "@until", "value": until})
+
+        if is_test_mode is True:
+            resolved_query += " AND c.is_test_mode = true"
+        elif is_test_mode is False:
+            resolved_query += " AND (NOT IS_DEFINED(c.is_test_mode) OR c.is_test_mode = false)"
+
+        resolved_conversations = await self.query(
+            tenant_id, resolved_query, resolved_params,
+        )
+
+        resolved_count = len(resolved_conversations)
+        if resolved_count == 0:
+            return {"resolved_count": 0, "fcr_count": 0, "fcr_rate": 0.0}
+
+        # Step 2: Determine the follow-up window — find the latest ended_at
+        # among resolved conversations, then add 72 hours.
+        customer_ids: set[str] = set()
+        resolved_by_customer: dict[str, list[str]] = {}  # customer_id -> [ended_at, ...]
+        for conv in resolved_conversations:
+            cid = conv.get("customer_id")
+            if cid:
+                customer_ids.add(cid)
+                resolved_by_customer.setdefault(cid, []).append(
+                    conv.get("ended_at", "")
+                )
+
+        if not customer_ids:
+            # All resolved conversations lack customer_id — treat as all FCR
+            return {
+                "resolved_count": resolved_count,
+                "fcr_count": resolved_count,
+                "fcr_rate": 1.0,
+            }
+
+        # Find the earliest resolution to set the follow-up window start,
+        # and latest resolution + 72h for the window end.
+        all_ended_ats = [
+            ea
+            for ends in resolved_by_customer.values()
+            for ea in ends
+            if ea
+        ]
+        if not all_ended_ats:
+            # No ended_at timestamps — cannot determine follow-ups
+            return {
+                "resolved_count": resolved_count,
+                "fcr_count": resolved_count,
+                "fcr_rate": 1.0,
+            }
+
+        earliest_end = min(all_ended_ats)
+        latest_end = max(all_ended_ats)
+
+        # Parse latest_end and add 72 hours for the follow-up window
+        try:
+            latest_end_dt = datetime.fromisoformat(latest_end.replace("Z", "+00:00"))
+        except (ValueError, AttributeError):
+            latest_end_dt = datetime.now(timezone.utc)
+
+        followup_window_end = (latest_end_dt + timedelta(hours=72)).isoformat()
+
+        # Step 3: Query all conversations started by those customers
+        # in the follow-up window (from earliest resolution onward).
+        followup_query = (
+            "SELECT c.conversation_id, c.customer_id, c.started_at "
+            "FROM c "
+            "WHERE c.started_at >= @window_start "
+            "AND c.started_at <= @window_end"
+        )
+        followup_params: list[dict[str, Any]] = [
+            {"name": "@window_start", "value": earliest_end},
+            {"name": "@window_end", "value": followup_window_end},
+        ]
+
+        if is_test_mode is True:
+            followup_query += " AND c.is_test_mode = true"
+        elif is_test_mode is False:
+            followup_query += " AND (NOT IS_DEFINED(c.is_test_mode) OR c.is_test_mode = false)"
+
+        followup_conversations = await self.query(
+            tenant_id, followup_query, followup_params,
+        )
+
+        # Build a map of customer_id -> list of follow-up started_at timestamps
+        # (excluding the resolved conversations themselves)
+        resolved_conv_ids = {
+            conv.get("conversation_id") for conv in resolved_conversations
+        }
+        followups_by_customer: dict[str, list[str]] = {}
+        for conv in followup_conversations:
+            if conv.get("conversation_id") in resolved_conv_ids:
+                continue  # Skip the resolved conversation itself
+            cid = conv.get("customer_id")
+            if cid and cid in customer_ids:
+                followups_by_customer.setdefault(cid, []).append(
+                    conv.get("started_at", "")
+                )
+
+        # Step 4: For each resolved conversation, check if the customer
+        # had a follow-up within 72 hours of its ended_at.
+        fcr_count = 0
+        for conv in resolved_conversations:
+            cid = conv.get("customer_id")
+            ended_at = conv.get("ended_at", "")
+
+            if not cid or not ended_at:
+                # No customer_id or ended_at — count as FCR (conservative)
+                fcr_count += 1
+                continue
+
+            # Parse the resolution time
+            try:
+                ended_dt = datetime.fromisoformat(ended_at.replace("Z", "+00:00"))
+            except (ValueError, AttributeError):
+                fcr_count += 1
+                continue
+
+            # 72-hour window: follow-up must start STRICTLY BEFORE
+            # ended_at + 72 hours to count as a repeat (< not <=).
+            cutoff = ended_dt + timedelta(hours=72)
+
+            customer_followups = followups_by_customer.get(cid, [])
+            has_followup = False
+            for fu_started in customer_followups:
+                if not fu_started:
+                    continue
+                try:
+                    fu_dt = datetime.fromisoformat(fu_started.replace("Z", "+00:00"))
+                except (ValueError, AttributeError):
+                    continue
+                # Follow-up must be AFTER resolution and STRICTLY BEFORE cutoff
+                if fu_dt > ended_dt and fu_dt < cutoff:
+                    has_followup = True
+                    break
+
+            if not has_followup:
+                fcr_count += 1
+
+        fcr_rate = (fcr_count / resolved_count) if resolved_count > 0 else 0.0
+
+        return {
+            "resolved_count": resolved_count,
+            "fcr_count": fcr_count,
+            "fcr_rate": round(fcr_rate, 4),
+        }

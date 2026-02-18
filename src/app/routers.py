@@ -1,6 +1,6 @@
 """Router registration for Agent Red Customer Experience.
 
-Imports all 24 API routers and provides a single function to register
+Imports all 32 API routers and provides a single function to register
 them on the FastAPI application instance.
 
 R1 refactoring — session 31.
@@ -36,11 +36,20 @@ from src.multi_tenant.admin_integration_api import router as admin_integration_r
 from src.multi_tenant.admin_quick_action_api import router as admin_quick_action_router
 from src.multi_tenant.superadmin_api import router as superadmin_router
 from src.multi_tenant.email_verification import router as email_verify_router
+from src.multi_tenant.magic_link_auth import router as magic_link_router
 from src.multi_tenant.status_api import router as status_router
+from src.multi_tenant.support_diagnostics import router as diagnostics_router
+from src.multi_tenant.abuse_detection import router as abuse_router
+from src.multi_tenant.config_locking import router as config_lock_router
+from src.multi_tenant.cost_analytics import router as cost_router
+from src.multi_tenant.avatar_upload import router as avatar_router
+from src.multi_tenant.tier_upgrade import router as tier_upgrade_router
+from src.multi_tenant.addon_checkout import router as addon_checkout_router
+from src.multi_tenant.memory_dashboard import router as memory_dashboard_router
 
 
 def register_routers(app: FastAPI) -> None:
-    """Register all 26 API routers on the FastAPI application.
+    """Register all 36 API routers on the FastAPI application.
 
     This mirrors the router registration block from main.py lines 186-209.
     """
@@ -69,4 +78,13 @@ def register_routers(app: FastAPI) -> None:
     app.include_router(admin_quick_action_router)
     app.include_router(superadmin_router)
     app.include_router(email_verify_router)
+    app.include_router(magic_link_router)
     app.include_router(status_router)
+    app.include_router(diagnostics_router)
+    app.include_router(abuse_router)
+    app.include_router(config_lock_router)
+    app.include_router(cost_router)
+    app.include_router(avatar_router)
+    app.include_router(tier_upgrade_router)
+    app.include_router(addon_checkout_router)
+    app.include_router(memory_dashboard_router)

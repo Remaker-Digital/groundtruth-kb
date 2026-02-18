@@ -14,7 +14,6 @@ import {
   Badge,
   Card,
   Group,
-  Loader,
   Paper,
   SimpleGrid,
   Stack,
@@ -23,6 +22,8 @@ import {
   Title,
 } from '@mantine/core';
 import { useProviderContext } from '../layouts/ProviderLayout';
+import { LoadingState } from '../../shared/LoadingState';
+import { HelpTooltip } from '../../shared/HelpTooltip';
 
 // ---------------------------------------------------------------------------
 // Types (matches SecretPostureResponse camelCase serialization)
@@ -98,12 +99,7 @@ export function SecretPosturePage() {
   }, [apiFetch, onNotify]);
 
   if (loading) {
-    return (
-      <Stack align="center" mt="xl">
-        <Loader color="red" />
-        <Text c="dimmed" size="sm">Loading secret posture...</Text>
-      </Stack>
-    );
+    return <LoadingState text="Loading secret posture" />;
   }
 
   if (!data) {
@@ -116,7 +112,7 @@ export function SecretPosturePage() {
 
   return (
     <Stack gap="lg">
-      <Title order={3} c="#F5F5F5">Secret Posture</Title>
+      <Title order={3} c="#F5F5F5">Secret Posture</Title><HelpTooltip text="Cross-tenant inventory of secrets stored in Azure Key Vault. Disabled secrets and missing integrations are flagged." />
 
       {/* Summary cards */}
       <SimpleGrid cols={{ base: 1, sm: 2, md: 4 }} spacing="md">
@@ -168,7 +164,7 @@ export function SecretPosturePage() {
               <Table.Th>Shopify</Table.Th>
               <Table.Th>Stripe</Table.Th>
               <Table.Th>API Key</Table.Th>
-              <Table.Th>Disabled</Table.Th>
+              <Table.Th>Disabled<HelpTooltip text="Secrets that have been revoked or expired. These should be rotated or removed." /></Table.Th>
               <Table.Th>Oldest</Table.Th>
               <Table.Th>Newest</Table.Th>
             </Table.Tr>

@@ -34,12 +34,12 @@ import {
   Text,
   ActionIcon,
   Tooltip,
-  Loader,
   Alert,
   Tabs,
   useComputedColorScheme,
 } from '@mantine/core';
 import { useAppContext } from '../layouts/StandaloneLayout';
+import { LoadingState } from '../../shared/LoadingState';
 
 // ---------------------------------------------------------------------------
 // Constants
@@ -438,12 +438,7 @@ export const QuickActionsPage: React.FC = () => {
   // ---- Loading state -------------------------------------------------------
 
   if (loading) {
-    return (
-      <Stack gap="lg" align="center" py="xl">
-        <Loader size="md" color={BRAND_RED} />
-        <Text c="dimmed" size="sm">Loading quick actions...</Text>
-      </Stack>
-    );
+    return <LoadingState text="Loading quick actions" />;
   }
 
   if (error && !actions.length) {

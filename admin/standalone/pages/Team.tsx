@@ -14,9 +14,10 @@
  */
 
 import React from 'react';
-import { Title, Text, Loader, Stack } from '@mantine/core';
+import { Title, Text, Stack } from '@mantine/core';
 import { useAppContext } from '../layouts/StandaloneLayout';
 import { TeamManager } from '../../shared/TeamManager';
+import { LoadingState } from '../../shared/LoadingState';
 
 const BRAND_RED = '#ff3621';
 
@@ -24,12 +25,7 @@ export const TeamPage: React.FC = () => {
   const { tenantContext, apiFetch, onNotify, loading } = useAppContext();
 
   if (loading || !tenantContext) {
-    return (
-      <Stack gap="lg" align="center" py="xl">
-        <Loader size="md" color={BRAND_RED} />
-        <Text c="dimmed" size="sm">Loading team...</Text>
-      </Stack>
-    );
+    return <LoadingState text="Loading team" />;
   }
 
   return (

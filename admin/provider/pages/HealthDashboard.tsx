@@ -15,7 +15,6 @@ import {
   Card,
   Grid,
   Group,
-  Loader,
   Paper,
   SimpleGrid,
   Stack,
@@ -23,6 +22,10 @@ import {
   Title,
 } from '@mantine/core';
 import { useProviderContext } from '../layouts/ProviderLayout';
+import { LoadingState } from '../../shared/LoadingState';
+import { EmptyState } from '../../shared/EmptyState';
+import { Icons } from '../../shared/icons';
+import { HelpTooltip } from '../../shared/HelpTooltip';
 
 // ---------------------------------------------------------------------------
 // Types
@@ -82,19 +85,16 @@ export function HealthDashboardPage() {
   }, [apiFetch, onNotify]);
 
   if (loading) {
-    return (
-      <Stack align="center" mt="xl">
-        <Loader color="red" />
-        <Text c="dimmed" size="sm">Loading dashboard...</Text>
-      </Stack>
-    );
+    return <LoadingState text="Loading dashboard" />;
   }
 
   if (!data) {
     return (
-      <Text c="dimmed" ta="center" mt="xl">
-        Unable to load dashboard data.
-      </Text>
+      <EmptyState
+        icon={<Icons.dashboard size={36} />}
+        title="Unable to load dashboard"
+        subtitle="Check your connection and try refreshing the page."
+      />
     );
   }
 
@@ -104,7 +104,7 @@ export function HealthDashboardPage() {
   return (
     <Stack gap="lg">
       <Group justify="space-between" align="baseline">
-        <Title order={3} c="#F5F5F5">Platform Dashboard</Title>
+        <Title order={3} c="#F5F5F5">Platform Dashboard</Title><HelpTooltip text="Real-time overview of system health, tenant distribution, and recent activity across the platform." />
         <Text c="dimmed" size="xs">
           Updated {new Date(data.timestamp).toLocaleString()}
         </Text>

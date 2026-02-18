@@ -18,7 +18,6 @@ import {
   Card,
   Collapse,
   Group,
-  Loader,
   Modal,
   MultiSelect,
   Select,
@@ -30,6 +29,8 @@ import {
   Title,
 } from '@mantine/core';
 import { useProviderContext } from '../layouts/ProviderLayout';
+import { LoadingState } from '../../shared/LoadingState';
+import { HelpTooltip } from '../../shared/HelpTooltip';
 
 // ---------------------------------------------------------------------------
 // Types (matches camelCase serialization)
@@ -223,12 +224,7 @@ export function StatusPageManagement() {
   };
 
   if (loading) {
-    return (
-      <Stack align="center" mt="xl">
-        <Loader color="red" />
-        <Text c="dimmed" size="sm">Loading incidents...</Text>
-      </Stack>
-    );
+    return <LoadingState text="Loading incidents" />;
   }
 
   const activeIncidents = (data?.incidents ?? []).filter((i) => i.status !== 'resolved');
@@ -237,7 +233,7 @@ export function StatusPageManagement() {
   return (
     <Stack gap="lg">
       <Group justify="space-between" align="baseline">
-        <Title order={3} c="#F5F5F5">Status Page</Title>
+        <Title order={3} c="#F5F5F5">Status Page</Title><HelpTooltip text="Manage incidents visible on the public status page at /api/status. Active incidents affect the overall system status." />
         <Button color="red" size="sm" onClick={() => setCreateOpen(true)}>
           Create Incident
         </Button>
@@ -247,7 +243,7 @@ export function StatusPageManagement() {
       {activeIncidents.length === 0 ? (
         <Card withBorder padding="lg" radius="md" bg="#1f1f1f">
           <Group gap="sm">
-            <Badge variant="filled" color="green" size="lg">All Systems Operational</Badge>
+            <Badge variant="filled" color="green" size="lg">All Systems Operational</Badge><HelpTooltip text="Status is operational when there are no active (non-resolved) incidents." />
           </Group>
           <Text c="dimmed" size="sm" mt="sm">No active incidents.</Text>
         </Card>

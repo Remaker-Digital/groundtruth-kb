@@ -30,6 +30,7 @@ A Repeatable Procedure is **not**:
 | Production regression suite | *(inline — see Section 5)* | Active |
 | Azure environment setup | `docs/operations/CATASTROPHIC-RECOVERY-RUNBOOK.md` | Active |
 | AGNTCY platform adoption | `docs/operations/agntcy-platform-adoption-procedure.md` | Active |
+| Admin UI lint (a11y) | *(inline — see Section 5)* | Active |
 
 > **Cross-procedure dependencies:**
 > - *Admin UI test* depends on *Tenant initialization*. After initialization, all post-conditions (Steps 2-5) must pass before the UI test pre-flight will pass.
@@ -216,6 +217,41 @@ KNOWN FAILURE MODES:
   | Count drift between sessions | Procedure defect (if significant) | Count may vary ±50 due to test collection changes during refactoring. Update EXPECTED_MIN_PASS if sustained. |
 ```
 
+### Admin UI Lint (Accessibility)
+
+```
+PROCEDURE: Run Admin UI Lint
+TYPE: Repeatable Procedure
+LAST VERIFIED: 2026-02-18
+
+VARIABLES:
+  PROJECT_ROOT = E:\Claude-Playground\CLAUDE-PROJECTS\Agent Red Customer Engagement
+  ADMIN_DIR    = $PROJECT_ROOT/admin
+
+PRECONDITIONS:
+  [ ] Node.js 18+ available               — node --version
+  [ ] npm available                        — npm --version
+  [ ] Dependencies installed               — ls $ADMIN_DIR/node_modules/.package-lock.json
+
+STEPS:
+  STEP 1: Run ESLint with jsx-a11y plugin
+    ACTION:    cd $ADMIN_DIR && npx eslint --ext .tsx,.ts,.jsx,.js shared/ standalone/ provider/ shopify/ --max-warnings 50
+    EXPECTED:  Exit code 0, warnings ≤ 50
+    VERIFY:    Exit code 0
+    ON FAIL:   Review a11y warnings. Errors must be fixed; warnings are advisory.
+
+POSTCONDITIONS:
+  [ ] No lint errors (only warnings allowed)
+  [ ] jsx-a11y/click-events-have-key-events warnings ≤ 20
+  [ ] All new components have aria-label on interactive elements
+
+KNOWN FAILURE MODES:
+  | Failure | Classification | Resolution |
+  |---------|---------------|------------|
+  | Module not found: eslint-plugin-jsx-a11y | Environment (deps) | Run npm install in $ADMIN_DIR |
+  | Parser errors on .tsx files | Environment (deps) | Ensure @typescript-eslint/parser is installed |
+```
+
 ### Production Regression Suite
 
 ```
@@ -356,4 +392,4 @@ When creating or modifying code, test scripts, or documentation:
 ---
 
 *© 2026 Remaker Digital, a DBA of VanDusen & Palmeter, LLC. All rights reserved.*
-*Last Updated: 2026-02-17*
+*Last Updated: 2026-02-18*

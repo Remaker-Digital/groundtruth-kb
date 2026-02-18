@@ -40,6 +40,7 @@ import {
 import { useAppContext } from '../layouts/StandaloneLayout';
 import { useUsageDashboard, useDailyVolume } from '../../shared/hooks/index';
 import { HelpTooltip } from '../../shared/HelpTooltip';
+import { LoadingState } from '../../shared/LoadingState';
 
 // ---------------------------------------------------------------------------
 // Constants
@@ -288,9 +289,7 @@ export const BillingPage: React.FC = () => {
           <Title order={2}>Billing & usage</Title>
           <Text c="dimmed" size="sm">Manage your subscription and monitor usage</Text>
         </div>
-        <Group justify="center" py="xl">
-          <Loader size="md" />
-        </Group>
+        <LoadingState text="Loading billing data" />
       </Stack>
     );
   }

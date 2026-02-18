@@ -107,13 +107,16 @@ export function useEscalateConversation(apiFetch: ApiFetch) {
   const [loading, setLoading] = useState(false);
 
   const escalate = useCallback(
-    async (conversationId: string) => {
+    async (conversationId: string, opts?: { category?: string; agentId?: string }) => {
       setLoading(true);
       try {
+        const payload: Record<string, string> = {};
+        if (opts?.category) payload.category = opts.category;
+        if (opts?.agentId) payload.agent_id = opts.agentId;
         const resp = await apiFetch(`/api/admin/conversations/${conversationId}/escalate`, {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({}),
+          body: JSON.stringify(payload),
         });
         if (!resp.ok) {
           const body = await resp.json().catch(() => ({ detail: `${resp.status}` }));

@@ -4,24 +4,49 @@
  * Login page where Stripe-direct merchants enter their API key.
  * Includes a "Forgot your key?" flow that sends a reset email.
  *
+ * Migrated to Mantine components (Cycle 10, item 10e).
+ *
  * © 2026 Remaker Digital, a DBA of VanDusen & Palmeter, LLC. All rights reserved.
  */
 
 import React, { useState, useCallback } from 'react';
+import {
+  Anchor,
+  Box,
+  Button,
+  Center,
+  Paper,
+  PasswordInput,
+  Stack,
+  Text,
+  TextInput,
+  ThemeIcon,
+  Title,
+} from '@mantine/core';
+import { Icons } from '../../shared/icons';
 
 const API_BASE_URL = import.meta.env?.VITE_API_URL || '';
 
 interface ApiKeyLoginProps {
   onLogin: (apiKey: string) => void;
+  /** Callback for magic link session token login. */
+  onMagicLinkLogin?: (sessionToken: string) => void;
+  /** Error from a failed magic link verification (e.g. expired link). */
+  verifyError?: string | null;
 }
 
-type View = 'login' | 'reset' | 'reset-sent';
+type View = 'login' | 'reset' | 'reset-sent' | 'magic-link' | 'magic-link-sent';
 
-export const ApiKeyLogin: React.FC<ApiKeyLoginProps> = ({ onLogin }) => {
+export const ApiKeyLogin: React.FC<ApiKeyLoginProps> = ({
+  onLogin,
+  onMagicLinkLogin,
+  verifyError,
+}) => {
   const [view, setView] = useState<View>('login');
   const [apiKey, setApiKey] = useState('');
   const [email, setEmail] = useState('');
-  const [error, setError] = useState<string | null>(null);
+  const [magicEmail, setMagicEmail] = useState('');
+  const [error, setError] = useState<string | null>(verifyError ?? null);
   const [loading, setLoading] = useState(false);
 
   const handleLogin = useCallback(
@@ -98,277 +123,379 @@ export const ApiKeyLogin: React.FC<ApiKeyLoginProps> = ({ onLogin }) => {
     [email],
   );
 
-  /* ---- shared styles -------------------------------------------------- */
+  const handleMagicLink = useCallback(
+    async (e: React.FormEvent) => {
+      e.preventDefault();
+      const trimmed = magicEmail.trim();
+      if (!trimmed) {
+        setError('Email address is required');
+        return;
+      }
+      if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(trimmed)) {
+        setError('Please enter a valid email address');
+        return;
+      }
 
-  const outerStyle: React.CSSProperties = {
-    minHeight: '100vh',
-    display: 'flex',
-    alignItems: 'center',
-    justifyContent: 'center',
-    backgroundColor: '#0a0a0a',
-    fontFamily: 'Inter, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif',
+      setLoading(true);
+      setError(null);
+
+      try {
+        const resp = await fetch(`${API_BASE_URL}/api/auth/magic-link/request`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ email: trimmed }),
+        });
+
+        if (resp.status === 429) {
+          setError('Too many requests. Please wait a few minutes and try again.');
+          return;
+        }
+
+        // Always show success (the server returns 200 regardless)
+        setView('magic-link-sent');
+      } catch {
+        setError('Unable to connect. Please check your network and try again.');
+      } finally {
+        setLoading(false);
+      }
+    },
+    [magicEmail],
+  );
+
+  /* ---- Shared UI elements ---------------------------------------------- */
+
+  const inputStyles = {
+    input: {
+      backgroundColor: '#141414',
+      borderColor: error ? '#ff6b6b' : '#272727',
+      color: '#e0e0e0',
+      '&:focus': { borderColor: '#ff3621' },
+    },
+    label: { color: '#e0e0e0', fontWeight: 500 },
   };
 
-  const cardStyle: React.CSSProperties = {
-    width: '100%',
-    maxWidth: '380px',
-    backgroundColor: '#1f1f1f',
-    borderRadius: '12px',
-    border: '1px solid #272727',
-    padding: '40px',
+  const cardProps = {
+    w: '100%' as const,
+    maw: 380,
+    bg: '#1f1f1f',
+    radius: 'md' as const,
+    p: 'xl' as const,
+    styles: { root: { border: '1px solid #272727' } },
   };
-
-  const inputStyle = (hasError: boolean): React.CSSProperties => ({
-    width: '100%',
-    padding: '10px 14px',
-    fontSize: '14px',
-    border: `1px solid ${hasError ? '#ff6b6b' : '#272727'}`,
-    borderRadius: '8px',
-    outline: 'none',
-    boxSizing: 'border-box',
-    backgroundColor: '#141414',
-    color: '#e0e0e0',
-    transition: 'border-color 0.15s',
-  });
-
-  const primaryBtnStyle = (disabled: boolean): React.CSSProperties => ({
-    width: '100%',
-    marginTop: '16px',
-    padding: '10px',
-    backgroundColor: disabled ? '#555' : '#ff3621',
-    color: '#ffffff',
-    border: 'none',
-    borderRadius: '8px',
-    fontSize: '14px',
-    fontWeight: 600,
-    cursor: disabled ? 'default' : 'pointer',
-    transition: 'background-color 0.15s',
-  });
-
-  const linkStyle: React.CSSProperties = {
-    color: '#ff3621',
-    textDecoration: 'none',
-    cursor: 'pointer',
-    fontSize: '13px',
-    background: 'none',
-    border: 'none',
-    padding: 0,
-    fontFamily: 'inherit',
-  };
-
-  const focusHandler = (e: React.FocusEvent<HTMLInputElement>) => {
-    if (!error) e.target.style.borderColor = '#ff3621';
-  };
-  const blurHandler = (e: React.FocusEvent<HTMLInputElement>) => {
-    if (!error) e.target.style.borderColor = '#272727';
-  };
-
-  /* ---- Logo/Brand block (shared across all views) --------------------- */
 
   const brandBlock = (
-    <div style={{ textAlign: 'center', marginBottom: '32px' }}>
+    <Stack align="center" gap="xs" mb="xl">
       <img
         src="/admin/standalone/primary-logo-no-wordmark.svg"
         alt="Agent Red"
-        style={{ width: '200px', height: 'auto', marginBottom: '16px' }}
+        style={{ width: '200px', height: 'auto' }}
       />
-      <p style={{ margin: 0, fontSize: '14px', color: '#a0a0a0' }}>
+      <Text size="sm" c="dimmed">
         Customer Experience Admin
-      </p>
-    </div>
+      </Text>
+    </Stack>
   );
 
-  /* ---- Login view ----------------------------------------------------- */
+  /* ---- Login view ------------------------------------------------------ */
 
   if (view === 'login') {
     return (
-      <div style={outerStyle}>
-        <div style={cardStyle}>
+      <Center mih="100vh" bg="#0a0a0a">
+        <Paper {...cardProps}>
           {brandBlock}
 
           <form onSubmit={handleLogin}>
-            <label
-              htmlFor="api-key"
-              style={{
-                display: 'block',
-                fontSize: '14px',
-                fontWeight: 500,
-                color: '#e0e0e0',
-                marginBottom: '6px',
-              }}
-            >
-              API key
-            </label>
-            <input
-              id="api-key"
-              type="password"
-              value={apiKey}
-              onChange={(e) => setApiKey(e.target.value)}
+            <PasswordInput
+              label="API key"
               placeholder="Enter your API key"
+              value={apiKey}
+              onChange={(e) => setApiKey(e.currentTarget.value)}
+              error={error}
               autoFocus
-              style={inputStyle(!!error)}
-              onFocus={focusHandler}
-              onBlur={blurHandler}
+              aria-label="API key"
+              styles={inputStyles}
             />
 
-            {error && (
-              <p style={{ margin: '8px 0 0', fontSize: '13px', color: '#ff6b6b' }}>
-                {error}
-              </p>
-            )}
-
-            <button type="submit" disabled={loading} style={primaryBtnStyle(loading)}>
-              {loading ? 'Verifying...' : 'Sign in'}
-            </button>
+            <Button
+              type="submit"
+              fullWidth
+              mt="md"
+              loading={loading}
+              color="#ff3621"
+              aria-label="Sign in"
+            >
+              Sign in
+            </Button>
           </form>
 
-          <div style={{ marginTop: '20px', textAlign: 'center' }}>
-            <button
+          <Text ta="center" mt="lg" size="sm">
+            <Anchor
+              c="#ff3621"
+              size="sm"
+              component="button"
               type="button"
               onClick={() => { setView('reset'); setError(null); setEmail(''); }}
-              style={linkStyle}
             >
               Lost your API key? Request a new one
-            </button>
-          </div>
+            </Anchor>
+          </Text>
 
-          <p style={{ marginTop: '16px', textAlign: 'center', fontSize: '12px', color: '#787878', lineHeight: '1.5' }}>
+          {onMagicLinkLogin && (
+            <>
+              <Box mt="lg" mb="sm" style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
+                <div style={{ flex: 1, height: '1px', backgroundColor: '#272727' }} />
+                <Text size="xs" c="dimmed">or</Text>
+                <div style={{ flex: 1, height: '1px', backgroundColor: '#272727' }} />
+              </Box>
+
+              <Button
+                fullWidth
+                variant="outline"
+                color="#ff3621"
+                onClick={() => { setView('magic-link'); setError(null); setMagicEmail(''); }}
+                aria-label="Sign in with email"
+              >
+                Sign in with email
+              </Button>
+            </>
+          )}
+
+          <Text size="xs" c="dimmed" ta="center" mt="sm" lh={1.5}>
             Your API key was sent in your welcome email.
             <br />
             If you need a new key, click the link above.
-          </p>
-        </div>
-      </div>
+          </Text>
+        </Paper>
+      </Center>
     );
   }
 
-  /* ---- Reset view (enter email) --------------------------------------- */
+  /* ---- Reset view (enter email) ---------------------------------------- */
 
   if (view === 'reset') {
     return (
-      <div style={outerStyle}>
-        <div style={cardStyle}>
+      <Center mih="100vh" bg="#0a0a0a">
+        <Paper {...cardProps}>
           {brandBlock}
 
-          <h2 style={{ margin: '0 0 8px', fontSize: '16px', fontWeight: 600, color: '#f5f5f5' }}>
+          <Title order={4} c="#f5f5f5" mb={4}>
             Request new API key
-          </h2>
-          <p style={{ margin: '0 0 20px', fontSize: '13px', color: '#a0a0a0', lineHeight: '1.5' }}>
+          </Title>
+          <Text size="sm" c="dimmed" lh={1.5} mb="lg">
             Enter the email address associated with your account.
             We'll generate a new API key and send it to you. Your previous key will be revoked.
-          </p>
+          </Text>
 
           <form onSubmit={handleReset}>
-            <label
-              htmlFor="reset-email"
-              style={{
-                display: 'block',
-                fontSize: '14px',
-                fontWeight: 500,
-                color: '#e0e0e0',
-                marginBottom: '6px',
-              }}
-            >
-              Email address
-            </label>
-            <input
-              id="reset-email"
+            <TextInput
+              label="Email address"
               type="email"
-              value={email}
-              onChange={(e) => setEmail(e.target.value)}
               placeholder="you@company.com"
+              value={email}
+              onChange={(e) => setEmail(e.currentTarget.value)}
+              error={error}
               autoFocus
-              style={inputStyle(!!error)}
-              onFocus={focusHandler}
-              onBlur={blurHandler}
+              aria-label="Email address"
+              styles={inputStyles}
             />
 
-            {error && (
-              <p style={{ margin: '8px 0 0', fontSize: '13px', color: '#ff6b6b' }}>
-                {error}
-              </p>
-            )}
-
-            <button type="submit" disabled={loading} style={primaryBtnStyle(loading)}>
-              {loading ? 'Requesting...' : 'Request new API key'}
-            </button>
+            <Button
+              type="submit"
+              fullWidth
+              mt="md"
+              loading={loading}
+              color="#ff3621"
+              aria-label="Request new API key"
+            >
+              Request new API key
+            </Button>
           </form>
 
-          <div style={{ marginTop: '20px', textAlign: 'center' }}>
-            <button
+          <Text ta="center" mt="lg" size="sm">
+            <Anchor
+              c="#ff3621"
+              size="sm"
+              component="button"
               type="button"
               onClick={() => { setView('login'); setError(null); setApiKey(''); }}
-              style={linkStyle}
             >
               Back to sign in
-            </button>
-          </div>
-        </div>
-      </div>
+            </Anchor>
+          </Text>
+        </Paper>
+      </Center>
     );
   }
 
-  /* ---- Reset sent (confirmation) -------------------------------------- */
+  /* ---- Magic link view (enter email) ----------------------------------- */
+
+  if (view === 'magic-link') {
+    return (
+      <Center mih="100vh" bg="#0a0a0a">
+        <Paper {...cardProps}>
+          {brandBlock}
+
+          <Title order={4} c="#f5f5f5" mb={4}>
+            Sign in with email
+          </Title>
+          <Text size="sm" c="dimmed" lh={1.5} mb="lg">
+            Enter your email address and we'll send you a sign-in link.
+            No password required.
+          </Text>
+
+          <form onSubmit={handleMagicLink}>
+            <TextInput
+              label="Email address"
+              type="email"
+              placeholder="you@company.com"
+              value={magicEmail}
+              onChange={(e) => setMagicEmail(e.currentTarget.value)}
+              error={error}
+              autoFocus
+              aria-label="Email address"
+              styles={inputStyles}
+            />
+
+            <Button
+              type="submit"
+              fullWidth
+              mt="md"
+              loading={loading}
+              color="#ff3621"
+              aria-label="Send sign-in link"
+            >
+              Send sign-in link
+            </Button>
+          </form>
+
+          <Text ta="center" mt="lg" size="sm">
+            <Anchor
+              c="#ff3621"
+              size="sm"
+              component="button"
+              type="button"
+              onClick={() => { setView('login'); setError(null); setApiKey(''); }}
+            >
+              Back to sign in with API key
+            </Anchor>
+          </Text>
+        </Paper>
+      </Center>
+    );
+  }
+
+  /* ---- Magic link sent (confirmation) --------------------------------- */
+
+  if (view === 'magic-link-sent') {
+    return (
+      <Center mih="100vh" bg="#0a0a0a">
+        <Paper {...cardProps}>
+          {brandBlock}
+
+          <Stack align="center" gap="xs" py="sm">
+            <ThemeIcon
+              size={48}
+              radius="xl"
+              variant="light"
+              color="#ff3621"
+              aria-hidden
+            >
+              <Icons.email size={24} />
+            </ThemeIcon>
+
+            <Title order={4} c="#f5f5f5" ta="center">
+              Check your email
+            </Title>
+            <Text size="sm" c="#e0e0e0" ta="center" lh={1.5}>
+              If an account with <Text span fw={600} c="#f5f5f5">{magicEmail}</Text> exists,
+              we've sent a sign-in link to that address.
+            </Text>
+            <Text size="xs" c="dimmed" ta="center" lh={1.5}>
+              The link will expire in 15 minutes. Check your spam folder if you don't see it.
+            </Text>
+          </Stack>
+
+          <Button
+            fullWidth
+            mt="md"
+            color="#ff3621"
+            onClick={() => { setView('login'); setError(null); setApiKey(''); setMagicEmail(''); }}
+            aria-label="Back to sign in"
+          >
+            Back to sign in
+          </Button>
+
+          <Text ta="center" mt="sm" size="sm">
+            <Anchor
+              c="#ff3621"
+              size="sm"
+              component="button"
+              type="button"
+              onClick={() => { setView('magic-link'); setError(null); }}
+            >
+              Didn't receive it? Try again
+            </Anchor>
+          </Text>
+        </Paper>
+      </Center>
+    );
+  }
+
+  /* ---- Reset sent (confirmation) --------------------------------------- */
 
   return (
-    <div style={outerStyle}>
-      <div style={cardStyle}>
+    <Center mih="100vh" bg="#0a0a0a">
+      <Paper {...cardProps}>
         {brandBlock}
 
-        <div style={{
-          textAlign: 'center',
-          padding: '8px 0',
-        }}>
-          <div style={{
-            width: '48px',
-            height: '48px',
-            margin: '0 auto 16px',
-            borderRadius: '50%',
-            backgroundColor: 'rgba(255, 54, 33, 0.1)',
-            display: 'flex',
-            alignItems: 'center',
-            justifyContent: 'center',
-            fontSize: '24px',
-          }}>
-            {String.fromCodePoint(0x2709)}
-          </div>
+        <Stack align="center" gap="xs" py="sm">
+          <ThemeIcon
+            size={48}
+            radius="xl"
+            variant="light"
+            color="#ff3621"
+            aria-hidden
+          >
+            <Icons.email size={24} />
+          </ThemeIcon>
 
-          <h2 style={{ margin: '0 0 8px', fontSize: '16px', fontWeight: 600, color: '#f5f5f5' }}>
+          <Title order={4} c="#f5f5f5" ta="center">
             Check your email
-          </h2>
-          <p style={{ margin: '0 0 8px', fontSize: '14px', color: '#e0e0e0', lineHeight: '1.5' }}>
-            If an account with <strong style={{ color: '#f5f5f5' }}>{email}</strong> exists,
+          </Title>
+          <Text size="sm" c="#e0e0e0" ta="center" lh={1.5}>
+            If an account with <Text span fw={600} c="#f5f5f5">{email}</Text> exists,
             we've generated a new API key and sent it to that address.
-          </p>
-          <p style={{ margin: '0 0 8px', fontSize: '13px', color: '#a0a0a0', lineHeight: '1.5' }}>
+          </Text>
+          <Text size="xs" c="dimmed" ta="center" lh={1.5}>
             Your previous API key has been revoked for security.
-          </p>
-          <p style={{ margin: '0 0 24px', fontSize: '13px', color: '#a0a0a0', lineHeight: '1.5' }}>
+          </Text>
+          <Text size="xs" c="dimmed" ta="center" lh={1.5}>
             The email may take a minute to arrive. Check your spam folder if you don't see it.
-          </p>
-        </div>
+          </Text>
+        </Stack>
 
-        <button
-          type="button"
+        <Button
+          fullWidth
+          mt="md"
+          color="#ff3621"
           onClick={() => { setView('login'); setError(null); setApiKey(''); setEmail(''); }}
-          style={{
-            ...primaryBtnStyle(false),
-            marginTop: '0',
-          }}
+          aria-label="Back to sign in"
         >
           Back to sign in
-        </button>
+        </Button>
 
-        <div style={{ marginTop: '16px', textAlign: 'center' }}>
-          <button
+        <Text ta="center" mt="sm" size="sm">
+          <Anchor
+            c="#ff3621"
+            size="sm"
+            component="button"
             type="button"
             onClick={() => { setView('reset'); setError(null); }}
-            style={linkStyle}
           >
             Didn't receive it? Try again
-          </button>
-        </div>
-      </div>
-    </div>
+          </Anchor>
+        </Text>
+      </Paper>
+    </Center>
   );
 };

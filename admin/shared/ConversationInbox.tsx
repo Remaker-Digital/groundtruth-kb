@@ -11,7 +11,7 @@
  * (c) 2026 Remaker Digital, a DBA of VanDusen & Palmeter, LLC. All rights reserved.
  */
 
-import React, { useState, useCallback, useEffect, useRef } from 'react';
+import React, { useState, useCallback, useEffect, useRef, useMemo } from 'react';
 import type {
   BaseComponentProps,
   InboxConversation,
@@ -24,6 +24,7 @@ import {
   useAssignConversation,
   useEscalateConversation,
   useResolveConversation,
+  useArchiveConversation,
   useTeamMembers,
   useSearchConversations,
 } from './hooks';
@@ -143,9 +144,10 @@ interface ConversationItemProps {
   conversation: InboxConversation;
   isSelected: boolean;
   onClick: () => void;
+  memberMap?: Record<string, string>;
 }
 
-const ConversationItem: React.FC<ConversationItemProps> = ({ conversation, isSelected, onClick }) => (
+const ConversationItem: React.FC<ConversationItemProps> = ({ conversation, isSelected, onClick, memberMap }) => (
   <div
     onClick={onClick}
     role="button"
@@ -201,9 +203,28 @@ const ConversationItem: React.FC<ConversationItemProps> = ({ conversation, isSel
         {conversation.messageCount} message{conversation.messageCount !== 1 ? 's' : ''}
       </span>
     </div>
-    {conversation.assignedTo && (
-      <div style={{ fontSize: '11px', color: COLOR_TEXT_SECONDARY, marginTop: '4px' }}>
-        Assigned to: {conversation.assignedTo}
+    {(conversation.assignedTo || conversation.escalationCategory) && (
+      <div style={{ display: 'flex', gap: '8px', alignItems: 'center', marginTop: '4px', flexWrap: 'wrap' }}>
+        {conversation.escalationCategory && (
+          <span
+            style={{
+              fontSize: '10px',
+              fontWeight: 600,
+              color: COLOR_DANGER,
+              backgroundColor: COLOR_DANGER + '14',
+              padding: '1px 6px',
+              borderRadius: '4px',
+              textTransform: 'capitalize',
+            }}
+          >
+            {conversation.escalationCategory.replace(/_/g, ' ')}
+          </span>
+        )}
+        {conversation.assignedTo && (
+          <span style={{ fontSize: '11px', color: COLOR_TEXT_SECONDARY }}>
+            Assigned to: {memberMap?.[conversation.assignedTo] ?? conversation.assignedTo}
+          </span>
+        )}
       </div>
     )}
   </div>
@@ -595,9 +616,16 @@ export const ConversationInbox: React.FC<BaseComponentProps> = ({
 
   const messages = messagesData?.messages ?? [];
 
-  // Team members (for assign modal)
+  // Team members (for assign modal + name resolution)
   const { data: teamData } = useTeamMembers(apiFetch);
   const teamMembers = teamData?.members ?? [];
+  const memberMap = useMemo(() => {
+    const map: Record<string, string> = {};
+    for (const m of teamMembers) {
+      map[m.id] = m.displayName || m.email;
+    }
+    return map;
+  }, [teamMembers]);
 
   // Search
   const { search: searchConversations, clearSearch, results: searchResults, loading: searchLoading } = useSearchConversations(apiFetch);
@@ -627,6 +655,9 @@ export const ConversationInbox: React.FC<BaseComponentProps> = ({
 
   // Resolve conversation
   const { resolve, loading: resolving } = useResolveConversation(apiFetch);
+
+  // Archive conversation
+  const { archive, loading: archiving } = useArchiveConversation(apiFetch);
 
   // Auto-scroll to bottom of messages when selected or messages change
   useEffect(() => {
@@ -681,6 +712,21 @@ export const ConversationInbox: React.FC<BaseComponentProps> = ({
       }
     },
     [resolve, onNotify, refetchInbox],
+  );
+
+  const handleArchive = useCallback(
+    async (conversationId: string) => {
+      try {
+        await archive(conversationId);
+        onNotify('Conversation archived', 'success');
+        setSelectedId(null);
+        refetchInbox();
+      } catch (err: unknown) {
+        const msg = err instanceof Error ? err.message : 'Failed to archive conversation';
+        onNotify(msg, 'error');
+      }
+    },
+    [archive, onNotify, refetchInbox],
   );
 
   // Group messages by date for day separators
@@ -847,6 +893,7 @@ export const ConversationInbox: React.FC<BaseComponentProps> = ({
                   conversation={conv}
                   isSelected={conv.conversationId === selectedId}
                   onClick={() => setSelectedId(conv.conversationId)}
+                  memberMap={memberMap}
                 />
               ))}
             </>
@@ -887,9 +934,29 @@ export const ConversationInbox: React.FC<BaseComponentProps> = ({
                   {selectedConversation?.customerName || selectedConversation?.customerId || 'Anonymous'}
                 </span>
                 {selectedConversation && (
-                  <span style={{ marginLeft: '10px', display: 'inline-flex', alignItems: 'center' }}>
+                  <span style={{ marginLeft: '10px', display: 'inline-flex', alignItems: 'center', gap: '6px' }}>
                     <StatusBadge status={selectedConversation.status} />
-                    <HelpTooltip text="Filter conversations by their current state." docLink="https://agentredcx.com/docs/admin-guide/conversations#conversation-list" />
+                    {selectedConversation.escalationCategory && (
+                      <span
+                        style={{
+                          fontSize: '11px',
+                          fontWeight: 600,
+                          color: COLOR_DANGER,
+                          backgroundColor: COLOR_DANGER + '14',
+                          padding: '2px 8px',
+                          borderRadius: '4px',
+                          textTransform: 'capitalize',
+                        }}
+                      >
+                        {selectedConversation.escalationCategory.replace(/_/g, ' ')}
+                      </span>
+                    )}
+                    {selectedConversation.assignedTo && (
+                      <span style={{ fontSize: '11px', color: COLOR_TEXT_SECONDARY }}>
+                        {memberMap[selectedConversation.assignedTo] ?? selectedConversation.assignedTo}
+                      </span>
+                    )}
+                    <HelpTooltip text="Conversation status, escalation category, and assigned agent." docLink="https://agentredcx.com/docs/admin-guide/conversations#conversation-list" />
                   </span>
                 )}
               </div>
@@ -966,6 +1033,26 @@ export const ConversationInbox: React.FC<BaseComponentProps> = ({
                 >
                   Add note
                 </button>
+                {(selectedConversation?.status === 'resolved' || selectedConversation?.status === 'ended') && (
+                  <button
+                    disabled={archiving}
+                    onClick={() => selectedId && handleArchive(selectedId)}
+                    style={{
+                      padding: '6px 12px',
+                      border: `1px solid ${COLOR_GRAY}`,
+                      borderRadius: BORDER_RADIUS,
+                      backgroundColor: COLOR_WHITE,
+                      color: COLOR_GRAY,
+                      fontSize: '12px',
+                      fontFamily: FONT_FAMILY,
+                      cursor: archiving ? 'not-allowed' : 'pointer',
+                      fontWeight: 500,
+                      opacity: archiving ? 0.7 : 1,
+                    }}
+                  >
+                    {archiving ? 'Archiving...' : 'Archive'}
+                  </button>
+                )}
               </div>
             </div>
 

@@ -15,7 +15,6 @@ import React, { useEffect, useState } from 'react';
 import {
   Card,
   Group,
-  Loader,
   RingProgress,
   SegmentedControl,
   SimpleGrid,
@@ -34,6 +33,7 @@ import {
   Legend,
 } from 'recharts';
 import { useProviderContext } from '../layouts/ProviderLayout';
+import { LoadingState } from '../../shared/LoadingState';
 
 // ---------------------------------------------------------------------------
 // Types
@@ -134,10 +134,7 @@ export function SLATrendsPage() {
       </Group>
 
       {loading ? (
-        <Stack align="center" mt="xl">
-          <Loader color="red" />
-          <Text c="dimmed" size="sm">Loading SLA data...</Text>
-        </Stack>
+        <LoadingState text="Loading SLA data" />
       ) : !data ? (
         <Text c="dimmed" ta="center" mt="xl">
           Unable to load SLA trend data.

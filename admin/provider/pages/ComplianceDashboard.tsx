@@ -14,7 +14,6 @@ import {
   Badge,
   Card,
   Group,
-  Loader,
   Paper,
   Progress,
   SimpleGrid,
@@ -24,6 +23,8 @@ import {
   Title,
 } from '@mantine/core';
 import { useProviderContext } from '../layouts/ProviderLayout';
+import { LoadingState } from '../../shared/LoadingState';
+import { HelpTooltip } from '../../shared/HelpTooltip';
 
 // ---------------------------------------------------------------------------
 // Types (matches ComplianceSummaryResponse camelCase serialization)
@@ -77,12 +78,7 @@ export function ComplianceDashboardPage() {
   }, [apiFetch, onNotify]);
 
   if (loading) {
-    return (
-      <Stack align="center" mt="xl">
-        <Loader color="red" />
-        <Text c="dimmed" size="sm">Loading compliance data...</Text>
-      </Stack>
-    );
+    return <LoadingState text="Loading compliance data" />;
   }
 
   if (!data) {
@@ -99,7 +95,7 @@ export function ComplianceDashboardPage() {
 
   return (
     <Stack gap="lg">
-      <Title order={3} c="#F5F5F5">Compliance Dashboard</Title>
+      <Title order={3} c="#F5F5F5">Compliance Dashboard</Title><HelpTooltip text="Cross-tenant compliance posture including PII scrubbing adoption and DSAR request tracking." />
 
       {/* Summary cards */}
       <SimpleGrid cols={{ base: 1, sm: 2, md: 4 }} spacing="md">
@@ -152,9 +148,9 @@ export function ComplianceDashboardPage() {
             <Table.Tr>
               <Table.Th>Tenant ID</Table.Th>
               <Table.Th>Tier</Table.Th>
-              <Table.Th>Grace Period</Table.Th>
+              <Table.Th>Grace Period<HelpTooltip text="New tenants receive a 30-day grace period before PII scrubbing enforcement begins." /></Table.Th>
               <Table.Th>PII Scrubbing</Table.Th>
-              <Table.Th>DSAR Requests</Table.Th>
+              <Table.Th>DSAR Requests<HelpTooltip text="Data Subject Access Requests — formal requests from customers to access or delete their personal data under GDPR/CCPA." /></Table.Th>
               <Table.Th>Last DSAR</Table.Th>
             </Table.Tr>
           </Table.Thead>

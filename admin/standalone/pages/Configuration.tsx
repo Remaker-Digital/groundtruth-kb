@@ -25,7 +25,6 @@ import {
   Title,
   Text,
   Badge,
-  Loader,
   Alert,
   Switch,
   ActionIcon,
@@ -36,6 +35,7 @@ import {
 import { useAppContext } from '../layouts/StandaloneLayout';
 import { useConfig, useUpdateConfig } from '../../shared/hooks/index';
 import { HelpTooltip } from '../../shared/HelpTooltip';
+import { LoadingState } from '../../shared/LoadingState';
 
 const DOCS_BASE = 'https://agentredcx.com/docs/admin-guide';
 
@@ -464,12 +464,7 @@ export const ConfigurationPage: React.FC = () => {
 
   // Loading state
   if (configResult.loading && !configResult.data) {
-    return (
-      <Stack align="center" justify="center" gap="md" py="xl">
-        <Loader color={BRAND_RED} size="md" />
-        <Text c="dimmed" size="sm">Loading configuration...</Text>
-      </Stack>
-    );
+    return <LoadingState text="Loading configuration" />;
   }
 
   // Error state
