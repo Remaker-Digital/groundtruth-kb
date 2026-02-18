@@ -169,6 +169,14 @@ class TestTier0StaticAssets:
         assert "text/html" in content_type
 
     @pytest.mark.tier0
+    def test_t0_13b_provider_admin_served(self, client):
+        """Provider SPA admin should be served (Cycle 9)."""
+        r = client.get("/admin/provider/")
+        assert r.status_code == 200
+        content_type = r.headers.get("content-type", "")
+        assert "text/html" in content_type
+
+    @pytest.mark.tier0
     def test_t0_14_openapi_schema_accessible(self, client):
         """OpenAPI schema should always be accessible (/openapi.json).
 
@@ -468,6 +476,73 @@ class TestTier1SuperadminAPI:
         assert r.status_code == 200
         data = r.json()
         assert "tenants" in data or "tenantCount" in data or "tenant_count" in data
+
+
+class TestTier1Cycle9Endpoints:
+    """T1-21 through T1-28: Cycle 9 — Incidents, Alerting, MFA, Status (Session 40).
+
+    These tests verify the Cycle 9 superadmin endpoints and public status API
+    are reachable after deployment.
+    """
+
+    @pytest.mark.tier1
+    def test_t1_21_public_status_api(self, client):
+        """Public status API returns operational status without auth."""
+        r = client.get("/api/status")
+        assert r.status_code == 200
+        data = r.json()
+        assert "overallStatus" in data or "overall_status" in data
+        assert "services" in data
+
+    @pytest.mark.tier1
+    def test_t1_22_superadmin_incidents_list(self, client, admin_headers):
+        """Superadmin can list incidents."""
+        r = client.get("/api/superadmin/incidents", headers=admin_headers)
+        assert r.status_code == 200
+        data = r.json()
+        assert "incidents" in data
+
+    @pytest.mark.tier1
+    def test_t1_23_superadmin_alert_rules_list(self, client, admin_headers):
+        """Superadmin can list alert rules."""
+        r = client.get("/api/superadmin/alerts/rules", headers=admin_headers)
+        assert r.status_code == 200
+        data = r.json()
+        assert "rules" in data
+
+    @pytest.mark.tier1
+    def test_t1_24_superadmin_alert_history(self, client, admin_headers):
+        """Superadmin can view alert history."""
+        r = client.get("/api/superadmin/alerts/history", headers=admin_headers)
+        assert r.status_code == 200
+        data = r.json()
+        assert "alerts" in data
+
+    @pytest.mark.tier1
+    def test_t1_25_superadmin_mfa_status(self, client, admin_headers):
+        """Superadmin can check MFA enrollment status."""
+        r = client.get("/api/superadmin/mfa/status", headers=admin_headers)
+        assert r.status_code == 200
+        data = r.json()
+        assert "mfaEnabled" in data or "mfa_enabled" in data
+
+    @pytest.mark.tier1
+    def test_t1_26_superadmin_queues(self, client, admin_headers):
+        """Superadmin queue depth endpoint reachable (Cycle 8)."""
+        r = client.get("/api/superadmin/queues", headers=admin_headers)
+        assert r.status_code in (200, 503)
+
+    @pytest.mark.tier1
+    def test_t1_27_superadmin_compliance(self, client, admin_headers):
+        """Superadmin compliance summary endpoint reachable (Cycle 8)."""
+        r = client.get("/api/superadmin/compliance", headers=admin_headers)
+        assert r.status_code in (200, 503)
+
+    @pytest.mark.tier1
+    def test_t1_28_superadmin_integrations_health(self, client, admin_headers):
+        """Superadmin integration health endpoint reachable (Cycle 8)."""
+        r = client.get("/api/superadmin/integrations/health", headers=admin_headers)
+        assert r.status_code in (200, 503)
 
 
 class TestTier2Performance:

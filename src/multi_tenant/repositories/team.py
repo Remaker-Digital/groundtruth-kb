@@ -152,6 +152,35 @@ class TeamMemberRepository(TenantScopedRepository):
         )
         return results[0] if results else None
 
+    async def update_member_fields(
+        self,
+        tenant_id: str,
+        member_id: str,
+        updates: dict[str, Any],
+    ) -> dict[str, Any]:
+        """Update arbitrary fields on a team member document.
+
+        Builds Cosmos DB patch operations from the updates dict and
+        always sets ``updated_at`` to the current UTC timestamp.
+
+        Args:
+            tenant_id: Tenant partition key.
+            member_id: Team member document ID.
+            updates: Dict of field names → new values. Values of ``None``
+                are stored as JSON null (for clearing fields).
+        """
+        now = datetime.now(timezone.utc).isoformat()
+        operations: list[dict[str, Any]] = [
+            {"op": "set", "path": f"/{key}", "value": value}
+            for key, value in updates.items()
+        ]
+        operations.append({"op": "set", "path": "/updated_at", "value": now})
+        return await self.patch(
+            tenant_id=tenant_id,
+            document_id=member_id,
+            operations=operations,
+        )
+
     async def list_agents_for_category(
         self, tenant_id: str, category: str,
     ) -> list[dict[str, Any]]:

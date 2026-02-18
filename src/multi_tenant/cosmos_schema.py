@@ -61,6 +61,9 @@ COLLECTION_AUDIT_LOG = "audit_log"
 COLLECTION_TEAM_MEMBERS = "team_members"
 COLLECTION_SLA_SNAPSHOTS = "sla_snapshots"
 COLLECTION_VERIFICATION_TOKENS = "verification_tokens"
+COLLECTION_INCIDENTS = "incidents"
+COLLECTION_ALERT_RULES = "alert_rules"
+COLLECTION_ALERT_HISTORY = "alert_history"
 
 ALL_COLLECTIONS = [
     COLLECTION_TENANTS,
@@ -75,6 +78,9 @@ ALL_COLLECTIONS = [
     COLLECTION_TEAM_MEMBERS,
     COLLECTION_SLA_SNAPSHOTS,
     COLLECTION_VERIFICATION_TOKENS,
+    COLLECTION_INCIDENTS,
+    COLLECTION_ALERT_RULES,
+    COLLECTION_ALERT_HISTORY,
 ]
 
 # Cosmos DB Serverless — no provisioned throughput (pay per RU consumed)
@@ -91,6 +97,8 @@ TTL_AUDIT_LOG = 365 * 24 * 60 * 60         # 1 year (audit log retention)
 TTL_PACK_BALANCE = 90 * 24 * 60 * 60       # 90 days (pack validity)
 TTL_SLA_SNAPSHOTS = 90 * 24 * 60 * 60     # 90 days (SLA trend retention)
 TTL_VERIFICATION_TOKEN = 10 * 60           # 10 minutes (email verification link)
+TTL_INCIDENTS = 365 * 24 * 60 * 60        # 1 year (incident history retention)
+TTL_ALERT_HISTORY = 90 * 24 * 60 * 60     # 90 days (alert history retention)
 
 
 # ---------------------------------------------------------------------------
@@ -1108,6 +1116,54 @@ ESCALATION_CATEGORIES = [
 ]
 
 
+class IncidentStatus(str, Enum):
+    """Incident lifecycle status (HV-5 status page)."""
+
+    INVESTIGATING = "investigating"
+    IDENTIFIED = "identified"
+    MONITORING = "monitoring"
+    RESOLVED = "resolved"
+    SCHEDULED = "scheduled"
+
+
+class IncidentSeverity(str, Enum):
+    """Incident severity level."""
+
+    MINOR = "minor"
+    MAJOR = "major"
+    CRITICAL = "critical"
+
+
+# Standard services that can be affected by incidents
+INCIDENT_SERVICES = [
+    "API",
+    "Widget",
+    "NATS",
+    "Key Vault",
+    "MCP",
+    "Admin Console",
+    "Cosmos DB",
+]
+
+
+class AlertRuleType(str, Enum):
+    """Alert rule category (RB-4 alerting)."""
+
+    QUEUE_DEPTH = "queue_depth"
+    SECRET_EXPIRY = "secret_expiry"
+    CIRCUIT_BREAKER = "circuit_breaker"
+    SLA_BREACH = "sla_breach"
+    INCIDENT = "incident"
+
+
+class AlertSeverity(str, Enum):
+    """Alert severity level."""
+
+    INFO = "info"
+    WARNING = "warning"
+    CRITICAL = "critical"
+
+
 class TeamMemberDocument(BaseModel):
     """Team member within a tenant (WI #179).
 
@@ -1157,6 +1213,99 @@ class TeamMemberDocument(BaseModel):
     updated_at: str = Field(description="Last update timestamp")
     last_login_at: str | None = Field(default=None, description="Last dashboard login")
     invited_by: str | None = Field(default=None, description="Who added this member")
+
+
+# ---------------------------------------------------------------------------
+# Incident document (HV-5 — status page)
+# ---------------------------------------------------------------------------
+
+
+class IncidentUpdateEntry(BaseModel):
+    """A single status update on an incident timeline."""
+
+    timestamp: str
+    status: str
+    message: str
+    author: str = "system"
+
+
+class IncidentDocument(BaseModel):
+    """Incident record for the status page.
+
+    Partition key: /status (investigating, identified, monitoring, resolved, scheduled)
+    TTL: 365 days. Unique key: /incident_id.
+    """
+
+    id: str = ""
+    incident_id: str = ""
+    title: str = ""
+    description: str = ""
+    status: str = IncidentStatus.INVESTIGATING.value
+    severity: str = IncidentSeverity.MINOR.value
+    affected_services: list[str] = Field(default_factory=list)
+    updates: list[IncidentUpdateEntry] = Field(default_factory=list)
+    created_at: str = ""
+    updated_at: str = ""
+    resolved_at: str | None = None
+    created_by: str = ""
+    ttl: int = Field(default=TTL_INCIDENTS, alias="_ts_ttl")
+
+
+# ---------------------------------------------------------------------------
+# Alert rule document (RB-4 — alerting)
+# ---------------------------------------------------------------------------
+
+
+class AlertCondition(BaseModel):
+    """Condition that triggers an alert."""
+
+    metric: str = ""
+    operator: str = "gt"  # gt, lt, gte, lte, eq, ne
+    threshold: float = 0
+
+
+class AlertRuleDocument(BaseModel):
+    """Alert rule definition.
+
+    Partition key: /rule_type (queue_depth, secret_expiry, etc.)
+    No TTL — rules persist until deleted.
+    """
+
+    id: str = ""
+    rule_id: str = ""
+    rule_type: str = AlertRuleType.QUEUE_DEPTH.value
+    name: str = ""
+    description: str = ""
+    enabled: bool = True
+    condition: AlertCondition = Field(default_factory=AlertCondition)
+    notification_channels: list[str] = Field(default_factory=list)
+    cooldown_minutes: int = 60
+    runbook_url: str = ""
+    created_at: str = ""
+    updated_at: str = ""
+
+
+class AlertHistoryDocument(BaseModel):
+    """Alert firing history.
+
+    Partition key: /alert_date (YYYY-MM-DD for even distribution)
+    TTL: 90 days.
+    """
+
+    id: str = ""
+    alert_date: str = ""
+    rule_id: str = ""
+    rule_name: str = ""
+    rule_type: str = ""
+    triggered_at: str = ""
+    resolved_at: str | None = None
+    severity: str = AlertSeverity.WARNING.value
+    message: str = ""
+    metric_value: float = 0
+    threshold_value: float = 0
+    acknowledged: bool = False
+    acknowledged_by: str | None = None
+    ttl: int = Field(default=TTL_ALERT_HISTORY, alias="_ts_ttl")
 
 
 # ---------------------------------------------------------------------------
@@ -1467,6 +1616,62 @@ def get_collection_configs() -> list[CollectionConfig]:
                 "indexingMode": "consistent",
                 "includedPaths": [{"path": "/*"}],
                 "excludedPaths": [{"path": '/"_etag"/?'}],
+            },
+        ),
+        # 13. incidents (HV-5: status page — incident management)
+        CollectionConfig(
+            name=COLLECTION_INCIDENTS,
+            partition_key="/status",
+            default_ttl=TTL_INCIDENTS,
+            unique_keys=[["/incident_id"]],
+            indexing_policy={
+                "automatic": True,
+                "indexingMode": "consistent",
+                "includedPaths": [{"path": "/*"}],
+                "excludedPaths": [
+                    {"path": "/updates/*"},
+                    {"path": '/"_etag"/?'},
+                ],
+                "compositeIndexes": [
+                    [
+                        {"path": "/status", "order": "ascending"},
+                        {"path": "/created_at", "order": "descending"},
+                    ],
+                    [
+                        {"path": "/severity", "order": "ascending"},
+                        {"path": "/created_at", "order": "descending"},
+                    ],
+                ],
+            },
+        ),
+        # 14. alert_rules (RB-4: alerting — rule definitions)
+        CollectionConfig(
+            name=COLLECTION_ALERT_RULES,
+            partition_key="/rule_type",
+            unique_keys=[["/rule_id"]],
+            indexing_policy={
+                "automatic": True,
+                "indexingMode": "consistent",
+                "includedPaths": [{"path": "/*"}],
+                "excludedPaths": [{"path": '/"_etag"/?'}],
+            },
+        ),
+        # 15. alert_history (RB-4: alerting — firing history, 90-day TTL)
+        CollectionConfig(
+            name=COLLECTION_ALERT_HISTORY,
+            partition_key="/alert_date",
+            default_ttl=TTL_ALERT_HISTORY,
+            indexing_policy={
+                "automatic": True,
+                "indexingMode": "consistent",
+                "includedPaths": [{"path": "/*"}],
+                "excludedPaths": [{"path": '/"_etag"/?'}],
+                "compositeIndexes": [
+                    [
+                        {"path": "/alert_date", "order": "ascending"},
+                        {"path": "/triggered_at", "order": "descending"},
+                    ],
+                ],
             },
         ),
     ]

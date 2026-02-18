@@ -1,0 +1,233 @@
+/**
+ * ComplianceDashboard — Cross-tenant compliance overview.
+ *
+ * PII scrubbing adoption, grace period tracking, DSAR request counts.
+ * PII adoption progress bar, grace period rows highlighted.
+ *
+ * API: GET /api/superadmin/compliance
+ *
+ * © 2026 Remaker Digital, a DBA of VanDusen & Palmeter, LLC. All rights reserved.
+ */
+
+import React, { useEffect, useState } from 'react';
+import {
+  Badge,
+  Card,
+  Group,
+  Loader,
+  Paper,
+  Progress,
+  SimpleGrid,
+  Stack,
+  Table,
+  Text,
+  Title,
+} from '@mantine/core';
+import { useProviderContext } from '../layouts/ProviderLayout';
+
+// ---------------------------------------------------------------------------
+// Types (matches ComplianceSummaryResponse camelCase serialization)
+// ---------------------------------------------------------------------------
+
+interface TenantComplianceInfo {
+  tenantId: string;
+  tier: string | null;
+  gracePeriodEndsAt: string | null;
+  gracePeriodActive: boolean;
+  piiScrubbingEnabled: boolean;
+  dsarRequestCount: number;
+  lastDsarRequest: string | null;
+}
+
+interface ComplianceSummaryResponse {
+  totalTenants: number;
+  tenantsWithPiiScrubbing: number;
+  tenantsInGracePeriod: number;
+  totalDsarRequests: number;
+  tenants: TenantComplianceInfo[];
+  errors: Array<{ tenantId: string; message: string }>;
+}
+
+// ---------------------------------------------------------------------------
+// Component
+// ---------------------------------------------------------------------------
+
+export function ComplianceDashboardPage() {
+  const { apiFetch, onNotify } = useProviderContext();
+  const [data, setData] = useState<ComplianceSummaryResponse | null>(null);
+  const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    let cancelled = false;
+    (async () => {
+      try {
+        const res = await apiFetch('/api/superadmin/compliance');
+        if (res.ok && !cancelled) {
+          setData(await res.json());
+        } else if (!cancelled) {
+          onNotify('Failed to load compliance data', 'error');
+        }
+      } catch {
+        if (!cancelled) onNotify('Network error loading compliance data', 'error');
+      } finally {
+        if (!cancelled) setLoading(false);
+      }
+    })();
+    return () => { cancelled = true; };
+  }, [apiFetch, onNotify]);
+
+  if (loading) {
+    return (
+      <Stack align="center" mt="xl">
+        <Loader color="red" />
+        <Text c="dimmed" size="sm">Loading compliance data...</Text>
+      </Stack>
+    );
+  }
+
+  if (!data) {
+    return (
+      <Text c="dimmed" ta="center" mt="xl">
+        Unable to load compliance data.
+      </Text>
+    );
+  }
+
+  const piiAdoptionPct = data.totalTenants > 0
+    ? Math.round((data.tenantsWithPiiScrubbing / data.totalTenants) * 100)
+    : 0;
+
+  return (
+    <Stack gap="lg">
+      <Title order={3} c="#F5F5F5">Compliance Dashboard</Title>
+
+      {/* Summary cards */}
+      <SimpleGrid cols={{ base: 1, sm: 2, md: 4 }} spacing="md">
+        <Card withBorder padding="lg" radius="md" bg="#1f1f1f">
+          <Text c="dimmed" size="xs" tt="uppercase" fw={600}>Total Tenants</Text>
+          <Text fw={700} size="xl" c="#F5F5F5" mt={4}>{data.totalTenants}</Text>
+        </Card>
+        <Card withBorder padding="lg" radius="md" bg="#1f1f1f">
+          <Text c="dimmed" size="xs" tt="uppercase" fw={600}>PII Scrubbing Enabled</Text>
+          <Text fw={700} size="xl" c="#0D7C3E" mt={4}>
+            {data.tenantsWithPiiScrubbing}
+          </Text>
+          <Text c="dimmed" size="xs">{piiAdoptionPct}% adoption</Text>
+        </Card>
+        <Card withBorder padding="lg" radius="md" bg="#1f1f1f">
+          <Text c="dimmed" size="xs" tt="uppercase" fw={600}>Grace Period Active</Text>
+          <Text
+            fw={700}
+            size="xl"
+            c={data.tenantsInGracePeriod > 0 ? '#E5A100' : '#0D7C3E'}
+            mt={4}
+          >
+            {data.tenantsInGracePeriod}
+          </Text>
+        </Card>
+        <Card withBorder padding="lg" radius="md" bg="#1f1f1f">
+          <Text c="dimmed" size="xs" tt="uppercase" fw={600}>Total DSAR Requests</Text>
+          <Text fw={700} size="xl" c="#F5F5F5" mt={4}>{data.totalDsarRequests}</Text>
+        </Card>
+      </SimpleGrid>
+
+      {/* PII adoption progress */}
+      <Paper withBorder radius="md" bg="#1f1f1f" p="md">
+        <Group justify="space-between" mb="xs">
+          <Text size="sm" fw={500} c="#E0E0E0">PII Scrubbing Adoption</Text>
+          <Text size="sm" fw={600} c="#F5F5F5">{piiAdoptionPct}%</Text>
+        </Group>
+        <Progress
+          value={piiAdoptionPct}
+          color={piiAdoptionPct >= 80 ? 'green' : piiAdoptionPct >= 50 ? 'yellow' : 'red'}
+          size="lg"
+          radius="md"
+        />
+      </Paper>
+
+      {/* Compliance matrix table */}
+      <Paper withBorder radius="md" bg="#1f1f1f" style={{ overflow: 'auto' }}>
+        <Table striped highlightOnHover>
+          <Table.Thead>
+            <Table.Tr>
+              <Table.Th>Tenant ID</Table.Th>
+              <Table.Th>Tier</Table.Th>
+              <Table.Th>Grace Period</Table.Th>
+              <Table.Th>PII Scrubbing</Table.Th>
+              <Table.Th>DSAR Requests</Table.Th>
+              <Table.Th>Last DSAR</Table.Th>
+            </Table.Tr>
+          </Table.Thead>
+          <Table.Tbody>
+            {data.tenants.length === 0 ? (
+              <Table.Tr>
+                <Table.Td colSpan={6}>
+                  <Text c="dimmed" ta="center" py="md">No compliance data available</Text>
+                </Table.Td>
+              </Table.Tr>
+            ) : (
+              data.tenants.map((t) => (
+                <Table.Tr
+                  key={t.tenantId}
+                  style={t.gracePeriodActive ? { backgroundColor: 'rgba(229, 161, 0, 0.06)' } : undefined}
+                >
+                  <Table.Td>
+                    <Text size="xs" ff="monospace" c="#E0E0E0">{t.tenantId}</Text>
+                  </Table.Td>
+                  <Table.Td>
+                    <Text size="xs" c="#A0A0A0">{t.tier ?? '\u2014'}</Text>
+                  </Table.Td>
+                  <Table.Td>
+                    {t.gracePeriodActive ? (
+                      <Badge variant="light" color="orange" size="sm">Active</Badge>
+                    ) : (
+                      <Badge variant="light" color="gray" size="sm">Expired</Badge>
+                    )}
+                  </Table.Td>
+                  <Table.Td>
+                    <Badge
+                      variant="light"
+                      color={t.piiScrubbingEnabled ? 'green' : 'red'}
+                      size="sm"
+                    >
+                      {t.piiScrubbingEnabled ? 'Enabled' : 'Disabled'}
+                    </Badge>
+                  </Table.Td>
+                  <Table.Td>
+                    <Text size="xs" fw={500} c="#E0E0E0">{t.dsarRequestCount}</Text>
+                  </Table.Td>
+                  <Table.Td>
+                    <Text size="xs" c="dimmed">
+                      {t.lastDsarRequest
+                        ? new Date(t.lastDsarRequest).toLocaleDateString()
+                        : '\u2014'}
+                    </Text>
+                  </Table.Td>
+                </Table.Tr>
+              ))
+            )}
+          </Table.Tbody>
+        </Table>
+      </Paper>
+
+      {/* Errors section */}
+      {data.errors.length > 0 && (
+        <Paper withBorder radius="md" bg="#1f1f1f" p="md">
+          <Group gap="xs" mb="sm">
+            <Badge variant="filled" color="red" size="sm">
+              {data.errors.length} Error{data.errors.length !== 1 ? 's' : ''}
+            </Badge>
+          </Group>
+          <Stack gap="xs">
+            {data.errors.map((err, i) => (
+              <Group key={i} gap="xs">
+                <Text size="xs" ff="monospace" c="#E5A100">{err.tenantId}</Text>
+                <Text size="xs" c="#A0A0A0">{err.message}</Text>
+              </Group>
+            ))}
+          </Stack>
+        </Paper>
+      )}
+    </Stack>
+  );
+}

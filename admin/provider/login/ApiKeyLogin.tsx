@@ -3,6 +3,7 @@
  *
  * Login page where the platform operator enters their SUPERADMIN API key.
  * Validates against /api/superadmin/tenants/summary (requires SUPERADMIN role).
+ * After validation, checks MFA status — if enabled, signals mfa_required.
  *
  * © 2026 Remaker Digital, a DBA of VanDusen & Palmeter, LLC. All rights reserved.
  */
@@ -11,8 +12,13 @@ import React, { useState, useCallback } from 'react';
 
 const API_BASE_URL = import.meta.env?.VITE_API_URL || '';
 
+export interface LoginResult {
+  apiKey: string;
+  mfaRequired: boolean;
+}
+
 interface ApiKeyLoginProps {
-  onLogin: (apiKey: string) => void;
+  onLogin: (result: LoginResult) => void;
 }
 
 export const ApiKeyLogin: React.FC<ApiKeyLoginProps> = ({ onLogin }) => {
@@ -46,7 +52,21 @@ export const ApiKeyLogin: React.FC<ApiKeyLoginProps> = ({ onLogin }) => {
           return;
         }
 
-        onLogin(apiKey.trim());
+        // Check MFA status
+        let mfaRequired = false;
+        try {
+          const mfaResp = await fetch(`${API_BASE_URL}/api/superadmin/mfa/status`, {
+            headers: { 'X-API-Key': apiKey.trim() },
+          });
+          if (mfaResp.ok) {
+            const mfaData = await mfaResp.json();
+            mfaRequired = !!mfaData.mfaEnabled;
+          }
+        } catch {
+          // MFA check failed — proceed without MFA (service may not be configured)
+        }
+
+        onLogin({ apiKey: apiKey.trim(), mfaRequired });
       } catch {
         setError('Unable to connect. Please check your network and try again.');
       } finally {

@@ -130,7 +130,7 @@ const App: React.FC = () => {
           <Routes>
             <Route path="/" element={<PageErrorBoundary pageName="Dashboard"><DashboardPage /></PageErrorBoundary>} />
             <Route path="/inbox" element={<PageErrorBoundary pageName="Inbox"><InboxPage /></PageErrorBoundary>} />
-            <Route path="/knowledge" element={<PageErrorBoundary pageName="Knowledge Base"><KnowledgeBasePage /></PageErrorBoundary>} />
+            <Route path="/knowledge-base" element={<PageErrorBoundary pageName="Knowledge Base"><KnowledgeBasePage /></PageErrorBoundary>} />
             <Route path="/configuration" element={<PageErrorBoundary pageName="Configuration"><ConfigurationPage /></PageErrorBoundary>} />
             <Route path="/widget" element={<PageErrorBoundary pageName="Widget"><WidgetPage /></PageErrorBoundary>} />
             <Route path="/billing" element={<PageErrorBoundary pageName="Billing"><BillingPage /></PageErrorBoundary>} />

@@ -2,6 +2,7 @@
 
 - Idle conversation scanner — closes conversations exceeding 30-min idle timeout.
 - SLA snapshot loop — persists hourly SLA snapshots and daily rollups (C-2).
+- Alert evaluation loop — evaluates enabled alert rules every 5 minutes (RB-4).
 
 © 2026 Remaker Digital, a DBA of VanDusen & Palmeter, LLC. All rights reserved.
 """
@@ -19,6 +20,7 @@ logger = logging.getLogger(__name__)
 
 _idle_scanner_task: asyncio.Task[None] | None = None
 _sla_snapshot_task: asyncio.Task[None] | None = None
+_alert_eval_task: asyncio.Task[None] | None = None
 
 
 async def _idle_scanner_loop() -> None:
@@ -230,3 +232,78 @@ def register_sla_snapshots(app: FastAPI) -> None:
     """Register SLA snapshot startup/shutdown handlers on the FastAPI app."""
     app.on_event("startup")(_startup_sla_snapshots)
     app.on_event("shutdown")(_shutdown_sla_snapshots)
+
+
+# ---------------------------------------------------------------------------
+# Alert evaluation loop (RB-4: alerting)
+# ---------------------------------------------------------------------------
+
+# Evaluation interval: 5 minutes (300 seconds)
+_ALERT_EVAL_INTERVAL = 300
+
+
+async def _alert_evaluation_loop() -> None:
+    """Periodic background task that evaluates enabled alert rules.
+
+    Runs every 5 minutes. Imports the AlertEngine singleton and calls
+    evaluate_all(), which checks each enabled rule against its metric
+    collector and fires alerts when conditions are met.
+    """
+    # Wait 90 seconds after startup before first evaluation
+    await asyncio.sleep(90)
+
+    while True:
+        try:
+            from src.multi_tenant.alert_engine import get_alert_engine
+
+            engine = get_alert_engine()
+            result = await engine.evaluate_all()
+
+            if result.get("alerts_fired", 0) > 0:
+                logger.info(
+                    "Alert evaluation: %d rules evaluated, %d alerts fired, "
+                    "%d skipped (cooldown), %d errors",
+                    result["rules_evaluated"],
+                    result["alerts_fired"],
+                    result["skipped_cooldown"],
+                    result["errors"],
+                )
+            else:
+                logger.debug(
+                    "Alert evaluation: %d rules evaluated, 0 fired",
+                    result.get("rules_evaluated", 0),
+                )
+        except RuntimeError:
+            # AlertEngine not configured yet — skip this cycle
+            pass
+        except Exception:
+            logger.debug("Alert evaluation cycle failed", exc_info=True)
+
+        # Sleep 5 minutes between evaluations
+        await asyncio.sleep(_ALERT_EVAL_INTERVAL)
+
+
+async def _startup_alert_evaluation() -> None:
+    """Start the alert evaluation background task."""
+    global _alert_eval_task  # noqa: PLW0603
+    _alert_eval_task = asyncio.create_task(_alert_evaluation_loop())
+    logger.info("Alert evaluation background task started (5-min interval)")
+
+
+async def _shutdown_alert_evaluation() -> None:
+    """Cancel the alert evaluation background task."""
+    global _alert_eval_task  # noqa: PLW0603
+    if _alert_eval_task and not _alert_eval_task.done():
+        _alert_eval_task.cancel()
+        try:
+            await _alert_eval_task
+        except asyncio.CancelledError:
+            pass
+        logger.info("Alert evaluation background task stopped")
+    _alert_eval_task = None
+
+
+def register_alert_evaluation(app: FastAPI) -> None:
+    """Register alert evaluation startup/shutdown handlers on the FastAPI app."""
+    app.on_event("startup")(_startup_alert_evaluation)
+    app.on_event("shutdown")(_shutdown_alert_evaluation)

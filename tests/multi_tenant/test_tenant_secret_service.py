@@ -100,6 +100,7 @@ class TestTenantSecretType:
             "api-key-hash", "openai-api-key",
             "zendesk-api-token", "mailchimp-api-key",
             "cmk-key-id", "webhook-signing-secret",
+            "totp-seed",
         }
         actual = {t.value for t in TenantSecretType}
         assert expected == actual

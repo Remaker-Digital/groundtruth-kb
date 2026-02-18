@@ -34,8 +34,12 @@ opentelemetry-instrumentation-fastapi>=0.49b0
 # Stripe (billing & subscriptions)
 stripe>=8.0.0
 
-# JWT (Shopify session token verification)
+# JWT (Shopify session token verification + MFA session tokens)
 PyJWT>=2.9.0
+
+# MFA/TOTP (RB-5: multi-factor authentication)
+pyotp>=2.9.0
+qrcode>=7.4.0
 
 # Data serialization (archival pipeline — Parquet format)
 pyarrow>=18.0.0

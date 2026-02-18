@@ -115,55 +115,31 @@ Active procedures:
 
 ---
 
-## Remaining Work — 5-Cycle Roadmap (Owner-Approved, Session 32)
+## Remaining Work — 14-Cycle Roadmap (Re-scoped Session 41)
 
 Full plan: `memory/build-deploy-roadmap.md`
 
-### Cycle 1: v1.35.0 — Ship S30-31 Work (1 day, LOW risk)
-- Deploy existing compliance + P0 refactoring (R1/R7/R8/R9a). No new development.
+### Active Cycle
 
-### Cycle 2: v1.36.0 — P1 Refactoring (4-5 days, MEDIUM risk)
-- **R2:** Repository file split — `repository.py` → `src/multi_tenant/repositories/` (10 domain files + re-export)
-- **R4:** Config processor decomposition — `tenant_config_processor.py` → `src/multi_tenant/config/` (6 files). **Fix latent bug line 1197.**
-- **R6 partial:** Hooks barrel split — `hooks/index.ts` → 6 domain files + re-export barrel
+**Cycle 9: v1.43.0** — SPA Phase 2 + HV-5/RB-4/RB-5 + UI Quick Wins (IMPLEMENTING S40-41)
+- S40: 4 SPA pages, grouped nav, incidents/status, alerting, MFA/TOTP (125+ tests)
+- S41: Shopify route fix, theme extraction, emoji→SVG icons
 
-### Cycle 3: v1.37.0 — Provider Admin Phase 2 Start (4-6 days, MEDIUM risk)
-- **C-2:** SLA persistence — new Cosmos collection, hourly snapshots, startup hydration, error budget, trends API
-- **C-1:** Queue depth + job health (if time permits)
+### Planned Cycles
 
-### Cycle 4: v1.38.0 — AGNTCY Phase 3A: MCP Client + Shopify Storefront MVP (2-3 weeks, MEDIUM-HIGH risk)
-- MCP client implementation with HTTP transport (relax assertion 3.4 for external servers)
-- Tenant MCP server registry in Cosmos DB PreferencesDocument
-- KR agent MCP integration (secondary source: KB → MCP → keyword fallback)
-- Read-only policy gate, shop_domain guard, credential cache, circuit breaker, PII tokenization
-- **Assessment:** `independent-progress-assments/MCP-SERVER-INTEGRATION-ASSESSMENT-2026-02-17.md`
-- **Architecture:** `memory/mcp-integration.md`
-
-### Cycle 5: v1.39.0 — AGNTCY Phase 3B: Stripe MCP + Mutation Safety + Admin UI ✅ COMPLETE
-- ✅ Stripe MCP (remote `mcp.stripe.com`, per-tenant restricted keys, read-only)
-- ✅ Credential cache (`McpCredentialCache`, 5-min TTL, Key Vault backend)
-- ✅ Mutation safety architecture (MutationPolicy, MutationExecutor — built, NOT activated)
-- ✅ Admin UI for MCP configuration (McpConfigPanel.tsx in IntegrationsManager)
-- ✅ **Milestone: AGNTCY Phase 3 COMPLETE** — all 14 assertions verified (session 37)
+| Cycle | Version | Content | Risk |
+|-------|---------|---------|------|
+| **10** | v1.44.0 | UI consistency, empty states, a11y, loading states, login migration, tooltips, design docs | LOW-MEDIUM |
+| **11** | v1.45.0 | R6 component slices + magic link auth + C1/C8/C9 | MEDIUM |
+| **12** | v1.46.0 | Provider Phase 3-4 (HV-1/HV-2/HV-4) + R9b CDN | MEDIUM |
+| **13** | v1.47.0 | C5/C10/C14/C15/C3 + D22/D30 + WI#138/WI#139 | MEDIUM |
+| **14** | v1.48.0 | Coverage 80%, regression, perf validation, launch | LOW |
 
 ### Completed Milestones
-- ✅ **Cycle 5 Phase 3B** (Session 37): Stripe MCP + mutation safety + Admin UI, 81 new tests → 2,646 total, AGNTCY Phase 3 14/14 PASS
-- ✅ **Cycle 4 Phase 3A** (Session 36): MCP client + Shopify Storefront MVP, 59 tests, assertions 3.1-3.5 + 3.11-3.14
-- ✅ **Cycle 3 SLA Persistence** (Session 35): C-2 SLA persistence, 2,506 tests
-- ✅ **Cycle 2 P1 Refactoring** (Session 34): R2 + R4 + R6, 2,476 tests
-- ✅ **Cycle 1 Deploy v1.35.0** (Session 33): S29-33 shipped, ACR build caw, revision 0000025, Tier 0 17/17 PASS
-- ✅ P0 Refactoring Cycle 1 (Session 31): R1 main.py split, R9a sourcemaps, R7 env loader, R8 CamelCaseModel
-- ✅ Configuration Strategy Compliance (Session 30): 25 files, 4 priority levels
-- ✅ Provider Admin Phase 1 (Session 29): 5 superadmin endpoints, 20 tests
-- ✅ AGNTCY Phase 2 (Session 25): 6 agents, pipeline decomposition, 100 agent tests
-- ✅ Owner Functional Review (Sessions 23-26): 178 UI tests, D46-D67 fixed, v1.34.0 deployed
-- ✅ MCP Assessment (Session 32): Independent cross-reference, 6 findings, revised sequencing
-
-### Deferred (Post-Cycle 5)
-- **Provider Admin Phase 2 remaining:** C-3 compliance, C-4 secret posture, HV-3 integration reliability, HV-5 status page, RB-5 MFA, RB-4 alerting
-- **Provider Admin Phase 3-4:** Support diagnostics, cost economics, abuse detection, capacity, AIOps, BI
-- **MCP post-Phase 3:** Customer Account MCP (widget OAuth UX), Checkout MCP (AGNTCY Phase 4 / UCP), GA4 MCP (experimental), Zendesk/Klaviyo (no official servers)
-- **Refactoring:** R3 config YAML, R6 full component slices, R9b CDN split, R10 pipeline.py → Phase 3/4
+- ✅ **Cycles 6-8** (Session 39): CI + Email + SPA Phase 1 + R10/R3 + Phase 2 backend → v1.42.0
+- ✅ **Cycle 5 Phase 3B** (Session 37): Stripe MCP + mutation safety + Admin UI → AGNTCY Phase 3 14/14 PASS
+- ✅ **Cycles 1-4** (Sessions 33-36): Compliance, refactoring, SLA, MCP client → v1.39.0
+- ✅ Pre-cycle work (Sessions 25-31): AGNTCY Phase 2, UI review, Provider Phase 1, config compliance, P0 refactoring
 
 ### Owner/Designer Tasks (blocking Shopify submission)
 1. Screenshots (3-6 at 1600x900) — designer
@@ -173,16 +149,13 @@ Full plan: `memory/build-deploy-roadmap.md`
 5. Deploy GDPR webhook URLs — owner
 6. Stripe test→live mode flip
 
-### Post-Launch Backlog
-- Email verification, blocked capabilities C1-C16 (42 UI steps)
-- Widget phases 3-5, multi-user admin auth (WI #295, 5-8 days)
-- Add-on Stripe checkout, customer context pre-computation (WI #138)
-- Azure OpenAI PTU (WI #139), Persistent Memory dashboard
-- D22 avatar PNG upload, D30 tier upgrade path
-- AGNTCY Phase 4 (UCP Commerce Protocol)
+### Deferred (Post-Cycle 14)
+- Provider Admin Phase 4: NH-1 capacity, NH-2 AIOps, NH-3 BI
+- MCP: Customer Account (widget OAuth), Checkout (AGNTCY Phase 4/UCP), GA4, Zendesk/Klaviyo
+- Widget phases 3-5, AGNTCY Phase 4 (UCP Commerce Protocol)
 
 ---
 
 *© 2026 Remaker Digital, a DBA of VanDusen & Palmeter, LLC. All rights reserved.*
-*Last Updated: 2026-02-17*
-*Version: 45.0.0*
+*Last Updated: 2026-02-18*
+*Version: 46.0.0*

@@ -1,8 +1,8 @@
 # Non-Disruptive Upgrade Verification
 
 **Type:** Repeatable Procedure (see `docs/operations/REPEATABLE-PROCEDURES.md`)
-**Last verified:** 2026-02-16
-**Last corrected:** 2026-02-16 — Created (S26)
+**Last verified:** 2026-02-18
+**Last corrected:** 2026-02-18 — Added C.15-C.19 for Cycle 9 (incidents, alerts, MFA, provider SPA, public status API); updated admin SPA build step to include 3rd SPA (S40)
 
 ---
 
@@ -67,8 +67,8 @@ Execute the standard deployment procedure:
 
 Or manual equivalent:
 1. Bump `PRODUCT_VERSION` in `src/multi_tenant/api_versioning.py`
-2. Build both admin SPAs (`npm run build` in `admin/standalone` and `admin/shopify`)
-3. ACR build: `az acr build --registry {ACR} --image api-gateway:v{NEW_VERSION} .`
+2. Build all 3 admin SPAs (`npm run build` in `admin/standalone`, `admin/shopify`, and `admin/provider`)
+3. ACR build: `az acr build --registry {ACR} --image api-gateway:v{NEW_VERSION} . --no-logs`
 4. Update container app: `az containerapp update ...`
 5. Wait for health: `GET /health` and `GET /ready` return 200
 
@@ -92,6 +92,11 @@ Compare every value from Phase A against the current state. **All values must ma
 | C.12 | API key still authenticates | `GET /api/config` with `{API_KEY}` returns 200 |
 | C.13 | Regression tests pass | `python -m pytest tests/regression/ -q` — all pass |
 | C.14 | Superadmin API functional | `GET /api/superadmin/tenants` with SPA API key returns 200 with `total >= 1` |
+| C.15 | Public status API functional | `GET /api/status` (no auth) returns 200 with `overall_status` field |
+| C.16 | Provider admin SPA served | `GET /admin/provider/` returns 200 with `text/html` content type |
+| C.17 | Incident endpoints functional | `GET /api/superadmin/incidents` with SPA API key returns 200 |
+| C.18 | Alert endpoints functional | `GET /api/superadmin/alerts/rules` with SPA API key returns 200 |
+| C.19 | MFA endpoint functional | `GET /api/superadmin/mfa/status` with SPA API key returns 200 |
 
 ### Phase D: Failure Response
 

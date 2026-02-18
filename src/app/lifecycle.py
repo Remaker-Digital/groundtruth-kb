@@ -796,6 +796,22 @@ async def _startup_superadmin_services() -> None:
         except Exception:
             logger.debug("Secret service not available for superadmin API")
 
+        # Incident + alert repositories for Phase B/C endpoints
+        incident_repo = None
+        alert_rule_repo = None
+        alert_history_repo = None
+        try:
+            from src.multi_tenant.repositories.incidents import IncidentRepository
+            from src.multi_tenant.repositories.alerts import (
+                AlertRuleRepository,
+                AlertHistoryRepository,
+            )
+            incident_repo = IncidentRepository()
+            alert_rule_repo = AlertRuleRepository()
+            alert_history_repo = AlertHistoryRepository()
+        except Exception:
+            logger.debug("Incident/alert repositories not available for superadmin API")
+
         configure_superadmin_services(
             tenant_repo=TenantRepository(),
             audit_repo=AuditLogRepository(),
@@ -804,12 +820,95 @@ async def _startup_superadmin_services() -> None:
             prefs_repo=PreferencesRepository(),
             nats_mgr=nats_mgr,
             secret_service=secret_svc,
+            incident_repo=incident_repo,
+            alert_rule_repo=alert_rule_repo,
+            alert_history_repo=alert_history_repo,
         )
-        logger.info("Superadmin provider operations API initialized (9 endpoints)")
+        logger.info("Superadmin provider operations API initialized (18 endpoints)")
     except Exception:
         logger.warning(
             "Superadmin API initialization failed — provider endpoints "
             "will return 503 until dependencies are available."
+        )
+
+
+async def _startup_status_api() -> None:
+    """Initialize the public status API with incident repository.
+
+    The /api/status endpoint is public (no auth) and returns active
+    incidents and service status.
+    Non-fatal: status page returns operational if unavailable.
+    """
+    from src.multi_tenant.status_api import configure_status_api
+
+    try:
+        from src.multi_tenant.repositories.incidents import IncidentRepository
+
+        configure_status_api(incident_repo=IncidentRepository())
+        logger.info("Public status API initialized (1 endpoint, no auth)")
+    except Exception:
+        logger.warning(
+            "Public status API initialization failed — "
+            "status page will report operational."
+        )
+
+
+async def _startup_alert_engine() -> None:
+    """Initialize the AlertEngine for rule-based metric evaluation.
+
+    Wires AlertRuleRepository, AlertHistoryRepository, and optionally
+    IncidentRepository into the engine singleton.
+    Non-fatal: alert evaluation will be unavailable until configured.
+    """
+    try:
+        from src.multi_tenant.alert_engine import configure_alert_engine
+        from src.multi_tenant.repositories.alerts import (
+            AlertHistoryRepository,
+            AlertRuleRepository,
+        )
+
+        rule_repo = AlertRuleRepository()
+        history_repo = AlertHistoryRepository()
+
+        incident_repo = None
+        try:
+            from src.multi_tenant.repositories.incidents import IncidentRepository
+            incident_repo = IncidentRepository()
+        except Exception:
+            pass
+
+        configure_alert_engine(rule_repo, history_repo, incident_repo)
+        logger.info("AlertEngine configured (5 metric collectors)")
+    except Exception:
+        logger.warning(
+            "AlertEngine initialization failed — "
+            "alert evaluation will be unavailable."
+        )
+
+
+async def _startup_mfa_service() -> None:
+    """Initialize the MfaTotpService for TOTP-based MFA.
+
+    Wires TenantSecretService (Key Vault TOTP seed storage) and
+    TeamMemberRepository (MFA enrollment state) into the service singleton.
+    Non-fatal: MFA enrollment/verification will be unavailable until configured.
+    """
+    try:
+        from src.multi_tenant.mfa_totp import configure_mfa_service
+        from src.multi_tenant.repositories.team import TeamMemberRepository
+        from src.multi_tenant.tenant_secret_service import TenantSecretService
+
+        secret_service = TenantSecretService()
+        team_repo = TeamMemberRepository()
+        configure_mfa_service(
+            secret_service=secret_service,
+            team_repo=team_repo,
+        )
+        logger.info("MfaTotpService configured")
+    except Exception:
+        logger.warning(
+            "MfaTotpService initialization failed — "
+            "MFA will be unavailable."
         )
 
 
@@ -1211,6 +1310,9 @@ def register_startup_handlers(app: FastAPI) -> None:
     app.on_event("startup")(_startup_admin_profile_services)
     app.on_event("startup")(_startup_admin_apikey_services)
     app.on_event("startup")(_startup_superadmin_services)
+    app.on_event("startup")(_startup_status_api)
+    app.on_event("startup")(_startup_alert_engine)
+    app.on_event("startup")(_startup_mfa_service)
     app.on_event("startup")(_startup_pattern_service)
     app.on_event("startup")(_startup_fine_tuning_service)
     app.on_event("startup")(_startup_key_rotation)

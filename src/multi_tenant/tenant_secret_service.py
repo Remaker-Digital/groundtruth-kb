@@ -77,6 +77,9 @@ class TenantSecretType(str, enum.Enum):
     # Custom webhook/integration secrets
     WEBHOOK_SIGNING_SECRET = "webhook-signing-secret"
 
+    # MFA/TOTP seed (per-user, naming: user-{team_member_id}-totp-seed)
+    TOTP_SEED = "totp-seed"
+
 
 # ---------------------------------------------------------------------------
 # Secret name construction
@@ -335,6 +338,51 @@ class TenantSecretService:
             if "NotFound" in exc_type or "ResourceNotFound" in exc_type:
                 return False
             logger.error("Failed to delete secret %s: %s", name, exc)
+            raise
+
+    # ------------------------------------------------------------------
+    # Raw name access (for non-tenant-scoped secrets, e.g. MFA TOTP seeds)
+    # ------------------------------------------------------------------
+
+    async def get_secret_raw(self, name: str) -> str | None:
+        """Retrieve a secret by raw Key Vault name (no tenant prefix)."""
+        self._ensure_initialized()
+        if self._dev_mode:
+            return self._dev_store.get(name)
+        try:
+            secret = await self._client.get_secret(name)
+            return secret.value
+        except Exception as exc:
+            exc_type = type(exc).__name__
+            if "NotFound" in exc_type or "ResourceNotFound" in exc_type:
+                return None
+            logger.error("Failed to get raw secret %s: %s", name, exc)
+            raise
+
+    async def set_secret_raw(self, name: str, value: str) -> None:
+        """Store a secret by raw Key Vault name (no tenant prefix)."""
+        self._ensure_initialized()
+        if self._dev_mode:
+            self._dev_store[name] = value
+            return
+        await self._client.set_secret(name, value)
+
+    async def delete_secret_raw(self, name: str) -> bool:
+        """Delete a secret by raw Key Vault name (no tenant prefix)."""
+        self._ensure_initialized()
+        if self._dev_mode:
+            existed = name in self._dev_store
+            self._dev_store.pop(name, None)
+            return existed
+        try:
+            poller = await self._client.begin_delete_secret(name)
+            await poller.wait()
+            return True
+        except Exception as exc:
+            exc_type = type(exc).__name__
+            if "NotFound" in exc_type or "ResourceNotFound" in exc_type:
+                return False
+            logger.error("Failed to delete raw secret %s: %s", name, exc)
             raise
 
     async def delete_all_tenant_secrets(

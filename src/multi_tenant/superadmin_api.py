@@ -18,6 +18,19 @@ Phase 2 (Critical):
     C-4:  GET /api/superadmin/secrets/posture    — Secret inventory per tenant
     HV-3: GET /api/superadmin/integrations/health — Circuit breakers + MCP status
 
+Phase 2 (Incident + Alert Management):
+    HV-5: GET/POST /api/superadmin/incidents     — Incident CRUD
+    RB-4: GET/POST/PUT/DELETE /api/superadmin/alerts/rules — Alert rule CRUD
+          GET/POST /api/superadmin/alerts/history         — Alert history + ack
+
+Phase 2 (MFA/TOTP):
+    RB-5: GET  /api/superadmin/mfa/status        — Enrollment status
+          POST /api/superadmin/mfa/enroll        — Start enrollment (QR + backup codes)
+          POST /api/superadmin/mfa/confirm       — Confirm enrollment with first code
+          POST /api/superadmin/mfa/verify        — Login-time TOTP verification
+          POST /api/superadmin/mfa/disable       — Disable MFA (requires valid code)
+          POST /api/superadmin/mfa/backup-verify — Login-time backup code verification
+
 All endpoints require SUPERADMIN role. Widget keys and tenant-level API keys
 are rejected. Only per-user API keys with SUPERADMIN role are accepted.
 
@@ -35,7 +48,7 @@ import logging
 from datetime import datetime, timezone
 from typing import Any
 
-from fastapi import APIRouter, Depends, HTTPException, Query
+from fastapi import APIRouter, Body, Depends, HTTPException, Query
 from pydantic import Field
 
 from src.multi_tenant.api_models import CamelCaseModel
@@ -70,6 +83,9 @@ _usage_repo: UsageRepository | None = None
 _prefs_repo: PreferencesRepository | None = None
 _nats_mgr: Any = None
 _secret_service: Any = None
+_incident_repo: Any = None
+_alert_rule_repo: Any = None
+_alert_history_repo: Any = None
 
 
 def configure_superadmin_services(
@@ -80,6 +96,9 @@ def configure_superadmin_services(
     prefs_repo: PreferencesRepository | None = None,
     nats_mgr: Any = None,
     secret_service: Any = None,
+    incident_repo: Any = None,
+    alert_rule_repo: Any = None,
+    alert_history_repo: Any = None,
 ) -> None:
     """Wire repositories into module-level variables.
 
@@ -87,6 +106,7 @@ def configure_superadmin_services(
     """
     global _tenant_repo, _audit_repo, _conv_repo, _usage_repo, _prefs_repo
     global _nats_mgr, _secret_service
+    global _incident_repo, _alert_rule_repo, _alert_history_repo
     _tenant_repo = tenant_repo
     _audit_repo = audit_repo
     _conv_repo = conv_repo
@@ -94,6 +114,9 @@ def configure_superadmin_services(
     _prefs_repo = prefs_repo
     _nats_mgr = nats_mgr
     _secret_service = secret_service
+    _incident_repo = incident_repo
+    _alert_rule_repo = alert_rule_repo
+    _alert_history_repo = alert_history_repo
     logger.info("Superadmin API services configured")
 
 
@@ -1231,4 +1254,792 @@ async def integration_health(
         nats_connected=nats_connected,
         mcp_integrations=mcp_integrations,
         errors=errors,
+    )
+
+
+# ---------------------------------------------------------------------------
+# HV-5: Incident Management — response models
+# ---------------------------------------------------------------------------
+
+
+class IncidentUpdateModel(CamelCaseModel):
+    """Single update entry on an incident."""
+
+    timestamp: str
+    status: str
+    message: str
+    author: str = "system"
+
+
+class IncidentModel(CamelCaseModel):
+    """Full incident document for API response."""
+
+    incident_id: str
+    title: str
+    description: str = ""
+    status: str
+    severity: str
+    affected_services: list[str] = Field(default_factory=list)
+    updates: list[IncidentUpdateModel] = Field(default_factory=list)
+    created_at: str
+    updated_at: str
+    resolved_at: str | None = None
+    created_by: str = "system"
+
+
+class IncidentListResponse(CamelCaseModel):
+    """List of incidents."""
+
+    incidents: list[IncidentModel] = Field(default_factory=list)
+    total: int = 0
+
+
+class CreateIncidentRequest(CamelCaseModel):
+    """Request body for creating an incident."""
+
+    title: str
+    description: str = ""
+    severity: str = "minor"
+    affected_services: list[str] = Field(default_factory=list)
+
+
+class AddIncidentUpdateRequest(CamelCaseModel):
+    """Request body for adding an update to an incident."""
+
+    status: str
+    message: str
+
+
+# ---------------------------------------------------------------------------
+# HV-5: Incident Management — endpoints
+# ---------------------------------------------------------------------------
+
+
+def _incident_to_model(doc: dict[str, Any]) -> IncidentModel:
+    """Convert a Cosmos incident document to an API model."""
+    updates = [
+        IncidentUpdateModel(
+            timestamp=u.get("timestamp", ""),
+            status=u.get("status", ""),
+            message=u.get("message", ""),
+            author=u.get("author", "system"),
+        )
+        for u in doc.get("updates", [])
+    ]
+    return IncidentModel(
+        incident_id=doc.get("incident_id", ""),
+        title=doc.get("title", ""),
+        description=doc.get("description", ""),
+        status=doc.get("status", "investigating"),
+        severity=doc.get("severity", "minor"),
+        affected_services=doc.get("affected_services", []),
+        updates=updates,
+        created_at=doc.get("created_at", ""),
+        updated_at=doc.get("updated_at", ""),
+        resolved_at=doc.get("resolved_at"),
+        created_by=doc.get("created_by", "system"),
+    )
+
+
+@router.get(
+    "/incidents",
+    response_model=IncidentListResponse,
+    summary="List incidents",
+    description="List all incidents (active first, then resolved).",
+    status_code=200,
+)
+async def list_incidents(
+    _ctx: TenantContext = Depends(require_role(TeamMemberRole.SUPERADMIN)),
+    limit: int = Query(50, ge=1, le=200, description="Max incidents to return"),
+) -> IncidentListResponse:
+    """List all incidents."""
+    if _incident_repo is None:
+        raise HTTPException(status_code=503, detail="Incident service not configured")
+
+    docs = await _incident_repo.list_all(limit=limit)
+    incidents = [_incident_to_model(d) for d in docs]
+    return IncidentListResponse(incidents=incidents, total=len(incidents))
+
+
+@router.post(
+    "/incidents",
+    response_model=IncidentModel,
+    summary="Create a new incident",
+    status_code=201,
+)
+async def create_incident(
+    body: CreateIncidentRequest,
+    ctx: TenantContext = Depends(require_role(TeamMemberRole.SUPERADMIN)),
+) -> IncidentModel:
+    """Create a new incident."""
+    if _incident_repo is None:
+        raise HTTPException(status_code=503, detail="Incident service not configured")
+
+    created_by = ctx.team_member.get("email", "superadmin") if ctx.team_member else "superadmin"
+    doc = await _incident_repo.create_incident(
+        title=body.title,
+        description=body.description,
+        severity=body.severity,
+        affected_services=body.affected_services,
+        created_by=created_by,
+    )
+    return _incident_to_model(doc)
+
+
+@router.get(
+    "/incidents/{incident_id}",
+    response_model=IncidentModel,
+    summary="Get a single incident",
+    status_code=200,
+)
+async def get_incident(
+    incident_id: str,
+    _ctx: TenantContext = Depends(require_role(TeamMemberRole.SUPERADMIN)),
+) -> IncidentModel:
+    """Get a single incident by ID."""
+    if _incident_repo is None:
+        raise HTTPException(status_code=503, detail="Incident service not configured")
+
+    doc = await _incident_repo.find_incident(incident_id)
+    if doc is None:
+        raise HTTPException(status_code=404, detail="Incident not found")
+    return _incident_to_model(doc)
+
+
+@router.post(
+    "/incidents/{incident_id}/update",
+    response_model=IncidentModel,
+    summary="Add status update to an incident",
+    status_code=200,
+)
+async def add_incident_update(
+    incident_id: str,
+    body: AddIncidentUpdateRequest,
+    ctx: TenantContext = Depends(require_role(TeamMemberRole.SUPERADMIN)),
+) -> IncidentModel:
+    """Add a status update to an incident."""
+    if _incident_repo is None:
+        raise HTTPException(status_code=503, detail="Incident service not configured")
+
+    # Find existing incident
+    existing = await _incident_repo.find_incident(incident_id)
+    if existing is None:
+        raise HTTPException(status_code=404, detail="Incident not found")
+
+    author = ctx.team_member.get("email", "superadmin") if ctx.team_member else "superadmin"
+    doc = await _incident_repo.add_update(
+        incident_id=incident_id,
+        current_status=existing["status"],
+        new_status=body.status,
+        message=body.message,
+        author=author,
+    )
+    if doc is None:
+        raise HTTPException(status_code=500, detail="Failed to update incident")
+    return _incident_to_model(doc)
+
+
+@router.post(
+    "/incidents/{incident_id}/resolve",
+    response_model=IncidentModel,
+    summary="Resolve an incident",
+    status_code=200,
+)
+async def resolve_incident(
+    incident_id: str,
+    message: str = Body("Incident resolved", embed=True),
+    ctx: TenantContext = Depends(require_role(TeamMemberRole.SUPERADMIN)),
+) -> IncidentModel:
+    """Mark an incident as resolved."""
+    if _incident_repo is None:
+        raise HTTPException(status_code=503, detail="Incident service not configured")
+
+    existing = await _incident_repo.find_incident(incident_id)
+    if existing is None:
+        raise HTTPException(status_code=404, detail="Incident not found")
+
+    if existing["status"] == "resolved":
+        raise HTTPException(status_code=400, detail="Incident is already resolved")
+
+    author = ctx.team_member.get("email", "superadmin") if ctx.team_member else "superadmin"
+    doc = await _incident_repo.resolve_incident(
+        incident_id=incident_id,
+        current_status=existing["status"],
+        message=message,
+        author=author,
+    )
+    if doc is None:
+        raise HTTPException(status_code=500, detail="Failed to resolve incident")
+    return _incident_to_model(doc)
+
+
+# ---------------------------------------------------------------------------
+# RB-4: Alert Rules — response models
+# ---------------------------------------------------------------------------
+
+
+class AlertConditionModel(CamelCaseModel):
+    """Condition for an alert rule."""
+
+    metric: str = ""
+    operator: str = "gt"
+    threshold: float = 0
+
+
+class AlertRuleModel(CamelCaseModel):
+    """Alert rule for API response."""
+
+    rule_id: str
+    rule_type: str
+    name: str
+    description: str = ""
+    enabled: bool = True
+    condition: AlertConditionModel = Field(default_factory=AlertConditionModel)
+    notification_channels: list[str] = Field(default_factory=list)
+    cooldown_minutes: int = 60
+    runbook_url: str = ""
+    created_at: str = ""
+    updated_at: str = ""
+
+
+class AlertRuleListResponse(CamelCaseModel):
+    """List of alert rules."""
+
+    rules: list[AlertRuleModel] = Field(default_factory=list)
+    total: int = 0
+
+
+class CreateAlertRuleRequest(CamelCaseModel):
+    """Request body for creating an alert rule."""
+
+    name: str
+    rule_type: str
+    description: str = ""
+    condition: AlertConditionModel = Field(default_factory=AlertConditionModel)
+    notification_channels: list[str] = Field(default_factory=list)
+    cooldown_minutes: int = 60
+    runbook_url: str = ""
+
+
+class UpdateAlertRuleRequest(CamelCaseModel):
+    """Request body for updating an alert rule."""
+
+    name: str | None = None
+    description: str | None = None
+    enabled: bool | None = None
+    condition: AlertConditionModel | None = None
+    notification_channels: list[str] | None = None
+    cooldown_minutes: int | None = None
+    runbook_url: str | None = None
+
+
+class AlertHistoryItemModel(CamelCaseModel):
+    """Single alert history entry."""
+
+    alert_id: str = ""
+    alert_date: str = ""
+    rule_id: str = ""
+    rule_name: str = ""
+    rule_type: str = ""
+    triggered_at: str = ""
+    resolved_at: str | None = None
+    severity: str = "warning"
+    message: str = ""
+    metric_value: float = 0
+    threshold_value: float = 0
+    acknowledged: bool = False
+    acknowledged_by: str | None = None
+
+
+class AlertHistoryResponse(CamelCaseModel):
+    """Alert history response."""
+
+    alerts: list[AlertHistoryItemModel] = Field(default_factory=list)
+    total: int = 0
+
+
+# ---------------------------------------------------------------------------
+# RB-5: MFA/TOTP — models
+# ---------------------------------------------------------------------------
+
+
+class MfaStatusResponse(CamelCaseModel):
+    """MFA enrollment status for the current user."""
+
+    mfa_enabled: bool = False
+    enrolled_at: str | None = None
+    backup_codes_remaining: int = 0
+
+
+class MfaEnrollResponse(CamelCaseModel):
+    """MFA enrollment response with QR code and backup codes."""
+
+    qr_code_data_url: str
+    provisioning_uri: str
+    backup_codes: list[str] = Field(default_factory=list)
+    backup_code_hashes: list[str] = Field(default_factory=list)
+
+
+class MfaConfirmRequest(CamelCaseModel):
+    """Confirm MFA enrollment with the first TOTP code."""
+
+    code: str
+    backup_code_hashes: list[str] = Field(default_factory=list)
+
+
+class MfaVerifyRequest(CamelCaseModel):
+    """Verify TOTP code at login time."""
+
+    code: str
+
+
+class MfaVerifyResponse(CamelCaseModel):
+    """MFA verification response with session token."""
+
+    mfa_token: str
+    backup_codes_remaining: int | None = None
+
+
+class MfaDisableRequest(CamelCaseModel):
+    """Disable MFA (requires valid TOTP code)."""
+
+    code: str
+
+
+# ---------------------------------------------------------------------------
+# RB-4: Alert Rules — endpoints
+# ---------------------------------------------------------------------------
+
+
+def _rule_to_model(doc: dict[str, Any]) -> AlertRuleModel:
+    """Convert a Cosmos alert rule document to an API model."""
+    cond = doc.get("condition", {})
+    return AlertRuleModel(
+        rule_id=doc.get("rule_id", ""),
+        rule_type=doc.get("rule_type", ""),
+        name=doc.get("name", ""),
+        description=doc.get("description", ""),
+        enabled=doc.get("enabled", True),
+        condition=AlertConditionModel(
+            metric=cond.get("metric", ""),
+            operator=cond.get("operator", "gt"),
+            threshold=cond.get("threshold", 0),
+        ),
+        notification_channels=doc.get("notification_channels", []),
+        cooldown_minutes=doc.get("cooldown_minutes", 60),
+        runbook_url=doc.get("runbook_url", ""),
+        created_at=doc.get("created_at", ""),
+        updated_at=doc.get("updated_at", ""),
+    )
+
+
+def _history_to_model(doc: dict[str, Any]) -> AlertHistoryItemModel:
+    """Convert a Cosmos alert history document to an API model."""
+    return AlertHistoryItemModel(
+        alert_id=doc.get("id", ""),
+        alert_date=doc.get("alert_date", ""),
+        rule_id=doc.get("rule_id", ""),
+        rule_name=doc.get("rule_name", ""),
+        rule_type=doc.get("rule_type", ""),
+        triggered_at=doc.get("triggered_at", ""),
+        resolved_at=doc.get("resolved_at"),
+        severity=doc.get("severity", "warning"),
+        message=doc.get("message", ""),
+        metric_value=doc.get("metric_value", 0),
+        threshold_value=doc.get("threshold_value", 0),
+        acknowledged=doc.get("acknowledged", False),
+        acknowledged_by=doc.get("acknowledged_by"),
+    )
+
+
+@router.get(
+    "/alerts/rules",
+    response_model=AlertRuleListResponse,
+    summary="List alert rules",
+    status_code=200,
+)
+async def list_alert_rules(
+    _ctx: TenantContext = Depends(require_role(TeamMemberRole.SUPERADMIN)),
+) -> AlertRuleListResponse:
+    """List all alert rules."""
+    if _alert_rule_repo is None:
+        raise HTTPException(status_code=503, detail="Alert service not configured")
+
+    docs = await _alert_rule_repo.list_all()
+    rules = [_rule_to_model(d) for d in docs]
+    return AlertRuleListResponse(rules=rules, total=len(rules))
+
+
+@router.post(
+    "/alerts/rules",
+    response_model=AlertRuleModel,
+    summary="Create alert rule",
+    status_code=201,
+)
+async def create_alert_rule(
+    body: CreateAlertRuleRequest,
+    _ctx: TenantContext = Depends(require_role(TeamMemberRole.SUPERADMIN)),
+) -> AlertRuleModel:
+    """Create a new alert rule."""
+    if _alert_rule_repo is None:
+        raise HTTPException(status_code=503, detail="Alert service not configured")
+
+    doc = await _alert_rule_repo.create_rule(
+        name=body.name,
+        rule_type=body.rule_type,
+        description=body.description,
+        condition=body.condition.model_dump() if body.condition else None,
+        notification_channels=body.notification_channels,
+        cooldown_minutes=body.cooldown_minutes,
+        runbook_url=body.runbook_url,
+    )
+    return _rule_to_model(doc)
+
+
+@router.put(
+    "/alerts/rules/{rule_id}",
+    response_model=AlertRuleModel,
+    summary="Update alert rule",
+    status_code=200,
+)
+async def update_alert_rule(
+    rule_id: str,
+    body: UpdateAlertRuleRequest,
+    _ctx: TenantContext = Depends(require_role(TeamMemberRole.SUPERADMIN)),
+) -> AlertRuleModel:
+    """Update an existing alert rule."""
+    if _alert_rule_repo is None:
+        raise HTTPException(status_code=503, detail="Alert service not configured")
+
+    # Find the rule first to get the rule_type (partition key)
+    existing = await _alert_rule_repo.find_rule(rule_id)
+    if existing is None:
+        raise HTTPException(status_code=404, detail="Alert rule not found")
+
+    updates: dict[str, Any] = {}
+    if body.name is not None:
+        updates["name"] = body.name
+    if body.description is not None:
+        updates["description"] = body.description
+    if body.enabled is not None:
+        updates["enabled"] = body.enabled
+    if body.condition is not None:
+        updates["condition"] = body.condition.model_dump()
+    if body.notification_channels is not None:
+        updates["notification_channels"] = body.notification_channels
+    if body.cooldown_minutes is not None:
+        updates["cooldown_minutes"] = body.cooldown_minutes
+    if body.runbook_url is not None:
+        updates["runbook_url"] = body.runbook_url
+
+    if not updates:
+        return _rule_to_model(existing)
+
+    doc = await _alert_rule_repo.update_rule(
+        rule_id=rule_id,
+        rule_type=existing["rule_type"],
+        updates=updates,
+    )
+    if doc is None:
+        raise HTTPException(status_code=404, detail="Alert rule not found")
+    return _rule_to_model(doc)
+
+
+@router.delete(
+    "/alerts/rules/{rule_id}",
+    summary="Delete alert rule",
+    status_code=200,
+)
+async def delete_alert_rule(
+    rule_id: str,
+    _ctx: TenantContext = Depends(require_role(TeamMemberRole.SUPERADMIN)),
+) -> dict[str, Any]:
+    """Delete an alert rule."""
+    if _alert_rule_repo is None:
+        raise HTTPException(status_code=503, detail="Alert service not configured")
+
+    existing = await _alert_rule_repo.find_rule(rule_id)
+    if existing is None:
+        raise HTTPException(status_code=404, detail="Alert rule not found")
+
+    deleted = await _alert_rule_repo.delete_rule(
+        rule_id=rule_id,
+        rule_type=existing["rule_type"],
+    )
+    if not deleted:
+        raise HTTPException(status_code=404, detail="Alert rule not found")
+    return {"deleted": True, "rule_id": rule_id}
+
+
+# ---------------------------------------------------------------------------
+# RB-4: Alert History — endpoints
+# ---------------------------------------------------------------------------
+
+
+@router.get(
+    "/alerts/history",
+    response_model=AlertHistoryResponse,
+    summary="Alert firing history",
+    status_code=200,
+)
+async def alert_history(
+    _ctx: TenantContext = Depends(require_role(TeamMemberRole.SUPERADMIN)),
+    days: int = Query(7, ge=1, le=90, description="Days of history"),
+    limit: int = Query(100, ge=1, le=500, description="Max alerts to return"),
+) -> AlertHistoryResponse:
+    """List recent alert history."""
+    if _alert_history_repo is None:
+        raise HTTPException(status_code=503, detail="Alert service not configured")
+
+    docs = await _alert_history_repo.list_recent(days=days, limit=limit)
+    alerts = [_history_to_model(d) for d in docs]
+    return AlertHistoryResponse(alerts=alerts, total=len(alerts))
+
+
+@router.post(
+    "/alerts/history/{alert_id}/acknowledge",
+    response_model=AlertHistoryItemModel,
+    summary="Acknowledge an alert",
+    status_code=200,
+)
+async def acknowledge_alert(
+    alert_id: str,
+    alert_date: str = Query(..., description="Alert date (YYYY-MM-DD partition key)"),
+    ctx: TenantContext = Depends(require_role(TeamMemberRole.SUPERADMIN)),
+) -> AlertHistoryItemModel:
+    """Acknowledge an alert firing event."""
+    if _alert_history_repo is None:
+        raise HTTPException(status_code=503, detail="Alert service not configured")
+
+    ack_by = ctx.team_member.get("email", "superadmin") if ctx.team_member else "superadmin"
+    doc = await _alert_history_repo.acknowledge(
+        alert_id=alert_id,
+        alert_date=alert_date,
+        acknowledged_by=ack_by,
+    )
+    if doc is None:
+        raise HTTPException(status_code=404, detail="Alert not found")
+    return _history_to_model(doc)
+
+
+@router.post(
+    "/alerts/evaluate",
+    summary="Force evaluate all alert rules",
+    status_code=200,
+)
+async def evaluate_alerts(
+    _ctx: TenantContext = Depends(require_role(TeamMemberRole.SUPERADMIN)),
+) -> dict[str, Any]:
+    """Manually trigger evaluation of all enabled alert rules."""
+    try:
+        from src.multi_tenant.alert_engine import get_alert_engine
+
+        engine = get_alert_engine()
+        result = await engine.evaluate_all()
+        return {"evaluated": True, **result}
+    except ImportError:
+        return {"evaluated": False, "message": "Alert engine not yet implemented"}
+    except Exception as exc:
+        logger.warning("Alert evaluation failed: %s", exc)
+        return {"evaluated": False, "message": str(exc)}
+
+
+# ---------------------------------------------------------------------------
+# RB-5: MFA/TOTP — endpoints
+# ---------------------------------------------------------------------------
+
+
+def _get_mfa_svc():
+    """Lazy import to avoid circular dependencies at module load time."""
+    from src.multi_tenant.mfa_totp import get_mfa_service
+
+    return get_mfa_service()
+
+
+@router.get(
+    "/mfa/status",
+    response_model=MfaStatusResponse,
+    summary="MFA enrollment status",
+    status_code=200,
+)
+async def mfa_status(
+    ctx: TenantContext = Depends(require_role(TeamMemberRole.SUPERADMIN)),
+) -> MfaStatusResponse:
+    """Get MFA enrollment status for the current authenticated user."""
+    if ctx.team_member is None:
+        raise HTTPException(status_code=401, detail="No authenticated team member")
+
+    try:
+        svc = _get_mfa_svc()
+    except RuntimeError:
+        raise HTTPException(status_code=503, detail="MFA service not configured")
+
+    status = await svc.get_enrollment_status(ctx.team_member)
+    return MfaStatusResponse(
+        mfa_enabled=status["mfa_enabled"],
+        enrolled_at=status.get("enrolled_at"),
+        backup_codes_remaining=status.get("backup_codes_remaining", 0),
+    )
+
+
+@router.post(
+    "/mfa/enroll",
+    response_model=MfaEnrollResponse,
+    summary="Start MFA enrollment",
+    status_code=200,
+)
+async def mfa_enroll(
+    ctx: TenantContext = Depends(require_role(TeamMemberRole.SUPERADMIN)),
+) -> MfaEnrollResponse:
+    """Start MFA enrollment — generates TOTP secret, QR code, and backup codes.
+
+    The secret is stored in Key Vault immediately. Enrollment is not
+    confirmed until the user provides their first valid TOTP code via
+    the ``/mfa/confirm`` endpoint.
+    """
+    if ctx.team_member is None:
+        raise HTTPException(status_code=401, detail="No authenticated team member")
+
+    if ctx.team_member.get("mfa_enabled", False):
+        raise HTTPException(status_code=409, detail="MFA is already enabled")
+
+    try:
+        svc = _get_mfa_svc()
+    except RuntimeError:
+        raise HTTPException(status_code=503, detail="MFA service not configured")
+
+    result = await svc.start_enrollment(ctx.team_member)
+    return MfaEnrollResponse(
+        qr_code_data_url=result["qr_code_data_url"],
+        provisioning_uri=result["provisioning_uri"],
+        backup_codes=result["backup_codes"],
+        backup_code_hashes=result["backup_code_hashes"],
+    )
+
+
+@router.post(
+    "/mfa/confirm",
+    summary="Confirm MFA enrollment",
+    status_code=200,
+)
+async def mfa_confirm(
+    body: MfaConfirmRequest = Body(...),
+    ctx: TenantContext = Depends(require_role(TeamMemberRole.SUPERADMIN)),
+) -> dict[str, Any]:
+    """Confirm MFA enrollment with the first valid TOTP code.
+
+    After this succeeds, MFA is required for all subsequent logins.
+    """
+    if ctx.team_member is None:
+        raise HTTPException(status_code=401, detail="No authenticated team member")
+
+    try:
+        svc = _get_mfa_svc()
+    except RuntimeError:
+        raise HTTPException(status_code=503, detail="MFA service not configured")
+
+    confirmed = await svc.confirm_enrollment(
+        member=ctx.team_member,
+        code=body.code,
+        backup_code_hashes=body.backup_code_hashes,
+    )
+    if not confirmed:
+        raise HTTPException(status_code=400, detail="Invalid TOTP code")
+
+    return {"confirmed": True, "message": "MFA enrollment confirmed"}
+
+
+@router.post(
+    "/mfa/verify",
+    response_model=MfaVerifyResponse,
+    summary="Verify TOTP code at login",
+    status_code=200,
+)
+async def mfa_verify(
+    body: MfaVerifyRequest = Body(...),
+    ctx: TenantContext = Depends(require_role(TeamMemberRole.SUPERADMIN)),
+) -> MfaVerifyResponse:
+    """Verify a TOTP code at login time and return an MFA session token.
+
+    The returned token should be included in subsequent requests as
+    the ``X-MFA-Token`` header.
+    """
+    if ctx.team_member is None:
+        raise HTTPException(status_code=401, detail="No authenticated team member")
+
+    if not ctx.team_member.get("mfa_enabled", False):
+        raise HTTPException(status_code=400, detail="MFA is not enabled for this user")
+
+    try:
+        svc = _get_mfa_svc()
+    except RuntimeError:
+        raise HTTPException(status_code=503, detail="MFA service not configured")
+
+    result = await svc.verify_code(ctx.team_member, body.code)
+    if result is None:
+        raise HTTPException(status_code=401, detail="Invalid TOTP code")
+
+    return MfaVerifyResponse(mfa_token=result["mfa_token"])
+
+
+@router.post(
+    "/mfa/disable",
+    summary="Disable MFA",
+    status_code=200,
+)
+async def mfa_disable(
+    body: MfaDisableRequest = Body(...),
+    ctx: TenantContext = Depends(require_role(TeamMemberRole.SUPERADMIN)),
+) -> dict[str, Any]:
+    """Disable MFA for the current user. Requires a valid TOTP code."""
+    if ctx.team_member is None:
+        raise HTTPException(status_code=401, detail="No authenticated team member")
+
+    if not ctx.team_member.get("mfa_enabled", False):
+        raise HTTPException(status_code=400, detail="MFA is not enabled")
+
+    try:
+        svc = _get_mfa_svc()
+    except RuntimeError:
+        raise HTTPException(status_code=503, detail="MFA service not configured")
+
+    disabled = await svc.disable_mfa(ctx.team_member, body.code)
+    if not disabled:
+        raise HTTPException(status_code=400, detail="Invalid TOTP code")
+
+    return {"disabled": True, "message": "MFA has been disabled"}
+
+
+@router.post(
+    "/mfa/backup-verify",
+    response_model=MfaVerifyResponse,
+    summary="Verify backup code at login",
+    status_code=200,
+)
+async def mfa_backup_verify(
+    body: MfaVerifyRequest = Body(...),
+    ctx: TenantContext = Depends(require_role(TeamMemberRole.SUPERADMIN)),
+) -> MfaVerifyResponse:
+    """Verify a backup code at login time. The backup code is consumed.
+
+    Returns an MFA session token and the number of remaining backup codes.
+    """
+    if ctx.team_member is None:
+        raise HTTPException(status_code=401, detail="No authenticated team member")
+
+    if not ctx.team_member.get("mfa_enabled", False):
+        raise HTTPException(status_code=400, detail="MFA is not enabled for this user")
+
+    try:
+        svc = _get_mfa_svc()
+    except RuntimeError:
+        raise HTTPException(status_code=503, detail="MFA service not configured")
+
+    result = await svc.verify_backup(ctx.team_member, body.code)
+    if result is None:
+        raise HTTPException(status_code=401, detail="Invalid backup code")
+
+    return MfaVerifyResponse(
+        mfa_token=result["mfa_token"],
+        backup_codes_remaining=result.get("backup_codes_remaining"),
     )

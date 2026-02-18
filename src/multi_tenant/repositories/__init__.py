@@ -37,6 +37,8 @@ from src.multi_tenant.repositories.platform import (
 )
 from src.multi_tenant.repositories.sla_snapshots import SLASnapshotRepository
 from src.multi_tenant.repositories.verification import VerificationTokenRepository
+from src.multi_tenant.repositories.incidents import IncidentRepository
+from src.multi_tenant.repositories.alerts import AlertRuleRepository, AlertHistoryRepository
 
 __all__ = [
     # Exceptions
@@ -60,4 +62,7 @@ __all__ = [
     "AuditLogRepository",
     "SLASnapshotRepository",
     "VerificationTokenRepository",
+    "IncidentRepository",
+    "AlertRuleRepository",
+    "AlertHistoryRepository",
 ]
