@@ -17,8 +17,12 @@
     "sourceMap": true,
     "resolveJsonModule": true,
     "isolatedModules": true,
+    "baseUrl": ".",
     "paths": {
-      "@shared/*": ["../shared/*"]
+      "@shared/*": ["../shared/*"],
+      "@mantine/core": ["./node_modules/@mantine/core"],
+      "@mantine/hooks": ["./node_modules/@mantine/hooks"],
+      "@mantine/notifications": ["./node_modules/@mantine/notifications"]
     }
   },
   "include": [

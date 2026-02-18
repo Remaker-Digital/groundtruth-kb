@@ -17,6 +17,7 @@ export default defineConfig({
     alias: {
       '@shared': resolve(__dirname, '../shared'),
     },
+    dedupe: ['@mantine/core', '@mantine/hooks', '@mantine/notifications', 'react', 'react-dom'],
   },
   base: '/admin/provider/',
   build: {

@@ -18,6 +18,8 @@ export default defineConfig({
     alias: {
       '@shared': resolve(__dirname, '../shared'),
     },
+    // Ensure imports from admin/shared/ resolve deps from this project's node_modules
+    dedupe: ['@mantine/core', '@mantine/hooks', '@mantine/notifications', 'react', 'react-dom'],
   },
   base: '/admin/standalone/',
   build: {
