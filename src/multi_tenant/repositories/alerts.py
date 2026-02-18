@@ -99,7 +99,6 @@ class AlertRuleRepository:
         items = self._container.query_items(
             query=query,
             parameters=params,
-            enable_cross_partition_query=True,
         )
         async for item in items:
             return item
@@ -111,7 +110,6 @@ class AlertRuleRepository:
         items = self._container.query_items(
             query=query,
             parameters=[],
-            enable_cross_partition_query=True,
         )
         results: list[dict[str, Any]] = []
         async for item in items:
@@ -124,7 +122,6 @@ class AlertRuleRepository:
         items = self._container.query_items(
             query=query,
             parameters=[],
-            enable_cross_partition_query=True,
         )
         results: list[dict[str, Any]] = []
         async for item in items:
@@ -233,7 +230,6 @@ class AlertHistoryRepository:
         items = self._container.query_items(
             query=query,
             parameters=params,
-            enable_cross_partition_query=True,
         )
         results: list[dict[str, Any]] = []
         async for item in items:
@@ -271,7 +267,6 @@ class AlertHistoryRepository:
         items = self._container.query_items(
             query=query,
             parameters=params,
-            enable_cross_partition_query=True,
         )
         async for item in items:
             return item

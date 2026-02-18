@@ -103,10 +103,10 @@ class IncidentRepository:
         """
         query = "SELECT * FROM c WHERE c.incident_id = @iid"
         params = [{"name": "@iid", "value": incident_id}]
+        # Omit partition_key to enable cross-partition query (SDK 4.14+).
         items = self._container.query_items(
             query=query,
             parameters=params,
-            enable_cross_partition_query=True,
         )
         async for item in items:
             return item
@@ -138,10 +138,10 @@ class IncidentRepository:
         """List all incidents (cross-partition), most recent first."""
         query = "SELECT * FROM c ORDER BY c.created_at DESC OFFSET 0 LIMIT @limit"
         params = [{"name": "@limit", "value": limit}]
+        # Omit partition_key to enable cross-partition query (SDK 4.14+).
         items = self._container.query_items(
             query=query,
             parameters=params,
-            enable_cross_partition_query=True,
         )
         results: list[dict[str, Any]] = []
         async for item in items:
