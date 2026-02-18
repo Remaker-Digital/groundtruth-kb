@@ -183,12 +183,12 @@ Some procedures are short enough to define inline rather than in separate files.
 ```
 PROCEDURE: Run Unit Test Suite
 TYPE: Repeatable Procedure
-LAST VERIFIED: 2026-02-17
-LAST CORRECTED: 2026-02-17 — Updated EXPECTED_MIN_PASS (2500→2400), added --ignore flags for consistency, updated counts (S31)
+LAST VERIFIED: 2026-02-18
+LAST CORRECTED: 2026-02-18 — Updated EXPECTED_MIN_PASS (2400→4000), updated postcondition counts (S45)
 
 VARIABLES:
   PROJECT_ROOT = E:\Claude-Playground\CLAUDE-PROJECTS\Agent Red Customer Engagement
-  EXPECTED_MIN_PASS = 2400
+  EXPECTED_MIN_PASS = 4000
   EXPECTED_MAX_SKIP = 10
   EXPECTED_FAILURES = 0
 
@@ -207,8 +207,8 @@ STEPS:
 
 POSTCONDITIONS:
   [ ] All tests passed (0 failures)
-  [ ] Pass count >= $EXPECTED_MIN_PASS (currently 2,646 unit-only as of session 37)
-  [ ] Skip count <= $EXPECTED_MAX_SKIP (currently 6)
+  [ ] Pass count >= $EXPECTED_MIN_PASS (currently 4,159 unit-only as of session 44)
+  [ ] Skip count <= $EXPECTED_MAX_SKIP (currently 5)
 
 KNOWN FAILURE MODES:
   | Failure | Classification | Resolution |
@@ -265,7 +265,7 @@ VARIABLES:
   WIDGET_KEY         = (from .env.local PREVIEW_WIDGET_KEY; rotates on every re-seed)
   AGENTRED_API_KEY   = (superadmin user API key — must match .env.local SUPERADMIN_PREVIEW_API_KEY; rotates on every re-seed)
   TIER0_COUNT        = 17
-  TIER1_COUNT        = 20
+  TIER1_COUNT        = 28
   TIER2_COUNT        = 10
 
 PRECONDITIONS:

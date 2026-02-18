@@ -1,7 +1,7 @@
 ﻿# upgrade.ps1 — Non-disruptive production upgrade for Agent Red API Gateway
 # Type: Repeatable Procedure (see docs/operations/REPEATABLE-PROCEDURES.md)
 # Last verified: 2026-02-14
-# Last corrected: 2026-02-14 — Fixed ACR name reference in prerequisites comment
+# Last corrected: 2026-02-18 — Added provider admin dist to build context and freshness checks (S45)
 #
 # © 2026 Remaker Digital, a DBA of VanDusen & Palmeter, LLC. All rights reserved.
 #
@@ -12,7 +12,7 @@
 #   - Azure CLI authenticated (az login)
 #   - ACR access (az acr login --name acragentredeastus)
 #   - Python 3.12+ with pytest, httpx installed
-#   - Admin UI built: cd admin/standalone && npm run build; cd admin/shopify && npm run build
+#   - Admin UI built: cd admin/standalone && npm run build; cd admin/shopify && npm run build; cd admin/provider && npm run build
 #
 # This script implements a 7-phase non-disruptive upgrade:
 #   Phase 1: Pre-flight checks (health, revision count, credential access)
@@ -173,7 +173,7 @@ try {
 # Verify admin SPA builds exist (required for frontend changes to take effect)
 Log "INFO" "Checking admin SPA build artifacts..."
 $missingDists = @()
-foreach ($spa in @("admin\standalone\dist", "admin\shopify\dist", "widget\dist")) {
+foreach ($spa in @("admin\standalone\dist", "admin\shopify\dist", "admin\provider\dist", "widget\dist")) {
     $distPath = "$PROJECT_ROOT\$spa"
     if (-not (Test-Path $distPath)) {
         $missingDists += $spa
@@ -238,6 +238,13 @@ if ($SkipBuild) {
             Copy-Item -Recurse "$PROJECT_ROOT\admin\shopify\dist" "$BUILD_CONTEXT_DIR\admin\shopify\dist"
         } else {
             Log "WARN" "admin/shopify/dist missing — Shopify embedded admin will not be updated"
+        }
+
+        if (Test-Path "$PROJECT_ROOT\admin\provider\dist") {
+            New-Item -ItemType Directory -Path "$BUILD_CONTEXT_DIR\admin\provider" -Force | Out-Null
+            Copy-Item -Recurse "$PROJECT_ROOT\admin\provider\dist" "$BUILD_CONTEXT_DIR\admin\provider\dist"
+        } else {
+            Log "WARN" "admin/provider/dist missing — Provider SPA will not be updated"
         }
 
         # Widget bundle
@@ -492,5 +499,5 @@ if ($DryRun) {
 # |                                            |                       | Build still completes on ACR. Verify with:                      |
 # |                                            |                       |   az acr task list-runs --registry $ACR --top 1 --output table  |
 # | Resource group not found                   | Procedure defect      | Corrected 2026-02-14: was rg-agentred-eastus, now Agent-Red     |
-# | Admin dist/ missing                        | Procedure defect      | Must run npm run build in admin/standalone and admin/shopify     |
+# | Admin dist/ missing                        | Procedure defect      | Must run npm run build in admin/standalone, admin/shopify, and admin/provider |
 # |                                            |                       | BEFORE running this script. Phase 1 now checks for stale dists. |
