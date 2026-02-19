@@ -1,7 +1,7 @@
 # Chrome-Automated Admin UI Test Procedure
 # Type: Repeatable Procedure (see docs/operations/REPEATABLE-PROCEDURES.md)
-# Last verified: 2026-02-18 (session 47) — smoke test: auth injection + DOM verification + API fetch patterns confirmed on production
-# Last corrected: —
+# Last verified: 2026-02-19 (session 54) — full E2E pass: 770 PASS, 3 SOFT-PASS, 37 SKIP, 0 FAIL
+# Last corrected: 2026-02-19 (session 54) — added test-customer-001 variables, multi-tenant auth injection, tier override sub-procedure
 
 ---
 
@@ -26,6 +26,7 @@ tests using Chrome MCP tools.
 
 ## Variables
 
+### Primary Tenant (remaker-digital-001 — production merchant)
 | Variable | Value |
 |----------|-------|
 | `PROD_BASE` | `https://agent-red-api-gateway.orangeglacier-f566a4e7.eastus.azurecontainerapps.io` |
@@ -36,11 +37,26 @@ tests using Chrome MCP tools.
 | `WIDGET_KEY` | (from .env.local `PREVIEW_WIDGET_KEY`; rotates on every re-seed) |
 | `TENANT_ID` | `remaker-digital-001` |
 
+### Simulated Customer Tenant (test-customer-001 — test data)
+| Variable | Value |
+|----------|-------|
+| `TEST_TENANT_ID` | `test-customer-001` |
+| `TEST_SUPERADMIN_KEY` | (from `logs/test_tenant_credentials.json` `superadmin_key`) |
+| `TEST_WIDGET_KEY` | (from `logs/test_tenant_credentials.json` `widget_key`) |
+| `TEST_TIER` | `starter` (can be changed via tier override endpoint) |
+
+### Tier Override (for tier-gating tests)
+| Variable | Value |
+|----------|-------|
+| `TIER_OVERRIDE_URL` | `$PROD_BASE/api/superadmin/tenants/$TEST_TENANT_ID/tier` |
+| `TIER_OVERRIDE_AUTH` | `$MERCHANT_API_KEY` (requires remaker-digital-001 SUPERADMIN role) |
+
 ---
 
 ## Preconditions
 
 - [ ] **Initialization procedure complete** — `docs/operations/initialization-procedure.md` executed, all 10 post-conditions (I.1-I.10) pass. Do not proceed until initialization is verified.
+- [ ] **Simulated customer tenant exists** — `scripts/create_test_tenant.py --execute` completed, all 8 post-conditions pass. Credentials in `logs/test_tenant_credentials.json`.
 - [ ] **Agent unit test gate** — `python -m pytest tests/agents/ -x -q` all 101 tests pass (0 failures)
 - [ ] **Full unit test suite** — `python -m pytest tests/ --ignore=tests/integration --ignore=tests/regression --ignore=tests/performance -x -q` 4,000+ tests pass (0 failures)
 - [ ] **Chrome MCP tab available** — `tabs_context_mcp` returns tab group with at least one tab
@@ -98,6 +114,53 @@ STEP B.4: Wait and verify authenticated state
   EXPECTED:  Sidebar navigation visible with Health Dashboard, Tenants links.
   VERIFY:    find("Health") or find("Tenants") returns at least one element.
   ON FAIL:   Auth injection failed. Verify $PROVIDER_API_KEY has SUPERADMIN role. Check sessionStorage key name.
+```
+
+### Test Customer Tenant Auth Injection (test-customer-001)
+
+Use this to test data-dependent pages (Team, Inbox, KB, Quick Actions) against the simulated customer tenant.
+
+```
+STEP C.1: Navigate to $STANDALONE_URL
+  ACTION:    navigate($STANDALONE_URL, tabId)
+  EXPECTED:  Login page or existing admin view renders
+
+STEP C.2: Inject test customer API key into sessionStorage
+  ACTION:    javascript_tool(tabId, "sessionStorage.setItem('agentred_api_key', '$TEST_SUPERADMIN_KEY'); 'injected'")
+  EXPECTED:  Returns "injected"
+
+STEP C.3: Reload to trigger auth state with test tenant
+  ACTION:    javascript_tool(tabId, "location.reload(); 'reloading'")
+  EXPECTED:  Page reloads, admin resolves test-customer-001 from API key
+
+STEP C.4: Wait and verify test tenant loaded
+  ACTION:    computer(action:'wait', duration:3, tabId). Then find("Starter", tabId) — tier badge should show Starter (not Professional).
+  EXPECTED:  Header tier badge shows "Starter". Sidebar navigation visible.
+  VERIFY:    find("Starter") returns at least one element.
+  ON FAIL:   Auth injection failed. Verify $TEST_SUPERADMIN_KEY is valid and resolves to test-customer-001.
+```
+
+### Tier Override Sub-Procedure
+
+Use this to test tier-gating UI behavior by cycling through tiers on test-customer-001.
+
+```
+STEP T.1: Override tier to target value
+  ACTION:    javascript_tool(tabId, "fetch('$TIER_OVERRIDE_URL', {method:'PUT', headers:{'X-API-Key':'$MERCHANT_API_KEY','Content-Type':'application/json'}, body:JSON.stringify({tier:'TARGET_TIER'})}).then(r=>r.json())")
+  EXPECTED:  Returns {tenant_id:'test-customer-001', previous_tier:'...', new_tier:'TARGET_TIER', updated_at:'...'}
+
+STEP T.2: Reload page to pick up new tier
+  ACTION:    javascript_tool(tabId, "location.reload(); 'reloading'")
+  EXPECTED:  Page reloads, /api/tenants/lookup returns updated tier → tenantContext.tier updates → tierMeetsMin() re-evaluates
+
+STEP T.3: Verify tier badge change
+  ACTION:    computer(action:'wait', duration:3, tabId). Then find("TARGET_TIER_LABEL", tabId).
+  EXPECTED:  Header tier badge shows updated tier name (Trial/Starter/Professional/Enterprise).
+
+STEP T.RESTORE: Restore tier to starter after testing
+  ACTION:    javascript_tool(tabId, "fetch('$TIER_OVERRIDE_URL', {method:'PUT', headers:{'X-API-Key':'$MERCHANT_API_KEY','Content-Type':'application/json'}, body:JSON.stringify({tier:'starter'})}).then(r=>r.json())")
+  EXPECTED:  Returns {new_tier:'starter'}
+  NOTE:      ALWAYS restore tier after tier-gating tests to avoid leaving test-customer-001 in unexpected state.
 ```
 
 ---

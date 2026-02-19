@@ -15,7 +15,7 @@ This document provides active guidance for AI assistants working on the Agent Re
 |-----------|-------|
 | **Project Name** | Agent Red Customer Experience |
 | **Type** | Commercial SaaS Product (Shopify + Standalone) |
-| **Status** | Production v1.48.0 HEALTHY (revision 0000034). ALL 14 CYCLES DEPLOYED. 4,164 unit tests (0 failures), 56 regression (51 pass + 5 skip), 810 UI tests (expanded from 193 using 8-dimension verification standard). See `memory/build-deploy-roadmap.md`. |
+| **Status** | Production v1.49.2 HEALTHY. ALL 14 CYCLES + SKIP Resolution DEPLOYED. 4,172 unit tests (0 failures), 56 regression (51 pass + 5 skip), 810 UI tests (770 PASS, 3 SOFT-PASS, 37 SKIP, 0 FAIL). See `memory/build-deploy-roadmap.md`. |
 | **Owner** | Remaker Digital (DBA of VanDusen & Palmeter, LLC) |
 
 ### Copyright Notice
@@ -90,12 +90,14 @@ When executing a Repeatable Procedure:
 Active procedures:
 - `scripts/deploy/upgrade.ps1` — Production deployment
 - `scripts/deploy/rollback.ps1` — Production rollback
-- `scripts/seed_tenant.py` — Tenant provisioning
+- `scripts/seed_tenant.py` — Tenant provisioning (single tenant, destructive)
+- `scripts/create_test_tenant.py` — Simulated customer tenant creation (test-customer-001, 8 phases, non-destructive)
 - `docs/operations/initialization-procedure.md` — Tenant initialization (destructive, 10 post-conditions)
 - `docs/operations/upgrade-verification-procedure.md` — Non-disruptive upgrade verification
 - `docs/operations/CATASTROPHIC-RECOVERY-RUNBOOK.md` — Azure environment setup
-- `docs/operations/ui-test-procedure.md` — Admin UI regression tests (780 standalone tests)
+- `docs/operations/ui-test-procedure.md` — Admin UI regression tests (780 standalone tests, authoritative test definitions)
 - `docs/operations/chrome-ui-test-procedure.md` — Chrome MCP-automated UI tests (810 total: 780 standalone + 30 provider)
+- `docs/operations/external-url-reachability-procedure.md` — URL reachability pre-flight (37 URLs)
 - Inline in spec: Unit test suite, Production regression suite
 - `docs/operations/agntcy-platform-adoption-procedure.md` — AGNTCY platform adoption verification
 
@@ -147,5 +149,5 @@ All cycles deployed to production. v1.48.0 is live (revision 0000034, session 46
 ---
 
 *© 2026 Remaker Digital, a DBA of VanDusen & Palmeter, LLC. All rights reserved.*
-*Last Updated: 2026-02-18*
-*Version: 48.0.0*
+*Last Updated: 2026-02-19*
+*Version: 49.2.0*
