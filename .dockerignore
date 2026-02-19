@@ -65,6 +65,7 @@ widget/dev.html
 
 # Admin: exclude everything EXCEPT admin/{shopify,standalone}/dist/ (pre-built SPA assets)
 admin/shared/
+admin/node_modules/
 admin/package.json
 admin/package-lock.json
 # Shopify admin — exclude source, keep dist/
@@ -91,6 +92,19 @@ admin/standalone/login/
 admin/standalone/layouts/
 admin/standalone/pages/
 
+# Provider admin — exclude source, keep dist/
+admin/provider/src/
+admin/provider/node_modules/
+admin/provider/package.json
+admin/provider/package-lock.json
+admin/provider/tsconfig.json
+admin/provider/vite.config.ts
+admin/provider/vite-env.d.ts
+admin/provider/index.html
+admin/provider/index.tsx
+admin/provider/layouts/
+admin/provider/pages/
+
 # Node / frontend tooling
 node_modules/
 package.json
@@ -106,6 +120,15 @@ infrastructure/
 
 # Scripts (setup/deploy tooling, not application code)
 scripts/
+
+# Evaluation datasets (not runtime)
+evaluation/
+
+# Logs (local test artifacts)
+logs/
+
+# Memory (Claude project memory)
+memory/
 
 # Independent assessments
 independent-progress-assments/

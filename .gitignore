@@ -149,6 +149,7 @@ scratch/
 scratchpad/
 temp/
 tmp/
+logs/
 
 # Test fixture binary files (uploaded documents for RAG testing)
 tests/rag-documents-upload/

@@ -179,7 +179,7 @@ const App: React.FC = () => {
   }
 
   return (
-    <MantineProvider theme={agentRedTheme} defaultColorScheme="dark">
+    <>
       <Notifications position="top-right" />
       <BrowserRouter basename="/admin/standalone">
         <StandaloneLayout auth={auth} onLogout={handleLogout}>
@@ -199,7 +199,7 @@ const App: React.FC = () => {
           </Routes>
         </StandaloneLayout>
       </BrowserRouter>
-    </MantineProvider>
+    </>
   );
 };
 
@@ -209,5 +209,9 @@ const App: React.FC = () => {
 
 const root = document.getElementById('app');
 if (root) {
-  createRoot(root).render(<App />);
+  createRoot(root).render(
+    <MantineProvider theme={agentRedTheme} defaultColorScheme="dark">
+      <App />
+    </MantineProvider>,
+  );
 }

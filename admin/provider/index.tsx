@@ -1,8 +1,9 @@
 /**
  * Provider Admin Console — entry point.
  *
- * Platform operator console for managing all tenants, monitoring health,
- * and viewing cross-tenant analytics. Requires SUPERADMIN API key.
+ * Service Provider Administration console for managing all tenants,
+ * monitoring health, and viewing cross-tenant analytics.
+ * Requires Service Provider Administrator (SPA) API key (SUPERADMIN role).
  * Supports optional MFA/TOTP verification after API key login.
  *
  * Architecture:
@@ -134,7 +135,7 @@ const App: React.FC = () => {
   }
 
   return (
-    <MantineProvider theme={agentRedTheme} defaultColorScheme="dark">
+    <>
       <Notifications position="top-right" />
       <BrowserRouter basename="/admin/provider">
         <ProviderLayout apiKey={apiKey} onLogout={handleLogout}>
@@ -162,7 +163,7 @@ const App: React.FC = () => {
           </Routes>
         </ProviderLayout>
       </BrowserRouter>
-    </MantineProvider>
+    </>
   );
 };
 
@@ -172,5 +173,9 @@ const App: React.FC = () => {
 
 const root = document.getElementById('app');
 if (root) {
-  createRoot(root).render(<App />);
+  createRoot(root).render(
+    <MantineProvider theme={agentRedTheme} defaultColorScheme="dark">
+      <App />
+    </MantineProvider>,
+  );
 }

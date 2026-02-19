@@ -15,7 +15,7 @@ This document provides active guidance for AI assistants working on the Agent Re
 |-----------|-------|
 | **Project Name** | Agent Red Customer Experience |
 | **Type** | Commercial SaaS Product (Shopify + Standalone) |
-| **Status** | Production v1.48.0 HEALTHY (revision 0000034). ALL 14 CYCLES DEPLOYED. 4,164 unit tests (0 failures), 56 regression (51 pass + 5 skip), 178 UI tests. See `memory/build-deploy-roadmap.md`. |
+| **Status** | Production v1.48.0 HEALTHY (revision 0000034). ALL 14 CYCLES DEPLOYED. 4,164 unit tests (0 failures), 56 regression (51 pass + 5 skip), 810 UI tests (expanded from 193 using 8-dimension verification standard). See `memory/build-deploy-roadmap.md`. |
 | **Owner** | Remaker Digital (DBA of VanDusen & Palmeter, LLC) |
 
 ### Copyright Notice
@@ -94,7 +94,8 @@ Active procedures:
 - `docs/operations/initialization-procedure.md` — Tenant initialization (destructive, 10 post-conditions)
 - `docs/operations/upgrade-verification-procedure.md` — Non-disruptive upgrade verification
 - `docs/operations/CATASTROPHIC-RECOVERY-RUNBOOK.md` — Azure environment setup
-- `docs/operations/ui-test-procedure.md` — Admin UI regression tests (178 tests)
+- `docs/operations/ui-test-procedure.md` — Admin UI regression tests (780 standalone tests)
+- `docs/operations/chrome-ui-test-procedure.md` — Chrome MCP-automated UI tests (810 total: 780 standalone + 30 provider)
 - Inline in spec: Unit test suite, Production regression suite
 - `docs/operations/agntcy-platform-adoption-procedure.md` — AGNTCY platform adoption verification
 

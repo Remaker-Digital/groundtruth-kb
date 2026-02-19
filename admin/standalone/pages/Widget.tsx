@@ -24,6 +24,7 @@ import {
 } from '@mantine/core';
 import { useAppContext } from '../layouts/StandaloneLayout';
 import { useConfig, useUpdateConfig } from '../../shared/hooks/index';
+import { useAvatarUpload, useDeleteAvatar } from '../../shared/hooks/useAvatar';
 import { HelpTooltip } from '../../shared/HelpTooltip';
 
 const DOCS_BASE = 'https://agentredcx.com/docs/admin-guide';
@@ -659,6 +660,88 @@ function WidgetPreview({ config, adminIsDark }: { config: WidgetConfig; adminIsD
 }
 
 // ---------------------------------------------------------------------------
+// Avatar Drop Zone — compact image upload for agent avatar
+// ---------------------------------------------------------------------------
+
+const AVATAR_ACCEPTED_TYPES = '.png,.jpg,.jpeg';
+const AVATAR_MAX_KB = 256;
+
+interface AvatarDropZoneProps {
+  onFileSelected: (file: File) => void;
+  uploading: boolean;
+  progress: 'idle' | 'uploading' | 'processing' | 'done';
+  error: string | null;
+}
+
+function AvatarDropZone({ onFileSelected, uploading, progress, error }: AvatarDropZoneProps) {
+  const inputRef = React.useRef<HTMLInputElement>(null);
+  const [dragOver, setDragOver] = React.useState(false);
+
+  const handleDrop = React.useCallback(
+    (e: React.DragEvent) => {
+      e.preventDefault();
+      setDragOver(false);
+      if (uploading) return;
+      const file = e.dataTransfer.files?.[0];
+      if (file) onFileSelected(file);
+    },
+    [onFileSelected, uploading],
+  );
+
+  const handleFileChange = React.useCallback(
+    (e: React.ChangeEvent<HTMLInputElement>) => {
+      const file = e.target.files?.[0];
+      if (file) onFileSelected(file);
+      if (inputRef.current) inputRef.current.value = '';
+    },
+    [onFileSelected],
+  );
+
+  const progressLabel =
+    progress === 'uploading' ? 'Uploading...' : progress === 'processing' ? 'Processing...' : '';
+
+  return (
+    <div>
+      <div
+        onDragOver={(e) => { e.preventDefault(); setDragOver(true); }}
+        onDragLeave={() => setDragOver(false)}
+        onDrop={handleDrop}
+        onClick={() => !uploading && inputRef.current?.click()}
+        style={{
+          border: `2px dashed ${dragOver ? '#ff3621' : '#3a3a3a'}`,
+          borderRadius: '8px',
+          padding: '20px 16px',
+          textAlign: 'center' as const,
+          cursor: uploading ? 'default' : 'pointer',
+          backgroundColor: dragOver ? 'rgba(255, 54, 33, 0.03)' : '#1a1a1a',
+          transition: 'all 0.2s ease',
+          opacity: uploading ? 0.7 : 1,
+        }}
+      >
+        <input
+          ref={inputRef}
+          type="file"
+          accept={AVATAR_ACCEPTED_TYPES}
+          onChange={handleFileChange}
+          style={{ display: 'none' }}
+        />
+        {uploading ? (
+          <Text size="sm" fw={500}>{progressLabel}</Text>
+        ) : (
+          <>
+            <Text size="sm" fw={500}>Drop an image or click to browse</Text>
+            <Text size="xs" c="dimmed" mt={2}>PNG or JPEG, max {AVATAR_MAX_KB} KB</Text>
+          </>
+        )}
+      </div>
+      {error && (
+        <Text size="xs" c="red" mt={4}>{error}</Text>
+      )}
+    </div>
+  );
+}
+
+// ---------------------------------------------------------------------------
 // Widget Page Component
 // ---------------------------------------------------------------------------
 
@@ -666,6 +749,8 @@ export function WidgetPage() {
   const { apiFetch, onNotify, refreshActivationStatus } = useAppContext();
   const configResult = useConfig(apiFetch);
   const { updateConfig: saveConfig, loading: saving, error: saveError } = useUpdateConfig(apiFetch);
+  const avatarUpload = useAvatarUpload(apiFetch);
+  const avatarDelete = useDeleteAvatar(apiFetch);
 
   const computedColorScheme = useComputedColorScheme('dark');
   const adminIsDark = computedColorScheme === 'dark';
@@ -1006,18 +1091,15 @@ export function WidgetPage() {
                   onChange={(e) => update('agentDisplayName', e.currentTarget.value)}
                   placeholder="Agent Red"
                 />
-                <TextInput
-                  label="Agent avatar URL"
-                  description="Image URL for the agent avatar in chat. Leave empty for initials fallback."
-                  value={config.agentAvatarUrl}
-                  onChange={(e) => update('agentAvatarUrl', e.currentTarget.value)}
-                  placeholder="https://example.com/avatar.png"
-                />
-                {config.agentAvatarUrl && (
+                <Text size="sm" fw={500}>Agent avatar</Text>
+                <Text size="xs" c="dimmed" mb={4}>
+                  Upload a PNG or JPEG image (max 256 KB). Leave empty for initials fallback.
+                </Text>
+                {config.agentAvatarUrl ? (
                   <Group gap="sm" align="center">
                     <div style={{
-                      width: 36,
-                      height: 36,
+                      width: 48,
+                      height: 48,
                       borderRadius: '50%',
                       overflow: 'hidden',
                       border: '1px solid #272727',
@@ -1030,8 +1112,43 @@ export function WidgetPage() {
                         onError={(e) => { (e.currentTarget as HTMLImageElement).style.display = 'none'; }}
                       />
                     </div>
-                    <Text size="xs" c="dimmed">Avatar preview</Text>
+                    <Stack gap={4}>
+                      <Text size="xs" c="dimmed">Current avatar</Text>
+                      <Button
+                        size="compact-xs"
+                        variant="subtle"
+                        color="red"
+                        loading={avatarDelete.loading}
+                        onClick={async () => {
+                          const result = await avatarDelete.deleteAvatar();
+                          if (result?.success) {
+                            update('agentAvatarUrl', '');
+                            avatarUpload.reset();
+                            onNotify('Avatar removed.', 'success');
+                          } else {
+                            onNotify(avatarDelete.error || 'Failed to remove avatar.', 'error');
+                          }
+                        }}
+                      >
+                        Remove avatar
+                      </Button>
+                    </Stack>
                   </Group>
+                ) : (
+                  <AvatarDropZone
+                    uploading={avatarUpload.loading}
+                    progress={avatarUpload.progress}
+                    error={avatarUpload.error}
+                    onFileSelected={async (file: File) => {
+                      const result = await avatarUpload.upload(file);
+                      if (result?.success && result.avatar_url) {
+                        update('agentAvatarUrl', result.avatar_url);
+                        onNotify('Avatar uploaded.', 'success');
+                      } else {
+                        onNotify(avatarUpload.error || 'Upload failed.', 'error');
+                      }
+                    }}
+                  />
                 )}
               </Stack>
             </Paper>

@@ -168,9 +168,9 @@ export function CostAnalyticsPage() {
       </SimpleGrid>
 
       {/* Tier breakdown */}
-      {Object.keys(data.costByTier).length > 0 && (
+      {Object.keys(data.costByTier ?? {}).length > 0 && (
         <SimpleGrid cols={{ base: 1, sm: 3 }} spacing="md">
-          {Object.entries(data.costByTier).map(([tier, cost]) => (
+          {Object.entries(data.costByTier ?? {}).map(([tier, cost]) => (
             <Card key={tier} withBorder padding="md" radius="md" bg="#1f1f1f">
               <Group justify="space-between">
                 <Text c="dimmed" size="xs" tt="uppercase" fw={600}>{tier}</Text>

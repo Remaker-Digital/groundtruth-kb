@@ -135,11 +135,11 @@ export function SecretPosturePage() {
       </SimpleGrid>
 
       {/* Global type breakdown */}
-      {Object.keys(data.secretsByTypeGlobal).length > 0 && (
+      {Object.keys(data.secretsByTypeGlobal ?? {}).length > 0 && (
         <Paper withBorder radius="md" bg="#1f1f1f" p="md">
           <Text size="sm" fw={500} c="#E0E0E0" mb="sm">Secret Types (Global)</Text>
           <Group gap="sm">
-            {Object.entries(data.secretsByTypeGlobal).map(([type, count]) => (
+            {Object.entries(data.secretsByTypeGlobal ?? {}).map(([type, count]) => (
               <Badge
                 key={type}
                 variant="light"

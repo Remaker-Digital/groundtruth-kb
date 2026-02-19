@@ -190,11 +190,11 @@ export function SLATrendsPage() {
           </Card>
 
           {/* Error budget gauges */}
-          {Object.keys(data.error_budgets).length > 0 && (
+          {Object.keys(data.error_budgets ?? {}).length > 0 && (
             <>
               <Title order={4} c="#E0E0E0">Error Budgets (30-day period)</Title>
               <SimpleGrid cols={{ base: 1, sm: 3 }} spacing="md">
-                {Object.entries(data.error_budgets).map(([tier, budget]) => (
+                {Object.entries(data.error_budgets ?? {}).map(([tier, budget]) => (
                   <Card key={tier} withBorder padding="lg" radius="md" bg="#1f1f1f">
                     <Group justify="space-between" mb="sm">
                       <Text fw={600} size="sm" c="#E0E0E0">{tier}</Text>

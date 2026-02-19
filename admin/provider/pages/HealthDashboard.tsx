@@ -38,7 +38,7 @@ interface DashboardData {
     circuit_breakers: Record<string, unknown>;
     key_vault: { healthy: boolean };
     version: { api: string; product: string };
-  };
+  } | null;
   tenant_summary: {
     total_tenants: number;
     by_status: Record<string, number>;
@@ -114,23 +114,23 @@ export function HealthDashboardPage() {
       <SimpleGrid cols={{ base: 1, sm: 2, md: 4 }} spacing="md">
         <HealthCard
           label="NATS"
-          status={health.nats?.connected ? 'healthy' : 'down'}
-          detail={health.nats?.connected ? 'Connected' : 'Disconnected'}
+          status={health?.nats?.connected ? 'healthy' : 'down'}
+          detail={health?.nats?.connected ? 'Connected' : 'Disconnected'}
         />
         <HealthCard
           label="Key Vault"
-          status={health.key_vault?.healthy ? 'healthy' : 'degraded'}
-          detail={health.key_vault?.healthy ? 'Healthy' : 'Degraded'}
+          status={health?.key_vault?.healthy ? 'healthy' : 'degraded'}
+          detail={health?.key_vault?.healthy ? 'Healthy' : 'Degraded'}
         />
         <HealthCard
           label="API Version"
           status="info"
-          detail={`v${health.version?.product ?? '?'}`}
+          detail={`v${health?.version?.product ?? '?'}`}
         />
         <HealthCard
           label="Circuit Breakers"
-          status={health.circuit_breakers ? 'healthy' : 'unknown'}
-          detail={health.circuit_breakers ? 'Operational' : 'Unknown'}
+          status={health?.circuit_breakers ? 'healthy' : 'unknown'}
+          detail={health?.circuit_breakers ? 'Operational' : 'Unknown'}
         />
       </SimpleGrid>
 
@@ -149,7 +149,7 @@ export function HealthDashboardPage() {
               <Card withBorder padding="lg" radius="md" bg="#1f1f1f">
                 <Text c="dimmed" size="xs" tt="uppercase" fw={600}>By Status</Text>
                 <Group gap="xs" mt="sm">
-                  {Object.entries(tenants.by_status).map(([k, v]) => (
+                  {Object.entries(tenants?.by_status ?? {}).map(([k, v]) => (
                     <Badge key={k} variant="light" color={k === 'active' ? 'green' : 'gray'} size="sm">
                       {k}: {v}
                     </Badge>
@@ -161,7 +161,7 @@ export function HealthDashboardPage() {
               <Card withBorder padding="lg" radius="md" bg="#1f1f1f">
                 <Text c="dimmed" size="xs" tt="uppercase" fw={600}>By Tier</Text>
                 <Group gap="xs" mt="sm">
-                  {Object.entries(tenants.by_tier).map(([k, v]) => (
+                  {Object.entries(tenants?.by_tier ?? {}).map(([k, v]) => (
                     <Badge key={k} variant="light" color="blue" size="sm">
                       {k}: {v}
                     </Badge>
@@ -174,7 +174,7 @@ export function HealthDashboardPage() {
       )}
 
       {/* Recent Deployments */}
-      {data.recent_deployments.length > 0 && (
+      {(data.recent_deployments?.length ?? 0) > 0 && (
         <>
           <Title order={4} c="#E0E0E0">Recent Deployments</Title>
           <Paper withBorder p="md" radius="md" bg="#1f1f1f">

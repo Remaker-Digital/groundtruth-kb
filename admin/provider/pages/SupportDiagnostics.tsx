@@ -305,9 +305,9 @@ export function SupportDiagnosticsPage() {
               <Stack gap="xs">
                 <Group justify="space-between">
                   <Text size="sm" c="#A0A0A0">Members</Text>
-                  <Text size="sm" fw={600} c="#F5F5F5">{data.team.memberCount}</Text>
+                  <Text size="sm" fw={600} c="#F5F5F5">{data.team?.memberCount ?? 0}</Text>
                 </Group>
-                {Object.entries(data.team.rolesBreakdown).map(([role, count]) => (
+                {Object.entries(data.team?.rolesBreakdown ?? {}).map(([role, count]) => (
                   <Group key={role} justify="space-between">
                     <Text size="xs" c="#A0A0A0">{role}</Text>
                     <Text size="xs" c="#E0E0E0">{count}</Text>

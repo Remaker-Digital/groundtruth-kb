@@ -90,6 +90,10 @@ export {
 } from './useAnalytics';
 export type { TestModeFilter, AnalyticsPeriod } from './useAnalytics';
 
+// Avatar
+export { useAvatarUpload, useDeleteAvatar } from './useAvatar';
+export type { AvatarUploadResult, AvatarDeleteResult } from './useAvatar';
+
 // Team + Billing + Integrations
 export {
   useTeamMembers,

@@ -5,7 +5,10 @@
   "description": "Agent Red Customer Experience — Shopify embedded admin (Polaris + App Bridge)",
   "type": "module",
   "scripts": {
+    "sync-env": "powershell -ExecutionPolicy Bypass -File ../../scripts/sync-admin-env.ps1",
+    "predev": "npm run sync-env",
     "dev": "vite",
+    "prebuild": "npm run sync-env",
     "build": "tsc && vite build",
     "preview": "vite preview",
     "typecheck": "tsc --noEmit"

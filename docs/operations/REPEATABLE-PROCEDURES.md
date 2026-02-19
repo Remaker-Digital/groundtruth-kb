@@ -31,9 +31,13 @@ A Repeatable Procedure is **not**:
 | Azure environment setup | `docs/operations/CATASTROPHIC-RECOVERY-RUNBOOK.md` | Active |
 | AGNTCY platform adoption | `docs/operations/agntcy-platform-adoption-procedure.md` | Active |
 | Admin UI lint (a11y) | *(inline — see Section 5)* | Active |
+| External URL reachability | `docs/operations/external-url-reachability-procedure.md` | Active |
+| Chrome-automated UI test | `docs/operations/chrome-ui-test-procedure.md` | Active |
 
 > **Cross-procedure dependencies:**
 > - *Admin UI test* depends on *Tenant initialization*. After initialization, all post-conditions (Steps 2-5) must pass before the UI test pre-flight will pass.
+> - *Chrome-automated UI test* depends on *Tenant initialization* (same dependency as manual UI test). Also depends on *External URL reachability* Group 1 + Group 2 passing.
+> - *External URL reachability* has no initialization dependency — can run as a standalone health check after any deployment.
 > - *Non-disruptive upgrade verification* wraps *Production deployment* with pre/post data integrity checks.
 > - *Tenant initialization* is destructive. Use *Non-disruptive upgrade verification* when existing data must be preserved.
 

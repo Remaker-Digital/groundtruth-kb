@@ -186,9 +186,9 @@ export function AbuseDetectionPage() {
       </SimpleGrid>
 
       {/* Signals by type */}
-      {Object.keys(data.signalsByType).length > 0 && (
+      {Object.keys(data.signalsByType ?? {}).length > 0 && (
         <SimpleGrid cols={{ base: 2, sm: 5 }} spacing="sm">
-          {Object.entries(data.signalsByType).map(([type, count]) => (
+          {Object.entries(data.signalsByType ?? {}).map(([type, count]) => (
             <Card key={type} withBorder padding="sm" radius="md" bg="#1f1f1f">
               <Text c="dimmed" size="xs" fw={600}>
                 {SIGNAL_LABELS[type] ?? type}

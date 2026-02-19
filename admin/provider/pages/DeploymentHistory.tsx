@@ -146,7 +146,7 @@ export function DeploymentHistoryPage() {
                 </Group>
 
                 {/* Payload details */}
-                {Object.keys(evt.payload).length > 0 && (
+                {Object.keys(evt.payload ?? {}).length > 0 && (
                   <Code
                     block
                     style={{

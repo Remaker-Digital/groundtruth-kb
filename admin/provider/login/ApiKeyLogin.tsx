@@ -1,9 +1,12 @@
 /**
- * Provider Admin Login — SUPERADMIN API key authentication.
+ * Provider Admin Login — Service Provider Administrator authentication.
  *
- * Login page where the platform operator enters their SUPERADMIN API key.
+ * Login page where the Service Provider Administrator (SPA) enters their API key.
  * Validates against /api/superadmin/tenants/summary (requires SUPERADMIN role).
  * After validation, checks MFA status — if enabled, signals mfa_required.
+ *
+ * Note: The backend role is "SUPERADMIN" but the user-facing label is
+ * "Service Provider Administration" — internal role names must not leak into UI.
  *
  * Migrated to Mantine components (Cycle 10, item 10e).
  *
@@ -56,7 +59,7 @@ export const ApiKeyLogin: React.FC<ApiKeyLoginProps> = ({ onLogin }) => {
 
         if (!resp.ok) {
           if (resp.status === 401 || resp.status === 403) {
-            setError('Invalid API key or insufficient permissions. SUPERADMIN role required.');
+            setError('Invalid API key or insufficient permissions.');
           } else {
             setError(`Server error (${resp.status}). Please try again later.`);
           }
@@ -104,19 +107,19 @@ export const ApiKeyLogin: React.FC<ApiKeyLoginProps> = ({ onLogin }) => {
             style={{ width: '200px', height: 'auto' }}
           />
           <Text size="sm" c="dimmed">
-            Provider Console
+            Service Provider Administration
           </Text>
         </Stack>
 
         <form onSubmit={handleLogin}>
           <PasswordInput
-            label="SUPERADMIN API key"
-            placeholder="Enter your SUPERADMIN API key"
+            label="API key"
+            placeholder="Enter your API key"
             value={apiKey}
             onChange={(e) => setApiKey(e.currentTarget.value)}
             error={error}
             autoFocus
-            aria-label="SUPERADMIN API key"
+            aria-label="Service Provider API key"
             styles={{
               input: {
                 backgroundColor: '#141414',
@@ -141,9 +144,9 @@ export const ApiKeyLogin: React.FC<ApiKeyLoginProps> = ({ onLogin }) => {
         </form>
 
         <Text size="xs" c="dimmed" ta="center" mt="lg" lh={1.5}>
-          Platform operator access only.
+          Service provider access only.
           <br />
-          Contact your administrator if you need access.
+          Contact your Remaker Digital administrator if you need access.
         </Text>
       </Paper>
     </Center>

@@ -498,6 +498,85 @@ async def tenant_summary(
 
 
 # ---------------------------------------------------------------------------
+# Tier Override — Private support/testing control
+# ---------------------------------------------------------------------------
+
+
+class TierOverrideResponse(CamelCaseModel):
+    """Response after setting a tenant's subscription tier."""
+
+    tenant_id: str
+    previous_tier: str | None = None
+    new_tier: str
+    updated_at: str
+
+
+VALID_TIERS = {t.value for t in TenantTier}
+
+
+@router.put(
+    "/tenants/{tenant_id}/tier",
+    response_model=TierOverrideResponse,
+    summary="Override tenant tier (testing/support use)",
+    description="Directly set a tenant's subscription tier. Intended for testing "
+    "entitlement enforcement and support escalation. Does not interact "
+    "with Stripe — use the billing upgrade flow for customer-facing changes.",
+    responses={
+        400: {"description": "Invalid tier value"},
+        404: {"description": "Tenant not found"},
+        503: {"description": "Service not initialized"},
+    },
+    status_code=200,
+)
+async def override_tenant_tier(
+    tenant_id: str,
+    tier: str = Body(..., embed=True, description="New tier value"),
+    _ctx: TenantContext = Depends(require_role(TeamMemberRole.SUPERADMIN)),
+) -> TierOverrideResponse:
+    """Set a tenant's tier directly, bypassing Stripe."""
+    if not _tenant_repo:
+        raise HTTPException(status_code=503, detail="Service not initialized")
+
+    # Validate tier value
+    if tier not in VALID_TIERS:
+        raise HTTPException(
+            status_code=400,
+            detail=f"Invalid tier '{tier}'. Valid values: {sorted(VALID_TIERS)}",
+        )
+
+    # Read current tenant document
+    try:
+        doc = await _tenant_repo.read(tenant_id, tenant_id)
+    except Exception:
+        raise HTTPException(status_code=404, detail=f"Tenant '{tenant_id}' not found")
+
+    previous_tier = doc.get("tier")
+    now = datetime.now(timezone.utc).isoformat()
+
+    # Patch the tier field
+    operations = [
+        {"op": "set", "path": "/tier", "value": tier},
+        {"op": "set", "path": "/updated_at", "value": now},
+    ]
+    await _tenant_repo.patch(tenant_id, tenant_id, operations)
+
+    logger.info(
+        "Tier override: tenant=%s %s -> %s (by %s)",
+        tenant_id[:12],
+        previous_tier or "none",
+        tier,
+        _ctx.team_member_email or "unknown",
+    )
+
+    return TierOverrideResponse(
+        tenant_id=tenant_id,
+        previous_tier=previous_tier,
+        new_tier=tier,
+        updated_at=now,
+    )
+
+
+# ---------------------------------------------------------------------------
 # RB-8: Deployment History
 # ---------------------------------------------------------------------------
 

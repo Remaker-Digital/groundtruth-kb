@@ -156,7 +156,7 @@ export function TenantDirectoryPage() {
             <Text c="dimmed" size="xs" tt="uppercase" fw={600}>Total Tenants</Text>
             <Text fw={700} size="xl" c="#F5F5F5" mt={4}>{summary.total_tenants}</Text>
           </Card>
-          {Object.entries(summary.by_status).map(([status, count]) => (
+          {Object.entries(summary.by_status ?? {}).map(([status, count]) => (
             <Card key={status} withBorder padding="lg" radius="md" bg="#1f1f1f">
               <Text c="dimmed" size="xs" tt="uppercase" fw={600}>{status}</Text>
               <Text fw={700} size="xl" c="#F5F5F5" mt={4}>{count}</Text>
@@ -174,7 +174,7 @@ export function TenantDirectoryPage() {
             clearable
             value={statusFilter}
             onChange={setStatusFilter}
-            data={summary ? Object.keys(summary.by_status).map(s => ({ value: s, label: s })) : []}
+            data={summary ? Object.keys(summary.by_status ?? {}).map(s => ({ value: s, label: s })) : []}
             size="sm"
             w={180}
           />
@@ -184,7 +184,7 @@ export function TenantDirectoryPage() {
             clearable
             value={tierFilter}
             onChange={setTierFilter}
-            data={summary ? Object.keys(summary.by_tier).map(t => ({ value: t, label: t })) : []}
+            data={summary ? Object.keys(summary.by_tier ?? {}).map(t => ({ value: t, label: t })) : []}
             size="sm"
             w={180}
           />
@@ -194,7 +194,7 @@ export function TenantDirectoryPage() {
             clearable
             value={channelFilter}
             onChange={setChannelFilter}
-            data={summary ? Object.keys(summary.by_billing_channel).map(c => ({ value: c, label: c })) : []}
+            data={summary ? Object.keys(summary.by_billing_channel ?? {}).map(c => ({ value: c, label: c })) : []}
             size="sm"
             w={180}
           />
