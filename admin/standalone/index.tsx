@@ -158,7 +158,7 @@ const App: React.FC = () => {
   if (verifying) {
     return (
       <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center',
-        minHeight: '100vh', backgroundColor: '#0a0a0a', color: '#e0e0e0' }}>
+        minHeight: '100vh', backgroundColor: '#0c0a09', color: '#e0e0e0' }}>
         <div style={{ textAlign: 'center' }}>
           <div style={{ fontSize: '18px', marginBottom: '8px' }}>Signing you in...</div>
           <div style={{ fontSize: '14px', color: '#808080' }}>Verifying your sign-in link</div>

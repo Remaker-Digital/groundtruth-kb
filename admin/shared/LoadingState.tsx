@@ -64,7 +64,7 @@ const Spinner: React.FC<SpinnerProps> = ({ text = 'Loading\u2026', size = 32 }) 
         style={{
           width: size,
           height: size,
-          border: '3px solid #272727',
+          border: '3px solid #44403c',
           borderTopColor: '#ff3621',
           borderRadius: '50%',
           animation: 'ar-spin 0.8s linear infinite',
@@ -100,7 +100,7 @@ const Skeleton: React.FC<SkeletonProps> = ({ lines = 3, showHeader = true }) => 
           style={{
             height: '20px',
             width: '40%',
-            background: '#272727',
+            background: '#44403c',
             borderRadius: '4px',
             marginBottom: '20px',
             animation: 'ar-pulse 1.5s ease-in-out infinite',
@@ -113,7 +113,7 @@ const Skeleton: React.FC<SkeletonProps> = ({ lines = 3, showHeader = true }) => 
           style={{
             height: '14px',
             width: lineWidths[i % lineWidths.length],
-            background: '#272727',
+            background: '#44403c',
             borderRadius: '4px',
             marginBottom: '12px',
             animation: 'ar-pulse 1.5s ease-in-out infinite',

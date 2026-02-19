@@ -116,7 +116,7 @@ export function IntegrationHealthPage() {
   return (
     <Stack gap="lg">
       <Group justify="space-between" align="baseline">
-        <Title order={3} c="#F5F5F5">Integration Health</Title>
+        <Title order={3} c="#fafaf9">Integration Health</Title>
         <Badge
           variant="filled"
           color={data.overallHealthy ? 'green' : 'red'}
@@ -127,7 +127,7 @@ export function IntegrationHealthPage() {
       </Group>
 
       {/* NATS connectivity */}
-      <Paper withBorder radius="md" bg="#1f1f1f" p="md">
+      <Paper withBorder radius="md" bg="#292524" p="md">
         <Group gap="sm">
           <Text size="sm" fw={500} c="#E0E0E0">NATS JetStream</Text>
           <Badge
@@ -146,7 +146,7 @@ export function IntegrationHealthPage() {
           <Text size="sm" fw={600} c="#A0A0A0" tt="uppercase">Circuit Breakers</Text>
           <SimpleGrid cols={{ base: 1, sm: 2, md: 3 }} spacing="md">
             {data.circuitBreakers.map((cb) => (
-              <Card key={cb.service} withBorder padding="lg" radius="md" bg="#1f1f1f">
+              <Card key={cb.service} withBorder padding="lg" radius="md" bg="#292524">
                 <Group justify="space-between" mb="xs">
                   <Text size="sm" fw={500} c="#E0E0E0">
                     {formatServiceName(cb.service)}
@@ -191,7 +191,7 @@ export function IntegrationHealthPage() {
                 ? Math.round((mcp.tenantsConnected / mcp.tenantsEnabled) * 100)
                 : 0;
               return (
-                <Card key={mcp.serverName} withBorder padding="lg" radius="md" bg="#1f1f1f">
+                <Card key={mcp.serverName} withBorder padding="lg" radius="md" bg="#292524">
                   <Group justify="space-between" align="flex-start">
                     <Stack gap={4}>
                       <Text size="sm" fw={500} c="#E0E0E0">
@@ -233,7 +233,7 @@ export function IntegrationHealthPage() {
                         },
                       ]}
                       label={
-                        <Text ta="center" size="xs" fw={600} c="#F5F5F5">
+                        <Text ta="center" size="xs" fw={600} c="#fafaf9">
                           {connectedPct}%
                         </Text>
                       }
@@ -248,7 +248,7 @@ export function IntegrationHealthPage() {
 
       {/* Errors section */}
       {data.errors.length > 0 && (
-        <Paper withBorder radius="md" bg="#1f1f1f" p="md">
+        <Paper withBorder radius="md" bg="#292524" p="md">
           <Group gap="xs" mb="sm">
             <Badge variant="filled" color="red" size="sm">
               {data.errors.length} Error{data.errors.length !== 1 ? 's' : ''}

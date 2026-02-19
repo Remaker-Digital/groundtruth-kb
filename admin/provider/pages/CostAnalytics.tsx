@@ -129,7 +129,7 @@ export function CostAnalyticsPage() {
   return (
     <Stack gap="lg">
       <Group justify="space-between" align="baseline">
-        <Title order={3} c="#F5F5F5">Cost Analytics</Title>
+        <Title order={3} c="#fafaf9">Cost Analytics</Title>
         <Select
           size="xs"
           data={PERIOD_OPTIONS}
@@ -141,27 +141,27 @@ export function CostAnalyticsPage() {
 
       {/* Summary cards */}
       <SimpleGrid cols={{ base: 1, sm: 2, md: 4 }} spacing="md">
-        <Card withBorder padding="lg" radius="md" bg="#1f1f1f">
+        <Card withBorder padding="lg" radius="md" bg="#292524">
           <Text c="dimmed" size="xs" tt="uppercase" fw={600}>Platform Cost</Text>
-          <Text fw={700} size="xl" c="#F5F5F5" mt={4}>
+          <Text fw={700} size="xl" c="#fafaf9" mt={4}>
             {formatCost(data.totalPlatformCost)}
           </Text>
         </Card>
-        <Card withBorder padding="lg" radius="md" bg="#1f1f1f">
+        <Card withBorder padding="lg" radius="md" bg="#292524">
           <Text c="dimmed" size="xs" tt="uppercase" fw={600}>Total Conversations</Text>
-          <Text fw={700} size="xl" c="#F5F5F5" mt={4}>
+          <Text fw={700} size="xl" c="#fafaf9" mt={4}>
             {data.totalConversations.toLocaleString()}
           </Text>
         </Card>
-        <Card withBorder padding="lg" radius="md" bg="#1f1f1f">
+        <Card withBorder padding="lg" radius="md" bg="#292524">
           <Text c="dimmed" size="xs" tt="uppercase" fw={600}>Avg / Tenant</Text>
-          <Text fw={700} size="xl" c="#F5F5F5" mt={4}>
+          <Text fw={700} size="xl" c="#fafaf9" mt={4}>
             {formatCost(data.avgCostPerTenant)}
           </Text>
         </Card>
-        <Card withBorder padding="lg" radius="md" bg="#1f1f1f">
+        <Card withBorder padding="lg" radius="md" bg="#292524">
           <Text c="dimmed" size="xs" tt="uppercase" fw={600}>Avg / Conversation</Text>
-          <Text fw={700} size="xl" c="#F5F5F5" mt={4}>
+          <Text fw={700} size="xl" c="#fafaf9" mt={4}>
             {formatCost(data.avgCostPerConversation)}
           </Text>
         </Card>
@@ -171,19 +171,19 @@ export function CostAnalyticsPage() {
       {Object.keys(data.costByTier ?? {}).length > 0 && (
         <SimpleGrid cols={{ base: 1, sm: 3 }} spacing="md">
           {Object.entries(data.costByTier ?? {}).map(([tier, cost]) => (
-            <Card key={tier} withBorder padding="md" radius="md" bg="#1f1f1f">
+            <Card key={tier} withBorder padding="md" radius="md" bg="#292524">
               <Group justify="space-between">
                 <Text c="dimmed" size="xs" tt="uppercase" fw={600}>{tier}</Text>
                 <Badge variant="light" color="blue" size="sm">{tier}</Badge>
               </Group>
-              <Text fw={700} size="lg" c="#F5F5F5" mt={4}>{formatCost(cost)}</Text>
+              <Text fw={700} size="lg" c="#fafaf9" mt={4}>{formatCost(cost)}</Text>
             </Card>
           ))}
         </SimpleGrid>
       )}
 
       {/* Per-tenant table */}
-      <Paper withBorder radius="md" bg="#1f1f1f" style={{ overflow: 'auto' }}>
+      <Paper withBorder radius="md" bg="#292524" style={{ overflow: 'auto' }}>
         <Table striped highlightOnHover>
           <Table.Thead>
             <Table.Tr>
@@ -235,7 +235,7 @@ export function CostAnalyticsPage() {
                     <Text size="xs" c="#E0E0E0">{formatCost(t.costBreakdown.cosmosDb)}</Text>
                   </Table.Td>
                   <Table.Td ta="right">
-                    <Text size="xs" fw={600} c="#F5F5F5">{formatCost(t.costBreakdown.total)}</Text>
+                    <Text size="xs" fw={600} c="#fafaf9">{formatCost(t.costBreakdown.total)}</Text>
                   </Table.Td>
                   <Table.Td ta="right">
                     <Text size="xs" c="#A0A0A0">{formatCost(t.costPerConversation)}</Text>

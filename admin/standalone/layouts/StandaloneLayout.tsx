@@ -10,7 +10,7 @@
  *   - Mantine notifications.show() instead of banner notifications
  *
  * Four-tier dark mode hierarchy (designer-approved):
- *   chrome #0a0a0a → page #141414 → surface #1f1f1f → border #272727
+ *   chrome #0c0a09 → page #1c1917 → surface #292524 → border #44403c
  *
  * © 2026 Remaker Digital, a DBA of VanDusen & Palmeter, LLC. All rights reserved.
  */
@@ -493,15 +493,15 @@ export const StandaloneLayout: React.FC<StandaloneLayoutProps> = ({
         padding="md"
         styles={{
           header: {
-            borderBottom: isDark ? '1px solid #272727' : '1px solid #1E1E1E',
-            background: '#0a0a0a',
+            borderBottom: isDark ? '1px solid #44403c' : '1px solid #292524',
+            background: '#0c0a09',
           },
           navbar: {
-            borderRight: isDark ? '1px solid #272727' : undefined,
-            background: isDark ? '#0a0a0a' : undefined,
+            borderRight: isDark ? '1px solid #44403c' : undefined,
+            background: isDark ? '#0c0a09' : undefined,
           },
           main: {
-            background: isDark ? '#141414' : undefined,
+            background: isDark ? '#1c1917' : undefined,
           },
         }}
       >
@@ -657,11 +657,11 @@ export const StandaloneLayout: React.FC<StandaloneLayoutProps> = ({
                     }
                     active={isActive}
                     onClick={() => navigate(item.path)}
-                    styles={{ label: isActive && isDark ? { color: '#F5F5F5' } : undefined }}
+                    styles={{ label: isActive && isDark ? { color: '#fafaf9' } : undefined }}
                     style={{
                       borderRadius: 8,
                       marginBottom: 2,
-                      ...(isActive && isDark ? { background: '#1f1f1f', border: '1px solid #272727' } : {}),
+                      ...(isActive && isDark ? { background: '#292524', border: '1px solid #44403c' } : {}),
                     }}
                   />
                 );
@@ -671,11 +671,11 @@ export const StandaloneLayout: React.FC<StandaloneLayoutProps> = ({
             {canSeeConfigGroup && (
               <Box
                 style={{
-                  border: `1px solid ${isDark ? '#272727' : '#e0e0e0'}`,
+                  border: `1px solid ${isDark ? '#44403c' : '#e0e0e0'}`,
                   borderRadius: 8,
                   padding: '8px 6px',
                   margin: '4px 0',
-                  background: isDark ? 'rgba(31, 31, 31, 0.4)' : 'rgba(0, 0, 0, 0.02)',
+                  background: isDark ? 'rgba(41, 37, 36, 0.4)' : 'rgba(0, 0, 0, 0.02)',
                 }}
               >
                 {/* Group header: label + status badge */}
@@ -728,11 +728,11 @@ export const StandaloneLayout: React.FC<StandaloneLayoutProps> = ({
                       }
                       active={isActive}
                       onClick={() => navigate(item.path)}
-                      styles={{ label: isActive && isDark ? { color: '#F5F5F5' } : undefined }}
+                      styles={{ label: isActive && isDark ? { color: '#fafaf9' } : undefined }}
                       style={{
                         borderRadius: 8,
                         marginBottom: 2,
-                        ...(isActive && isDark ? { background: '#1f1f1f', border: '1px solid #272727' } : {}),
+                        ...(isActive && isDark ? { background: '#292524', border: '1px solid #44403c' } : {}),
                       }}
                     />
                   );
@@ -746,7 +746,7 @@ export const StandaloneLayout: React.FC<StandaloneLayoutProps> = ({
                   pb={2}
                   wrap="nowrap"
                   style={{
-                    borderTop: `1px solid ${isDark ? '#272727' : '#e0e0e0'}`,
+                    borderTop: `1px solid ${isDark ? '#44403c' : '#e0e0e0'}`,
                     marginTop: 4,
                   }}
                 >
@@ -832,11 +832,11 @@ export const StandaloneLayout: React.FC<StandaloneLayoutProps> = ({
                     }
                     active={isActive}
                     onClick={() => navigate(item.path)}
-                    styles={{ label: isActive && isDark ? { color: '#F5F5F5' } : undefined }}
+                    styles={{ label: isActive && isDark ? { color: '#fafaf9' } : undefined }}
                     style={{
                       borderRadius: 8,
                       marginBottom: 2,
-                      ...(isActive && isDark ? { background: '#1f1f1f', border: '1px solid #272727' } : {}),
+                      ...(isActive && isDark ? { background: '#292524', border: '1px solid #44403c' } : {}),
                     }}
                   />
                 );
@@ -869,7 +869,7 @@ export const StandaloneLayout: React.FC<StandaloneLayoutProps> = ({
 
           {/* Footer with Remaker Digital branding */}
           <AppShell.Section>
-            <Box p="xs" style={{ borderTop: isDark ? '1px solid #272727' : '1px solid var(--mantine-color-gray-2)' }}>
+            <Box p="xs" style={{ borderTop: isDark ? '1px solid #44403c' : '1px solid var(--mantine-color-gray-2)' }}>
               <Group gap={8} justify="center" mb={4}>
                 <img
                   src={isDark ? '/admin/standalone/remaker-digital-logo-dark.svg' : '/admin/standalone/remaker-digital-logo-light.svg'}

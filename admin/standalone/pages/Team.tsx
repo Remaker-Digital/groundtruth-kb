@@ -19,7 +19,6 @@ import { useAppContext } from '../layouts/StandaloneLayout';
 import { TeamManager } from '../../shared/TeamManager';
 import { LoadingState } from '../../shared/LoadingState';
 
-const BRAND_RED = '#ff3621';
 
 export const TeamPage: React.FC = () => {
   const { tenantContext, apiFetch, onNotify, loading } = useAppContext();

@@ -91,14 +91,14 @@ export const ApiKeyLogin: React.FC<ApiKeyLoginProps> = ({ onLogin }) => {
   );
 
   return (
-    <Center mih="100vh" bg="#0a0a0a">
+    <Center mih="100vh" bg="#0c0a09">
       <Paper
         w="100%"
         maw={380}
-        bg="#1f1f1f"
+        bg="#292524"
         radius="md"
         p="xl"
-        styles={{ root: { border: '1px solid #272727' } }}
+        styles={{ root: { border: '1px solid #44403c' } }}
       >
         <Stack align="center" gap="xs" mb="xl">
           <img
@@ -122,10 +122,10 @@ export const ApiKeyLogin: React.FC<ApiKeyLoginProps> = ({ onLogin }) => {
             aria-label="Service Provider API key"
             styles={{
               input: {
-                backgroundColor: '#141414',
-                borderColor: error ? '#ff6b6b' : '#272727',
+                backgroundColor: '#1c1917',
+                borderColor: error ? '#ff6b6b' : '#44403c',
                 color: '#e0e0e0',
-                '&:focus': { borderColor: '#ff3621' },
+                '&:focus': { borderColor: '#3B82F6' },
               },
               label: { color: '#e0e0e0', fontWeight: 500 },
             }}
@@ -136,7 +136,7 @@ export const ApiKeyLogin: React.FC<ApiKeyLoginProps> = ({ onLogin }) => {
             fullWidth
             mt="md"
             loading={loading}
-            color="#ff3621"
+            color="#3B82F6"
             aria-label="Sign in"
           >
             Sign in

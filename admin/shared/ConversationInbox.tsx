@@ -35,7 +35,8 @@ import { HelpTooltip } from './HelpTooltip';
 // Style constants
 // ---------------------------------------------------------------------------
 
-const BRAND_PRIMARY = '#ff3621';
+const BRAND_PRIMARY = '#ff3621'; // accent only — message bubbles, spinner
+const ACTION_BLUE = '#3B82F6';
 const COLOR_SUCCESS = '#22863a';
 const COLOR_DANGER = '#d73a49';
 const COLOR_GRAY = '#6a737d';
@@ -379,7 +380,7 @@ const AssignModal: React.FC<AssignModalProps> = ({ conversationId, members, onAs
               padding: '8px 16px',
               border: 'none',
               borderRadius: BORDER_RADIUS,
-              backgroundColor: !selectedAgent || assigning ? COLOR_GRAY : BRAND_PRIMARY,
+              backgroundColor: !selectedAgent || assigning ? COLOR_GRAY : ACTION_BLUE,
               color: COLOR_WHITE,
               fontSize: '13px',
               fontFamily: FONT_FAMILY,
@@ -497,7 +498,7 @@ const NoteModal: React.FC<NoteModalProps> = ({ conversationId, apiFetch, onClose
               padding: '8px 16px',
               border: 'none',
               borderRadius: BORDER_RADIUS,
-              backgroundColor: !note.trim() || saving ? COLOR_GRAY : BRAND_PRIMARY,
+              backgroundColor: !note.trim() || saving ? COLOR_GRAY : ACTION_BLUE,
               color: COLOR_WHITE,
               fontSize: '13px',
               fontFamily: FONT_FAMILY,
@@ -812,7 +813,7 @@ export const ConversationInbox: React.FC<BaseComponentProps> = ({
                 boxSizing: 'border-box',
                 outline: 'none',
               }}
-              onFocus={(e) => { (e.currentTarget as HTMLInputElement).style.borderColor = BRAND_PRIMARY; }}
+              onFocus={(e) => { (e.currentTarget as HTMLInputElement).style.borderColor = ACTION_BLUE; }}
               onBlur={(e) => { (e.currentTarget as HTMLInputElement).style.borderColor = COLOR_BORDER; }}
             />
             <span style={{ position: 'absolute', left: '9px', top: '50%', transform: 'translateY(-50%)', fontSize: '14px', color: COLOR_TEXT_SECONDARY, pointerEvents: 'none' }}>

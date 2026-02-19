@@ -114,15 +114,15 @@ export function QueueHealthPage() {
 
   return (
     <Stack gap="lg">
-      <Title order={3} c="#F5F5F5">Queue Health</Title>
+      <Title order={3} c="#fafaf9">Queue Health</Title>
 
       {/* Summary cards */}
       <SimpleGrid cols={{ base: 1, sm: 3 }} spacing="md">
-        <Card withBorder padding="lg" radius="md" bg="#1f1f1f">
+        <Card withBorder padding="lg" radius="md" bg="#292524">
           <Text c="dimmed" size="xs" tt="uppercase" fw={600}>Total Tenants</Text>
-          <Text fw={700} size="xl" c="#F5F5F5" mt={4}>{data.total_tenants}</Text>
+          <Text fw={700} size="xl" c="#fafaf9" mt={4}>{data.total_tenants}</Text>
         </Card>
-        <Card withBorder padding="lg" radius="md" bg="#1f1f1f">
+        <Card withBorder padding="lg" radius="md" bg="#292524">
           <Text c="dimmed" size="xs" tt="uppercase" fw={600}>Total Messages</Text>
           <Text
             fw={700}
@@ -133,14 +133,14 @@ export function QueueHealthPage() {
             {data.total_messages.toLocaleString()}
           </Text>
         </Card>
-        <Card withBorder padding="lg" radius="md" bg="#1f1f1f">
+        <Card withBorder padding="lg" radius="md" bg="#292524">
           <Text c="dimmed" size="xs" tt="uppercase" fw={600}>Total Bytes</Text>
-          <Text fw={700} size="xl" c="#F5F5F5" mt={4}>{formatBytes(data.total_bytes)}</Text>
+          <Text fw={700} size="xl" c="#fafaf9" mt={4}>{formatBytes(data.total_bytes)}</Text>
         </Card>
       </SimpleGrid>
 
       {/* Per-tenant table */}
-      <Paper withBorder radius="md" bg="#1f1f1f" style={{ overflow: 'auto' }}>
+      <Paper withBorder radius="md" bg="#292524" style={{ overflow: 'auto' }}>
         <Table striped highlightOnHover>
           <Table.Thead>
             <Table.Tr>
@@ -197,7 +197,7 @@ export function QueueHealthPage() {
 
       {/* Errors section (collapsible) */}
       {data.errors.length > 0 && (
-        <Paper withBorder radius="md" bg="#1f1f1f" p="md">
+        <Paper withBorder radius="md" bg="#292524" p="md">
           <UnstyledButton onClick={toggleErrors}>
             <Group gap="xs">
               <Badge variant="filled" color="red" size="sm">

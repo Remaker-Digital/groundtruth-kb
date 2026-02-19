@@ -233,15 +233,15 @@ export function StatusPageManagement() {
   return (
     <Stack gap="lg">
       <Group justify="space-between" align="baseline">
-        <Title order={3} c="#F5F5F5">Status Page</Title><HelpTooltip text="Manage incidents visible on the public status page at /api/status. Active incidents affect the overall system status." />
-        <Button color="red" size="sm" onClick={() => setCreateOpen(true)}>
+        <Title order={3} c="#fafaf9">Status Page</Title><HelpTooltip text="Manage incidents visible on the public status page at /api/status. Active incidents affect the overall system status." />
+        <Button color="action" size="sm" onClick={() => setCreateOpen(true)}>
           Create Incident
         </Button>
       </Group>
 
       {/* Active incidents */}
       {activeIncidents.length === 0 ? (
-        <Card withBorder padding="lg" radius="md" bg="#1f1f1f">
+        <Card withBorder padding="lg" radius="md" bg="#292524">
           <Group gap="sm">
             <Badge variant="filled" color="green" size="lg">All Systems Operational</Badge><HelpTooltip text="Status is operational when there are no active (non-resolved) incidents." />
           </Group>
@@ -249,10 +249,10 @@ export function StatusPageManagement() {
         </Card>
       ) : (
         activeIncidents.map((inc) => (
-          <Card key={inc.incidentId} withBorder padding="lg" radius="md" bg="#1f1f1f">
+          <Card key={inc.incidentId} withBorder padding="lg" radius="md" bg="#292524">
             <Group justify="space-between" mb="sm">
               <Group gap="sm">
-                <Text fw={600} size="md" c="#F5F5F5">{inc.title}</Text>
+                <Text fw={600} size="md" c="#fafaf9">{inc.title}</Text>
                 <Badge variant="light" color={SEVERITY_COLORS[inc.severity] ?? 'gray'} size="sm">
                   {inc.severity}
                 </Badge>
@@ -343,7 +343,7 @@ export function StatusPageManagement() {
           <Collapse in={showResolved}>
             <Stack gap="md">
               {resolvedIncidents.map((inc) => (
-                <Card key={inc.incidentId} withBorder padding="md" radius="md" bg="#141414">
+                <Card key={inc.incidentId} withBorder padding="md" radius="md" bg="#1c1917">
                   <Group justify="space-between" mb="xs">
                     <Group gap="sm">
                       <Text fw={500} size="sm" c="#A0A0A0">{inc.title}</Text>
@@ -372,7 +372,7 @@ export function StatusPageManagement() {
         onClose={() => setCreateOpen(false)}
         title="Create Incident"
         size="md"
-        styles={{ content: { backgroundColor: '#1f1f1f' }, header: { backgroundColor: '#1f1f1f' } }}
+        styles={{ content: { backgroundColor: '#292524' }, header: { backgroundColor: '#292524' } }}
       >
         <Stack gap="md">
           <TextInput
@@ -381,7 +381,7 @@ export function StatusPageManagement() {
             value={createTitle}
             onChange={(e) => setCreateTitle(e.currentTarget.value)}
             required
-            styles={{ input: { backgroundColor: '#141414', borderColor: '#333', color: '#F5F5F5' } }}
+            styles={{ input: { backgroundColor: '#1c1917', borderColor: '#333', color: '#fafaf9' } }}
           />
           <Textarea
             label="Description"
@@ -389,7 +389,7 @@ export function StatusPageManagement() {
             value={createDesc}
             onChange={(e) => setCreateDesc(e.currentTarget.value)}
             minRows={3}
-            styles={{ input: { backgroundColor: '#141414', borderColor: '#333', color: '#F5F5F5' } }}
+            styles={{ input: { backgroundColor: '#1c1917', borderColor: '#333', color: '#fafaf9' } }}
           />
           <Select
             label="Severity"
@@ -400,7 +400,7 @@ export function StatusPageManagement() {
             ]}
             value={createSeverity}
             onChange={setCreateSeverity}
-            styles={{ input: { backgroundColor: '#141414', borderColor: '#333', color: '#F5F5F5' } }}
+            styles={{ input: { backgroundColor: '#1c1917', borderColor: '#333', color: '#fafaf9' } }}
           />
           <MultiSelect
             label="Affected Services"
@@ -408,12 +408,12 @@ export function StatusPageManagement() {
             value={createServices}
             onChange={setCreateServices}
             placeholder="Select affected services"
-            styles={{ input: { backgroundColor: '#141414', borderColor: '#333', color: '#F5F5F5' } }}
+            styles={{ input: { backgroundColor: '#1c1917', borderColor: '#333', color: '#fafaf9' } }}
           />
           <Group justify="flex-end">
             <Button variant="subtle" onClick={() => setCreateOpen(false)}>Cancel</Button>
             <Button
-              color="red"
+              color="action"
               loading={creating}
               disabled={!createTitle.trim()}
               onClick={handleCreate}
@@ -430,7 +430,7 @@ export function StatusPageManagement() {
         onClose={() => setUpdateOpen(false)}
         title="Add Incident Update"
         size="md"
-        styles={{ content: { backgroundColor: '#1f1f1f' }, header: { backgroundColor: '#1f1f1f' } }}
+        styles={{ content: { backgroundColor: '#292524' }, header: { backgroundColor: '#292524' } }}
       >
         <Stack gap="md">
           <Select
@@ -438,7 +438,7 @@ export function StatusPageManagement() {
             data={STATUS_OPTIONS}
             value={updateStatus}
             onChange={setUpdateStatus}
-            styles={{ input: { backgroundColor: '#141414', borderColor: '#333', color: '#F5F5F5' } }}
+            styles={{ input: { backgroundColor: '#1c1917', borderColor: '#333', color: '#fafaf9' } }}
           />
           <Textarea
             label="Update Message"
@@ -447,7 +447,7 @@ export function StatusPageManagement() {
             onChange={(e) => setUpdateMessage(e.currentTarget.value)}
             minRows={3}
             required
-            styles={{ input: { backgroundColor: '#141414', borderColor: '#333', color: '#F5F5F5' } }}
+            styles={{ input: { backgroundColor: '#1c1917', borderColor: '#333', color: '#fafaf9' } }}
           />
           <Group justify="flex-end">
             <Button variant="subtle" onClick={() => setUpdateOpen(false)}>Cancel</Button>

@@ -30,7 +30,8 @@ import { useKnowledgeBase, useSaveKBArticle, useUploadFile, useImportUrl, useExp
 import type { KBArticle, KBArticleStatus, KBUploadResult } from '../../shared/types/index';
 import { LoadingState } from '../../shared/LoadingState';
 
-const BRAND_RED = '#ff3621';
+const BRAND_RED = '#ff3621'; // accent only — drag borders, loaders, progress bars
+const ACTION_BLUE = '#3B82F6';
 
 const CATEGORIES = ['All', 'Policies', 'Shipping', 'Products', 'Sales', 'Services', 'FAQ', 'Custom'];
 const STATUSES = ['All', 'Published', 'Draft', 'Archived'];
@@ -578,7 +579,7 @@ export const KnowledgeBasePage: React.FC = () => {
             <Tooltip label="Create a new knowledge base article. Articles give your AI specific information to reference when answering customer questions." multiline w={260} withArrow>
               <Button
                 leftSection={<PlusIcon />}
-                color={BRAND_RED}
+                color={ACTION_BLUE}
                 onClick={handleAddArticle}
               >
                 Add article
@@ -723,7 +724,7 @@ export const KnowledgeBasePage: React.FC = () => {
           {saveError && <Text size="sm" c="red">{saveError}</Text>}
           <Group justify="flex-end" mt="md">
             <Button variant="default" onClick={closeModal}>Cancel</Button>
-            <Button color={BRAND_RED} onClick={handleSave} disabled={!form.title.trim() || !form.content.trim()} loading={saving}>
+            <Button color={ACTION_BLUE} onClick={handleSave} disabled={!form.title.trim() || !form.content.trim()} loading={saving}>
               {editingArticle ? 'Save changes' : 'Create article'}
             </Button>
           </Group>
@@ -748,7 +749,7 @@ export const KnowledgeBasePage: React.FC = () => {
               ({Math.round(uploadResult.total_chars / 1000)}K characters)
             </Text>
             <Group justify="center" mt="md">
-              <Button color={BRAND_RED} onClick={handleImportDone}>
+              <Button color={ACTION_BLUE} onClick={handleImportDone}>
                 Back to knowledge base
               </Button>
             </Group>
@@ -828,7 +829,7 @@ export const KnowledgeBasePage: React.FC = () => {
                 {importError && <Text size="sm" c="red">{importError}</Text>}
                 <Group justify="flex-end">
                   <Button
-                    color={BRAND_RED}
+                    color={ACTION_BLUE}
                     onClick={handleUrlImport}
                     disabled={!importUrl2.trim()}
                     loading={importing}
@@ -993,7 +994,7 @@ export const KnowledgeBasePage: React.FC = () => {
                 <Button variant="default" size="sm" onClick={() => handleScan(true)} loading={scanning}>
                   Re-scan (force)
                 </Button>
-                <Button color={BRAND_RED} size="sm" onClick={closeScanModal}>
+                <Button color={ACTION_BLUE} size="sm" onClick={closeScanModal}>
                   Close
                 </Button>
               </Group>

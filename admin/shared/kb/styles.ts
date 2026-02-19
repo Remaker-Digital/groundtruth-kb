@@ -13,7 +13,8 @@ import type { KBArticleStatus } from '../types';
 // Color constants
 // ---------------------------------------------------------------------------
 
-export const BRAND_PRIMARY = '#ff3621';
+export const BRAND_PRIMARY = '#ff3621'; // accent only — NOT for affirmative buttons
+export const ACTION_PRIMARY = '#3B82F6'; // affirmative action color (blue)
 export const COLOR_SUCCESS = '#22863a';
 export const COLOR_DANGER = '#d73a49';
 export const COLOR_GRAY = '#6a737d';
@@ -78,7 +79,7 @@ export function buttonStyle(variant: 'primary' | 'secondary' | 'danger', disable
   };
 
   if (variant === 'primary') {
-    return { ...base, backgroundColor: BRAND_PRIMARY, color: COLOR_WHITE };
+    return { ...base, backgroundColor: ACTION_PRIMARY, color: COLOR_WHITE };
   }
   if (variant === 'danger') {
     return { ...base, backgroundColor: COLOR_DANGER, color: COLOR_WHITE };

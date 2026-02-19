@@ -343,18 +343,18 @@ export function AlertConfigPage() {
   return (
     <Stack gap="lg">
       <Group justify="space-between" align="baseline">
-        <Title order={3} c="#F5F5F5">Alert Configuration</Title><HelpTooltip text="Define rules that monitor system metrics and trigger alerts when thresholds are exceeded. Rules are evaluated every 5 minutes." />
+        <Title order={3} c="#fafaf9">Alert Configuration</Title><HelpTooltip text="Define rules that monitor system metrics and trigger alerts when thresholds are exceeded. Rules are evaluated every 5 minutes." />
         <Group gap="sm">
           <Button variant="light" color="orange" size="sm" onClick={handleEvaluate}>
             Evaluate Now
           </Button>
-          <Button color="red" size="sm" onClick={openCreateModal}>
+          <Button color="action" size="sm" onClick={openCreateModal}>
             Create Rule
           </Button>
         </Group>
       </Group>
 
-      <Tabs defaultValue="rules" color="red">
+      <Tabs defaultValue="rules" color="action">
         <Tabs.List>
           <Tabs.Tab value="rules">Rules ({rules.length})</Tabs.Tab>
           <Tabs.Tab value="history">History ({history.length})</Tabs.Tab>
@@ -364,7 +364,7 @@ export function AlertConfigPage() {
         <Tabs.Panel value="rules" pt="md">
           {rulesLoading ? (
             <Stack align="center" mt="xl">
-              <Loader color="red" />
+              <Loader color="action" />
               <Text c="dimmed" size="sm">Loading rules...</Text>
             </Stack>
           ) : rules.length === 0 ? (
@@ -432,7 +432,7 @@ export function AlertConfigPage() {
         <Tabs.Panel value="history" pt="md">
           {historyLoading ? (
             <Stack align="center" mt="xl">
-              <Loader color="red" />
+              <Loader color="action" />
               <Text c="dimmed" size="sm">Loading history...</Text>
             </Stack>
           ) : history.length === 0 ? (
@@ -507,7 +507,7 @@ export function AlertConfigPage() {
         onClose={() => setModalOpen(false)}
         title={editingRule ? 'Edit Alert Rule' : 'Create Alert Rule'}
         size="lg"
-        styles={{ content: { backgroundColor: '#1f1f1f' }, header: { backgroundColor: '#1f1f1f' } }}
+        styles={{ content: { backgroundColor: '#292524' }, header: { backgroundColor: '#292524' } }}
       >
         <Stack gap="md">
           <TextInput
@@ -516,7 +516,7 @@ export function AlertConfigPage() {
             value={formName}
             onChange={(e) => setFormName(e.currentTarget.value)}
             required
-            styles={{ input: { backgroundColor: '#141414', borderColor: '#333', color: '#F5F5F5' } }}
+            styles={{ input: { backgroundColor: '#1c1917', borderColor: '#333', color: '#fafaf9' } }}
           />
           <Select
             label="Rule Type"
@@ -524,7 +524,7 @@ export function AlertConfigPage() {
             value={formType}
             onChange={setFormType}
             disabled={!!editingRule}
-            styles={{ input: { backgroundColor: '#141414', borderColor: '#333', color: '#F5F5F5' } }}
+            styles={{ input: { backgroundColor: '#1c1917', borderColor: '#333', color: '#fafaf9' } }}
           />
           <Textarea
             label="Description"
@@ -532,7 +532,7 @@ export function AlertConfigPage() {
             value={formDesc}
             onChange={(e) => setFormDesc(e.currentTarget.value)}
             minRows={2}
-            styles={{ input: { backgroundColor: '#141414', borderColor: '#333', color: '#F5F5F5' } }}
+            styles={{ input: { backgroundColor: '#1c1917', borderColor: '#333', color: '#fafaf9' } }}
           />
 
           <Text size="sm" fw={600} c="#A0A0A0" tt="uppercase">Condition</Text><HelpTooltip text="Define when this rule fires. The metric is compared to the threshold using the selected operator." />
@@ -542,20 +542,20 @@ export function AlertConfigPage() {
               placeholder="e.g. queue_depth, error_rate"
               value={formMetric}
               onChange={(e) => setFormMetric(e.currentTarget.value)}
-              styles={{ input: { backgroundColor: '#141414', borderColor: '#333', color: '#F5F5F5' } }}
+              styles={{ input: { backgroundColor: '#1c1917', borderColor: '#333', color: '#fafaf9' } }}
             />
             <Select
               label="Operator"
               data={OPERATOR_OPTIONS}
               value={formOperator}
               onChange={setFormOperator}
-              styles={{ input: { backgroundColor: '#141414', borderColor: '#333', color: '#F5F5F5' } }}
+              styles={{ input: { backgroundColor: '#1c1917', borderColor: '#333', color: '#fafaf9' } }}
             />
             <NumberInput
               label="Threshold"
               value={formThreshold}
               onChange={(v) => setFormThreshold(typeof v === 'number' ? v : 0)}
-              styles={{ input: { backgroundColor: '#141414', borderColor: '#333', color: '#F5F5F5' } }}
+              styles={{ input: { backgroundColor: '#1c1917', borderColor: '#333', color: '#fafaf9' } }}
             />
           </Group>
 
@@ -565,21 +565,21 @@ export function AlertConfigPage() {
               value={formCooldown}
               onChange={(v) => setFormCooldown(typeof v === 'number' ? v : 60)}
               min={1}
-              styles={{ input: { backgroundColor: '#141414', borderColor: '#333', color: '#F5F5F5' } }}
+              styles={{ input: { backgroundColor: '#1c1917', borderColor: '#333', color: '#fafaf9' } }}
             />
             <TextInput
               label="Runbook URL"
               placeholder="https://..."
               value={formRunbook}
               onChange={(e) => setFormRunbook(e.currentTarget.value)}
-              styles={{ input: { backgroundColor: '#141414', borderColor: '#333', color: '#F5F5F5' } }}
+              styles={{ input: { backgroundColor: '#1c1917', borderColor: '#333', color: '#fafaf9' } }}
             />
           </Group>
 
           <Group justify="flex-end">
             <Button variant="subtle" onClick={() => setModalOpen(false)}>Cancel</Button>
             <Button
-              color="red"
+              color="action"
               loading={saving}
               disabled={!formName.trim()}
               onClick={handleSave}

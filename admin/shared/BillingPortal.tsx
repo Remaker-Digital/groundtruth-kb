@@ -237,7 +237,7 @@ const styles = {
     border: variant === 'outline' ? '1px solid #D1D5DB' : 'none',
     background:
       variant === 'primary'
-        ? '#ff3621'
+        ? '#3B82F6'
         : variant === 'secondary'
           ? '#F3F4F6'
           : 'transparent',
@@ -572,8 +572,8 @@ export const BillingPortal: React.FC<BillingPortalProps> = ({
           <button
             style={styles.button('primary')}
             onClick={onManageBilling}
-            onMouseEnter={(e) => { (e.currentTarget as HTMLButtonElement).style.background = '#e62e1a'; }}
-            onMouseLeave={(e) => { (e.currentTarget as HTMLButtonElement).style.background = '#ff3621'; }}
+            onMouseEnter={(e) => { (e.currentTarget as HTMLButtonElement).style.background = '#2563EB'; }}
+            onMouseLeave={(e) => { (e.currentTarget as HTMLButtonElement).style.background = '#3B82F6'; }}
           >
             {tenantContext.billingChannel === 'shopify'
               ? 'Manage Shopify billing'
@@ -728,11 +728,11 @@ export const BillingPortal: React.FC<BillingPortalProps> = ({
                 onClick={() => handlePurchasePack(pack.size)}
                 onMouseEnter={(e) => {
                   if (purchasingPack !== pack.size) {
-                    (e.currentTarget as HTMLButtonElement).style.background = '#e62e1a';
+                    (e.currentTarget as HTMLButtonElement).style.background = '#2563EB';
                   }
                 }}
                 onMouseLeave={(e) => {
-                  (e.currentTarget as HTMLButtonElement).style.background = '#ff3621';
+                  (e.currentTarget as HTMLButtonElement).style.background = '#3B82F6';
                 }}
               >
                 {purchasingPack === pack.size ? 'Processing...' : 'Purchase'}
@@ -805,8 +805,8 @@ export const BillingPortal: React.FC<BillingPortalProps> = ({
                         );
                         onManageBilling();
                       }}
-                      onMouseEnter={(e) => { (e.currentTarget as HTMLButtonElement).style.background = '#e62e1a'; }}
-                      onMouseLeave={(e) => { (e.currentTarget as HTMLButtonElement).style.background = '#ff3621'; }}
+                      onMouseEnter={(e) => { (e.currentTarget as HTMLButtonElement).style.background = '#2563EB'; }}
+                      onMouseLeave={(e) => { (e.currentTarget as HTMLButtonElement).style.background = '#3B82F6'; }}
                     >
                       Upgrade to {display.label}
                     </button>

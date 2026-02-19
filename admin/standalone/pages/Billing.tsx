@@ -8,7 +8,7 @@
  * Invoice history table replaced with Stripe portal "Manage Billing" button.
  *
  * Four-tier dark mode hierarchy (designer-approved):
- *   chrome #0a0a0a -> page #141414 -> surface #1f1f1f -> border #272727
+ *   chrome #0c0a09 -> page #1c1917 -> surface #292524 -> border #44403c
  */
 
 import React, { useCallback } from 'react';
@@ -180,14 +180,11 @@ function PackCard({ conversations, price, effectiveRate, onPurchase, purchasing 
         {effectiveRate}/conversation
       </Text>
       <Button
-        variant="outline"
-        color="brand"
+        color="action"
         fullWidth
         onClick={onPurchase}
         loading={purchasing}
         disabled={purchasing}
-        onMouseEnter={(e) => { (e.currentTarget as HTMLElement).style.background = 'rgba(255, 255, 255, 0.06)'; }}
-        onMouseLeave={(e) => { (e.currentTarget as HTMLElement).style.background = ''; }}
       >
         Purchase
       </Button>
@@ -211,9 +208,9 @@ export const BillingPage: React.FC = () => {
   // Dark-mode-aware chart colors — Mazel design revision (2026-02-03 mockup)
   const gridStroke = isDark ? 'rgba(255,255,255,0.06)' : '#e9ecef';
   const axisTickFill = isDark ? '#5C5C5C' : '#868e96';
-  const axisLineStroke = isDark ? '#272727' : '#dee2e6';
-  const tooltipBg = isDark ? '#1f1f1f' : '#fff';
-  const tooltipBorder = isDark ? '#272727' : '#dee2e6';
+  const axisLineStroke = isDark ? '#44403c' : '#dee2e6';
+  const tooltipBg = isDark ? '#292524' : '#fff';
+  const tooltipBorder = isDark ? '#44403c' : '#dee2e6';
   const tooltipColor = isDark ? '#E0E0E0' : undefined;
 
   // Extract usage fields with null safety
@@ -344,7 +341,7 @@ export const BillingPage: React.FC = () => {
             </Group>
           </Stack>
           {tenantContext?.hasStripeBilling && (
-            <Button color="brand" onClick={handleManageSubscription}>
+            <Button color="action" onClick={handleManageSubscription}>
               Manage subscription
             </Button>
           )}
@@ -554,12 +551,9 @@ export const BillingPage: React.FC = () => {
                 <Text size="lg" fw={700} mb="sm">{formatCurrency(addon.price)}<Text span size="xs" c="dimmed">/mo</Text></Text>
                 {tierMet ? (
                   <Button
-                    variant="outline"
-                    color="brand"
+                    color="action"
                     fullWidth
                     onClick={() => onNotify('Add-on checkout coming soon.', 'info')}
-                    onMouseEnter={(e) => { (e.currentTarget as HTMLElement).style.background = 'rgba(255, 255, 255, 0.06)'; }}
-                    onMouseLeave={(e) => { (e.currentTarget as HTMLElement).style.background = ''; }}
                   >
                     Subscribe
                   </Button>
@@ -584,7 +578,7 @@ export const BillingPage: React.FC = () => {
                 View invoice history, update payment methods, and manage your subscription through Stripe.
               </Text>
             </div>
-            <Button color="brand" size="md" onClick={handleManageBilling}>
+            <Button color="action" size="md" onClick={handleManageBilling}>
               Manage billing
             </Button>
           </Group>

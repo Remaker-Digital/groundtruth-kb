@@ -178,7 +178,7 @@ export function SupportDiagnosticsPage() {
 
   return (
     <Stack gap="lg">
-      <Title order={3} c="#F5F5F5">Support Diagnostics</Title>
+      <Title order={3} c="#fafaf9">Support Diagnostics</Title>
 
       {/* Tenant lookup */}
       <Group>
@@ -210,7 +210,7 @@ export function SupportDiagnosticsPage() {
 
           {/* Summary cards */}
           <SimpleGrid cols={{ base: 1, sm: 2, md: 4 }} spacing="md">
-            <Card withBorder padding="md" radius="md" bg="#1f1f1f">
+            <Card withBorder padding="md" radius="md" bg="#292524">
               <Text c="dimmed" size="xs" tt="uppercase" fw={600}>Status</Text>
               <Badge
                 variant="filled"
@@ -221,17 +221,17 @@ export function SupportDiagnosticsPage() {
                 {data.status}
               </Badge>
             </Card>
-            <Card withBorder padding="md" radius="md" bg="#1f1f1f">
+            <Card withBorder padding="md" radius="md" bg="#292524">
               <Text c="dimmed" size="xs" tt="uppercase" fw={600}>Tier</Text>
-              <Text fw={700} size="lg" c="#F5F5F5" mt={4}>{data.tier ?? '—'}</Text>
+              <Text fw={700} size="lg" c="#fafaf9" mt={4}>{data.tier ?? '—'}</Text>
             </Card>
-            <Card withBorder padding="md" radius="md" bg="#1f1f1f">
+            <Card withBorder padding="md" radius="md" bg="#292524">
               <Text c="dimmed" size="xs" tt="uppercase" fw={600}>Billing Channel</Text>
-              <Text fw={700} size="lg" c="#F5F5F5" mt={4}>{data.billingChannel ?? '—'}</Text>
+              <Text fw={700} size="lg" c="#fafaf9" mt={4}>{data.billingChannel ?? '—'}</Text>
             </Card>
-            <Card withBorder padding="md" radius="md" bg="#1f1f1f">
+            <Card withBorder padding="md" radius="md" bg="#292524">
               <Text c="dimmed" size="xs" tt="uppercase" fw={600}>Created</Text>
-              <Text fw={500} size="sm" c="#F5F5F5" mt={4}>
+              <Text fw={500} size="sm" c="#fafaf9" mt={4}>
                 {data.createdAt ? new Date(data.createdAt).toLocaleDateString() : '—'}
               </Text>
             </Card>
@@ -239,7 +239,7 @@ export function SupportDiagnosticsPage() {
 
           {/* Config state + AI config */}
           <SimpleGrid cols={{ base: 1, sm: 2 }} spacing="md">
-            <Card withBorder padding="md" radius="md" bg="#1f1f1f">
+            <Card withBorder padding="md" radius="md" bg="#292524">
               <Text c="dimmed" size="xs" tt="uppercase" fw={600} mb="sm">Configuration State</Text>
               <Stack gap="xs">
                 <Group justify="space-between">
@@ -256,17 +256,17 @@ export function SupportDiagnosticsPage() {
                 </Group>
                 <Group justify="space-between">
                   <Text size="sm" c="#A0A0A0">Active Version</Text>
-                  <Text size="sm" c="#F5F5F5">{data.configState.activeVersion ?? '—'}</Text>
+                  <Text size="sm" c="#fafaf9">{data.configState.activeVersion ?? '—'}</Text>
                 </Group>
               </Stack>
             </Card>
 
-            <Card withBorder padding="md" radius="md" bg="#1f1f1f">
+            <Card withBorder padding="md" radius="md" bg="#292524">
               <Text c="dimmed" size="xs" tt="uppercase" fw={600} mb="sm">AI Configuration</Text>
               <Stack gap="xs">
                 <Group justify="space-between">
                   <Text size="sm" c="#A0A0A0">Model</Text>
-                  <Text size="sm" c="#F5F5F5">{data.aiConfig.model ?? '—'}</Text>
+                  <Text size="sm" c="#fafaf9">{data.aiConfig.model ?? '—'}</Text>
                 </Group>
                 <Group justify="space-between">
                   <Text size="sm" c="#A0A0A0">Brand Name</Text>
@@ -282,12 +282,12 @@ export function SupportDiagnosticsPage() {
 
           {/* Knowledge Base + Team + Conversations */}
           <SimpleGrid cols={{ base: 1, sm: 3 }} spacing="md">
-            <Card withBorder padding="md" radius="md" bg="#1f1f1f">
+            <Card withBorder padding="md" radius="md" bg="#292524">
               <Text c="dimmed" size="xs" tt="uppercase" fw={600} mb="sm">Knowledge Base</Text>
               <Stack gap="xs">
                 <Group justify="space-between">
                   <Text size="sm" c="#A0A0A0">Total Articles</Text>
-                  <Text size="sm" fw={600} c="#F5F5F5">{data.knowledgeBase.totalArticles}</Text>
+                  <Text size="sm" fw={600} c="#fafaf9">{data.knowledgeBase.totalArticles}</Text>
                 </Group>
                 <Group justify="space-between">
                   <Text size="sm" c="#A0A0A0">Active</Text>
@@ -300,12 +300,12 @@ export function SupportDiagnosticsPage() {
               </Stack>
             </Card>
 
-            <Card withBorder padding="md" radius="md" bg="#1f1f1f">
+            <Card withBorder padding="md" radius="md" bg="#292524">
               <Text c="dimmed" size="xs" tt="uppercase" fw={600} mb="sm">Team</Text>
               <Stack gap="xs">
                 <Group justify="space-between">
                   <Text size="sm" c="#A0A0A0">Members</Text>
-                  <Text size="sm" fw={600} c="#F5F5F5">{data.team?.memberCount ?? 0}</Text>
+                  <Text size="sm" fw={600} c="#fafaf9">{data.team?.memberCount ?? 0}</Text>
                 </Group>
                 {Object.entries(data.team?.rolesBreakdown ?? {}).map(([role, count]) => (
                   <Group key={role} justify="space-between">
@@ -316,16 +316,16 @@ export function SupportDiagnosticsPage() {
               </Stack>
             </Card>
 
-            <Card withBorder padding="md" radius="md" bg="#1f1f1f">
+            <Card withBorder padding="md" radius="md" bg="#292524">
               <Text c="dimmed" size="xs" tt="uppercase" fw={600} mb="sm">Conversations</Text>
               <Stack gap="xs">
                 <Group justify="space-between">
                   <Text size="sm" c="#A0A0A0">Last 24h</Text>
-                  <Text size="sm" fw={600} c="#F5F5F5">{data.conversations.last24hCount}</Text>
+                  <Text size="sm" fw={600} c="#fafaf9">{data.conversations.last24hCount}</Text>
                 </Group>
                 <Group justify="space-between">
                   <Text size="sm" c="#A0A0A0">Last 7d</Text>
-                  <Text size="sm" c="#F5F5F5">{data.conversations.last7dCount}</Text>
+                  <Text size="sm" c="#fafaf9">{data.conversations.last7dCount}</Text>
                 </Group>
               </Stack>
             </Card>
@@ -333,7 +333,7 @@ export function SupportDiagnosticsPage() {
 
           {/* Integrations + Widget */}
           <SimpleGrid cols={{ base: 1, sm: 2 }} spacing="md">
-            <Card withBorder padding="md" radius="md" bg="#1f1f1f">
+            <Card withBorder padding="md" radius="md" bg="#292524">
               <Text c="dimmed" size="xs" tt="uppercase" fw={600} mb="sm">Integrations</Text>
               <Stack gap="xs">
                 <Group justify="space-between">
@@ -351,7 +351,7 @@ export function SupportDiagnosticsPage() {
               </Stack>
             </Card>
 
-            <Card withBorder padding="md" radius="md" bg="#1f1f1f">
+            <Card withBorder padding="md" radius="md" bg="#292524">
               <Text c="dimmed" size="xs" tt="uppercase" fw={600} mb="sm">Widget Deployment</Text>
               <Stack gap="xs">
                 <Group justify="space-between">
@@ -368,14 +368,14 @@ export function SupportDiagnosticsPage() {
 
           {/* Errors section */}
           <Group justify="space-between" align="baseline" mt="md">
-            <Title order={4} c="#F5F5F5">Recent Errors</Title>
+            <Title order={4} c="#fafaf9">Recent Errors</Title>
             <Button variant="light" size="xs" onClick={handleFetchErrors} loading={errorsLoading}>
               Load Errors
             </Button>
           </Group>
 
           {errors && (
-            <Paper withBorder radius="md" bg="#1f1f1f" style={{ overflow: 'auto' }}>
+            <Paper withBorder radius="md" bg="#292524" style={{ overflow: 'auto' }}>
               <Table striped highlightOnHover>
                 <Table.Thead>
                   <Table.Tr>

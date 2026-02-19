@@ -38,7 +38,7 @@ export const ROLE_COLORS_DARK: Record<string, { bg: string; text: string }> = {
   superadmin: { bg: '#371520', text: '#FCA5A5' },
   admin: { bg: '#2E1065', text: '#C4B5FD' },
   escalation_agent: { bg: '#1E2A47', text: '#93C5FD' },
-  viewer: { bg: '#272727', text: '#A0A0A0' },
+  viewer: { bg: '#44403c', text: '#a8a29e' },
 };
 
 export function getRoleColors(isDark: boolean): Record<string, { bg: string; text: string }> {
@@ -74,16 +74,16 @@ export const LIGHT_PALETTE: ThemePalette = {
 };
 
 export const DARK_PALETTE: ThemePalette = {
-  surface: '#1f1f1f',
-  border: '#272727',
-  borderSubtle: '#2a2a2a',
-  textPrimary: '#E0E0E0',
-  textSecondary: '#A0A0A0',
-  textTertiary: '#B0B0B0',
-  inputBg: '#141414',
-  inputBorder: '#383838',
-  hoverBg: '#272727',
-  modalBg: '#1f1f1f',
+  surface: '#292524',    // Stone 7
+  border: '#44403c',     // Stone 6
+  borderSubtle: '#3a3633',
+  textPrimary: '#f5f5f4', // Stone 1
+  textSecondary: '#a8a29e', // Stone 4
+  textTertiary: '#d6d3d1', // Stone 3
+  inputBg: '#1c1917',    // Stone 8 (page)
+  inputBorder: '#57534e', // Stone 5
+  hoverBg: '#44403c',    // Stone 6
+  modalBg: '#292524',    // Stone 7
   overlayBg: 'rgba(0,0,0,0.6)',
 };
 

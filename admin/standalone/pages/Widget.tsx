@@ -357,25 +357,25 @@ function WidgetPreview({ config, adminIsDark }: { config: WidgetConfig; adminIsD
   const dk = config.colorMode === 'auto' ? adminIsDark : config.colorMode === 'dark';
 
   // Color tokens — light vs dark widget mode (Mazel design revision 2026-02-03 mockup)
-  const panelBg = dk ? '#1f1f1f' : '#fff';
-  const msgAreaBg = dk ? '#141414' : '#fafafa';
-  const agentBubbleBg = dk ? '#1f1f1f' : '#fff';
-  const agentBubbleBorder = dk ? '#272727' : '#e9ecef';
+  const panelBg = dk ? '#292524' : '#fff';
+  const msgAreaBg = dk ? '#1c1917' : '#fafafa';
+  const agentBubbleBg = dk ? '#292524' : '#fff';
+  const agentBubbleBorder = dk ? '#44403c' : '#e9ecef';
   const agentBubbleText = dk ? '#E0E0E0' : '#1f2937';
-  const dateSepBg = dk ? '#1f1f1f' : '#f1f3f5';
+  const dateSepBg = dk ? '#292524' : '#f1f3f5';
   const dateSepText = dk ? '#787878' : '#6b7280';
-  const inputBg = dk ? '#1f1f1f' : '#f1f3f5';
+  const inputBg = dk ? '#292524' : '#f1f3f5';
   const inputText = dk ? '#5C5C5C' : '#9ca3af';
-  const inputBarBg = dk ? '#0a0a0a' : '#fff';
-  const inputBarBorder = dk ? '#272727' : '#e9ecef';
+  const inputBarBg = dk ? '#0c0a09' : '#fff';
+  const inputBarBorder = dk ? '#44403c' : '#e9ecef';
   const brandingText = dk ? '#5C5C5C' : '#9ca3af';
-  const pageBg = dk ? '#141414' : '#f8f9fa';
-  const pageBorder = dk ? '#272727' : '#dee2e6';
+  const pageBg = dk ? '#1c1917' : '#f8f9fa';
+  const pageBorder = dk ? '#44403c' : '#dee2e6';
   // Simulated page chrome
-  const chromeBg = dk ? '#0a0a0a' : '#e9ecef';
-  const chromeBorder = dk ? '#272727' : '#dee2e6';
-  const skeletonDark = dk ? '#1f1f1f' : '#dee2e6';
-  const skeletonLight = dk ? '#0a0a0a' : '#e9ecef';
+  const chromeBg = dk ? '#0c0a09' : '#e9ecef';
+  const chromeBorder = dk ? '#44403c' : '#dee2e6';
+  const skeletonDark = dk ? '#292524' : '#dee2e6';
+  const skeletonLight = dk ? '#0c0a09' : '#e9ecef';
 
   return (
     <Box
@@ -708,12 +708,12 @@ function AvatarDropZone({ onFileSelected, uploading, progress, error }: AvatarDr
         onDrop={handleDrop}
         onClick={() => !uploading && inputRef.current?.click()}
         style={{
-          border: `2px dashed ${dragOver ? '#ff3621' : '#3a3a3a'}`,
+          border: `2px dashed ${dragOver ? '#3B82F6' : '#44403c'}`,
           borderRadius: '8px',
           padding: '20px 16px',
           textAlign: 'center' as const,
           cursor: uploading ? 'default' : 'pointer',
-          backgroundColor: dragOver ? 'rgba(255, 54, 33, 0.03)' : '#1a1a1a',
+          backgroundColor: dragOver ? 'rgba(59, 130, 246, 0.03)' : '#1c1917',
           transition: 'all 0.2s ease',
           opacity: uploading ? 0.7 : 1,
         }}
@@ -833,7 +833,7 @@ export function WidgetPage() {
                   description="When off, the header uses a solid color. When on, it blends left and right colors."
                   checked={config.headerGradientEnabled}
                   onChange={(e) => update('headerGradientEnabled', e.currentTarget.checked)}
-                  color="brand"
+                  color="action"
                 />
                 <Select
                   label="Font family"
@@ -851,7 +851,7 @@ export function WidgetPage() {
                     step={1}
                     value={config.borderRadius}
                     onChange={(val) => update('borderRadius', val)}
-                    color="brand"
+                    color="action"
                     marks={[
                       { value: 0, label: '0' },
                       { value: 8, label: '8' },
@@ -870,7 +870,7 @@ export function WidgetPage() {
                     step={1}
                     value={config.launcherSize}
                     onChange={(val) => update('launcherSize', val)}
-                    color="brand"
+                    color="action"
                     marks={[
                       { value: 48, label: '48' },
                       { value: 60, label: '60' },
@@ -897,7 +897,7 @@ export function WidgetPage() {
                       { label: 'Bottom right', value: 'bottom-right' },
                       { label: 'Bottom left', value: 'bottom-left' },
                     ]}
-                    color="brand"
+                    color="action"
                   />
                   <Group grow mt={8}>
                     <NumberInput
@@ -937,7 +937,7 @@ export function WidgetPage() {
                       { label: 'Dark', value: 'dark' },
                       { label: 'Auto', value: 'auto' },
                     ]}
-                    color="brand"
+                    color="action"
                   />
                 </div>
                 <div>
@@ -953,7 +953,7 @@ export function WidgetPage() {
                       { label: 'Standard', value: 'standard' },
                       { label: 'Wide', value: 'wide' },
                     ]}
-                    color="brand"
+                    color="action"
                   />
                 </div>
                 <div>
@@ -970,7 +970,7 @@ export function WidgetPage() {
                       { label: 'Standard', value: 'standard' },
                       { label: 'Heavy', value: 'heavy' },
                     ]}
-                    color="brand"
+                    color="action"
                   />
                 </div>
               </Stack>
@@ -985,7 +985,7 @@ export function WidgetPage() {
                   label="Greeting message"
                   checked={config.greetingEnabled}
                   onChange={(e) => update('greetingEnabled', e.currentTarget.checked)}
-                  color="brand"
+                  color="action"
                 />
                 <div>
                   <Textarea
@@ -1029,7 +1029,7 @@ export function WidgetPage() {
                   description="Collect visitor name and email before starting a conversation."
                   checked={config.preChatFormEnabled}
                   onChange={(e) => update('preChatFormEnabled', e.currentTarget.checked)}
-                  color="brand"
+                  color="action"
                 />
                 {config.preChatFormEnabled && (
                   <div>
@@ -1043,7 +1043,7 @@ export function WidgetPage() {
                     >
                       <Group gap="xs">
                         {PRE_CHAT_FIELDS.map((field) => (
-                          <Chip key={field} value={field} color="brand" variant="outline">
+                          <Chip key={field} value={field} color="action" variant="outline">
                             {field.charAt(0).toUpperCase() + field.slice(1)}
                           </Chip>
                         ))}
@@ -1055,7 +1055,7 @@ export function WidgetPage() {
                   label="Sound notifications"
                   checked={config.soundEnabled}
                   onChange={(e) => update('soundEnabled', e.currentTarget.checked)}
-                  color="brand"
+                  color="action"
                 />
               </Stack>
             </Paper>
@@ -1102,7 +1102,7 @@ export function WidgetPage() {
                       height: 48,
                       borderRadius: '50%',
                       overflow: 'hidden',
-                      border: '1px solid #272727',
+                      border: '1px solid #44403c',
                       flexShrink: 0,
                     }}>
                       <img
@@ -1158,7 +1158,7 @@ export function WidgetPage() {
               <Button variant="default" onClick={resetDefaults}>
                 Reset to defaults
               </Button>
-              <Button color="brand" onClick={handleSave} loading={saving}>
+              <Button color="action" onClick={handleSave} loading={saving}>
                 Save draft inputs
               </Button>
             </Group>

@@ -300,6 +300,8 @@ export const TeamManager: React.FC<BaseComponentProps> = ({
         <button
           style={s.inviteButton}
           onClick={() => setShowInviteForm(!showInviteForm)}
+          onMouseEnter={(e) => { (e.currentTarget as HTMLButtonElement).style.background = '#2563EB'; }}
+          onMouseLeave={(e) => { (e.currentTarget as HTMLButtonElement).style.background = '#3B82F6'; }}
         >
           {showInviteForm ? 'Cancel' : '+ Invite member'}
         </button>

@@ -166,22 +166,22 @@ export function ProviderLayout({ apiKey, onLogout, children }: ProviderLayoutPro
         navbar={{ width: 260, breakpoint: 'sm', collapsed: { mobile: !opened } }}
         padding="lg"
         styles={{
-          main: { backgroundColor: '#141414', minHeight: '100vh' },
-          header: { backgroundColor: '#0a0a0a', borderBottom: '1px solid #1E1E1E' },
-          navbar: { backgroundColor: '#0a0a0a', borderRight: '1px solid #1E1E1E' },
+          main: { backgroundColor: '#1c1917', minHeight: '100vh' },
+          header: { backgroundColor: '#0c0a09', borderBottom: '1px solid #292524' },
+          navbar: { backgroundColor: '#0c0a09', borderRight: '1px solid #292524' },
         }}
       >
         {/* Header */}
         <AppShell.Header>
           <Group h="100%" px="md" justify="space-between">
             <Group gap="sm">
-              <Burger opened={opened} onClick={toggle} hiddenFrom="sm" size="sm" color="#F5F5F5" />
+              <Burger opened={opened} onClick={toggle} hiddenFrom="sm" size="sm" color="#fafaf9" />
               <img
                 src="/admin/provider/primary-logo-no-wordmark.svg"
                 alt="Agent Red"
                 style={{ height: '28px' }}
               />
-              <Text fw={600} size="sm" c="#F5F5F5">
+              <Text fw={600} size="sm" c="#fafaf9">
                 Provider Console
               </Text>
               {productVersion && (

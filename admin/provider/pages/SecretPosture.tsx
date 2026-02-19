@@ -112,23 +112,23 @@ export function SecretPosturePage() {
 
   return (
     <Stack gap="lg">
-      <Title order={3} c="#F5F5F5">Secret Posture</Title><HelpTooltip text="Cross-tenant inventory of secrets stored in Azure Key Vault. Disabled secrets and missing integrations are flagged." />
+      <Title order={3} c="#fafaf9">Secret Posture</Title><HelpTooltip text="Cross-tenant inventory of secrets stored in Azure Key Vault. Disabled secrets and missing integrations are flagged." />
 
       {/* Summary cards */}
       <SimpleGrid cols={{ base: 1, sm: 2, md: 4 }} spacing="md">
-        <Card withBorder padding="lg" radius="md" bg="#1f1f1f">
+        <Card withBorder padding="lg" radius="md" bg="#292524">
           <Text c="dimmed" size="xs" tt="uppercase" fw={600}>Total Secrets</Text>
-          <Text fw={700} size="xl" c="#F5F5F5" mt={4}>{data.totalSecrets}</Text>
+          <Text fw={700} size="xl" c="#fafaf9" mt={4}>{data.totalSecrets}</Text>
         </Card>
-        <Card withBorder padding="lg" radius="md" bg="#1f1f1f">
+        <Card withBorder padding="lg" radius="md" bg="#292524">
           <Text c="dimmed" size="xs" tt="uppercase" fw={600}>Tenants w/ Shopify</Text>
           <Text fw={700} size="xl" c="#0D7C3E" mt={4}>{data.tenantsWithShopify}</Text>
         </Card>
-        <Card withBorder padding="lg" radius="md" bg="#1f1f1f">
+        <Card withBorder padding="lg" radius="md" bg="#292524">
           <Text c="dimmed" size="xs" tt="uppercase" fw={600}>Tenants w/ Stripe</Text>
           <Text fw={700} size="xl" c="#7C3AED" mt={4}>{data.tenantsWithStripe}</Text>
         </Card>
-        <Card withBorder padding="lg" radius="md" bg="#1f1f1f">
+        <Card withBorder padding="lg" radius="md" bg="#292524">
           <Text c="dimmed" size="xs" tt="uppercase" fw={600}>Tenants w/ API Key</Text>
           <Text fw={700} size="xl" c="#1E88E5" mt={4}>{data.tenantsWithApiKey}</Text>
         </Card>
@@ -136,7 +136,7 @@ export function SecretPosturePage() {
 
       {/* Global type breakdown */}
       {Object.keys(data.secretsByTypeGlobal ?? {}).length > 0 && (
-        <Paper withBorder radius="md" bg="#1f1f1f" p="md">
+        <Paper withBorder radius="md" bg="#292524" p="md">
           <Text size="sm" fw={500} c="#E0E0E0" mb="sm">Secret Types (Global)</Text>
           <Group gap="sm">
             {Object.entries(data.secretsByTypeGlobal ?? {}).map(([type, count]) => (
@@ -154,7 +154,7 @@ export function SecretPosturePage() {
       )}
 
       {/* Per-tenant table */}
-      <Paper withBorder radius="md" bg="#1f1f1f" style={{ overflow: 'auto' }}>
+      <Paper withBorder radius="md" bg="#292524" style={{ overflow: 'auto' }}>
         <Table striped highlightOnHover>
           <Table.Thead>
             <Table.Tr>
@@ -227,7 +227,7 @@ export function SecretPosturePage() {
 
       {/* Errors section */}
       {data.errors.length > 0 && (
-        <Paper withBorder radius="md" bg="#1f1f1f" p="md">
+        <Paper withBorder radius="md" bg="#292524" p="md">
           <Group gap="xs" mb="sm">
             <Badge variant="filled" color="red" size="sm">
               {data.errors.length} Error{data.errors.length !== 1 ? 's' : ''}

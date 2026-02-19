@@ -1,0 +1,1526 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>Agent Red — UI Element Color Reference</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
+<style>
+/* =========================================================================
+   Agent Red — UI Element Color Reference
+   Stand-alone design reference for the UI designer.
+   Shows every element type with exact hex values per state.
+
+   (c) 2026 Remaker Digital, a DBA of VanDusen & Palmeter, LLC. All rights reserved.
+   ========================================================================= */
+
+:root {
+  /* Brand scale (index 0-9, primary = 5) */
+  --brand-0: #FDE8E8;
+  --brand-1: #F2D4D6;
+  --brand-2: #E8A3A7;
+  --brand-3: #DC7278;
+  --brand-4: #D14B52;
+  --brand-5: #ff3621; /* PRIMARY */
+  --brand-6: #B01824;
+  --brand-7: #9B1420; /* hover */
+  --brand-8: #870E18;
+  --brand-9: #720912;
+
+  /* Action color (affirmative controls — buttons, switches, sliders) */
+  --action: #3B82F6;
+  --action-hover: #2563EB;
+  --action-active: #1E40AF;
+
+  /* Dark mode surface hierarchy (Stone neutrals from MantineHub) */
+  --chrome:  #0c0a09;  /* header, sidebar — deepest (Stone 9) */
+  --page:    #1c1917;  /* page background (Stone 8) */
+  --surface: #292524;  /* cards, elevated panels (Stone 7) */
+  --border:  #44403c;  /* all borders (Stone 6) */
+
+  /* Text hierarchy (Stone neutrals) */
+  --text-primary:   #fafaf9;  /* Stone 0 */
+  --text-secondary: #e7e5e4;  /* Stone 2 */
+  --text-muted:     #a8a29e;  /* Stone 4 */
+  --text-secondary2:#78716c;  /* Stone 5 */
+  --text-tertiary:  #57534e;  /* Stone 5 */
+
+  /* Input tokens (Stone dark palette) */
+  --input-bg:     #1c1917;  /* Stone 8 */
+  --input-border: #57534e;  /* Stone 5 */
+
+  /* Semantic colors */
+  --success: #0D7C3E;
+  --warning: #E5A100;
+  --error:   #D32F2F;
+  --info:    #1E3A5F;
+
+  /* Semantic legacy (KB styles) */
+  --danger-legacy:  #d73a49;
+  --success-legacy: #22863a;
+  --warning-legacy: #e36209;
+
+  /* Member status dots */
+  --status-active:   #059669;
+  --status-invited:  #D97706;
+  --status-disabled: #9CA3AF;
+
+  /* Role badge colors (dark mode) */
+  --role-superadmin-bg:   #371520;
+  --role-superadmin-text: #FCA5A5;
+  --role-admin-bg:        #2E1065;
+  --role-admin-text:      #C4B5FD;
+  --role-escalation-bg:   #1E2A47;
+  --role-escalation-text: #93C5FD;
+  --role-viewer-bg:       #44403c;
+  --role-viewer-text:     #a8a29e;
+
+  /* Font */
+  --font: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+  --font-mono: 'JetBrains Mono', ui-monospace, monospace;
+}
+
+* { margin: 0; padding: 0; box-sizing: border-box; }
+html { background: var(--page); color: var(--text-primary); font-family: var(--font); font-size: 14px; }
+body { max-width: 1400px; margin: 0 auto; padding: 32px 24px; }
+
+/* Header */
+.page-header { margin-bottom: 40px; }
+.page-header h1 { font-size: 28px; font-weight: 700; color: var(--brand-5); margin-bottom: 8px; }
+.page-header p { color: var(--text-muted); font-size: 15px; line-height: 1.6; max-width: 800px; }
+
+/* Legend */
+.legend { display: flex; gap: 24px; flex-wrap: wrap; margin-bottom: 32px; padding: 16px 20px; background: var(--surface); border: 1px solid var(--border); border-radius: 8px; }
+.legend-item { display: flex; align-items: center; gap: 8px; font-size: 13px; color: var(--text-muted); }
+.legend-swatch { width: 14px; height: 14px; border-radius: 3px; border: 1px solid var(--border); flex-shrink: 0; }
+
+/* Section headers */
+.section-title { font-size: 20px; font-weight: 700; color: var(--text-primary); margin: 40px 0 8px; padding-bottom: 8px; border-bottom: 2px solid var(--brand-5); display: inline-block; }
+.section-desc { color: var(--text-muted); font-size: 13px; margin-bottom: 20px; }
+
+/* The main reference table */
+.ref-table { width: 100%; border-collapse: collapse; background: var(--surface); border: 1px solid var(--border); border-radius: 8px; overflow: hidden; margin-bottom: 32px; }
+.ref-table thead th { text-align: left; font-size: 11px; font-weight: 600; text-transform: uppercase; letter-spacing: 0.06em; color: var(--text-muted); padding: 10px 14px; background: var(--chrome); border-bottom: 2px solid var(--border); white-space: nowrap; }
+.ref-table tbody td { padding: 14px; border-bottom: 1px solid var(--border); vertical-align: top; font-size: 13px; }
+.ref-table tbody tr:last-child td { border-bottom: none; }
+.ref-table tbody tr:hover { background: rgba(255,255,255,0.02); }
+
+/* Element name column */
+.el-name { font-weight: 600; color: var(--text-primary); white-space: nowrap; }
+.el-mantine { font-family: var(--font-mono); font-size: 11px; color: var(--text-muted); margin-top: 3px; }
+.el-usage { font-size: 12px; color: var(--text-secondary2); margin-top: 4px; font-style: italic; }
+
+/* Color cell with swatch + hex */
+.color-cell { display: flex; flex-direction: column; gap: 4px; }
+.color-row { display: flex; align-items: center; gap: 8px; }
+.swatch { width: 28px; height: 18px; border-radius: 3px; border: 1px solid rgba(255,255,255,0.1); flex-shrink: 0; }
+.hex { font-family: var(--font-mono); font-size: 12px; color: var(--text-secondary); }
+.color-label { font-size: 11px; color: var(--text-tertiary); }
+
+/* Live example column */
+.example-cell { min-width: 180px; }
+
+/* Interactive mock elements */
+.mock-btn { display: inline-block; padding: 8px 16px; border-radius: 6px; font-size: 13px; font-weight: 600; font-family: var(--font); cursor: pointer; transition: all 0.15s ease; border: none; }
+.mock-btn-primary { background: var(--action); color: #fff; }
+.mock-btn-primary:hover { background: var(--action-hover); }
+.mock-btn-primary:active { background: var(--action-active); }
+.mock-btn-primary.disabled { background: var(--action); opacity: 0.5; cursor: not-allowed; pointer-events: none; }
+
+.mock-btn-secondary { background: transparent; color: var(--text-secondary); border: 1px solid var(--border); }
+.mock-btn-secondary:hover { background: var(--chrome); border-color: var(--input-border); }
+.mock-btn-secondary:active { background: #111; }
+.mock-btn-secondary.disabled { opacity: 0.5; cursor: not-allowed; pointer-events: none; }
+
+.mock-btn-danger { background: var(--error); color: #fff; }
+.mock-btn-danger:hover { background: #B91C1C; }
+.mock-btn-danger:active { background: #991B1B; }
+.mock-btn-danger.disabled { background: var(--error); opacity: 0.5; cursor: not-allowed; pointer-events: none; }
+
+.mock-btn-subtle { background: transparent; color: var(--text-muted); border: none; }
+.mock-btn-subtle:hover { background: rgba(255,255,255,0.06); }
+.mock-btn-subtle:active { background: rgba(255,255,255,0.1); }
+
+.mock-action-icon { display: inline-flex; align-items: center; justify-content: center; width: 32px; height: 32px; border-radius: 6px; border: none; cursor: pointer; transition: all 0.15s ease; font-size: 16px; }
+.mock-action-icon-subtle { background: transparent; color: var(--text-muted); }
+.mock-action-icon-subtle:hover { background: rgba(255,255,255,0.06); color: var(--text-secondary); }
+.mock-action-icon-subtle:active { background: rgba(255,255,255,0.1); }
+.mock-action-icon-filled { background: var(--brand-5); color: #fff; }
+.mock-action-icon-filled:hover { background: var(--brand-7); }
+
+.mock-input { padding: 8px 12px; font-size: 14px; font-family: var(--font); background: var(--input-bg); color: var(--text-primary); border: 1px solid var(--border); border-radius: 6px; outline: none; transition: border-color 0.15s ease; width: 200px; }
+.mock-input:hover { border-color: var(--input-border); }
+.mock-input:focus { border-color: var(--action); box-shadow: 0 0 0 1px var(--action); }
+.mock-input.disabled { opacity: 0.5; cursor: not-allowed; background: var(--chrome); }
+.mock-input::placeholder { color: var(--text-tertiary); }
+
+.mock-select { padding: 8px 12px; font-size: 14px; font-family: var(--font); background: var(--input-bg); color: var(--text-primary); border: 1px solid var(--border); border-radius: 6px; outline: none; cursor: pointer; width: 200px; -webkit-appearance: none; }
+.mock-select:hover { border-color: var(--input-border); }
+.mock-select:focus { border-color: var(--action); }
+.mock-select.disabled { opacity: 0.5; cursor: not-allowed; }
+
+.mock-textarea { padding: 8px 12px; font-size: 14px; font-family: var(--font); background: var(--input-bg); color: var(--text-primary); border: 1px solid var(--border); border-radius: 6px; outline: none; resize: vertical; width: 200px; height: 56px; }
+.mock-textarea:hover { border-color: var(--input-border); }
+.mock-textarea:focus { border-color: var(--action); }
+
+.mock-switch { position: relative; display: inline-block; width: 42px; height: 24px; }
+.mock-switch input { opacity: 0; width: 0; height: 0; }
+.mock-switch .slider { position: absolute; top: 0; left: 0; right: 0; bottom: 0; background: var(--input-border); border-radius: 24px; cursor: pointer; transition: 0.2s; }
+.mock-switch .slider:before { content: ""; position: absolute; height: 18px; width: 18px; left: 3px; bottom: 3px; background: #fff; border-radius: 50%; transition: 0.2s; }
+.mock-switch input:checked + .slider { background: var(--action); }
+.mock-switch input:checked + .slider:before { transform: translateX(18px); }
+.mock-switch.disabled { opacity: 0.5; pointer-events: none; }
+
+.mock-checkbox { width: 18px; height: 18px; accent-color: var(--action); cursor: pointer; }
+.mock-checkbox.disabled { opacity: 0.5; pointer-events: none; }
+
+.mock-badge { display: inline-block; padding: 2px 10px; border-radius: 12px; font-size: 12px; font-weight: 600; white-space: nowrap; }
+
+.mock-navlink { display: flex; align-items: center; gap: 10px; padding: 8px 12px; border-radius: 6px; font-size: 14px; font-weight: 500; cursor: pointer; transition: all 0.15s ease; color: var(--text-muted); text-decoration: none; border: none; background: none; width: 100%; text-align: left; }
+.mock-navlink:hover { background: rgba(255,255,255,0.06); color: var(--text-secondary); }
+.mock-navlink.active { background: rgba(255,54,33,0.12); color: var(--brand-5); font-weight: 600; }
+.mock-navlink .nav-icon { width: 20px; text-align: center; }
+
+.mock-tab { display: inline-block; padding: 10px 16px; font-size: 14px; font-weight: 500; color: var(--text-muted); cursor: pointer; border-bottom: 2px solid transparent; transition: all 0.15s ease; background: none; border-top: none; border-left: none; border-right: none; font-family: var(--font); }
+.mock-tab:hover { color: var(--text-secondary); }
+.mock-tab.active { color: var(--action); border-bottom-color: var(--action); font-weight: 600; }
+
+.mock-paper { background: var(--surface); border: 1px solid var(--border); border-radius: 8px; padding: 16px; }
+
+.mock-divider { border: none; border-top: 1px solid var(--border); margin: 8px 0; }
+
+.mock-alert { padding: 12px 16px; border-radius: 8px; font-size: 13px; display: flex; align-items: center; gap: 10px; }
+.mock-alert-info { background: #0e2a47; color: #93C5FD; border: 1px solid #1E3A5F; }
+.mock-alert-success { background: #0a2e1a; color: #6EE7B7; border: 1px solid #0D7C3E; }
+.mock-alert-warning { background: #3b2f00; color: #FCD34D; border: 1px solid #E5A100; }
+.mock-alert-error { background: #371520; color: #FCA5A5; border: 1px solid #D32F2F; }
+
+.mock-tooltip { position: relative; display: inline-block; }
+.mock-tooltip .tip { visibility: hidden; background: var(--chrome); color: var(--text-primary); font-size: 12px; padding: 6px 10px; border-radius: 4px; border: 1px solid var(--border); position: absolute; bottom: 120%; left: 50%; transform: translateX(-50%); white-space: nowrap; z-index: 10; }
+.mock-tooltip:hover .tip { visibility: visible; }
+
+.mock-loader { display: inline-block; width: 22px; height: 22px; border: 3px solid var(--border); border-top-color: var(--brand-5); border-radius: 50%; animation: spin 0.8s linear infinite; }
+@keyframes spin { to { transform: rotate(360deg); } }
+
+.mock-progress { width: 200px; height: 8px; background: var(--border); border-radius: 8px; overflow: hidden; }
+.mock-progress-bar { height: 100%; border-radius: 8px; background: var(--brand-5); }
+
+.mock-chip { display: inline-block; padding: 4px 12px; border-radius: 16px; font-size: 13px; font-weight: 500; border: 1px solid var(--border); color: var(--text-muted); cursor: pointer; transition: all 0.15s ease; background: transparent; font-family: var(--font); }
+.mock-chip:hover { border-color: var(--input-border); background: rgba(255,255,255,0.03); }
+.mock-chip.selected { border-color: var(--action); color: var(--action); background: rgba(59,130,246,0.08); }
+
+.mock-segmented { display: inline-flex; background: var(--chrome); border-radius: 6px; border: 1px solid var(--border); overflow: hidden; }
+.mock-segmented button { padding: 8px 16px; font-size: 13px; font-weight: 500; background: transparent; color: var(--text-muted); border: none; cursor: pointer; font-family: var(--font); transition: all 0.15s ease; }
+.mock-segmented button:hover { color: var(--text-secondary); }
+.mock-segmented button.active { background: var(--surface); color: var(--text-primary); }
+
+.mock-anchor { color: var(--action); text-decoration: none; font-size: 14px; cursor: pointer; transition: color 0.15s ease; }
+.mock-anchor:hover { color: var(--action-hover); text-decoration: underline; }
+
+.mock-copy-btn { display: inline-flex; align-items: center; gap: 6px; padding: 4px 10px; font-size: 12px; font-family: var(--font-mono); background: var(--chrome); color: var(--text-muted); border: 1px solid var(--border); border-radius: 4px; cursor: pointer; transition: all 0.15s ease; }
+.mock-copy-btn:hover { border-color: var(--input-border); color: var(--text-secondary); }
+
+/* State labels within table */
+.state-tag { display: inline-block; font-size: 10px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.04em; padding: 1px 6px; border-radius: 3px; margin-bottom: 2px; }
+.state-tag.normal { background: #1a3a2a; color: #6EE7B7; }
+.state-tag.hover { background: #1E3A5F; color: #93C5FD; }
+.state-tag.active-state { background: #3b2f00; color: #FCD34D; }
+.state-tag.inactive { background: #2a2a2a; color: #787878; }
+.state-tag.focus { background: #2E1065; color: #C4B5FD; }
+
+/* Color palette strips */
+.palette-strip { display: flex; border-radius: 6px; overflow: hidden; margin-bottom: 4px; }
+.palette-cell { flex: 1; height: 36px; display: flex; align-items: center; justify-content: center; font-size: 10px; font-family: var(--font-mono); font-weight: 600; }
+
+/* Flex helpers */
+.flex-row { display: flex; gap: 8px; align-items: center; flex-wrap: wrap; }
+.flex-col { display: flex; flex-direction: column; gap: 4px; }
+.gap-12 { gap: 12px; }
+
+/* Multi-row examples */
+.example-states { display: flex; flex-direction: column; gap: 8px; }
+.example-states .state-label { font-size: 11px; color: var(--text-tertiary); min-width: 54px; display: inline-block; }
+</style>
+</head>
+<body>
+
+<!-- ===================================================================== -->
+<!-- HEADER                                                                 -->
+<!-- ===================================================================== -->
+<div class="page-header">
+  <h1>Agent Red UI Element Color Reference</h1>
+  <p>
+    This page shows every UI element type used in the Agent Red admin console, with its
+    <strong>design token name</strong> (for specification), <strong>Mantine component name</strong>
+    (for implementation), and the <strong>exact hex color values</strong> for each interactive state.
+    Use the element names in this document when specifying color changes.
+  </p>
+</div>
+
+<!-- ===================================================================== -->
+<!-- PALETTE OVERVIEW                                                       -->
+<!-- ===================================================================== -->
+<h2 class="section-title">1. Color Palette</h2>
+<p class="section-desc">All colors in the system. The brand scale is generated from the primary red (#ff3621).</p>
+
+<h3 style="font-size:15px; color:var(--text-secondary); margin: 16px 0 8px;">Brand Scale (10-step)</h3>
+<div class="palette-strip" style="max-width:900px;">
+  <div class="palette-cell" style="background:#FDE8E8; color:#333;">0<br>#FDE8E8</div>
+  <div class="palette-cell" style="background:#F2D4D6; color:#333;">1<br>#F2D4D6</div>
+  <div class="palette-cell" style="background:#E8A3A7; color:#333;">2<br>#E8A3A7</div>
+  <div class="palette-cell" style="background:#DC7278; color:#fff;">3<br>#DC7278</div>
+  <div class="palette-cell" style="background:#D14B52; color:#fff;">4<br>#D14B52</div>
+  <div class="palette-cell" style="background:#ff3621; color:#fff;">5 PRI<br>#ff3621</div>
+  <div class="palette-cell" style="background:#B01824; color:#fff;">6<br>#B01824</div>
+  <div class="palette-cell" style="background:#9B1420; color:#fff;">7 HOV<br>#9B1420</div>
+  <div class="palette-cell" style="background:#870E18; color:#fff;">8<br>#870E18</div>
+  <div class="palette-cell" style="background:#720912; color:#fff;">9<br>#720912</div>
+</div>
+
+<h3 style="font-size:15px; color:var(--text-secondary); margin: 16px 0 8px;">Dark Mode Surface Hierarchy (4-tier depth)</h3>
+<div class="palette-strip" style="max-width:600px;">
+  <div class="palette-cell" style="background:#0c0a09; color:#999;">Chrome<br>#0c0a09</div>
+  <div class="palette-cell" style="background:#1c1917; color:#999;">Page<br>#1c1917</div>
+  <div class="palette-cell" style="background:#292524; color:#999;">Surface<br>#292524</div>
+  <div class="palette-cell" style="background:#44403c; color:#999;">Border<br>#44403c</div>
+</div>
+
+<h3 style="font-size:15px; color:var(--text-secondary); margin: 16px 0 8px;">Text Hierarchy</h3>
+<div class="palette-strip" style="max-width:600px;">
+  <div class="palette-cell" style="background:#fafaf9; color:#333;">Primary<br>#fafaf9</div>
+  <div class="palette-cell" style="background:#E0E0E0; color:#333;">Secondary<br>#E0E0E0</div>
+  <div class="palette-cell" style="background:#A0A0A0; color:#333;">Muted<br>#A0A0A0</div>
+  <div class="palette-cell" style="background:#787878; color:#fff;">Tertiary<br>#787878</div>
+  <div class="palette-cell" style="background:#5C5C5C; color:#fff;">Disabled<br>#5C5C5C</div>
+</div>
+
+<h3 style="font-size:15px; color:var(--text-secondary); margin: 16px 0 8px;">Semantic Colors</h3>
+<div class="palette-strip" style="max-width:500px;">
+  <div class="palette-cell" style="background:#0D7C3E; color:#fff;">Success<br>#0D7C3E</div>
+  <div class="palette-cell" style="background:#E5A100; color:#fff;">Warning<br>#E5A100</div>
+  <div class="palette-cell" style="background:#D32F2F; color:#fff;">Error<br>#D32F2F</div>
+  <div class="palette-cell" style="background:#1E3A5F; color:#fff;">Info<br>#1E3A5F</div>
+</div>
+
+<!-- ===================================================================== -->
+<!-- BUTTONS                                                                -->
+<!-- ===================================================================== -->
+<h2 class="section-title">2. Buttons</h2>
+<p class="section-desc">All button variants. Buttons use <code>cursor: pointer</code> by default; disabled buttons use <code>cursor: not-allowed</code> + 50% opacity.</p>
+
+<table class="ref-table">
+<thead>
+  <tr>
+    <th style="width:200px">Element Name</th>
+    <th>Normal</th>
+    <th>Hover</th>
+    <th>Active (pressed)</th>
+    <th>Inactive (disabled)</th>
+    <th>Live Example</th>
+  </tr>
+</thead>
+<tbody>
+
+<tr>
+  <td>
+    <div class="el-name">Button — Primary</div>
+    <div class="el-mantine">&lt;Button color="brand"&gt;</div>
+    <div class="el-usage">Save, Activate, Invite, Submit</div>
+  </td>
+  <td class="color-cell">
+    <div class="color-row"><div class="swatch" style="background:#ff3621"></div><span class="hex">#ff3621</span></div>
+    <div class="color-label">bg</div>
+    <div class="color-row"><div class="swatch" style="background:#fff"></div><span class="hex">#FFFFFF</span></div>
+    <div class="color-label">text</div>
+  </td>
+  <td class="color-cell">
+    <div class="color-row"><div class="swatch" style="background:#9B1420"></div><span class="hex">#9B1420</span></div>
+    <div class="color-label">bg (brand.7)</div>
+  </td>
+  <td class="color-cell">
+    <div class="color-row"><div class="swatch" style="background:#870E18"></div><span class="hex">#870E18</span></div>
+    <div class="color-label">bg (brand.8)</div>
+  </td>
+  <td class="color-cell">
+    <div class="color-row"><div class="swatch" style="background:#ff3621; opacity:0.5;"></div><span class="hex">#ff3621 @ 50%</span></div>
+    <div class="color-label">opacity: 0.5</div>
+  </td>
+  <td class="example-cell">
+    <div class="example-states">
+      <div><span class="state-label">Normal</span> <button class="mock-btn mock-btn-primary">Save</button></div>
+      <div><span class="state-label">Hover</span> <button class="mock-btn mock-btn-primary" style="background:#9B1420">Save</button></div>
+      <div><span class="state-label">Disabled</span> <button class="mock-btn mock-btn-primary disabled">Save</button></div>
+    </div>
+  </td>
+</tr>
+
+<tr>
+  <td>
+    <div class="el-name">Button — Default</div>
+    <div class="el-mantine">&lt;Button variant="default"&gt;</div>
+    <div class="el-usage">Cancel, Dismiss, Secondary actions</div>
+  </td>
+  <td class="color-cell">
+    <div class="color-row"><div class="swatch" style="background:transparent; border-color:#44403c"></div><span class="hex">transparent</span></div>
+    <div class="color-label">bg</div>
+    <div class="color-row"><div class="swatch" style="background:#44403c"></div><span class="hex">#44403c</span></div>
+    <div class="color-label">border</div>
+    <div class="color-row"><div class="swatch" style="background:#E0E0E0"></div><span class="hex">#E0E0E0</span></div>
+    <div class="color-label">text</div>
+  </td>
+  <td class="color-cell">
+    <div class="color-row"><div class="swatch" style="background:#0c0a09"></div><span class="hex">#0c0a09</span></div>
+    <div class="color-label">bg</div>
+    <div class="color-row"><div class="swatch" style="background:#57534e"></div><span class="hex">#57534e</span></div>
+    <div class="color-label">border</div>
+  </td>
+  <td class="color-cell">
+    <div class="color-row"><div class="swatch" style="background:#111"></div><span class="hex">#111111</span></div>
+    <div class="color-label">bg</div>
+  </td>
+  <td class="color-cell">
+    <span class="hex">opacity: 0.5</span>
+  </td>
+  <td class="example-cell">
+    <div class="example-states">
+      <div><span class="state-label">Normal</span> <button class="mock-btn mock-btn-secondary">Cancel</button></div>
+      <div><span class="state-label">Hover</span> <button class="mock-btn mock-btn-secondary" style="background:#0c0a09; border-color:#57534e;">Cancel</button></div>
+      <div><span class="state-label">Disabled</span> <button class="mock-btn mock-btn-secondary disabled">Cancel</button></div>
+    </div>
+  </td>
+</tr>
+
+<tr>
+  <td>
+    <div class="el-name">Button — Danger</div>
+    <div class="el-mantine">&lt;Button color="red"&gt;</div>
+    <div class="el-usage">Remove, Delete, Deactivate</div>
+  </td>
+  <td class="color-cell">
+    <div class="color-row"><div class="swatch" style="background:#D32F2F"></div><span class="hex">#D32F2F</span></div>
+    <div class="color-label">bg (error)</div>
+    <div class="color-row"><div class="swatch" style="background:#fff"></div><span class="hex">#FFFFFF</span></div>
+    <div class="color-label">text</div>
+  </td>
+  <td class="color-cell">
+    <div class="color-row"><div class="swatch" style="background:#B91C1C"></div><span class="hex">#B91C1C</span></div>
+    <div class="color-label">bg</div>
+  </td>
+  <td class="color-cell">
+    <div class="color-row"><div class="swatch" style="background:#991B1B"></div><span class="hex">#991B1B</span></div>
+    <div class="color-label">bg</div>
+  </td>
+  <td class="color-cell">
+    <span class="hex">opacity: 0.5</span>
+  </td>
+  <td class="example-cell">
+    <div class="example-states">
+      <div><span class="state-label">Normal</span> <button class="mock-btn mock-btn-danger">Remove</button></div>
+      <div><span class="state-label">Hover</span> <button class="mock-btn mock-btn-danger" style="background:#B91C1C">Remove</button></div>
+      <div><span class="state-label">Disabled</span> <button class="mock-btn mock-btn-danger disabled">Remove</button></div>
+    </div>
+  </td>
+</tr>
+
+<tr>
+  <td>
+    <div class="el-name">Button — Subtle</div>
+    <div class="el-mantine">&lt;Button variant="subtle"&gt;</div>
+    <div class="el-usage">Tertiary actions, inline links</div>
+  </td>
+  <td class="color-cell">
+    <div class="color-row"><div class="swatch" style="background:transparent"></div><span class="hex">transparent</span></div>
+    <div class="color-label">bg (no border)</div>
+    <div class="color-row"><div class="swatch" style="background:#A0A0A0"></div><span class="hex">#A0A0A0</span></div>
+    <div class="color-label">text</div>
+  </td>
+  <td class="color-cell">
+    <div class="color-row"><div class="swatch" style="background:rgba(255,255,255,0.06)"></div><span class="hex">rgba(255,255,255,0.06)</span></div>
+    <div class="color-label">bg</div>
+  </td>
+  <td class="color-cell">
+    <div class="color-row"><div class="swatch" style="background:rgba(255,255,255,0.1)"></div><span class="hex">rgba(255,255,255,0.1)</span></div>
+    <div class="color-label">bg</div>
+  </td>
+  <td class="color-cell">
+    <span class="hex">opacity: 0.5</span>
+  </td>
+  <td class="example-cell">
+    <div class="example-states">
+      <div><span class="state-label">Normal</span> <button class="mock-btn mock-btn-subtle">More</button></div>
+      <div><span class="state-label">Hover</span> <button class="mock-btn mock-btn-subtle" style="background:rgba(255,255,255,0.06)">More</button></div>
+    </div>
+  </td>
+</tr>
+
+<tr>
+  <td>
+    <div class="el-name">ActionIcon — Subtle</div>
+    <div class="el-mantine">&lt;ActionIcon variant="subtle"&gt;</div>
+    <div class="el-usage">Dark mode toggle, nav collapse, icon-only actions</div>
+  </td>
+  <td class="color-cell">
+    <div class="color-row"><div class="swatch" style="background:transparent"></div><span class="hex">transparent</span></div>
+    <div class="color-label">bg</div>
+    <div class="color-row"><div class="swatch" style="background:#A0A0A0"></div><span class="hex">#A0A0A0</span></div>
+    <div class="color-label">icon</div>
+  </td>
+  <td class="color-cell">
+    <div class="color-row"><div class="swatch" style="background:rgba(255,255,255,0.06)"></div><span class="hex">rgba(…0.06)</span></div>
+    <div class="color-label">bg</div>
+    <div class="color-row"><div class="swatch" style="background:#E0E0E0"></div><span class="hex">#E0E0E0</span></div>
+    <div class="color-label">icon</div>
+  </td>
+  <td class="color-cell">
+    <div class="color-row"><div class="swatch" style="background:rgba(255,255,255,0.1)"></div><span class="hex">rgba(…0.1)</span></div>
+    <div class="color-label">bg</div>
+  </td>
+  <td class="color-cell">
+    <span class="hex">opacity: 0.5</span>
+  </td>
+  <td class="example-cell">
+    <div class="flex-row gap-12">
+      <button class="mock-action-icon mock-action-icon-subtle" title="Normal">&#9783;</button>
+      <button class="mock-action-icon mock-action-icon-subtle" title="Hover" style="background:rgba(255,255,255,0.06); color:var(--text-secondary)">&#9783;</button>
+    </div>
+  </td>
+</tr>
+
+<tr>
+  <td>
+    <div class="el-name">ActionIcon — Filled</div>
+    <div class="el-mantine">&lt;ActionIcon color="brand"&gt;</div>
+    <div class="el-usage">Primary icon-only buttons</div>
+  </td>
+  <td class="color-cell">
+    <div class="color-row"><div class="swatch" style="background:#ff3621"></div><span class="hex">#ff3621</span></div>
+    <div class="color-label">bg</div>
+    <div class="color-row"><div class="swatch" style="background:#fff"></div><span class="hex">#FFFFFF</span></div>
+    <div class="color-label">icon</div>
+  </td>
+  <td class="color-cell">
+    <div class="color-row"><div class="swatch" style="background:#9B1420"></div><span class="hex">#9B1420</span></div>
+    <div class="color-label">bg (brand.7)</div>
+  </td>
+  <td class="color-cell">
+    <div class="color-row"><div class="swatch" style="background:#870E18"></div><span class="hex">#870E18</span></div>
+  </td>
+  <td class="color-cell"><span class="hex">opacity: 0.5</span></td>
+  <td class="example-cell">
+    <div class="flex-row gap-12">
+      <button class="mock-action-icon mock-action-icon-filled" title="Normal">+</button>
+      <button class="mock-action-icon mock-action-icon-filled" title="Hover" style="background:#9B1420">+</button>
+    </div>
+  </td>
+</tr>
+
+</tbody>
+</table>
+
+<!-- ===================================================================== -->
+<!-- FORM INPUTS                                                            -->
+<!-- ===================================================================== -->
+<h2 class="section-title">3. Form Inputs</h2>
+<p class="section-desc">All form input types. Focus ring uses the action blue color. Borders align with the card border token <code>#44403c</code>.</p>
+
+<table class="ref-table">
+<thead>
+  <tr>
+    <th style="width:200px">Element Name</th>
+    <th>Normal</th>
+    <th>Hover</th>
+    <th>Focus</th>
+    <th>Inactive (disabled)</th>
+    <th>Live Example</th>
+  </tr>
+</thead>
+<tbody>
+
+<tr>
+  <td>
+    <div class="el-name">TextInput</div>
+    <div class="el-mantine">&lt;TextInput&gt;</div>
+    <div class="el-usage">Brand name, API keys, URLs</div>
+  </td>
+  <td class="color-cell">
+    <div class="color-row"><div class="swatch" style="background:#1c1917"></div><span class="hex">#1c1917</span></div>
+    <div class="color-label">bg</div>
+    <div class="color-row"><div class="swatch" style="background:#44403c"></div><span class="hex">#44403c</span></div>
+    <div class="color-label">border</div>
+    <div class="color-row"><div class="swatch" style="background:#fafaf9"></div><span class="hex">#fafaf9</span></div>
+    <div class="color-label">text</div>
+    <div class="color-row"><div class="swatch" style="background:#5C5C5C"></div><span class="hex">#5C5C5C</span></div>
+    <div class="color-label">placeholder</div>
+  </td>
+  <td class="color-cell">
+    <div class="color-row"><div class="swatch" style="background:#57534e"></div><span class="hex">#57534e</span></div>
+    <div class="color-label">border</div>
+  </td>
+  <td class="color-cell">
+    <div class="color-row"><div class="swatch" style="background:#ff3621"></div><span class="hex">#ff3621</span></div>
+    <div class="color-label">border + ring</div>
+  </td>
+  <td class="color-cell">
+    <div class="color-row"><div class="swatch" style="background:#0c0a09"></div><span class="hex">#0c0a09</span></div>
+    <div class="color-label">bg</div>
+    <span class="hex">opacity: 0.5</span>
+  </td>
+  <td class="example-cell">
+    <div class="example-states">
+      <div><span class="state-label">Normal</span> <input class="mock-input" placeholder="Enter value..." /></div>
+      <div><span class="state-label">Disabled</span> <input class="mock-input disabled" value="Locked" disabled /></div>
+    </div>
+  </td>
+</tr>
+
+<tr>
+  <td>
+    <div class="el-name">Textarea</div>
+    <div class="el-mantine">&lt;Textarea&gt;</div>
+    <div class="el-usage">Brand voice, descriptions</div>
+  </td>
+  <td colspan="4" style="color:var(--text-muted); font-size:13px;">Same color tokens as TextInput</td>
+  <td class="example-cell">
+    <textarea class="mock-textarea" placeholder="Multi-line text..."></textarea>
+  </td>
+</tr>
+
+<tr>
+  <td>
+    <div class="el-name">Select / Dropdown</div>
+    <div class="el-mantine">&lt;Select&gt;</div>
+    <div class="el-usage">Role picker, category, tier</div>
+  </td>
+  <td colspan="4" style="color:var(--text-muted); font-size:13px;">Same color tokens as TextInput</td>
+  <td class="example-cell">
+    <select class="mock-select"><option>Choose...</option><option>Option A</option><option>Option B</option></select>
+  </td>
+</tr>
+
+<tr>
+  <td>
+    <div class="el-name">PasswordInput</div>
+    <div class="el-mantine">&lt;PasswordInput&gt;</div>
+    <div class="el-usage">API key entry on login</div>
+  </td>
+  <td colspan="4" style="color:var(--text-muted); font-size:13px;">Same color tokens as TextInput (with trailing eye icon)</td>
+  <td class="example-cell">
+    <input class="mock-input" type="password" value="secret-key" style="width:200px;" />
+  </td>
+</tr>
+
+<tr>
+  <td>
+    <div class="el-name">Switch / Toggle</div>
+    <div class="el-mantine">&lt;Switch&gt;</div>
+    <div class="el-usage">Memory privacy, feature toggles</div>
+  </td>
+  <td class="color-cell">
+    <div class="color-row"><div class="swatch" style="background:#57534e"></div><span class="hex">#57534e</span></div>
+    <div class="color-label">track (off)</div>
+    <div class="color-row"><div class="swatch" style="background:#fff"></div><span class="hex">#FFFFFF</span></div>
+    <div class="color-label">thumb</div>
+  </td>
+  <td class="color-cell">
+    <span class="hex">(no change)</span>
+  </td>
+  <td class="color-cell">
+    <div class="color-row"><div class="swatch" style="background:#ff3621"></div><span class="hex">#ff3621</span></div>
+    <div class="color-label">track (on)</div>
+  </td>
+  <td class="color-cell">
+    <span class="hex">opacity: 0.5</span>
+  </td>
+  <td class="example-cell">
+    <div class="flex-row gap-12">
+      <label class="mock-switch"><input type="checkbox" /><span class="slider"></span></label>
+      <label class="mock-switch"><input type="checkbox" checked /><span class="slider"></span></label>
+      <label class="mock-switch disabled"><input type="checkbox" disabled /><span class="slider"></span></label>
+    </div>
+  </td>
+</tr>
+
+<tr>
+  <td>
+    <div class="el-name">Checkbox</div>
+    <div class="el-mantine">&lt;Checkbox&gt;</div>
+    <div class="el-usage">Multi-select options</div>
+  </td>
+  <td class="color-cell">
+    <div class="color-row"><div class="swatch" style="background:#44403c"></div><span class="hex">#44403c</span></div>
+    <div class="color-label">border (unchecked)</div>
+    <div class="color-row"><div class="swatch" style="background:#ff3621"></div><span class="hex">#ff3621</span></div>
+    <div class="color-label">fill (checked)</div>
+  </td>
+  <td colspan="2" style="color:var(--text-muted); font-size:13px;">Browser default hover glow</td>
+  <td class="color-cell"><span class="hex">opacity: 0.5</span></td>
+  <td class="example-cell">
+    <div class="flex-row gap-12">
+      <input type="checkbox" class="mock-checkbox" />
+      <input type="checkbox" class="mock-checkbox" checked />
+      <input type="checkbox" class="mock-checkbox disabled" disabled />
+    </div>
+  </td>
+</tr>
+
+<tr>
+  <td>
+    <div class="el-name">Chip</div>
+    <div class="el-mantine">&lt;Chip&gt;</div>
+    <div class="el-usage">Inline selectable pills, filters</div>
+  </td>
+  <td class="color-cell">
+    <div class="color-row"><div class="swatch" style="background:transparent; border-color:#44403c;"></div><span class="hex">transparent</span></div>
+    <div class="color-label">bg</div>
+    <div class="color-row"><div class="swatch" style="background:#44403c"></div><span class="hex">#44403c</span></div>
+    <div class="color-label">border</div>
+    <div class="color-row"><div class="swatch" style="background:#A0A0A0"></div><span class="hex">#A0A0A0</span></div>
+    <div class="color-label">text</div>
+  </td>
+  <td class="color-cell">
+    <div class="color-row"><div class="swatch" style="background:#57534e"></div><span class="hex">#57534e</span></div>
+    <div class="color-label">border</div>
+  </td>
+  <td class="color-cell">
+    <div class="color-row"><div class="swatch" style="background:rgba(255,54,33,0.08)"></div><span class="hex">rgba(…0.08)</span></div>
+    <div class="color-label">bg (selected)</div>
+    <div class="color-row"><div class="swatch" style="background:#ff3621"></div><span class="hex">#ff3621</span></div>
+    <div class="color-label">border + text</div>
+  </td>
+  <td class="color-cell"><span class="hex">opacity: 0.5</span></td>
+  <td class="example-cell">
+    <div class="flex-row gap-12">
+      <button class="mock-chip">Filter A</button>
+      <button class="mock-chip selected">Filter B</button>
+    </div>
+  </td>
+</tr>
+
+<tr>
+  <td>
+    <div class="el-name">SegmentedControl</div>
+    <div class="el-mantine">&lt;SegmentedControl&gt;</div>
+    <div class="el-usage">Tab-like selector, view mode</div>
+  </td>
+  <td class="color-cell">
+    <div class="color-row"><div class="swatch" style="background:#0c0a09"></div><span class="hex">#0c0a09</span></div>
+    <div class="color-label">track bg</div>
+    <div class="color-row"><div class="swatch" style="background:#A0A0A0"></div><span class="hex">#A0A0A0</span></div>
+    <div class="color-label">inactive text</div>
+  </td>
+  <td class="color-cell">
+    <div class="color-row"><div class="swatch" style="background:#E0E0E0"></div><span class="hex">#E0E0E0</span></div>
+    <div class="color-label">text (hovered)</div>
+  </td>
+  <td class="color-cell">
+    <div class="color-row"><div class="swatch" style="background:#292524"></div><span class="hex">#292524</span></div>
+    <div class="color-label">active thumb bg</div>
+    <div class="color-row"><div class="swatch" style="background:#fafaf9"></div><span class="hex">#fafaf9</span></div>
+    <div class="color-label">active text</div>
+  </td>
+  <td class="color-cell"><span class="hex">opacity: 0.5</span></td>
+  <td class="example-cell">
+    <div class="mock-segmented">
+      <button class="active">View A</button>
+      <button>View B</button>
+      <button>View C</button>
+    </div>
+  </td>
+</tr>
+
+<tr>
+  <td>
+    <div class="el-name">ColorPicker</div>
+    <div class="el-mantine">&lt;ColorPicker&gt;</div>
+    <div class="el-usage">Widget color config</div>
+  </td>
+  <td colspan="4" style="color:var(--text-muted); font-size:13px;">Native Mantine color picker; border follows card border token (#44403c)</td>
+  <td class="example-cell">
+    <div style="width:24px; height:24px; border-radius:4px; background:var(--brand-5); border:2px solid var(--border); cursor:pointer;"></div>
+  </td>
+</tr>
+
+</tbody>
+</table>
+
+<!-- ===================================================================== -->
+<!-- NAVIGATION                                                             -->
+<!-- ===================================================================== -->
+<h2 class="section-title">4. Navigation</h2>
+<p class="section-desc">Sidebar and tab navigation elements.</p>
+
+<table class="ref-table">
+<thead>
+  <tr>
+    <th style="width:200px">Element Name</th>
+    <th>Normal</th>
+    <th>Hover</th>
+    <th>Active (selected)</th>
+    <th>Inactive (disabled)</th>
+    <th>Live Example</th>
+  </tr>
+</thead>
+<tbody>
+
+<tr>
+  <td>
+    <div class="el-name">NavLink — Sidebar</div>
+    <div class="el-mantine">&lt;NavLink&gt;</div>
+    <div class="el-usage">Main sidebar nav items</div>
+  </td>
+  <td class="color-cell">
+    <div class="color-row"><div class="swatch" style="background:transparent"></div><span class="hex">transparent</span></div>
+    <div class="color-label">bg</div>
+    <div class="color-row"><div class="swatch" style="background:#A0A0A0"></div><span class="hex">#A0A0A0</span></div>
+    <div class="color-label">text + icon</div>
+  </td>
+  <td class="color-cell">
+    <div class="color-row"><div class="swatch" style="background:rgba(255,255,255,0.06)"></div><span class="hex">rgba(…0.06)</span></div>
+    <div class="color-label">bg</div>
+    <div class="color-row"><div class="swatch" style="background:#E0E0E0"></div><span class="hex">#E0E0E0</span></div>
+    <div class="color-label">text</div>
+  </td>
+  <td class="color-cell">
+    <div class="color-row"><div class="swatch" style="background:rgba(255,54,33,0.12)"></div><span class="hex">rgba(255,54,33,0.12)</span></div>
+    <div class="color-label">bg</div>
+    <div class="color-row"><div class="swatch" style="background:#ff3621"></div><span class="hex">#ff3621</span></div>
+    <div class="color-label">text + icon</div>
+  </td>
+  <td class="color-cell">
+    <span class="hex">opacity: 0.5</span>
+  </td>
+  <td class="example-cell" style="background:var(--chrome); border-radius:8px; padding:8px;">
+    <button class="mock-navlink"><span class="nav-icon">&#9632;</span> Dashboard</button>
+    <button class="mock-navlink active"><span class="nav-icon">&#9632;</span> Conversations</button>
+    <button class="mock-navlink"><span class="nav-icon">&#9632;</span> Knowledge Base</button>
+  </td>
+</tr>
+
+<tr>
+  <td>
+    <div class="el-name">Tab</div>
+    <div class="el-mantine">&lt;Tabs.Tab&gt;</div>
+    <div class="el-usage">Page-level tab navigation</div>
+  </td>
+  <td class="color-cell">
+    <div class="color-row"><div class="swatch" style="background:transparent"></div><span class="hex">transparent</span></div>
+    <div class="color-label">bg</div>
+    <div class="color-row"><div class="swatch" style="background:#A0A0A0"></div><span class="hex">#A0A0A0</span></div>
+    <div class="color-label">text</div>
+    <div class="color-row"><div class="swatch" style="background:transparent"></div><span class="hex">transparent</span></div>
+    <div class="color-label">underline</div>
+  </td>
+  <td class="color-cell">
+    <div class="color-row"><div class="swatch" style="background:#E0E0E0"></div><span class="hex">#E0E0E0</span></div>
+    <div class="color-label">text</div>
+  </td>
+  <td class="color-cell">
+    <div class="color-row"><div class="swatch" style="background:#ff3621"></div><span class="hex">#ff3621</span></div>
+    <div class="color-label">text + underline</div>
+  </td>
+  <td class="color-cell"><span class="hex">opacity: 0.5</span></td>
+  <td class="example-cell">
+    <div style="border-bottom:1px solid var(--border); padding-bottom:0;">
+      <button class="mock-tab active">Overview</button>
+      <button class="mock-tab">Settings</button>
+      <button class="mock-tab">History</button>
+    </div>
+  </td>
+</tr>
+
+<tr>
+  <td>
+    <div class="el-name">Anchor / Link</div>
+    <div class="el-mantine">&lt;Anchor&gt;</div>
+    <div class="el-usage">Inline text links</div>
+  </td>
+  <td class="color-cell">
+    <div class="color-row"><div class="swatch" style="background:#ff3621"></div><span class="hex">#ff3621</span></div>
+    <div class="color-label">text</div>
+  </td>
+  <td class="color-cell">
+    <div class="color-row"><div class="swatch" style="background:#9B1420"></div><span class="hex">#9B1420</span></div>
+    <div class="color-label">text + underline</div>
+  </td>
+  <td colspan="2" style="color:var(--text-muted); font-size:13px;">n/a</td>
+  <td class="example-cell">
+    <a class="mock-anchor">View documentation</a>
+  </td>
+</tr>
+
+</tbody>
+</table>
+
+<!-- ===================================================================== -->
+<!-- BADGES & STATUS                                                        -->
+<!-- ===================================================================== -->
+<h2 class="section-title">5. Badges & Status Indicators</h2>
+<p class="section-desc">Non-interactive display elements. Badges use Mantine's <code>variant</code> prop to control rendering.</p>
+
+<table class="ref-table">
+<thead>
+  <tr>
+    <th style="width:200px">Element Name</th>
+    <th>Colors</th>
+    <th>Live Examples</th>
+  </tr>
+</thead>
+<tbody>
+
+<tr>
+  <td>
+    <div class="el-name">Badge — Light</div>
+    <div class="el-mantine">&lt;Badge variant="light"&gt;</div>
+    <div class="el-usage">Tier badges, category tags</div>
+  </td>
+  <td class="color-cell">
+    <div class="color-label">Tinted bg + saturated text (per color prop)</div>
+    <div style="margin-top:4px;">
+      <div class="color-row"><div class="swatch" style="background:#FDE8E8"></div><span class="hex">brand → bg: #FDE8E8, text: #ff3621</span></div>
+    </div>
+  </td>
+  <td class="example-cell">
+    <div class="flex-row gap-12">
+      <span class="mock-badge" style="background:rgba(255,54,33,0.1); color:#ff3621;">Brand</span>
+      <span class="mock-badge" style="background:rgba(59,130,246,0.1); color:#60A5FA;">Starter</span>
+      <span class="mock-badge" style="background:rgba(34,197,94,0.1); color:#4ADE80;">Professional</span>
+      <span class="mock-badge" style="background:rgba(250,204,21,0.12); color:#FACC15;">Trial</span>
+      <span class="mock-badge" style="background:rgba(168,85,247,0.1); color:#C084FC;">Enterprise</span>
+    </div>
+  </td>
+</tr>
+
+<tr>
+  <td>
+    <div class="el-name">Badge — Filled</div>
+    <div class="el-mantine">&lt;Badge variant="filled"&gt;</div>
+    <div class="el-usage">Nav count badges</div>
+  </td>
+  <td class="color-cell">
+    <div class="color-row"><div class="swatch" style="background:#ff3621"></div><span class="hex">#ff3621 bg, #fff text</span></div>
+  </td>
+  <td class="example-cell">
+    <span class="mock-badge" style="background:#ff3621; color:#fff;">3</span>
+  </td>
+</tr>
+
+<tr>
+  <td>
+    <div class="el-name">Badge — Dot</div>
+    <div class="el-mantine">&lt;Badge variant="dot"&gt;</div>
+    <div class="el-usage">Status: Active / Inactive / Pending</div>
+  </td>
+  <td class="color-cell">
+    <div class="color-label">Colored dot + muted text</div>
+    <div class="color-row" style="margin-top:4px;"><div class="swatch" style="background:#059669"></div><span class="hex">green → #059669 (Active)</span></div>
+    <div class="color-row"><div class="swatch" style="background:#D32F2F"></div><span class="hex">red → #D32F2F (Inactive)</span></div>
+    <div class="color-row"><div class="swatch" style="background:#E5A100"></div><span class="hex">yellow → #E5A100 (Pending)</span></div>
+  </td>
+  <td class="example-cell">
+    <div class="flex-row gap-12">
+      <span class="mock-badge" style="background:transparent; color:#A0A0A0; border:1px solid var(--border);"><span style="display:inline-block;width:7px;height:7px;border-radius:50%;background:#059669;margin-right:6px;"></span>Active</span>
+      <span class="mock-badge" style="background:transparent; color:#A0A0A0; border:1px solid var(--border);"><span style="display:inline-block;width:7px;height:7px;border-radius:50%;background:#D32F2F;margin-right:6px;"></span>Inactive</span>
+      <span class="mock-badge" style="background:transparent; color:#A0A0A0; border:1px solid var(--border);"><span style="display:inline-block;width:7px;height:7px;border-radius:50%;background:#E5A100;margin-right:6px;"></span>Pending</span>
+    </div>
+  </td>
+</tr>
+
+<tr>
+  <td>
+    <div class="el-name">Badge — Outline</div>
+    <div class="el-mantine">&lt;Badge variant="outline"&gt;</div>
+    <div class="el-usage">Subtle labels</div>
+  </td>
+  <td class="color-cell">
+    <div class="color-row"><div class="swatch" style="background:transparent; border:2px solid #44403c;"></div><span class="hex">transparent bg, #44403c border</span></div>
+  </td>
+  <td class="example-cell">
+    <span class="mock-badge" style="background:transparent; color:#A0A0A0; border:1px solid #44403c;">Outline</span>
+  </td>
+</tr>
+
+<tr>
+  <td>
+    <div class="el-name">Role Badge</div>
+    <div class="el-mantine">Custom CSS-in-JS</div>
+    <div class="el-usage">Team member role display</div>
+  </td>
+  <td class="color-cell">
+    <div class="color-row"><div class="swatch" style="background:#371520"></div><span class="hex">Superadmin: #371520 / #FCA5A5</span></div>
+    <div class="color-row"><div class="swatch" style="background:#2E1065"></div><span class="hex">Admin: #2E1065 / #C4B5FD</span></div>
+    <div class="color-row"><div class="swatch" style="background:#1E2A47"></div><span class="hex">Escalation: #1E2A47 / #93C5FD</span></div>
+    <div class="color-row"><div class="swatch" style="background:#44403c"></div><span class="hex">Viewer: #44403c / #A0A0A0</span></div>
+  </td>
+  <td class="example-cell">
+    <div class="flex-row gap-12">
+      <span class="mock-badge" style="background:#371520; color:#FCA5A5;">Superadmin</span>
+      <span class="mock-badge" style="background:#2E1065; color:#C4B5FD;">Admin</span>
+      <span class="mock-badge" style="background:#1E2A47; color:#93C5FD;">Escalation</span>
+      <span class="mock-badge" style="background:#44403c; color:#A0A0A0;">Viewer</span>
+    </div>
+  </td>
+</tr>
+
+<tr>
+  <td>
+    <div class="el-name">Status Dot</div>
+    <div class="el-mantine">Custom CSS-in-JS</div>
+    <div class="el-usage">Member status (table rows)</div>
+  </td>
+  <td class="color-cell">
+    <div class="color-row"><div class="swatch" style="background:#059669"></div><span class="hex">Active: #059669</span></div>
+    <div class="color-row"><div class="swatch" style="background:#D97706"></div><span class="hex">Invited: #D97706</span></div>
+    <div class="color-row"><div class="swatch" style="background:#9CA3AF"></div><span class="hex">Disabled: #9CA3AF</span></div>
+  </td>
+  <td class="example-cell">
+    <div class="flex-col" style="gap:6px;">
+      <div class="flex-row"><span style="width:8px;height:8px;border-radius:50%;background:#059669;"></span> <span style="font-size:13px;color:var(--text-secondary2);">Active</span></div>
+      <div class="flex-row"><span style="width:8px;height:8px;border-radius:50%;background:#D97706;"></span> <span style="font-size:13px;color:var(--text-secondary2);">Invited</span></div>
+      <div class="flex-row"><span style="width:8px;height:8px;border-radius:50%;background:#9CA3AF;"></span> <span style="font-size:13px;color:var(--text-secondary2);">Disabled</span></div>
+    </div>
+  </td>
+</tr>
+
+<tr>
+  <td>
+    <div class="el-name">KB Status Badge</div>
+    <div class="el-mantine">Custom CSS-in-JS</div>
+    <div class="el-usage">Article status in Knowledge Base</div>
+  </td>
+  <td class="color-cell">
+    <div class="color-row"><div class="swatch" style="background:#dcffe4"></div><span class="hex">Published: #dcffe4 / #22863a</span></div>
+    <div class="color-row"><div class="swatch" style="background:#fff8c5"></div><span class="hex">Draft: #fff8c5 / #e36209</span></div>
+    <div class="color-row"><div class="swatch" style="background:#f6f8fa"></div><span class="hex">Archived: #f6f8fa / #6a737d</span></div>
+  </td>
+  <td class="example-cell">
+    <div class="flex-row gap-12">
+      <span class="mock-badge" style="background:#dcffe4; color:#22863a;">Published</span>
+      <span class="mock-badge" style="background:#fff8c5; color:#e36209;">Draft</span>
+      <span class="mock-badge" style="background:#f6f8fa; color:#6a737d;">Archived</span>
+    </div>
+  </td>
+</tr>
+
+<tr>
+  <td>
+    <div class="el-name">Staleness Badge</div>
+    <div class="el-mantine">Custom CSS-in-JS</div>
+    <div class="el-usage">KB article freshness</div>
+  </td>
+  <td class="color-cell">
+    <div class="color-row"><div class="swatch" style="background:#dcffe4"></div><span class="hex">Fresh: #dcffe4 / #22863a</span></div>
+    <div class="color-row"><div class="swatch" style="background:#fff8c5"></div><span class="hex">Aging: #fff8c5 / #e36209</span></div>
+    <div class="color-row"><div class="swatch" style="background:#ffeef0"></div><span class="hex">Stale: #ffeef0 / #d73a49</span></div>
+  </td>
+  <td class="example-cell">
+    <div class="flex-row gap-12">
+      <span class="mock-badge" style="background:#dcffe4; color:#22863a;">Fresh</span>
+      <span class="mock-badge" style="background:#fff8c5; color:#e36209;">Aging</span>
+      <span class="mock-badge" style="background:#ffeef0; color:#d73a49;">Stale</span>
+    </div>
+  </td>
+</tr>
+
+</tbody>
+</table>
+
+<!-- ===================================================================== -->
+<!-- CONTAINERS & SURFACES                                                  -->
+<!-- ===================================================================== -->
+<h2 class="section-title">6. Containers & Surfaces</h2>
+<p class="section-desc">Structural elements that form the visual depth hierarchy.</p>
+
+<table class="ref-table">
+<thead>
+  <tr>
+    <th style="width:200px">Element Name</th>
+    <th>Colors</th>
+    <th>Live Example</th>
+  </tr>
+</thead>
+<tbody>
+
+<tr>
+  <td>
+    <div class="el-name">AppShell Header</div>
+    <div class="el-mantine">&lt;AppShell.Header&gt;</div>
+    <div class="el-usage">Top header bar</div>
+  </td>
+  <td class="color-cell">
+    <div class="color-row"><div class="swatch" style="background:#0c0a09"></div><span class="hex">#0c0a09</span></div>
+    <div class="color-label">bg (chrome)</div>
+    <div class="color-row"><div class="swatch" style="background:#44403c"></div><span class="hex">#44403c</span></div>
+    <div class="color-label">bottom border</div>
+  </td>
+  <td class="example-cell">
+    <div style="background:#0c0a09; padding:12px 16px; border-bottom:1px solid #44403c; border-radius:6px; color:#fafaf9; font-weight:600; font-size:14px;">
+      Agent Red &mdash; Admin Console
+    </div>
+  </td>
+</tr>
+
+<tr>
+  <td>
+    <div class="el-name">AppShell Sidebar</div>
+    <div class="el-mantine">&lt;AppShell.Navbar&gt;</div>
+    <div class="el-usage">Left sidebar (260px)</div>
+  </td>
+  <td class="color-cell">
+    <div class="color-row"><div class="swatch" style="background:#0c0a09"></div><span class="hex">#0c0a09</span></div>
+    <div class="color-label">bg (chrome)</div>
+    <div class="color-row"><div class="swatch" style="background:#44403c"></div><span class="hex">#44403c</span></div>
+    <div class="color-label">right border</div>
+  </td>
+  <td></td>
+</tr>
+
+<tr>
+  <td>
+    <div class="el-name">Page Background</div>
+    <div class="el-mantine">&lt;AppShell.Main&gt;</div>
+    <div class="el-usage">Main content area</div>
+  </td>
+  <td class="color-cell">
+    <div class="color-row"><div class="swatch" style="background:#1c1917"></div><span class="hex">#1c1917</span></div>
+    <div class="color-label">bg (page)</div>
+  </td>
+  <td></td>
+</tr>
+
+<tr>
+  <td>
+    <div class="el-name">Paper / Card</div>
+    <div class="el-mantine">&lt;Paper&gt;</div>
+    <div class="el-usage">Content cards, form containers</div>
+  </td>
+  <td class="color-cell">
+    <div class="color-row"><div class="swatch" style="background:#292524"></div><span class="hex">#292524</span></div>
+    <div class="color-label">bg (surface)</div>
+    <div class="color-row"><div class="swatch" style="background:#44403c"></div><span class="hex">#44403c</span></div>
+    <div class="color-label">border</div>
+  </td>
+  <td class="example-cell">
+    <div class="mock-paper">
+      <div style="font-weight:600; margin-bottom:6px;">Card Title</div>
+      <div style="color:var(--text-muted); font-size:13px;">Card body content on an elevated surface.</div>
+    </div>
+  </td>
+</tr>
+
+<tr>
+  <td>
+    <div class="el-name">Modal</div>
+    <div class="el-mantine">&lt;Modal&gt;</div>
+    <div class="el-usage">Dialogs, confirmations</div>
+  </td>
+  <td class="color-cell">
+    <div class="color-row"><div class="swatch" style="background:#292524"></div><span class="hex">#292524</span></div>
+    <div class="color-label">bg (surface)</div>
+    <div class="color-row"><div class="swatch" style="background:#44403c"></div><span class="hex">#44403c</span></div>
+    <div class="color-label">border</div>
+    <div class="color-row"><div class="swatch" style="background:rgba(0,0,0,0.6)"></div><span class="hex">rgba(0,0,0,0.6)</span></div>
+    <div class="color-label">overlay</div>
+  </td>
+  <td></td>
+</tr>
+
+<tr>
+  <td>
+    <div class="el-name">Divider</div>
+    <div class="el-mantine">&lt;Divider&gt;</div>
+    <div class="el-usage">Section separators</div>
+  </td>
+  <td class="color-cell">
+    <div class="color-row"><div class="swatch" style="background:#44403c"></div><span class="hex">#44403c</span></div>
+    <div class="color-label">color</div>
+  </td>
+  <td class="example-cell" style="padding:8px 14px;">
+    <div style="color:var(--text-muted); font-size:13px;">Above</div>
+    <hr class="mock-divider" />
+    <div style="color:var(--text-muted); font-size:13px;">Below</div>
+  </td>
+</tr>
+
+</tbody>
+</table>
+
+<!-- ===================================================================== -->
+<!-- TABLE                                                                  -->
+<!-- ===================================================================== -->
+<h2 class="section-title">7. Data Table</h2>
+<p class="section-desc">Table elements used in team members, conversations, knowledge base, and quick actions.</p>
+
+<table class="ref-table">
+<thead>
+  <tr>
+    <th style="width:200px">Element Name</th>
+    <th>Colors</th>
+    <th>Live Example</th>
+  </tr>
+</thead>
+<tbody>
+
+<tr>
+  <td>
+    <div class="el-name">Table Header Cell</div>
+    <div class="el-mantine">&lt;Table.Th&gt; or custom &lt;th&gt;</div>
+  </td>
+  <td class="color-cell">
+    <div class="color-row"><div class="swatch" style="background:#A0A0A0"></div><span class="hex">#A0A0A0</span></div>
+    <div class="color-label">text (uppercase, 12px, 600)</div>
+    <div class="color-row"><div class="swatch" style="background:#44403c"></div><span class="hex">#44403c</span></div>
+    <div class="color-label">bottom border (2px)</div>
+  </td>
+  <td rowspan="4" class="example-cell">
+    <table style="width:100%; border-collapse:collapse;">
+      <thead>
+        <tr>
+          <th style="text-align:left; font-size:11px; font-weight:600; color:#A0A0A0; text-transform:uppercase; letter-spacing:0.05em; padding:8px 12px; border-bottom:2px solid #44403c;">Name</th>
+          <th style="text-align:left; font-size:11px; font-weight:600; color:#A0A0A0; text-transform:uppercase; letter-spacing:0.05em; padding:8px 12px; border-bottom:2px solid #44403c;">Role</th>
+          <th style="text-align:left; font-size:11px; font-weight:600; color:#A0A0A0; text-transform:uppercase; letter-spacing:0.05em; padding:8px 12px; border-bottom:2px solid #44403c;">Status</th>
+        </tr>
+      </thead>
+      <tbody>
+        <tr>
+          <td style="padding:10px 12px; border-bottom:1px solid #44403c; font-size:14px; color:#E0E0E0;">
+            <div style="font-weight:600; color:#E0E0E0;">Alice Chen</div>
+            <div style="font-size:12px; color:#A0A0A0;">alice@example.com</div>
+          </td>
+          <td style="padding:10px 12px; border-bottom:1px solid #44403c;"><span class="mock-badge" style="background:#2E1065; color:#C4B5FD;">Admin</span></td>
+          <td style="padding:10px 12px; border-bottom:1px solid #44403c;"><span style="display:inline-flex;align-items:center;gap:6px;font-size:13px;color:#787878;"><span style="width:8px;height:8px;border-radius:50%;background:#059669;"></span>Active</span></td>
+        </tr>
+        <tr style="opacity:0.55;">
+          <td style="padding:10px 12px; border-bottom:1px solid #44403c; font-size:14px; color:#E0E0E0;">
+            <div style="font-weight:600; color:#E0E0E0;">Bob Smith</div>
+            <div style="font-size:12px; color:#A0A0A0;">bob@example.com</div>
+          </td>
+          <td style="padding:10px 12px; border-bottom:1px solid #44403c;"><span class="mock-badge" style="background:#44403c; color:#A0A0A0;">Viewer</span></td>
+          <td style="padding:10px 12px; border-bottom:1px solid #44403c;"><span style="display:inline-flex;align-items:center;gap:6px;font-size:13px;color:#787878;"><span style="width:8px;height:8px;border-radius:50%;background:#9CA3AF;"></span>Disabled</span></td>
+        </tr>
+      </tbody>
+    </table>
+  </td>
+</tr>
+
+<tr>
+  <td>
+    <div class="el-name">Table Data Cell</div>
+    <div class="el-mantine">&lt;Table.Td&gt; or custom &lt;td&gt;</div>
+  </td>
+  <td class="color-cell">
+    <div class="color-row"><div class="swatch" style="background:#E0E0E0"></div><span class="hex">#E0E0E0</span></div>
+    <div class="color-label">primary text</div>
+    <div class="color-row"><div class="swatch" style="background:#A0A0A0"></div><span class="hex">#A0A0A0</span></div>
+    <div class="color-label">secondary text</div>
+    <div class="color-row"><div class="swatch" style="background:#44403c"></div><span class="hex">#44403c</span></div>
+    <div class="color-label">row border</div>
+  </td>
+</tr>
+
+<tr>
+  <td>
+    <div class="el-name">Table Row — Disabled</div>
+    <div class="el-mantine">Custom inline style</div>
+  </td>
+  <td class="color-cell">
+    <span class="hex">opacity: 0.55</span>
+    <div class="color-label">entire row</div>
+  </td>
+</tr>
+
+<tr>
+  <td>
+    <div class="el-name">Icon Button (table)</div>
+    <div class="el-mantine">Custom &lt;button&gt;</div>
+    <div class="el-usage">Edit, delete row actions</div>
+  </td>
+  <td class="color-cell">
+    <div class="color-row"><div class="swatch" style="background:rgba(255,255,255,0.06)"></div><span class="hex">rgba(…0.06)</span></div>
+    <div class="color-label">bg</div>
+    <div class="color-row"><div class="swatch" style="background:rgba(255,255,255,0.12); border-color:rgba(255,255,255,0.12);"></div><span class="hex">rgba(…0.12)</span></div>
+    <div class="color-label">border</div>
+    <div class="color-row"><div class="swatch" style="background:#A0A0A0"></div><span class="hex">#A0A0A0</span></div>
+    <div class="color-label">icon</div>
+  </td>
+</tr>
+
+</tbody>
+</table>
+
+<!-- ===================================================================== -->
+<!-- FEEDBACK & ALERTS                                                      -->
+<!-- ===================================================================== -->
+<h2 class="section-title">8. Feedback & Alerts</h2>
+<p class="section-desc">Alerts, toasts, progress indicators, and loading states.</p>
+
+<table class="ref-table">
+<thead>
+  <tr>
+    <th style="width:200px">Element Name</th>
+    <th>Colors</th>
+    <th>Live Example</th>
+  </tr>
+</thead>
+<tbody>
+
+<tr>
+  <td>
+    <div class="el-name">Alert — Info</div>
+    <div class="el-mantine">&lt;Alert color="blue"&gt;</div>
+  </td>
+  <td class="color-cell">
+    <div class="color-row"><div class="swatch" style="background:#0e2a47"></div><span class="hex">bg: #0e2a47</span></div>
+    <div class="color-row"><div class="swatch" style="background:#1E3A5F"></div><span class="hex">border: #1E3A5F</span></div>
+    <div class="color-row"><div class="swatch" style="background:#93C5FD"></div><span class="hex">text: #93C5FD</span></div>
+  </td>
+  <td class="example-cell"><div class="mock-alert mock-alert-info">&#9432; This is an informational message.</div></td>
+</tr>
+
+<tr>
+  <td>
+    <div class="el-name">Alert — Success</div>
+    <div class="el-mantine">&lt;Alert color="green"&gt;</div>
+  </td>
+  <td class="color-cell">
+    <div class="color-row"><div class="swatch" style="background:#0a2e1a"></div><span class="hex">bg: #0a2e1a</span></div>
+    <div class="color-row"><div class="swatch" style="background:#0D7C3E"></div><span class="hex">border: #0D7C3E</span></div>
+    <div class="color-row"><div class="swatch" style="background:#6EE7B7"></div><span class="hex">text: #6EE7B7</span></div>
+  </td>
+  <td class="example-cell"><div class="mock-alert mock-alert-success">&#10003; Configuration saved successfully.</div></td>
+</tr>
+
+<tr>
+  <td>
+    <div class="el-name">Alert — Warning</div>
+    <div class="el-mantine">&lt;Alert color="yellow"&gt;</div>
+  </td>
+  <td class="color-cell">
+    <div class="color-row"><div class="swatch" style="background:#3b2f00"></div><span class="hex">bg: #3b2f00</span></div>
+    <div class="color-row"><div class="swatch" style="background:#E5A100"></div><span class="hex">border: #E5A100</span></div>
+    <div class="color-row"><div class="swatch" style="background:#FCD34D"></div><span class="hex">text: #FCD34D</span></div>
+  </td>
+  <td class="example-cell"><div class="mock-alert mock-alert-warning">&#9888; Unsaved changes will be lost.</div></td>
+</tr>
+
+<tr>
+  <td>
+    <div class="el-name">Alert — Error</div>
+    <div class="el-mantine">&lt;Alert color="red"&gt;</div>
+  </td>
+  <td class="color-cell">
+    <div class="color-row"><div class="swatch" style="background:#371520"></div><span class="hex">bg: #371520</span></div>
+    <div class="color-row"><div class="swatch" style="background:#D32F2F"></div><span class="hex">border: #D32F2F</span></div>
+    <div class="color-row"><div class="swatch" style="background:#FCA5A5"></div><span class="hex">text: #FCA5A5</span></div>
+  </td>
+  <td class="example-cell"><div class="mock-alert mock-alert-error">&#10007; Failed to load configuration.</div></td>
+</tr>
+
+<tr>
+  <td>
+    <div class="el-name">Loader (spinner)</div>
+    <div class="el-mantine">&lt;Loader&gt;</div>
+  </td>
+  <td class="color-cell">
+    <div class="color-row"><div class="swatch" style="background:#ff3621"></div><span class="hex">#ff3621</span></div>
+    <div class="color-label">spinning arc</div>
+    <div class="color-row"><div class="swatch" style="background:#44403c"></div><span class="hex">#44403c</span></div>
+    <div class="color-label">track</div>
+  </td>
+  <td class="example-cell"><div class="mock-loader"></div></td>
+</tr>
+
+<tr>
+  <td>
+    <div class="el-name">Progress Bar</div>
+    <div class="el-mantine">&lt;Progress&gt;</div>
+  </td>
+  <td class="color-cell">
+    <div class="color-row"><div class="swatch" style="background:#ff3621"></div><span class="hex">#ff3621</span></div>
+    <div class="color-label">fill (brand)</div>
+    <div class="color-row"><div class="swatch" style="background:#44403c"></div><span class="hex">#44403c</span></div>
+    <div class="color-label">track</div>
+  </td>
+  <td class="example-cell">
+    <div class="mock-progress"><div class="mock-progress-bar" style="width:65%;"></div></div>
+  </td>
+</tr>
+
+<tr>
+  <td>
+    <div class="el-name">Tooltip</div>
+    <div class="el-mantine">&lt;Tooltip&gt;</div>
+  </td>
+  <td class="color-cell">
+    <div class="color-row"><div class="swatch" style="background:#0c0a09"></div><span class="hex">#0c0a09</span></div>
+    <div class="color-label">bg (chrome)</div>
+    <div class="color-row"><div class="swatch" style="background:#fafaf9"></div><span class="hex">#fafaf9</span></div>
+    <div class="color-label">text</div>
+    <div class="color-row"><div class="swatch" style="background:#44403c"></div><span class="hex">#44403c</span></div>
+    <div class="color-label">border</div>
+  </td>
+  <td class="example-cell">
+    <div class="mock-tooltip">
+      <span style="cursor:help; border-bottom:1px dotted var(--text-muted); color:var(--text-muted);">Hover me</span>
+      <span class="tip">Tooltip content here</span>
+    </div>
+  </td>
+</tr>
+
+<tr>
+  <td>
+    <div class="el-name">CopyButton</div>
+    <div class="el-mantine">&lt;CopyButton&gt;</div>
+    <div class="el-usage">API keys, widget keys</div>
+  </td>
+  <td class="color-cell">
+    <div class="color-row"><div class="swatch" style="background:#0c0a09"></div><span class="hex">#0c0a09 bg</span></div>
+    <div class="color-row"><div class="swatch" style="background:#44403c"></div><span class="hex">#44403c border</span></div>
+    <div class="color-row"><div class="swatch" style="background:#A0A0A0"></div><span class="hex">#A0A0A0 text</span></div>
+  </td>
+  <td class="example-cell">
+    <button class="mock-copy-btn">&#128203; pk_live_c79a…</button>
+  </td>
+</tr>
+
+</tbody>
+</table>
+
+<!-- ===================================================================== -->
+<!-- TYPOGRAPHY                                                             -->
+<!-- ===================================================================== -->
+<h2 class="section-title">9. Typography</h2>
+<p class="section-desc">Text elements and their color assignments.</p>
+
+<table class="ref-table">
+<thead>
+  <tr>
+    <th style="width:200px">Element Name</th>
+    <th>Colors</th>
+    <th>Live Example</th>
+  </tr>
+</thead>
+<tbody>
+
+<tr>
+  <td>
+    <div class="el-name">Title / Heading</div>
+    <div class="el-mantine">&lt;Title&gt;</div>
+  </td>
+  <td class="color-cell">
+    <div class="color-row"><div class="swatch" style="background:#fafaf9"></div><span class="hex">#fafaf9</span></div>
+    <div class="color-label">Inter, 600 weight</div>
+  </td>
+  <td class="example-cell">
+    <div style="font-size:20px; font-weight:600; color:#fafaf9;">Page Title</div>
+  </td>
+</tr>
+
+<tr>
+  <td>
+    <div class="el-name">Text — Primary</div>
+    <div class="el-mantine">&lt;Text&gt;</div>
+  </td>
+  <td class="color-cell">
+    <div class="color-row"><div class="swatch" style="background:#fafaf9"></div><span class="hex">#fafaf9</span></div>
+  </td>
+  <td class="example-cell"><span style="color:#fafaf9;">Primary body text</span></td>
+</tr>
+
+<tr>
+  <td>
+    <div class="el-name">Text — Secondary</div>
+    <div class="el-mantine">&lt;Text c="dimmed"&gt;</div>
+  </td>
+  <td class="color-cell">
+    <div class="color-row"><div class="swatch" style="background:#A0A0A0"></div><span class="hex">#A0A0A0</span></div>
+  </td>
+  <td class="example-cell"><span style="color:#A0A0A0;">Muted / secondary text</span></td>
+</tr>
+
+<tr>
+  <td>
+    <div class="el-name">Text — Tertiary</div>
+    <div class="el-mantine">Custom inline</div>
+  </td>
+  <td class="color-cell">
+    <div class="color-row"><div class="swatch" style="background:#787878"></div><span class="hex">#787878</span></div>
+  </td>
+  <td class="example-cell"><span style="color:#787878;">Tertiary / less important text</span></td>
+</tr>
+
+<tr>
+  <td>
+    <div class="el-name">Text — Disabled</div>
+    <div class="el-mantine">Custom inline</div>
+  </td>
+  <td class="color-cell">
+    <div class="color-row"><div class="swatch" style="background:#5C5C5C"></div><span class="hex">#5C5C5C</span></div>
+  </td>
+  <td class="example-cell"><span style="color:#5C5C5C;">Disabled / placeholder text</span></td>
+</tr>
+
+<tr>
+  <td>
+    <div class="el-name">Code / Monospace</div>
+    <div class="el-mantine">Custom inline</div>
+  </td>
+  <td class="color-cell">
+    <div class="color-row"><div class="swatch" style="background:#A0A0A0"></div><span class="hex">#A0A0A0</span></div>
+    <div class="color-label">JetBrains Mono</div>
+  </td>
+  <td class="example-cell"><code style="font-family:var(--font-mono); color:#A0A0A0; background:var(--chrome); padding:2px 6px; border-radius:3px; font-size:13px;">api_key_here</code></td>
+</tr>
+
+</tbody>
+</table>
+
+<!-- ===================================================================== -->
+<!-- CSS TOKEN QUICK REFERENCE                                              -->
+<!-- ===================================================================== -->
+<h2 class="section-title">10. CSS Token Quick Reference</h2>
+<p class="section-desc">Canonical token names for use in design specifications. When specifying color changes, reference these names.</p>
+
+<table class="ref-table" style="max-width:700px;">
+<thead>
+  <tr><th>Token Name</th><th>Hex Value</th><th>Usage</th></tr>
+</thead>
+<tbody>
+  <tr><td><code style="color:var(--brand-5);">brand.5</code></td><td class="hex">#ff3621</td><td>Brand accent only — nav indicators, badges, chart data, loaders</td></tr>
+  <tr><td><code style="color:var(--brand-7);">brand.7</code></td><td class="hex">#9B1420</td><td>Brand hover (accent contexts only)</td></tr>
+  <tr><td><code style="color:var(--brand-8);">brand.8</code></td><td class="hex">#870E18</td><td>Brand active / pressed (accent contexts only)</td></tr>
+  <tr><td><code style="color:var(--action);">action</code></td><td class="hex">#3B82F6</td><td>Affirmative controls: buttons, switches, sliders, checkboxes, focus rings</td></tr>
+  <tr><td><code style="color:var(--action-hover);">action-hover</code></td><td class="hex">#2563EB</td><td>Action hover</td></tr>
+  <tr><td><code style="color:var(--action-active);">action-active</code></td><td class="hex">#1E40AF</td><td>Action active / pressed</td></tr>
+  <tr><td><code>chrome</code></td><td class="hex">#0c0a09</td><td>Header, sidebar bg</td></tr>
+  <tr><td><code>page</code></td><td class="hex">#1c1917</td><td>Main content area bg, input bg</td></tr>
+  <tr><td><code>surface</code></td><td class="hex">#292524</td><td>Cards, paper, modal bg</td></tr>
+  <tr><td><code>border</code></td><td class="hex">#44403c</td><td>All borders: cards, inputs, tables, dividers</td></tr>
+  <tr><td><code>border-hover</code></td><td class="hex">#57534e</td><td>Input/button border on hover</td></tr>
+  <tr><td><code>text-primary</code></td><td class="hex">#fafaf9</td><td>Headings, primary body</td></tr>
+  <tr><td><code>text-secondary</code></td><td class="hex">#e7e5e4</td><td>Table cell text, secondary body (Stone 2)</td></tr>
+  <tr><td><code>text-muted</code></td><td class="hex">#a8a29e</td><td>Nav items, labels, secondary info (Stone 4)</td></tr>
+  <tr><td><code>text-tertiary</code></td><td class="hex">#78716c</td><td>Status text, less important (Stone 5)</td></tr>
+  <tr><td><code>text-disabled</code></td><td class="hex">#57534e</td><td>Placeholder text, disabled labels (Stone 5)</td></tr>
+  <tr><td><code>semantic-success</code></td><td class="hex">#0D7C3E</td><td>Success borders, status dots</td></tr>
+  <tr><td><code>semantic-warning</code></td><td class="hex">#E5A100</td><td>Warning borders, pending status</td></tr>
+  <tr><td><code>semantic-error</code></td><td class="hex">#D32F2F</td><td>Error borders, danger buttons</td></tr>
+  <tr><td><code>semantic-info</code></td><td class="hex">#1E3A5F</td><td>Info alert borders</td></tr>
+  <tr><td><code>overlay</code></td><td class="hex">rgba(0,0,0,0.6)</td><td>Modal backdrop</td></tr>
+  <tr><td><code>hover-subtle</code></td><td class="hex">rgba(255,255,255,0.06)</td><td>Subtle hover bg (nav, icons)</td></tr>
+  <tr><td><code>active-subtle</code></td><td class="hex">rgba(255,255,255,0.1)</td><td>Subtle pressed bg</td></tr>
+  <tr><td><code>brand-tint</code></td><td class="hex">rgba(255,54,33,0.12)</td><td>Active nav item bg</td></tr>
+</tbody>
+</table>
+
+<!-- ===================================================================== -->
+<!-- FOOTER                                                                 -->
+<!-- ===================================================================== -->
+<div style="margin-top:60px; padding-top:16px; border-top:1px solid var(--border); color:var(--text-tertiary); font-size:12px;">
+  <p>&copy; 2026 Remaker Digital, a DBA of VanDusen &amp; Palmeter, LLC. All rights reserved.</p>
+  <p style="margin-top:4px;">Generated from <code style="font-family:var(--font-mono);">admin/shared/theme/agentRedTheme.ts</code> &mdash; v1.49.2</p>
+</div>
+
+</body>
+</html>

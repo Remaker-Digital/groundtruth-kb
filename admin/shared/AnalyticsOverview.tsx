@@ -23,7 +23,8 @@ import { HelpTooltip } from './HelpTooltip';
 // Style constants
 // ---------------------------------------------------------------------------
 
-const BRAND_PRIMARY = '#ff3621';
+const BRAND_PRIMARY = '#ff3621'; // accent only — spinner, summary card accent
+const ACTION_BLUE = '#3B82F6';
 const COLOR_SUCCESS = '#22863a';
 const COLOR_DANGER = '#d73a49';
 const COLOR_GRAY = '#6a737d';
@@ -579,7 +580,7 @@ export const AnalyticsOverview: React.FC<BaseComponentProps & { isTestMode?: boo
                   padding: '5px 10px',
                   border: 'none',
                   borderRight: `1px solid ${COLOR_BORDER}`,
-                  backgroundColor: period === opt.value ? BRAND_PRIMARY : COLOR_WHITE,
+                  backgroundColor: period === opt.value ? ACTION_BLUE : COLOR_WHITE,
                   color: period === opt.value ? COLOR_WHITE : COLOR_TEXT,
                   fontSize: '12px',
                   fontFamily: FONT_FAMILY,

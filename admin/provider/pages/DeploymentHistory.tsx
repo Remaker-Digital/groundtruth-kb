@@ -87,7 +87,7 @@ export function DeploymentHistoryPage() {
   return (
     <Stack gap="lg">
       <Group justify="space-between" align="baseline">
-        <Title order={3} c="#F5F5F5">Deployment History</Title>
+        <Title order={3} c="#fafaf9">Deployment History</Title>
         <Select
           value={limit}
           onChange={(v) => v && setLimit(v)}
@@ -104,21 +104,21 @@ export function DeploymentHistoryPage() {
 
       {/* Summary */}
       <SimpleGrid cols={{ base: 1, sm: 2 }} spacing="md">
-        <Card withBorder padding="lg" radius="md" bg="#1f1f1f">
+        <Card withBorder padding="lg" radius="md" bg="#292524">
           <Text c="dimmed" size="xs" tt="uppercase" fw={600}>Current Version</Text>
-          <Text fw={700} size="xl" c="#F5F5F5" mt={4}>
+          <Text fw={700} size="xl" c="#fafaf9" mt={4}>
             {data.current_version ? `v${data.current_version}` : 'Unknown'}
           </Text>
         </Card>
-        <Card withBorder padding="lg" radius="md" bg="#1f1f1f">
+        <Card withBorder padding="lg" radius="md" bg="#292524">
           <Text c="dimmed" size="xs" tt="uppercase" fw={600}>Total Events</Text>
-          <Text fw={700} size="xl" c="#F5F5F5" mt={4}>{data.total}</Text>
+          <Text fw={700} size="xl" c="#fafaf9" mt={4}>{data.total}</Text>
         </Card>
       </SimpleGrid>
 
       {/* Event timeline */}
       {data.events.length === 0 ? (
-        <Paper withBorder p="xl" radius="md" bg="#1f1f1f">
+        <Paper withBorder p="xl" radius="md" bg="#292524">
           <Text c="dimmed" ta="center">No deployment events found</Text>
         </Paper>
       ) : (
@@ -126,7 +126,7 @@ export function DeploymentHistoryPage() {
           {data.events.map((evt, i) => {
             const isDeploy = evt.event_type === 'MODEL_DEPLOYED';
             return (
-              <Paper key={i} withBorder p="md" radius="md" bg="#1f1f1f">
+              <Paper key={i} withBorder p="md" radius="md" bg="#292524">
                 <Group justify="space-between" mb="xs">
                   <Group gap="sm">
                     <Badge
@@ -150,7 +150,7 @@ export function DeploymentHistoryPage() {
                   <Code
                     block
                     style={{
-                      backgroundColor: '#141414',
+                      backgroundColor: '#1c1917',
                       color: '#A0A0A0',
                       fontSize: '12px',
                       maxHeight: '120px',

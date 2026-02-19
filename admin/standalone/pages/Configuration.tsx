@@ -43,7 +43,8 @@ const DOCS_BASE = 'https://agentredcx.com/docs/admin-guide';
 // Constants
 // ---------------------------------------------------------------------------
 
-const BRAND_RED = '#ff3621';
+const BRAND_RED = '#ff3621'; // accent only — email badge indicator
+const ACTION_BLUE = '#3B82F6';
 
 // ---------------------------------------------------------------------------
 // Escalation categories — each has its own email + keyword set
@@ -600,7 +601,7 @@ export const ConfigurationPage: React.FC = () => {
                       { value: 1, label: <span style={{ position: 'relative', right: '50%' }}>Aggressive</span> },
                     ]}
                     label={(val) => val.toFixed(2)}
-                    color={BRAND_RED}
+                    color={ACTION_BLUE}
                     mb="lg"
                   />
                 </div>
@@ -621,8 +622,8 @@ export const ConfigurationPage: React.FC = () => {
                       p="sm"
                       radius="sm"
                       style={{
-                        backgroundColor: isDark ? '#141414' : '#f8f9fa',
-                        border: `1px solid ${isDark ? '#272727' : '#dee2e6'}`,
+                        backgroundColor: isDark ? '#1c1917' : '#f8f9fa',
+                        border: `1px solid ${isDark ? '#44403c' : '#dee2e6'}`,
                         opacity: catConfig.enabled ? 1 : 0.6,
                       }}
                     >
@@ -631,7 +632,7 @@ export const ConfigurationPage: React.FC = () => {
                         <Group gap="sm" wrap="nowrap" style={{ flex: 1, minWidth: 0, cursor: 'pointer' }} onClick={() => toggleCategory(cat.id)}>
                           <Switch
                             size="sm"
-                            color={BRAND_RED}
+                            color={ACTION_BLUE}
                             checked={catConfig.enabled}
                             onChange={(e) => {
                               e.stopPropagation();
@@ -799,7 +800,7 @@ export const ConfigurationPage: React.FC = () => {
                           key={lang.value}
                           value={lang.value}
                           size="sm"
-                          color={BRAND_RED}
+                          color={ACTION_BLUE}
                           disabled={lang.disabled}
                           styles={lang.disabled ? { label: { opacity: 0.5, cursor: 'not-allowed' } } : undefined}
                         >
@@ -817,7 +818,7 @@ export const ConfigurationPage: React.FC = () => {
           {/* Save draft inputs — persists field edits to draft state */}
           <Group justify="flex-end">
             <Button
-              color={BRAND_RED}
+              color={ACTION_BLUE}
               leftSection={<SaveIcon />}
               disabled={!hasChanges}
               loading={saving}

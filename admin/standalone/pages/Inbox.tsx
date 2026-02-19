@@ -385,13 +385,13 @@ export function InboxPage() {
   }, [notification]);
 
   // ---- Dark mode colors (Mazel design revision) ----
-  const panelBg = isDark ? '#0a0a0a' : '#fff';
-  const centerBg = isDark ? '#0a0a0a' : '#fafafa';
-  const borderColor = isDark ? '#272727' : 'var(--mantine-color-gray-2)';
+  const panelBg = isDark ? '#0c0a09' : '#fff';
+  const centerBg = isDark ? '#0c0a09' : '#fafafa';
+  const borderColor = isDark ? '#44403c' : 'var(--mantine-color-gray-2)';
   const hoverBg = isDark ? 'rgba(255,255,255,0.04)' : '#f8f9fa';
-  const selectedBg = isDark ? '#1f1f1f' : '#FFF1F2';
-  const bubbleAgentBg = isDark ? '#1f1f1f' : '#f1f3f5';
-  const bubbleCustomerBg = isDark ? '#1f1f1f' : '#f1f3f5';
+  const selectedBg = isDark ? '#292524' : '#FFF1F2';
+  const bubbleAgentBg = isDark ? '#292524' : '#f1f3f5';
+  const bubbleCustomerBg = isDark ? '#292524' : '#f1f3f5';
 
   // ---- Debounced backend search ----
   const handleSearchChange = useCallback(
@@ -557,7 +557,7 @@ export function InboxPage() {
             value={search}
             onChange={(e) => handleSearchChange(e.currentTarget.value)}
             styles={{
-              input: { borderColor: isDark ? '#272727' : 'var(--mantine-color-gray-3)' },
+              input: { borderColor: isDark ? '#44403c' : 'var(--mantine-color-gray-3)' },
             }}
           />
         </Box>

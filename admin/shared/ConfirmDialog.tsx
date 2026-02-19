@@ -119,7 +119,7 @@ export default function ConfirmDialog({
 
 const VARIANT_COLORS: Record<string, string> = {
   destructive: '#D32F2F',
-  primary: '#ff3621',
+  primary: '#3B82F6',
   default: '#444',
 };
 
@@ -138,9 +138,9 @@ const overlayStyle: React.CSSProperties = {
 };
 
 const dialogStyle: React.CSSProperties = {
-  backgroundColor: '#1f1f1f',
+  backgroundColor: '#292524',
   borderRadius: '12px',
-  border: '1px solid #272727',
+  border: '1px solid #44403c',
   width: '90%',
   maxWidth: '440px',
   display: 'flex',
@@ -153,7 +153,7 @@ const headerStyle: React.CSSProperties = {
   alignItems: 'center',
   justifyContent: 'space-between',
   padding: '20px 24px 16px',
-  borderBottom: '1px solid #272727',
+  borderBottom: '1px solid #44403c',
 };
 
 const titleStyle: React.CSSProperties = {
@@ -188,7 +188,7 @@ const footerStyle: React.CSSProperties = {
   justifyContent: 'flex-end',
   gap: '8px',
   padding: '16px 24px',
-  borderTop: '1px solid #272727',
+  borderTop: '1px solid #44403c',
 };
 
 const cancelButtonStyle: React.CSSProperties = {

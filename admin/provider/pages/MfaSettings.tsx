@@ -208,7 +208,7 @@ export function MfaSettingsPage() {
   if (step === 'qr' && enrollment) {
     return (
       <Stack gap="lg" maw={520}>
-        <Title order={3} c="#F5F5F5">
+        <Title order={3} c="#fafaf9">
           Set Up Authenticator App
         </Title>
         <Text c="dimmed" size="sm">
@@ -224,7 +224,7 @@ export function MfaSettingsPage() {
           />
         </Card>
 
-        <Paper withBorder radius="md" p="sm" bg="#141414">
+        <Paper withBorder radius="md" p="sm" bg="#1c1917">
           <Text size="xs" c="dimmed" mb={4}>
             Manual entry key:
           </Text>
@@ -248,7 +248,7 @@ export function MfaSettingsPage() {
           <Button variant="subtle" color="gray" onClick={() => { setStep('idle'); setEnrollment(null); }}>
             Cancel
           </Button>
-          <Button color="#ff3621" onClick={() => setStep('backup')}>
+          <Button color="#3B82F6" onClick={() => setStep('backup')}>
             Continue
           </Button>
         </Group>
@@ -259,7 +259,7 @@ export function MfaSettingsPage() {
   if (step === 'backup' && enrollment) {
     return (
       <Stack gap="lg" maw={520}>
-        <Title order={3} c="#F5F5F5">
+        <Title order={3} c="#fafaf9">
           Save Backup Codes
         </Title>
         <Alert color="orange" title="Important">
@@ -270,7 +270,7 @@ export function MfaSettingsPage() {
 
         <SimpleGrid cols={2}>
           {enrollment.backupCodes.map((code, i) => (
-            <Paper key={i} withBorder radius="sm" p="xs" bg="#141414" style={{ textAlign: 'center' }}>
+            <Paper key={i} withBorder radius="sm" p="xs" bg="#1c1917" style={{ textAlign: 'center' }}>
               <Code style={{ fontSize: '14px', letterSpacing: '0.1em' }}>{code}</Code>
             </Paper>
           ))}
@@ -284,7 +284,7 @@ export function MfaSettingsPage() {
             <Button variant="subtle" color="gray" onClick={() => setStep('qr')}>
               Back
             </Button>
-            <Button color="#ff3621" onClick={() => setStep('confirm')}>
+            <Button color="#3B82F6" onClick={() => setStep('confirm')}>
               I've saved these codes
             </Button>
           </Group>
@@ -296,7 +296,7 @@ export function MfaSettingsPage() {
   if (step === 'confirm') {
     return (
       <Stack gap="lg" maw={400}>
-        <Title order={3} c="#F5F5F5">
+        <Title order={3} c="#fafaf9">
           Verify Setup
         </Title>
         <Text c="dimmed" size="sm">
@@ -332,7 +332,7 @@ export function MfaSettingsPage() {
             Back
           </Button>
           <Button
-            color="#ff3621"
+            color="#3B82F6"
             loading={confirmLoading}
             onClick={handleConfirm}
             disabled={confirmCode.trim().length < 6}
@@ -350,7 +350,7 @@ export function MfaSettingsPage() {
 
   return (
     <Stack gap="lg">
-      <Title order={3} c="#F5F5F5">
+      <Title order={3} c="#fafaf9">
         MFA Settings
       </Title><HelpTooltip text="Multi-factor authentication adds a second verification step using a TOTP authenticator app when signing into the Provider Console." />
 
@@ -358,7 +358,7 @@ export function MfaSettingsPage() {
         <>
           <Card withBorder radius="md" bg="#1a1a1a" p="lg">
             <Group justify="space-between" mb="md">
-              <Text fw={600} c="#F5F5F5">
+              <Text fw={600} c="#fafaf9">
                 Two-Factor Authentication
               </Text>
               <Badge color="green" variant="filled" size="lg">
@@ -371,7 +371,7 @@ export function MfaSettingsPage() {
                 <Text size="xs" c="dimmed">
                   Enrolled since
                 </Text>
-                <Text size="sm" c="#F5F5F5">
+                <Text size="sm" c="#fafaf9">
                   {status.enrolledAt
                     ? new Date(status.enrolledAt).toLocaleDateString('en-US', {
                         year: 'numeric',
@@ -387,7 +387,7 @@ export function MfaSettingsPage() {
                 </Text><HelpTooltip text="Single-use codes for signing in when your authenticator app is unavailable. Generate new codes by re-enrolling." />
                 <Text
                   size="sm"
-                  c={status.backupCodesRemaining <= 2 ? '#ff6b6b' : '#F5F5F5'}
+                  c={status.backupCodesRemaining <= 2 ? '#ff6b6b' : '#fafaf9'}
                   fw={status.backupCodesRemaining <= 2 ? 600 : 400}
                 >
                   {status.backupCodesRemaining} of 10
@@ -405,7 +405,7 @@ export function MfaSettingsPage() {
           </Card>
 
           <Card withBorder radius="md" bg="#1a1a1a" p="lg">
-            <Text fw={600} c="#F5F5F5" mb="xs">
+            <Text fw={600} c="#fafaf9" mb="xs">
               Disable MFA
             </Text>
             <Text size="sm" c="dimmed" mb="md">
@@ -424,7 +424,7 @@ export function MfaSettingsPage() {
       ) : (
         <Card withBorder radius="md" bg="#1a1a1a" p="lg">
           <Group justify="space-between" mb="md">
-            <Text fw={600} c="#F5F5F5">
+            <Text fw={600} c="#fafaf9">
               Two-Factor Authentication
             </Text>
             <Badge color="gray" variant="outline" size="lg">
@@ -436,7 +436,7 @@ export function MfaSettingsPage() {
             you&apos;ll need to enter a code from your authenticator app in
             addition to your API key when signing in.
           </Text>
-          <Button color="#ff3621" onClick={handleEnroll}>
+          <Button color="#3B82F6" onClick={handleEnroll}>
             Enable MFA
           </Button>
         </Card>
@@ -452,9 +452,9 @@ export function MfaSettingsPage() {
         title="Disable MFA"
         centered
         styles={{
-          header: { backgroundColor: '#1f1f1f' },
-          body: { backgroundColor: '#1f1f1f' },
-          content: { backgroundColor: '#1f1f1f' },
+          header: { backgroundColor: '#292524' },
+          body: { backgroundColor: '#292524' },
+          content: { backgroundColor: '#292524' },
         }}
       >
         <Stack gap="md">

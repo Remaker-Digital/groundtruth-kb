@@ -332,7 +332,7 @@ const st = {
     fontSize: 11,
     fontWeight: 600,
     backgroundColor:
-      passed === null ? '#f5f5f5' : passed ? '#f0fdf4' : '#fef2f2',
+      passed === null ? '#fafaf9' : passed ? '#f0fdf4' : '#fef2f2',
     color: passed === null ? '#888' : passed ? '#166534' : '#991b1b',
   }),
 

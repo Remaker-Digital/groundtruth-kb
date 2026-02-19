@@ -143,8 +143,8 @@ export const McpConfigPanel: React.FC<McpConfigPanelProps> = ({
   }, [apiFetch, onNotify, onStatusChange]);
 
   return (
-    <Paper bg="#141414" p="md" radius="sm" mt="sm" withBorder styles={{ root: { borderColor: '#272727' } }}>
-      <Title order={5} c="#F5F5F5" mb="sm">
+    <Paper bg="#1c1917" p="md" radius="sm" mt="sm" withBorder styles={{ root: { borderColor: '#44403c' } }}>
+      <Title order={5} c="#fafaf9" mb="sm">
         Stripe MCP Configuration
       </Title>
 
@@ -165,9 +165,9 @@ export const McpConfigPanel: React.FC<McpConfigPanelProps> = ({
               letterSpacing: '0.04em',
             },
             input: {
-              backgroundColor: '#1f1f1f',
-              borderColor: '#272727',
-              color: '#F5F5F5',
+              backgroundColor: '#292524',
+              borderColor: '#44403c',
+              color: '#fafaf9',
               fontFamily: 'monospace',
             },
           }}
@@ -175,7 +175,7 @@ export const McpConfigPanel: React.FC<McpConfigPanelProps> = ({
         <Group gap="sm">
           <Button
             size="xs"
-            color="#ff3621"
+            color="#3B82F6"
             onClick={handleSaveKey}
             disabled={saving || !apiKey}
             loading={saving}

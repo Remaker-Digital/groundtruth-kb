@@ -110,7 +110,7 @@ export function BillingHealthPage() {
   return (
     <Stack gap="lg">
       <Group justify="space-between" align="baseline">
-        <Title order={3} c="#F5F5F5">Billing Health</Title>
+        <Title order={3} c="#fafaf9">Billing Health</Title>
         <Text c="dimmed" size="xs">
           Updated {new Date(data.timestamp).toLocaleString()}
         </Text>
@@ -118,11 +118,11 @@ export function BillingHealthPage() {
 
       {/* Summary cards */}
       <SimpleGrid cols={{ base: 1, sm: 3 }} spacing="md">
-        <Card withBorder padding="lg" radius="md" bg="#1f1f1f">
+        <Card withBorder padding="lg" radius="md" bg="#292524">
           <Text c="dimmed" size="xs" tt="uppercase" fw={600}>Total Tenants</Text>
-          <Text fw={700} size="xl" c="#F5F5F5" mt={4}>{data.total_tenants}</Text>
+          <Text fw={700} size="xl" c="#fafaf9" mt={4}>{data.total_tenants}</Text>
         </Card>
-        <Card withBorder padding="lg" radius="md" bg="#1f1f1f">
+        <Card withBorder padding="lg" radius="md" bg="#292524">
           <Text c="dimmed" size="xs" tt="uppercase" fw={600}>Needing Review</Text>
           <Text
             fw={700}
@@ -133,11 +133,11 @@ export function BillingHealthPage() {
             {data.tenants_needing_review}
           </Text>
         </Card>
-        <Card withBorder padding="lg" radius="md" bg="#1f1f1f">
+        <Card withBorder padding="lg" radius="md" bg="#292524">
           <Text c="dimmed" size="xs" tt="uppercase" fw={600}>Webhook Success Rate</Text>
           {webhookPct != null ? (
             <>
-              <Text fw={700} size="xl" c="#F5F5F5" mt={4}>{webhookPct}%</Text>
+              <Text fw={700} size="xl" c="#fafaf9" mt={4}>{webhookPct}%</Text>
               <Progress
                 value={webhookPct}
                 color={webhookPct >= 99 ? 'green' : webhookPct >= 95 ? 'yellow' : 'red'}
@@ -152,7 +152,7 @@ export function BillingHealthPage() {
       </SimpleGrid>
 
       {/* Tenant billing table */}
-      <Paper withBorder radius="md" bg="#1f1f1f" style={{ overflow: 'auto' }}>
+      <Paper withBorder radius="md" bg="#292524" style={{ overflow: 'auto' }}>
         <Table striped highlightOnHover>
           <Table.Thead>
             <Table.Tr>

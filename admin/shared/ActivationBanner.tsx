@@ -134,8 +134,8 @@ export default function ActivationBanner({
 // ---------------------------------------------------------------------------
 
 const bannerStyle: React.CSSProperties = {
-  backgroundColor: '#1a1a2e',
-  borderBottom: '1px solid #ff3621',
+  backgroundColor: '#1c1917',
+  borderBottom: '1px solid #3B82F6',
   padding: '10px 20px',
   display: 'flex',
   alignItems: 'center',
@@ -158,7 +158,7 @@ const textStyle: React.CSSProperties = {
 };
 
 const iconStyle: React.CSSProperties = {
-  color: '#ff3621',
+  color: '#3B82F6',
   marginRight: '8px',
   fontSize: '10px',
 };
@@ -175,7 +175,7 @@ const actionsStyle: React.CSSProperties = {
 };
 
 const activateButtonStyle: React.CSSProperties = {
-  backgroundColor: '#ff3621',
+  backgroundColor: '#2b8a3e',
   color: '#fff',
   border: 'none',
   borderRadius: '6px',

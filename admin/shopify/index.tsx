@@ -86,7 +86,7 @@ class PageErrorBoundary extends React.Component<
           <pre style={{
             textAlign: 'left',
             padding: 12,
-            background: '#f5f5f5',
+            background: '#fafaf9',
             borderRadius: 6,
             fontSize: 12,
             overflow: 'auto',

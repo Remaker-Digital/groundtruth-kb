@@ -147,26 +147,26 @@ export function TenantDirectoryPage() {
 
   return (
     <Stack gap="lg">
-      <Title order={3} c="#F5F5F5">Tenant Directory</Title>
+      <Title order={3} c="#fafaf9">Tenant Directory</Title>
 
       {/* Summary cards */}
       {summary && (
         <SimpleGrid cols={{ base: 1, sm: 2, md: 4 }} spacing="md">
-          <Card withBorder padding="lg" radius="md" bg="#1f1f1f">
+          <Card withBorder padding="lg" radius="md" bg="#292524">
             <Text c="dimmed" size="xs" tt="uppercase" fw={600}>Total Tenants</Text>
-            <Text fw={700} size="xl" c="#F5F5F5" mt={4}>{summary.total_tenants}</Text>
+            <Text fw={700} size="xl" c="#fafaf9" mt={4}>{summary.total_tenants}</Text>
           </Card>
           {Object.entries(summary.by_status ?? {}).map(([status, count]) => (
-            <Card key={status} withBorder padding="lg" radius="md" bg="#1f1f1f">
+            <Card key={status} withBorder padding="lg" radius="md" bg="#292524">
               <Text c="dimmed" size="xs" tt="uppercase" fw={600}>{status}</Text>
-              <Text fw={700} size="xl" c="#F5F5F5" mt={4}>{count}</Text>
+              <Text fw={700} size="xl" c="#fafaf9" mt={4}>{count}</Text>
             </Card>
           ))}
         </SimpleGrid>
       )}
 
       {/* Filters */}
-      <Paper withBorder p="md" radius="md" bg="#1f1f1f">
+      <Paper withBorder p="md" radius="md" bg="#292524">
         <Group gap="md">
           <Select
             label="Status"
@@ -205,7 +205,7 @@ export function TenantDirectoryPage() {
       </Paper>
 
       {/* Table */}
-      <Paper withBorder radius="md" bg="#1f1f1f" style={{ overflow: 'auto' }}>
+      <Paper withBorder radius="md" bg="#292524" style={{ overflow: 'auto' }}>
         {loading ? (
           <LoadingState text="Loading tenants" size={24} />
         ) : (
@@ -281,7 +281,7 @@ export function TenantDirectoryPage() {
             total={totalPages}
             value={page}
             onChange={setPage}
-            color="red"
+            color="action"
             size="sm"
           />
         </Group>

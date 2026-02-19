@@ -84,7 +84,7 @@ export const MfaChallenge: React.FC<MfaChallengeProps> = ({
     display: 'flex',
     alignItems: 'center',
     justifyContent: 'center',
-    backgroundColor: '#0a0a0a',
+    backgroundColor: '#0c0a09',
     fontFamily:
       'Inter, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif',
   };
@@ -92,9 +92,9 @@ export const MfaChallenge: React.FC<MfaChallengeProps> = ({
   const cardStyle: React.CSSProperties = {
     width: '100%',
     maxWidth: '380px',
-    backgroundColor: '#1f1f1f',
+    backgroundColor: '#292524',
     borderRadius: '12px',
-    border: '1px solid #272727',
+    border: '1px solid #44403c',
     padding: '40px',
   };
 
@@ -104,11 +104,11 @@ export const MfaChallenge: React.FC<MfaChallengeProps> = ({
     fontSize: useBackup ? '16px' : '24px',
     letterSpacing: useBackup ? 'normal' : '0.3em',
     textAlign: 'center',
-    border: `1px solid ${error ? '#ff6b6b' : '#272727'}`,
+    border: `1px solid ${error ? '#ff6b6b' : '#44403c'}`,
     borderRadius: '8px',
     outline: 'none',
     boxSizing: 'border-box',
-    backgroundColor: '#141414',
+    backgroundColor: '#1c1917',
     color: '#e0e0e0',
     fontFamily: 'monospace',
     transition: 'border-color 0.15s',
@@ -118,7 +118,7 @@ export const MfaChallenge: React.FC<MfaChallengeProps> = ({
     width: '100%',
     marginTop: '16px',
     padding: '10px',
-    backgroundColor: disabled ? '#555' : '#ff3621',
+    backgroundColor: disabled ? '#555' : '#3B82F6',
     color: '#fff',
     border: 'none',
     borderRadius: '8px',
@@ -130,7 +130,7 @@ export const MfaChallenge: React.FC<MfaChallengeProps> = ({
   const linkStyle: React.CSSProperties = {
     background: 'none',
     border: 'none',
-    color: '#ff3621',
+    color: '#3B82F6',
     fontSize: '13px',
     cursor: 'pointer',
     padding: 0,
@@ -149,7 +149,7 @@ export const MfaChallenge: React.FC<MfaChallengeProps> = ({
               margin: 0,
               fontSize: '18px',
               fontWeight: 600,
-              color: '#F5F5F5',
+              color: '#fafaf9',
             }}
           >
             {useBackup ? 'Enter Backup Code' : 'Two-Factor Authentication'}
@@ -172,10 +172,10 @@ export const MfaChallenge: React.FC<MfaChallengeProps> = ({
             autoComplete="one-time-code"
             style={inputStyle}
             onFocus={(e) => {
-              if (!error) e.target.style.borderColor = '#ff3621';
+              if (!error) e.target.style.borderColor = '#3B82F6';
             }}
             onBlur={(e) => {
-              if (!error) e.target.style.borderColor = '#272727';
+              if (!error) e.target.style.borderColor = '#44403c';
             }}
           />
 

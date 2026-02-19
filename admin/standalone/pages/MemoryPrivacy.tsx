@@ -36,7 +36,7 @@ import { LoadingState } from '../../shared/LoadingState';
 // Constants
 // ---------------------------------------------------------------------------
 
-const BRAND_RED = '#ff3621';
+const ACTION_BLUE = '#3B82F6';
 
 const RETENTION_OPTIONS = [
   { value: '30', label: '30 days' },
@@ -155,7 +155,7 @@ export const MemoryPrivacyPage: React.FC = () => {
           <Switch
             checked={memoryEnabled}
             onChange={(e) => setMemoryEnabled(e.currentTarget.checked)}
-            color={BRAND_RED}
+            color={ACTION_BLUE}
             label={memoryEnabled ? 'Enabled' : 'Disabled'}
             labelPosition="left"
           />
@@ -177,7 +177,7 @@ export const MemoryPrivacyPage: React.FC = () => {
           <Switch
             checked={conversationMemory}
             onChange={(e) => setConversationMemory(e.currentTarget.checked)}
-            color={BRAND_RED}
+            color={ACTION_BLUE}
             label={conversationMemory ? 'Enabled' : 'Disabled'}
             labelPosition="left"
             disabled={!memoryEnabled}
@@ -204,7 +204,7 @@ export const MemoryPrivacyPage: React.FC = () => {
           <Switch
             checked={crossSessionLearning}
             onChange={(e) => setCrossSessionLearning(e.currentTarget.checked)}
-            color={BRAND_RED}
+            color={ACTION_BLUE}
             label={crossSessionLearning ? 'Enabled' : 'Disabled'}
             labelPosition="left"
             disabled={!memoryEnabled || !isProOrHigher}
@@ -230,7 +230,7 @@ export const MemoryPrivacyPage: React.FC = () => {
                 { value: 180, label: '180' },
                 { value: 365, label: '365' },
               ]}
-              color={BRAND_RED}
+              color={ACTION_BLUE}
               mb="md"
               disabled={!memoryEnabled}
             />
@@ -288,7 +288,7 @@ export const MemoryPrivacyPage: React.FC = () => {
                 description="Automatically detect and redact personally identifiable information (emails, phone numbers, addresses) from stored conversations."
                 checked={piiScrubbing}
                 onChange={(e) => setPiiScrubbing(e.currentTarget.checked)}
-                color={BRAND_RED}
+                color={ACTION_BLUE}
               />
 
               <Switch
@@ -296,7 +296,7 @@ export const MemoryPrivacyPage: React.FC = () => {
                 description="Require explicit customer consent before storing conversation data. A consent prompt appears at the start of each conversation."
                 checked={consentRequired}
                 onChange={(e) => setConsentRequired(e.currentTarget.checked)}
-                color={BRAND_RED}
+                color={ACTION_BLUE}
               />
 
               <Switch
@@ -304,7 +304,7 @@ export const MemoryPrivacyPage: React.FC = () => {
                 description="Automatically delete all customer data when a GDPR deletion request is received."
                 checked={autoDeleteOnRequest}
                 onChange={(e) => setAutoDeleteOnRequest(e.currentTarget.checked)}
-                color={BRAND_RED}
+                color={ACTION_BLUE}
               />
             </Stack>
           </Accordion.Panel>
@@ -314,7 +314,7 @@ export const MemoryPrivacyPage: React.FC = () => {
       {/* Save draft inputs — persists field edits to draft state */}
       <Group justify="flex-end">
         <Button
-          color={BRAND_RED}
+          color={ACTION_BLUE}
           onClick={handleSave}
           loading={saving}
         >

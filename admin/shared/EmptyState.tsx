@@ -67,7 +67,7 @@ const styles = {
     fontSize: '13px',
     fontWeight: 500,
     color: '#fff',
-    background: '#ff3621',
+    background: '#3B82F6',
     border: 'none',
     borderRadius: '6px',
     cursor: 'pointer',

@@ -104,7 +104,7 @@ export function HealthDashboardPage() {
   return (
     <Stack gap="lg">
       <Group justify="space-between" align="baseline">
-        <Title order={3} c="#F5F5F5">Platform Dashboard</Title><HelpTooltip text="Real-time overview of system health, tenant distribution, and recent activity across the platform." />
+        <Title order={3} c="#fafaf9">Platform Dashboard</Title><HelpTooltip text="Real-time overview of system health, tenant distribution, and recent activity across the platform." />
         <Text c="dimmed" size="xs">
           Updated {new Date(data.timestamp).toLocaleString()}
         </Text>
@@ -140,13 +140,13 @@ export function HealthDashboardPage() {
           <Title order={4} c="#E0E0E0">Tenant Distribution</Title>
           <Grid>
             <Grid.Col span={{ base: 12, md: 4 }}>
-              <Card withBorder padding="lg" radius="md" bg="#1f1f1f">
+              <Card withBorder padding="lg" radius="md" bg="#292524">
                 <Text c="dimmed" size="xs" tt="uppercase" fw={600}>Total Tenants</Text>
-                <Text fw={700} size="xl" c="#F5F5F5" mt={4}>{tenants.total_tenants}</Text>
+                <Text fw={700} size="xl" c="#fafaf9" mt={4}>{tenants.total_tenants}</Text>
               </Card>
             </Grid.Col>
             <Grid.Col span={{ base: 12, md: 4 }}>
-              <Card withBorder padding="lg" radius="md" bg="#1f1f1f">
+              <Card withBorder padding="lg" radius="md" bg="#292524">
                 <Text c="dimmed" size="xs" tt="uppercase" fw={600}>By Status</Text>
                 <Group gap="xs" mt="sm">
                   {Object.entries(tenants?.by_status ?? {}).map(([k, v]) => (
@@ -158,7 +158,7 @@ export function HealthDashboardPage() {
               </Card>
             </Grid.Col>
             <Grid.Col span={{ base: 12, md: 4 }}>
-              <Card withBorder padding="lg" radius="md" bg="#1f1f1f">
+              <Card withBorder padding="lg" radius="md" bg="#292524">
                 <Text c="dimmed" size="xs" tt="uppercase" fw={600}>By Tier</Text>
                 <Group gap="xs" mt="sm">
                   {Object.entries(tenants?.by_tier ?? {}).map(([k, v]) => (
@@ -177,7 +177,7 @@ export function HealthDashboardPage() {
       {(data.recent_deployments?.length ?? 0) > 0 && (
         <>
           <Title order={4} c="#E0E0E0">Recent Deployments</Title>
-          <Paper withBorder p="md" radius="md" bg="#1f1f1f">
+          <Paper withBorder p="md" radius="md" bg="#292524">
             <Stack gap="xs">
               {data.recent_deployments.map((evt, i) => (
                 <Group key={i} justify="space-between">
@@ -221,7 +221,7 @@ function HealthCard({ label, status, detail }: { label: string; status: string; 
   const dotColor = colorMap[status] ?? '#5C5C5C';
 
   return (
-    <Card withBorder padding="lg" radius="md" bg="#1f1f1f">
+    <Card withBorder padding="lg" radius="md" bg="#292524">
       <Group gap="xs" mb={4}>
         <div style={{
           width: 8, height: 8, borderRadius: '50%',

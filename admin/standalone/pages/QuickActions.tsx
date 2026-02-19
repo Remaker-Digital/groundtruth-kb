@@ -45,7 +45,7 @@ import { LoadingState } from '../../shared/LoadingState';
 // Constants
 // ---------------------------------------------------------------------------
 
-const BRAND_RED = '#ff3621';
+const ACTION_BLUE = '#3B82F6';
 
 const PAGE_TYPES = [
   { value: 'all', label: 'All pages (fallback)' },
@@ -491,7 +491,7 @@ export const QuickActionsPage: React.FC = () => {
         <Tabs.Panel value="prompts" pt="md">
           <Stack gap="md">
             <Group justify="flex-end">
-              <Button color={BRAND_RED} onClick={openCreateAction}>
+              <Button color={ACTION_BLUE} onClick={openCreateAction}>
                 Create quick action
               </Button>
             </Group>
@@ -678,7 +678,7 @@ export const QuickActionsPage: React.FC = () => {
                           <Table.Td>
                             <Switch
                               size="xs"
-                              color={BRAND_RED}
+                              color={ACTION_BLUE}
                               checked={assign?.autoOpen ?? false}
                               onChange={(e) => handleAutoOpenToggle(pt.value, e.currentTarget.checked)}
                               aria-label={`Auto-open on ${pt.label}`}
@@ -792,7 +792,7 @@ export const QuickActionsPage: React.FC = () => {
             description="Inactive quick actions won't appear in the widget"
             checked={formActive}
             onChange={(e) => setFormActive(e.currentTarget.checked)}
-            color={BRAND_RED}
+            color={ACTION_BLUE}
           />
 
           {/* Preview */}
@@ -805,8 +805,8 @@ export const QuickActionsPage: React.FC = () => {
                 gap: 6,
                 padding: '6px 14px',
                 borderRadius: 20,
-                border: `1px solid ${isDark ? '#272727' : '#dee2e6'}`,
-                background: isDark ? '#1f1f1f' : '#f1f3f5',
+                border: `1px solid ${isDark ? '#44403c' : '#dee2e6'}`,
+                background: isDark ? '#292524' : '#f1f3f5',
                 fontSize: 13,
                 color: isDark ? '#E0E0E0' : '#1f2937',
               }}>
@@ -821,7 +821,7 @@ export const QuickActionsPage: React.FC = () => {
               Cancel
             </Button>
             <Button
-              color={BRAND_RED}
+              color={ACTION_BLUE}
               onClick={handleSaveAction}
               disabled={!formLabel.trim() || !formPrompt.trim()}
               loading={saving}

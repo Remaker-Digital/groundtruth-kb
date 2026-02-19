@@ -123,13 +123,13 @@ export function SLATrendsPage() {
   return (
     <Stack gap="lg">
       <Group justify="space-between" align="center">
-        <Title order={3} c="#F5F5F5">SLA Trends</Title>
+        <Title order={3} c="#fafaf9">SLA Trends</Title>
         <SegmentedControl
           value={range}
           onChange={setRange}
           data={RANGE_OPTIONS}
           size="xs"
-          color="red"
+          color="action"
         />
       </Group>
 
@@ -142,11 +142,11 @@ export function SLATrendsPage() {
       ) : (
         <>
           {/* Uptime chart */}
-          <Card withBorder padding="lg" radius="md" bg="#1f1f1f">
+          <Card withBorder padding="lg" radius="md" bg="#292524">
             <Text fw={600} size="sm" c="#E0E0E0" mb="md">Uptime %</Text>
             <ResponsiveContainer width="100%" height={250}>
               <LineChart data={chartData}>
-                <CartesianGrid strokeDasharray="3 3" stroke="#272727" />
+                <CartesianGrid strokeDasharray="3 3" stroke="#44403c" />
                 <XAxis dataKey="label" tick={{ fill: '#787878', fontSize: 11 }} />
                 <YAxis
                   domain={[99, 100]}
@@ -154,7 +154,7 @@ export function SLATrendsPage() {
                   tickFormatter={(v: number) => `${v}%`}
                 />
                 <Tooltip
-                  contentStyle={{ backgroundColor: '#1f1f1f', border: '1px solid #272727', color: '#E0E0E0' }}
+                  contentStyle={{ backgroundColor: '#292524', border: '1px solid #44403c', color: '#E0E0E0' }}
                   labelStyle={{ color: '#A0A0A0' }}
                 />
                 <Line
@@ -170,15 +170,15 @@ export function SLATrendsPage() {
           </Card>
 
           {/* Latency chart */}
-          <Card withBorder padding="lg" radius="md" bg="#1f1f1f">
+          <Card withBorder padding="lg" radius="md" bg="#292524">
             <Text fw={600} size="sm" c="#E0E0E0" mb="md">Response Latency (ms)</Text>
             <ResponsiveContainer width="100%" height={250}>
               <LineChart data={chartData}>
-                <CartesianGrid strokeDasharray="3 3" stroke="#272727" />
+                <CartesianGrid strokeDasharray="3 3" stroke="#44403c" />
                 <XAxis dataKey="label" tick={{ fill: '#787878', fontSize: 11 }} />
                 <YAxis tick={{ fill: '#787878', fontSize: 11 }} />
                 <Tooltip
-                  contentStyle={{ backgroundColor: '#1f1f1f', border: '1px solid #272727', color: '#E0E0E0' }}
+                  contentStyle={{ backgroundColor: '#292524', border: '1px solid #44403c', color: '#E0E0E0' }}
                   labelStyle={{ color: '#A0A0A0' }}
                 />
                 <Legend wrapperStyle={{ color: '#A0A0A0', fontSize: '12px' }} />
@@ -195,7 +195,7 @@ export function SLATrendsPage() {
               <Title order={4} c="#E0E0E0">Error Budgets (30-day period)</Title>
               <SimpleGrid cols={{ base: 1, sm: 3 }} spacing="md">
                 {Object.entries(data.error_budgets ?? {}).map(([tier, budget]) => (
-                  <Card key={tier} withBorder padding="lg" radius="md" bg="#1f1f1f">
+                  <Card key={tier} withBorder padding="lg" radius="md" bg="#292524">
                     <Group justify="space-between" mb="sm">
                       <Text fw={600} size="sm" c="#E0E0E0">{tier}</Text>
                       <Text
@@ -252,15 +252,15 @@ export function SLATrendsPage() {
 
           {/* Request volume */}
           {chartData.length > 0 && (
-            <Card withBorder padding="lg" radius="md" bg="#1f1f1f">
+            <Card withBorder padding="lg" radius="md" bg="#292524">
               <Text fw={600} size="sm" c="#E0E0E0" mb="md">Request Volume</Text>
               <ResponsiveContainer width="100%" height={180}>
                 <LineChart data={chartData}>
-                  <CartesianGrid strokeDasharray="3 3" stroke="#272727" />
+                  <CartesianGrid strokeDasharray="3 3" stroke="#44403c" />
                   <XAxis dataKey="label" tick={{ fill: '#787878', fontSize: 11 }} />
                   <YAxis tick={{ fill: '#787878', fontSize: 11 }} />
                   <Tooltip
-                    contentStyle={{ backgroundColor: '#1f1f1f', border: '1px solid #272727', color: '#E0E0E0' }}
+                    contentStyle={{ backgroundColor: '#292524', border: '1px solid #44403c', color: '#E0E0E0' }}
                     labelStyle={{ color: '#A0A0A0' }}
                   />
                   <Line

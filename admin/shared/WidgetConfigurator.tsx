@@ -123,19 +123,19 @@ const DEFAULT_CONFIG: WidgetConfig = {
 
 // Theme-aware style factory: produces light or dark styles based on admin UI color scheme
 function makeStyles(dark: boolean) {
-  // Four-tier dark mode hierarchy: chrome #0a0a0a → page #141414 → surface #1f1f1f → border #272727
-  const bg = dark ? '#1f1f1f' : '#FFFFFF';
-  const pageBg = dark ? '#141414' : '#F9FAFB';
-  const border = dark ? '#272727' : '#D1D5DB';
-  const borderLight = dark ? '#272727' : '#E5E7EB';
-  const text = dark ? '#F5F5F5' : '#111827';
+  // Four-tier dark mode hierarchy: chrome #0c0a09 → page #1c1917 → surface #292524 → border #44403c
+  const bg = dark ? '#292524' : '#FFFFFF';
+  const pageBg = dark ? '#1c1917' : '#F9FAFB';
+  const border = dark ? '#44403c' : '#D1D5DB';
+  const borderLight = dark ? '#44403c' : '#E5E7EB';
+  const text = dark ? '#fafaf9' : '#111827';
   const textSecondary = dark ? '#A0A0A0' : '#374151';
   const textMuted = dark ? '#787878' : '#6B7280';
-  const inputBg = dark ? '#141414' : '#FFFFFF';
+  const inputBg = dark ? '#1c1917' : '#FFFFFF';
   const inputText = dark ? '#E0E0E0' : '#111827';
-  const codeEditorBg = dark ? '#0a0a0a' : '#F9FAFB';
-  const buttonBg = dark ? '#272727' : '#F3F4F6';
-  const removeBtnBg = dark ? '#1f1f1f' : '#FFFFFF';
+  const codeEditorBg = dark ? '#0c0a09' : '#F9FAFB';
+  const buttonBg = dark ? '#44403c' : '#F3F4F6';
+  const removeBtnBg = dark ? '#292524' : '#FFFFFF';
   const errorBg = dark ? 'rgba(220,38,38,0.1)' : '#FEF2F2';
   const errorBorder = dark ? 'rgba(220,38,38,0.3)' : '#FECACA';
 
@@ -180,10 +180,10 @@ function makeStyles(dark: boolean) {
       padding: '10px 20px',
       fontSize: 14,
       fontWeight: active ? 600 : 500,
-      color: active ? '#ff3621' : textMuted,
+      color: active ? '#3B82F6' : textMuted,
       background: 'transparent',
       border: 'none',
-      borderBottom: active ? '2px solid #ff3621' : '2px solid transparent',
+      borderBottom: active ? '2px solid #3B82F6' : '2px solid transparent',
       marginBottom: -2,
       cursor: 'pointer',
       transition: 'color 0.15s ease',
@@ -305,7 +305,7 @@ function makeStyles(dark: boolean) {
       width: 40,
       height: 22,
       borderRadius: 11,
-      background: on ? '#ff3621' : (dark ? '#4B5563' : '#D1D5DB'),
+      background: on ? '#3B82F6' : (dark ? '#4B5563' : '#D1D5DB'),
       position: 'relative' as const,
       transition: 'background 0.2s ease',
       flexShrink: 0,
@@ -381,7 +381,7 @@ function makeStyles(dark: boolean) {
       alignItems: 'center',
       justifyContent: 'space-between',
       padding: '12px 24px',
-      background: dark ? '#0a0a0a' : '#111827',
+      background: dark ? '#0c0a09' : '#111827',
       borderRadius: 8,
       marginBottom: 16,
       color: '#FFFFFF',
@@ -391,7 +391,7 @@ function makeStyles(dark: boolean) {
 
     saveButton: {
       padding: '8px 24px',
-      background: '#ff3621',
+      background: '#3B82F6',
       color: '#FFFFFF',
       border: 'none',
       borderRadius: 6,
@@ -463,7 +463,7 @@ function makeStyles(dark: boolean) {
 
     emptyPageRules: {
       padding: 16,
-      background: dark ? '#141414' : '#F9FAFB',
+      background: dark ? '#1c1917' : '#F9FAFB',
       borderRadius: 6,
       border: `1px dashed ${border}`,
       textAlign: 'center' as const,
@@ -490,7 +490,7 @@ function makeStyles(dark: boolean) {
       alignItems: 'center',
       gap: 12,
       padding: '10px 16px',
-      background: dark ? '#0a0a0a' : '#F9FAFB',
+      background: dark ? '#0c0a09' : '#F9FAFB',
       border: `1px solid ${border}`,
       borderRadius: 8,
       marginBottom: 16,
@@ -507,7 +507,7 @@ function makeStyles(dark: boolean) {
       fontSize: 13,
       fontWeight: 600,
       color: text,
-      background: dark ? '#272727' : '#E5E7EB',
+      background: dark ? '#44403c' : '#E5E7EB',
       padding: '2px 10px',
       borderRadius: 4,
     } as React.CSSProperties,
@@ -640,7 +640,7 @@ const PRESET_COLORS = [
   '#1E88E5', '#039BE5', '#00ACC1', '#00897B', '#43A047',
   '#7CB342', '#C0CA33', '#FDD835', '#FFB300', '#FB8C00',
   '#F4511E', '#6D4C41', '#757575', '#546E7A', '#000000',
-  '#FFFFFF', '#F5F5F5', '#E0E0E0', '#9E9E9E', '#212121',
+  '#FFFFFF', '#fafaf9', '#E0E0E0', '#9E9E9E', '#212121',
 ];
 
 // ---------------------------------------------------------------------------
@@ -747,8 +747,8 @@ const ColorPickerField: React.FC<ColorPickerFieldProps> = ({ label, description,
     document.addEventListener('mouseup', onUp);
   }, [hsv.s, hsv.v, emitFromHsv, handleHueDrag]);
 
-  const panelBg = isDark ? '#1f1f1f' : '#FFFFFF';
-  const panelBorder = isDark ? '#272727' : '#D1D5DB';
+  const panelBg = isDark ? '#292524' : '#FFFFFF';
+  const panelBorder = isDark ? '#44403c' : '#D1D5DB';
   const panelText = isDark ? '#E0E0E0' : '#111827';
   const panelMuted = isDark ? '#787878' : '#6B7280';
 

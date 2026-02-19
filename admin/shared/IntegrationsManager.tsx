@@ -27,7 +27,7 @@ import { McpConfigPanel } from './McpConfigPanel';
 // Constants
 // ---------------------------------------------------------------------------
 
-const BRAND_PRIMARY = '#ff3621';
+const ACTION_BLUE = '#3B82F6';
 
 const STATUS_COLORS: Record<string, string> = {
   connected: '#0D7C3E',
@@ -120,8 +120,8 @@ interface IntegrationCardProps {
 }
 
 const cardStyle: React.CSSProperties = {
-  background: '#1f1f1f',
-  border: '1px solid #272727',
+  background: '#292524',
+  border: '1px solid #44403c',
   borderRadius: 8,
   padding: 16,
   display: 'flex',
@@ -134,8 +134,8 @@ const iconContainerStyle: React.CSSProperties = {
   width: 180,
   height: 180,
   borderRadius: 8,
-  background: '#141414',
-  border: '1px solid #272727',
+  background: '#1c1917',
+  border: '1px solid #44403c',
   display: 'flex',
   alignItems: 'center',
   justifyContent: 'center',
@@ -194,7 +194,7 @@ const btnBase: React.CSSProperties = {
 };
 
 const HoverButton: React.FC<{
-  variant: 'primary' | 'outline' | 'danger';
+  variant: 'primary' | 'success' | 'outline' | 'danger';
   onClick: () => void;
   disabled?: boolean;
   children: React.ReactNode;
@@ -203,12 +203,16 @@ const HoverButton: React.FC<{
 
   const styles: Record<string, { base: React.CSSProperties; hover: React.CSSProperties }> = {
     primary: {
-      base: { ...btnBase, border: 'none', background: BRAND_PRIMARY, color: '#fff' },
-      hover: { background: '#e02e1a' },
+      base: { ...btnBase, border: 'none', background: ACTION_BLUE, color: '#fff' },
+      hover: { background: '#2563EB' },
+    },
+    success: {
+      base: { ...btnBase, border: 'none', background: '#2b8a3e', color: '#fff' },
+      hover: { background: '#237032' },
     },
     outline: {
-      base: { ...btnBase, border: '1px solid #272727', background: 'transparent', color: '#A0A0A0' },
-      hover: { background: '#272727' },
+      base: { ...btnBase, border: '1px solid #44403c', background: 'transparent', color: '#A0A0A0' },
+      hover: { background: '#44403c' },
     },
     danger: {
       base: { ...btnBase, border: '1px solid #D32F2F44', background: 'transparent', color: '#D32F2F' },
@@ -281,7 +285,7 @@ const IntegrationCard: React.FC<IntegrationCardProps & {
       {/* Right side: name, badges, description, actions */}
       <div style={{ flex: 1, minWidth: 0 }}>
         <div style={{ display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap' }}>
-          <span style={{ fontSize: 22, fontWeight: 600, color: '#F5F5F5' }}>
+          <span style={{ fontSize: 22, fontWeight: 600, color: '#fafaf9' }}>
             {integration.name}
             {INTEGRATION_TOOLTIPS[integration.type] && (
               <HelpTooltip
@@ -365,7 +369,7 @@ const IntegrationCard: React.FC<IntegrationCardProps & {
             </>
           ) : (
             <HoverButton
-              variant="primary"
+              variant="success"
               onClick={() => onActivate(integration.type)}
               disabled={activating}
             >
@@ -498,8 +502,8 @@ export const IntegrationsManager: React.FC<BaseComponentProps & { isDark?: boole
             padding: 40,
             textAlign: 'center',
             color: '#787878',
-            background: '#1f1f1f',
-            border: '1px solid #272727',
+            background: '#292524',
+            border: '1px solid #44403c',
             borderRadius: 8,
           }}
         >
