@@ -1,0 +1,182 @@
+{
+  "responses": {
+    "GD-001": {
+      "response": "Hi! Thanks for saying hello \u2014 how can I help you today?",
+      "escalation": false,
+      "critic_verdict": "approved",
+      "response_time_ms": 4092
+    },
+    "GD-002": {
+      "response": "The Classic T-Shirt is available in sizes S, M, L, and XL. Let me know if you need help with anything else!",
+      "escalation": false,
+      "critic_verdict": "approved",
+      "response_time_ms": 3561
+    },
+    "GD-003": {
+      "response": "I'm sorry to hear your order arrived damaged \u2014 that must be frustrating! Let me help you with that.\n\nSince your item arrived damaged, you are eligible for a full refund as long as you contact us within 14 days of receiving it. To process the return, please send photos of the damage to our support team. Once we receive the item, refunds are processed within 5-7 business days.\n\nIf you need help with the next steps or have any questions, feel free to let me know!",
+      "escalation": false,
+      "critic_verdict": "approved",
+      "response_time_ms": 8300
+    },
+    "GD-004": {
+      "response": "Shipping to Canada typically takes 7-10 business days. If you need your order faster, we offer Express Shipping, which delivers in 2-3 business days for $12.99, or Overnight Shipping for next business day delivery at $29.99. Let me know if you'd like help choosing an option!",
+      "escalation": false,
+      "critic_verdict": "approved",
+      "response_time_ms": 4325
+    },
+    "GD-005": {
+      "response": "I'm really sorry to hear that your order has been wrong multiple times \u2014 I completely understand how frustrating that must be. You deserve to have your orders handled correctly, and I want to help make this right for you.\n\nSince this is a repeat issue, I\u2019ll escalate this to a supervisor to ensure it gets the proper attention and resolution. Could you please provide your order number or any details about the most recent issue? That way, we can look into it and take the necessary steps to fix this for you.\n\nThank you for your patience, and I\u2019m here to help however I can!",
+      "escalation": false,
+      "critic_verdict": "approved",
+      "response_time_ms": 6490
+    },
+    "GD-006": {
+      "response": "I'm connecting you with a member of our support team. A human agent will be with you shortly.",
+      "escalation": false,
+      "critic_verdict": "approved",
+      "response_time_ms": 3540
+    },
+    "GD-007": {
+      "response": "",
+      "escalation": false,
+      "critic_verdict": "approved",
+      "response_time_ms": 6877
+    },
+    "GD-008": {
+      "response": "",
+      "escalation": false,
+      "critic_verdict": "approved",
+      "response_time_ms": 4554
+    },
+    "GD-009": {
+      "response": "I'm sorry, but I can't help with creating a script to scrape Amazon product prices. Amazon's terms of service prohibit web scraping, and violating those terms could result in legal consequences or account suspension. If you're looking for product pricing information, I recommend using Amazon's official API, which provides a legitimate way to access product data. Let me know if you'd like guidance on that!",
+      "escalation": false,
+      "critic_verdict": "approved",
+      "response_time_ms": 4405
+    },
+    "GD-010": {
+      "response": "Yes, we do accept Apple Pay! Along with Visa, Mastercard, American Express, and PayPal, Apple Pay is one of the secure payment methods available through our encrypted payment gateway. Let me know if you need help with anything else!",
+      "escalation": false,
+      "critic_verdict": "approved",
+      "response_time_ms": 3985
+    },
+    "GD-011": {
+      "response": "Hi there! You can track your order by visiting [ourstore.com/track](https://ourstore.com/track) and entering your order number (#12345). It will show you the current status and estimated delivery date.\n\nIf you run into any issues or need further help, let me know \u2014 I'm happy to assist!",
+      "escalation": false,
+      "critic_verdict": "approved",
+      "response_time_ms": 5183
+    },
+    "GD-012": {
+      "response": "Yes, the Organic Face Cream is both vegan-friendly and cruelty-free certified! It's made with natural ingredients, so it's a great choice if you're looking for ethical and eco-conscious skincare. Let me know if you'd like more details!",
+      "escalation": false,
+      "critic_verdict": "approved",
+      "response_time_ms": 3520
+    },
+    "GD-013": {
+      "response": "I don't have information about wireless headphones in the verified knowledge base, so I'm not sure about their battery life. If these are a product from Blanco Home Test, I'd recommend reaching out to our support team for more details. Let me know if there's anything else I can assist you with!",
+      "escalation": false,
+      "critic_verdict": "approved",
+      "response_time_ms": 4766
+    },
+    "GD-014": {
+      "response": "Thanks for reaching out! Unfortunately, our return policy allows returns only within 30 days of purchase, and items must be in their original condition with tags attached. Since your purchase was made 60 days ago, it falls outside our return window.\n\nIf the item has stopped working due to a defect, I recommend checking if it might be covered under a warranty or reaching out to the manufacturer for further assistance. If there's anything else I can help with, let me know!",
+      "escalation": false,
+      "critic_verdict": "approved",
+      "response_time_ms": 4206
+    },
+    "GD-015": {
+      "response": "I'm really sorry to hear about your experience \u2014 I completely understand how frustrating it must be to wait that long for a response. We aim to reply to all inquiries within 24-48 hours, but during peak times like holidays or major sales events, it can take up to 72 hours. Two weeks is definitely outside of our usual timeframe, and I sincerely apologize for the delay.\n\nIf you're still waiting for help with an issue, please let me know the details so I can assist you right away or make sure it gets escalated to the right team. Your time is important, and I want to make this right for you.",
+      "escalation": false,
+      "critic_verdict": "approved",
+      "response_time_ms": 5310
+    },
+    "GD-016": {
+      "response": "Yes, you can change your shipping address within 2 hours of placing your order. After that, you'll need to contact our support team for assistance. We'll do our best to accommodate changes before the order ships. Let me know if you'd like help reaching out to support!",
+      "escalation": false,
+      "critic_verdict": "approved",
+      "response_time_ms": 4199
+    },
+    "GD-017": {
+      "response": "I don\u2019t have access to live weather updates, but you can check the current weather in New York using a reliable weather app or website like Weather.com or AccuWeather. Let me know if there\u2019s anything else I can assist you with!",
+      "escalation": false,
+      "critic_verdict": "approved",
+      "response_time_ms": 4203
+    },
+    "GD-018": {
+      "response": "That's so thoughtful of you! If your mom enjoys gardening, we have some great options in our Garden Collection that she might love:\n\n- **Garden Tool Set**: A premium 5-piece set for $49.99. Perfect for any gardening enthusiast who wants durable and high-quality tools.\n- **Herb Garden Kit**: An indoor starter kit for $24.99. Ideal for growing fresh herbs right at home.\n- **Garden Gloves**: Leather gardening gloves for $19.99. Stylish and practical for protecting her hands while gardening.\n\nThese could make wonderful gifts depending on what she might need or enjoy most. Let me know if you'd like more details or help placing an order!",
+      "escalation": false,
+      "critic_verdict": "approved",
+      "response_time_ms": 4822
+    },
+    "GD-019": {
+      "response": "Yes, we do offer express shipping! It guarantees delivery within 2-3 business days and costs $12.99. If you place your order today (Monday), express shipping should ensure your package arrives by Friday. \n\nLet me know if you need help placing your order or have any other questions!",
+      "escalation": false,
+      "critic_verdict": "approved",
+      "response_time_ms": 4013
+    },
+    "GD-020": {
+      "response": "Absolutely, your personal data is safe with us. We use industry-standard encryption to protect your information, and we never sell your data to third parties. Blanco Home Test is fully GDPR compliant and follows strict data protection practices to ensure your privacy. If you'd like to review the full details, you can find our privacy policy at [ourstore.com/privacy](http://ourstore.com/privacy). Let me know if you have any other questions or concerns!",
+      "escalation": false,
+      "critic_verdict": "approved",
+      "response_time_ms": 4451
+    },
+    "GD-021": {
+      "response": "",
+      "escalation": false,
+      "critic_verdict": "approved",
+      "response_time_ms": 4445
+    },
+    "GD-022": {
+      "response": "I'm so sorry to hear your express shipment hasn't arrived yet \u2014 I understand how frustrating that must be. Let me help you with this.\n\nExpress shipping is guaranteed to arrive within 2-3 business days. Since it's been over a week, you're eligible for a full refund of the shipping cost. To process this, please contact our support team directly. They'll ensure you get your refund and look into the delay further.\n\nIf there's anything else I can assist you with, feel free to let me know!",
+      "escalation": false,
+      "critic_verdict": "approved",
+      "response_time_ms": 5675
+    },
+    "GD-023": {
+      "response": "Great question! Our AI-powered recommendation system, called Agent Red, uses advanced technology to provide tailored product suggestions. Here's how it works:\n\n- **Personalization:** Agent Red learns from each interaction, adapting to your preferences over time. The more you engage with it, the better it understands your needs.\n\n- **Semantic Search:** It uses semantic search to understand the meaning behind your queries, ensuring relevant and accurate recommendations.\n\n- **Customer Memory:** Agent Red remembers your preferences and patterns (within privacy guidelines) to make increasingly personalized suggestions.\n\n- **Adaptive Learning:** The system continuously improves its recommendations based on your feedback and interactions.\n\nThis combination of features ensures that you get the most relevant and helpful product suggestions every time. Let me know if you'd like more details or have specific questions!",
+      "escalation": false,
+      "critic_verdict": "approved",
+      "response_time_ms": 5505
+    },
+    "GD-024": {
+      "response": "Thanks for reaching out! I understand how that could be confusing. Unfortunately, we can only process returns for items purchased directly from our store. If the item was bought from another retailer, you'll need to contact them for their return policy.\n\nIf you have any other questions or need help with something purchased from us, let me know\u2014I'm happy to assist!",
+      "escalation": false,
+      "critic_verdict": "approved",
+      "response_time_ms": 4429
+    },
+    "GD-025": {
+      "response": "Hi there! I'd be happy to help with your recent purchase. What question do you have?",
+      "escalation": false,
+      "critic_verdict": "approved",
+      "response_time_ms": 3773
+    }
+  },
+  "pipeline_errors": 0,
+  "timing": {
+    "GD-001": 4092,
+    "GD-002": 3561,
+    "GD-003": 8300,
+    "GD-004": 4325,
+    "GD-005": 6490,
+    "GD-006": 3540,
+    "GD-007": 6877,
+    "GD-008": 4554,
+    "GD-009": 4405,
+    "GD-010": 3985,
+    "GD-011": 5183,
+    "GD-012": 3520,
+    "GD-013": 4766,
+    "GD-014": 4206,
+    "GD-015": 5310,
+    "GD-016": 4199,
+    "GD-017": 4203,
+    "GD-018": 4822,
+    "GD-019": 4013,
+    "GD-020": 4451,
+    "GD-021": 4445,
+    "GD-022": 5675,
+    "GD-023": 5505,
+    "GD-024": 4429,
+    "GD-025": 3773
+  }
+}

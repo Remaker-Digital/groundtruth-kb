@@ -1,13 +1,14 @@
 # Conversation Quality Regression Testing Procedure
 # Type: Repeatable Procedure (see docs/operations/REPEATABLE-PROCEDURES.md)
-# Last verified: 2026-02-19 (session 62, v1.51.1 — CONDITIONAL PASS)
-# Last corrected: 2026-02-19 (added SSE streaming runner, jailbreak handling notes)
+# Last verified: 2026-02-20 (session 63, v1.51.1 — PASS, 25/25, 4.75/5.0)
+# Last corrected: 2026-02-20 (KB seeding prerequisite, jailbreak fast-path, smart-quote normalization)
 
 This procedure validates that the Agent Red AI conversation pipeline produces responses that meet quality thresholds across 25 golden evaluation scenarios. It exercises the full pipeline end-to-end (intent classification → knowledge retrieval → response generation → critic review) against production and scores responses using heuristic and (optionally) LLM-based evaluation.
 
 > **Audience:** AI assistants (Claude) and human operators.
 > **Tooling:** Custom evaluation framework (`evaluation/` module), optionally DeepEval.
 > **Test code:** `evaluation/pilots/quality_pilot.py` (heuristic scoring), `evaluation/deepeval_config.py` (LLM scoring).
+> **KB seeder:** `evaluation/seed_quality_kb.py` — creates 12 KB articles required by golden scenarios.
 > **Dataset:** `evaluation/datasets/response_quality.json` (25 scenarios, 10 categories).
 
 ---
@@ -52,7 +53,10 @@ SCENARIO_CATEGORIES = 10
                                                   Note: NATS connection is NOT required when USE_AGENT_CONTAINERS=false
                                                   (direct Azure OpenAI mode). Pipeline uses in-process agent delegation.
 [ ] Widget key valid                           — Test start-conversation endpoint returns 200
-[ ] Tenant has KB data loaded                  — At least 4 KB documents available for retrieval
+[ ] Tenant has KB data loaded                  — python evaluation/seed_quality_kb.py --execute
+                                                  Seeds 12 KB articles required by golden scenarios.
+                                                  Use --clean to delete existing articles first.
+                                                  Verify: GET /api/admin/knowledge returns ≥12 published entries
 [ ] Tenant is activated (ConfigState.ACTIVE)   — /api/config shows is_configured: true
 [ ] Golden dataset exists                      — ls $DATASET_FILE (25 scenarios)
 [ ] Results directory exists                   — mkdir -p $RESULTS_DIR

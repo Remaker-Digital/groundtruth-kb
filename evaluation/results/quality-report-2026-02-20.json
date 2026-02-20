@@ -1,0 +1,42 @@
+{
+  "date": "2026-02-20",
+  "version": "1.51.1",
+  "total_scenarios": 25,
+  "successful_responses": 22,
+  "pipeline_errors": 0,
+  "avg_response_time_ms": 4745,
+  "max_response_time_ms": 8300,
+  "heuristic_scores": {
+    "faithfulness": 5.0,
+    "relevancy": 4.41,
+    "tone": 4.92,
+    "overall": 4.75
+  },
+  "pass_rates": {
+    "contains_check": "92%",
+    "excludes_check": "100%",
+    "escalation_accuracy": "92%"
+  },
+  "deepeval_scores": null,
+  "failing_scenarios": [
+    {
+      "id": "GD-013",
+      "category": "product_inquiry",
+      "overall": 3.92,
+      "issues": [
+        "Missing expected phrase: 'check'",
+        "Missing expected phrase: 'help'"
+      ]
+    },
+    {
+      "id": "GD-017",
+      "category": "off_topic",
+      "overall": 3.4,
+      "issues": [
+        "Missing expected phrase: 'help'",
+        "Missing expected phrase: 'customer service'"
+      ]
+    }
+  ],
+  "verdict": "PASS"
+}
