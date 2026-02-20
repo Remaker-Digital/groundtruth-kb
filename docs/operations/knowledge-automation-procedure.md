@@ -49,7 +49,7 @@ curl -s -H "X-API-Key: ${SUPERADMIN_KEY}" \
 ```bash
 curl -s -X POST -H "X-API-Key: ${SUPERADMIN_KEY}" \
   -H "Content-Type: application/json" \
-  "${API_BASE}/api/admin/knowledge/templates/apparel-fashion/apply" | python -m json.tool
+  "${API_BASE}/api/admin/knowledge/templates/apparel_fashion/apply" | python -m json.tool
 ```
 
 **Expected:** JSON response with `articlesCreated > 0`, `totalChars > 0`.

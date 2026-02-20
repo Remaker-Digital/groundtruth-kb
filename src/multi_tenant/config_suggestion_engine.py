@@ -173,7 +173,6 @@ class ConfigSuggestionEngine:
                 tenant_id,
                 offset=0,
                 limit=100,
-                status="published",
             )
             return results
         except Exception:
