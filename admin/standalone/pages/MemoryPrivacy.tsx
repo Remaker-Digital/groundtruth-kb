@@ -31,12 +31,13 @@ import { useAppContext } from '../layouts/StandaloneLayout';
 import { useConfig, useUpdateConfig } from '../../shared/hooks/index';
 import { HelpTooltip } from '../../shared/HelpTooltip';
 import { LoadingState } from '../../shared/LoadingState';
+import { tokens } from '../../shared/theme/styles';
 
 // ---------------------------------------------------------------------------
 // Constants
 // ---------------------------------------------------------------------------
 
-const ACTION_BLUE = '#3B82F6';
+const ACTION_BLUE = tokens.action;
 
 const RETENTION_OPTIONS = [
   { value: '30', label: '30 days' },

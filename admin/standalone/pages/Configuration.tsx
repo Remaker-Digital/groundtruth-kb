@@ -36,6 +36,7 @@ import { useAppContext } from '../layouts/StandaloneLayout';
 import { useConfig, useUpdateConfig } from '../../shared/hooks/index';
 import { HelpTooltip } from '../../shared/HelpTooltip';
 import { LoadingState } from '../../shared/LoadingState';
+import { tokens } from '../../shared/theme/styles';
 
 const DOCS_BASE = 'https://agentredcx.com/docs/admin-guide';
 
@@ -43,8 +44,8 @@ const DOCS_BASE = 'https://agentredcx.com/docs/admin-guide';
 // Constants
 // ---------------------------------------------------------------------------
 
-const BRAND_RED = '#ff3621'; // accent only — email badge indicator
-const ACTION_BLUE = '#3B82F6';
+const BRAND_RED = tokens.brand; // accent only — email badge indicator
+const ACTION_BLUE = tokens.action;
 
 // ---------------------------------------------------------------------------
 // Escalation categories — each has its own email + keyword set
@@ -622,8 +623,8 @@ export const ConfigurationPage: React.FC = () => {
                       p="sm"
                       radius="sm"
                       style={{
-                        backgroundColor: isDark ? '#1c1917' : '#f8f9fa',
-                        border: `1px solid ${isDark ? '#44403c' : '#dee2e6'}`,
+                        backgroundColor: isDark ? tokens.page : '#f8f9fa',
+                        border: `1px solid ${isDark ? tokens.border : '#dee2e6'}`,
                         opacity: catConfig.enabled ? 1 : 0.6,
                       }}
                     >

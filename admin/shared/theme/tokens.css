@@ -1,0 +1,273 @@
+/**
+ * Agent Red Design Tokens — CSS Custom Properties
+ *
+ * Single source of truth for all design tokens consumed by the admin UI.
+ * Imported by each entry point (standalone, provider, shopify).
+ *
+ * Three-layer architecture:
+ *   Layer 1: THIS FILE — CSS custom properties + hover utility classes + Mantine dark-mode overrides
+ *   Layer 2: styles.ts — TypeScript constants mirroring these tokens for React.CSSProperties consumers
+ *   Layer 3: agentRedTheme.ts — Mantine theme props (color="action", bg="dark.7", etc.)
+ *
+ * Naming convention: --ar-{category}-{name}
+ *   Surfaces:  --ar-chrome, --ar-page, --ar-surface, --ar-border
+ *   Text:      --ar-text-primary, --ar-text-secondary, --ar-text-muted, --ar-text-tertiary
+ *   Actions:   --ar-action, --ar-action-hover, --ar-activate, --ar-activate-hover, --ar-danger, --ar-brand
+ *   Semantic:  --ar-success, --ar-warning, --ar-error, --ar-info
+ *
+ * (c) 2026 Remaker Digital, a DBA of VanDusen & Palmeter, LLC. All rights reserved.
+ */
+
+/* ==========================================================================
+   1. CSS Custom Properties (design tokens)
+   ========================================================================== */
+
+:root {
+  /* --- Stone neutral surface hierarchy (dark mode) --- */
+  --ar-chrome:  #0c0a09;
+  --ar-page:    #1c1917;
+  --ar-surface: #292524;
+  --ar-border:  #44403c;
+
+  /* --- Text hierarchy --- */
+  --ar-text-primary:   #fafaf9;
+  --ar-text-secondary: #f5f5f4;
+  --ar-text-muted:     #a8a29e;
+  --ar-text-tertiary:  #57534e;
+
+  /* --- Action colors --- */
+  --ar-action:          #3B82F6;
+  --ar-action-hover:    #2563EB;
+  --ar-activate:        #2b8a3e;
+  --ar-activate-hover:  #237032;
+  --ar-danger:          #D32F2F;
+  --ar-danger-hover:    #B71C1C;
+  --ar-brand:           #ff3621;
+
+  /* --- Semantic status --- */
+  --ar-success:  #0D7C3E;
+  --ar-warning:  #E5A100;
+  --ar-error:    #D32F2F;
+  --ar-info:     #1E3A5F;
+
+  /* --- Overlay / modal --- */
+  --ar-overlay-bg:  rgba(0, 0, 0, 0.6);
+  --ar-modal-shadow: 0 20px 60px rgba(0, 0, 0, 0.3);
+
+  /* --- Transitions --- */
+  --ar-transition-fast: 150ms ease;
+}
+
+
+/* ==========================================================================
+   2. Base reset + typography
+   ========================================================================== */
+
+html, body {
+  margin: 0;
+  padding: 0;
+  background: var(--ar-chrome);
+}
+
+body {
+  font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+}
+
+
+/* ==========================================================================
+   3. Mantine dark-mode overrides
+   ========================================================================== */
+
+/* Text color */
+html[data-mantine-color-scheme="dark"]      { color: var(--ar-text-primary); }
+html[data-mantine-color-scheme="dark"] body { color: var(--ar-text-primary); }
+
+/* Card / Paper borders */
+[data-mantine-color-scheme="dark"] .mantine-Paper-root {
+  --_paper-border-color: var(--ar-border);
+  border-color: var(--ar-border);
+  border-width: 1px;
+}
+
+/* Table borders */
+[data-mantine-color-scheme="dark"] .mantine-Table-tr  { border-color: var(--ar-border); }
+[data-mantine-color-scheme="dark"] .mantine-Table-th,
+[data-mantine-color-scheme="dark"] .mantine-Table-td  { border-color: var(--ar-border); }
+
+/* Input / Select borders */
+[data-mantine-color-scheme="dark"] .mantine-Input-input,
+[data-mantine-color-scheme="dark"] .mantine-Select-input { border-color: var(--ar-border); }
+
+/* Button borders (variant=default/outline) */
+[data-mantine-color-scheme="dark"] .mantine-Button-root[data-variant="default"],
+[data-mantine-color-scheme="dark"] .mantine-Button-root[data-variant="outline"] { border-color: var(--ar-border); }
+
+/* Chip borders (unchecked) */
+[data-mantine-color-scheme="dark"] .mantine-Chip-label:not([data-checked]) { border-color: var(--ar-border); }
+
+/* Accordion borders */
+[data-mantine-color-scheme="dark"] .mantine-Accordion-item    { border-color: var(--ar-border); }
+[data-mantine-color-scheme="dark"] .mantine-Accordion-control { border-color: var(--ar-border); }
+
+/* Badge borders (variant=outline) */
+[data-mantine-color-scheme="dark"] .mantine-Badge-root[data-variant="outline"] { border-color: var(--ar-border); }
+
+/* Divider */
+[data-mantine-color-scheme="dark"] .mantine-Divider-root {
+  --_divider-color: var(--ar-border);
+  border-color: var(--ar-border);
+}
+
+/* Badge label: sentence case (disable Mantine's default uppercase) */
+.mantine-Badge-label { text-transform: none; }
+
+/* Light mode: dark sticky header (matches dark mode chrome) */
+html[data-mantine-color-scheme="light"] .mantine-AppShell-header {
+  background: var(--ar-chrome) !important;
+  border-bottom-color: var(--ar-surface) !important;
+}
+html[data-mantine-color-scheme="light"] .mantine-AppShell-header .mantine-Text-root,
+html[data-mantine-color-scheme="light"] .mantine-AppShell-header .mantine-ActionIcon-root {
+  color: var(--ar-text-primary);
+}
+
+
+/* ==========================================================================
+   4. Hover utility classes — replaces JS onMouseEnter/onMouseLeave handlers
+   ========================================================================== */
+
+/* --- Action (blue) button hover --- */
+.ar-btn-action {
+  background-color: var(--ar-action);
+  color: #fff;
+  border: none;
+  cursor: pointer;
+  transition: background-color var(--ar-transition-fast);
+}
+.ar-btn-action:hover:not(:disabled) {
+  background-color: var(--ar-action-hover);
+}
+.ar-btn-action:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+/* --- Activate (green) button hover --- */
+.ar-btn-activate {
+  background-color: var(--ar-activate);
+  color: #fff;
+  border: none;
+  cursor: pointer;
+  transition: background-color var(--ar-transition-fast);
+}
+.ar-btn-activate:hover:not(:disabled) {
+  background-color: var(--ar-activate-hover);
+}
+.ar-btn-activate:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+/* --- Danger (red) button hover --- */
+.ar-btn-danger {
+  background-color: var(--ar-danger);
+  color: #fff;
+  border: none;
+  cursor: pointer;
+  transition: background-color var(--ar-transition-fast);
+}
+.ar-btn-danger:hover:not(:disabled) {
+  background-color: var(--ar-danger-hover);
+}
+.ar-btn-danger:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+/* --- Ghost / subtle button hover (border + transparent bg) --- */
+.ar-btn-ghost {
+  background: transparent;
+  color: var(--ar-text-muted);
+  border: 1px solid var(--ar-border);
+  cursor: pointer;
+  transition: background-color var(--ar-transition-fast), border-color var(--ar-transition-fast);
+}
+.ar-btn-ghost:hover:not(:disabled) {
+  background-color: var(--ar-surface);
+  border-color: var(--ar-text-tertiary);
+}
+
+/* --- Table / list row hover --- */
+.ar-row-hoverable {
+  transition: background-color var(--ar-transition-fast);
+}
+.ar-row-hoverable:hover {
+  background-color: var(--ar-surface);
+}
+
+/* --- Nav item hover --- */
+.ar-nav-item {
+  transition: background-color var(--ar-transition-fast);
+  cursor: pointer;
+}
+.ar-nav-item:hover {
+  background-color: var(--ar-surface);
+}
+
+/* --- Icon button hover (small action icons) --- */
+.ar-icon-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  background: transparent;
+  border: 1px solid var(--ar-border);
+  border-radius: 6px;
+  color: var(--ar-text-muted);
+  cursor: pointer;
+  transition: background-color var(--ar-transition-fast), color var(--ar-transition-fast);
+}
+.ar-icon-btn:hover {
+  background-color: var(--ar-surface);
+  color: var(--ar-text-primary);
+}
+
+/* --- Opacity hover (EmptyState, etc.) --- */
+.ar-opacity-hover {
+  transition: opacity var(--ar-transition-fast);
+}
+.ar-opacity-hover:hover {
+  opacity: 0.85;
+}
+
+/* --- Outline-danger button (IntegrationsManager disconnect) --- */
+.ar-btn-danger-outline {
+  background: transparent;
+  color: var(--ar-danger);
+  border: 1px solid rgba(211, 47, 47, 0.27);
+  cursor: pointer;
+  transition: background-color var(--ar-transition-fast);
+}
+.ar-btn-danger-outline:hover:not(:disabled) {
+  background-color: rgba(211, 47, 47, 0.09);
+}
+.ar-btn-danger-outline:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
+}
+
+/* --- Shop link (border-color hover) --- */
+.ar-link-shop {
+  transition: border-color var(--ar-transition-fast);
+  border: 1px solid rgba(255, 255, 255, 0.08);
+}
+.ar-link-shop:hover {
+  border-color: rgba(255, 255, 255, 0.2);
+}
+
+/* --- Light-mode row hover (KB ArticleRow, ConversationInbox) --- */
+.ar-row-hoverable-light {
+  transition: background-color var(--ar-transition-fast);
+}
+.ar-row-hoverable-light:hover {
+  background-color: #f6f8fa;
+}

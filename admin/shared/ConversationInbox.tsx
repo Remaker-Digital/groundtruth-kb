@@ -30,13 +30,14 @@ import {
 } from './hooks';
 import type { SearchResult } from './hooks';
 import { HelpTooltip } from './HelpTooltip';
+import { tokens } from './theme/styles';
 
 // ---------------------------------------------------------------------------
 // Style constants
 // ---------------------------------------------------------------------------
 
-const BRAND_PRIMARY = '#ff3621'; // accent only — message bubbles, spinner
-const ACTION_BLUE = '#3B82F6';
+const BRAND_PRIMARY = tokens.brand; // accent only — message bubbles, spinner
+const ACTION_BLUE = tokens.action;
 const COLOR_SUCCESS = '#22863a';
 const COLOR_DANGER = '#d73a49';
 const COLOR_GRAY = '#6a737d';

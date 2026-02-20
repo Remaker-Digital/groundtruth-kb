@@ -9,6 +9,7 @@
  */
 
 import React, { useState, useCallback, useRef, useEffect } from 'react';
+import { tokens } from '../../shared/theme/styles';
 
 const API_BASE_URL = import.meta.env?.VITE_API_URL || '';
 
@@ -84,7 +85,7 @@ export const MfaChallenge: React.FC<MfaChallengeProps> = ({
     display: 'flex',
     alignItems: 'center',
     justifyContent: 'center',
-    backgroundColor: '#0c0a09',
+    backgroundColor: tokens.chrome,
     fontFamily:
       'Inter, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif',
   };
@@ -92,9 +93,9 @@ export const MfaChallenge: React.FC<MfaChallengeProps> = ({
   const cardStyle: React.CSSProperties = {
     width: '100%',
     maxWidth: '380px',
-    backgroundColor: '#292524',
+    backgroundColor: tokens.surface,
     borderRadius: '12px',
-    border: '1px solid #44403c',
+    border: `1px solid ${tokens.border}`,
     padding: '40px',
   };
 
@@ -104,12 +105,12 @@ export const MfaChallenge: React.FC<MfaChallengeProps> = ({
     fontSize: useBackup ? '16px' : '24px',
     letterSpacing: useBackup ? 'normal' : '0.3em',
     textAlign: 'center',
-    border: `1px solid ${error ? '#ff6b6b' : '#44403c'}`,
+    border: `1px solid ${error ? tokens.errorLight : tokens.border}`,
     borderRadius: '8px',
     outline: 'none',
     boxSizing: 'border-box',
-    backgroundColor: '#1c1917',
-    color: '#e0e0e0',
+    backgroundColor: tokens.page,
+    color: tokens.textSecondary,
     fontFamily: 'monospace',
     transition: 'border-color 0.15s',
   };
@@ -118,7 +119,7 @@ export const MfaChallenge: React.FC<MfaChallengeProps> = ({
     width: '100%',
     marginTop: '16px',
     padding: '10px',
-    backgroundColor: disabled ? '#555' : '#3B82F6',
+    backgroundColor: disabled ? '#555' : tokens.action,
     color: '#fff',
     border: 'none',
     borderRadius: '8px',
@@ -130,7 +131,7 @@ export const MfaChallenge: React.FC<MfaChallengeProps> = ({
   const linkStyle: React.CSSProperties = {
     background: 'none',
     border: 'none',
-    color: '#3B82F6',
+    color: tokens.action,
     fontSize: '13px',
     cursor: 'pointer',
     padding: 0,
@@ -149,12 +150,12 @@ export const MfaChallenge: React.FC<MfaChallengeProps> = ({
               margin: 0,
               fontSize: '18px',
               fontWeight: 600,
-              color: '#fafaf9',
+              color: tokens.textPrimary,
             }}
           >
             {useBackup ? 'Enter Backup Code' : 'Two-Factor Authentication'}
           </h2>
-          <p style={{ margin: '8px 0 0', fontSize: '13px', color: '#a0a0a0' }}>
+          <p style={{ margin: '8px 0 0', fontSize: '13px', color: tokens.textMuted }}>
             {useBackup
               ? 'Enter one of your 8-character backup codes'
               : 'Enter the 6-digit code from your authenticator app'}
@@ -172,15 +173,15 @@ export const MfaChallenge: React.FC<MfaChallengeProps> = ({
             autoComplete="one-time-code"
             style={inputStyle}
             onFocus={(e) => {
-              if (!error) e.target.style.borderColor = '#3B82F6';
+              if (!error) e.target.style.borderColor = tokens.action;
             }}
             onBlur={(e) => {
-              if (!error) e.target.style.borderColor = '#44403c';
+              if (!error) e.target.style.borderColor = tokens.border;
             }}
           />
 
           {error && (
-            <p style={{ margin: '8px 0 0', fontSize: '13px', color: '#ff6b6b' }}>
+            <p style={{ margin: '8px 0 0', fontSize: '13px', color: tokens.errorLight }}>
               {error}
             </p>
           )}

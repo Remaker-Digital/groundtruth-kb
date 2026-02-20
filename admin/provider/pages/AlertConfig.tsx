@@ -35,6 +35,7 @@ import {
 } from '@mantine/core';
 import { useProviderContext } from '../layouts/ProviderLayout';
 import { HelpTooltip } from '../../shared/HelpTooltip';
+import { tokens } from '../../shared/theme/styles';
 
 // ---------------------------------------------------------------------------
 // Types (matches camelCase serialization)
@@ -343,7 +344,7 @@ export function AlertConfigPage() {
   return (
     <Stack gap="lg">
       <Group justify="space-between" align="baseline">
-        <Title order={3} c="#fafaf9">Alert Configuration</Title><HelpTooltip text="Define rules that monitor system metrics and trigger alerts when thresholds are exceeded. Rules are evaluated every 5 minutes." />
+        <Title order={3} c={tokens.textPrimary}>Alert Configuration</Title><HelpTooltip text="Define rules that monitor system metrics and trigger alerts when thresholds are exceeded. Rules are evaluated every 5 minutes." />
         <Group gap="sm">
           <Button variant="light" color="orange" size="sm" onClick={handleEvaluate}>
             Evaluate Now
@@ -385,7 +386,7 @@ export function AlertConfigPage() {
                 {rules.map((rule) => (
                   <Table.Tr key={rule.ruleId}>
                     <Table.Td>
-                      <Text size="sm" fw={500} c="#E0E0E0">{rule.name}</Text>
+                      <Text size="sm" fw={500} c={tokens.textSecondary}>{rule.name}</Text>
                       {rule.description && (
                         <Text size="xs" c="dimmed" lineClamp={1}>{rule.description}</Text>
                       )}
@@ -396,12 +397,12 @@ export function AlertConfigPage() {
                       </Badge>
                     </Table.Td>
                     <Table.Td>
-                      <Text size="xs" ff="monospace" c="#A0A0A0">
+                      <Text size="xs" ff="monospace" c={tokens.textMuted}>
                         {formatCondition(rule.condition)}
                       </Text>
                     </Table.Td>
                     <Table.Td>
-                      <Text size="xs" c="#A0A0A0">{rule.cooldownMinutes}m</Text>
+                      <Text size="xs" c={tokens.textMuted}>{rule.cooldownMinutes}m</Text>
                     </Table.Td>
                     <Table.Td>
                       <Switch
@@ -454,7 +455,7 @@ export function AlertConfigPage() {
                 {history.map((item) => (
                   <Table.Tr key={item.alertId}>
                     <Table.Td>
-                      <Text size="sm" c="#E0E0E0">{item.ruleName}</Text>
+                      <Text size="sm" c={tokens.textSecondary}>{item.ruleName}</Text>
                     </Table.Td>
                     <Table.Td>
                       <Badge variant="light" color={TYPE_COLORS[item.ruleType] ?? 'gray'} size="xs">
@@ -467,10 +468,10 @@ export function AlertConfigPage() {
                       </Badge>
                     </Table.Td>
                     <Table.Td>
-                      <Text size="xs" c="#A0A0A0" lineClamp={2}>{item.message}</Text>
+                      <Text size="xs" c={tokens.textMuted} lineClamp={2}>{item.message}</Text>
                     </Table.Td>
                     <Table.Td>
-                      <Text size="xs" ff="monospace" c="#E0E0E0">
+                      <Text size="xs" ff="monospace" c={tokens.textSecondary}>
                         {item.metricValue} / {item.thresholdValue}
                       </Text>
                     </Table.Td>
@@ -507,7 +508,7 @@ export function AlertConfigPage() {
         onClose={() => setModalOpen(false)}
         title={editingRule ? 'Edit Alert Rule' : 'Create Alert Rule'}
         size="lg"
-        styles={{ content: { backgroundColor: '#292524' }, header: { backgroundColor: '#292524' } }}
+        styles={{ content: { backgroundColor: tokens.surface }, header: { backgroundColor: tokens.surface } }}
       >
         <Stack gap="md">
           <TextInput
@@ -516,7 +517,7 @@ export function AlertConfigPage() {
             value={formName}
             onChange={(e) => setFormName(e.currentTarget.value)}
             required
-            styles={{ input: { backgroundColor: '#1c1917', borderColor: '#333', color: '#fafaf9' } }}
+            styles={{ input: { backgroundColor: tokens.page, borderColor: tokens.border, color: tokens.textPrimary } }}
           />
           <Select
             label="Rule Type"
@@ -524,7 +525,7 @@ export function AlertConfigPage() {
             value={formType}
             onChange={setFormType}
             disabled={!!editingRule}
-            styles={{ input: { backgroundColor: '#1c1917', borderColor: '#333', color: '#fafaf9' } }}
+            styles={{ input: { backgroundColor: tokens.page, borderColor: tokens.border, color: tokens.textPrimary } }}
           />
           <Textarea
             label="Description"
@@ -532,30 +533,30 @@ export function AlertConfigPage() {
             value={formDesc}
             onChange={(e) => setFormDesc(e.currentTarget.value)}
             minRows={2}
-            styles={{ input: { backgroundColor: '#1c1917', borderColor: '#333', color: '#fafaf9' } }}
+            styles={{ input: { backgroundColor: tokens.page, borderColor: tokens.border, color: tokens.textPrimary } }}
           />
 
-          <Text size="sm" fw={600} c="#A0A0A0" tt="uppercase">Condition</Text><HelpTooltip text="Define when this rule fires. The metric is compared to the threshold using the selected operator." />
+          <Text size="sm" fw={600} c={tokens.textMuted} tt="uppercase">Condition</Text><HelpTooltip text="Define when this rule fires. The metric is compared to the threshold using the selected operator." />
           <Group grow>
             <TextInput
               label="Metric"
               placeholder="e.g. queue_depth, error_rate"
               value={formMetric}
               onChange={(e) => setFormMetric(e.currentTarget.value)}
-              styles={{ input: { backgroundColor: '#1c1917', borderColor: '#333', color: '#fafaf9' } }}
+              styles={{ input: { backgroundColor: tokens.page, borderColor: tokens.border, color: tokens.textPrimary } }}
             />
             <Select
               label="Operator"
               data={OPERATOR_OPTIONS}
               value={formOperator}
               onChange={setFormOperator}
-              styles={{ input: { backgroundColor: '#1c1917', borderColor: '#333', color: '#fafaf9' } }}
+              styles={{ input: { backgroundColor: tokens.page, borderColor: tokens.border, color: tokens.textPrimary } }}
             />
             <NumberInput
               label="Threshold"
               value={formThreshold}
               onChange={(v) => setFormThreshold(typeof v === 'number' ? v : 0)}
-              styles={{ input: { backgroundColor: '#1c1917', borderColor: '#333', color: '#fafaf9' } }}
+              styles={{ input: { backgroundColor: tokens.page, borderColor: tokens.border, color: tokens.textPrimary } }}
             />
           </Group>
 
@@ -565,14 +566,14 @@ export function AlertConfigPage() {
               value={formCooldown}
               onChange={(v) => setFormCooldown(typeof v === 'number' ? v : 60)}
               min={1}
-              styles={{ input: { backgroundColor: '#1c1917', borderColor: '#333', color: '#fafaf9' } }}
+              styles={{ input: { backgroundColor: tokens.page, borderColor: tokens.border, color: tokens.textPrimary } }}
             />
             <TextInput
               label="Runbook URL"
               placeholder="https://..."
               value={formRunbook}
               onChange={(e) => setFormRunbook(e.currentTarget.value)}
-              styles={{ input: { backgroundColor: '#1c1917', borderColor: '#333', color: '#fafaf9' } }}
+              styles={{ input: { backgroundColor: tokens.page, borderColor: tokens.border, color: tokens.textPrimary } }}
             />
           </Group>
 

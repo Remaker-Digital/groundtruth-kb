@@ -39,6 +39,7 @@ import {
   useDeleteWidgetAppearance,
 } from './hooks';
 import type { NamedConfigSummary } from './hooks';
+import { tokens } from './theme/styles';
 
 // ---------------------------------------------------------------------------
 // Types
@@ -84,8 +85,8 @@ interface WidgetConfig {
 }
 
 const DEFAULT_CONFIG: WidgetConfig = {
-  widget_primary_color: '#ff3621',
-  widget_background_color: '#FFFFFF',
+  widget_primary_color: tokens.brand,
+  widget_background_color: tokens.white,
   widget_position: 'bottom-right',
   widget_offset_x: 20,
   widget_offset_y: 20,
@@ -123,19 +124,19 @@ const DEFAULT_CONFIG: WidgetConfig = {
 
 // Theme-aware style factory: produces light or dark styles based on admin UI color scheme
 function makeStyles(dark: boolean) {
-  // Four-tier dark mode hierarchy: chrome #0c0a09 → page #1c1917 → surface #292524 → border #44403c
-  const bg = dark ? '#292524' : '#FFFFFF';
-  const pageBg = dark ? '#1c1917' : '#F9FAFB';
-  const border = dark ? '#44403c' : '#D1D5DB';
-  const borderLight = dark ? '#44403c' : '#E5E7EB';
-  const text = dark ? '#fafaf9' : '#111827';
-  const textSecondary = dark ? '#A0A0A0' : '#374151';
-  const textMuted = dark ? '#787878' : '#6B7280';
-  const inputBg = dark ? '#1c1917' : '#FFFFFF';
-  const inputText = dark ? '#E0E0E0' : '#111827';
-  const codeEditorBg = dark ? '#0c0a09' : '#F9FAFB';
-  const buttonBg = dark ? '#44403c' : '#F3F4F6';
-  const removeBtnBg = dark ? '#292524' : '#FFFFFF';
+  // Four-tier dark mode hierarchy: chrome → page → surface → border
+  const bg = dark ? tokens.surface : '#FFFFFF';
+  const pageBg = dark ? tokens.page : '#F9FAFB';
+  const border = dark ? tokens.border : '#D1D5DB';
+  const borderLight = dark ? tokens.border : '#E5E7EB';
+  const text = dark ? tokens.textPrimary : '#111827';
+  const textSecondary = dark ? tokens.textMuted : '#374151';
+  const textMuted = dark ? tokens.textTertiary : '#6B7280';
+  const inputBg = dark ? tokens.page : '#FFFFFF';
+  const inputText = dark ? tokens.textSecondary : '#111827';
+  const codeEditorBg = dark ? tokens.chrome : '#F9FAFB';
+  const buttonBg = dark ? tokens.border : '#F3F4F6';
+  const removeBtnBg = dark ? tokens.surface : '#FFFFFF';
   const errorBg = dark ? 'rgba(220,38,38,0.1)' : '#FEF2F2';
   const errorBorder = dark ? 'rgba(220,38,38,0.3)' : '#FECACA';
 
@@ -180,10 +181,10 @@ function makeStyles(dark: boolean) {
       padding: '10px 20px',
       fontSize: 14,
       fontWeight: active ? 600 : 500,
-      color: active ? '#3B82F6' : textMuted,
+      color: active ? tokens.action : textMuted,
       background: 'transparent',
       border: 'none',
-      borderBottom: active ? '2px solid #3B82F6' : '2px solid transparent',
+      borderBottom: active ? `2px solid ${tokens.action}` : '2px solid transparent',
       marginBottom: -2,
       cursor: 'pointer',
       transition: 'color 0.15s ease',
@@ -305,7 +306,7 @@ function makeStyles(dark: boolean) {
       width: 40,
       height: 22,
       borderRadius: 11,
-      background: on ? '#3B82F6' : (dark ? '#4B5563' : '#D1D5DB'),
+      background: on ? tokens.action : (dark ? '#4B5563' : '#D1D5DB'),
       position: 'relative' as const,
       transition: 'background 0.2s ease',
       flexShrink: 0,
@@ -315,7 +316,7 @@ function makeStyles(dark: boolean) {
       width: 18,
       height: 18,
       borderRadius: '50%',
-      background: '#FFFFFF',
+      background: tokens.white,
       position: 'absolute' as const,
       top: 2,
       left: on ? 20 : 2,
@@ -355,7 +356,7 @@ function makeStyles(dark: boolean) {
       border: `1px solid ${border}`,
       borderRadius: 4,
       background: removeBtnBg,
-      color: '#DC2626',
+      color: tokens.danger,
       fontSize: 16,
       cursor: 'pointer',
       flexShrink: 0,
@@ -381,18 +382,18 @@ function makeStyles(dark: boolean) {
       alignItems: 'center',
       justifyContent: 'space-between',
       padding: '12px 24px',
-      background: dark ? '#0c0a09' : '#111827',
+      background: dark ? tokens.chrome : '#111827',
       borderRadius: 8,
       marginBottom: 16,
-      color: '#FFFFFF',
+      color: tokens.white,
       fontSize: 14,
       border: dark ? `1px solid ${border}` : 'none',
     } as React.CSSProperties,
 
     saveButton: {
       padding: '8px 24px',
-      background: '#3B82F6',
-      color: '#FFFFFF',
+      background: tokens.action,
+      color: tokens.white,
       border: 'none',
       borderRadius: 6,
       fontSize: 14,
@@ -434,8 +435,8 @@ function makeStyles(dark: boolean) {
     retryButton: {
       marginTop: 12,
       padding: '6px 16px',
-      background: '#DC2626',
-      color: '#FFFFFF',
+      background: tokens.danger,
+      color: tokens.white,
       border: 'none',
       borderRadius: 4,
       fontSize: 13,
@@ -463,7 +464,7 @@ function makeStyles(dark: boolean) {
 
     emptyPageRules: {
       padding: 16,
-      background: dark ? '#1c1917' : '#F9FAFB',
+      background: dark ? tokens.page : '#F9FAFB',
       borderRadius: 6,
       border: `1px dashed ${border}`,
       textAlign: 'center' as const,
@@ -490,7 +491,7 @@ function makeStyles(dark: boolean) {
       alignItems: 'center',
       gap: 12,
       padding: '10px 16px',
-      background: dark ? '#0c0a09' : '#F9FAFB',
+      background: dark ? tokens.chrome : '#F9FAFB',
       border: `1px solid ${border}`,
       borderRadius: 8,
       marginBottom: 16,
@@ -507,7 +508,7 @@ function makeStyles(dark: boolean) {
       fontSize: 13,
       fontWeight: 600,
       color: text,
-      background: dark ? '#44403c' : '#E5E7EB',
+      background: dark ? tokens.border : '#E5E7EB',
       padding: '2px 10px',
       borderRadius: 4,
     } as React.CSSProperties,
@@ -657,7 +658,7 @@ interface ColorPickerFieldProps {
 
 const ColorPickerField: React.FC<ColorPickerFieldProps> = ({ label, description, value, onChange, st }) => {
   const [open, setOpen] = useState(false);
-  const [hsv, setHsv] = useState(() => hexToHsv(value || '#ff3621'));
+  const [hsv, setHsv] = useState(() => hexToHsv(value || tokens.brand));
   const svAreaRef = React.useRef<HTMLDivElement>(null);
   const hueBarRef = React.useRef<HTMLDivElement>(null);
   const containerRef = React.useRef<HTMLDivElement>(null);
@@ -747,10 +748,10 @@ const ColorPickerField: React.FC<ColorPickerFieldProps> = ({ label, description,
     document.addEventListener('mouseup', onUp);
   }, [hsv.s, hsv.v, emitFromHsv, handleHueDrag]);
 
-  const panelBg = isDark ? '#292524' : '#FFFFFF';
-  const panelBorder = isDark ? '#44403c' : '#D1D5DB';
-  const panelText = isDark ? '#E0E0E0' : '#111827';
-  const panelMuted = isDark ? '#787878' : '#6B7280';
+  const panelBg = isDark ? tokens.surface : '#FFFFFF';
+  const panelBorder = isDark ? tokens.border : '#D1D5DB';
+  const panelText = isDark ? tokens.textSecondary : '#111827';
+  const panelMuted = isDark ? tokens.textTertiary : '#6B7280';
 
   return (
     <Field label={label} description={description} st={st}>
@@ -888,7 +889,7 @@ const ColorPickerField: React.FC<ColorPickerFieldProps> = ({ label, description,
                       background: color,
                       cursor: 'pointer',
                       border: value.toLowerCase() === color.toLowerCase()
-                        ? '2px solid #ff3621'
+                        ? `2px solid ${tokens.brand}`
                         : `1px solid ${color === '#FFFFFF' ? panelBorder : 'transparent'}`,
                       boxSizing: 'border-box',
                     }}
@@ -996,7 +997,7 @@ const WidgetPreview: React.FC<PreviewProps> = ({ config, st, quickActions }) => 
     return 0.2126 * r + 0.7152 * g + 0.0722 * b;
   };
 
-  const primaryColor = config.widget_primary_color || '#ff3621';
+  const primaryColor = config.widget_primary_color || tokens.brand;
   const bgColor = isDark ? '#1A1A2E' : (config.widget_background_color || '#FFFFFF');
   const textColor = isDark ? '#E5E7EB' : '#111827';
   const subtextColor = isDark ? '#9CA3AF' : '#6B7280';
@@ -1737,7 +1738,7 @@ export const WidgetConfigurator: React.FC<BaseComponentProps> = ({
                 />
               </Field>
               {saveAsName.trim().toLowerCase() === 'default' && (
-                <div style={{ fontSize: 12, color: '#F59E0B', marginTop: 4 }}>
+                <div style={{ fontSize: 12, color: tokens.warning, marginTop: 4 }}>
                   This will overwrite the Default appearance snapshot.
                 </div>
               )}
@@ -2079,14 +2080,14 @@ export const WidgetConfigurator: React.FC<BaseComponentProps> = ({
               <textarea
                 style={{
                   ...s.jsonEditor,
-                  borderColor: jsonErrors['widget_prechat_form'] ? '#DC2626' : undefined,
+                  borderColor: jsonErrors['widget_prechat_form'] ? tokens.danger : undefined,
                 }}
                 value={safeJsonStringify(localConfig.widget_prechat_form)}
                 placeholder='{"enabled": true, "fields": [...]}'
                 onChange={(e) => handleJsonField('widget_prechat_form', e.target.value)}
               />
               {jsonErrors['widget_prechat_form'] && (
-                <span style={{ fontSize: 12, color: '#DC2626', marginTop: 4, display: 'block' }}>
+                <span style={{ fontSize: 12, color: tokens.danger, marginTop: 4, display: 'block' }}>
                   {jsonErrors['widget_prechat_form']}
                 </span>
               )}
@@ -2101,14 +2102,14 @@ export const WidgetConfigurator: React.FC<BaseComponentProps> = ({
               <textarea
                 style={{
                   ...s.jsonEditor,
-                  borderColor: jsonErrors['widget_operating_hours'] ? '#DC2626' : undefined,
+                  borderColor: jsonErrors['widget_operating_hours'] ? tokens.danger : undefined,
                 }}
                 value={safeJsonStringify(localConfig.widget_operating_hours)}
                 placeholder='{"timezone": "America/New_York", "schedule": {...}}'
                 onChange={(e) => handleJsonField('widget_operating_hours', e.target.value)}
               />
               {jsonErrors['widget_operating_hours'] && (
-                <span style={{ fontSize: 12, color: '#DC2626', marginTop: 4, display: 'block' }}>
+                <span style={{ fontSize: 12, color: tokens.danger, marginTop: 4, display: 'block' }}>
                   {jsonErrors['widget_operating_hours']}
                 </span>
               )}

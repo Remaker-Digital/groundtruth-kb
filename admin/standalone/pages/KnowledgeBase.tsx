@@ -29,9 +29,10 @@ import { useAppContext } from '../layouts/StandaloneLayout';
 import { useKnowledgeBase, useSaveKBArticle, useUploadFile, useImportUrl, useExportCSV, useStalenessSummary, useVerifyEntry } from '../../shared/hooks/index';
 import type { KBArticle, KBArticleStatus, KBUploadResult } from '../../shared/types/index';
 import { LoadingState } from '../../shared/LoadingState';
+import { tokens } from '../../shared/theme/styles';
 
-const BRAND_RED = '#ff3621'; // accent only — drag borders, loaders, progress bars
-const ACTION_BLUE = '#3B82F6';
+const BRAND_RED = tokens.brand; // accent only — drag borders, loaders, progress bars
+const ACTION_BLUE = tokens.action;
 
 const CATEGORIES = ['All', 'Policies', 'Shipping', 'Products', 'Sales', 'Services', 'FAQ', 'Custom'];
 const STATUSES = ['All', 'Published', 'Draft', 'Archived'];

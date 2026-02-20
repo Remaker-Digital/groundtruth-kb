@@ -26,6 +26,7 @@ import { useAppContext } from '../layouts/StandaloneLayout';
 import { useConfig, useUpdateConfig } from '../../shared/hooks/index';
 import { useAvatarUpload, useDeleteAvatar } from '../../shared/hooks/useAvatar';
 import { HelpTooltip } from '../../shared/HelpTooltip';
+import { tokens } from '../../shared/theme/styles';
 
 const DOCS_BASE = 'https://agentredcx.com/docs/admin-guide';
 
@@ -33,7 +34,7 @@ const DOCS_BASE = 'https://agentredcx.com/docs/admin-guide';
 // Constants
 // ---------------------------------------------------------------------------
 
-const BRAND_RED = '#ff3621';
+const BRAND_RED = tokens.brand;
 
 const FONT_OPTIONS = [
   { value: 'Inter, system-ui, sans-serif', label: 'Inter (System)' },
@@ -357,25 +358,25 @@ function WidgetPreview({ config, adminIsDark }: { config: WidgetConfig; adminIsD
   const dk = config.colorMode === 'auto' ? adminIsDark : config.colorMode === 'dark';
 
   // Color tokens — light vs dark widget mode (Mazel design revision 2026-02-03 mockup)
-  const panelBg = dk ? '#292524' : '#fff';
-  const msgAreaBg = dk ? '#1c1917' : '#fafafa';
-  const agentBubbleBg = dk ? '#292524' : '#fff';
-  const agentBubbleBorder = dk ? '#44403c' : '#e9ecef';
-  const agentBubbleText = dk ? '#E0E0E0' : '#1f2937';
-  const dateSepBg = dk ? '#292524' : '#f1f3f5';
-  const dateSepText = dk ? '#787878' : '#6b7280';
-  const inputBg = dk ? '#292524' : '#f1f3f5';
-  const inputText = dk ? '#5C5C5C' : '#9ca3af';
-  const inputBarBg = dk ? '#0c0a09' : '#fff';
-  const inputBarBorder = dk ? '#44403c' : '#e9ecef';
-  const brandingText = dk ? '#5C5C5C' : '#9ca3af';
-  const pageBg = dk ? '#1c1917' : '#f8f9fa';
-  const pageBorder = dk ? '#44403c' : '#dee2e6';
+  const panelBg = dk ? tokens.surface : '#fff';
+  const msgAreaBg = dk ? tokens.page : '#fafafa';
+  const agentBubbleBg = dk ? tokens.surface : '#fff';
+  const agentBubbleBorder = dk ? tokens.border : '#e9ecef';
+  const agentBubbleText = dk ? tokens.textSecondary : '#1f2937';
+  const dateSepBg = dk ? tokens.surface : '#f1f3f5';
+  const dateSepText = dk ? tokens.textTertiary : '#6b7280';
+  const inputBg = dk ? tokens.surface : '#f1f3f5';
+  const inputText = dk ? tokens.textTertiary : '#9ca3af';
+  const inputBarBg = dk ? tokens.chrome : '#fff';
+  const inputBarBorder = dk ? tokens.border : '#e9ecef';
+  const brandingText = dk ? tokens.textTertiary : '#9ca3af';
+  const pageBg = dk ? tokens.page : '#f8f9fa';
+  const pageBorder = dk ? tokens.border : '#dee2e6';
   // Simulated page chrome
-  const chromeBg = dk ? '#0c0a09' : '#e9ecef';
-  const chromeBorder = dk ? '#44403c' : '#dee2e6';
-  const skeletonDark = dk ? '#292524' : '#dee2e6';
-  const skeletonLight = dk ? '#0c0a09' : '#e9ecef';
+  const chromeBg = dk ? tokens.chrome : '#e9ecef';
+  const chromeBorder = dk ? tokens.border : '#dee2e6';
+  const skeletonDark = dk ? tokens.surface : '#dee2e6';
+  const skeletonLight = dk ? tokens.chrome : '#e9ecef';
 
   return (
     <Box
@@ -708,12 +709,12 @@ function AvatarDropZone({ onFileSelected, uploading, progress, error }: AvatarDr
         onDrop={handleDrop}
         onClick={() => !uploading && inputRef.current?.click()}
         style={{
-          border: `2px dashed ${dragOver ? '#3B82F6' : '#44403c'}`,
+          border: `2px dashed ${dragOver ? tokens.action : tokens.border}`,
           borderRadius: '8px',
           padding: '20px 16px',
           textAlign: 'center' as const,
           cursor: uploading ? 'default' : 'pointer',
-          backgroundColor: dragOver ? 'rgba(59, 130, 246, 0.03)' : '#1c1917',
+          backgroundColor: dragOver ? 'rgba(59, 130, 246, 0.03)' : tokens.page,
           transition: 'all 0.2s ease',
           opacity: uploading ? 0.7 : 1,
         }}
@@ -1102,7 +1103,7 @@ export function WidgetPage() {
                       height: 48,
                       borderRadius: '50%',
                       overflow: 'hidden',
-                      border: '1px solid #44403c',
+                      border: `1px solid ${tokens.border}`,
                       flexShrink: 0,
                     }}>
                       <img

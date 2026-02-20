@@ -13,7 +13,6 @@ import { KBStalenessBadge } from './KBStalenessBadge';
 import { formatDate } from './utils';
 import {
   COLOR_LIGHT_GRAY,
-  COLOR_WHITE,
   COLOR_BORDER,
   COLOR_TEXT,
   COLOR_TEXT_SECONDARY,
@@ -32,13 +31,8 @@ export interface ArticleRowProps {
 export const ArticleRow: React.FC<ArticleRowProps> = ({ article, onClick, onVerify, verifying }) => (
   <tr
     onClick={onClick}
-    style={{ cursor: 'pointer', transition: 'background-color 0.15s ease' }}
-    onMouseEnter={(e) => {
-      (e.currentTarget as HTMLElement).style.backgroundColor = COLOR_LIGHT_GRAY;
-    }}
-    onMouseLeave={(e) => {
-      (e.currentTarget as HTMLElement).style.backgroundColor = COLOR_WHITE;
-    }}
+    className="ar-row-hoverable-light"
+    style={{ cursor: 'pointer' }}
   >
     <td style={{ padding: '12px 16px', borderBottom: `1px solid ${COLOR_BORDER}` }}>
       <span style={{ fontSize: '14px', fontWeight: 500, color: COLOR_TEXT }}>{article.title}</span>

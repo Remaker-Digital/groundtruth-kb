@@ -40,12 +40,13 @@ import {
 } from '@mantine/core';
 import { useAppContext } from '../layouts/StandaloneLayout';
 import { LoadingState } from '../../shared/LoadingState';
+import { tokens } from '../../shared/theme/styles';
 
 // ---------------------------------------------------------------------------
 // Constants
 // ---------------------------------------------------------------------------
 
-const ACTION_BLUE = '#3B82F6';
+const ACTION_BLUE = tokens.action;
 
 const PAGE_TYPES = [
   { value: 'all', label: 'All pages (fallback)' },
@@ -805,10 +806,10 @@ export const QuickActionsPage: React.FC = () => {
                 gap: 6,
                 padding: '6px 14px',
                 borderRadius: 20,
-                border: `1px solid ${isDark ? '#44403c' : '#dee2e6'}`,
-                background: isDark ? '#292524' : '#f1f3f5',
+                border: `1px solid ${isDark ? tokens.border : '#dee2e6'}`,
+                background: isDark ? tokens.surface : '#f1f3f5',
                 fontSize: 13,
-                color: isDark ? '#E0E0E0' : '#1f2937',
+                color: isDark ? tokens.textSecondary : '#1f2937',
               }}>
                 {formIcon.trim() && <span>{formIcon.trim()}</span>}
                 <span>{formLabel.trim()}</span>

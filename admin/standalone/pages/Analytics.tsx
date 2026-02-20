@@ -53,12 +53,13 @@ import {
   useKnowledgeGaps,
 } from '../../shared/hooks/index';
 import { agentDisplayLabel } from '../../shared/AnalyticsOverview';
+import { tokens } from '../../shared/theme/styles';
 
 // ---------------------------------------------------------------------------
 // Constants
 // ---------------------------------------------------------------------------
 
-const BRAND_RED = '#ff3621';
+const BRAND_RED = tokens.brand;
 
 // ---------------------------------------------------------------------------
 // StatCard — simplified (no delta badge)
@@ -129,12 +130,12 @@ export const AnalyticsPage: React.FC = () => {
   const computedColorScheme = useComputedColorScheme('dark');
   const isDark = computedColorScheme === 'dark';
   const gridStroke = isDark ? 'rgba(255,255,255,0.06)' : '#e9ecef';
-  const axisTickFill = isDark ? '#5C5C5C' : '#868e96';
-  const axisLineStroke = isDark ? '#44403c' : '#dee2e6';
-  const tooltipBg = isDark ? '#292524' : '#fff';
-  const tooltipBorder = isDark ? '#44403c' : '#dee2e6';
-  const tooltipColor = isDark ? '#E0E0E0' : undefined;
-  const cardBorder = isDark ? '#44403c' : 'var(--mantine-color-gray-2)';
+  const axisTickFill = isDark ? tokens.textTertiary : '#868e96';
+  const axisLineStroke = isDark ? tokens.border : '#dee2e6';
+  const tooltipBg = isDark ? tokens.surface : '#fff';
+  const tooltipBorder = isDark ? tokens.border : '#dee2e6';
+  const tooltipColor = isDark ? tokens.textSecondary : undefined;
+  const cardBorder = isDark ? tokens.border : 'var(--mantine-color-gray-2)';
 
   // Null-safe data extraction
   const s = summary.data;
@@ -280,8 +281,8 @@ export const AnalyticsPage: React.FC = () => {
                     <stop offset="95%" stopColor={BRAND_RED} stopOpacity={0} />
                   </linearGradient>
                   <linearGradient id="aGradBillable" x1="0" y1="0" x2="0" y2="1">
-                    <stop offset="5%" stopColor="#2563EB" stopOpacity={0.12} />
-                    <stop offset="95%" stopColor="#2563EB" stopOpacity={0} />
+                    <stop offset="5%" stopColor={tokens.actionHover} stopOpacity={0.12} />
+                    <stop offset="95%" stopColor={tokens.actionHover} stopOpacity={0} />
                   </linearGradient>
                 </defs>
                 <CartesianGrid strokeDasharray="3 3" stroke={gridStroke} />
@@ -318,7 +319,7 @@ export const AnalyticsPage: React.FC = () => {
                 <Area
                   type="monotone"
                   dataKey="billable"
-                  stroke="#2563EB"
+                  stroke={tokens.actionHover}
                   strokeWidth={1.5}
                   fill="url(#aGradBillable)"
                   name="Billable"
@@ -329,7 +330,7 @@ export const AnalyticsPage: React.FC = () => {
             <Group gap="lg" mt="xs" justify="center">
               {[
                 { color: BRAND_RED, label: 'Total' },
-                { color: '#2563EB', label: 'Billable' },
+                { color: tokens.actionHover, label: 'Billable' },
               ].map((item) => (
                 <Group gap={6} key={item.label}>
                   <Box

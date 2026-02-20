@@ -9,6 +9,7 @@
 
 import type { ThemePalette, RoleDef } from './types';
 import type { TeamRole } from '../types';
+import { tokens } from '../theme/styles';
 
 // ---------------------------------------------------------------------------
 // Role definitions
@@ -38,7 +39,7 @@ export const ROLE_COLORS_DARK: Record<string, { bg: string; text: string }> = {
   superadmin: { bg: '#371520', text: '#FCA5A5' },
   admin: { bg: '#2E1065', text: '#C4B5FD' },
   escalation_agent: { bg: '#1E2A47', text: '#93C5FD' },
-  viewer: { bg: '#44403c', text: '#a8a29e' },
+  viewer: { bg: tokens.border, text: tokens.textMuted },
 };
 
 export function getRoleColors(isDark: boolean): Record<string, { bg: string; text: string }> {
@@ -74,17 +75,17 @@ export const LIGHT_PALETTE: ThemePalette = {
 };
 
 export const DARK_PALETTE: ThemePalette = {
-  surface: '#292524',    // Stone 7
-  border: '#44403c',     // Stone 6
+  surface: tokens.surface,
+  border: tokens.border,
   borderSubtle: '#3a3633',
-  textPrimary: '#f5f5f4', // Stone 1
-  textSecondary: '#a8a29e', // Stone 4
-  textTertiary: '#d6d3d1', // Stone 3
-  inputBg: '#1c1917',    // Stone 8 (page)
-  inputBorder: '#57534e', // Stone 5
-  hoverBg: '#44403c',    // Stone 6
-  modalBg: '#292524',    // Stone 7
-  overlayBg: 'rgba(0,0,0,0.6)',
+  textPrimary: tokens.textSecondary,  // palette textPrimary = Stone 1 (#f5f5f4) = tokens.textSecondary
+  textSecondary: tokens.textMuted,    // palette textSecondary = Stone 4 (#a8a29e) = tokens.textMuted
+  textTertiary: '#d6d3d1',            // Stone 3 — not in token system
+  inputBg: tokens.page,
+  inputBorder: tokens.textTertiary,   // #57534e
+  hoverBg: tokens.border,
+  modalBg: tokens.surface,
+  overlayBg: tokens.overlayBg,
 };
 
 export function getPalette(isDark: boolean): ThemePalette {

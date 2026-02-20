@@ -14,6 +14,7 @@
  */
 
 import React from 'react';
+import { tokens } from './theme/styles';
 
 // ---------------------------------------------------------------------------
 // Keyframes (injected once)
@@ -55,7 +56,7 @@ const Spinner: React.FC<SpinnerProps> = ({ text = 'Loading\u2026', size = 32 }) 
         alignItems: 'center',
         justifyContent: 'center',
         padding: '48px 16px',
-        color: '#a0a0a0',
+        color: tokens.textMuted,
       }}
       role="status"
       aria-label={text}
@@ -64,8 +65,8 @@ const Spinner: React.FC<SpinnerProps> = ({ text = 'Loading\u2026', size = 32 }) 
         style={{
           width: size,
           height: size,
-          border: '3px solid #44403c',
-          borderTopColor: '#ff3621',
+          border: `3px solid ${tokens.border}`,
+          borderTopColor: tokens.brand,
           borderRadius: '50%',
           animation: 'ar-spin 0.8s linear infinite',
           marginBottom: '12px',
@@ -100,7 +101,7 @@ const Skeleton: React.FC<SkeletonProps> = ({ lines = 3, showHeader = true }) => 
           style={{
             height: '20px',
             width: '40%',
-            background: '#44403c',
+            background: tokens.border,
             borderRadius: '4px',
             marginBottom: '20px',
             animation: 'ar-pulse 1.5s ease-in-out infinite',
@@ -113,7 +114,7 @@ const Skeleton: React.FC<SkeletonProps> = ({ lines = 3, showHeader = true }) => 
           style={{
             height: '14px',
             width: lineWidths[i % lineWidths.length],
-            background: '#44403c',
+            background: tokens.border,
             borderRadius: '4px',
             marginBottom: '12px',
             animation: 'ar-pulse 1.5s ease-in-out infinite',

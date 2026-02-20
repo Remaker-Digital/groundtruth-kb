@@ -24,6 +24,7 @@ import {
 } from '@mantine/core';
 import { useProviderContext } from '../layouts/ProviderLayout';
 import { LoadingState } from '../../shared/LoadingState';
+import { tokens } from '../../shared/theme/styles';
 
 // ---------------------------------------------------------------------------
 // Types
@@ -129,7 +130,7 @@ export function CostAnalyticsPage() {
   return (
     <Stack gap="lg">
       <Group justify="space-between" align="baseline">
-        <Title order={3} c="#fafaf9">Cost Analytics</Title>
+        <Title order={3} c={tokens.textPrimary}>Cost Analytics</Title>
         <Select
           size="xs"
           data={PERIOD_OPTIONS}
@@ -141,27 +142,27 @@ export function CostAnalyticsPage() {
 
       {/* Summary cards */}
       <SimpleGrid cols={{ base: 1, sm: 2, md: 4 }} spacing="md">
-        <Card withBorder padding="lg" radius="md" bg="#292524">
+        <Card withBorder padding="lg" radius="md" bg={tokens.surface}>
           <Text c="dimmed" size="xs" tt="uppercase" fw={600}>Platform Cost</Text>
-          <Text fw={700} size="xl" c="#fafaf9" mt={4}>
+          <Text fw={700} size="xl" c={tokens.textPrimary} mt={4}>
             {formatCost(data.totalPlatformCost)}
           </Text>
         </Card>
-        <Card withBorder padding="lg" radius="md" bg="#292524">
+        <Card withBorder padding="lg" radius="md" bg={tokens.surface}>
           <Text c="dimmed" size="xs" tt="uppercase" fw={600}>Total Conversations</Text>
-          <Text fw={700} size="xl" c="#fafaf9" mt={4}>
+          <Text fw={700} size="xl" c={tokens.textPrimary} mt={4}>
             {data.totalConversations.toLocaleString()}
           </Text>
         </Card>
-        <Card withBorder padding="lg" radius="md" bg="#292524">
+        <Card withBorder padding="lg" radius="md" bg={tokens.surface}>
           <Text c="dimmed" size="xs" tt="uppercase" fw={600}>Avg / Tenant</Text>
-          <Text fw={700} size="xl" c="#fafaf9" mt={4}>
+          <Text fw={700} size="xl" c={tokens.textPrimary} mt={4}>
             {formatCost(data.avgCostPerTenant)}
           </Text>
         </Card>
-        <Card withBorder padding="lg" radius="md" bg="#292524">
+        <Card withBorder padding="lg" radius="md" bg={tokens.surface}>
           <Text c="dimmed" size="xs" tt="uppercase" fw={600}>Avg / Conversation</Text>
-          <Text fw={700} size="xl" c="#fafaf9" mt={4}>
+          <Text fw={700} size="xl" c={tokens.textPrimary} mt={4}>
             {formatCost(data.avgCostPerConversation)}
           </Text>
         </Card>
@@ -171,19 +172,19 @@ export function CostAnalyticsPage() {
       {Object.keys(data.costByTier ?? {}).length > 0 && (
         <SimpleGrid cols={{ base: 1, sm: 3 }} spacing="md">
           {Object.entries(data.costByTier ?? {}).map(([tier, cost]) => (
-            <Card key={tier} withBorder padding="md" radius="md" bg="#292524">
+            <Card key={tier} withBorder padding="md" radius="md" bg={tokens.surface}>
               <Group justify="space-between">
                 <Text c="dimmed" size="xs" tt="uppercase" fw={600}>{tier}</Text>
                 <Badge variant="light" color="blue" size="sm">{tier}</Badge>
               </Group>
-              <Text fw={700} size="lg" c="#fafaf9" mt={4}>{formatCost(cost)}</Text>
+              <Text fw={700} size="lg" c={tokens.textPrimary} mt={4}>{formatCost(cost)}</Text>
             </Card>
           ))}
         </SimpleGrid>
       )}
 
       {/* Per-tenant table */}
-      <Paper withBorder radius="md" bg="#292524" style={{ overflow: 'auto' }}>
+      <Paper withBorder radius="md" bg={tokens.surface} style={{ overflow: 'auto' }}>
         <Table striped highlightOnHover>
           <Table.Thead>
             <Table.Tr>
@@ -211,37 +212,37 @@ export function CostAnalyticsPage() {
               data.tenants.map((t) => (
                 <Table.Tr key={t.tenantId}>
                   <Table.Td>
-                    <Text size="xs" ff="monospace" c="#E0E0E0">{t.tenantId}</Text>
+                    <Text size="xs" ff="monospace" c={tokens.textSecondary}>{t.tenantId}</Text>
                   </Table.Td>
                   <Table.Td>
-                    <Text size="xs" c="#A0A0A0">{t.tier ?? '—'}</Text>
+                    <Text size="xs" c={tokens.textMuted}>{t.tier ?? '—'}</Text>
                   </Table.Td>
                   <Table.Td ta="right">
-                    <Text size="xs" c="#E0E0E0">{t.conversationCount.toLocaleString()}</Text>
+                    <Text size="xs" c={tokens.textSecondary}>{t.conversationCount.toLocaleString()}</Text>
                   </Table.Td>
                   <Table.Td ta="right">
-                    <Text size="xs" c="#A0A0A0">{formatTokens(t.totalInputTokens)}</Text>
+                    <Text size="xs" c={tokens.textMuted}>{formatTokens(t.totalInputTokens)}</Text>
                   </Table.Td>
                   <Table.Td ta="right">
-                    <Text size="xs" c="#A0A0A0">{formatTokens(t.totalOutputTokens)}</Text>
+                    <Text size="xs" c={tokens.textMuted}>{formatTokens(t.totalOutputTokens)}</Text>
                   </Table.Td>
                   <Table.Td ta="right">
-                    <Text size="xs" c="#A0A0A0">{t.articleCount}</Text>
+                    <Text size="xs" c={tokens.textMuted}>{t.articleCount}</Text>
                   </Table.Td>
                   <Table.Td ta="right">
-                    <Text size="xs" c="#E0E0E0">{formatCost(t.costBreakdown.aiTokens)}</Text>
+                    <Text size="xs" c={tokens.textSecondary}>{formatCost(t.costBreakdown.aiTokens)}</Text>
                   </Table.Td>
                   <Table.Td ta="right">
-                    <Text size="xs" c="#E0E0E0">{formatCost(t.costBreakdown.cosmosDb)}</Text>
+                    <Text size="xs" c={tokens.textSecondary}>{formatCost(t.costBreakdown.cosmosDb)}</Text>
                   </Table.Td>
                   <Table.Td ta="right">
-                    <Text size="xs" fw={600} c="#fafaf9">{formatCost(t.costBreakdown.total)}</Text>
+                    <Text size="xs" fw={600} c={tokens.textPrimary}>{formatCost(t.costBreakdown.total)}</Text>
                   </Table.Td>
                   <Table.Td ta="right">
-                    <Text size="xs" c="#A0A0A0">{formatCost(t.costPerConversation)}</Text>
+                    <Text size="xs" c={tokens.textMuted}>{formatCost(t.costPerConversation)}</Text>
                   </Table.Td>
                   <Table.Td ta="right">
-                    <Text size="xs" c="#A0A0A0">{t.costSharePct.toFixed(1)}%</Text>
+                    <Text size="xs" c={tokens.textMuted}>{t.costSharePct.toFixed(1)}%</Text>
                   </Table.Td>
                 </Table.Tr>
               ))

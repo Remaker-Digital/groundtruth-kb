@@ -21,6 +21,7 @@
  */
 
 import React, { useCallback, useEffect, useState } from 'react';
+import { tokens, dialog, button } from './theme/styles';
 
 // ---------------------------------------------------------------------------
 // Types
@@ -181,29 +182,29 @@ export default function ActivationDialog({
   }
 
   return (
-    <div style={overlayStyle} onClick={onClose}>
-      <div style={dialogStyle} onClick={e => e.stopPropagation()}>
+    <div style={dialog.overlay} onClick={onClose}>
+      <div style={dialogPanel} onClick={e => e.stopPropagation()}>
         {/* Header */}
         <div style={headerStyle}>
-          <h2 style={titleStyle}>Activate configuration</h2>
-          <button onClick={onClose} style={closeButtonStyle}>✕</button>
+          <h2 style={dialog.title}>Activate configuration</h2>
+          <button onClick={onClose} style={dialog.closeButton}>✕</button>
         </div>
 
         {/* Content */}
         <div style={bodyStyle}>
-          {loading && <div style={loadingStyle}>Loading…</div>}
+          {loading && <div style={mutedCentered}>Loading…</div>}
 
           {/* D35: Preflight hard errors — shown immediately on dialog open */}
           {!loading && preflight && preflight.hard_errors.length > 0 && (
-            <div style={errorSectionStyle}>
-              <h3 style={{ ...sectionTitleStyle, color: '#ff4444' }}>
+            <div style={dialog.errorSection}>
+              <h3 style={dialog.errorSectionTitle}>
                 Required before activation
               </h3>
               <div style={{ ...summaryStyle, marginBottom: '12px' }}>
                 The following fields must be configured before your AI assistant can be activated:
               </div>
               {preflight.hard_errors.map((e, i) => (
-                <div key={i} style={errorItemStyle}>
+                <div key={i} style={dialog.errorText}>
                   <strong>{e.page ? pageLabel(e.page) : e.field}:</strong> {e.message}
                 </div>
               ))}
@@ -213,7 +214,7 @@ export default function ActivationDialog({
           {/* Preflight warnings */}
           {!loading && preflight && preflight.warnings.length > 0 && (
             <div style={warningSectionStyle}>
-              <h3 style={{ ...sectionTitleStyle, color: '#ffaa00' }}>
+              <h3 style={dialog.warningSectionTitle}>
                 Recommendations
               </h3>
               {preflight.warnings.map((w, i) => (
@@ -250,12 +251,12 @@ export default function ActivationDialog({
 
           {/* Post-activate errors (from actual activation attempt) */}
           {activateErrors.length > 0 && (
-            <div style={errorSectionStyle}>
-              <h3 style={{ ...sectionTitleStyle, color: '#ff4444' }}>
+            <div style={dialog.errorSection}>
+              <h3 style={dialog.errorSectionTitle}>
                 Activation blocked
               </h3>
               {activateErrors.map((e, i) => (
-                <div key={i} style={errorItemStyle}>
+                <div key={i} style={dialog.errorText}>
                   <strong>{e.field}:</strong> {e.message}
                 </div>
               ))}
@@ -264,7 +265,7 @@ export default function ActivationDialog({
 
           {/* No changes and no errors */}
           {!loading && !draft?.has_pending_changes && preflight?.can_activate && (
-            <div style={emptyStyle}>Draft configuration is ready to activate.</div>
+            <div style={mutedCentered}>Draft configuration is ready to activate.</div>
           )}
 
           {/* Confirmation step */}
@@ -277,7 +278,7 @@ export default function ActivationDialog({
 
         {/* Footer */}
         <div style={footerStyle}>
-          <button onClick={onClose} style={cancelButtonStyle}>
+          <button onClick={onClose} style={dialog.cancelButton}>
             {preflight && !preflight.can_activate ? 'Close' : 'Cancel'}
           </button>
           {preflight?.can_activate && !confirmed ? (
@@ -285,8 +286,8 @@ export default function ActivationDialog({
               onClick={() => setConfirmed(true)}
               disabled={loading}
               style={{
-                ...activateButtonStyle,
-                opacity: loading ? 0.5 : 1,
+                ...button.activate,
+                ...(loading ? button.disabled : {}),
               }}
             >
               Activate now
@@ -296,8 +297,8 @@ export default function ActivationDialog({
               onClick={handleActivate}
               disabled={activating}
               style={{
-                ...confirmButtonStyle,
-                opacity: activating ? 0.5 : 1,
+                ...button.activate,
+                ...(activating ? button.disabled : {}),
               }}
             >
               {activating ? 'Activating…' : 'Yes, activate'}
@@ -310,53 +311,19 @@ export default function ActivationDialog({
 }
 
 // ---------------------------------------------------------------------------
-// Styles (inline, dark theme)
+// Local style overrides
 // ---------------------------------------------------------------------------
 
-const overlayStyle: React.CSSProperties = {
-  position: 'fixed',
-  inset: 0,
-  backgroundColor: 'rgba(0,0,0,0.6)',
-  display: 'flex',
-  alignItems: 'center',
-  justifyContent: 'center',
-  zIndex: 9999,
-};
-
-const dialogStyle: React.CSSProperties = {
-  backgroundColor: '#292524',
-  borderRadius: '12px',
-  border: '1px solid #44403c',
-  width: '90%',
-  maxWidth: '560px',
+const dialogPanel: React.CSSProperties = {
+  ...dialog.panel(560),
   maxHeight: '80vh',
   display: 'flex',
   flexDirection: 'column',
-  boxShadow: '0 20px 60px rgba(0,0,0,0.5)',
 };
 
 const headerStyle: React.CSSProperties = {
-  display: 'flex',
-  alignItems: 'center',
-  justifyContent: 'space-between',
+  ...dialog.header,
   padding: '20px 24px 16px',
-  borderBottom: '1px solid #44403c',
-};
-
-const titleStyle: React.CSSProperties = {
-  color: '#e0e0e0',
-  fontSize: '18px',
-  fontWeight: 600,
-  margin: 0,
-};
-
-const closeButtonStyle: React.CSSProperties = {
-  background: 'none',
-  border: 'none',
-  color: '#666',
-  fontSize: '18px',
-  cursor: 'pointer',
-  padding: '4px',
 };
 
 const bodyStyle: React.CSSProperties = {
@@ -365,29 +332,31 @@ const bodyStyle: React.CSSProperties = {
   flex: 1,
 };
 
-const loadingStyle: React.CSSProperties = { color: '#888', textAlign: 'center', padding: '24px' };
-const emptyStyle: React.CSSProperties = { color: '#888', textAlign: 'center', padding: '24px' };
+const mutedCentered: React.CSSProperties = {
+  color: tokens.textMuted,
+  textAlign: 'center',
+  padding: '24px',
+};
 
 const sectionStyle: React.CSSProperties = { marginBottom: '16px' };
+
 const sectionTitleStyle: React.CSSProperties = {
-  color: '#c0c0c0',
+  color: tokens.textSecondary,
   fontSize: '14px',
   fontWeight: 600,
   marginBottom: '8px',
 };
 
 const summaryStyle: React.CSSProperties = {
-  color: '#888',
+  color: tokens.textMuted,
   fontSize: '13px',
   marginBottom: '12px',
 };
 
-const groupStyle: React.CSSProperties = {
-  marginBottom: '10px',
-};
+const groupStyle: React.CSSProperties = { marginBottom: '10px' };
 
 const groupLabelStyle: React.CSSProperties = {
-  color: '#aaa',
+  color: tokens.textMuted,
   fontSize: '12px',
   fontWeight: 600,
   textTransform: 'uppercase',
@@ -402,28 +371,15 @@ const fieldListStyle: React.CSSProperties = {
 };
 
 const fieldChipStyle: React.CSSProperties = {
-  backgroundColor: '#44403c',
-  color: '#c0c0c0',
+  backgroundColor: tokens.border,
+  color: tokens.textSecondary,
   fontSize: '12px',
   padding: '2px 8px',
   borderRadius: '4px',
 };
 
-const errorSectionStyle: React.CSSProperties = {
-  backgroundColor: 'rgba(255,68,68,0.08)',
-  borderRadius: '8px',
-  padding: '12px 16px',
-  marginBottom: '12px',
-};
-
-const errorItemStyle: React.CSSProperties = {
-  color: '#ff6666',
-  fontSize: '13px',
-  marginTop: '4px',
-};
-
 const warningSectionStyle: React.CSSProperties = {
-  backgroundColor: 'rgba(255,170,0,0.08)',
+  ...dialog.warningBox,
   borderRadius: '8px',
   padding: '12px 16px',
   marginBottom: '12px',
@@ -436,43 +392,8 @@ const warningItemStyle: React.CSSProperties = {
 };
 
 const footerStyle: React.CSSProperties = {
-  display: 'flex',
-  justifyContent: 'flex-end',
-  gap: '8px',
+  ...dialog.footer,
   padding: '16px 24px',
-  borderTop: '1px solid #44403c',
-};
-
-const cancelButtonStyle: React.CSSProperties = {
-  backgroundColor: 'transparent',
-  color: '#888',
-  border: '1px solid #333',
-  borderRadius: '6px',
-  padding: '8px 20px',
-  fontSize: '13px',
-  cursor: 'pointer',
-};
-
-const activateButtonStyle: React.CSSProperties = {
-  backgroundColor: '#2b8a3e',
-  color: '#fff',
-  border: 'none',
-  borderRadius: '6px',
-  padding: '8px 20px',
-  fontSize: '13px',
-  fontWeight: 600,
-  cursor: 'pointer',
-};
-
-const confirmButtonStyle: React.CSSProperties = {
-  backgroundColor: '#2b8a3e',
-  color: '#fff',
-  border: 'none',
-  borderRadius: '6px',
-  padding: '8px 20px',
-  fontSize: '13px',
-  fontWeight: 600,
-  cursor: 'pointer',
 };
 
 const confirmSectionStyle: React.CSSProperties = {

@@ -298,10 +298,9 @@ export const TeamManager: React.FC<BaseComponentProps> = ({
           {totalCount} team member{totalCount !== 1 ? 's' : ''}
         </p>
         <button
+          className="ar-btn-action"
           style={s.inviteButton}
           onClick={() => setShowInviteForm(!showInviteForm)}
-          onMouseEnter={(e) => { (e.currentTarget as HTMLButtonElement).style.background = '#2563EB'; }}
-          onMouseLeave={(e) => { (e.currentTarget as HTMLButtonElement).style.background = '#3B82F6'; }}
         >
           {showInviteForm ? 'Cancel' : '+ Invite member'}
         </button>

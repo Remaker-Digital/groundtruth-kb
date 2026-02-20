@@ -42,6 +42,7 @@ import type { ActivationStatus } from '../../shared/hooks';
 import { Icons } from '../../shared/icons';
 import ActivationDialog from '../../shared/ActivationDialog';
 import RestoreDialog from '../../shared/RestoreDialog';
+import { tokens } from '../../shared/theme/styles';
 
 // ---------------------------------------------------------------------------
 // Types
@@ -493,15 +494,15 @@ export const StandaloneLayout: React.FC<StandaloneLayoutProps> = ({
         padding="md"
         styles={{
           header: {
-            borderBottom: isDark ? '1px solid #44403c' : '1px solid #292524',
-            background: '#0c0a09',
+            borderBottom: isDark ? `1px solid ${tokens.border}` : `1px solid ${tokens.surface}`,
+            background: tokens.chrome,
           },
           navbar: {
-            borderRight: isDark ? '1px solid #44403c' : undefined,
-            background: isDark ? '#0c0a09' : undefined,
+            borderRight: isDark ? `1px solid ${tokens.border}` : undefined,
+            background: isDark ? tokens.chrome : undefined,
           },
           main: {
-            background: isDark ? '#1c1917' : undefined,
+            background: isDark ? tokens.page : undefined,
           },
         }}
       >
@@ -536,21 +537,18 @@ export const StandaloneLayout: React.FC<StandaloneLayoutProps> = ({
                     href={`https://${tenantContext.shopDomain}`}
                     target="_blank"
                     rel="noopener noreferrer"
+                    className="ar-link-shop"
                     style={{
                       display: 'flex',
                       alignItems: 'center',
                       gap: 6,
                       textDecoration: 'none',
-                      color: '#A0A0A0',
+                      color: tokens.textMuted,
                       padding: '4px 10px',
                       borderRadius: 6,
-                      border: '1px solid rgba(255, 255, 255, 0.08)',
                       background: 'rgba(255, 255, 255, 0.03)',
                       fontSize: 13,
-                      transition: 'border-color 0.15s',
                     }}
-                    onMouseEnter={(e) => { (e.currentTarget as HTMLElement).style.borderColor = 'rgba(255, 255, 255, 0.2)'; }}
-                    onMouseLeave={(e) => { (e.currentTarget as HTMLElement).style.borderColor = 'rgba(255, 255, 255, 0.08)'; }}
                   >
                     <Icons.storefront />
                     <span style={{ maxWidth: 180, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
@@ -586,7 +584,7 @@ export const StandaloneLayout: React.FC<StandaloneLayoutProps> = ({
                   rel="noopener noreferrer"
                   aria-label="Open documentation"
                   style={{
-                    color: '#A0A0A0',
+                    color: tokens.textMuted,
                     border: '1px solid rgba(255, 255, 255, 0.12)',
                     background: 'rgba(255, 255, 255, 0.06)',
                   }}
@@ -601,7 +599,7 @@ export const StandaloneLayout: React.FC<StandaloneLayoutProps> = ({
                 onClick={() => setColorScheme(isDark ? 'light' : 'dark')}
                 aria-label="Toggle dark mode"
                 style={{
-                  color: '#A0A0A0',
+                  color: tokens.textMuted,
                   border: '1px solid rgba(255, 255, 255, 0.12)',
                   background: 'rgba(255, 255, 255, 0.06)',
                 }}
@@ -615,7 +613,7 @@ export const StandaloneLayout: React.FC<StandaloneLayoutProps> = ({
                 onClick={onLogout}
                 aria-label="Sign out"
                 style={{
-                  color: '#A0A0A0',
+                  color: tokens.textMuted,
                   border: '1px solid rgba(255, 255, 255, 0.12)',
                   background: 'rgba(255, 255, 255, 0.06)',
                 }}
@@ -657,11 +655,11 @@ export const StandaloneLayout: React.FC<StandaloneLayoutProps> = ({
                     }
                     active={isActive}
                     onClick={() => navigate(item.path)}
-                    styles={{ label: isActive && isDark ? { color: '#fafaf9' } : undefined }}
+                    styles={{ label: isActive && isDark ? { color: tokens.textPrimary } : undefined }}
                     style={{
                       borderRadius: 8,
                       marginBottom: 2,
-                      ...(isActive && isDark ? { background: '#292524', border: '1px solid #44403c' } : {}),
+                      ...(isActive && isDark ? { background: tokens.surface, border: `1px solid ${tokens.border}` } : {}),
                     }}
                   />
                 );
@@ -671,7 +669,7 @@ export const StandaloneLayout: React.FC<StandaloneLayoutProps> = ({
             {canSeeConfigGroup && (
               <Box
                 style={{
-                  border: `1px solid ${isDark ? '#44403c' : '#e0e0e0'}`,
+                  border: `1px solid ${isDark ? tokens.border : '#e0e0e0'}`,
                   borderRadius: 8,
                   padding: '8px 6px',
                   margin: '4px 0',
@@ -728,11 +726,11 @@ export const StandaloneLayout: React.FC<StandaloneLayoutProps> = ({
                       }
                       active={isActive}
                       onClick={() => navigate(item.path)}
-                      styles={{ label: isActive && isDark ? { color: '#fafaf9' } : undefined }}
+                      styles={{ label: isActive && isDark ? { color: tokens.textPrimary } : undefined }}
                       style={{
                         borderRadius: 8,
                         marginBottom: 2,
-                        ...(isActive && isDark ? { background: '#292524', border: '1px solid #44403c' } : {}),
+                        ...(isActive && isDark ? { background: tokens.surface, border: `1px solid ${tokens.border}` } : {}),
                       }}
                     />
                   );
@@ -746,7 +744,7 @@ export const StandaloneLayout: React.FC<StandaloneLayoutProps> = ({
                   pb={2}
                   wrap="nowrap"
                   style={{
-                    borderTop: `1px solid ${isDark ? '#44403c' : '#e0e0e0'}`,
+                    borderTop: `1px solid ${isDark ? tokens.border : '#e0e0e0'}`,
                     marginTop: 4,
                   }}
                 >
@@ -832,11 +830,11 @@ export const StandaloneLayout: React.FC<StandaloneLayoutProps> = ({
                     }
                     active={isActive}
                     onClick={() => navigate(item.path)}
-                    styles={{ label: isActive && isDark ? { color: '#fafaf9' } : undefined }}
+                    styles={{ label: isActive && isDark ? { color: tokens.textPrimary } : undefined }}
                     style={{
                       borderRadius: 8,
                       marginBottom: 2,
-                      ...(isActive && isDark ? { background: '#292524', border: '1px solid #44403c' } : {}),
+                      ...(isActive && isDark ? { background: tokens.surface, border: `1px solid ${tokens.border}` } : {}),
                     }}
                   />
                 );
@@ -869,7 +867,7 @@ export const StandaloneLayout: React.FC<StandaloneLayoutProps> = ({
 
           {/* Footer with Remaker Digital branding */}
           <AppShell.Section>
-            <Box p="xs" style={{ borderTop: isDark ? '1px solid #44403c' : '1px solid var(--mantine-color-gray-2)' }}>
+            <Box p="xs" style={{ borderTop: isDark ? `1px solid ${tokens.border}` : '1px solid var(--mantine-color-gray-2)' }}>
               <Group gap={8} justify="center" mb={4}>
                 <img
                   src={isDark ? '/admin/standalone/remaker-digital-logo-dark.svg' : '/admin/standalone/remaker-digital-logo-light.svg'}

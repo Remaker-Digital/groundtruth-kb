@@ -37,8 +37,9 @@ import {
 } from '../../shared/hooks/index';
 import { HelpTooltip } from '../../shared/HelpTooltip';
 import { agentDisplayLabel } from '../../shared/AnalyticsOverview';
+import { tokens } from '../../shared/theme/styles';
 
-const BRAND_RED = '#ff3621';
+const BRAND_RED = tokens.brand;
 
 const statusColorMap: Record<string, string> = {
   active: 'blue',
@@ -133,13 +134,13 @@ export function DashboardPage() {
 
   // Dark-mode-aware chart colors — Mazel design revision (2026-02-03 mockup)
   const gridStroke = isDark ? 'rgba(255,255,255,0.06)' : '#e9ecef';
-  const axisTickFill = isDark ? '#5C5C5C' : '#868e96';
-  const axisLineStroke = isDark ? '#44403c' : '#dee2e6';
-  const tooltipBg = isDark ? '#292524' : '#fff';
-  const tooltipBorder = isDark ? '#44403c' : '#dee2e6';
-  const tooltipColor = isDark ? '#E0E0E0' : undefined;
+  const axisTickFill = isDark ? tokens.textTertiary : '#868e96';
+  const axisLineStroke = isDark ? tokens.border : '#dee2e6';
+  const tooltipBg = isDark ? tokens.surface : '#fff';
+  const tooltipBorder = isDark ? tokens.border : '#dee2e6';
+  const tooltipColor = isDark ? tokens.textSecondary : undefined;
   const intentBarBg = isDark ? 'rgba(255,255,255,0.06)' : '#f1f3f5';
-  const cardBorder = isDark ? '#44403c' : 'var(--mantine-color-gray-2)';
+  const cardBorder = isDark ? tokens.border : 'var(--mantine-color-gray-2)';
 
   const recentConversations = (conversations.data?.conversations ?? []).slice(0, 5);
   const intentList = intents.data?.intents ?? [];
@@ -264,8 +265,8 @@ export function DashboardPage() {
                     <stop offset="95%" stopColor={BRAND_RED} stopOpacity={0} />
                   </linearGradient>
                   <linearGradient id="gradBillable" x1="0" y1="0" x2="0" y2="1">
-                    <stop offset="5%" stopColor="#2563EB" stopOpacity={0.12} />
-                    <stop offset="95%" stopColor="#2563EB" stopOpacity={0} />
+                    <stop offset="5%" stopColor={tokens.actionHover} stopOpacity={0.12} />
+                    <stop offset="95%" stopColor={tokens.actionHover} stopOpacity={0} />
                   </linearGradient>
                 </defs>
                 <CartesianGrid strokeDasharray="3 3" stroke={gridStroke} />
@@ -302,7 +303,7 @@ export function DashboardPage() {
                 <Area
                   type="monotone"
                   dataKey="billable"
-                  stroke="#2563EB"
+                  stroke={tokens.actionHover}
                   strokeWidth={1.5}
                   fill="url(#gradBillable)"
                   name="Billable"
@@ -313,7 +314,7 @@ export function DashboardPage() {
             <Group gap="lg" mt="xs" justify="center">
               {[
                 { color: BRAND_RED, label: 'Total' },
-                { color: '#2563EB', label: 'Billable' },
+                { color: tokens.actionHover, label: 'Billable' },
               ].map((item) => (
                 <Group gap={6} key={item.label}>
                   <Box

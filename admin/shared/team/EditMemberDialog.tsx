@@ -12,6 +12,7 @@ import type { TeamRole, EditMemberDialogProps } from './types';
 import { INVITABLE_ROLES } from './constants';
 import { ESCALATION_CATEGORIES } from '../types';
 import { HelpTooltip } from '../HelpTooltip';
+import { tokens } from '../theme/styles';
 
 export const EditMemberDialog: React.FC<EditMemberDialogProps> = ({
   member,
@@ -80,7 +81,7 @@ export const EditMemberDialog: React.FC<EditMemberDialogProps> = ({
                       borderRadius: 14,
                       fontSize: 12,
                       fontWeight: 500,
-                      border: `1px solid ${isSelected ? (isDark ? '#2563EB' : '#93C5FD') : palette.border}`,
+                      border: `1px solid ${isSelected ? (isDark ? tokens.actionHover : '#93C5FD') : palette.border}`,
                       background: isSelected ? (isDark ? '#1E2A47' : '#DBEAFE') : palette.hoverBg,
                       color: isSelected ? (isDark ? '#93C5FD' : '#1E40AF') : palette.textSecondary,
                       cursor: 'pointer',
@@ -97,7 +98,7 @@ export const EditMemberDialog: React.FC<EditMemberDialogProps> = ({
                           : [...editCategories, cat.id];
                         onCategoriesChange(next);
                       }}
-                      style={{ accentColor: '#3B82F6', width: 14, height: 14 }}
+                      style={{ accentColor: tokens.action, width: 14, height: 14 }}
                     />
                     {cat.label}
                   </label>

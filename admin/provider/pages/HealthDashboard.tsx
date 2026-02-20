@@ -26,6 +26,7 @@ import { LoadingState } from '../../shared/LoadingState';
 import { EmptyState } from '../../shared/EmptyState';
 import { Icons } from '../../shared/icons';
 import { HelpTooltip } from '../../shared/HelpTooltip';
+import { tokens } from '../../shared/theme/styles';
 
 // ---------------------------------------------------------------------------
 // Types
@@ -104,7 +105,7 @@ export function HealthDashboardPage() {
   return (
     <Stack gap="lg">
       <Group justify="space-between" align="baseline">
-        <Title order={3} c="#fafaf9">Platform Dashboard</Title><HelpTooltip text="Real-time overview of system health, tenant distribution, and recent activity across the platform." />
+        <Title order={3} c={tokens.textPrimary}>Platform Dashboard</Title><HelpTooltip text="Real-time overview of system health, tenant distribution, and recent activity across the platform." />
         <Text c="dimmed" size="xs">
           Updated {new Date(data.timestamp).toLocaleString()}
         </Text>
@@ -137,16 +138,16 @@ export function HealthDashboardPage() {
       {/* Tenant Distribution */}
       {tenants && (
         <>
-          <Title order={4} c="#E0E0E0">Tenant Distribution</Title>
+          <Title order={4} c={tokens.textSecondary}>Tenant Distribution</Title>
           <Grid>
             <Grid.Col span={{ base: 12, md: 4 }}>
-              <Card withBorder padding="lg" radius="md" bg="#292524">
+              <Card withBorder padding="lg" radius="md" bg={tokens.surface}>
                 <Text c="dimmed" size="xs" tt="uppercase" fw={600}>Total Tenants</Text>
-                <Text fw={700} size="xl" c="#fafaf9" mt={4}>{tenants.total_tenants}</Text>
+                <Text fw={700} size="xl" c={tokens.textPrimary} mt={4}>{tenants.total_tenants}</Text>
               </Card>
             </Grid.Col>
             <Grid.Col span={{ base: 12, md: 4 }}>
-              <Card withBorder padding="lg" radius="md" bg="#292524">
+              <Card withBorder padding="lg" radius="md" bg={tokens.surface}>
                 <Text c="dimmed" size="xs" tt="uppercase" fw={600}>By Status</Text>
                 <Group gap="xs" mt="sm">
                   {Object.entries(tenants?.by_status ?? {}).map(([k, v]) => (
@@ -158,7 +159,7 @@ export function HealthDashboardPage() {
               </Card>
             </Grid.Col>
             <Grid.Col span={{ base: 12, md: 4 }}>
-              <Card withBorder padding="lg" radius="md" bg="#292524">
+              <Card withBorder padding="lg" radius="md" bg={tokens.surface}>
                 <Text c="dimmed" size="xs" tt="uppercase" fw={600}>By Tier</Text>
                 <Group gap="xs" mt="sm">
                   {Object.entries(tenants?.by_tier ?? {}).map(([k, v]) => (
@@ -176,8 +177,8 @@ export function HealthDashboardPage() {
       {/* Recent Deployments */}
       {(data.recent_deployments?.length ?? 0) > 0 && (
         <>
-          <Title order={4} c="#E0E0E0">Recent Deployments</Title>
-          <Paper withBorder p="md" radius="md" bg="#292524">
+          <Title order={4} c={tokens.textSecondary}>Recent Deployments</Title>
+          <Paper withBorder p="md" radius="md" bg={tokens.surface}>
             <Stack gap="xs">
               {data.recent_deployments.map((evt, i) => (
                 <Group key={i} justify="space-between">
@@ -189,7 +190,7 @@ export function HealthDashboardPage() {
                     >
                       {evt.event_type === 'MODEL_DEPLOYED' ? 'Deploy' : 'Rollback'}
                     </Badge>
-                    <Text size="sm" c="#E0E0E0">
+                    <Text size="sm" c={tokens.textSecondary}>
                       {evt.actor || 'system'}
                     </Text>
                   </Group>
@@ -212,16 +213,16 @@ export function HealthDashboardPage() {
 
 function HealthCard({ label, status, detail }: { label: string; status: string; detail: string }) {
   const colorMap: Record<string, string> = {
-    healthy: '#0D7C3E',
-    down: '#D32F2F',
-    degraded: '#E5A100',
-    info: '#1E3A5F',
-    unknown: '#5C5C5C',
+    healthy: tokens.success,
+    down: tokens.danger,
+    degraded: tokens.warning,
+    info: tokens.info,
+    unknown: tokens.textTertiary,
   };
-  const dotColor = colorMap[status] ?? '#5C5C5C';
+  const dotColor = colorMap[status] ?? tokens.textTertiary;
 
   return (
-    <Card withBorder padding="lg" radius="md" bg="#292524">
+    <Card withBorder padding="lg" radius="md" bg={tokens.surface}>
       <Group gap="xs" mb={4}>
         <div style={{
           width: 8, height: 8, borderRadius: '50%',
@@ -229,7 +230,7 @@ function HealthCard({ label, status, detail }: { label: string; status: string; 
         }} />
         <Text c="dimmed" size="xs" tt="uppercase" fw={600}>{label}</Text>
       </Group>
-      <Text fw={600} size="sm" c="#E0E0E0">{detail}</Text>
+      <Text fw={600} size="sm" c={tokens.textSecondary}>{detail}</Text>
     </Card>
   );
 }

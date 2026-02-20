@@ -15,6 +15,7 @@
  */
 
 import React from 'react';
+import { tokens } from '../shared/theme/styles';
 import { createRoot } from 'react-dom/client';
 import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom';
 import { AppProvider } from '@shopify/polaris';
@@ -77,7 +78,7 @@ class PageErrorBoundary extends React.Component<
           fontFamily: '-apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif',
           textAlign: 'center',
         }}>
-          <h2 style={{ color: '#ff3621', marginBottom: 8 }}>
+          <h2 style={{ color: tokens.brand, marginBottom: 8 }}>
             Page Error
           </h2>
           <p style={{ color: '#666', fontSize: 14, marginBottom: 16 }}>
@@ -86,12 +87,12 @@ class PageErrorBoundary extends React.Component<
           <pre style={{
             textAlign: 'left',
             padding: 12,
-            background: '#fafaf9',
+            background: tokens.textPrimary,
             borderRadius: 6,
             fontSize: 12,
             overflow: 'auto',
             maxHeight: 200,
-            color: '#ff3621',
+            color: tokens.brand,
           }}>
             {this.state.error?.message}
           </pre>

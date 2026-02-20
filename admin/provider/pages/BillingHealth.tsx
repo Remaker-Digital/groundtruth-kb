@@ -24,6 +24,7 @@ import {
 } from '@mantine/core';
 import { useProviderContext } from '../layouts/ProviderLayout';
 import { LoadingState } from '../../shared/LoadingState';
+import { tokens } from '../../shared/theme/styles';
 
 // ---------------------------------------------------------------------------
 // Types
@@ -110,7 +111,7 @@ export function BillingHealthPage() {
   return (
     <Stack gap="lg">
       <Group justify="space-between" align="baseline">
-        <Title order={3} c="#fafaf9">Billing Health</Title>
+        <Title order={3} c={tokens.textPrimary}>Billing Health</Title>
         <Text c="dimmed" size="xs">
           Updated {new Date(data.timestamp).toLocaleString()}
         </Text>
@@ -118,26 +119,26 @@ export function BillingHealthPage() {
 
       {/* Summary cards */}
       <SimpleGrid cols={{ base: 1, sm: 3 }} spacing="md">
-        <Card withBorder padding="lg" radius="md" bg="#292524">
+        <Card withBorder padding="lg" radius="md" bg={tokens.surface}>
           <Text c="dimmed" size="xs" tt="uppercase" fw={600}>Total Tenants</Text>
-          <Text fw={700} size="xl" c="#fafaf9" mt={4}>{data.total_tenants}</Text>
+          <Text fw={700} size="xl" c={tokens.textPrimary} mt={4}>{data.total_tenants}</Text>
         </Card>
-        <Card withBorder padding="lg" radius="md" bg="#292524">
+        <Card withBorder padding="lg" radius="md" bg={tokens.surface}>
           <Text c="dimmed" size="xs" tt="uppercase" fw={600}>Needing Review</Text>
           <Text
             fw={700}
             size="xl"
-            c={data.tenants_needing_review > 0 ? '#E5A100' : '#0D7C3E'}
+            c={data.tenants_needing_review > 0 ? tokens.warning : tokens.success}
             mt={4}
           >
             {data.tenants_needing_review}
           </Text>
         </Card>
-        <Card withBorder padding="lg" radius="md" bg="#292524">
+        <Card withBorder padding="lg" radius="md" bg={tokens.surface}>
           <Text c="dimmed" size="xs" tt="uppercase" fw={600}>Webhook Success Rate</Text>
           {webhookPct != null ? (
             <>
-              <Text fw={700} size="xl" c="#fafaf9" mt={4}>{webhookPct}%</Text>
+              <Text fw={700} size="xl" c={tokens.textPrimary} mt={4}>{webhookPct}%</Text>
               <Progress
                 value={webhookPct}
                 color={webhookPct >= 99 ? 'green' : webhookPct >= 95 ? 'yellow' : 'red'}
@@ -152,7 +153,7 @@ export function BillingHealthPage() {
       </SimpleGrid>
 
       {/* Tenant billing table */}
-      <Paper withBorder radius="md" bg="#292524" style={{ overflow: 'auto' }}>
+      <Paper withBorder radius="md" bg={tokens.surface} style={{ overflow: 'auto' }}>
         <Table striped highlightOnHover>
           <Table.Thead>
             <Table.Tr>
@@ -176,10 +177,10 @@ export function BillingHealthPage() {
               data.tenants.map((t) => (
                 <Table.Tr key={t.tenant_id}>
                   <Table.Td>
-                    <Text size="xs" ff="monospace" c="#E0E0E0">{t.tenant_id}</Text>
+                    <Text size="xs" ff="monospace" c={tokens.textSecondary}>{t.tenant_id}</Text>
                   </Table.Td>
                   <Table.Td>
-                    <Text size="xs" c="#A0A0A0">{t.tier ?? '—'}</Text>
+                    <Text size="xs" c={tokens.textMuted}>{t.tier ?? '—'}</Text>
                   </Table.Td>
                   <Table.Td>
                     <Badge
@@ -191,7 +192,7 @@ export function BillingHealthPage() {
                     </Badge>
                   </Table.Td>
                   <Table.Td>
-                    <Text size="xs" c="#A0A0A0">
+                    <Text size="xs" c={tokens.textMuted}>
                       {RECONCILIATION_LABELS[t.reconciliation_status] ?? t.reconciliation_status}
                     </Text>
                   </Table.Td>
@@ -200,7 +201,7 @@ export function BillingHealthPage() {
                       <Text
                         size="xs"
                         fw={500}
-                        c={Math.abs(t.discrepancy_percent) > 5 ? '#E5A100' : '#0D7C3E'}
+                        c={Math.abs(t.discrepancy_percent) > 5 ? tokens.warning : tokens.success}
                       >
                         {t.discrepancy_percent.toFixed(1)}%
                       </Text>

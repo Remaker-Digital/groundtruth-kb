@@ -49,6 +49,7 @@ import {
   useConfigVersions,
   useConfigSchema,
 } from './hooks';
+import { tokens } from './theme/styles';
 
 // ---------------------------------------------------------------------------
 // Group definitions
@@ -191,10 +192,10 @@ const s = {
     padding: '8px 16px',
     fontSize: 13,
     fontWeight: active ? 600 : 400,
-    color: active ? '#3B82F6' : '#555',
+    color: active ? tokens.action : '#555',
     backgroundColor: 'transparent',
     border: 'none',
-    borderBottom: active ? '2px solid #3B82F6' : '2px solid transparent',
+    borderBottom: active ? `2px solid ${tokens.action}` : '2px solid transparent',
     cursor: 'pointer',
     whiteSpace: 'nowrap',
     marginBottom: -1,
@@ -307,7 +308,7 @@ const s = {
   checkbox: {
     width: 18,
     height: 18,
-    accentColor: '#3B82F6',
+    accentColor: tokens.action,
     cursor: 'pointer',
   } as React.CSSProperties,
 
@@ -344,8 +345,8 @@ const s = {
     padding: '8px 20px',
     fontSize: 14,
     fontWeight: 600,
-    backgroundColor: '#3B82F6',
-    color: '#fff',
+    backgroundColor: tokens.action,
+    color: tokens.white,
     border: 'none',
     borderRadius: 6,
     cursor: 'pointer',

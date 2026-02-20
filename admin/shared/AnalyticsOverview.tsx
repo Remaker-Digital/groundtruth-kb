@@ -18,13 +18,14 @@ import type { BaseComponentProps, IntentBreakdown, KnowledgeGap } from './types'
 import { useAnalyticsSummary, useIntentBreakdown, useKnowledgeGaps } from './hooks';
 import type { AnalyticsPeriod } from './hooks';
 import { HelpTooltip } from './HelpTooltip';
+import { tokens } from './theme/styles';
 
 // ---------------------------------------------------------------------------
 // Style constants
 // ---------------------------------------------------------------------------
 
-const BRAND_PRIMARY = '#ff3621'; // accent only — spinner, summary card accent
-const ACTION_BLUE = '#3B82F6';
+const BRAND_PRIMARY = tokens.brand; // accent only — spinner, summary card accent
+const ACTION_BLUE = tokens.action;
 const COLOR_SUCCESS = '#22863a';
 const COLOR_DANGER = '#d73a49';
 const COLOR_GRAY = '#6a737d';
@@ -634,7 +635,7 @@ export const AnalyticsOverview: React.FC<BaseComponentProps & { isTestMode?: boo
             <SummaryCard
               label="Total conversations"
               value={formatNumber(summary.totalConversations)}
-              accentColor="#3b82f6"
+              accentColor={tokens.action}
               tooltip="All conversations (billable and non-billable) in the selected period."
               docLink={`${DOCS_BASE}/analytics#total-conversations`}
             />

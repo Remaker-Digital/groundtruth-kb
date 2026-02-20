@@ -31,12 +31,13 @@ import {
 } from '../../shared/hooks/index';
 import type { InboxConversation, ConversationMessage, TeamMember } from '../../shared/types/index';
 import type { SearchResult } from '../../shared/hooks/index';
+import { tokens } from '../../shared/theme/styles';
 
 // ---------------------------------------------------------------------------
 // Constants
 // ---------------------------------------------------------------------------
 
-const BRAND_RED = '#ff3621';
+const BRAND_RED = tokens.brand;
 const HEADER_HEIGHT = 56;
 const PAGE_PADDING = 16;
 
@@ -385,13 +386,13 @@ export function InboxPage() {
   }, [notification]);
 
   // ---- Dark mode colors (Mazel design revision) ----
-  const panelBg = isDark ? '#0c0a09' : '#fff';
-  const centerBg = isDark ? '#0c0a09' : '#fafafa';
-  const borderColor = isDark ? '#44403c' : 'var(--mantine-color-gray-2)';
+  const panelBg = isDark ? tokens.chrome : '#fff';
+  const centerBg = isDark ? tokens.chrome : '#fafafa';
+  const borderColor = isDark ? tokens.border : 'var(--mantine-color-gray-2)';
   const hoverBg = isDark ? 'rgba(255,255,255,0.04)' : '#f8f9fa';
-  const selectedBg = isDark ? '#292524' : '#FFF1F2';
-  const bubbleAgentBg = isDark ? '#292524' : '#f1f3f5';
-  const bubbleCustomerBg = isDark ? '#292524' : '#f1f3f5';
+  const selectedBg = isDark ? tokens.surface : '#FFF1F2';
+  const bubbleAgentBg = isDark ? tokens.surface : '#f1f3f5';
+  const bubbleCustomerBg = isDark ? tokens.surface : '#f1f3f5';
 
   // ---- Debounced backend search ----
   const handleSearchChange = useCallback(
@@ -557,7 +558,7 @@ export function InboxPage() {
             value={search}
             onChange={(e) => handleSearchChange(e.currentTarget.value)}
             styles={{
-              input: { borderColor: isDark ? '#44403c' : 'var(--mantine-color-gray-3)' },
+              input: { borderColor: isDark ? tokens.border : 'var(--mantine-color-gray-3)' },
             }}
           />
         </Box>
@@ -612,7 +613,7 @@ export function InboxPage() {
                   height="48"
                   viewBox="0 0 24 24"
                   fill="none"
-                  stroke={isDark ? '#5C5C5C' : '#adb5bd'}
+                  stroke={isDark ? tokens.textTertiary : '#adb5bd'}
                   strokeWidth="1.5"
                   strokeLinecap="round"
                   strokeLinejoin="round"

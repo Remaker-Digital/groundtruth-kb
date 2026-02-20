@@ -19,6 +19,7 @@
  */
 
 import React, { useCallback, useState } from 'react';
+import { tokens, dialog, button } from './theme/styles';
 
 // ---------------------------------------------------------------------------
 // Types
@@ -90,12 +91,12 @@ export default function RestoreDialog({
     : 'Unknown';
 
   return (
-    <div style={overlayStyle} onClick={onClose}>
-      <div style={dialogStyle} onClick={e => e.stopPropagation()}>
+    <div style={dialog.overlay} onClick={onClose}>
+      <div style={dialogPanel} onClick={e => e.stopPropagation()}>
         {/* Header */}
         <div style={headerStyle}>
-          <h2 style={titleStyle}>Restore previous configuration</h2>
-          <button onClick={onClose} style={closeButtonStyle}>✕</button>
+          <h2 style={dialog.title}>Restore previous configuration</h2>
+          <button onClick={onClose} style={dialog.closeButton}>✕</button>
         </div>
 
         {/* Content */}
@@ -103,7 +104,7 @@ export default function RestoreDialog({
           <div style={warningBoxStyle}>
             <div style={warningIconStyle}>⚠</div>
             <div>
-              <div style={warningTextStyle}>
+              <div style={dialog.warningText}>
                 This will replace the current active configuration with the
                 previously activated version.
               </div>
@@ -122,13 +123,13 @@ export default function RestoreDialog({
 
         {/* Footer */}
         <div style={footerStyle}>
-          <button onClick={onClose} style={cancelButtonStyle}>Cancel</button>
+          <button onClick={onClose} style={dialog.cancelButton}>Cancel</button>
           <button
             onClick={handleRestore}
             disabled={restoring}
             style={{
-              ...restoreButtonStyle,
-              opacity: restoring ? 0.5 : 1,
+              ...button.action,
+              ...(restoring ? button.disabled : {}),
             }}
           >
             {restoring ? 'Restoring…' : 'Restore now'}
@@ -140,52 +141,18 @@ export default function RestoreDialog({
 }
 
 // ---------------------------------------------------------------------------
-// Styles (inline, dark theme)
+// Local style overrides
 // ---------------------------------------------------------------------------
 
-const overlayStyle: React.CSSProperties = {
-  position: 'fixed',
-  inset: 0,
-  backgroundColor: 'rgba(0,0,0,0.6)',
-  display: 'flex',
-  alignItems: 'center',
-  justifyContent: 'center',
-  zIndex: 9999,
-};
-
-const dialogStyle: React.CSSProperties = {
-  backgroundColor: '#292524',
-  borderRadius: '12px',
-  border: '1px solid #44403c',
-  width: '90%',
-  maxWidth: '480px',
+const dialogPanel: React.CSSProperties = {
+  ...dialog.panel(480),
   display: 'flex',
   flexDirection: 'column',
-  boxShadow: '0 20px 60px rgba(0,0,0,0.5)',
 };
 
 const headerStyle: React.CSSProperties = {
-  display: 'flex',
-  alignItems: 'center',
-  justifyContent: 'space-between',
+  ...dialog.header,
   padding: '20px 24px 16px',
-  borderBottom: '1px solid #44403c',
-};
-
-const titleStyle: React.CSSProperties = {
-  color: '#e0e0e0',
-  fontSize: '18px',
-  fontWeight: 600,
-  margin: 0,
-};
-
-const closeButtonStyle: React.CSSProperties = {
-  background: 'none',
-  border: 'none',
-  color: '#666',
-  fontSize: '18px',
-  cursor: 'pointer',
-  padding: '4px',
 };
 
 const bodyStyle: React.CSSProperties = {
@@ -193,12 +160,10 @@ const bodyStyle: React.CSSProperties = {
 };
 
 const warningBoxStyle: React.CSSProperties = {
+  ...dialog.warningBox,
   display: 'flex',
   gap: '12px',
-  backgroundColor: 'rgba(255,170,0,0.08)',
-  borderRadius: '8px',
   padding: '14px 16px',
-  marginBottom: '16px',
 };
 
 const warningIconStyle: React.CSSProperties = {
@@ -207,49 +172,19 @@ const warningIconStyle: React.CSSProperties = {
   flexShrink: 0,
 };
 
-const warningTextStyle: React.CSSProperties = {
-  color: '#e0e0e0',
-  fontSize: '14px',
-  lineHeight: '1.5',
-};
-
 const detailTextStyle: React.CSSProperties = {
-  color: '#888',
+  color: tokens.textMuted,
   fontSize: '13px',
   marginTop: '6px',
 };
 
 const noteStyle: React.CSSProperties = {
-  color: '#888',
+  color: tokens.textMuted,
   fontSize: '13px',
   lineHeight: '1.5',
 };
 
 const footerStyle: React.CSSProperties = {
-  display: 'flex',
-  justifyContent: 'flex-end',
-  gap: '8px',
+  ...dialog.footer,
   padding: '16px 24px',
-  borderTop: '1px solid #44403c',
-};
-
-const cancelButtonStyle: React.CSSProperties = {
-  backgroundColor: 'transparent',
-  color: '#888',
-  border: '1px solid #333',
-  borderRadius: '6px',
-  padding: '8px 20px',
-  fontSize: '13px',
-  cursor: 'pointer',
-};
-
-const restoreButtonStyle: React.CSSProperties = {
-  backgroundColor: '#3B82F6',
-  color: '#fff',
-  border: 'none',
-  borderRadius: '6px',
-  padding: '8px 20px',
-  fontSize: '13px',
-  fontWeight: 600,
-  cursor: 'pointer',
 };

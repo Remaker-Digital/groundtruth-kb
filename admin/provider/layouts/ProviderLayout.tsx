@@ -28,6 +28,7 @@ import {
 import { useDisclosure } from '@mantine/hooks';
 import { notifications } from '@mantine/notifications';
 import { Icons } from '../../shared/icons';
+import { tokens } from '../../shared/theme/styles';
 
 // ---------------------------------------------------------------------------
 // Context
@@ -166,22 +167,22 @@ export function ProviderLayout({ apiKey, onLogout, children }: ProviderLayoutPro
         navbar={{ width: 260, breakpoint: 'sm', collapsed: { mobile: !opened } }}
         padding="lg"
         styles={{
-          main: { backgroundColor: '#1c1917', minHeight: '100vh' },
-          header: { backgroundColor: '#0c0a09', borderBottom: '1px solid #292524' },
-          navbar: { backgroundColor: '#0c0a09', borderRight: '1px solid #292524' },
+          main: { backgroundColor: tokens.page, minHeight: '100vh' },
+          header: { backgroundColor: tokens.chrome, borderBottom: `1px solid ${tokens.surface}` },
+          navbar: { backgroundColor: tokens.chrome, borderRight: `1px solid ${tokens.surface}` },
         }}
       >
         {/* Header */}
         <AppShell.Header>
           <Group h="100%" px="md" justify="space-between">
             <Group gap="sm">
-              <Burger opened={opened} onClick={toggle} hiddenFrom="sm" size="sm" color="#fafaf9" />
+              <Burger opened={opened} onClick={toggle} hiddenFrom="sm" size="sm" color={tokens.textPrimary} />
               <img
                 src="/admin/provider/primary-logo-no-wordmark.svg"
                 alt="Agent Red"
                 style={{ height: '28px' }}
               />
-              <Text fw={600} size="sm" c="#fafaf9">
+              <Text fw={600} size="sm" c={tokens.textPrimary}>
                 Provider Console
               </Text>
               {productVersion && (
@@ -219,11 +220,11 @@ export function ProviderLayout({ apiKey, onLogout, children }: ProviderLayoutPro
             <Box mt="xs">
               {NAV_GROUPS.map((group, gi) => (
                 <Box key={group.group}>
-                  {gi > 0 && <Divider my="xs" color="#1E1E1E" />}
+                  {gi > 0 && <Divider my="xs" color={tokens.page} />}
                   <Text
                     size="xs"
                     fw={600}
-                    c="#5C5C5C"
+                    c={tokens.textTertiary}
                     tt="uppercase"
                     px="sm"
                     mb={4}
@@ -252,8 +253,8 @@ export function ProviderLayout({ apiKey, onLogout, children }: ProviderLayoutPro
                             backgroundColor: 'rgba(255, 54, 33, 0.1)',
                           },
                         },
-                        label: { color: '#E0E0E0', fontSize: '14px', fontWeight: 500 },
-                        description: { color: '#787878', fontSize: '12px' },
+                        label: { color: tokens.textSecondary, fontSize: '14px', fontWeight: 500 },
+                        description: { color: tokens.textTertiary, fontSize: '12px' },
                       }}
                     />
                     );

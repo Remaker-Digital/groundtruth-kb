@@ -31,6 +31,7 @@
  */
 
 import React from 'react';
+import { tokens, dialog, button } from './theme/styles';
 
 // ---------------------------------------------------------------------------
 // Types
@@ -47,6 +48,16 @@ export interface ConfirmDialogProps {
   onConfirm: () => void;
   onCancel: () => void;
 }
+
+// ---------------------------------------------------------------------------
+// Variant colors
+// ---------------------------------------------------------------------------
+
+const VARIANT_COLORS: Record<string, string> = {
+  destructive: tokens.danger,
+  primary: tokens.action,
+  default: tokens.border,
+};
 
 // ---------------------------------------------------------------------------
 // Component
@@ -71,12 +82,12 @@ export default function ConfirmDialog({
     : confirmLabel + 'ing\u2026';
 
   return (
-    <div style={overlayStyle} onClick={onCancel}>
-      <div style={dialogStyle} onClick={e => e.stopPropagation()}>
+    <div style={dialog.overlay} onClick={onCancel}>
+      <div style={dialogPanel} onClick={e => e.stopPropagation()}>
         {/* Header */}
         <div style={headerStyle}>
-          <h2 style={titleStyle}>{title}</h2>
-          <button onClick={onCancel} style={closeButtonStyle} aria-label="Close">
+          <h2 style={dialog.title}>{title}</h2>
+          <button onClick={onCancel} style={dialog.closeButton} aria-label="Close">
             ✕
           </button>
         </div>
@@ -84,7 +95,7 @@ export default function ConfirmDialog({
         {/* Body */}
         <div style={bodyStyle}>
           {typeof message === 'string' ? (
-            <p style={messageStyle}>{message}</p>
+            <p style={dialog.message}>{message}</p>
           ) : (
             message
           )}
@@ -92,17 +103,16 @@ export default function ConfirmDialog({
 
         {/* Footer */}
         <div style={footerStyle}>
-          <button onClick={onCancel} style={cancelButtonStyle}>
+          <button onClick={onCancel} style={dialog.cancelButton}>
             {cancelLabel}
           </button>
           <button
             onClick={onConfirm}
             disabled={loading}
             style={{
-              ...confirmButtonStyle,
+              ...button.action,
               backgroundColor: confirmColor,
-              opacity: loading ? 0.5 : 1,
-              cursor: loading ? 'not-allowed' : 'pointer',
+              ...(loading ? button.disabled : {}),
             }}
           >
             {loading ? loadingLabel : confirmLabel}
@@ -114,98 +124,25 @@ export default function ConfirmDialog({
 }
 
 // ---------------------------------------------------------------------------
-// Variant colors
+// Local style overrides (structure differs from shared dialog.* patterns)
 // ---------------------------------------------------------------------------
 
-const VARIANT_COLORS: Record<string, string> = {
-  destructive: '#D32F2F',
-  primary: '#3B82F6',
-  default: '#444',
-};
-
-// ---------------------------------------------------------------------------
-// Styles (inline, dark theme — matches RestoreDialog / ActivationDialog)
-// ---------------------------------------------------------------------------
-
-const overlayStyle: React.CSSProperties = {
-  position: 'fixed',
-  inset: 0,
-  backgroundColor: 'rgba(0,0,0,0.6)',
-  display: 'flex',
-  alignItems: 'center',
-  justifyContent: 'center',
-  zIndex: 9999,
-};
-
-const dialogStyle: React.CSSProperties = {
-  backgroundColor: '#292524',
-  borderRadius: '12px',
-  border: '1px solid #44403c',
-  width: '90%',
-  maxWidth: '440px',
+const dialogPanel: React.CSSProperties = {
+  ...dialog.panel(440),
   display: 'flex',
   flexDirection: 'column',
-  boxShadow: '0 20px 60px rgba(0,0,0,0.5)',
 };
 
 const headerStyle: React.CSSProperties = {
-  display: 'flex',
-  alignItems: 'center',
-  justifyContent: 'space-between',
+  ...dialog.header,
   padding: '20px 24px 16px',
-  borderBottom: '1px solid #44403c',
-};
-
-const titleStyle: React.CSSProperties = {
-  color: '#e0e0e0',
-  fontSize: '18px',
-  fontWeight: 600,
-  margin: 0,
-};
-
-const closeButtonStyle: React.CSSProperties = {
-  background: 'none',
-  border: 'none',
-  color: '#666',
-  fontSize: '18px',
-  cursor: 'pointer',
-  padding: '4px',
 };
 
 const bodyStyle: React.CSSProperties = {
   padding: '20px 24px',
 };
 
-const messageStyle: React.CSSProperties = {
-  color: '#c0c0c0',
-  fontSize: '14px',
-  lineHeight: '1.6',
-  margin: 0,
-};
-
 const footerStyle: React.CSSProperties = {
-  display: 'flex',
-  justifyContent: 'flex-end',
-  gap: '8px',
+  ...dialog.footer,
   padding: '16px 24px',
-  borderTop: '1px solid #44403c',
-};
-
-const cancelButtonStyle: React.CSSProperties = {
-  backgroundColor: 'transparent',
-  color: '#888',
-  border: '1px solid #333',
-  borderRadius: '6px',
-  padding: '8px 20px',
-  fontSize: '13px',
-  cursor: 'pointer',
-};
-
-const confirmButtonStyle: React.CSSProperties = {
-  color: '#fff',
-  border: 'none',
-  borderRadius: '6px',
-  padding: '8px 20px',
-  fontSize: '13px',
-  fontWeight: 600,
 };

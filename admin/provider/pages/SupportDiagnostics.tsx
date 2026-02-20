@@ -27,6 +27,7 @@ import {
 } from '@mantine/core';
 import { useProviderContext } from '../layouts/ProviderLayout';
 import { LoadingState } from '../../shared/LoadingState';
+import { tokens } from '../../shared/theme/styles';
 
 // ---------------------------------------------------------------------------
 // Types
@@ -178,7 +179,7 @@ export function SupportDiagnosticsPage() {
 
   return (
     <Stack gap="lg">
-      <Title order={3} c="#fafaf9">Support Diagnostics</Title>
+      <Title order={3} c={tokens.textPrimary}>Support Diagnostics</Title>
 
       {/* Tenant lookup */}
       <Group>
@@ -200,17 +201,17 @@ export function SupportDiagnosticsPage() {
         <>
           {/* Collection errors warning */}
           {data.collectionErrors.length > 0 && (
-            <Paper withBorder radius="md" p="md" bg="#2a1a1a">
-              <Text c="#E5A100" fw={600} size="sm" mb="xs">Partial data — collection errors:</Text>
+            <Paper withBorder radius="md" p="md" bg={tokens.page}>
+              <Text c={tokens.warning} fw={600} size="sm" mb="xs">Partial data — collection errors:</Text>
               {data.collectionErrors.map((e, i) => (
-                <Text key={i} c="#E5A100" size="xs">{e}</Text>
+                <Text key={i} c={tokens.warning} size="xs">{e}</Text>
               ))}
             </Paper>
           )}
 
           {/* Summary cards */}
           <SimpleGrid cols={{ base: 1, sm: 2, md: 4 }} spacing="md">
-            <Card withBorder padding="md" radius="md" bg="#292524">
+            <Card withBorder padding="md" radius="md" bg={tokens.surface}>
               <Text c="dimmed" size="xs" tt="uppercase" fw={600}>Status</Text>
               <Badge
                 variant="filled"
@@ -221,17 +222,17 @@ export function SupportDiagnosticsPage() {
                 {data.status}
               </Badge>
             </Card>
-            <Card withBorder padding="md" radius="md" bg="#292524">
+            <Card withBorder padding="md" radius="md" bg={tokens.surface}>
               <Text c="dimmed" size="xs" tt="uppercase" fw={600}>Tier</Text>
-              <Text fw={700} size="lg" c="#fafaf9" mt={4}>{data.tier ?? '—'}</Text>
+              <Text fw={700} size="lg" c={tokens.textPrimary} mt={4}>{data.tier ?? '—'}</Text>
             </Card>
-            <Card withBorder padding="md" radius="md" bg="#292524">
+            <Card withBorder padding="md" radius="md" bg={tokens.surface}>
               <Text c="dimmed" size="xs" tt="uppercase" fw={600}>Billing Channel</Text>
-              <Text fw={700} size="lg" c="#fafaf9" mt={4}>{data.billingChannel ?? '—'}</Text>
+              <Text fw={700} size="lg" c={tokens.textPrimary} mt={4}>{data.billingChannel ?? '—'}</Text>
             </Card>
-            <Card withBorder padding="md" radius="md" bg="#292524">
+            <Card withBorder padding="md" radius="md" bg={tokens.surface}>
               <Text c="dimmed" size="xs" tt="uppercase" fw={600}>Created</Text>
-              <Text fw={500} size="sm" c="#fafaf9" mt={4}>
+              <Text fw={500} size="sm" c={tokens.textPrimary} mt={4}>
                 {data.createdAt ? new Date(data.createdAt).toLocaleDateString() : '—'}
               </Text>
             </Card>
@@ -239,41 +240,41 @@ export function SupportDiagnosticsPage() {
 
           {/* Config state + AI config */}
           <SimpleGrid cols={{ base: 1, sm: 2 }} spacing="md">
-            <Card withBorder padding="md" radius="md" bg="#292524">
+            <Card withBorder padding="md" radius="md" bg={tokens.surface}>
               <Text c="dimmed" size="xs" tt="uppercase" fw={600} mb="sm">Configuration State</Text>
               <Stack gap="xs">
                 <Group justify="space-between">
-                  <Text size="sm" c="#A0A0A0">Active</Text>
+                  <Text size="sm" c={tokens.textMuted}>Active</Text>
                   <BoolBadge value={data.configState.isActive} />
                 </Group>
                 <Group justify="space-between">
-                  <Text size="sm" c="#A0A0A0">Configured</Text>
+                  <Text size="sm" c={tokens.textMuted}>Configured</Text>
                   <BoolBadge value={data.configState.isConfigured} />
                 </Group>
                 <Group justify="space-between">
-                  <Text size="sm" c="#A0A0A0">Pending Changes</Text>
+                  <Text size="sm" c={tokens.textMuted}>Pending Changes</Text>
                   <BoolBadge value={data.configState.hasPendingChanges} trueLabel="Yes" falseLabel="None" />
                 </Group>
                 <Group justify="space-between">
-                  <Text size="sm" c="#A0A0A0">Active Version</Text>
-                  <Text size="sm" c="#fafaf9">{data.configState.activeVersion ?? '—'}</Text>
+                  <Text size="sm" c={tokens.textMuted}>Active Version</Text>
+                  <Text size="sm" c={tokens.textPrimary}>{data.configState.activeVersion ?? '—'}</Text>
                 </Group>
               </Stack>
             </Card>
 
-            <Card withBorder padding="md" radius="md" bg="#292524">
+            <Card withBorder padding="md" radius="md" bg={tokens.surface}>
               <Text c="dimmed" size="xs" tt="uppercase" fw={600} mb="sm">AI Configuration</Text>
               <Stack gap="xs">
                 <Group justify="space-between">
-                  <Text size="sm" c="#A0A0A0">Model</Text>
-                  <Text size="sm" c="#fafaf9">{data.aiConfig.model ?? '—'}</Text>
+                  <Text size="sm" c={tokens.textMuted}>Model</Text>
+                  <Text size="sm" c={tokens.textPrimary}>{data.aiConfig.model ?? '—'}</Text>
                 </Group>
                 <Group justify="space-between">
-                  <Text size="sm" c="#A0A0A0">Brand Name</Text>
+                  <Text size="sm" c={tokens.textMuted}>Brand Name</Text>
                   <BoolBadge value={data.aiConfig.brandNamePresent} trueLabel="Set" falseLabel="Missing" />
                 </Group>
                 <Group justify="space-between">
-                  <Text size="sm" c="#A0A0A0">Brand Voice</Text>
+                  <Text size="sm" c={tokens.textMuted}>Brand Voice</Text>
                   <BoolBadge value={data.aiConfig.brandVoicePresent} trueLabel="Set" falseLabel="Missing" />
                 </Group>
               </Stack>
@@ -282,50 +283,50 @@ export function SupportDiagnosticsPage() {
 
           {/* Knowledge Base + Team + Conversations */}
           <SimpleGrid cols={{ base: 1, sm: 3 }} spacing="md">
-            <Card withBorder padding="md" radius="md" bg="#292524">
+            <Card withBorder padding="md" radius="md" bg={tokens.surface}>
               <Text c="dimmed" size="xs" tt="uppercase" fw={600} mb="sm">Knowledge Base</Text>
               <Stack gap="xs">
                 <Group justify="space-between">
-                  <Text size="sm" c="#A0A0A0">Total Articles</Text>
-                  <Text size="sm" fw={600} c="#fafaf9">{data.knowledgeBase.totalArticles}</Text>
+                  <Text size="sm" c={tokens.textMuted}>Total Articles</Text>
+                  <Text size="sm" fw={600} c={tokens.textPrimary}>{data.knowledgeBase.totalArticles}</Text>
                 </Group>
                 <Group justify="space-between">
-                  <Text size="sm" c="#A0A0A0">Active</Text>
-                  <Text size="sm" c="#0D7C3E">{data.knowledgeBase.activeCount}</Text>
+                  <Text size="sm" c={tokens.textMuted}>Active</Text>
+                  <Text size="sm" c={tokens.success}>{data.knowledgeBase.activeCount}</Text>
                 </Group>
                 <Group justify="space-between">
-                  <Text size="sm" c="#A0A0A0">Draft</Text>
-                  <Text size="sm" c="#E5A100">{data.knowledgeBase.draftCount}</Text>
+                  <Text size="sm" c={tokens.textMuted}>Draft</Text>
+                  <Text size="sm" c={tokens.warning}>{data.knowledgeBase.draftCount}</Text>
                 </Group>
               </Stack>
             </Card>
 
-            <Card withBorder padding="md" radius="md" bg="#292524">
+            <Card withBorder padding="md" radius="md" bg={tokens.surface}>
               <Text c="dimmed" size="xs" tt="uppercase" fw={600} mb="sm">Team</Text>
               <Stack gap="xs">
                 <Group justify="space-between">
-                  <Text size="sm" c="#A0A0A0">Members</Text>
-                  <Text size="sm" fw={600} c="#fafaf9">{data.team?.memberCount ?? 0}</Text>
+                  <Text size="sm" c={tokens.textMuted}>Members</Text>
+                  <Text size="sm" fw={600} c={tokens.textPrimary}>{data.team?.memberCount ?? 0}</Text>
                 </Group>
                 {Object.entries(data.team?.rolesBreakdown ?? {}).map(([role, count]) => (
                   <Group key={role} justify="space-between">
-                    <Text size="xs" c="#A0A0A0">{role}</Text>
-                    <Text size="xs" c="#E0E0E0">{count}</Text>
+                    <Text size="xs" c={tokens.textMuted}>{role}</Text>
+                    <Text size="xs" c={tokens.textSecondary}>{count}</Text>
                   </Group>
                 ))}
               </Stack>
             </Card>
 
-            <Card withBorder padding="md" radius="md" bg="#292524">
+            <Card withBorder padding="md" radius="md" bg={tokens.surface}>
               <Text c="dimmed" size="xs" tt="uppercase" fw={600} mb="sm">Conversations</Text>
               <Stack gap="xs">
                 <Group justify="space-between">
-                  <Text size="sm" c="#A0A0A0">Last 24h</Text>
-                  <Text size="sm" fw={600} c="#fafaf9">{data.conversations.last24hCount}</Text>
+                  <Text size="sm" c={tokens.textMuted}>Last 24h</Text>
+                  <Text size="sm" fw={600} c={tokens.textPrimary}>{data.conversations.last24hCount}</Text>
                 </Group>
                 <Group justify="space-between">
-                  <Text size="sm" c="#A0A0A0">Last 7d</Text>
-                  <Text size="sm" c="#fafaf9">{data.conversations.last7dCount}</Text>
+                  <Text size="sm" c={tokens.textMuted}>Last 7d</Text>
+                  <Text size="sm" c={tokens.textPrimary}>{data.conversations.last7dCount}</Text>
                 </Group>
               </Stack>
             </Card>
@@ -333,33 +334,33 @@ export function SupportDiagnosticsPage() {
 
           {/* Integrations + Widget */}
           <SimpleGrid cols={{ base: 1, sm: 2 }} spacing="md">
-            <Card withBorder padding="md" radius="md" bg="#292524">
+            <Card withBorder padding="md" radius="md" bg={tokens.surface}>
               <Text c="dimmed" size="xs" tt="uppercase" fw={600} mb="sm">Integrations</Text>
               <Stack gap="xs">
                 <Group justify="space-between">
-                  <Text size="sm" c="#A0A0A0">Shopify</Text>
+                  <Text size="sm" c={tokens.textMuted}>Shopify</Text>
                   <BoolBadge value={data.integrations.shopifyConnected} trueLabel="Connected" falseLabel="Disconnected" />
                 </Group>
                 <Group justify="space-between">
-                  <Text size="sm" c="#A0A0A0">Stripe</Text>
+                  <Text size="sm" c={tokens.textMuted}>Stripe</Text>
                   <BoolBadge value={data.integrations.stripeConnected} trueLabel="Connected" falseLabel="Disconnected" />
                 </Group>
                 <Group justify="space-between">
-                  <Text size="sm" c="#A0A0A0">NATS</Text>
+                  <Text size="sm" c={tokens.textMuted}>NATS</Text>
                   <BoolBadge value={data.integrations.natsConnected} trueLabel="Connected" falseLabel="Disconnected" />
                 </Group>
               </Stack>
             </Card>
 
-            <Card withBorder padding="md" radius="md" bg="#292524">
+            <Card withBorder padding="md" radius="md" bg={tokens.surface}>
               <Text c="dimmed" size="xs" tt="uppercase" fw={600} mb="sm">Widget Deployment</Text>
               <Stack gap="xs">
                 <Group justify="space-between">
-                  <Text size="sm" c="#A0A0A0">Widget Key</Text>
+                  <Text size="sm" c={tokens.textMuted}>Widget Key</Text>
                   <BoolBadge value={data.widget.widgetKeyPresent} trueLabel="Present" falseLabel="Missing" />
                 </Group>
                 <Group justify="space-between">
-                  <Text size="sm" c="#A0A0A0">Origin Configured</Text>
+                  <Text size="sm" c={tokens.textMuted}>Origin Configured</Text>
                   <BoolBadge value={data.widget.originConfigured} trueLabel="Yes" falseLabel="No" />
                 </Group>
               </Stack>
@@ -368,14 +369,14 @@ export function SupportDiagnosticsPage() {
 
           {/* Errors section */}
           <Group justify="space-between" align="baseline" mt="md">
-            <Title order={4} c="#fafaf9">Recent Errors</Title>
+            <Title order={4} c={tokens.textPrimary}>Recent Errors</Title>
             <Button variant="light" size="xs" onClick={handleFetchErrors} loading={errorsLoading}>
               Load Errors
             </Button>
           </Group>
 
           {errors && (
-            <Paper withBorder radius="md" bg="#292524" style={{ overflow: 'auto' }}>
+            <Paper withBorder radius="md" bg={tokens.surface} style={{ overflow: 'auto' }}>
               <Table striped highlightOnHover>
                 <Table.Thead>
                   <Table.Tr>
@@ -399,15 +400,15 @@ export function SupportDiagnosticsPage() {
                           <Badge variant="light" color="red" size="sm">{entry.eventType}</Badge>
                         </Table.Td>
                         <Table.Td>
-                          <Text size="xs" c="#A0A0A0">
+                          <Text size="xs" c={tokens.textMuted}>
                             {new Date(entry.timestamp).toLocaleString()}
                           </Text>
                         </Table.Td>
                         <Table.Td>
-                          <Text size="xs" c="#A0A0A0">{entry.actor}</Text>
+                          <Text size="xs" c={tokens.textMuted}>{entry.actor}</Text>
                         </Table.Td>
                         <Table.Td>
-                          <Text size="xs" ff="monospace" c="#E0E0E0">
+                          <Text size="xs" ff="monospace" c={tokens.textSecondary}>
                             {entry.conversationId ?? '—'}
                           </Text>
                         </Table.Td>

@@ -17,6 +17,7 @@
  */
 
 import React from 'react';
+import { tokens } from './theme/styles';
 
 interface EmptyStateAction {
   label: string;
@@ -42,22 +43,22 @@ const styles = {
     justifyContent: 'center',
     padding: '48px 24px',
     textAlign: 'center' as const,
-    color: '#a0a0a0',
+    color: tokens.textMuted,
   },
   iconWrapper: {
     marginBottom: '16px',
-    color: '#5C5C5C',
+    color: tokens.textTertiary,
   },
   title: {
     fontSize: '15px',
     fontWeight: 600,
-    color: '#e0e0e0',
+    color: tokens.textSecondary,
     marginBottom: '6px',
     lineHeight: 1.4,
   },
   subtitle: {
     fontSize: '13px',
-    color: '#a0a0a0',
+    color: tokens.textMuted,
     maxWidth: '360px',
     lineHeight: 1.5,
   },
@@ -66,12 +67,7 @@ const styles = {
     padding: '8px 16px',
     fontSize: '13px',
     fontWeight: 500,
-    color: '#fff',
-    background: '#3B82F6',
-    border: 'none',
     borderRadius: '6px',
-    cursor: 'pointer',
-    transition: 'opacity 0.15s',
   },
 };
 
@@ -83,10 +79,9 @@ export const EmptyState: React.FC<EmptyStateProps> = ({ icon, title, subtitle, a
     {action && (
       <button
         type="button"
+        className="ar-btn-action ar-opacity-hover"
         style={styles.actionButton}
         onClick={action.onClick}
-        onMouseEnter={(e) => { (e.currentTarget as HTMLElement).style.opacity = '0.85'; }}
-        onMouseLeave={(e) => { (e.currentTarget as HTMLElement).style.opacity = '1'; }}
       >
         {action.label}
       </button>

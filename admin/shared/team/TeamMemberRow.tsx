@@ -14,6 +14,7 @@ import type { TeamRole, TeamMemberRowProps } from './types';
 import { ROLES, INVITABLE_ROLES } from './constants';
 import { ESCALATION_CATEGORIES } from '../types';
 import { formatDate, formatRelativeDate } from './utils';
+import { tokens } from '../theme/styles';
 
 export const TeamMemberRow: React.FC<TeamMemberRowProps> = ({
   member,
@@ -82,7 +83,7 @@ export const TeamMemberRow: React.FC<TeamMemberRowProps> = ({
                     borderRadius: 10,
                     fontSize: 11,
                     fontWeight: 500,
-                    border: `1px solid ${isSelected ? (isDark ? '#2563EB' : '#93C5FD') : palette.border}`,
+                    border: `1px solid ${isSelected ? (isDark ? tokens.actionHover : '#93C5FD') : palette.border}`,
                     background: isSelected ? (isDark ? '#1E2A47' : '#DBEAFE') : palette.hoverBg,
                     color: isSelected ? (isDark ? '#93C5FD' : '#1E40AF') : palette.textSecondary,
                     cursor: 'pointer',

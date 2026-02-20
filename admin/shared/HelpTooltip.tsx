@@ -15,6 +15,7 @@
  */
 
 import React, { useState, useRef, useCallback } from 'react';
+import { tokens } from './theme/styles';
 
 export interface HelpTooltipProps {
   /** Short tooltip text (1-2 sentences). */
@@ -49,8 +50,8 @@ export const HelpTooltip: React.FC<HelpTooltipProps> = ({
     width: size,
     height: size,
     borderRadius: '50%',
-    border: '1px solid #9ca3af',
-    color: '#9ca3af',
+    border: `1px solid ${tokens.textMuted}`,
+    color: tokens.textMuted,
     fontSize: size * 0.65,
     fontWeight: 700,
     lineHeight: 1,
@@ -68,8 +69,8 @@ export const HelpTooltip: React.FC<HelpTooltipProps> = ({
     left: '50%',
     transform: 'translateX(-50%)',
     marginBottom: 8,
-    background: '#1f2937',
-    color: '#f9fafb',
+    background: tokens.surface,
+    color: tokens.textPrimary,
     fontSize: 12,
     lineHeight: 1.5,
     padding: '8px 12px',
@@ -91,7 +92,7 @@ export const HelpTooltip: React.FC<HelpTooltipProps> = ({
     height: 0,
     borderLeft: '5px solid transparent',
     borderRight: '5px solid transparent',
-    borderTop: '5px solid #1f2937',
+    borderTop: `5px solid ${tokens.surface}`,
   };
 
   return (
@@ -120,7 +121,7 @@ export const HelpTooltip: React.FC<HelpTooltipProps> = ({
                 href={docLink}
                 target="_blank"
                 rel="noopener noreferrer"
-                style={{ color: '#93c5fd', textDecoration: 'underline' }}
+                style={{ color: tokens.action, textDecoration: 'underline' }}
               >
                 Learn more
               </a>

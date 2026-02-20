@@ -31,6 +31,7 @@ import {
 import { useProviderContext } from '../layouts/ProviderLayout';
 import { LoadingState } from '../../shared/LoadingState';
 import { HelpTooltip } from '../../shared/HelpTooltip';
+import { tokens, modalStyles, modalInputStyles } from '../../shared/theme/styles';
 
 // ---------------------------------------------------------------------------
 // Types (matches camelCase serialization)
@@ -233,7 +234,7 @@ export function StatusPageManagement() {
   return (
     <Stack gap="lg">
       <Group justify="space-between" align="baseline">
-        <Title order={3} c="#fafaf9">Status Page</Title><HelpTooltip text="Manage incidents visible on the public status page at /api/status. Active incidents affect the overall system status." />
+        <Title order={3} c={tokens.textPrimary}>Status Page</Title><HelpTooltip text="Manage incidents visible on the public status page at /api/status. Active incidents affect the overall system status." />
         <Button color="action" size="sm" onClick={() => setCreateOpen(true)}>
           Create Incident
         </Button>
@@ -241,7 +242,7 @@ export function StatusPageManagement() {
 
       {/* Active incidents */}
       {activeIncidents.length === 0 ? (
-        <Card withBorder padding="lg" radius="md" bg="#292524">
+        <Card withBorder padding="lg" radius="md" bg={tokens.surface}>
           <Group gap="sm">
             <Badge variant="filled" color="green" size="lg">All Systems Operational</Badge><HelpTooltip text="Status is operational when there are no active (non-resolved) incidents." />
           </Group>
@@ -249,10 +250,10 @@ export function StatusPageManagement() {
         </Card>
       ) : (
         activeIncidents.map((inc) => (
-          <Card key={inc.incidentId} withBorder padding="lg" radius="md" bg="#292524">
+          <Card key={inc.incidentId} withBorder padding="lg" radius="md" bg={tokens.surface}>
             <Group justify="space-between" mb="sm">
               <Group gap="sm">
-                <Text fw={600} size="md" c="#fafaf9">{inc.title}</Text>
+                <Text fw={600} size="md" c={tokens.textPrimary}>{inc.title}</Text>
                 <Badge variant="light" color={SEVERITY_COLORS[inc.severity] ?? 'gray'} size="sm">
                   {inc.severity}
                 </Badge>
@@ -285,7 +286,7 @@ export function StatusPageManagement() {
             </Group>
 
             {inc.description && (
-              <Text size="sm" c="#A0A0A0" mb="sm">{inc.description}</Text>
+              <Text size="sm" c={tokens.textMuted} mb="sm">{inc.description}</Text>
             )}
 
             {inc.affectedServices.length > 0 && (
@@ -315,7 +316,7 @@ export function StatusPageManagement() {
                       </Group>
                     }
                   >
-                    <Text size="sm" c="#E0E0E0">{upd.message}</Text>
+                    <Text size="sm" c={tokens.textSecondary}>{upd.message}</Text>
                     <Text size="xs" c="dimmed">by {upd.author}</Text>
                   </Timeline.Item>
                 ))}
@@ -343,10 +344,10 @@ export function StatusPageManagement() {
           <Collapse in={showResolved}>
             <Stack gap="md">
               {resolvedIncidents.map((inc) => (
-                <Card key={inc.incidentId} withBorder padding="md" radius="md" bg="#1c1917">
+                <Card key={inc.incidentId} withBorder padding="md" radius="md" bg={tokens.page}>
                   <Group justify="space-between" mb="xs">
                     <Group gap="sm">
-                      <Text fw={500} size="sm" c="#A0A0A0">{inc.title}</Text>
+                      <Text fw={500} size="sm" c={tokens.textMuted}>{inc.title}</Text>
                       <Badge variant="light" color="green" size="xs">resolved</Badge>
                       <Badge variant="light" color={SEVERITY_COLORS[inc.severity] ?? 'gray'} size="xs">
                         {inc.severity}
@@ -372,7 +373,7 @@ export function StatusPageManagement() {
         onClose={() => setCreateOpen(false)}
         title="Create Incident"
         size="md"
-        styles={{ content: { backgroundColor: '#292524' }, header: { backgroundColor: '#292524' } }}
+        styles={modalStyles}
       >
         <Stack gap="md">
           <TextInput
@@ -381,7 +382,7 @@ export function StatusPageManagement() {
             value={createTitle}
             onChange={(e) => setCreateTitle(e.currentTarget.value)}
             required
-            styles={{ input: { backgroundColor: '#1c1917', borderColor: '#333', color: '#fafaf9' } }}
+            styles={modalInputStyles}
           />
           <Textarea
             label="Description"
@@ -389,7 +390,7 @@ export function StatusPageManagement() {
             value={createDesc}
             onChange={(e) => setCreateDesc(e.currentTarget.value)}
             minRows={3}
-            styles={{ input: { backgroundColor: '#1c1917', borderColor: '#333', color: '#fafaf9' } }}
+            styles={modalInputStyles}
           />
           <Select
             label="Severity"
@@ -400,7 +401,7 @@ export function StatusPageManagement() {
             ]}
             value={createSeverity}
             onChange={setCreateSeverity}
-            styles={{ input: { backgroundColor: '#1c1917', borderColor: '#333', color: '#fafaf9' } }}
+            styles={modalInputStyles}
           />
           <MultiSelect
             label="Affected Services"
@@ -408,7 +409,7 @@ export function StatusPageManagement() {
             value={createServices}
             onChange={setCreateServices}
             placeholder="Select affected services"
-            styles={{ input: { backgroundColor: '#1c1917', borderColor: '#333', color: '#fafaf9' } }}
+            styles={modalInputStyles}
           />
           <Group justify="flex-end">
             <Button variant="subtle" onClick={() => setCreateOpen(false)}>Cancel</Button>
@@ -430,7 +431,7 @@ export function StatusPageManagement() {
         onClose={() => setUpdateOpen(false)}
         title="Add Incident Update"
         size="md"
-        styles={{ content: { backgroundColor: '#292524' }, header: { backgroundColor: '#292524' } }}
+        styles={modalStyles}
       >
         <Stack gap="md">
           <Select
@@ -438,7 +439,7 @@ export function StatusPageManagement() {
             data={STATUS_OPTIONS}
             value={updateStatus}
             onChange={setUpdateStatus}
-            styles={{ input: { backgroundColor: '#1c1917', borderColor: '#333', color: '#fafaf9' } }}
+            styles={modalInputStyles}
           />
           <Textarea
             label="Update Message"
@@ -447,7 +448,7 @@ export function StatusPageManagement() {
             onChange={(e) => setUpdateMessage(e.currentTarget.value)}
             minRows={3}
             required
-            styles={{ input: { backgroundColor: '#1c1917', borderColor: '#333', color: '#fafaf9' } }}
+            styles={modalInputStyles}
           />
           <Group justify="flex-end">
             <Button variant="subtle" onClick={() => setUpdateOpen(false)}>Cancel</Button>

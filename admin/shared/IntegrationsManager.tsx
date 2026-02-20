@@ -21,18 +21,25 @@ import {
 } from './hooks/index';
 import { HelpTooltip } from './HelpTooltip';
 import { McpConfigPanel } from './McpConfigPanel';
+import { tokens } from './theme/styles';
 
 
 // ---------------------------------------------------------------------------
 // Constants
 // ---------------------------------------------------------------------------
 
-const ACTION_BLUE = '#3B82F6';
+/** Map HoverButton variant → CSS utility class */
+const VARIANT_CLASS: Record<string, string> = {
+  primary: 'ar-btn-action',
+  success: 'ar-btn-activate',
+  outline: 'ar-btn-ghost',
+  danger: 'ar-btn-danger-outline',
+};
 
 const STATUS_COLORS: Record<string, string> = {
-  connected: '#0D7C3E',
-  disconnected: '#787878',
-  error: '#D32F2F',
+  connected: tokens.success,
+  disconnected: tokens.textTertiary,
+  error: tokens.danger,
 };
 
 const STATUS_LABELS: Record<string, string> = {
@@ -120,8 +127,8 @@ interface IntegrationCardProps {
 }
 
 const cardStyle: React.CSSProperties = {
-  background: '#292524',
-  border: '1px solid #44403c',
+  background: tokens.surface,
+  border: `1px solid ${tokens.border}`,
   borderRadius: 8,
   padding: 16,
   display: 'flex',
@@ -134,12 +141,12 @@ const iconContainerStyle: React.CSSProperties = {
   width: 180,
   height: 180,
   borderRadius: 8,
-  background: '#1c1917',
-  border: '1px solid #44403c',
+  background: tokens.page,
+  border: `1px solid ${tokens.border}`,
   display: 'flex',
   alignItems: 'center',
   justifyContent: 'center',
-  color: '#A0A0A0',
+  color: tokens.textMuted,
   flexShrink: 0,
   overflow: 'hidden',
 };
@@ -165,9 +172,9 @@ const tierBadgeStyle: React.CSSProperties = {
   borderRadius: 10,
   fontSize: 11,
   fontWeight: 600,
-  background: '#E5A10022',
-  color: '#E5A100',
-  border: '1px solid #E5A10044',
+  background: `${tokens.warning}22`,
+  color: tokens.warning,
+  border: `1px solid ${tokens.warning}44`,
 };
 
 const comingSoonBadgeStyle: React.CSSProperties = {
@@ -183,14 +190,12 @@ const comingSoonBadgeStyle: React.CSSProperties = {
   border: '1px solid #6366f144',
 };
 
-// Button components with hover states
+// Button component — uses CSS hover utility classes from tokens.css
 const btnBase: React.CSSProperties = {
   padding: '6px 14px',
   borderRadius: 6,
   fontSize: 13,
   fontWeight: 500,
-  cursor: 'pointer',
-  transition: 'background 150ms ease, border-color 150ms ease',
 };
 
 const HoverButton: React.FC<{
@@ -198,41 +203,16 @@ const HoverButton: React.FC<{
   onClick: () => void;
   disabled?: boolean;
   children: React.ReactNode;
-}> = ({ variant, onClick, disabled, children }) => {
-  const [hovered, setHovered] = useState(false);
-
-  const styles: Record<string, { base: React.CSSProperties; hover: React.CSSProperties }> = {
-    primary: {
-      base: { ...btnBase, border: 'none', background: ACTION_BLUE, color: '#fff' },
-      hover: { background: '#2563EB' },
-    },
-    success: {
-      base: { ...btnBase, border: 'none', background: '#2b8a3e', color: '#fff' },
-      hover: { background: '#237032' },
-    },
-    outline: {
-      base: { ...btnBase, border: '1px solid #44403c', background: 'transparent', color: '#A0A0A0' },
-      hover: { background: '#44403c' },
-    },
-    danger: {
-      base: { ...btnBase, border: '1px solid #D32F2F44', background: 'transparent', color: '#D32F2F' },
-      hover: { background: '#D32F2F18' },
-    },
-  };
-
-  const s = styles[variant];
-  return (
-    <button
-      style={{ ...s.base, ...(hovered && !disabled ? s.hover : {}), opacity: disabled ? 0.6 : 1 }}
-      onClick={onClick}
-      disabled={disabled}
-      onMouseEnter={() => setHovered(true)}
-      onMouseLeave={() => setHovered(false)}
-    >
-      {children}
-    </button>
-  );
-};
+}> = ({ variant, onClick, disabled, children }) => (
+  <button
+    className={VARIANT_CLASS[variant] || 'ar-btn-action'}
+    style={btnBase}
+    onClick={onClick}
+    disabled={disabled}
+  >
+    {children}
+  </button>
+);
 
 const IntegrationCard: React.FC<IntegrationCardProps & {
   isDark?: boolean;
@@ -258,7 +238,7 @@ const IntegrationCard: React.FC<IntegrationCardProps & {
   const [showConfirm, setShowConfirm] = useState(false);
   const [logoError, setLogoError] = useState(false);
   const IconComponent = IntegrationIcons[integration.icon] || IntegrationIcons.shopify;
-  const statusColor = STATUS_COLORS[integration.status || 'disconnected'] || '#787878';
+  const statusColor = STATUS_COLORS[integration.status || 'disconnected'] || tokens.textTertiary;
   const statusLabel = STATUS_LABELS[integration.status || 'disconnected'] || 'Not Configured';
 
   // Resolve logo path: dark variant for dark mode, light for light mode
@@ -285,7 +265,7 @@ const IntegrationCard: React.FC<IntegrationCardProps & {
       {/* Right side: name, badges, description, actions */}
       <div style={{ flex: 1, minWidth: 0 }}>
         <div style={{ display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap' }}>
-          <span style={{ fontSize: 22, fontWeight: 600, color: '#fafaf9' }}>
+          <span style={{ fontSize: 22, fontWeight: 600, color: tokens.textPrimary }}>
             {integration.name}
             {INTEGRATION_TOOLTIPS[integration.type] && (
               <HelpTooltip
@@ -319,7 +299,7 @@ const IntegrationCard: React.FC<IntegrationCardProps & {
             </span>
           )}
         </div>
-        <p style={{ margin: '4px 0 8px', fontSize: 13, color: '#787878', lineHeight: 1.4 }}>
+        <p style={{ margin: '4px 0 8px', fontSize: 13, color: tokens.textTertiary, lineHeight: 1.4 }}>
           {integration.description}
         </p>
 
@@ -330,7 +310,7 @@ const IntegrationCard: React.FC<IntegrationCardProps & {
               This integration is under development and will be available soon.
             </span>
           ) : !integration.tierMet ? (
-            <span style={{ fontSize: 12, color: '#E5A100' }}>
+            <span style={{ fontSize: 12, color: tokens.warning }}>
               Upgrade to {integration.tierGate} to use this integration
             </span>
           ) : integration.enabled ? (
@@ -344,7 +324,7 @@ const IntegrationCard: React.FC<IntegrationCardProps & {
               </HoverButton>
               {showConfirm ? (
                 <div style={{ display: 'flex', gap: 6, alignItems: 'center' }}>
-                  <span style={{ fontSize: 12, color: '#D32F2F' }}>Disconnect? This removes credentials.</span>
+                  <span style={{ fontSize: 12, color: tokens.danger }}>Disconnect? This removes credentials.</span>
                   <HoverButton
                     variant="danger"
                     onClick={() => { onDisconnect(integration.type); setShowConfirm(false); }}
@@ -457,7 +437,7 @@ export const IntegrationsManager: React.FC<BaseComponentProps & { isDark?: boole
 
   if (loading) {
     return (
-      <div style={{ padding: 40, textAlign: 'center', color: '#787878' }}>
+      <div style={{ padding: 40, textAlign: 'center', color: tokens.textTertiary }}>
         Loading integrations...
       </div>
     );
@@ -465,7 +445,7 @@ export const IntegrationsManager: React.FC<BaseComponentProps & { isDark?: boole
 
   if (error) {
     return (
-      <div style={{ padding: 40, textAlign: 'center', color: '#D32F2F' }}>
+      <div style={{ padding: 40, textAlign: 'center', color: tokens.danger }}>
         Failed to load integrations: {error}
       </div>
     );
@@ -501,9 +481,9 @@ export const IntegrationsManager: React.FC<BaseComponentProps & { isDark?: boole
           style={{
             padding: 40,
             textAlign: 'center',
-            color: '#787878',
-            background: '#292524',
-            border: '1px solid #44403c',
+            color: tokens.textTertiary,
+            background: tokens.surface,
+            border: `1px solid ${tokens.border}`,
             borderRadius: 8,
           }}
         >
@@ -512,7 +492,7 @@ export const IntegrationsManager: React.FC<BaseComponentProps & { isDark?: boole
       )}
 
       {/* Summary footer */}
-      <div style={{ marginTop: 16, fontSize: 12, color: '#5C5C5C' }}>
+      <div style={{ marginTop: 16, fontSize: 12, color: tokens.textTertiary }}>
         {items.filter((i) => i.enabled).length} of {items.length} integrations active
         {tenantContext.tier === 'starter' || tenantContext.tier === 'trial' ? (
           <span> {String.fromCodePoint(0x2022)} Some integrations require Professional tier or above</span>

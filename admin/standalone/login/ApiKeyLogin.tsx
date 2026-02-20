@@ -24,6 +24,7 @@ import {
   Title,
 } from '@mantine/core';
 import { Icons } from '../../shared/icons';
+import { tokens } from '../../shared/theme/styles';
 
 const API_BASE_URL = import.meta.env?.VITE_API_URL || '';
 
@@ -166,21 +167,21 @@ export const ApiKeyLogin: React.FC<ApiKeyLoginProps> = ({
 
   const inputStyles = {
     input: {
-      backgroundColor: '#1c1917',
-      borderColor: error ? '#ff6b6b' : '#44403c',
-      color: '#e0e0e0',
-      '&:focus': { borderColor: '#3B82F6' },
+      backgroundColor: tokens.page,
+      borderColor: error ? tokens.errorLight : tokens.border,
+      color: tokens.textSecondary,
+      '&:focus': { borderColor: tokens.action },
     },
-    label: { color: '#e0e0e0', fontWeight: 500 },
+    label: { color: tokens.textSecondary, fontWeight: 500 },
   };
 
   const cardProps = {
     w: '100%' as const,
     maw: 380,
-    bg: '#292524',
+    bg: tokens.surface,
     radius: 'md' as const,
     p: 'xl' as const,
-    styles: { root: { border: '1px solid #44403c' } },
+    styles: { root: { border: `1px solid ${tokens.border}` } },
   };
 
   const brandBlock = (
@@ -200,7 +201,7 @@ export const ApiKeyLogin: React.FC<ApiKeyLoginProps> = ({
 
   if (view === 'login') {
     return (
-      <Center mih="100vh" bg="#0c0a09">
+      <Center mih="100vh" bg={tokens.chrome}>
         <Paper {...cardProps}>
           {brandBlock}
 
@@ -221,7 +222,7 @@ export const ApiKeyLogin: React.FC<ApiKeyLoginProps> = ({
               fullWidth
               mt="md"
               loading={loading}
-              color="#3B82F6"
+              color="action"
               aria-label="Sign in"
             >
               Sign in
@@ -230,7 +231,7 @@ export const ApiKeyLogin: React.FC<ApiKeyLoginProps> = ({
 
           <Text ta="center" mt="lg" size="sm">
             <Anchor
-              c="#3B82F6"
+              c={tokens.action}
               size="sm"
               component="button"
               type="button"
@@ -243,15 +244,15 @@ export const ApiKeyLogin: React.FC<ApiKeyLoginProps> = ({
           {onMagicLinkLogin && (
             <>
               <Box mt="lg" mb="sm" style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
-                <div style={{ flex: 1, height: '1px', backgroundColor: '#44403c' }} />
+                <div style={{ flex: 1, height: '1px', backgroundColor: tokens.border }} />
                 <Text size="xs" c="dimmed">or</Text>
-                <div style={{ flex: 1, height: '1px', backgroundColor: '#44403c' }} />
+                <div style={{ flex: 1, height: '1px', backgroundColor: tokens.border }} />
               </Box>
 
               <Button
                 fullWidth
                 variant="outline"
-                color="#3B82F6"
+                color="action"
                 onClick={() => { setView('magic-link'); setError(null); setMagicEmail(''); }}
                 aria-label="Sign in with email"
               >
@@ -274,11 +275,11 @@ export const ApiKeyLogin: React.FC<ApiKeyLoginProps> = ({
 
   if (view === 'reset') {
     return (
-      <Center mih="100vh" bg="#0c0a09">
+      <Center mih="100vh" bg={tokens.chrome}>
         <Paper {...cardProps}>
           {brandBlock}
 
-          <Title order={4} c="#fafaf9" mb={4}>
+          <Title order={4} c={tokens.textPrimary} mb={4}>
             Request new API key
           </Title>
           <Text size="sm" c="dimmed" lh={1.5} mb="lg">
@@ -304,7 +305,7 @@ export const ApiKeyLogin: React.FC<ApiKeyLoginProps> = ({
               fullWidth
               mt="md"
               loading={loading}
-              color="#3B82F6"
+              color="action"
               aria-label="Request new API key"
             >
               Request new API key
@@ -313,7 +314,7 @@ export const ApiKeyLogin: React.FC<ApiKeyLoginProps> = ({
 
           <Text ta="center" mt="lg" size="sm">
             <Anchor
-              c="#3B82F6"
+              c={tokens.action}
               size="sm"
               component="button"
               type="button"
@@ -331,11 +332,11 @@ export const ApiKeyLogin: React.FC<ApiKeyLoginProps> = ({
 
   if (view === 'magic-link') {
     return (
-      <Center mih="100vh" bg="#0c0a09">
+      <Center mih="100vh" bg={tokens.chrome}>
         <Paper {...cardProps}>
           {brandBlock}
 
-          <Title order={4} c="#fafaf9" mb={4}>
+          <Title order={4} c={tokens.textPrimary} mb={4}>
             Sign in with email
           </Title>
           <Text size="sm" c="dimmed" lh={1.5} mb="lg">
@@ -361,7 +362,7 @@ export const ApiKeyLogin: React.FC<ApiKeyLoginProps> = ({
               fullWidth
               mt="md"
               loading={loading}
-              color="#3B82F6"
+              color="action"
               aria-label="Send sign-in link"
             >
               Send sign-in link
@@ -370,7 +371,7 @@ export const ApiKeyLogin: React.FC<ApiKeyLoginProps> = ({
 
           <Text ta="center" mt="lg" size="sm">
             <Anchor
-              c="#3B82F6"
+              c={tokens.action}
               size="sm"
               component="button"
               type="button"
@@ -388,7 +389,7 @@ export const ApiKeyLogin: React.FC<ApiKeyLoginProps> = ({
 
   if (view === 'magic-link-sent') {
     return (
-      <Center mih="100vh" bg="#0c0a09">
+      <Center mih="100vh" bg={tokens.chrome}>
         <Paper {...cardProps}>
           {brandBlock}
 
@@ -397,17 +398,17 @@ export const ApiKeyLogin: React.FC<ApiKeyLoginProps> = ({
               size={48}
               radius="xl"
               variant="light"
-              color="#3B82F6"
+              color="action"
               aria-hidden
             >
               <Icons.email size={24} />
             </ThemeIcon>
 
-            <Title order={4} c="#fafaf9" ta="center">
+            <Title order={4} c={tokens.textPrimary} ta="center">
               Check your email
             </Title>
-            <Text size="sm" c="#e0e0e0" ta="center" lh={1.5}>
-              If an account with <Text span fw={600} c="#fafaf9">{magicEmail}</Text> exists,
+            <Text size="sm" c={tokens.textSecondary} ta="center" lh={1.5}>
+              If an account with <Text span fw={600} c={tokens.textPrimary}>{magicEmail}</Text> exists,
               we've sent a sign-in link to that address.
             </Text>
             <Text size="xs" c="dimmed" ta="center" lh={1.5}>
@@ -418,7 +419,7 @@ export const ApiKeyLogin: React.FC<ApiKeyLoginProps> = ({
           <Button
             fullWidth
             mt="md"
-            color="#3B82F6"
+            color="action"
             onClick={() => { setView('login'); setError(null); setApiKey(''); setMagicEmail(''); }}
             aria-label="Back to sign in"
           >
@@ -427,7 +428,7 @@ export const ApiKeyLogin: React.FC<ApiKeyLoginProps> = ({
 
           <Text ta="center" mt="sm" size="sm">
             <Anchor
-              c="#3B82F6"
+              c={tokens.action}
               size="sm"
               component="button"
               type="button"
@@ -444,7 +445,7 @@ export const ApiKeyLogin: React.FC<ApiKeyLoginProps> = ({
   /* ---- Reset sent (confirmation) --------------------------------------- */
 
   return (
-    <Center mih="100vh" bg="#0c0a09">
+    <Center mih="100vh" bg={tokens.chrome}>
       <Paper {...cardProps}>
         {brandBlock}
 
@@ -453,17 +454,17 @@ export const ApiKeyLogin: React.FC<ApiKeyLoginProps> = ({
             size={48}
             radius="xl"
             variant="light"
-            color="#3B82F6"
+            color="action"
             aria-hidden
           >
             <Icons.email size={24} />
           </ThemeIcon>
 
-          <Title order={4} c="#fafaf9" ta="center">
+          <Title order={4} c={tokens.textPrimary} ta="center">
             Check your email
           </Title>
-          <Text size="sm" c="#e0e0e0" ta="center" lh={1.5}>
-            If an account with <Text span fw={600} c="#fafaf9">{email}</Text> exists,
+          <Text size="sm" c={tokens.textSecondary} ta="center" lh={1.5}>
+            If an account with <Text span fw={600} c={tokens.textPrimary}>{email}</Text> exists,
             we've generated a new API key and sent it to that address.
           </Text>
           <Text size="xs" c="dimmed" ta="center" lh={1.5}>
@@ -477,7 +478,7 @@ export const ApiKeyLogin: React.FC<ApiKeyLoginProps> = ({
         <Button
           fullWidth
           mt="md"
-          color="#3B82F6"
+          color="action"
           onClick={() => { setView('login'); setError(null); setApiKey(''); setEmail(''); }}
           aria-label="Back to sign in"
         >
@@ -486,7 +487,7 @@ export const ApiKeyLogin: React.FC<ApiKeyLoginProps> = ({
 
         <Text ta="center" mt="sm" size="sm">
           <Anchor
-            c="#3B82F6"
+            c={tokens.action}
             size="sm"
             component="button"
             type="button"

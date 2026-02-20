@@ -34,6 +34,7 @@ import {
 } from 'recharts';
 import { useProviderContext } from '../layouts/ProviderLayout';
 import { LoadingState } from '../../shared/LoadingState';
+import { tokens, chartAxisTick, chartTooltipStyle, chartLabelStyle } from '../../shared/theme/styles';
 
 // ---------------------------------------------------------------------------
 // Types
@@ -77,9 +78,9 @@ const RANGE_OPTIONS = [
 ];
 
 const TIER_COLORS: Record<string, string> = {
-  STARTER: '#787878',
-  PROFESSIONAL: '#4c6ef5',
-  ENTERPRISE: '#7950f2',
+  STARTER: tokens.chartAxis,
+  PROFESSIONAL: tokens.chartLine1,
+  ENTERPRISE: tokens.chartPurple,
 };
 
 // ---------------------------------------------------------------------------
@@ -123,7 +124,7 @@ export function SLATrendsPage() {
   return (
     <Stack gap="lg">
       <Group justify="space-between" align="center">
-        <Title order={3} c="#fafaf9">SLA Trends</Title>
+        <Title order={3} c={tokens.textPrimary}>SLA Trends</Title>
         <SegmentedControl
           value={range}
           onChange={setRange}
@@ -142,25 +143,25 @@ export function SLATrendsPage() {
       ) : (
         <>
           {/* Uptime chart */}
-          <Card withBorder padding="lg" radius="md" bg="#292524">
-            <Text fw={600} size="sm" c="#E0E0E0" mb="md">Uptime %</Text>
+          <Card withBorder padding="lg" radius="md" bg={tokens.surface}>
+            <Text fw={600} size="sm" c={tokens.textSecondary} mb="md">Uptime %</Text>
             <ResponsiveContainer width="100%" height={250}>
               <LineChart data={chartData}>
-                <CartesianGrid strokeDasharray="3 3" stroke="#44403c" />
-                <XAxis dataKey="label" tick={{ fill: '#787878', fontSize: 11 }} />
+                <CartesianGrid strokeDasharray="3 3" stroke={tokens.chartGrid} />
+                <XAxis dataKey="label" tick={chartAxisTick} />
                 <YAxis
                   domain={[99, 100]}
-                  tick={{ fill: '#787878', fontSize: 11 }}
+                  tick={chartAxisTick}
                   tickFormatter={(v: number) => `${v}%`}
                 />
                 <Tooltip
-                  contentStyle={{ backgroundColor: '#292524', border: '1px solid #44403c', color: '#E0E0E0' }}
-                  labelStyle={{ color: '#A0A0A0' }}
+                  contentStyle={chartTooltipStyle}
+                  labelStyle={chartLabelStyle}
                 />
                 <Line
                   type="monotone"
                   dataKey="uptime_pct"
-                  stroke="#0D7C3E"
+                  stroke={tokens.success}
                   strokeWidth={2}
                   dot={false}
                   name="Uptime %"
@@ -170,21 +171,21 @@ export function SLATrendsPage() {
           </Card>
 
           {/* Latency chart */}
-          <Card withBorder padding="lg" radius="md" bg="#292524">
-            <Text fw={600} size="sm" c="#E0E0E0" mb="md">Response Latency (ms)</Text>
+          <Card withBorder padding="lg" radius="md" bg={tokens.surface}>
+            <Text fw={600} size="sm" c={tokens.textSecondary} mb="md">Response Latency (ms)</Text>
             <ResponsiveContainer width="100%" height={250}>
               <LineChart data={chartData}>
-                <CartesianGrid strokeDasharray="3 3" stroke="#44403c" />
-                <XAxis dataKey="label" tick={{ fill: '#787878', fontSize: 11 }} />
-                <YAxis tick={{ fill: '#787878', fontSize: 11 }} />
+                <CartesianGrid strokeDasharray="3 3" stroke={tokens.chartGrid} />
+                <XAxis dataKey="label" tick={chartAxisTick} />
+                <YAxis tick={chartAxisTick} />
                 <Tooltip
-                  contentStyle={{ backgroundColor: '#292524', border: '1px solid #44403c', color: '#E0E0E0' }}
-                  labelStyle={{ color: '#A0A0A0' }}
+                  contentStyle={chartTooltipStyle}
+                  labelStyle={chartLabelStyle}
                 />
-                <Legend wrapperStyle={{ color: '#A0A0A0', fontSize: '12px' }} />
-                <Line type="monotone" dataKey="p50_ms" stroke="#4c6ef5" strokeWidth={2} dot={false} name="P50" />
-                <Line type="monotone" dataKey="p95_ms" stroke="#E5A100" strokeWidth={2} dot={false} name="P95" />
-                <Line type="monotone" dataKey="p99_ms" stroke="#D32F2F" strokeWidth={2} dot={false} name="P99" />
+                <Legend wrapperStyle={{ color: tokens.textMuted, fontSize: '12px' }} />
+                <Line type="monotone" dataKey="p50_ms" stroke={tokens.chartLine1} strokeWidth={2} dot={false} name="P50" />
+                <Line type="monotone" dataKey="p95_ms" stroke={tokens.chartLine2} strokeWidth={2} dot={false} name="P95" />
+                <Line type="monotone" dataKey="p99_ms" stroke={tokens.chartLine3} strokeWidth={2} dot={false} name="P99" />
               </LineChart>
             </ResponsiveContainer>
           </Card>
@@ -192,16 +193,16 @@ export function SLATrendsPage() {
           {/* Error budget gauges */}
           {Object.keys(data.error_budgets ?? {}).length > 0 && (
             <>
-              <Title order={4} c="#E0E0E0">Error Budgets (30-day period)</Title>
+              <Title order={4} c={tokens.textSecondary}>Error Budgets (30-day period)</Title>
               <SimpleGrid cols={{ base: 1, sm: 3 }} spacing="md">
                 {Object.entries(data.error_budgets ?? {}).map(([tier, budget]) => (
-                  <Card key={tier} withBorder padding="lg" radius="md" bg="#292524">
+                  <Card key={tier} withBorder padding="lg" radius="md" bg={tokens.surface}>
                     <Group justify="space-between" mb="sm">
-                      <Text fw={600} size="sm" c="#E0E0E0">{tier}</Text>
+                      <Text fw={600} size="sm" c={tokens.textSecondary}>{tier}</Text>
                       <Text
                         size="xs"
                         fw={600}
-                        c={budget.is_within_budget ? '#0D7C3E' : '#D32F2F'}
+                        c={budget.is_within_budget ? tokens.success : tokens.danger}
                       >
                         {budget.is_within_budget ? 'Within budget' : 'Budget exceeded'}
                       </Text>
@@ -215,14 +216,14 @@ export function SLATrendsPage() {
                           {
                             value: Math.min(budget.budget_consumed_pct, 100),
                             color: budget.budget_consumed_pct > 80
-                              ? '#D32F2F'
+                              ? tokens.danger
                               : budget.budget_consumed_pct > 50
-                                ? '#E5A100'
-                                : TIER_COLORS[tier] ?? '#4c6ef5',
+                                ? tokens.warning
+                                : TIER_COLORS[tier] ?? tokens.chartLine1,
                           },
                         ]}
                         label={
-                          <Text ta="center" size="xs" c="#E0E0E0">
+                          <Text ta="center" size="xs" c={tokens.textSecondary}>
                             {budget.budget_consumed_pct.toFixed(1)}%
                             <br />
                             <Text span size="xs" c="dimmed">used</Text>
@@ -233,15 +234,15 @@ export function SLATrendsPage() {
                     <Stack gap={4} mt="sm">
                       <Group justify="space-between">
                         <Text size="xs" c="dimmed">Allowed</Text>
-                        <Text size="xs" c="#A0A0A0">{budget.allowed_downtime_minutes.toFixed(1)} min</Text>
+                        <Text size="xs" c={tokens.textMuted}>{budget.allowed_downtime_minutes.toFixed(1)} min</Text>
                       </Group>
                       <Group justify="space-between">
                         <Text size="xs" c="dimmed">Actual</Text>
-                        <Text size="xs" c="#A0A0A0">{budget.actual_downtime_minutes.toFixed(1)} min</Text>
+                        <Text size="xs" c={tokens.textMuted}>{budget.actual_downtime_minutes.toFixed(1)} min</Text>
                       </Group>
                       <Group justify="space-between">
                         <Text size="xs" c="dimmed">Remaining</Text>
-                        <Text size="xs" c="#A0A0A0">{(budget.budget_remaining * 100).toFixed(1)}%</Text>
+                        <Text size="xs" c={tokens.textMuted}>{(budget.budget_remaining * 100).toFixed(1)}%</Text>
                       </Group>
                     </Stack>
                   </Card>
@@ -252,21 +253,21 @@ export function SLATrendsPage() {
 
           {/* Request volume */}
           {chartData.length > 0 && (
-            <Card withBorder padding="lg" radius="md" bg="#292524">
-              <Text fw={600} size="sm" c="#E0E0E0" mb="md">Request Volume</Text>
+            <Card withBorder padding="lg" radius="md" bg={tokens.surface}>
+              <Text fw={600} size="sm" c={tokens.textSecondary} mb="md">Request Volume</Text>
               <ResponsiveContainer width="100%" height={180}>
                 <LineChart data={chartData}>
-                  <CartesianGrid strokeDasharray="3 3" stroke="#44403c" />
-                  <XAxis dataKey="label" tick={{ fill: '#787878', fontSize: 11 }} />
-                  <YAxis tick={{ fill: '#787878', fontSize: 11 }} />
+                  <CartesianGrid strokeDasharray="3 3" stroke={tokens.chartGrid} />
+                  <XAxis dataKey="label" tick={chartAxisTick} />
+                  <YAxis tick={chartAxisTick} />
                   <Tooltip
-                    contentStyle={{ backgroundColor: '#292524', border: '1px solid #44403c', color: '#E0E0E0' }}
-                    labelStyle={{ color: '#A0A0A0' }}
+                    contentStyle={chartTooltipStyle}
+                    labelStyle={chartLabelStyle}
                   />
                   <Line
                     type="monotone"
                     dataKey="total_requests"
-                    stroke="#787878"
+                    stroke={tokens.chartLine4}
                     strokeWidth={1.5}
                     dot={false}
                     name="Requests"

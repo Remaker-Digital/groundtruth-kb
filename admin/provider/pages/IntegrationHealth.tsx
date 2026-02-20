@@ -23,6 +23,7 @@ import {
 } from '@mantine/core';
 import { useProviderContext } from '../layouts/ProviderLayout';
 import { LoadingState } from '../../shared/LoadingState';
+import { tokens } from '../../shared/theme/styles';
 
 // ---------------------------------------------------------------------------
 // Types (matches IntegrationHealthResponse camelCase serialization)
@@ -116,7 +117,7 @@ export function IntegrationHealthPage() {
   return (
     <Stack gap="lg">
       <Group justify="space-between" align="baseline">
-        <Title order={3} c="#fafaf9">Integration Health</Title>
+        <Title order={3} c={tokens.textPrimary}>Integration Health</Title>
         <Badge
           variant="filled"
           color={data.overallHealthy ? 'green' : 'red'}
@@ -127,9 +128,9 @@ export function IntegrationHealthPage() {
       </Group>
 
       {/* NATS connectivity */}
-      <Paper withBorder radius="md" bg="#292524" p="md">
+      <Paper withBorder radius="md" bg={tokens.surface} p="md">
         <Group gap="sm">
-          <Text size="sm" fw={500} c="#E0E0E0">NATS JetStream</Text>
+          <Text size="sm" fw={500} c={tokens.textSecondary}>NATS JetStream</Text>
           <Badge
             variant="light"
             color={data.natsConnected ? 'green' : 'red'}
@@ -143,12 +144,12 @@ export function IntegrationHealthPage() {
       {/* Circuit breaker cards */}
       {data.circuitBreakers.length > 0 && (
         <>
-          <Text size="sm" fw={600} c="#A0A0A0" tt="uppercase">Circuit Breakers</Text>
+          <Text size="sm" fw={600} c={tokens.textMuted} tt="uppercase">Circuit Breakers</Text>
           <SimpleGrid cols={{ base: 1, sm: 2, md: 3 }} spacing="md">
             {data.circuitBreakers.map((cb) => (
-              <Card key={cb.service} withBorder padding="lg" radius="md" bg="#292524">
+              <Card key={cb.service} withBorder padding="lg" radius="md" bg={tokens.surface}>
                 <Group justify="space-between" mb="xs">
-                  <Text size="sm" fw={500} c="#E0E0E0">
+                  <Text size="sm" fw={500} c={tokens.textSecondary}>
                     {formatServiceName(cb.service)}
                   </Text>
                   <Badge
@@ -165,14 +166,14 @@ export function IntegrationHealthPage() {
                     <Text
                       fw={600}
                       size="lg"
-                      c={cb.failures > 0 ? '#D32F2F' : '#A0A0A0'}
+                      c={cb.failures > 0 ? tokens.danger : tokens.textMuted}
                     >
                       {cb.failures}
                     </Text>
                   </Stack>
                   <Stack gap={2}>
                     <Text c="dimmed" size="xs">Successes</Text>
-                    <Text fw={600} size="lg" c="#0D7C3E">{cb.successes}</Text>
+                    <Text fw={600} size="lg" c={tokens.success}>{cb.successes}</Text>
                   </Stack>
                 </Group>
               </Card>
@@ -184,34 +185,34 @@ export function IntegrationHealthPage() {
       {/* MCP integration status */}
       {data.mcpIntegrations.length > 0 && (
         <>
-          <Text size="sm" fw={600} c="#A0A0A0" tt="uppercase">MCP Integrations</Text>
+          <Text size="sm" fw={600} c={tokens.textMuted} tt="uppercase">MCP Integrations</Text>
           <SimpleGrid cols={{ base: 1, sm: 2 }} spacing="md">
             {data.mcpIntegrations.map((mcp) => {
               const connectedPct = mcp.tenantsEnabled > 0
                 ? Math.round((mcp.tenantsConnected / mcp.tenantsEnabled) * 100)
                 : 0;
               return (
-                <Card key={mcp.serverName} withBorder padding="lg" radius="md" bg="#292524">
+                <Card key={mcp.serverName} withBorder padding="lg" radius="md" bg={tokens.surface}>
                   <Group justify="space-between" align="flex-start">
                     <Stack gap={4}>
-                      <Text size="sm" fw={500} c="#E0E0E0">
+                      <Text size="sm" fw={500} c={tokens.textSecondary}>
                         {formatServiceName(mcp.serverName)}
                       </Text>
                       <Group gap="lg">
                         <Stack gap={0}>
                           <Text c="dimmed" size="xs">Enabled</Text>
-                          <Text size="sm" fw={500} c="#E0E0E0">{mcp.tenantsEnabled}</Text>
+                          <Text size="sm" fw={500} c={tokens.textSecondary}>{mcp.tenantsEnabled}</Text>
                         </Stack>
                         <Stack gap={0}>
                           <Text c="dimmed" size="xs">Connected</Text>
-                          <Text size="sm" fw={500} c="#0D7C3E">{mcp.tenantsConnected}</Text>
+                          <Text size="sm" fw={500} c={tokens.success}>{mcp.tenantsConnected}</Text>
                         </Stack>
                         <Stack gap={0}>
                           <Text c="dimmed" size="xs">Errored</Text>
                           <Text
                             size="sm"
                             fw={500}
-                            c={mcp.tenantsErrored > 0 ? '#D32F2F' : '#A0A0A0'}
+                            c={mcp.tenantsErrored > 0 ? tokens.danger : tokens.textMuted}
                           >
                             {mcp.tenantsErrored}
                           </Text>
@@ -226,14 +227,14 @@ export function IntegrationHealthPage() {
                         {
                           value: connectedPct,
                           color: connectedPct >= 80
-                            ? '#0D7C3E'
+                            ? tokens.success
                             : connectedPct >= 50
-                              ? '#E5A100'
-                              : '#D32F2F',
+                              ? tokens.warning
+                              : tokens.danger,
                         },
                       ]}
                       label={
-                        <Text ta="center" size="xs" fw={600} c="#fafaf9">
+                        <Text ta="center" size="xs" fw={600} c={tokens.textPrimary}>
                           {connectedPct}%
                         </Text>
                       }
@@ -248,7 +249,7 @@ export function IntegrationHealthPage() {
 
       {/* Errors section */}
       {data.errors.length > 0 && (
-        <Paper withBorder radius="md" bg="#292524" p="md">
+        <Paper withBorder radius="md" bg={tokens.surface} p="md">
           <Group gap="xs" mb="sm">
             <Badge variant="filled" color="red" size="sm">
               {data.errors.length} Error{data.errors.length !== 1 ? 's' : ''}
@@ -257,8 +258,8 @@ export function IntegrationHealthPage() {
           <Stack gap="xs">
             {data.errors.map((err, i) => (
               <Group key={i} gap="xs">
-                <Text size="xs" ff="monospace" c="#E5A100">{err.tenantId}</Text>
-                <Text size="xs" c="#A0A0A0">{err.message}</Text>
+                <Text size="xs" ff="monospace" c={tokens.warning}>{err.tenantId}</Text>
+                <Text size="xs" c={tokens.textMuted}>{err.message}</Text>
               </Group>
             ))}
           </Stack>

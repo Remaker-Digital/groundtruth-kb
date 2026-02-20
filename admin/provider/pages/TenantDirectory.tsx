@@ -27,6 +27,7 @@ import {
 } from '@mantine/core';
 import { useProviderContext } from '../layouts/ProviderLayout';
 import { LoadingState } from '../../shared/LoadingState';
+import { tokens } from '../../shared/theme/styles';
 
 // ---------------------------------------------------------------------------
 // Types
@@ -147,26 +148,26 @@ export function TenantDirectoryPage() {
 
   return (
     <Stack gap="lg">
-      <Title order={3} c="#fafaf9">Tenant Directory</Title>
+      <Title order={3} c={tokens.textPrimary}>Tenant Directory</Title>
 
       {/* Summary cards */}
       {summary && (
         <SimpleGrid cols={{ base: 1, sm: 2, md: 4 }} spacing="md">
-          <Card withBorder padding="lg" radius="md" bg="#292524">
+          <Card withBorder padding="lg" radius="md" bg={tokens.surface}>
             <Text c="dimmed" size="xs" tt="uppercase" fw={600}>Total Tenants</Text>
-            <Text fw={700} size="xl" c="#fafaf9" mt={4}>{summary.total_tenants}</Text>
+            <Text fw={700} size="xl" c={tokens.textPrimary} mt={4}>{summary.total_tenants}</Text>
           </Card>
           {Object.entries(summary.by_status ?? {}).map(([status, count]) => (
-            <Card key={status} withBorder padding="lg" radius="md" bg="#292524">
+            <Card key={status} withBorder padding="lg" radius="md" bg={tokens.surface}>
               <Text c="dimmed" size="xs" tt="uppercase" fw={600}>{status}</Text>
-              <Text fw={700} size="xl" c="#fafaf9" mt={4}>{count}</Text>
+              <Text fw={700} size="xl" c={tokens.textPrimary} mt={4}>{count}</Text>
             </Card>
           ))}
         </SimpleGrid>
       )}
 
       {/* Filters */}
-      <Paper withBorder p="md" radius="md" bg="#292524">
+      <Paper withBorder p="md" radius="md" bg={tokens.surface}>
         <Group gap="md">
           <Select
             label="Status"
@@ -205,7 +206,7 @@ export function TenantDirectoryPage() {
       </Paper>
 
       {/* Table */}
-      <Paper withBorder radius="md" bg="#292524" style={{ overflow: 'auto' }}>
+      <Paper withBorder radius="md" bg={tokens.surface} style={{ overflow: 'auto' }}>
         {loading ? (
           <LoadingState text="Loading tenants" size={24} />
         ) : (
@@ -232,7 +233,7 @@ export function TenantDirectoryPage() {
                 tenants.map((t) => (
                   <Table.Tr key={t.tenant_id}>
                     <Table.Td>
-                      <Text size="xs" ff="monospace" c="#E0E0E0">{t.tenant_id}</Text>
+                      <Text size="xs" ff="monospace" c={tokens.textSecondary}>{t.tenant_id}</Text>
                     </Table.Td>
                     <Table.Td>
                       <Badge
@@ -253,13 +254,13 @@ export function TenantDirectoryPage() {
                       )}
                     </Table.Td>
                     <Table.Td>
-                      <Text size="xs" c="#A0A0A0">{t.billing_channel ?? '—'}</Text>
+                      <Text size="xs" c={tokens.textMuted}>{t.billing_channel ?? '—'}</Text>
                     </Table.Td>
                     <Table.Td>
-                      <Text size="xs" c="#A0A0A0">{t.customer_email ?? '—'}</Text>
+                      <Text size="xs" c={tokens.textMuted}>{t.customer_email ?? '—'}</Text>
                     </Table.Td>
                     <Table.Td>
-                      <Text size="xs" c="#A0A0A0">{t.shopify_shop_domain ?? '—'}</Text>
+                      <Text size="xs" c={tokens.textMuted}>{t.shopify_shop_domain ?? '—'}</Text>
                     </Table.Td>
                     <Table.Td>
                       <Text size="xs" c="dimmed">

@@ -33,6 +33,7 @@ import React, { useState, useMemo } from 'react';
 import type { BaseComponentProps, TenantTier } from './types';
 import { useUsageDashboard, usePackBalance, useBillingStatus } from './hooks';
 import { HelpTooltip } from './HelpTooltip';
+import { tokens } from './theme/styles';
 
 // ---------------------------------------------------------------------------
 // Extended props
@@ -57,9 +58,9 @@ const PACK_OPTIONS: Array<{ size: 1000 | 5000 | 20000; price: string; rate: stri
 
 const TIER_DISPLAY: Record<string, { label: string; color: string }> = {
   trial: { label: 'Trial', color: '#6B7280' },
-  starter: { label: 'Starter', color: '#2563EB' },
-  professional: { label: 'Professional', color: '#7C3AED' },
-  enterprise: { label: 'Enterprise', color: '#ff3621' },
+  starter: { label: 'Starter', color: tokens.actionHover },
+  professional: { label: 'Professional', color: tokens.chartViolet },
+  enterprise: { label: 'Enterprise', color: tokens.brand },
 };
 
 const TIER_FEATURES: Array<{
@@ -118,7 +119,7 @@ const TIER_FEATURES: Array<{
 const STATUS_COLORS: Record<string, string> = {
   active: '#059669',
   suspended: '#D97706',
-  cancelled: '#DC2626',
+  cancelled: tokens.danger,
   trial_expired: '#9CA3AF',
 };
 
@@ -175,7 +176,7 @@ const styles = {
     borderRadius: 12,
     fontSize: 12,
     fontWeight: 600,
-    color: '#FFFFFF',
+    color: tokens.white,
     background: color,
   }),
 
@@ -237,13 +238,13 @@ const styles = {
     border: variant === 'outline' ? '1px solid #D1D5DB' : 'none',
     background:
       variant === 'primary'
-        ? '#3B82F6'
+        ? tokens.action
         : variant === 'secondary'
           ? '#F3F4F6'
           : 'transparent',
     color:
       variant === 'primary'
-        ? '#FFFFFF'
+        ? tokens.white
         : variant === 'secondary'
           ? '#374151'
           : '#374151',
@@ -277,7 +278,7 @@ const styles = {
   packPrice: {
     fontSize: 28,
     fontWeight: 700,
-    color: '#ff3621',
+    color: tokens.brand,
     margin: 0,
   } as React.CSSProperties,
 
@@ -295,7 +296,7 @@ const styles = {
 
   tierCard: (isCurrentTier: boolean): React.CSSProperties => ({
     background: isCurrentTier ? '#FEF2F2' : '#FFFFFF',
-    border: isCurrentTier ? '2px solid #ff3621' : '1px solid #E5E7EB',
+    border: isCurrentTier ? `2px solid ${tokens.brand}` : '1px solid #E5E7EB',
     borderRadius: 8,
     padding: 20,
     position: 'relative' as const,
@@ -305,8 +306,8 @@ const styles = {
     position: 'absolute' as const,
     top: -10,
     right: 16,
-    background: '#ff3621',
-    color: '#FFFFFF',
+    background: tokens.brand,
+    color: tokens.white,
     fontSize: 11,
     fontWeight: 600,
     padding: '2px 10px',
@@ -389,8 +390,8 @@ const styles = {
   retryButton: {
     marginTop: 12,
     padding: '6px 16px',
-    background: '#DC2626',
-    color: '#FFFFFF',
+    background: tokens.danger,
+    color: tokens.white,
     border: 'none',
     borderRadius: 4,
     fontSize: 13,
@@ -432,7 +433,7 @@ function formatDate(dateStr: string | undefined | null): string {
 }
 
 function getProgressColor(percent: number): string {
-  if (percent >= 100) return '#DC2626';
+  if (percent >= 100) return tokens.danger;
   if (percent >= 80) return '#D97706';
   return '#059669';
 }
@@ -570,10 +571,9 @@ export const BillingPortal: React.FC<BillingPortalProps> = ({
         ) : null}
         <div style={{ marginTop: 16 }}>
           <button
+            className="ar-btn-action"
             style={styles.button('primary')}
             onClick={onManageBilling}
-            onMouseEnter={(e) => { (e.currentTarget as HTMLButtonElement).style.background = '#2563EB'; }}
-            onMouseLeave={(e) => { (e.currentTarget as HTMLButtonElement).style.background = '#3B82F6'; }}
           >
             {tenantContext.billingChannel === 'shopify'
               ? 'Manage Shopify billing'
@@ -611,7 +611,7 @@ export const BillingPortal: React.FC<BillingPortalProps> = ({
               <div style={styles.statBox}>
                 <p style={{
                   ...styles.statValue,
-                  color: usage.data.overageConversations > 0 ? '#DC2626' : '#111827',
+                  color: usage.data.overageConversations > 0 ? tokens.danger : '#111827',
                 }}>
                   {formatNumber(usage.data.overageConversations)}
                 </p>
@@ -651,7 +651,7 @@ export const BillingPortal: React.FC<BillingPortalProps> = ({
                 <span style={{ ...styles.label, color: '#991B1B' }}>
                   Estimated overage cost <HelpTooltip text="Projected cost based on current overage conversations multiplied by your tier's overage rate." docLink="https://agentredcx.com/docs/billing/overview" />
                 </span>
-                <span style={{ ...styles.value, color: '#DC2626' }}>
+                <span style={{ ...styles.value, color: tokens.danger }}>
                   {formatCurrency(usage.data.estimatedOverageCost)}
                 </span>
               </div>
@@ -718,6 +718,7 @@ export const BillingPortal: React.FC<BillingPortalProps> = ({
               <p style={styles.packRate}>{pack.rate}</p>
               <p style={styles.packValidity}>Valid for 90 days</p>
               <button
+                className="ar-btn-action"
                 style={{
                   ...styles.button('primary'),
                   width: '100%',
@@ -726,14 +727,6 @@ export const BillingPortal: React.FC<BillingPortalProps> = ({
                 }}
                 disabled={purchasingPack === pack.size}
                 onClick={() => handlePurchasePack(pack.size)}
-                onMouseEnter={(e) => {
-                  if (purchasingPack !== pack.size) {
-                    (e.currentTarget as HTMLButtonElement).style.background = '#2563EB';
-                  }
-                }}
-                onMouseLeave={(e) => {
-                  (e.currentTarget as HTMLButtonElement).style.background = '#3B82F6';
-                }}
               >
                 {purchasingPack === pack.size ? 'Processing...' : 'Purchase'}
               </button>
@@ -797,6 +790,7 @@ export const BillingPortal: React.FC<BillingPortalProps> = ({
 
                   {!isCurrent && (
                     <button
+                      className="ar-btn-action"
                       style={{ ...styles.button('primary'), width: '100%' }}
                       onClick={() => {
                         onNotify(
@@ -805,8 +799,6 @@ export const BillingPortal: React.FC<BillingPortalProps> = ({
                         );
                         onManageBilling();
                       }}
-                      onMouseEnter={(e) => { (e.currentTarget as HTMLButtonElement).style.background = '#2563EB'; }}
-                      onMouseLeave={(e) => { (e.currentTarget as HTMLButtonElement).style.background = '#3B82F6'; }}
                     >
                       Upgrade to {display.label}
                     </button>

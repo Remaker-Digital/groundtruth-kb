@@ -23,6 +23,7 @@ import {
   Stack,
   Text,
 } from '@mantine/core';
+import { tokens } from '../../shared/theme/styles';
 
 const API_BASE_URL = import.meta.env?.VITE_API_URL || '';
 
@@ -91,14 +92,14 @@ export const ApiKeyLogin: React.FC<ApiKeyLoginProps> = ({ onLogin }) => {
   );
 
   return (
-    <Center mih="100vh" bg="#0c0a09">
+    <Center mih="100vh" bg={tokens.chrome}>
       <Paper
         w="100%"
         maw={380}
-        bg="#292524"
+        bg={tokens.surface}
         radius="md"
         p="xl"
-        styles={{ root: { border: '1px solid #44403c' } }}
+        styles={{ root: { border: `1px solid ${tokens.border}` } }}
       >
         <Stack align="center" gap="xs" mb="xl">
           <img
@@ -122,12 +123,12 @@ export const ApiKeyLogin: React.FC<ApiKeyLoginProps> = ({ onLogin }) => {
             aria-label="Service Provider API key"
             styles={{
               input: {
-                backgroundColor: '#1c1917',
-                borderColor: error ? '#ff6b6b' : '#44403c',
-                color: '#e0e0e0',
-                '&:focus': { borderColor: '#3B82F6' },
+                backgroundColor: tokens.page,
+                borderColor: error ? tokens.errorLight : tokens.border,
+                color: tokens.textSecondary,
+                '&:focus': { borderColor: tokens.action },
               },
-              label: { color: '#e0e0e0', fontWeight: 500 },
+              label: { color: tokens.textSecondary, fontWeight: 500 },
             }}
           />
 
@@ -136,7 +137,7 @@ export const ApiKeyLogin: React.FC<ApiKeyLoginProps> = ({ onLogin }) => {
             fullWidth
             mt="md"
             loading={loading}
-            color="#3B82F6"
+            color="action"
             aria-label="Sign in"
           >
             Sign in

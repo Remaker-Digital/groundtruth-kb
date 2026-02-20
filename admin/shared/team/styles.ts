@@ -10,6 +10,7 @@
 import type React from 'react';
 import type { ThemePalette, TeamStyles } from './types';
 import { getRoleColors } from './constants';
+import { tokens } from '../theme/styles';
 
 // ---------------------------------------------------------------------------
 // Style factory
@@ -176,14 +177,14 @@ export function makeStyles(p: ThemePalette, dark: boolean = false): TeamStyles {
       padding: '8px 20px',
       fontSize: 14,
       fontWeight: 600,
-      background: '#3B82F6',
-      color: '#FFFFFF',
+      background: tokens.action,
+      color: tokens.white,
       border: 'none',
       borderRadius: 6,
       cursor: 'pointer',
       whiteSpace: 'nowrap' as const,
       height: 38,
-      transition: 'background 150ms ease',
+      transition: `background ${tokens.transitionFast}`,
     } as React.CSSProperties,
 
     inviteButtonDisabled: {
@@ -250,8 +251,8 @@ export function makeStyles(p: ThemePalette, dark: boolean = false): TeamStyles {
       padding: '8px 16px',
       fontSize: 14,
       fontWeight: 600,
-      background: '#DC2626',
-      color: '#FFFFFF',
+      background: tokens.danger,
+      color: tokens.white,
       border: 'none',
       borderRadius: 6,
       cursor: 'pointer',
@@ -272,8 +273,8 @@ export function makeStyles(p: ThemePalette, dark: boolean = false): TeamStyles {
       padding: '8px 20px',
       fontSize: 14,
       fontWeight: 600,
-      background: '#3B82F6',
-      color: '#FFFFFF',
+      background: tokens.action,
+      color: tokens.white,
       border: 'none',
       borderRadius: 6,
       cursor: 'pointer',
@@ -303,7 +304,7 @@ export function makeStyles(p: ThemePalette, dark: boolean = false): TeamStyles {
       marginTop: 12,
       padding: '6px 16px',
       background: dark ? '#B91C1C' : '#DC2626',
-      color: '#FFFFFF',
+      color: tokens.white,
       border: 'none',
       borderRadius: 4,
       fontSize: 13,

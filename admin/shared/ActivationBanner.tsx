@@ -19,6 +19,7 @@
  */
 
 import React, { useCallback, useEffect, useState } from 'react';
+import { tokens, button } from './theme/styles';
 
 // ---------------------------------------------------------------------------
 // Types
@@ -112,7 +113,7 @@ export default function ActivationBanner({
         <div style={actionsStyle}>
           <button
             onClick={onActivate}
-            style={activateButtonStyle}
+            style={activateButtonSmall}
           >
             Activate
           </button>
@@ -130,12 +131,12 @@ export default function ActivationBanner({
 }
 
 // ---------------------------------------------------------------------------
-// Styles (inline, matching dark theme)
+// Styles (using centralized tokens)
 // ---------------------------------------------------------------------------
 
 const bannerStyle: React.CSSProperties = {
-  backgroundColor: '#1c1917',
-  borderBottom: '1px solid #3B82F6',
+  backgroundColor: tokens.page,
+  borderBottom: `1px solid ${tokens.action}`,
   padding: '10px 20px',
   display: 'flex',
   alignItems: 'center',
@@ -152,19 +153,19 @@ const contentStyle: React.CSSProperties = {
 };
 
 const textStyle: React.CSSProperties = {
-  color: '#e0e0e0',
+  color: tokens.textPrimary,
   fontSize: '14px',
   lineHeight: '1.4',
 };
 
 const iconStyle: React.CSSProperties = {
-  color: '#3B82F6',
+  color: tokens.action,
   marginRight: '8px',
   fontSize: '10px',
 };
 
 const versionStyle: React.CSSProperties = {
-  color: '#888',
+  color: tokens.textMuted,
   fontSize: '12px',
 };
 
@@ -174,23 +175,12 @@ const actionsStyle: React.CSSProperties = {
   flexShrink: 0,
 };
 
-const activateButtonStyle: React.CSSProperties = {
-  backgroundColor: '#2b8a3e',
-  color: '#fff',
-  border: 'none',
-  borderRadius: '6px',
-  padding: '6px 16px',
-  fontSize: '13px',
-  fontWeight: 600,
-  cursor: 'pointer',
+const activateButtonSmall: React.CSSProperties = {
+  ...button.activate,
+  ...button.sm,
 };
 
 const discardButtonStyle: React.CSSProperties = {
-  backgroundColor: 'transparent',
-  color: '#888',
-  border: '1px solid #333',
-  borderRadius: '6px',
-  padding: '6px 16px',
-  fontSize: '13px',
-  cursor: 'pointer',
+  ...button.cancel,
+  ...button.sm,
 };

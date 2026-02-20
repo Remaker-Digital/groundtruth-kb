@@ -27,6 +27,7 @@ import {
 } from '@mantine/core';
 import { useProviderContext } from '../layouts/ProviderLayout';
 import { LoadingState } from '../../shared/LoadingState';
+import { tokens } from '../../shared/theme/styles';
 
 // ---------------------------------------------------------------------------
 // Types
@@ -149,7 +150,7 @@ export function AbuseDetectionPage() {
   return (
     <Stack gap="lg">
       <Group justify="space-between" align="baseline">
-        <Title order={3} c="#fafaf9">Abuse Detection</Title>
+        <Title order={3} c={tokens.textPrimary}>Abuse Detection</Title>
         <Button variant="light" size="xs" onClick={fetchData}>
           Rescan
         </Button>
@@ -157,27 +158,27 @@ export function AbuseDetectionPage() {
 
       {/* Summary cards */}
       <SimpleGrid cols={{ base: 1, sm: 3 }} spacing="md">
-        <Card withBorder padding="lg" radius="md" bg="#292524">
+        <Card withBorder padding="lg" radius="md" bg={tokens.surface}>
           <Text c="dimmed" size="xs" tt="uppercase" fw={600}>Tenants Scanned</Text>
-          <Text fw={700} size="xl" c="#fafaf9" mt={4}>{data.totalTenantsScanned}</Text>
+          <Text fw={700} size="xl" c={tokens.textPrimary} mt={4}>{data.totalTenantsScanned}</Text>
         </Card>
-        <Card withBorder padding="lg" radius="md" bg="#292524">
+        <Card withBorder padding="lg" radius="md" bg={tokens.surface}>
           <Text c="dimmed" size="xs" tt="uppercase" fw={600}>Flagged</Text>
           <Text
             fw={700}
             size="xl"
-            c={data.flaggedCount > 0 ? '#E5A100' : '#0D7C3E'}
+            c={data.flaggedCount > 0 ? tokens.warning : tokens.success}
             mt={4}
           >
             {data.flaggedCount}
           </Text>
         </Card>
-        <Card withBorder padding="lg" radius="md" bg="#292524">
+        <Card withBorder padding="lg" radius="md" bg={tokens.surface}>
           <Text c="dimmed" size="xs" tt="uppercase" fw={600}>High-Risk Tenants</Text>
           <Text
             fw={700}
             size="xl"
-            c={data.highRiskTenants.length > 0 ? '#ff3621' : '#0D7C3E'}
+            c={data.highRiskTenants.length > 0 ? tokens.brand : tokens.success}
             mt={4}
           >
             {data.highRiskTenants.length}
@@ -189,19 +190,19 @@ export function AbuseDetectionPage() {
       {Object.keys(data.signalsByType ?? {}).length > 0 && (
         <SimpleGrid cols={{ base: 2, sm: 5 }} spacing="sm">
           {Object.entries(data.signalsByType ?? {}).map(([type, count]) => (
-            <Card key={type} withBorder padding="sm" radius="md" bg="#292524">
+            <Card key={type} withBorder padding="sm" radius="md" bg={tokens.surface}>
               <Text c="dimmed" size="xs" fw={600}>
                 {SIGNAL_LABELS[type] ?? type}
               </Text>
-              <Text fw={700} size="lg" c="#fafaf9" mt={2}>{count}</Text>
+              <Text fw={700} size="lg" c={tokens.textPrimary} mt={2}>{count}</Text>
             </Card>
           ))}
         </SimpleGrid>
       )}
 
       {/* High-risk tenants table */}
-      <Title order={4} c="#fafaf9" mt="sm">High-Risk Tenants</Title>
-      <Paper withBorder radius="md" bg="#292524" style={{ overflow: 'auto' }}>
+      <Title order={4} c={tokens.textPrimary} mt="sm">High-Risk Tenants</Title>
+      <Paper withBorder radius="md" bg={tokens.surface} style={{ overflow: 'auto' }}>
         <Table striped highlightOnHover>
           <Table.Thead>
             <Table.Tr>
@@ -223,7 +224,7 @@ export function AbuseDetectionPage() {
               data.highRiskTenants.map((t) => (
                 <Table.Tr key={t.tenantId}>
                   <Table.Td>
-                    <Text size="xs" ff="monospace" c="#E0E0E0">{t.tenantId}</Text>
+                    <Text size="xs" ff="monospace" c={tokens.textSecondary}>{t.tenantId}</Text>
                   </Table.Td>
                   <Table.Td>
                     <Group gap="xs">
@@ -233,7 +234,7 @@ export function AbuseDetectionPage() {
                         size="sm"
                         w={60}
                       />
-                      <Text size="xs" fw={600} c="#fafaf9">{t.riskScore}</Text>
+                      <Text size="xs" fw={600} c={tokens.textPrimary}>{t.riskScore}</Text>
                     </Group>
                   </Table.Td>
                   <Table.Td>

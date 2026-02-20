@@ -40,6 +40,7 @@ import type {
 } from './types';
 import { useUsageDashboard, useDailyVolume, useConversationList } from './hooks';
 import { HelpTooltip } from './HelpTooltip';
+import { tokens } from './theme/styles';
 
 // ---------------------------------------------------------------------------
 // Constants
@@ -179,7 +180,7 @@ const st = {
   meterFill: (percent: number, isOverage: boolean): React.CSSProperties => ({
     height: '100%',
     width: `${Math.min(percent, 100)}%`,
-    backgroundColor: isOverage ? '#ff3621' : percent > 80 ? '#f59e0b' : '#16a34a',
+    backgroundColor: isOverage ? tokens.brand : percent > 80 ? '#f59e0b' : '#16a34a',
     borderRadius: 6,
     transition: 'width 0.4s ease, background-color 0.3s ease',
   }),
@@ -190,7 +191,7 @@ const st = {
     right: 0,
     height: '100%',
     width: `${Math.min(overflowPercent, 20)}%`,
-    backgroundColor: '#ff3621',
+    backgroundColor: tokens.brand,
     opacity: 0.3,
     borderRadius: '0 6px 6px 0',
   }),
@@ -497,7 +498,7 @@ const UsageMeter: React.FC<UsageMeterProps> = ({ usage }) => {
           style={{
             fontSize: 14,
             fontWeight: 600,
-            color: isOverage ? '#ff3621' : percent > 80 ? '#f59e0b' : '#16a34a',
+            color: isOverage ? tokens.brand : percent > 80 ? '#f59e0b' : '#16a34a',
           }}
         >
           {(percent ?? 0).toFixed(0)}%
@@ -513,7 +514,7 @@ const UsageMeter: React.FC<UsageMeterProps> = ({ usage }) => {
         <div
           style={{
             fontSize: 12,
-            color: '#ff3621',
+            color: tokens.brand,
             marginTop: 8,
             fontWeight: 500,
           }}
@@ -551,7 +552,7 @@ const SummaryCards: React.FC<SummaryCardsProps> = ({ usage }) => (
       <p
         style={{
           ...st.cardValue,
-          color: usage.overageConversations > 0 ? '#ff3621' : '#1a1a1a',
+          color: usage.overageConversations > 0 ? tokens.brand : '#1a1a1a',
         }}
       >
         {formatNumber(usage.overageConversations)}
@@ -628,7 +629,7 @@ const DailyChart: React.FC<DailyChartProps> = ({ days }) => {
                     title={`Total: ${day.total}`}
                   />
                   <div
-                    style={st.bar(billableH, '#ff3621')}
+                    style={st.bar(billableH, tokens.brand)}
                     title={`Billable: ${day.billable}`}
                   />
                 </div>
@@ -645,7 +646,7 @@ const DailyChart: React.FC<DailyChartProps> = ({ days }) => {
           Total
         </span>
         <span>
-          <span style={st.legendDot('#ff3621')} />
+          <span style={st.legendDot(tokens.brand)} />
           Billable
         </span>
       </div>

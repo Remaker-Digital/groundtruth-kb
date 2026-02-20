@@ -26,6 +26,7 @@ import {
 import { useDisclosure } from '@mantine/hooks';
 import { useProviderContext } from '../layouts/ProviderLayout';
 import { LoadingState } from '../../shared/LoadingState';
+import { tokens } from '../../shared/theme/styles';
 
 // ---------------------------------------------------------------------------
 // Types
@@ -114,33 +115,33 @@ export function QueueHealthPage() {
 
   return (
     <Stack gap="lg">
-      <Title order={3} c="#fafaf9">Queue Health</Title>
+      <Title order={3} c={tokens.textPrimary}>Queue Health</Title>
 
       {/* Summary cards */}
       <SimpleGrid cols={{ base: 1, sm: 3 }} spacing="md">
-        <Card withBorder padding="lg" radius="md" bg="#292524">
+        <Card withBorder padding="lg" radius="md" bg={tokens.surface}>
           <Text c="dimmed" size="xs" tt="uppercase" fw={600}>Total Tenants</Text>
-          <Text fw={700} size="xl" c="#fafaf9" mt={4}>{data.total_tenants}</Text>
+          <Text fw={700} size="xl" c={tokens.textPrimary} mt={4}>{data.total_tenants}</Text>
         </Card>
-        <Card withBorder padding="lg" radius="md" bg="#292524">
+        <Card withBorder padding="lg" radius="md" bg={tokens.surface}>
           <Text c="dimmed" size="xs" tt="uppercase" fw={600}>Total Messages</Text>
           <Text
             fw={700}
             size="xl"
-            c={data.total_messages > 1000 ? '#D32F2F' : data.total_messages > 100 ? '#E5A100' : '#0D7C3E'}
+            c={data.total_messages > 1000 ? tokens.danger : data.total_messages > 100 ? tokens.warning : tokens.success}
             mt={4}
           >
             {data.total_messages.toLocaleString()}
           </Text>
         </Card>
-        <Card withBorder padding="lg" radius="md" bg="#292524">
+        <Card withBorder padding="lg" radius="md" bg={tokens.surface}>
           <Text c="dimmed" size="xs" tt="uppercase" fw={600}>Total Bytes</Text>
-          <Text fw={700} size="xl" c="#fafaf9" mt={4}>{formatBytes(data.total_bytes)}</Text>
+          <Text fw={700} size="xl" c={tokens.textPrimary} mt={4}>{formatBytes(data.total_bytes)}</Text>
         </Card>
       </SimpleGrid>
 
       {/* Per-tenant table */}
-      <Paper withBorder radius="md" bg="#292524" style={{ overflow: 'auto' }}>
+      <Paper withBorder radius="md" bg={tokens.surface} style={{ overflow: 'auto' }}>
         <Table striped highlightOnHover>
           <Table.Thead>
             <Table.Tr>
@@ -163,21 +164,21 @@ export function QueueHealthPage() {
               data.tenants.map((t) => (
                 <Table.Tr key={t.tenant_id}>
                   <Table.Td>
-                    <Text size="xs" ff="monospace" c="#E0E0E0">{t.tenant_id}</Text>
+                    <Text size="xs" ff="monospace" c={tokens.textSecondary}>{t.tenant_id}</Text>
                   </Table.Td>
                   <Table.Td>
-                    <Text size="xs" ff="monospace" c="#A0A0A0">{t.stream_name}</Text>
+                    <Text size="xs" ff="monospace" c={tokens.textMuted}>{t.stream_name}</Text>
                   </Table.Td>
                   <Table.Td>
-                    <Text size="xs" fw={500} c="#E0E0E0">
+                    <Text size="xs" fw={500} c={tokens.textSecondary}>
                       {t.messages.toLocaleString()}
                     </Text>
                   </Table.Td>
                   <Table.Td>
-                    <Text size="xs" c="#A0A0A0">{formatBytes(t.bytes)}</Text>
+                    <Text size="xs" c={tokens.textMuted}>{formatBytes(t.bytes)}</Text>
                   </Table.Td>
                   <Table.Td>
-                    <Text size="xs" c="#A0A0A0">{t.consumer_count}</Text>
+                    <Text size="xs" c={tokens.textMuted}>{t.consumer_count}</Text>
                   </Table.Td>
                   <Table.Td>
                     <Badge
@@ -197,7 +198,7 @@ export function QueueHealthPage() {
 
       {/* Errors section (collapsible) */}
       {data.errors.length > 0 && (
-        <Paper withBorder radius="md" bg="#292524" p="md">
+        <Paper withBorder radius="md" bg={tokens.surface} p="md">
           <UnstyledButton onClick={toggleErrors}>
             <Group gap="xs">
               <Badge variant="filled" color="red" size="sm">
@@ -212,8 +213,8 @@ export function QueueHealthPage() {
             <Stack gap="xs" mt="sm">
               {data.errors.map((err, i) => (
                 <Group key={i} gap="xs">
-                  <Text size="xs" ff="monospace" c="#E5A100">{err.tenant_id}</Text>
-                  <Text size="xs" c="#A0A0A0">{err.message}</Text>
+                  <Text size="xs" ff="monospace" c={tokens.warning}>{err.tenant_id}</Text>
+                  <Text size="xs" c={tokens.textMuted}>{err.message}</Text>
                 </Group>
               ))}
             </Stack>

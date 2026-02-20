@@ -25,6 +25,7 @@ import {
 import { useProviderContext } from '../layouts/ProviderLayout';
 import { LoadingState } from '../../shared/LoadingState';
 import { HelpTooltip } from '../../shared/HelpTooltip';
+import { tokens } from '../../shared/theme/styles';
 
 // ---------------------------------------------------------------------------
 // Types (matches ComplianceSummaryResponse camelCase serialization)
@@ -95,43 +96,43 @@ export function ComplianceDashboardPage() {
 
   return (
     <Stack gap="lg">
-      <Title order={3} c="#fafaf9">Compliance Dashboard</Title><HelpTooltip text="Cross-tenant compliance posture including PII scrubbing adoption and DSAR request tracking." />
+      <Title order={3} c={tokens.textPrimary}>Compliance Dashboard</Title><HelpTooltip text="Cross-tenant compliance posture including PII scrubbing adoption and DSAR request tracking." />
 
       {/* Summary cards */}
       <SimpleGrid cols={{ base: 1, sm: 2, md: 4 }} spacing="md">
-        <Card withBorder padding="lg" radius="md" bg="#292524">
+        <Card withBorder padding="lg" radius="md" bg={tokens.surface}>
           <Text c="dimmed" size="xs" tt="uppercase" fw={600}>Total Tenants</Text>
-          <Text fw={700} size="xl" c="#fafaf9" mt={4}>{data.totalTenants}</Text>
+          <Text fw={700} size="xl" c={tokens.textPrimary} mt={4}>{data.totalTenants}</Text>
         </Card>
-        <Card withBorder padding="lg" radius="md" bg="#292524">
+        <Card withBorder padding="lg" radius="md" bg={tokens.surface}>
           <Text c="dimmed" size="xs" tt="uppercase" fw={600}>PII Scrubbing Enabled</Text>
-          <Text fw={700} size="xl" c="#0D7C3E" mt={4}>
+          <Text fw={700} size="xl" c={tokens.success} mt={4}>
             {data.tenantsWithPiiScrubbing}
           </Text>
           <Text c="dimmed" size="xs">{piiAdoptionPct}% adoption</Text>
         </Card>
-        <Card withBorder padding="lg" radius="md" bg="#292524">
+        <Card withBorder padding="lg" radius="md" bg={tokens.surface}>
           <Text c="dimmed" size="xs" tt="uppercase" fw={600}>Grace Period Active</Text>
           <Text
             fw={700}
             size="xl"
-            c={data.tenantsInGracePeriod > 0 ? '#E5A100' : '#0D7C3E'}
+            c={data.tenantsInGracePeriod > 0 ? tokens.warning : tokens.success}
             mt={4}
           >
             {data.tenantsInGracePeriod}
           </Text>
         </Card>
-        <Card withBorder padding="lg" radius="md" bg="#292524">
+        <Card withBorder padding="lg" radius="md" bg={tokens.surface}>
           <Text c="dimmed" size="xs" tt="uppercase" fw={600}>Total DSAR Requests</Text>
-          <Text fw={700} size="xl" c="#fafaf9" mt={4}>{data.totalDsarRequests}</Text>
+          <Text fw={700} size="xl" c={tokens.textPrimary} mt={4}>{data.totalDsarRequests}</Text>
         </Card>
       </SimpleGrid>
 
       {/* PII adoption progress */}
-      <Paper withBorder radius="md" bg="#292524" p="md">
+      <Paper withBorder radius="md" bg={tokens.surface} p="md">
         <Group justify="space-between" mb="xs">
-          <Text size="sm" fw={500} c="#E0E0E0">PII Scrubbing Adoption</Text>
-          <Text size="sm" fw={600} c="#fafaf9">{piiAdoptionPct}%</Text>
+          <Text size="sm" fw={500} c={tokens.textSecondary}>PII Scrubbing Adoption</Text>
+          <Text size="sm" fw={600} c={tokens.textPrimary}>{piiAdoptionPct}%</Text>
         </Group>
         <Progress
           value={piiAdoptionPct}
@@ -142,7 +143,7 @@ export function ComplianceDashboardPage() {
       </Paper>
 
       {/* Compliance matrix table */}
-      <Paper withBorder radius="md" bg="#292524" style={{ overflow: 'auto' }}>
+      <Paper withBorder radius="md" bg={tokens.surface} style={{ overflow: 'auto' }}>
         <Table striped highlightOnHover>
           <Table.Thead>
             <Table.Tr>
@@ -168,10 +169,10 @@ export function ComplianceDashboardPage() {
                   style={t.gracePeriodActive ? { backgroundColor: 'rgba(229, 161, 0, 0.06)' } : undefined}
                 >
                   <Table.Td>
-                    <Text size="xs" ff="monospace" c="#E0E0E0">{t.tenantId}</Text>
+                    <Text size="xs" ff="monospace" c={tokens.textSecondary}>{t.tenantId}</Text>
                   </Table.Td>
                   <Table.Td>
-                    <Text size="xs" c="#A0A0A0">{t.tier ?? '\u2014'}</Text>
+                    <Text size="xs" c={tokens.textMuted}>{t.tier ?? '\u2014'}</Text>
                   </Table.Td>
                   <Table.Td>
                     {t.gracePeriodActive ? (
@@ -190,7 +191,7 @@ export function ComplianceDashboardPage() {
                     </Badge>
                   </Table.Td>
                   <Table.Td>
-                    <Text size="xs" fw={500} c="#E0E0E0">{t.dsarRequestCount}</Text>
+                    <Text size="xs" fw={500} c={tokens.textSecondary}>{t.dsarRequestCount}</Text>
                   </Table.Td>
                   <Table.Td>
                     <Text size="xs" c="dimmed">
@@ -208,7 +209,7 @@ export function ComplianceDashboardPage() {
 
       {/* Errors section */}
       {data.errors.length > 0 && (
-        <Paper withBorder radius="md" bg="#292524" p="md">
+        <Paper withBorder radius="md" bg={tokens.surface} p="md">
           <Group gap="xs" mb="sm">
             <Badge variant="filled" color="red" size="sm">
               {data.errors.length} Error{data.errors.length !== 1 ? 's' : ''}
@@ -217,8 +218,8 @@ export function ComplianceDashboardPage() {
           <Stack gap="xs">
             {data.errors.map((err, i) => (
               <Group key={i} gap="xs">
-                <Text size="xs" ff="monospace" c="#E5A100">{err.tenantId}</Text>
-                <Text size="xs" c="#A0A0A0">{err.message}</Text>
+                <Text size="xs" ff="monospace" c={tokens.warning}>{err.tenantId}</Text>
+                <Text size="xs" c={tokens.textMuted}>{err.message}</Text>
               </Group>
             ))}
           </Stack>
