@@ -15,7 +15,7 @@ This document provides active guidance for AI assistants working on the Agent Re
 |-----------|-------|
 | **Project Name** | Agent Red Customer Experience |
 | **Type** | Commercial SaaS Product (Shopify + Standalone) |
-| **Status** | Production v1.50.0 HEALTHY. ALL 14 CYCLES + SKIP Resolution + CSS Centralization DEPLOYED. 3,985 unit tests (0 failures), 56 regression (51 pass + 5 skip), 810 UI tests (770 PASS, 3 SOFT-PASS, 37 SKIP, 0 FAIL — verified S58). See `memory/build-deploy-roadmap.md`. |
+| **Status** | Production v1.51.1 HEALTHY. ALL 14 CYCLES + SKIP Resolution + CSS Centralization + SDK Fix DEPLOYED. 3,985 unit tests (0 failures), 56 regression (51 pass + 5 skip), 917 UI tests (793 PASS, 4 SOFT-PASS, 62 SKIP, 0 FAIL — verified S60), 25 conversation quality scenarios (CONDITIONAL PASS — S62). See `memory/build-deploy-roadmap.md`. |
 | **Owner** | Remaker Digital (DBA of VanDusen & Palmeter, LLC) |
 
 ### Copyright Notice
@@ -36,7 +36,7 @@ All new work in this repository must include:
 Continue work on Agent Red Customer Experience commercial project.
 Location: E:\Claude-Playground\CLAUDE-PROJECTS\Agent Red Customer Engagement
 Key files: CLAUDE.md, memory/MEMORY.md
-Current status: Production v1.50.0 HEALTHY. ALL 14 CYCLES + CSS Centralization DEPLOYED. 3,985 unit tests (0 failures). Next: [describe task].
+Current status: Production v1.51.1 HEALTHY. ALL 14 CYCLES + SDK Fix DEPLOYED. 3,985 unit tests, 25 CQ scenarios (CONDITIONAL PASS). Next: [describe task].
 ```
 
 ### Preferred Way of Working
@@ -131,7 +131,7 @@ Full plan: `memory/build-deploy-roadmap.md`
 
 ### Current Status — ALL 14 CYCLES DEPLOYED
 
-All cycles deployed to production. v1.48.0 is live (revision 0000034, session 46).
+All cycles deployed to production. v1.51.1 is live (revision 0000043, session 62).
 
 | Cycle | Version | Content | Status |
 |-------|---------|---------|--------|
@@ -139,6 +139,7 @@ All cycles deployed to production. v1.48.0 is live (revision 0000034, session 46
 | **6-8** | v1.42.0 | CI + Email + SPA Phase 1 + R10/R3 + Phase 2 backend | ✅ DEPLOYED (S39) |
 | **9** | v1.43.0 | SPA Phase 2 + HV-5/RB-4/RB-5 + UI quick wins | ✅ DEPLOYED (S41) |
 | **10-14** | v1.48.0 | UI polish, magic link, Provider Phase 3-4, features, coverage, quality | ✅ DEPLOYED (S46) |
+| **Post-14** | v1.49.2→v1.51.1 | SKIP resolution, CSS centralization, SDK fix, quality tests | ✅ DEPLOYED (S54-S62) |
 
 ### Owner/Designer Tasks (blocking Shopify submission)
 1. Screenshots (3-6 at 1600x900) — designer
@@ -157,4 +158,4 @@ All cycles deployed to production. v1.48.0 is live (revision 0000034, session 46
 
 *© 2026 Remaker Digital, a DBA of VanDusen & Palmeter, LLC. All rights reserved.*
 *Last Updated: 2026-02-19*
-*Version: 50.0.0*
+*Version: 51.1.0*

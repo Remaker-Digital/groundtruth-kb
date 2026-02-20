@@ -2,7 +2,7 @@
 #
 # Type: Repeatable Procedure (see docs/operations/REPEATABLE-PROCEDURES.md)
 # Last verified: 2026-02-13
-# Last corrected: 2026-02-14 — Added Repeatable Procedure header and known failure modes
+# Last corrected: 2026-02-19 — Added AZURE_KEYVAULT_URL and NATS_URL to env-vars (discovered S62)
 
 > Full-environment rebuild from scratch when the Azure subscription or infrastructure is
 > completely lost. Based on the actual recovery performed on 2026-02-13 (session 15)
@@ -266,6 +266,8 @@ az containerapp create `
         "SMTP_PORT=465" `
         "SMTP_USER=<SMTP_USER>" `
         "SMTP_PASSWORD=<SMTP_PASSWORD>" `
+        "AZURE_KEYVAULT_URL=https://kv-agentred-eastus.vault.azure.net/" `
+        "NATS_URL=<NATS_URL_IF_USING_AGENT_CONTAINERS>" `
         "ADMIN_RESET_EMAIL=<ADMIN_EMAIL>"
 ```
 

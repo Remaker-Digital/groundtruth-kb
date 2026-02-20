@@ -9,6 +9,54 @@ All notable changes to Agent Red Customer Experience are documented here.
 
 ---
 
+## v1.51.1 — 2026-02-19
+
+### Chat pipeline reliability
+- **AGNTCY SDK import resilience:** All imports from the agntcy-app-sdk package are now wrapped in try/except with local stub fallbacks. This prevents pipeline initialization failures when the SDK removes or renames exported classes (as occurred when SDK 0.5.x removed `BaseAgentProtocol`).
+- **Improved error diagnostics:** The lifecycle startup handler now logs exception tracebacks (`exc_info=True`), making root-cause analysis of pipeline initialization failures significantly faster.
+- **Environment variable fix:** Added `AZURE_KEYVAULT_URL` to the production container configuration, ensuring Key Vault access for secret resolution.
+
+### Conversation quality testing
+- **Live quality runner:** New `evaluation/run_quality_live.py` executes all 25 golden scenarios against production via SSE streaming, collecting response text, timing, escalation flags, and critic verdicts.
+- **First live execution:** 22/25 scenarios responded (3 jailbreak correctly blocked by Critic). Scores: Faithfulness 4.72/5.0, Relevancy 3.23/5.0, Tone 4.96/5.0, Overall 4.17/5.0. Verdict: CONDITIONAL PASS.
+
+---
+
+## v1.51.0 — 2026-02-19
+
+### UI improvements
+- **Contact Us feature:** New Contact Us page accessible from the admin navigation, providing support contact information and feedback form.
+- **Provider Console camelCase fix:** Six Provider Console pages corrected to use camelCase field names matching API response format.
+- **Data-binding verification (9th dimension):** Added data-binding correctness as a new test dimension across all 16 Provider Console pages.
+
+### Test expansion
+- 917 total UI tests (up from 810) — 802 standalone + 115 provider.
+- 793 PASS, 4 SOFT-PASS, 62 SKIP, 0 FAIL (verified S60).
+
+---
+
+## v1.50.0 — 2026-02-19
+
+### Design system centralization
+- **CSS custom properties:** New `tokens.css` file defines 30+ design tokens (colors, spacing, borders) as CSS custom properties, replacing hardcoded hex values.
+- **TypeScript token constants:** New `styles.ts` module exports typed token references for use in Mantine `sx` props and inline styles.
+- **57 files refactored:** Over 200 hardcoded dark-mode hex color values replaced with design token references across all three admin distributions (Shopify, Standalone, Provider).
+- **Stone neutral palette:** New warm-gray palette (Chrome #0c0a09, Page #1c1917, Surface #292524, Border #44403c) replaces generic dark grays.
+- **Zero regressions:** Full 810-test E2E verification confirmed no visual or functional regressions.
+
+---
+
+## v1.49.2 — 2026-02-19
+
+### SKIP resolution
+- **Avatar upload UI:** File upload zone for agent avatar with circular preview and remove button, integrated into the Widget Appearance page.
+- **Tier override endpoint:** Superadmin API endpoint for changing tenant tier without Stripe webhooks.
+- **Simulated customer tenant:** Automated 8-phase creation script (`create_test_tenant.py`) for test-customer-001 with 9 team members, 12 quick actions, 7 KB docs, 19 conversations.
+- **Provider Console null-safety:** Added `?? {}` null coalescing to 8 Provider Console pages to prevent crashes when backend returns null aggregate fields.
+- **UI test results:** 770 PASS, 3 SOFT-PASS, 37 SKIP, 0 FAIL (improved from 649/2/159/0).
+
+---
+
 ## v1.48.0 — 2026-02-18
 
 ### Conversation quality infrastructure
