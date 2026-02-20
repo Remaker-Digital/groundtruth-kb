@@ -1,6 +1,6 @@
 # Chrome-Automated Admin UI Test Procedure
 # Type: Repeatable Procedure (see docs/operations/REPEATABLE-PROCEDURES.md)
-# Last verified: 2026-02-19 (session 54) — full E2E pass: 770 PASS, 3 SOFT-PASS, 37 SKIP, 0 FAIL
+# Last verified: 2026-02-19 (session 58) — full E2E pass: 770 PASS, 3 SOFT-PASS, 37 SKIP, 0 FAIL (v1.50.0, CSS centralization verified)
 # Last corrected: 2026-02-19 (session 54) — added test-customer-001 variables, multi-tenant auth injection, tier override sub-procedure
 
 ---
