@@ -29,23 +29,23 @@ import { LoadingState } from '../../shared/LoadingState';
 import { tokens } from '../../shared/theme/styles';
 
 // ---------------------------------------------------------------------------
-// Types
+// Types (camelCase — matches CamelCaseModel API serialization)
 // ---------------------------------------------------------------------------
 
 interface TenantQueueInfo {
-  tenant_id: string;
-  stream_name: string;
+  tenantId: string;
+  streamName: string;
   messages: number;
   bytes: number;
-  consumer_count: number;
+  consumerCount: number;
 }
 
 interface QueueDepthResponse {
-  total_tenants: number;
-  total_messages: number;
-  total_bytes: number;
+  totalTenants: number;
+  totalMessages: number;
+  totalBytes: number;
   tenants: TenantQueueInfo[];
-  errors: Array<{ tenant_id: string; message: string }>;
+  errors: Array<{ tenantId: string; message: string }>;
 }
 
 // ---------------------------------------------------------------------------
@@ -121,22 +121,22 @@ export function QueueHealthPage() {
       <SimpleGrid cols={{ base: 1, sm: 3 }} spacing="md">
         <Card withBorder padding="lg" radius="md" bg={tokens.surface}>
           <Text c="dimmed" size="xs" tt="uppercase" fw={600}>Total Tenants</Text>
-          <Text fw={700} size="xl" c={tokens.textPrimary} mt={4}>{data.total_tenants}</Text>
+          <Text fw={700} size="xl" c={tokens.textPrimary} mt={4}>{data.totalTenants}</Text>
         </Card>
         <Card withBorder padding="lg" radius="md" bg={tokens.surface}>
           <Text c="dimmed" size="xs" tt="uppercase" fw={600}>Total Messages</Text>
           <Text
             fw={700}
             size="xl"
-            c={data.total_messages > 1000 ? tokens.danger : data.total_messages > 100 ? tokens.warning : tokens.success}
+            c={data.totalMessages > 1000 ? tokens.danger : data.totalMessages > 100 ? tokens.warning : tokens.success}
             mt={4}
           >
-            {data.total_messages.toLocaleString()}
+            {data.totalMessages.toLocaleString()}
           </Text>
         </Card>
         <Card withBorder padding="lg" radius="md" bg={tokens.surface}>
           <Text c="dimmed" size="xs" tt="uppercase" fw={600}>Total Bytes</Text>
-          <Text fw={700} size="xl" c={tokens.textPrimary} mt={4}>{formatBytes(data.total_bytes)}</Text>
+          <Text fw={700} size="xl" c={tokens.textPrimary} mt={4}>{formatBytes(data.totalBytes)}</Text>
         </Card>
       </SimpleGrid>
 
@@ -162,12 +162,12 @@ export function QueueHealthPage() {
               </Table.Tr>
             ) : (
               data.tenants.map((t) => (
-                <Table.Tr key={t.tenant_id}>
+                <Table.Tr key={t.tenantId}>
                   <Table.Td>
-                    <Text size="xs" ff="monospace" c={tokens.textSecondary}>{t.tenant_id}</Text>
+                    <Text size="xs" ff="monospace" style={{ color: tokens.textPrimary }}>{t.tenantId}</Text>
                   </Table.Td>
                   <Table.Td>
-                    <Text size="xs" ff="monospace" c={tokens.textMuted}>{t.stream_name}</Text>
+                    <Text size="xs" ff="monospace" c={tokens.textMuted}>{t.streamName}</Text>
                   </Table.Td>
                   <Table.Td>
                     <Text size="xs" fw={500} c={tokens.textSecondary}>
@@ -178,7 +178,7 @@ export function QueueHealthPage() {
                     <Text size="xs" c={tokens.textMuted}>{formatBytes(t.bytes)}</Text>
                   </Table.Td>
                   <Table.Td>
-                    <Text size="xs" c={tokens.textMuted}>{t.consumer_count}</Text>
+                    <Text size="xs" c={tokens.textMuted}>{t.consumerCount}</Text>
                   </Table.Td>
                   <Table.Td>
                     <Badge
@@ -213,7 +213,7 @@ export function QueueHealthPage() {
             <Stack gap="xs" mt="sm">
               {data.errors.map((err, i) => (
                 <Group key={i} gap="xs">
-                  <Text size="xs" ff="monospace" c={tokens.warning}>{err.tenant_id}</Text>
+                  <Text size="xs" ff="monospace" c={tokens.warning}>{err.tenantId}</Text>
                   <Text size="xs" c={tokens.textMuted}>{err.message}</Text>
                 </Group>
               ))}

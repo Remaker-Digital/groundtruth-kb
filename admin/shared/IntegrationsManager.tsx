@@ -316,7 +316,7 @@ const IntegrationCard: React.FC<IntegrationCardProps & {
           ) : integration.enabled ? (
             <>
               <HoverButton
-                variant="outline"
+                variant="danger"
                 onClick={() => onDeactivate(integration.type)}
                 disabled={deactivating}
               >
@@ -349,7 +349,7 @@ const IntegrationCard: React.FC<IntegrationCardProps & {
             </>
           ) : (
             <HoverButton
-              variant="success"
+              variant="primary"
               onClick={() => onActivate(integration.type)}
               disabled={activating}
             >

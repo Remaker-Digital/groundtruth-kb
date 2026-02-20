@@ -177,14 +177,9 @@ export function makeStyles(p: ThemePalette, dark: boolean = false): TeamStyles {
       padding: '8px 20px',
       fontSize: 14,
       fontWeight: 600,
-      background: tokens.action,
-      color: tokens.white,
-      border: 'none',
       borderRadius: 6,
-      cursor: 'pointer',
       whiteSpace: 'nowrap' as const,
       height: 38,
-      transition: `background ${tokens.transitionFast}`,
     } as React.CSSProperties,
 
     inviteButtonDisabled: {

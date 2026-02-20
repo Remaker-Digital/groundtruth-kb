@@ -29,32 +29,32 @@ import { HelpTooltip } from '../../shared/HelpTooltip';
 import { tokens } from '../../shared/theme/styles';
 
 // ---------------------------------------------------------------------------
-// Types
+// Types (camelCase — matches CamelCaseModel API serialization)
 // ---------------------------------------------------------------------------
 
 interface DashboardData {
   timestamp: string;
-  system_health: {
+  systemHealth: {
     nats: { connected: boolean };
-    circuit_breakers: Record<string, unknown>;
-    key_vault: { healthy: boolean };
+    circuitBreakers: Record<string, unknown>;
+    keyVault: { healthy: boolean };
     version: { api: string; product: string };
   } | null;
-  tenant_summary: {
-    total_tenants: number;
-    by_status: Record<string, number>;
-    by_tier: Record<string, number>;
-    by_billing_channel: Record<string, number>;
+  tenantSummary: {
+    totalTenants: number;
+    byStatus: Record<string, number>;
+    byTier: Record<string, number>;
+    byBillingChannel: Record<string, number>;
   } | null;
-  sla_summary: Record<string, unknown>;
-  usage_summary: Record<string, unknown>;
-  recent_deployments: Array<{
-    event_type: string;
+  slaSummary: Record<string, unknown>;
+  usageSummary: Record<string, unknown>;
+  recentDeployments: Array<{
+    eventType: string;
     timestamp: string;
     actor: string;
     payload: Record<string, unknown>;
   }>;
-  recent_alerts: unknown[];
+  recentAlerts: unknown[];
 }
 
 // ---------------------------------------------------------------------------
@@ -99,8 +99,8 @@ export function HealthDashboardPage() {
     );
   }
 
-  const health = data.system_health;
-  const tenants = data.tenant_summary;
+  const health = data.systemHealth;
+  const tenants = data.tenantSummary;
 
   return (
     <Stack gap="lg">
@@ -120,8 +120,8 @@ export function HealthDashboardPage() {
         />
         <HealthCard
           label="Key Vault"
-          status={health?.key_vault?.healthy ? 'healthy' : 'degraded'}
-          detail={health?.key_vault?.healthy ? 'Healthy' : 'Degraded'}
+          status={health?.keyVault?.healthy ? 'healthy' : 'degraded'}
+          detail={health?.keyVault?.healthy ? 'Healthy' : 'Degraded'}
         />
         <HealthCard
           label="API Version"
@@ -130,8 +130,8 @@ export function HealthDashboardPage() {
         />
         <HealthCard
           label="Circuit Breakers"
-          status={health?.circuit_breakers ? 'healthy' : 'unknown'}
-          detail={health?.circuit_breakers ? 'Operational' : 'Unknown'}
+          status={health?.circuitBreakers ? 'healthy' : 'unknown'}
+          detail={health?.circuitBreakers ? 'Operational' : 'Unknown'}
         />
       </SimpleGrid>
 
@@ -143,14 +143,14 @@ export function HealthDashboardPage() {
             <Grid.Col span={{ base: 12, md: 4 }}>
               <Card withBorder padding="lg" radius="md" bg={tokens.surface}>
                 <Text c="dimmed" size="xs" tt="uppercase" fw={600}>Total Tenants</Text>
-                <Text fw={700} size="xl" c={tokens.textPrimary} mt={4}>{tenants.total_tenants}</Text>
+                <Text fw={700} size="xl" c={tokens.textPrimary} mt={4}>{tenants.totalTenants}</Text>
               </Card>
             </Grid.Col>
             <Grid.Col span={{ base: 12, md: 4 }}>
               <Card withBorder padding="lg" radius="md" bg={tokens.surface}>
                 <Text c="dimmed" size="xs" tt="uppercase" fw={600}>By Status</Text>
                 <Group gap="xs" mt="sm">
-                  {Object.entries(tenants?.by_status ?? {}).map(([k, v]) => (
+                  {Object.entries(tenants?.byStatus ?? {}).map(([k, v]) => (
                     <Badge key={k} variant="light" color={k === 'active' ? 'green' : 'gray'} size="sm">
                       {k}: {v}
                     </Badge>
@@ -162,7 +162,7 @@ export function HealthDashboardPage() {
               <Card withBorder padding="lg" radius="md" bg={tokens.surface}>
                 <Text c="dimmed" size="xs" tt="uppercase" fw={600}>By Tier</Text>
                 <Group gap="xs" mt="sm">
-                  {Object.entries(tenants?.by_tier ?? {}).map(([k, v]) => (
+                  {Object.entries(tenants?.byTier ?? {}).map(([k, v]) => (
                     <Badge key={k} variant="light" color="blue" size="sm">
                       {k}: {v}
                     </Badge>
@@ -175,20 +175,20 @@ export function HealthDashboardPage() {
       )}
 
       {/* Recent Deployments */}
-      {(data.recent_deployments?.length ?? 0) > 0 && (
+      {(data.recentDeployments?.length ?? 0) > 0 && (
         <>
           <Title order={4} c={tokens.textSecondary}>Recent Deployments</Title>
           <Paper withBorder p="md" radius="md" bg={tokens.surface}>
             <Stack gap="xs">
-              {data.recent_deployments.map((evt, i) => (
+              {data.recentDeployments.map((evt, i) => (
                 <Group key={i} justify="space-between">
                   <Group gap="xs">
                     <Badge
                       variant="light"
-                      color={evt.event_type === 'MODEL_DEPLOYED' ? 'green' : 'orange'}
+                      color={evt.eventType === 'MODEL_DEPLOYED' ? 'green' : 'orange'}
                       size="sm"
                     >
-                      {evt.event_type === 'MODEL_DEPLOYED' ? 'Deploy' : 'Rollback'}
+                      {evt.eventType === 'MODEL_DEPLOYED' ? 'Deploy' : 'Rollback'}
                     </Badge>
                     <Text size="sm" c={tokens.textSecondary}>
                       {evt.actor || 'system'}

@@ -541,7 +541,7 @@ export function InboxPage() {
       {/* ================================================================= */}
       <Box
         style={{
-          width: 280,
+          width: 320,
           flexShrink: 0,
           display: 'flex',
           flexDirection: 'column',
@@ -873,7 +873,7 @@ export function InboxPage() {
       {/* ================================================================= */}
       <Box
         style={{
-          width: 320,
+          width: 280,
           flexShrink: 0,
           display: 'flex',
           flexDirection: 'column',

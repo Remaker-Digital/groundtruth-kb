@@ -34,23 +34,23 @@ import { tokens } from '../../shared/theme/styles';
 // ---------------------------------------------------------------------------
 
 interface TenantSummary {
-  total_tenants: number;
-  by_status: Record<string, number>;
-  by_tier: Record<string, number>;
-  by_billing_channel: Record<string, number>;
+  totalTenants: number;
+  byStatus: Record<string, number>;
+  byTier: Record<string, number>;
+  byBillingChannel: Record<string, number>;
 }
 
 interface TenantItem {
-  tenant_id: string;
+  tenantId: string;
   status: string;
   tier: string | null;
-  billing_channel: string | null;
-  customer_email: string | null;
-  shopify_shop_domain: string | null;
-  created_at: string | null;
-  updated_at: string | null;
-  deactivated_at: string | null;
-  consent_status: string | null;
+  billingChannel: string | null;
+  customerEmail: string | null;
+  shopifyShopDomain: string | null;
+  createdAt: string | null;
+  updatedAt: string | null;
+  deactivatedAt: string | null;
+  consentStatus: string | null;
 }
 
 interface TenantListResponse {
@@ -155,9 +155,9 @@ export function TenantDirectoryPage() {
         <SimpleGrid cols={{ base: 1, sm: 2, md: 4 }} spacing="md">
           <Card withBorder padding="lg" radius="md" bg={tokens.surface}>
             <Text c="dimmed" size="xs" tt="uppercase" fw={600}>Total Tenants</Text>
-            <Text fw={700} size="xl" c={tokens.textPrimary} mt={4}>{summary.total_tenants}</Text>
+            <Text fw={700} size="xl" c={tokens.textPrimary} mt={4}>{summary.totalTenants}</Text>
           </Card>
-          {Object.entries(summary.by_status ?? {}).map(([status, count]) => (
+          {Object.entries(summary.byStatus ?? {}).map(([status, count]) => (
             <Card key={status} withBorder padding="lg" radius="md" bg={tokens.surface}>
               <Text c="dimmed" size="xs" tt="uppercase" fw={600}>{status}</Text>
               <Text fw={700} size="xl" c={tokens.textPrimary} mt={4}>{count}</Text>
@@ -175,7 +175,7 @@ export function TenantDirectoryPage() {
             clearable
             value={statusFilter}
             onChange={setStatusFilter}
-            data={summary ? Object.keys(summary.by_status ?? {}).map(s => ({ value: s, label: s })) : []}
+            data={summary ? Object.keys(summary.byStatus ?? {}).map(s => ({ value: s, label: s })) : []}
             size="sm"
             w={180}
           />
@@ -185,7 +185,7 @@ export function TenantDirectoryPage() {
             clearable
             value={tierFilter}
             onChange={setTierFilter}
-            data={summary ? Object.keys(summary.by_tier ?? {}).map(t => ({ value: t, label: t })) : []}
+            data={summary ? Object.keys(summary.byTier ?? {}).map(t => ({ value: t, label: t })) : []}
             size="sm"
             w={180}
           />
@@ -195,7 +195,7 @@ export function TenantDirectoryPage() {
             clearable
             value={channelFilter}
             onChange={setChannelFilter}
-            data={summary ? Object.keys(summary.by_billing_channel ?? {}).map(c => ({ value: c, label: c })) : []}
+            data={summary ? Object.keys(summary.byBillingChannel ?? {}).map(c => ({ value: c, label: c })) : []}
             size="sm"
             w={180}
           />
@@ -231,9 +231,9 @@ export function TenantDirectoryPage() {
                 </Table.Tr>
               ) : (
                 tenants.map((t) => (
-                  <Table.Tr key={t.tenant_id}>
+                  <Table.Tr key={t.tenantId}>
                     <Table.Td>
-                      <Text size="xs" ff="monospace" c={tokens.textSecondary}>{t.tenant_id}</Text>
+                      <Text size="xs" ff="monospace" style={{ color: tokens.textPrimary }}>{t.tenantId}</Text>
                     </Table.Td>
                     <Table.Td>
                       <Badge
@@ -254,17 +254,17 @@ export function TenantDirectoryPage() {
                       )}
                     </Table.Td>
                     <Table.Td>
-                      <Text size="xs" c={tokens.textMuted}>{t.billing_channel ?? '—'}</Text>
+                      <Text size="xs" c={tokens.textMuted}>{t.billingChannel ?? '—'}</Text>
                     </Table.Td>
                     <Table.Td>
-                      <Text size="xs" c={tokens.textMuted}>{t.customer_email ?? '—'}</Text>
+                      <Text size="xs" c={tokens.textMuted}>{t.customerEmail ?? '—'}</Text>
                     </Table.Td>
                     <Table.Td>
-                      <Text size="xs" c={tokens.textMuted}>{t.shopify_shop_domain ?? '—'}</Text>
+                      <Text size="xs" c={tokens.textMuted}>{t.shopifyShopDomain ?? '—'}</Text>
                     </Table.Td>
                     <Table.Td>
                       <Text size="xs" c="dimmed">
-                        {t.created_at ? new Date(t.created_at).toLocaleDateString() : '—'}
+                        {t.createdAt ? new Date(t.createdAt).toLocaleDateString() : '—'}
                       </Text>
                     </Table.Td>
                   </Table.Tr>

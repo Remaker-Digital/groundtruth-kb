@@ -241,6 +241,13 @@ const Email: React.FC<IconProps> = (props) => (
   </svg>
 );
 
+/** Message bubble — Contact us / Send message */
+const Contact: React.FC<IconProps> = (props) => (
+  <svg {...svgAttrs(props)}>
+    <path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z" />
+  </svg>
+);
+
 // ---------------------------------------------------------------------------
 // Utility icons (dark mode toggle, etc.)
 // ---------------------------------------------------------------------------
@@ -305,6 +312,7 @@ export const Icons = {
   cost: Billing, // Alias — same billing icon for cost analytics
   abuse: Alerts, // Alias — same alert icon for abuse detection
   email: Email,
+  contact: Contact,
 
   // Utility
   sun: Sun,

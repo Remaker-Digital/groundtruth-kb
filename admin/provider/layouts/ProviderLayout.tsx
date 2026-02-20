@@ -179,11 +179,11 @@ export function ProviderLayout({ apiKey, onLogout, children }: ProviderLayoutPro
               <Burger opened={opened} onClick={toggle} hiddenFrom="sm" size="sm" color={tokens.textPrimary} />
               <img
                 src="/admin/provider/primary-logo-no-wordmark.svg"
-                alt="Agent Red"
+                alt=""
                 style={{ height: '28px' }}
               />
               <Text fw={600} size="sm" c={tokens.textPrimary}>
-                Provider Console
+                Service Provider Console
               </Text>
               {productVersion && (
                 <Badge variant="outline" color="gray" size="xs" radius="sm">

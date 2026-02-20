@@ -151,7 +151,7 @@ Run after Page 0A (system is now re-activated with brand_name + brand_voice set)
 
 ### Page 1: Dashboard
 
-> Every element tested for presence, correct value, input manipulation, valid population, state change, control activation, input validation, and disposition variants per the 8-dimension verification standard.
+> Every element tested for presence, correct value, input manipulation, valid population, state change, control activation, input validation, and disposition variants per the 9-dimension verification standard (incl. data-binding correctness).
 
 #### 1.1 Metric stat cards
 
@@ -267,7 +267,7 @@ Run after Page 0A (system is now re-activated with brand_name + brand_voice set)
 
 ### Page 2: Inbox
 
-> Every element tested for presence, correct value, input manipulation, valid population, state change, control activation, input validation, and disposition variants per the 8-dimension verification standard.
+> Every element tested for presence, correct value, input manipulation, valid population, state change, control activation, input validation, and disposition variants per the 9-dimension verification standard (incl. data-binding correctness).
 >
 > Tests 2.4–2.18 require conversation data — SKIP if tenant has 0 conversations.
 
@@ -628,7 +628,7 @@ Run after Page 0A (system is now re-activated with brand_name + brand_voice set)
 
 ### Page 5: Knowledge Base
 
-> Every element tested for presence, correct value, input manipulation, valid population, state change, control activation, input validation, and disposition variants per the 8-dimension verification standard.
+> Every element tested for presence, correct value, input manipulation, valid population, state change, control activation, input validation, and disposition variants per the 9-dimension verification standard (incl. data-binding correctness).
 
 #### 5.1 Summary stat cards
 
@@ -766,7 +766,7 @@ Run after Page 0A (system is now re-activated with brand_name + brand_voice set)
 
 ### Page 6: Quick Actions
 
-> Every element tested for presence, correct value, input manipulation, valid population, state change, control activation, input validation, and disposition variants per the 8-dimension verification standard.
+> Every element tested for presence, correct value, input manipulation, valid population, state change, control activation, input validation, and disposition variants per the 9-dimension verification standard (incl. data-binding correctness).
 
 #### 6.1 Tab navigation and page header
 
@@ -869,7 +869,7 @@ Run after Page 0A (system is now re-activated with brand_name + brand_voice set)
 
 ### Page 7: Widget Configuration
 
-> Every element tested for presence, correct value, input manipulation, valid population, state change, control activation, input validation, and disposition variants per the 8-dimension verification standard.
+> Every element tested for presence, correct value, input manipulation, valid population, state change, control activation, input validation, and disposition variants per the 9-dimension verification standard (incl. data-binding correctness).
 
 #### 7.1 Live preview
 
@@ -1109,7 +1109,7 @@ Run after Page 0A (system is now re-activated with brand_name + brand_voice set)
 
 ### Page 9: Memory & Privacy
 
-> Every element tested for presence, correct value, input manipulation, valid population, state change, control activation, input validation, and disposition variants per the 8-dimension verification standard.
+> Every element tested for presence, correct value, input manipulation, valid population, state change, control activation, input validation, and disposition variants per the 9-dimension verification standard (incl. data-binding correctness).
 
 #### 9.1 Page header and upgrade banner
 

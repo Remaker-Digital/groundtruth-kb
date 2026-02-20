@@ -1,7 +1,7 @@
 # Chrome-Automated Admin UI Test Procedure
 # Type: Repeatable Procedure (see docs/operations/REPEATABLE-PROCEDURES.md)
 # Last verified: 2026-02-19 (session 58) — full E2E pass: 770 PASS, 3 SOFT-PASS, 37 SKIP, 0 FAIL (v1.50.0, CSS centralization verified)
-# Last corrected: 2026-02-19 (session 54) — added test-customer-001 variables, multi-tenant auth injection, tier override sub-procedure
+# Last corrected: 2026-02-19 (session 59) — added data-binding verification layer (9th dimension), logo/image assertions, Contact Us tests, Provider Console data-population tests
 
 ---
 
@@ -9,7 +9,8 @@
 
 Chrome MCP-automated replacement for the manual `ui-test-procedure.md`. Uses Chrome
 browser automation tools to navigate pages, verify DOM elements, check console errors,
-and capture screenshots.
+capture screenshots, and verify data-binding correctness (API response fields populate
+into visible UI elements with expected values).
 
 **Authoritative test definitions:** `docs/operations/ui-test-procedure.md` remains the
 authoritative source for test IDs, expected results, the defect log, and the activation
@@ -165,7 +166,7 @@ STEP T.RESTORE: Restore tier to starter after testing
 
 ---
 
-## Test Execution — Standalone Admin (Pages 0–10)
+## Test Execution — Standalone Admin (Pages H, 0–10)
 
 Each test references its ID from `ui-test-procedure.md`. The Chrome MCP verification
 approach is described for each group.
@@ -178,6 +179,47 @@ approach is described for each group.
 4. `read_page(tabId)` or `find(query, tabId)` — verify expected DOM elements
 5. `computer(action:'screenshot')` — capture visual state
 6. Record each test ID as PASS / FAIL / SKIP with notes
+
+### Page H: Header, Logo, and Contact Us (22 tests)
+
+Verify the shared header bar, logo, action icons, and Contact Us feature. Auth injection must be performed first (Steps A.1–A.4). Navigate to any authenticated page (e.g., `$STANDALONE_URL`).
+
+#### H.1 Logo and branding (6 tests)
+
+| Test ID | Chrome MCP Verification |
+|---------|------------------------|
+| H.1a | **Logo image rendered** — `javascript_tool(tabId, "document.querySelector('img[src*=primary-logo]')?.naturalWidth > 0")` — logo image loaded successfully (naturalWidth > 0 confirms it didn't 404) |
+| H.1b | **Logo image source** — `javascript_tool(tabId, "document.querySelector('img[src*=primary-logo]')?.src")` — src contains "primary-logo-no-wordmark.svg" |
+| H.1c | **Logo alt text** — `javascript_tool(tabId, "document.querySelector('img[src*=primary-logo]')?.alt")` — alt is "Agent Red" (brand identification) |
+| H.1d | **Branding text** — `find("Customer Experience", tabId)` — header shows "Customer Experience" text next to logo |
+| H.1e | **Logo dimensions** — `javascript_tool(tabId, "document.querySelector('img[src*=primary-logo]')?.offsetHeight")` — logo renders at expected height (~28px, not 0 or broken) |
+| H.1f | **No duplicate logos** — `javascript_tool(tabId, "document.querySelectorAll('img[src*=logo]').length")` — exactly 1 logo image in header (no sidebar logo — removed session 59) |
+
+#### H.2 Header action icons (6 tests)
+
+| Test ID | Chrome MCP Verification |
+|---------|------------------------|
+| H.2a | **Documentation icon** — `find("Documentation", tabId)` via hover tooltip, or `javascript_tool(tabId, "document.querySelector('[aria-label=\"Open documentation\"]') !== null")` — docs action icon present |
+| H.2b | **Contact Us icon** — `javascript_tool(tabId, "document.querySelector('[aria-label=\"Contact us\"]') !== null")` — contact us action icon present |
+| H.2c | **Dark mode toggle** — `javascript_tool(tabId, "document.querySelector('[aria-label=\"Toggle dark mode\"]') !== null")` — dark mode toggle present |
+| H.2d | **Sign out icon** — `javascript_tool(tabId, "document.querySelector('[aria-label=\"Sign out\"]') !== null")` — sign out action icon present |
+| H.2e | **Icon order** — `javascript_tool(tabId, "[...document.querySelectorAll('header [aria-label]')].map(e => e.getAttribute('aria-label')).join(', ')")` — icons appear in order: "Open documentation", "Contact us", "Toggle dark mode", "Sign out" |
+| H.2f | **Tier badge** — `find("Professional", tabId)` or `find("Starter", tabId)` — tier badge visible in header with recognized tier name |
+
+#### H.3 Contact Us modal (10 tests)
+
+| Test ID | Chrome MCP Verification |
+|---------|------------------------|
+| H.3a | Click Contact Us icon → `find("Contact us", tabId)` — modal opens with "Contact us" heading |
+| H.3b | **Topic dropdown** — `find("Topic", tabId)` → click select → `javascript_tool(tabId, "document.querySelectorAll('[role=option]').length")` — dropdown has 5 options (Support, Feature request, Billing, Bug report, General) |
+| H.3c | **Topic options populated** — `find("Support", tabId)`, `find("Feature request", tabId)`, `find("Bug report", tabId)` — at least 3 recognized topic options visible in dropdown |
+| H.3d | **Subject field** — `find("Subject", tabId)` — text input present with max length 200 |
+| H.3e | **Message field** — `find("Message", tabId)` — textarea present with max length 5000 |
+| H.3f | **Cancel button** — `find("Cancel", tabId)` — Cancel button present in modal footer |
+| H.3g | **Send button** — `find("Send message", tabId)` — Send message button present with blue (action) styling |
+| H.3h | **Cancel closes modal** — Click Cancel → modal closes; Contact Us icon still present |
+| H.3i | **Empty form validation** — Click Send message with empty subject/message → validation prevents submission (button stays enabled but form does not submit) |
+| H.3j | **Topic default value** — `javascript_tool(tabId, "document.querySelector('select, [role=combobox]')?.textContent")` — topic defaults to "Support" |
 
 ### Page 0: Initial Provisioned State (20 tests)
 
@@ -387,7 +429,9 @@ Navigate to `$STANDALONE_URL` (root = Dashboard).
 
 Navigate to `$STANDALONE_URL/inbox`.
 
-> Every element tested for presence, correct value, input manipulation, valid population, state change, control activation, input validation, and disposition variants per the 8-dimension verification standard.
+> Every element tested for presence, correct value, input manipulation, valid population, state change, control activation, input validation, disposition variants, and **data-binding correctness** per the 9-dimension verification standard.
+>
+> **9th dimension — data-binding correctness:** API response fields populate visible UI elements with expected value types (numbers, dates, emails, recognized enum strings). Fields must not render as "undefined", empty, or "NaN". Logo/brand images must load successfully (naturalWidth > 0). Select/filter dropdowns must have populated options.
 >
 > Tests 2.4–2.18 require conversation data — SKIP if tenant has 0 conversations.
 
@@ -522,7 +566,7 @@ Navigate to `$STANDALONE_URL/inbox`.
 
 Navigate to `$STANDALONE_URL/team`.
 
-> Every element tested for presence, correct value, input manipulation, valid population, state change, control activation, input validation, and disposition variants per the 8-dimension verification standard.
+> Every element tested for presence, correct value, input manipulation, valid population, state change, control activation, input validation, and disposition variants per the 9-dimension verification standard.
 
 #### 3.1 Page header and loading states (5 tests)
 
@@ -748,7 +792,7 @@ Navigate to `$STANDALONE_URL/configuration`.
 
 Navigate to `$STANDALONE_URL/knowledge-base`.
 
-> Every element tested for presence, correct value, input manipulation, valid population, state change, control activation, input validation, and disposition variants per the 8-dimension verification standard.
+> Every element tested for presence, correct value, input manipulation, valid population, state change, control activation, input validation, and disposition variants per the 9-dimension verification standard.
 
 #### 5.1 Summary stat cards (10 tests)
 
@@ -886,7 +930,7 @@ Navigate to `$STANDALONE_URL/knowledge-base`.
 
 Navigate to `$STANDALONE_URL/quick-actions`.
 
-> Every element tested for presence, correct value, input manipulation, valid population, state change, control activation, input validation, and disposition variants per the 8-dimension verification standard.
+> Every element tested for presence, correct value, input manipulation, valid population, state change, control activation, input validation, and disposition variants per the 9-dimension verification standard.
 
 #### 6.1 Tab navigation and page header (5 tests)
 
@@ -989,7 +1033,7 @@ Navigate to `$STANDALONE_URL/quick-actions`.
 
 Navigate to `$STANDALONE_URL/widget`.
 
-> Every element tested for presence, correct value, input manipulation, valid population, state change, control activation, input validation, and disposition variants per the 8-dimension verification standard.
+> Every element tested for presence, correct value, input manipulation, valid population, state change, control activation, input validation, and disposition variants per the 9-dimension verification standard.
 
 #### 7.1 Live preview (12 tests)
 
@@ -1168,7 +1212,7 @@ Navigate to `$STANDALONE_URL/widget`.
 
 Navigate to `$STANDALONE_URL/integrations`.
 
-> Every element tested for presence, correct value, input manipulation, valid population, state change, control activation, input validation, and disposition variants per the 8-dimension verification standard.
+> Every element tested for presence, correct value, input manipulation, valid population, state change, control activation, input validation, and disposition variants per the 9-dimension verification standard.
 
 #### 8.1 Page header and loading states (5 tests)
 
@@ -1231,7 +1275,7 @@ Navigate to `$STANDALONE_URL/integrations`.
 
 Navigate to `$STANDALONE_URL/memory-privacy`.
 
-> Every element tested for presence, correct value, input manipulation, valid population, state change, control activation, input validation, and disposition variants per the 8-dimension verification standard.
+> Every element tested for presence, correct value, input manipulation, valid population, state change, control activation, input validation, and disposition variants per the 9-dimension verification standard.
 
 #### 9.1 Page header and upgrade banner (3 tests)
 
@@ -1340,7 +1384,7 @@ Navigate to `$STANDALONE_URL/memory-privacy`.
 
 Navigate to `$STANDALONE_URL/billing`.
 
-> Every element tested for presence, correct value, input manipulation, valid population, state change, control activation, input validation, and disposition variants per the 8-dimension verification standard.
+> Every element tested for presence, correct value, input manipulation, valid population, state change, control activation, input validation, and disposition variants per the 9-dimension verification standard.
 
 #### 10.1 Page header and error states (5 tests)
 
@@ -1461,12 +1505,12 @@ Navigate to `$STANDALONE_URL/billing`.
 
 ---
 
-## Test Execution — SPA Provider Console (30 tests)
+## Test Execution — SPA Provider Console (115 tests)
 
 After completing Standalone Admin tests, inject SPA auth (Steps B.1–B.4) and verify
 each Provider Console page loads and renders its primary content.
 
-> Provider Console tests verify presence, no-error rendering, and correct navigation group structure. Pages are read-only dashboards — input/state-change dimensions are not applicable.
+> Provider Console tests verify presence, no-error rendering, correct navigation group structure, **data-binding correctness** (API response fields populate visible UI elements), **dropdown operability** (filter selects have populated options), **data value visibility** (tenant IDs, emails, dates, status values render with expected types), and **logo/branding integrity**. Pages are read-only dashboards — input manipulation and state-change dimensions are not applicable.
 
 #### P.0 Provider auth and navigation (5 tests)
 
@@ -1476,50 +1520,237 @@ each Provider Console page loads and renders its primary content.
 | P.0b | Sidebar navigation groups: `find("Overview", tabId)`, `find("Operations", tabId)`, `find("Compliance", tabId)` or `find("Security", tabId)`, `find("Account", tabId)` — 4 nav groups |
 | P.0c | Sidebar nav items: at least 13 navigation links present via `read_page(tabId, { filter: 'interactive' })` |
 | P.0d | `read_console_messages(onlyErrors:true)` — zero console errors on initial load |
-| P.0e | Provider header shows "Provider Console" or SPA branding — not tenant admin branding |
+| P.0e | Provider header shows "Service Provider Console" text — not tenant admin branding |
 
-#### P.1–P.15 Page rendering (15 tests)
+#### P.1 Health Dashboard (8 tests)
 
-| Test ID | Page | Route | Chrome MCP Verification |
-|---------|------|-------|------------------------|
-| P.1 | Health Dashboard | `/` | `find("Health", tabId)` — dashboard renders with system status indicators |
-| P.2 | Tenant Directory | `/tenants` | `find("Tenant", tabId)` or `find("remaker-digital", tabId)` — tenant list renders |
-| P.3 | Deployment History | `/deployments` | `find("Deployment", tabId)` or `find("deployment", tabId)` — page renders |
-| P.4 | Queue Health | `/queues` | `find("Queue", tabId)` or `find("queue", tabId)` — page renders |
-| P.5 | Integration Health | `/integrations` | Page renders with integration status content |
-| P.6 | Status Page | `/status` | `find("Status", tabId)` — page management renders |
-| P.7 | Alert Configuration | `/alerts` | `find("Alert", tabId)` or `find("alert", tabId)` — page renders |
-| P.8 | Support Diagnostics | `/diagnostics` | `find("Diagnostic", tabId)` or `find("diagnostic", tabId)` — page renders |
-| P.9 | Compliance Dashboard | `/compliance` | `find("Compliance", tabId)` or `find("compliance", tabId)` — page renders |
-| P.10 | Secret Posture | `/secrets` | `find("Secret", tabId)` or `find("secret", tabId)` — page renders |
-| P.11 | Billing Health | `/billing` | Page renders with billing health content |
-| P.12 | Cost Analytics | `/costs` | `find("Cost", tabId)` or `find("cost", tabId)` — page renders |
-| P.13 | SLA Trends | `/sla` | `find("SLA", tabId)` or `find("sla", tabId)` — page renders |
-| P.14 | Abuse Detection | `/abuse` | `find("Abuse", tabId)` or `find("abuse", tabId)` — page renders |
-| P.15 | MFA Settings | `/mfa` | `find("MFA", tabId)` or `find("Multi-factor", tabId)` — page renders |
-
-#### P.16 Cross-page verification (10 tests)
+Navigate to `$PROVIDER_URL/`.
 
 | Test ID | Chrome MCP Verification |
 |---------|------------------------|
-| P.16a | Each P.1–P.15 page: `read_console_messages(onlyErrors:true)` after navigation — zero errors |
-| P.16b | Each page transition: `computer(action:'screenshot')` — capture visual state for regression comparison |
-| P.16c | P.1 Health Dashboard: data table or status indicators render with numeric values (not empty) |
-| P.16d | P.2 Tenant Directory: tenant list shows at least 1 tenant row (remaker-digital-001) |
-| P.16e | P.7 Alert Configuration: alert rules list or configuration form renders |
-| P.16f | P.9 Compliance Dashboard: compliance assessment results or checklist renders |
-| P.16g | P.10 Secret Posture: secret status indicators or expiry warnings render |
-| P.16h | P.13 SLA Trends: chart or metrics render (not empty state) |
-| P.16i | P.15 MFA Settings: MFA configuration form or status indicator renders |
-| P.16j | Navigate to invalid route (e.g., `/nonexistent`) → catch-all page renders gracefully |
+| P.1a | `find("Health", tabId)` — dashboard page heading renders |
+| P.1b | `read_console_messages(onlyErrors:true)` — zero console errors |
+| P.1c | **Data-binding: System health status** — `javascript_tool(tabId, "document.body.innerText.match(/healthy\|degraded\|unhealthy/i)?.[0]")` — system status renders a recognized value (not undefined/empty) |
+| P.1d | **Data-binding: Tenant summary stats** — `javascript_tool(tabId, "document.body.innerText.match(/Total tenants.*?(\\d+)/s)?.[1]")` — "Total tenants" stat card shows a numeric count ≥ 1 |
+| P.1e | **Data-binding: By-status breakdown** — `find("active", tabId)` within tenant summary section — at least one status category renders with a count |
+| P.1f | **Data-binding: Circuit breaker states** — `find("closed", tabId)` or `find("open", tabId)` — circuit breaker section renders actual state values (not empty) |
+| P.1g | **Data-binding: Recent deployments** — `javascript_tool(tabId, "document.querySelectorAll('table tbody tr').length > 0 || document.body.innerText.includes('No recent')")` — deployment table has rows OR shows explicit empty state |
+| P.1h | `computer(action:'screenshot')` — capture visual state |
+
+#### P.2 Tenant Directory (12 tests)
+
+Navigate to `$PROVIDER_URL/tenants`.
+
+| Test ID | Chrome MCP Verification |
+|---------|------------------------|
+| P.2a | `find("Tenant", tabId)` — page heading renders |
+| P.2b | `read_console_messages(onlyErrors:true)` — zero console errors |
+| P.2c | **Data-binding: Total tenant count** — `javascript_tool(tabId, "document.body.innerText.match(/Total.*?(\\d+)/)?.[1]")` — total tenants stat card shows numeric count ≥ 1 |
+| P.2d | **Data-binding: Tenant ID visible** — `find("remaker-digital-001", tabId)` — at least one tenant row shows a tenant ID string (not empty cell) |
+| P.2e | **Data-binding: Billing channel** — `javascript_tool(tabId, "document.body.innerText.match(/stripe\|shopify\|manual/i)?.[0]")` — billing channel column shows a recognized value |
+| P.2f | **Data-binding: Customer email** — `javascript_tool(tabId, "document.body.innerText.match(/[\\w.-]+@[\\w.-]+\\.[a-z]{2,}/)?.[0]")` — email column shows an email address pattern (or "--" if unset) |
+| P.2g | **Data-binding: Created date** — `javascript_tool(tabId, "document.body.innerText.match(/\\d{4}-\\d{2}-\\d{2}\|\\w{3} \\d{1,2}/)?.[0]")` — created column shows a date (not empty) |
+| P.2h | **Data-binding: Status filter dropdown** — `find("Status", tabId)` → click select → `javascript_tool(tabId, "document.querySelectorAll('[role=option]').length")` — dropdown has ≥ 2 options (e.g., active, inactive) |
+| P.2i | **Data-binding: Tier filter dropdown** — `find("Tier", tabId)` → click select → `javascript_tool(tabId, "document.querySelectorAll('[role=option]').length")` — dropdown has ≥ 2 options (e.g., starter, professional) |
+| P.2j | **Data-binding: Channel filter dropdown** — `find("Channel", tabId)` → click select → `javascript_tool(tabId, "document.querySelectorAll('[role=option]').length")` — dropdown has ≥ 1 option |
+| P.2k | **Data-binding: Shop domain** — `javascript_tool(tabId, "document.body.innerText.match(/\\.myshopify\\.com/)?.[0]")` — shop domain column shows a domain string (or "--" if billing_channel is not shopify) |
+| P.2l | `computer(action:'screenshot')` — capture visual state |
+
+#### P.3 Deployment History (7 tests)
+
+Navigate to `$PROVIDER_URL/deployments`.
+
+| Test ID | Chrome MCP Verification |
+|---------|------------------------|
+| P.3a | `find("Deployment", tabId)` or `find("deployment", tabId)` — page heading renders |
+| P.3b | `read_console_messages(onlyErrors:true)` — zero console errors |
+| P.3c | **Data-binding: Deployment table rows** — `javascript_tool(tabId, "document.querySelectorAll('table tbody tr').length")` — table has ≥ 1 row (at least current deployment) |
+| P.3d | **Data-binding: Event type values** — `javascript_tool(tabId, "document.body.innerText.match(/deploy\|rollback\|scale\|restart/i)?.[0]")` — event type column shows recognized deployment event type |
+| P.3e | **Data-binding: Version string** — `javascript_tool(tabId, "document.body.innerText.match(/v\\d+\\.\\d+\\.\\d+/)?.[0]")` — version column shows semantic version (e.g., "v1.51.0") |
+| P.3f | **Data-binding: Timestamp** — `javascript_tool(tabId, "document.body.innerText.match(/\\d{4}-\\d{2}-\\d{2}\|\\w{3} \\d{1,2}/)?.[0]")` — timestamp column shows a date value |
+| P.3g | `computer(action:'screenshot')` — capture visual state |
+
+#### P.4 Queue Health (8 tests)
+
+Navigate to `$PROVIDER_URL/queues`.
+
+| Test ID | Chrome MCP Verification |
+|---------|------------------------|
+| P.4a | `find("Queue", tabId)` or `find("queue", tabId)` — page heading renders |
+| P.4b | `read_console_messages(onlyErrors:true)` — zero console errors |
+| P.4c | **Data-binding: Queue summary stats** — `javascript_tool(tabId, "document.body.innerText.match(/Total (tenants\|messages\|bytes).*?(\\d+)/si)?.[0]")` — at least one summary stat card shows a numeric value |
+| P.4d | **Data-binding: Stream table rows** — `javascript_tool(tabId, "document.querySelectorAll('table tbody tr').length")` — table has ≥ 1 row OR shows explicit "No queue data" empty state |
+| P.4e | **Data-binding: Tenant ID in table** — `javascript_tool(tabId, "[...document.querySelectorAll('table td')].some(td => /remaker-digital\|test-customer/.test(td.textContent))")` — tenant ID column shows recognized tenant identifier (not empty) |
+| P.4f | **Data-binding: Stream name** — `javascript_tool(tabId, "[...document.querySelectorAll('table td')].some(td => td.textContent.length > 0)")` — stream name column populated (not blank cells) |
+| P.4g | **Data-binding: Consumer count** — `javascript_tool(tabId, "document.body.innerText.match(/consumer/i)")` — consumer count column header and values render |
+| P.4h | `computer(action:'screenshot')` — capture visual state |
+
+#### P.5 Integration Health (4 tests)
+
+Navigate to `$PROVIDER_URL/integrations`.
+
+| Test ID | Chrome MCP Verification |
+|---------|------------------------|
+| P.5a | Page renders with integration status content — `find("Integration", tabId)` or `find("integration", tabId)` |
+| P.5b | `read_console_messages(onlyErrors:true)` — zero console errors |
+| P.5c | **Data-binding: Integration status values** — `javascript_tool(tabId, "document.body.innerText.match(/connected\|disconnected\|healthy\|degraded/i)?.[0]")` — at least one integration shows a recognized status (not empty) |
+| P.5d | `computer(action:'screenshot')` — capture visual state |
+
+#### P.6 Status Page (4 tests)
+
+Navigate to `$PROVIDER_URL/status`.
+
+| Test ID | Chrome MCP Verification |
+|---------|------------------------|
+| P.6a | `find("Status", tabId)` — page management renders |
+| P.6b | `read_console_messages(onlyErrors:true)` — zero console errors |
+| P.6c | **Data-binding: Overall status** — `javascript_tool(tabId, "document.body.innerText.match(/operational\|degraded\|outage\|maintenance/i)?.[0]")` — overall status shows a recognized value |
+| P.6d | `computer(action:'screenshot')` — capture visual state |
+
+#### P.7 Alert Configuration (5 tests)
+
+Navigate to `$PROVIDER_URL/alerts`.
+
+| Test ID | Chrome MCP Verification |
+|---------|------------------------|
+| P.7a | `find("Alert", tabId)` or `find("alert", tabId)` — page renders |
+| P.7b | `read_console_messages(onlyErrors:true)` — zero console errors |
+| P.7c | **Data-binding: Alert rules list** — `javascript_tool(tabId, "document.querySelectorAll('table tbody tr, [class*=Card]').length")` — alert rules table/cards have ≥ 1 item OR shows explicit "No alerts" empty state |
+| P.7d | **Data-binding: Rule type values** — `javascript_tool(tabId, "document.body.innerText.match(/queue_depth\|secret_expiry\|circuit_breaker\|sla_breach\|incident/i)?.[0]")` — at least one rule type is a recognized AlertEngine type |
+| P.7e | `computer(action:'screenshot')` — capture visual state |
+
+#### P.8 Support Diagnostics (4 tests)
+
+Navigate to `$PROVIDER_URL/diagnostics`.
+
+| Test ID | Chrome MCP Verification |
+|---------|------------------------|
+| P.8a | `find("Diagnostic", tabId)` or `find("diagnostic", tabId)` — page renders |
+| P.8b | `read_console_messages(onlyErrors:true)` — zero console errors |
+| P.8c | **Data-binding: Diagnostic data** — `javascript_tool(tabId, "document.querySelectorAll('table tbody tr, [class*=Card], [class*=Section]').length > 0")` — diagnostic content renders (not blank page) |
+| P.8d | `computer(action:'screenshot')` — capture visual state |
+
+#### P.9 Compliance Dashboard (5 tests)
+
+Navigate to `$PROVIDER_URL/compliance`.
+
+| Test ID | Chrome MCP Verification |
+|---------|------------------------|
+| P.9a | `find("Compliance", tabId)` or `find("compliance", tabId)` — page renders |
+| P.9b | `read_console_messages(onlyErrors:true)` — zero console errors |
+| P.9c | **Data-binding: Assessment results** — `javascript_tool(tabId, "document.body.innerText.match(/pass\|fail\|warning\|compliant\|non-compliant/i)?.[0]")` — at least one compliance check shows a recognized result (not empty) |
+| P.9d | **Data-binding: Assessment item count** — `javascript_tool(tabId, "document.querySelectorAll('table tbody tr, [class*=Card], [class*=item]').length")` — compliance checklist has ≥ 1 item |
+| P.9e | `computer(action:'screenshot')` — capture visual state |
+
+#### P.10 Secret Posture (5 tests)
+
+Navigate to `$PROVIDER_URL/secrets`.
+
+| Test ID | Chrome MCP Verification |
+|---------|------------------------|
+| P.10a | `find("Secret", tabId)` or `find("secret", tabId)` — page renders |
+| P.10b | `read_console_messages(onlyErrors:true)` — zero console errors |
+| P.10c | **Data-binding: Secret status indicators** — `javascript_tool(tabId, "document.body.innerText.match(/valid\|expiring\|expired\|rotated/i)?.[0]")` — at least one secret shows a recognized status |
+| P.10d | **Data-binding: Secret list** — `javascript_tool(tabId, "document.querySelectorAll('table tbody tr, [class*=Card]').length")` — secrets table/cards have ≥ 1 item |
+| P.10e | `computer(action:'screenshot')` — capture visual state |
+
+#### P.11 Billing Health (8 tests)
+
+Navigate to `$PROVIDER_URL/billing`.
+
+| Test ID | Chrome MCP Verification |
+|---------|------------------------|
+| P.11a | Page renders with billing health content — `find("Billing", tabId)` or `find("billing", tabId)` |
+| P.11b | `read_console_messages(onlyErrors:true)` — zero console errors |
+| P.11c | **Data-binding: Total tenants stat** — `javascript_tool(tabId, "document.body.innerText.match(/Total.*?(\\d+)/)?.[1]")` — stat card shows numeric tenant count ≥ 1 |
+| P.11d | **Data-binding: Tenant ID in table** — `javascript_tool(tabId, "[...document.querySelectorAll('table td')].some(td => /remaker-digital\|test-customer/.test(td.textContent))")` — billing table shows recognized tenant ID |
+| P.11e | **Data-binding: Reconciliation status** — `javascript_tool(tabId, "document.body.innerText.match(/reconciled\|pending\|failed\|review/i)?.[0]")` — reconciliation column shows recognized status value |
+| P.11f | **Data-binding: Webhook success rate** — `javascript_tool(tabId, "document.body.innerText.match(/(\\d+\\.?\\d*)%/)?.[0]")` — webhook success rate shows percentage value |
+| P.11g | **Data-binding: Needs review flag** — `javascript_tool(tabId, "document.body.innerText.match(/needs review/i)?.[0] || 'none flagged'")` — review status renders (explicit value or absence) |
+| P.11h | `computer(action:'screenshot')` — capture visual state |
+
+#### P.12 Cost Analytics (4 tests)
+
+Navigate to `$PROVIDER_URL/costs`.
+
+| Test ID | Chrome MCP Verification |
+|---------|------------------------|
+| P.12a | `find("Cost", tabId)` or `find("cost", tabId)` — page renders |
+| P.12b | `read_console_messages(onlyErrors:true)` — zero console errors |
+| P.12c | **Data-binding: Cost data** — `javascript_tool(tabId, "document.body.innerText.match(/\\$\\d+\\.?\\d*\|\\d+\\.?\\d*%/)?.[0]")` — cost figures or percentages render (not empty page) |
+| P.12d | `computer(action:'screenshot')` — capture visual state |
+
+#### P.13 SLA Trends (8 tests)
+
+Navigate to `$PROVIDER_URL/sla`.
+
+| Test ID | Chrome MCP Verification |
+|---------|------------------------|
+| P.13a | `find("SLA", tabId)` or `find("sla", tabId)` — page renders |
+| P.13b | `read_console_messages(onlyErrors:true)` — zero console errors |
+| P.13c | **Data-binding: Uptime percentage** — `javascript_tool(tabId, "document.body.innerText.match(/(\\d+\\.?\\d*)%/)?.[0]")` — uptime stat shows percentage value (e.g., "99.9%") |
+| P.13d | **Data-binding: Latency metrics** — `javascript_tool(tabId, "document.body.innerText.match(/p50\|p95\|p99/i)?.[0]")` — latency percentile labels render |
+| P.13e | **Data-binding: Latency values** — `javascript_tool(tabId, "document.body.innerText.match(/(\\d+\\.?\\d*)\\s*ms/)?.[0]")` — latency values show numeric ms values (e.g., "45ms") |
+| P.13f | **Data-binding: Error budget** — `javascript_tool(tabId, "document.body.innerText.match(/budget.*?(\\d+)/si)?.[0]")` — error budget section shows numeric values |
+| P.13g | **Data-binding: Range selector** — `find("7", tabId)` or `find("30", tabId)` or `find("90", tabId)` — range/period selector buttons present with operable options |
+| P.13h | `computer(action:'screenshot')` — capture visual state |
+
+#### P.14 Abuse Detection (4 tests)
+
+Navigate to `$PROVIDER_URL/abuse`.
+
+| Test ID | Chrome MCP Verification |
+|---------|------------------------|
+| P.14a | `find("Abuse", tabId)` or `find("abuse", tabId)` — page renders |
+| P.14b | `read_console_messages(onlyErrors:true)` — zero console errors |
+| P.14c | **Data-binding: Abuse data** — `javascript_tool(tabId, "document.querySelectorAll('table tbody tr, [class*=Card]').length >= 0")` — abuse detection table/cards render (even if 0 items with empty state) |
+| P.14d | `computer(action:'screenshot')` — capture visual state |
+
+#### P.15 MFA Settings (4 tests)
+
+Navigate to `$PROVIDER_URL/mfa`.
+
+| Test ID | Chrome MCP Verification |
+|---------|------------------------|
+| P.15a | `find("MFA", tabId)` or `find("Multi-factor", tabId)` — page renders |
+| P.15b | `read_console_messages(onlyErrors:true)` — zero console errors |
+| P.15c | **Data-binding: MFA status** — `javascript_tool(tabId, "document.body.innerText.match(/enabled\|disabled\|not configured\|setup/i)?.[0]")` — MFA status shows a recognized value |
+| P.15d | `computer(action:'screenshot')` — capture visual state |
+
+#### P.16 Provider Logo and Branding (6 tests)
+
+| Test ID | Chrome MCP Verification |
+|---------|------------------------|
+| P.16a | **Logo image rendered** — `javascript_tool(tabId, "document.querySelector('img[src*=primary-logo]')?.naturalWidth > 0")` — logo image loaded successfully (naturalWidth > 0 confirms it didn't 404) |
+| P.16b | **Logo image source** — `javascript_tool(tabId, "document.querySelector('img[src*=primary-logo]')?.src")` — src contains "primary-logo-no-wordmark.svg" |
+| P.16c | **Logo alt text** — `javascript_tool(tabId, "document.querySelector('img[src*=primary-logo]')?.alt")` — alt is empty string (decorative image — branding text is separate) |
+| P.16d | **Branding text** — `find("Service Provider Console", tabId)` — header text reads "Service Provider Console" (not "Provider Console" or "Agent Red") |
+| P.16e | **No duplicate branding** — `javascript_tool(tabId, "document.querySelectorAll('img[src*=logo]').length")` — exactly 1 logo image in header (no duplicates, no leftover alt text) |
+| P.16f | **Logo dimensions** — `javascript_tool(tabId, "document.querySelector('img[src*=primary-logo]')?.offsetHeight")` — logo renders at expected height (~28px, not 0 or broken) |
+
+#### P.17 Cross-page verification (10 tests)
+
+| Test ID | Chrome MCP Verification |
+|---------|------------------------|
+| P.17a | Each P.1–P.15 page: `read_console_messages(onlyErrors:true)` after navigation — zero errors |
+| P.17b | Each page transition: `computer(action:'screenshot')` — capture visual state for regression comparison |
+| P.17c | **Data-binding spot check: Health Dashboard** — P.1 stat cards show numeric values (not "undefined", not empty, not "NaN") |
+| P.17d | **Data-binding spot check: Tenant Directory** — P.2 tenant table has ≥ 1 row with non-empty tenant ID cell |
+| P.17e | **Data-binding spot check: Alert Config** — P.7 alert rules list or configuration form renders with content |
+| P.17f | **Data-binding spot check: Compliance** — P.9 compliance assessment results or checklist renders |
+| P.17g | **Data-binding spot check: Secret Posture** — P.10 secret status indicators render with values |
+| P.17h | **Data-binding spot check: SLA Trends** — P.13 chart or metrics render with percentage/ms values (not empty state) |
+| P.17i | **Data-binding spot check: MFA Settings** — P.15 MFA configuration form or status indicator renders |
+| P.17j | Navigate to invalid route (e.g., `/nonexistent`) → catch-all page renders gracefully |
 
 **Per-test pattern:**
 1. Navigate to `$PROVIDER_URL{route}`
 2. `computer(action:'wait', duration:2)`
 3. `read_console_messages(onlyErrors:true)` — zero errors expected
 4. `find(query)` — verify primary content element exists
-5. `computer(action:'screenshot')` — capture visual state
-6. Record PASS/FAIL
+5. **Data-binding verification** — `javascript_tool` to verify API response fields populate visible elements with expected value types (numbers, dates, emails, recognized enum strings) — not "undefined", not empty, not "NaN"
+6. `computer(action:'screenshot')` — capture visual state
+7. Record PASS/FAIL
 
 ---
 
@@ -1532,17 +1763,22 @@ each Provider Console page loads and renders its primary content.
 | Avatar upload tests (7.16–7.20) | Deferred per D22 — requires Azure Blob Storage + client-side cropping |
 | Storefront widget mount (0A.8) | Requires access to live Shopify storefront (blanco-9939.myshopify.com) |
 | Consent prompt (9.13) | Widget consent UI not yet built — deferred to widget phases 3-5 |
+| Contact Us email delivery (H.3k) | Cannot verify email actually arrives at support@remakerdigital.com — ACS delivery is tested by unit tests. UI tests verify modal form, validation, and submit behavior only. |
+| Provider Console data-binding: exact values | Data-binding tests verify values are populated and have expected *types* (numeric, email, date, enum). Exact numeric values depend on live data and may vary between runs. |
 
 ---
 
 ## Postconditions
 
-- [ ] **Standalone Admin:** 178 tests executed (from `ui-test-procedure.md`), results recorded with test ID / PASS / FAIL / SKIP
-- [ ] **SPA Provider Console:** 15 new tests executed (P.1–P.15), all PASS or documented FAIL
-- [ ] **Total:** 193 tests (178 + 15)
+- [ ] **Standalone Admin:** 802 tests executed (780 original + 22 new header/logo/contact tests), results recorded with test ID / PASS / FAIL / SKIP
+- [ ] **SPA Provider Console:** 115 tests executed (P.0–P.17), all PASS or documented FAIL
+- [ ] **Total:** 917 tests (802 standalone + 115 provider)
 - [ ] **Zero unexpected console errors** across all pages
-- [ ] **Screenshots captured** for each page group (minimum 15 screenshots)
+- [ ] **Screenshots captured** for each page group (minimum 27 screenshots — 11 standalone page groups + 16 provider pages)
 - [ ] **Auth injection verified** for both Standalone and Provider Console
+- [ ] **Data-binding verification:** Every Provider Console page with data tables/stat cards verified for populated values (not "undefined", not empty, not "NaN")
+- [ ] **Logo/branding verification:** Both Standalone and Provider Console headers verified for correct logo rendering, image source, dimensions, and branding text
+- [ ] **Contact Us feature:** Modal opens, topic dropdown has 5 options, form fields render, cancel/send buttons present
 
 ---
 
@@ -1556,6 +1792,12 @@ each Provider Console page loads and renders its primary content.
 | Console error: "MantineProvider was not found" | Procedure defect (MantineProvider not hoisted) | See MantineProvider fix — provider must wrap `<App />` at mount point |
 | Provider Console pages show "Loading..." indefinitely | Environment transient (API timeout) | Superadmin endpoints depend on Cosmos DB queries; may be slow on cold start. Wait 10s. |
 | SPA pages fail P.1–P.15 with 401 | Environment transient (API key lacks SUPERADMIN role) | Verify the API key used has SUPERADMIN role. Re-seed if necessary. |
+| Data-binding: table cells empty but page loads | Code defect (snake_case/camelCase mismatch) | Backend uses `CamelCaseModel` (pydantic `alias_generator=to_camel`) — all API response fields are camelCase. Frontend TypeScript interfaces MUST use camelCase. Check interface field names match API response. |
+| Data-binding: stat cards show "undefined" or "NaN" | Code defect (wrong field name or missing null coalescing) | Verify the stat card reads the correct camelCase field. Add `?? 0` or `?? '--'` fallback. |
+| Data-binding: select/filter dropdowns have 0 options | Code defect (options derived from empty array due to field mismatch) | Verify the dropdown `data` prop reads from correct camelCase response field. Add `?? []` fallback. |
+| Logo image shows broken icon (0x0 pixels) | Procedure defect (wrong asset path) | Verify `primary-logo-no-wordmark.svg` exists in admin dist's public folder. Check image `naturalWidth > 0`. |
+| Contact Us modal doesn't open | Code defect (missing onClick handler or icon component) | Verify `[aria-label="Contact us"]` ActionIcon renders and `contactHandlers.open` is wired. |
+| Contact Us topic dropdown empty | Code defect (Select data prop missing) | Verify the `Select` component's `data` array has 5 topic options in StandaloneLayout.tsx. |
 
 ---
 
@@ -1566,11 +1808,18 @@ Results should be recorded in markdown table format:
 ```
 | Test ID | Result | Console Errors | Notes |
 |---------|--------|----------------|-------|
+| H.1a    | PASS   | 0              | naturalWidth=60 |
+| H.3b    | PASS   | 0              | 5 topic options |
 | 0.1     | PASS   | 0              |       |
 | 0.2     | PASS   | 0              |       |
 | 0A.8    | SKIP   | —              | Requires Shopify storefront |
-| P.1     | PASS   | 0              |       |
+| P.1c    | PASS   | 0              | Status: "healthy" |
+| P.2d    | PASS   | 0              | Tenant ID: remaker-digital-001 |
+| P.2h    | PASS   | 0              | Status dropdown: 3 options |
+| P.16a   | PASS   | 0              | Logo naturalWidth=60 |
 ```
+
+**Data-binding test result notes:** For data-binding tests (marked with `**Data-binding:**` prefix), record the actual value observed in the Notes column. This creates an audit trail for regression — if a value changes from "2" to "undefined" between runs, the defect is immediately visible.
 
 ---
 

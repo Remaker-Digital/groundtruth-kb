@@ -27,11 +27,11 @@ import { LoadingState } from '../../shared/LoadingState';
 import { tokens } from '../../shared/theme/styles';
 
 // ---------------------------------------------------------------------------
-// Types
+// Types (camelCase — matches CamelCaseModel API serialization)
 // ---------------------------------------------------------------------------
 
 interface DeploymentEvent {
-  event_type: string;
+  eventType: string;
   timestamp: string;
   actor: string;
   payload: Record<string, unknown>;
@@ -40,7 +40,7 @@ interface DeploymentEvent {
 interface DeploymentResponse {
   events: DeploymentEvent[];
   total: number;
-  current_version: string | null;
+  currentVersion: string | null;
 }
 
 // ---------------------------------------------------------------------------
@@ -108,7 +108,7 @@ export function DeploymentHistoryPage() {
         <Card withBorder padding="lg" radius="md" bg={tokens.surface}>
           <Text c="dimmed" size="xs" tt="uppercase" fw={600}>Current Version</Text>
           <Text fw={700} size="xl" c={tokens.textPrimary} mt={4}>
-            {data.current_version ? `v${data.current_version}` : 'Unknown'}
+            {data.currentVersion ? `v${data.currentVersion}` : 'Unknown'}
           </Text>
         </Card>
         <Card withBorder padding="lg" radius="md" bg={tokens.surface}>
@@ -125,7 +125,7 @@ export function DeploymentHistoryPage() {
       ) : (
         <Stack gap="sm">
           {data.events.map((evt, i) => {
-            const isDeploy = evt.event_type === 'MODEL_DEPLOYED';
+            const isDeploy = evt.eventType === 'MODEL_DEPLOYED';
             return (
               <Paper key={i} withBorder p="md" radius="md" bg={tokens.surface}>
                 <Group justify="space-between" mb="xs">

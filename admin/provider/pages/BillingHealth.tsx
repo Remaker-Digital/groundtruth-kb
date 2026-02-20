@@ -27,25 +27,25 @@ import { LoadingState } from '../../shared/LoadingState';
 import { tokens } from '../../shared/theme/styles';
 
 // ---------------------------------------------------------------------------
-// Types
+// Types (camelCase — matches CamelCaseModel API serialization)
 // ---------------------------------------------------------------------------
 
 interface TenantBillingHealth {
-  tenant_id: string;
+  tenantId: string;
   tier: string | null;
   status: string;
-  reconciliation_status: string;
-  last_reconciliation: string | null;
-  discrepancy_percent: number | null;
-  needs_review: boolean;
+  reconciliationStatus: string;
+  lastReconciliation: string | null;
+  discrepancyPercent: number | null;
+  needsReview: boolean;
 }
 
 interface BillingHealthResponse {
   timestamp: string;
   tenants: TenantBillingHealth[];
-  total_tenants: number;
-  tenants_needing_review: number;
-  webhook_success_rate: number | null;
+  totalTenants: number;
+  tenantsNeedingReview: number;
+  webhookSuccessRate: number | null;
 }
 
 // ---------------------------------------------------------------------------
@@ -104,8 +104,8 @@ export function BillingHealthPage() {
     );
   }
 
-  const webhookPct = data.webhook_success_rate != null
-    ? Math.round(data.webhook_success_rate * 100)
+  const webhookPct = data.webhookSuccessRate != null
+    ? Math.round(data.webhookSuccessRate * 100)
     : null;
 
   return (
@@ -121,17 +121,17 @@ export function BillingHealthPage() {
       <SimpleGrid cols={{ base: 1, sm: 3 }} spacing="md">
         <Card withBorder padding="lg" radius="md" bg={tokens.surface}>
           <Text c="dimmed" size="xs" tt="uppercase" fw={600}>Total Tenants</Text>
-          <Text fw={700} size="xl" c={tokens.textPrimary} mt={4}>{data.total_tenants}</Text>
+          <Text fw={700} size="xl" c={tokens.textPrimary} mt={4}>{data.totalTenants}</Text>
         </Card>
         <Card withBorder padding="lg" radius="md" bg={tokens.surface}>
           <Text c="dimmed" size="xs" tt="uppercase" fw={600}>Needing Review</Text>
           <Text
             fw={700}
             size="xl"
-            c={data.tenants_needing_review > 0 ? tokens.warning : tokens.success}
+            c={data.tenantsNeedingReview > 0 ? tokens.warning : tokens.success}
             mt={4}
           >
-            {data.tenants_needing_review}
+            {data.tenantsNeedingReview}
           </Text>
         </Card>
         <Card withBorder padding="lg" radius="md" bg={tokens.surface}>
@@ -175,9 +175,9 @@ export function BillingHealthPage() {
               </Table.Tr>
             ) : (
               data.tenants.map((t) => (
-                <Table.Tr key={t.tenant_id}>
+                <Table.Tr key={t.tenantId}>
                   <Table.Td>
-                    <Text size="xs" ff="monospace" c={tokens.textSecondary}>{t.tenant_id}</Text>
+                    <Text size="xs" ff="monospace" style={{ color: tokens.textPrimary }}>{t.tenantId}</Text>
                   </Table.Td>
                   <Table.Td>
                     <Text size="xs" c={tokens.textMuted}>{t.tier ?? '—'}</Text>
@@ -193,17 +193,17 @@ export function BillingHealthPage() {
                   </Table.Td>
                   <Table.Td>
                     <Text size="xs" c={tokens.textMuted}>
-                      {RECONCILIATION_LABELS[t.reconciliation_status] ?? t.reconciliation_status}
+                      {RECONCILIATION_LABELS[t.reconciliationStatus] ?? t.reconciliationStatus}
                     </Text>
                   </Table.Td>
                   <Table.Td>
-                    {t.discrepancy_percent != null ? (
+                    {t.discrepancyPercent != null ? (
                       <Text
                         size="xs"
                         fw={500}
-                        c={Math.abs(t.discrepancy_percent) > 5 ? tokens.warning : tokens.success}
+                        c={Math.abs(t.discrepancyPercent) > 5 ? tokens.warning : tokens.success}
                       >
-                        {t.discrepancy_percent.toFixed(1)}%
+                        {t.discrepancyPercent.toFixed(1)}%
                       </Text>
                     ) : (
                       <Text size="xs" c="dimmed">—</Text>
@@ -211,13 +211,13 @@ export function BillingHealthPage() {
                   </Table.Td>
                   <Table.Td>
                     <Text size="xs" c="dimmed">
-                      {t.last_reconciliation
-                        ? new Date(t.last_reconciliation).toLocaleDateString()
+                      {t.lastReconciliation
+                        ? new Date(t.lastReconciliation).toLocaleDateString()
                         : '—'}
                     </Text>
                   </Table.Td>
                   <Table.Td>
-                    {t.needs_review && (
+                    {t.needsReview && (
                       <Badge variant="filled" color="orange" size="xs">
                         Review
                       </Badge>

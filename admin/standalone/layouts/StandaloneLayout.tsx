@@ -31,6 +31,9 @@ import {
   Modal,
   Button,
   Stack,
+  Select,
+  Textarea,
+  TextInput,
   useMantineColorScheme,
   useComputedColorScheme,
 } from '@mantine/core';
@@ -189,6 +192,13 @@ export const StandaloneLayout: React.FC<StandaloneLayoutProps> = ({
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
+  // ---- Contact Us modal state --------------------------------------------
+  const [contactOpened, contactHandlers] = useDisclosure(false);
+  const [contactTopic, setContactTopic] = useState<string | null>('support');
+  const [contactSubject, setContactSubject] = useState('');
+  const [contactMessage, setContactMessage] = useState('');
+  const [contactSending, setContactSending] = useState(false);
+
   // ---- Authenticated fetch -----------------------------------------------
 
   const apiFetch = useCallback(
@@ -276,6 +286,38 @@ export const StandaloneLayout: React.FC<StandaloneLayoutProps> = ({
     resolveTenant();
     return () => { cancelled = true; };
   }, [apiFetch, onLogout]);
+
+  // ---- Contact Us submit handler ------------------------------------------
+
+  const handleContactSubmit = useCallback(async () => {
+    if (!contactTopic || !contactSubject.trim() || !contactMessage.trim()) return;
+    setContactSending(true);
+    try {
+      const resp = await apiFetch('/api/admin/contact', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          topic: contactTopic,
+          subject: contactSubject.trim(),
+          message: contactMessage.trim(),
+        }),
+      });
+      if (resp.ok) {
+        notifications.show({ title: 'Message sent', message: 'We\'ll get back to you shortly.', color: 'green' });
+        contactHandlers.close();
+        setContactTopic('support');
+        setContactSubject('');
+        setContactMessage('');
+      } else {
+        const data = await resp.json().catch(() => ({ detail: 'Unexpected error' }));
+        notifications.show({ title: 'Failed to send', message: data.detail || 'Please try again.', color: 'red' });
+      }
+    } catch {
+      notifications.show({ title: 'Network error', message: 'Please check your connection and try again.', color: 'red' });
+    } finally {
+      setContactSending(false);
+    }
+  }, [apiFetch, contactTopic, contactSubject, contactMessage, contactHandlers]);
 
   // ---- Caller role resolution (whoami) ------------------------------------
 
@@ -592,6 +634,22 @@ export const StandaloneLayout: React.FC<StandaloneLayoutProps> = ({
                   <Icons.docs />
                 </ActionIcon>
               </Tooltip>
+              {/* Contact Us */}
+              <Tooltip label="Contact us" position="bottom">
+                <ActionIcon
+                  variant="subtle"
+                  size="md"
+                  onClick={contactHandlers.open}
+                  aria-label="Contact us"
+                  style={{
+                    color: tokens.textMuted,
+                    border: '1px solid rgba(255, 255, 255, 0.12)',
+                    background: 'rgba(255, 255, 255, 0.06)',
+                  }}
+                >
+                  <Icons.contact />
+                </ActionIcon>
+              </Tooltip>
               {/* Dark mode toggle */}
               <ActionIcon
                 variant="subtle"
@@ -865,16 +923,9 @@ export const StandaloneLayout: React.FC<StandaloneLayoutProps> = ({
             />
           </AppShell.Section>
 
-          {/* Footer with Remaker Digital branding */}
+          {/* Footer */}
           <AppShell.Section>
             <Box p="xs" style={{ borderTop: isDark ? `1px solid ${tokens.border}` : '1px solid var(--mantine-color-gray-2)' }}>
-              <Group gap={8} justify="center" mb={4}>
-                <img
-                  src={isDark ? '/admin/standalone/remaker-digital-logo-dark.svg' : '/admin/standalone/remaker-digital-logo-light.svg'}
-                  alt="Remaker Digital"
-                  style={{ height: 22, display: 'block' }}
-                />
-              </Group>
               <Text size="xs" c="dimmed" ta="center" lh={1.3}>
                 Agent Red Customer Experience
               </Text>
@@ -882,9 +933,6 @@ export const StandaloneLayout: React.FC<StandaloneLayoutProps> = ({
                 v{productVersion || '...'}
               </Text>
               <Text size="xs" c="dimmed" ta="center" lh={1.4} mt={4} style={{ opacity: 0.7, fontSize: 10 }}>
-                Brought to you by remakerdigital.com
-              </Text>
-              <Text size="xs" c="dimmed" ta="center" lh={1.4} style={{ opacity: 0.7, fontSize: 10 }}>
                 {String.fromCodePoint(0x00A9)} 2026 Remaker Digital, a DBA of
               </Text>
               <Text size="xs" c="dimmed" ta="center" lh={1.4} style={{ opacity: 0.7, fontSize: 10 }}>
@@ -991,6 +1039,67 @@ export const StandaloneLayout: React.FC<StandaloneLayoutProps> = ({
           activeActivatedAt={activationStatus.active_activated_at}
         />
       )}
+
+      {/* Contact Us modal */}
+      <Modal
+        opened={contactOpened}
+        onClose={contactHandlers.close}
+        title={
+          <Text fw={600} size="lg">
+            Contact us
+          </Text>
+        }
+        centered
+        size="md"
+      >
+        <Stack gap="md">
+          <Select
+            label="Topic"
+            placeholder="Select a topic"
+            value={contactTopic}
+            onChange={setContactTopic}
+            data={[
+              { value: 'support', label: 'Support Request' },
+              { value: 'feature_request', label: 'Feature Request' },
+              { value: 'billing', label: 'Billing Inquiry' },
+              { value: 'bug_report', label: 'Bug Report' },
+              { value: 'general', label: 'General Inquiry' },
+            ]}
+          />
+          <TextInput
+            label="Subject"
+            placeholder="Brief summary of your message"
+            value={contactSubject}
+            onChange={(e) => setContactSubject(e.currentTarget.value)}
+            maxLength={200}
+            required
+          />
+          <Textarea
+            label="Message"
+            placeholder="Describe your request in detail..."
+            value={contactMessage}
+            onChange={(e) => setContactMessage(e.currentTarget.value)}
+            minRows={4}
+            maxRows={8}
+            maxLength={5000}
+            autosize
+            required
+          />
+          <Group justify="flex-end" gap="sm">
+            <Button variant="default" onClick={contactHandlers.close} disabled={contactSending}>
+              Cancel
+            </Button>
+            <Button
+              className="ar-btn-action"
+              onClick={handleContactSubmit}
+              loading={contactSending}
+              disabled={!contactTopic || !contactSubject.trim() || !contactMessage.trim()}
+            >
+              Send message
+            </Button>
+          </Group>
+        </Stack>
+      </Modal>
 
       {/* Welcome popup for first-time merchants (WI #292) */}
       <Modal

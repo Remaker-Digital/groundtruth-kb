@@ -37,33 +37,33 @@ import { LoadingState } from '../../shared/LoadingState';
 import { tokens, chartAxisTick, chartTooltipStyle, chartLabelStyle } from '../../shared/theme/styles';
 
 // ---------------------------------------------------------------------------
-// Types
+// Types (camelCase — matches CamelCaseModel API serialization)
 // ---------------------------------------------------------------------------
 
 interface TrendPoint {
   timestamp: string;
-  uptime_pct: number;
-  p50_ms: number;
-  p95_ms: number;
-  p99_ms: number;
-  total_requests: number;
+  uptimePct: number;
+  p50Ms: number;
+  p95Ms: number;
+  p99Ms: number;
+  totalRequests: number;
 }
 
 interface ErrorBudget {
   tier: string;
-  period_days: number;
-  allowed_downtime_minutes: number;
-  actual_downtime_minutes: number;
-  budget_remaining: number;
-  budget_consumed_pct: number;
-  is_within_budget: boolean;
+  periodDays: number;
+  allowedDowntimeMinutes: number;
+  actualDowntimeMinutes: number;
+  budgetRemaining: number;
+  budgetConsumedPct: number;
+  isWithinBudget: boolean;
 }
 
 interface SLATrendsResponse {
-  range_days: number;
-  trend_points: TrendPoint[];
-  error_budgets: Record<string, ErrorBudget>;
-  generated_at: string;
+  rangeDays: number;
+  trendPoints: TrendPoint[];
+  errorBudgets: Record<string, ErrorBudget>;
+  generatedAt: string;
 }
 
 // ---------------------------------------------------------------------------
@@ -116,7 +116,7 @@ export function SLATrendsPage() {
   }, [apiFetch, onNotify, range]);
 
   // Prepare chart data
-  const chartData = (data?.trend_points ?? []).map((pt) => ({
+  const chartData = (data?.trendPoints ?? []).map((pt) => ({
     ...pt,
     label: formatTimestamp(pt.timestamp, parseInt(range)),
   }));
@@ -160,7 +160,7 @@ export function SLATrendsPage() {
                 />
                 <Line
                   type="monotone"
-                  dataKey="uptime_pct"
+                  dataKey="uptimePct"
                   stroke={tokens.success}
                   strokeWidth={2}
                   dot={false}
@@ -183,28 +183,28 @@ export function SLATrendsPage() {
                   labelStyle={chartLabelStyle}
                 />
                 <Legend wrapperStyle={{ color: tokens.textMuted, fontSize: '12px' }} />
-                <Line type="monotone" dataKey="p50_ms" stroke={tokens.chartLine1} strokeWidth={2} dot={false} name="P50" />
-                <Line type="monotone" dataKey="p95_ms" stroke={tokens.chartLine2} strokeWidth={2} dot={false} name="P95" />
-                <Line type="monotone" dataKey="p99_ms" stroke={tokens.chartLine3} strokeWidth={2} dot={false} name="P99" />
+                <Line type="monotone" dataKey="p50Ms" stroke={tokens.chartLine1} strokeWidth={2} dot={false} name="P50" />
+                <Line type="monotone" dataKey="p95Ms" stroke={tokens.chartLine2} strokeWidth={2} dot={false} name="P95" />
+                <Line type="monotone" dataKey="p99Ms" stroke={tokens.chartLine3} strokeWidth={2} dot={false} name="P99" />
               </LineChart>
             </ResponsiveContainer>
           </Card>
 
           {/* Error budget gauges */}
-          {Object.keys(data.error_budgets ?? {}).length > 0 && (
+          {Object.keys(data.errorBudgets ?? {}).length > 0 && (
             <>
               <Title order={4} c={tokens.textSecondary}>Error Budgets (30-day period)</Title>
               <SimpleGrid cols={{ base: 1, sm: 3 }} spacing="md">
-                {Object.entries(data.error_budgets ?? {}).map(([tier, budget]) => (
+                {Object.entries(data.errorBudgets ?? {}).map(([tier, budget]) => (
                   <Card key={tier} withBorder padding="lg" radius="md" bg={tokens.surface}>
                     <Group justify="space-between" mb="sm">
                       <Text fw={600} size="sm" c={tokens.textSecondary}>{tier}</Text>
                       <Text
                         size="xs"
                         fw={600}
-                        c={budget.is_within_budget ? tokens.success : tokens.danger}
+                        c={budget.isWithinBudget ? tokens.success : tokens.danger}
                       >
-                        {budget.is_within_budget ? 'Within budget' : 'Budget exceeded'}
+                        {budget.isWithinBudget ? 'Within budget' : 'Budget exceeded'}
                       </Text>
                     </Group>
                     <Group justify="center">
@@ -214,17 +214,17 @@ export function SLATrendsPage() {
                         roundCaps
                         sections={[
                           {
-                            value: Math.min(budget.budget_consumed_pct, 100),
-                            color: budget.budget_consumed_pct > 80
+                            value: Math.min(budget.budgetConsumedPct, 100),
+                            color: budget.budgetConsumedPct > 80
                               ? tokens.danger
-                              : budget.budget_consumed_pct > 50
+                              : budget.budgetConsumedPct > 50
                                 ? tokens.warning
                                 : TIER_COLORS[tier] ?? tokens.chartLine1,
                           },
                         ]}
                         label={
                           <Text ta="center" size="xs" c={tokens.textSecondary}>
-                            {budget.budget_consumed_pct.toFixed(1)}%
+                            {budget.budgetConsumedPct.toFixed(1)}%
                             <br />
                             <Text span size="xs" c="dimmed">used</Text>
                           </Text>
@@ -234,15 +234,15 @@ export function SLATrendsPage() {
                     <Stack gap={4} mt="sm">
                       <Group justify="space-between">
                         <Text size="xs" c="dimmed">Allowed</Text>
-                        <Text size="xs" c={tokens.textMuted}>{budget.allowed_downtime_minutes.toFixed(1)} min</Text>
+                        <Text size="xs" c={tokens.textMuted}>{budget.allowedDowntimeMinutes.toFixed(1)} min</Text>
                       </Group>
                       <Group justify="space-between">
                         <Text size="xs" c="dimmed">Actual</Text>
-                        <Text size="xs" c={tokens.textMuted}>{budget.actual_downtime_minutes.toFixed(1)} min</Text>
+                        <Text size="xs" c={tokens.textMuted}>{budget.actualDowntimeMinutes.toFixed(1)} min</Text>
                       </Group>
                       <Group justify="space-between">
                         <Text size="xs" c="dimmed">Remaining</Text>
-                        <Text size="xs" c={tokens.textMuted}>{(budget.budget_remaining * 100).toFixed(1)}%</Text>
+                        <Text size="xs" c={tokens.textMuted}>{(budget.budgetRemaining * 100).toFixed(1)}%</Text>
                       </Group>
                     </Stack>
                   </Card>
@@ -266,7 +266,7 @@ export function SLATrendsPage() {
                   />
                   <Line
                     type="monotone"
-                    dataKey="total_requests"
+                    dataKey="totalRequests"
                     stroke={tokens.chartLine4}
                     strokeWidth={1.5}
                     dot={false}
