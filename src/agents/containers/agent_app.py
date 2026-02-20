@@ -25,9 +25,7 @@ from typing import Any, Type
 from fastapi import FastAPI, Request
 from fastapi.responses import JSONResponse
 
-from agntcy_app_sdk.semantic.message import Message
-
-from src.agents.base import AgentRedBaseAgent, parse_payload
+from src.agents.base import AgentRedBaseAgent, Message, parse_payload
 
 logger = logging.getLogger(__name__)
 

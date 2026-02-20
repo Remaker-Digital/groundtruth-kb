@@ -385,7 +385,8 @@ async def _startup_chat_services() -> None:
     except Exception:
         logger.warning(
             "Chat API service initialization failed — chat endpoints will "
-            "return 503 until dependencies are available."
+            "return 503 until dependencies are available.",
+            exc_info=True,
         )
 
 

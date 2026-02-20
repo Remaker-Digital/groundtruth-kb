@@ -20,10 +20,28 @@ import os
 from enum import Enum
 from typing import Any
 
-from agntcy_app_sdk.factory import AgntcyFactory, ProtocolTypes, TransportTypes
-from agntcy_app_sdk.semantic.base import BaseAgentProtocol
-from agntcy_app_sdk.semantic.message import Message
-from agntcy_app_sdk.transport.base import BaseTransport
+# AGNTCY SDK imports — wrapped in try/except per project lesson.
+try:
+    from agntcy_app_sdk.factory import AgntcyFactory, ProtocolTypes, TransportTypes
+except ImportError:
+    AgntcyFactory = None  # type: ignore[assignment,misc]
+    ProtocolTypes = None  # type: ignore[assignment,misc]
+    TransportTypes = None  # type: ignore[assignment,misc]
+
+try:
+    from agntcy_app_sdk.semantic.base import BaseAgentProtocol
+except ImportError:
+    BaseAgentProtocol = None  # type: ignore[assignment,misc]
+
+try:
+    from agntcy_app_sdk.semantic.message import Message
+except ImportError:
+    Message = None  # type: ignore[assignment,misc]
+
+try:
+    from agntcy_app_sdk.transport.base import BaseTransport
+except ImportError:
+    BaseTransport = None  # type: ignore[assignment,misc]
 
 logger = logging.getLogger(__name__)
 

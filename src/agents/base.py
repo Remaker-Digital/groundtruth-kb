@@ -21,9 +21,33 @@ import time
 from abc import abstractmethod
 from typing import Any
 
-from agntcy_app_sdk.semantic.base import BaseAgentProtocol
-from agntcy_app_sdk.semantic.message import Message
-from agntcy_app_sdk.transport.base import BaseTransport
+# AGNTCY SDK imports — wrapped in try/except per project lesson.
+# The SDK's BaseAgentProtocol was renamed/removed in 0.5.x; provide a
+# local ABC stub so the agent hierarchy works regardless of SDK version.
+try:
+    from agntcy_app_sdk.semantic.base import BaseAgentProtocol
+except ImportError:
+    from abc import ABC
+
+    class BaseAgentProtocol(ABC):  # type: ignore[no-redef]
+        """Local stub when agntcy_app_sdk.semantic.base.BaseAgentProtocol is unavailable."""
+        pass
+
+try:
+    from agntcy_app_sdk.semantic.message import Message
+except ImportError:
+
+    class Message:  # type: ignore[no-redef]
+        """Local stub for Message when agntcy_app_sdk is unavailable."""
+
+        def __init__(self, **kwargs: Any) -> None:
+            for k, v in kwargs.items():
+                setattr(self, k, v)
+
+try:
+    from agntcy_app_sdk.transport.base import BaseTransport
+except ImportError:
+    BaseTransport = None  # type: ignore[assignment,misc]
 
 logger = logging.getLogger(__name__)
 
