@@ -33,10 +33,12 @@ import {
   useComputedColorScheme,
 } from '@mantine/core';
 import { useAppContext } from '../layouts/StandaloneLayout';
-import { useConfig, useUpdateConfig } from '../../shared/hooks/index';
+import { useConfig, useUpdateConfig, useConfigSuggestions } from '../../shared/hooks/index';
 import { HelpTooltip } from '../../shared/HelpTooltip';
+import { LabelWithSuggestion } from '../../shared/components/SuggestionBadge';
 import { LoadingState } from '../../shared/LoadingState';
 import { tokens } from '../../shared/theme/styles';
+import type { SuggestionMap } from '../../shared/hooks/useSuggestions';
 
 const DOCS_BASE = 'https://agentredcx.com/docs/admin-guide';
 
@@ -353,6 +355,10 @@ export const ConfigurationPage: React.FC = () => {
   const configResult = useConfig(apiFetch);
   const { updateConfig: saveConfig, loading: saving, error: saveError, clearError: clearSaveError } = useUpdateConfig(apiFetch);
 
+  // KA-7: Config field suggestions from KB analysis
+  const suggestionsResult = useConfigSuggestions(apiFetch);
+  const suggestions: SuggestionMap = suggestionsResult.data ?? {};
+
   const computedColorScheme = useComputedColorScheme('dark');
   const isDark = computedColorScheme === 'dark';
 
@@ -505,14 +511,28 @@ export const ConfigurationPage: React.FC = () => {
               <Text fw={600} mb="md">Brand & persona <HelpTooltip text="Set your AI agent's name, greeting, personality tone, and formality level." docLink={`${DOCS_BASE}/brand-and-tone`} /></Text>
               <Stack gap="md">
                 <TextInput
-                  label="Brand name"
+                  label={
+                    <LabelWithSuggestion
+                      label="Brand name"
+                      suggestion={suggestions.brand_name}
+                      currentValue={form.brandName}
+                      onApply={(v) => updateField('brandName', String(v))}
+                    />
+                  }
                   placeholder="Your store or brand name"
                   value={form.brandName}
                   onChange={(e) => updateField('brandName', e.currentTarget.value)}
                   required
                 />
                 <Textarea
-                  label="Brand voice"
+                  label={
+                    <LabelWithSuggestion
+                      label="Brand voice"
+                      suggestion={suggestions.brand_voice}
+                      currentValue={form.brandVoice}
+                      onApply={(v) => updateField('brandVoice', String(v))}
+                    />
+                  }
                   placeholder="Describe the personality and tone of your AI agent..."
                   value={form.brandVoice}
                   onChange={(e) => updateField('brandVoice', e.currentTarget.value)}
@@ -558,7 +578,14 @@ export const ConfigurationPage: React.FC = () => {
                   max={365}
                 />
                 <Textarea
-                  label="Refund policy"
+                  label={
+                    <LabelWithSuggestion
+                      label="Refund policy"
+                      suggestion={suggestions.return_policy}
+                      currentValue={form.refundPolicy}
+                      onApply={(v) => updateField('refundPolicy', String(v))}
+                    />
+                  }
                   placeholder="Describe your refund policy..."
                   value={form.refundPolicy}
                   onChange={(e) => updateField('refundPolicy', e.currentTarget.value)}
@@ -566,7 +593,14 @@ export const ConfigurationPage: React.FC = () => {
                   autosize
                 />
                 <Textarea
-                  label="Shipping policy"
+                  label={
+                    <LabelWithSuggestion
+                      label="Shipping policy"
+                      suggestion={suggestions.shipping_info}
+                      currentValue={form.shippingPolicy}
+                      onApply={(v) => updateField('shippingPolicy', String(v))}
+                    />
+                  }
                   placeholder="Describe your shipping policy..."
                   value={form.shippingPolicy}
                   onChange={(e) => updateField('shippingPolicy', e.currentTarget.value)}

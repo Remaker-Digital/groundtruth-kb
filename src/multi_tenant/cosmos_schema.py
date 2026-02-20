@@ -64,6 +64,7 @@ COLLECTION_VERIFICATION_TOKENS = "verification_tokens"
 COLLECTION_INCIDENTS = "incidents"
 COLLECTION_ALERT_RULES = "alert_rules"
 COLLECTION_ALERT_HISTORY = "alert_history"
+COLLECTION_INGESTION_JOBS = "ingestion_jobs"
 
 ALL_COLLECTIONS = [
     COLLECTION_TENANTS,
@@ -81,6 +82,7 @@ ALL_COLLECTIONS = [
     COLLECTION_INCIDENTS,
     COLLECTION_ALERT_RULES,
     COLLECTION_ALERT_HISTORY,
+    COLLECTION_INGESTION_JOBS,
 ]
 
 # Cosmos DB Serverless — no provisioned throughput (pay per RU consumed)
@@ -99,6 +101,7 @@ TTL_SLA_SNAPSHOTS = 90 * 24 * 60 * 60     # 90 days (SLA trend retention)
 TTL_VERIFICATION_TOKEN = 10 * 60           # 10 minutes (email verification link)
 TTL_INCIDENTS = 365 * 24 * 60 * 60        # 1 year (incident history retention)
 TTL_ALERT_HISTORY = 90 * 24 * 60 * 60     # 90 days (alert history retention)
+TTL_INGESTION_JOBS = 30 * 24 * 60 * 60   # 30 days (ingestion job retention)
 
 
 # ---------------------------------------------------------------------------
@@ -818,6 +821,15 @@ class PreferencesDocument(BaseModel):
 
     # Memory & privacy (onboarding step 8)
     memory_enabled: bool = Field(default=True, description="Whether Layer 2+ memory is active")
+    customer_identification_mode: str = Field(
+        default="standard",
+        description=(
+            "How aggressively the AI encourages customers to identify themselves. "
+            "Values: off, gentle, standard, aggressive. Controls prompt injection "
+            "in Response Generator for authentication suggestions and PCM-building "
+            "probing questions."
+        ),
+    )
 
     # Custom system prompt additions
     custom_instructions: str | None = Field(
@@ -1308,6 +1320,80 @@ class AlertHistoryDocument(BaseModel):
     ttl: int = Field(default=TTL_ALERT_HISTORY, alias="_ts_ttl")
 
 
+class IngestionJobType(str, Enum):
+    """Type of storefront ingestion job."""
+
+    SHOPIFY = "shopify"
+    URL = "url"
+    CATEGORY_TEMPLATE = "category_template"
+
+
+class IngestionJobStatus(str, Enum):
+    """Status of a storefront ingestion job."""
+
+    PENDING = "pending"
+    RUNNING = "running"
+    COMPLETED = "completed"
+    FAILED = "failed"
+    CANCELLED = "cancelled"
+
+
+class IngestionJobDocument(BaseModel):
+    """Storefront ingestion job tracking (KA-1: Knowledge Automation).
+
+    Tracks background knowledge ingestion jobs — Shopify product imports,
+    URL crawls, and category template applications. Each job creates
+    KB articles and vectorizes them asynchronously.
+
+    Partition key: /tenant_id
+    TTL: 30 days.
+    """
+
+    id: str = Field(description="Document ID (UUID)")
+    tenant_id: str = Field(description="Partition key — tenant owning this job")
+
+    # Job configuration
+    job_type: str = Field(description="shopify | url | category_template")
+    status: str = Field(
+        default=IngestionJobStatus.PENDING.value,
+        description="pending | running | completed | failed | cancelled",
+    )
+    source_config: dict[str, Any] = Field(
+        default_factory=dict,
+        description=(
+            "Job-specific configuration. "
+            "Shopify: {shop_domain, access_token_ref}. "
+            "URL: {start_url, max_pages, entry_type}. "
+            "Template: {category_id, merge_mode}."
+        ),
+    )
+
+    # Progress tracking
+    progress_percent: int = Field(default=0, description="0-100 completion percentage")
+    articles_created: int = Field(default=0, description="KB articles successfully created")
+    articles_failed: int = Field(default=0, description="KB articles that failed to create")
+    total_chars: int = Field(default=0, description="Total characters of content ingested")
+    pages_crawled: int = Field(default=0, description="Number of pages/products processed")
+
+    # Results
+    entry_ids: list[str] = Field(
+        default_factory=list,
+        description="IDs of created KB articles (for rollback/tracking)",
+    )
+    error_message: str | None = Field(
+        default=None,
+        description="Error message if job failed",
+    )
+
+    # Timestamps
+    created_at: str = Field(description="When job was created (ISO 8601)")
+    started_at: str | None = Field(default=None, description="When processing began")
+    completed_at: str | None = Field(default=None, description="When processing finished")
+
+    # TTL
+    ttl: int = Field(default=TTL_INGESTION_JOBS, alias="_ts_ttl")
+
+
 # ---------------------------------------------------------------------------
 # Collection configuration
 # ---------------------------------------------------------------------------
@@ -1325,7 +1411,7 @@ class CollectionConfig(BaseModel):
 
 
 def get_collection_configs() -> list[CollectionConfig]:
-    """Return collection configurations for all 11 containers.
+    """Return collection configurations for all 16 containers.
 
     These configs are used by the database initialization utility
     to create containers idempotently.
@@ -1670,6 +1756,31 @@ def get_collection_configs() -> list[CollectionConfig]:
                     [
                         {"path": "/alert_date", "order": "ascending"},
                         {"path": "/triggered_at", "order": "descending"},
+                    ],
+                ],
+            },
+        ),
+        # 16. ingestion_jobs (KA-1: storefront ingestion — job tracking, 30-day TTL)
+        CollectionConfig(
+            name=COLLECTION_INGESTION_JOBS,
+            partition_key="/tenant_id",
+            default_ttl=TTL_INGESTION_JOBS,
+            indexing_policy={
+                "automatic": True,
+                "indexingMode": "consistent",
+                "includedPaths": [{"path": "/*"}],
+                "excludedPaths": [
+                    {"path": "/entry_ids/*"},
+                    {"path": '/"_etag"/?'},
+                ],
+                "compositeIndexes": [
+                    [
+                        {"path": "/tenant_id", "order": "ascending"},
+                        {"path": "/created_at", "order": "descending"},
+                    ],
+                    [
+                        {"path": "/status", "order": "ascending"},
+                        {"path": "/created_at", "order": "ascending"},
                     ],
                 ],
             },

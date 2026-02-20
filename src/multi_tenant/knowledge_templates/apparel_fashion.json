@@ -1,0 +1,117 @@
+{
+  "id": "apparel_fashion",
+  "name": "Apparel & Fashion",
+  "version": 1,
+  "articles": [
+    {
+      "entry_type": "faq",
+      "title": "Sizing Guide",
+      "content": "We provide detailed sizing charts for every product on our store. To find the right size, measure your chest, waist, and hips using a soft measuring tape. Compare your measurements against the chart listed on each product page. If you are between sizes, we recommend sizing up for a relaxed fit or sizing down for a more tailored look. Our sizing follows US standard measurements unless otherwise noted. For international conversions, refer to the size conversion table at the bottom of each product listing.",
+      "category": "Sizing & Fit",
+      "tags": ["sizing", "measurements", "fit-guide"]
+    },
+    {
+      "entry_type": "faq",
+      "title": "Garment Care Instructions",
+      "content": "Proper garment care extends the life of your clothing. Always check the care label sewn inside each garment before washing. As a general rule, wash darks and lights separately in cold water to prevent color bleeding. Delicate fabrics like silk and cashmere should be hand-washed or placed in a mesh laundry bag on a gentle cycle. Avoid using bleach on colored items. Tumble dry on low heat or hang dry to reduce shrinkage. Iron on the appropriate heat setting for the fabric type. Store knits folded rather than hung to prevent stretching.",
+      "category": "Care & Maintenance",
+      "tags": ["care", "washing", "laundry", "maintenance"]
+    },
+    {
+      "entry_type": "faq",
+      "title": "How to Exchange an Item",
+      "content": "To exchange an item for a different size or color, log into your account and navigate to your order history. Select the item you wish to exchange and choose the Exchange option. Pick the new size or color you prefer, and we will generate a prepaid return label for you. Ship the original item back within 14 days. Once we receive and inspect the returned item, we will ship your replacement. If the replacement item is a different price, we will charge or refund the difference to your original payment method. Exchanges are available for items in unworn, unwashed condition with tags attached.",
+      "category": "Orders & Returns",
+      "tags": ["exchange", "returns", "sizing", "order-help"]
+    },
+    {
+      "entry_type": "faq",
+      "title": "Understanding Fabric Terminology",
+      "content": "Our product descriptions use standard textile industry terms. Cotton is a natural, breathable fiber ideal for everyday wear. Polyester is a synthetic fiber known for durability and wrinkle resistance. Linen is a lightweight natural fiber perfect for warm weather but wrinkles easily. Rayon is a semi-synthetic fiber with a silky drape. Spandex (also called elastane or Lycra) provides stretch. Blends combine fibers for balanced performance, such as cotton-polyester for softness with durability. Thread count refers to the density of woven threads per square inch and indicates fabric quality.",
+      "category": "Product Knowledge",
+      "tags": ["fabrics", "materials", "terminology"]
+    },
+    {
+      "entry_type": "faq",
+      "title": "Style Guide and Outfit Suggestions",
+      "content": "Not sure how to style a piece? Our style guide offers outfit suggestions for each product. Look for the Complete the Look section on any product page to see curated pairings. For business casual, pair chinos with a button-down shirt and loafers. For weekend casual, try our slim-fit jeans with a crew-neck tee and sneakers. Layering is key for transitional weather: add a lightweight jacket or cardigan over any outfit. Our customer service team can also provide personalized styling advice if you share your preferences and the occasion you are shopping for.",
+      "category": "Style & Inspiration",
+      "tags": ["style", "outfits", "fashion-advice", "lookbook"]
+    },
+    {
+      "entry_type": "policy",
+      "title": "Returns and Exchanges Policy",
+      "content": "We accept returns and exchanges within 30 days of delivery for items in their original condition: unworn, unwashed, and with all tags attached. Sale items and intimates are final sale and cannot be returned. To initiate a return, visit our Returns Center online and enter your order number and email address. A prepaid shipping label will be provided for domestic orders. Refunds are processed within 5-7 business days after we receive and inspect the returned item. The refund will be issued to your original payment method. Shipping costs are non-refundable unless the return is due to our error or a defective item.",
+      "category": "Policies",
+      "tags": ["returns", "exchanges", "refund", "policy"]
+    },
+    {
+      "entry_type": "policy",
+      "title": "Shipping Policy",
+      "content": "We offer several shipping options to meet your needs. Standard shipping takes 5-7 business days and is free on orders over $75. Expedited shipping takes 2-3 business days for a flat rate of $12.99. Overnight shipping is available for $24.99 and delivers the next business day if ordered before 2:00 PM EST. All orders are processed within 1-2 business days. You will receive a tracking number via email once your order ships. We currently ship to all 50 US states and select international destinations. International shipping rates and delivery times vary by destination and are calculated at checkout.",
+      "category": "Policies",
+      "tags": ["shipping", "delivery", "tracking", "rates"]
+    },
+    {
+      "entry_type": "policy",
+      "title": "Price Matching Policy",
+      "content": "We want you to feel confident in your purchase. If you find an identical item at a lower price from an authorized retailer within 14 days of your purchase, we will match that price. To request a price match, contact our customer service team with a link to the competitor listing. The item must be the same brand, style, color, and size. Price matching does not apply to clearance items, flash sales, coupon-stacked prices, or marketplace sellers. We reserve the right to verify the competitor price before issuing a price adjustment. Approved adjustments are applied as a refund to your original payment method.",
+      "category": "Policies",
+      "tags": ["price-match", "guarantee", "pricing"]
+    },
+    {
+      "entry_type": "article",
+      "title": "Fabric Types and Their Properties",
+      "content": "Understanding fabric types helps you choose garments suited to your lifestyle. Cotton is soft, breathable, and absorbs moisture well, making it perfect for t-shirts and everyday basics. Wool is naturally insulating and moisture-wicking, ideal for sweaters and cold-weather layers. Silk has a luxurious hand feel and natural temperature regulation but requires delicate care. Nylon is strong and abrasion-resistant, commonly used in activewear and outerwear. Modal is a type of rayon made from beech tree pulp, known for its exceptional softness and resistance to shrinkage. Tencel (lyocell) is an eco-friendly fiber made from sustainably harvested wood pulp.",
+      "category": "Product Knowledge",
+      "tags": ["fabrics", "cotton", "wool", "silk", "nylon", "modal"]
+    },
+    {
+      "entry_type": "article",
+      "title": "Understanding Fit Descriptions",
+      "content": "Our product listings use standard fit descriptions to help you choose. Slim fit is cut close to the body with minimal excess fabric, suitable for lean builds. Regular fit offers a comfortable amount of room through the body without being baggy. Relaxed fit provides extra room in the chest, waist, and seat for unrestricted movement. Oversized fit is intentionally loose and roomy for a contemporary streetwear look. Tailored fit falls between slim and regular, offering a polished look with enough room for comfort. Athletic fit is designed with extra room in the shoulders and thighs while tapering at the waist for muscular builds.",
+      "category": "Sizing & Fit",
+      "tags": ["fit", "slim", "regular", "relaxed", "tailored"]
+    },
+    {
+      "entry_type": "article",
+      "title": "Measurement Guide",
+      "content": "Accurate measurements are the key to finding your perfect fit. Use a flexible soft measuring tape and wear lightweight clothing. For chest measurement, wrap the tape around the fullest part of your chest, under your arms, keeping the tape level. For waist, measure around your natural waistline, which is the narrowest point above your belly button. For hips, measure around the widest point of your hips and buttocks. For inseam, measure from the crotch seam to the bottom of the leg along the inner seam of a well-fitting pair of pants. For sleeve length, measure from the center back of your neck, across the shoulder, and down to your wrist with your arm slightly bent.",
+      "category": "Sizing & Fit",
+      "tags": ["measurements", "sizing", "how-to-measure"]
+    },
+    {
+      "entry_type": "article",
+      "title": "Seasonal Collections Explained",
+      "content": "Our collections follow the standard fashion calendar. The Spring/Summer collection launches in February and features lightweight fabrics, bright colors, and warm-weather essentials like shorts, sundresses, and linen shirts. The Fall/Winter collection drops in August and includes heavier fabrics, layering pieces, outerwear, and rich seasonal tones. Pre-Fall is a transitional capsule available in June that bridges summer and fall with versatile pieces. Resort (or Cruise) collections appear in November and are designed for vacation and holiday travel. Limited-edition capsule collections may launch at any time and feature exclusive collaborations or special themes with reduced production runs.",
+      "category": "Product Knowledge",
+      "tags": ["seasonal", "collections", "spring-summer", "fall-winter"]
+    },
+    {
+      "entry_type": "article",
+      "title": "Denim Care and Maintenance",
+      "content": "Denim is one of the most durable fabrics, but proper care keeps it looking its best. Wash jeans inside out in cold water to preserve color and prevent fading. Avoid washing denim after every wear; instead, spot-clean stains and air out between wears. Most denim experts recommend washing jeans every 5-10 wears to maintain the integrity of the fabric. Use a mild detergent without bleach. Hang dry or tumble dry on low heat to minimize shrinkage. Raw or selvedge denim should be soaked in cold water before the first wear to allow natural shrinkage. Over time, unwashed raw denim develops unique fade patterns that reflect your personal wear habits.",
+      "category": "Care & Maintenance",
+      "tags": ["denim", "jeans", "care", "raw-denim", "washing"]
+    },
+    {
+      "entry_type": "article",
+      "title": "How to Measure Yourself at Home",
+      "content": "Getting accurate body measurements at home is straightforward with the right technique. You will need a flexible measuring tape, a mirror, and optionally a friend to help. Stand naturally with your arms relaxed at your sides. For the best results, measure over thin clothing or undergarments rather than bulky layers. Take each measurement twice and use the average if the numbers differ slightly. Write down your measurements and compare them to our size chart before ordering. If one measurement falls between two sizes, consider the fit style you prefer. For a closer fit, choose the smaller size. For a more comfortable or relaxed fit, go with the larger size. Our customer service team is also available to help you determine the best size based on your measurements.",
+      "category": "Sizing & Fit",
+      "tags": ["measurements", "how-to", "self-measure", "sizing-help"]
+    },
+    {
+      "entry_type": "article",
+      "title": "Gift Wrapping and Gift Cards",
+      "content": "Make your purchase extra special with our gift wrapping service. During checkout, select the gift wrap option for any eligible item for a fee of $5.99 per item. Each gift-wrapped item arrives in a branded box with tissue paper, a ribbon, and a complimentary gift card where you can include a personalized message up to 150 characters. Gift receipts are also available and show the item details without the price. If you are unsure of sizing or style, consider our digital gift cards, available in denominations from $25 to $500. Gift cards are delivered via email and never expire. They can be redeemed online or in-store and can be combined with other payment methods at checkout.",
+      "category": "Shopping & Services",
+      "tags": ["gift-wrap", "gift-cards", "presents", "packaging"]
+    }
+  ],
+  "config_suggestions": {
+    "brand_voice": "Friendly and fashion-forward. Use approachable language that makes customers feel confident about their style choices. Be knowledgeable about fabrics, fits, and trends without being pretentious.",
+    "escalation_keywords": ["damaged item", "wrong size shipped", "missing package", "refund not received", "defective", "complaint", "manager", "legal"],
+    "greeting_message": "Hi! Welcome to {{brand_name}}. Whether you need help with sizing, styling, or your order, I'm here to help!"
+  }
+}

@@ -705,14 +705,14 @@ class TestCollectionConfigurations:
 
     @pytest.mark.unit
     def test_ten_collections_defined(self):
-        """CR-23: ALL_COLLECTIONS has exactly 15 entries (10 original + sla_snapshots + verification_tokens + incidents + alert_rules + alert_history)."""
-        assert len(ALL_COLLECTIONS) == 15
+        """CR-23: ALL_COLLECTIONS has exactly 16 entries (10 original + sla_snapshots + verification_tokens + incidents + alert_rules + alert_history + ingestion_jobs)."""
+        assert len(ALL_COLLECTIONS) == 16
 
     @pytest.mark.unit
-    def test_collection_configs_returns_ten(self):
-        """CR-23: get_collection_configs() returns 15 configs."""
+    def test_collection_configs_returns_sixteen(self):
+        """CR-23: get_collection_configs() returns 16 configs (15 original + ingestion_jobs)."""
         configs = get_collection_configs()
-        assert len(configs) == 15
+        assert len(configs) == 16
 
     @pytest.mark.unit
     def test_tenant_scoped_collections_use_tenant_id_partition(self):

@@ -1,0 +1,117 @@
+{
+  "id": "home_garden",
+  "name": "Home & Garden",
+  "version": 1,
+  "articles": [
+    {
+      "entry_type": "faq",
+      "title": "Assembly Assistance and Instructions",
+      "content": "Most of our furniture items require some assembly. Each product ships with a printed instruction manual, all necessary hardware, and the tools required for assembly. Step-by-step video guides are also available on the product page under the Assembly tab. Average assembly time ranges from 30 minutes for small items like side tables to 2-3 hours for larger pieces like bed frames or bookshelves. We recommend having a second person assist with items that weigh over 50 pounds or have large panel components. If you are missing any hardware or parts, contact our support team with your order number and we will ship replacement parts at no charge within 2-3 business days. Professional assembly services are available in select areas through our partnership with local installation providers.",
+      "category": "Assembly & Setup",
+      "tags": ["assembly", "instructions", "furniture-setup", "tools"]
+    },
+    {
+      "entry_type": "faq",
+      "title": "Product Dimensions and Space Planning",
+      "content": "Accurate dimensions for every product are listed on the product page, including height, width, depth, and weight. For furniture, we also list the assembled dimensions separately from the shipping box dimensions. Measure your intended space carefully before ordering, and account for at least 3-4 inches of clearance on each side for furniture near walls to allow for baseboards and air circulation. For dining tables, allow 24 inches of width per place setting and 36 inches between the table edge and any wall or other furniture for comfortable chair movement. Our product images include scale references where possible. If you need specific measurements not listed on the product page, our customer service team can provide detailed specs including diagonal measurements and clearance requirements.",
+      "category": "Product Information",
+      "tags": ["dimensions", "measurements", "space-planning", "sizing"]
+    },
+    {
+      "entry_type": "faq",
+      "title": "Furniture Care Instructions",
+      "content": "Proper care extends the life and appearance of your furniture. For wood furniture, dust regularly with a soft, dry cloth and avoid placing items directly on the surface without coasters or placemats, as moisture rings and heat marks are difficult to remove. Apply wood polish or oil every 3-6 months to maintain the finish. For upholstered pieces, vacuum weekly using the upholstery attachment and rotate cushions monthly to ensure even wear. Blot spills immediately with a clean, damp cloth rather than rubbing, which can spread the stain. Metal furniture should be wiped down with a damp cloth and dried immediately to prevent water spots or corrosion. For glass surfaces, use a glass-specific cleaner and a microfiber cloth to avoid streaks. Keep all furniture out of direct sunlight to prevent fading.",
+      "category": "Care & Maintenance",
+      "tags": ["furniture-care", "wood", "upholstery", "maintenance"]
+    },
+    {
+      "entry_type": "faq",
+      "title": "Outdoor Product Durability",
+      "content": "Our outdoor products are designed to withstand the elements, but proper care maximizes their lifespan. Outdoor furniture made from teak, cedar, or poly-resin wicker is naturally weather-resistant. Aluminum frames are lightweight and rust-proof. Powder-coated steel resists rust but should be touched up if the coating chips. All outdoor cushion fabrics are treated for UV resistance and water repellency, but we recommend storing cushions indoors or in a storage bin during extended wet weather or winter months. Cover larger furniture items with fitted weather covers (available separately) when not in use for long periods. Rinse outdoor items with a garden hose periodically to remove pollen, dirt, and debris. For areas with harsh winters, bring smaller items indoors or store them in a garage or shed to prevent freeze-thaw damage.",
+      "category": "Product Information",
+      "tags": ["outdoor", "weather-resistant", "durability", "patio"]
+    },
+    {
+      "entry_type": "faq",
+      "title": "Replacement Parts and Hardware",
+      "content": "We stock replacement parts for all current products and most discontinued items from the last five years. Common replacement items include furniture hardware (bolts, screws, cam locks, dowels), cushion covers, glass shelves, drawer slides, and casters. To order replacement parts, contact our customer service team with your product name or SKU and a description of the part you need. If the product is still under its 1-year structural warranty, replacement parts are provided free of charge. For items outside the warranty period, parts are available for purchase at cost. Standard replacement parts ship within 3-5 business days. Custom or made-to-order parts may take 2-4 weeks. We will always attempt to source a compatible alternative if the exact part is no longer manufactured.",
+      "category": "Parts & Repairs",
+      "tags": ["replacement-parts", "hardware", "repairs", "spare-parts"]
+    },
+    {
+      "entry_type": "policy",
+      "title": "Furniture Return Policy",
+      "content": "Furniture may be returned within 30 days of delivery in its original condition and packaging. Items must be unassembled or in like-new assembled condition without scratches, stains, or other damage. Due to the size and weight of furniture items, return shipping is arranged through our logistics team and a pickup fee of $49.99 may apply for large items requiring freight return. Custom-order furniture (items made to order with custom fabrics, finishes, or dimensions) is non-returnable. Mattresses may be returned within a 100-night trial period provided they are used with a mattress protector. Refunds are processed within 7-10 business days after the item is received and inspected at our warehouse. For items damaged during delivery, we will arrange a free replacement or full refund immediately upon receiving photos of the damage.",
+      "category": "Policies",
+      "tags": ["returns", "furniture", "refund", "policy"]
+    },
+    {
+      "entry_type": "policy",
+      "title": "Large Item Shipping Policy",
+      "content": "Large and heavy items such as furniture, outdoor structures, and major garden equipment ship via freight carrier or specialized white-glove delivery. Standard freight delivery brings the item to your driveway or building entrance. White-glove delivery, available for an additional fee, includes delivery to the room of your choice, unpacking, assembly, and removal of all packaging materials. Delivery appointments are scheduled within a 4-hour window and you will receive a call from the carrier 24 hours in advance to confirm. An adult (18 or older) must be present to sign for the delivery. For apartments or condos, ensure that elevator dimensions and doorway widths can accommodate the item by checking the shipping box dimensions listed on the product page. Items shipped via freight typically arrive within 7-14 business days depending on your location.",
+      "category": "Policies",
+      "tags": ["shipping", "freight", "white-glove", "delivery", "large-items"]
+    },
+    {
+      "entry_type": "policy",
+      "title": "Shipping Damage Claims",
+      "content": "If your item arrives damaged, document the damage immediately by taking photos of the packaging and the product before discarding any materials. Report damage within 48 hours of delivery by contacting our customer service team with your order number, photos of the damage, and a description of the issue. For freight deliveries, note any visible damage on the carrier's delivery receipt before signing. We will arrange either a replacement shipment at no cost, a partial refund for minor cosmetic damage you are willing to accept, or a full refund including shipping charges. Replacement items are prioritized and typically ship within 2-3 business days. You do not need to return the damaged item unless specifically requested by our team; in most cases, we will ask you to dispose of or donate the damaged product at your convenience.",
+      "category": "Policies",
+      "tags": ["damage", "shipping-damage", "claims", "replacement"]
+    },
+    {
+      "entry_type": "article",
+      "title": "Common Material Types for Furniture",
+      "content": "Understanding furniture materials helps you make informed choices. Solid hardwood (oak, walnut, maple, cherry) is the most durable and long-lasting option, suitable for heirloom-quality pieces that can be refinished multiple times. Engineered wood (MDF, particle board, plywood) is more affordable and resists warping but cannot be refinished. Veneer applies a thin layer of real wood over engineered wood, combining the look of hardwood with the stability of engineered construction. Metal frames in steel or iron provide industrial strength, while aluminum is lightweight and rust-resistant for outdoor use. Rattan and wicker are natural or synthetic woven materials ideal for casual and outdoor furniture. Marble, granite, and quartz are premium surface materials for tabletops that offer beauty and durability but require sealing and careful maintenance.",
+      "category": "Product Knowledge",
+      "tags": ["materials", "hardwood", "engineered-wood", "metal", "stone"]
+    },
+    {
+      "entry_type": "article",
+      "title": "Furniture Style Guide",
+      "content": "Choosing a furniture style that suits your space creates a cohesive look. Mid-century modern features clean lines, tapered legs, and organic curves with warm wood tones, popular for living rooms and home offices. Industrial style emphasizes raw materials like exposed metal, reclaimed wood, and distressed finishes. Farmhouse style is characterized by rustic wood, shiplap details, and a warm, lived-in feel with neutral colors. Scandinavian design focuses on minimalism, functionality, and light-colored woods with simple silhouettes. Contemporary style is current and evolving, often blending elements from multiple styles with a focus on clean lines and neutral palettes. Traditional style features ornate details, rich wood stains, and classic silhouettes inspired by European design heritage. Bohemian style mixes patterns, textures, and global influences for an eclectic, collected-over-time aesthetic.",
+      "category": "Design Inspiration",
+      "tags": ["styles", "mid-century", "industrial", "farmhouse", "scandinavian"]
+    },
+    {
+      "entry_type": "article",
+      "title": "Essential Plant Care Terminology",
+      "content": "Understanding plant care terms helps you choose and maintain healthy plants. Full sun means the plant needs 6 or more hours of direct sunlight daily. Partial shade means 3-6 hours of direct sun, preferably morning sun with afternoon shade. Full shade means fewer than 3 hours of direct sun. Hardiness zones (USDA zones 1-13) indicate the coldest temperatures a perennial plant can survive; check your zone before purchasing outdoor plants. Annuals complete their life cycle in one season, while perennials return year after year. Soil pH measures acidity or alkalinity on a scale of 0-14; most plants prefer slightly acidic soil between 6.0 and 7.0. Mulching means spreading material around plants to retain moisture, suppress weeds, and regulate soil temperature. Deadheading refers to removing spent flowers to encourage continued blooming throughout the season.",
+      "category": "Garden Knowledge",
+      "tags": ["plants", "gardening", "terminology", "care", "sunlight"]
+    },
+    {
+      "entry_type": "article",
+      "title": "Understanding Lighting Types",
+      "content": "Choosing the right lighting transforms a space. Ambient lighting provides overall illumination for a room and includes ceiling-mounted fixtures, recessed lights, and chandeliers. Task lighting focuses light where you need it for specific activities such as reading lamps, under-cabinet kitchen lights, and desk lamps. Accent lighting highlights decorative elements, artwork, or architectural features using track lights, picture lights, or uplighters. LED bulbs are the most energy-efficient option, lasting 15,000 to 50,000 hours and using up to 75% less energy than incandescent bulbs. Color temperature is measured in Kelvin (K): warm white (2700-3000K) creates a cozy atmosphere for living rooms and bedrooms, neutral white (3500-4000K) suits kitchens and bathrooms, and daylight (5000-6500K) is ideal for task areas and home offices.",
+      "category": "Product Knowledge",
+      "tags": ["lighting", "LED", "ambient", "task-lighting", "color-temperature"]
+    },
+    {
+      "entry_type": "article",
+      "title": "Upholstery Fabric Grades Explained",
+      "content": "Upholstery fabrics are graded by durability, measured in double rubs using the Wyzenbeek or Martindale test. Grade A fabrics (up to 15,000 double rubs) are decorative and suited for low-use pieces like accent chairs. Grade B (15,000-30,000 double rubs) works well for average residential use. Grade C and above (30,000+ double rubs) is recommended for high-traffic areas, households with children or pets, and commercial settings. Performance fabrics like Crypton and Sunbrella are engineered to resist stains, moisture, and fading, making them ideal for families. Leather is graded by quality: top-grain leather is the most durable and develops a natural patina over time, while bonded leather is more affordable but less durable. When selecting fabric, also consider pilling resistance, colorfastness, and whether the fabric is treated with a stain-resistant finish.",
+      "category": "Product Knowledge",
+      "tags": ["upholstery", "fabric", "durability", "grades", "performance"]
+    },
+    {
+      "entry_type": "article",
+      "title": "Room Measurement and Layout Guide",
+      "content": "Proper room measurement is essential before purchasing furniture. Start by drawing a basic floor plan of your room, noting the location of windows, doors, electrical outlets, and any permanent fixtures like fireplaces or built-in shelving. Measure the room length and width, recording measurements in both feet and inches. Measure doorway widths and heights to ensure furniture can be moved into the room. For living rooms, leave 18 inches between a coffee table and sofa for comfortable legroom. Dining rooms need at least 36 inches between the table edge and walls for chair clearance. In bedrooms, leave 24 inches on each side of the bed for nightstands and walking space. For hallways and walkways, maintain a minimum of 36 inches clear width for easy passage. Use painter's tape on the floor to outline furniture dimensions before purchasing to visualize the layout.",
+      "category": "Planning & Design",
+      "tags": ["measurements", "layout", "floor-plan", "room-planning"]
+    },
+    {
+      "entry_type": "article",
+      "title": "Seasonal Garden Planning Calendar",
+      "content": "A well-planned garden produces results throughout the year. In early spring (March-April), start seeds indoors for warm-season crops like tomatoes and peppers, and direct-sow cool-season crops like lettuce, peas, and spinach outdoors once the soil can be worked. In late spring (May), after the last frost date for your zone, transplant warm-season starts outdoors and plant flower annuals. Summer (June-August) is the time for regular watering (1 inch per week minimum), mulching to retain moisture, and succession planting of quick-growing crops like beans and radishes. In fall (September-October), plant spring-blooming bulbs like tulips and daffodils, sow cover crops in empty beds, and harvest remaining summer produce. Winter (November-February) is ideal for pruning dormant trees and shrubs, cleaning and sharpening tools, planning next year's layout, and ordering seeds from catalogs.",
+      "category": "Garden Knowledge",
+      "tags": ["seasonal", "garden-planning", "planting", "calendar", "schedule"]
+    }
+  ],
+  "config_suggestions": {
+    "brand_voice": "Helpful and practical. Use clear, hands-on language that empowers customers to tackle home improvement and gardening projects with confidence. Be thorough with measurements and care instructions without being overly technical.",
+    "escalation_keywords": ["damaged in shipping", "missing parts", "wrong item", "assembly defect", "broken", "injury", "refund not received", "delivery not received", "complaint", "manager"],
+    "greeting_message": "Hi! Welcome to {{brand_name}}. I can help with product details, assembly questions, care tips, or your order. How can I assist you?"
+  }
+}

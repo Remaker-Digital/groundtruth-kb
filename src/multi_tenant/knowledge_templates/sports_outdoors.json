@@ -1,0 +1,117 @@
+{
+  "id": "sports_outdoors",
+  "name": "Sports & Outdoors",
+  "version": 1,
+  "articles": [
+    {
+      "entry_type": "faq",
+      "title": "Athletic Wear and Shoe Sizing Guide",
+      "content": "Finding the right fit is critical for performance and comfort. Our athletic apparel uses standard US sizing, and each product page includes a detailed size chart with measurements for chest, waist, hips, and inseam in both inches and centimeters. For athletic shoes, we recommend ordering a half size up from your standard street shoe size, as feet swell during exercise. Trail running shoes and hiking boots should have approximately a thumb's width of space between your longest toe and the front of the shoe to accommodate downhill movement. If you are between sizes, size up for running and hiking footwear, or size down for climbing shoes where a snug fit improves precision.",
+      "category": "Sizing & Fit",
+      "tags": ["sizing", "athletic-wear", "shoes", "fit-guide"]
+    },
+    {
+      "entry_type": "faq",
+      "title": "Equipment Maintenance and Care",
+      "content": "Regular maintenance extends the life of your equipment and ensures safety. Bicycle chains should be cleaned and lubricated every 100 to 200 miles, and tires should be inspected for wear and proper pressure before each ride. Camping stoves need to have fuel lines checked for cracks and burner jets cleared of debris before each trip. Climbing ropes should be inspected along their full length before every use, looking for cuts, abrasion, flat spots, or stiffness that could indicate core damage. Ski and snowboard edges should be tuned and waxed at the start of each season and every 5 to 7 days of use. Wetsuits should be rinsed with fresh water after every saltwater session and hung to dry out of direct sunlight.",
+      "category": "Maintenance",
+      "tags": ["maintenance", "care", "equipment", "safety", "longevity"]
+    },
+    {
+      "entry_type": "faq",
+      "title": "Weather Resistance and Waterproof Ratings",
+      "content": "Understanding waterproof ratings helps you choose the right gear for your conditions. Waterproof ratings are measured in millimeters of water column pressure a fabric can withstand before moisture penetrates. A rating of 5,000mm handles light rain and dry snow. Ratings of 10,000mm to 15,000mm are suitable for moderate rain and average snow conditions. Ratings above 20,000mm provide protection in heavy, sustained rain and wet snow. Breathability, measured in grams of moisture vapor per square meter per 24 hours (g/m2/24h), indicates how well the fabric allows sweat to escape. Look for both a high waterproof rating and high breathability for active use. Seam-sealed construction is essential, as untaped seams will leak regardless of the fabric's waterproof rating.",
+      "category": "Gear Specifications",
+      "tags": ["waterproof", "weather", "ratings", "breathability", "rain"]
+    },
+    {
+      "entry_type": "faq",
+      "title": "How to File a Warranty Claim",
+      "content": "To file a warranty claim, gather your original order number or proof of purchase, clear photographs of the defect from multiple angles, and a brief description of how the issue occurred and when you first noticed it. Submit these through our warranty claim form on our website or email them to our warranty team. Claims are typically reviewed within 5 business days. If approved, we will either repair the item, replace it with the same or equivalent model, or issue a store credit depending on the product and nature of the defect. Keep your original product during the review process, as we may request that you ship it to us for inspection. Warranty coverage periods vary by product category and are detailed on each product page.",
+      "category": "Warranty",
+      "tags": ["warranty", "claim", "defect", "replacement", "repair"]
+    },
+    {
+      "entry_type": "faq",
+      "title": "Returning Used or Tested Equipment",
+      "content": "We understand that some equipment needs to be tried in real conditions to determine if it works for you. Our Field Test policy allows you to return select gear within 30 days even if it has been used outdoors, provided it has been cleaned, is in functional condition, and shows only normal signs of use rather than abuse or heavy wear. Items eligible for the Field Test return are marked with a special badge on the product page. Footwear can be tested indoors on clean surfaces for fit and comfort but must show no outdoor wear marks for a full refund. Items returned under the Field Test policy will be inspected, and heavily worn items may receive a partial refund at our discretion. Electronics and GPS devices must be returned with all original accessories and in their original packaging.",
+      "category": "Returns",
+      "tags": ["returns", "used-equipment", "field-test", "policy"]
+    },
+    {
+      "entry_type": "policy",
+      "title": "Sports Equipment Returns Policy",
+      "content": "Unused and unmodified equipment may be returned within 30 days of delivery for a full refund in the original payment method. Items must be in their original packaging with all tags and accessories included. Custom-built or specially ordered items such as custom-length skis, built-to-order bicycles, or personalized equipment are final sale unless they arrive with a manufacturing defect. Protective equipment including helmets, life jackets, and harnesses cannot be returned once the packaging seal has been broken, as we cannot verify their continued safety integrity. Clearance items marked as final sale cannot be returned. Return shipping is free for defective items; for all other returns, a flat return shipping fee of $7.95 will be deducted from your refund.",
+      "category": "Returns & Exchanges",
+      "tags": ["returns", "policy", "equipment", "refund", "exchange"]
+    },
+    {
+      "entry_type": "policy",
+      "title": "Product Warranty Coverage Details",
+      "content": "Our warranty coverage varies by product category to match expected product lifespans. Bicycles carry a lifetime frame warranty and a 2-year components warranty. Tents and backpacks are covered for 3 years against defects in materials and workmanship. Footwear is warranted for 1 year from the date of purchase. Electronics including GPS units, cycling computers, and heart rate monitors are covered for 2 years. Clothing is warranted for 1 year against seam failure, zipper malfunction, and delamination under normal use conditions. Warranty coverage does not extend to normal wear and tear, cosmetic damage, modifications, commercial use, or damage resulting from failure to follow care instructions. Our warranty is non-transferable and applies only to the original purchaser.",
+      "category": "Warranty",
+      "tags": ["warranty", "coverage", "lifetime", "defects", "categories"]
+    },
+    {
+      "entry_type": "policy",
+      "title": "Safety Disclaimer for Sports Equipment",
+      "content": "Participation in sports and outdoor activities involves inherent risks including but not limited to physical injury, property damage, and exposure to environmental hazards. The equipment we sell is designed to enhance your experience and provide appropriate protection when used correctly, but no equipment can eliminate all risk. Always use protective gear as recommended for your activity. Helmets must be replaced after any significant impact even if no visible damage is present. Weight-bearing equipment including climbing harnesses, ropes, and anchors must be retired according to manufacturer specifications and after any fall or significant load event. We strongly recommend professional instruction before undertaking technical activities such as rock climbing, whitewater kayaking, backcountry skiing, or technical mountaineering.",
+      "category": "Safety & Legal",
+      "tags": ["safety", "disclaimer", "risk", "protective-gear", "legal"]
+    },
+    {
+      "entry_type": "article",
+      "title": "Understanding Fabric Technology in Athletic Gear",
+      "content": "Modern athletic fabrics use advanced technology to enhance performance. Moisture-wicking fabrics pull sweat away from your skin to the fabric's outer surface where it evaporates, keeping you dry during activity. Common moisture-wicking technologies include DRI-FIT, Climalite, and HeatGear. Merino wool is a natural fiber that regulates temperature in both hot and cold conditions, resists odor naturally, and wicks moisture effectively. Ripstop fabrics have a reinforcing technique that makes them resistant to tearing and ripping using a crosshatch pattern woven into the material. Softshell fabrics combine weather resistance with stretch and breathability, ideal for high-output activities in mild conditions. Hardshell fabrics provide maximum waterproof and windproof protection using membrane technologies like Gore-Tex, eVent, or proprietary alternatives.",
+      "category": "Education",
+      "tags": ["fabric", "technology", "moisture-wicking", "gore-tex", "merino"]
+    },
+    {
+      "entry_type": "article",
+      "title": "Equipment Specifications Decoded",
+      "content": "Product specifications contain critical information for choosing the right gear. Fill power in sleeping bags and down jackets measures the quality of down insulation; 550 fill power is good, 700 is very good, and 800 or higher is premium. R-value for sleeping pads measures thermal resistance against ground cold; an R-value of 1 to 2 suits summer camping, 3 to 4 suits three-season use, and 5 or higher is needed for winter conditions. Denier (D) measures fabric thread thickness; higher denier means more durability but also more weight. A 20D fabric is ultralight, 40D to 70D balances weight and durability, and 210D or higher is heavy-duty. Lumen output in headlamps measures total light emitted; 100 lumens suffices for camp tasks, 200 to 400 lumens suits trail running, and 600 or more lumens are needed for mountain biking at night.",
+      "category": "Education",
+      "tags": ["specifications", "fill-power", "R-value", "denier", "lumens"]
+    },
+    {
+      "entry_type": "article",
+      "title": "Fitness Terminology for Equipment Shoppers",
+      "content": "Understanding fitness terminology helps you select equipment that matches your training goals. VO2 max is the maximum rate of oxygen your body can use during exercise, a key indicator of cardiovascular fitness measured by some advanced fitness watches. Heart rate zones divide your effort into 5 zones from easy recovery (Zone 1, 50 to 60 percent of max heart rate) to maximum effort (Zone 5, 90 to 100 percent). Cadence refers to the number of steps per minute in running or pedal revolutions per minute in cycling, with optimal running cadence typically between 170 and 180 steps per minute. Progressive overload is the gradual increase of stress placed on the body during training, achieved by increasing weight, repetitions, or intensity over time. Power-to-weight ratio, measured in watts per kilogram, is a key performance metric in cycling.",
+      "category": "Education",
+      "tags": ["fitness", "VO2-max", "heart-rate", "cadence", "terminology"]
+    },
+    {
+      "entry_type": "article",
+      "title": "Outdoor Safety Terminology and Concepts",
+      "content": "Knowing outdoor safety terms can help you prepare for and respond to situations in the field. Leave No Trace (LNT) comprises seven principles for minimizing environmental impact during outdoor recreation, including packing out all trash, staying on designated trails, and properly disposing of waste. The Ten Essentials is a widely recommended list of items to carry on any outdoor excursion: navigation tools, sun protection, insulation (extra clothing), illumination (headlamp), first-aid supplies, fire-starting tools, repair kit, nutrition, hydration, and emergency shelter. WBGT (Wet Bulb Globe Temperature) measures heat stress that accounts for temperature, humidity, wind speed, and solar radiation, and is more accurate than heat index alone. Wind chill factor describes how wind speed makes the air feel colder than the actual temperature, critical for cold-weather planning.",
+      "category": "Education",
+      "tags": ["safety", "leave-no-trace", "ten-essentials", "outdoor", "preparation"]
+    },
+    {
+      "entry_type": "article",
+      "title": "Understanding Gear Ratings and Standards",
+      "content": "Industry ratings and standards help you evaluate gear quality and safety. EN (European Norm) ratings certify climbing equipment and helmets meet rigorous safety standards. UIAA (International Climbing and Mountaineering Federation) certification indicates gear has passed additional testing beyond EN standards. CE marking confirms a product meets European Union safety, health, and environmental requirements. IPX ratings classify water resistance for electronics: IPX4 handles splashes, IPX7 survives submersion to 1 meter for 30 minutes, and IPX8 handles deeper or prolonged submersion. Temperature ratings for sleeping bags indicate the lowest temperature at which an average user will sleep comfortably; EN and ISO testing standards provide comparable, lab-tested ratings across brands.",
+      "category": "Education",
+      "tags": ["ratings", "EN", "UIAA", "IPX", "standards", "certifications"]
+    },
+    {
+      "entry_type": "article",
+      "title": "Comprehensive Gear Sizing Guide",
+      "content": "Proper sizing across equipment categories prevents discomfort and enhances performance. For backpacks, measure your torso length from the C7 vertebra (the bump at the base of your neck) to the top of your hip bones; packs come in small (up to 16 inches), medium (16 to 18 inches), and large (18 to 20 inches) torso sizes. Helmet sizing requires measuring your head circumference one inch above your eyebrows; most brands offer small, medium, and large with dial-fit adjusters for fine tuning. Wetsuit sizing depends on height, weight, and chest measurement, with a snug fit being essential because water will flush through gaps and negate insulation. Ski length depends on your height, weight, and ability level; beginners should choose skis that reach between their chin and nose, while advanced skiers typically use skis at forehead height or taller.",
+      "category": "Guides",
+      "tags": ["sizing", "backpacks", "helmets", "wetsuits", "skis", "guide"]
+    },
+    {
+      "entry_type": "article",
+      "title": "Equipment Maintenance Schedule and Tips",
+      "content": "Following a regular maintenance schedule keeps your gear performing safely and extends its lifespan. After every use: rinse saltwater gear with fresh water, air dry tents and sleeping bags before storing, and inspect ropes and harnesses for damage. Monthly: lubricate zippers with zipper lubricant or a graphite pencil, check and inflate bicycle tires to proper pressure, and clean water filter cartridges. Seasonally: reapply DWR (Durable Water Repellent) treatment to rain jackets and tents using spray-on or wash-in products, wax ski and snowboard bases, and restring racquets. Annually: have bicycles professionally tuned (adjust derailleurs, replace cables, true wheels), replace helmet after 5 years or any impact, and inspect inflatable watercraft for slow leaks. Always store gear in a cool, dry place away from direct sunlight, and never compress down products in stuff sacks for long-term storage.",
+      "category": "Guides",
+      "tags": ["maintenance", "schedule", "care", "DWR", "storage", "guide"]
+    }
+  ],
+  "config_suggestions": {
+    "brand_voice": "Enthusiastic and expert, passionate about outdoor adventure and athletic performance. Provide clear, practical advice with an emphasis on safety and proper gear selection.",
+    "escalation_keywords": ["injury", "safety concern", "defective", "recall", "broken", "dangerous", "emergency", "snapped", "failed during use", "accident"],
+    "greeting_message": "Hi! Welcome to {{brand_name}}. Whether you need help finding the right gear, sizing advice, or equipment maintenance tips, I'm here to help. What can I assist you with?"
+  }
+}

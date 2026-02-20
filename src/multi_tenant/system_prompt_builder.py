@@ -334,6 +334,91 @@ def _build_tier_section(tier: TenantTier) -> str:
 
 
 # ---------------------------------------------------------------------------
+# Customer identification & PCM-building prompt fragments
+# ---------------------------------------------------------------------------
+
+# Mode → prompt fragment mapping.  The off mode returns an empty string;
+# all others inject a contextual instruction block into the Response
+# Generator's system prompt.  The Critic/Supervisor prompt is NEVER
+# modified (immutable safety invariant).
+
+_IDENTIFICATION_PROMPTS: dict[str, str] = {
+    "off": "",
+
+    "gentle": (
+        "CUSTOMER IDENTIFICATION:\n"
+        "If the customer has not identified themselves (no name, email, or "
+        "login detected), casually mention that logging in or sharing their "
+        "email helps you provide more personalized assistance — such as "
+        "looking up order history or remembering their preferences.  Keep it "
+        "light and natural; do not pressure them."
+    ),
+
+    "standard": (
+        "CUSTOMER IDENTIFICATION:\n"
+        "In your first response to a new customer, suggest they log in or "
+        "provide their email address so you can access their order history "
+        "and provide personalized help.  Briefly explain the benefits: "
+        "faster order lookups, personalized recommendations, and continuity "
+        "across conversations.  If they decline, continue providing "
+        "excellent service without pressing the issue."
+    ),
+
+    "aggressive": (
+        "CUSTOMER IDENTIFICATION:\n"
+        "Your first response MUST include a strong, clear suggestion that "
+        "the customer authenticate or provide identifying information "
+        "(email, order number, or account login).  Explain the concrete "
+        "benefits: instant order status, personalized product "
+        "recommendations, faster resolution of account issues, and a "
+        "remembered experience across visits.  Ask at least one probing "
+        "question about their recent orders or product interests to "
+        "demonstrate the value of identification.  If they decline, respect "
+        "that — but revisit the suggestion once if a later question would "
+        "benefit from account access."
+    ),
+}
+
+_PCM_BUILDING_PROMPT = (
+    "BUILDING CUSTOMER KNOWLEDGE:\n"
+    "As you converse, actively learn about the customer.  Ask natural, "
+    "contextual follow-up questions to discover their preferences, "
+    "interests, and needs — for example, what products they are shopping "
+    "for, what features matter most, or whether they have had previous "
+    "experience with similar products.  These observations help build a "
+    "richer profile for future conversations.  Keep probing questions "
+    "natural and relevant to the conversation; never interrogate."
+)
+
+
+def _build_identification_section(prefs: PreferencesDocument) -> str:
+    """Build the customer identification and PCM-building prompt section.
+
+    Returns an empty string if mode is ``off`` and memory is disabled,
+    or a combined identification + PCM-building block otherwise.
+
+    Only called for the Response Generator agent.  The Critic prompt is
+    never modified.
+    """
+    mode = getattr(prefs, "customer_identification_mode", "standard") or "standard"
+    memory_on = getattr(prefs, "memory_enabled", True)
+
+    parts: list[str] = []
+
+    # Identification prompt (gated by mode)
+    id_prompt = _IDENTIFICATION_PROMPTS.get(mode, "")
+    if id_prompt:
+        parts.append(id_prompt)
+
+    # PCM-building prompt (gated by memory_enabled — Layer 2+ must be on
+    # for probing questions to have value)
+    if memory_on and mode != "off":
+        parts.append(_PCM_BUILDING_PROMPT)
+
+    return "\n\n".join(parts)
+
+
+# ---------------------------------------------------------------------------
 # Tenant configuration section builder
 # ---------------------------------------------------------------------------
 
@@ -398,6 +483,13 @@ def _build_tenant_config_section(
             lines.append(
                 f"- Escalation keywords: {', '.join(prefs.escalation_keywords)}"
             )
+
+    # --- Customer identification & PCM building (Response Generator only) ---
+    if agent == AgentRole.RESPONSE_GENERATOR:
+        id_section = _build_identification_section(prefs)
+        if id_section:
+            lines.append("")
+            lines.append(id_section)
 
     # --- Custom instructions (Response Generator only, sandboxed) ---
     if agent == AgentRole.RESPONSE_GENERATOR and prefs.custom_instructions:

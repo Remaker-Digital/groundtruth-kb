@@ -106,3 +106,21 @@ export {
   useDeactivateIntegration,
   useDisconnectIntegration,
 } from './useAdmin';
+
+// Ingestion (KA-7: Knowledge Automation)
+export {
+  useIngestionStatus,
+  useTemplates,
+  useStartIngestion,
+  useCancelIngestion,
+  useApplyTemplate,
+} from './useIngestion';
+export type {
+  IngestionJob,
+  CategoryTemplate,
+  TemplateApplyResult,
+} from './useIngestion';
+
+// Config Suggestions (KA-7: Knowledge Automation)
+export { useConfigSuggestions } from './useSuggestions';
+export type { ConfigSuggestion, SuggestionMap } from './useSuggestions';

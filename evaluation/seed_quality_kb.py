@@ -13,7 +13,7 @@ Preconditions:
     - Valid superadmin API key for the target tenant
 
 Usage:
-    # Dry run — list articles that would be created
+    # Dry run — list articles that would be created (default: remaker-digital-001)
     python evaluation/seed_quality_kb.py
 
     # Execute — create articles via admin API
@@ -22,6 +22,9 @@ Usage:
     # Wipe existing KB first, then seed (clean slate)
     python evaluation/seed_quality_kb.py --execute --clean
 
+    # Target a different tenant via env vars
+    QUALITY_API_KEY=ar_user_test_... python evaluation/seed_quality_kb.py --execute
+
 © 2026 Remaker Digital, a DBA of VanDusen & Palmeter, LLC. All rights reserved.
 """
 
@@ -29,17 +32,24 @@ from __future__ import annotations
 
 import argparse
 import json
+import os
 import sys
 import time
 
 import requests
 
 # ---------------------------------------------------------------------------
-# Configuration
+# Configuration (override via env vars for multi-tenant support)
 # ---------------------------------------------------------------------------
 
-PROD_URL = "https://agent-red-api-gateway.orangeglacier-f566a4e7.eastus.azurecontainerapps.io"
-API_KEY = "ar_user_rema_qcHQpv0bhGwXpEou14WH3fnE_RZMvI_N"
+PROD_URL = os.environ.get(
+    "QUALITY_PROD_URL",
+    "https://agent-red-api-gateway.orangeglacier-f566a4e7.eastus.azurecontainerapps.io",
+)
+API_KEY = os.environ.get(
+    "QUALITY_API_KEY",
+    "ar_user_rema_qcHQpv0bhGwXpEou14WH3fnE_RZMvI_N",  # default: remaker-digital-001
+)
 
 # ---------------------------------------------------------------------------
 # KB Articles — derived from response_quality.json knowledge_context fields

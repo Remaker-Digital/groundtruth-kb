@@ -27,6 +27,9 @@ import {
 import { useDisclosure } from '@mantine/hooks';
 import { useAppContext } from '../layouts/StandaloneLayout';
 import { useKnowledgeBase, useSaveKBArticle, useUploadFile, useImportUrl, useExportCSV, useStalenessSummary, useVerifyEntry } from '../../shared/hooks/index';
+import { useIngestionStatus, useTemplates, useStartIngestion, useCancelIngestion, useApplyTemplate } from '../../shared/hooks/useIngestion';
+import { IngestionPanel } from '../../shared/components/IngestionPanel';
+import { CategoryTemplateSelector } from '../../shared/components/CategoryTemplateSelector';
 import type { KBArticle, KBArticleStatus, KBUploadResult } from '../../shared/types/index';
 import { LoadingState } from '../../shared/LoadingState';
 import { tokens } from '../../shared/theme/styles';
@@ -257,6 +260,14 @@ export const KnowledgeBasePage: React.FC = () => {
   // Staleness hooks
   const { data: stalenessData, refetch: refetchStaleness } = useStalenessSummary(apiFetch);
   const { verify, loading: verifying } = useVerifyEntry(apiFetch);
+
+  // Ingestion & template hooks (KA-7)
+  const ingestionStatus = useIngestionStatus(apiFetch);
+  const templatesResult = useTemplates(apiFetch);
+  const { start: startIngestion, loading: startingIngestion } = useStartIngestion(apiFetch);
+  const { cancel: cancelIngestion, loading: cancellingIngestion } = useCancelIngestion(apiFetch);
+  const { apply: applyTemplate, loading: applyingTemplate, error: applyTemplateError } = useApplyTemplate(apiFetch);
+  const [showAutomation, setShowAutomation] = useState(false);
 
   // Local UI state
   const [search, setSearch] = useState('');
@@ -617,6 +628,92 @@ export const KnowledgeBasePage: React.FC = () => {
           </Paper>
         </Tooltip>
       </SimpleGrid>
+
+      {/* KA-7: Knowledge Automation section */}
+      <Paper p="md" radius="md" withBorder>
+        <Group justify="space-between" mb={showAutomation ? 'md' : 0}>
+          <Group gap="xs">
+            <Text fw={600}>Knowledge automation</Text>
+            <Badge size="xs" variant="light" color="violet">Beta</Badge>
+          </Group>
+          <Button
+            variant="subtle"
+            size="xs"
+            onClick={() => setShowAutomation((prev) => !prev)}
+          >
+            {showAutomation ? 'Hide' : 'Show'}
+          </Button>
+        </Group>
+        {!showAutomation && (
+          <Text size="xs" c="dimmed" mt="xs">
+            Import content from your storefront or apply industry templates to quickly build your knowledge base.
+          </Text>
+        )}
+        {showAutomation && (
+          <Stack gap="lg">
+            {/* Storefront scan */}
+            <div>
+              <Group gap="xs" mb="sm">
+                <Text fw={500} size="sm">Storefront import</Text>
+                <Tooltip label="Scan your storefront to import product descriptions, policies, and FAQ content as knowledge base articles." multiline w={280} withArrow>
+                  <Badge size="xs" variant="light" color="gray" style={{ cursor: 'help' }}>?</Badge>
+                </Tooltip>
+              </Group>
+              <Group gap="sm" mb="sm">
+                <Button
+                  size="xs"
+                  color={ACTION_BLUE}
+                  onClick={() => startIngestion('shopify')}
+                  loading={startingIngestion}
+                  disabled={ingestionStatus.data?.status === 'running' || ingestionStatus.data?.status === 'pending'}
+                >
+                  Scan storefront
+                </Button>
+                <Button
+                  size="xs"
+                  variant="default"
+                  onClick={() => ingestionStatus.refetch()}
+                >
+                  Refresh status
+                </Button>
+              </Group>
+              <IngestionPanel
+                job={ingestionStatus.data ?? null}
+                loading={ingestionStatus.loading}
+                onCancel={cancelIngestion}
+                cancelLoading={cancellingIngestion}
+                onRefresh={ingestionStatus.refetch}
+              />
+            </div>
+
+            {/* Category templates */}
+            <div>
+              <Group gap="xs" mb="sm">
+                <Text fw={500} size="sm">Industry templates</Text>
+                <Tooltip label="Pre-built article sets for common Shopify merchant categories. Provides starter FAQ articles, policy templates, and glossary terms." multiline w={280} withArrow>
+                  <Badge size="xs" variant="light" color="gray" style={{ cursor: 'help' }}>?</Badge>
+                </Tooltip>
+              </Group>
+              <CategoryTemplateSelector
+                templates={templatesResult.data ?? null}
+                loading={templatesResult.loading}
+                error={templatesResult.error}
+                onApply={async (categoryId) => {
+                  const result = await applyTemplate(categoryId);
+                  if (result) {
+                    kbResult.refetch();
+                    refetchStaleness();
+                    onNotify(`Template applied — ${result.articlesCreated} articles created.`, 'success');
+                  }
+                  return result;
+                }}
+                applyLoading={applyingTemplate}
+                applyError={applyTemplateError}
+              />
+            </div>
+          </Stack>
+        )}
+      </Paper>
 
       {/* Articles table */}
       <Paper p="md" radius="md" withBorder>

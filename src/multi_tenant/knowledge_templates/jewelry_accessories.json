@@ -1,0 +1,117 @@
+{
+  "id": "jewelry_accessories",
+  "name": "Jewelry & Accessories",
+  "version": 1,
+  "articles": [
+    {
+      "entry_type": "faq",
+      "title": "How to Determine Your Ring Size",
+      "content": "We recommend three methods for finding your accurate ring size. First, visit a local jeweler for a professional measurement using a ring mandrel, which provides the most accurate result. Second, use our printable ring sizer available on our sizing page. Print the PDF at exactly 100 percent scale, cut out the strip, and wrap it around the base of your finger. Third, measure a ring that already fits you well by placing it on our on-screen ring chart. Keep in mind that finger size can fluctuate throughout the day due to temperature and activity. For the most accurate measurement, size your finger at the end of the day when fingers tend to be at their largest.",
+      "category": "Sizing & Fit",
+      "tags": ["ring-size", "sizing", "measurement", "fit"]
+    },
+    {
+      "entry_type": "faq",
+      "title": "Caring for Different Metal Types",
+      "content": "Each metal requires specific care to maintain its appearance. Gold (14K and 18K) can be cleaned with warm soapy water and a soft brush, then dried with a lint-free cloth. Sterling silver tarnishes naturally when exposed to air and should be polished regularly with a silver polishing cloth. Platinum is extremely durable but develops a natural patina over time, which can be professionally polished to restore its original shine. Rose gold should be cleaned gently as the copper content can react with certain chemicals. For all metals, remove jewelry before swimming in chlorinated pools, using household cleaners, or applying perfumes and lotions directly on the piece.",
+      "category": "Care & Maintenance",
+      "tags": ["metal-care", "gold", "silver", "platinum", "cleaning"]
+    },
+    {
+      "entry_type": "faq",
+      "title": "Gemstone Authenticity and Certification",
+      "content": "Every gemstone we sell valued at over $500 comes with an independent certification from a recognized gemological laboratory such as GIA (Gemological Institute of America), AGS (American Gem Society), or IGI (International Gemological Institute). These certificates verify the stone's characteristics including carat weight, color grade, clarity grade, and cut quality for diamonds, or species identification and treatment disclosure for colored gemstones. We also provide a detailed product description indicating whether a gemstone is natural, lab-created, or treated. Lab-created stones are always clearly identified in the product listing and offer an excellent alternative with the same physical and chemical properties as mined stones at a lower price point.",
+      "category": "Authenticity & Certification",
+      "tags": ["gemstone", "GIA", "certification", "authenticity", "lab-created"]
+    },
+    {
+      "entry_type": "faq",
+      "title": "Custom Engraving Options",
+      "content": "We offer custom engraving on select rings, bracelets, pendants, and watch case backs. Available fonts include classic serif, modern sans-serif, and script handwriting styles. Most items accommodate up to 25 characters including spaces. Special symbols such as hearts, infinity signs, and ampersands are available upon request. Engraving typically adds 3 to 5 business days to your order processing time. Please double-check your engraving text carefully before submitting, as personalized items cannot be returned or exchanged unless there is a manufacturing defect. A preview image of your engraving will be emailed to you for approval before production begins.",
+      "category": "Customization",
+      "tags": ["engraving", "personalization", "custom", "fonts"]
+    },
+    {
+      "entry_type": "faq",
+      "title": "Jewelry Repair and Restoration Services",
+      "content": "We offer professional repair services for items purchased from our store and, on a case-by-case basis, for fine jewelry purchased elsewhere. Common repairs include ring resizing (up to two sizes up or down), prong retipping and stone resetting, chain soldering, clasp replacement, and rhodium replating for white gold pieces. Repair turnaround time is typically 2 to 3 weeks depending on complexity. For an estimate, submit photos through our repair request form or bring the piece to one of our retail locations. All repairs come with a 90-day workmanship guarantee. Vintage and antique pieces may require consultation with our master jeweler before we can provide a repair estimate.",
+      "category": "Repairs & Services",
+      "tags": ["repair", "restoration", "resizing", "replating", "services"]
+    },
+    {
+      "entry_type": "policy",
+      "title": "Returns Policy for Personalized and Engraved Items",
+      "content": "Due to the custom nature of personalized and engraved jewelry, these items are considered final sale and cannot be returned or exchanged unless there is a manufacturing defect or an error made by our team during the engraving process. If you receive a personalized item with incorrect engraving that differs from your approved proof, contact us within 7 days of delivery with photos of the discrepancy. We will remake the item at no additional cost and provide a prepaid return label for the incorrect piece. Non-personalized items may be returned within 30 days of delivery in their original condition with all packaging and documentation. A full refund will be issued to the original payment method within 5 to 10 business days of receiving the return.",
+      "category": "Returns & Exchanges",
+      "tags": ["returns", "personalized", "engraving", "final-sale", "policy"]
+    },
+    {
+      "entry_type": "policy",
+      "title": "Craftsmanship Warranty",
+      "content": "Every piece of jewelry we sell is backed by our lifetime craftsmanship warranty, which covers defects in materials and workmanship under normal wear conditions. This warranty includes prong failure resulting in stone loss (if the piece has been inspected within the recommended 6-month interval), structural defects in clasps and closures, manufacturing defects in chains and links, and plating defects that appear within the first 12 months. This warranty does not cover damage caused by accidents, misuse, unauthorized repairs, or normal wear and tear such as scratching or gradual thinning of metal. To file a warranty claim, contact our customer service team with your original order number and photos of the defect.",
+      "category": "Warranty",
+      "tags": ["warranty", "craftsmanship", "lifetime", "defects", "coverage"]
+    },
+    {
+      "entry_type": "policy",
+      "title": "Jewelry Insurance Options",
+      "content": "We highly recommend insuring fine jewelry purchases against loss, theft, and damage. At checkout, you can add our preferred insurance partner's coverage, which provides worldwide protection with no deductible. Coverage is based on the appraised value of the piece and typically costs between 1 and 2 percent of the item's value per year. Alternatively, many homeowner's or renter's insurance policies allow you to add a jewelry rider or floater. We provide a detailed appraisal document with every purchase over $1,000, which you can use to obtain coverage from any insurance provider. We recommend updating your appraisal every 2 to 3 years to reflect current market values, and we offer complimentary reappraisals for items purchased from our store.",
+      "category": "Insurance",
+      "tags": ["insurance", "coverage", "appraisal", "protection", "loss"]
+    },
+    {
+      "entry_type": "article",
+      "title": "Guide to Precious Metals",
+      "content": "Understanding precious metals helps you make informed jewelry purchases. Yellow gold is alloyed with copper and zinc for strength; 24K is pure gold (too soft for daily wear), 18K is 75 percent gold (rich color, good durability), and 14K is 58.3 percent gold (most durable for everyday pieces). White gold is alloyed with palladium or nickel and usually rhodium-plated for a bright finish. Rose gold gets its warm pink hue from a higher copper content. Sterling silver is 92.5 percent pure silver mixed with copper for strength. Platinum is 95 percent pure, hypoallergenic, and the densest precious metal, making it excellent for securing gemstones. Palladium is similar to platinum but lighter in weight and more affordable.",
+      "category": "Education",
+      "tags": ["metals", "gold", "silver", "platinum", "palladium"]
+    },
+    {
+      "entry_type": "article",
+      "title": "Gemstone Types and Their Characteristics",
+      "content": "Gemstones are categorized as precious or semi-precious based on rarity and tradition. The four precious stones are diamond, ruby, sapphire, and emerald. Diamonds are graded on the 4Cs: carat weight, color (D being colorless and most valuable), clarity (FL flawless to I3 heavily included), and cut quality. Rubies and sapphires are both corundum varieties, with rubies being red and sapphires occurring in every other color. Emeralds are beryl crystals prized for their vivid green color, often containing natural inclusions called jardin. Popular semi-precious gemstones include amethyst, topaz, garnet, tourmaline, aquamarine, and opal. Mohs hardness scale rates scratch resistance from 1 (talc) to 10 (diamond), which affects a stone's suitability for daily-wear jewelry.",
+      "category": "Education",
+      "tags": ["gemstones", "diamonds", "4Cs", "precious", "semi-precious"]
+    },
+    {
+      "entry_type": "article",
+      "title": "Understanding Jewelry Settings and Styles",
+      "content": "The setting refers to how a gemstone is mounted in a piece of jewelry. Prong setting uses metal claws (typically 4 or 6) to hold the stone, maximizing light exposure for brilliance. Bezel setting encircles the stone with a thin metal rim, offering excellent protection for active wearers. Channel setting places stones in a row between two metal walls without individual prongs, commonly used in wedding bands. Pave setting uses many small stones set closely together with tiny beads of metal, creating a surface that appears encrusted with gems. Tension setting suspends the stone between two sides of the band using spring pressure, creating a floating appearance. Halo setting surrounds a center stone with a ring of smaller accent stones to enhance its apparent size and sparkle.",
+      "category": "Education",
+      "tags": ["settings", "prong", "bezel", "channel", "pave", "halo"]
+    },
+    {
+      "entry_type": "article",
+      "title": "Watch Movements Explained",
+      "content": "A watch's movement is the mechanism that drives its timekeeping function. Quartz movements use a battery-powered oscillating quartz crystal to keep time, offering excellent accuracy within a few seconds per month and requiring minimal maintenance beyond battery replacement every 1 to 3 years. Mechanical movements are powered by a wound mainspring that gradually unwinds to move the gears. Manual mechanical watches require hand winding daily or every few days. Automatic (self-winding) mechanical watches use a weighted rotor that winds the mainspring through the wearer's natural wrist movements. Mechanical movements are prized by collectors for their craftsmanship and typically require professional servicing every 3 to 5 years. Solar-powered movements convert light energy into electrical energy stored in a rechargeable cell, often lasting months on a full charge.",
+      "category": "Education",
+      "tags": ["watches", "movements", "quartz", "mechanical", "automatic"]
+    },
+    {
+      "entry_type": "article",
+      "title": "Material-Specific Care Instructions",
+      "content": "Proper care varies significantly by material. Pearl jewelry should never be cleaned with ultrasonic cleaners or harsh chemicals, as nacre is delicate. Wipe pearls with a damp soft cloth after wearing and store them separately to prevent scratching. Turquoise and opals are porous and should never be soaked in water or exposed to solvents. Costume and fashion jewelry with plated finishes should be kept dry and stored in airtight bags to slow tarnishing. Titanium and tungsten are extremely scratch-resistant but cannot be resized. Leather watch straps should be kept away from water and treated with leather conditioner periodically. Store all jewelry pieces separately in soft-lined compartments to prevent pieces from scratching each other.",
+      "category": "Education",
+      "tags": ["care", "pearls", "opals", "cleaning", "storage", "materials"]
+    },
+    {
+      "entry_type": "article",
+      "title": "Complete Jewelry Care Guide",
+      "content": "Maintaining your jewelry's beauty and integrity requires consistent care habits. Clean fine jewelry at home every two weeks using warm water with a few drops of mild dish soap and a soft-bristled toothbrush. Rinse thoroughly under warm running water (close the drain first) and dry with a lint-free cloth. Have fine jewelry professionally inspected and cleaned every six months. During inspection, a jeweler will check prong integrity, clasp security, and overall structural condition. Remove jewelry before showering, swimming, exercising, applying cosmetics, and performing household chores. Put jewelry on last when getting dressed and take it off first when undressing. Store pieces individually in soft pouches or a lined jewelry box with separate compartments to prevent tangling and surface scratches.",
+      "category": "Guides",
+      "tags": ["care-guide", "cleaning", "maintenance", "inspection", "storage"]
+    },
+    {
+      "entry_type": "article",
+      "title": "Jewelry Gift Guide by Occasion",
+      "content": "Choosing jewelry as a gift is meaningful but can feel daunting. For engagements, diamond solitaire rings remain the classic choice, with round brilliant and oval cuts being the most popular. Wedding anniversaries have traditional gemstone associations: 5th anniversary is sapphire, 10th is diamond, 15th is ruby, and 25th is silver. For birthdays, birthstone jewelry adds a personal touch; January is garnet, February is amethyst, March is aquamarine, through to December's tanzanite. Graduation gifts often include pendant necklaces or stud earrings as timeless pieces that mark the milestone. For Mother's Day, family birthstone jewelry or lockets with photo inserts are sentimental choices. When in doubt about style preferences, a gift card paired with a small accessory like a polishing cloth set lets the recipient choose exactly what they love.",
+      "category": "Guides",
+      "tags": ["gift-guide", "occasions", "birthstones", "anniversaries", "engagement"]
+    }
+  ],
+  "config_suggestions": {
+    "brand_voice": "Elegant and knowledgeable, conveying expertise in fine jewelry while remaining approachable and helpful. Guide customers with confidence through their jewelry purchasing and care decisions.",
+    "escalation_keywords": ["broken", "damaged in shipping", "stone fell out", "lost", "stolen", "insurance claim", "wrong engraving", "allergic reaction", "fraud", "unauthorized charge"],
+    "greeting_message": "Hi! Welcome to {{brand_name}}. Whether you're shopping for a special occasion or need help with jewelry care, I'm here to assist you. How can I help today?"
+  }
+}

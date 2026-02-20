@@ -649,6 +649,28 @@ fields:
     pii_classification: none
     injected_in_prompt: false
 
+  - field_name: customer_identification_mode
+    display_name: Customer identification
+    field_type: string
+    validation:
+      allowed_values:
+        - "off"
+        - gentle
+        - standard
+        - aggressive
+    platform_default: standard
+    tier_gate: all
+    onboarding_step: 8
+    step_order: 1
+    tooltip: How strongly the AI encourages customers to identify themselves.
+    description: "Controls whether and how aggressively the AI agent suggests customers log in or provide identifying information. Identified customers get personalized responses based on order history and past interactions. Off: no identification prompts. Gentle: casual mention that logging in improves help. Standard: first response suggests login for order history access. Aggressive: first response strongly encourages authentication with benefits explanation."
+    placeholder: standard
+    doc_link: "https://docs.agentred.ai/configuration/memory-privacy#identification"
+    affects_agents:
+      - response-generator
+    pii_classification: none
+    injected_in_prompt: true
+
   - field_name: pattern_learning_enabled
     display_name: Pattern learning (Layer 3)
     field_type: boolean
@@ -656,7 +678,7 @@ fields:
     platform_default: true
     tier_gate: pro+
     onboarding_step: 8
-    step_order: 1
+    step_order: 2
     tooltip: Enable automatic learning of customer communication patterns.
     description: "The AI analyses completed conversations to learn customer preferences, communication style, and common needs. Extracted patterns are stored with confidence scores and decay over time without reinforcement. Professional and Enterprise tiers only."
     doc_link: "https://docs.agentred.ai/configuration/memory-privacy#layer3"
@@ -672,7 +694,7 @@ fields:
     platform_default: false
     tier_gate: enterprise
     onboarding_step: 8
-    step_order: 2
+    step_order: 3
     tooltip: Train a dedicated AI model on your customer conversations.
     description: "After 1,000+ conversations, a dedicated GPT-4o-mini model is fine-tuned on your data for maximum personalization. Includes monthly retraining pipeline with quality gates and A/B validation. Enterprise add-on ($299/mo). The Critic still validates all outputs."
     doc_link: "https://docs.agentred.ai/configuration/memory-privacy#layer4"
@@ -694,7 +716,7 @@ fields:
       enterprise: 730
     tier_gate: all
     onboarding_step: 8
-    step_order: 3
+    step_order: 4
     tooltip: How long conversation data is retained in hot storage.
     description: Conversations older than this are archived to warm/cold storage. Affects Layer 2 (conversation history search depth). Tier defaults reflect the included history depth. GDPR data deletion requests override this setting.
     doc_link: "https://docs.agentred.ai/configuration/memory-privacy#retention"
@@ -709,7 +731,7 @@ fields:
     platform_default: true
     tier_gate: all
     onboarding_step: 8
-    step_order: 4
+    step_order: 5
     tooltip: Ask customers for consent before using their data for memory.
     description: "When enabled, customers are asked for consent before their data is used for Layers 2-4 of Persistent Customer Memory. Required for GDPR compliance in the EU. Layer 1 (basic profile from Shopify) operates under legitimate interest basis and does not require separate consent."
     doc_link: "https://docs.agentred.ai/configuration/memory-privacy#consent"

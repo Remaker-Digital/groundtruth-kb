@@ -727,11 +727,26 @@ class ActivationService:
                     active.get("version", 0) if active else 0,
                 )
 
+                # KA-6: First-activation ingestion hook
+                # If no prior active config existed, this is a first activation.
+                # Dispatch a background ingestion job (non-blocking).
+                first_activation_warnings: list[str] = []
+                if active is None:
+                    first_activation_warnings = await self._maybe_start_ingestion(
+                        tenant_id
+                    )
+
+                result_warnings = list(validation.warnings or [])
+                result_warnings.extend(
+                    {"field": "_system", "message": w}
+                    for w in first_activation_warnings
+                )
+
                 return ActivationResult(
                     success=True,
                     version=draft.get("version", 0),
                     activated_at=now,
-                    warnings=validation.warnings,
+                    warnings=result_warnings or None,
                 )
         except Exception as exc:
             logger.error(
@@ -742,6 +757,59 @@ class ActivationService:
                 success=False,
                 errors=[{"field": "_system", "message": f"Activation failed: {exc}"}],
             )
+
+    # ------------------------------------------------------------------
+    # KA-6: First-Activation Ingestion Hook
+    # ------------------------------------------------------------------
+
+    async def _maybe_start_ingestion(self, tenant_id: str) -> list[str]:
+        """Dispatch background ingestion on first activation (non-blocking).
+
+        Checks for shopify_shop_domain on the TenantDocument. If present,
+        dispatches a Shopify ingestion job. Returns a list of informational
+        warnings to include in the ActivationResult.
+        """
+        warnings: list[str] = []
+        try:
+            from src.multi_tenant.storefront_ingestion import get_ingestion_service
+
+            service = get_ingestion_service()
+
+            # Check if tenant has a Shopify domain
+            tenant_doc = await self._tenant_repo.read(tenant_id, tenant_id)
+            shop_domain = None
+            if isinstance(tenant_doc, dict):
+                shop_domain = tenant_doc.get("shopify_shop_domain")
+
+            if shop_domain:
+                # Dispatch Shopify ingestion
+                await service.start_ingestion(
+                    tenant_id=tenant_id,
+                    source_type="shopify",
+                    source_config={"shop_domain": shop_domain},
+                )
+                warnings.append(
+                    "Knowledge base population from Shopify storefront is in progress. "
+                    "This runs in the background and may take a few minutes."
+                )
+                logger.info(
+                    "First-activation ingestion dispatched for tenant %s (Shopify: %s)",
+                    tenant_id[:8], shop_domain,
+                )
+            else:
+                logger.info(
+                    "First activation for tenant %s — no Shopify domain, "
+                    "skipping automatic ingestion",
+                    tenant_id[:8],
+                )
+
+        except Exception:
+            logger.warning(
+                "First-activation ingestion hook failed for tenant %s (non-fatal)",
+                tenant_id[:8],
+                exc_info=True,
+            )
+        return warnings
 
     # ------------------------------------------------------------------
     # Restore Previous

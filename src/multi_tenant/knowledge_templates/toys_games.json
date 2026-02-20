@@ -1,0 +1,117 @@
+{
+  "id": "toys_games",
+  "name": "Toys & Games",
+  "version": 1,
+  "articles": [
+    {
+      "entry_type": "faq",
+      "title": "Age Recommendations and Suitability",
+      "content": "Every product in our store displays a recommended age range that reflects both developmental appropriateness and safety considerations. These recommendations are based on manufacturer testing, CPSC (Consumer Product Safety Commission) guidelines, and the cognitive and motor skill requirements of the toy. Items marked 0 to 3 years have been specifically tested for small parts, sharp edges, and choking hazards. Products labeled for ages 3 and up may contain small parts. Age recommendations are guidelines rather than strict rules, as children develop at different rates. If you are unsure whether a toy is appropriate for your child's age or developmental stage, our customer service team can provide personalized guidance based on the specific product.",
+      "category": "Product Information",
+      "tags": ["age-recommendations", "safety", "suitability", "development"]
+    },
+    {
+      "entry_type": "faq",
+      "title": "Battery Requirements and Compatibility",
+      "content": "Many of our electronic toys require batteries that are not included in the package. Each product listing specifies the exact battery type and quantity needed. Common types include AA, AAA, C, D, and 9V alkaline batteries, as well as button cell batteries (such as LR44 and CR2032) for smaller electronic items. Some premium toys come with built-in rechargeable lithium-ion batteries and include a USB charging cable. For battery-operated toys used frequently, we recommend investing in rechargeable NiMH batteries and a quality charger to reduce ongoing costs and environmental waste. Always install batteries according to the polarity markings inside the battery compartment, and replace all batteries in a set at the same time rather than mixing old and new batteries.",
+      "category": "Product Information",
+      "tags": ["batteries", "requirements", "rechargeable", "compatibility"]
+    },
+    {
+      "entry_type": "faq",
+      "title": "Safety Certifications and Testing Standards",
+      "content": "All toys sold in our store meet or exceed the safety requirements of ASTM F963, the standard consumer safety specification for toy safety in the United States. Products are also compliant with CPSIA (Consumer Product Safety Improvement Act) testing requirements including lead content limits and phthalate restrictions. Toys sold internationally also carry the CE mark indicating compliance with European safety directives. For specific product categories, additional certifications may apply: electronic toys must meet FCC requirements, and plush toys undergo flammability testing. We maintain certificates of compliance on file for every product we sell and can provide documentation upon request. Products from new suppliers undergo third-party laboratory testing before being listed in our store.",
+      "category": "Safety",
+      "tags": ["safety", "ASTM", "CPSIA", "certifications", "testing"]
+    },
+    {
+      "entry_type": "faq",
+      "title": "Missing Pieces and Replacement Parts",
+      "content": "If your toy or game arrives with missing pieces or a piece is lost or broken after purchase, we can help. For items that arrived with missing components, contact us within 14 days of delivery with your order number and a description of the missing piece. We will ship the replacement part at no cost, or if the part is unavailable, offer a full replacement of the item. For pieces lost or broken after purchase, check the manufacturer's website first, as many toy companies such as LEGO, Hasbro, and Mattel offer direct replacement part services. If the manufacturer cannot help, contact our customer service team and we will do our best to source the part for you. For board games, we maintain an inventory of common replacement components including dice, tokens, cards, and spinners for popular titles.",
+      "category": "Customer Support",
+      "tags": ["missing-pieces", "replacement", "parts", "support"]
+    },
+    {
+      "entry_type": "faq",
+      "title": "Assembly Instructions and Help",
+      "content": "Many toys and play sets require some assembly. Digital copies of assembly instructions are available on each product page under the Documents tab, so you can review them before purchasing or access them if the printed instructions are misplaced. For particularly complex builds such as playhouses, ride-on vehicles, and large play sets, we offer video assembly guides on our YouTube channel with step-by-step walkthroughs. If you encounter difficulties during assembly, our customer support team is available via phone and live chat to walk you through the process. Common assembly issues include hardware packets being hidden inside foam packaging, parts that require significant force to snap together for the first time, and sticker sheets that are separate from the instruction packet. We recommend laying out all parts and hardware before beginning assembly.",
+      "category": "Customer Support",
+      "tags": ["assembly", "instructions", "help", "video-guides"]
+    },
+    {
+      "entry_type": "policy",
+      "title": "Returns Policy for Opened Toys",
+      "content": "We accept returns of opened toys within 30 days of delivery, provided the item is in resalable condition with all original parts, accessories, instructions, and packaging included. Items that have been used but are in like-new condition will receive a full refund. Toys showing moderate use or missing original packaging may be subject to a restocking fee of up to 25 percent. Items that are broken due to misuse, heavily used, or missing significant components are not eligible for return. Electronic toys must be returned with all batteries removed for shipping safety. Collectible items that have been removed from sealed packaging and hygiene-sensitive items such as bath toys or teething products are final sale once opened. Holiday return window: items purchased between November 15 and December 31 may be returned through January 31 of the following year.",
+      "category": "Returns & Exchanges",
+      "tags": ["returns", "opened", "policy", "restocking", "holiday"]
+    },
+    {
+      "entry_type": "policy",
+      "title": "Safety Recall Notification Process",
+      "content": "Your child's safety is our highest priority. When a product recall is announced by the CPSC or a manufacturer, we take immediate action. We remove the affected item from sale on our website within 24 hours of the recall announcement. We send email notifications to every customer who purchased the recalled item with specific instructions on what to do, including whether to stop using the product, return it for a refund, or contact the manufacturer for a repair kit or replacement. Refunds for recalled items are processed in full regardless of when the item was purchased or its current condition. You do not need your original receipt to return a recalled item. We maintain a recall information page on our website that lists all current recalls affecting products we have sold, along with the appropriate response for each.",
+      "category": "Safety",
+      "tags": ["recall", "safety", "CPSC", "notification", "refund"]
+    },
+    {
+      "entry_type": "policy",
+      "title": "Birthday Gift Registry Program",
+      "content": "Our Birthday Registry program allows parents and guardians to create a curated wish list of age-appropriate toys that friends and family can purchase as gifts. To create a registry, sign into your account and navigate to the Gift Registry section. You can add items from anywhere on our site, set a registry event date, and share your registry link via email or social media. Registry contributors can see which items have already been purchased to avoid duplicates. A 10 percent completion discount is applied to any remaining unpurchased registry items for 30 days after the event date, allowing you to complete the wish list at a reduced price. Gift receipts are included automatically with all registry purchases so the recipient can exchange items if needed without seeing the purchase price.",
+      "category": "Programs & Services",
+      "tags": ["registry", "birthday", "gift", "wish-list", "discount"]
+    },
+    {
+      "entry_type": "article",
+      "title": "Understanding Toy Age Rating Systems",
+      "content": "Multiple age rating systems help parents choose appropriate toys and games. In the United States, the CPSC mandates age-grading guidelines that toy manufacturers must follow, focusing on safety hazards by age group. The ages 0 to 3 category has the strictest requirements including mandatory small parts testing (no piece can fit through a small parts cylinder), sharp edge testing, and toxicology testing. The ESRB (Entertainment Software Rating Board) rates video games: E for Everyone, E10+ for ages 10 and up, T for Teen (13+), and M for Mature (17+). Board games typically display age ratings set by the publisher based on complexity and theme. PEGI (Pan European Game Information) is the European equivalent of ESRB with ratings of 3, 7, 12, 16, and 18. Always check both safety age ratings and skill level recommendations to ensure a good match.",
+      "category": "Education",
+      "tags": ["age-ratings", "CPSC", "ESRB", "PEGI", "safety-standards"]
+    },
+    {
+      "entry_type": "article",
+      "title": "Toy Safety Standards Explained",
+      "content": "Toy safety standards protect children through rigorous testing requirements. ASTM F963 is the primary US voluntary safety standard that has been incorporated into federal law through the CPSIA. Key tests include: the small parts test, which uses a cylinder mimicking a child's throat to identify choking hazards for children under 3; the sharp edge test, which uses a device to detect edges sharp enough to cut skin; the drop test, which simulates a toy being dropped from various heights to check for breakage into dangerous pieces; and flammability testing, which ensures toys do not ignite easily or burn rapidly. The CPSIA requires third-party testing and certification for all children's products sold in the US. Lead content must not exceed 100 parts per million in accessible parts, and specific phthalates are banned in children's toys and child care articles.",
+      "category": "Education",
+      "tags": ["safety-standards", "ASTM", "testing", "CPSIA", "lead", "phthalates"]
+    },
+    {
+      "entry_type": "article",
+      "title": "Game Categories and Types Explained",
+      "content": "Understanding game categories helps you choose the right entertainment for your group. Strategy games (like chess and Settlers of Catan) emphasize planning, resource management, and decision-making. Cooperative games require all players to work together toward a common goal rather than competing against each other, making them excellent for younger players and family groups. Dexterity games (like Jenga and Operation) test physical skill and hand-eye coordination. Party games are designed for larger groups (6 or more players) and prioritize fun, laughter, and social interaction over deep strategy. Deck-building games start each player with identical basic cards and allow them to purchase better cards during gameplay to build a unique strategy. Legacy games permanently change between sessions through sticker placement, card destruction, and sealed components that are opened as the story progresses.",
+      "category": "Education",
+      "tags": ["game-types", "strategy", "cooperative", "party", "deck-building"]
+    },
+    {
+      "entry_type": "article",
+      "title": "Battery Types and Safety Information",
+      "content": "Different battery types serve different purposes in toys and electronic games. Alkaline batteries (AA, AAA, C, D, 9V) are the most common and provide reliable power for moderate-drain devices like remote controls, board game accessories, and basic electronic toys. Lithium coin cells (CR2032, CR2025) are used in smaller devices and can be extremely dangerous if swallowed, requiring immediate medical attention. NiMH rechargeable batteries are cost-effective for high-drain toys that consume batteries quickly, such as RC vehicles and interactive robots. Lithium-ion rechargeable batteries are built into many modern electronic toys and should only be charged with the included charger. Never mix battery types, brands, or old and new batteries in the same device. Always supervise battery replacement with young children and ensure battery compartment screws are secured tightly.",
+      "category": "Education",
+      "tags": ["batteries", "safety", "alkaline", "lithium", "rechargeable"]
+    },
+    {
+      "entry_type": "article",
+      "title": "Educational Toy Categories and STEM Benefits",
+      "content": "Educational toys are organized into categories that align with learning objectives. STEM toys (Science, Technology, Engineering, Mathematics) encourage problem-solving, logical thinking, and hands-on experimentation through building kits, coding robots, chemistry sets, and engineering challenges. STEAM adds Arts to the mix, incorporating creative expression alongside technical skills through products like architectural building sets and musical instruments. Montessori-inspired toys emphasize self-directed learning with natural materials, open-ended play, and sensory exploration. Sensory toys provide tactile, visual, and auditory stimulation and are beneficial for all children, particularly those with sensory processing differences. Fine motor skill toys like threading beads, pegboards, and play dough tools develop the small muscle movements essential for writing, buttoning, and other daily tasks.",
+      "category": "Education",
+      "tags": ["educational", "STEM", "STEAM", "Montessori", "sensory", "fine-motor"]
+    },
+    {
+      "entry_type": "article",
+      "title": "Gift Guide by Age Group",
+      "content": "Selecting age-appropriate gifts ensures engagement and safety. For infants (0 to 12 months), choose high-contrast visual toys, soft rattles, teething rings, and textured sensory balls. Toddlers (1 to 3 years) enjoy stacking toys, simple puzzles with knobs, push-and-pull toys, and chunky crayons for first art experiences. Preschoolers (3 to 5 years) thrive with imaginative play sets, building blocks, beginner board games with simple rules, and outdoor toys like tricycles and sand play sets. Early school age (5 to 8 years) is ideal for construction sets with more pieces, science experiment kits, detailed art supplies, and board games that develop reading and math skills. Tweens (8 to 12 years) gravitate toward complex building sets, strategy games, technology-focused toys like coding kits and drones, and creative pursuits like jewelry-making kits and model building. Each product page on our site displays its recommended age range prominently to help with selection.",
+      "category": "Guides",
+      "tags": ["gift-guide", "age-groups", "infant", "toddler", "tween"]
+    },
+    {
+      "entry_type": "article",
+      "title": "Battery Safety Guide for Parents",
+      "content": "Battery safety is a critical concern for households with young children. Button cell and coin lithium batteries pose the most serious ingestion risk and can cause severe internal burns within as little as two hours if swallowed. Always ensure battery compartments are securely fastened with screws and check them regularly for wear or loosening. Store spare batteries in a locked or high location out of reach of children. If you suspect a child has swallowed a battery, go to the emergency room immediately and call the National Battery Ingestion Hotline. Do not induce vomiting. For routine battery handling: avoid letting children change batteries unsupervised, dispose of used batteries promptly rather than leaving them on counters, and recycle batteries at designated drop-off locations rather than placing them in household trash. Never attempt to recharge non-rechargeable batteries, as this can cause leaking, overheating, or rupturing.",
+      "category": "Guides",
+      "tags": ["battery-safety", "children", "ingestion", "parents", "guide"]
+    }
+  ],
+  "config_suggestions": {
+    "brand_voice": "Fun, helpful, and safety-conscious. Communicate with enthusiasm about play and learning while always prioritizing child safety. Use clear, parent-friendly language.",
+    "escalation_keywords": ["swallowed", "choking", "injury", "recalled", "dangerous", "sharp", "broken piece", "allergic reaction", "burns", "electric shock", "battery swallowed"],
+    "greeting_message": "Hi! Welcome to {{brand_name}}. Looking for the perfect toy, need help with assembly, or have a safety question? I'm here to help. What can I assist you with?"
+  }
+}

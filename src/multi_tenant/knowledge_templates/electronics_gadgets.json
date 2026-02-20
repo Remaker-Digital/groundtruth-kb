@@ -1,0 +1,117 @@
+{
+  "id": "electronics_gadgets",
+  "name": "Electronics & Gadgets",
+  "version": 1,
+  "articles": [
+    {
+      "entry_type": "faq",
+      "title": "How to File a Warranty Claim",
+      "content": "To file a warranty claim, you will need your original order number and proof of purchase. Navigate to our Warranty Claims page and fill out the request form with a description of the defect, including photos or a short video demonstrating the issue. Our support team will review your claim within 2 business days and respond with next steps. If the claim is approved, we will provide a prepaid shipping label for you to send the defective item to our service center. Repairs typically take 7-10 business days. If the item cannot be repaired, we will offer a replacement of the same model or a comparable model if your original product has been discontinued.",
+      "category": "Warranty & Support",
+      "tags": ["warranty", "claims", "repair", "defective"]
+    },
+    {
+      "entry_type": "faq",
+      "title": "Product Compatibility Questions",
+      "content": "Before purchasing accessories or peripherals, verify compatibility by checking the Compatibility section on each product page. This section lists supported devices, operating systems, and connection standards. For cables and adapters, confirm both the connector type and the protocol version (for example, USB-C connectors may support USB 2.0, 3.0, 3.1, or Thunderbolt 3/4, each with different speed and power capabilities). For phone cases and screen protectors, select your exact device model, as dimensions vary even between model years. If you are unsure about compatibility, our support team can verify whether a specific product works with your device before you purchase.",
+      "category": "Product Information",
+      "tags": ["compatibility", "devices", "connectors", "peripherals"]
+    },
+    {
+      "entry_type": "faq",
+      "title": "Battery Care and Longevity",
+      "content": "Modern lithium-ion batteries perform best when kept between 20% and 80% charge. Avoid regularly draining the battery to 0% or keeping it at 100% for extended periods, as both extremes accelerate chemical degradation. Heat is the biggest enemy of battery health, so keep your device away from direct sunlight and avoid using it while charging if it gets noticeably warm. Use only the charger that came with your device or a certified third-party charger that matches the correct voltage and amperage. Most batteries are rated for 300-500 full charge cycles before capacity drops to 80% of original. If your device supports optimized charging features, enable them to extend battery lifespan.",
+      "category": "Care & Maintenance",
+      "tags": ["battery", "charging", "lithium-ion", "longevity"]
+    },
+    {
+      "entry_type": "faq",
+      "title": "Firmware and Software Updates",
+      "content": "Keeping your device firmware up to date ensures optimal performance, security patches, and access to new features. Most of our products support over-the-air (OTA) updates that can be initiated from the companion app or the device settings menu. Before updating, ensure your device has at least 50% battery charge and is connected to a stable Wi-Fi network. Do not power off the device during an update, as this can cause firmware corruption. Update files vary in size from a few megabytes to several hundred megabytes depending on the scope of changes. Check the product support page on our website for release notes detailing what each update includes. If an update fails, try restarting the device and attempting the update again.",
+      "category": "Technical Support",
+      "tags": ["firmware", "updates", "software", "OTA"]
+    },
+    {
+      "entry_type": "faq",
+      "title": "Basic Troubleshooting Steps",
+      "content": "If your device is not functioning as expected, try these steps before contacting support. First, restart the device by powering it off completely, waiting 10 seconds, and powering it back on. This resolves most temporary software glitches. Second, check that the device firmware is up to date. Third, for connectivity issues, forget and re-pair the Bluetooth or Wi-Fi connection. Fourth, for charging problems, try a different cable and power adapter to rule out accessory issues. Fifth, perform a factory reset as a last resort (note this erases all settings and data). If none of these steps resolve the issue, contact our support team with your device model, firmware version, and a detailed description of the problem for further assistance.",
+      "category": "Technical Support",
+      "tags": ["troubleshooting", "reset", "connectivity", "support"]
+    },
+    {
+      "entry_type": "policy",
+      "title": "Electronics Return Policy",
+      "content": "Electronics may be returned within 30 days of delivery in their original packaging with all included accessories, cables, manuals, and documentation. Items must be in like-new condition without physical damage, scratches, or signs of misuse. Opened items are subject to a 15% restocking fee. Software, digital downloads, and consumable items (such as batteries and ink cartridges) are non-returnable once opened. To initiate a return, visit our Returns Center with your order number. Refunds are processed within 5-7 business days after inspection. For items purchased during holiday promotions (November 15 through December 31), the return window is extended to January 31 of the following year.",
+      "category": "Policies",
+      "tags": ["returns", "restocking-fee", "refund", "policy"]
+    },
+    {
+      "entry_type": "policy",
+      "title": "Manufacturer Warranty Policy",
+      "content": "All electronics sold on our store carry the manufacturer's original warranty. Warranty periods vary by product category: smartphones and tablets carry a 1-year warranty, laptops carry a 1 to 2-year warranty depending on brand, and accessories carry a 6-month to 1-year warranty. The warranty covers manufacturing defects and hardware failures under normal use conditions. It does not cover damage from drops, water exposure (unless the device has an IP water resistance rating and was used within its rated conditions), unauthorized modifications, or normal wear and tear. Extended warranty plans are available for purchase within 30 days of your original order date and provide an additional 1-2 years of coverage including accidental damage protection.",
+      "category": "Policies",
+      "tags": ["warranty", "manufacturer", "extended-warranty", "coverage"]
+    },
+    {
+      "entry_type": "policy",
+      "title": "Dead-On-Arrival (DOA) Replacement Policy",
+      "content": "If your product arrives defective or non-functional, our Dead-On-Arrival (DOA) policy provides an immediate replacement at no additional cost. A DOA claim must be submitted within 7 days of delivery. Contact our support team with your order number, a description of the defect, and photos or video evidence showing the issue. Once approved, we will ship a replacement unit via expedited shipping within 1-2 business days and provide a prepaid return label for the defective unit. You have 14 days to return the defective item after receiving your replacement. If the same model is out of stock, we will offer a comparable replacement or a full refund including any original shipping charges you paid.",
+      "category": "Policies",
+      "tags": ["DOA", "defective", "replacement", "dead-on-arrival"]
+    },
+    {
+      "entry_type": "article",
+      "title": "Common Connector Types Explained",
+      "content": "Modern electronics use a variety of connectors. USB-C is the current standard, offering reversible plug orientation and supporting data transfer, video output, and charging through a single cable. USB-A is the older rectangular connector still found on many computers and chargers. Lightning is Apple's proprietary connector used on iPhones and some iPads. Micro-USB is an older standard still used on some budget devices and accessories. HDMI carries high-definition audio and video and comes in full-size, mini, and micro variants. DisplayPort is commonly found on monitors and graphics cards and supports higher refresh rates. Thunderbolt 3 and 4 use the USB-C form factor but offer significantly higher bandwidth for professional peripherals and external displays.",
+      "category": "Technical Knowledge",
+      "tags": ["connectors", "USB-C", "HDMI", "lightning", "thunderbolt"]
+    },
+    {
+      "entry_type": "article",
+      "title": "Display Specifications Decoded",
+      "content": "Understanding display specs helps you choose the right screen. Resolution refers to the number of pixels on screen: Full HD (1920x1080) is standard, QHD (2560x1440) offers sharper detail, and 4K UHD (3840x2160) provides the highest clarity for consumer displays. Refresh rate, measured in Hertz (Hz), indicates how many times the screen updates per second; 60Hz is standard, 120Hz or 144Hz provides smoother motion for gaming and video. Panel types include IPS (wide viewing angles and accurate color), VA (deeper blacks and higher contrast), TN (fastest response times but poorest color), and OLED (perfect blacks with individually lit pixels). Brightness is measured in nits; 300 nits is adequate for indoor use, while 500+ nits is recommended for outdoor visibility or HDR content.",
+      "category": "Technical Knowledge",
+      "tags": ["display", "resolution", "refresh-rate", "OLED", "IPS"]
+    },
+    {
+      "entry_type": "article",
+      "title": "Understanding Processor Terminology",
+      "content": "Processors (CPUs) are the brain of any computing device. Clock speed, measured in GHz (gigahertz), indicates how many cycles a processor can complete per second; higher is generally faster. Cores are independent processing units within a single chip; more cores allow the processor to handle multiple tasks simultaneously. Threads are virtual cores that allow each physical core to handle two tasks at once through a technology called hyper-threading or simultaneous multi-threading. Cache is a small amount of ultra-fast memory on the processor die that stores frequently accessed data. The manufacturing process node (measured in nanometers, such as 7nm or 5nm) indicates transistor size; smaller nodes are generally more power-efficient and offer better performance per watt.",
+      "category": "Technical Knowledge",
+      "tags": ["processor", "CPU", "cores", "clock-speed", "terminology"]
+    },
+    {
+      "entry_type": "article",
+      "title": "Battery Capacity and Charging Standards",
+      "content": "Battery capacity is measured in milliampere-hours (mAh) or watt-hours (Wh). A higher mAh rating means the battery can deliver current for a longer period before needing a recharge. For reference, most smartphones have batteries between 3,000 and 5,000 mAh, tablets range from 5,000 to 10,000 mAh, and laptops typically range from 40 to 100 Wh. Charging standards determine how quickly a battery can be recharged. USB Power Delivery (PD) supports up to 240W and is the most widely adopted fast-charging standard. Qualcomm Quick Charge is common on Android devices. Wireless charging via the Qi standard typically delivers 5-15W, with some proprietary standards reaching 50W. Always use a charger that matches your device's supported standard for safe, optimal charging speed.",
+      "category": "Technical Knowledge",
+      "tags": ["battery", "mAh", "charging", "USB-PD", "quick-charge"]
+    },
+    {
+      "entry_type": "article",
+      "title": "Wireless Standards and Connectivity",
+      "content": "Wireless technology is described by standardized protocols. Wi-Fi 6 (802.11ax) is the current mainstream standard offering speeds up to 9.6 Gbps and improved performance in crowded networks. Wi-Fi 6E extends this to the 6 GHz band for less interference. Bluetooth 5.3 is the latest Bluetooth version, offering improved range (up to 240 meters line-of-sight), faster data transfer, and better power efficiency than previous versions. NFC (Near Field Communication) enables tap-to-pay and quick device pairing at very short range (typically under 4 cm). Zigbee and Z-Wave are low-power protocols used primarily for smart home devices like lights, sensors, and locks. 5G is the fifth generation of cellular network technology, offering peak theoretical speeds over 10 Gbps with ultra-low latency.",
+      "category": "Technical Knowledge",
+      "tags": ["wireless", "Wi-Fi", "bluetooth", "5G", "NFC"]
+    },
+    {
+      "entry_type": "article",
+      "title": "Setting Up Your New Device",
+      "content": "Getting started with a new device is straightforward when you follow these steps. First, unbox the device and verify all listed accessories are included by checking against the packing list in the box. Charge the device fully before first use to calibrate the battery meter. Power on the device and follow the on-screen setup wizard, which will guide you through language selection, Wi-Fi connection, and account sign-in. If the device has a companion app, download it from the App Store or Google Play and pair the device via Bluetooth or Wi-Fi as directed. Check for firmware updates immediately after setup, as manufacturers often release updates between the time of manufacturing and your purchase date. Finally, explore the settings menu to customize notifications, display preferences, and privacy options to your liking.",
+      "category": "Getting Started",
+      "tags": ["setup", "unboxing", "first-use", "getting-started"]
+    },
+    {
+      "entry_type": "article",
+      "title": "How to Read Technical Specifications",
+      "content": "Product specification sheets can be overwhelming, but focusing on key metrics makes comparison shopping easier. For smartphones, prioritize the processor, RAM (4-8 GB for most users), storage (128 GB minimum recommended), battery capacity, and camera megapixel count along with sensor size. For laptops, focus on the processor generation, RAM (8-16 GB for general use, 32 GB or more for creative professionals), storage type (SSD is significantly faster than HDD), display resolution, and battery life in hours. For headphones, look at driver size (larger drivers generally produce better bass), frequency response range (20 Hz to 20 kHz covers human hearing), impedance (lower is easier to drive from a phone), and active noise cancellation rating. Our product pages highlight the most important specs at the top of each listing.",
+      "category": "Buying Guides",
+      "tags": ["specifications", "specs", "comparison", "buying-guide"]
+    }
+  ],
+  "config_suggestions": {
+    "brand_voice": "Technically precise but accessible. Explain specifications and features in plain language. Be patient with less technical customers while providing enough detail for power users. Prioritize accuracy over brevity.",
+    "escalation_keywords": ["defective", "dead on arrival", "DOA", "not working", "broken", "refund not received", "warranty denied", "overheating", "safety hazard", "complaint", "manager"],
+    "greeting_message": "Hi! Welcome to {{brand_name}}. I can help with product specs, compatibility questions, troubleshooting, or order support. What do you need?"
+  }
+}

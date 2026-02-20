@@ -7,10 +7,11 @@ Last corrected: 2026-02-19 — Initial creation (S52)
 Creates a fully populated test tenant for UI testing with realistic data:
   - 9 team members (3 from seed + 6 additional)
   - 12 quick actions with 6 page assignments
-  - 7 KB documents (4 uploaded + 3 manual)
+  - 3 manual KB documents + 1 KA template (apparel_fashion, ~15 articles)
   - 19 conversations via live AI pipeline
   - Avatar uploaded
   - Tier override verified
+  - Knowledge Automation template applied (KA-3)
 
 VARIABLES:
   TENANT_ID          = test-customer-001
@@ -291,6 +292,7 @@ def phase_1_configure(dry_run: bool) -> None:
             "greeting_message": "Hi there! How can I help you today?",
             "widget_primary_color": "#2563eb",
             "widget_position": "bottom-right",
+            "customer_identification_mode": "standard",
         },
     }
 
@@ -537,6 +539,45 @@ def phase_4_knowledge(dry_run: bool) -> None:
 
 
 # ---------------------------------------------------------------------------
+# Phase 4B: Apply Knowledge Automation Template (KA-3)
+# ---------------------------------------------------------------------------
+
+TEMPLATE_TO_APPLY = "apparel_fashion"
+
+
+def phase_4b_ka_template(dry_run: bool) -> None:
+    phase_header(4, "Apply Knowledge Automation Template (KA-3)")
+
+    if dry_run:
+        log("INFO", f"[DRY RUN] Would POST /api/admin/knowledge/templates/{TEMPLATE_TO_APPLY}/apply")
+        return
+
+    key = CREDENTIALS.get("superadmin_key", "")
+
+    # Apply template
+    status, body = api_call(
+        "POST", f"/api/admin/knowledge/templates/{TEMPLATE_TO_APPLY}/apply",
+        body={}, api_key=key,
+    )
+
+    if status in (200, 201):
+        articles_created = body.get("articlesCreated", body.get("articles_created", "?"))
+        log("PASS", f"Template '{TEMPLATE_TO_APPLY}' applied: {articles_created} articles created")
+    else:
+        log("WARN", f"Template apply failed: {status} — {body}")
+        log("INFO", "Template apply is non-critical — continuing")
+        return
+
+    # Verify suggestions endpoint works after KB population
+    status, body = api_call("GET", "/api/admin/knowledge/suggestions", api_key=key)
+    if status == 200:
+        suggestion_count = len(body) if isinstance(body, dict) else 0
+        log("PASS", f"Config suggestions available: {suggestion_count} suggestions")
+    else:
+        log("WARN", f"Suggestions endpoint: {status} — non-critical")
+
+
+# ---------------------------------------------------------------------------
 # Phase 5: Create Conversations Through Live AI Pipeline
 # ---------------------------------------------------------------------------
 
@@ -734,7 +775,7 @@ def verify_postconditions(dry_run: bool) -> None:
 
     key = CREDENTIALS.get("superadmin_key", "")
     gates_passed = 0
-    total_gates = 7
+    total_gates = 8
 
     # Gate 1: Tenant exists and is active
     status, body = api_call("GET", "/api/tenants/lookup", api_key=key)
@@ -775,11 +816,11 @@ def verify_postconditions(dry_run: bool) -> None:
     if status == 200:
         entries = body if isinstance(body, list) else body.get("items", body.get("entries", []))
         count = len(entries) if isinstance(entries, list) else 0
-        if count >= 3:
-            log("PASS", f"Gate 4: {count} KB entries found")
+        if count >= 10:
+            log("PASS", f"Gate 4: {count} KB entries found (manual + template)")
             gates_passed += 1
         else:
-            log("WARN", f"Gate 4: Only {count} KB entries (expected ≥3)")
+            log("WARN", f"Gate 4: Only {count} KB entries (expected ≥10 = 3 manual + template)")
     else:
         log("FAIL", f"Gate 4: KB list failed — {status}")
 
@@ -824,6 +865,18 @@ def verify_postconditions(dry_run: bool) -> None:
     else:
         log("FAIL", f"Gate 7: remaker-digital-001 lookup failed — {status}")
 
+    # Gate 8: KA config field persisted
+    status, body = api_call("GET", "/api/config", api_key=key)
+    if status == 200 and isinstance(body, dict):
+        id_mode = body.get("customer_identification_mode", body.get("customerIdentificationMode", ""))
+        if id_mode in ("off", "gentle", "standard", "aggressive"):
+            log("PASS", f"Gate 8: customer_identification_mode={id_mode}")
+            gates_passed += 1
+        else:
+            log("WARN", f"Gate 8: customer_identification_mode missing or invalid: '{id_mode}'")
+    else:
+        log("FAIL", f"Gate 8: Config read for KA field failed — {status}")
+
     # Summary
     log("PHASE", f"\n{'='*60}")
     if gates_passed == total_gates:
@@ -851,10 +904,11 @@ PHASES = [
     (2, "Create Team Members", phase_2_team),
     (3, "Create Quick Actions", phase_3_quick_actions),
     (4, "Create KB Documents", phase_4_knowledge),
-    (5, "Create Conversations", phase_5_conversations),
-    (6, "Upload Avatar", phase_6_avatar),
-    (7, "Verify Tier Override", phase_7_tier_verify),
-    (8, "Verify Postconditions", verify_postconditions),
+    (5, "Apply KA Template", phase_4b_ka_template),
+    (6, "Create Conversations", phase_5_conversations),
+    (7, "Upload Avatar", phase_6_avatar),
+    (8, "Verify Tier Override", phase_7_tier_verify),
+    (9, "Verify Postconditions", verify_postconditions),
 ]
 
 

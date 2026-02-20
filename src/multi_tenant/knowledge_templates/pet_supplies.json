@@ -1,0 +1,117 @@
+{
+  "id": "pet_supplies",
+  "name": "Pet Supplies",
+  "version": 1,
+  "articles": [
+    {
+      "entry_type": "faq",
+      "title": "Managing Food Allergies and Sensitivities in Pets",
+      "content": "Food allergies and sensitivities are common in both dogs and cats. The most frequent allergens in dog food are beef, dairy, wheat, chicken, and soy. For cats, the top allergens include fish, beef, dairy, and chicken. Symptoms of food allergies may include itchy skin, ear infections, excessive paw licking, vomiting, diarrhea, and hot spots. If you suspect your pet has a food allergy, consult your veterinarian about conducting an elimination diet trial, which typically lasts 8 to 12 weeks. We offer a wide selection of limited-ingredient diets, novel protein formulas (such as venison, duck, and rabbit), and hydrolyzed protein diets that break proteins down to a size unlikely to trigger an immune response. Use the allergy filter on our shop page to find products free from specific ingredients.",
+      "category": "Pet Health",
+      "tags": ["allergies", "food-sensitivity", "limited-ingredient", "novel-protein"]
+    },
+    {
+      "entry_type": "faq",
+      "title": "Sizing Guide for Pet Clothing and Accessories",
+      "content": "Getting the right fit for pet clothing, harnesses, and collars requires accurate measurements. For collars, measure around the base of your pet's neck where a collar would sit and add 2 inches for comfort. For harnesses, measure both the neck and the widest part of the chest (just behind the front legs) and refer to the brand-specific size chart on the product page, as sizing varies significantly between manufacturers. For pet clothing, you will need three measurements: neck circumference, chest girth at the widest point, and back length from the base of the neck to the base of the tail. When in doubt between two sizes, size up rather than down. For boots and paw protectors, place your pet's paw on a piece of paper, mark the widest point, and measure the distance in millimeters.",
+      "category": "Sizing & Fit",
+      "tags": ["sizing", "clothing", "harness", "collar", "measurement"]
+    },
+    {
+      "entry_type": "faq",
+      "title": "Understanding Pet Food Ingredients",
+      "content": "Reading pet food labels can be confusing, but understanding a few key principles helps you make informed choices. Ingredients are listed in descending order by weight before cooking. A named meat (such as chicken or beef) listed first is approximately 70 percent water by weight, so after processing it contributes less protein than it appears. Meat meal (such as chicken meal) is already dehydrated and is a more concentrated protein source. By-products include organ meats, which are highly nutritious for pets though the term sounds unappealing. Grain-free does not necessarily mean low-carbohydrate, as these formulas often substitute grains with potatoes, peas, or lentils. The AAFCO (Association of American Feed Control Officials) statement on the label tells you whether the food is complete and balanced for a specific life stage or whether it is intended only as a treat or supplement.",
+      "category": "Pet Health",
+      "tags": ["ingredients", "labels", "AAFCO", "nutrition", "food"]
+    },
+    {
+      "entry_type": "faq",
+      "title": "Autoship and Subscription Management",
+      "content": "Our Autoship program ensures your pet never runs out of essential supplies. Set up recurring deliveries for food, treats, litter, medications, and any other products on a schedule that works for you, ranging from every 2 weeks to every 12 weeks. Autoship subscribers save 10 percent on every recurring order. To manage your subscription, log into your account and visit the Autoship section where you can change delivery frequency, swap products or flavors, add or remove items, skip a shipment, or cancel entirely. Changes must be made at least 48 hours before your next scheduled processing date. We send a reminder email 5 days before each shipment is processed so you have time to make adjustments. If your pet's dietary needs change, you can update products at any time without losing your subscription discount.",
+      "category": "Subscriptions",
+      "tags": ["autoship", "subscription", "recurring", "delivery", "savings"]
+    },
+    {
+      "entry_type": "faq",
+      "title": "Species and Breed Compatibility for Products",
+      "content": "Not all pet products are safe or suitable for every species or breed. Many products designed for dogs are toxic to cats and vice versa. For example, certain flea and tick treatments containing permethrin are safe for dogs but can be fatal to cats. Essential oil diffusers and sprays may be harmful to birds, reptiles, and small mammals. Rawhide chews are not recommended for aggressive chewers or small breeds due to choking and digestive blockage risks. Brachycephalic breeds (flat-faced dogs like Bulldogs and Pugs, and flat-faced cats like Persians) have specific needs for bowls, harnesses, and treats that accommodate their facial structure. Each product page clearly lists which species and, where relevant, which breed sizes the product is intended for. When in doubt, consult your veterinarian before introducing a new product.",
+      "category": "Product Information",
+      "tags": ["species", "breed", "compatibility", "safety", "toxicity"]
+    },
+    {
+      "entry_type": "policy",
+      "title": "Pet Food Returns Policy",
+      "content": "If your pet does not like the food you purchased or has an adverse reaction to it, we accept returns of opened pet food bags within 30 days of delivery, provided at least 75 percent of the product remains. You may return the item for a full refund or exchange it for a different formula. For unopened bags, we accept returns within 60 days of delivery for a full refund. Refrigerated and frozen raw food products are final sale due to food safety concerns and cold chain requirements. Prescription diet foods require a valid veterinary authorization and can only be returned if unopened and within 30 days. To initiate a food return, contact our customer service team with your order number; we will provide a return shipping label or, for open bags, may ask for a photo of the remaining product instead of requiring you to ship it back.",
+      "category": "Returns & Exchanges",
+      "tags": ["returns", "pet-food", "refund", "exchange", "policy"]
+    },
+    {
+      "entry_type": "policy",
+      "title": "Freshness Guarantee on Perishable Products",
+      "content": "We guarantee the freshness of all perishable pet products including dry food, wet food, treats, and supplements. Every product shipped from our warehouse has a minimum remaining shelf life of 3 months from the date of delivery. If you receive a product with a best-by date less than 3 months away, contact us for an immediate replacement or full refund. Frozen raw food is shipped in insulated packaging with dry ice or gel packs and must be received within the delivery window specified at checkout. If your frozen shipment arrives thawed or at unsafe temperatures, photograph the condition and contact us within 24 hours for a replacement shipment. We rotate inventory using the FIFO (First In, First Out) method and conduct regular shelf-life audits to ensure every product reaching your door meets our freshness standards.",
+      "category": "Quality Assurance",
+      "tags": ["freshness", "guarantee", "shelf-life", "perishable", "quality"]
+    },
+    {
+      "entry_type": "policy",
+      "title": "Prescription Item Policy",
+      "content": "Certain products in our store are classified as prescription items and require a valid veterinary prescription before purchase. These include prescription diet foods, certain flea and tick preventatives, prescription medications, and therapeutic supplements. When you add a prescription item to your cart, you will be prompted to provide your veterinarian's name and clinic information. We will contact your vet directly to verify the prescription, which typically takes 1 to 2 business days. Alternatively, you can upload a copy of your written prescription or have your vet fax it to our pharmacy team. Prescriptions are valid for the duration specified by your veterinarian, up to a maximum of 12 months. Autoship orders for prescription items will require annual prescription renewal. We will notify you 30 days before your prescription expires so you can obtain a renewal from your vet without interruption to your pet's treatment.",
+      "category": "Prescriptions",
+      "tags": ["prescription", "veterinary", "authorization", "pharmacy", "policy"]
+    },
+    {
+      "entry_type": "article",
+      "title": "Pet Food Ingredient Terminology Guide",
+      "content": "Navigating pet food labels is easier when you understand the terminology. Crude protein is the total protein content measured by nitrogen analysis, but does not indicate protein quality or digestibility. Guaranteed analysis is the nutritional breakdown required on all pet food labels showing minimum percentages of crude protein and fat, and maximum percentages of crude fiber and moisture. Prebiotics are non-digestible fibers that feed beneficial bacteria in the gut, while probiotics are live beneficial bacteria added to support digestive health. Glucosamine and chondroitin are joint-supporting compounds commonly added to senior pet formulas. Taurine is an essential amino acid for cats that must be obtained through diet; deficiency can cause serious heart and eye conditions. Omega-3 and omega-6 fatty acids support skin health, coat quality, and cognitive function, typically sourced from fish oil, flaxseed, or algae.",
+      "category": "Education",
+      "tags": ["ingredients", "terminology", "crude-protein", "probiotics", "taurine"]
+    },
+    {
+      "entry_type": "article",
+      "title": "Pet Supplement Types and Uses",
+      "content": "Pet supplements address a wide range of health concerns and are available in various forms including chewable tablets, soft chews, powders, liquids, and capsules. Joint supplements containing glucosamine, chondroitin, and MSM are among the most popular, particularly for aging dogs and large breeds prone to hip dysplasia. Calming supplements use ingredients like L-theanine, chamomile, and valerian root to help pets with anxiety, thunderstorm phobia, or separation stress. Digestive enzymes and probiotic supplements support gut health and can help pets with sensitive stomachs, gas, or irregular bowel movements. Skin and coat supplements rich in omega fatty acids, biotin, and zinc promote a healthy, shiny coat and can reduce excessive shedding. Always choose supplements formulated specifically for your pet's species, as human supplements may contain ingredients that are toxic to animals, such as xylitol in some chewable vitamins.",
+      "category": "Education",
+      "tags": ["supplements", "joint-health", "calming", "digestive", "skin-coat"]
+    },
+    {
+      "entry_type": "article",
+      "title": "Breed-Specific Considerations for Product Selection",
+      "content": "Different breeds have unique physical characteristics and health predispositions that affect product selection. Large and giant breeds (Great Danes, Mastiffs, Saint Bernards) benefit from elevated food bowls, orthopedic beds with memory foam, and joint supplements starting in young adulthood. Small breeds (Chihuahuas, Yorkies, Pomeranians) need kibble sized for small mouths, harnesses instead of collars to protect delicate tracheas, and calorie-dense formulas because of their fast metabolism. Double-coated breeds (Huskies, Samoyeds, Golden Retrievers) require specific grooming tools like undercoat rakes and deshedding tools, and should never be shaved. Flat-faced brachycephalic breeds need shallow, wide bowls for easier eating and drinking, front-clip harnesses that do not put pressure on the throat, and extra temperature management in warm weather as they are prone to overheating.",
+      "category": "Education",
+      "tags": ["breed-specific", "large-breed", "small-breed", "brachycephalic", "grooming"]
+    },
+    {
+      "entry_type": "article",
+      "title": "Collar, Harness, and Leash Sizing Guide",
+      "content": "Proper fit is essential for both safety and comfort when selecting collars, harnesses, and leashes. Flat collars should allow two fingers to slide comfortably between the collar and your pet's neck; too loose and the pet can slip out, too tight and it restricts breathing. Martingale collars are designed for breeds with narrow heads (Greyhounds, Whippets) and tighten slightly to prevent escape without choking. Front-clip harnesses redirect pulling by turning the dog toward the handler and are excellent for training, while back-clip harnesses are suitable for well-trained dogs and small breeds. For cats, always use a breakaway collar that releases under pressure to prevent strangulation if caught on an object. Leash length matters: 4-foot leashes provide maximum control for urban walking, 6-foot leashes are the versatile standard, and retractable leashes should only be used in open areas where tangling and sudden stopping are not a concern.",
+      "category": "Education",
+      "tags": ["collar", "harness", "leash", "sizing", "fit", "safety"]
+    },
+    {
+      "entry_type": "article",
+      "title": "Pet Grooming Terminology and Tools",
+      "content": "Understanding grooming terms helps you maintain your pet's coat health between professional grooming appointments. Slicker brushes have fine, short wires on a flat surface and are ideal for removing mats and tangles from medium to long coats. Pin brushes resemble human hair brushes and are gentle enough for daily use on most coat types. Deshedding tools like the Furminator reach through the topcoat to remove loose undercoat hair without cutting the guard hairs. Stripping involves removing dead hair by hand or with a stripping knife, required for wire-coated breeds like terriers to maintain coat texture. Dematting combs have sharp, spaced blades that cut through severe mats without removing large sections of coat. Nail grinders use a rotating file to shorten nails gradually and are an alternative to clippers for pets that are sensitive to the squeezing pressure. Quick refers to the blood vessel inside the nail that must be avoided during trimming to prevent pain and bleeding.",
+      "category": "Education",
+      "tags": ["grooming", "tools", "brushes", "deshedding", "nail-care"]
+    },
+    {
+      "entry_type": "article",
+      "title": "New Pet Owner Essentials Checklist",
+      "content": "Bringing a new pet home is exciting, and having the right supplies ready ensures a smooth transition. For dogs: a size-appropriate crate for safe transportation and house training, food and water bowls (stainless steel is the most hygienic), a collar with ID tag and leash, age-appropriate food recommended by your vet, puppy pads if house training, enzymatic cleaner for accidents, chew toys to satisfy teething needs, a comfortable bed, grooming basics (brush, nail clippers, shampoo), and waste bags. For cats: a litter box (one per cat plus one extra), litter and a scoop, food and water bowls, a scratching post, a carrier for vet visits, interactive toys, a cozy hideaway or bed, and a breakaway collar with ID tag. For both: schedule a veterinary checkup within the first week, establish a feeding routine, and introduce your pet to their new environment gradually, starting with one room before allowing access to the full home.",
+      "category": "Guides",
+      "tags": ["new-pet", "checklist", "essentials", "dog", "cat", "getting-started"]
+    },
+    {
+      "entry_type": "article",
+      "title": "Pet Nutrition Guide: Choosing the Right Food",
+      "content": "Selecting the right food for your pet depends on their species, age, breed size, activity level, and any health conditions. Life stage formulas are designed to meet the specific nutritional needs at each phase: puppy and kitten foods have higher calories and protein to support growth; adult maintenance formulas sustain healthy weight and activity; and senior formulas typically have reduced calories with added joint support and digestive aids. For dogs, breed size matters: small breed formulas have smaller kibble and higher calorie density, while large breed formulas include controlled calcium and phosphorus levels to support proper bone development. Wet food provides higher moisture content, which benefits pets that do not drink enough water, while dry kibble helps maintain dental health through mechanical abrasion. Consult your veterinarian before switching to a raw diet, grain-free diet, or home-cooked meals, as these require careful balancing to meet all nutritional requirements and avoid deficiencies.",
+      "category": "Guides",
+      "tags": ["nutrition", "food-selection", "life-stage", "diet", "guide"]
+    }
+  ],
+  "config_suggestions": {
+    "brand_voice": "Warm, caring, and knowledgeable about pet health and wellness. Treat every pet like family while providing practical, veterinary-informed guidance. Always recommend consulting a vet for health concerns.",
+    "escalation_keywords": ["poisoned", "toxic", "emergency", "choking", "allergic reaction", "swallowed", "sick", "vomiting", "not eating", "recalled", "adverse reaction", "veterinary emergency"],
+    "greeting_message": "Hi! Welcome to {{brand_name}}. Whether you need help choosing the right food, finding the perfect fit for your furry friend, or managing your subscription, I'm here to help. What can I assist you with?"
+  }
+}

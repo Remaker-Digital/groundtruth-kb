@@ -1,0 +1,82 @@
+[
+  {
+    "id": "apparel_fashion",
+    "name": "Apparel & Fashion",
+    "description": "Clothing, shoes, accessories — sizing, care, returns, style terminology",
+    "article_count": 15,
+    "suggested_brand_voice": "trendy and helpful",
+    "suggested_escalation_keywords": ["damaged", "wrong size", "defective", "fraud", "stolen"]
+  },
+  {
+    "id": "beauty_cosmetics",
+    "name": "Beauty & Cosmetics",
+    "description": "Skincare, makeup, fragrances — ingredients, application, allergies, shelf life",
+    "article_count": 15,
+    "suggested_brand_voice": "warm and knowledgeable",
+    "suggested_escalation_keywords": ["allergic reaction", "rash", "irritation", "expired", "counterfeit"]
+  },
+  {
+    "id": "electronics_gadgets",
+    "name": "Electronics & Gadgets",
+    "description": "Consumer electronics, tech accessories — specs, compatibility, warranties, troubleshooting",
+    "article_count": 15,
+    "suggested_brand_voice": "technical yet approachable",
+    "suggested_escalation_keywords": ["defective", "not working", "broken", "fire", "safety hazard", "recall"]
+  },
+  {
+    "id": "home_garden",
+    "name": "Home & Garden",
+    "description": "Furniture, decor, gardening supplies — dimensions, assembly, care instructions",
+    "article_count": 15,
+    "suggested_brand_voice": "friendly and practical",
+    "suggested_escalation_keywords": ["damaged in shipping", "missing parts", "assembly defect", "safety issue"]
+  },
+  {
+    "id": "food_beverage",
+    "name": "Food & Beverage",
+    "description": "Specialty foods, beverages, supplements — allergens, storage, freshness, dietary info",
+    "article_count": 15,
+    "suggested_brand_voice": "enthusiastic and informative",
+    "suggested_escalation_keywords": ["food poisoning", "allergic reaction", "contamination", "expired", "recall"]
+  },
+  {
+    "id": "health_wellness",
+    "name": "Health & Wellness",
+    "description": "Vitamins, fitness, personal care — usage guidance, ingredient info, wellness tips",
+    "article_count": 15,
+    "suggested_brand_voice": "caring and professional",
+    "suggested_escalation_keywords": ["side effect", "adverse reaction", "medical", "doctor", "emergency", "recall"]
+  },
+  {
+    "id": "jewelry_accessories",
+    "name": "Jewelry & Accessories",
+    "description": "Fine jewelry, watches, bags — materials, sizing, care, authenticity",
+    "article_count": 15,
+    "suggested_brand_voice": "elegant and attentive",
+    "suggested_escalation_keywords": ["counterfeit", "tarnished", "broken clasp", "missing stone", "appraisal"]
+  },
+  {
+    "id": "sports_outdoors",
+    "name": "Sports & Outdoors",
+    "description": "Athletic gear, outdoor equipment — sizing, performance specs, safety, maintenance",
+    "article_count": 15,
+    "suggested_brand_voice": "energetic and knowledgeable",
+    "suggested_escalation_keywords": ["safety defect", "injury", "recall", "broken equipment", "warranty claim"]
+  },
+  {
+    "id": "toys_games",
+    "name": "Toys & Games",
+    "description": "Children's toys, board games, hobby items — age ratings, safety, batteries, assembly",
+    "article_count": 15,
+    "suggested_brand_voice": "fun and reassuring",
+    "suggested_escalation_keywords": ["choking hazard", "safety concern", "recall", "lead paint", "battery leak"]
+  },
+  {
+    "id": "pet_supplies",
+    "name": "Pet Supplies",
+    "description": "Pet food, accessories, health products — ingredients, sizing, species compatibility",
+    "article_count": 15,
+    "suggested_brand_voice": "caring and enthusiastic",
+    "suggested_escalation_keywords": ["pet illness", "toxic", "recall", "allergic reaction", "contamination"]
+  }
+]

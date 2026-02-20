@@ -1,0 +1,117 @@
+{
+  "id": "beauty_cosmetics",
+  "name": "Beauty & Cosmetics",
+  "version": 1,
+  "articles": [
+    {
+      "entry_type": "faq",
+      "title": "Product Shelf Life and Expiration",
+      "content": "All of our beauty products have a shelf life indicated by the Period After Opening (PAO) symbol on the packaging, which looks like an open jar with a number followed by the letter M (for months). For example, 12M means the product should be used within 12 months of opening. Unopened products typically last 2-3 years from the manufacture date. Sunscreens have a strict expiration date printed on the packaging and should not be used past that date. Natural and organic products without synthetic preservatives may have shorter shelf lives, typically 6-9 months after opening. Store products in a cool, dry place away from direct sunlight to maximize their longevity.",
+      "category": "Product Information",
+      "tags": ["shelf-life", "expiration", "storage", "PAO"]
+    },
+    {
+      "entry_type": "faq",
+      "title": "How to Perform a Patch Test",
+      "content": "We strongly recommend performing a patch test before using any new skincare or cosmetic product, especially if you have sensitive skin or known allergies. Apply a small amount of the product to the inside of your wrist or behind your ear. Leave it on for 24-48 hours without washing the area. Monitor for any signs of irritation such as redness, itching, swelling, or burning. If you experience any adverse reaction, wash the area immediately with mild soap and water and discontinue use of the product. If the reaction is severe, seek medical attention. A negative patch test does not guarantee you will not have a reaction on your face, but it significantly reduces the risk of a full-face adverse event.",
+      "category": "Safety & Usage",
+      "tags": ["patch-test", "sensitive-skin", "allergies", "safety"]
+    },
+    {
+      "entry_type": "faq",
+      "title": "Understanding Ingredient Lists",
+      "content": "Ingredient lists on our products follow the INCI (International Nomenclature of Cosmetic Ingredients) standard, which uses scientific names. Ingredients are listed in descending order of concentration; the first few ingredients make up the majority of the formula. Common ingredients include Aqua (water), Glycerin (a humectant that attracts moisture), Tocopherol (Vitamin E, an antioxidant), and Hyaluronic Acid (a powerful hydrator). If you have specific ingredient concerns or allergies, you can search any product on our site by ingredient. Our customer service team can also provide the full ingredient deck and help identify potential allergens in any product upon request.",
+      "category": "Product Information",
+      "tags": ["ingredients", "INCI", "formulation", "allergens"]
+    },
+    {
+      "entry_type": "faq",
+      "title": "Building a Skincare Routine",
+      "content": "A basic skincare routine consists of three essential steps: cleanse, moisturize, and protect. In the morning, start with a gentle cleanser, apply a moisturizer suited to your skin type, and finish with a broad-spectrum SPF 30 or higher sunscreen. In the evening, double cleanse if you wear makeup (an oil-based cleanser followed by a water-based one), apply any treatment serums, and finish with a night moisturizer or sleeping mask. Introduce new products one at a time, waiting at least two weeks before adding another, so you can identify what works for your skin. Our product pages include routine placement suggestions to help you layer products in the correct order.",
+      "category": "Skincare Education",
+      "tags": ["routine", "skincare-steps", "morning-routine", "evening-routine"]
+    },
+    {
+      "entry_type": "faq",
+      "title": "Cruelty-Free and Vegan Products",
+      "content": "We are committed to ethical beauty. Products labeled Cruelty-Free on our store have not been tested on animals at any stage of product development, and we require certification from recognized organizations such as Leaping Bunny or PETA. Products labeled Vegan contain no animal-derived ingredients, including common ones like beeswax, lanolin, carmine, and keratin. Note that a product can be cruelty-free but not vegan (for example, a product containing beeswax that was not tested on animals). Use our filters to shop by cruelty-free, vegan, or both. If you have questions about a specific product's certifications, our customer service team can provide detailed sourcing information.",
+      "category": "Ethics & Sustainability",
+      "tags": ["cruelty-free", "vegan", "ethical", "certifications"]
+    },
+    {
+      "entry_type": "policy",
+      "title": "Returns Policy for Opened Products",
+      "content": "We understand that sometimes a product does not work for your skin. Opened beauty products may be returned within 30 days of purchase if you have used less than 20% of the product. To initiate a return, contact our customer service team with your order number and a brief description of why the product did not work for you. We will provide a prepaid return label. Once we receive the item, we will process a refund to your original payment method within 5-7 business days. Items that have been used beyond 20% or are older than 30 days from purchase are not eligible for return but may qualify for a store credit at our discretion. Sealed, unused products can be returned within 60 days for a full refund.",
+      "category": "Policies",
+      "tags": ["returns", "opened-products", "refund", "policy"]
+    },
+    {
+      "entry_type": "policy",
+      "title": "Allergen Disclosure Policy",
+      "content": "Your safety is our highest priority. All product listings on our store include a complete INCI ingredient list. Products that contain common allergens such as tree nuts, gluten, soy, or fragrance are flagged with allergen warnings on the product page. However, many of our products are manufactured in facilities that also process items containing these allergens, so cross-contamination is possible. If you have severe allergies, we strongly recommend performing a patch test before use and consulting with your dermatologist. Our customer service team can provide detailed allergen and manufacturing facility information for any product upon request. We update our allergen information whenever formulations change.",
+      "category": "Policies",
+      "tags": ["allergens", "safety", "disclosure", "ingredients"]
+    },
+    {
+      "entry_type": "policy",
+      "title": "Satisfaction Guarantee",
+      "content": "We stand behind every product we sell. If you are not completely satisfied with your purchase, our satisfaction guarantee ensures you have options. Within the first 30 days of purchase, you can return any product for a full refund or exchange. For products that caused an adverse skin reaction, we will process an immediate refund regardless of usage amount upon receiving a description of the reaction. First-time buyers are also eligible for our Try It risk-free program on select products, which provides a full refund within 45 days if the product does not meet your expectations. Contact our customer service team to initiate any satisfaction guarantee claim, and we will work to make it right.",
+      "category": "Policies",
+      "tags": ["guarantee", "satisfaction", "refund", "risk-free"]
+    },
+    {
+      "entry_type": "article",
+      "title": "Understanding Skin Types",
+      "content": "Identifying your skin type is the first step to choosing the right products. Normal skin has a balanced moisture level, small pores, and few imperfections. Oily skin produces excess sebum, has enlarged pores, and is prone to shine and breakouts. Dry skin feels tight, may flake or peel, and often looks dull. Combination skin is oily in the T-zone (forehead, nose, and chin) and dry on the cheeks. Sensitive skin reacts easily to products and environmental factors, often showing redness, stinging, or irritation. Your skin type can change with age, seasons, hormones, and lifestyle. We recommend reassessing your skin type periodically and adjusting your routine accordingly.",
+      "category": "Skincare Education",
+      "tags": ["skin-types", "oily", "dry", "combination", "sensitive"]
+    },
+    {
+      "entry_type": "article",
+      "title": "SPF and Sun Protection Guide",
+      "content": "SPF (Sun Protection Factor) measures how well a sunscreen protects against UVB rays, which cause sunburn. SPF 30 blocks approximately 97% of UVB rays, while SPF 50 blocks about 98%. No sunscreen blocks 100% of UV rays. For adequate protection, apply a generous amount (about a nickel-sized dollop for the face) 15 minutes before sun exposure and reapply every two hours, or immediately after swimming or sweating. Look for broad-spectrum formulas that protect against both UVA rays (which cause aging) and UVB rays (which cause burning). Chemical sunscreens absorb UV rays using ingredients like avobenzone, while mineral sunscreens (zinc oxide, titanium dioxide) sit on top of the skin and physically deflect rays.",
+      "category": "Skincare Education",
+      "tags": ["SPF", "sunscreen", "sun-protection", "UVA", "UVB"]
+    },
+    {
+      "entry_type": "article",
+      "title": "Key Skincare Ingredient Glossary",
+      "content": "Retinol is a form of Vitamin A that promotes cell turnover and collagen production, effective for anti-aging and acne. Start with a low concentration and use at night, as it increases sun sensitivity. Niacinamide (Vitamin B3) reduces inflammation, minimizes pores, and brightens uneven skin tone. It pairs well with most other ingredients. Vitamin C (Ascorbic Acid) is a potent antioxidant that brightens skin, fades dark spots, and provides environmental protection. Salicylic Acid (BHA) penetrates pores to dissolve excess oil and dead skin cells, making it effective for acne-prone skin. AHA (Alpha Hydroxy Acids) such as Glycolic Acid and Lactic Acid exfoliate the skin surface to improve texture and radiance.",
+      "category": "Product Information",
+      "tags": ["ingredients", "retinol", "niacinamide", "vitamin-c", "glossary"]
+    },
+    {
+      "entry_type": "article",
+      "title": "Makeup Application Techniques",
+      "content": "Achieving a flawless finish starts with the right tools and techniques. For foundation, use a damp beauty sponge for a natural, skin-like finish or a dense brush for fuller coverage. Always start from the center of the face and blend outward. For concealer, apply in an inverted triangle under the eyes and blend with a sponge or ring finger using gentle tapping motions. Set your base with a light dusting of translucent powder on the T-zone. For eyeshadow, apply a transition shade in the crease first, then build color on the lid. Blend edges with a clean fluffy brush. For lips, line with a lip liner that matches your lipstick shade, then fill in with color and blot once for a long-lasting finish.",
+      "category": "Beauty Education",
+      "tags": ["application", "techniques", "foundation", "makeup-tips"]
+    },
+    {
+      "entry_type": "article",
+      "title": "Product Categories Explained",
+      "content": "Our store organizes products into key categories. Cleansers remove dirt, oil, and makeup from the skin and come in forms like gel, foam, cream, micellar water, and oil. Toners rebalance skin pH and prep the skin to absorb subsequent products. Serums are lightweight, concentrated treatments targeting specific concerns like wrinkles, dark spots, or dehydration. Moisturizers hydrate and seal in moisture, available as lotions, creams, and gels for different skin types. Masks provide intensive treatment and come in sheet, clay, peel-off, and overnight formats. Exfoliators remove dead skin cells through physical scrubs or chemical acids. SPF products protect against UV damage and are the final step in a morning routine.",
+      "category": "Product Information",
+      "tags": ["categories", "cleansers", "serums", "moisturizers", "masks"]
+    },
+    {
+      "entry_type": "article",
+      "title": "Complete Skincare Routine Guide",
+      "content": "A well-structured skincare routine addresses cleansing, treating, and protecting your skin. In the morning, follow this order: cleanser, toner (optional), antioxidant serum (such as Vitamin C), eye cream, moisturizer, and sunscreen. In the evening, the order changes slightly: first cleanse (double cleanse if wearing makeup), then toner, treatment serum (such as retinol or exfoliating acid), eye cream, and a richer night moisturizer or sleeping mask. Use exfoliants 2-3 times per week rather than daily to avoid over-exfoliation. Sheet masks can be used 1-2 times per week after cleansing. Wait 30-60 seconds between each product layer to allow absorption before applying the next step.",
+      "category": "Skincare Education",
+      "tags": ["routine", "step-by-step", "morning", "evening", "layering"]
+    },
+    {
+      "entry_type": "article",
+      "title": "Understanding Fragrance Notes",
+      "content": "Fragrances are composed of three layers of notes that unfold over time. Top notes are the first scents you smell upon application and typically last 15-30 minutes. Common top notes include citrus fruits like bergamot and lemon, as well as light herbs like basil and mint. Middle notes (also called heart notes) emerge after the top notes fade and form the core of the fragrance, lasting 2-4 hours. Floral notes like rose, jasmine, and lavender are popular heart notes. Base notes are the foundation of the scent, appearing last and lingering for hours. Common base notes include vanilla, musk, sandalwood, and amber. When testing a fragrance, wait at least 30 minutes to experience all three layers before making a decision.",
+      "category": "Product Information",
+      "tags": ["fragrance", "perfume", "notes", "scent-profiles"]
+    }
+  ],
+  "config_suggestions": {
+    "brand_voice": "Warm, knowledgeable, and reassuring. Use clear language to explain ingredients and techniques without overwhelming customers. Emphasize safety, self-care, and helping each customer find what works for their unique skin.",
+    "escalation_keywords": ["allergic reaction", "skin irritation", "rash", "burning", "swelling", "refund not received", "damaged product", "wrong item", "complaint", "manager"],
+    "greeting_message": "Hi! Welcome to {{brand_name}}. I can help with product recommendations, skincare routines, or order questions. What can I do for you?"
+  }
+}

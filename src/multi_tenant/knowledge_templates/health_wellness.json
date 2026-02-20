@@ -1,0 +1,117 @@
+{
+  "id": "health_wellness",
+  "name": "Health & Wellness",
+  "version": 1,
+  "articles": [
+    {
+      "entry_type": "faq",
+      "title": "Supplement Dosage Guidelines",
+      "content": "Most supplements include a recommended daily dosage on the product label. We strongly advise following the manufacturer's suggested serving size unless your healthcare provider has given you personalized instructions. Taking more than the recommended dose does not necessarily increase benefits and may cause adverse effects. If you are unsure about the right dosage for your needs, please consult your physician or a registered dietitian before adjusting your intake.",
+      "category": "Dosage & Usage",
+      "tags": ["dosage", "supplements", "daily-intake", "safety"]
+    },
+    {
+      "entry_type": "faq",
+      "title": "Drug and Supplement Interaction Warnings",
+      "content": "Certain dietary supplements may interact with prescription medications, over-the-counter drugs, or other supplements. For example, St. John's Wort can reduce the effectiveness of birth control pills and blood thinners. Calcium supplements may interfere with thyroid medication absorption. We include interaction warnings on each product page where known interactions exist. Always inform your healthcare provider about all supplements you are currently taking, especially before surgery or starting new medications.",
+      "category": "Safety & Interactions",
+      "tags": ["interactions", "medications", "safety", "warnings"]
+    },
+    {
+      "entry_type": "faq",
+      "title": "Proper Supplement Storage",
+      "content": "To maintain potency and freshness, store supplements in a cool, dry place away from direct sunlight. Most capsules and tablets should be kept at room temperature between 59-77 degrees Fahrenheit. Probiotics and certain liquid supplements may require refrigeration after opening; check the product label for specific instructions. Always keep supplements in their original containers with the lids tightly sealed. Avoid storing supplements in bathrooms where humidity levels are high, as moisture can degrade the active ingredients over time.",
+      "category": "Storage & Handling",
+      "tags": ["storage", "freshness", "temperature", "handling"]
+    },
+    {
+      "entry_type": "faq",
+      "title": "Third-Party Certifications and Testing",
+      "content": "We carry products that have been verified by independent third-party testing organizations including NSF International, USP (United States Pharmacopeia), and ConsumerLab. These certifications verify that the product contains the ingredients listed on the label in the declared amounts, is free from harmful levels of contaminants, and was manufactured following Good Manufacturing Practices (GMP). Look for certification badges on each product page. Products without third-party certification are clearly labeled so you can make informed purchasing decisions.",
+      "category": "Quality & Certifications",
+      "tags": ["certifications", "NSF", "USP", "GMP", "testing"]
+    },
+    {
+      "entry_type": "faq",
+      "title": "Managing Your Supplement Subscription",
+      "content": "You can manage your supplement subscription directly from your account dashboard. To change delivery frequency, swap products, skip a shipment, or cancel entirely, navigate to My Account and then Subscriptions. Changes made before midnight on the day before your next processing date will apply to the upcoming shipment. Subscription customers receive a 15 percent discount on all recurring orders. If you need to pause your subscription temporarily, you can set a resume date up to 90 days in the future without losing your discount rate.",
+      "category": "Subscriptions",
+      "tags": ["subscription", "autoship", "manage", "delivery", "discount"]
+    },
+    {
+      "entry_type": "policy",
+      "title": "Returns Policy for Supplements",
+      "content": "We accept returns on unopened supplement products within 30 days of delivery for a full refund. Opened products may be returned within 30 days if you are dissatisfied, but a restocking fee of 15 percent will apply. For safety and regulatory reasons, we cannot accept returns on products that have been stored improperly or have expired. Perishable items such as refrigerated probiotics are final sale once opened. To initiate a return, contact our customer service team with your order number and reason for return. Refunds are processed within 5-7 business days after we receive the returned item.",
+      "category": "Returns & Refunds",
+      "tags": ["returns", "refunds", "policy", "supplements"]
+    },
+    {
+      "entry_type": "policy",
+      "title": "Medical and Health Disclaimer",
+      "content": "The products sold on our website are not intended to diagnose, treat, cure, or prevent any disease. All information provided on product pages, blog posts, and marketing materials is for educational purposes only and should not be considered medical advice. Individual results may vary. Statements regarding dietary supplements have not been evaluated by the Food and Drug Administration. We strongly recommend consulting with a qualified healthcare professional before starting any new supplement regimen, especially if you are pregnant, nursing, taking medications, or have a pre-existing medical condition.",
+      "category": "Legal & Compliance",
+      "tags": ["disclaimer", "FDA", "medical", "legal", "compliance"]
+    },
+    {
+      "entry_type": "policy",
+      "title": "Satisfaction Guarantee",
+      "content": "We stand behind the quality of every product we sell with our 60-day satisfaction guarantee. If you are not completely satisfied with your purchase for any reason, contact our customer support team within 60 days of your delivery date. For first-time customers, we offer a full refund on your first order with no questions asked. Returning customers who have previously used the satisfaction guarantee may receive store credit instead of a monetary refund. This guarantee covers up to one unit per product per customer and does not apply to bulk or wholesale orders.",
+      "category": "Guarantees",
+      "tags": ["guarantee", "satisfaction", "refund", "first-order"]
+    },
+    {
+      "entry_type": "article",
+      "title": "Understanding Vitamin Types: Fat-Soluble vs Water-Soluble",
+      "content": "Vitamins are classified into two groups based on how they dissolve and are stored in the body. Fat-soluble vitamins (A, D, E, and K) dissolve in fat and can be stored in the liver and fatty tissues for extended periods. Because they accumulate, excessive intake can potentially lead to toxicity. Water-soluble vitamins (C and B-complex vitamins including B1, B2, B3, B5, B6, B7, B9, and B12) dissolve in water and are not stored in significant amounts. Excess water-soluble vitamins are excreted through urine, which means they need to be consumed more regularly through diet or supplementation.",
+      "category": "Education",
+      "tags": ["vitamins", "fat-soluble", "water-soluble", "nutrition"]
+    },
+    {
+      "entry_type": "article",
+      "title": "Dietary Supplement Terminology Guide",
+      "content": "Understanding supplement labels can be confusing. Here are key terms you will encounter: Bioavailability refers to how much of a nutrient your body can actually absorb and use. Chelated minerals are bound to amino acids for improved absorption. Standardized extract means the product contains a guaranteed minimum percentage of the active compound. Proprietary blend is a mixture of ingredients listed by total weight without individual amounts disclosed. Enteric coating is a special covering that prevents a capsule from dissolving until it reaches the intestines, reducing stomach upset. RDA stands for Recommended Dietary Allowance, the average daily intake sufficient for most healthy individuals.",
+      "category": "Education",
+      "tags": ["terminology", "labels", "bioavailability", "supplements"]
+    },
+    {
+      "entry_type": "article",
+      "title": "Wellness and Holistic Health Terminology",
+      "content": "The wellness space uses many terms that can be unclear to newcomers. Adaptogen refers to natural substances, typically herbs, believed to help the body adapt to stress and promote balance. Nootropic describes compounds that may support cognitive function, memory, and focus. Gut microbiome is the community of trillions of microorganisms living in your digestive tract that influence digestion, immunity, and mood. Antioxidant is a molecule that helps neutralize free radicals, which are unstable atoms that can damage cells. Inflammation response is the body's natural defense mechanism, though chronic inflammation is associated with various health conditions.",
+      "category": "Education",
+      "tags": ["wellness", "adaptogens", "nootropics", "microbiome", "terminology"]
+    },
+    {
+      "entry_type": "article",
+      "title": "Fitness and Performance Supplement Terms",
+      "content": "If you are shopping for fitness supplements, understanding these terms will help you choose the right products. BCAA stands for Branched-Chain Amino Acids (leucine, isoleucine, valine), which support muscle protein synthesis and recovery. Creatine monohydrate is a compound that helps regenerate ATP, the primary energy source for short-duration high-intensity exercise. Pre-workout formulas typically contain caffeine, beta-alanine, and nitric oxide precursors to enhance energy and blood flow during training. Whey isolate is a highly filtered form of whey protein containing at least 90 percent protein with minimal lactose and fat. Recovery window refers to the period after exercise when nutrient uptake and muscle repair are believed to be enhanced.",
+      "category": "Education",
+      "tags": ["fitness", "BCAA", "creatine", "pre-workout", "protein"]
+    },
+    {
+      "entry_type": "article",
+      "title": "Understanding Organic and Natural Certifications",
+      "content": "Several certification labels appear on supplement packaging, each with different standards. USDA Organic means the product contains at least 95 percent organically produced ingredients and has been verified by an accredited certifying agent. Non-GMO Project Verified indicates the product has been tested and confirmed to meet the Non-GMO Project Standard for genetically modified organism avoidance. Certified Vegan from the Vegan Awareness Foundation confirms no animal-derived ingredients or animal testing. GMP Certified ensures the manufacturing facility follows Good Manufacturing Practices as defined by the FDA. Clean Label Project tests for industrial and environmental contaminants beyond what is required by regulations.",
+      "category": "Education",
+      "tags": ["organic", "non-GMO", "vegan", "certifications", "clean-label"]
+    },
+    {
+      "entry_type": "article",
+      "title": "Beginner's Guide to Starting a Supplement Routine",
+      "content": "Starting a supplement routine can feel overwhelming with thousands of products available. Begin by identifying your primary health goals, whether that is supporting immune function, improving energy levels, enhancing sleep quality, or filling nutritional gaps in your diet. A basic foundation stack for most adults includes a quality multivitamin, vitamin D3 (especially if you have limited sun exposure), omega-3 fatty acids from fish oil or algae, and magnesium. Introduce one new supplement at a time and wait at least two weeks before adding another so you can identify how each one affects you. Keep a simple journal noting energy levels, sleep quality, digestion, and mood. Always take supplements as directed on the label and with food unless otherwise specified.",
+      "category": "Guides",
+      "tags": ["beginner", "routine", "foundation", "getting-started"]
+    },
+    {
+      "entry_type": "article",
+      "title": "Building a Daily Wellness Routine",
+      "content": "A comprehensive daily wellness routine combines proper nutrition, movement, rest, and targeted supplementation. Morning: Take your fat-soluble vitamins (A, D, E, K) with a meal containing healthy fats for optimal absorption. Include a probiotic on an empty stomach if recommended by the product label. Midday: If you use energy-supporting supplements like B-complex or iron, take them with lunch to sustain afternoon energy without interfering with sleep. Evening: Magnesium glycinate and melatonin, if used, work best taken 30 to 60 minutes before bedtime. Consistency matters more than perfection. Set reminders, use a pill organizer, and track your routine for at least 30 days before evaluating results.",
+      "category": "Guides",
+      "tags": ["daily-routine", "wellness", "morning", "evening", "consistency"]
+    }
+  ],
+  "config_suggestions": {
+    "brand_voice": "Knowledgeable and caring, providing evidence-based wellness guidance with a warm, supportive tone. Encourage customers to consult healthcare professionals for personalized advice.",
+    "escalation_keywords": ["allergic reaction", "side effect", "adverse", "sick", "emergency", "overdose", "pregnant", "medication interaction", "hospitalized"],
+    "greeting_message": "Hi! Welcome to {{brand_name}}. Whether you have questions about supplements, dosage, or wellness tips, I'm here to help. How can I assist you today?"
+  }
+}

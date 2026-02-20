@@ -26,6 +26,7 @@ import {
   Accordion,
   Alert,
   Badge,
+  SegmentedControl,
 } from '@mantine/core';
 import { useAppContext } from '../layouts/StandaloneLayout';
 import { useConfig, useUpdateConfig } from '../../shared/hooks/index';
@@ -67,6 +68,7 @@ export const MemoryPrivacyPage: React.FC = () => {
   const [consentRequired, setConsentRequired] = useState(true);
   const [autoDeleteOnRequest, setAutoDeleteOnRequest] = useState(true);
   const [patternDecayDays, setPatternDecayDays] = useState(90);
+  const [identificationMode, setIdentificationMode] = useState('standard');
 
   // Sync from config when loaded (field names match backend config registry)
   useEffect(() => {
@@ -79,6 +81,7 @@ export const MemoryPrivacyPage: React.FC = () => {
       setConsentRequired(config.consent_collection_enabled !== false);
       setAutoDeleteOnRequest(config.auto_delete_on_request !== false);
       setPatternDecayDays(Number(config.pattern_decay_days ?? 90));
+      setIdentificationMode(String(config.customer_identification_mode ?? 'standard'));
     }
   }, [config]);
 
@@ -94,6 +97,7 @@ export const MemoryPrivacyPage: React.FC = () => {
       data_retention_days: parseInt(retentionDays, 10),
       pii_scrubbing: piiScrubbing,
       consent_collection_enabled: consentRequired,
+      customer_identification_mode: identificationMode,
     };
 
     const result = await updateConfig(updates);
@@ -106,7 +110,7 @@ export const MemoryPrivacyPage: React.FC = () => {
   }, [
     memoryEnabled, conversationMemory, crossSessionLearning, retentionDays,
     piiScrubbing, consentRequired, autoDeleteOnRequest, patternDecayDays,
-    updateConfig, onNotify, refreshActivationStatus,
+    identificationMode, updateConfig, onNotify, refreshActivationStatus,
   ]);
 
   // Loading state
@@ -262,6 +266,47 @@ export const MemoryPrivacyPage: React.FC = () => {
             <Text size="sm">Upgrade to Enterprise tier to access dedicated model training.</Text>
           </Alert>
         )}
+      </Paper>
+
+      {/* KA-8: Customer identification mode */}
+      <Paper radius="md" withBorder p="lg">
+        <Group justify="space-between" mb="md">
+          <Group gap="xs">
+            <Text fw={600} size="md">Customer identification</Text>
+            <Badge variant="light" color="green" size="xs">All tiers</Badge>
+          </Group>
+        </Group>
+        <Text c="dimmed" size="sm" mb="md">
+          Controls how aggressively the AI prompts anonymous visitors to identify
+          themselves (log in or provide an email). Identified customers get richer
+          memory and personalization.
+        </Text>
+        <SegmentedControl
+          value={identificationMode}
+          onChange={setIdentificationMode}
+          fullWidth
+          data={[
+            { value: 'off', label: 'Off' },
+            { value: 'gentle', label: 'Gentle' },
+            { value: 'standard', label: 'Standard' },
+            { value: 'aggressive', label: 'Aggressive' },
+          ]}
+          color={ACTION_BLUE}
+          mb="sm"
+          disabled={!memoryEnabled}
+        />
+        <Text size="xs" c="dimmed">
+          {identificationMode === 'off' && 'No identification prompt. The AI will not ask visitors to log in or provide contact information.'}
+          {identificationMode === 'gentle' && 'Casual mention. The AI may casually note that logging in helps with personalization, but will not push.'}
+          {identificationMode === 'standard' && 'Standard prompt. The AI\'s first response suggests logging in or providing an email to access order history and personalized support.'}
+          {identificationMode === 'aggressive' && 'Strong prompt. The AI\'s first response includes a clear authentication suggestion and asks probing questions about interests and recent orders.'}
+        </Text>
+        {!memoryEnabled && (
+          <Alert color="yellow" variant="light" mt="sm">
+            <Text size="xs">Enable customer context above to use identification prompts.</Text>
+          </Alert>
+        )}
+        <HelpTooltip text="Customer identification helps your AI build richer memory profiles. When customers identify themselves, the AI can access their order history, preferences, and past interactions — enabling more personalized and effective support." docLink="https://agentredcx.com/docs/admin-guide/customer-memory#identification" />
       </Paper>
 
       {/* Privacy & data retention */}

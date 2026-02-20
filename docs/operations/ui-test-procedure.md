@@ -487,7 +487,7 @@ Run after Page 0A (system is now re-activated with brand_name + brand_voice set)
 
 ---
 
-### Page 4: Agent Configuration (65 tests)
+### Page 4: Agent Configuration (73 tests)
 
 > **Verification standard (session 47):** Every element is tested for presence, correct value,
 > input manipulation, valid population, state change, control activation, input validation,
@@ -531,6 +531,19 @@ Run after Page 0A (system is now re-activated with brand_name + brand_voice set)
 | 4.2f | Refund policy textarea autosizes | Type 10+ lines → textarea height expands (autosize, minRows=3) | |
 | 4.2g | Shipping policy shows current value | Textarea displays `shipping_info` from draft config; empty with placeholder "Describe your shipping policy…" | |
 | 4.2h | Policies section tooltip | (?) icon present next to "Policies" header with doc link to business-policies | |
+
+#### 4.2B Configuration suggestions (KA-4) — 8 tests
+
+| # | Test | Expected | Status |
+|---|------|----------|--------|
+| 4.2i | Brand name suggestion badge — visible when empty | When brand_name is empty and suggestions API returns a brand_name suggestion, "Suggested" badge (violet) appears inline next to field label | |
+| 4.2j | Brand name suggestion badge — hidden when populated | When brand_name has a value, suggestion badge is NOT shown even if API returned a suggestion | |
+| 4.2k | Brand name suggestion — click to apply | Click "Suggested" badge → field populates with suggestion value; badge disappears | |
+| 4.2l | Brand voice suggestion badge — visible when empty | When brand_voice is empty and suggestion exists, "Suggested" badge appears next to "Brand voice" label | |
+| 4.2m | Brand voice suggestion — click to apply | Click badge → textarea populates with suggested brand voice text | |
+| 4.2n | Refund policy suggestion badge — visible when empty | When return_policy (refund policy) is empty and suggestion exists, badge appears next to "Refund policy" label | |
+| 4.2o | Shipping policy suggestion badge — visible when empty | When shipping_info (shipping policy) is empty and suggestion exists, badge appears next to "Shipping policy" label | |
+| 4.2p | Suggestion badges — all hidden after apply+save | Apply all 4 suggestions → Save → reload → no suggestion badges visible (all fields populated) | |
 
 #### 4.3 Escalation section
 
@@ -753,6 +766,29 @@ Run after Page 0A (system is now re-activated with brand_name + brand_voice set)
 | 5.21e | Conflict scan — 503 error | If embedding support unavailable, shows "Conflict scanner is not available. This feature requires embedding support." | |
 | 5.21f | Conflict scan — re-scan force | "Re-scan (force)" button triggers new scan with force=true | |
 | 5.21g | Conflict scan — footer info | Shows scan timestamp and count of entries skipped (no embeddings) | |
+
+#### 5.23 Knowledge automation section (KA-7) — 18 tests
+
+| # | Test | Expected | Status |
+|---|------|----------|--------|
+| 5.23 | Knowledge automation section renders | Paper card with title "Knowledge automation", violet "Beta" badge, Show/Hide toggle button | |
+| 5.23a | Default state — collapsed | Section initially collapsed; subtitle text "Import content from your storefront or apply industry templates..." visible | |
+| 5.23b | Show toggle — expand | Click "Show" → section expands, button text changes to "Hide" | |
+| 5.23c | Hide toggle — collapse | Click "Hide" → section collapses back, subtitle reappears, button text changes to "Show" | |
+| 5.23d | Storefront scan button renders | "Scan storefront" button with `action` blue color inside expanded section | |
+| 5.23e | Scan storefront — loading state | Click "Scan storefront" → button shows loading spinner (startingIngestion=true) | |
+| 5.23f | Scan storefront — disabled during active job | When ingestionStatus shows an active job, "Scan storefront" button is disabled | |
+| 5.23g | IngestionPanel — empty state | When no ingestion job exists, IngestionPanel renders without error (null job → no visible panel or empty message) | |
+| 5.23h | IngestionPanel — active job display | When ingestion job exists (status=running), panel shows: status badge, source label, progress bar with percent, articles found count, cancel button | |
+| 5.23i | IngestionPanel — completed job | When job status=completed, panel shows green "completed" badge, total articles created, elapsed time | |
+| 5.23j | IngestionPanel — cancel button | Click "Cancel" → cancel API called; loading state on cancel button; job status updates to "cancelled" | |
+| 5.23k | Category template selector renders | Grid of template cards within expanded section; each card shows template name, description, article count badge | |
+| 5.23l | Template count — 10 templates | Grid displays exactly 10 category templates (apparel_fashion through pet_supplies) | |
+| 5.23m | Template card — apply button | Each template card has "Apply to knowledge base" button with action blue color | |
+| 5.23n | Template apply — loading state | Click "Apply to knowledge base" → button shows loading spinner (applyingTemplate=true) | |
+| 5.23o | Template apply — success | After successful apply, success notification shows articles created count; KB stats refresh (article count increases) | |
+| 5.23p | Template apply — error | If apply fails, error notification displayed with error message; template grid remains usable | |
+| 5.23q | Template selector — loading state | While templates API loading, shows skeleton/loading indicator | |
 
 #### 5.22 Loading and error states
 
@@ -1169,6 +1205,21 @@ Run after Page 0A (system is now re-activated with brand_name + brand_voice set)
 | 9.5e | Upgrade alert — Enterprise | Alert NOT shown for Enterprise tier tenants | |
 | 9.5f | Dedicated model HelpTooltip | (?) icon with text about custom AI model; doc link to customer-memory#dedicated-model-training | |
 
+#### 9.5B Customer identification (KA-8) — 10 tests
+
+| # | Test | Expected | Status |
+|---|------|----------|--------|
+| 9.15 | Customer identification section renders | Paper card with title "Customer identification", green "All tiers" badge, SegmentedControl, HelpTooltip | |
+| 9.15a | SegmentedControl — 4 modes | SegmentedControl displays 4 options: Off, Gentle, Standard, Aggressive | |
+| 9.15b | SegmentedControl — current value | Shows `customer_identification_mode` from config (default: "standard") | |
+| 9.15c | SegmentedControl — change to Off | Select "Off" → description updates to "No identification prompts..." | |
+| 9.15d | SegmentedControl — change to Gentle | Select "Gentle" → description updates to "Casual mention..." | |
+| 9.15e | SegmentedControl — change to Aggressive | Select "Aggressive" → description updates to "Strong prompt..." | |
+| 9.15f | SegmentedControl — action blue color | SegmentedControl uses `action` color (blue #3B82F6) for selected segment | |
+| 9.15g | SegmentedControl — disabled when memory off | When Customer context (memoryEnabled) is OFF, SegmentedControl is disabled (greyed out) | |
+| 9.15h | Memory-off alert | When memoryEnabled=false, yellow Alert shown below SegmentedControl warning that identification requires memory | |
+| 9.15i | Identification mode save persists | Change mode → "Save draft inputs" → reload → SegmentedControl shows saved value; `GET /api/config?state=draft` returns `customer_identification_mode` with new value | |
+
 #### 9.6 Data retention & privacy accordion
 
 | # | Test | Expected | Status |
@@ -1194,7 +1245,7 @@ Run after Page 0A (system is now re-activated with brand_name + brand_voice set)
 |---|------|----------|--------|
 | 9.8 | Save draft inputs button | Red "Save draft inputs" button at bottom of page (no button at top) | |
 | 9.7a | Save button loading state | Button shows spinner while saving (saving=true) | |
-| 9.11 | Save draft inputs persists all Memory & Privacy settings | After modifying toggles/sliders and clicking "Save draft inputs", all 8 fields persist correctly on page reload (memory_enabled, pattern_learning_enabled, data_retention_days, consent_collection_enabled, pii_scrubbing, conversation_memory, cross_session_learning, pattern_decay_days) | |
+| 9.11 | Save draft inputs persists all Memory & Privacy settings | After modifying toggles/sliders and clicking "Save draft inputs", all 9 fields persist correctly on page reload (memory_enabled, pattern_learning_enabled, data_retention_days, consent_collection_enabled, pii_scrubbing, conversation_memory, cross_session_learning, pattern_decay_days, customer_identification_mode) | |
 | 9.7b | Save success notification | "Draft memory & privacy settings saved." notification in green | |
 | 9.7c | Save error notification | Error message notification when save fails | |
 | 9.7d | Save triggers activation status refresh | After successful save, refreshActivationStatus() called; sidebar badge may change to "Pending" | |

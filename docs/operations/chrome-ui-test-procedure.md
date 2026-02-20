@@ -1770,9 +1770,9 @@ Navigate to `$PROVIDER_URL/mfa`.
 
 ## Postconditions
 
-- [ ] **Standalone Admin:** 802 tests executed (780 original + 22 new header/logo/contact tests), results recorded with test ID / PASS / FAIL / SKIP
+- [ ] **Standalone Admin:** 838 tests executed (802 prior + 36 KA tests), results recorded with test ID / PASS / FAIL / SKIP
 - [ ] **SPA Provider Console:** 115 tests executed (P.0–P.17), all PASS or documented FAIL
-- [ ] **Total:** 917 tests (802 standalone + 115 provider)
+- [ ] **Total:** 953 tests (838 standalone + 115 provider)
 - [ ] **Zero unexpected console errors** across all pages
 - [ ] **Screenshots captured** for each page group (minimum 27 screenshots — 11 standalone page groups + 16 provider pages)
 - [ ] **Auth injection verified** for both Standalone and Provider Console

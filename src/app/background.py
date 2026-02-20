@@ -3,6 +3,7 @@
 - Idle conversation scanner — closes conversations exceeding 30-min idle timeout.
 - SLA snapshot loop — persists hourly SLA snapshots and daily rollups (C-2).
 - Alert evaluation loop — evaluates enabled alert rules every 5 minutes (RB-4).
+- Ingestion processor — processes pending storefront ingestion jobs (KA-1).
 
 © 2026 Remaker Digital, a DBA of VanDusen & Palmeter, LLC. All rights reserved.
 """
@@ -12,7 +13,7 @@ from __future__ import annotations
 import asyncio
 import logging
 
-from datetime import datetime, timezone
+from datetime import datetime, timedelta, timezone
 
 from fastapi import FastAPI
 
@@ -21,6 +22,7 @@ logger = logging.getLogger(__name__)
 _idle_scanner_task: asyncio.Task[None] | None = None
 _sla_snapshot_task: asyncio.Task[None] | None = None
 _alert_eval_task: asyncio.Task[None] | None = None
+_ingestion_processor_task: asyncio.Task[None] | None = None
 
 
 async def _idle_scanner_loop() -> None:
@@ -134,7 +136,6 @@ async def _maybe_compute_daily_rollup(
         return
 
     # Compute rollup for yesterday
-    from datetime import timedelta
     yesterday = (now_utc - timedelta(days=1)).strftime("%Y-%m-%d")
 
     try:
@@ -307,3 +308,115 @@ def register_alert_evaluation(app: FastAPI) -> None:
     """Register alert evaluation startup/shutdown handlers on the FastAPI app."""
     app.on_event("startup")(_startup_alert_evaluation)
     app.on_event("shutdown")(_shutdown_alert_evaluation)
+
+
+# ---------------------------------------------------------------------------
+# Ingestion processor loop (KA-1: storefront ingestion)
+# ---------------------------------------------------------------------------
+
+# Poll interval: 30 seconds
+_INGESTION_POLL_INTERVAL = 30
+# Orphan detection: jobs running > 30 minutes are marked failed
+_INGESTION_ORPHAN_MINUTES = 30
+
+
+async def _recover_orphaned_jobs() -> None:
+    """Mark running ingestion jobs >30 minutes as failed (orphan recovery).
+
+    Called once during startup to handle jobs left in 'running' state
+    after a container restart.
+    """
+    try:
+        from src.multi_tenant.storefront_ingestion import IngestionJobRepository
+        from src.multi_tenant.cosmos_schema import IngestionJobStatus
+
+        repo = IngestionJobRepository()
+        cutoff = (
+            datetime.now(timezone.utc) - timedelta(minutes=_INGESTION_ORPHAN_MINUTES)
+        ).isoformat()
+
+        orphans = await repo.get_orphaned_running(cutoff)
+        for job in orphans:
+            try:
+                now = datetime.now(timezone.utc).isoformat()
+                await repo.patch(
+                    job["tenant_id"],
+                    job["id"],
+                    [
+                        {"op": "set", "path": "/status", "value": IngestionJobStatus.FAILED.value},
+                        {"op": "set", "path": "/completed_at", "value": now},
+                        {"op": "set", "path": "/error_message", "value": "Orphaned job recovered after container restart"},
+                    ],
+                )
+                logger.info(
+                    "Recovered orphaned ingestion job %s (tenant %s)",
+                    job["id"][:8], job["tenant_id"][:8],
+                )
+            except Exception:
+                logger.debug("Failed to recover orphaned job %s", job.get("id", "?")[:8], exc_info=True)
+
+        if orphans:
+            logger.info("Ingestion orphan recovery: marked %d jobs as failed", len(orphans))
+    except Exception:
+        logger.debug("Ingestion orphan recovery failed (non-fatal)", exc_info=True)
+
+
+async def _ingestion_processor_loop() -> None:
+    """Periodic background task that processes pending ingestion jobs.
+
+    Runs every 30 seconds. Picks up one pending job at a time and
+    executes it via StorefrontIngestionService.process_job().
+    """
+    # Wait 45 seconds after startup before first poll
+    await asyncio.sleep(45)
+
+    while True:
+        try:
+            from src.multi_tenant.storefront_ingestion import (
+                IngestionJobRepository,
+                StorefrontIngestionService,
+            )
+
+            repo = IngestionJobRepository()
+            pending = await repo.get_pending_jobs(limit=1)
+
+            if pending:
+                job = pending[0]
+                service = StorefrontIngestionService()
+                await service.process_job(job["id"], job["tenant_id"])
+
+        except RuntimeError:
+            # Service not configured yet — skip this cycle
+            pass
+        except Exception:
+            logger.debug("Ingestion processor cycle failed", exc_info=True)
+
+        # Sleep between polls
+        await asyncio.sleep(_INGESTION_POLL_INTERVAL)
+
+
+async def _startup_ingestion_processor() -> None:
+    """Recover orphaned jobs, then start the ingestion processor loop."""
+    global _ingestion_processor_task  # noqa: PLW0603
+    await _recover_orphaned_jobs()
+    _ingestion_processor_task = asyncio.create_task(_ingestion_processor_loop())
+    logger.info("Ingestion processor background task started (30s poll interval)")
+
+
+async def _shutdown_ingestion_processor() -> None:
+    """Cancel the ingestion processor background task."""
+    global _ingestion_processor_task  # noqa: PLW0603
+    if _ingestion_processor_task and not _ingestion_processor_task.done():
+        _ingestion_processor_task.cancel()
+        try:
+            await _ingestion_processor_task
+        except asyncio.CancelledError:
+            pass
+        logger.info("Ingestion processor background task stopped")
+    _ingestion_processor_task = None
+
+
+def register_ingestion_processor(app: FastAPI) -> None:
+    """Register ingestion processor startup/shutdown handlers on the FastAPI app."""
+    app.on_event("startup")(_startup_ingestion_processor)
+    app.on_event("shutdown")(_shutdown_ingestion_processor)

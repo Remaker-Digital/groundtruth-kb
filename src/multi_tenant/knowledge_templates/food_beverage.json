@@ -1,0 +1,117 @@
+{
+  "id": "food_beverage",
+  "name": "Food & Beverage",
+  "version": 1,
+  "articles": [
+    {
+      "entry_type": "faq",
+      "title": "Allergen Information",
+      "content": "We take food allergies seriously. Every product on our store lists its complete ingredient list and identifies the presence of major allergens as defined by the FDA: milk, eggs, fish, shellfish, tree nuts, peanuts, wheat, soybeans, and sesame. Products are labeled with bold allergen warnings directly below the ingredient list. Many of our items are produced in shared facilities where cross-contamination with allergens is possible, and this is disclosed on each product page. For customers with severe allergies, we recommend contacting our team before ordering for detailed facility and production line information. We also offer filters to shop by allergen-free categories including nut-free, gluten-free, dairy-free, and soy-free selections.",
+      "category": "Food Safety",
+      "tags": ["allergens", "food-safety", "dietary-restrictions", "ingredients"]
+    },
+    {
+      "entry_type": "faq",
+      "title": "Storage Instructions",
+      "content": "Proper storage ensures your food products maintain their quality and safety. Shelf-stable items like dry goods, canned products, and sealed snacks should be stored in a cool, dry place away from direct sunlight, ideally between 50-70 degrees Fahrenheit. Once opened, transfer items to airtight containers to preserve freshness. Refrigerated items must be kept at or below 40 degrees Fahrenheit and consumed by the use-by date on the packaging. Frozen items should be stored at 0 degrees Fahrenheit or below. Coffee beans should be stored in an airtight, opaque container at room temperature and used within 2-4 weeks of opening for optimal flavor. Oils and vinegars should be kept in a cool, dark cabinet away from the stove. Each product page includes specific storage recommendations tailored to that item.",
+      "category": "Food Safety",
+      "tags": ["storage", "freshness", "temperature", "shelf-stable"]
+    },
+    {
+      "entry_type": "faq",
+      "title": "Shelf Life and Best-By Dates",
+      "content": "All of our products are shipped with a minimum of 60% of their shelf life remaining unless otherwise noted on the product listing. Best-by dates indicate when the product is at peak quality, not a safety expiration. Many shelf-stable items like honey, vinegar, dried pasta, and certain spices remain safe to consume well beyond the best-by date, though flavor and texture may diminish. Perishable items like fresh baked goods, dairy products, and prepared foods should be consumed by the use-by date printed on the package. If you receive a product that is at or past its best-by date upon arrival, contact our support team immediately for a full replacement or refund. We rotate our inventory regularly to ensure the freshest possible products are shipped.",
+      "category": "Product Information",
+      "tags": ["shelf-life", "best-by", "expiration", "freshness"]
+    },
+    {
+      "entry_type": "faq",
+      "title": "Understanding Dietary Labels",
+      "content": "We use standardized dietary labels to help you find products that meet your needs. Organic means the product meets USDA organic standards, produced without synthetic pesticides, GMOs, or artificial fertilizers. Non-GMO Project Verified means the product has been tested and verified to avoid genetically modified organisms. Gluten-Free indicates the product contains less than 20 parts per million of gluten, the FDA threshold for this claim. Kosher and Halal certifications are provided by recognized certifying agencies and indicated on the product page. Fair Trade certification ensures farmers and workers received fair compensation. We display all applicable certifications as icons on each product listing and include the certifying body name in the product details section for transparency.",
+      "category": "Product Information",
+      "tags": ["dietary", "labels", "organic", "non-GMO", "certifications"]
+    },
+    {
+      "entry_type": "faq",
+      "title": "Subscription Management",
+      "content": "Our subscription service delivers your favorite products on a regular schedule at a 10-15% discount compared to one-time purchases. You can choose delivery intervals of every 2, 4, 6, or 8 weeks. Log into your account and visit the Subscriptions page to manage your active subscriptions at any time. You can skip an upcoming delivery, swap products, change your delivery interval, update your shipping address, or cancel entirely with no penalty or fees. Changes must be made at least 48 hours before your next scheduled shipment to take effect. If you cancel, any remaining credit or prepaid deliveries will be honored. Subscribers also receive early access to new product launches and exclusive subscriber-only items throughout the year.",
+      "category": "Orders & Subscriptions",
+      "tags": ["subscription", "auto-delivery", "recurring", "management"]
+    },
+    {
+      "entry_type": "policy",
+      "title": "Perishable Product Return Policy",
+      "content": "Due to the nature of perishable goods, we cannot accept physical returns of food items. However, if you receive a product that is damaged, spoiled, stale, or materially different from what was described, we will issue a full refund or send a replacement at no charge. To submit a claim, contact our customer service team within 48 hours of delivery with your order number and photos showing the issue. For non-perishable items that are unopened and in their original sealed packaging, we accept returns within 30 days of delivery for a full refund. Subscription orders that arrive damaged are automatically credited to your account. We do not offer refunds for products you simply did not enjoy, but we will apply a one-time courtesy credit toward your next order if you are dissatisfied with a first-time purchase.",
+      "category": "Policies",
+      "tags": ["returns", "perishable", "refund", "damaged-goods"]
+    },
+    {
+      "entry_type": "policy",
+      "title": "Shipping and Temperature Requirements",
+      "content": "We use specialized packaging to ensure your food arrives in perfect condition. Shelf-stable items ship via standard ground service in insulated boxes. Refrigerated items are packed with gel ice packs in insulated liners and shipped via 2-day or overnight service to maintain safe temperatures. Frozen items ship with dry ice in insulated foam coolers via overnight delivery. During summer months (June through September), we may upgrade shipping on temperature-sensitive items at no extra cost to account for higher transit temperatures. Perishable shipments include a temperature indicator strip so you can verify the package maintained safe conditions during transit. We currently ship perishable items to the contiguous 48 US states only. Shelf-stable items can ship to all 50 states, US territories, and select international destinations.",
+      "category": "Policies",
+      "tags": ["shipping", "cold-chain", "perishable", "temperature", "packaging"]
+    },
+    {
+      "entry_type": "policy",
+      "title": "Freshness Guarantee",
+      "content": "We guarantee every product arrives fresh and in the condition described on our website. All perishable items are shipped within 24 hours of preparation or packaging and arrive within the delivery window specified for your shipping method. If any product arrives not meeting our freshness standards, including items that have thawed during transit, packaging that has been compromised, or products that appear to have degraded in quality, simply contact our support team within 48 hours of delivery with photos of the product and packaging. We will immediately ship a replacement or issue a full refund to your original payment method, including any shipping charges paid. No return of the product is necessary. Our freshness guarantee applies to every order, every time, with no limits on the number of claims per customer.",
+      "category": "Policies",
+      "tags": ["freshness", "guarantee", "quality", "refund"]
+    },
+    {
+      "entry_type": "article",
+      "title": "Dietary Terms Glossary",
+      "content": "Understanding dietary terms helps you shop confidently. Vegan products contain no animal-derived ingredients whatsoever, including honey, gelatin, and dairy. Vegetarian products may contain dairy, eggs, and honey but no meat, poultry, or fish. Keto-friendly products are high in healthy fats and very low in carbohydrates, typically under 5-10 grams of net carbs per serving. Paleo products avoid grains, legumes, dairy, refined sugar, and processed foods, focusing on meats, fish, vegetables, fruits, nuts, and seeds. Whole30-compliant products follow strict elimination diet rules excluding sugar, alcohol, grains, legumes, soy, and dairy for 30 days. Low-FODMAP products avoid certain fermentable carbohydrates that can trigger digestive issues. Plant-based indicates the product is primarily or entirely derived from plants but may not be strictly vegan.",
+      "category": "Dietary Education",
+      "tags": ["vegan", "keto", "paleo", "dietary", "glossary"]
+    },
+    {
+      "entry_type": "article",
+      "title": "Origin Certifications and Sourcing",
+      "content": "We are transparent about where our products come from. Single-origin products are sourced from one specific farm, region, or country, offering a distinctive flavor profile tied to that location's terroir. Direct Trade means we have a direct purchasing relationship with the farmer or producer, often resulting in higher quality and fairer compensation than commodity pricing. Rainforest Alliance certification indicates the product was grown using practices that protect ecosystems and support the livelihoods of farming communities. UTZ certification ensures sustainable farming standards for products like coffee, cocoa, and tea. Denomination of Origin labels (such as DOP, DOC, AOC) certify that a product was produced in a specific geographic region using traditional methods. We include sourcing details and certifications on every product page so you can make informed purchasing decisions.",
+      "category": "Sourcing & Ethics",
+      "tags": ["origin", "certifications", "single-origin", "fair-trade", "sourcing"]
+    },
+    {
+      "entry_type": "article",
+      "title": "Flavor Profile Descriptions",
+      "content": "Our flavor profile descriptions help you discover products you will love. We use a consistent vocabulary across our catalog. Bright refers to lively, acidic, or citrusy notes that feel clean on the palate. Earthy describes deep, grounded flavors reminiscent of soil, mushrooms, or root vegetables. Floral indicates delicate, aromatic notes like jasmine, lavender, or rose. Nutty covers warm, toasted flavors similar to almonds, hazelnuts, or peanuts. Smoky describes flavors imparted by wood-fire smoking or roasting processes. Umami is the savory, deeply satisfying taste found in aged cheeses, fermented foods, and mushrooms. Tangy refers to a sharp, acidic quality found in fermented products like vinegar, yogurt, and sourdough. Each product page includes a flavor wheel or tasting notes to guide your selection.",
+      "category": "Product Knowledge",
+      "tags": ["flavor", "tasting-notes", "profiles", "descriptions"]
+    },
+    {
+      "entry_type": "article",
+      "title": "Coffee Roast Levels Explained",
+      "content": "Coffee roast levels significantly affect flavor, aroma, and caffeine content. Light roast beans are roasted to an internal temperature of 356-401 degrees Fahrenheit, resulting in a light brown color with no oil on the surface. Light roasts preserve the bean's origin flavors, producing bright, complex, and acidic cups. Medium roast reaches 410-428 degrees Fahrenheit, yielding a balanced cup with moderate acidity and fuller body. This is the most popular roast level in North America. Medium-dark roast (435-450 degrees Fahrenheit) develops rich, bittersweet flavors with some oil visible on the bean surface. Dark roast exceeds 465 degrees Fahrenheit, creating bold, smoky, and sometimes charred flavors with a prominent oily sheen. Contrary to popular belief, darker roasts contain slightly less caffeine than lighter roasts because the roasting process breaks down caffeine molecules.",
+      "category": "Product Knowledge",
+      "tags": ["coffee", "roast", "light-roast", "dark-roast", "brewing"]
+    },
+    {
+      "entry_type": "article",
+      "title": "Brewing Methods and Recommendations",
+      "content": "Different brewing methods highlight different characteristics in coffee and tea. For coffee, drip brewing is the most common method, producing a clean, consistent cup with medium body. French press uses a metal mesh filter that allows oils and fine particles through, creating a rich, full-bodied cup. Pour-over methods like Chemex and V60 use paper filters for a clean, nuanced brew that highlights origin flavors. Espresso forces hot water through finely ground coffee under pressure, producing an intense, concentrated shot. Cold brew steeps coarsely ground coffee in cold water for 12-24 hours, resulting in a smooth, low-acid concentrate. For tea, water temperature matters: green tea brews best at 160-180 degrees Fahrenheit, black tea at 200-212 degrees, and herbal infusions at a full rolling boil. Steep times range from 1-3 minutes for delicate greens to 5-7 minutes for robust herbal blends.",
+      "category": "Product Knowledge",
+      "tags": ["brewing", "coffee", "tea", "methods", "preparation"]
+    },
+    {
+      "entry_type": "article",
+      "title": "Complete Food Storage Guide",
+      "content": "Maximizing the shelf life of your purchases starts with proper storage at home. Store whole coffee beans in an airtight, opaque container at room temperature and grind just before brewing; do not refrigerate or freeze beans as moisture degrades flavor. Keep olive oils and specialty cooking oils in a cool, dark cabinet, tightly capped after each use; most oils stay fresh for 6-12 months after opening. Chocolate should be stored in a cool, dry place between 60-68 degrees Fahrenheit; avoid refrigeration as it causes sugar bloom (white film) that affects texture. Nuts and seeds stay freshest in the refrigerator or freezer due to their high oil content, which can go rancid at room temperature. Dried spices maintain potency for 1-3 years when stored in airtight containers away from heat and light. Honey never truly expires but should be stored at room temperature; if it crystallizes, gently warm the jar in hot water to reliquify.",
+      "category": "Food Safety",
+      "tags": ["storage", "shelf-life", "freshness", "guide", "preservation"]
+    },
+    {
+      "entry_type": "article",
+      "title": "Food and Beverage Pairing Suggestions",
+      "content": "Thoughtful pairings elevate both food and drink. For cheese pairings, match intensity levels: mild cheeses like fresh mozzarella pair with light white wines or pilsners, while aged cheddars complement bold red wines or stouts. Dark chocolate (70% cacao or higher) pairs beautifully with full-bodied red wine, espresso, or bourbon. Honey varieties match different foods: clover honey is versatile for tea and toast, buckwheat honey enhances strong cheeses and grilled meats, and lavender honey complements fresh fruit and soft cheeses. For coffee, light roast pairs well with fruit-forward pastries and citrus desserts, while dark roast complements chocolate, caramel, and nut-based treats. Olive oils follow similar principles: delicate oils suit salads and fish, while robust, peppery oils stand up to grilled meats and hearty soups. Our product pages include pairing recommendations curated by our in-house food specialists.",
+      "category": "Product Knowledge",
+      "tags": ["pairing", "food-pairing", "wine", "cheese", "recommendations"]
+    }
+  ],
+  "config_suggestions": {
+    "brand_voice": "Passionate and knowledgeable about food. Use appetizing, descriptive language that conveys quality and craftsmanship. Be precise about ingredients, allergens, and dietary information. Make customers feel confident about their food choices.",
+    "escalation_keywords": ["allergic reaction", "food safety", "spoiled", "expired", "contaminated", "illness", "sick", "foreign object", "refund not received", "wrong item", "complaint", "manager"],
+    "greeting_message": "Hi! Welcome to {{brand_name}}. I can help with product recommendations, dietary questions, storage tips, or your order. What are you looking for today?"
+  }
+}
