@@ -213,31 +213,44 @@ class TestIngestionJobRepository:
 
     @pytest.mark.asyncio
     async def test_get_pending_jobs_queries_pending_status(self):
-        self.repo._repo.query = AsyncMock(return_value=[])
+        mock_container = MagicMock()
+
+        async def _empty_iter(**kwargs):
+            return
+            yield  # noqa: unreachable — makes this an async generator
+
+        mock_container.query_items = MagicMock(side_effect=_empty_iter)
+        self.repo._repo._container = mock_container
         await self.repo.get_pending_jobs(limit=5)
-        call_args = self.repo._repo.query.call_args
-        query = call_args[0][0]
-        assert "status = @status" in query
-        params = call_args[0][1]
-        assert any(p["value"] == "pending" for p in params)
+        call_kwargs = mock_container.query_items.call_args[1]
+        assert "status = @status" in call_kwargs["query"]
+        assert any(p["value"] == "pending" for p in call_kwargs["parameters"])
 
     @pytest.mark.asyncio
     async def test_get_latest_for_tenant(self):
         self.repo._repo.query = AsyncMock(return_value=[])
         await self.repo.get_latest_for_tenant("t1", limit=3)
         call_args = self.repo._repo.query.call_args
-        query = call_args[0][0]
+        # First positional arg is tenant_id, second is query text
+        assert call_args[0][0] == "t1"
+        query = call_args[0][1]
         assert "tenant_id = @tenant_id" in query
         assert "ORDER BY c.created_at DESC" in query
 
     @pytest.mark.asyncio
     async def test_get_orphaned_running(self):
-        self.repo._repo.query = AsyncMock(return_value=[])
+        mock_container = MagicMock()
+
+        async def _empty_iter(**kwargs):
+            return
+            yield  # noqa: unreachable — makes this an async generator
+
+        mock_container.query_items = MagicMock(side_effect=_empty_iter)
+        self.repo._repo._container = mock_container
         await self.repo.get_orphaned_running("2026-01-01T00:00:00Z")
-        call_args = self.repo._repo.query.call_args
-        query = call_args[0][0]
-        assert "status = @status" in query
-        assert "started_at < @cutoff" in query
+        call_kwargs = mock_container.query_items.call_args[1]
+        assert "status = @status" in call_kwargs["query"]
+        assert "started_at < @cutoff" in call_kwargs["query"]
 
 
 # ---------------------------------------------------------------------------

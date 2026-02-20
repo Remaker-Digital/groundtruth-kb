@@ -167,7 +167,10 @@ class IngestionJobRepository:
         return await self._repo.patch(tenant_id, job_id, operations)
 
     async def get_pending_jobs(self, limit: int = 10) -> list[dict[str, Any]]:
-        """Get pending jobs ordered by creation time (oldest first)."""
+        """Get pending jobs ordered by creation time (oldest first).
+
+        Cross-partition query — scans all tenants for pending jobs.
+        """
         query = (
             "SELECT * FROM c WHERE c.status = @status "
             "ORDER BY c.created_at ASC OFFSET 0 LIMIT @limit"
@@ -176,7 +179,12 @@ class IngestionJobRepository:
             {"name": "@status", "value": IngestionJobStatus.PENDING.value},
             {"name": "@limit", "value": limit},
         ]
-        return await self._repo.query(query, params)
+        items: list[dict[str, Any]] = []
+        async for item in self._repo._container.query_items(
+            query=query, parameters=params,
+        ):
+            items.append(item)
+        return items
 
     async def get_latest_for_tenant(
         self,
@@ -192,10 +200,13 @@ class IngestionJobRepository:
             {"name": "@tenant_id", "value": tenant_id},
             {"name": "@limit", "value": limit},
         ]
-        return await self._repo.query(query, params, partition_key=tenant_id)
+        return await self._repo.query(tenant_id, query, params)
 
     async def get_orphaned_running(self, cutoff_iso: str) -> list[dict[str, Any]]:
-        """Find running jobs that started before the cutoff (orphan detection)."""
+        """Find running jobs that started before the cutoff (orphan detection).
+
+        Cross-partition query — scans all tenants for orphaned jobs.
+        """
         query = (
             "SELECT * FROM c WHERE c.status = @status "
             "AND c.started_at < @cutoff"
@@ -204,7 +215,12 @@ class IngestionJobRepository:
             {"name": "@status", "value": IngestionJobStatus.RUNNING.value},
             {"name": "@cutoff", "value": cutoff_iso},
         ]
-        return await self._repo.query(query, params)
+        items: list[dict[str, Any]] = []
+        async for item in self._repo._container.query_items(
+            query=query, parameters=params,
+        ):
+            items.append(item)
+        return items
 
 
 # ---------------------------------------------------------------------------

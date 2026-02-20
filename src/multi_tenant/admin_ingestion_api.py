@@ -172,8 +172,13 @@ async def get_ingestion_status(
     """Get the latest ingestion job status for the current tenant."""
     from src.multi_tenant.storefront_ingestion import get_ingestion_service
 
-    service = get_ingestion_service()
-    job = await service.get_latest_job(ctx.tenant_id)
+    try:
+        service = get_ingestion_service()
+        job = await service.get_latest_job(ctx.tenant_id)
+    except Exception:
+        # Collection may not exist yet or other transient error
+        logger.debug("Failed to fetch ingestion status", exc_info=True)
+        return None
 
     if job is None:
         return None
