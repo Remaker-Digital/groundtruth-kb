@@ -331,11 +331,11 @@ class AdminDashboardTasks(TaskSet):
 
     @task(1)
     def list_team_members(self) -> None:
-        """GET /api/team — team member list."""
+        """GET /api/admin/team — team member list."""
         with self.client.get(
-            "/api/team",
+            "/api/admin/team",
             headers=_api_headers(),
-            name="/api/team [list]",
+            name="/api/admin/team [list]",
             catch_response=True,
         ) as response:
             if response.status_code in (200, 401, 429):

@@ -33,6 +33,13 @@ A Repeatable Procedure is **not**:
 | Admin UI lint (a11y) | *(inline — see Section 5)* | Active |
 | External URL reachability | `docs/operations/external-url-reachability-procedure.md` | Active |
 | Chrome-automated UI test | `docs/operations/chrome-ui-test-procedure.md` | Active |
+| Load testing | `docs/operations/load-test-procedure.md` | Active |
+| Tenant isolation verification | `docs/operations/tenant-isolation-test-procedure.md` | Active |
+| API security & penetration testing | `docs/operations/api-security-test-procedure.md` | Active |
+| Rate limiting & DoS resilience | `docs/operations/rate-limit-test-procedure.md` | Active |
+| Conversation quality regression | `docs/operations/conversation-quality-test-procedure.md` | Active |
+| Resilience & failover testing | `docs/operations/resilience-failover-test-procedure.md` | Active |
+| Data integrity & backup verification | `docs/operations/data-integrity-test-procedure.md` | Active |
 
 > **Cross-procedure dependencies:**
 > - *Admin UI test* depends on *Tenant initialization*. After initialization, all post-conditions (Steps 2-5) must pass before the UI test pre-flight will pass.
@@ -40,6 +47,13 @@ A Repeatable Procedure is **not**:
 > - *External URL reachability* has no initialization dependency — can run as a standalone health check after any deployment.
 > - *Non-disruptive upgrade verification* wraps *Production deployment* with pre/post data integrity checks.
 > - *Tenant initialization* is destructive. Use *Non-disruptive upgrade verification* when existing data must be preserved.
+> - *Load testing* depends on production being healthy and Locust being installed. Uses existing `tests/performance/locustfile.py`.
+> - *Tenant isolation verification* depends on both tenants (remaker-digital-001 and test-customer-001) being seeded with data.
+> - *API security & penetration testing* depends on production being healthy. Creates `tests/security/test_live_penetration.py`.
+> - *Rate limiting & DoS resilience* depends on both tenants being accessible. Intentionally exhausts rate limits — wait 60s before running other live tests.
+> - *Conversation quality regression* depends on NATS being connected (AI pipeline functional). Cannot run if chat is unavailable.
+> - *Resilience & failover testing* does NOT require all dependencies to be healthy — it tests behavior under degradation.
+> - *Data integrity & backup verification* depends on Azure CLI access and Cosmos DB being accessible.
 
 ---
 
@@ -396,4 +410,4 @@ When creating or modifying code, test scripts, or documentation:
 ---
 
 *© 2026 Remaker Digital, a DBA of VanDusen & Palmeter, LLC. All rights reserved.*
-*Last Updated: 2026-02-18*
+*Last Updated: 2026-02-19*

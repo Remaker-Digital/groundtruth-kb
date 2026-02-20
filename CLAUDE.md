@@ -100,6 +100,13 @@ Active procedures:
 - `docs/operations/external-url-reachability-procedure.md` — URL reachability pre-flight (37 URLs)
 - Inline in spec: Unit test suite, Production regression suite
 - `docs/operations/agntcy-platform-adoption-procedure.md` — AGNTCY platform adoption verification
+- `docs/operations/load-test-procedure.md` — Load testing (50 users, SLA validation, Locust)
+- `docs/operations/tenant-isolation-test-procedure.md` — Tenant isolation verification (cross-tenant access prevention)
+- `docs/operations/api-security-test-procedure.md` — API security & penetration testing (45 tests)
+- `docs/operations/rate-limit-test-procedure.md` — Rate limiting & DoS resilience (per-tier enforcement)
+- `docs/operations/conversation-quality-test-procedure.md` — Conversation quality regression (25 golden scenarios)
+- `docs/operations/resilience-failover-test-procedure.md` — Resilience & failover testing (dependency degradation)
+- `docs/operations/data-integrity-test-procedure.md` — Data integrity & backup verification (Cosmos DB)
 
 ### Adding Commercial Features
 
