@@ -93,20 +93,25 @@ curl -s -H "X-API-Key: ${SUPERADMIN_KEY}" \
 **Action:** Set identification mode to each value and verify persistence.
 
 ```bash
-# Set to aggressive
+# Set to aggressive (saves to draft)
 curl -s -X PUT -H "X-API-Key: ${SUPERADMIN_KEY}" \
   -H "Content-Type: application/json" \
   -d '{"fields": {"customer_identification_mode": "aggressive"}}' \
   "${API_BASE}/api/config" | python -m json.tool
 
-# Read back
+# Activate the draft (promotes draft to active)
+curl -s -X POST -H "X-API-Key: ${SUPERADMIN_KEY}" \
+  -H "Content-Type: application/json" -d '{}' \
+  "${API_BASE}/api/config/draft/activate" | python -m json.tool
+
+# Read back (reads active config)
 curl -s -H "X-API-Key: ${SUPERADMIN_KEY}" \
   "${API_BASE}/api/config" | python -m json.tool | grep customer_identification_mode
 ```
 
-**Expected:** Config save returns success. Read-back shows `"customer_identification_mode": "aggressive"`.
+**Expected:** Config save returns `state: "draft"`, activate returns `state: "active"`. Read-back shows `"customer_identification_mode": "aggressive"` inside the `config` object.
 
-**Post-condition:** Field persists through save/read cycle. Valid values: `off`, `gentle`, `standard`, `aggressive`.
+**Post-condition:** Field persists through save/activate/read cycle. Valid values: `off`, `gentle`, `standard`, `aggressive`.
 
 ---
 
