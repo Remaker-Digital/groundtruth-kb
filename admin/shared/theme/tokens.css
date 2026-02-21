@@ -54,6 +54,11 @@
   --ar-overlay-bg:  rgba(0, 0, 0, 0.6);
   --ar-modal-shadow: 0 20px 60px rgba(0, 0, 0, 0.3);
 
+  /* --- Icon button / storefront link (translucent, mode-aware) --- */
+  --ar-icon-btn-border: rgba(255, 255, 255, 0.12);
+  --ar-icon-btn-bg:     rgba(255, 255, 255, 0.06);
+  --ar-storefront-link-bg: rgba(255, 255, 255, 0.03);
+
   /* --- Transitions --- */
   --ar-transition-fast: 150ms ease;
 }
@@ -121,14 +126,37 @@ html[data-mantine-color-scheme="dark"] body { color: var(--ar-text-primary); }
 /* Badge label: sentence case (disable Mantine's default uppercase) */
 .mantine-Badge-label { text-transform: none; }
 
-/* Light mode: dark sticky header (matches dark mode chrome) */
+/* Light mode: dark sticky header (hardcoded dark values — must NOT use var() because
+   the light-mode override block below changes --ar-chrome/--ar-surface/--ar-text-primary) */
 html[data-mantine-color-scheme="light"] .mantine-AppShell-header {
-  background: var(--ar-chrome) !important;
-  border-bottom-color: var(--ar-surface) !important;
+  background: #0c0a09 !important;
+  border-bottom-color: #292524 !important;
 }
 html[data-mantine-color-scheme="light"] .mantine-AppShell-header .mantine-Text-root,
 html[data-mantine-color-scheme="light"] .mantine-AppShell-header .mantine-ActionIcon-root {
-  color: var(--ar-text-primary);
+  color: #fafaf9;
+}
+
+/* Light mode: override surface/text/overlay tokens */
+html[data-mantine-color-scheme="light"] {
+  /* Header stays dark — --ar-chrome is NOT overridden here.
+     The AppShell.Header rules above handle that explicitly. */
+  --ar-chrome:           #f5f5f5;
+  --ar-page:             #f0f0ef;
+  --ar-surface:          #ffffff;
+  --ar-border:           #e5e3e0;
+
+  --ar-text-primary:     #1c1917;
+  --ar-text-secondary:   #292524;
+  --ar-text-muted:       #78716c;
+  --ar-text-tertiary:    #a8a29e;
+
+  --ar-overlay-bg:       rgba(0, 0, 0, 0.45);
+  --ar-modal-shadow:     0 20px 60px rgba(0, 0, 0, 0.15);
+
+  --ar-icon-btn-border:  rgba(0, 0, 0, 0.12);
+  --ar-icon-btn-bg:      rgba(0, 0, 0, 0.04);
+  --ar-storefront-link-bg: rgba(0, 0, 0, 0.03);
 }
 
 
@@ -258,10 +286,10 @@ html[data-mantine-color-scheme="light"] .mantine-AppShell-header .mantine-Action
 /* --- Shop link (border-color hover) --- */
 .ar-link-shop {
   transition: border-color var(--ar-transition-fast);
-  border: 1px solid rgba(255, 255, 255, 0.08);
+  border: 1px solid var(--ar-icon-btn-border);
 }
 .ar-link-shop:hover {
-  border-color: rgba(255, 255, 255, 0.2);
+  border-color: var(--ar-text-tertiary);
 }
 
 /* --- Light-mode row hover (KB ArticleRow, ConversationInbox) --- */

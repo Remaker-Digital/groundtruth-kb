@@ -353,12 +353,12 @@ async def _recover_orphaned_jobs() -> None:
                     job["id"][:8], job["tenant_id"][:8],
                 )
             except Exception:
-                logger.debug("Failed to recover orphaned job %s", job.get("id", "?")[:8], exc_info=True)
+                logger.warning("Failed to recover orphaned job %s", job.get("id", "?")[:8], exc_info=True)
 
         if orphans:
             logger.info("Ingestion orphan recovery: marked %d jobs as failed", len(orphans))
     except Exception:
-        logger.debug("Ingestion orphan recovery failed (non-fatal)", exc_info=True)
+        logger.warning("Ingestion orphan recovery failed (non-fatal)", exc_info=True)
 
 
 async def _ingestion_processor_loop() -> None:
@@ -389,7 +389,52 @@ async def _ingestion_processor_loop() -> None:
             # Service not configured yet — skip this cycle
             pass
         except Exception:
-            logger.debug("Ingestion processor cycle failed", exc_info=True)
+            logger.warning("Ingestion processor cycle failed", exc_info=True)
+
+        # Periodic orphan recovery — catch RUNNING jobs stuck >30 min
+        # (supplements the one-time startup recovery in _recover_orphaned_jobs)
+        try:
+            from src.multi_tenant.storefront_ingestion import IngestionJobRepository
+            from src.multi_tenant.cosmos_schema import IngestionJobStatus
+
+            repo = IngestionJobRepository()
+            cutoff = (
+                datetime.now(timezone.utc)
+                - timedelta(minutes=_INGESTION_ORPHAN_MINUTES)
+            ).isoformat()
+            orphans = await repo.get_orphaned_running(cutoff)
+            for job in orphans:
+                try:
+                    now = datetime.now(timezone.utc).isoformat()
+                    await repo.patch(
+                        job["tenant_id"],
+                        job["id"],
+                        [
+                            {
+                                "op": "set",
+                                "path": "/status",
+                                "value": IngestionJobStatus.PENDING.value,
+                            },
+                            {"op": "set", "path": "/started_at", "value": None},
+                            {"op": "set", "path": "/error_message", "value": None},
+                        ],
+                    )
+                    logger.warning(
+                        "Reset stale ingestion job %s to PENDING "
+                        "(was RUNNING for >%d min)",
+                        job["id"][:8],
+                        _INGESTION_ORPHAN_MINUTES,
+                    )
+                except Exception:
+                    logger.warning(
+                        "Failed to reset stale job %s",
+                        job.get("id", "?")[:8],
+                        exc_info=True,
+                    )
+        except RuntimeError:
+            pass  # Service not configured yet
+        except Exception:
+            logger.debug("Periodic orphan check failed (non-fatal)", exc_info=True)
 
         # Sleep between polls
         await asyncio.sleep(_INGESTION_POLL_INTERVAL)

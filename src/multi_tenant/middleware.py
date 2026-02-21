@@ -227,17 +227,18 @@ class TenantAuthMiddleware(BaseHTTPMiddleware):
     @staticmethod
     def _resolve_tenant_fields(
         tenant: dict[str, Any],
-    ) -> tuple[str, TenantStatus, TenantTier | None, str | None]:
+    ) -> tuple[str, TenantStatus, TenantTier | None, str | None, int | None]:
         """Extract common fields from a resolved tenant document.
 
-        Returns (tenant_id, status, tier, trial_expires_at).
+        Returns (tenant_id, status, tier, trial_expires_at, rate_limit_rpm).
         """
         tenant_id = tenant["tenant_id"]
         status = TenantStatus(tenant.get("status", "active"))
         tier_str = tenant.get("tier")
         tier = TenantTier(tier_str) if tier_str else None
         trial_expires_at = tenant.get("trial_expires_at")
-        return tenant_id, status, tier, trial_expires_at
+        rate_limit_rpm = tenant.get("rate_limit_rpm")
+        return tenant_id, status, tier, trial_expires_at, rate_limit_rpm
 
     @staticmethod
     def _check_trial_expiry(
@@ -295,7 +296,7 @@ class TenantAuthMiddleware(BaseHTTPMiddleware):
                 f"No tenant found for shop domain: {shop_domain}"
             )
 
-        tenant_id, status, tier, trial_expires_at = self._resolve_tenant_fields(tenant)
+        tenant_id, status, tier, trial_expires_at, rl_rpm = self._resolve_tenant_fields(tenant)
         validate_tenant_status(tenant_id, status)
         self._check_trial_expiry(tenant_id, tier, trial_expires_at)
 
@@ -305,6 +306,7 @@ class TenantAuthMiddleware(BaseHTTPMiddleware):
             status=status,
             auth_method="shopify_session",
             trial_expires_at=trial_expires_at,
+            rate_limit_rpm=rl_rpm,
             shop_domain=shop_domain,
             user_id=payload.get("sub"),
             session_id=payload.get("sid"),
@@ -331,7 +333,7 @@ class TenantAuthMiddleware(BaseHTTPMiddleware):
 
         tenant = await verify_api_key(api_key, _resolve_by_api_key_hash)
 
-        tenant_id, status, tier, trial_expires_at = self._resolve_tenant_fields(tenant)
+        tenant_id, status, tier, trial_expires_at, rl_rpm = self._resolve_tenant_fields(tenant)
         validate_tenant_status(tenant_id, status)
         self._check_trial_expiry(tenant_id, tier, trial_expires_at)
 
@@ -341,6 +343,7 @@ class TenantAuthMiddleware(BaseHTTPMiddleware):
             status=status,
             auth_method="api_key",
             trial_expires_at=trial_expires_at,
+            rate_limit_rpm=rl_rpm,
         )
 
     async def _auth_user_api_key(self, api_key: str) -> TenantContext:
@@ -359,7 +362,7 @@ class TenantAuthMiddleware(BaseHTTPMiddleware):
         tenant = result["tenant"]
         member = result["team_member"]
 
-        tenant_id, status, tier, trial_expires_at = self._resolve_tenant_fields(tenant)
+        tenant_id, status, tier, trial_expires_at, rl_rpm = self._resolve_tenant_fields(tenant)
         validate_tenant_status(tenant_id, status)
         self._check_trial_expiry(tenant_id, tier, trial_expires_at)
 
@@ -381,6 +384,7 @@ class TenantAuthMiddleware(BaseHTTPMiddleware):
             status=status,
             auth_method="user_api_key",
             trial_expires_at=trial_expires_at,
+            rate_limit_rpm=rl_rpm,
             team_member_id=member.get("id"),
             team_member_email=member.get("email"),
             team_member_role=role,
@@ -408,7 +412,7 @@ class TenantAuthMiddleware(BaseHTTPMiddleware):
 
         tenant = await verify_widget_key(widget_key, _resolve_by_widget_key_hash)
 
-        tenant_id, status, tier, trial_expires_at = self._resolve_tenant_fields(tenant)
+        tenant_id, status, tier, trial_expires_at, rl_rpm = self._resolve_tenant_fields(tenant)
         validate_tenant_status(tenant_id, status)
         self._check_trial_expiry(tenant_id, tier, trial_expires_at)
 
@@ -419,6 +423,7 @@ class TenantAuthMiddleware(BaseHTTPMiddleware):
             auth_method="widget_key",
             is_widget_auth=True,
             trial_expires_at=trial_expires_at,
+            rate_limit_rpm=rl_rpm,
         )
 
     async def _auth_magic_link_session(self, token: str) -> TenantContext:
@@ -453,7 +458,7 @@ class TenantAuthMiddleware(BaseHTTPMiddleware):
                 f"No tenant found for session token: {tenant_id}",
             )
 
-        _, status, tier, trial_expires_at = self._resolve_tenant_fields(tenant)
+        _, status, tier, trial_expires_at, rl_rpm = self._resolve_tenant_fields(tenant)
         validate_tenant_status(tenant_id, status)
         self._check_trial_expiry(tenant_id, tier, trial_expires_at)
 
@@ -463,6 +468,7 @@ class TenantAuthMiddleware(BaseHTTPMiddleware):
             status=status,
             auth_method="magic_link_session",
             trial_expires_at=trial_expires_at,
+            rate_limit_rpm=rl_rpm,
             team_member_email=payload.get("email"),
         )
 
@@ -686,10 +692,20 @@ class RateLimitMiddleware(BaseHTTPMiddleware):
         return response
 
     def _get_limit(self, ctx: TenantContext) -> int | None:
-        """Get the rate limit for a tenant based on tier.
+        """Get the rate limit for a tenant.
 
-        Returns None if no rate limit applies (e.g., unknown tier).
+        Resolution order:
+        1. Per-tenant override (TenantContext.rate_limit_rpm) if set
+        2. Tier defaults from TIER_DEFAULTS
+        3. None (no rate limit) if tier is unknown
+
+        Returns None if no rate limit applies.
         """
+        # Per-tenant override takes precedence
+        per_tenant = getattr(ctx, "rate_limit_rpm", None)
+        if per_tenant is not None:
+            return per_tenant
+
         if ctx.tier is None:
             return None
 

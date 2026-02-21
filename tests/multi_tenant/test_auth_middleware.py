@@ -534,6 +534,38 @@ class TestRateLimitGetLimit:
         ctx = TenantContext(tenant_id="t-x", tier=None, status=TenantStatus.ACTIVE)
         assert mw._get_limit(ctx) is None
 
+    def test_per_tenant_override_takes_precedence(self):
+        """MW-03b: Per-tenant rate_limit_rpm overrides tier default."""
+        mw = self._make_middleware()
+        ctx = TenantContext(
+            tenant_id="t-override",
+            tier=TenantTier.STARTER,
+            status=TenantStatus.ACTIVE,
+            rate_limit_rpm=120,
+        )
+        assert mw._get_limit(ctx) == 120
+
+    def test_per_tenant_override_none_falls_through(self):
+        """MW-03c: rate_limit_rpm=None falls through to tier default."""
+        mw = self._make_middleware()
+        ctx = TenantContext(
+            tenant_id="t-fallthrough",
+            tier=TenantTier.PROFESSIONAL,
+            status=TenantStatus.ACTIVE,
+            rate_limit_rpm=None,
+        )
+        assert mw._get_limit(ctx) == TIER_DEFAULTS["professional"]["rate_limit_rpm"]
+
+    def test_trial_gets_admin_rpm(self):
+        """MW-03d: Trial tier gets same RPM as professional."""
+        mw = self._make_middleware()
+        ctx = TenantContext(
+            tenant_id="t-trial",
+            tier=TenantTier.TRIAL,
+            status=TenantStatus.ACTIVE,
+        )
+        assert mw._get_limit(ctx) == TIER_DEFAULTS["professional"]["rate_limit_rpm"]
+
 
 # ===================================================================
 # middleware.py — RateLimitMiddleware sliding window

@@ -782,20 +782,54 @@ class ActivationService:
                 shop_domain = tenant_doc.get("shopify_shop_domain")
 
             if shop_domain:
-                # Dispatch Shopify ingestion
-                await service.start_ingestion(
-                    tenant_id=tenant_id,
-                    source_type="shopify",
-                    source_config={"shop_domain": shop_domain},
-                )
-                warnings.append(
-                    "Knowledge base population from Shopify storefront is in progress. "
-                    "This runs in the background and may take a few minutes."
-                )
-                logger.info(
-                    "First-activation ingestion dispatched for tenant %s (Shopify: %s)",
-                    tenant_id[:8], shop_domain,
-                )
+                # Retrieve Shopify access token: Key Vault → env var fallback
+                access_token: str | None = None
+                try:
+                    from src.multi_tenant.tenant_secret_service import (
+                        TenantSecretType,
+                        get_secret_service,
+                    )
+
+                    secret_service = get_secret_service()
+                    access_token = await secret_service.get_secret(
+                        tenant_id, TenantSecretType.SHOPIFY_TOKEN,
+                    )
+                except Exception:
+                    pass
+                if not access_token:
+                    import os
+
+                    access_token = os.environ.get("SHOPIFY_ACCESS_TOKEN", "")
+                if not access_token:
+                    warnings.append(
+                        "Shopify access token not available — "
+                        "storefront ingestion skipped."
+                    )
+                    logger.warning(
+                        "First-activation ingestion skipped for tenant %s: "
+                        "no Shopify access token",
+                        tenant_id[:8],
+                    )
+                else:
+                    # Dispatch Shopify ingestion with valid credentials
+                    await service.start_ingestion(
+                        tenant_id=tenant_id,
+                        source_type="shopify",
+                        source_config={
+                            "shop_domain": shop_domain,
+                            "access_token": access_token,
+                        },
+                    )
+                    warnings.append(
+                        "Knowledge base population from Shopify storefront "
+                        "is in progress. This runs in the background and "
+                        "may take a few minutes."
+                    )
+                    logger.info(
+                        "First-activation ingestion dispatched for tenant "
+                        "%s (Shopify: %s)",
+                        tenant_id[:8], shop_domain,
+                    )
             else:
                 logger.info(
                     "First activation for tenant %s — no Shopify domain, "

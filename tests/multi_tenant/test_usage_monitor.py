@@ -822,26 +822,17 @@ class TestTenantUsageSnapshot:
 class TestProfessionalTier:
     """Verify tier-specific thresholds for Professional tier."""
 
-    def test_professional_higher_capacity(self):
-        """Professional tier has higher capacity before escalation."""
-        monitor = _make_monitor()
+    def test_professional_same_rpm_as_starter(self):
+        """All tiers share uniform admin RPM; differentiation is via other entitlements."""
         pro_rpm = _pro_rpm()
         starter_rpm = _starter_rpm()
 
-        # Same event count that would throttle Starter...
-        starter_capacity = _window_capacity(starter_rpm)
-        throttle_count = int(starter_capacity * THROTTLE_MULTIPLIER)
+        # Uniform admin RPM: professional == starter
+        assert pro_rpm == starter_rpm
 
-        _fill_events(monitor, _TENANT_A, count=throttle_count, tier=_PROFESSIONAL)
-
-        snapshot = monitor.evaluate(_TENANT_A, _PROFESSIONAL)
-
-        # Professional has higher RPM, so same count should NOT trigger throttle
-        assert pro_rpm > starter_rpm
-        # With 50 RPM (Professional) vs 10 RPM (Starter), same count should be lower level
-        pro_capacity = _window_capacity(pro_rpm)
-        if throttle_count < pro_capacity * WARN_MULTIPLIER:
-            assert snapshot.escalation_level == EscalationLevel.NORMAL
-        else:
-            # At most WARN for Professional
-            assert snapshot.escalation_level.value in ("normal", "warn")
+        # Tiers differ on concurrency, not RPM
+        from src.multi_tenant.cosmos_schema import TIER_DEFAULTS
+        assert (
+            TIER_DEFAULTS["professional"]["max_concurrent"]
+            > TIER_DEFAULTS["starter"]["max_concurrent"]
+        )

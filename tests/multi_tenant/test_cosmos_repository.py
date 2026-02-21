@@ -570,15 +570,18 @@ class TestTierDefaults:
 
     @pytest.mark.unit
     def test_tier_defaults_rate_limits(self):
-        """CR-18: Rate limits match Decision #5."""
-        assert TIER_DEFAULTS["starter"]["rate_limit_rpm"] == 10
-        assert TIER_DEFAULTS["professional"]["rate_limit_rpm"] == 50
-        assert TIER_DEFAULTS["enterprise"]["rate_limit_rpm"] == 200
+        """CR-18: Rate limits — uniform admin RPM across tiers, enterprise 4x."""
+        from src.multi_tenant.cosmos_schema import _ADMIN_RPM
+        assert TIER_DEFAULTS["trial"]["rate_limit_rpm"] == _ADMIN_RPM
+        assert TIER_DEFAULTS["starter"]["rate_limit_rpm"] == _ADMIN_RPM
+        assert TIER_DEFAULTS["professional"]["rate_limit_rpm"] == _ADMIN_RPM
+        assert TIER_DEFAULTS["enterprise"]["rate_limit_rpm"] == _ADMIN_RPM * 4
 
     @pytest.mark.unit
     def test_tier_defaults_concurrency(self):
-        """CR-18: Concurrency limits match Decision #14."""
-        assert TIER_DEFAULTS["starter"]["max_concurrent"] == 3
+        """CR-18: Concurrency limits — trial=professional, enterprise highest."""
+        assert TIER_DEFAULTS["trial"]["max_concurrent"] == 10
+        assert TIER_DEFAULTS["starter"]["max_concurrent"] == 5
         assert TIER_DEFAULTS["professional"]["max_concurrent"] == 10
         assert TIER_DEFAULTS["enterprise"]["max_concurrent"] == 30
 

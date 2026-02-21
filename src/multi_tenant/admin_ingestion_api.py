@@ -134,11 +134,52 @@ async def start_ingestion(
     # Build source config
     source_config: dict[str, Any] = {}
     if body.source_type == "url":
-        source_config["url"] = body.url
+        source_config["start_url"] = body.url
         source_config["max_pages"] = body.max_pages
     elif body.source_type == "category_template":
         source_config["category_id"] = body.category_id
-    # Shopify source_config is populated from tenant's shopify_shop_domain
+    elif body.source_type == "shopify":
+        # Populate Shopify source_config from tenant document + credentials.
+        # Try Key Vault first (multi-tenant ready), fall back to env vars
+        # (single-store deployment).
+        from src.multi_tenant.repositories.tenant import TenantRepository
+
+        tenant_repo = TenantRepository()
+        tenant_doc = await tenant_repo.read(ctx.tenant_id, ctx.tenant_id)
+        shop_domain = (
+            tenant_doc.get("shopify_shop_domain") if isinstance(tenant_doc, dict) else None
+        )
+        if not shop_domain:
+            raise HTTPException(
+                status_code=400,
+                detail="No Shopify shop domain configured for this tenant",
+            )
+        source_config["shop_domain"] = shop_domain
+
+        # Retrieve access token: Key Vault (preferred) → env var (fallback)
+        access_token: str | None = None
+        try:
+            from src.multi_tenant.tenant_secret_service import (
+                TenantSecretType,
+                get_secret_service,
+            )
+
+            secret_service = get_secret_service()
+            access_token = await secret_service.get_secret(
+                ctx.tenant_id, TenantSecretType.SHOPIFY_TOKEN,
+            )
+        except Exception:
+            pass  # Key Vault may not be configured in dev
+        if not access_token:
+            import os
+
+            access_token = os.environ.get("SHOPIFY_ACCESS_TOKEN", "")
+        if not access_token:
+            raise HTTPException(
+                status_code=400,
+                detail="Shopify access token not available — check app installation",
+            )
+        source_config["access_token"] = access_token
 
     from src.multi_tenant.storefront_ingestion import get_ingestion_service
 

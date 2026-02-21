@@ -57,8 +57,20 @@ Run immediately after `seed_tenant.py --execute` on a fresh tenant. This validat
 | 0.7 | Activation control disposition (never activated, mandatory fields missing) | Yellow / "Activate" — mandatory fields (brand_name, brand_voice) are empty, so activation is blocked | |
 | 0.8 | Discard button | Visible, enabled | |
 | 0.9 | Roll back button | Visible, disabled/greyed out (no prior state) | |
-| 0.10 | Welcome dialog on first load | "Your AI customer service assistant is not yet active" message shown | |
-| 0.10a | Welcome dialog dismiss | Dismissing welcome dialog removes it; does not reappear on subsequent page loads | |
+| 0.10 | OnboardingWizard on first load | OnboardingWizard modal opens with "Set up your AI assistant" title when tenant is unactivated and wizard not previously dismissed | |
+| 0.10a | OnboardingWizard dismiss | Closing the wizard removes it; does not reappear on subsequent page loads (localStorage `agentred-onboarding-dismissed` persists) | |
+| 0.10b | Setup wizard nav item visible | "Setup wizard" nav link appears in AI Configuration sidebar group (star icon, always present) | |
+| 0.10c | Re-launch wizard via nav item | Click "Setup wizard" → OnboardingWizard modal opens with "Set up your AI assistant" title | |
+| 0.10d | Wizard Step 1: category cards | Template categories load from `/api/admin/knowledge/templates`; at least 1 category card visible | |
+| 0.10e | Wizard Step 1: storefront URL field | "Your storefront URL" text input visible below category grid (non-Shopify merchants only) | |
+| 0.10f | Wizard Step 1: Skip for now | "Skip for now" button visible; clicking it closes the wizard | |
+| 0.10g | Wizard Step 1: Continue disabled | "Continue" button disabled when no category is selected | |
+| 0.10h | Select category + Continue | Select a category card → "Continue" enables → click → wizard advances to Step 2 "Building your knowledge base" | |
+| 0.10i | Wizard Step 2: template applied | "articles added" confirmation text appears after template is applied | |
+| 0.10j | Wizard Step 2: Continue to Step 3 | Click "Continue" → wizard advances to Step 3 "Ready to activate" | |
+| 0.10k | Wizard Step 3: suggestions or fallback | Shows config suggestion cards OR "No configuration suggestions" informational alert | |
+| 0.10l | Wizard Step 3: action buttons | "I'll configure later", "Review first", "Activate now" buttons all visible | |
+| 0.10m | Review first navigates | Click "Review first" → wizard closes, navigates to /configuration page | |
 | 0.11 | `GET /api/config/activation-status` | `has_pending_changes=true, active_version=0, active_activated_at=null, is_configured=false, is_active=false` | |
 | 0.12 | `GET /api/config?state=draft` brand_name | Empty string `""` | |
 | 0.13 | Click Discard on never-activated tenant | State unchanged: badge stays Pending, all fields remain empty | |
@@ -67,7 +79,7 @@ Run immediately after `seed_tenant.py --execute` on a fresh tenant. This validat
 | 0.14a | Preflight dialog blocks activation | Preflight dialog has no Confirm button when hard errors present — activation cannot proceed | |
 | 0.15 | Click Activate (yellow) with brand_voice empty | Preflight dialog shows hard error: "Brand voice is required before activation" | |
 | 0.16 | Widget conversation gate (never activated) | `POST /api/chat/conversations` with valid widget key returns 403 `{"type": "not_active"}` — no conversation document created | |
-| 0.17 | Widget.js config response (never activated) | Widget config fetch returns `widget_active: false` — widget does not mount on storefront | |
+| 0.17 | Activation status (never activated) | `GET /api/config/activation-status` returns `is_active=false, can_activate=false` (mandatory fields still empty) | |
 
 ---
 
@@ -151,7 +163,7 @@ Run after Page 0A (system is now re-activated with brand_name + brand_voice set)
 
 ### Page 1: Dashboard
 
-> Every element tested for presence, correct value, input manipulation, valid population, state change, control activation, input validation, and disposition variants per the 9-dimension verification standard (incl. data-binding correctness).
+> Every element tested for presence, correct value, input manipulation, valid population, state change, control activation, input validation, and disposition variants per the 10-dimension verification standard (incl. data-binding correctness, color mode consistency).
 
 #### 1.1 Metric stat cards
 
@@ -267,7 +279,7 @@ Run after Page 0A (system is now re-activated with brand_name + brand_voice set)
 
 ### Page 2: Inbox
 
-> Every element tested for presence, correct value, input manipulation, valid population, state change, control activation, input validation, and disposition variants per the 9-dimension verification standard (incl. data-binding correctness).
+> Every element tested for presence, correct value, input manipulation, valid population, state change, control activation, input validation, and disposition variants per the 10-dimension verification standard (incl. data-binding correctness, color mode consistency).
 >
 > Tests 2.4–2.18 require conversation data — SKIP if tenant has 0 conversations.
 
@@ -641,7 +653,7 @@ Run after Page 0A (system is now re-activated with brand_name + brand_voice set)
 
 ### Page 5: Knowledge Base
 
-> Every element tested for presence, correct value, input manipulation, valid population, state change, control activation, input validation, and disposition variants per the 9-dimension verification standard (incl. data-binding correctness).
+> Every element tested for presence, correct value, input manipulation, valid population, state change, control activation, input validation, and disposition variants per the 10-dimension verification standard (incl. data-binding correctness, color mode consistency).
 
 #### 5.1 Summary stat cards
 
@@ -802,7 +814,7 @@ Run after Page 0A (system is now re-activated with brand_name + brand_voice set)
 
 ### Page 6: Quick Actions
 
-> Every element tested for presence, correct value, input manipulation, valid population, state change, control activation, input validation, and disposition variants per the 9-dimension verification standard (incl. data-binding correctness).
+> Every element tested for presence, correct value, input manipulation, valid population, state change, control activation, input validation, and disposition variants per the 10-dimension verification standard (incl. data-binding correctness, color mode consistency).
 
 #### 6.1 Tab navigation and page header
 
@@ -905,7 +917,7 @@ Run after Page 0A (system is now re-activated with brand_name + brand_voice set)
 
 ### Page 7: Widget Configuration
 
-> Every element tested for presence, correct value, input manipulation, valid population, state change, control activation, input validation, and disposition variants per the 9-dimension verification standard (incl. data-binding correctness).
+> Every element tested for presence, correct value, input manipulation, valid population, state change, control activation, input validation, and disposition variants per the 10-dimension verification standard (incl. data-binding correctness, color mode consistency).
 
 #### 7.1 Live preview
 
@@ -985,9 +997,11 @@ Run after Page 0A (system is now re-activated with brand_name + brand_voice set)
 | 7.8b | Panel width — tooltip | HelpTooltip (?) icon explains Compact (320px), Standard (380px), Wide (440px) | |
 | 7.8c | Panel width — change updates preview | Selecting "Wide" visibly widens chat panel in preview | |
 | 7.8d | Color mode — renders | Light / Dark / Auto segmented control | |
-| 7.8e | Color mode — current value | Shows saved colorMode (default "Dark") as active | |
+| 7.8e | Color mode — current value | Shows saved colorMode (default "Auto") as active | |
 | 7.8f | Color mode — Light updates preview | Selecting "Light" changes preview to light background, light bubbles | |
 | 7.8g | Color mode — Auto follows admin theme | Selecting "Auto" makes widget preview match admin dark/light mode | |
+| 7.8h | Color mode — Dark override in light admin | Admin in light mode + widget "Dark" → preview shows dark panel bg, dark input bar, dark simulated chrome | |
+| 7.8i | Color mode — Light override in dark admin | Admin in dark mode + widget "Light" → preview shows light panel bg, light input bar, light simulated chrome | |
 | 7.9 | Panel shadow control renders | None / Subtle / Standard / Heavy segmented control | PASS |
 | 7.9a | Panel shadow — current value | Shows saved shadowIntensity (default "Standard") as active | |
 | 7.9b | Panel shadow — None removes shadow | Selecting "None" removes box-shadow from chat panel in preview | |
@@ -1145,7 +1159,7 @@ Run after Page 0A (system is now re-activated with brand_name + brand_voice set)
 
 ### Page 9: Memory & Privacy
 
-> Every element tested for presence, correct value, input manipulation, valid population, state change, control activation, input validation, and disposition variants per the 9-dimension verification standard (incl. data-binding correctness).
+> Every element tested for presence, correct value, input manipulation, valid population, state change, control activation, input validation, and disposition variants per the 10-dimension verification standard (incl. data-binding correctness, color mode consistency).
 
 #### 9.1 Page header and upgrade banner
 
@@ -1388,6 +1402,132 @@ Run after Page 0A (system is now re-activated with brand_name + brand_voice set)
 
 ---
 
+## Shopify Embedded Admin (Pages S.1–S.8)
+
+> **Auth:** Shopify App Bridge 4.x — no sessionStorage injection possible. User must open the app from Shopify Partners Dashboard → blanco-9939 dev store → Apps → Agent Red. App Bridge provides session token auth automatically.
+>
+> **Architecture:** All 7 Shopify pages wrap shared components from `admin/shared/` in Polaris `Page` + `Layout` shells. Tests focus on: (1) Polaris shell rendering, (2) shared component mounting, (3) Shopify-specific features (GDPR export, App Bridge billing redirect), (4) data-binding with live tenant data.
+>
+> **Scope:** Shopify admin is a subset of standalone — missing Quick Actions, Integrations, Memory & Privacy. Deep shared component interactions are tested via standalone admin; Shopify tests verify the component renders correctly in Polaris context.
+
+### Page S.1: Shopify Layout & Navigation
+
+| # | Test | Expected | Status |
+|---|------|----------|--------|
+| S.1a | Frame renders without error | No console errors; Polaris Frame visible | |
+| S.1b | Dashboard page title | Polaris `Page` title "Dashboard" renders | |
+| S.1c | Cross-nav: Documentation link | "Documentation ↗" external link present, href contains "agentredcx.com" | |
+| S.1d | Cross-nav: Full admin link | "Open full admin ↗" external link present, href contains "/admin/standalone" | |
+| S.1e | ActivationBanner renders | "Active" or "Activate" or "Pending" banner present | |
+| S.1f | Navigation: 7 items accessible | Navigate to each of the 7 routes — each loads without blank screen | |
+| S.1g | Navigation: Dashboard | Navigate to `/` → "Dashboard" page title visible | |
+| S.1h | Navigation: Inbox | Navigate to `/inbox` → "Conversation Inbox" page title visible | |
+| S.1i | Navigation: Knowledge Base | Navigate to `/knowledge-base` → "Knowledge Base" page title visible | |
+| S.1j | Navigation: Configuration | Navigate to `/configuration` → "Agent configuration" page title visible | |
+| S.1k | Navigation: Widget | Navigate to `/widget` → "Widget configuration" page title visible | |
+| S.1l | Navigation: Billing | Navigate to `/billing` → "Billing & Usage" page title visible | |
+
+### Page S.2: Dashboard
+
+| # | Test | Expected | Status |
+|---|------|----------|--------|
+| S.2a | AnalyticsOverview renders | Analytics cards/stats visible — conversation count, response time, etc. | |
+| S.2b | UsageDashboard renders | Usage section visible below analytics | |
+| S.2c | Data-binding: conversation count | Stat card shows numeric value (not "undefined", not "NaN") | |
+| S.2d | Data-binding: response time | Stat card shows time value (ms or seconds format) | |
+| S.2e | No console errors | Zero console errors on page load | |
+| S.2f | Polaris Page title | Page heading reads "Dashboard" | |
+| S.2g | Layout sections render | At least 2 Layout.Section containers visible (analytics + usage) | |
+| S.2h | Screenshot capture | Visual state captured for regression baseline | |
+
+### Page S.3: Inbox
+
+| # | Test | Expected | Status |
+|---|------|----------|--------|
+| S.3a | ConversationInbox renders | Inbox UI visible — conversation list or empty state | |
+| S.3b | fullWidth layout | Page uses full width (no constrained Layout wrapper) | |
+| S.3c | Conversation list populated | At least 1 conversation visible OR empty state message | |
+| S.3d | Conversation columns | Status, customer, last message preview columns visible in list | |
+| S.3e | Data-binding: conversation status | Status badges show recognized values (active, ended, escalated) | |
+| S.3f | No console errors | Zero console errors on page load | |
+| S.3g | Polaris Page title | Page heading reads "Conversation Inbox" | |
+| S.3h | Screenshot capture | Visual state captured | |
+
+### Page S.4: Knowledge Base
+
+| # | Test | Expected | Status |
+|---|------|----------|--------|
+| S.4a | KnowledgeBaseManager renders | KB list or empty state visible | |
+| S.4b | Article count visible | Badge or count showing number of KB articles | |
+| S.4c | Data-binding: articles populated | At least 1 article visible (remaker-digital-001 has 50+ KB articles) | |
+| S.4d | Article table columns | Title, category, status, entry_type columns visible | |
+| S.4e | Data-binding: article status | Status values show "published" or "draft" (recognized enum values) | |
+| S.4f | Knowledge automation section (KA-7) | KA section renders — "Knowledge automation" title visible | |
+| S.4g | Template selector (KA-7) | 10 category template cards visible in KA section | |
+| S.4h | Ingestion panel | Ingestion status renders without error (null job = no panel or empty message) | |
+| S.4i | No console errors | Zero console errors | |
+| S.4j | Screenshot capture | Visual state captured | |
+
+### Page S.5: Configuration
+
+| # | Test | Expected | Status |
+|---|------|----------|--------|
+| S.5a | ConfigEditor renders | Configuration form visible — brand name, brand voice, etc. | |
+| S.5b | Data-binding: brand name | Brand name field populated with current value (not empty if configured) | |
+| S.5c | Data-binding: brand voice | Brand voice field populated with current value | |
+| S.5d | Escalation section | Escalation configuration section renders | |
+| S.5e | Custom instructions | Custom instructions textarea renders | |
+| S.5f | Save button | "Save draft inputs" button visible | |
+| S.5g | No console errors | Zero console errors | |
+| S.5h | Screenshot capture | Visual state captured | |
+
+### Page S.6: Widget
+
+| # | Test | Expected | Status |
+|---|------|----------|--------|
+| S.6a | WidgetConfigurator renders | Widget configuration UI visible | |
+| S.6b | Widget preview | Widget preview panel renders (shows chat bubble preview) | |
+| S.6c | Data-binding: widget key | Widget key field or display shows a `pk_live_` prefixed value | |
+| S.6d | Color customization | Color picker or color inputs visible | |
+| S.6e | Greeting message | Greeting message textarea renders | |
+| S.6f | Installation instructions | Widget installation snippet or instructions visible | |
+| S.6g | No console errors | Zero console errors | |
+| S.6h | Screenshot capture | Visual state captured | |
+
+### Page S.7: Billing
+
+| # | Test | Expected | Status |
+|---|------|----------|--------|
+| S.7a | BillingPortal renders | Billing information visible | |
+| S.7b | Tier display | Current tier shown (Professional for remaker-digital-001) | |
+| S.7c | Usage stats | Conversation count or usage metrics visible | |
+| S.7d | Pack purchase buttons | At least 1 pack purchase option visible (1K, 5K, 20K) | |
+| S.7e | Data-binding: tier name | Tier shows recognized value (trial/starter/professional/enterprise) | |
+| S.7f | Data-binding: usage count | Usage number is numeric (not "undefined") | |
+| S.7g | Manage billing button | "Manage" or billing management control visible | |
+| S.7h | Pack size labels | Pack sizes show formatted numbers (1,000 / 5,000 / 20,000) | |
+| S.7i | No console errors | Zero console errors | |
+| S.7j | Screenshot capture | Visual state captured | |
+
+### Page S.8: Settings
+
+| # | Test | Expected | Status |
+|---|------|----------|--------|
+| S.8a | TeamManager renders | Team member list or management UI visible | |
+| S.8b | GDPR section renders | "Data & Privacy" section visible below team manager | |
+| S.8c | GDPR heading | "Data & Privacy" section heading text | |
+| S.8d | GDPR description | "Export or delete your data in compliance with GDPR" text visible | |
+| S.8e | Export button | "Export My Data" button present | |
+| S.8f | Export button clickable | Button not disabled (no `disabled` attribute) | |
+| S.8g | Team member count | At least 1 team member visible in list | |
+| S.8h | Data-binding: member email | Member email shows valid email format (contains "@") | |
+| S.8i | Data-binding: member role | Role shows recognized value (superadmin/admin/agent/viewer) | |
+| S.8j | Settings page title | Polaris Page title reads "Settings" | |
+| S.8k | No console errors | Zero console errors | |
+| S.8l | Screenshot capture | Visual state captured | |
+
+---
+
 ## Defect Log
 
 | ID | Page | Defect | Session | Fix | Regression Test |
@@ -1454,6 +1594,57 @@ Run after Page 0A (system is now re-activated with brand_name + brand_voice set)
 | D64 | Quick Actions | Status badges truncated ("Act...") — Status column `w={80}` too narrow for "Active" badge text | S26 | Fixed — Status column widened to `w={100}`; Prompt template column capped at `maxWidth: 300` | 6.9 |
 | D67 | Quick Actions | Auto-open toggle non-functional — `PageAssignmentResponse` model missing `auto_open` and `auto_open_delay_ms` fields; GET endpoint returned assignments without these values, so frontend always saw `undefined` → `false` after refetch | S26 | Fixed — added both fields to response model + builder function; toggle state now round-trips correctly | 6.8 |
 | D68 | Quick Actions | Page assignments (slot changes, auto-open, delay) save directly to assignments document instead of writing to draft configuration — violates Save→Activate model where all AI Configuration pages write to draft and only commit on Activate | S26 | Fixed S27 — `_ensure_qa_draft()` called before `upsert_page_assignment` and `delete_page_assignment`; draft-first repo methods now write to draft; Discard reverts assignments | 6.7, 6.8, 6.10 |
+
+---
+
+### Cross-Cutting: Color Mode Consistency (10th Dimension)
+
+> **Added session 65.** Every standalone admin page must render correctly in both dark and light color modes. The admin color scheme is toggled via the sun/moon icon in the header. CSS custom properties (`var(--ar-*)`) automatically adapt surface, text, and overlay colors. This section verifies that no hardcoded dark-only values remain visible when the admin is in light mode.
+
+#### CM.1 Light Mode Verification
+
+Toggle admin to **light mode** (sun icon in header). Verify across all standalone pages:
+
+| # | Test | Expected | Status |
+|---|------|----------|--------|
+| CM.1a | Header stays dark | Header background is dark chrome (#0c0a09), logo and nav icons are white — header does NOT become light | |
+| CM.1b | Page background is light | Main content area background is light gray (#f0f0ef), not dark (#1c1917) | |
+| CM.1c | Cards/panels are white | Card backgrounds are white (#ffffff), not dark surface (#292524) | |
+| CM.1d | Text is dark on light | Primary text is dark (#1c1917), not white (#fafaf9) — all headings, labels, body text readable | |
+| CM.1e | Borders are light gray | Card borders, dividers, table borders are light (#e5e3e0), not dark (#44403c) | |
+| CM.1f | Inputs are light | Text inputs, selects, textareas have light backgrounds and dark text | |
+| CM.1g | Dialogs render on light surface | Open ActivationDialog (or ConfirmDialog) — dialog panel bg is white, text is dark, overlay is semi-transparent | |
+| CM.1h | Sidebar nav is light | Sidebar background matches page, nav items have dark text, active item is highlighted | |
+| CM.1i | Badges are readable | Status badges (Active, Pending, Professional, etc.) have sufficient contrast on light surface | |
+| CM.1j | Action buttons unchanged | Blue (action), green (activate), red (danger) buttons render same color in both modes | |
+
+#### CM.2 Dark Mode Regression
+
+Toggle admin back to **dark mode** (moon icon in header). Spot-check:
+
+| # | Test | Expected | Status |
+|---|------|----------|--------|
+| CM.2a | Page background is dark | Main content area is dark page (#1c1917) | |
+| CM.2b | Cards are dark surface | Card backgrounds are dark (#292524) | |
+| CM.2c | Text is light on dark | Primary text is light (#fafaf9), readable on dark surface | |
+| CM.2d | Header unchanged | Header same dark chrome appearance as light mode | |
+
+#### CM.3 Widget Preview Cross-Mode
+
+| # | Test | Expected | Status |
+|---|------|----------|--------|
+| CM.3a | Default color mode is Auto | Widget config Color mode selector defaults to "Auto" | |
+| CM.3b | Auto + light admin = light preview | Admin light + widget "Auto" → preview panel, input bar, simulated chrome all light | |
+| CM.3c | Auto + dark admin = dark preview | Admin dark + widget "Auto" → preview panel, input bar, simulated chrome all dark | |
+| CM.3d | Dark override + light admin | Admin light + widget "Dark" → preview dark (#292524 panel bg), admin stays light | |
+| CM.3e | Light override + dark admin | Admin dark + widget "Light" → preview light (#fff panel bg), admin stays dark | |
+
+#### CM.4 Toggle Persistence
+
+| # | Test | Expected | Status |
+|---|------|----------|--------|
+| CM.4a | Light mode survives reload | Toggle to light → reload page → admin stays in light mode (Mantine localStorage) | |
+| CM.4b | Dark mode survives reload | Toggle to dark → reload page → admin stays in dark mode | |
 
 ---
 

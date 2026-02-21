@@ -14,7 +14,6 @@ import React from 'react';
 import {
   Badge,
   Tooltip,
-  Group,
 } from '@mantine/core';
 import type { ConfigSuggestion } from '../hooks/useSuggestions';
 
@@ -93,13 +92,13 @@ export function LabelWithSuggestion({
   onApply: (value: unknown) => void;
 }) {
   return (
-    <Group gap={6} wrap="nowrap">
+    <span style={{ display: 'inline-flex', alignItems: 'center', gap: 6 }}>
       <span>{label}</span>
       <SuggestionBadge
         suggestion={suggestion}
         currentValue={currentValue}
         onApply={onApply}
       />
-    </Group>
+    </span>
   );
 }

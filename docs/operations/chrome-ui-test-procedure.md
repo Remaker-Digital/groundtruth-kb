@@ -1,7 +1,7 @@
 # Chrome-Automated Admin UI Test Procedure
 # Type: Repeatable Procedure (see docs/operations/REPEATABLE-PROCEDURES.md)
 # Last verified: 2026-02-19 (session 58) — full E2E pass: 770 PASS, 3 SOFT-PASS, 37 SKIP, 0 FAIL (v1.50.0, CSS centralization verified)
-# Last corrected: 2026-02-19 (session 59) — added data-binding verification layer (9th dimension), logo/image assertions, Contact Us tests, Provider Console data-population tests
+# Last corrected: 2026-02-20 (session 65) — added Shopify Embedded Admin tests (S.1–S.8, 76 tests), user-assisted App Bridge auth, updated totals to 1,029 (838+115+76)
 
 ---
 
@@ -45,6 +45,13 @@ tests using Chrome MCP tools.
 | `TEST_SUPERADMIN_KEY` | (from `logs/test_tenant_credentials.json` `superadmin_key`) |
 | `TEST_WIDGET_KEY` | (from `logs/test_tenant_credentials.json` `widget_key`) |
 | `TEST_TIER` | `starter` (can be changed via tier override endpoint) |
+
+### Shopify Embedded Admin (remaker-digital-001 via Shopify Partners)
+| Variable | Value |
+|----------|-------|
+| `SHOPIFY_APP_URL` | Opened from Shopify Partners Dashboard → blanco-9939 dev store → Apps → Agent Red |
+| `SHOPIFY_ADMIN_URL` | `$PROD_BASE/admin/shopify` (loaded via App Bridge within Shopify admin chrome) |
+| `SHOPIFY_AUTH` | App Bridge 4.x session token — no injection possible; user must open from Shopify admin |
 
 ### Tier Override (for tier-gating tests)
 | Variable | Value |
@@ -164,6 +171,32 @@ STEP T.RESTORE: Restore tier to starter after testing
   NOTE:      ALWAYS restore tier after tier-gating tests to avoid leaving test-customer-001 in unexpected state.
 ```
 
+### Shopify Embedded Admin Auth (User-Assisted)
+
+App Bridge auth cannot be injected via Chrome MCP. The user must perform manual login.
+
+```
+STEP S.1: User opens Shopify Partners Dashboard
+  USER ACTION:  Login to partners.shopify.com → select blanco-9939 dev store → Apps → Agent Red → open embedded app
+  EXPECTED:     Shopify admin loads with Agent Red embedded content
+
+STEP S.2: Capture tab context
+  CHROME MCP:   tabs_context_mcp → identify the tab showing the Shopify admin
+  EXPECTED:     Tab ID available for subsequent test commands
+
+STEP S.3: Verify embedded app loaded
+  ACTION:    computer(action:'wait', duration:5, tabId). Then find("Dashboard", tabId) or find("Agent configuration", tabId).
+  EXPECTED:  Agent Red content renders inside Shopify admin. At least one page title visible.
+  ON FAIL:   App Bridge auth failed. User must re-open app from Shopify admin. Check that the app is installed on blanco-9939.
+
+STEP S.4: Verify cross-navigation links present
+  ACTION:    find("Documentation", tabId) and find("Open full admin", tabId)
+  EXPECTED:  Both external links render in top-right area of layout
+  NOTE:      These links confirm ShopifyAppLayout is rendering correctly.
+```
+
+**Critical constraint:** If App Bridge session expires during testing, user must re-authenticate via Shopify Partners Dashboard. Tests should be executed in one session to minimize disruption.
+
 ---
 
 ## Test Execution — Standalone Admin (Pages H, 0–10)
@@ -221,7 +254,7 @@ Verify the shared header bar, logo, action icons, and Contact Us feature. Auth i
 | H.3i | **Empty form validation** — Click Send message with empty subject/message → validation prevents submission (button stays enabled but form does not submit) |
 | H.3j | **Topic default value** — `javascript_tool(tabId, "document.querySelector('select, [role=combobox]')?.textContent")` — topic defaults to "Support" |
 
-### Page 0: Initial Provisioned State (20 tests)
+### Page 0: Initial Provisioned State (32 tests)
 
 **Precondition:** Run immediately after `seed_tenant.py --execute` on a fresh tenant.
 Auth injection must be performed first (Steps A.1–A.4).
@@ -239,8 +272,20 @@ Navigate to `$STANDALONE_URL/configuration`.
 | 0.7 | `find("Activate", tabId)` — button present, yellow state (mandatory fields missing) |
 | 0.8 | `find("Discard", tabId)` — button visible, enabled |
 | 0.9 | `find("Roll back", tabId)` — button visible, disabled/greyed |
-| 0.10 | `find("not yet active", tabId)` — welcome dialog message present |
-| 0.10a | Dismiss welcome dialog → `find("not yet active", tabId)` no longer present; reload page → dialog does not reappear |
+| 0.10 | `find("Set up your AI assistant", tabId)` — OnboardingWizard modal opens on first visit to an unactivated tenant |
+| 0.10a | Close OnboardingWizard → `find("Set up your AI assistant", tabId)` no longer present; reload page → wizard does not reappear (dismissed state stored in localStorage `agentred-onboarding-dismissed`) |
+| 0.10b | `find("Setup wizard", tabId)` — "Setup wizard" nav link appears in AI Configuration sidebar group (star icon) |
+| 0.10c | Click "Setup wizard" nav link → `find("Set up your AI assistant", tabId)` — OnboardingWizard modal re-opens |
+| 0.10d | Wizard Step 1: `javascript_tool(tabId, "document.querySelectorAll('[class*=Card]').length")` or visual check — at least 1 category card visible after templates load from `/api/admin/knowledge/templates` |
+| 0.10e | `find("Your storefront URL", tabId)` — text input visible below category grid (non-Shopify merchants only) |
+| 0.10f | `find("Skip for now", tabId)` — button visible; click it → wizard closes |
+| 0.10g | Re-open wizard via "Setup wizard" nav link → `find("Continue", tabId)` — Continue button present but disabled (no category selected) |
+| 0.10h | Click a category card → `find("Continue", tabId)` enabled → click Continue → `find("Building your knowledge base", tabId)` — advances to Step 2 |
+| 0.10i | `find("articles added", tabId)` or `find("articles", tabId)` — template apply confirmation visible in Step 2 |
+| 0.10j | `find("Continue", tabId)` in Step 2 → click → `find("Ready to activate", tabId)` — advances to Step 3 |
+| 0.10k | Step 3: `find("suggestions", tabId)` or `find("No configuration suggestions", tabId)` — shows suggestions or fallback |
+| 0.10l | `find("I'll configure later", tabId)`, `find("Review first", tabId)`, `find("Activate now", tabId)` — all three action buttons visible |
+| 0.10m | Click "Review first" → wizard closes, page navigates to `/configuration` |
 | 0.11 | `javascript_tool`: `fetch('$PROD_BASE/api/config/activation-status', {headers:{'X-API-Key':'$MERCHANT_API_KEY'}}).then(r=>r.json())` — verify `is_active=false, is_configured=false` |
 | 0.12 | `javascript_tool`: `fetch('$PROD_BASE/api/config?state=draft', {headers:{'X-API-Key':'$MERCHANT_API_KEY'}}).then(r=>r.json())` — verify `brand_name` is empty |
 | 0.13 | Click Discard → verify state unchanged (badge stays Pending, fields remain empty) |
@@ -249,7 +294,7 @@ Navigate to `$STANDALONE_URL/configuration`.
 | 0.14a | Preflight dialog has no "Confirm" button when hard errors present — activation blocked |
 | 0.15 | Click Activate with brand_voice empty → `find("Brand voice is required", tabId)` in preflight dialog |
 | 0.16 | `javascript_tool`: `fetch('$PROD_BASE/api/chat/conversations', {method:'POST', headers:{'X-Widget-Key':'$WIDGET_KEY','Content-Type':'application/json'}, body:'{}'}).then(r=>r.status)` — expect 403 |
-| 0.17 | `javascript_tool`: fetch widget config → verify `widget_active: false` |
+| 0.17 | `javascript_tool`: `fetch('$PROD_BASE/api/config/activation-status', {headers:{'X-API-Key':'$MERCHANT_API_KEY'}}).then(r=>r.json())` — verify `is_active=false` and `can_activate=false` (mandatory fields still empty) |
 
 ### Page 0A: Activation Control Lifecycle (26 tests)
 
@@ -429,9 +474,11 @@ Navigate to `$STANDALONE_URL` (root = Dashboard).
 
 Navigate to `$STANDALONE_URL/inbox`.
 
-> Every element tested for presence, correct value, input manipulation, valid population, state change, control activation, input validation, disposition variants, and **data-binding correctness** per the 9-dimension verification standard.
+> Every element tested for presence, correct value, input manipulation, valid population, state change, control activation, input validation, disposition variants, and **data-binding correctness** per the 10-dimension verification standard (incl. color mode consistency).
 >
 > **9th dimension — data-binding correctness:** API response fields populate visible UI elements with expected value types (numbers, dates, emails, recognized enum strings). Fields must not render as "undefined", empty, or "NaN". Logo/brand images must load successfully (naturalWidth > 0). Select/filter dropdowns must have populated options.
+>
+> **10th dimension — color mode consistency:** Page elements (cards, dialogs, text, inputs, badges) must render with correct surface/text colors in both light and dark admin modes. See CM.1–CM.4 in the authoritative test procedure.
 >
 > Tests 2.4–2.18 require conversation data — SKIP if tenant has 0 conversations.
 
@@ -566,7 +613,7 @@ Navigate to `$STANDALONE_URL/inbox`.
 
 Navigate to `$STANDALONE_URL/team`.
 
-> Every element tested for presence, correct value, input manipulation, valid population, state change, control activation, input validation, and disposition variants per the 9-dimension verification standard.
+> Every element tested for presence, correct value, input manipulation, valid population, state change, control activation, input validation, and disposition variants per the 10-dimension verification standard (incl. color mode consistency).
 
 #### 3.1 Page header and loading states (5 tests)
 
@@ -792,7 +839,7 @@ Navigate to `$STANDALONE_URL/configuration`.
 
 Navigate to `$STANDALONE_URL/knowledge-base`.
 
-> Every element tested for presence, correct value, input manipulation, valid population, state change, control activation, input validation, and disposition variants per the 9-dimension verification standard.
+> Every element tested for presence, correct value, input manipulation, valid population, state change, control activation, input validation, and disposition variants per the 10-dimension verification standard (incl. color mode consistency).
 
 #### 5.1 Summary stat cards (10 tests)
 
@@ -930,7 +977,7 @@ Navigate to `$STANDALONE_URL/knowledge-base`.
 
 Navigate to `$STANDALONE_URL/quick-actions`.
 
-> Every element tested for presence, correct value, input manipulation, valid population, state change, control activation, input validation, and disposition variants per the 9-dimension verification standard.
+> Every element tested for presence, correct value, input manipulation, valid population, state change, control activation, input validation, and disposition variants per the 10-dimension verification standard (incl. color mode consistency).
 
 #### 6.1 Tab navigation and page header (5 tests)
 
@@ -1033,7 +1080,7 @@ Navigate to `$STANDALONE_URL/quick-actions`.
 
 Navigate to `$STANDALONE_URL/widget`.
 
-> Every element tested for presence, correct value, input manipulation, valid population, state change, control activation, input validation, and disposition variants per the 9-dimension verification standard.
+> Every element tested for presence, correct value, input manipulation, valid population, state change, control activation, input validation, and disposition variants per the 10-dimension verification standard (incl. color mode consistency).
 
 #### 7.1 Live preview (12 tests)
 
@@ -1113,9 +1160,11 @@ Navigate to `$STANDALONE_URL/widget`.
 | 7.8b | `find("Panel width", tabId)` then look for (?) tooltip icon — tooltip text about 320px/380px/440px |
 | 7.8c | Click "Wide" → `computer(action:'screenshot')` — chat panel wider in preview |
 | 7.8d | `find("Light", tabId)` and `find("Dark", tabId)` and `find("Auto", tabId)` — color mode segmented control |
-| 7.8e | `read_page(tabId)` — Color mode segmented control has "Dark" selected |
+| 7.8e | `read_page(tabId)` — Color mode segmented control has "Auto" selected |
 | 7.8f | Click "Light" → `computer(action:'screenshot')` — preview switches to light theme |
 | 7.8g | Click "Auto" → verify preview follows admin theme (screenshot comparison) |
+| 7.8h | Admin light mode + click "Dark" → `computer(action:'screenshot')` — preview dark panel bg, admin stays light |
+| 7.8i | Admin dark mode + click "Light" → `computer(action:'screenshot')` — preview light panel bg, admin stays dark |
 | 7.9 | `find("None", tabId)` and `find("Subtle", tabId)` and `find("Heavy", tabId)` — panel shadow segmented control |
 | 7.9a | `read_page(tabId)` — Panel shadow segmented control has "Standard" selected |
 | 7.9b | Click "None" → `computer(action:'screenshot')` — no shadow visible on chat panel |
@@ -1212,7 +1261,7 @@ Navigate to `$STANDALONE_URL/widget`.
 
 Navigate to `$STANDALONE_URL/integrations`.
 
-> Every element tested for presence, correct value, input manipulation, valid population, state change, control activation, input validation, and disposition variants per the 9-dimension verification standard.
+> Every element tested for presence, correct value, input manipulation, valid population, state change, control activation, input validation, and disposition variants per the 10-dimension verification standard (incl. color mode consistency).
 
 #### 8.1 Page header and loading states (5 tests)
 
@@ -1275,7 +1324,7 @@ Navigate to `$STANDALONE_URL/integrations`.
 
 Navigate to `$STANDALONE_URL/memory-privacy`.
 
-> Every element tested for presence, correct value, input manipulation, valid population, state change, control activation, input validation, and disposition variants per the 9-dimension verification standard.
+> Every element tested for presence, correct value, input manipulation, valid population, state change, control activation, input validation, and disposition variants per the 10-dimension verification standard (incl. color mode consistency).
 
 #### 9.1 Page header and upgrade banner (3 tests)
 
@@ -1384,7 +1433,7 @@ Navigate to `$STANDALONE_URL/memory-privacy`.
 
 Navigate to `$STANDALONE_URL/billing`.
 
-> Every element tested for presence, correct value, input manipulation, valid population, state change, control activation, input validation, and disposition variants per the 9-dimension verification standard.
+> Every element tested for presence, correct value, input manipulation, valid population, state change, control activation, input validation, and disposition variants per the 10-dimension verification standard (incl. color mode consistency).
 
 #### 10.1 Page header and error states (5 tests)
 
@@ -1754,17 +1803,150 @@ Navigate to `$PROVIDER_URL/mfa`.
 
 ---
 
+## Test Execution — Shopify Embedded Admin (Pages S.1–S.8)
+
+Each test references its ID from `ui-test-procedure.md`. Auth must be established via the
+user-assisted Shopify auth sub-procedure (Steps S.1–S.4) before testing begins.
+
+### Execution Pattern (per page)
+
+1. Navigate to the Shopify page route (user clicks nav item or Chrome MCP navigates within app)
+2. `computer(action:'wait', duration:3)` — allow Polaris + shared component render
+3. `read_console_messages(onlyErrors:true)` — check for runtime errors
+4. `read_page(tabId)` or `find(query, tabId)` — verify expected DOM elements
+5. `computer(action:'screenshot')` — capture visual state
+6. Record each test ID as PASS / FAIL / SKIP with notes
+
+### Page S.1: Shopify Layout & Navigation (12 tests)
+
+| Test ID | Chrome MCP Verification |
+|---------|------------------------|
+| S.1a | `read_console_messages(onlyErrors:true, tabId)` — zero errors; `read_page(tabId)` — Polaris Frame structure visible |
+| S.1b | `find("Dashboard", tabId)` — Polaris Page title renders |
+| S.1c | `find("Documentation", tabId)` — external link present; `javascript_tool(tabId, "document.querySelector('a[href*=agentredcx]')?.href")` — href contains "agentredcx.com" |
+| S.1d | `find("Open full admin", tabId)` — external link present; `javascript_tool(tabId, "document.querySelector('a[href*=standalone]')?.href")` — href contains "/admin/standalone" |
+| S.1e | `find("Active", tabId)` or `find("Activate", tabId)` or `find("not yet active", tabId)` — ActivationBanner present |
+| S.1f | Navigate to each of 7 routes — verify each loads without blank screen (combined with S.1g–S.1l) |
+| S.1g | Navigate to Dashboard route → `find("Dashboard", tabId)` |
+| S.1h | Navigate to Inbox route → `find("Conversation Inbox", tabId)` |
+| S.1i | Navigate to KB route → `find("Knowledge Base", tabId)` |
+| S.1j | Navigate to Configuration route → `find("Agent configuration", tabId)` |
+| S.1k | Navigate to Widget route → `find("Widget configuration", tabId)` |
+| S.1l | Navigate to Billing route → `find("Billing", tabId)` or `find("Billing & Usage", tabId)` |
+
+### Page S.2: Dashboard (8 tests)
+
+| Test ID | Chrome MCP Verification |
+|---------|------------------------|
+| S.2a | `read_page(tabId)` — analytics cards/stat elements visible after Dashboard load |
+| S.2b | `find("usage", tabId)` or `find("Usage", tabId)` — usage section present below analytics |
+| S.2c | `javascript_tool(tabId, "document.body.innerText.match(/\\d+\\s*(conversation|message)/i)?.[0]")` — numeric conversation count present |
+| S.2d | `javascript_tool(tabId, "document.body.innerText.match(/\\d+\\.?\\d*\\s*(ms|s|sec|seconds)/i)?.[0]")` — response time value present |
+| S.2e | `read_console_messages(onlyErrors:true, tabId)` — zero errors |
+| S.2f | `find("Dashboard", tabId)` — page heading |
+| S.2g | `javascript_tool(tabId, "document.querySelectorAll('[class*=Layout]').length >= 2")` — at least 2 layout sections |
+| S.2h | `computer(action:'screenshot', tabId)` — visual capture |
+
+### Page S.3: Inbox (8 tests)
+
+| Test ID | Chrome MCP Verification |
+|---------|------------------------|
+| S.3a | Navigate to Inbox → `read_page(tabId)` — conversation list or empty state visible |
+| S.3b | `javascript_tool(tabId, "document.querySelector('[class*=fullWidth], [class*=Page--fullWidth]') !== null")` — fullWidth layout applied |
+| S.3c | `find("conversation", tabId)` or `find("No conversations", tabId)` — list populated or empty state |
+| S.3d | `javascript_tool(tabId, "document.body.innerText.match(/(active|ended|escalated|assigned)/i)?.[0]")` — status text present |
+| S.3e | Same as S.3d — recognized status values |
+| S.3f | `read_console_messages(onlyErrors:true, tabId)` — zero errors |
+| S.3g | `find("Conversation Inbox", tabId)` — page heading |
+| S.3h | `computer(action:'screenshot', tabId)` — visual capture |
+
+### Page S.4: Knowledge Base (10 tests)
+
+| Test ID | Chrome MCP Verification |
+|---------|------------------------|
+| S.4a | Navigate to KB → `read_page(tabId)` — KB list or empty state visible |
+| S.4b | `javascript_tool(tabId, "document.body.innerText.match(/\\d+\\s*(article|entr)/i)?.[0]")` — article count visible |
+| S.4c | `javascript_tool(tabId, "document.querySelectorAll('table tr, [class*=article], [class*=entry]').length > 1")` — at least 1 article row |
+| S.4d | `javascript_tool(tabId, "document.body.innerText.match(/(title|category|status|type)/i)?.[0]")` — column headers present |
+| S.4e | `javascript_tool(tabId, "document.body.innerText.match(/(published|draft)/i)?.[0]")` — recognized status |
+| S.4f | `find("Knowledge automation", tabId)` — KA section title present |
+| S.4g | `javascript_tool(tabId, "document.querySelectorAll('[class*=template], [class*=Template]').length")` — template cards rendered (expect ~10) |
+| S.4h | No error from ingestion panel — either absent (no job) or shows status |
+| S.4i | `read_console_messages(onlyErrors:true, tabId)` — zero errors |
+| S.4j | `computer(action:'screenshot', tabId)` — visual capture |
+
+### Page S.5: Configuration (8 tests)
+
+| Test ID | Chrome MCP Verification |
+|---------|------------------------|
+| S.5a | Navigate to Configuration → `read_page(tabId)` — config form visible |
+| S.5b | `find("Brand name", tabId)` or `find("brand", tabId)` — brand name field present with value |
+| S.5c | `find("Brand voice", tabId)` — brand voice field present with value |
+| S.5d | `find("Escalation", tabId)` or `find("escalation", tabId)` — escalation section renders |
+| S.5e | `find("Custom instructions", tabId)` or `find("instructions", tabId)` — textarea renders |
+| S.5f | `find("Save", tabId)` — save button present |
+| S.5g | `read_console_messages(onlyErrors:true, tabId)` — zero errors |
+| S.5h | `computer(action:'screenshot', tabId)` — visual capture |
+
+### Page S.6: Widget (8 tests)
+
+| Test ID | Chrome MCP Verification |
+|---------|------------------------|
+| S.6a | Navigate to Widget → `read_page(tabId)` — widget config UI visible |
+| S.6b | `javascript_tool(tabId, "document.querySelector('[class*=preview], [class*=Preview], [class*=widget]') !== null")` — preview panel present |
+| S.6c | `javascript_tool(tabId, "document.body.innerText.match(/pk_live_/)?.[0]")` — widget key with pk_live_ prefix visible |
+| S.6d | `javascript_tool(tabId, "document.querySelector('input[type=color], [class*=ColorInput], [class*=color]') !== null")` — color customization present |
+| S.6e | `find("Greeting", tabId)` or `find("greeting", tabId)` — greeting message field present |
+| S.6f | `find("install", tabId)` or `find("Install", tabId)` or `find("snippet", tabId)` — installation section present |
+| S.6g | `read_console_messages(onlyErrors:true, tabId)` — zero errors |
+| S.6h | `computer(action:'screenshot', tabId)` — visual capture |
+
+### Page S.7: Billing (10 tests)
+
+| Test ID | Chrome MCP Verification |
+|---------|------------------------|
+| S.7a | Navigate to Billing → `read_page(tabId)` — billing info visible |
+| S.7b | `find("Professional", tabId)` — tier display for remaker-digital-001 |
+| S.7c | `javascript_tool(tabId, "document.body.innerText.match(/\\d+\\s*(conversation|message|used)/i)?.[0]")` — usage stat present |
+| S.7d | `javascript_tool(tabId, "document.body.innerText.match(/(1,000|5,000|20,000|pack)/i)?.[0]")` — pack option visible |
+| S.7e | `javascript_tool(tabId, "document.body.innerText.match(/(trial|starter|professional|enterprise)/i)?.[0]")` — recognized tier |
+| S.7f | `javascript_tool(tabId, "document.body.innerText.match(/\\d+/)?.[0]")` — numeric usage value |
+| S.7g | `find("Manage", tabId)` or `find("billing", tabId)` — billing management control |
+| S.7h | Same as S.7d — pack size labels with formatted numbers |
+| S.7i | `read_console_messages(onlyErrors:true, tabId)` — zero errors |
+| S.7j | `computer(action:'screenshot', tabId)` — visual capture |
+
+### Page S.8: Settings (12 tests)
+
+| Test ID | Chrome MCP Verification |
+|---------|------------------------|
+| S.8a | Navigate to Settings → `read_page(tabId)` — team manager UI visible |
+| S.8b | `find("Data & Privacy", tabId)` or `find("Data", tabId)` — GDPR section visible |
+| S.8c | `find("Data & Privacy", tabId)` — heading text |
+| S.8d | `find("GDPR", tabId)` or `find("compliance", tabId)` or `find("Export or delete", tabId)` — GDPR description text |
+| S.8e | `find("Export My Data", tabId)` — export button present |
+| S.8f | `javascript_tool(tabId, "document.querySelector('button')?.disabled !== true")` — export button not disabled |
+| S.8g | `javascript_tool(tabId, "document.querySelectorAll('table tr, [class*=member], [class*=team]').length >= 1")` — at least 1 team member |
+| S.8h | `javascript_tool(tabId, "document.body.innerText.match(/[\\w.+-]+@[\\w-]+\\.[\\w.]+/)?.[0]")` — email format present |
+| S.8i | `javascript_tool(tabId, "document.body.innerText.match(/(superadmin|admin|agent|viewer)/i)?.[0]")` — recognized role |
+| S.8j | `find("Settings", tabId)` — Polaris Page title |
+| S.8k | `read_console_messages(onlyErrors:true, tabId)` — zero errors |
+| S.8l | `computer(action:'screenshot', tabId)` — visual capture |
+
+---
+
 ## Known Exclusions
 
 | Exclusion | Reason |
 |-----------|--------|
-| Shopify embedded admin | Requires App Bridge auth context — cannot inject via Chrome MCP outside Shopify |
 | MFA TOTP flow | Requires time-based OTP generation — auth injection bypasses MFA by design |
 | Avatar upload tests (7.16–7.20) | Deferred per D22 — requires Azure Blob Storage + client-side cropping |
 | Storefront widget mount (0A.8) | Requires access to live Shopify storefront (blanco-9939.myshopify.com) |
 | Consent prompt (9.13) | Widget consent UI not yet built — deferred to widget phases 3-5 |
 | Contact Us email delivery (H.3k) | Cannot verify email actually arrives at support@remakerdigital.com — ACS delivery is tested by unit tests. UI tests verify modal form, validation, and submit behavior only. |
 | Provider Console data-binding: exact values | Data-binding tests verify values are populated and have expected *types* (numeric, email, date, enum). Exact numeric values depend on live data and may vary between runs. |
+| Shopify admin: deep input manipulation | User-assisted App Bridge login enables presence/data-binding verification (S.1–S.8). Deep interaction tests (form fills, escalation config changes, save/activate) are covered by standalone admin which uses the same shared components. |
+| Shopify admin: App Bridge session expiry | If session expires mid-test, user must re-authenticate via Shopify Partners Dashboard. Tests grouped to complete in one session. |
 
 ---
 
@@ -1772,13 +1954,16 @@ Navigate to `$PROVIDER_URL/mfa`.
 
 - [ ] **Standalone Admin:** 838 tests executed (802 prior + 36 KA tests), results recorded with test ID / PASS / FAIL / SKIP
 - [ ] **SPA Provider Console:** 115 tests executed (P.0–P.17), all PASS or documented FAIL
-- [ ] **Total:** 953 tests (838 standalone + 115 provider)
-- [ ] **Zero unexpected console errors** across all pages
-- [ ] **Screenshots captured** for each page group (minimum 27 screenshots — 11 standalone page groups + 16 provider pages)
-- [ ] **Auth injection verified** for both Standalone and Provider Console
-- [ ] **Data-binding verification:** Every Provider Console page with data tables/stat cards verified for populated values (not "undefined", not empty, not "NaN")
+- [ ] **Shopify Embedded Admin:** 76 tests executed (S.1–S.8), results recorded with test ID / PASS / FAIL / SKIP
+- [ ] **Total:** 1,029 tests (838 standalone + 115 provider + 76 Shopify)
+- [ ] **Zero unexpected console errors** across all pages (all 3 interfaces)
+- [ ] **Screenshots captured** for each page group (minimum 35 screenshots — 11 standalone page groups + 16 provider pages + 8 Shopify pages)
+- [ ] **Auth verified** for all 3 interfaces: sessionStorage injection (standalone + provider), App Bridge user-assisted (Shopify)
+- [ ] **Data-binding verification:** Every Provider Console page + Shopify page with data tables/stat cards verified for populated values (not "undefined", not empty, not "NaN")
 - [ ] **Logo/branding verification:** Both Standalone and Provider Console headers verified for correct logo rendering, image source, dimensions, and branding text
+- [ ] **Color mode verification:** Standalone admin verified in both light and dark modes — pages render correct surface/text colors, header stays dark, dialogs adapt, widget preview cross-mode behavior verified (CM.1–CM.4)
 - [ ] **Contact Us feature:** Modal opens, topic dropdown has 5 options, form fields render, cancel/send buttons present
+- [ ] **Shopify-specific verification:** GDPR section with "Export My Data" button renders; cross-navigation links (Documentation ↗, Open full admin ↗) present; ActivationBanner renders in Polaris context
 
 ---
 
@@ -1798,6 +1983,10 @@ Navigate to `$PROVIDER_URL/mfa`.
 | Logo image shows broken icon (0x0 pixels) | Procedure defect (wrong asset path) | Verify `primary-logo-no-wordmark.svg` exists in admin dist's public folder. Check image `naturalWidth > 0`. |
 | Contact Us modal doesn't open | Code defect (missing onClick handler or icon component) | Verify `[aria-label="Contact us"]` ActionIcon renders and `contactHandlers.open` is wired. |
 | Contact Us topic dropdown empty | Code defect (Select data prop missing) | Verify the `Select` component's `data` array has 5 topic options in StandaloneLayout.tsx. |
+| Shopify: "App Bridge not available" error banner | Environment transient (opened outside Shopify admin) | App must be opened from Shopify Partners Dashboard → dev store → Apps. Direct URL navigation will fail. |
+| Shopify: pages show "Loading..." indefinitely | Environment transient (App Bridge session expired) | User must re-authenticate via Shopify Partners Dashboard. |
+| Shopify: shared component renders but no data | Environment transient (App Bridge token not refreshing) | Reload the page within Shopify admin. If persistent, re-open app from Shopify admin. |
+| Shopify: find() returns no elements for Polaris components | Procedure defect (Polaris uses different text/class patterns) | Use broader text queries or `javascript_tool` DOM inspection. Polaris wraps content differently than Mantine. |
 
 ---
 
@@ -1817,6 +2006,9 @@ Results should be recorded in markdown table format:
 | P.2d    | PASS   | 0              | Tenant ID: remaker-digital-001 |
 | P.2h    | PASS   | 0              | Status dropdown: 3 options |
 | P.16a   | PASS   | 0              | Logo naturalWidth=60 |
+| S.1b    | PASS   | 0              | Dashboard title visible |
+| S.4f    | PASS   | 0              | KA section: "Knowledge automation" |
+| S.8e    | PASS   | 0              | Export My Data button present |
 ```
 
 **Data-binding test result notes:** For data-binding tests (marked with `**Data-binding:**` prefix), record the actual value observed in the Notes column. This creates an audit trail for regression — if a value changes from "2" to "undefined" between runs, the defect is immediately visible.

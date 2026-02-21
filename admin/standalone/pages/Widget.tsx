@@ -114,7 +114,7 @@ const DEFAULT_WIDGET_CONFIG: WidgetConfig = {
   positionOffsetY: 20,
   shadowIntensity: 'standard',
   panelWidth: 'standard',
-  colorMode: 'dark',
+  colorMode: 'auto',
   autoOpen: false,
   autoOpenDelay: 5,
   greetingEnabled: true,
@@ -358,25 +358,27 @@ function WidgetPreview({ config, adminIsDark }: { config: WidgetConfig; adminIsD
   const dk = config.colorMode === 'auto' ? adminIsDark : config.colorMode === 'dark';
 
   // Color tokens — light vs dark widget mode (Mazel design revision 2026-02-03 mockup)
-  const panelBg = dk ? tokens.surface : '#fff';
-  const msgAreaBg = dk ? tokens.page : '#fafafa';
-  const agentBubbleBg = dk ? tokens.surface : '#fff';
-  const agentBubbleBorder = dk ? tokens.border : '#e9ecef';
-  const agentBubbleText = dk ? tokens.textSecondary : '#1f2937';
-  const dateSepBg = dk ? tokens.surface : '#f1f3f5';
-  const dateSepText = dk ? tokens.textTertiary : '#6b7280';
-  const inputBg = dk ? tokens.surface : '#f1f3f5';
-  const inputText = dk ? tokens.textTertiary : '#9ca3af';
-  const inputBarBg = dk ? tokens.chrome : '#fff';
-  const inputBarBorder = dk ? tokens.border : '#e9ecef';
-  const brandingText = dk ? tokens.textTertiary : '#9ca3af';
-  const pageBg = dk ? tokens.page : '#f8f9fa';
-  const pageBorder = dk ? tokens.border : '#dee2e6';
+  // Dark path uses hardcoded hex values (NOT tokens.*) because tokens are now CSS
+  // variables that resolve to light values when admin is in light mode.
+  const panelBg = dk ? '#292524' : '#fff';
+  const msgAreaBg = dk ? '#1c1917' : '#fafafa';
+  const agentBubbleBg = dk ? '#292524' : '#fff';
+  const agentBubbleBorder = dk ? '#44403c' : '#e9ecef';
+  const agentBubbleText = dk ? '#f5f5f4' : '#1f2937';
+  const dateSepBg = dk ? '#292524' : '#f1f3f5';
+  const dateSepText = dk ? '#57534e' : '#6b7280';
+  const inputBg = dk ? '#292524' : '#f1f3f5';
+  const inputText = dk ? '#57534e' : '#9ca3af';
+  const inputBarBg = dk ? '#0c0a09' : '#fff';
+  const inputBarBorder = dk ? '#44403c' : '#e9ecef';
+  const brandingText = dk ? '#57534e' : '#9ca3af';
+  const pageBg = dk ? '#1c1917' : '#f8f9fa';
+  const pageBorder = dk ? '#44403c' : '#dee2e6';
   // Simulated page chrome
-  const chromeBg = dk ? tokens.chrome : '#e9ecef';
-  const chromeBorder = dk ? tokens.border : '#dee2e6';
-  const skeletonDark = dk ? tokens.surface : '#dee2e6';
-  const skeletonLight = dk ? tokens.chrome : '#e9ecef';
+  const chromeBg = dk ? '#0c0a09' : '#e9ecef';
+  const chromeBorder = dk ? '#44403c' : '#dee2e6';
+  const skeletonDark = dk ? '#292524' : '#dee2e6';
+  const skeletonLight = dk ? '#0c0a09' : '#e9ecef';
 
   return (
     <Box

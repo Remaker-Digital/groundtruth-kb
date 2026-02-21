@@ -48,7 +48,7 @@ PROD_URL = os.environ.get(
 )
 API_KEY = os.environ.get(
     "QUALITY_API_KEY",
-    "ar_user_rema_qcHQpv0bhGwXpEou14WH3fnE_RZMvI_N",  # default: remaker-digital-001
+    "ar_user_rema_uB7sJ28x8vR458RH8FJsrHaBBNhR0HUu",  # default: remaker-digital-001
 )
 
 # ---------------------------------------------------------------------------

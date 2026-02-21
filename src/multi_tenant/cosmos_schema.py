@@ -1792,33 +1792,40 @@ def get_collection_configs() -> list[CollectionConfig]:
 # Tier defaults (Decision #5 — rate limits, Decision #14 — concurrency)
 # ---------------------------------------------------------------------------
 
+# Admin RPM: All tiers share the same rate limit to support aggressive
+# concurrent multi-user admin usage. Per-tenant overrides via TenantDocument
+# rate_limit_rpm field take precedence (resolved in middleware._get_limit).
+_ADMIN_RPM = 60
+
 TIER_DEFAULTS: dict[str, dict[str, Any]] = {
+    # Trial: Full professional-grade entitlements for 14 days.
+    # After expiry the merchant chooses Basic, Professional, Professional+, or Enterprise.
     TenantTier.TRIAL.value: {
-        "included_conversations": 50,
-        "rate_limit_rpm": 5,
-        "max_concurrent": 2,
-        "queue_depth": 3,
-        "history_depth_days": 14,       # Trial: 14-day retention only
-        "memory_layers": [1],           # Layer 1 only (basic profile)
-        "overage_rate": 0.0,            # No overage — hard cap at 50
+        "included_conversations": 5_000, # Same as professional
+        "rate_limit_rpm": _ADMIN_RPM,
+        "max_concurrent": 10,
+        "queue_depth": 20,
+        "history_depth_days": 365,
+        "memory_layers": [1, 2, 3],
+        "overage_rate": 0.0,            # No overage during trial — hard cap
         "trial_duration_days": 14,      # 14-day trial period
-        "max_quick_actions": 2,         # Quick action prompt limit
-        "max_quick_action_assignments": 2,
+        "max_quick_actions": 20,
+        "max_quick_action_assignments": 50,
     },
     TenantTier.STARTER.value: {
         "included_conversations": 1_000,
-        "rate_limit_rpm": 10,
-        "max_concurrent": 3,
-        "queue_depth": 5,
-        "history_depth_days": 90,       # Layer 2 retention
-        "memory_layers": [1, 2],        # Layers available
+        "rate_limit_rpm": _ADMIN_RPM,
+        "max_concurrent": 5,
+        "queue_depth": 10,
+        "history_depth_days": 90,
+        "memory_layers": [1, 2],
         "overage_rate": 0.04,
         "max_quick_actions": 5,
         "max_quick_action_assignments": 10,
     },
     TenantTier.PROFESSIONAL.value: {
         "included_conversations": 5_000,
-        "rate_limit_rpm": 50,
+        "rate_limit_rpm": _ADMIN_RPM,
         "max_concurrent": 10,
         "queue_depth": 20,
         "history_depth_days": 365,
@@ -1829,7 +1836,7 @@ TIER_DEFAULTS: dict[str, dict[str, Any]] = {
     },
     TenantTier.ENTERPRISE.value: {
         "included_conversations": 20_000,
-        "rate_limit_rpm": 200,
+        "rate_limit_rpm": _ADMIN_RPM * 4, # 240 RPM for enterprise
         "max_concurrent": 30,
         "queue_depth": 50,
         "history_depth_days": None,     # Unlimited

@@ -36,6 +36,7 @@ EXPECTED_CATEGORIES = [
     "sports_outdoors",
     "toys_games",
     "pet_supplies",
+    "general_goods",
 ]
 
 REQUIRED_ARTICLE_FIELDS = {"entry_type", "title", "content", "category", "tags"}
@@ -63,9 +64,9 @@ class TestRegistryValidation:
         data = json.loads(_REGISTRY_FILE.read_text(encoding="utf-8"))
         assert isinstance(data, list)
 
-    def test_registry_has_ten_categories(self):
+    def test_registry_has_eleven_categories(self):
         data = json.loads(_REGISTRY_FILE.read_text(encoding="utf-8"))
-        assert len(data) == 10
+        assert len(data) == 11
 
     def test_registry_category_ids_match_expected(self):
         data = json.loads(_REGISTRY_FILE.read_text(encoding="utf-8"))
@@ -208,9 +209,9 @@ class TestListCategories:
         cats = loader.list_categories()
         assert isinstance(cats, list)
 
-    def test_returns_ten_categories(self, loader: TemplateLoader):
+    def test_returns_eleven_categories(self, loader: TemplateLoader):
         cats = loader.list_categories()
-        assert len(cats) == 10
+        assert len(cats) == 11
 
     def test_category_ids_match(self, loader: TemplateLoader):
         cats = loader.list_categories()
@@ -454,7 +455,7 @@ class TestContentQuality:
         for cat_id in EXPECTED_CATEGORIES:
             template = loader.get_template(cat_id)
             total += len(template["articles"])
-        assert total == 150, f"Expected 150 total articles, got {total}"
+        assert total == 165, f"Expected 165 total articles, got {total}"
 
     def test_all_categories_have_faq_articles(self, loader: TemplateLoader):
         for cat_id in EXPECTED_CATEGORIES:

@@ -78,5 +78,13 @@
     "article_count": 15,
     "suggested_brand_voice": "caring and enthusiastic",
     "suggested_escalation_keywords": ["pet illness", "toxic", "recall", "allergic reaction", "contamination"]
+  },
+  {
+    "id": "general_goods",
+    "name": "General Goods & Services",
+    "description": "General retail, mixed products, services — shipping, returns, payments, account management",
+    "article_count": 15,
+    "suggested_brand_voice": "friendly and professional",
+    "suggested_escalation_keywords": ["defective", "damaged", "fraud", "unauthorized charge", "safety concern"]
   }
 ]

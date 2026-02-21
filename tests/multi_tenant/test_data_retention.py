@@ -151,12 +151,12 @@ class TestRetentionEnforcement:
         assert "active" in query_arg
         assert "past_due" in query_arg
 
-    async def test_dr_02_trial_tier_uses_14_day_cutoff(self):
-        """DR-02: Trial tier uses 14-day retention cutoff."""
+    async def test_dr_02_trial_tier_uses_professional_cutoff(self):
+        """DR-02: Trial tier uses professional-level retention cutoff (365 days)."""
         service, _ = _make_service()
         retention_days = service.get_retention_days(TenantTier.TRIAL.value)
-        assert retention_days == 14
-        assert TIER_DEFAULTS[TenantTier.TRIAL.value]["history_depth_days"] == 14
+        assert retention_days == 365
+        assert TIER_DEFAULTS[TenantTier.TRIAL.value]["history_depth_days"] == 365
 
     async def test_dr_03_starter_tier_uses_90_day_cutoff(self):
         """DR-03: Starter tier uses 90-day retention cutoff."""

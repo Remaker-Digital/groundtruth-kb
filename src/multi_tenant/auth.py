@@ -155,6 +155,10 @@ class TenantContext:
     # Trial tier (WI #119) — ISO 8601 expiry timestamp
     trial_expires_at: str | None = None
 
+    # Per-tenant rate limit override (from TenantDocument.rate_limit_rpm).
+    # None = use tier default from TIER_DEFAULTS.
+    rate_limit_rpm: int | None = None
+
     # Shopify-specific (populated only for session token auth)
     shop_domain: str | None = None
     user_id: str | None = None

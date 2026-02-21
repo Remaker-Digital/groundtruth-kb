@@ -575,32 +575,53 @@ export const KnowledgeBaseManager: React.FC<BaseComponentProps> = ({
           type="text"
           value={searchQuery}
           onChange={(e) => setSearchQuery(e.target.value)}
-          placeholder="Search by title..."
+          placeholder="Search articles..."
+          aria-label="Search articles by title"
           style={inputStyle({ width: '240px', flex: 'none' })}
         />
 
         {/* Category filter */}
-        <select
-          value={categoryFilter}
-          onChange={(e) => setCategoryFilter(e.target.value)}
-          style={inputStyle({ width: '180px', flex: 'none' })}
-        >
-          <option value="">All categories</option>
-          {categories.map((cat) => (
-            <option key={cat} value={cat}>{cat}</option>
-          ))}
-        </select>
+        <label style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+          <span
+            style={{ fontSize: '12px', color: COLOR_TEXT_SECONDARY, whiteSpace: 'nowrap' }}
+            title="Filter articles by category"
+          >
+            Category
+          </span>
+          <select
+            value={categoryFilter}
+            onChange={(e) => setCategoryFilter(e.target.value)}
+            style={inputStyle({ width: '160px', flex: 'none' })}
+            aria-label="Filter by category"
+            title="Filter articles by category"
+          >
+            <option value="">All</option>
+            {categories.map((cat) => (
+              <option key={cat} value={cat}>{cat}</option>
+            ))}
+          </select>
+        </label>
 
         {/* Status filter */}
-        <select
-          value={statusFilter}
-          onChange={(e) => setStatusFilter(e.target.value as '' | KBArticleStatus)}
-          style={inputStyle({ width: '160px', flex: 'none' })}
-        >
-          {ALL_STATUSES.map((s) => (
-            <option key={s.value} value={s.value}>{s.label}</option>
-          ))}
-        </select>
+        <label style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+          <span
+            style={{ fontSize: '12px', color: COLOR_TEXT_SECONDARY, whiteSpace: 'nowrap' }}
+            title="Filter articles by publication status"
+          >
+            Status
+          </span>
+          <select
+            value={statusFilter}
+            onChange={(e) => setStatusFilter(e.target.value as '' | KBArticleStatus)}
+            style={inputStyle({ width: '140px', flex: 'none' })}
+            aria-label="Filter by status"
+            title="Filter articles by publication status"
+          >
+            {ALL_STATUSES.map((s) => (
+              <option key={s.value} value={s.value}>{s.label}</option>
+            ))}
+          </select>
+        </label>
 
         {/* Clear filters */}
         {(searchQuery || categoryFilter || statusFilter) && (

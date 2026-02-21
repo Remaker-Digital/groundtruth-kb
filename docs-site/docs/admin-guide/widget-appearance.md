@@ -151,7 +151,7 @@ The White-Label Package (Enterprise only, $399/month) removes all Agent Red bran
 | **Field** | `widget_color_mode` |
 | **Type** | Dropdown |
 | **Options** | `light`, `dark`, `auto` |
-| **Default** | `light` |
+| **Default** | `auto` |
 | **Affects** | Widget |
 
 Controls the widget's color scheme.

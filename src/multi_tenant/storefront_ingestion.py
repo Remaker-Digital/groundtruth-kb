@@ -373,7 +373,7 @@ class StorefrontIngestionService:
                     [
                         {"op": "set", "path": "/status", "value": IngestionJobStatus.FAILED.value},
                         {"op": "set", "path": "/completed_at", "value": failed_at},
-                        {"op": "set", "path": "/error_message", "value": str(exc)[:500]},
+                        {"op": "set", "path": "/error_message", "value": f"{type(exc).__name__}: {exc}"[:500]},
                     ],
                 )
             except Exception:
@@ -535,7 +535,7 @@ class StorefrontIngestionService:
         price_range = product.get("priceRangeV2", {})
         min_price = price_range.get("minVariantPrice", {})
         max_price = price_range.get("maxVariantPrice", {})
-        if min_price.get("amount"):
+        if min_price.get("amount") is not None:
             currency = min_price.get("currencyCode", "USD")
             min_amt = min_price["amount"]
             max_amt = max_price.get("amount", min_amt)
@@ -550,7 +550,12 @@ class StorefrontIngestionService:
         # Extract metadata
         tags = product.get("tags", [])
         images = product.get("images", {}).get("edges", [])
-        image_url = images[0]["node"]["url"] if images else None
+        image_url = None
+        if images:
+            first_image = images[0]
+            if isinstance(first_image, dict):
+                node = first_image.get("node", {})
+                image_url = node.get("url") if isinstance(node, dict) else None
 
         sku = None
         variants = product.get("variants", {}).get("edges", [])

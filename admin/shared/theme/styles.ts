@@ -24,17 +24,17 @@ import type React from 'react';
 // ===========================================================================
 
 export const tokens = {
-  // --- Stone neutral surface hierarchy ---
-  chrome:  '#0c0a09',
-  page:    '#1c1917',
-  surface: '#292524',
-  border:  '#44403c',
+  // --- Stone neutral surface hierarchy (resolved via CSS custom properties) ---
+  chrome:  'var(--ar-chrome)',
+  page:    'var(--ar-page)',
+  surface: 'var(--ar-surface)',
+  border:  'var(--ar-border)',
 
-  // --- Text hierarchy ---
-  textPrimary:   '#fafaf9',
-  textSecondary: '#f5f5f4',
-  textMuted:     '#a8a29e',
-  textTertiary:  '#57534e',
+  // --- Text hierarchy (resolved via CSS custom properties) ---
+  textPrimary:   'var(--ar-text-primary)',
+  textSecondary: 'var(--ar-text-secondary)',
+  textMuted:     'var(--ar-text-muted)',
+  textTertiary:  'var(--ar-text-tertiary)',
 
   // --- Action colors ---
   action:        '#3B82F6',
@@ -66,9 +66,9 @@ export const tokens = {
   // --- White (for button text on colored backgrounds) ---
   white: '#FFFFFF',
 
-  // --- Overlay / modal ---
-  overlayBg:  'rgba(0, 0, 0, 0.6)',
-  modalShadow: '0 20px 60px rgba(0, 0, 0, 0.3)',
+  // --- Overlay / modal (resolved via CSS custom properties) ---
+  overlayBg:  'var(--ar-overlay-bg)',
+  modalShadow: 'var(--ar-modal-shadow)',
 
   // --- Transition ---
   transitionFast: '150ms ease',

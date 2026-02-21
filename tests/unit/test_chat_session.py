@@ -156,7 +156,8 @@ class TestStartConversation:
     @pytest.mark.asyncio
     async def test_start_trial_limit_blocks(self, session, mock_meter):
         dashboard = MagicMock()
-        dashboard.total_conversations = 50
+        # Trial now has 5000 conversation limit (professional entitlements)
+        dashboard.total_conversations = 5500
         mock_meter.get_usage_dashboard = AsyncMock(return_value=dashboard)
 
         request = ConversationStartRequest()
@@ -168,7 +169,7 @@ class TestStartConversation:
     @pytest.mark.asyncio
     async def test_start_trial_allows_under_limit(self, session, mock_repo, mock_meter):
         dashboard = MagicMock()
-        dashboard.total_conversations = 10
+        dashboard.total_conversations = 100
         mock_meter.get_usage_dashboard = AsyncMock(return_value=dashboard)
 
         request = ConversationStartRequest()

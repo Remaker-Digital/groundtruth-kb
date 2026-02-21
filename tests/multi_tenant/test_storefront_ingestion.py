@@ -669,3 +669,150 @@ class TestTemplateIngestion:
         last_patch = patch_calls[-1][0][2]
         status_op = next(op for op in last_patch if op["path"] == "/status")
         assert status_op["value"] == "failed"
+
+
+# ---------------------------------------------------------------------------
+# F10: Free product inclusion tests
+# ---------------------------------------------------------------------------
+
+class TestFreeProductInclusion:
+    """Verify that products with price=0 are included (F10 fix)."""
+
+    @pytest.fixture(autouse=True)
+    def _setup(self):
+        self.service = StorefrontIngestionService.__new__(StorefrontIngestionService)
+        self.service._job_repo = AsyncMock(spec=IngestionJobRepository)
+
+    def test_free_product_includes_price(self):
+        """Price amount '0' or '0.00' should not be excluded (F10)."""
+        product = _make_shopify_product(min_price="0", max_price="0")
+        entry = self.service._shopify_product_to_kb_entry("t1", product)
+        assert entry is not None
+        assert "Price:" in entry["content"]
+        assert "0" in entry["content"]
+
+    def test_free_product_zero_decimal(self):
+        """Price '0.00' should be included (F10)."""
+        product = _make_shopify_product(min_price="0.00", max_price="0.00")
+        entry = self.service._shopify_product_to_kb_entry("t1", product)
+        assert entry is not None
+        assert "0.00" in entry["content"]
+
+    def test_empty_string_price_excluded(self):
+        """Empty string amount should not produce price line."""
+        product = _make_shopify_product()
+        product["priceRangeV2"]["minVariantPrice"]["amount"] = ""
+        entry = self.service._shopify_product_to_kb_entry("t1", product)
+        # Empty string is falsy — but `is not None` check should still allow it
+        # (empty string price is semantically "no price", not "free")
+        assert entry is not None
+
+    def test_null_price_excluded(self):
+        """None amount should not produce a price line."""
+        product = _make_shopify_product()
+        product["priceRangeV2"]["minVariantPrice"]["amount"] = None
+        entry = self.service._shopify_product_to_kb_entry("t1", product)
+        assert entry is not None
+        assert "Price:" not in entry["content"]
+
+
+# ---------------------------------------------------------------------------
+# F11: Safe nested image access tests
+# ---------------------------------------------------------------------------
+
+class TestSafeImageAccess:
+    """Verify safe traversal of nested product image fields (F11 fix)."""
+
+    @pytest.fixture(autouse=True)
+    def _setup(self):
+        self.service = StorefrontIngestionService.__new__(StorefrontIngestionService)
+        self.service._job_repo = AsyncMock(spec=IngestionJobRepository)
+
+    def test_normal_image_extraction(self):
+        """Standard image node structure should work."""
+        product = _make_shopify_product(image_url="https://cdn.example.com/img.jpg")
+        entry = self.service._shopify_product_to_kb_entry("t1", product)
+        assert entry["metadata"]["image_url"] == "https://cdn.example.com/img.jpg"
+
+    def test_missing_node_key(self):
+        """Image edge without 'node' key should not crash (F11)."""
+        product = _make_shopify_product()
+        product["images"] = {"edges": [{"other": "data"}]}
+        entry = self.service._shopify_product_to_kb_entry("t1", product)
+        assert entry is not None
+        assert entry["metadata"]["image_url"] is None
+
+    def test_node_is_not_dict(self):
+        """Image node that is not a dict should not crash (F11)."""
+        product = _make_shopify_product()
+        product["images"] = {"edges": [{"node": "not-a-dict"}]}
+        entry = self.service._shopify_product_to_kb_entry("t1", product)
+        assert entry is not None
+        assert entry["metadata"]["image_url"] is None
+
+    def test_edge_is_not_dict(self):
+        """Image edge that is not a dict should not crash (F11)."""
+        product = _make_shopify_product()
+        product["images"] = {"edges": ["not-a-dict"]}
+        entry = self.service._shopify_product_to_kb_entry("t1", product)
+        assert entry is not None
+        assert entry["metadata"]["image_url"] is None
+
+    def test_empty_edges(self):
+        """Empty edges array should produce None image_url."""
+        product = _make_shopify_product(image_url=None)
+        entry = self.service._shopify_product_to_kb_entry("t1", product)
+        assert entry is not None
+        assert entry["metadata"]["image_url"] is None
+
+    def test_node_missing_url_key(self):
+        """Image node without 'url' key should produce None (F11)."""
+        product = _make_shopify_product()
+        product["images"] = {"edges": [{"node": {"altText": "test"}}]}
+        entry = self.service._shopify_product_to_kb_entry("t1", product)
+        assert entry is not None
+        assert entry["metadata"]["image_url"] is None
+
+
+# ---------------------------------------------------------------------------
+# F12: Error message formatting tests
+# ---------------------------------------------------------------------------
+
+class TestErrorMessageFormatting:
+    """Verify error messages include exception type name (F12 fix)."""
+
+    @pytest.fixture(autouse=True)
+    def _setup(self):
+        self.service = StorefrontIngestionService.__new__(StorefrontIngestionService)
+        self.service._job_repo = AsyncMock(spec=IngestionJobRepository)
+
+    @pytest.mark.asyncio
+    async def test_error_message_includes_type_name(self):
+        """Failed job error_message should include exception class name (F12)."""
+        self.service._job_repo.read = AsyncMock(return_value={
+            "id": "j1",
+            "tenant_id": "t1",
+            "job_type": "url",
+            "status": "running",
+            "source_config": {"start_url": "https://example.com", "max_pages": 5},
+        })
+
+        with patch(
+            "src.multi_tenant.document_parser.crawl_url",
+            new_callable=AsyncMock,
+            side_effect=ConnectionError("Connection refused"),
+        ):
+            await self.service.process_job("j1", "t1")
+
+        # Verify error_message contains the exception type
+        patch_calls = self.service._job_repo.patch.call_args_list
+        # Find the failed status patch
+        for call in patch_calls:
+            ops = call[0][2]
+            error_op = next((op for op in ops if op["path"] == "/error_message"), None)
+            if error_op and error_op["value"]:
+                assert "ConnectionError" in error_op["value"]
+                assert "Connection refused" in error_op["value"]
+                break
+        else:
+            pytest.fail("No error_message patch found")

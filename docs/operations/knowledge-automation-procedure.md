@@ -22,7 +22,7 @@
 ```
 TENANT_ID       = remaker-digital-001
 API_BASE        = https://agent-red-api-gateway.orangeglacier-f566a4e7.eastus.azurecontainerapps.io
-SUPERADMIN_KEY  = ar_user_rema_qcHQpv0bhGwXpEou14WH3fnE_RZMvI_N
+SUPERADMIN_KEY  = ar_user_rema_uB7sJ28x8vR458RH8FJsrHaBBNhR0HUu
 ```
 
 ---

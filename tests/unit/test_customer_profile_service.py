@@ -621,9 +621,12 @@ class TestTierUtilities:
     """Tests for get_available_layers and get_history_depth_days."""
 
     def test_trial_layers(self):
+        # Trial now has professional-level entitlements: layers [1, 2, 3]
         layers = CustomerProfileService.get_available_layers(TenantTier.TRIAL)
         assert 1 in layers
-        assert len(layers) == 1
+        assert 2 in layers
+        assert 3 in layers
+        assert len(layers) == 3
 
     def test_starter_layers(self):
         layers = CustomerProfileService.get_available_layers(TenantTier.STARTER)
@@ -639,8 +642,9 @@ class TestTierUtilities:
         assert 4 in layers
 
     def test_trial_history_depth(self):
+        # Trial now has professional-level entitlements: 365-day history
         days = CustomerProfileService.get_history_depth_days(TenantTier.TRIAL)
-        assert days == 14
+        assert days == 365
 
     def test_starter_history_depth(self):
         days = CustomerProfileService.get_history_depth_days(TenantTier.STARTER)

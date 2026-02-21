@@ -46,6 +46,7 @@ Configuration changes use a two-phase commit model. When you save a setting, it 
 | [Quick action prompts](./quick-actions.md) | Pre-defined prompt buttons in the widget greeting area |
 | [Knowledge base management](./knowledge-base-management.md) | Creating, editing, uploading, and organizing knowledge articles |
 | [Conflict scanner](./conflict-scanner.md) | Detect duplicate and conflicting knowledge base articles |
+| [Knowledge automation](./knowledge-automation.md) | Storefront ingestion, industry templates, and AI-generated config suggestions |
 | [Save and activate](./save-and-activate.md) | Draft, review, and activate configuration changes |
 | [Team management](./team-management.md) | Invite team members, assign roles, and control admin console access |
 | [Analytics](./analytics.md) | Conversation volume, intent breakdown, resolution rates, first-contact resolution |

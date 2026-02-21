@@ -742,7 +742,7 @@ def phase_7_tier_verify(dry_run: bool) -> None:
     phase_header(7, "Verify Tier Override")
 
     # Need remaker-digital-001 superadmin key for tier override (cross-tenant)
-    rd_key = os.environ.get("SUPERADMIN_API_KEY", "ar_user_rema_qcHQpv0bhGwXpEou14WH3fnE_RZMvI_N")
+    rd_key = os.environ.get("SUPERADMIN_API_KEY", "ar_user_rema_uB7sJ28x8vR458RH8FJsrHaBBNhR0HUu")
 
     if dry_run:
         log("INFO", f"[DRY RUN] Would PUT /api/superadmin/tenants/{TENANT_ID}/tier with tier=starter")
@@ -852,7 +852,7 @@ def verify_postconditions(dry_run: bool) -> None:
         log("FAIL", f"Gate 6: Config read failed — {status}")
 
     # Gate 7: remaker-digital-001 unchanged
-    rd_key = "ar_user_rema_qcHQpv0bhGwXpEou14WH3fnE_RZMvI_N"
+    rd_key = "ar_user_rema_uB7sJ28x8vR458RH8FJsrHaBBNhR0HUu"
     status, body = api_call("GET", "/api/tenants/lookup", api_key=rd_key)
     if status == 200:
         tier = body.get("tier", "?")

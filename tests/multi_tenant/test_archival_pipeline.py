@@ -176,12 +176,12 @@ class TestArchivalScan:
         assert "active" in query_arg
         assert "past_due" in query_arg
 
-    async def test_ap_02_trial_tier_uses_14_day_cutoff(self):
-        """AP-02: Trial tier archival uses 14-day cutoff."""
+    async def test_ap_02_trial_tier_uses_professional_cutoff(self):
+        """AP-02: Trial tier archival uses professional-level cutoff (365 days)."""
         service, _ = _make_service()
         cutoff_days = service.get_archival_cutoff(TenantTier.TRIAL.value)
-        assert cutoff_days == 14
-        assert TIER_DEFAULTS[TenantTier.TRIAL.value]["history_depth_days"] == 14
+        assert cutoff_days == 365
+        assert TIER_DEFAULTS[TenantTier.TRIAL.value]["history_depth_days"] == 365
 
     async def test_ap_03_starter_tier_uses_90_day_cutoff(self):
         """AP-03: Starter tier archival uses 90-day cutoff."""

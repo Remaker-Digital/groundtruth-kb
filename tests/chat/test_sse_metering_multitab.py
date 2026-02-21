@@ -349,9 +349,11 @@ class TestMultiTabTracking:
         mgr.connect("tenant-1", "conv-1", tab_id="tab-A")
         mgr.connect("tenant-1", "conv-2", tab_id="tab-B")
         mgr.connect("tenant-1", "conv-3", tab_id="tab-C")
+        mgr.connect("tenant-1", "conv-4", tab_id="tab-D")
+        mgr.connect("tenant-1", "conv-5", tab_id="tab-E")
 
-        assert mgr.get_active_count("tenant-1") == 3
-        # Starter limit = 3, so next connection would be blocked
+        assert mgr.get_active_count("tenant-1") == 5
+        # Starter limit = 5, so next connection would be blocked
         assert not mgr.can_connect("tenant-1", "starter")
 
     def test_tab_133_09_health_summary_includes_tab_count(self):

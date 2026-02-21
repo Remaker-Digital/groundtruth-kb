@@ -9,6 +9,43 @@ All notable changes to Agent Red Customer Experience are documented here.
 
 ---
 
+## v1.54.7 — 2026-02-21
+
+### Light/dark color mode
+- **CSS custom property theming:** All surface, text, and overlay tokens in `styles.ts` now reference CSS custom properties (`var(--ar-*)`) instead of hardcoded hex values. The browser resolves these at paint time, enabling instant theme switching without React re-renders.
+- **Light mode override:** New `html[data-mantine-color-scheme="light"]` block in `tokens.css` redefines all mode-dependent tokens — surfaces become white, text becomes dark, borders and overlays lighten.
+- **Auto color mode default:** The widget `colorMode` setting defaults to `Auto`, which follows the visitor's OS preference via `prefers-color-scheme`.
+- **Header always dark:** The admin header retains its dark chrome in both modes via hardcoded CSS rules.
+- **Widget preview isolation:** The widget preview panel always renders with a dark background using hardcoded hex values, independent of the admin's active color scheme.
+- **Toggle persistence:** Color mode selection persists across page reloads via Mantine's `localStorage` mechanism.
+- **10th verification dimension:** New "Color Mode Consistency" test dimension (CM.1–CM.4) added to both UI test procedures — verifying light mode rendering, dark mode regression, widget preview isolation, and toggle persistence.
+
+### Light-mode palette
+| Token | Dark | Light |
+|-------|------|-------|
+| Chrome | `#0c0a09` | `#f5f5f5` |
+| Page | `#1c1917` | `#f0f0ef` |
+| Surface | `#292524` | `#ffffff` |
+| Border | `#44403c` | `#e5e3e0` |
+| Text Primary | `#fafaf9` | `#1c1917` |
+| Text Secondary | `#f5f5f4` | `#292524` |
+| Text Muted | `#a8a29e` | `#78716c` |
+
+---
+
+## v1.54.0 — 2026-02-20
+
+### Knowledge automation
+- **Storefront content ingestion (KA-1):** Automatic extraction of product titles, descriptions, collections, and policies from your Shopify storefront. Ingested content is stored as knowledge base articles with `storefront` source attribution.
+- **Industry template library (KA-2):** 11 industry-specific knowledge base templates (Electronics, Fashion, Beauty, Food, Health, Home, Jewelry, Pet, Sports, Toys, General) with pre-written FAQ articles, shipping policies, and return procedures.
+- **Config suggestion engine (KA-3):** Analyzes ingested knowledge base content to suggest optimal values for brand name, brand voice, greeting message, escalation keywords, and display name — with confidence scores and source attribution.
+- **Suggestion badges (KA-4):** Visual badges on configuration inputs indicating when an AI-generated suggestion is available. Click to preview and apply the suggested value.
+- **Onboarding wizard (KA-5):** Three-step setup wizard (Connect Store → Review Knowledge → Configure Agent) that guides new merchants through initial activation, with progress tracking and skip-ahead navigation.
+- **Document parser (KA-6):** Expanded document parsing to extract meaningful content from Shopify HTML pages, handling product descriptions, policy pages, and collection metadata.
+- **Knowledge automation procedure:** New repeatable procedure (`docs/operations/knowledge-automation-procedure.md`) with 6 verification steps and 11 post-conditions.
+
+---
+
 ## v1.51.1 — 2026-02-19
 
 ### Chat pipeline reliability

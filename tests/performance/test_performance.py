@@ -293,16 +293,19 @@ class TestThroughputConcurrency:
     """PERF-11 through PERF-20: Concurrency limits, circuit breakers, rate limiting."""
 
     def test_perf_11_tier_concurrency_limits(self):
-        """PERF-11: Tier concurrency limits are correctly defined."""
-        assert TIER_DEFAULTS["starter"]["max_concurrent"] == 3
+        """PERF-11: Tier concurrency limits — trial=professional, enterprise highest."""
+        assert TIER_DEFAULTS["trial"]["max_concurrent"] == 10
+        assert TIER_DEFAULTS["starter"]["max_concurrent"] == 5
         assert TIER_DEFAULTS["professional"]["max_concurrent"] == 10
         assert TIER_DEFAULTS["enterprise"]["max_concurrent"] == 30
 
     def test_perf_12_tier_rate_limits(self):
-        """PERF-12: Tier rate limits are correctly defined."""
-        assert TIER_DEFAULTS["starter"]["rate_limit_rpm"] == 10
-        assert TIER_DEFAULTS["professional"]["rate_limit_rpm"] == 50
-        assert TIER_DEFAULTS["enterprise"]["rate_limit_rpm"] == 200
+        """PERF-12: Tier rate limits — uniform admin RPM, enterprise 4x."""
+        from src.multi_tenant.cosmos_schema import _ADMIN_RPM
+        assert TIER_DEFAULTS["trial"]["rate_limit_rpm"] == _ADMIN_RPM
+        assert TIER_DEFAULTS["starter"]["rate_limit_rpm"] == _ADMIN_RPM
+        assert TIER_DEFAULTS["professional"]["rate_limit_rpm"] == _ADMIN_RPM
+        assert TIER_DEFAULTS["enterprise"]["rate_limit_rpm"] == _ADMIN_RPM * 4
 
     def test_perf_14_multi_tenant_isolation_in_sse(self):
         """PERF-14: SSE connections tracked independently per tenant."""
@@ -514,8 +517,8 @@ class TestStreamingSSE:
         """PERF-24: SSE connection limits match tier concurrency settings."""
         mgr = SSEConnectionManager()
 
-        # Starter: max_concurrent = 3
-        for i in range(3):
+        # Starter: max_concurrent = 5
+        for i in range(5):
             assert mgr.can_connect("starter-t", "starter")
             mgr.connect("starter-t", f"conv-{i}")
 

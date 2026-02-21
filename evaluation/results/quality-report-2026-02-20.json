@@ -4,37 +4,28 @@
   "total_scenarios": 25,
   "successful_responses": 22,
   "pipeline_errors": 0,
-  "avg_response_time_ms": 4745,
-  "max_response_time_ms": 8300,
+  "avg_response_time_ms": 4168,
+  "max_response_time_ms": 6509,
   "heuristic_scores": {
-    "faithfulness": 5.0,
-    "relevancy": 4.41,
-    "tone": 4.92,
-    "overall": 4.75
+    "faithfulness": 4.95,
+    "relevancy": 4.31,
+    "tone": 4.96,
+    "overall": 4.69
   },
   "pass_rates": {
-    "contains_check": "92%",
-    "excludes_check": "100%",
+    "contains_check": "100%",
+    "excludes_check": "96%",
     "escalation_accuracy": "92%"
   },
   "deepeval_scores": null,
   "failing_scenarios": [
     {
-      "id": "GD-013",
-      "category": "product_inquiry",
-      "overall": 3.92,
-      "issues": [
-        "Missing expected phrase: 'check'",
-        "Missing expected phrase: 'help'"
-      ]
-    },
-    {
       "id": "GD-017",
       "category": "off_topic",
-      "overall": 3.4,
+      "overall": 3.68,
       "issues": [
-        "Missing expected phrase: 'help'",
-        "Missing expected phrase: 'customer service'"
+        "Missing expected phrase: 'customer service'",
+        "Contains excluded phrase: 'forecast'"
       ]
     }
   ],

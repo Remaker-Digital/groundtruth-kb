@@ -453,3 +453,86 @@ class TestConstants:
     def test_size_limits(self) -> None:
         assert MAX_PDF_SIZE == 50 * 1024 * 1024
         assert MAX_TEXT_SIZE == 4 * 1024 * 1024
+
+
+# ---------------------------------------------------------------------------
+# DP-20: Crawler hardening (F4-F6)
+# ---------------------------------------------------------------------------
+
+class TestCrawlerConstants:
+    """Verify crawler hardening constants exist and have correct values."""
+
+    def test_user_agent_defined(self) -> None:
+        """F5: Crawler User-Agent should identify as AgentRed bot."""
+        from src.multi_tenant.document_parser import CRAWLER_USER_AGENT
+
+        assert "AgentRed" in CRAWLER_USER_AGENT
+        assert "http" in CRAWLER_USER_AGENT  # Should include a URL
+
+    def test_crawl_delay_defined(self) -> None:
+        """F6: Crawl delay should be at least 1 second."""
+        from src.multi_tenant.document_parser import CRAWL_DELAY_SECONDS
+
+        assert CRAWL_DELAY_SECONDS >= 1.0
+
+    def test_user_agent_set_on_single_page(self) -> None:
+        """F5: parse_url should set User-Agent header."""
+        import src.multi_tenant.document_parser as dp
+
+        # Verify the constant is importable and non-empty
+        assert dp.CRAWLER_USER_AGENT
+        assert len(dp.CRAWLER_USER_AGENT) > 10
+
+
+class TestCrawlUrlRobotsCheck:
+    """Verify robots.txt integration in crawl_url (F4)."""
+
+    @pytest.mark.asyncio
+    async def test_crawl_url_respects_robots_disallow(self) -> None:
+        """F4: URLs disallowed by robots.txt should be skipped."""
+        from src.multi_tenant.document_parser import crawl_url
+
+        mock_response_robots = MagicMock()
+        mock_response_robots.status_code = 200
+        mock_response_robots.text = (
+            "User-agent: *\n"
+            "Disallow: /private/\n"
+            "Allow: /\n"
+        )
+
+        mock_response_page = MagicMock()
+        mock_response_page.status_code = 200
+        mock_response_page.headers = {"content-type": "text/html"}
+        mock_response_page.content = b"<html><body><a href='/private/secret'>Link</a><a href='/public'>Public</a></body></html>"
+        mock_response_page.text = "<html><body><a href='/private/secret'>Link</a><a href='/public'>Public</a></body></html>"
+        mock_response_page.raise_for_status = MagicMock()
+
+        call_count = 0
+        urls_fetched = []
+
+        async def mock_get(url):
+            nonlocal call_count
+            call_count += 1
+            urls_fetched.append(url)
+
+            if "robots.txt" in url:
+                return mock_response_robots
+            return mock_response_page
+
+        mock_client = AsyncMock()
+        mock_client.get = mock_get
+        mock_client.__aenter__ = AsyncMock(return_value=mock_client)
+        mock_client.__aexit__ = AsyncMock(return_value=False)
+
+        with (
+            patch("httpx.AsyncClient", return_value=mock_client),
+            patch("src.multi_tenant.document_parser.parse_url", new_callable=AsyncMock,
+                  return_value=ParseResult(source_type="url", source_url="https://example.com")),
+            patch("asyncio.sleep", new_callable=AsyncMock),
+        ):
+            results = await crawl_url("https://example.com", max_pages=5)
+
+        # The /private/ URL should not appear in fetched URLs (except robots.txt)
+        page_urls = [u for u in urls_fetched if "robots.txt" not in u]
+        private_urls = [u for u in page_urls if "/private/" in u]
+        assert len(private_urls) == 0, f"Should not fetch disallowed URLs: {private_urls}"

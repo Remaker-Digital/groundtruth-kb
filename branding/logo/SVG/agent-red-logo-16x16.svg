@@ -1,0 +1,36 @@
+<?xml version="1.0" encoding="UTF-8" standalone="no"?>
+<!--
+  Agent Red Customer Experience — Icon Master (The Beacon)
+  Design: AR monogram on Agent Red rounded rectangle
+  Usage: Source file for all icon/favicon exports
+  © 2026 Remaker Digital, a DBA of VanDusen & Palmeter, LLC. All rights reserved.
+-->
+
+<svg
+   viewBox="0 0 16 16"
+   width="16"
+   height="16"
+   version="1.1"
+   id="svg1"
+   xml:space="preserve"
+   xmlns="http://www.w3.org/2000/svg"
+   xmlns:svg="http://www.w3.org/2000/svg"><defs
+     id="defs1"><style
+       id="style1">.cls-1{fill:#f8f8fa;}.cls-2{fill:#c41e2a;}</style></defs><!-- Background: Agent Red rounded rectangle --><!-- Corner radius: ~21% of width = 252px --><!-- AR Monogram: Inter Extra Bold 800, white, tight letter-spacing --><!-- Centered vertically, slight left offset for optical balance --><!-- Font metrics: Inter 800 at ~650px size, baseline ~780px from top --><g
+     id="Layer_1-2"
+     transform="matrix(0.08836361,0,0,0.10171,-8.8770241e-6,-1.5742464e-5)"><g
+       id="g15"
+       transform="matrix(1.4097124,0,0,1.2289844,-1.3575699e-6,-2.0915938e-6)"><rect
+         class="cls-2"
+         width="128.44464"
+         height="128"
+         id="rect1"
+         x="0"
+         y="0"
+         style="fill:none;stroke-width:1.38949" /><path
+         id="rect2"
+         style="fill:#ffffff;stroke-width:1.06215"
+         class="cls-3"
+         d="M 16.055653,16.000127 V 112.00012 H 112.38914 V 16.000127 Z m 27.035102,19.733731 h 5.275434 v 7.635004 h -2.811173 c -2.512451,0 -3.134157,1.417827 -3.134157,3.578159 v 10.722512 c 0,4.437728 -3.501439,5.922218 -6.268316,6.294689 v 0.131639 c 2.152017,0.372471 6.20471,1.475048 6.268316,6.593866 v 10.423334 c 0,2.160333 0.621706,3.566189 3.134157,3.566189 h 2.811173 v 7.58714 h -5.275434 c -4.600862,0 -9.09145,-3.63314 -9.09145,-8.688109 V 71.240213 c 0,-2.958485 -3.006603,-3.817418 -5.646269,-4.008975 v -6.474196 c 2.639666,-0.06386 5.646269,-0.928294 5.646269,-3.578159 V 44.493767 c 0,-5.054964 4.490588,-8.759909 9.09145,-8.759909 z m 36.987846,0 h 5.275438 c 4.60086,0 9.09145,3.704945 9.09145,8.759909 v 12.685116 c 0,2.649865 3.0066,3.514307 5.646271,3.578159 v 6.474196 c -2.703281,0.180915 -5.646271,1.039848 -5.646271,4.008975 v 12.338068 c 0,5.054969 -4.49059,8.688109 -9.09145,8.688109 h -5.275438 v -7.58714 h 2.763324 c 2.576054,0 3.193974,-1.405856 3.193974,-3.566189 V 70.689727 c 0,-5.118817 4.04452,-6.221395 6.19653,-6.593866 v -0.131639 c -2.70326,-0.37247 -6.19653,-1.856962 -6.19653,-6.294689 V 46.947021 c 0,-2.160332 -0.61792,-3.578159 -3.193974,-3.578159 h -2.763324 z m -7.165498,11.584143 c 1.240326,0 1.853686,0.187456 2.129314,0.251309 v 9.310395 c -0.89049,-0.308619 -1.99576,-0.430815 -3.098271,-0.430815 -5.629164,0 -8.923976,3.637159 -8.923976,8.628272 V 80.670279 H 53.402373 V 48.191598 h 9.067526 v 5.552729 h 0.131587 c 1.717372,-4.065256 5.774362,-6.426326 10.311617,-6.426326 z" /><g
+         id="g14"
+         transform="translate(0.06252497)" /></g></g></svg>

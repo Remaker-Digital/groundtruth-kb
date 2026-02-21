@@ -1,0 +1,117 @@
+{
+  "id": "general_goods",
+  "name": "General Goods & Services",
+  "version": 1,
+  "articles": [
+    {
+      "entry_type": "faq",
+      "title": "Shipping Policy",
+      "content": "We offer standard and express shipping options. Standard shipping typically takes 5-7 business days, while express shipping delivers within 2-3 business days. Shipping costs are calculated at checkout based on the weight and destination of your order. We ship to all 50 US states and select international destinations. Once your order ships, you will receive a tracking number via email so you can monitor delivery progress. During peak seasons, delivery times may be slightly longer than usual.",
+      "category": "Shipping & Delivery",
+      "tags": ["shipping", "delivery", "tracking"]
+    },
+    {
+      "entry_type": "policy",
+      "title": "Return and Refund Policy",
+      "content": "We accept returns within 30 days of delivery for most items. To initiate a return, contact our customer support team with your order number and reason for return. Items must be in their original condition, unused, and in the original packaging. Once we receive and inspect the returned item, refunds are processed within 5-10 business days to your original payment method. Shipping costs for returns are the responsibility of the customer unless the item was defective or shipped in error.",
+      "category": "Returns & Refunds",
+      "tags": ["returns", "refunds", "exchanges"]
+    },
+    {
+      "entry_type": "faq",
+      "title": "Payment Methods",
+      "content": "We accept all major credit and debit cards including Visa, Mastercard, American Express, and Discover. We also accept payments through PayPal, Apple Pay, Google Pay, and Shop Pay. All transactions are processed through secure, encrypted payment gateways to protect your financial information. If you experience any issues with payment, please contact our support team for assistance.",
+      "category": "Payments & Billing",
+      "tags": ["payment", "credit-card", "billing"]
+    },
+    {
+      "entry_type": "faq",
+      "title": "Order Tracking",
+      "content": "You can track your order using the tracking number provided in your shipping confirmation email. Visit our website and navigate to the Order Tracking page, or click the tracking link directly from the email. If your tracking information has not updated in several days, the carrier may be experiencing delays. Contact our support team if your order appears lost or has not arrived within the expected delivery window.",
+      "category": "Orders",
+      "tags": ["tracking", "order-status", "delivery"]
+    },
+    {
+      "entry_type": "faq",
+      "title": "How to Cancel or Modify an Order",
+      "content": "If you need to cancel or modify an order, please contact us as soon as possible. We process orders quickly and may not be able to make changes once the order has entered fulfillment. If the order has already shipped, you may need to wait for delivery and then initiate a return. Order modifications such as changing the shipping address or item quantity may be possible if the order has not yet been packed.",
+      "category": "Orders",
+      "tags": ["cancel", "modify", "order-changes"]
+    },
+    {
+      "entry_type": "faq",
+      "title": "Product Warranty Information",
+      "content": "Many of our products come with a manufacturer warranty that covers defects in materials and workmanship. Warranty duration varies by product and is listed on the product page. To make a warranty claim, contact our support team with your order number, a description of the issue, and photos if applicable. We will coordinate with the manufacturer to arrange a repair, replacement, or refund as appropriate under the warranty terms.",
+      "category": "Product Support",
+      "tags": ["warranty", "defects", "claims"]
+    },
+    {
+      "entry_type": "faq",
+      "title": "Account Management",
+      "content": "You can create an account on our website to save your shipping addresses, view order history, and check out faster. To update your account information, log in and navigate to Account Settings. If you forgot your password, use the Forgot Password link on the login page to receive a reset email. For account deletion requests or data privacy inquiries, contact our customer support team.",
+      "category": "Account",
+      "tags": ["account", "login", "password", "settings"]
+    },
+    {
+      "entry_type": "faq",
+      "title": "Gift Cards and Promotional Codes",
+      "content": "We offer digital gift cards in various denominations that can be purchased on our website. Gift cards are delivered via email and can be redeemed at checkout. Promotional codes can be entered during checkout in the discount code field. Only one promotional code can be applied per order. Gift cards do not expire and cannot be exchanged for cash. If a gift card balance does not cover the full order amount, you can pay the remaining balance with another payment method.",
+      "category": "Promotions",
+      "tags": ["gift-cards", "promo-codes", "discounts"]
+    },
+    {
+      "entry_type": "faq",
+      "title": "International Shipping",
+      "content": "We ship to many international destinations. International shipping rates and delivery times vary by country and are calculated at checkout. Please note that international orders may be subject to customs duties, taxes, and import fees imposed by the destination country. These charges are the responsibility of the recipient and are not included in our shipping fees. Delivery times for international orders typically range from 10-21 business days depending on the destination.",
+      "category": "Shipping & Delivery",
+      "tags": ["international", "customs", "global-shipping"]
+    },
+    {
+      "entry_type": "faq",
+      "title": "Bulk and Wholesale Orders",
+      "content": "For bulk or wholesale orders, please contact our sales team directly. We offer competitive pricing for large quantity orders and can provide custom quotes based on your needs. Minimum order quantities may apply depending on the product. We also offer corporate gifting solutions with custom packaging and personalized messaging options.",
+      "category": "Business",
+      "tags": ["bulk", "wholesale", "corporate"]
+    },
+    {
+      "entry_type": "faq",
+      "title": "Product Availability and Restocking",
+      "content": "If a product is out of stock, you can sign up for restock notifications on the product page. We regularly replenish our inventory and will notify you via email when the item becomes available again. For high-demand items, we recommend purchasing promptly as quantities may be limited. If you need a specific item urgently, contact our support team to check for alternatives or expected restock dates.",
+      "category": "Product Support",
+      "tags": ["stock", "availability", "restock"]
+    },
+    {
+      "entry_type": "policy",
+      "title": "Privacy and Data Protection",
+      "content": "We take your privacy seriously and are committed to protecting your personal information. We collect only the information necessary to process your orders and improve your shopping experience. We never sell or share your personal data with third parties for marketing purposes. You can review our full privacy policy on our website. To request access to, correction of, or deletion of your personal data, contact our support team.",
+      "category": "Privacy & Legal",
+      "tags": ["privacy", "data-protection", "gdpr"]
+    },
+    {
+      "entry_type": "faq",
+      "title": "Damaged or Defective Items",
+      "content": "If you receive a damaged or defective item, please contact our support team within 48 hours of delivery. Include your order number, a description of the damage, and clear photos showing the issue. We will arrange a replacement shipment or full refund at no additional cost to you. Do not discard the damaged item or packaging until our team confirms the resolution, as we may need to coordinate a return pickup.",
+      "category": "Returns & Refunds",
+      "tags": ["damaged", "defective", "quality"]
+    },
+    {
+      "entry_type": "faq",
+      "title": "Customer Support Hours",
+      "content": "Our customer support team is available Monday through Friday, 9 AM to 6 PM Eastern Time. You can reach us via email, live chat on our website, or through our contact form. We aim to respond to all inquiries within one business day. For urgent matters outside of business hours, please submit a support ticket and we will prioritize your request when we reopen.",
+      "category": "Support",
+      "tags": ["support", "contact", "hours"]
+    },
+    {
+      "entry_type": "faq",
+      "title": "Store Policies Overview",
+      "content": "Our store operates under a set of policies designed to ensure a fair and transparent shopping experience. All prices are listed in US dollars unless otherwise noted. We reserve the right to correct pricing errors. Promotional offers may be subject to additional terms and conditions. Product images are for illustration purposes and actual items may vary slightly. We encourage customers to read product descriptions carefully before purchasing.",
+      "category": "General",
+      "tags": ["policies", "terms", "general-info"]
+    }
+  ],
+  "config_suggestions": {
+    "brand_voice": "Friendly and professional. Be clear, helpful, and empathetic. Provide accurate information about products and policies while maintaining a warm, approachable tone.",
+    "escalation_keywords": ["defective", "damaged", "fraud", "unauthorized charge", "safety concern", "complaint", "manager", "legal", "refund not received"],
+    "greeting_message": "Hi! Welcome to {{brand_name}}. I'm here to help with any questions about your order, our products, or our policies. How can I assist you today?"
+  }
+}

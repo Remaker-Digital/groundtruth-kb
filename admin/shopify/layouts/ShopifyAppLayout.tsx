@@ -16,11 +16,12 @@
  */
 
 import React, { createContext, useCallback, useContext, useEffect, useState } from 'react';
-import { useLocation } from 'react-router-dom';
+import { useLocation, useNavigate } from 'react-router-dom';
 import { Frame, Loading, Banner, Toast } from '@shopify/polaris';
 import type { TenantContext } from '../../shared/types';
 import ActivationBanner from '../../shared/ActivationBanner';
 import ActivationDialog from '../../shared/ActivationDialog';
+import { OnboardingWizard } from '../../shared/components/OnboardingWizard';
 
 // ---------------------------------------------------------------------------
 // Types
@@ -82,6 +83,8 @@ export const ShopifyAppLayout: React.FC<ShopifyAppLayoutProps> = ({
   } | null>(null);
   const [showActivationDialog, setShowActivationDialog] = useState(false);
   const [activationRefreshKey, setActivationRefreshKey] = useState(0);
+  const [showOnboarding, setShowOnboarding] = useState(false);
+  const navigate = useNavigate();
 
   // ---- Session token retrieval -------------------------------------------
 
@@ -176,6 +179,31 @@ export const ShopifyAppLayout: React.FC<ShopifyAppLayoutProps> = ({
     resolveTenant();
     return () => { cancelled = true; };
   }, [apiFetch, shopifyConfig.shop]);
+
+  // ---- Onboarding wizard — first-time merchants ---------------------------
+
+  useEffect(() => {
+    if (!tenantContext || loading) return;
+    // Check activation status to determine if merchant is new
+    apiFetch('/api/config/activation-status')
+      .then((r) => r.ok ? r.json() : null)
+      .then((data) => {
+        if (!data) return;
+        const activated = data.is_configured && data.active_activated_at != null;
+        if (!activated) {
+          try {
+            const dismissed = localStorage.getItem('agentred-onboarding-dismissed');
+            if (!dismissed) setShowOnboarding(true);
+          } catch { /* ignore */ }
+        }
+      })
+      .catch(() => { /* best-effort */ });
+  }, [tenantContext, loading, apiFetch]);
+
+  const dismissOnboarding = useCallback(() => {
+    setShowOnboarding(false);
+    try { localStorage.setItem('agentred-onboarding-dismissed', '1'); } catch { /* ignore */ }
+  }, []);
 
   // ---- Navigation menu (App Bridge) --------------------------------------
 
@@ -273,6 +301,12 @@ export const ShopifyAppLayout: React.FC<ShopifyAppLayoutProps> = ({
               >
                 Open full admin ↗
               </a>
+              <a
+                style={{ color: '#2c6ecb', textDecoration: 'none', cursor: 'pointer' }}
+                onClick={() => setShowOnboarding(true)}
+              >
+                Setup wizard
+              </a>
             </div>
             <ActivationBanner
               apiFetch={apiFetch}
@@ -294,6 +328,15 @@ export const ShopifyAppLayout: React.FC<ShopifyAppLayoutProps> = ({
             {children}
           </>
         )}
+
+        {/* Onboarding wizard for first-time merchants */}
+        <OnboardingWizard
+          opened={showOnboarding}
+          onClose={dismissOnboarding}
+          apiFetch={apiFetch}
+          shopDomain={tenantContext?.shopDomain}
+          onNavigate={(path) => navigate(path)}
+        />
       </Frame>
     </AppContext.Provider>
   );

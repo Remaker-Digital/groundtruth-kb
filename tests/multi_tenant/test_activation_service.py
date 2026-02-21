@@ -2458,19 +2458,32 @@ class TestFirstActivationIngestionHook:
         })
         service._tenant_repo = tenant_repo
 
+        # Mock secret service to return a Shopify access token (F1/F2)
+        mock_secret_service = MagicMock()
+        mock_secret_service.get_secret = AsyncMock(return_value="shpat_test_token")
+
         mock_ingestion = AsyncMock()
         mock_ingestion.start_ingestion = AsyncMock(return_value={"id": "job-1"})
 
-        with patch(
-            "src.multi_tenant.storefront_ingestion.get_ingestion_service",
-            return_value=mock_ingestion,
+        with (
+            patch(
+                "src.multi_tenant.tenant_secret_service.get_secret_service",
+                return_value=mock_secret_service,
+            ),
+            patch(
+                "src.multi_tenant.storefront_ingestion.get_ingestion_service",
+                return_value=mock_ingestion,
+            ),
         ):
             warnings = await service._maybe_start_ingestion(STARTER_TENANT_ID)
 
         mock_ingestion.start_ingestion.assert_called_once_with(
             tenant_id=STARTER_TENANT_ID,
             source_type="shopify",
-            source_config={"shop_domain": "test-store.myshopify.com"},
+            source_config={
+                "shop_domain": "test-store.myshopify.com",
+                "access_token": "shpat_test_token",
+            },
         )
         assert len(warnings) == 1
         assert "in progress" in warnings[0].lower()
@@ -2523,14 +2536,24 @@ class TestFirstActivationIngestionHook:
         })
         service._tenant_repo = tenant_repo
 
+        # Mock secret service to provide a token so we reach start_ingestion
+        mock_secret_service = MagicMock()
+        mock_secret_service.get_secret = AsyncMock(return_value="shpat_test_token")
+
         mock_ingestion = AsyncMock()
         mock_ingestion.start_ingestion = AsyncMock(
             side_effect=Exception("Service unavailable")
         )
 
-        with patch(
-            "src.multi_tenant.storefront_ingestion.get_ingestion_service",
-            return_value=mock_ingestion,
+        with (
+            patch(
+                "src.multi_tenant.tenant_secret_service.get_secret_service",
+                return_value=mock_secret_service,
+            ),
+            patch(
+                "src.multi_tenant.storefront_ingestion.get_ingestion_service",
+                return_value=mock_ingestion,
+            ),
         ):
             warnings = await service._maybe_start_ingestion(STARTER_TENANT_ID)
 

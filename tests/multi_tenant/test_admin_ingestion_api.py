@@ -94,6 +94,16 @@ class TestStartIngestion:
         assert data["jobType"] == "url"
 
     def test_start_shopify_ingestion(self, client):
+        mock_tenant_repo = MagicMock()
+        mock_tenant_repo.read = AsyncMock(return_value={
+            "id": "t1",
+            "tenant_id": "t1",
+            "shopify_shop_domain": "test.myshopify.com",
+        })
+
+        mock_secret_service = MagicMock()
+        mock_secret_service.get_secret = AsyncMock(return_value="shpat_test_token")
+
         mock_service = MagicMock()
         mock_service.start_ingestion = AsyncMock(return_value={
             "id": "job-2",
@@ -109,9 +119,19 @@ class TestStartIngestion:
             "created_at": "2026-02-20T00:00:00Z",
         })
 
-        with patch(
-            "src.multi_tenant.storefront_ingestion.get_ingestion_service",
-            return_value=mock_service,
+        with (
+            patch(
+                "src.multi_tenant.repositories.tenant.TenantRepository",
+                return_value=mock_tenant_repo,
+            ),
+            patch(
+                "src.multi_tenant.tenant_secret_service.get_secret_service",
+                return_value=mock_secret_service,
+            ),
+            patch(
+                "src.multi_tenant.storefront_ingestion.get_ingestion_service",
+                return_value=mock_service,
+            ),
         ):
             resp = client.post("/api/admin/knowledge/ingest", json={
                 "sourceType": "shopify",
@@ -403,3 +423,193 @@ class TestRequestModels:
         assert "jobType" in data
         assert "tenantId" in data
         assert "progressPercent" in data
+
+
+# ---------------------------------------------------------------------------
+# F3: URL source_config uses correct field name
+# ---------------------------------------------------------------------------
+
+
+class TestUrlSourceConfigFieldName:
+    """Verify URL ingestion passes 'start_url' (not 'url') in source_config (F3)."""
+
+    def test_url_source_config_uses_start_url(self, client):
+        """F3 regression: source_config must use 'start_url', not 'url'."""
+        mock_service = MagicMock()
+        mock_service.start_ingestion = AsyncMock(return_value={
+            "id": "job-f3",
+            "tenant_id": "t1",
+            "job_type": "url",
+            "status": "pending",
+            "progress_percent": 0,
+            "articles_created": 0,
+            "articles_failed": 0,
+            "total_chars": 0,
+            "pages_crawled": 0,
+            "error_message": None,
+            "created_at": "2026-02-20T00:00:00Z",
+        })
+
+        with patch(
+            "src.multi_tenant.storefront_ingestion.get_ingestion_service",
+            return_value=mock_service,
+        ):
+            resp = client.post("/api/admin/knowledge/ingest", json={
+                "sourceType": "url",
+                "url": "https://example.com",
+                "maxPages": 10,
+            })
+
+        assert resp.status_code == 201
+        # Verify the source_config dict passed to service.start_ingestion
+        call_args = mock_service.start_ingestion.call_args
+        source_config = call_args.kwargs.get("source_config") or call_args[1].get("source_config")
+        if source_config is None:
+            # Positional args: start_ingestion(tenant_id, source_type, source_config)
+            source_config = call_args[0][2] if len(call_args[0]) > 2 else call_args[1]["source_config"]
+        assert "start_url" in source_config, f"source_config must use 'start_url', got: {source_config}"
+        assert source_config["start_url"] == "https://example.com"
+        assert "url" not in source_config, "source_config must NOT have bare 'url' key"
+
+    def test_url_source_config_includes_max_pages(self, client):
+        """URL source_config should include max_pages."""
+        mock_service = MagicMock()
+        mock_service.start_ingestion = AsyncMock(return_value={
+            "id": "job-mp",
+            "tenant_id": "t1",
+            "job_type": "url",
+            "status": "pending",
+            "progress_percent": 0,
+            "articles_created": 0,
+            "articles_failed": 0,
+            "total_chars": 0,
+            "pages_crawled": 0,
+            "error_message": None,
+            "created_at": "2026-02-20T00:00:00Z",
+        })
+
+        with patch(
+            "src.multi_tenant.storefront_ingestion.get_ingestion_service",
+            return_value=mock_service,
+        ):
+            resp = client.post("/api/admin/knowledge/ingest", json={
+                "sourceType": "url",
+                "url": "https://example.com",
+                "maxPages": 25,
+            })
+
+        assert resp.status_code == 201
+        call_args = mock_service.start_ingestion.call_args
+        source_config = call_args[0][2] if len(call_args[0]) > 2 else call_args[1].get("source_config")
+        assert source_config["max_pages"] == 25
+
+
+# ---------------------------------------------------------------------------
+# F1/F2: Shopify source_config includes token
+# ---------------------------------------------------------------------------
+
+
+class TestShopifySourceConfig:
+    """Verify Shopify ingestion populates shop_domain and access_token (F1/F2)."""
+
+    def test_shopify_requires_shop_domain(self, client):
+        """Shopify ingestion should fail if tenant has no shop domain."""
+        mock_tenant_repo = MagicMock()
+        mock_tenant_repo.read = AsyncMock(return_value={
+            "id": "t1",
+            "tenant_id": "t1",
+            # No shopify_shop_domain
+        })
+
+        with patch(
+            "src.multi_tenant.repositories.tenant.TenantRepository",
+            return_value=mock_tenant_repo,
+        ):
+            resp = client.post("/api/admin/knowledge/ingest", json={
+                "sourceType": "shopify",
+            })
+
+        assert resp.status_code == 400
+        assert "shop domain" in resp.json()["detail"].lower()
+
+    def test_shopify_requires_access_token(self, client):
+        """Shopify ingestion should fail if no access token available (F1)."""
+        mock_tenant_repo = MagicMock()
+        mock_tenant_repo.read = AsyncMock(return_value={
+            "id": "t1",
+            "tenant_id": "t1",
+            "shopify_shop_domain": "test.myshopify.com",
+        })
+
+        mock_secret_service = MagicMock()
+        mock_secret_service.get_secret = AsyncMock(return_value=None)
+
+        with (
+            patch(
+                "src.multi_tenant.repositories.tenant.TenantRepository",
+                return_value=mock_tenant_repo,
+            ),
+            patch(
+                "src.multi_tenant.tenant_secret_service.get_secret_service",
+                return_value=mock_secret_service,
+            ),
+            patch.dict("os.environ", {"SHOPIFY_ACCESS_TOKEN": ""}, clear=False),
+        ):
+            resp = client.post("/api/admin/knowledge/ingest", json={
+                "sourceType": "shopify",
+            })
+
+        assert resp.status_code == 400
+        assert "access token" in resp.json()["detail"].lower()
+
+    def test_shopify_uses_keyvault_token(self, client):
+        """Shopify ingestion should use Key Vault token when available (F2)."""
+        mock_tenant_repo = MagicMock()
+        mock_tenant_repo.read = AsyncMock(return_value={
+            "id": "t1",
+            "tenant_id": "t1",
+            "shopify_shop_domain": "test.myshopify.com",
+        })
+
+        mock_secret_service = MagicMock()
+        mock_secret_service.get_secret = AsyncMock(return_value="shpat_vault_token")
+
+        mock_service = MagicMock()
+        mock_service.start_ingestion = AsyncMock(return_value={
+            "id": "job-kv",
+            "tenant_id": "t1",
+            "job_type": "shopify",
+            "status": "pending",
+            "progress_percent": 0,
+            "articles_created": 0,
+            "articles_failed": 0,
+            "total_chars": 0,
+            "pages_crawled": 0,
+            "error_message": None,
+            "created_at": "2026-02-20T00:00:00Z",
+        })
+
+        with (
+            patch(
+                "src.multi_tenant.repositories.tenant.TenantRepository",
+                return_value=mock_tenant_repo,
+            ),
+            patch(
+                "src.multi_tenant.tenant_secret_service.get_secret_service",
+                return_value=mock_secret_service,
+            ),
+            patch(
+                "src.multi_tenant.storefront_ingestion.get_ingestion_service",
+                return_value=mock_service,
+            ),
+        ):
+            resp = client.post("/api/admin/knowledge/ingest", json={
+                "sourceType": "shopify",
+            })
+
+        assert resp.status_code == 201
+        # Verify source_config contains the correct token
+        call_args = mock_service.start_ingestion.call_args
+        source_config = call_args[0][2] if len(call_args[0]) > 2 else call_args[1].get("source_config")
+        assert source_config["shop_domain"] == "test.myshopify.com"
+        assert source_config["access_token"] == "shpat_vault_token"

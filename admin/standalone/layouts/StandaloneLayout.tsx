@@ -45,6 +45,7 @@ import type { ActivationStatus } from '../../shared/hooks';
 import { Icons } from '../../shared/icons';
 import ActivationDialog from '../../shared/ActivationDialog';
 import RestoreDialog from '../../shared/RestoreDialog';
+import { OnboardingWizard } from '../../shared/components/OnboardingWizard';
 import { tokens } from '../../shared/theme/styles';
 
 // ---------------------------------------------------------------------------
@@ -117,8 +118,14 @@ const TIER_BADGE_COLORS: Record<string, string> = {
   enterprise: 'grape',
 };
 
-/** Tier ordering for comparison. Higher index = higher tier. */
-const TIER_ORDER: TenantTier[] = ['trial', 'starter', 'professional', 'enterprise'];
+/** Tier ordering for feature-gating comparison. Higher index = higher tier.
+ *  Trial has professional-grade entitlements, so it maps to professional's index. */
+const TIER_ORDER: Record<TenantTier, number> = {
+  starter: 0,
+  professional: 1,
+  trial: 1,         // Trial = professional entitlements
+  enterprise: 2,
+};
 
 /** Short labels for nav tier badges. */
 const TIER_BADGE_LABELS: Record<TenantTier, string> = {
@@ -130,7 +137,7 @@ const TIER_BADGE_LABELS: Record<TenantTier, string> = {
 
 /** Returns true if the tenant tier meets or exceeds the required minimum. */
 function tierMeetsMin(current: TenantTier, minTier: TenantTier): boolean {
-  return TIER_ORDER.indexOf(current) >= TIER_ORDER.indexOf(minTier);
+  return (TIER_ORDER[current] ?? 0) >= (TIER_ORDER[minTier] ?? 0);
 }
 
 // Icons imported from shared icon library (admin/shared/icons/)
@@ -383,21 +390,21 @@ export const StandaloneLayout: React.FC<StandaloneLayoutProps> = ({
     && activationStatus?.active_activated_at != null
   ) ? true : (activationStatus != null ? false : null);
 
-  // ---- Welcome popup (WI #292) — first-time merchants ---------------------
+  // ---- Onboarding wizard (WI #292) — first-time merchants -----------------
 
-  const [showWelcome, setShowWelcome] = useState(false);
+  const [showOnboarding, setShowOnboarding] = useState(false);
 
   useEffect(() => {
     if (isActivated !== false) return; // Only show when explicitly not activated
     try {
-      const dismissed = localStorage.getItem('agentred-welcome-dismissed');
-      if (!dismissed) setShowWelcome(true);
+      const dismissed = localStorage.getItem('agentred-onboarding-dismissed');
+      if (!dismissed) setShowOnboarding(true);
     } catch { /* ignore */ }
   }, [isActivated]);
 
-  const dismissWelcome = useCallback(() => {
-    setShowWelcome(false);
-    try { localStorage.setItem('agentred-welcome-dismissed', '1'); } catch { /* ignore */ }
+  const dismissOnboarding = useCallback(() => {
+    setShowOnboarding(false);
+    try { localStorage.setItem('agentred-onboarding-dismissed', '1'); } catch { /* ignore */ }
   }, []);
 
   // Discard all draft changes (confirm → POST → refresh)
@@ -588,7 +595,7 @@ export const StandaloneLayout: React.FC<StandaloneLayoutProps> = ({
                       color: tokens.textMuted,
                       padding: '4px 10px',
                       borderRadius: 6,
-                      background: 'rgba(255, 255, 255, 0.03)',
+                      background: 'var(--ar-storefront-link-bg)',
                       fontSize: 13,
                     }}
                   >
@@ -627,8 +634,8 @@ export const StandaloneLayout: React.FC<StandaloneLayoutProps> = ({
                   aria-label="Open documentation"
                   style={{
                     color: tokens.textMuted,
-                    border: '1px solid rgba(255, 255, 255, 0.12)',
-                    background: 'rgba(255, 255, 255, 0.06)',
+                    border: '1px solid var(--ar-icon-btn-border)',
+                    background: 'var(--ar-icon-btn-bg)',
                   }}
                 >
                   <Icons.docs />
@@ -643,8 +650,8 @@ export const StandaloneLayout: React.FC<StandaloneLayoutProps> = ({
                   aria-label="Contact us"
                   style={{
                     color: tokens.textMuted,
-                    border: '1px solid rgba(255, 255, 255, 0.12)',
-                    background: 'rgba(255, 255, 255, 0.06)',
+                    border: '1px solid var(--ar-icon-btn-border)',
+                    background: 'var(--ar-icon-btn-bg)',
                   }}
                 >
                   <Icons.contact />
@@ -658,8 +665,8 @@ export const StandaloneLayout: React.FC<StandaloneLayoutProps> = ({
                 aria-label="Toggle dark mode"
                 style={{
                   color: tokens.textMuted,
-                  border: '1px solid rgba(255, 255, 255, 0.12)',
-                  background: 'rgba(255, 255, 255, 0.06)',
+                  border: '1px solid var(--ar-icon-btn-border)',
+                  background: 'var(--ar-icon-btn-bg)',
                 }}
               >
                 {isDark ? <Icons.sun /> : <Icons.moon />}
@@ -672,8 +679,8 @@ export const StandaloneLayout: React.FC<StandaloneLayoutProps> = ({
                 aria-label="Sign out"
                 style={{
                   color: tokens.textMuted,
-                  border: '1px solid rgba(255, 255, 255, 0.12)',
-                  background: 'rgba(255, 255, 255, 0.06)',
+                  border: '1px solid var(--ar-icon-btn-border)',
+                  background: 'var(--ar-icon-btn-bg)',
                 }}
               >
                 <Icons.logout size={16} />
@@ -793,6 +800,25 @@ export const StandaloneLayout: React.FC<StandaloneLayoutProps> = ({
                     />
                   );
                 })}
+
+                {/* Setup wizard — re-launch onboarding at any time */}
+                <NavLink
+                  label="Setup wizard"
+                  leftSection={
+                    <ThemeIcon
+                      variant={isDark ? 'default' : 'light'}
+                      size="sm"
+                      color="gray"
+                      style={isDark ? { background: 'transparent', border: 'none' } : undefined}
+                    >
+                      <svg width="16" height="16" viewBox="0 0 16 16" fill="none" xmlns="http://www.w3.org/2000/svg">
+                        <path d="M8 0L9.8 6.2L16 8L9.8 9.8L8 16L6.2 9.8L0 8L6.2 6.2L8 0Z" fill="currentColor" />
+                      </svg>
+                    </ThemeIcon>
+                  }
+                  onClick={() => setShowOnboarding(true)}
+                  style={{ borderRadius: 8, marginBottom: 2 }}
+                />
 
                 {/* Action buttons */}
                 <Group
@@ -1101,30 +1127,14 @@ export const StandaloneLayout: React.FC<StandaloneLayoutProps> = ({
         </Stack>
       </Modal>
 
-      {/* Welcome popup for first-time merchants (WI #292) */}
-      <Modal
-        opened={showWelcome}
-        onClose={dismissWelcome}
-        title={
-          <Text fw={600} size="lg">
-            Welcome to Agent Red!
-          </Text>
-        }
-        centered
-        size="sm"
-      >
-        <Stack gap="md">
-          <Text size="sm">
-            Your AI customer service assistant is not yet active. Configure your agent on the
-            Agent Configuration page, then activate your changes to go live.
-          </Text>
-          <Group justify="flex-end">
-            <Button variant="default" onClick={dismissWelcome}>
-              Dismiss
-            </Button>
-          </Group>
-        </Stack>
-      </Modal>
+      {/* Onboarding wizard for first-time merchants (WI #292) */}
+      <OnboardingWizard
+        opened={showOnboarding}
+        onClose={dismissOnboarding}
+        apiFetch={apiFetch}
+        shopDomain={tenantContext?.shopDomain}
+        onNavigate={(path) => navigate(path)}
+      />
     </AppContext.Provider>
   );
 };

@@ -28,7 +28,7 @@ export const TeamPage: React.FC = () => {
   }
 
   return (
-    <div style={{ maxWidth: 900, margin: '0 auto' }}>
+    <div>
       <Title order={2} mb="xs">Team members</Title>
       <Text size="sm" c="dimmed" mb="lg">
         Manage team members, assign roles, and configure escalation categories.

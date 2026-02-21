@@ -69,6 +69,8 @@ URL_FETCH_TIMEOUT = 30  # seconds
 MAX_URL_REDIRECTS = 5
 CRAWL_DEFAULT_MAX_PAGES = 10
 CRAWL_MAX_PAGES_HARD_LIMIT = 50
+CRAWLER_USER_AGENT = "AgentRed-KnowledgeBot/1.0 (+https://agentredcx.com/bot)"
+CRAWL_DELAY_SECONDS = 1.0  # Polite delay between page fetches
 
 
 # ---------------------------------------------------------------------------
@@ -628,6 +630,7 @@ async def parse_url(
             follow_redirects=True,
             max_redirects=MAX_URL_REDIRECTS,
             timeout=URL_FETCH_TIMEOUT,
+            headers={"User-Agent": CRAWLER_USER_AGENT},
         ) as client:
             response = await client.get(url)
             response.raise_for_status()
@@ -774,7 +777,27 @@ async def crawl_url(
         follow_redirects=True,
         max_redirects=MAX_URL_REDIRECTS,
         timeout=URL_FETCH_TIMEOUT,
+        headers={"User-Agent": CRAWLER_USER_AGENT},
     ) as client:
+        # Fetch and parse robots.txt before crawling (F4)
+        from urllib.robotparser import RobotFileParser
+
+        rp = RobotFileParser()
+        robots_url = f"{start_parsed.scheme}://{base_domain}/robots.txt"
+        try:
+            robots_resp = await client.get(robots_url)
+            if robots_resp.status_code == 200:
+                rp.parse(robots_resp.text.splitlines())
+                logger.info("Crawl: loaded robots.txt from %s", robots_url)
+            else:
+                logger.debug(
+                    "Crawl: no robots.txt at %s (status %d)",
+                    robots_url, robots_resp.status_code,
+                )
+        except Exception:
+            logger.debug("Crawl: could not fetch robots.txt from %s", robots_url)
+
+        pages_fetched = 0
         while queue and len(results) < max_pages:
             url = queue.pop(0)
             # Normalise for dedup (strip fragment)
@@ -783,9 +806,21 @@ async def crawl_url(
                 continue
             visited.add(normalised)
 
+            # Respect robots.txt (F4)
+            if not rp.can_fetch(CRAWLER_USER_AGENT, url):
+                logger.debug("Crawl: robots.txt disallows %s", url)
+                continue
+
+            # Polite crawl delay between requests (F6)
+            if pages_fetched > 0:
+                import asyncio
+
+                await asyncio.sleep(CRAWL_DELAY_SECONDS)
+
             try:
                 response = await client.get(url)
                 response.raise_for_status()
+                pages_fetched += 1
             except Exception as fetch_exc:
                 logger.warning("Crawl: failed to fetch %s: %s", url, fetch_exc)
                 continue

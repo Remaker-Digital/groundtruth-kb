@@ -793,8 +793,8 @@ class TestTierDefaults:
     def test_trial_limits(self):
         assert "max_quick_actions" in TIER_DEFAULTS["trial"]
         assert "max_quick_action_assignments" in TIER_DEFAULTS["trial"]
-        assert TIER_DEFAULTS["trial"]["max_quick_actions"] == 2
-        assert TIER_DEFAULTS["trial"]["max_quick_action_assignments"] == 2
+        assert TIER_DEFAULTS["trial"]["max_quick_actions"] == 20
+        assert TIER_DEFAULTS["trial"]["max_quick_action_assignments"] == 50
 
     def test_starter_limits(self):
         assert TIER_DEFAULTS["starter"]["max_quick_actions"] == 5
@@ -808,13 +808,19 @@ class TestTierDefaults:
         assert TIER_DEFAULTS["enterprise"]["max_quick_actions"] == 50
         assert TIER_DEFAULTS["enterprise"]["max_quick_action_assignments"] == 200
 
-    def test_limits_increase_with_tier(self):
-        tiers = ["trial", "starter", "professional", "enterprise"]
-        for i in range(len(tiers) - 1):
+    def test_limits_increase_with_paid_tier(self):
+        """Paid tiers increase monotonically; trial >= professional."""
+        paid_tiers = ["starter", "professional", "enterprise"]
+        for i in range(len(paid_tiers) - 1):
             assert (
-                TIER_DEFAULTS[tiers[i]]["max_quick_actions"]
-                < TIER_DEFAULTS[tiers[i + 1]]["max_quick_actions"]
+                TIER_DEFAULTS[paid_tiers[i]]["max_quick_actions"]
+                <= TIER_DEFAULTS[paid_tiers[i + 1]]["max_quick_actions"]
             )
+        # Trial has professional-grade entitlements
+        assert (
+            TIER_DEFAULTS["trial"]["max_quick_actions"]
+            >= TIER_DEFAULTS["professional"]["max_quick_actions"]
+        )
 
 
 # ===========================================================================

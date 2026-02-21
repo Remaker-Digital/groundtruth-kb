@@ -21,8 +21,6 @@ export function makeStyles(p: ThemePalette, dark: boolean = false): TeamStyles {
   return {
     container: {
       fontFamily: "'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif",
-      maxWidth: 960,
-      margin: '0 auto',
     } as React.CSSProperties,
 
     // Table
@@ -118,8 +116,8 @@ export function makeStyles(p: ThemePalette, dark: boolean = false): TeamStyles {
       width: 28,
       height: 28,
       borderRadius: 6,
-      border: `1px solid ${dark ? 'rgba(255,255,255,0.12)' : p.border}`,
-      background: dark ? 'rgba(255,255,255,0.06)' : p.hoverBg,
+      border: `1px solid ${p.border}`,
+      background: p.hoverBg,
       color: p.textSecondary,
       cursor: 'pointer',
       outline: 'none',

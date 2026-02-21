@@ -108,10 +108,12 @@ class TestSSEConnectionLifecycle:
 
     def test_can_connect_at_limit(self):
         mgr = SSEConnectionManager()
-        # Starter has max_concurrent=3
+        # Starter has max_concurrent=5
         mgr.connect("tenant-001", "conv-1")
         mgr.connect("tenant-001", "conv-2")
         mgr.connect("tenant-001", "conv-3")
+        mgr.connect("tenant-001", "conv-4")
+        mgr.connect("tenant-001", "conv-5")
         assert mgr.can_connect("tenant-001", "starter") is False
 
     def test_disconnect_frees_slot(self):
@@ -119,6 +121,8 @@ class TestSSEConnectionLifecycle:
         mgr.connect("tenant-001", "conv-1")
         mgr.connect("tenant-001", "conv-2")
         mgr.connect("tenant-001", "conv-3")
+        mgr.connect("tenant-001", "conv-4")
+        mgr.connect("tenant-001", "conv-5")
         assert mgr.can_connect("tenant-001", "starter") is False
 
         mgr.disconnect("tenant-001", "conv-1")
