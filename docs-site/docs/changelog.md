@@ -9,7 +9,20 @@ All notable changes to Agent Red Customer Experience are documented here.
 
 ---
 
-## Unreleased — Cycles 15-16 (Customer Identity)
+## Unreleased — Cycles 15-19
+
+### Onboarding polish (Cycle 19)
+- **Automatic widget key generation (WI-E1):** Widget keys are now generated automatically when a tenant is provisioned — no manual setup required. Keys are created during Stripe checkout, Shopify billing confirmation, and trial provisioning. The rotation endpoint now correctly updates both the authentication hash and the admin-visible raw key.
+- **Welcome email (WI-E2):** New merchants receive a branded welcome email upon account creation containing their API key and widget key credentials, security notices, and getting-started steps. Sent via Azure Communication Services with SMTP fallback.
+- **Trial expiry warning emails (WI-E3):** Trial tenants receive automated warning emails at 7 days, 3 days, and 1 day before expiry. Each tier has distinct urgency styling (blue/info, amber/warning, red/critical). Deduplication prevents repeat sends. Background task runs every 12 hours.
+- **Setup wizard re-trigger (WI-E4):** The onboarding wizard now re-appears on each new browser session for merchants who haven't completed activation, instead of being permanently dismissed after the first viewing.
+
+### Provisioning persistence (Cycle 17)
+- **Cosmos DB primary store (WI-C1):** All tenant provisioning data is now persisted in Cosmos DB. Three in-memory dictionaries that were lost on container restart have been removed. All seven core provisioning functions are now async with durable storage.
+- **Superadmin auto-provisioning (WI-C2):** A superadmin team member and API key are automatically created when a merchant completes Stripe checkout. The API key is included in the welcome email.
+
+### Background task hardening (Cycle 18)
+- **Trial expiry scanner (WI-D1):** Proactively marks expired trial tenants as `trial_expired` in the database. Runs hourly as a background task. Defense-in-depth: the middleware already rejects expired trials at request time; the scanner ensures status accuracy for dashboards and reports.
 
 ### Customer authentication (Cycle 16)
 - **OTP email verification (AUTH-3):** Customers entering their email in the pre-chat form can verify their identity via a 6-digit one-time password sent to their email. Verified customers unlock full Persistent Customer Memory — the AI remembers them across conversations. OTP codes have a 10-minute TTL with rate limiting (3 per 5 minutes).
@@ -29,7 +42,7 @@ All notable changes to Agent Red Customer Experience are documented here.
 - **Knowledge base filter labels (WI-A6):** Filter dropdowns on the Knowledge Base page now have explicit labels for accessibility.
 
 ### Tests
-- 44 new unit tests (9 from Cycle 15, 35 from Cycle 16) — 4,516 total, 0 failures
+- 99 new unit tests across Cycles 15-19 (9 + 35 + 20 + 35) — all pass, 0 new failures
 
 ---
 

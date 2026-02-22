@@ -2,10 +2,11 @@
 slug: /
 sidebar_position: 1
 title: Welcome
+hide_title: true
 ---
 
 <div style={{textAlign: 'center', marginBottom: '2rem'}}>
-  <img src="/img/agent-red-logo.svg" alt="Agent Red" style={{maxHeight: '240px', marginBottom: '1rem'}} />
+  <img src="/img/agent-red-logo.svg" alt="Agent Red" style={{maxHeight: '240px', marginBottom: '180px'}} />
   <h1 style={{fontSize: '2.5rem', marginBottom: '0.25rem'}}>Agent Red Customer Experience</h1>
   <p style={{fontSize: '1.1rem', opacity: 0.7}}>
     A product of <a href="https://remakerdigital.com" target="_blank" rel="noopener noreferrer">Remaker Digital</a>
@@ -33,6 +34,8 @@ Agent Red is an AI-powered customer service platform that automates support conv
 | **Analytics** | Monitors conversation quality, resolution rates, and AI performance |
 | **Content safety** | Validates every response before delivery to customers |
 | **Persistent customer memory** | Builds customer context, conversation history, and learned preferences across sessions |
+| **Customer identity** | Pre-chat form, OTP email verification, and Shopify HMAC passthrough ensure every conversation is linked to a real customer |
+| **Automated onboarding** | Widget keys, welcome emails, and setup wizard guide new merchants from signup to first conversation |
 | **MCP integrations** | Connects to Stripe and Shopify Storefront via the Model Context Protocol for real-time payment and product data |
 | **Provider console** | Platform-level SPA for multi-tenant monitoring, alerting, incident management, and compliance |
 | **MFA/TOTP** | Two-factor authentication with backup codes for Provider admin security |

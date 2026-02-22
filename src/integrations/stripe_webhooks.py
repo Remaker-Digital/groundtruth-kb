@@ -35,6 +35,7 @@ from src.integrations.provisioning import (
     BillingChannel,
     activate_tenant,
     auto_provision_superadmin,
+    auto_provision_widget_key,
     deactivate_tenant,
     flag_payment_issue,
     provision_tenant,
@@ -411,6 +412,26 @@ async def handle_checkout_completed(event: dict) -> dict:
     )
     if superadmin_key:
         provisioning_payload["superadmin_api_key"] = superadmin_key
+
+    # Auto-provision widget key for the new tenant.
+    # This generates a pk_live_ key and stores the hash on TenantDocument.
+    # Failures are logged but do not block provisioning.
+    widget_key = await auto_provision_widget_key(tenant_id=tenant.tenant_id)
+    if widget_key:
+        provisioning_payload["widget_key"] = widget_key
+
+    # Send welcome email with credentials (failures don't block provisioning)
+    customer_email = provisioning_payload.get("customer_email")
+    if customer_email:
+        from src.multi_tenant.welcome_email import send_welcome_email
+
+        await send_welcome_email(
+            to_email=customer_email,
+            tenant_id=tenant.tenant_id,
+            superadmin_key=superadmin_key,
+            widget_key=widget_key,
+            tier=provisioning_payload.get("tier"),
+        )
 
     return provisioning_payload
 

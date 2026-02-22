@@ -15,7 +15,7 @@ This document provides active guidance for AI assistants working on the Agent Re
 |-----------|-------|
 | **Project Name** | Agent Red Customer Experience |
 | **Type** | Commercial SaaS Product (Shopify + Standalone) |
-| **Status** | Production v1.54.7 HEALTHY. ALL 14 CYCLES + post-14 patches DEPLOYED. Cycles 15-18 IMPLEMENTED (S66-70), Cycle 19 planned. ~4,539 unit tests (1 pre-existing failure), 56 regression (51 pass + 5 skip), 917 UI tests (793 PASS, 4 SOFT-PASS, 62 SKIP, 0 FAIL — verified S60), 25 conversation quality scenarios (PASS — 23/25, 4.75/5.0, S63). See `memory/build-deploy-roadmap.md`. |
+| **Status** | Production v1.54.7 HEALTHY. ALL 14 CYCLES + post-14 patches DEPLOYED. Cycles 15-19 IMPLEMENTED (S66-71). ~4,574 unit tests (1 pre-existing failure), 56 regression (51 pass + 5 skip), 917 UI tests (793 PASS, 4 SOFT-PASS, 62 SKIP, 0 FAIL — verified S60), 25 conversation quality scenarios (PASS — 23/25, 4.75/5.0, S63). See `memory/build-deploy-roadmap.md`. |
 | **Owner** | Remaker Digital (DBA of VanDusen & Palmeter, LLC) |
 
 ### Copyright Notice
@@ -129,9 +129,9 @@ Active procedures:
 
 Full plan: `memory/build-deploy-roadmap.md`
 
-### Current Status — v1.54.7 DEPLOYED, Cycles 15-18 IMPLEMENTED, Cycle 19 planned
+### Current Status — v1.54.7 DEPLOYED, Cycles 15-19 IMPLEMENTED
 
-Production is v1.54.7 (revision 0000053, session 65). Cycles 15-18 implemented (S66-70), Cycle 19 planned.
+Production is v1.54.7 (revision 0000053, session 65). Cycles 15-19 implemented (S66-71), ready for deployment + E2E testing.
 
 | Cycle | Version | Content | Status |
 |-------|---------|---------|--------|
@@ -144,7 +144,7 @@ Production is v1.54.7 (revision 0000053, session 65). Cycles 15-18 implemented (
 | **16** | TBD | AUTH-3 (OTP) + AUTH-4 (Shopify HMAC) + AUTH-5 (profile linkage) | ✅ IMPLEMENTED (S68) |
 | **17** | TBD | WI-C1/C2: provisioning persistence + superadmin auto-provisioning | ✅ IMPLEMENTED (S70) |
 | **18** | TBD | WI-D1 (trial scanner) + WI-D2 (already done in C15) | ✅ IMPLEMENTED (S70) |
-| **19** | TBD | WI-E1-E4: widget key gen, welcome email, trial expiry, wizard | ⬜ PLANNED |
+| **19** | TBD | WI-E1-E4: widget key gen, welcome email, trial expiry, wizard | ✅ IMPLEMENTED (S71) |
 
 ### Owner/Designer Tasks (blocking Shopify submission)
 1. Screenshots (3-6 at 1600x900) — designer

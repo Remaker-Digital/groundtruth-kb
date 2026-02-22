@@ -8,6 +8,8 @@
   a tenant exceeds 1,000 non-archived conversations (WI-A7).
 - Trial expiry scanner — transitions expired trial tenants from ACTIVE to
   TRIAL_EXPIRED status (WI-D1).
+- Trial expiry warning emails — sends warning emails at 7, 3, and 1 day(s)
+  before trial end (WI-E3).
 
 © 2026 Remaker Digital, a DBA of VanDusen & Palmeter, LLC. All rights reserved.
 """
@@ -691,3 +693,141 @@ def register_trial_scanner(app: FastAPI) -> None:
     """Register trial expiry scanner startup/shutdown handlers on the FastAPI app."""
     app.on_event("startup")(_startup_trial_scanner)
     app.on_event("shutdown")(_shutdown_trial_scanner)
+
+
+# ---------------------------------------------------------------------------
+# Trial expiry warning emails (WI-E3)
+# ---------------------------------------------------------------------------
+
+# Warning tiers: days before expiry → warning label
+_WARNING_TIERS = [
+    (7, "7d"),
+    (3, "3d"),
+    (1, "1d"),
+]
+
+# Scan interval — every 12 hours (twice daily covers daily granularity)
+_WARNING_SCAN_INTERVAL = 43200
+# Startup delay — 180 seconds (after trial scanner)
+_WARNING_SCAN_STARTUP_DELAY = 180
+
+_trial_warning_task: asyncio.Task | None = None
+
+
+async def _trial_warning_loop() -> None:
+    """Periodic background task that sends trial expiry warning emails.
+
+    Runs every 12 hours. For each warning tier (7d, 3d, 1d), queries
+    for active trial tenants expiring within that window, checks the
+    trial_warnings_sent field for deduplication, sends the email,
+    and patches the sent marker.
+    """
+    from src.multi_tenant.repository import TenantRepository
+
+    await asyncio.sleep(_WARNING_SCAN_STARTUP_DELAY)
+
+    while True:
+        try:
+            tenant_repo = TenantRepository()
+            warnings_sent = 0
+
+            for days, tier_label in _WARNING_TIERS:
+                within_iso = (
+                    datetime.now(timezone.utc) + timedelta(days=days)
+                ).isoformat()
+
+                try:
+                    expiring = await tenant_repo.list_expiring_trials(within_iso)
+                except Exception:
+                    logger.debug(
+                        "Trial warning query failed for tier %s",
+                        tier_label,
+                        exc_info=True,
+                    )
+                    continue
+
+                for tenant_doc in expiring:
+                    tid = tenant_doc.get("tenant_id")
+                    email = tenant_doc.get("customer_email")
+                    already_sent = tenant_doc.get("trial_warnings_sent", [])
+
+                    if not tid or not email:
+                        continue
+                    if tier_label in already_sent:
+                        continue
+
+                    try:
+                        from src.multi_tenant.trial_expiry_email import (
+                            send_trial_expiry_warning,
+                        )
+
+                        sent = await send_trial_expiry_warning(
+                            to_email=email,
+                            tenant_id=tid,
+                            warning_tier=tier_label,
+                        )
+
+                        if sent:
+                            # Mark warning as sent to prevent duplicates
+                            new_warnings = already_sent + [tier_label]
+                            now_iso = datetime.now(timezone.utc).isoformat()
+                            await tenant_repo.patch(
+                                tenant_id=tid,
+                                document_id=tid,
+                                operations=[
+                                    {
+                                        "op": "set",
+                                        "path": "/trial_warnings_sent",
+                                        "value": new_warnings,
+                                    },
+                                    {
+                                        "op": "set",
+                                        "path": "/updated_at",
+                                        "value": now_iso,
+                                    },
+                                ],
+                            )
+                            warnings_sent += 1
+                    except Exception:
+                        logger.debug(
+                            "Trial warning failed for tenant %s tier %s",
+                            tid[:8],
+                            tier_label,
+                            exc_info=True,
+                        )
+
+            if warnings_sent > 0:
+                logger.info(
+                    "Trial warning scanner: sent %d expiry warnings",
+                    warnings_sent,
+                )
+        except Exception:
+            logger.debug("Trial warning scanner cycle failed", exc_info=True)
+
+        await asyncio.sleep(_WARNING_SCAN_INTERVAL)
+
+
+async def _startup_trial_warning() -> None:
+    """Start the trial expiry warning background task."""
+    global _trial_warning_task  # noqa: PLW0603
+    _trial_warning_task = asyncio.create_task(_trial_warning_loop())
+    logger.info("Trial expiry warning scanner started (12-hour interval)")
+
+
+async def _shutdown_trial_warning() -> None:
+    """Cancel the trial expiry warning background task."""
+    global _trial_warning_task  # noqa: PLW0603
+    if _trial_warning_task and not _trial_warning_task.done():
+        _trial_warning_task.cancel()
+        try:
+            await _trial_warning_task
+        except asyncio.CancelledError:
+            pass
+        logger.info("Trial expiry warning scanner stopped")
+    _trial_warning_task = None
+
+
+def register_trial_warning(app: FastAPI) -> None:
+    """Register trial expiry warning startup/shutdown handlers on the FastAPI app."""
+    app.on_event("startup")(_startup_trial_warning)
+    app.on_event("shutdown")(_shutdown_trial_warning)

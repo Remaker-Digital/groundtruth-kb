@@ -275,6 +275,11 @@ class TenantDocument(BaseModel):
         description="Hard cap on conversations during the trial period. "
         "Overrides included_conversations from TIER_DEFAULTS when set.",
     )
+    trial_warnings_sent: list[str] = Field(
+        default_factory=list,
+        description="Expiry warning milestones already sent (e.g. ['7d', '3d', '1d']). "
+        "Prevents duplicate warning emails from the expiry warning scanner.",
+    )
 
     # Rate limiting (Decision #5)
     rate_limit_rpm: int | None = Field(

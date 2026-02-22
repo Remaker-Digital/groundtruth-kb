@@ -171,6 +171,12 @@ cookies.txt
 # GitHub Wiki (separate repo, not committed to main)
 # =============================================================================
 agent-red.wiki/
+wiki/
+
+# =============================================================================
+# Independent Progress Assessments (Cursor-generated, consumed)
+# =============================================================================
+independent-progress-assments/
 
 # =============================================================================
 # Research / Scratch Data

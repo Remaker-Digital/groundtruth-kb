@@ -49,6 +49,7 @@ from pydantic import BaseModel, Field
 from src.integrations.provisioning import (
     BillingChannel,
     activate_tenant,
+    auto_provision_widget_key,
     provision_tenant,
 )
 from src.integrations.shopify_client import (
@@ -554,6 +555,9 @@ async def confirm_subscription(
     # Immediately activate — Shopify collects payment during approval
     activated = await activate_tenant(shopify_shop_domain=shop_domain)
 
+    # Auto-provision widget key (failures logged, don't block billing)
+    widget_key = await auto_provision_widget_key(tenant_id=tenant.tenant_id)
+
     result = {
         "shop_domain": shop_domain,
         "status": "active",
@@ -565,6 +569,19 @@ async def confirm_subscription(
         "tenant_id": tenant.tenant_id,
         "tenant_status": (activated.status.value if activated else tenant.status.value),
     }
+    if widget_key:
+        result["widget_key"] = widget_key
+
+    # Send welcome email if customer email is available
+    if tenant.customer_email:
+        from src.multi_tenant.welcome_email import send_welcome_email
+
+        await send_welcome_email(
+            to_email=tenant.customer_email,
+            tenant_id=tenant.tenant_id,
+            widget_key=widget_key,
+            tier=sub_info.get("tier"),
+        )
 
     return result
 

@@ -390,21 +390,24 @@ export const StandaloneLayout: React.FC<StandaloneLayoutProps> = ({
     && activationStatus?.active_activated_at != null
   ) ? true : (activationStatus != null ? false : null);
 
-  // ---- Onboarding wizard (WI #292) — first-time merchants -----------------
+  // ---- Onboarding wizard (WI #292 / WI-E4) — first-time merchants --------
+  // Uses sessionStorage so the wizard re-appears on each new browser session
+  // if the tenant is still unconfigured. Once activated, isActivated === true
+  // and the wizard never shows regardless of storage state.
 
   const [showOnboarding, setShowOnboarding] = useState(false);
 
   useEffect(() => {
     if (isActivated !== false) return; // Only show when explicitly not activated
     try {
-      const dismissed = localStorage.getItem('agentred-onboarding-dismissed');
+      const dismissed = sessionStorage.getItem('agentred-onboarding-dismissed');
       if (!dismissed) setShowOnboarding(true);
     } catch { /* ignore */ }
   }, [isActivated]);
 
   const dismissOnboarding = useCallback(() => {
     setShowOnboarding(false);
-    try { localStorage.setItem('agentred-onboarding-dismissed', '1'); } catch { /* ignore */ }
+    try { sessionStorage.setItem('agentred-onboarding-dismissed', '1'); } catch { /* ignore */ }
   }, []);
 
   // Discard all draft changes (confirm → POST → refresh)

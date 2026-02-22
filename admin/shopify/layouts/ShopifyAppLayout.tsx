@@ -180,7 +180,10 @@ export const ShopifyAppLayout: React.FC<ShopifyAppLayoutProps> = ({
     return () => { cancelled = true; };
   }, [apiFetch, shopifyConfig.shop]);
 
-  // ---- Onboarding wizard — first-time merchants ---------------------------
+  // ---- Onboarding wizard (WI-E4) — first-time merchants -------------------
+  // Uses sessionStorage so the wizard re-appears on each new browser session
+  // if the tenant is still unconfigured. Once activated, the is_configured
+  // check prevents the wizard from showing regardless of storage state.
 
   useEffect(() => {
     if (!tenantContext || loading) return;
@@ -192,7 +195,7 @@ export const ShopifyAppLayout: React.FC<ShopifyAppLayoutProps> = ({
         const activated = data.is_configured && data.active_activated_at != null;
         if (!activated) {
           try {
-            const dismissed = localStorage.getItem('agentred-onboarding-dismissed');
+            const dismissed = sessionStorage.getItem('agentred-onboarding-dismissed');
             if (!dismissed) setShowOnboarding(true);
           } catch { /* ignore */ }
         }
@@ -202,7 +205,7 @@ export const ShopifyAppLayout: React.FC<ShopifyAppLayoutProps> = ({
 
   const dismissOnboarding = useCallback(() => {
     setShowOnboarding(false);
-    try { localStorage.setItem('agentred-onboarding-dismissed', '1'); } catch { /* ignore */ }
+    try { sessionStorage.setItem('agentred-onboarding-dismissed', '1'); } catch { /* ignore */ }
   }, []);
 
   // ---- Navigation menu (App Bridge) --------------------------------------

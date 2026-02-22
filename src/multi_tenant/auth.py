@@ -447,6 +447,29 @@ async def verify_user_api_key(
 # ---------------------------------------------------------------------------
 
 
+def generate_widget_key(tenant_id: str) -> str:
+    """Generate a new publishable widget key.
+
+    Format: pk_live_{tenant_hash}_{random}
+    Example: pk_live_a7f3c9e1b2c3_d4e5f6a7b8c9d0e1f2a3b4c5d6e7f8a9
+
+    The tenant hash prefix (first 12 hex chars of SHA-256) makes keys
+    visually distinguishable per tenant. The random suffix (32 hex chars)
+    provides cryptographic strength.
+
+    Args:
+        tenant_id: The tenant identifier (used for hash prefix).
+
+    Returns:
+        The raw widget key (must be sent to user, never stored directly).
+    """
+    import secrets
+
+    tenant_hash = hashlib.sha256(tenant_id.encode()).hexdigest()[:12]
+    random_part = secrets.token_hex(16)
+    return f"{WIDGET_KEY_PREFIX}{tenant_hash}_{random_part}"
+
+
 def validate_widget_key_format(key: str) -> bool:
     """Check that a widget key matches the expected format.
 

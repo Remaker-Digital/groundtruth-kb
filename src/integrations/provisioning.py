@@ -98,6 +98,9 @@ class TenantRecord(BaseModel):
     deactivated_at: str | None = Field(default=None, description="When cancellation began")
     grace_period_ends_at: str | None = Field(default=None, description="When data will be deleted")
 
+    # Widget key (populated during provisioning, shown once)
+    widget_key: str | None = Field(default=None, description="Raw widget key (pk_live_...) — present only in provisioning response")
+
 
 # Grace period duration (30 days, per SLA)
 _GRACE_PERIOD = timedelta(days=30)
@@ -440,6 +443,81 @@ async def auto_provision_superadmin(
         return None
 
 
+async def auto_provision_widget_key(tenant_id: str) -> str | None:
+    """Generate and persist a widget key for a newly provisioned tenant.
+
+    Writes to both storage locations:
+    - TenantDocument.widget_key_hash  (for auth lookup)
+    - PreferencesDocument.widget_key  (for admin UI display + activation gate)
+
+    Called after tenant provisioning (both paid and trial). The raw key
+    is returned once — callers should include it in the provisioning
+    response so the merchant can embed it in their widget script tag.
+
+    Args:
+        tenant_id: The new tenant's ID.
+
+    Returns:
+        The raw widget key (pk_live_...) or None if provisioning failed.
+    """
+    if _tenant_repo is None:
+        logger.warning("No tenant repo — skipping widget key provisioning for %s", tenant_id)
+        return None
+
+    try:
+        from src.multi_tenant.auth import generate_widget_key, hash_widget_key
+        from src.multi_tenant.repository import PreferencesRepository
+
+        raw_key = generate_widget_key(tenant_id)
+        key_hash = hash_widget_key(raw_key)
+        now_iso = datetime.now(timezone.utc).isoformat()
+
+        # 1. Patch TenantDocument with key hash (for auth lookup)
+        await _tenant_repo.patch(
+            tenant_id,
+            tenant_id,
+            operations=[
+                {"op": "set", "path": "/widget_key_hash", "value": key_hash},
+                {"op": "set", "path": "/updated_at", "value": now_iso},
+            ],
+        )
+
+        # 2. Write raw key to PreferencesDocument (for admin UI + activation gate)
+        prefs_repo = PreferencesRepository()
+        try:
+            await prefs_repo.patch(
+                tenant_id,
+                f"{tenant_id}:active",
+                operations=[
+                    {"op": "set", "path": "/widget_key", "value": raw_key},
+                    {"op": "set", "path": "/updated_at", "value": now_iso},
+                ],
+            )
+        except Exception:
+            # Preferences doc may not exist yet at provisioning time —
+            # the widget key will be written when the first draft is created
+            # via the activation service (which copies from TenantDocument).
+            logger.debug(
+                "Preferences doc not yet available for widget key — "
+                "key will propagate on first draft: tenant=%s",
+                tenant_id[:8],
+            )
+
+        logger.info(
+            "Widget key auto-provisioned: tenant=%s prefix=%s",
+            tenant_id[:8],
+            raw_key[:16] + "...",
+        )
+        return raw_key
+    except Exception as exc:
+        logger.error(
+            "Failed to auto-provision widget key for tenant %s: %s",
+            tenant_id,
+            exc,
+        )
+        return None
+
+
 async def activate_tenant(
     tenant_id: str | None = None,
     stripe_customer_id: str | None = None,
@@ -673,6 +751,20 @@ async def provision_trial_tenant(
         conversation_limit,
     )
 
+    # Auto-provision widget key (failures logged, don't block trial creation)
+    widget_key = await auto_provision_widget_key(tenant_id)
+
+    # Send welcome email (failures logged, don't block trial creation)
+    if customer_email:
+        from src.multi_tenant.welcome_email import send_welcome_email
+
+        await send_welcome_email(
+            to_email=customer_email,
+            tenant_id=tenant_id,
+            widget_key=widget_key,
+            tier="trial",
+        )
+
     return TenantRecord(
         tenant_id=tenant_id,
         status=TenantStatus.ACTIVE,
@@ -683,6 +775,7 @@ async def provision_trial_tenant(
         customer_email=customer_email,
         created_at=now_iso,
         updated_at=now_iso,
+        widget_key=widget_key,
     )
 
 

@@ -460,11 +460,12 @@ def _generate_api_key() -> str:
 def _generate_widget_key(tenant_id: str) -> str:
     """Generate a new publishable widget key.
 
-    Format: pk_live_{tenant_hash}_{random}
+    Delegates to the canonical implementation in auth.py.
+    Kept as a private wrapper for backward compatibility within this module.
     """
-    tenant_hash = hashlib.sha256(tenant_id.encode()).hexdigest()[:12]
-    random_part = secrets.token_hex(16)
-    return f"pk_live_{tenant_hash}_{random_part}"
+    from src.multi_tenant.auth import generate_widget_key
+
+    return generate_widget_key(tenant_id)
 
 
 @rotation_router.post("/rotate", response_model=KeyRotationResponse)
@@ -553,14 +554,37 @@ async def rotate_widget_key(request: Request) -> WidgetKeyRotationResponse:
 
     import datetime as dt
 
+    now_iso = dt.datetime.now(dt.timezone.utc).isoformat()
+
     await _tenant_repo.patch(
         tenant_id,
         tenant_id,
         operations=[
             {"op": "set", "path": "/widget_key_hash", "value": new_hash},
-            {"op": "set", "path": "/updated_at", "value": dt.datetime.now(dt.timezone.utc).isoformat()},
+            {"op": "set", "path": "/updated_at", "value": now_iso},
         ],
     )
+
+    # Also update the raw key in PreferencesDocument (admin UI + activation gate)
+    try:
+        from src.multi_tenant.repository import PreferencesRepository
+
+        prefs_repo = PreferencesRepository()
+        await prefs_repo.patch(
+            tenant_id,
+            f"{tenant_id}:active",
+            operations=[
+                {"op": "set", "path": "/widget_key", "value": new_key},
+                {"op": "set", "path": "/updated_at", "value": now_iso},
+            ],
+        )
+    except Exception as exc:
+        logger.warning(
+            "Widget key rotated on TenantDocument but PreferencesDocument "
+            "update failed (will sync on next activate): tenant=%s error=%s",
+            tenant_id,
+            exc,
+        )
 
     logger.info("Widget key rotated: tenant=%s", tenant_id)
 
