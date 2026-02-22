@@ -347,7 +347,7 @@ async def purchase_pack_endpoint(body: PurchasePackRequest) -> PurchasePackRespo
     pack = catalog.packs[body.pack_id]
 
     # Resolve Stripe customer ID from tenant_id or stripe_customer_id
-    customer_id = _resolve_stripe_customer_id(
+    customer_id = await _resolve_stripe_customer_id(
         tenant_id=body.tenant_id,
         stripe_customer_id=body.stripe_customer_id,
     )

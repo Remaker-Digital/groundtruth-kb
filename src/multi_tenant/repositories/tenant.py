@@ -202,6 +202,31 @@ class TenantRepository(TenantScopedRepository):
                 ids.append(tid)
         return ids
 
+    async def list_expired_trials(self) -> list[dict[str, Any]]:
+        """List active trial tenants whose trial period has expired (cross-partition).
+
+        Returns tenant documents where:
+            - status = 'active'
+            - billing_channel = 'trial'
+            - trial_expires_at < current UTC time (ISO 8601 comparison)
+
+        Used by the trial expiry scanner background task.
+        Performs a cross-partition query — call infrequently (hourly).
+        """
+        now_iso = datetime.now(timezone.utc).isoformat()
+        results: list[dict[str, Any]] = []
+        async for item in self._container.query_items(
+            query=(
+                "SELECT * FROM c WHERE c.status = 'active' "
+                "AND c.billing_channel = 'trial' "
+                "AND c.trial_expires_at < @now"
+            ),
+            parameters=[{"name": "@now", "value": now_iso}],
+            max_item_count=100,
+        ):
+            results.append(item)
+        return results
+
     async def update_status(
         self, tenant_id: str, status: TenantStatus,
     ) -> dict[str, Any]:

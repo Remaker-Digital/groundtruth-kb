@@ -276,17 +276,99 @@ class TestHandleCheckoutCompleted:
             },
         }
 
-        with patch("src.integrations.stripe_webhooks.provision_tenant") as mock_prov:
+        with (
+            patch("src.integrations.stripe_webhooks.provision_tenant") as mock_prov,
+            patch("src.integrations.stripe_webhooks.auto_provision_superadmin") as mock_sa,
+        ):
             tenant = MagicMock()
             tenant.tenant_id = "t-001"
             tenant.status.value = "active"
             mock_prov.return_value = tenant
+            mock_sa.return_value = "ar_user_t001_TESTKEY"
 
             result = await handle_checkout_completed(event)
 
         assert result["action"] == "provision_tenant"
         assert result["tenant_id"] == "t-001"
         assert result["tier"] == "starter"
+        assert result["superadmin_api_key"] == "ar_user_t001_TESTKEY"
+        mock_prov.assert_called_once()
+        mock_sa.assert_called_once_with(
+            tenant_id="t-001",
+            customer_email="user@test.com",
+        )
+
+    @pytest.mark.asyncio
+    async def test_subscription_checkout_no_email_skips_superadmin(self):
+        """When customer_details.email is absent, superadmin key is not in payload."""
+        event = {
+            "data": {
+                "object": {
+                    "id": "cs_no_email",
+                    "customer": "cus_no_email",
+                    "subscription": "sub_ne",
+                    "customer_details": None,
+                    "metadata": {
+                        "agent_red_tier": "starter",
+                        "agent_red_interval": "month",
+                    },
+                    "amount_total": 14900,
+                    "currency": "usd",
+                },
+            },
+        }
+
+        with (
+            patch("src.integrations.stripe_webhooks.provision_tenant") as mock_prov,
+            patch("src.integrations.stripe_webhooks.auto_provision_superadmin") as mock_sa,
+        ):
+            tenant = MagicMock()
+            tenant.tenant_id = "t-ne"
+            tenant.status.value = "active"
+            mock_prov.return_value = tenant
+            mock_sa.return_value = None  # no email → None
+
+            result = await handle_checkout_completed(event)
+
+        assert result["action"] == "provision_tenant"
+        assert "superadmin_api_key" not in result
+        mock_sa.assert_called_once_with(tenant_id="t-ne", customer_email="")
+
+    @pytest.mark.asyncio
+    async def test_superadmin_failure_does_not_block_provisioning(self):
+        """auto_provision_superadmin failure should not affect the provisioning response."""
+        event = {
+            "data": {
+                "object": {
+                    "id": "cs_sa_fail",
+                    "customer": "cus_sa_fail",
+                    "subscription": "sub_sa_fail",
+                    "customer_details": {"email": "fail@test.com"},
+                    "metadata": {
+                        "agent_red_tier": "professional",
+                        "agent_red_interval": "year",
+                    },
+                    "amount_total": 99900,
+                    "currency": "usd",
+                },
+            },
+        }
+
+        with (
+            patch("src.integrations.stripe_webhooks.provision_tenant") as mock_prov,
+            patch("src.integrations.stripe_webhooks.auto_provision_superadmin") as mock_sa,
+        ):
+            tenant = MagicMock()
+            tenant.tenant_id = "t-fail"
+            tenant.status.value = "active"
+            mock_prov.return_value = tenant
+            mock_sa.return_value = None  # failure returns None
+
+            result = await handle_checkout_completed(event)
+
+        assert result["action"] == "provision_tenant"
+        assert result["tenant_id"] == "t-fail"
+        assert "superadmin_api_key" not in result
         mock_prov.assert_called_once()
 
     @pytest.mark.asyncio
@@ -371,11 +453,15 @@ class TestHandleCheckoutCompleted:
             },
         }
 
-        with patch("src.integrations.stripe_webhooks.provision_tenant") as mock_prov:
+        with (
+            patch("src.integrations.stripe_webhooks.provision_tenant") as mock_prov,
+            patch("src.integrations.stripe_webhooks.auto_provision_superadmin") as mock_sa,
+        ):
             tenant = MagicMock()
             tenant.tenant_id = "t-002"
             tenant.status.value = "active"
             mock_prov.return_value = tenant
+            mock_sa.return_value = "ar_user_t002_KEY"
 
             result = await handle_checkout_completed(event)
 

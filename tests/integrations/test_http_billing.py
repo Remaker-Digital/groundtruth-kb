@@ -31,6 +31,7 @@ from tests.conftest import (
     TEST_API_KEY_ENTERPRISE,
     auth_headers_api_key,
 )
+from tests.helpers.fake_tenant_repo import FakeTenantRepo, run_sync
 
 
 # ---------------------------------------------------------------------------
@@ -81,17 +82,14 @@ def _reset_in_memory_stores(app_client):
     The billing modules use module-level dicts for dev state.
     The rate limiter accumulates across tests via the shared app instance.
     Tests must start with a clean slate.
+
+    Provisioning uses a FakeTenantRepo (wired per-test) instead of
+    module-level dicts — see ``_fake_provisioning_repo`` fixture below.
     """
-    import src.integrations.provisioning as prov_mod
     import src.integrations.stripe_packs as packs_mod
     import src.integrations.stripe_usage as usage_mod
     import src.integrations.stripe_webhooks as wh_mod
     import src.main as main_mod
-
-    # Clear provisioning stores
-    prov_mod._tenants.clear()
-    prov_mod._stripe_index.clear()
-    prov_mod._shopify_index.clear()
 
     # Clear pack balances
     packs_mod._pack_balances.clear()
@@ -117,9 +115,6 @@ def _reset_in_memory_stores(app_client):
     yield
 
     # Cleanup after test
-    prov_mod._tenants.clear()
-    prov_mod._stripe_index.clear()
-    prov_mod._shopify_index.clear()
     packs_mod._pack_balances.clear()
     usage_mod._usage_counters.clear()
     wh_mod._processed_events.clear()
@@ -143,6 +138,21 @@ def _reset_middleware_state(app: Any) -> None:
         if hasattr(current, "_gates"):
             current._gates.clear()
         current = getattr(current, "app", None)
+
+
+@pytest.fixture(autouse=True)
+def _fake_provisioning_repo():
+    """Wire a FakeTenantRepo into the provisioning module for each test.
+
+    Ensures provisioning functions (provision_tenant, get_tenant, etc.)
+    read and write from an in-memory store instead of Cosmos DB.
+    """
+    from src.integrations.provisioning import configure_provisioning_repo
+
+    repo = FakeTenantRepo()
+    configure_provisioning_repo(repo, team_repo=None)
+    yield repo
+    configure_provisioning_repo(None, team_repo=None)
 
 
 @pytest.fixture
@@ -636,13 +646,13 @@ class TestStripeWebhooks:
         """HTTP-BILL-23: POST /api/webhooks/stripe — customer.subscription.deleted."""
         # First provision a tenant so deletion has something to deactivate
         from src.integrations.provisioning import BillingChannel, provision_tenant
-        provision_tenant(
+        run_sync(provision_tenant(
             billing_channel=BillingChannel.STRIPE,
             tier="starter",
             interval="month",
             stripe_customer_id="cus_cancel_001",
             stripe_subscription_id="sub_cancel_001",
-        )
+        ))
 
         event = _make_stripe_event(
             event_type="customer.subscription.deleted",
@@ -714,12 +724,12 @@ class TestStripeWebhooks:
         """HTTP-BILL-25: POST /api/webhooks/stripe — invoice.payment_failed."""
         # Provision a tenant first so flag_payment_issue finds it
         from src.integrations.provisioning import BillingChannel, provision_tenant
-        provision_tenant(
+        run_sync(provision_tenant(
             billing_channel=BillingChannel.STRIPE,
             tier="starter",
             interval="month",
             stripe_customer_id="cus_fail_001",
-        )
+        ))
 
         event = _make_stripe_event(
             event_type="invoice.payment_failed",
@@ -1057,13 +1067,13 @@ class TestTenantEndpoints:
     @pytest.mark.unit
     def test_tenant_lookup_by_domain(self, starter_client):
         """HTTP-BILL-34: GET /api/tenants/lookup — returns tenant by domain."""
-        # Provision a tenant via the in-memory store
+        # Provision a tenant via the FakeTenantRepo
         from src.integrations.provisioning import BillingChannel, provision_tenant
-        tenant = provision_tenant(
+        tenant = run_sync(provision_tenant(
             billing_channel=BillingChannel.SHOPIFY,
             tier="starter",
             shopify_shop_domain="lookup-shop.myshopify.com",
-        )
+        ))
 
         resp = starter_client.get(
             "/api/tenants/lookup?shop=lookup-shop.myshopify.com",
@@ -1079,12 +1089,12 @@ class TestTenantEndpoints:
     def test_tenant_get_by_id(self, starter_client):
         """HTTP-BILL-35: GET /api/tenants/{tenant_id} — returns tenant detail."""
         from src.integrations.provisioning import BillingChannel, provision_tenant
-        tenant = provision_tenant(
+        tenant = run_sync(provision_tenant(
             billing_channel=BillingChannel.STRIPE,
             tier="professional",
             interval="month",
             stripe_customer_id="cus_detail_001",
-        )
+        ))
 
         resp = starter_client.get(f"/api/tenants/{tenant.tenant_id}")
         assert resp.status_code == 200
@@ -1108,12 +1118,12 @@ class TestPackPurchaseWithTenantId:
         """HTTP-BILL-36: POST /api/packs/purchase — tenant_id resolves to Stripe customer."""
         from src.integrations.provisioning import BillingChannel, provision_tenant
 
-        tenant = provision_tenant(
+        tenant = run_sync(provision_tenant(
             billing_channel=BillingChannel.STRIPE,
             tier="starter",
             interval="month",
             stripe_customer_id="cus_tenant_pack_001",
-        )
+        ))
 
         resp = starter_client.post(
             "/api/packs/purchase",

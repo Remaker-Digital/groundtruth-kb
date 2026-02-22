@@ -120,7 +120,7 @@ class BillingStatusResponse(BaseModel):
 # ---------------------------------------------------------------------------
 
 
-def _resolve_stripe_customer_id(
+async def _resolve_stripe_customer_id(
     tenant_id: str | None,
     stripe_customer_id: str | None,
 ) -> str:
@@ -150,7 +150,7 @@ def _resolve_stripe_customer_id(
             detail="Provide either 'tenant_id' or 'stripe_customer_id'.",
         )
 
-    tenant = get_tenant(tenant_id=tenant_id)
+    tenant = await get_tenant(tenant_id=tenant_id)
     if not tenant:
         raise HTTPException(
             status_code=404,
@@ -199,7 +199,7 @@ async def create_portal_session(body: PortalRequest) -> PortalResponse:
     Accepts either a tenant_id (looked up via provisioning) or a direct
     stripe_customer_id. Returns the portal URL for frontend redirect.
     """
-    customer_id = _resolve_stripe_customer_id(
+    customer_id = await _resolve_stripe_customer_id(
         tenant_id=body.tenant_id,
         stripe_customer_id=body.stripe_customer_id,
     )
@@ -266,7 +266,7 @@ async def billing_status_endpoint(
     """
     # Resolve Stripe customer from authenticated tenant
     try:
-        customer_id = _resolve_stripe_customer_id(
+        customer_id = await _resolve_stripe_customer_id(
             tenant_id=ctx.tenant_id,
             stripe_customer_id=None,
         )

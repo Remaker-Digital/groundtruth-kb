@@ -34,6 +34,7 @@ from fastapi.responses import JSONResponse
 from src.integrations.provisioning import (
     BillingChannel,
     activate_tenant,
+    auto_provision_superadmin,
     deactivate_tenant,
     flag_payment_issue,
     provision_tenant,
@@ -389,7 +390,7 @@ async def handle_checkout_completed(event: dict) -> dict:
     )
 
     # Provision tenant via channel-agnostic provisioning service
-    tenant = provision_tenant(
+    tenant = await provision_tenant(
         billing_channel=BillingChannel.STRIPE,
         tier=provisioning_payload["tier"],
         interval=provisioning_payload["interval"],
@@ -400,6 +401,16 @@ async def handle_checkout_completed(event: dict) -> dict:
     )
     provisioning_payload["tenant_id"] = tenant.tenant_id
     provisioning_payload["tenant_status"] = tenant.status.value
+
+    # Auto-provision superadmin team member for the new tenant.
+    # This creates the owner's per-user API key (shown once in the
+    # response). Failures are logged but do not block provisioning.
+    superadmin_key = await auto_provision_superadmin(
+        tenant_id=tenant.tenant_id,
+        customer_email=provisioning_payload["customer_email"] or "",
+    )
+    if superadmin_key:
+        provisioning_payload["superadmin_api_key"] = superadmin_key
 
     return provisioning_payload
 
@@ -435,7 +446,7 @@ async def handle_subscription_created(event: dict) -> dict:
     )
 
     # Activate tenant — mark as fully operational after payment confirmation
-    tenant = activate_tenant(stripe_customer_id=result["stripe_customer_id"])
+    tenant = await activate_tenant(stripe_customer_id=result["stripe_customer_id"])
     if tenant:
         result["tenant_id"] = tenant.tenant_id
         result["tenant_status"] = tenant.status.value
@@ -512,7 +523,7 @@ async def handle_subscription_updated(event: dict) -> dict:
     new_addons_str = metadata.get("agent_red_addons", "")
     new_addons = new_addons_str.split(",") if new_addons_str else None
 
-    tenant = update_tenant(
+    tenant = await update_tenant(
         tier=new_tier,
         interval=new_interval,
         addons=new_addons,
@@ -530,13 +541,13 @@ async def handle_subscription_updated(event: dict) -> dict:
     if "status" in previous and result.get("stripe_customer_id"):
         prev_status = previous["status"]
         if current_status == "past_due" and prev_status != "past_due":
-            flagged = flag_payment_issue(
+            flagged = await flag_payment_issue(
                 stripe_customer_id=result["stripe_customer_id"],
             )
             if flagged:
                 result["tenant_status"] = flagged.status.value
         elif current_status == "active" and prev_status == "past_due":
-            activated = activate_tenant(
+            activated = await activate_tenant(
                 stripe_customer_id=result["stripe_customer_id"],
             )
             if activated:
@@ -573,7 +584,7 @@ async def handle_subscription_deleted(event: dict) -> dict:
     )
 
     # Begin tenant deactivation with 30-day grace period
-    tenant = deactivate_tenant(stripe_customer_id=result["stripe_customer_id"])
+    tenant = await deactivate_tenant(stripe_customer_id=result["stripe_customer_id"])
     if tenant:
         result["tenant_id"] = tenant.tenant_id
         result["tenant_status"] = tenant.status.value
@@ -623,7 +634,7 @@ async def handle_payment_succeeded(event: dict) -> dict:
     # Re-activate tenant if payment succeeds (clears past_due status).
     # This covers the case where a previously failed payment retry succeeds.
     if result["stripe_customer_id"]:
-        tenant = activate_tenant(stripe_customer_id=result["stripe_customer_id"])
+        tenant = await activate_tenant(stripe_customer_id=result["stripe_customer_id"])
         if tenant:
             result["tenant_id"] = tenant.tenant_id
             result["tenant_status"] = tenant.status.value
@@ -679,7 +690,7 @@ async def handle_payment_failed(event: dict) -> dict:
 
     # Flag tenant for payment issue (sets status to PAST_DUE)
     if result["stripe_customer_id"]:
-        tenant = flag_payment_issue(stripe_customer_id=result["stripe_customer_id"])
+        tenant = await flag_payment_issue(stripe_customer_id=result["stripe_customer_id"])
         if tenant:
             result["tenant_id"] = tenant.tenant_id
             result["tenant_status"] = tenant.status.value
@@ -731,7 +742,7 @@ async def handle_finalization_failed(event: dict) -> dict:
 
     # Flag the tenant so the customer portal can prompt for address update
     if result["stripe_customer_id"]:
-        tenant = flag_payment_issue(
+        tenant = await flag_payment_issue(
             stripe_customer_id=result["stripe_customer_id"],
         )
         if tenant:

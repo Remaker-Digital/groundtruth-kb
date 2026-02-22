@@ -15,7 +15,7 @@ This document provides active guidance for AI assistants working on the Agent Re
 |-----------|-------|
 | **Project Name** | Agent Red Customer Experience |
 | **Type** | Commercial SaaS Product (Shopify + Standalone) |
-| **Status** | Production v1.54.7 HEALTHY. ALL 14 CYCLES + post-14 patches DEPLOYED. Cycle 15 IMPLEMENTED (S66), Cycles 16-19 in progress. 3,987 unit tests (0 failures), 56 regression (51 pass + 5 skip), 917 UI tests (793 PASS, 4 SOFT-PASS, 62 SKIP, 0 FAIL — verified S60), 25 conversation quality scenarios (PASS — 23/25, 4.75/5.0, S63). See `memory/build-deploy-roadmap.md`. |
+| **Status** | Production v1.54.7 HEALTHY. ALL 14 CYCLES + post-14 patches DEPLOYED. Cycles 15-18 IMPLEMENTED (S66-70), Cycle 19 planned. ~4,539 unit tests (1 pre-existing failure), 56 regression (51 pass + 5 skip), 917 UI tests (793 PASS, 4 SOFT-PASS, 62 SKIP, 0 FAIL — verified S60), 25 conversation quality scenarios (PASS — 23/25, 4.75/5.0, S63). See `memory/build-deploy-roadmap.md`. |
 | **Owner** | Remaker Digital (DBA of VanDusen & Palmeter, LLC) |
 
 ### Copyright Notice
@@ -129,9 +129,9 @@ Active procedures:
 
 Full plan: `memory/build-deploy-roadmap.md`
 
-### Current Status — v1.54.7 DEPLOYED, Cycles 15-19 in progress
+### Current Status — v1.54.7 DEPLOYED, Cycles 15-18 IMPLEMENTED, Cycle 19 planned
 
-Production is v1.54.7 (revision 0000053, session 65). Cycle 15 implemented (S66), Cycles 16-19 in progress.
+Production is v1.54.7 (revision 0000053, session 65). Cycles 15-18 implemented (S66-70), Cycle 19 planned.
 
 | Cycle | Version | Content | Status |
 |-------|---------|---------|--------|
@@ -141,8 +141,10 @@ Production is v1.54.7 (revision 0000053, session 65). Cycle 15 implemented (S66)
 | **10-14** | v1.48.0 | UI polish, magic link, Provider Phase 3-4, features, coverage, quality | ✅ DEPLOYED (S46) |
 | **Post-14** | v1.49.2→v1.54.7 | SKIP resolution, CSS, SDK fix, quality, color mode, KA | ✅ DEPLOYED (S54-S65) |
 | **15** | TBD | WI-A1→A7 + D9 + AUTH-1: activation, archival, pre-chat gate | ✅ IMPLEMENTED (S66) |
-| **16** | TBD | AUTH-3 (OTP) + AUTH-4 (Shopify HMAC) + AUTH-5 (profile linkage) | 🔄 IN PROGRESS |
-| **17-19** | TBD | Provisioning, background tasks, onboarding polish | ⬜ PLANNED |
+| **16** | TBD | AUTH-3 (OTP) + AUTH-4 (Shopify HMAC) + AUTH-5 (profile linkage) | ✅ IMPLEMENTED (S68) |
+| **17** | TBD | WI-C1/C2: provisioning persistence + superadmin auto-provisioning | ✅ IMPLEMENTED (S70) |
+| **18** | TBD | WI-D1 (trial scanner) + WI-D2 (already done in C15) | ✅ IMPLEMENTED (S70) |
+| **19** | TBD | WI-E1-E4: widget key gen, welcome email, trial expiry, wizard | ⬜ PLANNED |
 
 ### Owner/Designer Tasks (blocking Shopify submission)
 1. Screenshots (3-6 at 1600x900) — designer

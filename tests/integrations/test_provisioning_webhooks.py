@@ -4,6 +4,11 @@ Covers:
     - provisioning.py: provision, activate, update, deactivate, flag, lookup
     - stripe_webhooks.py: idempotency, event routing, handler branches
 
+All provisioning functions are async and persist to Cosmos DB via
+TenantRepository. Tests use a FakeTenantRepo that stores documents
+in-memory and implements the same interface (upsert, patch, read,
+find_by_stripe_customer_id, find_by_shopify_domain).
+
 Run:
     pytest tests/integrations/test_provisioning_webhooks.py -v
 
@@ -12,8 +17,8 @@ Run:
 
 from __future__ import annotations
 
-import time
-from unittest.mock import AsyncMock, MagicMock, patch
+from datetime import datetime, timedelta, timezone
+from unittest.mock import AsyncMock, patch
 
 import pytest
 
@@ -21,34 +26,33 @@ from src.integrations.provisioning import (
     BillingChannel,
     TenantRecord,
     TenantStatus,
-    _GRACE_PERIOD_SECONDS,
-    _shopify_index,
-    _stripe_index,
-    _tenants,
+    _GRACE_PERIOD,
     activate_tenant,
     auto_provision_superadmin,
+    configure_provisioning_repo,
     deactivate_tenant,
     flag_payment_issue,
     get_tenant,
     provision_tenant,
+    provision_trial_tenant,
     update_tenant,
 )
+from tests.helpers.fake_tenant_repo import FakeTenantRepo
 
 
 # ---------------------------------------------------------------------------
-# Fixtures — clear in-memory stores between tests
+# Fixtures
 # ---------------------------------------------------------------------------
+
 
 @pytest.fixture(autouse=True)
-def _clear_tenant_stores():
-    """Reset module-level in-memory stores before each test."""
-    _tenants.clear()
-    _stripe_index.clear()
-    _shopify_index.clear()
-    yield
-    _tenants.clear()
-    _stripe_index.clear()
-    _shopify_index.clear()
+def fake_tenant_repo():
+    """Wire a FakeTenantRepo into the provisioning module for each test."""
+    repo = FakeTenantRepo()
+    configure_provisioning_repo(repo, team_repo=None)
+    yield repo
+    # Clean up module-level reference
+    configure_provisioning_repo(None, team_repo=None)
 
 
 # ===================================================================
@@ -58,8 +62,9 @@ def _clear_tenant_stores():
 class TestProvisionTenant:
     """PROV-01: Tenant creation and re-provisioning."""
 
-    def test_new_stripe_tenant(self):
-        t = provision_tenant(
+    @pytest.mark.asyncio
+    async def test_new_stripe_tenant(self, fake_tenant_repo):
+        t = await provision_tenant(
             billing_channel=BillingChannel.STRIPE,
             tier="starter",
             interval="month",
@@ -73,11 +78,11 @@ class TestProvisionTenant:
         assert t.interval == "month"
         assert t.stripe_customer_id == "cus_test_001"
         assert t.customer_email == "alice@example.com"
-        assert t.tenant_id in _tenants
-        assert _stripe_index["cus_test_001"] == t.tenant_id
+        assert t.tenant_id in fake_tenant_repo.store
 
-    def test_new_shopify_tenant(self):
-        t = provision_tenant(
+    @pytest.mark.asyncio
+    async def test_new_shopify_tenant(self, fake_tenant_repo):
+        t = await provision_tenant(
             billing_channel=BillingChannel.SHOPIFY,
             tier="professional",
             interval="month",
@@ -86,17 +91,20 @@ class TestProvisionTenant:
         )
         assert t.billing_channel == BillingChannel.SHOPIFY
         assert t.shopify_shop_domain == "alice.myshopify.com"
-        assert _shopify_index["alice.myshopify.com"] == t.tenant_id
+        # Verify stored in fake repo
+        doc = await fake_tenant_repo.find_by_shopify_domain("alice.myshopify.com")
+        assert doc is not None
 
-    def test_re_provision_existing_stripe_tenant(self):
-        t1 = provision_tenant(
+    @pytest.mark.asyncio
+    async def test_re_provision_existing_stripe_tenant(self, fake_tenant_repo):
+        t1 = await provision_tenant(
             billing_channel=BillingChannel.STRIPE,
             tier="starter",
             stripe_customer_id="cus_re",
         )
         original_id = t1.tenant_id
 
-        t2 = provision_tenant(
+        t2 = await provision_tenant(
             billing_channel=BillingChannel.STRIPE,
             tier="professional",
             stripe_customer_id="cus_re",
@@ -106,18 +114,21 @@ class TestProvisionTenant:
         assert t2.tier == "professional"
         assert t2.status == TenantStatus.PROVISIONING
 
-    def test_re_provision_clears_grace_period(self):
-        t = provision_tenant(
+    @pytest.mark.asyncio
+    async def test_re_provision_clears_grace_period(self, fake_tenant_repo):
+        t = await provision_tenant(
             billing_channel=BillingChannel.STRIPE,
             tier="starter",
             stripe_customer_id="cus_grace",
         )
-        # Simulate deactivation
-        t.status = TenantStatus.GRACE_PERIOD
-        t.deactivated_at = int(time.time())
-        t.grace_period_ends_at = int(time.time()) + _GRACE_PERIOD_SECONDS
+        # Simulate deactivation via direct repo patch
+        await fake_tenant_repo.patch(t.tenant_id, t.tenant_id, [
+            {"op": "set", "path": "/status", "value": "grace_period"},
+            {"op": "set", "path": "/deactivated_at", "value": datetime.now(timezone.utc).isoformat()},
+            {"op": "set", "path": "/grace_period_ends_at", "value": datetime.now(timezone.utc).isoformat()},
+        ])
 
-        t2 = provision_tenant(
+        t2 = await provision_tenant(
             billing_channel=BillingChannel.STRIPE,
             tier="starter",
             stripe_customer_id="cus_grace",
@@ -125,8 +136,9 @@ class TestProvisionTenant:
         assert t2.deactivated_at is None
         assert t2.grace_period_ends_at is None
 
-    def test_provision_with_addons(self):
-        t = provision_tenant(
+    @pytest.mark.asyncio
+    async def test_provision_with_addons(self):
+        t = await provision_tenant(
             billing_channel=BillingChannel.STRIPE,
             tier="enterprise",
             addons=["multi-language", "white-label"],
@@ -134,13 +146,27 @@ class TestProvisionTenant:
         )
         assert t.addons == ["multi-language", "white-label"]
 
-    def test_provision_generates_uuid(self):
-        t = provision_tenant(
+    @pytest.mark.asyncio
+    async def test_provision_generates_uuid(self):
+        t = await provision_tenant(
             billing_channel=BillingChannel.STRIPE,
             stripe_customer_id="cus_uuid",
         )
         assert len(t.tenant_id) == 36  # UUID format
         assert "-" in t.tenant_id
+
+    @pytest.mark.asyncio
+    async def test_provision_timestamps_are_iso8601(self):
+        t = await provision_tenant(
+            billing_channel=BillingChannel.STRIPE,
+            stripe_customer_id="cus_ts",
+        )
+        # Verify timestamps are ISO 8601 strings
+        assert isinstance(t.created_at, str)
+        assert isinstance(t.updated_at, str)
+        # Should be parseable
+        datetime.fromisoformat(t.created_at)
+        datetime.fromisoformat(t.updated_at)
 
 
 # ===================================================================
@@ -150,48 +176,57 @@ class TestProvisionTenant:
 class TestActivateTenant:
     """PROV-02: Tenant activation after payment confirmation."""
 
-    def test_activate_by_tenant_id(self):
-        t = provision_tenant(
+    @pytest.mark.asyncio
+    async def test_activate_by_tenant_id(self):
+        t = await provision_tenant(
             billing_channel=BillingChannel.STRIPE,
             stripe_customer_id="cus_act",
         )
         assert t.status == TenantStatus.PROVISIONING
 
-        result = activate_tenant(tenant_id=t.tenant_id)
+        result = await activate_tenant(tenant_id=t.tenant_id)
         assert result is not None
         assert result.status == TenantStatus.ACTIVE
 
-    def test_activate_by_stripe_customer_id(self):
-        t = provision_tenant(
+    @pytest.mark.asyncio
+    async def test_activate_by_stripe_customer_id(self):
+        await provision_tenant(
             billing_channel=BillingChannel.STRIPE,
             stripe_customer_id="cus_act_stripe",
         )
-        result = activate_tenant(stripe_customer_id="cus_act_stripe")
+        result = await activate_tenant(stripe_customer_id="cus_act_stripe")
         assert result is not None
         assert result.status == TenantStatus.ACTIVE
 
-    def test_activate_by_shop_domain(self):
-        t = provision_tenant(
+    @pytest.mark.asyncio
+    async def test_activate_by_shop_domain(self):
+        await provision_tenant(
             billing_channel=BillingChannel.SHOPIFY,
             shopify_shop_domain="shop.myshopify.com",
         )
-        result = activate_tenant(shopify_shop_domain="shop.myshopify.com")
+        result = await activate_tenant(shopify_shop_domain="shop.myshopify.com")
         assert result is not None
         assert result.status == TenantStatus.ACTIVE
 
-    def test_activate_not_found(self):
-        result = activate_tenant(tenant_id="nonexistent")
+    @pytest.mark.asyncio
+    async def test_activate_not_found(self):
+        result = await activate_tenant(tenant_id="nonexistent")
         assert result is None
 
-    def test_activate_clears_deactivation_fields(self):
-        t = provision_tenant(
+    @pytest.mark.asyncio
+    async def test_activate_clears_deactivation_fields(self, fake_tenant_repo):
+        t = await provision_tenant(
             billing_channel=BillingChannel.STRIPE,
             stripe_customer_id="cus_clear",
         )
-        t.deactivated_at = int(time.time())
-        t.grace_period_ends_at = int(time.time()) + 1000
+        # Simulate prior deactivation
+        now_iso = datetime.now(timezone.utc).isoformat()
+        await fake_tenant_repo.patch(t.tenant_id, t.tenant_id, [
+            {"op": "set", "path": "/deactivated_at", "value": now_iso},
+            {"op": "set", "path": "/grace_period_ends_at", "value": now_iso},
+        ])
 
-        result = activate_tenant(stripe_customer_id="cus_clear")
+        result = await activate_tenant(stripe_customer_id="cus_clear")
         assert result.deactivated_at is None
         assert result.grace_period_ends_at is None
 
@@ -203,55 +238,61 @@ class TestActivateTenant:
 class TestUpdateTenant:
     """PROV-03: Tenant plan updates (tier, interval, addons)."""
 
-    def test_update_tier(self):
-        t = provision_tenant(
+    @pytest.mark.asyncio
+    async def test_update_tier(self):
+        await provision_tenant(
             billing_channel=BillingChannel.STRIPE,
             tier="starter",
             stripe_customer_id="cus_upd",
         )
-        result = update_tenant(tier="professional", stripe_customer_id="cus_upd")
+        result = await update_tenant(tier="professional", stripe_customer_id="cus_upd")
         assert result.tier == "professional"
 
-    def test_update_interval(self):
-        t = provision_tenant(
+    @pytest.mark.asyncio
+    async def test_update_interval(self):
+        await provision_tenant(
             billing_channel=BillingChannel.STRIPE,
             tier="starter",
             interval="month",
             stripe_customer_id="cus_int",
         )
-        result = update_tenant(interval="year", stripe_customer_id="cus_int")
+        result = await update_tenant(interval="year", stripe_customer_id="cus_int")
         assert result.interval == "year"
 
-    def test_update_addons(self):
-        t = provision_tenant(
+    @pytest.mark.asyncio
+    async def test_update_addons(self):
+        await provision_tenant(
             billing_channel=BillingChannel.STRIPE,
             addons=["a"],
             stripe_customer_id="cus_addon",
         )
-        result = update_tenant(addons=["a", "b", "c"], stripe_customer_id="cus_addon")
+        result = await update_tenant(addons=["a", "b", "c"], stripe_customer_id="cus_addon")
         assert result.addons == ["a", "b", "c"]
 
-    def test_update_clears_addons(self):
-        t = provision_tenant(
+    @pytest.mark.asyncio
+    async def test_update_clears_addons(self):
+        await provision_tenant(
             billing_channel=BillingChannel.STRIPE,
             addons=["multi-language"],
             stripe_customer_id="cus_clr",
         )
-        result = update_tenant(addons=[], stripe_customer_id="cus_clr")
+        result = await update_tenant(addons=[], stripe_customer_id="cus_clr")
         assert result.addons == []
 
-    def test_update_none_keeps_current(self):
-        t = provision_tenant(
+    @pytest.mark.asyncio
+    async def test_update_none_keeps_current(self):
+        await provision_tenant(
             billing_channel=BillingChannel.STRIPE,
             tier="starter",
             interval="month",
             stripe_customer_id="cus_keep",
         )
-        result = update_tenant(tier=None, stripe_customer_id="cus_keep")
+        result = await update_tenant(tier=None, stripe_customer_id="cus_keep")
         assert result.tier == "starter"  # Unchanged
 
-    def test_update_not_found(self):
-        result = update_tenant(tier="enterprise", tenant_id="nonexistent")
+    @pytest.mark.asyncio
+    async def test_update_not_found(self):
+        result = await update_tenant(tier="enterprise", tenant_id="nonexistent")
         assert result is None
 
 
@@ -262,30 +303,35 @@ class TestUpdateTenant:
 class TestDeactivateTenant:
     """PROV-04: Tenant deactivation with 30-day grace period."""
 
-    def test_deactivate_sets_grace_period(self):
-        t = provision_tenant(
+    @pytest.mark.asyncio
+    async def test_deactivate_sets_grace_period(self):
+        await provision_tenant(
             billing_channel=BillingChannel.STRIPE,
             stripe_customer_id="cus_deact",
         )
-        activate_tenant(stripe_customer_id="cus_deact")
+        await activate_tenant(stripe_customer_id="cus_deact")
 
-        result = deactivate_tenant(stripe_customer_id="cus_deact")
+        result = await deactivate_tenant(stripe_customer_id="cus_deact")
         assert result.status == TenantStatus.GRACE_PERIOD
         assert result.deactivated_at is not None
         assert result.grace_period_ends_at is not None
 
-    def test_grace_period_is_30_days(self):
-        t = provision_tenant(
+    @pytest.mark.asyncio
+    async def test_grace_period_is_30_days(self):
+        await provision_tenant(
             billing_channel=BillingChannel.STRIPE,
             stripe_customer_id="cus_30d",
         )
-        result = deactivate_tenant(stripe_customer_id="cus_30d")
-        expected_delta = _GRACE_PERIOD_SECONDS  # 30 * 24 * 60 * 60
-        actual_delta = result.grace_period_ends_at - result.deactivated_at
-        assert actual_delta == expected_delta
+        result = await deactivate_tenant(stripe_customer_id="cus_30d")
+        # Parse ISO timestamps and verify 30-day delta
+        deactivated = datetime.fromisoformat(result.deactivated_at)
+        grace_end = datetime.fromisoformat(result.grace_period_ends_at)
+        delta = grace_end - deactivated
+        assert delta == _GRACE_PERIOD
 
-    def test_deactivate_not_found(self):
-        result = deactivate_tenant(tenant_id="nonexistent")
+    @pytest.mark.asyncio
+    async def test_deactivate_not_found(self):
+        result = await deactivate_tenant(tenant_id="nonexistent")
         assert result is None
 
 
@@ -296,29 +342,32 @@ class TestDeactivateTenant:
 class TestFlagPaymentIssue:
     """PROV-05: Payment failure flagging."""
 
-    def test_flag_sets_past_due(self):
-        t = provision_tenant(
+    @pytest.mark.asyncio
+    async def test_flag_sets_past_due(self):
+        await provision_tenant(
             billing_channel=BillingChannel.STRIPE,
             stripe_customer_id="cus_flag",
         )
-        activate_tenant(stripe_customer_id="cus_flag")
+        await activate_tenant(stripe_customer_id="cus_flag")
 
-        result = flag_payment_issue(stripe_customer_id="cus_flag")
+        result = await flag_payment_issue(stripe_customer_id="cus_flag")
         assert result.status == TenantStatus.PAST_DUE
 
-    def test_flag_not_found(self):
-        result = flag_payment_issue(tenant_id="nonexistent")
+    @pytest.mark.asyncio
+    async def test_flag_not_found(self):
+        result = await flag_payment_issue(tenant_id="nonexistent")
         assert result is None
 
-    def test_flag_updates_timestamp(self):
-        t = provision_tenant(
+    @pytest.mark.asyncio
+    async def test_flag_updates_timestamp(self):
+        t = await provision_tenant(
             billing_channel=BillingChannel.STRIPE,
             stripe_customer_id="cus_ts",
         )
         old_updated = t.updated_at
-        # Small delay to ensure timestamp changes
-        flag_payment_issue(stripe_customer_id="cus_ts")
-        assert t.updated_at >= old_updated
+        result = await flag_payment_issue(stripe_customer_id="cus_ts")
+        # updated_at should be >= the original (ISO string comparison works for ISO 8601)
+        assert result.updated_at >= old_updated
 
 
 # ===================================================================
@@ -328,34 +377,71 @@ class TestFlagPaymentIssue:
 class TestGetTenant:
     """PROV-06: Tenant lookup by various identifiers."""
 
-    def test_get_by_tenant_id(self):
-        t = provision_tenant(
+    @pytest.mark.asyncio
+    async def test_get_by_tenant_id(self):
+        t = await provision_tenant(
             billing_channel=BillingChannel.STRIPE,
             stripe_customer_id="cus_get",
         )
-        result = get_tenant(tenant_id=t.tenant_id)
+        result = await get_tenant(tenant_id=t.tenant_id)
         assert result is not None
         assert result.tenant_id == t.tenant_id
 
-    def test_get_by_stripe_id(self):
-        t = provision_tenant(
+    @pytest.mark.asyncio
+    async def test_get_by_stripe_id(self):
+        await provision_tenant(
             billing_channel=BillingChannel.STRIPE,
             stripe_customer_id="cus_get_stripe",
         )
-        result = get_tenant(stripe_customer_id="cus_get_stripe")
+        result = await get_tenant(stripe_customer_id="cus_get_stripe")
         assert result is not None
 
-    def test_get_by_shop_domain(self):
-        t = provision_tenant(
+    @pytest.mark.asyncio
+    async def test_get_by_shop_domain(self):
+        await provision_tenant(
             billing_channel=BillingChannel.SHOPIFY,
             shopify_shop_domain="getshop.myshopify.com",
         )
-        result = get_tenant(shopify_shop_domain="getshop.myshopify.com")
+        result = await get_tenant(shopify_shop_domain="getshop.myshopify.com")
         assert result is not None
 
-    def test_get_not_found(self):
-        result = get_tenant(tenant_id="nonexistent")
+    @pytest.mark.asyncio
+    async def test_get_not_found(self):
+        result = await get_tenant(tenant_id="nonexistent")
         assert result is None
+
+
+# ===================================================================
+# provisioning.py — provision_trial_tenant
+# ===================================================================
+
+class TestProvisionTrialTenant:
+    """PROV-08: Trial tenant provisioning."""
+
+    @pytest.mark.asyncio
+    async def test_trial_tenant_created(self, fake_tenant_repo):
+        t = await provision_trial_tenant(
+            customer_email="trial@example.com",
+            trial_duration_days=14,
+            conversation_limit=50,
+        )
+        assert t.status == TenantStatus.ACTIVE
+        assert t.billing_channel == BillingChannel.TRIAL
+        assert t.tier == "trial"
+        assert t.customer_email == "trial@example.com"
+        # Verify stored in repo
+        doc = fake_tenant_repo.store.get(t.tenant_id)
+        assert doc is not None
+        assert doc.get("trial_conversation_limit") == 50
+
+    @pytest.mark.asyncio
+    async def test_trial_tenant_has_expiry(self, fake_tenant_repo):
+        t = await provision_trial_tenant(trial_duration_days=7)
+        doc = fake_tenant_repo.store.get(t.tenant_id)
+        trial_end = datetime.fromisoformat(doc["trial_expires_at"])
+        created = datetime.fromisoformat(doc["created_at"])
+        delta = trial_end - created
+        assert delta == timedelta(days=7)
 
 
 # ===================================================================
@@ -365,9 +451,10 @@ class TestGetTenant:
 class TestTenantLifecycle:
     """PROV-07: Full provision → activate → update → deactivate → re-provision."""
 
-    def test_full_stripe_lifecycle(self):
+    @pytest.mark.asyncio
+    async def test_full_stripe_lifecycle(self):
         # 1. Provision
-        t = provision_tenant(
+        t = await provision_tenant(
             billing_channel=BillingChannel.STRIPE,
             tier="starter",
             interval="month",
@@ -377,29 +464,29 @@ class TestTenantLifecycle:
         assert t.status == TenantStatus.PROVISIONING
 
         # 2. Activate
-        t = activate_tenant(stripe_customer_id="cus_lifecycle")
+        t = await activate_tenant(stripe_customer_id="cus_lifecycle")
         assert t.status == TenantStatus.ACTIVE
 
         # 3. Update tier
-        t = update_tenant(tier="professional", stripe_customer_id="cus_lifecycle")
+        t = await update_tenant(tier="professional", stripe_customer_id="cus_lifecycle")
         assert t.tier == "professional"
         assert t.status == TenantStatus.ACTIVE
 
         # 4. Payment failure
-        t = flag_payment_issue(stripe_customer_id="cus_lifecycle")
+        t = await flag_payment_issue(stripe_customer_id="cus_lifecycle")
         assert t.status == TenantStatus.PAST_DUE
 
         # 5. Payment recovered
-        t = activate_tenant(stripe_customer_id="cus_lifecycle")
+        t = await activate_tenant(stripe_customer_id="cus_lifecycle")
         assert t.status == TenantStatus.ACTIVE
 
         # 6. Cancel
-        t = deactivate_tenant(stripe_customer_id="cus_lifecycle")
+        t = await deactivate_tenant(stripe_customer_id="cus_lifecycle")
         assert t.status == TenantStatus.GRACE_PERIOD
         assert t.grace_period_ends_at is not None
 
         # 7. Re-subscribe
-        t = provision_tenant(
+        t = await provision_tenant(
             billing_channel=BillingChannel.STRIPE,
             tier="enterprise",
             stripe_customer_id="cus_lifecycle",
@@ -408,24 +495,25 @@ class TestTenantLifecycle:
         assert t.tier == "enterprise"
         assert t.deactivated_at is None
 
-    def test_cross_channel_isolation(self):
+    @pytest.mark.asyncio
+    async def test_cross_channel_isolation(self, fake_tenant_repo):
         """Stripe and Shopify tenants are independent."""
-        s1 = provision_tenant(
+        s1 = await provision_tenant(
             billing_channel=BillingChannel.STRIPE,
             tier="starter",
             stripe_customer_id="cus_iso_1",
         )
-        s2 = provision_tenant(
+        s2 = await provision_tenant(
             billing_channel=BillingChannel.SHOPIFY,
             tier="professional",
             shopify_shop_domain="iso.myshopify.com",
         )
         assert s1.tenant_id != s2.tenant_id
-        assert len(_tenants) == 2
+        assert len(fake_tenant_repo.store) == 2
 
         # Deactivating one doesn't affect the other
-        deactivate_tenant(stripe_customer_id="cus_iso_1")
-        shopify_tenant = get_tenant(shopify_shop_domain="iso.myshopify.com")
+        await deactivate_tenant(stripe_customer_id="cus_iso_1")
+        shopify_tenant = await get_tenant(shopify_shop_domain="iso.myshopify.com")
         assert shopify_tenant.status != TenantStatus.GRACE_PERIOD
 
 
@@ -485,10 +573,57 @@ class TestHandleCheckoutCompleted:
         assert result["action"] == "provision_tenant"
         assert result["stripe_customer_id"] == "cus_wh_sub"
 
-        # Verify tenant was created in the in-memory store
-        t = get_tenant(stripe_customer_id="cus_wh_sub")
+        # Verify tenant was created
+        t = await get_tenant(stripe_customer_id="cus_wh_sub")
         assert t is not None
         assert t.tier == "professional"
+
+    @pytest.mark.asyncio
+    async def test_subscription_checkout_with_superadmin(self):
+        """Checkout with customer_details triggers superadmin auto-provisioning."""
+        from src.integrations.stripe_webhooks import handle_checkout_completed
+
+        mock_team_repo = AsyncMock()
+
+        event = {
+            "data": {
+                "object": {
+                    "id": "cs_sub_sa",
+                    "mode": "subscription",
+                    "customer": "cus_wh_sa",
+                    "subscription": "sub_wh_sa",
+                    "customer_details": {"email": "owner@merchant.com"},
+                    "metadata": {
+                        "agent_red_tier": "starter",
+                        "agent_red_interval": "month",
+                    },
+                    "client_reference_id": None,
+                },
+            },
+        }
+
+        with patch(
+            "src.multi_tenant.repository.TeamMemberRepository",
+            return_value=mock_team_repo,
+        ):
+            result = await handle_checkout_completed(event)
+
+        assert result["action"] == "provision_tenant"
+        assert result["stripe_customer_id"] == "cus_wh_sa"
+        assert "superadmin_api_key" in result
+        assert result["superadmin_api_key"].startswith("ar_user_")
+
+        # Verify superadmin team member was created
+        mock_team_repo.create.assert_called_once()
+        created_doc = mock_team_repo.create.call_args[0][1]
+        assert created_doc.email == "owner@merchant.com"
+        assert created_doc.role.value == "superadmin"
+        assert created_doc.invited_by == "system"
+
+        # Verify tenant was created in repo
+        t = await get_tenant(stripe_customer_id="cus_wh_sa")
+        assert t is not None
+        assert t.tier == "starter"
 
     @pytest.mark.asyncio
     async def test_pack_purchase(self):
@@ -524,12 +659,12 @@ class TestHandleSubscriptionDeleted:
         from src.integrations.stripe_webhooks import handle_subscription_deleted
 
         # Pre-provision a tenant
-        provision_tenant(
+        await provision_tenant(
             billing_channel=BillingChannel.STRIPE,
             tier="starter",
             stripe_customer_id="cus_wh_del",
         )
-        activate_tenant(stripe_customer_id="cus_wh_del")
+        await activate_tenant(stripe_customer_id="cus_wh_del")
 
         event = {
             "data": {
@@ -546,7 +681,7 @@ class TestHandleSubscriptionDeleted:
         assert result["action"] == "subscription_cancelled"
         assert result["grace_period_days"] == 30
 
-        t = get_tenant(stripe_customer_id="cus_wh_del")
+        t = await get_tenant(stripe_customer_id="cus_wh_del")
         assert t.status == TenantStatus.GRACE_PERIOD
 
 
@@ -561,12 +696,12 @@ class TestHandlePaymentFailed:
     async def test_payment_failed_flags_tenant(self):
         from src.integrations.stripe_webhooks import handle_payment_failed
 
-        provision_tenant(
+        await provision_tenant(
             billing_channel=BillingChannel.STRIPE,
             tier="starter",
             stripe_customer_id="cus_wh_fail",
         )
-        activate_tenant(stripe_customer_id="cus_wh_fail")
+        await activate_tenant(stripe_customer_id="cus_wh_fail")
 
         event = {
             "data": {
@@ -585,7 +720,7 @@ class TestHandlePaymentFailed:
         result = await handle_payment_failed(event)
         assert result["action"] == "payment_failed"
 
-        t = get_tenant(stripe_customer_id="cus_wh_fail")
+        t = await get_tenant(stripe_customer_id="cus_wh_fail")
         assert t.status == TenantStatus.PAST_DUE
 
 
@@ -600,12 +735,12 @@ class TestHandlePaymentSucceeded:
     async def test_renewal_resets_usage(self):
         from src.integrations.stripe_webhooks import handle_payment_succeeded
 
-        provision_tenant(
+        await provision_tenant(
             billing_channel=BillingChannel.STRIPE,
             tier="starter",
             stripe_customer_id="cus_wh_pay",
         )
-        activate_tenant(stripe_customer_id="cus_wh_pay")
+        await activate_tenant(stripe_customer_id="cus_wh_pay")
 
         event = {
             "data": {

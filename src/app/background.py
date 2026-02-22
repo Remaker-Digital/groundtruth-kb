@@ -6,6 +6,8 @@
 - Ingestion processor — processes pending storefront ingestion jobs (KA-1).
 - Conversation archival sweep — auto-archives oldest resolved conversations when
   a tenant exceeds 1,000 non-archived conversations (WI-A7).
+- Trial expiry scanner — transitions expired trial tenants from ACTIVE to
+  TRIAL_EXPIRED status (WI-D1).
 
 © 2026 Remaker Digital, a DBA of VanDusen & Palmeter, LLC. All rights reserved.
 """
@@ -26,6 +28,7 @@ _sla_snapshot_task: asyncio.Task[None] | None = None
 _alert_eval_task: asyncio.Task[None] | None = None
 _ingestion_processor_task: asyncio.Task[None] | None = None
 _archival_sweep_task: asyncio.Task[None] | None = None
+_trial_scanner_task: asyncio.Task[None] | None = None
 
 
 async def _idle_scanner_loop() -> None:
@@ -589,3 +592,102 @@ def register_archival_sweep(app: FastAPI) -> None:
     """Register conversation archival sweep startup/shutdown handlers on the FastAPI app."""
     app.on_event("startup")(_startup_archival_sweep)
     app.on_event("shutdown")(_shutdown_archival_sweep)
+
+
+# ---------------------------------------------------------------------------
+# Trial expiry scanner (WI-D1)
+# ---------------------------------------------------------------------------
+
+# Scan interval — every 1 hour
+_TRIAL_SCAN_INTERVAL = 3600
+# Startup delay before first scan — 120 seconds
+_TRIAL_SCAN_STARTUP_DELAY = 120
+
+
+async def _trial_scanner_loop() -> None:
+    """Periodic background task that expires overdue trial tenants.
+
+    Runs every hour. Queries for active trial tenants whose
+    trial_expires_at timestamp is in the past, then transitions
+    them to TRIAL_EXPIRED status.
+
+    Middleware already rejects requests from expired trials
+    (middleware._check_trial_expiry), but this scanner ensures the
+    tenant status is updated proactively — important for accurate
+    dashboard metrics, billing reports, and preventing stale data.
+    """
+    from src.multi_tenant.repository import TenantRepository
+
+    # Wait before first scan to allow startup to complete
+    await asyncio.sleep(_TRIAL_SCAN_STARTUP_DELAY)
+
+    while True:
+        try:
+            tenant_repo = TenantRepository()
+            expired_trials = await tenant_repo.list_expired_trials()
+            expired_count = 0
+
+            for tenant_doc in expired_trials:
+                tid = tenant_doc.get("tenant_id")
+                if not tid:
+                    continue
+
+                try:
+                    now_iso = datetime.now(timezone.utc).isoformat()
+                    await tenant_repo.patch(
+                        tenant_id=tid,
+                        document_id=tid,
+                        operations=[
+                            {"op": "set", "path": "/status", "value": "trial_expired"},
+                            {"op": "set", "path": "/updated_at", "value": now_iso},
+                            {"op": "set", "path": "/trial_expired_at", "value": now_iso},
+                        ],
+                    )
+                    expired_count += 1
+                    logger.info(
+                        "Trial expired: tenant=%s trial_expires_at=%s",
+                        tid[:8],
+                        tenant_doc.get("trial_expires_at", "?"),
+                    )
+                except Exception:
+                    logger.debug(
+                        "Trial expiry failed for tenant %s",
+                        tid[:8],
+                        exc_info=True,
+                    )
+
+            if expired_count > 0:
+                logger.info(
+                    "Trial scanner: expired %d trial tenants",
+                    expired_count,
+                )
+        except Exception:
+            logger.debug("Trial scanner cycle failed", exc_info=True)
+
+        await asyncio.sleep(_TRIAL_SCAN_INTERVAL)
+
+
+async def _startup_trial_scanner() -> None:
+    """Start the trial expiry scanner background task."""
+    global _trial_scanner_task  # noqa: PLW0603
+    _trial_scanner_task = asyncio.create_task(_trial_scanner_loop())
+    logger.info("Trial expiry scanner started (1-hour interval)")
+
+
+async def _shutdown_trial_scanner() -> None:
+    """Cancel the trial expiry scanner background task."""
+    global _trial_scanner_task  # noqa: PLW0603
+    if _trial_scanner_task and not _trial_scanner_task.done():
+        _trial_scanner_task.cancel()
+        try:
+            await _trial_scanner_task
+        except asyncio.CancelledError:
+            pass
+        logger.info("Trial expiry scanner stopped")
+    _trial_scanner_task = None
+
+
+def register_trial_scanner(app: FastAPI) -> None:
+    """Register trial expiry scanner startup/shutdown handlers on the FastAPI app."""
+    app.on_event("startup")(_startup_trial_scanner)
+    app.on_event("shutdown")(_shutdown_trial_scanner)

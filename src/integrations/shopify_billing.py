@@ -543,7 +543,7 @@ async def confirm_subscription(
     # Shopify confirmation is both provisioning AND activation in one step
     # (payment is already confirmed by the time the merchant is redirected back).
     sub_info = _shop_subscriptions.get(shop_domain, {})
-    tenant = provision_tenant(
+    tenant = await provision_tenant(
         billing_channel=BillingChannel.SHOPIFY,
         tier=sub_info.get("tier"),
         interval=sub_info.get("interval"),
@@ -552,7 +552,7 @@ async def confirm_subscription(
     )
 
     # Immediately activate — Shopify collects payment during approval
-    activated = activate_tenant(shopify_shop_domain=shop_domain)
+    activated = await activate_tenant(shopify_shop_domain=shop_domain)
 
     result = {
         "shop_domain": shop_domain,

@@ -45,6 +45,7 @@ from tests.conftest import (
     auth_headers_api_key,
     make_tenant_document,
 )
+from tests.helpers.fake_tenant_repo import FakeTenantRepo
 
 # Skip all tests in this module if real APIs are not configured
 pytestmark = pytest.mark.skipif(
@@ -101,6 +102,26 @@ def _post_webhook(app_client: TestClient, event: dict[str, Any]) -> Any:
             "content-type": "application/json",
         },
     )
+
+
+# ---------------------------------------------------------------------------
+# Fixtures
+# ---------------------------------------------------------------------------
+
+
+@pytest.fixture(autouse=True)
+def _fake_provisioning_repo():
+    """Wire a FakeTenantRepo into the provisioning module for each test.
+
+    The lifecycle startup patches TenantRepository to fail, so provisioning
+    functions need an in-memory repo to store/retrieve tenant data.
+    """
+    from src.integrations.provisioning import configure_provisioning_repo
+
+    repo = FakeTenantRepo()
+    configure_provisioning_repo(repo, team_repo=None)
+    yield repo
+    configure_provisioning_repo(None, team_repo=None)
 
 
 # ---------------------------------------------------------------------------

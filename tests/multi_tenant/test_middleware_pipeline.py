@@ -33,6 +33,7 @@ from tests.conftest import (
     hash_test_api_key,
     make_tenant_document,
 )
+from tests.helpers.fake_tenant_repo import FakeTenantRepo, run_sync
 from src.multi_tenant.cosmos_schema import TenantStatus, TenantTier
 
 
@@ -93,6 +94,21 @@ def _reset_middleware_state(app_client):
         current = getattr(current, "app", None)
 
 
+@pytest.fixture(autouse=True)
+def _fake_provisioning_repo():
+    """Wire a FakeTenantRepo into the provisioning module for each test.
+
+    Ensures provisioning functions (provision_tenant, get_tenant, etc.)
+    read and write from an in-memory store instead of Cosmos DB.
+    """
+    from src.integrations.provisioning import configure_provisioning_repo
+
+    repo = FakeTenantRepo()
+    configure_provisioning_repo(repo, team_repo=None)
+    yield repo
+    configure_provisioning_repo(None, team_repo=None)
+
+
 @pytest.fixture
 def shopify_env():
     """Set Shopify app credentials for JWT verification."""
@@ -134,13 +150,13 @@ class TestAuthentication:
 
         # Also test a protected endpoint — dashboard needs services configured,
         # so use the health endpoint which is simpler
-        # Let's use a tenant lookup since provisioning is in-memory
+        # Let's use a tenant lookup since provisioning uses FakeTenantRepo
         from src.integrations.provisioning import BillingChannel, provision_tenant
-        tenant = provision_tenant(
+        tenant = run_sync(provision_tenant(
             billing_channel=BillingChannel.STRIPE,
             tier="starter",
             stripe_customer_id="cus_mwp02",
-        )
+        ))
         resp = starter_client.get(f"/api/tenants/{tenant.tenant_id}")
         assert resp.status_code == 200
 
@@ -451,11 +467,11 @@ class TestCorrelation:
         that an authenticated request completes (the middleware ran).
         """
         from src.integrations.provisioning import BillingChannel, provision_tenant
-        tenant = provision_tenant(
+        tenant = run_sync(provision_tenant(
             billing_channel=BillingChannel.STRIPE,
             tier="starter",
             stripe_customer_id="cus_corr_001",
-        )
+        ))
         resp = starter_client.get(f"/api/tenants/{tenant.tenant_id}")
         assert resp.status_code == 200
         # The CorrelationMiddleware runs between auth and handler.
@@ -496,11 +512,11 @@ class TestFullStack:
         because it's a protected endpoint.
         """
         from src.integrations.provisioning import BillingChannel, provision_tenant
-        tenant = provision_tenant(
+        tenant = run_sync(provision_tenant(
             billing_channel=BillingChannel.STRIPE,
             tier="starter",
             stripe_customer_id="cus_stack_001",
-        )
+        ))
         resp = starter_client.get(f"/api/tenants/{tenant.tenant_id}")
         assert resp.status_code == 200
         body = resp.json()

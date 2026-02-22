@@ -22,6 +22,7 @@ from tests.conftest import (
     TEST_API_KEY_STARTER,
     auth_headers_api_key,
 )
+from tests.helpers.fake_tenant_repo import FakeTenantRepo
 
 
 # ---------------------------------------------------------------------------
@@ -57,17 +58,16 @@ def _reset_in_memory_stores(app_client):
 
     The billing modules use module-level dicts for dev state.
     Tests must start with a clean slate.
+
+    Provisioning uses a FakeTenantRepo (wired per-test) instead of
+    module-level dicts — see ``_fake_provisioning_repo`` fixture below.
     """
-    import src.integrations.provisioning as prov_mod
     import src.integrations.stripe_packs as packs_mod
     import src.integrations.stripe_usage as usage_mod
     import src.integrations.stripe_webhooks as wh_mod
     import src.integrations.shopify_billing as shopify_mod
     import src.main as main_mod
 
-    prov_mod._tenants.clear()
-    prov_mod._stripe_index.clear()
-    prov_mod._shopify_index.clear()
     packs_mod._pack_balances.clear()
     usage_mod._usage_counters.clear()
     usage_mod._stripe_client = None
@@ -77,13 +77,21 @@ def _reset_in_memory_stores(app_client):
 
     yield
 
-    prov_mod._tenants.clear()
-    prov_mod._stripe_index.clear()
-    prov_mod._shopify_index.clear()
     packs_mod._pack_balances.clear()
     usage_mod._usage_counters.clear()
     wh_mod._processed_events.clear()
     shopify_mod._shop_subscriptions.clear()
+
+
+@pytest.fixture(autouse=True)
+def _fake_provisioning_repo():
+    """Wire a FakeTenantRepo into the provisioning module for each test."""
+    from src.integrations.provisioning import configure_provisioning_repo
+
+    repo = FakeTenantRepo()
+    configure_provisioning_repo(repo, team_repo=None)
+    yield repo
+    configure_provisioning_repo(None, team_repo=None)
 
 
 @pytest.fixture

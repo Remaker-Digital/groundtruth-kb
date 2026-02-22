@@ -9,6 +9,9 @@ This abstraction ensures downstream code (usage tracking, feature gating,
 API key management) doesn't need to know which billing channel the
 customer uses.
 
+Persistence: Cosmos DB ``tenants`` collection via TenantRepository.
+All core functions are async — callers must ``await`` them.
+
 Tenant lifecycle:
     1. provision_tenant()  — New subscription → create tenant record
     2. activate_tenant()   — Payment confirmed → mark tenant active
@@ -30,51 +33,34 @@ Endpoints:
 
 from __future__ import annotations
 
-import logging
-import time
-import uuid
-from datetime import datetime, timezone
-from enum import Enum
-from typing import Any
-
 import hashlib
+import logging
+import uuid
+from datetime import datetime, timedelta, timezone
+from typing import Any
 
 from fastapi import APIRouter, HTTPException, Request
 from pydantic import BaseModel, Field
 
-# Cosmos DB fallback for tenant lookup (populated at startup)
-_tenant_repo = None
-_team_repo = None
+# Canonical enums from Cosmos DB schema — re-exported for backward compatibility.
+# Callers may continue to ``from src.integrations.provisioning import BillingChannel``.
+from src.multi_tenant.cosmos_schema import (  # noqa: F401  — re-export
+    BillingChannel,
+    TenantStatus,
+)
 
 logger = logging.getLogger(__name__)
 
-
 # ---------------------------------------------------------------------------
-# Enums
+# Cosmos DB repositories (wired at startup via configure_provisioning_repo)
 # ---------------------------------------------------------------------------
 
-
-class BillingChannel(str, Enum):
-    """Billing channel through which the customer subscribes."""
-
-    STRIPE = "stripe"
-    SHOPIFY = "shopify"
-    TRIAL = "trial"
-
-
-class TenantStatus(str, Enum):
-    """Lifecycle status of a tenant."""
-
-    PROVISIONING = "provisioning"    # Checkout completed, setting up
-    ACTIVE = "active"                # Payment confirmed, fully operational
-    PAST_DUE = "past_due"            # Payment failed, limited access
-    GRACE_PERIOD = "grace_period"    # Cancelled, data preserved (30 days)
-    DEACTIVATED = "deactivated"      # Grace period expired, access revoked
-    TRIAL_EXPIRED = "trial_expired"  # Trial period ended, must subscribe
+_tenant_repo = None
+_team_repo = None
 
 
 # ---------------------------------------------------------------------------
-# Tenant record
+# Tenant record — returned by all core functions
 # ---------------------------------------------------------------------------
 
 
@@ -84,6 +70,8 @@ class TenantRecord(BaseModel):
     This record is the single source of truth for a tenant's status,
     regardless of billing channel. All downstream systems (usage
     tracking, feature flags, API gateway) read from this record.
+
+    Timestamps are ISO 8601 strings (matching TenantDocument schema).
     """
 
     tenant_id: str = Field(description="Unique tenant identifier (UUID)")
@@ -104,38 +92,15 @@ class TenantRecord(BaseModel):
     # Contact
     customer_email: str | None = Field(default=None, description="Primary contact email")
 
-    # Timestamps (Unix epoch)
-    created_at: int = Field(description="When tenant was provisioned")
-    updated_at: int = Field(description="Last status change")
-    deactivated_at: int | None = Field(default=None, description="When cancellation began")
-    grace_period_ends_at: int | None = Field(default=None, description="When data will be deleted")
+    # Timestamps (ISO 8601 strings)
+    created_at: str = Field(description="When tenant was provisioned")
+    updated_at: str = Field(description="Last status change")
+    deactivated_at: str | None = Field(default=None, description="When cancellation began")
+    grace_period_ends_at: str | None = Field(default=None, description="When data will be deleted")
 
 
-# ---------------------------------------------------------------------------
-# In-memory tenant store (DEVELOPMENT ONLY)
-#
-# WARNING: Same caveats as other in-memory stores in this codebase:
-#   1. Lost on restart.
-#   2. Not shared across workers.
-#   3. Non-atomic operations.
-#
-# Production replacement (Phase 2.2): Cosmos DB with:
-#   - Partition key: tenant_id
-#   - Secondary indexes on stripe_customer_id, shopify_shop_domain
-#   - Change feed for downstream event propagation
-#
-# Indexes:
-#   _tenants:        { tenant_id: TenantRecord }
-#   _stripe_index:   { stripe_customer_id: tenant_id }
-#   _shopify_index:  { shop_domain: tenant_id }
-# ---------------------------------------------------------------------------
-
-_tenants: dict[str, TenantRecord] = {}
-_stripe_index: dict[str, str] = {}   # stripe_customer_id → tenant_id
-_shopify_index: dict[str, str] = {}  # shop_domain → tenant_id
-
-# Grace period in seconds (30 days, per SLA)
-_GRACE_PERIOD_SECONDS = 30 * 24 * 60 * 60
+# Grace period duration (30 days, per SLA)
+_GRACE_PERIOD = timedelta(days=30)
 
 # ---------------------------------------------------------------------------
 # Router
@@ -175,11 +140,105 @@ class TenantLookupResponse(BaseModel):
 
 
 # ---------------------------------------------------------------------------
-# Core provisioning logic
+# Repository configuration (called at startup from lifecycle.py)
 # ---------------------------------------------------------------------------
 
 
-def provision_tenant(
+def configure_provisioning_repo(tenant_repo: Any, team_repo: Any = None) -> None:
+    """Wire Cosmos DB repositories as the primary persistence layer.
+
+    Called from lifecycle.py startup to enable all provisioning operations
+    and tenant lookup endpoints.
+
+    Args:
+        tenant_repo: TenantRepository for tenant CRUD and lookups.
+        team_repo: TeamMemberRepository for per-user API key lookups.
+    """
+    global _tenant_repo, _team_repo  # noqa: PLW0603
+    _tenant_repo = tenant_repo
+    _team_repo = team_repo
+    logger.info("Provisioning repos configured (team_repo=%s)", "yes" if team_repo else "no")
+
+
+# ---------------------------------------------------------------------------
+# Internal helpers
+# ---------------------------------------------------------------------------
+
+
+def _doc_to_record(doc: dict[str, Any]) -> TenantRecord:
+    """Convert a Cosmos DB tenant document dict to a TenantRecord."""
+    tier_val = doc.get("tier")
+    # TenantDocument.tier is TenantTier enum — extract string value
+    if hasattr(tier_val, "value"):
+        tier_val = tier_val.value
+    status_val = doc.get("status", "provisioning")
+    if hasattr(status_val, "value"):
+        status_val = status_val.value
+    channel_val = doc.get("billing_channel", "stripe")
+    if hasattr(channel_val, "value"):
+        channel_val = channel_val.value
+
+    return TenantRecord(
+        tenant_id=doc.get("tenant_id") or doc.get("id"),
+        status=status_val,
+        billing_channel=channel_val,
+        tier=tier_val,
+        interval=doc.get("interval"),
+        addons=doc.get("addons", []),
+        stripe_customer_id=doc.get("stripe_customer_id"),
+        stripe_subscription_id=doc.get("stripe_subscription_id"),
+        shopify_shop_domain=doc.get("shopify_shop_domain"),
+        shopify_subscription_id=doc.get("shopify_subscription_id"),
+        customer_email=doc.get("customer_email"),
+        created_at=doc.get("created_at", ""),
+        updated_at=doc.get("updated_at", ""),
+        deactivated_at=doc.get("deactivated_at"),
+        grace_period_ends_at=doc.get("grace_period_ends_at"),
+    )
+
+
+async def _lookup_tenant(
+    tenant_id: str | None = None,
+    stripe_customer_id: str | None = None,
+    shopify_shop_domain: str | None = None,
+) -> TenantRecord | None:
+    """Internal: lookup tenant by any identifier via Cosmos DB."""
+    if _tenant_repo is None:
+        logger.warning("Tenant repo not configured — cannot look up tenant")
+        return None
+
+    doc: dict[str, Any] | None = None
+
+    if tenant_id:
+        try:
+            doc = await _tenant_repo.read(tenant_id, tenant_id)
+        except Exception:
+            doc = None
+
+    if doc is None and stripe_customer_id:
+        try:
+            doc = await _tenant_repo.find_by_stripe_customer_id(stripe_customer_id)
+        except Exception:
+            doc = None
+
+    if doc is None and shopify_shop_domain:
+        try:
+            doc = await _tenant_repo.find_by_shopify_domain(shopify_shop_domain)
+        except Exception:
+            doc = None
+
+    if doc is None:
+        return None
+
+    return _doc_to_record(doc)
+
+
+# ---------------------------------------------------------------------------
+# Core provisioning logic (all async — callers must await)
+# ---------------------------------------------------------------------------
+
+
+async def provision_tenant(
     billing_channel: BillingChannel,
     tier: str | None = None,
     interval: str | None = None,
@@ -212,46 +271,67 @@ def provision_tenant(
 
     Returns:
         The created or updated TenantRecord.
+
+    Raises:
+        RuntimeError: If the tenant repository is not configured.
     """
-    now = int(time.time())
+    if _tenant_repo is None:
+        raise RuntimeError("Tenant repository not configured")
+
+    now_iso = datetime.now(timezone.utc).isoformat()
 
     # Check if tenant already exists for this channel identifier
-    existing_tenant_id = None
+    existing_doc: dict[str, Any] | None = None
     if billing_channel == BillingChannel.STRIPE and stripe_customer_id:
-        existing_tenant_id = _stripe_index.get(stripe_customer_id)
+        try:
+            existing_doc = await _tenant_repo.find_by_stripe_customer_id(stripe_customer_id)
+        except Exception:
+            existing_doc = None
     elif billing_channel == BillingChannel.SHOPIFY and shopify_shop_domain:
-        existing_tenant_id = _shopify_index.get(shopify_shop_domain)
+        try:
+            existing_doc = await _tenant_repo.find_by_shopify_domain(shopify_shop_domain)
+        except Exception:
+            existing_doc = None
 
-    if existing_tenant_id and existing_tenant_id in _tenants:
-        # Update existing tenant (re-subscription or plan change)
-        tenant = _tenants[existing_tenant_id]
-        tenant.status = TenantStatus.PROVISIONING
-        tenant.tier = tier or tenant.tier
-        tenant.interval = interval or tenant.interval
-        tenant.addons = addons if addons is not None else tenant.addons
-        tenant.updated_at = now
-        tenant.deactivated_at = None
-        tenant.grace_period_ends_at = None
-
-        # Update channel-specific fields
+    if existing_doc:
+        # Re-provision existing tenant (re-subscription or plan change)
+        existing_id = existing_doc.get("tenant_id") or existing_doc.get("id")
+        operations: list[dict[str, Any]] = [
+            {"op": "set", "path": "/status", "value": TenantStatus.PROVISIONING.value},
+            {"op": "set", "path": "/updated_at", "value": now_iso},
+            {"op": "set", "path": "/deactivated_at", "value": None},
+            {"op": "set", "path": "/grace_period_ends_at", "value": None},
+        ]
+        if tier is not None:
+            operations.append({"op": "set", "path": "/tier", "value": tier})
+        if interval is not None:
+            operations.append({"op": "set", "path": "/interval", "value": interval})
+        if addons is not None:
+            operations.append({"op": "set", "path": "/addons", "value": addons})
         if stripe_subscription_id:
-            tenant.stripe_subscription_id = stripe_subscription_id
+            operations.append({"op": "set", "path": "/stripe_subscription_id", "value": stripe_subscription_id})
         if shopify_subscription_id:
-            tenant.shopify_subscription_id = shopify_subscription_id
+            operations.append({"op": "set", "path": "/shopify_subscription_id", "value": shopify_subscription_id})
         if customer_email:
-            tenant.customer_email = customer_email
+            operations.append({"op": "set", "path": "/customer_email", "value": customer_email})
+
+        updated_doc = await _tenant_repo.patch(existing_id, existing_id, operations)
 
         logger.info(
             "Tenant re-provisioned: tenant=%s channel=%s tier=%s",
-            tenant.tenant_id,
+            existing_id,
             billing_channel.value,
             tier,
         )
-        return tenant
+        return _doc_to_record(updated_doc)
 
     # Create new tenant
     tenant_id = str(uuid.uuid4())
-    tenant = TenantRecord(
+
+    from src.multi_tenant.cosmos_schema import TenantDocument
+
+    doc = TenantDocument(
+        id=tenant_id,
         tenant_id=tenant_id,
         status=TenantStatus.PROVISIONING,
         billing_channel=billing_channel,
@@ -263,17 +343,11 @@ def provision_tenant(
         shopify_shop_domain=shopify_shop_domain,
         shopify_subscription_id=shopify_subscription_id,
         customer_email=customer_email,
-        created_at=now,
-        updated_at=now,
+        created_at=now_iso,
+        updated_at=now_iso,
     )
 
-    _tenants[tenant_id] = tenant
-
-    # Build indexes
-    if stripe_customer_id:
-        _stripe_index[stripe_customer_id] = tenant_id
-    if shopify_shop_domain:
-        _shopify_index[shopify_shop_domain] = tenant_id
+    await _tenant_repo.upsert(tenant_id, doc)
 
     logger.info(
         "Tenant provisioned: tenant=%s channel=%s tier=%s email=%s",
@@ -283,7 +357,21 @@ def provision_tenant(
         customer_email,
     )
 
-    return tenant
+    return TenantRecord(
+        tenant_id=tenant_id,
+        status=TenantStatus.PROVISIONING,
+        billing_channel=billing_channel,
+        tier=tier,
+        interval=interval,
+        addons=addons or [],
+        stripe_customer_id=stripe_customer_id,
+        stripe_subscription_id=stripe_subscription_id,
+        shopify_shop_domain=shopify_shop_domain,
+        shopify_subscription_id=shopify_subscription_id,
+        customer_email=customer_email,
+        created_at=now_iso,
+        updated_at=now_iso,
+    )
 
 
 async def auto_provision_superadmin(
@@ -352,7 +440,7 @@ async def auto_provision_superadmin(
         return None
 
 
-def activate_tenant(
+async def activate_tenant(
     tenant_id: str | None = None,
     stripe_customer_id: str | None = None,
     shopify_shop_domain: str | None = None,
@@ -371,20 +459,25 @@ def activate_tenant(
     Returns:
         The updated TenantRecord, or None if not found.
     """
-    tenant = _lookup_tenant(tenant_id, stripe_customer_id, shopify_shop_domain)
+    tenant = await _lookup_tenant(tenant_id, stripe_customer_id, shopify_shop_domain)
     if not tenant:
         return None
 
-    tenant.status = TenantStatus.ACTIVE
-    tenant.updated_at = int(time.time())
-    tenant.deactivated_at = None
-    tenant.grace_period_ends_at = None
+    now_iso = datetime.now(timezone.utc).isoformat()
+    operations = [
+        {"op": "set", "path": "/status", "value": TenantStatus.ACTIVE.value},
+        {"op": "set", "path": "/updated_at", "value": now_iso},
+        {"op": "set", "path": "/deactivated_at", "value": None},
+        {"op": "set", "path": "/grace_period_ends_at", "value": None},
+    ]
+
+    updated_doc = await _tenant_repo.patch(tenant.tenant_id, tenant.tenant_id, operations)
 
     logger.info("Tenant activated: tenant=%s", tenant.tenant_id)
-    return tenant
+    return _doc_to_record(updated_doc)
 
 
-def update_tenant(
+async def update_tenant(
     tier: str | None = None,
     interval: str | None = None,
     addons: list[str] | None = None,
@@ -408,29 +501,34 @@ def update_tenant(
     Returns:
         The updated TenantRecord, or None if not found.
     """
-    tenant = _lookup_tenant(tenant_id, stripe_customer_id, shopify_shop_domain)
+    tenant = await _lookup_tenant(tenant_id, stripe_customer_id, shopify_shop_domain)
     if not tenant:
         return None
 
-    old_tier = tenant.tier
+    now_iso = datetime.now(timezone.utc).isoformat()
+    operations: list[dict[str, Any]] = [
+        {"op": "set", "path": "/updated_at", "value": now_iso},
+    ]
     if tier is not None:
-        tenant.tier = tier
+        operations.append({"op": "set", "path": "/tier", "value": tier})
     if interval is not None:
-        tenant.interval = interval
+        operations.append({"op": "set", "path": "/interval", "value": interval})
     if addons is not None:
-        tenant.addons = addons
-    tenant.updated_at = int(time.time())
+        operations.append({"op": "set", "path": "/addons", "value": addons})
+
+    old_tier = tenant.tier
+    updated_doc = await _tenant_repo.patch(tenant.tenant_id, tenant.tenant_id, operations)
 
     logger.info(
         "Tenant updated: tenant=%s tier=%s→%s",
         tenant.tenant_id,
         old_tier,
-        tenant.tier,
+        tier if tier is not None else old_tier,
     )
-    return tenant
+    return _doc_to_record(updated_doc)
 
 
-def deactivate_tenant(
+async def deactivate_tenant(
     tenant_id: str | None = None,
     stripe_customer_id: str | None = None,
     shopify_shop_domain: str | None = None,
@@ -452,25 +550,32 @@ def deactivate_tenant(
     Returns:
         The updated TenantRecord, or None if not found.
     """
-    tenant = _lookup_tenant(tenant_id, stripe_customer_id, shopify_shop_domain)
+    tenant = await _lookup_tenant(tenant_id, stripe_customer_id, shopify_shop_domain)
     if not tenant:
         return None
 
-    now = int(time.time())
-    tenant.status = TenantStatus.GRACE_PERIOD
-    tenant.updated_at = now
-    tenant.deactivated_at = now
-    tenant.grace_period_ends_at = now + _GRACE_PERIOD_SECONDS
+    now = datetime.now(timezone.utc)
+    now_iso = now.isoformat()
+    grace_end_iso = (now + _GRACE_PERIOD).isoformat()
+
+    operations = [
+        {"op": "set", "path": "/status", "value": TenantStatus.GRACE_PERIOD.value},
+        {"op": "set", "path": "/updated_at", "value": now_iso},
+        {"op": "set", "path": "/deactivated_at", "value": now_iso},
+        {"op": "set", "path": "/grace_period_ends_at", "value": grace_end_iso},
+    ]
+
+    updated_doc = await _tenant_repo.patch(tenant.tenant_id, tenant.tenant_id, operations)
 
     logger.info(
-        "Tenant deactivated: tenant=%s grace_period_ends=%d",
+        "Tenant deactivated: tenant=%s grace_period_ends=%s",
         tenant.tenant_id,
-        tenant.grace_period_ends_at,
+        grace_end_iso,
     )
-    return tenant
+    return _doc_to_record(updated_doc)
 
 
-def flag_payment_issue(
+async def flag_payment_issue(
     tenant_id: str | None = None,
     stripe_customer_id: str | None = None,
     shopify_shop_domain: str | None = None,
@@ -491,18 +596,23 @@ def flag_payment_issue(
     Returns:
         The updated TenantRecord, or None if not found.
     """
-    tenant = _lookup_tenant(tenant_id, stripe_customer_id, shopify_shop_domain)
+    tenant = await _lookup_tenant(tenant_id, stripe_customer_id, shopify_shop_domain)
     if not tenant:
         return None
 
-    tenant.status = TenantStatus.PAST_DUE
-    tenant.updated_at = int(time.time())
+    now_iso = datetime.now(timezone.utc).isoformat()
+    operations = [
+        {"op": "set", "path": "/status", "value": TenantStatus.PAST_DUE.value},
+        {"op": "set", "path": "/updated_at", "value": now_iso},
+    ]
+
+    updated_doc = await _tenant_repo.patch(tenant.tenant_id, tenant.tenant_id, operations)
 
     logger.info("Tenant flagged past_due: tenant=%s", tenant.tenant_id)
-    return tenant
+    return _doc_to_record(updated_doc)
 
 
-def provision_trial_tenant(
+async def provision_trial_tenant(
     customer_email: str | None = None,
     trial_duration_days: int = 14,
     conversation_limit: int = 50,
@@ -524,11 +634,22 @@ def provision_trial_tenant(
 
     Returns:
         The created TenantRecord.
+
+    Raises:
+        RuntimeError: If the tenant repository is not configured.
     """
-    now = int(time.time())
+    if _tenant_repo is None:
+        raise RuntimeError("Tenant repository not configured")
+
+    now = datetime.now(timezone.utc)
+    now_iso = now.isoformat()
+    trial_end_iso = (now + timedelta(days=trial_duration_days)).isoformat()
     tenant_id = str(uuid.uuid4())
 
-    tenant = TenantRecord(
+    from src.multi_tenant.cosmos_schema import TenantDocument
+
+    doc = TenantDocument(
+        id=tenant_id,
         tenant_id=tenant_id,
         status=TenantStatus.ACTIVE,
         billing_channel=BillingChannel.TRIAL,
@@ -536,11 +657,13 @@ def provision_trial_tenant(
         interval=None,
         addons=[],
         customer_email=customer_email,
-        created_at=now,
-        updated_at=now,
+        trial_expires_at=trial_end_iso,
+        trial_conversation_limit=conversation_limit,
+        created_at=now_iso,
+        updated_at=now_iso,
     )
 
-    _tenants[tenant_id] = tenant
+    await _tenant_repo.upsert(tenant_id, doc)
 
     logger.info(
         "Trial tenant provisioned: tenant=%s email=%s duration=%dd limit=%d",
@@ -550,10 +673,20 @@ def provision_trial_tenant(
         conversation_limit,
     )
 
-    return tenant
+    return TenantRecord(
+        tenant_id=tenant_id,
+        status=TenantStatus.ACTIVE,
+        billing_channel=BillingChannel.TRIAL,
+        tier="trial",
+        interval=None,
+        addons=[],
+        customer_email=customer_email,
+        created_at=now_iso,
+        updated_at=now_iso,
+    )
 
 
-def get_tenant(
+async def get_tenant(
     tenant_id: str | None = None,
     stripe_customer_id: str | None = None,
     shopify_shop_domain: str | None = None,
@@ -568,76 +701,15 @@ def get_tenant(
     Returns:
         The TenantRecord, or None if not found.
     """
-    return _lookup_tenant(tenant_id, stripe_customer_id, shopify_shop_domain)
+    return await _lookup_tenant(tenant_id, stripe_customer_id, shopify_shop_domain)
 
 
 # ---------------------------------------------------------------------------
-# Internal helpers
+# API key lookup (used by /api/tenants/lookup endpoint)
 # ---------------------------------------------------------------------------
 
 
-def _lookup_tenant(
-    tenant_id: str | None = None,
-    stripe_customer_id: str | None = None,
-    shopify_shop_domain: str | None = None,
-) -> TenantRecord | None:
-    """Internal: lookup tenant by any identifier."""
-    if tenant_id and tenant_id in _tenants:
-        return _tenants[tenant_id]
-
-    if stripe_customer_id:
-        tid = _stripe_index.get(stripe_customer_id)
-        if tid and tid in _tenants:
-            return _tenants[tid]
-
-    if shopify_shop_domain:
-        tid = _shopify_index.get(shopify_shop_domain)
-        if tid and tid in _tenants:
-            return _tenants[tid]
-
-    return None
-
-
-# ---------------------------------------------------------------------------
-# Cosmos DB fallback configuration
-# ---------------------------------------------------------------------------
-
-
-def configure_tenant_lookup_repo(tenant_repo: Any, team_repo: Any = None) -> None:
-    """Wire Cosmos DB repositories for lookup fallback.
-
-    Called from main.py startup to enable /api/tenants/lookup and
-    /api/tenants/{tenant_id} to query Cosmos DB when the in-memory
-    index has no match (e.g., tenants provisioned via scripts).
-
-    Args:
-        tenant_repo: TenantRepository for tenant API key and ID lookups.
-        team_repo: TeamMemberRepository for per-user API key lookups.
-    """
-    global _tenant_repo, _team_repo  # noqa: PLW0603
-    _tenant_repo = tenant_repo
-    _team_repo = team_repo
-    logger.info("Tenant lookup Cosmos DB fallback configured (team_repo=%s)", "yes" if team_repo else "no")
-
-
-async def _cosmos_lookup(
-    tenant_id: str | None = None,
-    shopify_shop_domain: str | None = None,
-) -> dict[str, Any] | None:
-    """Fallback to Cosmos DB when in-memory index misses."""
-    if _tenant_repo is None:
-        return None
-    try:
-        if shopify_shop_domain:
-            return await _tenant_repo.find_by_shopify_domain(shopify_shop_domain)
-        if tenant_id:
-            return await _tenant_repo.read(tenant_id, tenant_id)
-    except Exception as exc:
-        logger.warning("Cosmos DB tenant lookup failed: %s", exc)
-    return None
-
-
-async def _cosmos_lookup_by_api_key(api_key: str) -> dict[str, Any] | None:
+async def _lookup_by_api_key(api_key: str) -> dict[str, Any] | None:
     """Lookup a tenant in Cosmos DB by API key hash.
 
     Used by the standalone admin login flow — the raw key is hashed
@@ -655,11 +727,11 @@ async def _cosmos_lookup_by_api_key(api_key: str) -> dict[str, Any] | None:
         try:
             member = await _team_repo.find_by_user_api_key_hash(key_hash)
             if member and _tenant_repo is not None:
-                tenant_id = member.get("tenant_id")
-                if tenant_id:
-                    return await _tenant_repo.read(tenant_id, tenant_id)
+                tid = member.get("tenant_id")
+                if tid:
+                    return await _tenant_repo.read(tid, tid)
         except Exception as exc:
-            logger.warning("Cosmos DB user API key lookup failed: %s", exc)
+            logger.warning("User API key lookup failed: %s", exc)
         return None
 
     # Tenant API key → direct lookup
@@ -668,7 +740,7 @@ async def _cosmos_lookup_by_api_key(api_key: str) -> dict[str, Any] | None:
     try:
         return await _tenant_repo.find_by_api_key_hash(key_hash)
     except Exception as exc:
-        logger.warning("Cosmos DB API key lookup failed: %s", exc)
+        logger.warning("API key lookup failed: %s", exc)
     return None
 
 
@@ -712,7 +784,7 @@ async def lookup_tenant_endpoint(
     # When shop or stripe_customer_id is given, those take precedence.
     api_key = request.headers.get("X-API-Key", "").strip()
     if api_key and not stripe_customer_id and not shop:
-        doc = await _cosmos_lookup_by_api_key(api_key)
+        doc = await _lookup_by_api_key(api_key)
         if doc:
             return TenantLookupResponse(
                 found=True,
@@ -731,24 +803,13 @@ async def lookup_tenant_endpoint(
             detail="Provide 'stripe_customer_id' or 'shop' query parameter, or X-API-Key header.",
         )
 
-    tenant = get_tenant(
+    # Direct channel lookup — repo is the primary path
+    tenant = await get_tenant(
         stripe_customer_id=stripe_customer_id,
         shopify_shop_domain=shop,
     )
 
     if not tenant:
-        # Fallback to Cosmos DB for tenants provisioned outside webhook flow
-        doc = await _cosmos_lookup(shopify_shop_domain=shop)
-        if doc:
-            return TenantLookupResponse(
-                found=True,
-                tenant_id=doc.get("tenant_id") or doc.get("id"),
-                status=doc.get("status"),
-                tier=doc.get("tier"),
-                billing_channel=doc.get("billing_channel"),
-                has_stripe_billing=bool(doc.get("stripe_customer_id")),
-                shopify_shop_domain=doc.get("shopify_shop_domain"),
-            )
         return TenantLookupResponse(found=False)
 
     return TenantLookupResponse(
@@ -773,27 +834,10 @@ async def lookup_tenant_endpoint(
     },
 )
 async def get_tenant_endpoint(tenant_id: str) -> TenantResponse:
-    """Get tenant status by tenant ID.
-
-    In production, this endpoint would be authenticated via API key
-    or service-to-service auth.
-    """
-    tenant = get_tenant(tenant_id=tenant_id)
+    """Get tenant status by tenant ID."""
+    tenant = await get_tenant(tenant_id=tenant_id)
     if not tenant:
-        # Fallback to Cosmos DB
-        doc = await _cosmos_lookup(tenant_id=tenant_id)
-        if not doc:
-            raise HTTPException(status_code=404, detail="Tenant not found.")
-        return TenantResponse(
-            tenant_id=doc.get("tenant_id") or doc.get("id"),
-            status=doc.get("status"),
-            billing_channel=doc.get("billing_channel"),
-            tier=doc.get("tier"),
-            interval=doc.get("interval"),
-            addons=doc.get("addons", []),
-            created_at=doc.get("created_at"),
-            updated_at=doc.get("updated_at"),
-        )
+        raise HTTPException(status_code=404, detail="Tenant not found.")
 
     return TenantResponse(
         tenant_id=tenant.tenant_id,
