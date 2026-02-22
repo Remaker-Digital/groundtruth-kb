@@ -9,7 +9,7 @@ All notable changes to Agent Red Customer Experience are documented here.
 
 ---
 
-## Unreleased — Cycles 15-19
+## v1.55.0 — Cycles 15-19 (2026-02-22)
 
 ### Onboarding polish (Cycle 19)
 - **Automatic widget key generation (WI-E1):** Widget keys are now generated automatically when a tenant is provisioned — no manual setup required. Keys are created during Stripe checkout, Shopify billing confirmation, and trial provisioning. The rotation endpoint now correctly updates both the authentication hash and the admin-visible raw key.
