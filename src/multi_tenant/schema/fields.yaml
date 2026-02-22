@@ -1114,7 +1114,7 @@ fields:
     display_name: Pre-chat form
     field_type: boolean
     validation: {}
-    platform_default: false
+    platform_default: true
     tier_gate: all
     onboarding_step: 9
     step_order: 34
@@ -1246,11 +1246,40 @@ fields:
     pii_classification: none
     injected_in_prompt: false
 
+  - field_name: customer_email_verification
+    display_name: Customer email verification
+    field_type: string
+    validation:
+      allowed_values:
+        - required
+        - optional
+        - disabled
+    platform_default: required
+    tier_gate: all
+    onboarding_step: 9
+    step_order: 16.5
+    tooltip: Verify customer email with a one-time code before starting a conversation.
+    description: "Required: customers must verify their email with a 6-digit code sent to their inbox before chatting. Optional: customers can skip verification but won't get full personalized service. Disabled: no email verification step."
+    doc_link: "https://docs.agentred.ai/configuration/widget-appearance#email-verification"
+    affects_agents: []
+    pii_classification: none
+    injected_in_prompt: false
+
   - field_name: widget_prechat_form
     display_name: Pre-chat form
     field_type: object
     validation: {}
-    platform_default: null
+    platform_default:
+      enabled: true
+      fields:
+        - name: name
+          label: Name
+          type: text
+          required: true
+        - name: email
+          label: Email
+          type: email
+          required: true
     tier_gate: all
     onboarding_step: 9
     step_order: 17

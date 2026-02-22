@@ -34,6 +34,18 @@ export interface PreChatData {
   [fieldName: string]: string;
 }
 
+/** Shopify customer identity data injected from Liquid template (AUTH-4). */
+export interface ShopifyCustomer {
+  /** Shopify customer ID (e.g. "7654321012345"). */
+  id: string;
+  /** Customer email from Shopify account. */
+  email: string;
+  /** Customer display name. */
+  name: string;
+  /** HMAC-SHA256(customer_id, identity_secret) for server verification. */
+  hmac: string;
+}
+
 // ---------------------------------------------------------------------------
 // Widget view states
 // ---------------------------------------------------------------------------
@@ -41,6 +53,7 @@ export interface PreChatData {
 export type WidgetView =
   | 'closed'           // Launcher button only
   | 'prechat'          // Pre-chat form (if configured)
+  | 'otp'              // OTP email verification (AUTH-3)
   | 'conversation'     // Active chat
   | 'rating'           // Post-chat rating prompt
   | 'offline_form'     // Leave-a-message form
@@ -69,6 +82,15 @@ export interface WidgetState {
 
   // Pre-chat
   preChatData: PreChatData | null;
+
+  // Identity (AUTH-1, AUTH-3, AUTH-4)
+  isAnonymous: boolean;
+  customerEmail: string | null;
+  customerToken: string | null;
+  otpError: string | null;
+
+  // Shopify customer passthrough (AUTH-4)
+  shopifyCustomer: ShopifyCustomer | null;
 }
 
 // ---------------------------------------------------------------------------
@@ -146,6 +168,11 @@ class Store {
       error: null,
       unreadCount: 0,
       preChatData: null,
+      isAnonymous: false,
+      customerEmail: null,
+      customerToken: null,
+      otpError: null,
+      // NOTE: shopifyCustomer is NOT reset — it persists for the browser session
     };
     this.notify();
   }
@@ -181,6 +208,11 @@ export function createStore(config: WidgetConfig, locale: Locale): Store {
     error: null,
     unreadCount: 0,
     preChatData: null,
+    isAnonymous: false,
+    customerEmail: null,
+    customerToken: null,
+    otpError: null,
+    shopifyCustomer: null,
   });
   return _store;
 }

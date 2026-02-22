@@ -612,6 +612,31 @@ def _build_customer_context_section(
 
 
 # ---------------------------------------------------------------------------
+# Anonymous session rules (AUTH-1)
+# ---------------------------------------------------------------------------
+
+_ANONYMOUS_SESSION_RULES = """\
+ANONYMOUS SESSION — The customer chose not to identify themselves.
+
+Rules for this session:
+- At the START of the conversation, warn the customer about limitations:
+  "Since you're chatting as a guest, I won't be able to help with orders, \
+account details, loyalty programs, rewards, or anything that requires \
+verifying your identity. If you ask about any of these, I'll need your \
+email first. Would you like to continue as a guest, or provide your email?"
+- Wait for the customer to confirm before proceeding.
+- If the customer asks about orders, account info, loyalty, rewards, or any
+  identity-gated topic: respond with "I'll need your email to look that up.
+  Would you like to provide your email now?"
+- General questions (return policy, store hours, product info, shipping info)
+  can be answered without identification.
+- Never fabricate or guess customer identity information.
+- If the customer provides their email mid-conversation, acknowledge it and
+  note that it will be verified for future sessions.
+"""
+
+
+# ---------------------------------------------------------------------------
 # SystemPromptBuilder
 # ---------------------------------------------------------------------------
 
@@ -647,6 +672,7 @@ class SystemPromptBuilder:
         preferences: PreferencesDocument,
         customer_profile: CustomerProfileDocument | None = None,
         pattern_context: str | None = None,
+        is_anonymous: bool = False,
     ) -> str:
         """Assemble the system prompt for *agent*.
 
@@ -668,6 +694,10 @@ class SystemPromptBuilder:
             provided, injected for agents that support customer awareness
             (Response Generator + Escalation Handler).  Professional+
             only — the caller is responsible for tier gating.
+        is_anonymous:
+            True when the customer skipped identification.  Injects
+            anonymous session rules for the Response Generator and
+            Escalation Handler (AUTH-1).
 
         Returns
         -------
@@ -713,6 +743,19 @@ class SystemPromptBuilder:
         ):
             sections.append(pattern_context)
 
+        # Layer 6 — Anonymous session rules (AUTH-1)
+        # When the customer skipped identification, inject instructions for
+        # the Response Generator and Escalation Handler to warn about
+        # limitations and encourage identification.
+        if (
+            is_anonymous
+            and agent in (
+                AgentRole.RESPONSE_GENERATOR,
+                AgentRole.ESCALATION_HANDLER,
+            )
+        ):
+            sections.append(_ANONYMOUS_SESSION_RULES)
+
         prompt = "\n\n".join(sections)
 
         logger.debug(
@@ -736,6 +779,7 @@ class SystemPromptBuilder:
         preferences: PreferencesDocument,
         customer_profile: CustomerProfileDocument | None = None,
         pattern_context: str | None = None,
+        is_anonymous: bool = False,
     ) -> dict[AgentRole, str]:
         """Build system prompts for all 6 pipeline agents at once.
 
@@ -747,10 +791,13 @@ class SystemPromptBuilder:
         pattern_context:
             Optional Layer 3 pattern context string.  Passed through to
             :meth:`build` for agents that support it.
+        is_anonymous:
+            True when the customer skipped identification (AUTH-1).
         """
         return {
             role: self.build(
-                role, tenant, preferences, customer_profile, pattern_context,
+                role, tenant, preferences, customer_profile,
+                pattern_context, is_anonymous=is_anonymous,
             )
             for role in AgentRole
         }

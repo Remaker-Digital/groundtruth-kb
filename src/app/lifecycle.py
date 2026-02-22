@@ -1197,6 +1197,7 @@ async def _startup_activation_service() -> None:
             audit_repo=AuditLogRepository(),
             kb_repo=KnowledgeBaseRepository(),
             config_processor=get_config_processor(),
+            tenant_repo=TenantRepository(),
         )
         logger.info("ActivationService configured (Save → Activate model)")
     except Exception as exc:

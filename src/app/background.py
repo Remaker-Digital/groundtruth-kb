@@ -4,6 +4,8 @@
 - SLA snapshot loop — persists hourly SLA snapshots and daily rollups (C-2).
 - Alert evaluation loop — evaluates enabled alert rules every 5 minutes (RB-4).
 - Ingestion processor — processes pending storefront ingestion jobs (KA-1).
+- Conversation archival sweep — auto-archives oldest resolved conversations when
+  a tenant exceeds 1,000 non-archived conversations (WI-A7).
 
 © 2026 Remaker Digital, a DBA of VanDusen & Palmeter, LLC. All rights reserved.
 """
@@ -23,6 +25,7 @@ _idle_scanner_task: asyncio.Task[None] | None = None
 _sla_snapshot_task: asyncio.Task[None] | None = None
 _alert_eval_task: asyncio.Task[None] | None = None
 _ingestion_processor_task: asyncio.Task[None] | None = None
+_archival_sweep_task: asyncio.Task[None] | None = None
 
 
 async def _idle_scanner_loop() -> None:
@@ -465,3 +468,124 @@ def register_ingestion_processor(app: FastAPI) -> None:
     """Register ingestion processor startup/shutdown handlers on the FastAPI app."""
     app.on_event("startup")(_startup_ingestion_processor)
     app.on_event("shutdown")(_shutdown_ingestion_processor)
+
+
+# ---------------------------------------------------------------------------
+# Conversation archival sweep (WI-A7: auto-archival at 1,000 limit)
+# ---------------------------------------------------------------------------
+
+# Sweep interval: 1 hour (3600 seconds)
+_ARCHIVAL_SWEEP_INTERVAL = 3600
+# Maximum non-archived conversations per tenant before auto-archival kicks in
+_MAX_NON_ARCHIVED = 1000
+# Number of conversations to archive per sweep iteration (batch size)
+_ARCHIVAL_BATCH_SIZE = 100
+
+
+async def _archival_sweep_loop() -> None:
+    """Periodic background task that auto-archives old conversations.
+
+    Runs every hour. For each active tenant, checks whether non-archived
+    conversation count exceeds the limit (1,000). If so, archives the
+    oldest resolved/timed-out conversations until the count is within
+    the limit.
+    """
+    from src.multi_tenant.repositories.conversation import ConversationRepository
+    from src.multi_tenant.repository import TenantRepository
+
+    # Wait 180 seconds after startup before first sweep
+    await asyncio.sleep(180)
+
+    while True:
+        try:
+            tenant_repo = TenantRepository()
+            conv_repo = ConversationRepository()
+            tenant_ids = await tenant_repo.list_active_tenant_ids()
+            total_archived = 0
+
+            for tid in tenant_ids:
+                try:
+                    count = await conv_repo.count_non_archived(tid)
+                    if count <= _MAX_NON_ARCHIVED:
+                        continue
+
+                    excess = count - _MAX_NON_ARCHIVED
+                    to_archive = min(excess, _ARCHIVAL_BATCH_SIZE)
+
+                    candidates = await conv_repo.list_oldest_archivable(
+                        tid, limit=to_archive,
+                    )
+
+                    now = datetime.now(timezone.utc).isoformat()
+                    archived_count = 0
+                    for conv in candidates:
+                        try:
+                            doc_id = conv.get("id") or conv.get("conversation_id")
+                            if not doc_id:
+                                continue
+                            await conv_repo.patch(
+                                tenant_id=tid,
+                                document_id=doc_id,
+                                operations=[
+                                    {"op": "set", "path": "/archived_at", "value": now},
+                                ],
+                            )
+                            archived_count += 1
+                        except Exception:
+                            logger.debug(
+                                "Auto-archive failed for conv %s tenant %s",
+                                conv.get("conversation_id", "?")[:8],
+                                tid[:8],
+                                exc_info=True,
+                            )
+
+                    if archived_count > 0:
+                        logger.info(
+                            "Auto-archival: archived %d conversations for tenant %s "
+                            "(was %d, limit %d)",
+                            archived_count, tid[:8], count, _MAX_NON_ARCHIVED,
+                        )
+                        total_archived += archived_count
+
+                except Exception:
+                    logger.debug(
+                        "Archival sweep failed for tenant %s",
+                        tid[:8], exc_info=True,
+                    )
+
+            if total_archived > 0:
+                logger.info(
+                    "Archival sweep: archived %d conversations across %d tenants",
+                    total_archived, len(tenant_ids),
+                )
+        except Exception:
+            logger.debug("Archival sweep cycle failed", exc_info=True)
+
+        # Sleep 1 hour between sweeps
+        await asyncio.sleep(_ARCHIVAL_SWEEP_INTERVAL)
+
+
+async def _startup_archival_sweep() -> None:
+    """Start the conversation archival sweep background task."""
+    global _archival_sweep_task  # noqa: PLW0603
+    _archival_sweep_task = asyncio.create_task(_archival_sweep_loop())
+    logger.info("Conversation archival sweep started (1-hour interval, limit %d)", _MAX_NON_ARCHIVED)
+
+
+async def _shutdown_archival_sweep() -> None:
+    """Cancel the conversation archival sweep background task."""
+    global _archival_sweep_task  # noqa: PLW0603
+    if _archival_sweep_task and not _archival_sweep_task.done():
+        _archival_sweep_task.cancel()
+        try:
+            await _archival_sweep_task
+        except asyncio.CancelledError:
+            pass
+        logger.info("Conversation archival sweep stopped")
+    _archival_sweep_task = None
+
+
+def register_archival_sweep(app: FastAPI) -> None:
+    """Register conversation archival sweep startup/shutdown handlers on the FastAPI app."""
+    app.on_event("startup")(_startup_archival_sweep)
+    app.on_event("shutdown")(_shutdown_archival_sweep)

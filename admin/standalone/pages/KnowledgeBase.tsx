@@ -540,6 +540,7 @@ export const KnowledgeBasePage: React.FC = () => {
               style={{ minWidth: 220, flex: 1, maxWidth: 360 }}
             />
             <Select
+              label="Category"
               placeholder="Category"
               data={CATEGORIES}
               value={categoryFilter}
@@ -548,6 +549,7 @@ export const KnowledgeBasePage: React.FC = () => {
               w={160}
             />
             <Select
+              label="Status"
               placeholder="Status"
               data={STATUSES}
               value={statusFilter}

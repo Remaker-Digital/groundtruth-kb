@@ -44,6 +44,7 @@ interface PreChatFormProps {
   locale: Locale;
   formConfig: PreChatFormConfig;
   onSubmit: (data: Record<string, string>) => void;
+  onSkip?: () => void;
   isLoading: boolean;
 }
 
@@ -70,6 +71,7 @@ export const PreChatForm: FunctionComponent<PreChatFormProps> = ({
   locale,
   formConfig,
   onSubmit,
+  onSkip,
   isLoading,
 }) => {
   const [values, setValues] = useState<Record<string, string>>({});
@@ -242,6 +244,29 @@ export const PreChatForm: FunctionComponent<PreChatFormProps> = ({
         >
           {isLoading ? '...' : locale.preChatSubmit}
         </button>
+
+        {/* "Continue as guest" skip link — soft gate, not hard gate */}
+        {onSkip && (
+          <button
+            type="button"
+            onClick={onSkip}
+            style={{
+              background: 'none',
+              border: 'none',
+              padding: `${tokens.space2} 0`,
+              fontSize: tokens.fontSizeXs,
+              fontFamily: tokens.fontFamily,
+              color: tokens.colorTextMuted,
+              cursor: 'pointer',
+              textAlign: 'center',
+              textDecoration: 'none',
+              outline: 'none',
+              marginTop: tokens.space1,
+            }}
+          >
+            {locale.preChatSkip}
+          </button>
+        )}
       </form>
     </div>
   );

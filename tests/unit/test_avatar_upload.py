@@ -1,6 +1,9 @@
 """
 Tests for avatar upload endpoint — D22 capability.
 
+Migrated from processor.update_config() to activation_service.save_draft()
+(WI-A3, session 66).
+
 © 2026 Remaker Digital, a DBA of VanDusen & Palmeter, LLC. All rights reserved.
 """
 
@@ -13,7 +16,7 @@ import pytest
 from fastapi import FastAPI
 from httpx import ASGITransport, AsyncClient
 
-from src.multi_tenant.avatar_upload import router, configure_avatar_service
+from src.multi_tenant.avatar_upload import router
 
 # ---------------------------------------------------------------------------
 # Fixtures
@@ -26,12 +29,13 @@ def _make_app() -> FastAPI:
     return app
 
 
-def _make_mock_processor(success: bool = True):
-    proc = MagicMock()
+def _make_mock_activation_service(success: bool = True):
+    """Create a mock ActivationService with save_draft returning the desired result."""
+    svc = MagicMock()
     result = MagicMock()
     result.success = success
-    proc.update_config = AsyncMock(return_value=result)
-    return proc
+    svc.save_draft = AsyncMock(return_value=result)
+    return svc
 
 
 def _make_png_bytes(size: int = 100) -> bytes:
@@ -64,11 +68,13 @@ class TestAvatarUpload:
 
     @pytest.mark.asyncio
     async def test_upload_png_success(self, mock_ctx):
-        proc = _make_mock_processor()
-        configure_avatar_service(proc)
+        svc = _make_mock_activation_service()
         app = _make_app()
 
-        with patch("src.multi_tenant.avatar_upload.get_tenant_context", return_value=mock_ctx):
+        with (
+            patch("src.multi_tenant.avatar_upload.get_tenant_context", return_value=mock_ctx),
+            patch("src.multi_tenant.activation_service.get_activation_service", return_value=svc),
+        ):
             app.dependency_overrides[
                 __import__("src.multi_tenant.middleware", fromlist=["get_tenant_context"]).get_tenant_context
             ] = lambda: mock_ctx
@@ -88,11 +94,13 @@ class TestAvatarUpload:
 
     @pytest.mark.asyncio
     async def test_upload_jpeg_success(self, mock_ctx):
-        proc = _make_mock_processor()
-        configure_avatar_service(proc)
+        svc = _make_mock_activation_service()
         app = _make_app()
 
-        with patch("src.multi_tenant.avatar_upload.get_tenant_context", return_value=mock_ctx):
+        with (
+            patch("src.multi_tenant.avatar_upload.get_tenant_context", return_value=mock_ctx),
+            patch("src.multi_tenant.activation_service.get_activation_service", return_value=svc),
+        ):
             app.dependency_overrides[
                 __import__("src.multi_tenant.middleware", fromlist=["get_tenant_context"]).get_tenant_context
             ] = lambda: mock_ctx
@@ -111,11 +119,13 @@ class TestAvatarUpload:
 
     @pytest.mark.asyncio
     async def test_upload_rejects_invalid_type(self, mock_ctx):
-        proc = _make_mock_processor()
-        configure_avatar_service(proc)
+        svc = _make_mock_activation_service()
         app = _make_app()
 
-        with patch("src.multi_tenant.avatar_upload.get_tenant_context", return_value=mock_ctx):
+        with (
+            patch("src.multi_tenant.avatar_upload.get_tenant_context", return_value=mock_ctx),
+            patch("src.multi_tenant.activation_service.get_activation_service", return_value=svc),
+        ):
             app.dependency_overrides[
                 __import__("src.multi_tenant.middleware", fromlist=["get_tenant_context"]).get_tenant_context
             ] = lambda: mock_ctx
@@ -131,11 +141,13 @@ class TestAvatarUpload:
 
     @pytest.mark.asyncio
     async def test_upload_rejects_oversized_file(self, mock_ctx):
-        proc = _make_mock_processor()
-        configure_avatar_service(proc)
+        svc = _make_mock_activation_service()
         app = _make_app()
 
-        with patch("src.multi_tenant.avatar_upload.get_tenant_context", return_value=mock_ctx):
+        with (
+            patch("src.multi_tenant.avatar_upload.get_tenant_context", return_value=mock_ctx),
+            patch("src.multi_tenant.activation_service.get_activation_service", return_value=svc),
+        ):
             app.dependency_overrides[
                 __import__("src.multi_tenant.middleware", fromlist=["get_tenant_context"]).get_tenant_context
             ] = lambda: mock_ctx
@@ -151,12 +163,14 @@ class TestAvatarUpload:
         assert "too large" in resp.json()["detail"]
 
     @pytest.mark.asyncio
-    async def test_upload_stores_data_uri_in_config(self, mock_ctx):
-        proc = _make_mock_processor()
-        configure_avatar_service(proc)
+    async def test_upload_calls_save_draft(self, mock_ctx):
+        svc = _make_mock_activation_service()
         app = _make_app()
 
-        with patch("src.multi_tenant.avatar_upload.get_tenant_context", return_value=mock_ctx):
+        with (
+            patch("src.multi_tenant.avatar_upload.get_tenant_context", return_value=mock_ctx),
+            patch("src.multi_tenant.activation_service.get_activation_service", return_value=svc),
+        ):
             app.dependency_overrides[
                 __import__("src.multi_tenant.middleware", fromlist=["get_tenant_context"]).get_tenant_context
             ] = lambda: mock_ctx
@@ -168,12 +182,13 @@ class TestAvatarUpload:
                     files={"file": ("a.png", png_data, "image/png")},
                 )
 
-        # Verify update_config was called with data URI
-        proc.update_config.assert_called_once()
-        call_kwargs = proc.update_config.call_args
-        updates = call_kwargs.kwargs.get("updates") or call_kwargs[1].get("updates")
-        assert "widget_agent_avatar_url" in updates
-        assert updates["widget_agent_avatar_url"].startswith("data:image/png;base64,")
+        # Verify save_draft was called with data URI
+        svc.save_draft.assert_called_once()
+        call_kwargs = svc.save_draft.call_args.kwargs
+        assert call_kwargs["tenant_id"] == "test-tenant-001"
+        assert call_kwargs["changes"]["widget_agent_avatar_url"].startswith(
+            "data:image/png;base64,"
+        )
 
 
 class TestAvatarDelete:
@@ -181,11 +196,13 @@ class TestAvatarDelete:
 
     @pytest.mark.asyncio
     async def test_delete_success(self, mock_ctx):
-        proc = _make_mock_processor()
-        configure_avatar_service(proc)
+        svc = _make_mock_activation_service()
         app = _make_app()
 
-        with patch("src.multi_tenant.avatar_upload.get_tenant_context", return_value=mock_ctx):
+        with (
+            patch("src.multi_tenant.avatar_upload.get_tenant_context", return_value=mock_ctx),
+            patch("src.multi_tenant.activation_service.get_activation_service", return_value=svc),
+        ):
             app.dependency_overrides[
                 __import__("src.multi_tenant.middleware", fromlist=["get_tenant_context"]).get_tenant_context
             ] = lambda: mock_ctx
@@ -200,11 +217,13 @@ class TestAvatarDelete:
 
     @pytest.mark.asyncio
     async def test_delete_sets_avatar_to_none(self, mock_ctx):
-        proc = _make_mock_processor()
-        configure_avatar_service(proc)
+        svc = _make_mock_activation_service()
         app = _make_app()
 
-        with patch("src.multi_tenant.avatar_upload.get_tenant_context", return_value=mock_ctx):
+        with (
+            patch("src.multi_tenant.avatar_upload.get_tenant_context", return_value=mock_ctx),
+            patch("src.multi_tenant.activation_service.get_activation_service", return_value=svc),
+        ):
             app.dependency_overrides[
                 __import__("src.multi_tenant.middleware", fromlist=["get_tenant_context"]).get_tenant_context
             ] = lambda: mock_ctx
@@ -212,6 +231,5 @@ class TestAvatarDelete:
             async with AsyncClient(transport=transport, base_url="http://test") as client:
                 await client.delete("/api/admin/avatar")
 
-        call_kwargs = proc.update_config.call_args
-        updates = call_kwargs.kwargs.get("updates") or call_kwargs[1].get("updates")
-        assert updates["widget_agent_avatar_url"] is None
+        call_kwargs = svc.save_draft.call_args.kwargs
+        assert call_kwargs["changes"]["widget_agent_avatar_url"] is None

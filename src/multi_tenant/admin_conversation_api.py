@@ -830,7 +830,7 @@ async def assign_agent(
     description="Marks a conversation as escalated, flagging it for human agent attention. The AI agent stops responding and the conversation appears in the escalated queue.",
     responses={
         404: {"description": "Conversation not found"},
-        409: {"description": "Conversation already escalated or resolved"},
+        409: {"description": "Conversation already escalated, or resolved >24h ago"},
         503: {"description": "Admin conversation services not initialized"},
     },
 )
@@ -851,14 +851,33 @@ async def escalate_conversation(
     doc = await _read_conversation(repo, ctx.tenant_id, conversation_id)
 
     current_status = doc.get("status")
-    if current_status in (
-        ConversationStatus.ESCALATED.value,
-        ConversationStatus.RESOLVED.value,
-    ):
+
+    # Already escalated — hard reject
+    if current_status == ConversationStatus.ESCALATED.value:
         raise HTTPException(
             status_code=409,
-            detail=f"Conversation is already {current_status}",
+            detail="Conversation is already escalated",
         )
+
+    # Resolved — allow re-escalation within 24-hour window
+    if current_status == ConversationStatus.RESOLVED.value:
+        resolved_at_str = doc.get("resolved_at")
+        re_escalation_allowed = False
+        if resolved_at_str:
+            try:
+                resolved_at = datetime.fromisoformat(resolved_at_str)
+                hours_since = (
+                    datetime.now(timezone.utc) - resolved_at
+                ).total_seconds() / 3600
+                re_escalation_allowed = hours_since <= 24
+            except (ValueError, TypeError):
+                pass  # Malformed timestamp — treat as outside window
+        if not re_escalation_allowed:
+            raise HTTPException(
+                status_code=409,
+                detail="Conversation was resolved more than 24 hours ago "
+                "and can no longer be escalated",
+            )
 
     now = datetime.now(timezone.utc).isoformat()
     doc_id = doc.get("id", conversation_id)

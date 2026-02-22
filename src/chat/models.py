@@ -136,11 +136,20 @@ class ConversationStartRequest(BaseModel):
     Starts a new conversation. The conversation_id is assigned server-side
     and returned in the response. An optional visitor identity can be
     provided for customer context (Layer 1) injection.
+
+    AUTH-5: ``customer_token`` is an OTP-verified identity token. When
+    present, the server validates the token signature and expiry. A valid
+    token proves the customer verified their email → full PCM access.
     """
 
     visitor: VisitorIdentity | None = Field(
         default=None,
         description="Optional visitor identity for customer context",
+    )
+    customer_token: str | None = Field(
+        default=None,
+        max_length=500,
+        description="OTP customer token proving email verification (AUTH-5)",
     )
     page_url: str | None = Field(
         default=None,

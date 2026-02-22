@@ -27,6 +27,7 @@ export interface Locale {
   ratingCommentPlaceholder: string;
   preChatTitle: string;
   preChatSubmit: string;
+  preChatSkip: string;
   offlineFormTitle: string;
   offlineFormSubmit: string;
   offlineFormSuccess: string;
@@ -51,6 +52,11 @@ export interface Locale {
   issueSubmitting: string;
   issueSubmitSuccess: string;
   issueCancel: string;
+  otpPrompt: string;
+  otpVerify: string;
+  otpResend: string;
+  otpSkip: string;
+  otpInvalid: string;
 }
 
 export const en: Locale = {
@@ -70,6 +76,7 @@ export const en: Locale = {
   ratingCommentPlaceholder: 'Any additional comments? (optional)',
   preChatTitle: 'Before we start',
   preChatSubmit: 'Start chat',
+  preChatSkip: 'Continue as guest',
   offlineFormTitle: 'Leave us a message',
   offlineFormSubmit: 'Send message',
   offlineFormSuccess: 'Message sent! We\'ll get back to you soon.',
@@ -94,4 +101,9 @@ export const en: Locale = {
   issueSubmitting: 'Submitting...',
   issueSubmitSuccess: 'Thank you! Your report has been submitted.',
   issueCancel: 'Cancel',
+  otpPrompt: 'Enter the code we sent to your email.',
+  otpVerify: 'Verify',
+  otpResend: 'Resend code',
+  otpSkip: 'Continue without verifying',
+  otpInvalid: 'Invalid code. Please try again.',
 };

@@ -511,6 +511,8 @@ async def upsert_page_assignment(
         page_handle=body.page_handle,
         slot_1_action_id=body.slot_1_action_id,
         slot_2_action_id=body.slot_2_action_id,
+        auto_open=body.auto_open,
+        auto_open_delay_ms=body.auto_open_delay_ms,
     )
 
     assignment_dict = assignment.model_dump()

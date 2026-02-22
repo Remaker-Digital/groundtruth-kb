@@ -1024,7 +1024,7 @@ Run after Page 0A (system is now re-activated with brand_name + brand_voice set)
 | 7.11a | Template variable — click inserts token | Clicking \<FIRST_NAME\> appends token to greeting message textarea | |
 | 7.11b | Template variable — preview resolves tokens | Greeting bubble in preview shows "Sarah" instead of \<FIRST_NAME\>, "Johnson" for \<LAST_NAME\>, etc. | |
 | 7.11c | Pre-chat form toggle — renders | Switch with label "Pre-chat form", HelpTooltip, description text | |
-| 7.11d | Pre-chat form toggle — default OFF | Switch is OFF by default (preChatFormEnabled: false) | |
+| 7.11d | Pre-chat form toggle — default ON | Switch is ON by default (preChatFormEnabled: true, AUTH-1 Cycle 15). For pre-Cycle-15 tenants, may be OFF until re-initialized. | |
 | 7.11e | Pre-chat form toggle — ON reveals field chips | Toggling ON shows Chip.Group with 4 field chips: Name, Email, Phone, Company | |
 | 7.11f | Pre-chat field chips — default selection | Name and Email chips selected by default (preChatFields: ['name', 'email']) | |
 | 7.11g | Pre-chat field chips — toggle selection | Clicking Phone chip adds it to selection; clicking Email deselects it | |

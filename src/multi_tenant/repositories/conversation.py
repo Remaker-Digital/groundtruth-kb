@@ -475,6 +475,39 @@ class ConversationRepository(TenantScopedRepository):
 
         return await self.query(tenant_id, query_text, params)
 
+    # --- Auto-archival (WI-A7) ---
+
+    async def count_non_archived(self, tenant_id: str) -> int:
+        """Count non-archived conversations for a tenant."""
+        return await self.query_count(
+            tenant_id,
+            "SELECT VALUE COUNT(1) FROM c "
+            "WHERE (NOT IS_DEFINED(c.archived_at) OR c.archived_at = null)",
+            [],
+        )
+
+    async def list_oldest_archivable(
+        self,
+        tenant_id: str,
+        *,
+        limit: int = 100,
+    ) -> list[dict[str, Any]]:
+        """List oldest resolved/timed-out non-archived conversations.
+
+        Returns conversations eligible for auto-archival, ordered by
+        last_activity_at ascending (oldest first).
+        """
+        return await self.query(
+            tenant_id,
+            "SELECT c.id, c.conversation_id, c.status, c.last_activity_at "
+            "FROM c "
+            "WHERE c.status IN ('resolved', 'timed_out') "
+            "AND (NOT IS_DEFINED(c.archived_at) OR c.archived_at = null) "
+            "ORDER BY c.last_activity_at ASC "
+            "OFFSET 0 LIMIT @limit",
+            [{"name": "@limit", "value": limit}],
+        )
+
     # --- First Contact Resolution (CQ-5) ---
 
     async def count_fcr(

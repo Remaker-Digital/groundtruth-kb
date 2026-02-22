@@ -362,6 +362,12 @@ class ConversationDocument(BaseModel):
         description="ISO 8601 timestamp when conversation was archived (null = not archived)",
     )
 
+    # Customer verification level (AUTH-5 — profile linkage)
+    customer_verified: bool = Field(
+        default=False,
+        description="Whether customer identity was verified (OTP token or Shopify HMAC)",
+    )
+
     # Test Mode (C2 — controlled rollout)
     is_test_mode: bool = Field(
         default=False,

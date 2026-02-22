@@ -51,6 +51,13 @@
     {% elsif blog %}
       data-page-handle="{{ blog.handle }}"
     {% endif %}
+    {% comment %} Shopify customer identity passthrough (AUTH-4) {% endcomment %}
+    {% if customer and block.settings.identity_secret != blank %}
+      data-shopify-customer-id="{{ customer.id }}"
+      data-shopify-customer-email="{{ customer.email | escape }}"
+      data-shopify-customer-name="{{ customer.first_name | escape }} {{ customer.last_name | escape }}"
+      data-shopify-customer-hmac="{{ customer.id | hmac_sha256: block.settings.identity_secret }}"
+    {% endif %}
   ></script>
 {% endif %}
 
@@ -78,6 +85,12 @@
       "label": "API URL",
       "default": "https://agent-red-api-gateway.orangeglacier-f566a4e7.eastus.azurecontainerapps.io",
       "info": "Leave as default unless instructed by Agent Red support"
+    },
+    {
+      "type": "text",
+      "id": "identity_secret",
+      "label": "Customer Identity Secret",
+      "info": "Paste from Agent Red dashboard → Settings → Security. Enables automatic identification of logged-in Shopify customers (skips verification form)."
     },
     {
       "type": "header",

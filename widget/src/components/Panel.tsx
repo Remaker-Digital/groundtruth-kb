@@ -29,6 +29,7 @@ import { Header } from './Header';
 import { MessageList } from './MessageList';
 import { InputBar } from './InputBar';
 import { PreChatForm } from './PreChatForm';
+import { OtpVerification } from './OtpVerification';
 import { ChatRating } from './ChatRating';
 import { OfflineForm } from './OfflineForm';
 import { IssueReport } from './IssueReport';
@@ -38,6 +39,8 @@ import {
   endConversation as apiEndConversation,
   submitRating as apiSubmitRating,
   reportIssue as apiReportIssue,
+  sendOtp as apiSendOtp,
+  verifyOtp as apiVerifyOtp,
   getTransportConfig,
 } from '@/transport/http';
 import { SSEConnection } from '@/transport/sse';
@@ -133,12 +136,19 @@ export const Panel: FunctionComponent<PanelProps> = ({
 
   // ---- Conversation lifecycle ---------------------------------------------
 
-  /** Start a new conversation (optionally with pre-chat data). */
+  /** Start a new conversation (optionally with pre-chat data).
+   *
+   * AUTH-5: Passes the OTP customer token (if available) to the backend
+   * for server-side verification. This proves the customer verified
+   * their email, giving the conversation full PCM access.
+   */
   const beginConversation = useCallback(async (preChatData?: Record<string, string>) => {
     const store = getStore();
     store.setState({ isLoading: true, error: null });
 
-    const conversationId = await apiStartConversation(preChatData);
+    // AUTH-5: Include customer token for verified identity
+    const { customerToken } = store.getState();
+    const conversationId = await apiStartConversation(preChatData, customerToken);
     if (!conversationId) {
       store.setState({ isLoading: false, error: 'Failed to start conversation' });
       return;
@@ -247,8 +257,23 @@ export const Panel: FunctionComponent<PanelProps> = ({
     handleSend(resolvedPrompt);
   }, [handleSend]);
 
-  /** End the current conversation. */
-  /** End the current conversation (wired to Header close). */
+  /** Close the widget without ending the conversation.
+   *
+   * Disconnects SSE but preserves conversation state so the customer
+   * can reopen the widget and resume where they left off.  The
+   * conversation is NOT auto-resolved — only explicit "End conversation"
+   * or idle-timeout should resolve it.
+   */
+  const handleCloseWidget = useCallback(() => {
+    // Disconnect SSE — it will reconnect on reopen
+    if (sseRef.current) {
+      sseRef.current.disconnect();
+      sseRef.current = null;
+    }
+    onClose();
+  }, [onClose]);
+
+  /** Explicitly end the current conversation (new-conversation / idle). */
   const handleEndConversation = useCallback(async () => {
     const store = getStore();
     const { conversationId } = store.getState();
@@ -290,9 +315,81 @@ export const Panel: FunctionComponent<PanelProps> = ({
     store.setState({ view: hasPrechat ? 'prechat' : 'conversation' });
   }, [config.widget_prechat_form]);
 
-  /** Handle pre-chat form submission. */
-  const handlePreChatSubmit = useCallback((data: Record<string, string>) => {
-    beginConversation(data);
+  /** Handle pre-chat form submission — route through OTP if verification enabled. */
+  const handlePreChatSubmit = useCallback(async (data: Record<string, string>) => {
+    const store = getStore();
+    const verificationMode = (config as Record<string, unknown>).customer_email_verification as string ?? 'required';
+    const email = data.email || '';
+
+    // If verification is disabled or no email provided, go straight to conversation
+    if (verificationMode === 'disabled' || !email) {
+      beginConversation(data);
+      return;
+    }
+
+    // Store pre-chat data and email for OTP flow
+    store.setState({
+      preChatData: data,
+      customerEmail: email,
+      isLoading: true,
+      otpError: null,
+    });
+
+    // Send OTP
+    await apiSendOtp(email, data.name || '');
+
+    // Transition to OTP screen
+    store.setState({ view: 'otp', isLoading: false });
+  }, [beginConversation, config]);
+
+  /** Skip pre-chat form — continue as anonymous guest. */
+  const handlePreChatSkip = useCallback(() => {
+    const store = getStore();
+    store.setState({ isAnonymous: true });
+    beginConversation();
+  }, [beginConversation]);
+
+  /** Verify OTP code entered by customer (AUTH-3). */
+  const handleOtpVerify = useCallback(async (code: string) => {
+    const store = getStore();
+    const { customerEmail, preChatData } = store.getState();
+    if (!customerEmail) return;
+
+    store.setState({ isLoading: true, otpError: null });
+
+    const result = await apiVerifyOtp(customerEmail, code);
+
+    if (result.verified) {
+      store.setState({
+        customerToken: result.customerToken,
+        isLoading: false,
+      });
+      // Start conversation with pre-chat data
+      beginConversation(preChatData || undefined);
+    } else {
+      store.setState({
+        isLoading: false,
+        otpError: locale.otpInvalid,
+      });
+    }
+  }, [beginConversation, locale]);
+
+  /** Resend OTP code (AUTH-3). */
+  const handleOtpResend = useCallback(async () => {
+    const store = getStore();
+    const { customerEmail, preChatData } = store.getState();
+    if (!customerEmail) return;
+
+    await apiSendOtp(customerEmail, preChatData?.name || '');
+    store.setState({ otpError: null });
+  }, []);
+
+  /** Skip OTP verification — continue without verifying (AUTH-3, optional mode only). */
+  const handleOtpSkip = useCallback(() => {
+    const store = getStore();
+    const { preChatData } = store.getState();
+    // Customer has email from pre-chat but didn't verify — partial identity
+    beginConversation(preChatData || undefined);
   }, [beginConversation]);
 
   /** Handle offline form submission. */
@@ -349,12 +446,34 @@ export const Panel: FunctionComponent<PanelProps> = ({
     };
   }, []);
 
-  // Auto-start conversation if no pre-chat form
+  // Auto-start conversation for Shopify customers (AUTH-4).
+  // When the widget opens with verified Shopify identity, skip pre-chat
+  // and OTP entirely and begin the conversation immediately.
+  const shopifyAutoStarted = useRef(false);
+  useEffect(() => {
+    const currentState = getStore().getState();
+    if (
+      currentState.shopifyCustomer
+      && currentState.view === 'conversation'
+      && !currentState.conversationId
+      && !shopifyAutoStarted.current
+    ) {
+      shopifyAutoStarted.current = true;
+      const { shopifyCustomer } = currentState;
+      beginConversation({
+        name: shopifyCustomer.name,
+        email: shopifyCustomer.email,
+        shopify_customer_id: shopifyCustomer.id,
+        shopify_customer_hmac: shopifyCustomer.hmac,
+      });
+    }
+  }, [state.view, beginConversation]);
+
+  // Auto-start conversation if no pre-chat form (non-Shopify path)
   useEffect(() => {
     const currentState = getStore().getState();
     if (currentState.view === 'conversation' && !currentState.conversationId) {
-      // Don't auto-start if there's a prechat form configured
-      if (!config.widget_prechat_form) {
+      if (!config.widget_prechat_form && !currentState.shopifyCustomer) {
         // No auto-start needed — user sends first message to begin
       }
     }
@@ -389,7 +508,7 @@ export const Panel: FunctionComponent<PanelProps> = ({
         agentAvatarUrl={agentAvatarUrl}
         logoUrl={logoUrl}
         headerText={config.widget_header_text || null}
-        onClose={() => { handleEndConversation(); onClose(); }}
+        onClose={handleCloseWidget}
         onDragStart={handleDragStart}
       />
 
@@ -482,7 +601,26 @@ export const Panel: FunctionComponent<PanelProps> = ({
           locale={locale}
           formConfig={config.widget_prechat_form as { fields: { name: string; label: string; type: 'text' | 'email' | 'textarea'; required: boolean; placeholder?: string }[] }}
           onSubmit={handlePreChatSubmit}
+          onSkip={handlePreChatSkip}
           isLoading={state.isLoading}
+        />
+      )}
+
+      {/* OTP verification (AUTH-3) */}
+      {state.view === 'otp' && state.customerEmail && (
+        <OtpVerification
+          tokens={tokens}
+          locale={locale}
+          email={state.customerEmail}
+          onVerify={handleOtpVerify}
+          onSkip={
+            ((config as Record<string, unknown>).customer_email_verification as string) === 'optional'
+              ? handleOtpSkip
+              : undefined
+          }
+          onResend={handleOtpResend}
+          isLoading={state.isLoading}
+          error={state.otpError ?? undefined}
         />
       )}
 

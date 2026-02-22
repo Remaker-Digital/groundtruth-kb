@@ -15,7 +15,6 @@ from __future__ import annotations
 
 import base64
 import logging
-from typing import Any
 
 from fastapi import APIRouter, Depends, HTTPException, UploadFile, File
 from pydantic import BaseModel, Field
@@ -54,27 +53,6 @@ class AvatarDeleteResponse(BaseModel):
 
     success: bool
     message: str = ""
-
-
-# ---------------------------------------------------------------------------
-# Service wiring
-# ---------------------------------------------------------------------------
-
-_config_processor: Any = None
-
-
-def configure_avatar_service(config_processor: Any) -> None:
-    """Wire the avatar upload to the config processor for persistence."""
-    global _config_processor
-    _config_processor = config_processor
-    logger.info("Avatar upload service configured")
-
-
-def _get_processor() -> Any:
-    if _config_processor is None:
-        from src.multi_tenant.tenant_config_processor import get_config_processor
-        return get_config_processor()
-    return _config_processor
 
 
 # ---------------------------------------------------------------------------
@@ -119,12 +97,14 @@ async def upload_avatar(
     b64 = base64.b64encode(data).decode("ascii")
     data_uri = f"data:{mime};base64,{b64}"
 
-    # Persist to config
-    processor = _get_processor()
-    result = await processor.update_config(
+    # Persist to draft via activation service (handles draft-only tenants)
+    from src.multi_tenant.activation_service import get_activation_service
+
+    activation_svc = get_activation_service()
+    result = await activation_svc.save_draft(
         tenant_id=ctx.tenant_id,
         tier=ctx.tier,
-        updates={"widget_agent_avatar_url": data_uri},
+        changes={"widget_agent_avatar_url": data_uri},
         actor=f"admin:{ctx.tenant_id}",
     )
 
@@ -149,11 +129,13 @@ async def delete_avatar(
     ctx: TenantContext = Depends(get_tenant_context),
 ) -> AvatarDeleteResponse:
     """Remove the avatar image (resets to default)."""
-    processor = _get_processor()
-    result = await processor.update_config(
+    from src.multi_tenant.activation_service import get_activation_service
+
+    activation_svc = get_activation_service()
+    result = await activation_svc.save_draft(
         tenant_id=ctx.tenant_id,
         tier=ctx.tier,
-        updates={"widget_agent_avatar_url": None},
+        changes={"widget_agent_avatar_url": None},
         actor=f"admin:{ctx.tenant_id}",
     )
 

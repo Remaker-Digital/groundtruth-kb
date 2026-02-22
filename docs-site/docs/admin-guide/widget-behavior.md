@@ -89,19 +89,24 @@ A message displayed when the widget is in offline mode (only relevant if offline
 |---|---|
 | **Field** | `widget_pre_chat_enabled` |
 | **Type** | Toggle (on/off) |
-| **Default** | Off |
+| **Default** | On |
 | **Affects** | Widget |
 
-When enabled, customers must fill out a form (name, email, and any custom fields you configure) before the conversation starts.
+When enabled, customers see a form (Name and Email by default) before the conversation starts. This is **strongly recommended** and enabled by default for all new tenants.
 
-**When to enable:**
-- You need to identify customers before they chat (e.g., to look up their account or order).
-- Your team needs an email address to follow up on escalated conversations.
-- You want to pre-qualify leads.
+**Why this matters:**
+- **Persistent Customer Memory requires identification.** Without knowing who the customer is, the AI cannot recall past interactions, preferences, or purchase history.
+- **Order lookups, account management, loyalty programs, and personalized recommendations all require an email address.**
+- Customers who skip the form ("Continue as guest") receive a warning about reduced capabilities and must confirm they want to proceed anonymously.
 
-**When to leave off:**
-- Pre-chat forms add friction. Every required field reduces the number of customers who start a conversation.
-- If Persistent Customer Memory is enabled, the AI can often identify returning customers without a form.
+**Guest access:**
+- Customers can skip the pre-chat form by clicking "Continue as guest."
+- The AI immediately informs the guest about limitations and asks once more if they'd like to provide their email.
+- General questions (return policy, store hours, product info) are answered normally without identification.
+
+**Email verification (OTP):**
+- When email verification is enabled, customers who provide an email receive a 6-digit one-time password to confirm their identity. This ensures the AI links conversations to the correct customer profile.
+- Shopify customers who are already logged in skip both the pre-chat form and OTP — their identity is verified automatically via Shopify's customer authentication.
 
 ---
 

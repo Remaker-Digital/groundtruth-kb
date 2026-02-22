@@ -1,0 +1,327 @@
+"""Unit tests for widget OTP email verification (AUTH-3).
+
+Tests the OTP send and verify endpoints in
+src/multi_tenant/widget_otp_verification.py.
+
+© 2026 Remaker Digital, a DBA of VanDusen & Palmeter, LLC. All rights reserved.
+"""
+
+from __future__ import annotations
+
+import json
+from unittest.mock import AsyncMock, MagicMock, patch
+
+import pytest
+from fastapi import FastAPI
+from httpx import ASGITransport, AsyncClient
+
+from src.multi_tenant.widget_otp_verification import (
+    _generate_otp,
+    _OTP_TOKEN_TYPE,
+    decode_customer_token,
+    router,
+)
+
+# ---------------------------------------------------------------------------
+# Test app
+# ---------------------------------------------------------------------------
+
+
+def _build_app() -> FastAPI:
+    """Create a minimal FastAPI app with the OTP router."""
+    app = FastAPI()
+    app.include_router(router)
+    return app
+
+
+def _mock_tenant_context(tenant_id: str = "test-tenant-001"):
+    """Create a mock TenantContext for dependency injection."""
+    ctx = MagicMock()
+    ctx.tenant_id = tenant_id
+    ctx.tier = "starter"
+    ctx.status = "active"
+    return ctx
+
+
+# ---------------------------------------------------------------------------
+# OTP generation tests
+# ---------------------------------------------------------------------------
+
+
+class TestOtpGeneration:
+    """Test the OTP code generation function."""
+
+    def test_otp_is_six_digits(self):
+        code = _generate_otp()
+        assert len(code) == 6
+        assert code.isdigit()
+
+    def test_otp_is_zero_padded(self):
+        """Ensure codes like 000123 are zero-padded."""
+        # Run many times to increase probability of small numbers
+        for _ in range(100):
+            code = _generate_otp()
+            assert len(code) == 6
+
+    def test_otp_is_random(self):
+        """Codes should vary (probabilistic test)."""
+        codes = {_generate_otp() for _ in range(20)}
+        # With 10^6 possible values and 20 draws, collisions are very unlikely
+        assert len(codes) >= 15
+
+
+# ---------------------------------------------------------------------------
+# Customer token tests
+# ---------------------------------------------------------------------------
+
+
+class TestCustomerToken:
+    """Test customer token generation and validation."""
+
+    def test_valid_token_decodes(self):
+        from src.multi_tenant.widget_otp_verification import _generate_customer_token
+
+        token = _generate_customer_token(
+            tenant_id="test-tenant",
+            email="alice@example.com",
+            name="Alice",
+        )
+        payload = decode_customer_token(token)
+        assert payload is not None
+        assert payload["tenant_id"] == "test-tenant"
+        assert payload["email"] == "alice@example.com"
+        assert payload["name"] == "Alice"
+        assert "exp" in payload
+
+    def test_expired_token_returns_none(self):
+        import base64
+        import hashlib
+        import hmac
+        import os
+        import time
+
+        # Manually create an expired token
+        payload = json.dumps({
+            "tenant_id": "t",
+            "email": "a@b.com",
+            "name": "",
+            "exp": int(time.time()) - 100,  # Expired 100s ago
+        }, separators=(",", ":"), sort_keys=True)
+        secret = os.environ.get("CUSTOMER_TOKEN_SECRET", "agentred-customer-token-default")
+        sig = hmac.new(secret.encode(), payload.encode(), hashlib.sha256).hexdigest()[:32]
+        encoded = base64.urlsafe_b64encode(payload.encode()).decode()
+        token = f"{encoded}.{sig}"
+
+        assert decode_customer_token(token) is None
+
+    def test_tampered_token_returns_none(self):
+        from src.multi_tenant.widget_otp_verification import _generate_customer_token
+
+        token = _generate_customer_token(
+            tenant_id="test-tenant",
+            email="alice@example.com",
+            name="Alice",
+        )
+        # Flip a character in the signature
+        parts = token.split(".")
+        tampered_sig = parts[1][:-1] + ("a" if parts[1][-1] != "a" else "b")
+        tampered = f"{parts[0]}.{tampered_sig}"
+        assert decode_customer_token(tampered) is None
+
+    def test_garbage_token_returns_none(self):
+        assert decode_customer_token("not-a-token") is None
+        assert decode_customer_token("") is None
+        assert decode_customer_token("a.b.c") is None
+
+
+# ---------------------------------------------------------------------------
+# Endpoint tests
+# ---------------------------------------------------------------------------
+
+
+@pytest.mark.asyncio
+class TestSendOtpEndpoint:
+    """Test POST /api/chat/otp/send."""
+
+    async def test_send_otp_success(self):
+        app = _build_app()
+        ctx = _mock_tenant_context()
+
+        mock_token_repo = MagicMock()
+        mock_token_repo.delete_token = AsyncMock(return_value=True)
+        mock_token_repo.create_token = AsyncMock(return_value={"id": "otp:test-tenant-001:alice@example.com"})
+
+        mock_container = MagicMock()
+        mock_container.patch_item = AsyncMock(return_value={})
+
+        mock_cosmos = MagicMock()
+        mock_cosmos.get_container = MagicMock(return_value=mock_container)
+
+        with (
+            patch("src.multi_tenant.widget_otp_verification.get_tenant_context", return_value=ctx),
+            patch("src.multi_tenant.widget_otp_verification._get_verification_mode", new_callable=AsyncMock, return_value="required"),
+            patch("src.multi_tenant.repositories.VerificationTokenRepository", return_value=mock_token_repo),
+            patch("src.multi_tenant.cosmos_client.get_cosmos_manager", return_value=mock_cosmos),
+            patch("src.multi_tenant.widget_otp_verification._send_otp_email", new_callable=AsyncMock, return_value=True),
+        ):
+            app.dependency_overrides = {}
+            from src.multi_tenant.middleware import get_tenant_context
+            app.dependency_overrides[get_tenant_context] = lambda: ctx
+
+            async with AsyncClient(transport=ASGITransport(app=app), base_url="http://test") as client:
+                resp = await client.post("/api/chat/otp/send", json={
+                    "email": "alice@example.com",
+                    "name": "Alice",
+                })
+
+            assert resp.status_code == 200
+            data = resp.json()
+            assert data["sent"] is True
+
+    async def test_send_otp_when_disabled(self):
+        app = _build_app()
+        ctx = _mock_tenant_context()
+
+        with (
+            patch("src.multi_tenant.widget_otp_verification._get_verification_mode", new_callable=AsyncMock, return_value="disabled"),
+        ):
+            from src.multi_tenant.middleware import get_tenant_context
+            app.dependency_overrides[get_tenant_context] = lambda: ctx
+
+            async with AsyncClient(transport=ASGITransport(app=app), base_url="http://test") as client:
+                resp = await client.post("/api/chat/otp/send", json={
+                    "email": "alice@example.com",
+                })
+
+            assert resp.status_code == 200
+            data = resp.json()
+            assert "not required" in data["message"].lower()
+
+
+@pytest.mark.asyncio
+class TestVerifyOtpEndpoint:
+    """Test POST /api/chat/otp/verify."""
+
+    async def test_verify_otp_success(self):
+        app = _build_app()
+        ctx = _mock_tenant_context()
+
+        mock_container = MagicMock()
+        mock_container.read_item = AsyncMock(return_value={
+            "id": "otp:test-tenant-001:alice@example.com",
+            "otp_code": "123456",
+            "used": False,
+            "customer_name": "Alice",
+        })
+
+        mock_cosmos = MagicMock()
+        mock_cosmos.get_container = MagicMock(return_value=mock_container)
+
+        mock_token_repo = MagicMock()
+        mock_token_repo.consume_token = AsyncMock(return_value={"id": "otp:test-tenant-001:alice@example.com"})
+
+        with (
+            patch("src.multi_tenant.cosmos_client.get_cosmos_manager", return_value=mock_cosmos),
+            patch("src.multi_tenant.repositories.VerificationTokenRepository", return_value=mock_token_repo),
+        ):
+            from src.multi_tenant.middleware import get_tenant_context
+            app.dependency_overrides[get_tenant_context] = lambda: ctx
+
+            async with AsyncClient(transport=ASGITransport(app=app), base_url="http://test") as client:
+                resp = await client.post("/api/chat/otp/verify", json={
+                    "email": "alice@example.com",
+                    "code": "123456",
+                })
+
+            assert resp.status_code == 200
+            data = resp.json()
+            assert data["verified"] is True
+            assert data["customer_token"] is not None
+
+    async def test_verify_otp_wrong_code(self):
+        app = _build_app()
+        ctx = _mock_tenant_context()
+
+        mock_container = MagicMock()
+        mock_container.read_item = AsyncMock(return_value={
+            "id": "otp:test-tenant-001:alice@example.com",
+            "otp_code": "123456",
+            "used": False,
+        })
+
+        mock_cosmos = MagicMock()
+        mock_cosmos.get_container = MagicMock(return_value=mock_container)
+
+        with (
+            patch("src.multi_tenant.cosmos_client.get_cosmos_manager", return_value=mock_cosmos),
+        ):
+            from src.multi_tenant.middleware import get_tenant_context
+            app.dependency_overrides[get_tenant_context] = lambda: ctx
+
+            async with AsyncClient(transport=ASGITransport(app=app), base_url="http://test") as client:
+                resp = await client.post("/api/chat/otp/verify", json={
+                    "email": "alice@example.com",
+                    "code": "999999",
+                })
+
+            assert resp.status_code == 200
+            data = resp.json()
+            assert data["verified"] is False
+            assert data["customer_token"] is None
+
+    async def test_verify_otp_already_used(self):
+        app = _build_app()
+        ctx = _mock_tenant_context()
+
+        mock_container = MagicMock()
+        mock_container.read_item = AsyncMock(return_value={
+            "id": "otp:test-tenant-001:alice@example.com",
+            "otp_code": "123456",
+            "used": True,  # Already used
+        })
+
+        mock_cosmos = MagicMock()
+        mock_cosmos.get_container = MagicMock(return_value=mock_container)
+
+        with (
+            patch("src.multi_tenant.cosmos_client.get_cosmos_manager", return_value=mock_cosmos),
+        ):
+            from src.multi_tenant.middleware import get_tenant_context
+            app.dependency_overrides[get_tenant_context] = lambda: ctx
+
+            async with AsyncClient(transport=ASGITransport(app=app), base_url="http://test") as client:
+                resp = await client.post("/api/chat/otp/verify", json={
+                    "email": "alice@example.com",
+                    "code": "123456",
+                })
+
+            assert resp.status_code == 200
+            data = resp.json()
+            assert data["verified"] is False
+
+    async def test_verify_otp_expired_not_found(self):
+        """OTP expired (Cosmos DB TTL deleted it)."""
+        app = _build_app()
+        ctx = _mock_tenant_context()
+
+        mock_container = MagicMock()
+        mock_container.read_item = AsyncMock(side_effect=Exception("NotFound"))
+
+        mock_cosmos = MagicMock()
+        mock_cosmos.get_container = MagicMock(return_value=mock_container)
+
+        with (
+            patch("src.multi_tenant.cosmos_client.get_cosmos_manager", return_value=mock_cosmos),
+        ):
+            from src.multi_tenant.middleware import get_tenant_context
+            app.dependency_overrides[get_tenant_context] = lambda: ctx
+
+            async with AsyncClient(transport=ASGITransport(app=app), base_url="http://test") as client:
+                resp = await client.post("/api/chat/otp/verify", json={
+                    "email": "alice@example.com",
+                    "code": "123456",
+                })
+
+            assert resp.status_code == 200
+            data = resp.json()
+            assert data["verified"] is False

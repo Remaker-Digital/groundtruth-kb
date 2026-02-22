@@ -209,6 +209,11 @@ class ConversationSession:
         # Resolve customer_id from visitor identity if provided
         customer_id = _resolve_customer_id(request.visitor)
 
+        # AUTH-5: Extract verification flag from metadata (set by endpoint)
+        customer_verified = bool(
+            request.metadata and request.metadata.get("customer_verified")
+        )
+
         # Determine billability from conversation_id prefix
         is_billable = not conversation_id.startswith(NON_BILLABLE_PREFIXES)
 
@@ -233,6 +238,7 @@ class ConversationSession:
             conversation_id=conversation_id,
             status=ConversationStatus.ACTIVE,
             customer_id=customer_id,
+            customer_verified=customer_verified,
             is_billable=is_billable,
             message_count=message_count,
             turn_count=turn_count,

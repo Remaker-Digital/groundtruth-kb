@@ -116,11 +116,25 @@ interface AgentRedSDK {
     }
   }
 
+  // Read Shopify customer identity passthrough data attributes (AUTH-4).
+  // When a Shopify customer is logged in and the merchant has configured an
+  // identity secret, the Liquid template injects HMAC-signed customer data.
+  const shopifyCustomerId = scriptTag.getAttribute('data-shopify-customer-id');
+  const shopifyCustomerHmac = scriptTag.getAttribute('data-shopify-customer-hmac');
+  const shopifyCustomer = shopifyCustomerId && shopifyCustomerHmac
+    ? {
+        id: shopifyCustomerId,
+        email: scriptTag.getAttribute('data-shopify-customer-email') || '',
+        name: scriptTag.getAttribute('data-shopify-customer-name') || '',
+        hmac: shopifyCustomerHmac,
+      }
+    : null;
+
   // Configure transport
   configureTransport({ apiBaseUrl, widgetKey });
 
   // Fetch config and initialize
-  init(widgetKey, apiBaseUrl, dataOverrides).catch((err) => {
+  init(widgetKey, apiBaseUrl, dataOverrides, shopifyCustomer).catch((err) => {
     console.error('[AgentRed] Widget initialization failed:', err);
   });
 })();
@@ -133,6 +147,7 @@ async function init(
   _widgetKey: string,
   _apiBaseUrl: string,
   dataOverrides?: Record<string, string | boolean>,
+  shopifyCustomer?: { id: string; email: string; name: string; hmac: string } | null,
 ): Promise<void> {
   // Detect page context for quick action filtering (WI #227)
   const pageCtx = detectPageContext();
@@ -165,10 +180,19 @@ async function init(
   // Create the reactive store
   const store = createStore(config, locale);
 
-  // Determine initial view
+  // Inject Shopify customer data into the store (AUTH-4).
+  // When present, this signals the Panel to auto-start the conversation
+  // with verified Shopify identity — skipping pre-chat form and OTP.
+  if (shopifyCustomer) {
+    store.setState({ shopifyCustomer });
+  }
+
+  // Determine initial view — skip prechat if Shopify customer is present
   const hasPrechat = config.widget_prechat_form
     && (config.widget_prechat_form as { fields?: unknown[] }).fields?.length;
-  const initialView = hasPrechat ? 'prechat' : 'conversation';
+  const initialView = shopifyCustomer
+    ? 'conversation'
+    : (hasPrechat ? 'prechat' : 'conversation');
 
   // Mount launcher in Shadow DOM
   const { shadowHost, shadowRoot } = mountLauncherHost();

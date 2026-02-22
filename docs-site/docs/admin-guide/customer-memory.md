@@ -53,22 +53,25 @@ Controls whether the AI stores and uses customer profiles and conversation histo
 
 ---
 
-## Asserted identity extraction
+## Customer identification
 
-When a customer mentions their name or email during a conversation (e.g., "My name is Sarah" or "You can reach me at sarah@example.com"), Agent Red automatically extracts this information and stores it on the customer's profile as an **unverified** identity.
+Persistent Customer Memory requires knowing who the customer is. Without identification, the AI cannot recall past interactions, preferences, or purchase history.
 
-**How it works:**
-1. After each customer message, the AI scans for natural language name introductions and email addresses.
-2. Detected identities are stored on the customer profile with an `unverified` status.
-3. The customer's display name in the Inbox updates from a session ID to the asserted name.
-4. Unverified identities are shown with a badge to distinguish them from verified Shopify customer identities.
+Agent Red uses a layered identification system — customers are identified through the strongest available method:
 
 **Identity hierarchy (highest to lowest):**
-- **Shopify customer name** — Verified through Shopify authentication
-- **Asserted name** — Extracted from conversation (unverified, shown with badge)
-- **Session ID** — System-assigned identifier (always available)
 
-This feature requires no configuration — it activates automatically when Customer Memory is enabled.
+| Level | Method | Verification | How it works |
+|-------|--------|-------------|--------------|
+| 1 | **Shopify customer** | HMAC-verified | Logged-in Shopify customers are identified automatically via cryptographic verification. No form, no code — identity is confirmed before the conversation starts. |
+| 2 | **OTP email verification** | Email-verified | Customers who provide their email in the pre-chat form receive a 6-digit one-time code. Entering the code confirms they own the email address. |
+| 3 | **Pre-chat form** | Self-asserted | The pre-chat form collects name and email before the conversation starts. The email is stored as unverified until confirmed via OTP. |
+| 4 | **In-conversation assertion** | Unverified | If a customer mentions their name or email during a conversation, Agent Red extracts it and stores it on the customer profile with an `unverified` status. |
+| 5 | **Anonymous session** | None | Customers who skip the pre-chat form ("Continue as guest") receive limited service. The AI warns about reduced capabilities and prompts for email when needed. |
+
+**Pre-chat form (enabled by default):** The pre-chat form is the primary identification mechanism. It is enabled by default for all new tenants. Customers who skip the form can still use the chat, but without access to order lookups, account management, loyalty programs, or personalized recommendations. See [Widget behavior — Pre-chat form](/docs/admin-guide/widget-behavior#pre-chat-form) for configuration details.
+
+**Asserted identity extraction:** When a customer mentions their name or email during a conversation (e.g., "My name is Sarah" or "my email is sarah@example.com"), Agent Red automatically extracts this information and stores it on the customer's profile with an `unverified` status. The customer's display name in the Inbox updates from a session ID to the asserted name. Unverified identities are shown with a badge. This feature requires no configuration — it activates automatically when Customer Memory is enabled.
 
 ---
 

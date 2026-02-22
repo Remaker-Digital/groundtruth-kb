@@ -15,7 +15,7 @@ This document provides active guidance for AI assistants working on the Agent Re
 |-----------|-------|
 | **Project Name** | Agent Red Customer Experience |
 | **Type** | Commercial SaaS Product (Shopify + Standalone) |
-| **Status** | Production v1.51.1 HEALTHY. ALL 14 CYCLES + SKIP Resolution + CSS Centralization + SDK Fix DEPLOYED. 3,985 unit tests (0 failures), 56 regression (51 pass + 5 skip), 917 UI tests (793 PASS, 4 SOFT-PASS, 62 SKIP, 0 FAIL — verified S60), 25 conversation quality scenarios (CONDITIONAL PASS — S62). See `memory/build-deploy-roadmap.md`. |
+| **Status** | Production v1.54.7 HEALTHY. ALL 14 CYCLES + post-14 patches DEPLOYED. Cycle 15 IMPLEMENTED (S66), Cycles 16-19 in progress. 3,987 unit tests (0 failures), 56 regression (51 pass + 5 skip), 917 UI tests (793 PASS, 4 SOFT-PASS, 62 SKIP, 0 FAIL — verified S60), 25 conversation quality scenarios (PASS — 23/25, 4.75/5.0, S63). See `memory/build-deploy-roadmap.md`. |
 | **Owner** | Remaker Digital (DBA of VanDusen & Palmeter, LLC) |
 
 ### Copyright Notice
@@ -125,13 +125,13 @@ Active procedures:
 
 ---
 
-## Completed Roadmap — 14 Cycles (ALL DEPLOYED)
+## Completed Roadmap — 14 Cycles + Cycles 15-19
 
 Full plan: `memory/build-deploy-roadmap.md`
 
-### Current Status — ALL 14 CYCLES DEPLOYED
+### Current Status — v1.54.7 DEPLOYED, Cycles 15-19 in progress
 
-All cycles deployed to production. v1.51.1 is live (revision 0000043, session 62).
+Production is v1.54.7 (revision 0000053, session 65). Cycle 15 implemented (S66), Cycles 16-19 in progress.
 
 | Cycle | Version | Content | Status |
 |-------|---------|---------|--------|
@@ -139,7 +139,10 @@ All cycles deployed to production. v1.51.1 is live (revision 0000043, session 62
 | **6-8** | v1.42.0 | CI + Email + SPA Phase 1 + R10/R3 + Phase 2 backend | ✅ DEPLOYED (S39) |
 | **9** | v1.43.0 | SPA Phase 2 + HV-5/RB-4/RB-5 + UI quick wins | ✅ DEPLOYED (S41) |
 | **10-14** | v1.48.0 | UI polish, magic link, Provider Phase 3-4, features, coverage, quality | ✅ DEPLOYED (S46) |
-| **Post-14** | v1.49.2→v1.51.1 | SKIP resolution, CSS centralization, SDK fix, quality tests | ✅ DEPLOYED (S54-S62) |
+| **Post-14** | v1.49.2→v1.54.7 | SKIP resolution, CSS, SDK fix, quality, color mode, KA | ✅ DEPLOYED (S54-S65) |
+| **15** | TBD | WI-A1→A7 + D9 + AUTH-1: activation, archival, pre-chat gate | ✅ IMPLEMENTED (S66) |
+| **16** | TBD | AUTH-3 (OTP) + AUTH-4 (Shopify HMAC) + AUTH-5 (profile linkage) | 🔄 IN PROGRESS |
+| **17-19** | TBD | Provisioning, background tasks, onboarding polish | ⬜ PLANNED |
 
 ### Owner/Designer Tasks (blocking Shopify submission)
 1. Screenshots (3-6 at 1600x900) — designer
@@ -157,5 +160,5 @@ All cycles deployed to production. v1.51.1 is live (revision 0000043, session 62
 ---
 
 *© 2026 Remaker Digital, a DBA of VanDusen & Palmeter, LLC. All rights reserved.*
-*Last Updated: 2026-02-19*
-*Version: 51.1.0*
+*Last Updated: 2026-02-22*
+*Version: 54.7.0*

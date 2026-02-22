@@ -1187,7 +1187,7 @@ Navigate to `$STANDALONE_URL/widget`.
 | 7.11a | Click \<FIRST_NAME\> button → `javascript_tool` read textarea value — contains "\<FIRST_NAME\>" token |
 | 7.11b | With token in greeting → preview bubble shows "Sarah" instead of \<FIRST_NAME\> |
 | 7.11c | `find("Pre-chat form", tabId)` — Switch renders with label and description |
-| 7.11d | `read_page(tabId, filter:'interactive')` — Pre-chat form switch is unchecked (OFF by default) |
+| 7.11d | `read_page(tabId, filter:'interactive')` — Pre-chat form switch is checked (ON by default, AUTH-1 Cycle 15). Pre-Cycle-15 tenants may show OFF. |
 | 7.11e | Toggle pre-chat ON → `find("Name", tabId)` and `find("Email", tabId)` and `find("Phone", tabId)` and `find("Company", tabId)` — 4 chips visible |
 | 7.11f | `read_page(tabId)` — Name and Email chips are selected by default |
 | 7.11g | Click Phone chip → verify it becomes selected; click Email chip → verify it becomes deselected |

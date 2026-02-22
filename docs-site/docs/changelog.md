@@ -9,6 +9,30 @@ All notable changes to Agent Red Customer Experience are documented here.
 
 ---
 
+## Unreleased — Cycles 15-16 (Customer Identity)
+
+### Customer authentication (Cycle 16)
+- **OTP email verification (AUTH-3):** Customers entering their email in the pre-chat form can verify their identity via a 6-digit one-time password sent to their email. Verified customers unlock full Persistent Customer Memory — the AI remembers them across conversations. OTP codes have a 10-minute TTL with rate limiting (3 per 5 minutes).
+- **Shopify customer passthrough (AUTH-4):** Logged-in Shopify customers are automatically identified via HMAC-SHA256 verification — zero-friction identity that skips the pre-chat form entirely. Configure your Customer Identity Secret in the Shopify theme settings.
+- **Profile linkage (AUTH-5):** Verified customer identity (via OTP or Shopify HMAC) is now linked to the conversation record, enabling the AI to retrieve purchase history, preferences, and past interactions. A critical transport bug was fixed where non-Shopify customers' email addresses were not transmitted to the backend.
+
+### Pre-chat identification gate (Cycle 15)
+- **Pre-chat form default ON (AUTH-1):** The pre-chat form (Name + Email) is now enabled by default for all new tenants. Existing tenants are unaffected.
+- **Guest access with warning:** Customers can skip identification ("Continue as guest"), but the AI immediately warns about limited capabilities — order lookups, account management, loyalty programs, and personalized recommendations are unavailable without identification. Customers must confirm they want to proceed anonymously.
+- **Anonymous session AI rules:** The AI prompts anonymous customers for their email when they ask about identity-gated topics (orders, account, loyalty, rewards).
+
+### Activation and backend improvements (Cycle 15)
+- **Escalation re-escalation window (WI-A5):** Resolved conversations can be re-escalated within 24 hours. After 24 hours, the conversation is fully closed.
+- **Conversation auto-archival (WI-A7):** Background sweep task runs hourly, archiving the oldest resolved/timed-out conversations when a tenant exceeds 1,000 active conversations.
+- **Widget close fix (D9):** Fixed a race condition where closing the widget could terminate the conversation before the UI finished rendering.
+- **Quick action auto-open (WI-A4):** Quick actions can now configure automatic widget opening with a configurable delay.
+- **Knowledge base filter labels (WI-A6):** Filter dropdowns on the Knowledge Base page now have explicit labels for accessibility.
+
+### Tests
+- 44 new unit tests (9 from Cycle 15, 35 from Cycle 16) — 4,516 total, 0 failures
+
+---
+
 ## v1.54.7 — 2026-02-21
 
 ### Light/dark color mode

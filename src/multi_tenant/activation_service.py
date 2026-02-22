@@ -140,6 +140,7 @@ class ActivationService:
         self._audit_repo: Any = None
         self._kb_repo: Any = None
         self._config_processor: Any = None
+        self._tenant_repo: Any = None
         self._lock = asyncio.Lock()
 
     def configure(
@@ -148,12 +149,14 @@ class ActivationService:
         audit_repo: Any,
         kb_repo: Any | None = None,
         config_processor: Any | None = None,
+        tenant_repo: Any | None = None,
     ) -> None:
         """Wire dependencies (called at startup)."""
         self._prefs_repo = prefs_repo
         self._audit_repo = audit_repo
         self._kb_repo = kb_repo
         self._config_processor = config_processor
+        self._tenant_repo = tenant_repo
         logger.info("ActivationService configured")
 
     @property
@@ -272,12 +275,14 @@ class ActivationService:
                     )
                 else:
                     # Create new draft from active config + changes
-                    base_config: dict[str, Any] = {}
+                    # Seed with tier defaults so fresh tenants get complete config
+                    base_config: dict[str, Any] = dict(resolve_defaults(tier))
                     active_version = 0
 
                     if active:
                         active_version = active.get("version", 0)
                         # Copy all PreferencesDocument fields from active
+                        # (overrides tier defaults with tenant's actual values)
                         for key, value in active.items():
                             if key not in ("id", "_rid", "_self", "_etag", "_attachments", "_ts"):
                                 base_config[key] = value
@@ -729,12 +734,24 @@ class ActivationService:
 
                 # KA-6: First-activation ingestion hook
                 # If no prior active config existed, this is a first activation.
-                # Dispatch a background ingestion job (non-blocking).
+                # Dispatch a background ingestion job (awaited but isolated —
+                # failures must not reverse the successful activation above).
                 first_activation_warnings: list[str] = []
                 if active is None:
-                    first_activation_warnings = await self._maybe_start_ingestion(
-                        tenant_id
-                    )
+                    try:
+                        first_activation_warnings = await self._maybe_start_ingestion(
+                            tenant_id
+                        )
+                    except Exception:
+                        logger.warning(
+                            "Post-activation ingestion failed for tenant=%s "
+                            "(activation itself succeeded)",
+                            tenant_id[:8], exc_info=True,
+                        )
+                        first_activation_warnings = [
+                            "Storefront ingestion could not start. "
+                            "You can trigger it manually from the Knowledge Base page."
+                        ]
 
                 result_warnings = list(validation.warnings or [])
                 result_warnings.extend(

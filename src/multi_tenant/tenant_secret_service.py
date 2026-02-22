@@ -77,6 +77,9 @@ class TenantSecretType(str, enum.Enum):
     # Custom webhook/integration secrets
     WEBHOOK_SIGNING_SECRET = "webhook-signing-secret"
 
+    # Customer identity verification (AUTH-4 — Shopify HMAC passthrough)
+    CUSTOMER_IDENTITY_SECRET = "customer-identity-secret"
+
     # MFA/TOTP seed (per-user, naming: user-{team_member_id}-totp-seed)
     TOTP_SEED = "totp-seed"
 

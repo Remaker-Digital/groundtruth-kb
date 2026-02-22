@@ -248,6 +248,7 @@ class ChatPipeline(AgentDispatchMixin, CriticEscalationMixin, AnalyticsMixin):
                 tenant=tenant,
                 preferences=preferences,
                 customer_profile=profile,
+                is_anonymous=customer_id is None,
             )
 
             # Record prompt trace for explainability

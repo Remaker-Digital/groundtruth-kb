@@ -122,14 +122,56 @@ export async function fetchWidgetConfig(
   return cfg;
 }
 
-/** Start a new conversation. Returns conversation_id. */
+/** Start a new conversation. Returns conversation_id.
+ *
+ * Builds a ``visitor`` identity object from available customer data:
+ *   - Shopify keys (shopify_customer_id, shopify_customer_hmac) → AUTH-4
+ *   - Pre-chat email/name → used as customer_id fallback for PCM
+ *   - OTP customer token → proves verified identity (AUTH-3/AUTH-5)
+ *
+ * The backend uses ``visitor`` for _resolve_customer_id() which feeds
+ * the Layer 1 PCM profile loading chain. Without visitor, the conversation
+ * is anonymous and PCM is unavailable.
+ */
 export async function startConversation(
   customerData?: Record<string, string>,
+  customerToken?: string | null,
 ): Promise<string | null> {
+  const body: Record<string, unknown> = {};
+
+  if (customerData) {
+    // Separate Shopify identity keys from regular pre-chat fields
+    const visitor: Record<string, string> = {};
+    const regular: Record<string, string> = {};
+
+    for (const [key, value] of Object.entries(customerData)) {
+      if (key === 'shopify_customer_id') visitor.customer_id = value;
+      else if (key === 'shopify_customer_hmac') visitor.hmac = value;
+      else regular[key] = value;
+    }
+
+    // Populate visitor email/name from regular pre-chat fields
+    if (regular.email) visitor.email = regular.email;
+    if (regular.name) visitor.name = regular.name;
+
+    if (Object.keys(regular).length > 0) body.customer_data = regular;
+
+    // AUTH-5: Send visitor whenever we have ANY identity signal
+    // (customer_id from Shopify OR email from pre-chat/OTP).
+    // Previously only sent when customer_id existed — breaking PCM
+    // for all non-Shopify customers.
+    if (visitor.customer_id || visitor.email) body.visitor = visitor;
+  }
+
+  // AUTH-5: Attach OTP customer token for server-side verification
+  if (customerToken) {
+    body.customer_token = customerToken;
+  }
+
   const resp = await request<{ conversation_id: string }>(
     'POST',
     '/api/chat/conversations',
-    customerData ? { customer_data: customerData } : {},
+    body,
   );
   return resp.ok && resp.data ? resp.data.conversation_id : null;
 }
@@ -183,4 +225,35 @@ export async function reportIssue(
     details,
   });
   return resp.ok;
+}
+
+// ---------------------------------------------------------------------------
+// OTP verification (AUTH-3)
+// ---------------------------------------------------------------------------
+
+/** Send a 6-digit OTP to the customer's email. */
+export async function sendOtp(
+  email: string,
+  name?: string,
+): Promise<boolean> {
+  const resp = await request<{ sent: boolean }>('POST', '/api/chat/otp/send', {
+    email,
+    name: name ?? '',
+  });
+  return resp.ok;
+}
+
+/** Verify a 6-digit OTP code. Returns customer_token on success. */
+export async function verifyOtp(
+  email: string,
+  code: string,
+): Promise<{ verified: boolean; customerToken: string | null }> {
+  const resp = await request<{ verified: boolean; customer_token: string | null }>(
+    'POST', '/api/chat/otp/verify',
+    { email, code },
+  );
+  if (resp.ok && resp.data?.verified) {
+    return { verified: true, customerToken: resp.data.customer_token ?? null };
+  }
+  return { verified: false, customerToken: null };
 }

@@ -48,6 +48,7 @@ from src.multi_tenant.addon_checkout import router as addon_checkout_router
 from src.multi_tenant.memory_dashboard import router as memory_dashboard_router
 from src.multi_tenant.admin_contact_api import router as admin_contact_router
 from src.multi_tenant.admin_ingestion_api import router as admin_ingestion_router
+from src.multi_tenant.widget_otp_verification import router as widget_otp_router
 
 
 def register_routers(app: FastAPI) -> None:
@@ -92,3 +93,4 @@ def register_routers(app: FastAPI) -> None:
     app.include_router(addon_checkout_router)
     app.include_router(memory_dashboard_router)
     app.include_router(admin_contact_router)
+    app.include_router(widget_otp_router)

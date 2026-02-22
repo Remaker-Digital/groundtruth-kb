@@ -220,6 +220,76 @@ async def start_conversation(
             detail={"type": "not_active", "message": "Chat is currently disabled for this store."},
         )
 
+    # --- Identity verification (AUTH-4 Shopify HMAC + AUTH-5 OTP token) ---
+    # Track whether the customer's identity has been cryptographically verified.
+    # Verified customers get full PCM access; unverified get limited context.
+    customer_verified = False
+
+    # AUTH-4: Shopify HMAC verification
+    if request.visitor and request.visitor.hmac and request.visitor.customer_id:
+        try:
+            from src.multi_tenant.shopify_customer_verification import (
+                verify_shopify_customer_hmac,
+            )
+
+            is_valid = await verify_shopify_customer_hmac(
+                tenant_id=ctx.tenant_id,
+                customer_id=request.visitor.customer_id,
+                provided_hmac=request.visitor.hmac,
+            )
+            if is_valid:
+                customer_verified = True
+            else:
+                logger.warning(
+                    "Shopify HMAC failed: tenant=%s customer_id=%s — stripping identity",
+                    ctx.tenant_id,
+                    request.visitor.customer_id,
+                )
+                request.visitor = None
+        except Exception:
+            logger.exception("Shopify HMAC verification error — stripping identity")
+            request.visitor = None
+
+    # AUTH-5: OTP customer token verification
+    if request.customer_token and not customer_verified:
+        try:
+            from src.multi_tenant.widget_otp_verification import decode_customer_token
+
+            payload = decode_customer_token(request.customer_token)
+            if payload and payload.get("tenant_id") == ctx.tenant_id:
+                customer_verified = True
+                # Ensure visitor identity matches the verified token
+                if request.visitor:
+                    token_email = payload.get("email", "")
+                    if token_email and not request.visitor.email:
+                        request.visitor.email = token_email
+                    token_name = payload.get("name", "")
+                    if token_name and not request.visitor.name:
+                        request.visitor.name = token_name
+                else:
+                    # Create visitor from token claims
+                    from src.chat.models import VisitorIdentity
+                    request.visitor = VisitorIdentity(
+                        email=payload.get("email"),
+                        name=payload.get("name"),
+                    )
+                logger.info(
+                    "OTP token verified: tenant=%s email=%s",
+                    ctx.tenant_id,
+                    payload.get("email", "?"),
+                )
+            else:
+                logger.warning(
+                    "OTP token invalid or tenant mismatch: tenant=%s",
+                    ctx.tenant_id,
+                )
+        except Exception:
+            logger.exception("OTP token verification error")
+
+    # Attach verification status for session.start_conversation()
+    request.metadata = request.metadata or {}
+    request.metadata["customer_verified"] = customer_verified
+
     session = _get_session()
 
     try:
