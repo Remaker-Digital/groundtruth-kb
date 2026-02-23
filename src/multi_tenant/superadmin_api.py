@@ -49,7 +49,7 @@ from datetime import datetime, timezone
 from typing import Any
 
 from fastapi import APIRouter, Body, Depends, HTTPException, Query
-from pydantic import Field
+from pydantic import Field, field_validator
 
 from src.multi_tenant.api_models import CamelCaseModel
 
@@ -573,6 +573,178 @@ async def override_tenant_tier(
         previous_tier=previous_tier,
         new_tier=tier,
         updated_at=now,
+    )
+
+
+# ---------------------------------------------------------------------------
+# P0-PROV-1: SPA Console Tenant Provisioning
+# ---------------------------------------------------------------------------
+
+
+class CreateTenantRequest(CamelCaseModel):
+    """Request body for SPA tenant creation."""
+
+    merchant_name: str = Field(
+        ..., min_length=1, max_length=200,
+        description="Merchant display name (becomes brand_name in preferences)",
+    )
+    merchant_url: str | None = Field(
+        default=None, max_length=500,
+        description="Merchant website or Shopify domain (optional)",
+    )
+    superadmin_email: str = Field(
+        ..., min_length=5, max_length=320,
+        description="Tenant owner email — receives welcome email + SUPERADMIN key",
+    )
+
+    @field_validator("superadmin_email")
+    @classmethod
+    def validate_email_format(cls, v: str) -> str:
+        import re
+        if not re.match(r"^[^\s@]+@[^\s@]+\.[^\s@]+$", v):
+            raise ValueError("Invalid email address format")
+        return v
+    tier: str = Field(
+        ...,
+        description="Subscription tier: trial, starter, professional, or enterprise",
+    )
+
+
+class CreateTenantResponse(CamelCaseModel):
+    """Response from SPA tenant creation — includes one-time credentials."""
+
+    tenant_id: str
+    status: str
+    tier: str
+    superadmin_email: str
+    superadmin_api_key: str | None = None
+    widget_key: str | None = None
+    warnings: list[str] = Field(default_factory=list)
+
+
+@router.post(
+    "/tenants",
+    response_model=CreateTenantResponse,
+    summary="Provision a new tenant (SPA Console)",
+    description=(
+        "Creates a fully provisioned tenant with SUPERADMIN team member, "
+        "widget key, and welcome email. For use by the service provider "
+        "administrator — not exposed to merchants."
+    ),
+    responses={
+        400: {"description": "Invalid tier value"},
+        503: {"description": "Service not initialized"},
+    },
+    status_code=201,
+)
+async def create_tenant(
+    body: CreateTenantRequest,
+    ctx: TenantContext = Depends(require_role(TeamMemberRole.SUPERADMIN)),
+) -> CreateTenantResponse:
+    """Provision a new tenant from the SPA Console.
+
+    Orchestrates the full lifecycle: create tenant → activate → provision
+    superadmin → generate widget key → send welcome email. Partial failures
+    are captured in the ``warnings`` field — the tenant is still created.
+    """
+    if not _tenant_repo:
+        raise HTTPException(status_code=503, detail="Service not initialized")
+
+    # Only the SPA tenant can provision new tenants — prevent merchant
+    # superadmins from creating tenants via their own API keys.
+    _SPA_TENANT_ID = "remaker-digital-001"
+    if ctx.tenant_id != _SPA_TENANT_ID:
+        raise HTTPException(
+            status_code=403,
+            detail="Tenant provisioning is restricted to the service provider.",
+        )
+
+    # Validate tier against TenantTier enum
+    if body.tier not in VALID_TIERS:
+        raise HTTPException(
+            status_code=400,
+            detail=f"Invalid tier '{body.tier}'. Valid values: {sorted(VALID_TIERS)}",
+        )
+
+    # Import provisioning orchestrator (lazy — avoids circular imports)
+    from src.integrations.provisioning import spa_provision_tenant
+
+    try:
+        result = await spa_provision_tenant(
+            merchant_name=body.merchant_name,
+            merchant_url=body.merchant_url,
+            superadmin_email=body.superadmin_email,
+            tier=body.tier,
+        )
+    except RuntimeError as exc:
+        logger.error("SPA tenant creation failed: %s", exc)
+        raise HTTPException(status_code=500, detail=str(exc))
+    except Exception as exc:
+        logger.error("Unexpected error during SPA tenant creation: %s", exc)
+        raise HTTPException(status_code=500, detail=f"Provisioning failed: {exc}")
+
+    # Create default preferences document with merchant name
+    try:
+        from src.multi_tenant.cosmos_schema import PreferencesDocument
+
+        now_iso = datetime.now(timezone.utc).isoformat()
+        prefs_doc = PreferencesDocument(
+            id=f"{result.tenant_id}:1",
+            tenant_id=result.tenant_id,
+            version=1,
+            is_current=True,
+            brand_name=body.merchant_name,
+            created_at=now_iso,
+            created_by=ctx.team_member_email or "spa-console",
+        )
+
+        if _prefs_repo:
+            try:
+                await _prefs_repo.create(result.tenant_id, prefs_doc)
+            except Exception:
+                await _prefs_repo.upsert(result.tenant_id, prefs_doc)
+    except Exception as exc:
+        logger.warning("Failed to create preferences for %s: %s", result.tenant_id, exc)
+        result.errors.append(f"Preferences creation failed: {exc}")
+
+    # Audit log entry
+    try:
+        if _audit_repo:
+            await _audit_repo.create(
+                result.tenant_id,
+                {
+                    "id": f"audit:{result.tenant_id}:spa-create:{datetime.now(timezone.utc).isoformat()}",
+                    "tenant_id": result.tenant_id,
+                    "event_type": AuditEventType.CONFIG_CHANGE.value,
+                    "action": "spa_tenant_created",
+                    "actor": ctx.team_member_email or "spa-console",
+                    "details": {
+                        "merchant_name": body.merchant_name,
+                        "tier": body.tier,
+                        "email": body.superadmin_email,
+                    },
+                    "created_at": datetime.now(timezone.utc).isoformat(),
+                },
+            )
+    except Exception as exc:
+        logger.warning("Audit log failed for SPA tenant creation: %s", exc)
+
+    logger.info(
+        "SPA tenant created: tenant=%s tier=%s email=%s (by %s)",
+        result.tenant_id[:12],
+        body.tier,
+        body.superadmin_email,
+        ctx.team_member_email or "unknown",
+    )
+
+    return CreateTenantResponse(
+        tenant_id=result.tenant_id,
+        status=result.status,
+        tier=result.tier,
+        superadmin_email=result.superadmin_email,
+        superadmin_api_key=result.superadmin_api_key,
+        widget_key=result.widget_key,
+        warnings=result.errors,
     )
 
 

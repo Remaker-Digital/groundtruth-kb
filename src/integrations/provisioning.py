@@ -36,6 +36,7 @@ from __future__ import annotations
 import hashlib
 import logging
 import uuid
+from dataclasses import dataclass, field
 from datetime import datetime, timedelta, timezone
 from typing import Any
 
@@ -688,6 +689,134 @@ async def flag_payment_issue(
 
     logger.info("Tenant flagged past_due: tenant=%s", tenant.tenant_id)
     return _doc_to_record(updated_doc)
+
+
+# ---------------------------------------------------------------------------
+# SPA Console provisioning (P0-PROV-1)
+# ---------------------------------------------------------------------------
+
+
+@dataclass
+class SpaProvisionResult:
+    """Result of SPA Console tenant provisioning.
+
+    Partial failures are captured in ``errors`` — the tenant is still
+    created even if superadmin key or widget key generation fails.
+    The SPA operator can see what failed and retry manually.
+    """
+
+    tenant_id: str
+    status: str
+    tier: str
+    superadmin_email: str
+    superadmin_api_key: str | None = None
+    widget_key: str | None = None
+    errors: list[str] = field(default_factory=list)
+
+
+async def spa_provision_tenant(
+    merchant_name: str,
+    merchant_url: str | None,
+    superadmin_email: str,
+    tier: str,
+) -> SpaProvisionResult:
+    """Provision a new tenant from the SPA Console.
+
+    Orchestrates the full provisioning pipeline:
+    1. provision_tenant() — creates TenantDocument (PROVISIONING status)
+    2. activate_tenant() — transitions to ACTIVE (no webhook delay)
+    3. auto_provision_superadmin() — creates SUPERADMIN team member + API key
+    4. auto_provision_widget_key() — generates + dual-writes widget key
+
+    Each step after (1) is individually wrapped so partial failures
+    are captured without rolling back the tenant. The SPA operator
+    can see which steps failed via the ``errors`` list.
+
+    Optionally sends a welcome email (never raises).
+
+    Args:
+        merchant_name: Display name (becomes brand_name in preferences).
+        merchant_url: Merchant website or Shopify domain (optional).
+        superadmin_email: Tenant owner email (becomes SUPERADMIN member).
+        tier: Subscription tier (validated by caller against TenantTier).
+
+    Returns:
+        SpaProvisionResult with tenant_id, credentials, and any errors.
+
+    Raises:
+        RuntimeError: If tenant repository is not configured or
+            provision_tenant() fails (total failure — nothing was created).
+    """
+    # Step 1: Create tenant (PROVISIONING status)
+    record = await provision_tenant(
+        billing_channel=BillingChannel.MANUAL,
+        tier=tier,
+        customer_email=superadmin_email,
+    )
+
+    result = SpaProvisionResult(
+        tenant_id=record.tenant_id,
+        status=record.status.value if hasattr(record.status, "value") else str(record.status),
+        tier=tier,
+        superadmin_email=superadmin_email,
+    )
+
+    # Step 2: Activate immediately (no webhook round-trip for manual channel)
+    try:
+        activated = await activate_tenant(tenant_id=record.tenant_id)
+        if activated:
+            result.status = activated.status.value if hasattr(activated.status, "value") else str(activated.status)
+        else:
+            result.errors.append("Activation returned None — tenant may still be in PROVISIONING state")
+    except Exception as exc:
+        logger.error("SPA provision — activation failed for %s: %s", record.tenant_id, exc)
+        result.errors.append(f"Activation failed: {exc}")
+
+    # Step 3: Create SUPERADMIN team member + API key
+    try:
+        superadmin_key = await auto_provision_superadmin(record.tenant_id, superadmin_email)
+        result.superadmin_api_key = superadmin_key
+        if not superadmin_key:
+            result.errors.append("Superadmin provisioning returned None — check logs")
+    except Exception as exc:
+        logger.error("SPA provision — superadmin failed for %s: %s", record.tenant_id, exc)
+        result.errors.append(f"Superadmin provisioning failed: {exc}")
+
+    # Step 4: Generate widget key
+    try:
+        widget_key = await auto_provision_widget_key(record.tenant_id)
+        result.widget_key = widget_key
+        if not widget_key:
+            result.errors.append("Widget key provisioning returned None — check logs")
+    except Exception as exc:
+        logger.error("SPA provision — widget key failed for %s: %s", record.tenant_id, exc)
+        result.errors.append(f"Widget key provisioning failed: {exc}")
+
+    # Step 5: Send welcome email (never raises — defensive by design)
+    try:
+        from src.multi_tenant.welcome_email import send_welcome_email
+
+        await send_welcome_email(
+            to_email=superadmin_email,
+            tenant_id=record.tenant_id,
+            superadmin_key=result.superadmin_api_key,
+            widget_key=result.widget_key,
+            tier=tier,
+        )
+    except Exception as exc:
+        # Welcome email is best-effort — log but surface to operator (never fail silently)
+        logger.warning("SPA provision — welcome email failed for %s: %s", record.tenant_id, exc)
+        result.errors.append(f"Welcome email failed: {exc}")
+
+    logger.info(
+        "SPA tenant provisioned: tenant=%s tier=%s email=%s errors=%d",
+        record.tenant_id[:8],
+        tier,
+        superadmin_email,
+        len(result.errors),
+    )
+
+    return result
 
 
 async def provision_trial_tenant(
