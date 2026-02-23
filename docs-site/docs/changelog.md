@@ -9,7 +9,7 @@ All notable changes to Agent Red Customer Experience are documented here.
 
 ---
 
-## v1.56.0 — Identity pipeline and tenant provisioning (pending deployment)
+## v1.56.0 — Identity pipeline and tenant provisioning (2026-02-22)
 
 ### Identity preprocessor pipeline
 
