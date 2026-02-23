@@ -1114,7 +1114,7 @@ fields:
     display_name: Pre-chat form
     field_type: boolean
     validation: {}
-    platform_default: true
+    platform_default: false
     tier_gate: all
     onboarding_step: 9
     step_order: 34

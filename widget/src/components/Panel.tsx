@@ -309,11 +309,10 @@ export const Panel: FunctionComponent<PanelProps> = ({
     const store = getStore();
     store.resetConversation();
 
-    // If prechat form is configured, show it; otherwise go straight to conversation
-    const hasPrechat = config.widget_prechat_form
-      && (config.widget_prechat_form as { fields?: unknown[] }).fields?.length;
-    store.setState({ view: hasPrechat ? 'prechat' : 'conversation' });
-  }, [config.widget_prechat_form]);
+    // P0-AUTH-FIX: Always go to conversation view. Identity collection
+    // happens in-conversation, not via pre-chat form.
+    store.setState({ view: 'conversation' });
+  }, []);
 
   /** Handle pre-chat form submission — route through OTP if verification enabled. */
   const handlePreChatSubmit = useCallback(async (data: Record<string, string>) => {

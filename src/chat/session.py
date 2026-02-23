@@ -425,6 +425,64 @@ class ConversationSession:
         return message_id
 
     # -------------------------------------------------------------------
+    # Identity preprocessor system message (P0-AUTH-FIX)
+    # -------------------------------------------------------------------
+
+    async def add_system_identity_message(
+        self,
+        tenant_id: str,
+        conversation_id: str,
+        content: str,
+    ) -> str:
+        """Append a system-generated identity message (OTP flow).
+
+        These messages are mechanical responses from the identity
+        preprocessor (email confirmation, OTP validation results, etc.)
+        and are stored as AI messages so the widget displays them in
+        the chat bubble. They do NOT increment turn_count since no
+        AI pipeline was invoked.
+
+        Args:
+            tenant_id: Tenant identifier.
+            conversation_id: Target conversation.
+            content: System message text.
+
+        Returns:
+            The assigned message_id.
+        """
+        now = datetime.now(timezone.utc).isoformat()
+        message_id = str(uuid.uuid4())
+
+        message_dict: dict[str, Any] = {
+            "role": MessageRole.AI.value,
+            "content": content,
+            "timestamp": now,
+            "message_id": message_id,
+            "metadata": {"source": "identity_preprocessor"},
+        }
+
+        # Append message + increment message_count (but NOT turn_count)
+        operations: list[dict[str, Any]] = [
+            {"op": "add", "path": "/messages/-", "value": message_dict},
+            {"op": "incr", "path": "/message_count", "value": 1},
+            {"op": "set", "path": "/last_activity_at", "value": now},
+        ]
+
+        await self._repo.patch(
+            tenant_id=tenant_id,
+            document_id=conversation_id,
+            operations=operations,
+        )
+
+        logger.debug(
+            "Identity system message appended: conv=%s msg=%s",
+            conversation_id,
+            message_id,
+        )
+
+        return message_id
+
+    # -------------------------------------------------------------------
     # End conversation
     # -------------------------------------------------------------------
 
@@ -557,6 +615,7 @@ class ConversationSession:
             message_count=doc.get("message_count", 0),
             messages=messages,
             is_escalated=doc.get("status") == ConversationStatus.ESCALATED.value,
+            customer_verified=bool(doc.get("customer_verified", False)),
             created_at=doc.get("started_at", ""),
             last_activity_at=doc.get("last_activity_at", ""),
         )

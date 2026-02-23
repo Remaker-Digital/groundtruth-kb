@@ -139,6 +139,7 @@ class BillingChannel(str, Enum):
     STRIPE = "stripe"
     SHOPIFY = "shopify"
     TRIAL = "trial"
+    MANUAL = "manual"  # SPA Console provisioned (no webhook trigger)
 
 
 class ConsentStatus(str, Enum):
@@ -371,6 +372,20 @@ class ConversationDocument(BaseModel):
     customer_verified: bool = Field(
         default=False,
         description="Whether customer identity was verified (OTP token or Shopify HMAC)",
+    )
+
+    # In-conversation identity collection (P0-AUTH-FIX)
+    identity_email: str | None = Field(
+        default=None,
+        description="Email address collected in-conversation (before OTP verification)",
+    )
+    identity_otp_sent_at: str | None = Field(
+        default=None,
+        description="ISO 8601 timestamp when OTP was last sent for this conversation",
+    )
+    identity_otp_attempts: int = Field(
+        default=0,
+        description="Number of OTP verification attempts in this conversation (rate limit: 3)",
     )
 
     # Test Mode (C2 — controlled rollout)

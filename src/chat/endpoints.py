@@ -463,6 +463,52 @@ async def stream_response(
             headers={"Cache-Control": "no-cache"},
         )
 
+    # P0-AUTH-FIX: Identity preprocessor — intercept email/OTP messages
+    # before the AI pipeline. This keeps OTP mechanics deterministic.
+    try:
+        from src.chat.identity_preprocessor import preprocess_identity
+
+        identity_result = await preprocess_identity(
+            conversation_id=conversation_id,
+            tenant_id=ctx.tenant_id,
+            content=last_customer_msg,
+        )
+
+        if identity_result.action != "none":
+            # Identity message handled — return system response via SSE
+            # without invoking the AI pipeline.
+            import json as _json_id
+
+            sys_msg = identity_result.system_message or ""
+
+            # Append system response to conversation as an AI message
+            try:
+                await session.add_system_identity_message(
+                    tenant_id=ctx.tenant_id,
+                    conversation_id=conversation_id,
+                    content=sys_msg,
+                )
+            except Exception as exc:
+                logger.warning("Failed to persist identity system message: %s", exc)
+
+            async def _identity_stream():
+                yield f"event: token\ndata: {_json_id.dumps({'text': sys_msg})}\n\n"
+                yield f"event: done\ndata: {_json_id.dumps({'reason': 'identity_preprocessor'})}\n\n"
+
+            return StreamingResponse(
+                _identity_stream(),
+                media_type="text/event-stream",
+                headers={"Cache-Control": "no-cache"},
+            )
+
+        # If preprocessor returned a system_message with action="none",
+        # it's an informational note (e.g., OTP send failure) — let AI handle
+        # but we could inject context. For now, proceed normally.
+    except ImportError:
+        pass  # identity_preprocessor not available — proceed normally
+    except Exception as exc:
+        logger.warning("Identity preprocessor error (non-fatal): %s", exc)
+
     # Extract customer_id from conversation state
     customer_id: str | None = None
     for msg in reversed(state.messages):
@@ -492,6 +538,9 @@ async def stream_response(
                     yield sse_text
 
             # Stream new events from pipeline with heartbeat
+            # P0-AUTH-FIX: Pass customer_verified so the orchestrator can
+            # determine if in-conversation OTP verification has already
+            # identified this customer (suppresses identity collection rules).
             pipeline_events = pipeline.execute(
                 tenant_id=ctx.tenant_id,
                 conversation_id=conversation_id,
@@ -499,6 +548,7 @@ async def stream_response(
                 tenant=tenant_doc,
                 preferences=prefs_doc,
                 customer_id=customer_id,
+                customer_verified=getattr(state, "customer_verified", False),
                 conversation_history=conversation_history,
             )
 

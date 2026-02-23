@@ -635,6 +635,33 @@ email first. Would you like to continue as a guest, or provide your email?"
   note that it will be verified for future sessions.
 """
 
+# P0-AUTH-FIX: In-conversation identity collection rules
+# Unlike _ANONYMOUS_SESSION_RULES, this does NOT warn upfront — the AI
+# only asks for email when the customer needs identity-gated features.
+_IDENTITY_COLLECTION_RULES = """\
+IDENTITY STATUS — The customer has NOT been identified yet.
+
+Rules for this session:
+- Greet the customer warmly and answer general questions normally.
+- If the customer asks about orders, account info, loyalty, rewards, or any
+  identity-gated topic: respond with "I'd be happy to help with that! I'll
+  just need your email address to pull up your information."
+- General questions (return policy, store hours, product info, shipping info)
+  can be answered without identification.
+- Never fabricate or guess customer identity information.
+- If the customer provides an email address, the system will automatically
+  detect it and send a verification code. You do NOT need to acknowledge
+  the email or claim to send a code yourself — the system handles it.
+- If the customer asks about verification or says they haven't received a
+  code, suggest they type ONLY their email address on a new line.
+- If the customer says "skip" or "continue as guest" during verification,
+  warn about limitations: "No problem! Just so you know, without verification
+  I won't be able to access order details, account info, or loyalty rewards.
+  I can still help with general questions."
+- Do NOT proactively ask for email or warn about limitations at the start.
+  Wait until the customer requests something that requires identification.
+"""
+
 
 # ---------------------------------------------------------------------------
 # SystemPromptBuilder
@@ -743,10 +770,12 @@ class SystemPromptBuilder:
         ):
             sections.append(pattern_context)
 
-        # Layer 6 — Anonymous session rules (AUTH-1)
-        # When the customer skipped identification, inject instructions for
-        # the Response Generator and Escalation Handler to warn about
-        # limitations and encourage identification.
+        # Layer 6 — Identity collection rules (P0-AUTH-FIX)
+        # When the customer has NOT been identified (no customer_id and not
+        # verified via OTP/HMAC), inject in-conversation identity collection
+        # rules.  Unlike the old _ANONYMOUS_SESSION_RULES, these do NOT warn
+        # upfront — the AI only asks for email when the customer requests
+        # an identity-gated feature (order lookup, account info, etc.).
         if (
             is_anonymous
             and agent in (
@@ -754,7 +783,7 @@ class SystemPromptBuilder:
                 AgentRole.ESCALATION_HANDLER,
             )
         ):
-            sections.append(_ANONYMOUS_SESSION_RULES)
+            sections.append(_IDENTITY_COLLECTION_RULES)
 
         prompt = "\n\n".join(sections)
 

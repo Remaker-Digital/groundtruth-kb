@@ -188,6 +188,7 @@ class ChatPipeline(AgentDispatchMixin, CriticEscalationMixin, AnalyticsMixin):
         tenant: TenantDocument,
         preferences: PreferencesDocument,
         customer_id: str | None = None,
+        customer_verified: bool = False,
         conversation_history: list[dict[str, str]] | None = None,
     ) -> AsyncGenerator[StreamEvent, None]:
         """Run the full pipeline for a customer message.
@@ -202,6 +203,8 @@ class ChatPipeline(AgentDispatchMixin, CriticEscalationMixin, AnalyticsMixin):
             tenant: Tenant document (for prompt builder).
             preferences: Resolved merchant preferences.
             customer_id: Optional customer identifier for profile lookup.
+            customer_verified: Whether the customer has been verified via
+                OTP, Shopify HMAC, or other mechanism (P0-AUTH-FIX).
             conversation_history: Prior messages as list of
                 {"role": "user"|"assistant", "content": "..."} dicts
                 for multi-turn context. Most recent last. Capped by caller.
@@ -244,11 +247,17 @@ class ChatPipeline(AgentDispatchMixin, CriticEscalationMixin, AnalyticsMixin):
                     pass  # Non-fatal -- best-effort identity extraction
 
             # Build system prompts for all agents
+            # P0-AUTH-FIX: A customer is "anonymous" only if they have no
+            # pre-existing customer_id AND have not been verified in-conversation
+            # via OTP or Shopify HMAC.  In-conversation verification sets
+            # customer_verified=True on the ConversationDocument, allowing
+            # previously-anonymous users to become identified mid-session.
+            is_anonymous = customer_id is None and not customer_verified
             prompts = self._prompt_builder.build_all(
                 tenant=tenant,
                 preferences=preferences,
                 customer_profile=profile,
-                is_anonymous=customer_id is None,
+                is_anonymous=is_anonymous,
             )
 
             # Record prompt trace for explainability

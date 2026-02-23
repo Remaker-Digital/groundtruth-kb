@@ -305,6 +305,10 @@ class ConversationStateResponse(BaseModel):
         default=False,
         description="Whether conversation has been escalated to a human agent",
     )
+    customer_verified: bool = Field(
+        default=False,
+        description="Whether the customer has been verified (OTP, Shopify HMAC, etc.)",
+    )
     created_at: str = Field(description="When conversation started")
     last_activity_at: str = Field(description="Last message timestamp")
 

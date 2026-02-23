@@ -187,12 +187,11 @@ async function init(
     store.setState({ shopifyCustomer });
   }
 
-  // Determine initial view — skip prechat if Shopify customer is present
-  const hasPrechat = config.widget_prechat_form
-    && (config.widget_prechat_form as { fields?: unknown[] }).fields?.length;
-  const initialView = shopifyCustomer
-    ? 'conversation'
-    : (hasPrechat ? 'prechat' : 'conversation');
+  // P0-AUTH-FIX: Always start in conversation view. Identity collection
+  // happens in-conversation via the identity preprocessor, not via a
+  // blocking pre-chat form. Shopify HMAC customers get auto-verified;
+  // all others see the AI greeting + Quick Actions immediately.
+  const initialView = 'conversation';
 
   // Mount launcher in Shadow DOM
   const { shadowHost, shadowRoot } = mountLauncherHost();
