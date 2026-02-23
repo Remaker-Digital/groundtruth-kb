@@ -11,7 +11,7 @@ asyncio_mode = "auto"
 python_files = ["test_*.py"]
 python_classes = ["Test*"]
 python_functions = ["test_*"]
-addopts = "-v --tb=short --strict-markers"
+addopts = "-v --tb=short --strict-markers --timeout=30"
 markers = [
     "unit: fast, isolated unit tests (no I/O, no network)",
     "integration: cross-module integration tests (may use mocks for external services)",
@@ -21,6 +21,7 @@ markers = [
     "tier0: blocking regression tests — must pass for every deployment",
     "tier1: pre-launch gate regression tests — must pass before traffic cutover",
     "tier2: post-deploy smoke tests — performance and latency validation",
+    "sequential: tests that must not run in parallel (live endpoints, session fixtures)",
 ]
 filterwarnings = [
     "ignore::DeprecationWarning:pkg_resources",

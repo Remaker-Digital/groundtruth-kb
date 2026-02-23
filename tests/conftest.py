@@ -566,3 +566,16 @@ class AuthenticatedClient:
     def raw(self) -> TestClient:
         """Access the underlying TestClient for unauthenticated requests."""
         return self._client
+
+
+# ---------------------------------------------------------------------------
+# xdist compatibility
+# ---------------------------------------------------------------------------
+
+
+def pytest_configure(config):
+    """Register thermal-safe test markers for xdist batch execution."""
+    config.addinivalue_line(
+        "markers",
+        "sequential: tests that must not run in parallel (live endpoints, session fixtures)",
+    )

@@ -64,7 +64,7 @@ class TestRegistryLoading:
 
     def test_registry_loads_79_fields(self):
         registry = get_field_registry()
-        assert len(registry) == 79
+        assert len(registry) == 80
 
     def test_all_fields_have_required_attributes(self):
         registry = get_field_registry()

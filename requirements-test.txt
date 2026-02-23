@@ -11,6 +11,8 @@
 pytest>=8.0.0
 pytest-asyncio>=0.24.0
 pytest-cov>=5.0.0
+pytest-xdist>=3.5.0
+pytest-timeout>=2.3.0
 
 # FastAPI TestClient transport (httpx already in requirements.txt,
 # listed here as explicit test dependency for clarity)

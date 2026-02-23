@@ -199,38 +199,54 @@ Some procedures are short enough to define inline rather than in separate files.
 ### Unit Test Suite
 
 ```
-PROCEDURE: Run Unit Test Suite
+PROCEDURE: Run Unit Test Suite (Thermal-Safe)
 TYPE: Repeatable Procedure
-LAST VERIFIED: 2026-02-18
-LAST CORRECTED: 2026-02-18 — Updated EXPECTED_MIN_PASS (2400→4000), updated postcondition counts (S45)
+LAST VERIFIED: 2026-02-22
+LAST CORRECTED: 2026-02-22 — Thermal-safe batched execution with pytest-xdist (S74)
 
 VARIABLES:
   PROJECT_ROOT = E:\Claude-Playground\CLAUDE-PROJECTS\Agent Red Customer Engagement
   EXPECTED_MIN_PASS = 4000
   EXPECTED_MAX_SKIP = 10
   EXPECTED_FAILURES = 0
+  XDIST_WORKERS = 4
+  COOLDOWN_SECONDS = 30
 
 PRECONDITIONS:
   [ ] Python 3.12+ available             — python --version
   [ ] pytest installed                    — python -m pytest --version
-  [ ] Working directory is PROJECT_ROOT   — pwd
+  [ ] pytest-xdist installed             — python -m pytest --co -n 0 (should not error)
+  [ ] pytest-timeout installed           — verify in pytest --version output
+  [ ] Working directory is PROJECT_ROOT  — pwd
 
 STEPS:
-  STEP 1: Run pytest (unit tests only, excluding integration/regression/performance)
-    ACTION:    python -m pytest tests/ --ignore=tests/integration --ignore=tests/regression --ignore=tests/performance -x -q --tb=short
+  STEP 1: Run thermal-safe batched test suite
+    ACTION:    .\scripts\run-tests-thermal-safe.ps1 -Workers $XDIST_WORKERS -CoolDown $COOLDOWN_SECONDS -SkipLive
+    EXPECTED:  Exit code 0, "OVERALL: PASS" summary line
+    VERIFY:    Sum of passed counts across all batches >= $EXPECTED_MIN_PASS
+               Sum of failed counts == $EXPECTED_FAILURES
+    ON FAIL:   Identify which batch failed. Re-run that batch in isolation:
+               .\scripts\run-tests-thermal-safe.ps1 -Batch <batch-name> -Workers 2
+
+  STEP 1-ALT: Run tests without thermal safety (CI/cold environments only)
+    ACTION:    python -m pytest tests/ --ignore=tests/integration --ignore=tests/regression --ignore=tests/performance -n auto --timeout=30 -q --tb=short
     EXPECTED:  Exit code 0, "N passed, M skipped" summary line
     VERIFY:    Parse summary line: passed >= $EXPECTED_MIN_PASS,
                skipped <= $EXPECTED_MAX_SKIP, failed == $EXPECTED_FAILURES
-    ON FAIL:   Do not proceed with deployment. Investigate failures.
+    NOTE:      Use ONLY when thermal limits are not a concern (CI runners, cold ambient)
 
 POSTCONDITIONS:
   [ ] All tests passed (0 failures)
-  [ ] Pass count >= $EXPECTED_MIN_PASS (currently 4,159 unit-only as of session 44)
+  [ ] Pass count >= $EXPECTED_MIN_PASS (currently ~4,574 as of session 74)
   [ ] Skip count <= $EXPECTED_MAX_SKIP (currently 5)
+  [ ] No BSOD or thermal shutdown during test execution
 
 KNOWN FAILURE MODES:
   | Failure | Classification | Resolution |
   |---------|---------------|------------|
+  | Heat-related BSOD during test run | Environment transient | Reduce -Workers to 2, increase -CoolDown to 60. If persistent, check CPU cooler and ambient temperature. |
+  | pytest-xdist "no such option: -n" | Procedure defect (missing dep) | pip install pytest-xdist>=3.5.0 |
+  | Test timeout (>30s) on a unit test | Procedure defect (test is broken) | Investigate the specific test. Unit tests should complete in <5s. |
   | Azure integration test fails (RBAC) | Environment transient | Unrelated to unit tests; skip with -k "not azure_integration" |
   | Count drift between sessions | Procedure defect (if significant) | Count may vary ±50 due to test collection changes during refactoring. Update EXPECTED_MIN_PASS if sustained. |
 ```

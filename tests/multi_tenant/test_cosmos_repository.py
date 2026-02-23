@@ -618,9 +618,9 @@ class TestEnumCompleteness:
 
     @pytest.mark.unit
     def test_billing_channel_values(self):
-        """CR-20 supplement: BillingChannel has 3 values."""
+        """CR-20 supplement: BillingChannel has 4 values."""
         values = {c.value for c in BillingChannel}
-        assert values == {"stripe", "shopify", "trial"}
+        assert values == {"stripe", "shopify", "trial", "manual"}
 
     @pytest.mark.unit
     def test_consent_status_values(self):
