@@ -260,6 +260,72 @@ class TenantRepository(TenantScopedRepository):
             results.append(item)
         return results
 
+    # ------------------------------------------------------------------
+    # General access expiry queries (WI-EXPIRY-1)
+    # ------------------------------------------------------------------
+
+    async def list_expired_tenants(self) -> list[dict[str, Any]]:
+        """List active tenants whose general access has expired (cross-partition).
+
+        Returns tenant documents where:
+            - status = 'active'
+            - expires_at is set (not null)
+            - expires_at < current UTC time (ISO 8601 comparison)
+
+        No billing_channel filter — works for ANY channel.
+        Used by the access expiry scanner background task.
+        Performs a cross-partition query — call infrequently (hourly).
+        """
+        now_iso = datetime.now(timezone.utc).isoformat()
+        results: list[dict[str, Any]] = []
+        async for item in self._container.query_items(
+            query=(
+                "SELECT * FROM c WHERE c.status = 'active' "
+                "AND IS_DEFINED(c.expires_at) "
+                "AND c.expires_at != null "
+                "AND c.expires_at < @now"
+            ),
+            parameters=[{"name": "@now", "value": now_iso}],
+            max_item_count=100,
+        ):
+            results.append(item)
+        return results
+
+    async def list_expiring_tenants(self, within_iso: str) -> list[dict[str, Any]]:
+        """List active tenants expiring before the given timestamp (cross-partition).
+
+        Returns tenant documents where:
+            - status = 'active'
+            - expires_at is set (not null)
+            - expires_at is between now and within_iso
+
+        No billing_channel filter — works for ANY channel.
+        Used by the access expiry warning background task.
+        Performs a cross-partition query — call infrequently (every 12 hours).
+
+        Args:
+            within_iso: ISO 8601 upper-bound timestamp. Tenants expiring
+                before this time (but still in the future) are returned.
+        """
+        now_iso = datetime.now(timezone.utc).isoformat()
+        results: list[dict[str, Any]] = []
+        async for item in self._container.query_items(
+            query=(
+                "SELECT * FROM c WHERE c.status = 'active' "
+                "AND IS_DEFINED(c.expires_at) "
+                "AND c.expires_at != null "
+                "AND c.expires_at > @now "
+                "AND c.expires_at <= @within"
+            ),
+            parameters=[
+                {"name": "@now", "value": now_iso},
+                {"name": "@within", "value": within_iso},
+            ],
+            max_item_count=100,
+        ):
+            results.append(item)
+        return results
+
     async def update_status(
         self, tenant_id: str, status: TenantStatus,
     ) -> dict[str, Any]:

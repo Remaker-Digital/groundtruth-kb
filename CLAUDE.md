@@ -15,7 +15,7 @@ This document provides active guidance for AI assistants working on the Agent Re
 |-----------|-------|
 | **Project Name** | Agent Red Customer Experience |
 | **Type** | Commercial SaaS Product (Shopify + Standalone) |
-| **Status** | Production v1.55.0 HEALTHY (revision 0000054, S72). ALL 14 CYCLES + post-14 patches + Cycles 15-19 DEPLOYED. ~4,574 unit tests (1 pre-existing failure), 56 regression (46 pass + 10 deselected, 1 pre-existing T1-11 fail), 917 UI tests (793 PASS, 4 SOFT-PASS, 62 SKIP, 0 FAIL — verified S60), 25 conversation quality scenarios (PASS — 23/25, 4.75/5.0, S63). See `memory/build-deploy-roadmap.md`. |
+| **Status** | Production v1.56.7 HEALTHY (revision 0000063, S76b). ALL 14 CYCLES + post-14 patches + Cycles 15-19 DEPLOYED. ~4,791 unit tests (1 pre-existing failure), 18/18 T0 regression, 917 UI tests, 25 CQ scenarios (4.75/5.0), CP.1–CP.21 21/21 PASS. See `memory/build-deploy-roadmap.md`. |
 | **Owner** | Remaker Digital (DBA of VanDusen & Palmeter, LLC) |
 
 ### Copyright Notice
@@ -77,6 +77,35 @@ Skip feedback when the message is already clear. Only flag genuine opportunities
 
 **Technical work has elevated priority over creative/content work.** Technical implementation, test case creation, testing/results analysis, and new capabilities are prioritized above creative assets, marketing, and cosmetic work.
 
+### Master Test Plan
+
+The **Master Test Plan** (`docs/MASTER-TEST-PLAN-1.0.md`) is the single canonical document that defines what must be tested and in what order for the 1.0 GA release. It specifies a 15-phase ordered execution sequence where each phase is a child Repeatable Procedure. All 15 phases must pass for the release gate to clear.
+
+**Maintenance rules:**
+- Whenever a testing Repeatable Procedure is **created**, it MUST be added to the Master Test Plan as a new phase or within an existing phase.
+- Whenever a testing Repeatable Procedure is **updated** (assertions added, removed, or modified), the Master Test Plan MUST be updated to reflect the new test counts, pass criteria, and any changed phase gates.
+- The Master Test Plan's §10 Success Criteria table MUST always be consistent with the individual child procedures it references.
+
+**Test outcome rules:**
+- Every test in every procedure MUST result in one of three outcomes:
+  1. **PASS** — the test executed and produced the expected result.
+  2. **FAIL** — the test executed and produced an unexpected result. A FAIL blocks the release gate. The root cause must be investigated and fixed (either in the product code or the test itself).
+  3. **Correction** — the test itself was found to be incorrect (wrong expected value, stale endpoint, outdated assertion). When a test is corrected, the corrected procedure MUST be re-executed to verify the correction is valid. A corrected test that has not been re-verified does not count as PASS.
+- **CONDITIONAL PASS is not accepted.** Any test that does not cleanly PASS must be either fixed (product or test) and re-run, or documented as a 1.1 deferral with justification.
+- **No pre-existing failures are accepted** for the 1.0 GA release gate. Known failing tests must be fixed or removed with justification before the release gate execution begins.
+
+### Release Plan
+
+The **Release Plan** (`docs/operations/release-plan-v1.57.md`) is the governing framework for all current work. It defines an 8-step process from Master Test Plan execution through beta deployment and non-disruptive upgrade.
+
+**Key terminology:**
+- **Beta (Prime)** — the production environment serving beta customers. Runs a pinned release image.
+- **Staging** — an isolated parallel production environment for validating the next release and proving non-disruptive upgrade.
+- All beta feedback fixes are developed on `main` toward v1.58.0.
+- Non-disruptive upgrade is proven on Staging before applying to Beta (Prime).
+
+**Branching model:** Tag-and-branch-forward (Model A). No long-lived development branches. `main` always moves forward.
+
 ### Repeatable Procedures
 
 Some operational tasks are governed by **Repeatable Procedures** — structured SOPs with pinned variables, verification gates, and known failure modes. The specification is defined in `docs/operations/REPEATABLE-PROCEDURES.md`.
@@ -88,25 +117,26 @@ When executing a Repeatable Procedure:
 - For environment transients: retry, do not modify the procedure
 
 Active procedures:
+- `docs/operations/release-plan-v1.57.md` — **Release Plan v1.57.0 Beta** (governing framework, 8 steps)
 - `scripts/deploy/upgrade.ps1` — Production deployment
 - `scripts/deploy/rollback.ps1` — Production rollback
-- `scripts/seed_tenant.py` — Tenant provisioning (single tenant, destructive)
+- `scripts/seed_tenant.py` — Tenant provisioning (single tenant, destructive, superadmin only)
 - `scripts/create_test_tenant.py` — Simulated customer tenant creation (test-customer-001, 8 phases, non-destructive)
 - `docs/operations/initialization-procedure.md` — Tenant initialization (destructive, 10 post-conditions)
-- `docs/operations/upgrade-verification-procedure.md` — Non-disruptive upgrade verification
+- `docs/operations/upgrade-verification-procedure.md` — Non-disruptive upgrade verification (35 assertions)
 - `docs/operations/CATASTROPHIC-RECOVERY-RUNBOOK.md` — Azure environment setup
 - `docs/operations/ui-test-procedure.md` — Admin UI regression tests (780 standalone tests, authoritative test definitions)
-- `docs/operations/chrome-ui-test-procedure.md` — Chrome MCP-automated UI tests (810 total: 780 standalone + 30 provider)
+- `docs/operations/chrome-ui-test-procedure.md` — Chrome MCP-automated UI tests (917 total) + Critical Path CP.1–CP.21
 - `docs/operations/external-url-reachability-procedure.md` — URL reachability pre-flight (37 URLs)
 - Inline in spec: Unit test suite, Production regression suite
 - `docs/operations/agntcy-platform-adoption-procedure.md` — AGNTCY platform adoption verification
 - `docs/operations/load-test-procedure.md` — Load testing (50 users, SLA validation, Locust)
-- `docs/operations/tenant-isolation-test-procedure.md` — Tenant isolation verification (cross-tenant access prevention)
+- `docs/operations/tenant-isolation-test-procedure.md` — Tenant isolation verification (30 cross-tenant tests)
 - `docs/operations/api-security-test-procedure.md` — API security & penetration testing (45 tests)
-- `docs/operations/rate-limit-test-procedure.md` — Rate limiting & DoS resilience (per-tier enforcement)
+- `docs/operations/rate-limit-test-procedure.md` — Rate limiting & DoS resilience (20 tests, per-tier enforcement)
 - `docs/operations/conversation-quality-test-procedure.md` — Conversation quality regression (25 golden scenarios)
-- `docs/operations/resilience-failover-test-procedure.md` — Resilience & failover testing (dependency degradation)
-- `docs/operations/data-integrity-test-procedure.md` — Data integrity & backup verification (Cosmos DB)
+- `docs/operations/resilience-failover-test-procedure.md` — Resilience & failover testing (29 PASS + 6 SKIP)
+- `docs/operations/data-integrity-test-procedure.md` — Data integrity & backup verification (25 Cosmos DB tests)
 
 ### Adding Commercial Features
 
@@ -129,9 +159,9 @@ Active procedures:
 
 Full plan: `memory/build-deploy-roadmap.md`
 
-### Current Status — v1.55.0 DEPLOYED (Cycles 15-19)
+### Current Status — v1.56.7 DEPLOYED, Release Plan ACTIVE
 
-Production is v1.55.0 (revision 0000054, session 72). Cycles 15-19 deployed. Tier 0 regression: 18/18 PASS. Tier 1: 45/46 (1 pre-existing T1-11 fail).
+Production is v1.56.7 (revision 0000063, session 76b). All 19 cycles deployed. 18/18 T0 PASS. Release Plan (`docs/operations/release-plan-v1.57.md`) is the governing framework — next step: Step 1 (Master Test Plan execution).
 
 | Cycle | Version | Content | Status |
 |-------|---------|---------|--------|
@@ -158,5 +188,5 @@ Production is v1.55.0 (revision 0000054, session 72). Cycles 15-19 deployed. Tie
 ---
 
 *© 2026 Remaker Digital, a DBA of VanDusen & Palmeter, LLC. All rights reserved.*
-*Last Updated: 2026-02-22*
-*Version: 56.0.0*
+*Last Updated: 2026-02-23*
+*Version: 57.0.0*

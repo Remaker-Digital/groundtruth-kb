@@ -276,6 +276,15 @@ APPROVE everything else.  Most responses should be approved.
 DEFAULT TO APPROVED.  The vast majority of customer service responses
 are safe and should be approved without modification.
 
+IMPORTANT — CUSTOMER IDENTIFICATION REQUESTS ARE ALWAYS SAFE:
+Asking the customer for their email address, name, or order number
+so the agent can look up their account is STANDARD customer service
+practice and must ALWAYS be approved.  This includes responses that
+greet the customer, address their question, AND ask for email or
+other identification in the same message.  The agent is instructed
+to request customer identification — blocking such requests would
+break the required customer identification flow.
+
 IMPORTANT — PRODUCT FEATURE DESCRIPTIONS ARE ALWAYS SAFE:
 Any response describing how the product works, what technology it uses,
 its features, architecture, layers, capabilities, AI techniques, or
@@ -635,31 +644,33 @@ email first. Would you like to continue as a guest, or provide your email?"
   note that it will be verified for future sessions.
 """
 
-# P0-AUTH-FIX: In-conversation identity collection rules
-# Unlike _ANONYMOUS_SESSION_RULES, this does NOT warn upfront — the AI
-# only asks for email when the customer needs identity-gated features.
+# P0-AUTH-FIX: In-conversation identity collection rules (proactive)
+# The P0 mandate requires customer identification for every conversation.
+# The AI proactively asks for an email address in its first response to
+# enable personalized service and verified identity.
 _IDENTITY_COLLECTION_RULES = """\
 IDENTITY STATUS — The customer has NOT been identified yet.
 
 Rules for this session:
-- Greet the customer warmly and answer general questions normally.
-- If the customer asks about orders, account info, loyalty, rewards, or any
-  identity-gated topic: respond with "I'd be happy to help with that! I'll
-  just need your email address to pull up your information."
-- General questions (return policy, store hours, product info, shipping info)
-  can be answered without identification.
-- Never fabricate or guess customer identity information.
+- In your FIRST response, greet the customer warmly, briefly address their
+  question, and then ask for their email address. Example: "I'd be happy to
+  help! To give you the best experience and access your account details,
+  could you share your email address?"
 - If the customer provides an email address, the system will automatically
   detect it and send a verification code. You do NOT need to acknowledge
   the email or claim to send a code yourself — the system handles it.
+- If the customer asks about orders, account info, loyalty, rewards, or any
+  identity-gated topic and has not yet provided email: remind them you need
+  their email to look that up.
 - If the customer asks about verification or says they haven't received a
   code, suggest they type ONLY their email address on a new line.
 - If the customer says "skip" or "continue as guest" during verification,
   warn about limitations: "No problem! Just so you know, without verification
   I won't be able to access order details, account info, or loyalty rewards.
   I can still help with general questions."
-- Do NOT proactively ask for email or warn about limitations at the start.
-  Wait until the customer requests something that requires identification.
+- Never fabricate or guess customer identity information.
+- After the first request, do not repeatedly ask for email — respect the
+  customer's choice if they decline or ignore the request.
 """
 
 
@@ -772,10 +783,9 @@ class SystemPromptBuilder:
 
         # Layer 6 — Identity collection rules (P0-AUTH-FIX)
         # When the customer has NOT been identified (no customer_id and not
-        # verified via OTP/HMAC), inject in-conversation identity collection
-        # rules.  Unlike the old _ANONYMOUS_SESSION_RULES, these do NOT warn
-        # upfront — the AI only asks for email when the customer requests
-        # an identity-gated feature (order lookup, account info, etc.).
+        # verified via OTP/HMAC), inject proactive identity collection rules.
+        # The AI asks for the customer's email in its FIRST response per the
+        # P0 mandate. Shopify customers bypass this (AUTH-4 HMAC verified).
         if (
             is_anonymous
             and agent in (

@@ -47,6 +47,7 @@ interface IntegrationHealthResponse {
   overallHealthy: boolean;
   circuitBreakers: CircuitBreakerStatus[];
   anyBreakerOpen: boolean;
+  natsDeployed: boolean;
   natsConnected: boolean;
   mcpIntegrations: McpIntegrationStatus[];
   errors: Array<{ tenantId: string; message: string }>;
@@ -133,10 +134,10 @@ export function IntegrationHealthPage() {
           <Text size="sm" fw={500} c={tokens.textSecondary}>NATS JetStream</Text>
           <Badge
             variant="light"
-            color={data.natsConnected ? 'green' : 'red'}
+            color={data.natsConnected ? 'green' : data.natsDeployed ? 'red' : 'gray'}
             size="sm"
           >
-            {data.natsConnected ? 'Connected' : 'Disconnected'}
+            {data.natsConnected ? 'Connected' : data.natsDeployed ? 'Disconnected' : 'Not Deployed'}
           </Badge>
         </Group>
       </Paper>

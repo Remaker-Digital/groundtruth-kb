@@ -400,10 +400,19 @@ export const StandaloneLayout: React.FC<StandaloneLayoutProps> = ({
   useEffect(() => {
     if (isActivated !== false) return; // Only show when explicitly not activated
     try {
+      // WI-CP3: When tenant has NEVER been activated (version 0), always show
+      // the wizard regardless of sessionStorage state.  This prevents stale
+      // dismiss flags from hiding the wizard after tenant re-provisioning
+      // or when a new tenant is served to the same browser tab.
+      if (activationStatus?.active_version === 0) {
+        sessionStorage.removeItem('agentred-onboarding-dismissed');
+        setShowOnboarding(true);
+        return;
+      }
       const dismissed = sessionStorage.getItem('agentred-onboarding-dismissed');
       if (!dismissed) setShowOnboarding(true);
     } catch { /* ignore */ }
-  }, [isActivated]);
+  }, [isActivated, activationStatus?.active_version]);
 
   const dismissOnboarding = useCallback(() => {
     setShowOnboarding(false);
@@ -710,7 +719,7 @@ export const StandaloneLayout: React.FC<StandaloneLayoutProps> = ({
                       <ThemeIcon
                         variant={isActive ? 'filled' : isDark ? 'default' : 'light'}
                         size="sm"
-                        color={isActive ? 'brand' : 'gray'}
+                        color={isActive ? 'brand.5' : 'gray'}
                         style={!isActive && isDark ? { background: 'transparent', border: 'none' } : undefined}
                       >
                         <IconComponent />
@@ -718,7 +727,7 @@ export const StandaloneLayout: React.FC<StandaloneLayoutProps> = ({
                     }
                     rightSection={
                       item.badge ? (
-                        <Badge size="xs" variant="filled" color="brand" circle>{item.badge}</Badge>
+                        <Badge size="xs" variant="filled" color="brand.5" circle>{item.badge}</Badge>
                       ) : undefined
                     }
                     active={isActive}
@@ -786,7 +795,7 @@ export const StandaloneLayout: React.FC<StandaloneLayoutProps> = ({
                         <ThemeIcon
                           variant={isActive ? 'filled' : isDark ? 'default' : 'light'}
                           size="sm"
-                          color={isActive ? 'brand' : 'gray'}
+                          color={isActive ? 'brand.5' : 'gray'}
                           style={!isActive && isDark ? { background: 'transparent', border: 'none' } : undefined}
                         >
                           <IconComponent />
@@ -900,7 +909,7 @@ export const StandaloneLayout: React.FC<StandaloneLayoutProps> = ({
                       <ThemeIcon
                         variant={isActive ? 'filled' : isDark ? 'default' : 'light'}
                         size="sm"
-                        color={isActive ? 'brand' : 'gray'}
+                        color={isActive ? 'brand.5' : 'gray'}
                         style={!isActive && isDark ? { background: 'transparent', border: 'none' } : undefined}
                       >
                         <IconComponent />
@@ -908,7 +917,7 @@ export const StandaloneLayout: React.FC<StandaloneLayoutProps> = ({
                     }
                     rightSection={
                       item.badge ? (
-                        <Badge size="xs" variant="filled" color="brand" circle>{item.badge}</Badge>
+                        <Badge size="xs" variant="filled" color="brand.5" circle>{item.badge}</Badge>
                       ) : showTierBadge ? (
                         <Badge size="xs" variant="light" color={TIER_BADGE_COLORS[item.minTier!] ?? 'gray'}>
                           {TIER_BADGE_LABELS[item.minTier!]}

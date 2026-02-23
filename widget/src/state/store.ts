@@ -91,6 +91,9 @@ export interface WidgetState {
 
   // Shopify customer passthrough (AUTH-4)
   shopifyCustomer: ShopifyCustomer | null;
+
+  // Consent (WI #87)
+  consentCollected: boolean;
 }
 
 // ---------------------------------------------------------------------------
@@ -213,6 +216,7 @@ export function createStore(config: WidgetConfig, locale: Locale): Store {
     customerToken: null,
     otpError: null,
     shopifyCustomer: null,
+    consentCollected: false,
   });
   return _store;
 }

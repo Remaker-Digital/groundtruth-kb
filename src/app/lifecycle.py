@@ -452,6 +452,49 @@ async def _startup_knowledge_vectorizer() -> None:
         )
 
 
+async def _startup_conversation_vectorizer() -> None:
+    """Initialize the Conversation Vectorizer for Layer 2 memory.
+
+    Configures ConversationVectorizer singleton with MemoryVectorRepository,
+    Azure OpenAI client (for embeddings), and PiiScrubber.
+    Non-fatal: vectorization scanner will skip if not configured.
+    """
+    try:
+        from src.multi_tenant.conversation_vectorizer import get_vectorizer
+        from src.multi_tenant.repository import MemoryVectorRepository
+        from src.multi_tenant.gdpr_services import PiiScrubber
+
+        vector_repo = MemoryVectorRepository()
+        vectorizer = get_vectorizer()
+
+        # Create OpenAI client for embeddings (same pattern as KB vectorizer)
+        openai_client = None
+        from src.chat.pipeline import USE_AGENT_CONTAINERS as _use_containers
+        if not _use_containers:
+            try:
+                from src.chat.pipeline import _create_openai_client
+                openai_client = _create_openai_client()
+            except Exception:
+                logger.warning(
+                    "Azure OpenAI client creation failed for conversation vectorizer — "
+                    "embeddings will use dev-mode zero vectors."
+                )
+
+        pii_scrubber = PiiScrubber()
+
+        vectorizer.configure(
+            vector_repo=vector_repo,
+            openai_client=openai_client,
+            pii_scrubber=pii_scrubber,
+        )
+        logger.info("ConversationVectorizer configured (Layer 2 memory)")
+    except Exception as exc:
+        logger.warning(
+            "ConversationVectorizer initialization failed — "
+            "Layer 2 memory vectorization unavailable: %s", exc,
+        )
+
+
 async def _startup_admin_knowledge_services() -> None:
     """Initialize the Admin Knowledge Base API.
 
@@ -1302,6 +1345,7 @@ def register_startup_handlers(app: FastAPI) -> None:
     app.on_event("startup")(_startup_chat_services)
     app.on_event("startup")(_startup_admin_inbox_services)
     app.on_event("startup")(_startup_knowledge_vectorizer)
+    app.on_event("startup")(_startup_conversation_vectorizer)
     app.on_event("startup")(_startup_admin_knowledge_services)
     app.on_event("startup")(_startup_embed_unembedded_kb)
     app.on_event("startup")(_startup_admin_analytics_services)

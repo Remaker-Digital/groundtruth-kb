@@ -151,6 +151,10 @@ class ConfigSuggestionEngine:
         if greeting:
             suggestions.suggestions.append(greeting)
 
+        widget_greeting = self._generate_widget_greeting(brand_name)
+        if widget_greeting:
+            suggestions.suggestions.append(widget_greeting)
+
         display_name = self._suggest_display_name(brand_name)
         if display_name:
             suggestions.suggestions.append(display_name)
@@ -309,6 +313,32 @@ class ConfigSuggestionEngine:
             value=greeting,
             confidence=round(confidence, 2),
             source="Generated from brand name and category analysis",
+        )
+
+    @staticmethod
+    def _generate_widget_greeting(
+        brand_suggestion: Suggestion | None,
+    ) -> Suggestion | None:
+        """Generate the widget UI greeting banner text.
+
+        This is separate from greeting_message (AI prompt greeting). The
+        widget_greeting_message is displayed in the chat panel header before
+        the customer sends their first message.
+        """
+        brand_name = brand_suggestion.value if brand_suggestion else None
+
+        if brand_name:
+            greeting = f"Welcome to {brand_name}! How can we help you today?"
+            confidence = 0.7
+        else:
+            greeting = "Hi there! How can I help you today?"
+            confidence = 0.4
+
+        return Suggestion(
+            field_name="widget_greeting_message",
+            value=greeting,
+            confidence=round(confidence, 2),
+            source="Generated from brand name" if brand_name else "Platform default",
         )
 
     @staticmethod

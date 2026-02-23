@@ -40,10 +40,12 @@ import {
   reportIssue as apiReportIssue,
   sendOtp as apiSendOtp,
   verifyOtp as apiVerifyOtp,
+  submitConsent as apiSubmitConsent,
   getTransportConfig,
 } from '@/transport/http';
 import { SSEConnection } from '@/transport/sse';
 import { detectPageContext, resolveTemplate } from '@/utils/templateVars';
+import { ConsentBanner } from './ConsentBanner';
 
 // ---------------------------------------------------------------------------
 // Props (passed from the iframe bootstrap)
@@ -394,6 +396,26 @@ export const Panel: FunctionComponent<PanelProps> = ({
     store.setState({ view: 'conversation' });
   }, []);
 
+  /** Handle consent acceptance (WI #87). */
+  const handleConsentAccept = useCallback(async () => {
+    const store = getStore();
+    const { conversationId } = store.getState();
+    store.setState({ consentCollected: true });
+    if (conversationId) {
+      await apiSubmitConsent(conversationId, true);
+    }
+  }, []);
+
+  /** Handle consent decline (WI #87). */
+  const handleConsentDecline = useCallback(async () => {
+    const store = getStore();
+    const { conversationId } = store.getState();
+    store.setState({ consentCollected: true });
+    if (conversationId) {
+      await apiSubmitConsent(conversationId, false);
+    }
+  }, []);
+
   // ---- Drag-to-reposition (WI #253) ----------------------------------------
 
   /**
@@ -493,6 +515,19 @@ export const Panel: FunctionComponent<PanelProps> = ({
       )}
       {state.error && !state.isReconnecting && (
         <ConnectionBanner tokens={tokens} locale={locale} type="error" message={state.error} />
+      )}
+
+      {/* Consent banner (WI #87) — shown when consent collection is enabled */}
+      {state.view === 'conversation'
+        && (config as Record<string, unknown>).consent_collection_enabled === true
+        && !state.consentCollected
+        && state.conversationId && (
+        <ConsentBanner
+          tokens={tokens}
+          locale={locale}
+          onAccept={handleConsentAccept}
+          onDecline={handleConsentDecline}
+        />
       )}
 
       {/* Main content area — switches based on view */}

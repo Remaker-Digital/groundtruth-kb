@@ -67,6 +67,7 @@ interface ConversationStats {
 interface IntegrationHealth {
   shopifyConnected: boolean;
   stripeConnected: boolean;
+  natsDeployed: boolean;
   natsConnected: boolean;
 }
 
@@ -347,7 +348,11 @@ export function SupportDiagnosticsPage() {
                 </Group>
                 <Group justify="space-between">
                   <Text size="sm" c={tokens.textMuted}>NATS</Text>
-                  <BoolBadge value={data.integrations.natsConnected} trueLabel="Connected" falseLabel="Disconnected" />
+                  {data.integrations.natsDeployed ? (
+                    <BoolBadge value={data.integrations.natsConnected} trueLabel="Connected" falseLabel="Disconnected" />
+                  ) : (
+                    <Badge variant="light" color="gray" size="sm">Not Deployed</Badge>
+                  )}
                 </Group>
               </Stack>
             </Card>

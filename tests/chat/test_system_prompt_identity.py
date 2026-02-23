@@ -89,10 +89,11 @@ class TestSystemPromptIdentityRules:
             is_anonymous=True,
         )
 
-        # Should contain the identity collection rules, NOT anonymous rules
+        # Should contain the proactive identity collection rules
         assert "IDENTITY STATUS" in prompt
         assert "has NOT been identified" in prompt
-        assert "Do NOT proactively ask for email" in prompt
+        assert "In your FIRST response" in prompt
+        assert "ask for their email address" in prompt
 
     def test_verified_conversation_no_layer_6(
         self, builder, tenant, preferences,
@@ -132,7 +133,8 @@ class TestSystemPromptIdentityRules:
         """Unverified user gets _IDENTITY_COLLECTION_RULES, not old rules.
 
         P0-AUTH-FIX changed Layer 6 from _ANONYMOUS_SESSION_RULES to
-        _IDENTITY_COLLECTION_RULES. The new rules do NOT warn upfront.
+        _IDENTITY_COLLECTION_RULES. The AI proactively asks for email
+        in its first response per the P0 mandate.
         """
         prompt = builder.build(
             agent=AgentRole.RESPONSE_GENERATOR,
@@ -141,8 +143,9 @@ class TestSystemPromptIdentityRules:
             is_anonymous=True,
         )
 
-        # New rules: don't warn at the start
-        assert "Do NOT proactively ask for email" in prompt
+        # New rules: proactively ask for email in first response
+        assert "In your FIRST response" in prompt
+        assert "ask for their email address" in prompt
         # Old rules: warned at the start — should NOT be present
         assert "ANONYMOUS SESSION" not in prompt
         assert "Since you're chatting as a guest" not in prompt

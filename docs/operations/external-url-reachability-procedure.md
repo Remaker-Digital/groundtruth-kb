@@ -64,8 +64,8 @@ STEP 1.2: Ready endpoint
 
 STEP 1.3: Public status API
   ACTION:    Navigate to $STATUS_URL. Read page text.
-  EXPECTED:  HTTP 200. JSON response containing "overall_status".
-  VERIFY:    get_page_text contains "overall_status"
+  EXPECTED:  HTTP 200. JSON response containing "overallStatus".
+  VERIFY:    get_page_text contains "overallStatus"
   ON FAIL:   Status endpoint misconfigured. Check /api/status route in main.py.
 
 STEP 1.4: Widget JavaScript bundle

@@ -1039,7 +1039,7 @@ class ActivationService:
                     {"op": "set", "path": "/warranty_info", "value": None},
                     {"op": "set", "path": "/support_hours", "value": None},
                     {"op": "set", "path": "/custom_policies", "value": None},
-                    {"op": "set", "path": "/widget_greeting_message", "value": ""},
+                    {"op": "set", "path": "/widget_greeting_message", "value": None},
                     # Activation metadata
                     {"op": "set", "path": "/activated_at", "value": None},
                     {"op": "set", "path": "/activated_by", "value": None},

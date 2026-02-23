@@ -57,6 +57,9 @@ export interface Locale {
   otpResend: string;
   otpSkip: string;
   otpInvalid: string;
+  consentPrompt: string;
+  consentAccept: string;
+  consentDecline: string;
 }
 
 export const en: Locale = {
@@ -106,4 +109,7 @@ export const en: Locale = {
   otpResend: 'Resend code',
   otpSkip: 'Continue without verifying',
   otpInvalid: 'Invalid code. Please try again.',
+  consentPrompt: 'We use your conversation history to provide personalized support. You can change this at any time.',
+  consentAccept: 'Allow',
+  consentDecline: 'No thanks',
 };

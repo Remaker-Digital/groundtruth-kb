@@ -228,6 +228,21 @@ export async function reportIssue(
 }
 
 // ---------------------------------------------------------------------------
+// Consent collection (WI #87)
+// ---------------------------------------------------------------------------
+
+/** Submit customer consent choice for Persistent Customer Memory. */
+export async function submitConsent(
+  conversationId: string,
+  consentGranted: boolean,
+): Promise<boolean> {
+  const resp = await request('POST', `/api/chat/conversations/${conversationId}/consent`, {
+    consent_status: consentGranted ? 'granted' : 'denied',
+  });
+  return resp.ok;
+}
+
+// ---------------------------------------------------------------------------
 // OTP verification (AUTH-3)
 // ---------------------------------------------------------------------------
 

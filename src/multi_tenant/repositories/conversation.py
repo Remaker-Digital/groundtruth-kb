@@ -508,6 +508,41 @@ class ConversationRepository(TenantScopedRepository):
             [{"name": "@limit", "value": limit}],
         )
 
+    # --- Layer 2 Memory Vectorization (WI #87) ---
+
+    async def list_unvectorized_ended(
+        self,
+        tenant_id: str,
+        *,
+        limit: int = 50,
+        min_messages: int = 2,
+    ) -> list[dict[str, Any]]:
+        """List ended conversations that haven't been vectorized yet.
+
+        Returns conversations eligible for Layer 2 memory vectorization,
+        ordered by ended_at ascending (oldest first).
+
+        Filters:
+            - Status: resolved, timed_out, or escalated (not active/error)
+            - At least ``min_messages`` messages (skip empty/greeting-only)
+            - Not yet vectorized (vectorized_at is null/undefined)
+            - Has customer_id (anonymous conversations can't be linked)
+        """
+        return await self.query(
+            tenant_id,
+            "SELECT * FROM c "
+            "WHERE c.status IN ('resolved', 'timed_out', 'escalated') "
+            "AND c.message_count >= @min_messages "
+            "AND (NOT IS_DEFINED(c.vectorized_at) OR c.vectorized_at = null) "
+            "AND c.customer_id != null "
+            "ORDER BY c.ended_at ASC "
+            "OFFSET 0 LIMIT @limit",
+            [
+                {"name": "@min_messages", "value": min_messages},
+                {"name": "@limit", "value": limit},
+            ],
+        )
+
     # --- First Contact Resolution (CQ-5) ---
 
     async def count_fcr(

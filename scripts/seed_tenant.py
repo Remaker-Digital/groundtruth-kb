@@ -24,7 +24,7 @@ POSTCONDITIONS:
   [ ] 10 Cosmos DB containers created/verified
   [ ] Tenant document with API key + widget key
   [ ] Preferences document (config_state=draft, all merchant-configurable fields empty)
-  [ ] 3 team members with per-user API keys
+  [ ] 1 team member (superadmin) with per-user API key
   [ ] 54 KB articles seeded
   [ ] 4 tier_defaults platform config documents
   [ ] Credentials printed to stdout (SAVE THESE)
@@ -101,7 +101,7 @@ Orchestrates 8 phases:
     0. Clean        — Delete ALL existing tenant docs (clean slate)
     2. Tenant       — TenantDocument (active, professional) + API/widget keys
     3. Preferences  — PreferencesDocument v1 (draft config, brand, widget, quick actions)
-    4. Team         — 3 TeamMemberDocuments (superadmin + 2 escalation agents)
+    4. Team         — 1 TeamMemberDocument (superadmin only)
     6. Platform     — 4 tier_defaults documents
     7. Demo Data    — Conversations, profiles, memory (with --demo flag)
     8. Summary      — Print all credentials, URLs, phase results
@@ -171,25 +171,17 @@ INTERVAL = os.environ.get("SEED_INTERVAL", "month")
 
 FQDN = os.environ.get("SEED_FQDN", "agent-red-api-gateway.orangeglacier-f566a4e7.eastus.azurecontainerapps.io")
 
-# Team members to create
+# Team members to create — ONLY the superadmin.
+# A freshly provisioned tenant has exactly one team member: the owner
+# who is logging in for the first time. Additional team members
+# (escalation agents, admins, viewers) are added by the merchant
+# through the Admin UI after onboarding.
 TEAM_MEMBERS = [
     {
         "email": "mike@remakerdigital.com",
         "display_name": "Owner",
         "role": "superadmin",
         "escalation_categories": [],
-    },
-    {
-        "email": "help@remakerdigital.com",
-        "display_name": "Charles Northey",
-        "role": "escalation_agent",
-        "escalation_categories": ["service", "support", "general_inquiry"],
-    },
-    {
-        "email": "support@remakerdigital.com",
-        "display_name": "Scott Carey",
-        "role": "escalation_agent",
-        "escalation_categories": ["sales", "account", "technical_assistance"],
     },
 ]
 
@@ -578,7 +570,8 @@ async def phase_3_preferences(dry_run: bool) -> None:
         widget_sound_enabled=True,
         widget_file_upload_enabled=False,
         widget_greeting_enabled=True,
-        widget_greeting_message="",
+        # widget_greeting_message intentionally omitted — platform_default
+        # "Hi there! How can I help you today?" applies via resolve_defaults().
         widget_offline_form_enabled=True,
         # Widget content — empty for merchant to fill
         widget_header_text="",
@@ -625,7 +618,7 @@ async def phase_3_preferences(dry_run: bool) -> None:
 # ---------------------------------------------------------------------------
 
 async def phase_4_team(dry_run: bool) -> None:
-    """Create 3 TeamMemberDocuments with per-user API keys."""
+    """Create superadmin TeamMemberDocument with per-user API key."""
     print()
     print("=" * 65)
     print("  PHASE 4: Team Members")
@@ -907,8 +900,8 @@ async def seed(
     # Use seed_knowledge_base.py separately if KB data is needed.
     await phase_6_platform_config(dry_run)
     await phase_7_demo_data(dry_run, demo)
-    # Phase 4 runs AFTER demo data so team members with API key hashes
-    # overwrite any demo data records that lack key hashes.
+    # Phase 4 runs AFTER demo data so superadmin with API key hash
+    # overwrites any demo data record that lacks a key hash.
     await phase_4_team(dry_run)
     phase_8_summary()
 

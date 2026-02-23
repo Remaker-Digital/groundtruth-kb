@@ -171,9 +171,9 @@ class TestNatsDisconnection:
             "initial_message": "test",
         }
         r = client.post("/api/chat/conversations", json=payload, headers=widget_headers)
-        # If NATS is down: 503. If NATS is up: 200. Both are valid.
-        assert r.status_code in (200, 503), (
-            f"Chat should return 200 or 503, got {r.status_code}"
+        # If NATS is down: 503. If NATS is up: 200/201 (Created). All valid.
+        assert r.status_code in (200, 201, 503), (
+            f"Chat should return 200/201 or 503, got {r.status_code}"
         )
         if r.status_code == 503:
             # Verify it's a well-formed error, not a crash
@@ -273,7 +273,7 @@ class TestCircuitBreaker:
         elapsed = time.time() - start
         # Should respond within 10s (8s budget + 2s overhead)
         assert elapsed < 10.0, f"Chat took {elapsed:.1f}s (budget: 8s + 2s overhead)"
-        assert r.status_code in (200, 429, 503), f"Chat: {r.status_code}"
+        assert r.status_code in (200, 201, 429, 503), f"Chat: {r.status_code}"
 
 
 # ===========================================================================
@@ -447,4 +447,4 @@ class TestExternalDependencies:
         elapsed = time.time() - start
         # Must not hang — 10s max (8s budget + overhead)
         assert elapsed < 12.0, f"OpenAI test took {elapsed:.1f}s — possible hang"
-        assert r.status_code in (200, 429, 503), f"OpenAI test: {r.status_code}"
+        assert r.status_code in (200, 201, 429, 503), f"OpenAI test: {r.status_code}"

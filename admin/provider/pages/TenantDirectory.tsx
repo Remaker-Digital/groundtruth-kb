@@ -2,16 +2,18 @@
  * TenantDirectory — Cross-tenant directory with filtering and pagination.
  *
  * Shows tenant summary cards (total, by status, by tier) and a filterable
- * paginated table of all tenants.
+ * paginated table of all tenants. Includes expiry management (WI-EXPIRY-1).
  *
  * API:
  *   GET /api/superadmin/tenants          — paginated, filterable tenant list
  *   GET /api/superadmin/tenants/summary  — distribution aggregates
+ *   POST /api/superadmin/tenants         — create new tenant
+ *   PATCH /api/superadmin/tenants/:id/expiry — set/clear/extend expiry
  *
  * © 2026 Remaker Digital, a DBA of VanDusen & Palmeter, LLC. All rights reserved.
  */
 
-import React, { useCallback, useEffect, useState } from 'react';
+import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import {
   ActionIcon,
   Alert,
@@ -20,6 +22,7 @@ import {
   Card,
   CopyButton,
   Group,
+  Menu,
   Modal,
   Pagination,
   Paper,
@@ -58,6 +61,7 @@ interface TenantItem {
   updatedAt: string | null;
   deactivatedAt: string | null;
   consentStatus: string | null;
+  expiresAt: string | null;
 }
 
 interface TenantListResponse {
@@ -90,6 +94,7 @@ const STATUS_COLORS: Record<string, string> = {
   suspended: 'orange',
   deactivated: 'red',
   pending: 'yellow',
+  trial_expired: 'red',
 };
 
 const TIER_COLORS: Record<string, string> = {
@@ -104,6 +109,40 @@ const TIER_OPTIONS = [
   { value: 'professional', label: 'Professional' },
   { value: 'enterprise', label: 'Enterprise' },
 ];
+
+// ---------------------------------------------------------------------------
+// Helpers
+// ---------------------------------------------------------------------------
+
+/** Days remaining until an ISO date. Negative = already past. */
+function daysUntil(isoDate: string): number {
+  const now = new Date();
+  const target = new Date(isoDate);
+  return Math.ceil((target.getTime() - now.getTime()) / (1000 * 60 * 60 * 24));
+}
+
+/** Color for the expiry badge based on days remaining. */
+function expiryColor(days: number): string {
+  if (days < 0) return 'red';
+  if (days <= 7) return 'red';
+  if (days <= 30) return 'orange';
+  return 'dimmed';
+}
+
+/** Format a date string as YYYY-MM-DD for <input type="date">. */
+function toDateInputValue(isoDate: string | null): string {
+  if (!isoDate) return '';
+  try {
+    return new Date(isoDate).toISOString().split('T')[0];
+  } catch {
+    return '';
+  }
+}
+
+/** Convert YYYY-MM-DD to end-of-day UTC ISO string. */
+function dateToExpiryIso(dateStr: string): string {
+  return new Date(dateStr + 'T23:59:59Z').toISOString();
+}
 
 // ---------------------------------------------------------------------------
 // Component
@@ -133,13 +172,25 @@ export function TenantDirectoryPage() {
     merchantUrl: '',
     superadminEmail: '',
     tier: 'starter',
+    expiresDate: '',
   });
 
+  // Expiry modal state (WI-EXPIRY-1)
+  const [expiryTenant, setExpiryTenant] = useState<TenantItem | null>(null);
+  const [expiryDate, setExpiryDate] = useState('');
+  const [expiryLoading, setExpiryLoading] = useState(false);
+
   const resetCreateForm = useCallback(() => {
-    setCreateForm({ merchantName: '', merchantUrl: '', superadminEmail: '', tier: 'starter' });
+    setCreateForm({ merchantName: '', merchantUrl: '', superadminEmail: '', tier: 'starter', expiresDate: '' });
     setCreateResult(null);
     setCreateLoading(false);
   }, []);
+
+  // Whether to show expiry date picker in create form (not for trial)
+  const showExpiryInCreate = useMemo(
+    () => createForm.tier !== 'trial',
+    [createForm.tier],
+  );
 
   const handleCreateSubmit = useCallback(async () => {
     if (!createForm.merchantName.trim() || !createForm.superadminEmail.trim()) {
@@ -148,22 +199,26 @@ export function TenantDirectoryPage() {
     }
     setCreateLoading(true);
     try {
+      const payload: Record<string, unknown> = {
+        merchantName: createForm.merchantName.trim(),
+        merchantUrl: createForm.merchantUrl.trim() || null,
+        superadminEmail: createForm.superadminEmail.trim(),
+        tier: createForm.tier,
+      };
+      if (createForm.expiresDate && showExpiryInCreate) {
+        payload.expiresAt = dateToExpiryIso(createForm.expiresDate);
+      }
+
       const res = await apiFetch('/api/superadmin/tenants', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          merchantName: createForm.merchantName.trim(),
-          merchantUrl: createForm.merchantUrl.trim() || null,
-          superadminEmail: createForm.superadminEmail.trim(),
-          tier: createForm.tier,
-        }),
+        body: JSON.stringify(payload),
       });
 
       if (res.ok) {
         const data: CreateTenantResponse = await res.json();
         setCreateResult(data);
         onNotify(`Tenant ${data.tenantId.slice(0, 8)}... created successfully`, 'success');
-        // Trigger a re-fetch by resetting to page 1 (useEffect dependency)
         setPage(1);
       } else {
         const err = await res.json().catch(() => ({ detail: 'Unknown error' }));
@@ -174,7 +229,45 @@ export function TenantDirectoryPage() {
     } finally {
       setCreateLoading(false);
     }
-  }, [apiFetch, createForm, onNotify]);
+  }, [apiFetch, createForm, showExpiryInCreate, onNotify]);
+
+  // ---- Expiry management (WI-EXPIRY-1) ----
+
+  const handleSetExpiry = useCallback(async (tenantId: string, expiresAt: string | null) => {
+    setExpiryLoading(true);
+    try {
+      const res = await apiFetch(`/api/superadmin/tenants/${tenantId}/expiry`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ expiresAt }),
+      });
+      if (res.ok) {
+        onNotify(
+          expiresAt ? `Expiry set for ${new Date(expiresAt).toLocaleDateString()}` : 'Expiry removed',
+          'success',
+        );
+        setExpiryTenant(null);
+        setExpiryDate('');
+        fetchTenants();
+      } else {
+        const err = await res.json().catch(() => ({ detail: 'Unknown error' }));
+        onNotify(`Failed to update expiry: ${err.detail || res.statusText}`, 'error');
+      }
+    } catch {
+      onNotify('Network error updating expiry', 'error');
+    } finally {
+      setExpiryLoading(false);
+    }
+  }, [apiFetch, onNotify]);
+
+  const handleExtend30Days = useCallback(
+    (tenantId: string) => {
+      const target = new Date();
+      target.setDate(target.getDate() + 30);
+      handleSetExpiry(tenantId, target.toISOString());
+    },
+    [handleSetExpiry],
+  );
 
   // Fetch summary on mount
   useEffect(() => {
@@ -300,57 +393,91 @@ export function TenantDirectoryPage() {
                 <Table.Th>Tier</Table.Th>
                 <Table.Th>Channel</Table.Th>
                 <Table.Th>Email</Table.Th>
-                <Table.Th>Shop Domain</Table.Th>
                 <Table.Th>Created</Table.Th>
+                <Table.Th>Expires</Table.Th>
+                <Table.Th w={50} />
               </Table.Tr>
             </Table.Thead>
             <Table.Tbody>
               {tenants.length === 0 ? (
                 <Table.Tr>
-                  <Table.Td colSpan={7}>
+                  <Table.Td colSpan={8}>
                     <Text c="dimmed" ta="center" py="md">No tenants found</Text>
                   </Table.Td>
                 </Table.Tr>
               ) : (
-                tenants.map((t) => (
-                  <Table.Tr key={t.tenantId}>
-                    <Table.Td>
-                      <Text size="xs" ff="monospace" style={{ color: tokens.textPrimary }}>{t.tenantId}</Text>
-                    </Table.Td>
-                    <Table.Td>
-                      <Badge
-                        variant="light"
-                        color={STATUS_COLORS[t.status] ?? 'gray'}
-                        size="sm"
-                      >
-                        {t.status}
-                      </Badge>
-                    </Table.Td>
-                    <Table.Td>
-                      {t.tier ? (
-                        <Badge variant="outline" color={TIER_COLORS[t.tier] ?? 'gray'} size="sm">
-                          {t.tier}
+                tenants.map((t) => {
+                  const days = t.expiresAt ? daysUntil(t.expiresAt) : null;
+                  return (
+                    <Table.Tr key={t.tenantId}>
+                      <Table.Td>
+                        <Text size="xs" ff="monospace" style={{ color: tokens.textPrimary }}>{t.tenantId}</Text>
+                      </Table.Td>
+                      <Table.Td>
+                        <Badge
+                          variant="light"
+                          color={STATUS_COLORS[t.status] ?? 'gray'}
+                          size="sm"
+                        >
+                          {t.status}
                         </Badge>
-                      ) : (
-                        <Text c="dimmed" size="xs">—</Text>
-                      )}
-                    </Table.Td>
-                    <Table.Td>
-                      <Text size="xs" c={tokens.textMuted}>{t.billingChannel ?? '—'}</Text>
-                    </Table.Td>
-                    <Table.Td>
-                      <Text size="xs" c={tokens.textMuted}>{t.customerEmail ?? '—'}</Text>
-                    </Table.Td>
-                    <Table.Td>
-                      <Text size="xs" c={tokens.textMuted}>{t.shopifyShopDomain ?? '—'}</Text>
-                    </Table.Td>
-                    <Table.Td>
-                      <Text size="xs" c="dimmed">
-                        {t.createdAt ? new Date(t.createdAt).toLocaleDateString() : '—'}
-                      </Text>
-                    </Table.Td>
-                  </Table.Tr>
-                ))
+                      </Table.Td>
+                      <Table.Td>
+                        {t.tier ? (
+                          <Badge variant="outline" color={TIER_COLORS[t.tier] ?? 'gray'} size="sm">
+                            {t.tier}
+                          </Badge>
+                        ) : (
+                          <Text c="dimmed" size="xs">—</Text>
+                        )}
+                      </Table.Td>
+                      <Table.Td>
+                        <Text size="xs" c={tokens.textMuted}>{t.billingChannel ?? '—'}</Text>
+                      </Table.Td>
+                      <Table.Td>
+                        <Text size="xs" c={tokens.textMuted}>{t.customerEmail ?? '—'}</Text>
+                      </Table.Td>
+                      <Table.Td>
+                        <Text size="xs" c="dimmed">
+                          {t.createdAt ? new Date(t.createdAt).toLocaleDateString() : '—'}
+                        </Text>
+                      </Table.Td>
+                      <Table.Td>
+                        <ExpiryCell expiresAt={t.expiresAt} status={t.status} days={days} />
+                      </Table.Td>
+                      <Table.Td>
+                        <Menu position="bottom-end" withinPortal>
+                          <Menu.Target>
+                            <ActionIcon variant="subtle" size="sm" color="gray">
+                              ⋮
+                            </ActionIcon>
+                          </Menu.Target>
+                          <Menu.Dropdown>
+                            <Menu.Item
+                              onClick={() => {
+                                setExpiryTenant(t);
+                                setExpiryDate(toDateInputValue(t.expiresAt));
+                              }}
+                            >
+                              Set Expiry…
+                            </Menu.Item>
+                            <Menu.Item onClick={() => handleExtend30Days(t.tenantId)}>
+                              Extend 30 Days
+                            </Menu.Item>
+                            {t.expiresAt && (
+                              <Menu.Item
+                                color="red"
+                                onClick={() => handleSetExpiry(t.tenantId, null)}
+                              >
+                                Remove Expiry
+                              </Menu.Item>
+                            )}
+                          </Menu.Dropdown>
+                        </Menu>
+                      </Table.Td>
+                    </Table.Tr>
+                  );
+                })
               )}
             </Table.Tbody>
           </Table>
@@ -501,6 +628,16 @@ export function TenantDirectoryPage() {
               required
               disabled={createLoading}
             />
+            {showExpiryInCreate && (
+              <TextInput
+                label="Access Expires"
+                description="Optional — leave empty for no expiry. Trial tenants use automatic 14-day expiry."
+                type="date"
+                value={createForm.expiresDate}
+                onChange={(e) => setCreateForm(f => ({ ...f, expiresDate: e.currentTarget.value }))}
+                disabled={createLoading}
+              />
+            )}
 
             <Group justify="flex-end" mt="sm">
               <Button
@@ -521,6 +658,100 @@ export function TenantDirectoryPage() {
           </Stack>
         )}
       </Modal>
+
+      {/* Set Expiry Modal (WI-EXPIRY-1) */}
+      <Modal
+        opened={!!expiryTenant}
+        onClose={() => { setExpiryTenant(null); setExpiryDate(''); }}
+        title="Set Access Expiry"
+        size="sm"
+        centered
+      >
+        {expiryTenant && (
+          <Stack gap="md">
+            <Group gap="xs">
+              <Text size="sm" c="dimmed">Tenant:</Text>
+              <Text size="sm" ff="monospace" fw={500} c={tokens.textPrimary}>
+                {expiryTenant.tenantId.slice(0, 12)}…
+              </Text>
+            </Group>
+            {expiryTenant.expiresAt && (
+              <Group gap="xs">
+                <Text size="sm" c="dimmed">Current expiry:</Text>
+                <Text size="sm" c={tokens.textSecondary}>
+                  {new Date(expiryTenant.expiresAt).toLocaleDateString()}
+                </Text>
+              </Group>
+            )}
+            <TextInput
+              label="New expiry date"
+              description="End-of-day UTC. Clear to remove expiry."
+              type="date"
+              value={expiryDate}
+              onChange={(e) => setExpiryDate(e.currentTarget.value)}
+            />
+            <Group justify="flex-end" mt="sm">
+              <Button
+                variant="subtle"
+                onClick={() => { setExpiryTenant(null); setExpiryDate(''); }}
+              >
+                Cancel
+              </Button>
+              <Button
+                color="action"
+                loading={expiryLoading}
+                onClick={() => {
+                  if (expiryDate) {
+                    handleSetExpiry(expiryTenant.tenantId, dateToExpiryIso(expiryDate));
+                  } else {
+                    handleSetExpiry(expiryTenant.tenantId, null);
+                  }
+                }}
+              >
+                {expiryDate ? 'Set Expiry' : 'Remove Expiry'}
+              </Button>
+            </Group>
+          </Stack>
+        )}
+      </Modal>
     </Stack>
+  );
+}
+
+// ---------------------------------------------------------------------------
+// Expiry cell sub-component
+// ---------------------------------------------------------------------------
+
+function ExpiryCell({
+  expiresAt,
+  status,
+  days,
+}: {
+  expiresAt: string | null;
+  status: string;
+  days: number | null;
+}) {
+  if (!expiresAt) {
+    return <Text c="dimmed" size="xs">—</Text>;
+  }
+
+  // Already expired and status reflects it
+  if (status === 'trial_expired' && days !== null && days < 0) {
+    return (
+      <Badge variant="light" color="red" size="sm">
+        Expired
+      </Badge>
+    );
+  }
+
+  const color = days !== null ? expiryColor(days) : 'dimmed';
+  const label = days !== null && days <= 0
+    ? 'Expired'
+    : new Date(expiresAt).toLocaleDateString();
+
+  return (
+    <Text size="xs" c={color} fw={days !== null && days <= 7 ? 600 : 400}>
+      {label}
+    </Text>
   );
 }

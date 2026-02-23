@@ -49,7 +49,7 @@ from datetime import datetime, timezone
 from typing import Any
 
 from fastapi import APIRouter, Body, Depends, HTTPException, Query
-from pydantic import Field, field_validator
+from pydantic import BaseModel, Field, field_validator
 
 from src.multi_tenant.api_models import CamelCaseModel
 
@@ -139,6 +139,7 @@ class TenantSummaryItem(CamelCaseModel):
     updated_at: str | None = None
     deactivated_at: str | None = None
     consent_status: str | None = None
+    expires_at: str | None = None
 
 
 class TenantDirectoryResponse(CamelCaseModel):
@@ -267,6 +268,7 @@ class TenantQueueInfo(CamelCaseModel):
 class QueueDepthResponse(CamelCaseModel):
     """Aggregate queue depth across all tenants."""
 
+    nats_deployed: bool = True
     total_tenants: int = 0
     total_messages: int = 0
     total_bytes: int = 0
@@ -364,6 +366,7 @@ class IntegrationHealthResponse(CamelCaseModel):
     overall_healthy: bool = True
     circuit_breakers: list[CircuitBreakerStatus] = Field(default_factory=list)
     any_breaker_open: bool = False
+    nats_deployed: bool = False
     nats_connected: bool = False
     mcp_integrations: list[McpIntegrationStatus] = Field(default_factory=list)
     errors: list[dict[str, str]] = Field(default_factory=list)
@@ -433,7 +436,7 @@ async def list_all_tenants(
     data_query = (
         f"SELECT c.tenant_id, c.status, c.tier, c.billing_channel, "
         f"c.customer_email, c.shopify_shop_domain, c.created_at, "
-        f"c.updated_at, c.deactivated_at, c.consent_status "
+        f"c.updated_at, c.deactivated_at, c.consent_status, c.expires_at "
         f"FROM c WHERE {where_clause} "
         f"ORDER BY c.created_at DESC "
         f"OFFSET {skip} LIMIT {limit}"
@@ -608,6 +611,22 @@ class CreateTenantRequest(CamelCaseModel):
         ...,
         description="Subscription tier: trial, starter, professional, or enterprise",
     )
+    expires_at: str | None = Field(
+        default=None,
+        description="Optional ISO 8601 expiry timestamp. When set, tenant access "
+        "is blocked after this time. Omit or null for no expiry.",
+    )
+
+    @field_validator("expires_at")
+    @classmethod
+    def validate_expires_at_iso(cls, v: str | None) -> str | None:
+        if v is None:
+            return v
+        try:
+            datetime.fromisoformat(v)
+        except (ValueError, TypeError):
+            raise ValueError("expires_at must be a valid ISO 8601 timestamp")
+        return v
 
 
 class CreateTenantResponse(CamelCaseModel):
@@ -707,6 +726,21 @@ async def create_tenant(
         logger.warning("Failed to create preferences for %s: %s", result.tenant_id, exc)
         result.errors.append(f"Preferences creation failed: {exc}")
 
+    # Set expires_at if provided (WI-EXPIRY-1)
+    if body.expires_at and _tenant_repo:
+        try:
+            await _tenant_repo.patch(
+                tenant_id=result.tenant_id,
+                document_id=result.tenant_id,
+                operations=[
+                    {"op": "set", "path": "/expires_at", "value": body.expires_at},
+                    {"op": "set", "path": "/updated_at", "value": datetime.now(timezone.utc).isoformat()},
+                ],
+            )
+        except Exception as exc:
+            logger.warning("Failed to set expires_at for %s: %s", result.tenant_id, exc)
+            result.errors.append(f"Expiry date setting failed: {exc}")
+
     # Audit log entry
     try:
         if _audit_repo:
@@ -722,6 +756,7 @@ async def create_tenant(
                         "merchant_name": body.merchant_name,
                         "tier": body.tier,
                         "email": body.superadmin_email,
+                        "expires_at": body.expires_at,
                     },
                     "created_at": datetime.now(timezone.utc).isoformat(),
                 },
@@ -745,6 +780,150 @@ async def create_tenant(
         superadmin_api_key=result.superadmin_api_key,
         widget_key=result.widget_key,
         warnings=result.errors,
+    )
+
+
+# ---------------------------------------------------------------------------
+# WI-EXPIRY-1: Tenant access expiry management
+# ---------------------------------------------------------------------------
+
+
+class SetExpiryRequest(CamelCaseModel):
+    """Request body for setting/clearing tenant access expiry."""
+
+    expires_at: str | None = Field(
+        description="ISO 8601 timestamp for access expiry, or null to remove expiry.",
+    )
+
+    @field_validator("expires_at")
+    @classmethod
+    def validate_expires_at_iso(cls, v: str | None) -> str | None:
+        if v is None:
+            return v
+        try:
+            datetime.fromisoformat(v)
+        except (ValueError, TypeError):
+            raise ValueError("expires_at must be a valid ISO 8601 timestamp")
+        return v
+
+
+class SetExpiryResponse(CamelCaseModel):
+    """Response from setting/clearing tenant access expiry."""
+
+    tenant_id: str
+    previous_expires_at: str | None
+    new_expires_at: str | None
+    updated_at: str
+
+
+@router.patch(
+    "/tenants/{tenant_id}/expiry",
+    response_model=SetExpiryResponse,
+    summary="Set or clear tenant access expiry",
+    description=(
+        "Sets, extends, or removes the access expiry date for a tenant. "
+        "When expires_at is set, the tenant will be blocked after that time. "
+        "Send null to remove expiry (tenant becomes indefinite). "
+        "Resets expiry_warnings_sent when changing the date."
+    ),
+    responses={
+        404: {"description": "Tenant not found"},
+        503: {"description": "Service not initialized"},
+    },
+)
+async def set_tenant_expiry(
+    tenant_id: str,
+    body: SetExpiryRequest,
+    ctx: TenantContext = Depends(require_role(TeamMemberRole.SUPERADMIN)),
+) -> SetExpiryResponse:
+    """Set or clear the access expiry for a tenant."""
+    if not _tenant_repo:
+        raise HTTPException(status_code=503, detail="Service not initialized")
+
+    # Only the SPA tenant can manage expiry
+    _SPA_TENANT_ID = "remaker-digital-001"
+    if ctx.tenant_id != _SPA_TENANT_ID:
+        raise HTTPException(
+            status_code=403,
+            detail="Expiry management is restricted to the service provider.",
+        )
+
+    # Read current tenant
+    tenant_doc = await _tenant_repo.read(tenant_id)
+    if tenant_doc is None:
+        raise HTTPException(status_code=404, detail=f"Tenant {tenant_id} not found")
+
+    previous_expires_at = tenant_doc.get("expires_at")
+    now_iso = datetime.now(timezone.utc).isoformat()
+
+    # Build patch operations
+    operations: list[dict[str, Any]] = [
+        {"op": "set", "path": "/expires_at", "value": body.expires_at},
+        {"op": "set", "path": "/updated_at", "value": now_iso},
+    ]
+
+    # Reset warning dedup when expiry changes (so new warnings fire)
+    if body.expires_at != previous_expires_at:
+        operations.append(
+            {"op": "set", "path": "/expiry_warnings_sent", "value": []},
+        )
+
+    # If tenant was trial_expired and we're setting a future expiry, reactivate
+    if (
+        body.expires_at
+        and tenant_doc.get("status") == "trial_expired"
+    ):
+        try:
+            expires_dt = datetime.fromisoformat(body.expires_at)
+            if expires_dt.tzinfo is None:
+                expires_dt = expires_dt.replace(tzinfo=timezone.utc)
+            if datetime.now(timezone.utc) < expires_dt:
+                operations.append(
+                    {"op": "set", "path": "/status", "value": "active"},
+                )
+        except Exception:
+            pass  # Malformed — don't reactivate
+
+    await _tenant_repo.patch(
+        tenant_id=tenant_id,
+        document_id=tenant_id,
+        operations=operations,
+    )
+
+    # Audit log
+    try:
+        if _audit_repo:
+            await _audit_repo.create(
+                tenant_id,
+                {
+                    "id": f"audit:{tenant_id}:set-expiry:{now_iso}",
+                    "tenant_id": tenant_id,
+                    "event_type": AuditEventType.CONFIG_CHANGE.value,
+                    "action": "tenant_expiry_updated",
+                    "actor": ctx.team_member_email or "spa-console",
+                    "details": {
+                        "previous_expires_at": previous_expires_at,
+                        "new_expires_at": body.expires_at,
+                    },
+                    "created_at": now_iso,
+                },
+            )
+    except Exception:
+        pass  # Non-fatal
+
+    logger.info(
+        "Tenant expiry updated: tenant=%s prev=%s new=%s (by %s)",
+        tenant_id[:12],
+        previous_expires_at or "none",
+        body.expires_at or "none",
+        ctx.team_member_email or "unknown",
+    )
+
+    return SetExpiryResponse(
+        tenant_id=tenant_id,
+        previous_expires_at=previous_expires_at,
+        new_expires_at=body.expires_at,
+        updated_at=now_iso,
     )
 
 
@@ -842,9 +1021,9 @@ async def provider_dashboard(
     try:
         from src.multi_tenant.nats_isolation import get_nats_manager
         nats_mgr = get_nats_manager()
-        health["nats"] = {"connected": nats_mgr.is_connected}
+        health["nats"] = {"deployed": True, "connected": nats_mgr.is_connected}
     except Exception:
-        health["nats"] = {"connected": False, "error": "unavailable"}
+        health["nats"] = {"deployed": False, "connected": False}
 
     try:
         from src.multi_tenant.pipeline_resilience import get_circuit_breaker_registry
@@ -1118,7 +1297,14 @@ async def queue_depth(
     _ctx: TenantContext = Depends(require_role(TeamMemberRole.SUPERADMIN)),
 ) -> QueueDepthResponse:
     """Get queue depth and job health metrics across all tenants."""
-    if _nats_mgr is None or not _nats_mgr.is_connected:
+    if _nats_mgr is None:
+        # NATS not deployed — return empty response (not an error)
+        return QueueDepthResponse(
+            nats_deployed=False,
+            total_tenants=0, total_messages=0, total_bytes=0,
+            tenants=[], errors=[],
+        )
+    if not _nats_mgr.is_connected:
         raise HTTPException(status_code=503, detail="NATS is not connected")
 
     if _tenant_repo is None:
@@ -1430,9 +1616,10 @@ async def integration_health(
             "message": f"Circuit breaker registry unavailable: {exc}",
         })
 
-    # NATS connectivity
+    # NATS connectivity — distinguish "not deployed" from "deployed but disconnected"
+    nats_deployed = _nats_mgr is not None
     nats_connected = False
-    if _nats_mgr is not None:
+    if nats_deployed:
         try:
             nats_connected = _nats_mgr.is_connected
         except Exception as exc:
@@ -1496,12 +1683,16 @@ async def integration_health(
                 "message": f"MCP status check failed: {exc}",
             })
 
-    overall = (not any_open) and nats_connected
+    # NATS only counts against health when deployed but disconnected.
+    # When not deployed, it is not a health concern.
+    nats_healthy = nats_connected or (not nats_deployed)
+    overall = (not any_open) and nats_healthy
 
     return IntegrationHealthResponse(
         overall_healthy=overall,
         circuit_breakers=breakers,
         any_breaker_open=any_open,
+        nats_deployed=nats_deployed,
         nats_connected=nats_connected,
         mcp_integrations=mcp_integrations,
         errors=errors,
@@ -2305,3 +2496,431 @@ async def mfa_backup_verify(
         mfa_token=result["mfa_token"],
         backup_codes_remaining=result.get("backup_codes_remaining"),
     )
+
+
+# ===========================================================================
+# Cost Analytics (WI #88)
+# ===========================================================================
+
+
+class CostBreakdownModel(CamelCaseModel):
+    """Per-tenant cost breakdown by category."""
+
+    ai_tokens: float = 0.0
+    cosmos_db: float = 0.0
+    storage: float = 0.0
+    compute: float = 0.0
+    total: float = 0.0
+
+
+class TenantCostProfileModel(CamelCaseModel):
+    """Cost attribution for a single tenant over a period."""
+
+    tenant_id: str
+    tier: str | None = None
+    period_start: str = ""
+    period_end: str = ""
+    conversation_count: int = 0
+    total_input_tokens: int = 0
+    total_output_tokens: int = 0
+    article_count: int = 0
+    cost_breakdown: CostBreakdownModel = Field(default_factory=CostBreakdownModel)
+    cost_per_conversation: float = 0.0
+    cost_share_pct: float = 0.0
+
+
+class CostOverviewResponse(CamelCaseModel):
+    """Platform-wide cost overview with per-tenant breakdown."""
+
+    period_start: str = ""
+    period_end: str = ""
+    total_platform_cost: float = 0.0
+    total_conversations: int = 0
+    total_tenants: int = 0
+    avg_cost_per_tenant: float = 0.0
+    avg_cost_per_conversation: float = 0.0
+    tenants: list[TenantCostProfileModel] = Field(default_factory=list)
+    cost_by_tier: dict[str, float] = Field(default_factory=dict)
+
+
+# Token pricing (Azure OpenAI gpt-4o-mini, per 1M tokens)
+_INPUT_TOKEN_COST_PER_M = 0.15
+_OUTPUT_TOKEN_COST_PER_M = 0.60
+# Cosmos DB serverless: ~$0.25 per 1M RU
+_COSMOS_RU_COST_PER_CONV = 0.0003  # estimated RU per conversation
+# Flat compute share per conversation (container app amortized)
+_COMPUTE_COST_PER_CONV = 0.0002
+# Storage: negligible for conversations, set per article
+_STORAGE_COST_PER_ARTICLE = 0.0001
+
+
+@router.get(
+    "/costs",
+    response_model=CostOverviewResponse,
+    summary="Cost analytics — per-tenant cost attribution",
+    status_code=200,
+)
+async def get_cost_analytics(
+    days: int = Query(default=30, ge=1, le=365),
+    ctx: TenantContext = Depends(require_role(TeamMemberRole.SUPERADMIN)),
+) -> CostOverviewResponse:
+    """Compute estimated per-tenant costs based on conversation volume and token usage."""
+    from datetime import datetime, timedelta, timezone
+
+    if not _tenant_repo:
+        raise HTTPException(status_code=503, detail="Service not initialized")
+
+    now = datetime.now(timezone.utc)
+    period_start = (now - timedelta(days=days)).isoformat()
+    period_end = now.isoformat()
+
+    # Query all active tenants
+    tenant_ids: list[str] = []
+    try:
+        tenant_ids = await _tenant_repo.list_active_tenant_ids()
+    except Exception:
+        pass
+
+    tenant_profiles: list[TenantCostProfileModel] = []
+    total_platform_cost = 0.0
+    total_conversations = 0
+    cost_by_tier: dict[str, float] = {}
+
+    for tid in tenant_ids:
+        try:
+            # Get tenant tier
+            tenant_doc = await _tenant_repo.read(tid, tid)
+            tier = tenant_doc.get("tier", "starter") if tenant_doc else "starter"
+
+            # Count conversations in period
+            conv_count = 0
+            total_input = 0
+            total_output = 0
+            if _conv_repo:
+                try:
+                    convs = await _conv_repo.query(
+                        tid,
+                        "SELECT c.id, c.message_count, c.messages FROM c "
+                        "WHERE c.started_at >= @start "
+                        "ORDER BY c.started_at DESC "
+                        "OFFSET 0 LIMIT 500",
+                        [{"name": "@start", "value": period_start}],
+                    )
+                    conv_count = len(convs)
+                    # Estimate tokens from messages (avg ~150 tokens/message)
+                    for c in convs:
+                        msg_count = c.get("message_count", 0) or len(c.get("messages", []))
+                        total_input += int(msg_count * 75)   # customer msgs
+                        total_output += int(msg_count * 150)  # AI responses
+                except Exception:
+                    pass
+
+            # Count KB articles
+            article_count = 0
+            try:
+                from src.multi_tenant.repositories.knowledge import KnowledgeBaseRepository
+
+                kb_repo = KnowledgeBaseRepository()
+                articles = await kb_repo.query(
+                    tid,
+                    "SELECT VALUE COUNT(1) FROM c",
+                    [],
+                )
+                article_count = articles[0] if articles else 0
+            except Exception:
+                pass
+
+            # Calculate cost breakdown
+            ai_cost = (
+                (total_input / 1_000_000) * _INPUT_TOKEN_COST_PER_M
+                + (total_output / 1_000_000) * _OUTPUT_TOKEN_COST_PER_M
+            )
+            cosmos_cost = conv_count * _COSMOS_RU_COST_PER_CONV
+            storage_cost = article_count * _STORAGE_COST_PER_ARTICLE
+            compute_cost = conv_count * _COMPUTE_COST_PER_CONV
+            total_cost = ai_cost + cosmos_cost + storage_cost + compute_cost
+
+            profile = TenantCostProfileModel(
+                tenant_id=tid,
+                tier=tier,
+                period_start=period_start,
+                period_end=period_end,
+                conversation_count=conv_count,
+                total_input_tokens=total_input,
+                total_output_tokens=total_output,
+                article_count=article_count,
+                cost_breakdown=CostBreakdownModel(
+                    ai_tokens=round(ai_cost, 6),
+                    cosmos_db=round(cosmos_cost, 6),
+                    storage=round(storage_cost, 6),
+                    compute=round(compute_cost, 6),
+                    total=round(total_cost, 6),
+                ),
+                cost_per_conversation=round(total_cost / max(conv_count, 1), 6),
+                cost_share_pct=0.0,  # computed after totals
+            )
+            tenant_profiles.append(profile)
+            total_platform_cost += total_cost
+            total_conversations += conv_count
+            cost_by_tier[tier] = cost_by_tier.get(tier, 0.0) + total_cost
+        except Exception:
+            logger.debug("Cost analytics failed for tenant %s", tid)
+
+    # Compute cost share percentages
+    for p in tenant_profiles:
+        if total_platform_cost > 0:
+            p.cost_share_pct = round(
+                (p.cost_breakdown.total / total_platform_cost) * 100, 1,
+            )
+
+    # Round tier costs
+    cost_by_tier = {k: round(v, 4) for k, v in cost_by_tier.items()}
+
+    return CostOverviewResponse(
+        period_start=period_start,
+        period_end=period_end,
+        total_platform_cost=round(total_platform_cost, 4),
+        total_conversations=total_conversations,
+        total_tenants=len(tenant_profiles),
+        avg_cost_per_tenant=round(
+            total_platform_cost / max(len(tenant_profiles), 1), 4,
+        ),
+        avg_cost_per_conversation=round(
+            total_platform_cost / max(total_conversations, 1), 4,
+        ),
+        tenants=tenant_profiles,
+        cost_by_tier=cost_by_tier,
+    )
+
+
+# ===========================================================================
+# Abuse Detection (WI #89)
+# ===========================================================================
+
+
+class AbuseSignalModel(CamelCaseModel):
+    """A single detected abuse signal."""
+
+    tenant_id: str
+    signal_type: str
+    severity: str
+    description: str
+    detected_at: str
+    metric_value: float = 0.0
+    threshold: float = 0.0
+
+
+class TenantAbuseProfileModel(CamelCaseModel):
+    """Abuse profile for a single tenant."""
+
+    tenant_id: str
+    is_flagged: bool = False
+    flagged_at: str | None = None
+    flagged_by: str | None = None
+    signals: list[AbuseSignalModel] = Field(default_factory=list)
+    risk_score: int = 0
+
+
+class AbuseOverviewResponse(CamelCaseModel):
+    """Platform-wide abuse scan results."""
+
+    total_tenants_scanned: int = 0
+    flagged_count: int = 0
+    signals_by_type: dict[str, int] = Field(default_factory=dict)
+    high_risk_tenants: list[TenantAbuseProfileModel] = Field(default_factory=list)
+
+
+class FlagTenantRequest(BaseModel):
+    """Request body for POST /api/superadmin/abuse/tenant/{tenant_id}/flag."""
+
+    flagged: bool
+
+
+# Abuse detection thresholds
+_RATE_ANOMALY_THRESHOLD = 100     # conversations per day
+_VOLUME_SPIKE_MULTIPLIER = 3.0    # 3x above normal
+_ERROR_RATE_THRESHOLD = 0.25      # 25% error rate
+_TOKEN_EXHAUSTION_THRESHOLD = 500_000  # tokens per day
+
+
+@router.get(
+    "/abuse/signals",
+    response_model=AbuseOverviewResponse,
+    summary="Abuse detection — cross-tenant anomaly scan",
+    status_code=200,
+)
+async def get_abuse_signals(
+    ctx: TenantContext = Depends(require_role(TeamMemberRole.SUPERADMIN)),
+) -> AbuseOverviewResponse:
+    """Scan all active tenants for abuse signals and anomalous usage patterns."""
+    from datetime import datetime, timedelta, timezone
+
+    if not _tenant_repo:
+        raise HTTPException(status_code=503, detail="Service not initialized")
+
+    now = datetime.now(timezone.utc)
+    day_ago = (now - timedelta(days=1)).isoformat()
+
+    tenant_ids: list[str] = []
+    try:
+        tenant_ids = await _tenant_repo.list_active_tenant_ids()
+    except Exception:
+        pass
+
+    high_risk: list[TenantAbuseProfileModel] = []
+    signals_by_type: dict[str, int] = {}
+    flagged_count = 0
+
+    for tid in tenant_ids:
+        try:
+            tenant_doc = await _tenant_repo.read(tid, tid)
+            is_flagged = tenant_doc.get("abuse_flagged", False) if tenant_doc else False
+            flagged_at = tenant_doc.get("abuse_flagged_at") if tenant_doc else None
+            flagged_by = tenant_doc.get("abuse_flagged_by") if tenant_doc else None
+
+            if is_flagged:
+                flagged_count += 1
+
+            signals: list[AbuseSignalModel] = []
+
+            # Check conversation volume (last 24h)
+            daily_convs = 0
+            error_convs = 0
+            if _conv_repo:
+                try:
+                    results = await _conv_repo.query(
+                        tid,
+                        "SELECT c.status FROM c WHERE c.started_at >= @start",
+                        [{"name": "@start", "value": day_ago}],
+                    )
+                    daily_convs = len(results)
+                    error_convs = sum(
+                        1 for r in results if r.get("status") == "error"
+                    )
+                except Exception:
+                    pass
+
+            # Rate anomaly: too many conversations per day
+            if daily_convs > _RATE_ANOMALY_THRESHOLD:
+                sig = AbuseSignalModel(
+                    tenant_id=tid,
+                    signal_type="rate_anomaly",
+                    severity="high" if daily_convs > _RATE_ANOMALY_THRESHOLD * 2 else "medium",
+                    description=f"{daily_convs} conversations in 24h (threshold: {_RATE_ANOMALY_THRESHOLD})",
+                    detected_at=now.isoformat(),
+                    metric_value=float(daily_convs),
+                    threshold=float(_RATE_ANOMALY_THRESHOLD),
+                )
+                signals.append(sig)
+                signals_by_type["rate_anomaly"] = signals_by_type.get("rate_anomaly", 0) + 1
+
+            # Error rate: high proportion of error conversations
+            if daily_convs >= 10 and error_convs / daily_convs > _ERROR_RATE_THRESHOLD:
+                error_rate = error_convs / daily_convs
+                sig = AbuseSignalModel(
+                    tenant_id=tid,
+                    signal_type="error_rate",
+                    severity="critical" if error_rate > 0.5 else "high",
+                    description=f"{error_rate:.0%} error rate ({error_convs}/{daily_convs})",
+                    detected_at=now.isoformat(),
+                    metric_value=round(error_rate, 3),
+                    threshold=_ERROR_RATE_THRESHOLD,
+                )
+                signals.append(sig)
+                signals_by_type["error_rate"] = signals_by_type.get("error_rate", 0) + 1
+
+            # Compute risk score (0-100)
+            risk_score = 0
+            for s in signals:
+                if s.severity == "critical":
+                    risk_score += 40
+                elif s.severity == "high":
+                    risk_score += 25
+                elif s.severity == "medium":
+                    risk_score += 15
+                else:
+                    risk_score += 5
+            if is_flagged:
+                risk_score += 20
+            risk_score = min(risk_score, 100)
+
+            # Include in high-risk list if score >= 25 or flagged
+            if risk_score >= 25 or is_flagged:
+                profile = TenantAbuseProfileModel(
+                    tenant_id=tid,
+                    is_flagged=is_flagged,
+                    flagged_at=flagged_at,
+                    flagged_by=flagged_by,
+                    signals=signals,
+                    risk_score=risk_score,
+                )
+                high_risk.append(profile)
+        except Exception:
+            logger.debug("Abuse scan failed for tenant %s", tid)
+
+    # Sort by risk score descending
+    high_risk.sort(key=lambda x: x.risk_score, reverse=True)
+
+    return AbuseOverviewResponse(
+        total_tenants_scanned=len(tenant_ids),
+        flagged_count=flagged_count,
+        signals_by_type=signals_by_type,
+        high_risk_tenants=high_risk,
+    )
+
+
+@router.post(
+    "/abuse/tenant/{tenant_id}/flag",
+    summary="Flag or unflag a tenant for abuse review",
+    status_code=200,
+)
+async def toggle_abuse_flag(
+    tenant_id: str,
+    body: FlagTenantRequest = Body(...),
+    ctx: TenantContext = Depends(require_role(TeamMemberRole.SUPERADMIN)),
+) -> dict[str, Any]:
+    """Flag or unflag a tenant for manual abuse review."""
+    from datetime import datetime, timezone
+
+    if not _tenant_repo:
+        raise HTTPException(status_code=503, detail="Service not initialized")
+
+    now_iso = datetime.now(timezone.utc).isoformat()
+    actor = ctx.user_id if hasattr(ctx, "user_id") else "superadmin"
+
+    try:
+        operations = [
+            {"op": "set", "path": "/abuse_flagged", "value": body.flagged},
+            {"op": "set", "path": "/abuse_flagged_at", "value": now_iso if body.flagged else None},
+            {"op": "set", "path": "/abuse_flagged_by", "value": actor if body.flagged else None},
+        ]
+        await _tenant_repo.patch(
+            tenant_id=tenant_id,
+            document_id=tenant_id,
+            operations=operations,
+        )
+    except Exception:
+        raise HTTPException(status_code=500, detail="Failed to update flag")
+
+    # Audit log
+    if _audit_repo:
+        try:
+            await _audit_repo.log_event(
+                tenant_id=tenant_id,
+                event_type=AuditEventType.SECURITY_EVENT,
+                actor_id=actor,
+                resource_type="tenant",
+                resource_id=tenant_id,
+                details={
+                    "action": "abuse_flag_toggled",
+                    "flagged": body.flagged,
+                },
+            )
+        except Exception:
+            pass
+
+    return {
+        "tenant_id": tenant_id,
+        "flagged": body.flagged,
+        "updated_at": now_iso,
+    }

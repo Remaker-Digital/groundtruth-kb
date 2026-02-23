@@ -35,7 +35,7 @@ import { tokens } from '../../shared/theme/styles';
 interface DashboardData {
   timestamp: string;
   systemHealth: {
-    nats: { connected: boolean };
+    nats: { deployed: boolean; connected: boolean };
     circuitBreakers: Record<string, unknown>;
     keyVault: { healthy: boolean };
     version: { api: string; product: string };
@@ -115,8 +115,8 @@ export function HealthDashboardPage() {
       <SimpleGrid cols={{ base: 1, sm: 2, md: 4 }} spacing="md">
         <HealthCard
           label="NATS"
-          status={health?.nats?.connected ? 'healthy' : 'down'}
-          detail={health?.nats?.connected ? 'Connected' : 'Disconnected'}
+          status={health?.nats?.connected ? 'healthy' : health?.nats?.deployed ? 'down' : 'unknown'}
+          detail={health?.nats?.connected ? 'Connected' : health?.nats?.deployed ? 'Disconnected' : 'Not Deployed'}
         />
         <HealthCard
           label="Key Vault"

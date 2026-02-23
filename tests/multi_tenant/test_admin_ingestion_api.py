@@ -346,6 +346,50 @@ class TestListTemplates:
         assert data[0]["id"] == "apparel_fashion"
         assert data[0]["articleCount"] == 15
 
+    def test_template_response_uses_camel_case(self, client):
+        """Regression S79: CategoryTemplateResponse extends CamelCaseModel,
+        so all field names in the JSON response must be camelCase.
+
+        The wizard's Template interface must use camelCase to match.
+        Without this, selectedTemplate.suggestedBrandVoice is undefined
+        and the wizard sends empty brand_voice → activation 500.
+        """
+        mock_loader = MagicMock()
+        mock_loader.list_categories.return_value = [
+            {
+                "id": "home_garden",
+                "name": "Home & Garden",
+                "description": "Furniture and decor",
+                "article_count": 15,
+                "suggested_brand_voice": "friendly and practical",
+                "suggested_escalation_keywords": ["damaged", "missing parts"],
+            },
+        ]
+
+        with patch(
+            "src.multi_tenant.template_loader.get_template_loader",
+            return_value=mock_loader,
+        ):
+            resp = client.get("/api/admin/knowledge/templates")
+
+        assert resp.status_code == 200
+        template = resp.json()[0]
+
+        # All fields MUST be camelCase (CamelCaseModel serialization)
+        assert "suggestedBrandVoice" in template, (
+            "API must return suggestedBrandVoice (camelCase), not suggested_brand_voice"
+        )
+        assert template["suggestedBrandVoice"] == "friendly and practical"
+        assert "suggestedEscalationKeywords" in template
+        assert "articleCount" in template
+
+        # Snake_case keys must NOT be present in the response
+        assert "suggested_brand_voice" not in template, (
+            "snake_case key leaked into JSON response — CamelCaseModel not applied"
+        )
+        assert "suggested_escalation_keywords" not in template
+        assert "article_count" not in template
+
 
 # ---------------------------------------------------------------------------
 # POST /api/admin/knowledge/templates/{category_id}/apply

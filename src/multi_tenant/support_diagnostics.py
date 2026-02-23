@@ -87,6 +87,7 @@ class IntegrationHealth(CamelCaseModel):
 
     shopify_connected: bool = False
     stripe_connected: bool = False
+    nats_deployed: bool = False
     nats_connected: bool = False
 
 
@@ -274,11 +275,29 @@ async def _collect_conversation_stats(tenant_id: str) -> ConversationStats:
 
 
 async def _collect_integration_health(tenant_doc: dict[str, Any]) -> IntegrationHealth:
-    """Derive integration health from the tenant document."""
+    """Derive integration health from the tenant document.
+
+    NATS status is determined from the injected superadmin_api module-level
+    ``_nats_mgr`` (set via ``configure_superadmin_services``).  The global
+    ``get_nats_manager()`` singleton always creates a manager, so it cannot
+    distinguish "not deployed" from "deployed but disconnected".
+    """
+    # Check the dependency-injected NATS manager (None = not deployed)
+    nats_deployed = False
+    nats_connected = False
+    try:
+        from src.multi_tenant.superadmin_api import _nats_mgr
+        if _nats_mgr is not None:
+            nats_deployed = True
+            nats_connected = bool(_nats_mgr.is_connected)
+    except Exception:
+        pass
+
     return IntegrationHealth(
         shopify_connected=bool(tenant_doc.get("shopify_shop_domain")),
         stripe_connected=bool(tenant_doc.get("stripe_customer_id")),
-        nats_connected=bool(tenant_doc.get("nats_enabled", False)),
+        nats_deployed=nats_deployed,
+        nats_connected=nats_connected,
     )
 
 

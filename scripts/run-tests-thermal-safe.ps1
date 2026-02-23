@@ -1,4 +1,4 @@
-# run-tests-thermal-safe.ps1 — Thermal-safe batched test execution for Agent Red
+# run-tests-thermal-safe.ps1 -- Thermal-safe batched test execution for Agent Red
 # Type: Repeatable Procedure (see docs/operations/REPEATABLE-PROCEDURES.md)
 # Created: 2026-02-22 (Session 74)
 #
@@ -42,7 +42,7 @@ param(
     [switch]$DryRun
 )
 
-# ─── Configuration ────────────────────────────────────────────────────────────
+# --- Configuration ------------------------------------------------------------
 $ErrorActionPreference = "Continue"
 $ProjectRoot = Split-Path -Parent (Split-Path -Parent $PSScriptRoot)
 if (-not $ProjectRoot) { $ProjectRoot = Get-Location }
@@ -113,23 +113,23 @@ $Batches = [ordered]@{
     }
 }
 
-# ─── Helpers ──────────────────────────────────────────────────────────────────
+# --- Helpers ------------------------------------------------------------------
 
 function Write-Phase {
     param([string]$Phase, [string]$Message)
     Write-Host ""
-    Write-Host "═══════════════════════════════════════════════════════════════" -ForegroundColor Cyan
-    Write-Host "  $Phase — $Message" -ForegroundColor Cyan
-    Write-Host "═══════════════════════════════════════════════════════════════" -ForegroundColor Cyan
+    Write-Host "===============================================================" -ForegroundColor Cyan
+    Write-Host "  $Phase -- $Message" -ForegroundColor Cyan
+    Write-Host "===============================================================" -ForegroundColor Cyan
 }
 
 function Write-BatchHeader {
     param([string]$Name, [string]$Label, [bool]$UseXdist, [int]$WorkerCount)
     $mode = if ($UseXdist) { "$WorkerCount workers (xdist)" } else { "sequential" }
     Write-Host ""
-    Write-Host "───────────────────────────────────────────────────────────────" -ForegroundColor Yellow
-    Write-Host "  BATCH: $Name — $Label [$mode]" -ForegroundColor Yellow
-    Write-Host "───────────────────────────────────────────────────────────────" -ForegroundColor Yellow
+    Write-Host "---------------------------------------------------------------" -ForegroundColor Yellow
+    Write-Host "  BATCH: $Name -- $Label [$mode]" -ForegroundColor Yellow
+    Write-Host "---------------------------------------------------------------" -ForegroundColor Yellow
 }
 
 function Format-Duration {
@@ -140,7 +140,7 @@ function Format-Duration {
     return "{0:N1}s" -f $Duration.TotalSeconds
 }
 
-# ─── Pre-flight ───────────────────────────────────────────────────────────────
+# --- Pre-flight ---------------------------------------------------------------
 
 Write-Phase "PRE-FLIGHT" "Verifying test infrastructure"
 
@@ -152,25 +152,28 @@ if ($LASTEXITCODE -ne 0) {
 }
 Write-Host "  [OK] $pythonVersion" -ForegroundColor Green
 
-# Check pytest + xdist
+# Check pytest
 $pytestCheck = python -m pytest --version 2>&1
 if ($LASTEXITCODE -ne 0) {
     Write-Host "  [FAIL] pytest not installed" -ForegroundColor Red
     exit 1
 }
-$hasXdist = $pytestCheck | Select-String "xdist"
-if (-not $hasXdist) {
+Write-Host "  [OK] $pytestCheck" -ForegroundColor Green
+
+# Check pytest-xdist (import check -- pytest --version no longer shows plugins)
+$xdistCheck = python -c "import xdist; print(xdist.__version__)" 2>&1
+if ($LASTEXITCODE -ne 0) {
     Write-Host "  [FAIL] pytest-xdist not installed. Run: pip install pytest-xdist>=3.5.0" -ForegroundColor Red
     exit 1
 }
-Write-Host "  [OK] pytest with xdist plugin" -ForegroundColor Green
+Write-Host "  [OK] pytest-xdist $xdistCheck" -ForegroundColor Green
 
-# Check pytest-timeout
-$hasTimeout = $pytestCheck | Select-String "timeout"
-if (-not $hasTimeout) {
-    Write-Host "  [WARN] pytest-timeout not detected — tests may run without timeout protection" -ForegroundColor Yellow
+# Check pytest-timeout (import check)
+$timeoutCheck = python -c "import pytest_timeout; print('installed')" 2>&1
+if ($LASTEXITCODE -ne 0) {
+    Write-Host "  [WARN] pytest-timeout not detected -- tests may run without timeout protection" -ForegroundColor Yellow
 } else {
-    Write-Host "  [OK] pytest-timeout plugin" -ForegroundColor Green
+    Write-Host "  [OK] pytest-timeout $timeoutCheck" -ForegroundColor Green
 }
 
 # System info
@@ -185,7 +188,7 @@ if ($Coverage) {
     Write-Host "  [INFO] Coverage collection: ENABLED" -ForegroundColor Gray
 }
 
-# ─── Determine which batches to run ──────────────────────────────────────────
+# --- Determine which batches to run ------------------------------------------
 
 $batchesToRun = if ($Batch -eq "all") {
     $Batches.Keys | ForEach-Object { $_ }
@@ -198,7 +201,7 @@ if ($SkipLive) {
     Write-Host "  [INFO] Skipping live/sequential batch" -ForegroundColor Gray
 }
 
-# ─── Print batch plan ────────────────────────────────────────────────────────
+# --- Print batch plan --------------------------------------------------------
 
 Write-Phase "BATCH PLAN" "$(($batchesToRun | Measure-Object).Count) batches queued"
 
@@ -206,16 +209,17 @@ foreach ($name in $batchesToRun) {
     $b = $Batches[$name]
     $mode = if ($b.Xdist) { "-n $Workers" } else { "sequential" }
     $dirCount = ($b.Dirs | Measure-Object).Count
-    Write-Host "  $name — $($b.Label) ($dirCount paths, $mode, ${$b.Timeout}s timeout)" -ForegroundColor White
+    $timeoutVal = $b.Timeout
+    Write-Host "  $name -- $($b.Label) ($dirCount paths, $mode, ${timeoutVal}s timeout)" -ForegroundColor White
 }
 
 if ($DryRun) {
     Write-Host ""
-    Write-Host "  DRY RUN — commands that would be executed:" -ForegroundColor Magenta
+    Write-Host "  DRY RUN -- commands that would be executed:" -ForegroundColor Magenta
     Write-Host ""
 }
 
-# ─── Execute batches ──────────────────────────────────────────────────────────
+# --- Execute batches ----------------------------------------------------------
 
 $results = @{}
 $overallStart = Get-Date
@@ -281,16 +285,16 @@ foreach ($name in $batchesToRun) {
 
     if ($status -eq "FAIL") {
         $anyFailure = $true
-        Write-Host "  RESULT: $status — $passed passed, $failed FAILED, $skipped skipped ($(Format-Duration $batchDuration))" -ForegroundColor Red
+        Write-Host "  RESULT: $status -- $passed passed, $failed FAILED, $skipped skipped ($(Format-Duration $batchDuration))" -ForegroundColor Red
         # Show failure details
         $failureLines = $output | Select-String -Pattern "FAILED|ERROR|AssertionError|assert "
         $failureLines | Select-Object -First 10 | ForEach-Object {
             Write-Host "    $_" -ForegroundColor Red
         }
     } elseif ($status -eq "SKIP") {
-        Write-Host "  RESULT: $status — all tests skipped ($(Format-Duration $batchDuration))" -ForegroundColor Yellow
+        Write-Host "  RESULT: $status -- all tests skipped ($(Format-Duration $batchDuration))" -ForegroundColor Yellow
     } else {
-        Write-Host "  RESULT: $status — $passed passed, $skipped skipped ($(Format-Duration $batchDuration))" -ForegroundColor Green
+        Write-Host "  RESULT: $status -- $passed passed, $skipped skipped ($(Format-Duration $batchDuration))" -ForegroundColor Green
     }
 
     $results[$name] = @{
@@ -305,7 +309,7 @@ foreach ($name in $batchesToRun) {
     # Stop on failure if requested
     if ($anyFailure -and $StopOnFail) {
         Write-Host ""
-        Write-Host "  STOPPING — -StopOnFail is set and batch '$name' failed" -ForegroundColor Red
+        Write-Host "  STOPPING -- -StopOnFail is set and batch '$name' failed" -ForegroundColor Red
         break
     }
 
@@ -317,7 +321,7 @@ foreach ($name in $batchesToRun) {
     }
 }
 
-# ─── Summary ──────────────────────────────────────────────────────────────────
+# --- Summary ------------------------------------------------------------------
 
 $overallDuration = (Get-Date) - $overallStart
 
@@ -325,7 +329,7 @@ Write-Phase "SUMMARY" "Test execution complete"
 
 Write-Host ""
 Write-Host "  Batch Results:" -ForegroundColor White
-Write-Host "  ─────────────────────────────────────────────────────────────" -ForegroundColor DarkGray
+Write-Host "  -------------------------------------------------------------" -ForegroundColor DarkGray
 
 foreach ($name in $batchesToRun) {
     $r = $results[$name]
@@ -341,7 +345,7 @@ foreach ($name in $batchesToRun) {
     Write-Host ("  {0,-15} {1,-6} {2} ({3})" -f $name, $r.Status, $detail, $dur) -ForegroundColor $color
 }
 
-Write-Host "  ─────────────────────────────────────────────────────────────" -ForegroundColor DarkGray
+Write-Host "  -------------------------------------------------------------" -ForegroundColor DarkGray
 Write-Host ("  TOTAL:         {0} passed, {1} failed, {2} skipped" -f $totalPassed, $totalFailed, $totalSkipped) -ForegroundColor White
 Write-Host ("  ELAPSED:       {0}" -f (Format-Duration $overallDuration)) -ForegroundColor White
 Write-Host ""
@@ -355,13 +359,13 @@ if ($Coverage -and -not $DryRun) {
 
 # Overall verdict
 if ($DryRun) {
-    Write-Host "  OVERALL: DRY RUN — no tests executed" -ForegroundColor Magenta
+    Write-Host "  OVERALL: DRY RUN -- no tests executed" -ForegroundColor Magenta
     exit 0
 } elseif ($anyFailure) {
     Write-Host "  OVERALL: FAIL" -ForegroundColor Red
     Write-Host ""
     Write-Host "  To re-run a failed batch:" -ForegroundColor Yellow
-    Write-Host "    .\scripts\run-tests-thermal-safe.ps1 -Batch <batch-name> -Workers 2" -ForegroundColor Yellow
+    Write-Host '    .\scripts\run-tests-thermal-safe.ps1 -Batch <batch-name> -Workers 2' -ForegroundColor Yellow
     exit 1
 } else {
     Write-Host "  OVERALL: PASS" -ForegroundColor Green

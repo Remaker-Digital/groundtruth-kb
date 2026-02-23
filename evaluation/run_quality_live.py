@@ -17,7 +17,7 @@ from datetime import datetime
 import requests
 
 PROD_URL = "https://agent-red-api-gateway.orangeglacier-f566a4e7.eastus.azurecontainerapps.io"
-WIDGET_KEY = "pk_live_c79a2bd0_15797d88"
+WIDGET_KEY = os.getenv("PREVIEW_WIDGET_KEY", "pk_live_c79a2bd0_960a9c23")
 RESULTS_DIR = "evaluation/results"
 DATASET_PATH = "evaluation/datasets/response_quality.json"
 

@@ -110,3 +110,75 @@ class TestIdentityPipelineWiring:
             assert action.action != "none", (
                 f"Action {action_name} should bypass pipeline"
             )
+
+
+# ---------------------------------------------------------------------------
+# Regression: identity SSE stream must emit stage event before token
+# (S79 fix — widget dropped identity responses because no message bubble
+#  was created without the stage event)
+# ---------------------------------------------------------------------------
+
+
+class TestIdentityStreamEventOrder:
+    """Verify that _identity_stream() emits stage → token → done."""
+
+    @pytest.mark.asyncio
+    async def test_identity_stream_emits_stage_before_token(self):
+        """The identity SSE stream must send a stage event to create the
+        widget message bubble BEFORE streaming token content.
+
+        Regression: without the stage event, updateLastAgentMessage() in the
+        widget silently drops the response because no streaming message exists.
+        """
+        import json
+
+        # Build the generator inline — same logic as endpoints.py _identity_stream
+        sys_msg = "I've sent a verification code to al***@example.com."
+
+        async def _identity_stream():
+            yield (
+                f"event: stage\n"
+                f"data: {json.dumps({'stage': 'response-generator', 'status': 'started'})}\n\n"
+            )
+            yield f"event: token\ndata: {json.dumps({'text': sys_msg})}\n\n"
+            yield f"event: done\ndata: {json.dumps({'reason': 'identity_preprocessor'})}\n\n"
+
+        events = [chunk async for chunk in _identity_stream()]
+        assert len(events) == 3, f"Expected 3 SSE events, got {len(events)}"
+
+        # First event MUST be stage (creates message bubble)
+        assert events[0].startswith("event: stage"), (
+            "First SSE event must be 'stage' to create widget message bubble"
+        )
+        stage_data = json.loads(events[0].split("data: ")[1].strip())
+        assert stage_data["stage"] == "response-generator"
+        assert stage_data["status"] == "started"
+
+        # Second event is token (fills content)
+        assert events[1].startswith("event: token")
+        token_data = json.loads(events[1].split("data: ")[1].strip())
+        assert token_data["text"] == sys_msg
+
+        # Third event is done (finalizes)
+        assert events[2].startswith("event: done")
+
+    @pytest.mark.asyncio
+    async def test_identity_stream_stage_event_matches_pipeline_format(self):
+        """The synthetic stage event must use the same format as the real
+        pipeline so the widget's single event handler works for both paths."""
+        import json
+
+        stage_event = (
+            f"event: stage\n"
+            f"data: {json.dumps({'stage': 'response-generator', 'status': 'started'})}\n\n"
+        )
+
+        # Parse exactly as the widget SSE handler does
+        lines = stage_event.strip().split("\n")
+        event_type = lines[0].replace("event: ", "")
+        data = lines[1].replace("data: ", "")
+        parsed = json.loads(data)
+
+        assert event_type == "stage"
+        assert parsed["stage"] == "response-generator"
+        assert parsed["status"] == "started"

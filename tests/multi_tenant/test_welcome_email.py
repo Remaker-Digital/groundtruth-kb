@@ -1,7 +1,8 @@
-"""Tests for WI-E2: Welcome email on tenant creation.
+"""Tests for WI-E2 + WI-CP2: Welcome email on tenant creation.
 
 Verifies that:
-    - Email body template renders all credential fields
+    - Email body template renders all credential fields + admin URL
+    - _build_admin_login_url() resolves correctly (explicit > env > fallback)
     - ACS provider path sends successfully
     - SMTP fallback sends when ACS is not configured
     - Graceful failure when no provider configured
@@ -17,24 +18,31 @@ from unittest.mock import AsyncMock, MagicMock, patch
 
 import pytest
 
-from src.multi_tenant.welcome_email import _WELCOME_EMAIL_BODY, send_welcome_email
+from src.multi_tenant.welcome_email import (
+    _WELCOME_EMAIL_BODY,
+    _build_admin_login_url,
+    send_welcome_email,
+)
 
 
 # ---------------------------------------------------------------------------
 # Template rendering
 # ---------------------------------------------------------------------------
 
+_TEMPLATE_KWARGS = dict(
+    superadmin_key="ar_user_test_abc123",
+    widget_key="pk_live_abc123_def456",
+    tier="Starter",
+    tenant_id="t-001",
+    admin_login_url="https://example.com/admin/standalone/",
+)
+
 
 class TestWelcomeEmailTemplate:
     """Verify the HTML body template renders correctly."""
 
     def test_template_contains_all_fields(self):
-        rendered = _WELCOME_EMAIL_BODY.format(
-            superadmin_key="ar_user_test_abc123",
-            widget_key="pk_live_abc123_def456",
-            tier="Starter",
-            tenant_id="t-001",
-        )
+        rendered = _WELCOME_EMAIL_BODY.format(**_TEMPLATE_KWARGS)
         assert "ar_user_test_abc123" in rendered
         assert "pk_live_abc123_def456" in rendered
         assert "Starter" in rendered
@@ -50,8 +58,86 @@ class TestWelcomeEmailTemplate:
             widget_key="(not generated)",
             tier="Trial",
             tenant_id="t-002",
+            admin_login_url="https://example.com/admin/standalone/",
         )
         assert "(not generated)" in rendered
+
+    def test_template_contains_admin_login_url(self):
+        """WI-CP2: Admin console URL must appear in the email body."""
+        rendered = _WELCOME_EMAIL_BODY.format(**_TEMPLATE_KWARGS)
+        assert "https://example.com/admin/standalone/" in rendered
+        assert "Sign in to Dashboard" in rendered
+
+    def test_template_admin_url_in_next_steps(self):
+        """WI-CP2: Next Steps list item links to admin dashboard."""
+        rendered = _WELCOME_EMAIL_BODY.format(**_TEMPLATE_KWARGS)
+        assert 'href="https://example.com/admin/standalone/"' in rendered
+
+    def test_template_admin_url_button(self):
+        """WI-CP2: Prominent CTA button with admin URL."""
+        rendered = _WELCOME_EMAIL_BODY.format(**_TEMPLATE_KWARGS)
+        # The CTA button href
+        assert 'href="https://example.com/admin/standalone/"' in rendered
+        # Brand color on the button
+        assert "#ff3621" in rendered
+
+
+# ---------------------------------------------------------------------------
+# _build_admin_login_url() — URL resolution
+# ---------------------------------------------------------------------------
+
+
+class TestBuildAdminLoginUrl:
+    """WI-CP2: Verify URL resolution priority chain."""
+
+    def test_explicit_url_takes_priority(self):
+        with patch.dict("os.environ", {"STANDALONE_ADMIN_URL": "https://env.com/admin/"}):
+            result = _build_admin_login_url("https://explicit.com/admin/")
+        assert result == "https://explicit.com/admin/"
+
+    def test_standalone_admin_url_env(self):
+        with patch.dict("os.environ", {
+            "STANDALONE_ADMIN_URL": "https://standalone.com/admin/standalone",
+            "PROD_URL": "https://prod.com",
+        }, clear=True):
+            result = _build_admin_login_url()
+        assert result == "https://standalone.com/admin/standalone"
+
+    def test_prod_url_fallback(self):
+        with patch.dict("os.environ", {
+            "STANDALONE_ADMIN_URL": "",
+            "PROD_URL": "https://myapp.azurecontainerapps.io",
+        }, clear=True):
+            result = _build_admin_login_url()
+        assert result == "https://myapp.azurecontainerapps.io/admin/standalone/"
+
+    def test_prod_url_trailing_slash_handled(self):
+        with patch.dict("os.environ", {
+            "STANDALONE_ADMIN_URL": "",
+            "PROD_URL": "https://myapp.azurecontainerapps.io/",
+        }, clear=True):
+            result = _build_admin_login_url()
+        assert result == "https://myapp.azurecontainerapps.io/admin/standalone/"
+
+    def test_no_env_vars_returns_docs_fallback(self):
+        with patch.dict("os.environ", {}, clear=True):
+            result = _build_admin_login_url()
+        assert result == "https://agentredcx.com/docs/getting-started"
+
+    def test_none_explicit_uses_env(self):
+        with patch.dict("os.environ", {
+            "STANDALONE_ADMIN_URL": "https://env.com/admin/",
+        }, clear=True):
+            result = _build_admin_login_url(None)
+        assert result == "https://env.com/admin/"
+
+    def test_empty_string_explicit_uses_env(self):
+        """Empty string is falsy, should fall through to env."""
+        with patch.dict("os.environ", {
+            "STANDALONE_ADMIN_URL": "https://env.com/admin/",
+        }, clear=True):
+            result = _build_admin_login_url("")
+        assert result == "https://env.com/admin/"
 
 
 # ---------------------------------------------------------------------------
@@ -89,25 +175,6 @@ class TestSendWelcomeEmail:
         mock_client = MagicMock()
         mock_client.begin_send.return_value = mock_poller
 
-        with (
-            patch.dict("os.environ", {"AZURE_COMM_CONNECTION_STRING": "endpoint=test;key=test"}),
-            patch(
-                "src.multi_tenant.welcome_email.EmailClient",
-                create=True,
-            ) as mock_email_cls,
-        ):
-            # Patch the lazy import
-            import src.multi_tenant.welcome_email as mod
-
-            with patch.object(mod, "__builtins__", mod.__builtins__, create=True):
-                with patch(
-                    "azure.communication.email.EmailClient.from_connection_string",
-                    return_value=mock_client,
-                ):
-                    # Simpler approach: mock at the os.environ level and
-                    # patch the EmailClient import inside the function
-                    pass
-
         # Use a cleaner approach: mock the import chain
         with (
             patch.dict("os.environ", {"AZURE_COMM_CONNECTION_STRING": "endpoint=test;key=test"}),
@@ -127,6 +194,66 @@ class TestSendWelcomeEmail:
         msg = mock_client.begin_send.call_args[0][0]
         assert msg["recipients"]["to"][0]["address"] == "merchant@example.com"
         assert "Welcome to Agent Red" in msg["content"]["subject"]
+
+    @pytest.mark.asyncio
+    async def test_acs_email_contains_admin_url(self):
+        """WI-CP2: ACS email body includes admin login URL."""
+        mock_poller = MagicMock()
+        mock_result = MagicMock()
+        mock_result.status = "Succeeded"
+        mock_poller.result.return_value = mock_result
+
+        mock_client = MagicMock()
+        mock_client.begin_send.return_value = mock_poller
+
+        with (
+            patch.dict("os.environ", {
+                "AZURE_COMM_CONNECTION_STRING": "endpoint=test;key=test",
+                "PROD_URL": "https://myapp.test.io",
+            }),
+            patch("azure.communication.email.EmailClient") as mock_cls,
+        ):
+            mock_cls.from_connection_string.return_value = mock_client
+            await send_welcome_email(
+                to_email="merchant@example.com",
+                tenant_id="t-url-test",
+                superadmin_key="ar_user_test_key",
+            )
+
+        msg = mock_client.begin_send.call_args[0][0]
+        html = msg["content"]["html"]
+        assert "https://myapp.test.io/admin/standalone/" in html
+        assert "Sign in to Dashboard" in html
+
+    @pytest.mark.asyncio
+    async def test_explicit_admin_url_overrides_env(self):
+        """WI-CP2: Explicit admin_login_url param overrides env var."""
+        mock_poller = MagicMock()
+        mock_result = MagicMock()
+        mock_result.status = "Succeeded"
+        mock_poller.result.return_value = mock_result
+
+        mock_client = MagicMock()
+        mock_client.begin_send.return_value = mock_poller
+
+        with (
+            patch.dict("os.environ", {
+                "AZURE_COMM_CONNECTION_STRING": "endpoint=test;key=test",
+                "PROD_URL": "https://should-not-appear.test.io",
+            }),
+            patch("azure.communication.email.EmailClient") as mock_cls,
+        ):
+            mock_cls.from_connection_string.return_value = mock_client
+            await send_welcome_email(
+                to_email="merchant@example.com",
+                tenant_id="t-explicit",
+                admin_login_url="https://custom.example.com/admin/",
+            )
+
+        msg = mock_client.begin_send.call_args[0][0]
+        html = msg["content"]["html"]
+        assert "https://custom.example.com/admin/" in html
+        assert "should-not-appear" not in html
 
     @pytest.mark.asyncio
     async def test_acs_failure_returns_false(self):

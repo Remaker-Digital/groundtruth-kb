@@ -1468,7 +1468,7 @@ class TestDiscardDraft:
         assert op_map.get("/warranty_info") is None
         assert op_map.get("/support_hours") is None
         assert op_map.get("/custom_policies") is None
-        assert op_map.get("/widget_greeting_message") == ""
+        assert op_map.get("/widget_greeting_message") is None
         assert op_map.get("/activated_at") is None
         assert op_map.get("/activated_by") is None
 

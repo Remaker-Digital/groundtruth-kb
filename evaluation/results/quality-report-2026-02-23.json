@@ -1,0 +1,55 @@
+{
+  "date": "2026-02-23",
+  "version": "1.51.1",
+  "total_scenarios": 25,
+  "successful_responses": 21,
+  "pipeline_errors": 0,
+  "avg_response_time_ms": 4884,
+  "max_response_time_ms": 8976,
+  "heuristic_scores": {
+    "faithfulness": 4.96,
+    "relevancy": 3.57,
+    "tone": 4.96,
+    "overall": 4.4
+  },
+  "pass_rates": {
+    "contains_check": "88%",
+    "excludes_check": "100%",
+    "escalation_accuracy": "92%"
+  },
+  "deepeval_scores": null,
+  "failing_scenarios": [
+    {
+      "id": "GD-002",
+      "category": "product_inquiry",
+      "overall": 3.0,
+      "issues": [
+        "Missing expected phrase: 'S'",
+        "Missing expected phrase: 'M'",
+        "Missing expected phrase: 'L'",
+        "Missing expected phrase: 'XL'",
+        "Response suspiciously short"
+      ]
+    },
+    {
+      "id": "GD-012",
+      "category": "product_inquiry",
+      "overall": 3.4,
+      "issues": [
+        "Missing expected phrase: 'vegan'",
+        "Missing expected phrase: 'cruelty-free'"
+      ]
+    },
+    {
+      "id": "GD-022",
+      "category": "complaint",
+      "overall": 3.4,
+      "issues": [
+        "Missing expected phrase: 'sorry'",
+        "Missing expected phrase: 'express'",
+        "Missing expected phrase: 'refund'"
+      ]
+    }
+  ],
+  "verdict": "PASS"
+}

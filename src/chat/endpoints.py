@@ -38,6 +38,8 @@ from fastapi import APIRouter, Depends, HTTPException, Query, Request, WebSocket
 from fastapi.responses import StreamingResponse
 
 from src.chat.models import (
+    ConsentUpdateRequest,
+    ConsentUpdateResponse,
     ConversationStartRequest,
     ConversationStartResponse,
     ConversationStateResponse,
@@ -492,6 +494,12 @@ async def stream_response(
                 logger.warning("Failed to persist identity system message: %s", exc)
 
             async def _identity_stream():
+                # Emit a synthetic stage event so the widget creates a
+                # message bubble before we stream the token content.
+                yield (
+                    f"event: stage\n"
+                    f"data: {_json_id.dumps({'stage': 'response-generator', 'status': 'started'})}\n\n"
+                )
                 yield f"event: token\ndata: {_json_id.dumps({'text': sys_msg})}\n\n"
                 yield f"event: done\ndata: {_json_id.dumps({'reason': 'identity_preprocessor'})}\n\n"
 
@@ -806,6 +814,129 @@ async def report_issue(
     return IssueReportResponse(
         conversation_id=conversation_id,
         issue_id=issue_id,
+        accepted=True,
+    )
+
+
+# ---------------------------------------------------------------------------
+# POST /api/chat/conversations/{conversation_id}/consent — Update consent (WI #87)
+# ---------------------------------------------------------------------------
+
+
+@router.post(
+    "/conversations/{conversation_id}/consent",
+    response_model=ConsentUpdateResponse,
+    summary="Update customer memory consent",
+    description=(
+        "Records the customer's explicit consent choice for Persistent Customer "
+        "Memory (Layers 2-4). Called by the widget consent banner when the tenant "
+        "has consent_collection_enabled = true (WI #87)."
+    ),
+    responses={
+        404: {"description": "Conversation not found"},
+        503: {"description": "Chat service not initialized"},
+    },
+)
+async def update_consent(
+    conversation_id: str,
+    request: ConsentUpdateRequest,
+    ctx: TenantContext = Depends(get_tenant_context),
+) -> ConsentUpdateResponse:
+    """Record customer consent choice for PCM vectorization.
+
+    Updates the customer's consent_status on their CustomerProfileDocument.
+    If the conversation has a verified customer_id, consent is stored
+    permanently on the profile. Otherwise, consent is only recorded on
+    the conversation document for this session.
+    """
+    from datetime import datetime, timezone
+
+    from src.multi_tenant.cosmos_schema import ConsentStatus
+
+    session = _get_session()
+
+    # Validate consent_status value
+    try:
+        consent = ConsentStatus(request.consent_status)
+    except ValueError:
+        raise HTTPException(
+            status_code=422,
+            detail=f"Invalid consent_status: must be 'granted' or 'denied'",
+        )
+
+    # Verify conversation exists
+    try:
+        state = await session.get_state(
+            tenant_id=ctx.tenant_id,
+            conversation_id=conversation_id,
+        )
+    except ConversationNotFoundError:
+        raise HTTPException(status_code=404, detail="Conversation not found")
+
+    now_iso = datetime.now(timezone.utc).isoformat()
+
+    # Update customer profile if we have a customer_id
+    customer_id = state.customer_id if hasattr(state, "customer_id") else None
+    if customer_id:
+        try:
+            from src.multi_tenant.repository import CustomerProfileRepository
+
+            profile_repo = CustomerProfileRepository()
+            await profile_repo.patch(
+                tenant_id=ctx.tenant_id,
+                document_id=f"profile:{customer_id}",
+                operations=[
+                    {"op": "set", "path": "/consent_status", "value": consent.value},
+                    {"op": "set", "path": "/consent_updated_at", "value": now_iso},
+                ],
+            )
+        except Exception:
+            logger.warning(
+                "Failed to update customer consent on profile: tenant=%s customer=%s",
+                ctx.tenant_id, customer_id,
+            )
+
+    # Also record on the conversation document
+    try:
+        if session._conversation_repo:
+            await session._conversation_repo.patch(
+                ctx.tenant_id,
+                conversation_id,
+                [
+                    {"op": "set", "path": "/consent_status", "value": consent.value},
+                    {"op": "set", "path": "/consent_updated_at", "value": now_iso},
+                ],
+            )
+    except Exception:
+        logger.warning(
+            "Failed to record consent on conversation: conv=%s", conversation_id,
+        )
+
+    # Audit log
+    try:
+        from src.multi_tenant.cosmos_schema import AuditEventType
+        from src.multi_tenant.repository import AuditLogRepository
+
+        audit_repo = AuditLogRepository()
+        await audit_repo.log_event(
+            tenant_id=ctx.tenant_id,
+            event_type=AuditEventType.CONSENT_CHANGED,
+            actor_id=f"customer:{customer_id or conversation_id}",
+            resource_type="customer_profile",
+            resource_id=customer_id or conversation_id,
+            details={
+                "action": "consent_updated",
+                "consent_status": consent.value,
+                "conversation_id": conversation_id,
+                "source": "widget_banner",
+            },
+        )
+    except Exception:
+        logger.warning("Failed to write consent audit log: conv=%s", conversation_id)
+
+    return ConsentUpdateResponse(
+        conversation_id=conversation_id,
+        consent_status=consent.value,
         accepted=True,
     )
 

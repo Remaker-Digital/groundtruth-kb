@@ -1,7 +1,8 @@
 # Chrome-Automated Admin UI Test Procedure
 # Type: Repeatable Procedure (see docs/operations/REPEATABLE-PROCEDURES.md)
 # Last verified: 2026-02-19 (session 58) — full E2E pass: 770 PASS, 3 SOFT-PASS, 37 SKIP, 0 FAIL (v1.50.0, CSS centralization verified)
-# Last corrected: 2026-02-20 (session 65) — added Shopify Embedded Admin tests (S.1–S.8, 76 tests), user-assisted App Bridge auth, updated totals to 1,029 (838+115+76)
+# Last corrected: 2026-02-23 (session 75) — added Stage 0 Critical-Path Test (CP.1–CP.21, 21 steps) as mandatory gate before page-by-page testing
+# Previous: 2026-02-20 (session 65) — added Shopify Embedded Admin tests (S.1–S.8, 76 tests), user-assisted App Bridge auth, updated totals to 1,029 (838+115+76)
 
 ---
 
@@ -63,15 +64,19 @@ tests using Chrome MCP tools.
 
 ## Preconditions
 
-- [ ] **Initialization procedure complete** — `docs/operations/initialization-procedure.md` executed, all 10 post-conditions (I.1-I.10) pass. Do not proceed until initialization is verified.
-- [ ] **Simulated customer tenant exists** — `scripts/create_test_tenant.py --execute` completed, all 8 post-conditions pass. Credentials in `logs/test_tenant_credentials.json`.
+End-to-end UI tests must start from a clean, freshly-provisioned tenant state so that Pages 0, 0A, and 0B (initial provisioned state, activation lifecycle, configuration controls) can be tested. **All pre-existing data for the primary tenant must be deleted and the tenancy re-initialized before testing begins.**
+
+- [ ] **Tenant re-initialized** — `scripts/seed_tenant.py --execute` run against `remaker-digital-001`, completing all 9 phases (Phase 0 deletes existing data). All post-conditions pass. This is **destructive** and resets the tenant to a freshly-provisioned state (unconfigured, not activated).
+- [ ] **Credentials updated** — After re-seed, update `.env.local` with the new `SUPERADMIN_PREVIEW_API_KEY` and `PREVIEW_WIDGET_KEY` from seed output.
+- [ ] **Simulated customer tenant exists** — `scripts/create_test_tenant.py --execute` completed, all 8 post-conditions pass. Credentials in `logs/test_tenant_credentials.json`. (Only needed if test-customer-001 does not already exist.)
 - [ ] **Agent unit test gate** — `python -m pytest tests/agents/ -x -q` all 101 tests pass (0 failures)
 - [ ] **Full unit test suite** — `python -m pytest tests/ --ignore=tests/integration --ignore=tests/regression --ignore=tests/performance -x -q` 4,000+ tests pass (0 failures)
 - [ ] **Chrome MCP tab available** — `tabs_context_mcp` returns tab group with at least one tab
-- [ ] **Credentials current** — `.env.local` keys match last seed output; Key Vault updated; revision restarted if re-seeded
 - [ ] **External URL reachability** — `external-url-reachability-procedure.md` Group 1 + Group 2 pass (health OK, login pages render)
 
 **Rule:** If any precondition fails, the procedure does not start.
+
+**Gate:** After preconditions pass, the **Stage 0: Critical-Path Test (CP.1–CP.21)** must execute with 100% pass rate before page-by-page testing (Pages H, 0–10) begins. See "Critical-Path Failure Protocol" for failure handling.
 
 ---
 
@@ -199,6 +204,246 @@ STEP S.4: Verify cross-navigation links present
 
 ---
 
+## Stage 0: Critical-Path Test (21 steps — GATE)
+
+The critical-path test simulates a merchant superadmin's complete first-use journey from
+initial login through first billable conversation. **This test must execute with 100% pass
+rate before any page-by-page UI testing begins.** If any step fails, testing ceases
+immediately and defects are logged as blocking work items.
+
+**Manual steps:** Steps 10, 16, and 20 require the owner to check email off-line. The test
+operator pauses at these steps and resumes after the owner confirms receipt.
+
+**Preconditions:**
+- Tenant re-initialized (seed_tenant.py completed — freshly provisioned, unconfigured)
+- Auth injection completed (Steps A.1–A.4)
+- Chrome MCP tab available
+
+### CP.1–CP.2: Tenant initialization and session
+
+```
+STEP CP.1: Verify tenant initialized
+  ACTION:    javascript_tool(tabId, "fetch('/api/health', {headers:{'X-Api-Key':'$MERCHANT_API_KEY'}}).then(r=>r.json())")
+  EXPECTED:  Returns {status: "healthy"} — tenant exists and API responds
+  VERIFY:    Response includes "healthy"
+  ON FAIL:   Tenant not provisioned. Run seed_tenant.py --execute.
+
+STEP CP.2: Verify API key session active
+  ACTION:    javascript_tool(tabId, "fetch('/api/config/activation-status', {headers:{'X-Api-Key':'$MERCHANT_API_KEY'}}).then(r=>r.json())")
+  EXPECTED:  Returns activation status object with is_configured, is_active fields
+  VERIFY:    Response contains is_configured field (boolean)
+  ON FAIL:   API key invalid or expired. Re-seed tenant and update credentials.
+```
+
+### CP.3–CP.6: Setup wizard → configuration → activation
+
+```
+STEP CP.3: Setup wizard auto-presents
+  ACTION:    Navigate to $STANDALONE_URL. If tenant is unconfigured (is_configured=false), the Setup wizard should auto-present.
+             If already configured, navigate to Setup wizard via sidebar link: find("Setup wizard", tabId) → click.
+  EXPECTED:  Setup wizard page renders with configuration options (e.g., template cards or setup steps)
+  VERIFY:    find("Setup wizard", tabId) or page contains setup/template selection UI
+  ON FAIL:   Wizard not rendering. Check StandaloneLayout routing for unconfigured state.
+
+STEP CP.4: Select first option (top left)
+  ACTION:    computer(action:'screenshot', tabId) to capture wizard layout. Click the first/top-left option card.
+  EXPECTED:  Wizard advances to next step (storefront configuration or brand details)
+  VERIFY:    Page content changes after click — new form fields or step indicator advances
+  ON FAIL:   Wizard card click not responding. Check onClick handlers on template cards.
+
+STEP CP.5: Enter storefront URL (standalone mode)
+  ACTION:    For standalone mode (not Shopify): find storefront URL input field and enter the storefront URL.
+             For Shopify mode: confirm storefront is auto-detected from Shopify integration.
+             Standalone: find("storefront", tabId) or find("URL", tabId) → type storefront URL
+  EXPECTED:  Storefront URL accepted; wizard allows progression to next step
+  VERIFY:    Input field populated; no validation errors visible
+  ON FAIL:   Storefront URL field not found or validation rejecting input. Check wizard step 2 component.
+
+STEP CP.6: Complete draft configuration and activate
+  ACTION:    Complete all required wizard fields (brand_name, brand_voice at minimum).
+             Save configuration → Activate:
+             find("Activate", tabId) → click → confirm activation dialog ("Yes, activate" or "Activate now")
+  EXPECTED:  Configuration activates successfully. Sidebar badge changes to "Active" (green).
+  VERIFY:    find("Active", tabId) — green badge in sidebar. API: /api/config/activation-status returns is_active=true
+  ON FAIL:   Activation blocked — check for missing required fields. See activation-status API for can_activate flag.
+```
+
+### CP.7–CP.9: Chat widget → identity request → email submission
+
+```
+STEP CP.7: Open chat UI
+  ACTION:    Navigate to the chat widget. Either:
+             (a) Open widget URL directly: navigate("$PROD_BASE/widget/chat?key=$WIDGET_KEY", tabId)
+             (b) Or navigate to storefront page with embedded widget and click chat icon
+  EXPECTED:  Chat widget loads. Either shows personalized welcome (Shopify with known customer) or
+             requests customer identification (standalone mode).
+  VERIFY:    Chat UI renders with message input area and at least one message (welcome or identity prompt)
+  ON FAIL:   Widget not loading. Verify WIDGET_KEY is valid. Check /api/widget/config endpoint.
+
+STEP CP.8: Observe identity request (standalone mode)
+  ACTION:    Read the AI's initial message. For standalone mode (no Shopify customer data), the AI should
+             request the customer's email address to establish identity.
+  EXPECTED:  AI message contains a request for email (e.g., "Could I get your email address?" or
+             "To help you better, could you share your email?")
+  VERIFY:    Message content references email or identification
+  NOTE:      For Shopify mode with known customer, skip to CP.12 — AI shows personalized welcome with
+             Quick Actions instead of requesting email.
+
+STEP CP.9: Provide email address
+  ACTION:    Type "mike@remakerdigital.com" into chat input → send message
+  EXPECTED:  Message sent. AI processes the email and initiates OTP verification flow.
+             AI responds with confirmation that a verification code has been sent to the email.
+  VERIFY:    AI response mentions verification code, OTP, or "check your email"
+  ON FAIL:   AI did not trigger OTP flow. Check identity_preprocessor.py email extraction and OTP trigger logic.
+```
+
+### CP.10–CP.13: Email verification → personalized response
+
+```
+STEP CP.10: Check email for verification code (MANUAL — owner task)
+  ACTION:    Owner checks mike@remakerdigital.com inbox for OTP verification email from Agent Red.
+  EXPECTED:  Email received with 6-digit verification code
+  VERIFY:    Owner confirms receipt and reads code aloud or provides it in chat
+  ON FAIL:   Email not received. Check email delivery service (SendGrid/SES), OTP generation in auth flow,
+             and email template rendering.
+  NOTE:      Test operator PAUSES here until owner provides the verification code.
+
+STEP CP.11: Enter verification code in chat
+  ACTION:    Type the 6-digit verification code into the chat input → send message
+  EXPECTED:  AI validates the OTP code and authenticates the customer identity.
+             AI responds with confirmation of identity verification.
+  VERIFY:    AI response indicates successful verification (e.g., "Thanks for verifying!" or personalized greeting)
+  ON FAIL:   OTP validation failed. Check OTP expiry window, code matching logic in identity_preprocessor.py.
+
+STEP CP.12: AI responds with personalized message
+  ACTION:    Observe AI's post-verification response.
+  EXPECTED:  AI provides a personalized response that demonstrates customer knowledge — e.g., referencing
+             purchase history, preferences, or tailored product recommendations.
+             Example: "Hi Mike, welcome back! I noticed you might be interested in..."
+             The response should reflect PCM (Profile/Context/Memory) data for the authenticated customer.
+  VERIFY:    Response contains the customer's first name AND at least one personalized detail
+             (product reference, purchase history, preference, or recommendation)
+  ON FAIL:   No personalization. Check system_prompt_builder.py Layer 6 identity injection,
+             PCM data retrieval for the customer, and MCP integration for customer profile data.
+  NOTE:      Personalization quality depends on available PCM data. For a demo/test tenant,
+             the data may be seeded or limited.
+
+STEP CP.13: Customer replies "Yes"
+  ACTION:    Type "Yes" into chat input → send message
+  EXPECTED:  AI continues the conversation naturally, elaborating on the recommendation or
+             providing additional details (product info, pricing, availability, etc.)
+  VERIFY:    AI response is contextually appropriate and continues the sales/support thread
+  ON FAIL:   AI response is generic or disconnected from prior context. Check conversation memory
+             and context window management.
+```
+
+### CP.14–CP.17: Team member invitation and role assignment
+
+```
+STEP CP.14: Navigate to Team members
+  ACTION:    find("Team members", tabId) → click. Wait for page load.
+  EXPECTED:  Team members page renders with member list/table and "+Invite member" button
+  VERIFY:    find("Invite member", tabId) or find("Team members", tabId) — page title and invite button present
+  ON FAIL:   Team members page not loading. Check routing and API /api/team/members endpoint.
+
+STEP CP.15: Invite new team member
+  ACTION:    Click "+Invite member" button. Fill in the invite form:
+             - Email: sales@remakerdigital.com
+             - Name: "Test member"
+             - Role: Select "Escalation agent"
+             Click "Send invite"
+  EXPECTED:  Invite sent successfully. Toast notification confirms invitation.
+             New member appears in the team list with "Invited" or "Pending" status.
+  VERIFY:    find("Test member", tabId) — new member visible in list. find("Invited", tabId) or
+             find("Pending", tabId) — status badge shows invited state.
+  ON FAIL:   Invite failed. Check /api/team/invite endpoint, email delivery, and role validation.
+
+STEP CP.16: Check invite email (MANUAL — owner task)
+  ACTION:    Owner checks sales@remakerdigital.com inbox for team invitation email.
+  EXPECTED:  Email received with invitation details and acceptance link/instructions.
+  VERIFY:    Owner confirms receipt of invitation email.
+  ON FAIL:   Email not received. Check email delivery configuration, invitation template, and
+             the /api/team/invite email sending logic.
+  NOTE:      Test operator PAUSES here until owner confirms email receipt.
+
+STEP CP.17: Assign "Sales" escalation category to team member
+  ACTION:    On Team members page, find "Test member" row. Click to edit or select role/category options.
+             Assign the "Sales" escalation category to this team member.
+  EXPECTED:  Team member "Test member" now has "Sales" category assigned. Category badge or label
+             visible on the member's row.
+  VERIFY:    find("Sales", tabId) within Test member's row or detail panel.
+             API: /api/team/members returns the member with escalation categories including "Sales"
+  ON FAIL:   Category assignment failed. Check escalation category configuration and team member
+             update endpoint.
+```
+
+### CP.18–CP.21: Escalation → verification → dashboard
+
+```
+STEP CP.18: Escalate conversation to Sales
+  ACTION:    Navigate to Inbox: find("Inbox", tabId) → click. Select the conversation from CP.7–CP.13.
+             Click "Escalate to human" action button (triangle icon).
+             In the escalation dialog: select category "Sales", then click "Assign".
+  EXPECTED:  Conversation status changes to "escalated". Toast notification: "Conversation escalated".
+             Conversation appears under "Esc" filter tab. Assigned to "Test member".
+  VERIFY:    find("escalated", tabId) — status badge changed.
+             Click "Esc" filter tab — escalated conversation visible.
+             Right panel shows "Assigned to" with "Test member" name.
+  ON FAIL:   Escalation failed. Check /api/conversations/{id}/escalate endpoint,
+             escalation routing logic, and category-to-member assignment.
+
+STEP CP.19: Verify team member escalation count
+  ACTION:    Navigate to Team members: find("Team members", tabId) → click.
+             Find "Test member" row.
+  EXPECTED:  Test member shows escalation count of 1 (or "1 escalation" indicator).
+  VERIFY:    Test member row displays count reflecting the escalation from CP.18.
+  ON FAIL:   Count not updated. Check team member stats aggregation and the /api/team/members
+             response for escalation_count field.
+
+STEP CP.20: Check escalation email (MANUAL — owner task)
+  ACTION:    Owner checks sales@remakerdigital.com inbox for escalation notification email.
+  EXPECTED:  Email received notifying Test member of the new escalation assignment, including
+             conversation details and a link to view the conversation.
+  VERIFY:    Owner confirms receipt of escalation notification email.
+  ON FAIL:   Escalation email not sent. Check escalation notification logic, email templates,
+             and the notification trigger in the escalation handler.
+  NOTE:      Test operator PAUSES here until owner confirms email receipt.
+
+STEP CP.21: Dashboard confirms billable conversation
+  ACTION:    Navigate to Dashboard: find("Dashboard", tabId) → click. Wait for data load.
+  EXPECTED:  Dashboard stat cards show at least 1 billable conversation.
+             "Total conversations" >= 1. "Billable" sub-label shows >= 1.
+             Conversation volume chart shows data point for today.
+  VERIFY:    javascript_tool: body.match(/Billable:\s*(\d+)/) — billable count >= 1.
+             find("Total conversations", tabId) — stat card visible with non-zero count.
+  ON FAIL:   Billable count is 0. Check conversation billing classification logic — the
+             authenticated conversation with identity verification should be classified as billable.
+```
+
+### Critical-Path Failure Protocol
+
+If **any** CP step fails:
+1. **STOP** all UI testing immediately
+2. Record the failing step, actual behavior, and error details
+3. Create blocking work items to resolve the identified defect(s)
+4. After fix is deployed, **restart the critical-path test from CP.1**
+5. Page-by-page UI testing (Pages H, 0–10) may only proceed after CP.1–CP.21 all PASS
+
+### Critical-Path Known Failure Modes
+
+| Symptom | Classification | Resolution |
+|---------|---------------|------------|
+| Setup wizard doesn't auto-present for unconfigured tenant | Code defect (routing guard) | Fix conditional redirect in StandaloneLayout for is_configured=false |
+| Chat widget returns 401 on /api/widget/config | Environment transient (widget key rotated) | Re-seed tenant, update WIDGET_KEY |
+| AI doesn't request email in standalone mode | Code defect (identity preprocessor) | Check system prompt Layer 6 identity injection and anonymous behavior rules |
+| OTP email not delivered | Environment transient (email service) | Check SendGrid/SES delivery logs, verify sender domain |
+| AI response not personalized after OTP | Code defect (PCM data not injected) | Check identity_preprocessor session storage and system_prompt_builder Layer 6 |
+| "+Invite member" button missing | Code defect (tier-gating or role check) | Verify superadmin role has team management permissions for this tier |
+| Escalation category dropdown empty | Code defect (categories not seeded) | Check escalation_categories in tenant config and /api/config response |
+| Billable count 0 after conversation | Code defect (billing classification) | Check billing_classifier.py — authenticated conversations should be billable |
+
+---
+
 ## Test Execution — Standalone Admin (Pages H, 0–10)
 
 Each test references its ID from `ui-test-procedure.md`. The Chrome MCP verification
@@ -296,7 +541,7 @@ Navigate to `$STANDALONE_URL/configuration`.
 | 0.16 | `javascript_tool`: `fetch('$PROD_BASE/api/chat/conversations', {method:'POST', headers:{'X-Widget-Key':'$WIDGET_KEY','Content-Type':'application/json'}, body:'{}'}).then(r=>r.status)` — expect 403 |
 | 0.17 | `javascript_tool`: `fetch('$PROD_BASE/api/config/activation-status', {headers:{'X-API-Key':'$MERCHANT_API_KEY'}}).then(r=>r.json())` — verify `is_active=false` and `can_activate=false` (mandatory fields still empty) |
 
-### Page 0A: Activation Control Lifecycle (26 tests)
+### Page 0A: Activation Control Lifecycle (28 tests)
 
 Continue from Page 0 state. Tests 0A.1–0A.21 follow the activation/deactivation/re-activation cycle. Each test involves:
 - Form fills via `find` + `computer(action:'left_click')` + `computer(action:'type')`
@@ -310,6 +555,8 @@ Continue from Page 0 state. Tests 0A.1–0A.21 follow the activation/deactivatio
 | 0A.1a | After save: notification toast with "saved" or "Draft" text |
 | 0A.2 | Fill brand_voice, save → Activate button turns green |
 | 0A.3 | Click Activate (green) → confirmation dialog with validation results → confirm |
+| 0A.3b | **Activation dialog field tags — accuracy check.** Scroll the "Changes to activate" list and verify that field tags shown under AGENT CONFIGURATION are accurate for a freshly-seeded standalone tenant. Fields like `shopify sync enabled`, `stripe mcp enabled`, `google analytics enabled`, `zendesk escalation enabled`, `mailchimp segment sync`, `fine tuning enabled`, `fine tuning min conversations` should **NOT** appear unless the merchant explicitly configured them. If they appear, log as **DEFECT**: activation dialog includes unconfigured integration fields. |
+| 0A.3c | **Activation dialog — no `[object Object]`**. Verify that no field tag or value in the dialog renders as `[object Object]`. If found, log as **DEFECT**: activation dialog renders raw object instead of formatted value. |
 | 0A.3a | After activation: success notification with "activated" text |
 | 0A.4 | `find("Active", tabId)` — green badge in sidebar |
 | 0A.5 | `find("Deactivate", tabId)` — red button replaces Activate |
@@ -1952,10 +2199,11 @@ user-assisted Shopify auth sub-procedure (Steps S.1–S.4) before testing begins
 
 ## Postconditions
 
-- [ ] **Standalone Admin:** 838 tests executed (802 prior + 36 KA tests), results recorded with test ID / PASS / FAIL / SKIP
+- [ ] **Tenant re-initialized:** Primary tenant (remaker-digital-001) was re-seeded at start; Pages 0, 0A, 0B tested from clean state
+- [ ] **Standalone Admin:** 840 tests executed (802 prior + 36 KA tests + 2 activation dialog accuracy tests), results recorded with test ID / PASS / FAIL / SKIP
 - [ ] **SPA Provider Console:** 115 tests executed (P.0–P.17), all PASS or documented FAIL
 - [ ] **Shopify Embedded Admin:** 76 tests executed (S.1–S.8), results recorded with test ID / PASS / FAIL / SKIP
-- [ ] **Total:** 1,029 tests (838 standalone + 115 provider + 76 Shopify)
+- [ ] **Total:** 1,031 tests (840 standalone + 115 provider + 76 Shopify)
 - [ ] **Zero unexpected console errors** across all pages (all 3 interfaces)
 - [ ] **Screenshots captured** for each page group (minimum 35 screenshots — 11 standalone page groups + 16 provider pages + 8 Shopify pages)
 - [ ] **Auth verified** for all 3 interfaces: sessionStorage injection (standalone + provider), App Bridge user-assisted (Shopify)

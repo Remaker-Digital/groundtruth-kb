@@ -41,6 +41,7 @@ interface TenantQueueInfo {
 }
 
 interface QueueDepthResponse {
+  natsDeployed: boolean;
   totalTenants: number;
   totalMessages: number;
   totalBytes: number;
@@ -110,6 +111,23 @@ export function QueueHealthPage() {
       <Text c="dimmed" ta="center" mt="xl">
         Unable to load queue health data.
       </Text>
+    );
+  }
+
+  if (!data.natsDeployed) {
+    return (
+      <Stack gap="lg">
+        <Title order={3} c={tokens.textPrimary}>Queue Health</Title>
+        <Paper withBorder radius="md" bg={tokens.surface} p="xl">
+          <Stack align="center" gap="sm">
+            <Badge variant="light" color="gray" size="lg">Not Deployed</Badge>
+            <Text c="dimmed" size="sm" ta="center">
+              NATS JetStream is not deployed in this environment.
+              Queue health monitoring will be available when NATS is configured.
+            </Text>
+          </Stack>
+        </Paper>
+      </Stack>
     );
   }
 

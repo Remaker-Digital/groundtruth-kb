@@ -831,3 +831,414 @@ def register_trial_warning(app: FastAPI) -> None:
     """Register trial expiry warning startup/shutdown handlers on the FastAPI app."""
     app.on_event("startup")(_startup_trial_warning)
     app.on_event("shutdown")(_shutdown_trial_warning)
+
+
+# ---------------------------------------------------------------------------
+# General access expiry scanner (WI-EXPIRY-1)
+# ---------------------------------------------------------------------------
+
+# Scan interval — every 1 hour (same cadence as trial scanner)
+_EXPIRY_SCAN_INTERVAL = 3600
+# Startup delay — 150 seconds (after trial scanner, before warning)
+_EXPIRY_SCAN_STARTUP_DELAY = 150
+
+_expiry_scanner_task: asyncio.Task | None = None
+
+
+async def _expiry_scanner_loop() -> None:
+    """Periodic background task that expires tenants past their expires_at date.
+
+    Runs every hour. Queries for active tenants (any billing channel) whose
+    ``expires_at`` timestamp is in the past, then transitions them to
+    TRIAL_EXPIRED status — same lifecycle end-state used for trial tenants.
+
+    Middleware already rejects requests from expired tenants
+    (middleware._check_access_expiry), but this scanner ensures the
+    tenant status is updated proactively — important for accurate
+    dashboard metrics, billing reports, and preventing stale data.
+    """
+    from src.multi_tenant.repository import TenantRepository
+
+    await asyncio.sleep(_EXPIRY_SCAN_STARTUP_DELAY)
+
+    while True:
+        try:
+            tenant_repo = TenantRepository()
+            expired = await tenant_repo.list_expired_tenants()
+            expired_count = 0
+
+            for tenant_doc in expired:
+                tid = tenant_doc.get("tenant_id")
+                if not tid:
+                    continue
+
+                try:
+                    now_iso = datetime.now(timezone.utc).isoformat()
+                    await tenant_repo.patch(
+                        tenant_id=tid,
+                        document_id=tid,
+                        operations=[
+                            {"op": "set", "path": "/status", "value": "trial_expired"},
+                            {"op": "set", "path": "/updated_at", "value": now_iso},
+                        ],
+                    )
+                    expired_count += 1
+                    logger.info(
+                        "Access expired: tenant=%s expires_at=%s channel=%s",
+                        tid[:8],
+                        tenant_doc.get("expires_at", "?"),
+                        tenant_doc.get("billing_channel", "?"),
+                    )
+                except Exception:
+                    logger.debug(
+                        "Access expiry failed for tenant %s",
+                        tid[:8],
+                        exc_info=True,
+                    )
+
+            if expired_count > 0:
+                logger.info(
+                    "Expiry scanner: expired %d tenants",
+                    expired_count,
+                )
+        except Exception:
+            logger.debug("Expiry scanner cycle failed", exc_info=True)
+
+        await asyncio.sleep(_EXPIRY_SCAN_INTERVAL)
+
+
+async def _startup_expiry_scanner() -> None:
+    """Start the access expiry scanner background task."""
+    global _expiry_scanner_task  # noqa: PLW0603
+    _expiry_scanner_task = asyncio.create_task(_expiry_scanner_loop())
+    logger.info("Access expiry scanner started (1-hour interval)")
+
+
+async def _shutdown_expiry_scanner() -> None:
+    """Cancel the access expiry scanner background task."""
+    global _expiry_scanner_task  # noqa: PLW0603
+    if _expiry_scanner_task and not _expiry_scanner_task.done():
+        _expiry_scanner_task.cancel()
+        try:
+            await _expiry_scanner_task
+        except asyncio.CancelledError:
+            pass
+        logger.info("Access expiry scanner stopped")
+    _expiry_scanner_task = None
+
+
+def register_expiry_scanner(app: FastAPI) -> None:
+    """Register access expiry scanner startup/shutdown handlers on the FastAPI app."""
+    app.on_event("startup")(_startup_expiry_scanner)
+    app.on_event("shutdown")(_shutdown_expiry_scanner)
+
+
+# ---------------------------------------------------------------------------
+# Access expiry warning emails (WI-EXPIRY-1)
+# ---------------------------------------------------------------------------
+
+# Warning tiers: same as trial (7d, 3d, 1d)
+_EXPIRY_WARNING_TIERS = [
+    (7, "7d"),
+    (3, "3d"),
+    (1, "1d"),
+]
+
+# Scan interval — every 12 hours
+_EXPIRY_WARNING_SCAN_INTERVAL = 43200
+# Startup delay — 210 seconds (after expiry scanner)
+_EXPIRY_WARNING_SCAN_STARTUP_DELAY = 210
+
+_expiry_warning_task: asyncio.Task | None = None
+
+
+async def _expiry_warning_loop() -> None:
+    """Periodic background task that sends access expiry warning emails.
+
+    Runs every 12 hours. For each warning tier (7d, 3d, 1d), queries
+    for active tenants with ``expires_at`` within that window, checks the
+    ``expiry_warnings_sent`` field for deduplication, sends the email,
+    and patches the sent marker.
+    """
+    from src.multi_tenant.repository import TenantRepository
+
+    await asyncio.sleep(_EXPIRY_WARNING_SCAN_STARTUP_DELAY)
+
+    while True:
+        try:
+            tenant_repo = TenantRepository()
+            warnings_sent = 0
+
+            for days, tier_label in _EXPIRY_WARNING_TIERS:
+                within_iso = (
+                    datetime.now(timezone.utc) + timedelta(days=days)
+                ).isoformat()
+
+                try:
+                    expiring = await tenant_repo.list_expiring_tenants(within_iso)
+                except Exception:
+                    logger.debug(
+                        "Expiry warning query failed for tier %s",
+                        tier_label,
+                        exc_info=True,
+                    )
+                    continue
+
+                for tenant_doc in expiring:
+                    tid = tenant_doc.get("tenant_id")
+                    email = tenant_doc.get("customer_email")
+                    already_sent = tenant_doc.get("expiry_warnings_sent", [])
+
+                    if not tid or not email:
+                        continue
+                    if tier_label in already_sent:
+                        continue
+
+                    try:
+                        from src.multi_tenant.access_expiry_email import (
+                            send_access_expiry_warning,
+                        )
+
+                        sent = await send_access_expiry_warning(
+                            to_email=email,
+                            tenant_id=tid,
+                            warning_tier=tier_label,
+                        )
+
+                        if sent:
+                            new_warnings = already_sent + [tier_label]
+                            now_iso = datetime.now(timezone.utc).isoformat()
+                            await tenant_repo.patch(
+                                tenant_id=tid,
+                                document_id=tid,
+                                operations=[
+                                    {
+                                        "op": "set",
+                                        "path": "/expiry_warnings_sent",
+                                        "value": new_warnings,
+                                    },
+                                    {
+                                        "op": "set",
+                                        "path": "/updated_at",
+                                        "value": now_iso,
+                                    },
+                                ],
+                            )
+                            warnings_sent += 1
+                    except Exception:
+                        logger.debug(
+                            "Expiry warning failed for tenant %s tier %s",
+                            tid[:8],
+                            tier_label,
+                            exc_info=True,
+                        )
+
+            if warnings_sent > 0:
+                logger.info(
+                    "Expiry warning scanner: sent %d warnings",
+                    warnings_sent,
+                )
+        except Exception:
+            logger.debug("Expiry warning scanner cycle failed", exc_info=True)
+
+        await asyncio.sleep(_EXPIRY_WARNING_SCAN_INTERVAL)
+
+
+async def _startup_expiry_warning() -> None:
+    """Start the access expiry warning background task."""
+    global _expiry_warning_task  # noqa: PLW0603
+    _expiry_warning_task = asyncio.create_task(_expiry_warning_loop())
+    logger.info("Access expiry warning scanner started (12-hour interval)")
+
+
+async def _shutdown_expiry_warning() -> None:
+    """Cancel the access expiry warning background task."""
+    global _expiry_warning_task  # noqa: PLW0603
+    if _expiry_warning_task and not _expiry_warning_task.done():
+        _expiry_warning_task.cancel()
+        try:
+            await _expiry_warning_task
+        except asyncio.CancelledError:
+            pass
+        logger.info("Access expiry warning scanner stopped")
+    _expiry_warning_task = None
+
+
+def register_expiry_warning(app: FastAPI) -> None:
+    """Register access expiry warning startup/shutdown handlers on the FastAPI app."""
+    app.on_event("startup")(_startup_expiry_warning)
+    app.on_event("shutdown")(_shutdown_expiry_warning)
+
+
+# ---------------------------------------------------------------------------
+# Conversation vectorization scanner (WI #87 — Layer 2 memory)
+# ---------------------------------------------------------------------------
+
+# Scan interval — every 5 minutes
+_VECTORIZATION_SCAN_INTERVAL = 300
+# Startup delay — 240 seconds (after other scanners)
+_VECTORIZATION_SCAN_STARTUP_DELAY = 240
+# Max conversations to process per tenant per scan cycle
+_VECTORIZATION_BATCH_SIZE = 20
+
+_vectorization_scanner_task: asyncio.Task | None = None
+
+
+async def _vectorization_scanner_loop() -> None:
+    """Periodic background task that vectorizes ended conversations.
+
+    Runs every 5 minutes. For each active tenant, queries for ended
+    conversations that haven't been vectorized yet, then calls
+    vectorize_conversation() to generate embeddings and store them
+    in the memory_vectors collection for Layer 2 semantic search.
+
+    Consent-gated: respects customer-level consent_status. Conversations
+    with DENIED or NOT_ASKED consent are still marked as vectorized_at
+    (to prevent re-processing) but no vectors are stored.
+    """
+    from src.multi_tenant.conversation_vectorizer import get_vectorizer
+    from src.multi_tenant.cosmos_schema import ConsentStatus
+    from src.multi_tenant.repositories.conversation import ConversationRepository
+    from src.multi_tenant.repository import (
+        CustomerProfileRepository,
+        PreferencesRepository,
+        TenantRepository,
+    )
+
+    await asyncio.sleep(_VECTORIZATION_SCAN_STARTUP_DELAY)
+
+    while True:
+        try:
+            vectorizer = get_vectorizer()
+            vectorizer._ensure_configured()
+
+            tenant_repo = TenantRepository()
+            conv_repo = ConversationRepository()
+            profile_repo = CustomerProfileRepository()
+            prefs_repo = PreferencesRepository()
+            tenant_ids = await tenant_repo.list_active_tenant_ids()
+            total_vectorized = 0
+
+            for tid in tenant_ids:
+                try:
+                    # Check tenant-level consent configuration once per tenant
+                    consent_required = False
+                    try:
+                        prefs = await prefs_repo.read(tid, f"preferences:{tid}")
+                        if prefs:
+                            consent_required = prefs.get(
+                                "consent_collection_enabled", False,
+                            ) is True
+                    except Exception:
+                        pass  # Preferences not found → default (no consent required)
+
+                    unvectorized = await conv_repo.list_unvectorized_ended(
+                        tid, limit=_VECTORIZATION_BATCH_SIZE,
+                    )
+                    if not unvectorized:
+                        continue
+
+                    for conv in unvectorized:
+                        conv_id = conv.get("conversation_id") or conv.get("id")
+                        customer_id = conv.get("customer_id")
+                        messages = conv.get("messages", [])
+
+                        if not conv_id or not customer_id:
+                            continue
+
+                        try:
+                            # Determine consent status
+                            if not consent_required:
+                                # Tenant does not require explicit consent →
+                                # implied GRANTED (service terms acceptance)
+                                consent = ConsentStatus.GRANTED
+                            else:
+                                # Explicit consent required — check customer profile
+                                consent = ConsentStatus.NOT_ASKED
+                                try:
+                                    profile = await profile_repo.read(
+                                        tid, f"profile:{customer_id}",
+                                    )
+                                    if profile:
+                                        consent = ConsentStatus(
+                                            profile.get("consent_status", "not_asked")
+                                        )
+                                except Exception:
+                                    pass  # Profile not found → NOT_ASKED
+
+                            # Vectorize (consent-gated internally)
+                            await vectorizer.vectorize_conversation(
+                                tenant_id=tid,
+                                customer_id=customer_id,
+                                conversation_id=conv_id,
+                                messages=messages,
+                                consent_status=consent,
+                            )
+
+                            # Mark as vectorized regardless of consent
+                            # (prevents re-processing)
+                            now_iso = datetime.now(timezone.utc).isoformat()
+                            await conv_repo.patch(
+                                tenant_id=tid,
+                                document_id=conv_id,
+                                operations=[
+                                    {
+                                        "op": "set",
+                                        "path": "/vectorized_at",
+                                        "value": now_iso,
+                                    },
+                                ],
+                            )
+                            total_vectorized += 1
+                        except Exception:
+                            logger.debug(
+                                "Vectorization failed for conv %s tenant %s",
+                                conv_id[:8] if conv_id else "?",
+                                tid[:8],
+                                exc_info=True,
+                            )
+                except Exception:
+                    logger.debug(
+                        "Vectorization scan failed for tenant %s",
+                        tid[:8],
+                        exc_info=True,
+                    )
+
+            if total_vectorized > 0:
+                logger.info(
+                    "Vectorization scanner: processed %d conversations across %d tenants",
+                    total_vectorized, len(tenant_ids),
+                )
+        except RuntimeError:
+            # ConversationVectorizer not configured — skip this cycle
+            pass
+        except Exception:
+            logger.debug("Vectorization scanner cycle failed", exc_info=True)
+
+        await asyncio.sleep(_VECTORIZATION_SCAN_INTERVAL)
+
+
+async def _startup_vectorization_scanner() -> None:
+    """Start the conversation vectorization scanner background task."""
+    global _vectorization_scanner_task  # noqa: PLW0603
+    _vectorization_scanner_task = asyncio.create_task(_vectorization_scanner_loop())
+    logger.info("Conversation vectorization scanner started (5-min interval)")
+
+
+async def _shutdown_vectorization_scanner() -> None:
+    """Cancel the conversation vectorization scanner background task."""
+    global _vectorization_scanner_task  # noqa: PLW0603
+    if _vectorization_scanner_task and not _vectorization_scanner_task.done():
+        _vectorization_scanner_task.cancel()
+        try:
+            await _vectorization_scanner_task
+        except asyncio.CancelledError:
+            pass
+        logger.info("Conversation vectorization scanner stopped")
+    _vectorization_scanner_task = None
+
+
+def register_vectorization_scanner(app: FastAPI) -> None:
+    """Register vectorization scanner startup/shutdown handlers on the FastAPI app."""
+    app.on_event("startup")(_startup_vectorization_scanner)
+    app.on_event("shutdown")(_shutdown_vectorization_scanner)

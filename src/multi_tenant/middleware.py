@@ -227,18 +227,19 @@ class TenantAuthMiddleware(BaseHTTPMiddleware):
     @staticmethod
     def _resolve_tenant_fields(
         tenant: dict[str, Any],
-    ) -> tuple[str, TenantStatus, TenantTier | None, str | None, int | None]:
+    ) -> tuple[str, TenantStatus, TenantTier | None, str | None, str | None, int | None]:
         """Extract common fields from a resolved tenant document.
 
-        Returns (tenant_id, status, tier, trial_expires_at, rate_limit_rpm).
+        Returns (tenant_id, status, tier, trial_expires_at, expires_at, rate_limit_rpm).
         """
         tenant_id = tenant["tenant_id"]
         status = TenantStatus(tenant.get("status", "active"))
         tier_str = tenant.get("tier")
         tier = TenantTier(tier_str) if tier_str else None
         trial_expires_at = tenant.get("trial_expires_at")
+        expires_at = tenant.get("expires_at")
         rate_limit_rpm = tenant.get("rate_limit_rpm")
-        return tenant_id, status, tier, trial_expires_at, rate_limit_rpm
+        return tenant_id, status, tier, trial_expires_at, expires_at, rate_limit_rpm
 
     @staticmethod
     def _check_trial_expiry(
@@ -273,6 +274,41 @@ class TenantAuthMiddleware(BaseHTTPMiddleware):
                 tenant_id, trial_expires_at,
             )
 
+    @staticmethod
+    def _check_access_expiry(
+        tenant_id: str,
+        expires_at: str | None,
+    ) -> None:
+        """Reject the request if general access has expired (WI-EXPIRY-1).
+
+        Works for any billing channel and any tier. Reads the ``expires_at``
+        field (distinct from ``trial_expires_at``).
+
+        Raises AuthenticationError (403) if the current time is past
+        ``expires_at``.
+        """
+        if not expires_at:
+            return
+
+        try:
+            expires = datetime.fromisoformat(expires_at)
+            if expires.tzinfo is None:
+                expires = expires.replace(tzinfo=timezone.utc)
+            if datetime.now(timezone.utc) > expires:
+                raise AuthenticationError(
+                    f"Access has expired for tenant {tenant_id}. "
+                    "Please contact your service provider.",
+                    status_code=403,
+                )
+        except AuthenticationError:
+            raise
+        except Exception:
+            # Malformed timestamp — log but don't block
+            logger.warning(
+                "Could not parse expires_at for tenant=%s: %s",
+                tenant_id, expires_at,
+            )
+
     async def _auth_shopify(self, token: str) -> TenantContext:
         """Authenticate via Shopify session token."""
         # Verify JWT and extract claims
@@ -296,9 +332,10 @@ class TenantAuthMiddleware(BaseHTTPMiddleware):
                 f"No tenant found for shop domain: {shop_domain}"
             )
 
-        tenant_id, status, tier, trial_expires_at, rl_rpm = self._resolve_tenant_fields(tenant)
+        tenant_id, status, tier, trial_expires_at, expires_at, rl_rpm = self._resolve_tenant_fields(tenant)
         validate_tenant_status(tenant_id, status)
         self._check_trial_expiry(tenant_id, tier, trial_expires_at)
+        self._check_access_expiry(tenant_id, expires_at)
 
         return TenantContext(
             tenant_id=tenant_id,
@@ -333,9 +370,10 @@ class TenantAuthMiddleware(BaseHTTPMiddleware):
 
         tenant = await verify_api_key(api_key, _resolve_by_api_key_hash)
 
-        tenant_id, status, tier, trial_expires_at, rl_rpm = self._resolve_tenant_fields(tenant)
+        tenant_id, status, tier, trial_expires_at, expires_at, rl_rpm = self._resolve_tenant_fields(tenant)
         validate_tenant_status(tenant_id, status)
         self._check_trial_expiry(tenant_id, tier, trial_expires_at)
+        self._check_access_expiry(tenant_id, expires_at)
 
         return TenantContext(
             tenant_id=tenant_id,
@@ -362,9 +400,10 @@ class TenantAuthMiddleware(BaseHTTPMiddleware):
         tenant = result["tenant"]
         member = result["team_member"]
 
-        tenant_id, status, tier, trial_expires_at, rl_rpm = self._resolve_tenant_fields(tenant)
+        tenant_id, status, tier, trial_expires_at, expires_at, rl_rpm = self._resolve_tenant_fields(tenant)
         validate_tenant_status(tenant_id, status)
         self._check_trial_expiry(tenant_id, tier, trial_expires_at)
+        self._check_access_expiry(tenant_id, expires_at)
 
         # Resolve role
         role_str = member.get("role", "viewer")
@@ -412,9 +451,10 @@ class TenantAuthMiddleware(BaseHTTPMiddleware):
 
         tenant = await verify_widget_key(widget_key, _resolve_by_widget_key_hash)
 
-        tenant_id, status, tier, trial_expires_at, rl_rpm = self._resolve_tenant_fields(tenant)
+        tenant_id, status, tier, trial_expires_at, expires_at, rl_rpm = self._resolve_tenant_fields(tenant)
         validate_tenant_status(tenant_id, status)
         self._check_trial_expiry(tenant_id, tier, trial_expires_at)
+        self._check_access_expiry(tenant_id, expires_at)
 
         return TenantContext(
             tenant_id=tenant_id,
@@ -458,9 +498,10 @@ class TenantAuthMiddleware(BaseHTTPMiddleware):
                 f"No tenant found for session token: {tenant_id}",
             )
 
-        _, status, tier, trial_expires_at, rl_rpm = self._resolve_tenant_fields(tenant)
+        _, status, tier, trial_expires_at, expires_at, rl_rpm = self._resolve_tenant_fields(tenant)
         validate_tenant_status(tenant_id, status)
         self._check_trial_expiry(tenant_id, tier, trial_expires_at)
+        self._check_access_expiry(tenant_id, expires_at)
 
         return TenantContext(
             tenant_id=tenant_id,

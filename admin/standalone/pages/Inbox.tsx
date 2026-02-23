@@ -1,6 +1,6 @@
 // © 2026 Remaker Digital, a DBA of VanDusen & Palmeter, LLC. All rights reserved.
 
-import React, { useState, useRef, useEffect, useCallback } from 'react';
+import React, { useState, useMemo, useRef, useEffect, useCallback } from 'react';
 import {
   Paper,
   TextInput,
@@ -18,6 +18,9 @@ import {
   Loader,
   useComputedColorScheme,
   Notification,
+  Modal,
+  Select,
+  Button,
 } from '@mantine/core';
 import { useAppContext } from '../layouts/StandaloneLayout';
 import {
@@ -52,6 +55,16 @@ const STATUS_COLORS: Record<string, string> = {
 };
 
 const AVATAR_PALETTE = ['#ff3621', '#2563EB', '#059669', '#D97706', '#7C3AED', '#DB2777'];
+
+// Escalation categories matching backend ESCALATION_CATEGORIES
+const ESCALATION_CATEGORY_OPTIONS = [
+  { value: 'service', label: 'Service' },
+  { value: 'support', label: 'Support' },
+  { value: 'sales', label: 'Sales' },
+  { value: 'account', label: 'Account' },
+  { value: 'technical_assistance', label: 'Technical Assistance' },
+  { value: 'general_inquiry', label: 'General Inquiry' },
+];
 
 // ---------------------------------------------------------------------------
 // Helpers
@@ -329,6 +342,118 @@ function MessageBubble({
 }
 
 // ---------------------------------------------------------------------------
+// Escalation Modal (Mantine)
+// ---------------------------------------------------------------------------
+
+function EscalationModal({
+  opened,
+  onClose,
+  onConfirm,
+  escalating,
+  members,
+}: {
+  opened: boolean;
+  onClose: () => void;
+  onConfirm: (opts: { category: string; agentId?: string }) => Promise<void>;
+  escalating: boolean;
+  members: TeamMember[];
+}) {
+  const [category, setCategory] = useState<string | null>(null);
+  const [agentId, setAgentId] = useState<string | null>(null);
+
+  // All active team members — any member can be manually assigned.
+  // Designated escalation agents for the selected category appear first.
+  const agentOptions = useMemo(() => {
+    if (!category) return [];
+    const active = members.filter((m) => m.isActive);
+    // Sort: designated agents for this category first, then others
+    const sorted = [...active].sort((a, b) => {
+      const aMatch =
+        a.role === 'escalation_agent' &&
+        (a.escalationCategories ?? []).includes(category)
+          ? 0
+          : 1;
+      const bMatch =
+        b.role === 'escalation_agent' &&
+        (b.escalationCategories ?? []).includes(category)
+          ? 0
+          : 1;
+      return aMatch - bMatch;
+    });
+    return sorted.map((m) => ({ value: m.id, label: m.displayName }));
+  }, [members, category]);
+
+  // Reset agent when category changes
+  const handleCategoryChange = (value: string | null) => {
+    setCategory(value);
+    setAgentId(null);
+  };
+
+  // Reset on close
+  const handleClose = () => {
+    setCategory(null);
+    setAgentId(null);
+    onClose();
+  };
+
+  return (
+    <Modal
+      opened={opened}
+      onClose={handleClose}
+      title="Escalate to human"
+      size="sm"
+      centered
+    >
+      <Stack gap="md">
+        <Select
+          label="Category"
+          placeholder="Select category..."
+          data={ESCALATION_CATEGORY_OPTIONS}
+          value={category}
+          onChange={handleCategoryChange}
+          withAsterisk
+          allowDeselect={false}
+        />
+        <Select
+          label="Assign to agent"
+          description={
+            agentOptions.length === 0 && category
+              ? 'No team members available — add members via the Team page'
+              : 'Optional — leave empty for auto-assignment'
+          }
+          placeholder="Auto-assign (best available)"
+          data={agentOptions}
+          value={agentId}
+          onChange={setAgentId}
+          disabled={!category}
+          clearable
+        />
+        <Group justify="flex-end" mt="sm">
+          <Button variant="default" onClick={handleClose}>
+            Cancel
+          </Button>
+          <Button
+            color="red"
+            disabled={!category}
+            loading={escalating}
+            onClick={async () => {
+              if (category) {
+                await onConfirm({
+                  category,
+                  agentId: agentId || undefined,
+                });
+              }
+            }}
+          >
+            Escalate
+          </Button>
+        </Group>
+      </Stack>
+    </Modal>
+  );
+}
+
+// ---------------------------------------------------------------------------
 // Main Inbox Page
 // ---------------------------------------------------------------------------
 
@@ -342,6 +467,7 @@ export function InboxPage() {
   const [filter, setFilter] = useState('all');
   const [search, setSearch] = useState('');
   const [notification, setNotification] = useState<{ message: string; color: string } | null>(null);
+  const [showEscalateModal, setShowEscalateModal] = useState(false);
   const messageEndRef = useRef<HTMLDivElement>(null);
   const searchTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
@@ -411,18 +537,24 @@ export function InboxPage() {
   );
 
   // ---- Escalate / Resolve handlers ----
-  const handleEscalate = useCallback(async () => {
+  const handleEscalateClick = useCallback(() => {
     if (!selectedId || escalating) return;
+    setShowEscalateModal(true);
+  }, [selectedId, escalating]);
+
+  const handleEscalateConfirm = useCallback(async (opts: { category: string; agentId?: string }) => {
+    if (!selectedId) return;
     try {
-      await escalate(selectedId);
+      await escalate(selectedId, opts);
       setNotification({ message: 'Conversation escalated to human agent.', color: 'orange' });
+      setShowEscalateModal(false);
       // Brief delay before refetch to allow Cosmos read-after-write propagation
       setTimeout(() => convResult.refetch(), 500);
     } catch (err: unknown) {
       const msg = err instanceof Error ? err.message : 'Escalation failed';
       setNotification({ message: msg, color: 'red' });
     }
-  }, [selectedId, escalating, escalate, convResult]);
+  }, [selectedId, escalate, convResult]);
 
   const handleResolve = useCallback(async () => {
     if (!selectedId || resolving) return;
@@ -758,7 +890,7 @@ export function InboxPage() {
                       variant="subtle"
                       color="orange"
                       size="md"
-                      onClick={handleEscalate}
+                      onClick={handleEscalateClick}
                       loading={escalating}
                       disabled={escalating || resolving}
                     >
@@ -1013,6 +1145,15 @@ export function InboxPage() {
           </Stack>
         </ScrollArea>
       </Box>
+
+      {/* Escalation dialog */}
+      <EscalationModal
+        opened={showEscalateModal}
+        onClose={() => setShowEscalateModal(false)}
+        onConfirm={handleEscalateConfirm}
+        escalating={escalating}
+        members={(teamResult.data?.members ?? []) as TeamMember[]}
+      />
 
       {/* Notification toast */}
       {notification && (

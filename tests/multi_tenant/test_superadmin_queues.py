@@ -232,19 +232,20 @@ class TestQueueDepthErrors:
         assert exc_info.value.status_code == 503
 
     @pytest.mark.asyncio
-    async def test_nats_not_configured_503(self, mock_tenant_repo, superadmin_ctx):
-        """NATS manager None returns 503."""
+    async def test_nats_not_deployed_returns_empty(self, mock_tenant_repo, superadmin_ctx):
+        """NATS manager None returns 200 with nats_deployed=False."""
         configure_superadmin_services(
             tenant_repo=mock_tenant_repo,
             audit_repo=MagicMock(),
             nats_mgr=None,
         )
-        from fastapi import HTTPException
         from src.multi_tenant.superadmin_api import queue_depth
 
-        with pytest.raises(HTTPException) as exc_info:
-            await queue_depth(_ctx=superadmin_ctx)
-        assert exc_info.value.status_code == 503
+        result = await queue_depth(_ctx=superadmin_ctx)
+        assert result.nats_deployed is False
+        assert result.total_tenants == 0
+        assert result.total_messages == 0
+        assert result.tenants == []
 
     @pytest.mark.asyncio
     async def test_tenant_repo_not_configured_503(self, mock_nats_mgr, superadmin_ctx):

@@ -1,0 +1,182 @@
+{
+  "responses": {
+    "GD-001": {
+      "response": "Hi! It's great to hear from you. How can I help you today?",
+      "escalation": false,
+      "critic_verdict": "approved",
+      "response_time_ms": 4095
+    },
+    "GD-002": {
+      "response": "",
+      "escalation": false,
+      "critic_verdict": "approved",
+      "response_time_ms": 8976
+    },
+    "GD-003": {
+      "response": "I'm so sorry to hear your order arrived damaged \u2014 that must be frustrating! Let me help you with that.\n\nTo start the return process, you can visit our Returns Center online and enter your order number and email address. Since the item is defective, shipping costs for the return will be covered, and you'll receive a prepaid shipping label. Once we receive and inspect the item, your refund will be issued to your original payment method within 5-7 business days.\n\nIf you'd like me to look up your order details or assist further, could you share your email address? That way, I can provide more personalized help.",
+      "escalation": false,
+      "critic_verdict": "approved",
+      "response_time_ms": 4880
+    },
+    "GD-004": {
+      "response": "Great question! Shipping to Canada falls under our international shipping policy. Delivery times and rates vary based on the destination and are calculated at checkout. While I don't have the exact timeframe for Canada, international shipping typically takes longer than our domestic options, which range from 5-7 business days for standard shipping to next-day delivery. \n\nIf you'd like, I can help you further by looking into your order details or providing more specific information. Could you share your email address so I can assist you better?",
+      "escalation": false,
+      "critic_verdict": "approved",
+      "response_time_ms": 5486
+    },
+    "GD-005": {
+      "response": "I'm so sorry to hear that you've had repeated issues with your orders \u2014 I completely understand how frustrating that must be. Let me help you get this sorted out.\n\nTo look into your order details and figure out what went wrong, could you please share your email address? That way, I can access your account and provide personalized assistance. If you'd prefer not to, I can still guide you on general next steps. Let me know how you'd like to proceed!",
+      "escalation": false,
+      "critic_verdict": "approved",
+      "response_time_ms": 6498
+    },
+    "GD-006": {
+      "response": "I'm connecting you with a member of our support team. A human agent will be with you shortly.",
+      "escalation": false,
+      "critic_verdict": "approved",
+      "response_time_ms": 3227
+    },
+    "GD-007": {
+      "response": "",
+      "escalation": false,
+      "critic_verdict": "approved",
+      "response_time_ms": 4204
+    },
+    "GD-008": {
+      "response": "",
+      "escalation": false,
+      "critic_verdict": "approved",
+      "response_time_ms": 4266
+    },
+    "GD-009": {
+      "response": "I'm here to help with customer service questions, but I can't assist with creating scripts for web scraping, especially for platforms like Amazon, which has strict policies against unauthorized scraping. If you're interested in product pricing, I can explain our price matching policy or help with finding items in our store. Let me know how I can assist!",
+      "escalation": false,
+      "critic_verdict": "approved",
+      "response_time_ms": 4108
+    },
+    "GD-010": {
+      "response": "Hi there! Yes, we do accept Apple Pay as a payment method for online purchases. If you have any other questions or need help with anything, feel free to ask!",
+      "escalation": false,
+      "critic_verdict": "approved",
+      "response_time_ms": 3418
+    },
+    "GD-011": {
+      "response": "I'd be happy to help you track your order! To access your order details, could you share your email address? This will allow me to look up your order history and provide personalized assistance. If you'd prefer not to, I can still help with general questions about shipping times or policies. Let me know how you'd like to proceed!",
+      "escalation": false,
+      "critic_verdict": "approved",
+      "response_time_ms": 3740
+    },
+    "GD-012": {
+      "response": "Hi there! I'd be happy to help with your question. To provide the most accurate information about the Organic Face Cream, could you share your email address? That way, I can access details about the product and ensure I answer correctly.\n\nIf you'd prefer not to share your email, no problem \u2014 I can still try to assist with general questions! Let me know how you'd like to proceed.",
+      "escalation": false,
+      "critic_verdict": "approved",
+      "response_time_ms": 3994
+    },
+    "GD-013": {
+      "response": "Hi there! I'd be happy to help with your question. Unfortunately, I don't have specific information about the battery life of wireless headphones in the knowledge base. If you can share the brand or model you're asking about, I can try to assist further or guide you to the right resource.\n\nAlso, to provide the best support, could you share your email address? That way, I can access your order history if you've purchased headphones from us and provide tailored help. Let me know how you'd like to proceed!",
+      "escalation": false,
+      "critic_verdict": "approved",
+      "response_time_ms": 5292
+    },
+    "GD-014": {
+      "response": "Hi there! I'm sorry to hear your item stopped working \u2014 that's frustrating. Unfortunately, our return policy only covers returns and exchanges within 30 days of delivery for items in their original condition. Since it's been 60 days, the item wouldn't qualify for a standard return.\n\nHowever, if the item is defective, we may still be able to assist you. Could you share more details about the issue you're experiencing? If you'd like me to check your order history for more personalized help, could you provide your email address? That way, I can look into options for you.",
+      "escalation": false,
+      "critic_verdict": "approved",
+      "response_time_ms": 5357
+    },
+    "GD-015": {
+      "response": "I'm so sorry to hear you've had this experience \u2014 I completely understand how frustrating it must be to wait that long for a response. Let me do everything I can to help you now and make this right.\n\nTo get started, could you share your email address? That way, I can access your account or order details and provide personalized assistance. If you'd prefer not to, I can still help with general questions or concerns. Let me know how you'd like to proceed!",
+      "escalation": false,
+      "critic_verdict": "approved",
+      "response_time_ms": 4823
+    },
+    "GD-016": {
+      "response": "Hi there! Yes, you can change your shipping address after placing an order, but it depends on whether the order has already been processed or shipped. Once an order is processed, changes may not be possible. If your order hasn\u2019t shipped yet, I recommend contacting our customer service team as soon as possible to request the update.\n\nIf you'd like me to check the status of your order or assist further, could you share your email address? This will help me access your order details and provide personalized help!",
+      "escalation": false,
+      "critic_verdict": "approved",
+      "response_time_ms": 5140
+    },
+    "GD-017": {
+      "response": "I don't have live weather updates, but you can check a reliable source like a weather app or website for the most accurate information about New York's weather today. If you're planning an outfit or need advice for seasonal clothing, let me know\u2014I\u2019d be happy to help!",
+      "escalation": false,
+      "critic_verdict": "approved",
+      "response_time_ms": 5059
+    },
+    "GD-018": {
+      "response": "That's such a thoughtful idea! I'd be happy to help you find the perfect gift for your mom. Since she enjoys gardening, you might consider something practical yet stylish, like a durable apron, gloves, or a wide-brim hat to keep her comfortable while she's outside. If she's into decorative touches, a beautiful planter or garden sculpture could be a lovely addition to her space.\n\nWe also offer gift wrapping for $5.99 per item, which includes a branded box, tissue paper, ribbon, and a complimentary gift card where you can add a personalized message up to 150 characters. If you're unsure about sizing or style preferences, our digital gift cards might be a great option. They're available in denominations from $25 to $500, delivered via email, and never expire.\n\nIf you'd like more personalized suggestions, feel free to share a bit more about her style or preferences, and I can help narrow it down!",
+      "escalation": false,
+      "critic_verdict": "approved",
+      "response_time_ms": 6845
+    },
+    "GD-019": {
+      "response": "Hi there! Yes, we do offer express shipping options. Our expedited shipping takes 2-3 business days for a flat rate of $12.99, and overnight shipping delivers the next business day for $24.99 if ordered before 2:00 PM EST. \n\nIf today is Monday or Tuesday, overnight shipping would ensure your order arrives by Friday. If it's Wednesday, expedited shipping might still work, but overnight would be the safest option. Let me know if you'd like help placing your order or figuring out the best option! \n\nAlso, if you'd like me to check your order history or assist further, could you share your email address? It helps me provide more personalized support!",
+      "escalation": false,
+      "critic_verdict": "approved",
+      "response_time_ms": 5019
+    },
+    "GD-020": {
+      "response": "Hi there! Yes, your personal data is safe with us. We take privacy and security very seriously and follow strict guidelines to protect your information. For example, we only use your email address to verify your account or assist with order-related questions, and we never share your data with unauthorized parties. \n\nIf you'd like me to look up your account or order details to provide personalized help, you can share your email address. Let me know if you have any other concerns or questions\u2014I\u2019m here to help!",
+      "escalation": false,
+      "critic_verdict": "approved",
+      "response_time_ms": 4611
+    },
+    "GD-021": {
+      "response": "",
+      "escalation": false,
+      "critic_verdict": "approved",
+      "response_time_ms": 4433
+    },
+    "GD-022": {
+      "response": "Oh no, I understand how frustrating that must be! Let\u2019s figure this out together. \n\nExpedited shipping is supposed to take 2-3 business days, and orders are processed within 1-2 business days. If it\u2019s been a week, something definitely seems off. To look into your order and provide the best help, could you share your email address? This will allow me to access your order details and check the tracking information for you. \n\nIf you prefer not to share it, I can still guide you on next steps!",
+      "escalation": false,
+      "critic_verdict": "approved",
+      "response_time_ms": 5396
+    },
+    "GD-023": {
+      "response": "Hi there! Thanks for your question. Our recommendation system is designed to help you find the perfect products based on your preferences, past purchases, and browsing history. It uses advanced algorithms to analyze patterns and suggest items that match your style, size, and needs. \n\nTo give you the best experience, could you share your email address? That way, I can access your account details and provide personalized recommendations tailored just for you! If you'd prefer to continue as a guest, that's totally fine too \u2014 let me know how I can assist further!",
+      "escalation": false,
+      "critic_verdict": "approved",
+      "response_time_ms": 4794
+    },
+    "GD-024": {
+      "response": "Thanks for reaching out! I understand how that could be confusing. Unfortunately, we can only process returns for items purchased directly from Blanco. If the item was bought from another store, you'll need to check their return policy and contact them for assistance.\n\nIf you have any questions about our own return process or need help with anything else, let me know!",
+      "escalation": false,
+      "critic_verdict": "approved",
+      "response_time_ms": 4335
+    },
+    "GD-025": {
+      "response": "Hi there! I'd be happy to help with your recent purchase. To assist you better and look up your order details, could you share your email address? This will allow me to provide personalized support, like checking your order history or resolving any issues faster. Let me know how I can assist!",
+      "escalation": false,
+      "critic_verdict": "approved",
+      "response_time_ms": 4123
+    }
+  },
+  "pipeline_errors": 0,
+  "timing": {
+    "GD-001": 4095,
+    "GD-002": 8976,
+    "GD-003": 4880,
+    "GD-004": 5486,
+    "GD-005": 6498,
+    "GD-006": 3227,
+    "GD-007": 4204,
+    "GD-008": 4266,
+    "GD-009": 4108,
+    "GD-010": 3418,
+    "GD-011": 3740,
+    "GD-012": 3994,
+    "GD-013": 5292,
+    "GD-014": 5357,
+    "GD-015": 4823,
+    "GD-016": 5140,
+    "GD-017": 5059,
+    "GD-018": 6845,
+    "GD-019": 5019,
+    "GD-020": 4611,
+    "GD-021": 4433,
+    "GD-022": 5396,
+    "GD-023": 4794,
+    "GD-024": 4335,
+    "GD-025": 4123
+  }
+}

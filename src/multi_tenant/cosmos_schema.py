@@ -282,6 +282,19 @@ class TenantDocument(BaseModel):
         "Prevents duplicate warning emails from the expiry warning scanner.",
     )
 
+    # General access expiry (any billing channel — WI-EXPIRY-1)
+    expires_at: str | None = Field(
+        default=None,
+        description="ISO 8601 timestamp when tenant access expires. "
+        "Works for any billing channel. Auth middleware rejects requests "
+        "after this time. Scanner transitions status to TRIAL_EXPIRED.",
+    )
+    expiry_warnings_sent: list[str] = Field(
+        default_factory=list,
+        description="Expiry warning milestones already sent (e.g. ['7d', '3d', '1d']). "
+        "Prevents duplicate warning emails for general expiry.",
+    )
+
     # Rate limiting (Decision #5)
     rate_limit_rpm: int | None = Field(
         default=None,
@@ -392,6 +405,13 @@ class ConversationDocument(BaseModel):
     is_test_mode: bool = Field(
         default=False,
         description="Whether this conversation was routed to the test AI configuration",
+    )
+
+    # Layer 2 memory vectorization (WI #87)
+    vectorized_at: str | None = Field(
+        default=None,
+        description="ISO 8601 timestamp when conversation was vectorized for Layer 2 memory. "
+        "Null means not yet vectorized. Set by the vectorization background scanner.",
     )
 
     # TTL — no default TTL; conversations persist in hot storage until

@@ -241,6 +241,29 @@ class IssueReportResponse(BaseModel):
     accepted: bool = Field(default=True, description="Whether the report was accepted")
 
 
+class ConsentUpdateRequest(BaseModel):
+    """Request body for POST /api/chat/conversations/{conversation_id}/consent.
+
+    Allows the customer to grant or deny consent for Persistent Customer
+    Memory (Layers 2-4). This endpoint is called by the widget's consent
+    banner when the tenant has consent_collection_enabled = true.
+
+    WI #87: Widget consent collection for PCM vectorization.
+    """
+
+    consent_status: str = Field(
+        description="Customer's consent choice: 'granted' or 'denied'",
+    )
+
+
+class ConsentUpdateResponse(BaseModel):
+    """Response body for POST /api/chat/conversations/{conversation_id}/consent."""
+
+    conversation_id: str = Field(description="Conversation this consent applies to")
+    consent_status: str = Field(description="Recorded consent status")
+    accepted: bool = Field(default=True, description="Whether the consent was recorded")
+
+
 # ---------------------------------------------------------------------------
 # Response models
 # ---------------------------------------------------------------------------

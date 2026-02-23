@@ -398,6 +398,194 @@ const AssignModal: React.FC<AssignModalProps> = ({ conversationId, members, onAs
   );
 };
 
+// Escalation categories matching backend ESCALATION_CATEGORIES
+const ESCALATION_CATEGORIES = [
+  { value: 'service', label: 'Service' },
+  { value: 'support', label: 'Support' },
+  { value: 'sales', label: 'Sales' },
+  { value: 'account', label: 'Account' },
+  { value: 'technical_assistance', label: 'Technical Assistance' },
+  { value: 'general_inquiry', label: 'General Inquiry' },
+];
+
+interface EscalateModalProps {
+  conversationId: string;
+  members: TeamMember[];
+  onEscalate: (conversationId: string, opts: { category: string; agentId?: string }) => Promise<void>;
+  onClose: () => void;
+  escalating: boolean;
+}
+
+const EscalateModal: React.FC<EscalateModalProps> = ({ conversationId, members, onEscalate, onClose, escalating }) => {
+  const [selectedCategory, setSelectedCategory] = useState('');
+  const [selectedAgent, setSelectedAgent] = useState('');
+
+  // All active team members — any member can be manually assigned.
+  // Designated escalation agents for the selected category appear first.
+  const availableAgents = useMemo(() => {
+    if (!selectedCategory) return [];
+    const active = members.filter((m) => m.isActive);
+    // Sort: designated agents for this category first, then others
+    return active.sort((a, b) => {
+      const aMatch =
+        a.role === 'escalation_agent' &&
+        (a.escalationCategories ?? []).includes(selectedCategory)
+          ? 0
+          : 1;
+      const bMatch =
+        b.role === 'escalation_agent' &&
+        (b.escalationCategories ?? []).includes(selectedCategory)
+          ? 0
+          : 1;
+      return aMatch - bMatch;
+    });
+  }, [members, selectedCategory]);
+
+  // Reset agent when category changes
+  const handleCategoryChange = (value: string) => {
+    setSelectedCategory(value);
+    setSelectedAgent('');
+  };
+
+  return (
+    <div
+      style={{
+        position: 'fixed',
+        top: 0,
+        left: 0,
+        right: 0,
+        bottom: 0,
+        backgroundColor: 'rgba(0,0,0,0.4)',
+        display: 'flex',
+        alignItems: 'center',
+        justifyContent: 'center',
+        zIndex: 1000,
+      }}
+      onClick={onClose}
+    >
+      <div
+        style={{
+          backgroundColor: COLOR_WHITE,
+          borderRadius: BORDER_RADIUS,
+          padding: '24px',
+          width: '420px',
+          maxWidth: '90vw',
+          boxShadow: '0 8px 24px rgba(0,0,0,0.15)',
+        }}
+        onClick={(e) => e.stopPropagation()}
+      >
+        <h3 style={{ margin: '0 0 16px 0', fontSize: '16px', fontWeight: 600, color: COLOR_TEXT, display: 'inline-flex', alignItems: 'center' }}>
+          Escalate to human
+          <HelpTooltip text="Choose a department and optionally assign to a specific agent." docLink="https://agentredcx.com/docs/admin-guide/conversations#escalation" />
+        </h3>
+
+        {/* Category selection */}
+        <label style={{ display: 'block', fontSize: '13px', fontWeight: 500, color: COLOR_TEXT, marginBottom: '6px' }}>
+          Category <span style={{ color: COLOR_DANGER }}>*</span>
+        </label>
+        <select
+          value={selectedCategory}
+          onChange={(e) => handleCategoryChange(e.target.value)}
+          style={{
+            width: '100%',
+            padding: '8px 12px',
+            border: `1px solid ${COLOR_BORDER}`,
+            borderRadius: BORDER_RADIUS,
+            fontSize: '14px',
+            fontFamily: FONT_FAMILY,
+            backgroundColor: COLOR_WHITE,
+            marginBottom: '16px',
+          }}
+        >
+          <option value="">Select category...</option>
+          {ESCALATION_CATEGORIES.map((cat) => (
+            <option key={cat.value} value={cat.value}>
+              {cat.label}
+            </option>
+          ))}
+        </select>
+
+        {/* Agent selection (optional) */}
+        <label style={{ display: 'block', fontSize: '13px', fontWeight: 500, color: COLOR_TEXT, marginBottom: '6px' }}>
+          Assign to agent <span style={{ fontSize: '11px', color: COLOR_GRAY }}>(optional)</span>
+        </label>
+        <select
+          value={selectedAgent}
+          onChange={(e) => setSelectedAgent(e.target.value)}
+          disabled={!selectedCategory}
+          style={{
+            width: '100%',
+            padding: '8px 12px',
+            border: `1px solid ${COLOR_BORDER}`,
+            borderRadius: BORDER_RADIUS,
+            fontSize: '14px',
+            fontFamily: FONT_FAMILY,
+            backgroundColor: !selectedCategory ? COLOR_LIGHT_GRAY : COLOR_WHITE,
+            marginBottom: availableAgents.length === 0 && selectedCategory ? '4px' : '16px',
+            opacity: !selectedCategory ? 0.6 : 1,
+          }}
+        >
+          <option value="">Auto-assign (best available)</option>
+          {availableAgents.map((m) => (
+            <option key={m.id} value={m.id}>
+              {m.displayName}
+            </option>
+          ))}
+        </select>
+        {availableAgents.length === 0 && selectedCategory && (
+          <p style={{ fontSize: '11px', color: COLOR_GRAY, margin: '0 0 16px 0' }}>
+            No team members available. Add team members via the Team page to enable assignment.
+          </p>
+        )}
+
+        <div style={{ display: 'flex', gap: '8px', justifyContent: 'flex-end' }}>
+          <button
+            onClick={onClose}
+            style={{
+              padding: '8px 16px',
+              border: `1px solid ${COLOR_BORDER}`,
+              borderRadius: BORDER_RADIUS,
+              backgroundColor: COLOR_WHITE,
+              color: COLOR_TEXT,
+              fontSize: '13px',
+              fontFamily: FONT_FAMILY,
+              cursor: 'pointer',
+            }}
+          >
+            Cancel
+          </button>
+          <button
+            disabled={!selectedCategory || escalating}
+            onClick={async () => {
+              if (selectedCategory) {
+                await onEscalate(conversationId, {
+                  category: selectedCategory,
+                  agentId: selectedAgent || undefined,
+                });
+                onClose();
+              }
+            }}
+            style={{
+              padding: '8px 16px',
+              border: 'none',
+              borderRadius: BORDER_RADIUS,
+              backgroundColor: !selectedCategory || escalating ? COLOR_GRAY : COLOR_DANGER,
+              color: COLOR_WHITE,
+              fontSize: '13px',
+              fontFamily: FONT_FAMILY,
+              fontWeight: 500,
+              cursor: !selectedCategory || escalating ? 'not-allowed' : 'pointer',
+              opacity: escalating ? 0.7 : 1,
+            }}
+          >
+            {escalating ? 'Escalating...' : 'Escalate'}
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+};
+
 interface NoteModalProps {
   conversationId: string;
   apiFetch: (path: string, init?: RequestInit) => Promise<Response>;
@@ -594,6 +782,7 @@ export const ConversationInbox: React.FC<BaseComponentProps> = ({
   const [selectedId, setSelectedId] = useState<string | null>(null);
   const [showAssignModal, setShowAssignModal] = useState(false);
   const [showNoteModal, setShowNoteModal] = useState(false);
+  const [showEscalateModal, setShowEscalateModal] = useState(false);
   const [searchQuery, setSearchQuery] = useState('');
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const searchTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
@@ -688,10 +877,17 @@ export const ConversationInbox: React.FC<BaseComponentProps> = ({
     refetchMessages();
   }, [onNotify, refetchMessages]);
 
-  const handleEscalate = useCallback(
-    async (conversationId: string) => {
+  const handleEscalateClick = useCallback(
+    (_conversationId: string) => {
+      setShowEscalateModal(true);
+    },
+    [],
+  );
+
+  const handleEscalateConfirm = useCallback(
+    async (conversationId: string, opts: { category: string; agentId?: string }) => {
       try {
-        await escalate(conversationId);
+        await escalate(conversationId, opts);
         onNotify('Conversation escalated to human support', 'success');
         refetchInbox();
       } catch (err: unknown) {
@@ -966,7 +1162,7 @@ export const ConversationInbox: React.FC<BaseComponentProps> = ({
                 {selectedConversation?.status !== 'escalated' && selectedConversation?.status !== 'resolved' && (
                   <button
                     disabled={escalating}
-                    onClick={() => selectedId && handleEscalate(selectedId)}
+                    onClick={() => selectedId && handleEscalateClick(selectedId)}
                     style={{
                       padding: '6px 12px',
                       border: `1px solid ${COLOR_DANGER}`,
@@ -1124,6 +1320,15 @@ export const ConversationInbox: React.FC<BaseComponentProps> = ({
           apiFetch={apiFetch}
           onClose={() => setShowNoteModal(false)}
           onSuccess={handleNoteSuccess}
+        />
+      )}
+      {showEscalateModal && selectedId && (
+        <EscalateModal
+          conversationId={selectedId}
+          members={teamMembers}
+          onEscalate={handleEscalateConfirm}
+          onClose={() => setShowEscalateModal(false)}
+          escalating={escalating}
         />
       )}
     </div>

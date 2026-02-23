@@ -51,8 +51,8 @@ from locust.exception import StopUser
 # Configuration from environment
 # ---------------------------------------------------------------------------
 
-API_KEY = os.getenv("LOAD_TEST_API_KEY", "test-api-key-load")
-WIDGET_KEY = os.getenv("LOAD_TEST_WIDGET_KEY", "pk_live_test_load")
+API_KEY = os.getenv("LOAD_TEST_API_KEY", "ar_user_rema_xsTc1hkyFupc5L4qGQojoCXCxsJCKeEi")
+WIDGET_KEY = os.getenv("LOAD_TEST_WIDGET_KEY", "pk_live_c79a2bd0_960a9c23")
 TENANT_ID = os.getenv("LOAD_TEST_TENANT_ID", "load-test-tenant")
 
 
@@ -125,7 +125,7 @@ class WidgetCustomerTasks(TaskSet):
             name="/api/chat/conversations [start]",
             catch_response=True,
         ) as response:
-            if response.status_code == 200:
+            if response.status_code in (200, 201):
                 data = response.json()
                 self.conversation_id = data.get("conversation_id")
                 response.success()

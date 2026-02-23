@@ -80,12 +80,12 @@ This runs 7 phases:
 3. **Preferences** — Creates draft PreferencesDocument with all merchant fields empty
 6. **Platform** — Creates 4 tier_defaults documents
 7. **Demo data** — Skipped (no `--demo` flag)
-4. **Team** — Creates 3 team members (superadmin + 2 escalation agents) with API key hashes
+4. **Team** — Creates 1 team member (superadmin only) with API key hash
 
 **Capture the output.** The summary (Phase 8) prints:
 - `ADMIN_PREVIEW_API_KEY` (superadmin key)
 - `WIDGET_KEY` (publishable widget key)
-- Per-user API keys for each team member
+- Superadmin per-user API key
 
 ### Step 2: Update Key Vault
 
@@ -184,7 +184,7 @@ All of the following must be true after initialization:
 | I.6 | Mandatory config fields populated | `GET /api/config` → `brand_name`, `brand_voice` non-empty (after Step 5.5) |
 | I.7 | Configuration badge is Active | `GET /api/config/activation-status` → `"is_configured": true` (after Step 5.5) |
 | I.8 | Widget gate accepts conversations | `POST /api/chat/conversations` with `X-Widget-Key` header + body `{}` → 201 (after Step 5.5) |
-| I.9 | 3 team members exist | `GET /api/admin/team` — superadmin + 2 escalation agents |
+| I.9 | 1 team member exists (superadmin only) | `GET /api/admin/team` — exactly 1 member with role `superadmin` |
 | I.10 | Widget key matches seed output | Compare widget key from Step 1 output with `.env.local` `PREVIEW_WIDGET_KEY` value |
 
 If any assertion fails, classify per Section 3 of `REPEATABLE-PROCEDURES.md`:

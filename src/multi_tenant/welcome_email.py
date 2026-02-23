@@ -1,13 +1,14 @@
 """Welcome email — sent once when a new tenant is provisioned.
 
-Delivers the merchant's initial credentials (superadmin API key, widget key)
-and onboarding guidance. Follows the same dual-provider pattern as
-widget_otp_verification.py (ACS primary, SMTP fallback, returns bool).
+Delivers the merchant's initial credentials (superadmin API key, widget key),
+admin console URL, and onboarding guidance. Follows the same dual-provider
+pattern as widget_otp_verification.py (ACS primary, SMTP fallback, returns bool).
 
 Call sites:
     - stripe_webhooks.handle_checkout_completed()  (Stripe checkout)
     - shopify_billing.confirm_subscription()        (Shopify billing)
     - provisioning.provision_trial_tenant()          (trial signup)
+    - provisioning.spa_provision_tenant()            (SPA manual)
 
 © 2026 Remaker Digital, a DBA of VanDusen & Palmeter, LLC. All rights reserved.
 """
@@ -29,6 +30,21 @@ _WELCOME_EMAIL_BODY = """
 <p style="color:#374151;font-size:14px;line-height:1.6;margin:0 0 24px">
   Your account is ready. Here are your credentials to get started.
 </p>
+
+<div style="background:#fff7ed;border:1px solid #fed7aa;border-radius:6px;
+     padding:16px;margin:16px 0;text-align:center">
+  <p style="margin:0 0 12px;color:#9a3412;font-size:13px;font-weight:600">
+    Your Admin Dashboard
+  </p>
+  <a href="{admin_login_url}" style="display:inline-block;padding:10px 24px;
+     background:#ff3621;color:#ffffff;font-size:14px;font-weight:600;
+     text-decoration:none;border-radius:6px">
+    Sign in to Dashboard
+  </a>
+  <p style="margin:8px 0 0;color:#9a3412;font-size:12px">
+    {admin_login_url}
+  </p>
+</div>
 
 <div style="background:#f3f4f6;border:1px solid #d1d5db;border-radius:6px;
      padding:16px;margin:16px 0">
@@ -57,7 +73,7 @@ _WELCOME_EMAIL_BODY = """
 
 <h3 style="margin:24px 0 12px;color:#111827;font-size:16px">Next Steps</h3>
 <ol style="color:#374151;font-size:14px;line-height:1.8;margin:0;padding-left:20px">
-  <li>Sign in to your <strong>Admin Dashboard</strong> using your API key</li>
+  <li>Sign in to your <a href="{admin_login_url}" style="color:#ff3621;font-weight:600">Admin Dashboard</a> using your API key</li>
   <li>Configure your brand name, voice, and AI agent personality</li>
   <li>Add your widget key to your website to start chatting with customers</li>
   <li>Invite team members to handle escalated conversations</li>
@@ -76,12 +92,29 @@ _WELCOME_EMAIL_BODY = """
 # ---------------------------------------------------------------------------
 
 
+def _build_admin_login_url(explicit_url: str | None = None) -> str:
+    """Build the admin console login URL.
+
+    Priority: explicit_url > STANDALONE_ADMIN_URL env > PROD_URL env > fallback.
+    """
+    if explicit_url:
+        return explicit_url
+    standalone = os.environ.get("STANDALONE_ADMIN_URL", "")
+    if standalone:
+        return standalone
+    prod = os.environ.get("PROD_URL", "")
+    if prod:
+        return f"{prod.rstrip('/')}/admin/standalone/"
+    return "https://agentredcx.com/docs/getting-started"
+
+
 async def send_welcome_email(
     to_email: str,
     tenant_id: str,
     superadmin_key: str | None = None,
     widget_key: str | None = None,
     tier: str | None = None,
+    admin_login_url: str | None = None,
 ) -> bool:
     """Send a welcome email to the newly provisioned merchant.
 
@@ -95,6 +128,8 @@ async def send_welcome_email(
         superadmin_key: Raw superadmin API key (shown once).
         widget_key: Raw widget key (shown once).
         tier: Subscription tier name.
+        admin_login_url: Admin dashboard URL. If not provided, built from
+            STANDALONE_ADMIN_URL or PROD_URL environment variables.
 
     Returns:
         True if the email was sent successfully, False otherwise.
@@ -105,11 +140,14 @@ async def send_welcome_email(
 
     from src.multi_tenant.alert_delivery import EmailAlertChannel, _EMAIL_WRAPPER
 
+    resolved_url = _build_admin_login_url(admin_login_url)
+
     html_body = _WELCOME_EMAIL_BODY.format(
         superadmin_key=superadmin_key or "(not generated)",
         widget_key=widget_key or "(not generated)",
         tier=(tier or "trial").capitalize(),
         tenant_id=tenant_id,
+        admin_login_url=resolved_url,
     )
     full_html = _EMAIL_WRAPPER.format(body=html_body)
     subject = "Welcome to Agent Red — Your account is ready"

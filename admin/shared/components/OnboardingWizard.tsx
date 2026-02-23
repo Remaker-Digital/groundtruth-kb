@@ -39,9 +39,9 @@ interface Template {
   id: string;
   name: string;
   description: string;
-  article_count: number;
-  suggested_brand_voice: string;
-  suggested_escalation_keywords: string[];
+  articleCount: number;
+  suggestedBrandVoice: string;
+  suggestedEscalationKeywords: string[];
 }
 
 interface ApplyResult {
@@ -122,6 +122,7 @@ export const OnboardingWizard: React.FC<Props> = ({
   // The effective ingestion URL for non-Shopify merchants
   const effectiveUrl = !shopDomain && storefrontUrl.trim() ? storefrontUrl.trim() : null;
   const urlValid = !effectiveUrl || isValidUrl(effectiveUrl);
+  const selectedTemplate = templates.find((t) => t.id === selectedCategory);
 
   // Load templates on open
   useEffect(() => {
@@ -228,9 +229,18 @@ export const OnboardingWizard: React.FC<Props> = ({
         setIngestionJob(job);
         startIngestionPolling();
       } else {
+        const err = await res.json().catch(() => ({ detail: 'Storefront import failed' }));
+        setIngestionJob({
+          job_id: '', status: 'failed', source_type: 'shopify',
+          error: typeof err.detail === 'string' ? err.detail : 'Could not connect to Shopify store',
+        });
         setIngestionRunning(false);
       }
     } catch {
+      setIngestionJob({
+        job_id: '', status: 'failed', source_type: 'shopify',
+        error: 'Network error while starting storefront import',
+      });
       setIngestionRunning(false);
     }
   }, [apiFetch, startIngestionPolling]);
@@ -252,9 +262,18 @@ export const OnboardingWizard: React.FC<Props> = ({
         setIngestionJob(job);
         startIngestionPolling();
       } else {
+        const err = await res.json().catch(() => ({ detail: 'Storefront crawl failed' }));
+        setIngestionJob({
+          job_id: '', status: 'failed', source_type: 'url',
+          error: typeof err.detail === 'string' ? err.detail : 'Could not crawl storefront URL',
+        });
         setIngestionRunning(false);
       }
     } catch {
+      setIngestionJob({
+        job_id: '', status: 'failed', source_type: 'url',
+        error: 'Network error while starting storefront crawl',
+      });
       setIngestionRunning(false);
     }
   }, [apiFetch, startIngestionPolling]);
@@ -277,18 +296,66 @@ export const OnboardingWizard: React.FC<Props> = ({
     setSuggestionsLoading(false);
   }, [apiFetch]);
 
+  /** Extract a human-readable error message from API error responses. */
+  const extractErrorMessage = (detail: unknown, fallback: string): string => {
+    if (typeof detail === 'string') return detail;
+    if (detail && typeof detail === 'object') {
+      const obj = detail as Record<string, unknown>;
+      if (Array.isArray(obj.errors) && obj.errors.length > 0) {
+        // Config save: errors are {field_name, message} objects
+        // Activation: errors are plain strings
+        return obj.errors
+          .map((e: unknown) => (typeof e === 'string' ? e : (e as any)?.message ?? String(e)))
+          .join('; ');
+      }
+      if (typeof obj.detail === 'string') return obj.detail;
+      if (typeof obj.message === 'string') return obj.message;
+    }
+    return fallback;
+  };
+
+  /** Derive a brand name fallback from shopDomain or template category. */
+  const inferBrandName = (): string | null => {
+    if (shopDomain) {
+      // "blanco-9939.myshopify.com" → "Blanco 9939" → "Blanco"
+      const storeName = shopDomain.replace('.myshopify.com', '').replace(/[._]/g, ' ');
+      // Capitalize each word, drop trailing numbers-only segments
+      const parts = storeName.split(/[-\s]+/).filter((p) => !/^\d+$/.test(p));
+      if (parts.length > 0) {
+        return parts.map((p) => p.charAt(0).toUpperCase() + p.slice(1).toLowerCase()).join(' ');
+      }
+    }
+    if (selectedTemplate) {
+      return selectedTemplate.name;
+    }
+    return null;
+  };
+
   /** One-click activation: save suggested config fields, then activate. */
   const handleActivateWithSuggestions = useCallback(async () => {
     setActivating(true);
     setActivateError(null);
     try {
-      // Build fields from suggestions
+      // Build fields from suggestions — keep arrays as-is for list fields
       const fields: Record<string, unknown> = {};
       for (const s of suggestions || []) {
-        fields[s.fieldName] = Array.isArray(s.value) ? s.value.join(', ') : s.value;
+        fields[s.fieldName] = s.value;
       }
 
-      // Save config draft (only if we have suggestions to apply)
+      // Ensure mandatory fields have values — fall back to inference
+      if (!fields.brand_name) {
+        const inferred = inferBrandName();
+        if (inferred) fields.brand_name = inferred;
+      }
+      if (!fields.brand_voice && selectedTemplate?.suggestedBrandVoice) {
+        fields.brand_voice = selectedTemplate.suggestedBrandVoice;
+      }
+      // Hard fallback — brand_voice is mandatory for activation
+      if (!fields.brand_voice) {
+        fields.brand_voice = 'professional and friendly';
+      }
+
+      // Save config draft
       if (Object.keys(fields).length > 0) {
         const saveRes = await apiFetch('/api/config', {
           method: 'PUT',
@@ -297,7 +364,7 @@ export const OnboardingWizard: React.FC<Props> = ({
         });
         if (!saveRes.ok) {
           const err = await saveRes.json().catch(() => ({ detail: 'Failed to save configuration' }));
-          throw new Error(err.detail || `Save failed: HTTP ${saveRes.status}`);
+          throw new Error(extractErrorMessage(err.detail ?? err, `Save failed: HTTP ${saveRes.status}`));
         }
       }
 
@@ -307,18 +374,18 @@ export const OnboardingWizard: React.FC<Props> = ({
       });
       if (!activateRes.ok) {
         const err = await activateRes.json().catch(() => ({ detail: 'Activation failed' }));
-        throw new Error(err.detail || `Activate failed: HTTP ${activateRes.status}`);
+        throw new Error(extractErrorMessage(err.detail ?? err, `Activate failed: HTTP ${activateRes.status}`));
       }
 
       // Success — close wizard and go to dashboard
       handleClose();
       if (onNavigate) onNavigate('/');
     } catch (e: any) {
-      setActivateError(e.message || 'Activation failed');
+      setActivateError(typeof e?.message === 'string' ? e.message : 'Activation failed');
     } finally {
       setActivating(false);
     }
-  }, [suggestions, apiFetch, onNavigate]);
+  }, [suggestions, apiFetch, onNavigate, shopDomain, selectedTemplate]);
 
   // Navigate to config page (fallback for manual review)
   const handleGoToConfig = useCallback(() => {
@@ -344,8 +411,6 @@ export const OnboardingWizard: React.FC<Props> = ({
     }
     onClose();
   }, [onClose]);
-
-  const selectedTemplate = templates.find((t) => t.id === selectedCategory);
 
   // The label shown during ingestion progress
   const ingestionLabel = shopDomain
@@ -401,7 +466,8 @@ export const OnboardingWizard: React.FC<Props> = ({
                   style={{
                     cursor: 'pointer',
                     borderColor: selectedCategory === t.id ? 'var(--mantine-color-action-6)' : undefined,
-                    backgroundColor: selectedCategory === t.id ? 'var(--mantine-color-action-0)' : undefined,
+                    backgroundColor: selectedCategory === t.id ? 'var(--mantine-color-action-light)' : undefined,
+                    color: selectedCategory === t.id ? 'var(--mantine-color-action-light-color)' : undefined,
                   }}
                   onClick={() => setSelectedCategory(t.id)}
                 >
@@ -419,17 +485,24 @@ export const OnboardingWizard: React.FC<Props> = ({
           {selectedTemplate && (
             <Alert variant="light" color="action" radius="sm">
               <Text size="xs">
-                <strong>{selectedTemplate.article_count} articles</strong> will be
+                <strong>{selectedTemplate.articleCount} articles</strong> will be
                 created for <strong>{selectedTemplate.name}</strong>.
-                {selectedTemplate.suggested_brand_voice && (
-                  <> Suggested voice: <em>{selectedTemplate.suggested_brand_voice}</em>.</>
+                {selectedTemplate.suggestedBrandVoice && (
+                  <> Suggested voice: <em>{selectedTemplate.suggestedBrandVoice}</em>.</>
                 )}
               </Text>
             </Alert>
           )}
 
-          {/* Storefront URL input — shown for non-Shopify merchants (4A) */}
-          {!shopDomain && (
+          {/* Storefront: show detected domain (Shopify) or URL input (standalone) */}
+          {shopDomain ? (
+            <Alert variant="light" color="green" radius="sm" title="Storefront detected">
+              <Text size="sm">
+                We'll import products and policies from{' '}
+                <strong>{shopDomain}</strong> to build your knowledge base.
+              </Text>
+            </Alert>
+          ) : (
             <TextInput
               label="Your storefront URL (optional)"
               placeholder="https://www.yourstore.com"
@@ -534,9 +607,10 @@ export const OnboardingWizard: React.FC<Props> = ({
               )}
 
               {ingestionJob && !ingestionRunning && ingestionJob.status === 'failed' && (
-                <Alert variant="light" color="yellow" radius="sm">
+                <Alert variant="light" color="yellow" radius="sm" title="Storefront import issue">
                   <Text size="sm">
-                    Storefront scan encountered an issue. Your template articles are still available.
+                    {ingestionJob.error || 'Storefront scan encountered an issue.'}{' '}
+                    Your template articles are still available.
                     You can retry the scan later from the Knowledge Base page.
                   </Text>
                 </Alert>
