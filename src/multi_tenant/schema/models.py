@@ -184,9 +184,9 @@ class ConfigFieldDefinition(BaseModel):
     onboarding_step: OnboardingStep = Field(
         description="Which onboarding step this field belongs to"
     )
-    step_order: int = Field(
+    step_order: float = Field(
         default=0,
-        description="Display order within the onboarding step (0-indexed)",
+        description="Display order within the onboarding step (supports fractional values for insertion between existing fields)",
     )
 
     # UI metadata
