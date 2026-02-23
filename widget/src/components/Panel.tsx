@@ -36,7 +36,6 @@ import { IssueReport } from './IssueReport';
 import {
   startConversation as apiStartConversation,
   sendMessage as apiSendMessage,
-  endConversation as apiEndConversation,
   submitRating as apiSubmitRating,
   reportIssue as apiReportIssue,
   sendOtp as apiSendOtp,
@@ -131,7 +130,6 @@ export const Panel: FunctionComponent<PanelProps> = ({
   const greetingMessage = config.widget_greeting_message || null;
   const showBranding = config.widget_show_branding !== false;
   const fileUploadEnabled = config.widget_file_upload_enabled === true;
-  const chatRatingEnabled = config.widget_chat_rating_enabled !== false;
   const quickActions = config.widget_quick_actions || [];
 
   // ---- Conversation lifecycle ---------------------------------------------
@@ -272,28 +270,6 @@ export const Panel: FunctionComponent<PanelProps> = ({
     }
     onClose();
   }, [onClose]);
-
-  /** Explicitly end the current conversation (new-conversation / idle). */
-  const handleEndConversation = useCallback(async () => {
-    const store = getStore();
-    const { conversationId } = store.getState();
-    if (!conversationId) return;
-
-    // Disconnect SSE
-    if (sseRef.current) {
-      sseRef.current.disconnect();
-      sseRef.current = null;
-    }
-
-    await apiEndConversation(conversationId);
-
-    if (chatRatingEnabled) {
-      store.setState({ view: 'rating' });
-    } else {
-      store.resetConversation();
-      store.setState({ view: 'conversation' });
-    }
-  }, [chatRatingEnabled]);
 
   /** Submit a rating for the ended conversation. */
   const handleRatingSubmit = useCallback(async (rating: 'positive' | 'negative', comment?: string) => {
