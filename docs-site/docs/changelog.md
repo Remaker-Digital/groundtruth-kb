@@ -9,6 +9,44 @@ All notable changes to Agent Red Customer Experience are documented here.
 
 ---
 
+## v1.56.0 — Identity pipeline and tenant provisioning (pending deployment)
+
+### Identity preprocessor pipeline
+
+A new centralized identity preprocessing stage has been added to the chat pipeline. Before the AI orchestrator processes a message, the identity preprocessor extracts verified customer identity from all available sources — OTP tokens, Shopify HMAC, pre-chat form data, and session context — and injects it into the conversation. This ensures every AI response has access to the customer's verified identity regardless of how they authenticated.
+
+- **Centralized extraction:** Identity resolution is now a single pipeline stage instead of being scattered across multiple components. The preprocessor runs before the orchestrator and populates customer identity fields (name, email, verification status) on the session and conversation records.
+- **Session identity persistence:** Verified customer identity is stored on the chat session, so subsequent messages in the same conversation automatically carry the customer's identity without re-verification.
+- **System prompt identity injection:** A new Layer 6 in the system prompt builder injects the customer's verified identity directly into the AI's context. The AI knows the customer's name, email, and verification level, enabling personalized responses from the first message.
+- **Widget identity forwarding:** The widget now forwards pre-chat form data (name, email) and OTP verification tokens to the backend on every message, not just the first one. This ensures identity is available even if the session is resumed.
+
+### SPA tenant provisioning
+
+Service providers can now create tenants directly from the Provider Console without requiring Stripe or Shopify billing flows.
+
+- **Create Tenant modal:** A new "Create Tenant" button in the Tenant Directory opens a modal form with fields for company name, tenant ID (auto-generated or custom), tier, billing channel, and contact email.
+- **Manual billing channel:** A new `manual` billing channel type distinguishes tenants created by the service provider from those provisioned through Stripe, Shopify, or trial flows.
+- **Auto-activation:** Manually provisioned tenants are automatically activated on creation — no separate activation step required.
+- **Superadmin key generation:** When a contact email is provided, a superadmin team member and API key are automatically created and displayed in the success confirmation.
+
+### Developer experience
+
+- **Thermal-safe test harness:** A new `scripts/run-tests-thermal-safe.ps1` script distributes the test suite across 5 batches with configurable xdist parallelism and cooling pauses between batches. This prevents sustained CPU heat buildup that caused system instability during extended test runs.
+
+### Tests
+
+- 57 new tests across 5 test files — identity preprocessor (14), pipeline wiring (5), system prompt identity (12), SPA provisioning (12), superadmin tenant creation (8), plus 6 test drift fixes for new schema values
+
+---
+
+## v1.55.1 — Hotfix (2026-02-22)
+
+### Bug fix
+
+- **Configuration endpoint fix:** Fixed a server error (500) on `/api/config` caused by the `step_order` field in the configuration field registry rejecting fractional values. The `customer_email_verification` field (added in v1.55.0 for OTP verification) uses `step_order: 16.5` to position it between existing fields. The field type has been changed from integer to float to support fractional ordering.
+
+---
+
 ## v1.55.0 — Cycles 15-19 (2026-02-22)
 
 ### Onboarding polish (Cycle 19)

@@ -17,7 +17,7 @@ The Provider console organizes its pages into four navigation groups:
 
 ### Overview
 - **Health Dashboard** — Real-time system health metrics, uptime indicators, and resource utilization.
-- **Tenant Directory** — List of all provisioned tenants with status, tier, and configuration health.
+- **Tenant Directory** — List of all provisioned tenants with status, tier, and configuration health. Includes a "Create Tenant" action for manually provisioning new tenants with auto-activation and optional superadmin key generation.
 
 ### Operations
 - **Deployment History** — Chronological log of production deployments with revision numbers and rollback status.
