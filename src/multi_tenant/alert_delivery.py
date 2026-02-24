@@ -483,17 +483,17 @@ class WebhookAlertChannel(AlertChannel):
 _EMAIL_WRAPPER = """<!DOCTYPE html>
 <html>
 <head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"></head>
-<body style="margin:0;padding:0;background:#f4f4f5;font-family:Inter,-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,sans-serif">
-<table width="100%" cellpadding="0" cellspacing="0" style="background:#f4f4f5;padding:32px 0">
+<body style="margin:0;padding:0;background:#141414;font-family:Inter,-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,sans-serif">
+<table width="100%" cellpadding="0" cellspacing="0" style="background:#141414;padding:32px 0">
 <tr><td align="center">
-<table width="600" cellpadding="0" cellspacing="0" style="background:#ffffff;border-radius:8px;overflow:hidden;box-shadow:0 1px 3px rgba(0,0,0,0.1)">
+<table width="600" cellpadding="0" cellspacing="0" style="background:#ffffff;border-radius:8px;overflow:hidden">
 <tr><td style="background:#141414;padding:24px 32px">
   <img src="https://agentredcx.com/img/email-logo-light.png"
        alt="Agent Red Customer Experience" width="220" height="auto"
        style="display:block;max-width:220px;height:auto;border:0" />
 </td></tr>
 <tr><td style="padding:32px">{body}</td></tr>
-<tr><td style="background:#f9fafb;padding:16px 32px;border-top:1px solid #e5e7eb">
+<tr><td style="padding:16px 32px">
   <p style="margin:0;color:#9ca3af;font-size:12px;text-align:center">
     Agent Red Customer Experience &mdash; a product of <a href="https://remakerdigital.com" style="color:#ff3621;text-decoration:none">Remaker Digital</a>
   </p>
