@@ -565,19 +565,29 @@ async def rotate_widget_key(request: Request) -> WidgetKeyRotationResponse:
         ],
     )
 
-    # Also update the raw key in PreferencesDocument (admin UI + activation gate)
+    # Also update the raw key in PreferencesDocument (admin UI + activation gate).
+    # Bug fix (S85): Preferences doc ID is {tenant_id}:{version}, NOT
+    # {tenant_id}:active.  Must query for the active doc first to get its real ID.
     try:
-        from src.multi_tenant.repository import PreferencesRepository
+        from src.multi_tenant.repositories.preferences import PreferencesRepository
 
         prefs_repo = PreferencesRepository()
-        await prefs_repo.patch(
-            tenant_id,
-            f"{tenant_id}:active",
-            operations=[
-                {"op": "set", "path": "/widget_key", "value": new_key},
-                {"op": "set", "path": "/updated_at", "value": now_iso},
-            ],
-        )
+        active_prefs = await prefs_repo.get_active(tenant_id)
+        if active_prefs and active_prefs.get("id"):
+            await prefs_repo.patch(
+                tenant_id,
+                active_prefs["id"],
+                operations=[
+                    {"op": "set", "path": "/widget_key", "value": new_key},
+                    {"op": "set", "path": "/updated_at", "value": now_iso},
+                ],
+            )
+        else:
+            logger.warning(
+                "No active PreferencesDocument found for widget_key update: "
+                "tenant=%s (key will sync on next activate)",
+                tenant_id,
+            )
     except Exception as exc:
         logger.warning(
             "Widget key rotated on TenantDocument but PreferencesDocument "
@@ -585,6 +595,16 @@ async def rotate_widget_key(request: Request) -> WidgetKeyRotationResponse:
             tenant_id,
             exc,
         )
+
+    # Invalidate config cache so /api/config returns the new widget_key
+    # immediately (without waiting for the 60-second cache TTL to expire).
+    try:
+        from src.multi_tenant.tenant_config_processor import get_config_processor
+
+        processor = get_config_processor()
+        processor._invalidate_cache(tenant_id)
+    except Exception:
+        pass  # Cache will expire naturally within 60s
 
     logger.info("Widget key rotated: tenant=%s", tenant_id)
 

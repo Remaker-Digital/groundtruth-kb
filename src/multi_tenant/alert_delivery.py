@@ -73,7 +73,7 @@ def _send_acs_email_sync(
         "content": {"subject": subject, "html": html_body},
     }
     poller = client.begin_send(message)
-    result = poller.result()
+    result = poller.result(timeout=60)  # 60s max — prevent indefinite hang
     return getattr(result, "status", "unknown")
 
 

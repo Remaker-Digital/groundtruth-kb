@@ -165,7 +165,7 @@ async def send_welcome_email(
             if sent:
                 logger.info("Welcome email sent via ACS: tenant=%s email=%s", tenant_id[:8], to_email)
             else:
-                logger.warning("ACS welcome email status=%s: tenant=%s", getattr(result, "status", "unknown"), tenant_id[:8])
+                logger.warning("ACS welcome email status=%s: tenant=%s", status, tenant_id[:8])
             return sent
         except Exception:
             logger.exception("ACS welcome email send failed: tenant=%s", tenant_id[:8])
