@@ -38,7 +38,7 @@ API_VERSION = "1.0.0"
 # Product release version — updated with each deployment.
 # This is displayed in the admin sidebar footer and returned via
 # the X-Product-Version response header on all API calls.
-PRODUCT_VERSION = "1.57.20"
+PRODUCT_VERSION = "1.58.0"
 
 # Deprecated paths — these still work but clients should migrate.
 # Format: {path_prefix: deprecation_message}
