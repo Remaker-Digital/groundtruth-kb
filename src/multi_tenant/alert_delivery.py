@@ -46,7 +46,7 @@ logger = logging.getLogger(__name__)
 # ---------------------------------------------------------------------------
 
 
-SENDER_ADDRESS = "DoNotReply@agentredcx.com"
+SENDER_ADDRESS = "DoNotReply@7049c840-0df7-4d4c-ae36-6d00bfc459d4.us1.azurecomm.net"
 
 
 def _send_acs_email_sync(
@@ -613,7 +613,7 @@ class EmailAlertChannel(AlertChannel):
     © 2026 Remaker Digital, a DBA of VanDusen & Palmeter, LLC. All rights reserved.
     """
 
-    SENDER_ADDRESS = "DoNotReply@7049c840-0df7-4d4c-ae36-6d00bfc459d4.azurecomm.net"
+    SENDER_ADDRESS = "DoNotReply@7049c840-0df7-4d4c-ae36-6d00bfc459d4.us1.azurecomm.net"
     TIMEOUT_SECONDS = 10.0
 
     def __init__(
