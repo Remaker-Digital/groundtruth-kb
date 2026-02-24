@@ -843,18 +843,19 @@ async def resend_welcome_email(
         raise HTTPException(status_code=404, detail=f"Tenant {tenant_id} not found")
 
     # Find the email address — check preferences first, then tenant record
+    # NOTE: Both repos return plain dicts — use .get(), NOT getattr().
     email_addr: str | None = None
     try:
         prefs = await _prefs_repo.get_active(tenant_id)
         if prefs:
-            email_addr = getattr(prefs, "notification_email", None) or getattr(
-                prefs, "customer_email", None
+            email_addr = prefs.get("notification_email") or prefs.get(
+                "customer_email"
             )
     except Exception:
         pass
 
     if not email_addr:
-        email_addr = getattr(tenant, "customer_email", None)
+        email_addr = tenant.get("customer_email")
 
     if not email_addr:
         raise HTTPException(
@@ -866,7 +867,7 @@ async def resend_welcome_email(
     # Send the welcome email (without raw keys — they're hashed and irrecoverable)
     from src.multi_tenant.welcome_email import send_welcome_email
 
-    tier_name = getattr(tenant, "tier", "unknown")
+    tier_name = tenant.get("tier", "unknown")
     if hasattr(tier_name, "value"):
         tier_name = tier_name.value
 
