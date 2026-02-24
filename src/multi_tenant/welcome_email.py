@@ -167,7 +167,8 @@ async def send_welcome_email(
                 "content": {"subject": subject, "html": full_html},
             }
             poller = client.begin_send(message)
-            result = poller.result()
+            import asyncio
+            result = await asyncio.to_thread(poller.result)
             sent = getattr(result, "status", "") == "Succeeded"
             if sent:
                 logger.info("Welcome email sent via ACS: tenant=%s email=%s", tenant_id[:8], to_email)

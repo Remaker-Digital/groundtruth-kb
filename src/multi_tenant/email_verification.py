@@ -364,7 +364,8 @@ async def _send_verification_email(
                 "content": {"subject": subject, "html": html_body},
             }
             poller = client.begin_send(message)
-            result = poller.result()
+            import asyncio
+            result = await asyncio.to_thread(poller.result)
             return getattr(result, "status", "") == "Succeeded"
         except Exception:
             logger.exception("ACS email send failed for verification")

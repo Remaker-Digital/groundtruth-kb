@@ -142,7 +142,8 @@ async def send_trial_expiry_warning(
                 "content": {"subject": subject, "html": full_html},
             }
             poller = client.begin_send(message)
-            result = poller.result()
+            import asyncio
+            result = await asyncio.to_thread(poller.result)
             sent = getattr(result, "status", "") == "Succeeded"
             if sent:
                 logger.info(

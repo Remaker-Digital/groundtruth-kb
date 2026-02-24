@@ -199,7 +199,8 @@ async def _send_magic_link_email(to_email: str, html_body: str) -> bool:
                 "content": {"subject": subject, "html": html_body},
             }
             poller = client.begin_send(message)
-            result = poller.result()
+            import asyncio
+            result = await asyncio.to_thread(poller.result)
             return getattr(result, "status", "") == "Succeeded"
         except Exception:
             logger.exception("ACS email send failed for magic link")

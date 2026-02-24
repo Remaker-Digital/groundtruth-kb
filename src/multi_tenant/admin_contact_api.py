@@ -160,7 +160,8 @@ async def _send_contact_email(
             "content": {"subject": subject, "html": html_body},
         }
         poller = client.begin_send(message)
-        result = poller.result()
+        import asyncio
+        result = await asyncio.to_thread(poller.result)
         status = getattr(result, "status", "")
         if status == "Succeeded":
             logger.info("Contact email sent to %s", to_email)

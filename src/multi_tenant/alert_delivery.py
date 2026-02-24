@@ -634,7 +634,8 @@ class EmailAlertChannel(AlertChannel):
                 },
             }
             poller = client.begin_send(message)
-            result = poller.result()
+            import asyncio
+            result = await asyncio.to_thread(poller.result)
             status = getattr(result, "status", "unknown")
 
             if status == "Succeeded":
