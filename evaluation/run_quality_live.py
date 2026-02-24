@@ -34,7 +34,10 @@ def run_scenario(scenario: dict) -> dict:
         f"{PROD_URL}/api/chat/conversations",
         headers={"X-Widget-Key": WIDGET_KEY, "Content-Type": "application/json"},
         json={
-            "visitor": {"name": f"QualityTest-{sid}"},
+            "visitor": {
+                "name": f"QualityTest-{sid}",
+                "email": f"quality-test-{sid}@example.com",
+            },
             "page_url": "https://quality-test.com",
             "initial_message": msg,
         },

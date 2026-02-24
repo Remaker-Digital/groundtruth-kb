@@ -1052,6 +1052,30 @@ class TestResponseModelStructure:
         }
         assert expected_keys <= set(data.keys())
 
+    def test_activate_response_survives_none_warnings(
+        self, client: TestClient, mock_activation_service: AsyncMock,
+    ) -> None:
+        """Activation must not 500 when ActivationResult has None warnings/errors.
+
+        Regression: ActivateResponse Pydantic model rejects None for list fields.
+        The ``or []`` coercion in the endpoint handler prevents the 500.
+        """
+        result = ActivationResult(
+            success=True, version=3, activated_at=DRAFT_ACTIVATED_AT,
+        )
+        # Simulate the old bug: ``warnings=result_warnings or None`` → None
+        result.warnings = None  # type: ignore[assignment]
+        result.errors = None  # type: ignore[assignment]
+        mock_activation_service.activate.return_value = result
+
+        resp = client.post("/api/config/draft/activate")
+
+        assert resp.status_code == 200
+        data = resp.json()
+        assert data["success"] is True
+        assert data["warnings"] == []
+        assert data["errors"] == []
+
     def test_discard_response_fields(
         self, client: TestClient, mock_activation_service: AsyncMock,
     ) -> None:

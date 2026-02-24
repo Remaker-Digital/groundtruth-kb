@@ -837,25 +837,20 @@ class FineTuningPipelineService:
         validation_data: list[dict[str, Any]],
         base_model: str,
     ) -> dict[str, Any]:
-        """Mockable API call for fine-tuning.
+        """Submit a fine-tuning job to the OpenAI API.
 
-        Default (dev mode): returns a placeholder completed job.
-        Production: uploads JSONL files, calls openai.fine_tuning.jobs.create().
+        This method must be overridden with a real OpenAI fine-tuning
+        integration before Layer 4 can be offered in production.
+        The default implementation raises NotImplementedError to prevent
+        placeholder data from reaching customers.
 
         Override or mock this method in tests.
         """
-        logger.warning(
-            "Real fine-tuning API not configured — returning dev-mode "
-            "placeholder.  Override _call_fine_tuning_api() for production."
+        raise NotImplementedError(
+            "Layer 4 fine-tuning API is not yet connected to OpenAI. "
+            "Override _call_fine_tuning_api() with a real implementation "
+            "before enabling fine-tuning for production tenants."
         )
-        dev_model_id = f"ft:{base_model}:dev:{uuid.uuid4().hex[:8]}"
-        return {
-            "job_id": f"ftjob-dev-{uuid.uuid4().hex[:12]}",
-            "status": "completed",
-            "fine_tuned_model": dev_model_id,
-            "training_file_id": f"file-dev-train-{uuid.uuid4().hex[:8]}",
-            "validation_file_id": f"file-dev-val-{uuid.uuid4().hex[:8]}",
-        }
 
     async def check_job_status(
         self,
@@ -919,14 +914,21 @@ class FineTuningPipelineService:
         self,
         openai_job_id: str,
     ) -> dict[str, Any]:
-        """Mockable job status check.
+        """Poll the OpenAI API for fine-tuning job status.
 
-        Default (dev mode): returns completed status.
+        This method must be overridden with a real OpenAI polling
+        implementation before Layer 4 can be offered in production.
+        The default implementation raises NotImplementedError to prevent
+        fake completion status from reaching customers.
+
+        Override or mock this method in tests.
         """
-        return {
-            "status": "completed",
-            "fine_tuned_model": f"ft:{BASE_MODEL}:dev:polled",
-        }
+        raise NotImplementedError(
+            "Layer 4 fine-tuning status polling is not yet connected to "
+            "OpenAI. Override _check_job_status_api() with a real "
+            "implementation before enabling fine-tuning for production "
+            "tenants."
+        )
 
     # ------------------------------------------------------------------
     # Stage 5: Compare — quality gate evaluation (WI #94)

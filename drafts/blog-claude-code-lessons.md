@@ -329,31 +329,29 @@ These are the most costly mistakes from 79 sessions of production development, w
 
 To ground these lessons in concrete scale, here's what the system looks like at session 79:
 
-| Metric | Value |
-|--------|------:|
-| Total project lines | 185,000 |
-| Production source code (Python + TypeScript) | 131,000 |
-| Test code (Python) | 88,000 |
-| Operational documentation | 29,000 lines across 62 files |
-| API endpoints | 217 (108 GET, 84 POST, 11 PUT, 13 DELETE, 1 PATCH) |
-| Admin console pages | 33 (15 Provider + 11 Standalone + 7 Shopify) |
-| Cosmos DB collections | 16 |
-| Background task scanners | 8 distinct loops |
-| Agent modules | 8 (intent, knowledge, response, critic, escalation, analytics, base, app) |
-| Configuration field definitions | 1,436 lines (78 tenant-configurable fields) |
-| Superadmin API paths | 30 unique endpoints |
-| Unit tests | 4,518 (0 failures) |
-| UI tests | 917 |
-| Critical-path tests | 21/21 PASS |
-| Regression tests (T0) | 18/18 PASS |
-| Conversation quality scenarios | 25 (4.40/5.0 average) |
-| Non-functional test procedures | 7 (all verified) |
-| Repeatable Procedures | 26 |
-| Memory topic files | 30 |
-| Git commits | 137 |
-| Production deployments | 30+ (100% success after adopting procedures) |
-| Implementation cycles | 19 (all shipped) |
-| Supported concurrent tenants | 50 (load tested) |
+• Total project lines: 185,000
+• Production source code (Python + TypeScript): 131,000
+• Test code (Python): 88,000
+• Operational documentation: 29,000 lines across 62 files
+• API endpoints: 217 (108 GET, 84 POST, 11 PUT, 13 DELETE, 1 PATCH)
+• Admin console pages: 33 (15 Provider + 11 Standalone + 7 Shopify)
+• Cosmos DB collections: 16
+• Background task scanners: 8 distinct loops
+• Agent modules: 8 (intent, knowledge, response, critic, escalation, analytics, base, app)
+• Configuration field definitions: 1,436 lines (78 tenant-configurable fields)
+• Superadmin API paths: 30 unique endpoints
+• Unit tests: 4,518 (0 failures)
+• UI tests: 917
+• Critical-path tests: 21/21 PASS
+• Regression tests (T0): 18/18 PASS
+• Conversation quality scenarios: 25 (4.40/5.0 average)
+• Non-functional test procedures: 7 (all verified)
+• Repeatable Procedures: 26
+• Memory topic files: 30
+• Git commits: 137
+• Production deployments: 30+ (100% success after adopting procedures)
+• Implementation cycles: 19 (all shipped)
+• Supported concurrent tenants: 50 (load tested)
 
 This isn't a toy project. It's a multi-tenant SaaS platform with per-tenant data isolation, role-based access control across 4 roles, MFA/TOTP authentication, non-disruptive zero-downtime upgrades, automated abuse detection, cost analytics, and a full release management process. It was built by one person with an AI partner, in 25 calendar days.
 

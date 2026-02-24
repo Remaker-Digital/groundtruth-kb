@@ -790,7 +790,7 @@ class StorefrontIngestionService:
         return result
 
     # -------------------------------------------------------------------
-    # Category template ingestion path (stub — implemented in KA-3)
+    # Category template ingestion path (KA-3)
     # -------------------------------------------------------------------
 
     async def _process_template(

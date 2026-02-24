@@ -22,7 +22,7 @@ This document consolidates every testable requirement from 8 source documents in
 | Requirements with existing coverage | 1,289 (90.5%) | 1,424 (100%) |
 | Gaps requiring new 1.0 tests | 38 | **0** (all addressed) |
 | Gaps deferred to 1.1 | 72 | 72 |
-| Python test functions | ~1,496 | ~4,791 |
+| Python test functions | ~1,496 | ~4,791 (grep); 4,518 (pytest collected) |
 | Python test files | 53 | 90+ |
 | Child Repeatable Procedures | 0 | **10** |
 | Non-functional procedure assertions | 0 | **274** |
@@ -582,7 +582,7 @@ This phase proves the full tenant lifecycle: provider creates a tenant via the S
 | CP.P1 | **Create tenant** — Open Provider Console → Create Tenant modal → fill form (tenant ID: `mtp-smoke-001`, billing_channel: `manual`, tier: `starter`, superadmin email: test address) → submit | Tenant appears in Tenant Directory | Screenshot of Tenant Directory showing new row |
 | CP.P2 | **Welcome email** — Verify welcome email received for `mtp-smoke-001` with correct standalone admin URL | Email received, URL is valid | Screenshot of email content |
 | CP.P3 | **First login** — Open standalone admin URL from welcome email → verify wizard auto-shows | Wizard renders on first visit | Screenshot of wizard in browser |
-| CP.P4 | **Cleanup** — Delete test tenant: `DELETE /api/superadmin/tenants/mtp-smoke-001` → verify removed from Tenant Directory | Tenant no longer listed | Screenshot of Tenant Directory without `mtp-smoke-001` |
+| CP.P4 | **Cleanup** — Verify smoke test tenant is harmless (no DELETE endpoint exists; tenant remains in directory as inactive test data). Confirm tenant count is correct and no data leakage to other tenants. | Tenant visible in directory, no cross-tenant impact | Screenshot of Tenant Directory showing smoke test tenant |
 
 CP.P1–CP.P4 must all PASS before proceeding to CP.1–CP.21. This confirms that when the release is frozen and beta customers are provisioned (Release Plan Step 3), the provisioning pathway is proven to work.
 

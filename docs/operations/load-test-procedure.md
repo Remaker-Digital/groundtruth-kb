@@ -1,6 +1,6 @@
 # Load Testing Procedure
 # Type: Repeatable Procedure (see docs/operations/REPEATABLE-PROCEDURES.md)
-# Last verified: 2026-02-19 — CONDITIONAL PASS (NATS disconnected, latency SLAs met)
+# Last verified: 2026-02-23 — PASS (v1.57.0, 922 reqs, 0 failures, P50 160ms, P95 470ms, P99 520ms)
 # Last corrected: 2026-02-19 — Fixed /api/team → /api/admin/team in locustfile.py
 
 This procedure validates that the Agent Red API gateway meets SLA commitments under sustained concurrent load matching the declared launch scale target (50 concurrent tenants).

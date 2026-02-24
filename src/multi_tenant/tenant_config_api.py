@@ -562,9 +562,9 @@ async def update_config(
     return ConfigUpdateResponse(
         success=result.success,
         version=result.version,
-        errors=result.errors,
-        warnings=result.warnings,
-        changes=result.changes,
+        errors=result.errors or [],
+        warnings=result.warnings or [],
+        changes=result.changes or {},
         state="draft",
     )
 
@@ -595,9 +595,9 @@ async def validate_config_endpoint(
 
     return ConfigValidateResponse(
         valid=result.valid,
-        errors=result.errors,
-        warnings=result.warnings,
-        sanitized=result.sanitized,
+        errors=result.errors or [],
+        warnings=result.warnings or [],
+        sanitized=result.sanitized or {},
     )
 
 
@@ -1484,8 +1484,8 @@ async def activate_draft(
         success=result.success,
         version=result.version,
         activated_at=result.activated_at,
-        errors=result.errors,
-        warnings=result.warnings,
+        errors=result.errors or [],
+        warnings=result.warnings or [],
     )
 
 

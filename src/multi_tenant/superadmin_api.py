@@ -702,20 +702,27 @@ async def create_tenant(
         logger.error("Unexpected error during SPA tenant creation: %s", exc)
         raise HTTPException(status_code=500, detail=f"Provisioning failed: {exc}")
 
-    # Create default preferences document with merchant name
+    # Create default preferences document with merchant name.
+    # IMPORTANT: Carry forward widget_key from provisioning step 4.
+    # auto_provision_widget_key() creates a seed (version 0), but this
+    # version 1 doc shadows it (get_active → ORDER BY version DESC).
+    # Without widget_key here, activation is blocked (CP.6 defect).
     try:
         from src.multi_tenant.cosmos_schema import PreferencesDocument
 
         now_iso = datetime.now(timezone.utc).isoformat()
-        prefs_doc = PreferencesDocument(
-            id=f"{result.tenant_id}:1",
-            tenant_id=result.tenant_id,
-            version=1,
-            is_current=True,
-            brand_name=body.merchant_name,
-            created_at=now_iso,
-            created_by=ctx.team_member_email or "spa-console",
-        )
+        prefs_kwargs: dict[str, Any] = {
+            "id": f"{result.tenant_id}:1",
+            "tenant_id": result.tenant_id,
+            "version": 1,
+            "is_current": True,
+            "brand_name": body.merchant_name,
+            "created_at": now_iso,
+            "created_by": ctx.team_member_email or "spa-console",
+        }
+        if result.widget_key:
+            prefs_kwargs["widget_key"] = result.widget_key
+        prefs_doc = PreferencesDocument(**prefs_kwargs)
 
         if _prefs_repo:
             try:

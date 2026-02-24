@@ -1,8 +1,8 @@
 # Tenant Initialization
 
 **Type:** Repeatable Procedure (see `docs/operations/REPEATABLE-PROCEDURES.md`)
-**Last verified:** 2026-02-21
-**Last corrected:** 2026-02-21 — Added Step 5.5 (config activation), Step 6 (KB seeding), corrected chat endpoint path, updated I.4/I.5/I.8 for post-activation state, added known failure mode for activate endpoint 500
+**Last verified:** 2026-02-23
+**Last corrected:** 2026-02-23 — Added known failure modes for seed script widget key defect and Container App env var auth precedence (S82). Previous: 2026-02-21 — Added Step 5.5 (config activation), Step 6 (KB seeding), corrected chat endpoint path, updated I.4/I.5/I.8 for post-activation state, added known failure mode for activate endpoint 500
 
 ---
 
@@ -215,6 +215,8 @@ After Page 0/0A/0B tests complete, resume with Step 5.5 (configure + activate), 
 | Chat endpoint `/api/chat` returns 401 "Widget key auth only for /api/chat/ endpoints" | Procedure defect (corrected 2026-02-21) | The correct endpoint for creating conversations is `POST /api/chat/conversations` (not `/api/chat`). Body must be `{}` (empty JSON). Widget key goes in `X-Widget-Key` header. |
 | `seed_quality_kb.py` fails with auth error | Environment (stale API key) | The hardcoded `QUALITY_API_KEY` fallback in the script goes stale after every re-seed. Must set `QUALITY_API_KEY` env var to the new superadmin key before running. |
 | `PUT /api/config` with camelCase fields returns 200 but fields ignored | By design | Config fields use snake_case (`brand_name`, not `brandName`). camelCase fields are silently ignored with "Unknown field — ignored" warnings. Fields must be wrapped in `{"fields": {...}}` body. |
+| Widget key from seed returns 401 (I.8/Step 7 fails) | Product defect (confirmed 2026-02-23, S82) | `seed_tenant.py` generates a widget key and writes it to PreferencesDocument but does NOT hash it to TenantDocument.widget_key_hash. Auth middleware checks the hash. **Workaround:** After seed, rotate the widget key via `POST /api/keys/rotate-widget-key` (requires superadmin auth). The rotation endpoint performs the correct dual-write. Then update `.env.local` PREVIEW_WIDGET_KEY with the new key. |
+| Superadmin key from seed returns 401 | Environment (Container App env var) | The Container App env var `SUPERADMIN_PREVIEW_API_KEY` is checked BEFORE Cosmos DB team_members lookup. After re-seed, the new Cosmos-stored key doesn't match this env var. **Workaround:** Use the old env var key (it still works). The env var survives re-seeds. To use the new seed-generated key instead, update the Container App env var and restart the revision. |
 
 ---
 

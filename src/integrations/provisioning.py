@@ -484,23 +484,44 @@ async def auto_provision_widget_key(tenant_id: str) -> str | None:
         )
 
         # 2. Write raw key to PreferencesDocument (for admin UI + activation gate)
+        #
+        # The activation service reads widget_key from the active prefs doc
+        # when creating drafts (save_draft, start_from_defaults).  If no
+        # active prefs doc exists yet (fresh tenant), we create a seed
+        # document (version 0) so widget_key is available for the wizard's
+        # first draft.  Bug fix: patch() on a non-existent doc was silently
+        # failing, leaving widget_key absent and blocking activation (CP.6).
         prefs_repo = PreferencesRepository()
         try:
-            await prefs_repo.patch(
-                tenant_id,
-                f"{tenant_id}:active",
-                operations=[
-                    {"op": "set", "path": "/widget_key", "value": raw_key},
-                    {"op": "set", "path": "/updated_at", "value": now_iso},
-                ],
-            )
+            existing = await prefs_repo.get_active(tenant_id)
+            if existing:
+                # Active prefs doc already exists — patch widget_key into it
+                await prefs_repo.patch(
+                    tenant_id,
+                    existing["id"],
+                    operations=[
+                        {"op": "set", "path": "/widget_key", "value": raw_key},
+                        {"op": "set", "path": "/updated_at", "value": now_iso},
+                    ],
+                )
+            else:
+                # No active prefs doc yet (fresh tenant) — create seed
+                from src.multi_tenant.cosmos_schema import PreferencesDocument
+
+                seed_doc = PreferencesDocument(
+                    id=f"{tenant_id}:0",
+                    tenant_id=tenant_id,
+                    version=0,
+                    is_current=True,
+                    config_state="active",
+                    widget_key=raw_key,
+                    created_at=now_iso,
+                    activated_at=now_iso,
+                )
+                await prefs_repo.upsert(tenant_id, seed_doc)
         except Exception:
-            # Preferences doc may not exist yet at provisioning time —
-            # the widget key will be written when the first draft is created
-            # via the activation service (which copies from TenantDocument).
-            logger.debug(
-                "Preferences doc not yet available for widget key — "
-                "key will propagate on first draft: tenant=%s",
+            logger.warning(
+                "Failed to write widget key to preferences doc: tenant=%s",
                 tenant_id[:8],
             )
 

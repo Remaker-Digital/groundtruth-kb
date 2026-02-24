@@ -9,6 +9,34 @@ All notable changes to Agent Red Customer Experience are documented here.
 
 ---
 
+## v1.57.4 — Beta verification and quality hardening (2026-02-23)
+
+### Beta readiness (v1.57.0)
+
+Four features required for beta customer onboarding have been completed:
+
+- **Conversation vectorization scanner:** A background task scans ended conversations every 5 minutes and vectorizes them for persistent memory retrieval. Each cycle processes up to 20 conversations per tenant. Vectorized conversations are marked with a timestamp to prevent re-processing.
+- **Widget consent collection:** A consent banner appears in the chat widget when the tenant has enabled consent collection. Customer consent status (granted, denied, withdrawn) is stored on their profile and controls whether conversation memory is retained.
+- **Cost analytics:** A new superadmin endpoint provides estimated per-tenant cost breakdowns including Azure OpenAI token costs, Cosmos DB request unit consumption, and container compute amortization.
+- **Abuse detection:** Rate anomaly and error rate heuristics calculate a risk score (0-100) for each tenant. Operators can flag tenants from the Provider Console.
+
+### Assessment fixes (v1.57.1)
+
+An independent assessment review identified four items, all resolved:
+
+- **Fine-tuning pipeline hardened:** Placeholder return values in the fine-tuning pipeline have been replaced with `NotImplementedError` exceptions. The existing triple-gate (feature flag, tier check, safety validation) already prevents user access, but the explicit errors provide defense-in-depth.
+- **Storefront ingestion annotation:** A misleading "stub" comment has been corrected to accurately describe the module's production functionality.
+
+### Critical path verification (v1.57.4)
+
+The full 21-test critical path (CP.1–CP.21) has been verified against production, covering SPA provisioning, setup wizard, activation, all admin pages, live chat pipeline, dashboard, inbox, and configuration persistence. All 21 tests pass.
+
+### Tests
+
+- 4,522 unit tests (0 failures), 56 regression tests (all tiers), 21/21 critical path, load test pass (50 users, 0% failures)
+
+---
+
 ## v1.56.0 — Identity pipeline and tenant provisioning (2026-02-22)
 
 ### Identity preprocessor pipeline

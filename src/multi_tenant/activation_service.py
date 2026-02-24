@@ -763,7 +763,7 @@ class ActivationService:
                     success=True,
                     version=draft.get("version", 0),
                     activated_at=now,
-                    warnings=result_warnings or None,
+                    warnings=result_warnings,
                 )
         except Exception as exc:
             logger.error(

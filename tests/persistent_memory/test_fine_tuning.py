@@ -24,6 +24,7 @@ import json
 import math
 from datetime import datetime, timedelta, timezone
 from typing import Any
+from unittest.mock import AsyncMock, patch
 
 import pytest
 
@@ -290,6 +291,16 @@ class TestFT04TrainingAPI:
             for i in range(10)
         ]
 
+        # Mock the API call (production API not connected)
+        mock_api_response = {
+            "job_id": "ftjob-test-abc123",
+            "status": "completed",
+            "fine_tuned_model": f"ft:{BASE_MODEL}:test:v1",
+            "training_file_id": "file-test-train-001",
+            "validation_file_id": "file-test-val-001",
+        }
+        service._call_fine_tuning_api = AsyncMock(return_value=mock_api_response)
+
         job = await service.submit_training_job(
             tenant_id=TENANT_ENTERPRISE,
             training_data=training_data,
@@ -314,6 +325,16 @@ class TestFT04TrainingAPI:
             {"messages": [{"role": "user", "content": "q"}, {"role": "assistant", "content": "a"}]}
         ] * 50
 
+        # Mock the API call (production API not connected)
+        mock_api_response = {
+            "job_id": "ftjob-test-store-001",
+            "status": "completed",
+            "fine_tuned_model": f"ft:{BASE_MODEL}:test:stored",
+            "training_file_id": "file-test-train-002",
+            "validation_file_id": "file-test-val-002",
+        }
+        service._call_fine_tuning_api = AsyncMock(return_value=mock_api_response)
+
         job = await service.submit_training_job(
             tenant_id=TENANT_ENTERPRISE,
             training_data=training_data,
@@ -324,18 +345,16 @@ class TestFT04TrainingAPI:
         stored_jobs = service._dev_jobs.get(TENANT_ENTERPRISE, [])
         assert any(j.get("job_id") == job.job_id for j in stored_jobs)
 
-    async def test_dev_mode_returns_completed_job(self):
-        """In dev mode, _call_fine_tuning_api returns placeholder."""
+    async def test_default_api_raises_not_implemented(self):
+        """Default _call_fine_tuning_api raises NotImplementedError (gated)."""
         service = _make_service()
 
-        result = await service._call_fine_tuning_api(
-            [],  # training_data
-            [],  # validation_data
-            BASE_MODEL,
-        )
-
-        assert "job_id" in result
-        assert result["status"] in ("completed", "succeeded")
+        with pytest.raises(NotImplementedError, match="Layer 4 fine-tuning API"):
+            await service._call_fine_tuning_api(
+                [],  # training_data
+                [],  # validation_data
+                BASE_MODEL,
+            )
 
 
 # ===========================================================================
@@ -871,22 +890,20 @@ class TestFTS05ConsentBlocking:
 # ===========================================================================
 
 
-class TestFTS06DevMode:
-    """FT-S06: Dev mode returns placeholder data without calling APIs."""
+class TestFTS06ProductionGating:
+    """FT-S06: Default API methods raise NotImplementedError (production gated)."""
 
-    async def test_dev_mode_fine_tuning_api(self):
-        """_call_fine_tuning_api returns dev placeholder."""
+    async def test_fine_tuning_api_raises_not_implemented(self):
+        """_call_fine_tuning_api raises NotImplementedError when not overridden."""
         service = _make_service()
-        result = await service._call_fine_tuning_api([], [], BASE_MODEL)
-        assert isinstance(result, dict)
-        assert "job_id" in result
+        with pytest.raises(NotImplementedError, match="Layer 4 fine-tuning API"):
+            await service._call_fine_tuning_api([], [], BASE_MODEL)
 
-    async def test_dev_mode_job_status(self):
-        """_check_job_status_api returns completed in dev mode."""
+    async def test_job_status_api_raises_not_implemented(self):
+        """_check_job_status_api raises NotImplementedError when not overridden."""
         service = _make_service()
-        result = await service._check_job_status_api("ftjob-xxx")
-        assert isinstance(result, dict)
-        assert result.get("status") in ("completed", "succeeded")
+        with pytest.raises(NotImplementedError, match="fine-tuning status polling"):
+            await service._check_job_status_api("ftjob-xxx")
 
     async def test_dev_mode_model_evaluation(self):
         """_call_model_for_evaluation returns dev placeholder."""

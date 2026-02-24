@@ -15,7 +15,7 @@ This document provides active guidance for AI assistants working on the Agent Re
 |-----------|-------|
 | **Project Name** | Agent Red Customer Experience |
 | **Type** | Commercial SaaS Product (Shopify + Standalone) |
-| **Status** | Production v1.56.7 HEALTHY (revision 0000063, S76b). ALL 14 CYCLES + post-14 patches + Cycles 15-19 DEPLOYED. ~4,791 unit tests (1 pre-existing failure), 18/18 T0 regression, 917 UI tests, 25 CQ scenarios (4.75/5.0), CP.1–CP.21 21/21 PASS. See `memory/build-deploy-roadmap.md`. |
+| **Status** | Production v1.57.1 HEALTHY (S81), v1.57.4 BUILD READY (S82). ALL 14 CYCLES + post-14 patches + Cycles 15-19 DEPLOYED. 4,522 unit tests (0 failures), 56/56 T0-T2 regression, 917 UI tests, 25 CQ scenarios (4.40/5.0), CP.1–CP.21 21/21 PASS. Load test PASS (50 users, 0% failures, P95 470ms). Release Plan Steps 1-2.5 COMPLETE. See `memory/build-deploy-roadmap.md`. |
 | **Owner** | Remaker Digital (DBA of VanDusen & Palmeter, LLC) |
 
 ### Copyright Notice
@@ -36,7 +36,7 @@ All new work in this repository must include:
 Continue work on Agent Red Customer Experience commercial project.
 Location: E:\Claude-Playground\CLAUDE-PROJECTS\Agent Red Customer Engagement
 Key files: CLAUDE.md, memory/MEMORY.md
-Current status: Production v1.51.1 HEALTHY. ALL 14 CYCLES + SDK Fix DEPLOYED. 3,985 unit tests, 25 CQ scenarios (CONDITIONAL PASS). Next: [describe task].
+Current status: Production v1.57.1 HEALTHY (v1.57.4 BUILD READY). ALL 19 CYCLES DEPLOYED. 4,522 unit tests, 56/56 regression, CP 21/21 PASS. Next: [describe task].
 ```
 
 ### Preferred Way of Working
@@ -159,9 +159,9 @@ Active procedures:
 
 Full plan: `memory/build-deploy-roadmap.md`
 
-### Current Status — v1.56.7 DEPLOYED, Release Plan ACTIVE
+### Current Status — v1.57.1 DEPLOYED, v1.57.4 BUILD READY, Release Plan Steps 1-2.5 COMPLETE
 
-Production is v1.56.7 (revision 0000063, session 76b). All 19 cycles deployed. 18/18 T0 PASS. Release Plan (`docs/operations/release-plan-v1.57.md`) is the governing framework — next step: Step 1 (Master Test Plan execution).
+Production is v1.57.1 (session 81). v1.57.4 ACR build ready (session 82, ca2f). All 19 cycles deployed. 4,522 tests (0 failures). 56/56 T0-T2 regression PASS. CP 21/21 PASS. Load test PASS (50 users, 0% failures, P95 470ms). Release Plan Steps 1-2.5 COMPLETE. Next: Step 3 (beta tenant provisioning).
 
 | Cycle | Version | Content | Status |
 |-------|---------|---------|--------|
@@ -189,4 +189,4 @@ Production is v1.56.7 (revision 0000063, session 76b). All 19 cycles deployed. 1
 
 *© 2026 Remaker Digital, a DBA of VanDusen & Palmeter, LLC. All rights reserved.*
 *Last Updated: 2026-02-23*
-*Version: 57.0.0*
+*Version: 57.4.0*

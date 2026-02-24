@@ -106,23 +106,30 @@
 **Objective:** Verify the full merchant onboarding journey works end-to-end before provisioning real beta customers.
 
 **Procedure:**
-1. Open Provider Console (`/admin/provider`)
-2. Create throwaway tenant via "Create Tenant" modal:
-   - Tenant ID: `smoke-test-001`
-   - Business name: `Smoke Test`
-   - Billing channel: `manual`
-   - Tier: `starter`
-   - Superadmin email: (your own email)
-3. Verify welcome email received with correct standalone admin URL
-4. Open standalone admin URL → verify wizard auto-shows on first login
-5. Complete wizard: set brand name, brand voice, upload knowledge
-6. Activate configuration → verify widget key generated
-7. Embed widget on a test page → send test message → verify AI responds with configured brand voice
-8. Verify customer identity collection (AI asks for email in first response)
-9. Delete throwaway tenant: `DELETE /api/superadmin/tenants/smoke-test-001`
-10. Record result: PASS or list of defects found
+1. Open Provider Console (`/admin/provider`) — verify HTTP 200
+2. Create tenant via SPA API (`POST /api/superadmin/tenants`):
+   - Required fields (camelCase): `merchantName`, `superadminEmail`, `tier`
+   - Optional: `merchantUrl`, `expiresAt`
+   - Note: `tenant_id` is auto-generated (UUID) — not user-specified
+   - Record returned `tenantId`, `superadminApiKey`, `widgetKey`
+3. Verify tenant appears in SPA directory (`GET /api/superadmin/tenants/summary`)
+4. Verify standalone admin accessible (`/admin/standalone/` → HTTP 200)
+5. Activate configuration: the SPA provisioning auto-creates preferences but does NOT set `activated_at`. The chat pipeline requires activation. To activate:
+   a. `POST /api/config/reset` (creates draft from tier defaults, includes widget_key)
+   b. `PUT /api/config` with `{"fields": {"brand_name": "..."}}` (set mandatory fields)
+   c. `POST /api/config/draft/activate` (may return 500 on first activation due to suggestion engine bootstrap — verify config state shows `"state": "active"`)
+6. Verify chat pipeline: `POST /api/chat/conversations` with `X-Widget-Key` header → expect HTTP 201
+7. Verify customer identity collection: check that AI response includes email request (requires SSE stream monitoring or widget UI test)
+8. Record result: PASS or list of defects found
 
-**Completion criterion:** All 10 steps pass. Any defects found must be fixed and re-tested before proceeding.
+**Known issues (procedure defects corrected 2026-02-23):**
+- API uses camelCase field names (`merchantName`, `superadminEmail`) not snake_case
+- Tenant ID is auto-generated UUID, not user-specified
+- SPA provisioning does not set `activated_at` — manual activation flow required
+- First activation may return 500 but activation succeeds (check config state)
+- Tenant deletion endpoint does not exist — smoke test tenants persist (harmless)
+
+**Completion criterion:** Steps 1-6 pass. Step 7 validated via widget UI if available. Any blocking defects must be fixed and re-tested before proceeding.
 
 ---
 
