@@ -15,7 +15,7 @@ This document provides active guidance for AI assistants working on the Agent Re
 |-----------|-------|
 | **Project Name** | Agent Red Customer Experience |
 | **Type** | Commercial SaaS Product (Shopify + Standalone) |
-| **Status** | Production v1.57.1 HEALTHY (S81), v1.57.4 BUILD READY (S82). ALL 14 CYCLES + post-14 patches + Cycles 15-19 DEPLOYED. 4,522 unit tests (0 failures), 56/56 T0-T2 regression, 917 UI tests, 25 CQ scenarios (4.40/5.0), CP.1–CP.21 21/21 PASS. Load test PASS (50 users, 0% failures, P95 470ms). Release Plan Steps 1-2.5 COMPLETE. See `memory/build-deploy-roadmap.md`. |
+| **Status** | Beta Prime v1.57.19 PINNED. Staging v1.57.20. Release Plan Step 4 (beta feedback) IN PROGRESS. See `memory/MEMORY.md` for full status. |
 | **Owner** | Remaker Digital (DBA of VanDusen & Palmeter, LLC) |
 
 ### Copyright Notice
@@ -36,7 +36,7 @@ All new work in this repository must include:
 Continue work on Agent Red Customer Experience commercial project.
 Location: E:\Claude-Playground\CLAUDE-PROJECTS\Agent Red Customer Engagement
 Key files: CLAUDE.md, memory/MEMORY.md
-Current status: Production v1.57.1 HEALTHY (v1.57.4 BUILD READY). ALL 19 CYCLES DEPLOYED. 4,522 unit tests, 56/56 regression, CP 21/21 PASS. Next: [describe task].
+Next: [describe task].
 ```
 
 ### Preferred Way of Working
@@ -116,27 +116,15 @@ When executing a Repeatable Procedure:
 - For procedure defects: fix the procedure document before continuing, not just the immediate issue
 - For environment transients: retry, do not modify the procedure
 
-Active procedures:
-- `docs/operations/release-plan-v1.57.md` — **Release Plan v1.57.0 Beta** (governing framework, 8 steps)
-- `scripts/deploy/upgrade.ps1` — Production deployment
-- `scripts/deploy/rollback.ps1` — Production rollback
-- `scripts/seed_tenant.py` — Tenant provisioning (single tenant, destructive, superadmin only)
-- `scripts/create_test_tenant.py` — Simulated customer tenant creation (test-customer-001, 8 phases, non-destructive)
-- `docs/operations/initialization-procedure.md` — Tenant initialization (destructive, 10 post-conditions)
-- `docs/operations/upgrade-verification-procedure.md` — Non-disruptive upgrade verification (35 assertions)
-- `docs/operations/CATASTROPHIC-RECOVERY-RUNBOOK.md` — Azure environment setup
-- `docs/operations/ui-test-procedure.md` — Admin UI regression tests (780 standalone tests, authoritative test definitions)
-- `docs/operations/chrome-ui-test-procedure.md` — Chrome MCP-automated UI tests (917 total) + Critical Path CP.1–CP.21
-- `docs/operations/external-url-reachability-procedure.md` — URL reachability pre-flight (37 URLs)
-- Inline in spec: Unit test suite, Production regression suite
-- `docs/operations/agntcy-platform-adoption-procedure.md` — AGNTCY platform adoption verification
-- `docs/operations/load-test-procedure.md` — Load testing (50 users, SLA validation, Locust)
-- `docs/operations/tenant-isolation-test-procedure.md` — Tenant isolation verification (30 cross-tenant tests)
-- `docs/operations/api-security-test-procedure.md` — API security & penetration testing (45 tests)
-- `docs/operations/rate-limit-test-procedure.md` — Rate limiting & DoS resilience (20 tests, per-tier enforcement)
-- `docs/operations/conversation-quality-test-procedure.md` — Conversation quality regression (25 golden scenarios)
-- `docs/operations/resilience-failover-test-procedure.md` — Resilience & failover testing (29 PASS + 6 SKIP)
-- `docs/operations/data-integrity-test-procedure.md` — Data integrity & backup verification (25 Cosmos DB tests)
+Active procedures are listed in `docs/operations/REPEATABLE-PROCEDURES.md`. Key procedures: release plan (`release-plan-v1.57.md`), deploy/rollback scripts, seed/test tenant scripts, initialization, upgrade verification (parameterized for staging/production), and 8 test procedures (UI, Chrome MCP, load, isolation, security, rate limit, quality, resilience, data integrity).
+
+### Session Scheduler
+
+The file `.claude/SCHEDULE.md` contains pre-planned prompts that are automatically injected via a `UserPromptSubmit` hook (`.claude/hooks/scheduler.py`). Groups of sequential prompts are processed FIFO — one prompt per user message.
+
+**Trigger types:** `always` (next prompt), `session_end` (wrap-up keywords detected), `after:N` (after N prompts).
+
+**Claude's permissions:** Claude may append new groups to SCHEDULE.md when anticipating future housekeeping needs (e.g., "after this deployment, remind me to update the procedure"). The owner can delete groups to cancel, or reorder groups to change priority.
 
 ### Adding Commercial Features
 
@@ -150,27 +138,14 @@ Active procedures:
 
 - Read the public repository at https://github.com/Remaker-Digital/AGNTCY-muti-agent-deployment-customer-service
 - Do **not** reference local AGNTCY files by path — see isolation rules in `CLAUDE-REFERENCE.md`
-- Agent Red uses in-process agent delegation (`USE_AGENT_CONTAINERS=false`); 6 extracted agent modules in `src/agents/` delegate to Azure OpenAI directly
-- AGNTCY Phase 2 complete (session 25): pipeline decomposed into 6 containerized agent modules with A2A protocol; pipeline orchestrator delegates to agent instances
+- Agent Red uses in-process agent delegation (`USE_AGENT_CONTAINERS=false`); 7 extracted agent modules in `src/agents/` delegate to Azure OpenAI directly
+- AGNTCY Phase 2 complete (session 25): pipeline decomposed into 7 containerized agent modules with A2A protocol; pipeline orchestrator delegates to agent instances
 
 ---
 
-## Completed Roadmap — 14 Cycles + Cycles 15-19
+## Roadmap & Remaining Tasks
 
-Full plan: `memory/build-deploy-roadmap.md`
-
-### Current Status — v1.57.1 DEPLOYED, v1.57.4 BUILD READY, Release Plan Steps 1-2.5 COMPLETE
-
-Production is v1.57.1 (session 81). v1.57.4 ACR build ready (session 82, ca2f). All 19 cycles deployed. 4,522 tests (0 failures). 56/56 T0-T2 regression PASS. CP 21/21 PASS. Load test PASS (50 users, 0% failures, P95 470ms). Release Plan Steps 1-2.5 COMPLETE. Next: Step 3 (beta tenant provisioning).
-
-| Cycle | Version | Content | Status |
-|-------|---------|---------|--------|
-| **1-5** | v1.35.0→v1.39.0 | Compliance, refactoring, SLA, MCP, AGNTCY Phase 3 | ✅ DEPLOYED (S38) |
-| **6-8** | v1.42.0 | CI + Email + SPA Phase 1 + R10/R3 + Phase 2 backend | ✅ DEPLOYED (S39) |
-| **9** | v1.43.0 | SPA Phase 2 + HV-5/RB-4/RB-5 + UI quick wins | ✅ DEPLOYED (S41) |
-| **10-14** | v1.48.0 | UI polish, magic link, Provider Phase 3-4, features, coverage, quality | ✅ DEPLOYED (S46) |
-| **Post-14** | v1.49.2→v1.54.7 | SKIP resolution, CSS, SDK fix, quality, color mode, KA | ✅ DEPLOYED (S54-S65) |
-| **15-19** | v1.55.0 | Customer identity, provisioning persistence, trial scanner, widget key gen, welcome email, trial expiry, wizard fix | ✅ DEPLOYED (S72) |
+All 19 cycles deployed. Full history: `memory/build-deploy-roadmap.md`.
 
 ### Owner/Designer Tasks (blocking Shopify submission)
 1. Screenshots (3-6 at 1600x900) — designer
@@ -188,5 +163,5 @@ Production is v1.57.1 (session 81). v1.57.4 ACR build ready (session 82, ca2f). 
 ---
 
 *© 2026 Remaker Digital, a DBA of VanDusen & Palmeter, LLC. All rights reserved.*
-*Last Updated: 2026-02-23*
-*Version: 57.4.0*
+*Last Updated: 2026-02-24*
+*Version: 57.20.0*

@@ -194,8 +194,10 @@
 1. Deploy v1.57.0 image to staging → verify baseline functionality
 2. Run Master Test Plan against staging → confirm baseline PASS
 3. Build v1.58.0-rc1 from `main`
-4. Execute full Upgrade Verification Procedure against staging (v1.57.0 → v1.58.0-rc1)
+4. Execute full Upgrade Verification Procedure against staging (`TARGET_ENVIRONMENT=staging`, v1.57.0 → v1.58.0-rc1)
 5. All 35 assertions must pass — proving the upgrade preserves data, keys, and configuration
+
+> **Prerequisite:** Upgrade Verification Procedure has been parameterized with `TARGET_ENVIRONMENT` variable (Session 88, 2026-02-24). Set `TARGET_ENVIRONMENT=staging` to use staging connection parameters.
 
 **Completion criterion:** Upgrade Verification Procedure passes on staging. v1.58.0 is proven non-disruptive.
 

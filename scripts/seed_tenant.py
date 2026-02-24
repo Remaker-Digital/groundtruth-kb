@@ -2,7 +2,7 @@
 seed_tenant.py — Unified tenant seed for Agent Red Customer Experience
 Type: Repeatable Procedure (see docs/operations/REPEATABLE-PROCEDURES.md)
 Last verified: 2026-02-15
-Last corrected: 2026-02-15 — Added mandatory postcondition: Key Vault update + revision restart after every re-seed
+Last corrected: 2026-02-24 — Switched to canonical auth imports (auth.generate_widget_key + hash_api_key + hash_widget_key); seed now produces production-format widget keys
 
 VARIABLES:
   TENANT_ID       = remaker-digital-001
@@ -132,6 +132,7 @@ import argparse
 import asyncio
 import logging
 import os
+import secrets
 import sys
 import uuid
 from datetime import datetime, timezone
@@ -416,7 +417,11 @@ async def phase_2_tenant(dry_run: bool) -> None:
     print("  PHASE 2: Tenant Document")
     print("=" * 65)
 
-    from scripts.provision_tenant_one import generate_api_key, generate_widget_key, hash_key
+    from src.multi_tenant.auth import (
+        generate_widget_key,
+        hash_api_key,
+        hash_widget_key,
+    )
     from src.multi_tenant.cosmos_schema import (
         BillingChannel,
         ConsentStatus,
@@ -425,7 +430,9 @@ async def phase_2_tenant(dry_run: bool) -> None:
         TenantTier,
     )
 
-    api_key = generate_api_key()
+    # Tenant-level API key — simple random token (no canonical generator
+    # in auth.py; per-user keys use generate_user_api_key instead).
+    api_key = "ar_" + secrets.token_hex(24)
     widget_key = generate_widget_key(TENANT_ID)
     now = datetime.now(timezone.utc).isoformat()
 
@@ -443,8 +450,8 @@ async def phase_2_tenant(dry_run: bool) -> None:
         shopify_shop_domain=SHOP_DOMAIN,
         customer_email=CUSTOMER_EMAIL,
         consent_status=ConsentStatus.GRANTED,
-        api_key_hash=hash_key(api_key),
-        widget_key_hash=hash_key(widget_key),
+        api_key_hash=hash_api_key(api_key),
+        widget_key_hash=hash_widget_key(widget_key),
         rate_limit_rpm=50,
         max_concurrent=10,
         created_at=now,

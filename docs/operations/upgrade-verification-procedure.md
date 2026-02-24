@@ -2,13 +2,15 @@
 
 **Type:** Repeatable Procedure (see `docs/operations/REPEATABLE-PROCEDURES.md`)
 **Last verified:** 2026-02-18
-**Last corrected:** 2026-02-18 — Added C.33-C.35 for Cycle 14 (unit test count gate, evaluation framework, Critic rule integrity); updated known failure modes
+**Last corrected:** 2026-02-24 — Parameterized for staging + production (TARGET_ENVIRONMENT variable, environment lookup table, staging deploy/rollback instructions)
 
 ---
 
 ## Purpose
 
-Verifies that a production deployment preserves all existing tenant data. This procedure wraps the existing deployment script (`scripts/deploy/upgrade.ps1`) with pre-deployment and post-deployment verification gates that ensure no data is lost during the upgrade.
+Verifies that a deployment preserves all existing tenant data on the target environment. This procedure wraps the deployment with pre-deployment and post-deployment verification gates that ensure no data is lost during the upgrade.
+
+This procedure is **environment-agnostic** — it works against both **production** (Beta Prime) and **staging** by setting the `TARGET_ENVIRONMENT` variable. The verification logic is identical; only the connection parameters change.
 
 This is distinct from **Initialization** (which destroys all data). A non-disruptive upgrade must leave every article, conversation, configuration value, team member, and customer profile intact.
 
@@ -16,7 +18,8 @@ This is distinct from **Initialization** (which destroys all data). A non-disrup
 
 ## When to Execute
 
-- Every production deployment to a tenant with live data.
+- **Staging:** Before deploying a new version to production — prove the upgrade is non-disruptive on staging first (Release Plan Step 5).
+- **Production:** Every production deployment to a tenant with live data (Release Plan Step 6).
 - Any deployment where data preservation is required.
 
 For test deployments to a clean tenant, use the **Initialization** procedure instead (`docs/operations/initialization-procedure.md`).
@@ -25,13 +28,29 @@ For test deployments to a clean tenant, use the **Initialization** procedure ins
 
 ## Variables
 
+### Environment Selector
+
 | Variable | Value |
 |----------|-------|
-| `TENANT_ID` | `remaker-digital-001` |
-| `FQDN` | `agent-red-api-gateway.orangeglacier-f566a4e7.eastus.azurecontainerapps.io` |
-| `API_KEY` | Current superadmin API key (from Key Vault `ADMIN-PREVIEW-API-KEY`) |
-| `NEW_VERSION` | Version being deployed (e.g. `1.34.0`) |
+| `TARGET_ENVIRONMENT` | **`production`** or **`staging`** — determines all environment-dependent values below |
+| `NEW_VERSION` | Version being deployed (e.g. `1.58.0`) |
 | `PREVIOUS_VERSION` | Version currently running (from `GET /ready` → `version` field) |
+
+### Environment-Dependent Values
+
+Select the column matching `TARGET_ENVIRONMENT`. Use these values for all `{VARIABLE}` references throughout the procedure.
+
+| Variable | Production | Staging |
+|----------|-----------|---------|
+| `FQDN` | `agent-red-api-gateway.orangeglacier-f566a4e7.eastus.azurecontainerapps.io` | `agent-red-staging.orangeglacier-f566a4e7.eastus.azurecontainerapps.io` |
+| `CONTAINER_APP` | `agent-red-api-gateway` | `agent-red-staging` |
+| `TENANT_ID` | `remaker-digital-001` | `staging-001` |
+| `API_KEY` | Superadmin key from `kv-agentred-eastus` → `ADMIN-PREVIEW-API-KEY` | Superadmin key from `kv-agentred-staging` → `ADMIN-PREVIEW-API-KEY` |
+| `SPA_API_KEY` | Container App env var `SUPERADMIN_PREVIEW_API_KEY` on `agent-red-api-gateway` | Container App env var `SUPERADMIN_PREVIEW_API_KEY` on `agent-red-staging` |
+| `WIDGET_KEY` | Current widget key for `remaker-digital-001` (from preferences doc or Key Vault) | Current widget key for `staging-001` (from preferences doc or Key Vault) |
+| `KEY_VAULT` | `kv-agentred-eastus` | `kv-agentred-staging` |
+| `RESOURCE_GROUP` | `Agent-Red` | `Agent-Red` |
+| `ACR` | `acragentredeastus` | `acragentredeastus` (shared) |
 
 ---
 
@@ -40,6 +59,8 @@ For test deployments to a clean tenant, use the **Initialization** procedure ins
 ### Phase A: Pre-Deployment Snapshot
 
 Before deploying, capture the current state of all tenant data. Record each value — these become the expected values for post-deployment verification.
+
+> **Note:** All API calls in Phases A and C use relative paths. Prefix every call with `https://{FQDN}`. Authenticate tenant endpoints (A.2–A.11, C.2–C.12) with `{API_KEY}` and superadmin endpoints (C.14–C.25) with `{SPA_API_KEY}`.
 
 | # | Data Point | API Call | Record |
 |---|-----------|----------|--------|
@@ -59,18 +80,27 @@ Store these values in a temporary file or note for comparison in Phase C.
 
 ### Phase B: Deploy
 
-Execute the standard deployment procedure:
+**If `TARGET_ENVIRONMENT` = `production`:** Execute the standard deployment script:
 
 ```powershell
-.\scripts\deploy\upgrade.ps1
+.\scripts\deploy\upgrade.ps1 -Version "v{NEW_VERSION}"
 ```
 
-Or manual equivalent:
+**If `TARGET_ENVIRONMENT` = `staging`:** The upgrade script targets production by default. For staging, use the manual equivalent below with staging values.
+
+**Manual equivalent** (works for both environments — substitute `{CONTAINER_APP}` from the environment table):
+
 1. Bump `PRODUCT_VERSION` in `src/multi_tenant/api_versioning.py`
 2. Build all 3 admin SPAs (`npm run build` in `admin/standalone`, `admin/shopify`, and `admin/provider`)
 3. ACR build: `az acr build --registry {ACR} --image api-gateway:v{NEW_VERSION} . --no-logs`
-4. Update container app: `az containerapp update ...`
-5. Wait for health: `GET /health` and `GET /ready` return 200
+4. Update container app:
+   ```powershell
+   az containerapp update `
+       --name {CONTAINER_APP} `
+       --resource-group {RESOURCE_GROUP} `
+       --image acragentredeastus.azurecr.io/api-gateway:v{NEW_VERSION}
+   ```
+5. Wait for health: `GET https://{FQDN}/health` and `GET https://{FQDN}/ready` return 200
 
 ### Phase C: Post-Deployment Verification
 
@@ -88,8 +118,8 @@ Compare every value from Phase A against the current state. **All values must ma
 | C.8 | Team member names + roles unchanged | Same as A.8 |
 | C.9 | Draft config values unchanged | Same as A.9 |
 | C.10 | Active config values unchanged | Same as A.10 |
-| C.11 | Widget key still valid | `POST /api/chat/conversations` with widget key returns 200 (if tenant was active) or 403 (if tenant was inactive — same as before) |
-| C.12 | API key still authenticates | `GET /api/config` with `{API_KEY}` returns 200 |
+| C.11 | Widget key still valid | `POST https://{FQDN}/api/chat/conversations` with `{WIDGET_KEY}` returns 200/201 (if tenant was active) or 403 (if tenant was inactive — same as before) |
+| C.12 | API key still authenticates | `GET https://{FQDN}/api/config` with `{API_KEY}` returns 200 |
 | C.13 | Regression tests pass | `python -m pytest tests/regression/ -q` — all pass |
 | C.14 | Superadmin API functional | `GET /api/superadmin/tenants` with SPA API key returns 200 with `total >= 1` |
 | C.15 | Public status API functional | `GET /api/status` (no auth) returns 200 with `overall_status` field |
@@ -119,9 +149,20 @@ Compare every value from Phase A against the current state. **All values must ma
 If any assertion in Phase C fails:
 
 1. **Data loss detected** — Do NOT proceed. Roll back immediately:
+
+   **If `TARGET_ENVIRONMENT` = `production`:**
    ```powershell
-   .\scripts\deploy\rollback.ps1
+   .\scripts\deploy\rollback.ps1 -Version "v{PREVIOUS_VERSION}"
    ```
+
+   **If `TARGET_ENVIRONMENT` = `staging`** (rollback script targets production; use manual rollback):
+   ```powershell
+   az containerapp update `
+       --name {CONTAINER_APP} `
+       --resource-group {RESOURCE_GROUP} `
+       --image acragentredeastus.azurecr.io/api-gateway:v{PREVIOUS_VERSION}
+   ```
+
 2. After rollback, re-run Phase C assertions against `{PREVIOUS_VERSION}` to confirm data is intact.
 3. Investigate root cause before re-attempting deployment.
 
@@ -153,6 +194,9 @@ If any assertion in Phase C fails:
 | Unit test count below 4000 | Code defect | Coverage regression — verify no test files were deleted; run `pytest --co -q` to count |
 | Evaluation dataset fails to load | Code defect | Verify `evaluation/datasets/response_quality.json` exists and has valid JSON with >= 20 scenarios |
 | Critic rule missing sub-rules | Code defect | Verify rule #7 in `system_prompt_builder.py` has three sub-rules (a), (b), (c) for jailbreak coverage |
+| Staging Container App cold start (min replicas=0) | Environment transient | Staging scales to zero when idle. First request after idle may take 30-60s. Wait for health before running Phase C. |
+| Staging tenant not found (404) | Procedure defect | Staging tenant `staging-001` must be seeded and activated before running procedure. Use `seed_tenant.py` targeting staging, then activate via API. |
+| Wrong environment targeted | Procedure defect | Verify `TARGET_ENVIRONMENT` is set correctly before starting. Check `FQDN` in browser to confirm you are hitting the intended environment. |
 
 ---
 
