@@ -51,11 +51,14 @@ def mount_static_apps(app: FastAPI) -> None:
         async def _admin_shopify_spa(full_path: str) -> FileResponse:
             """Catch-all route for the Shopify embedded admin SPA.
 
-            All client-side routes (/, /inbox, /billing, etc.) return the same
-            index.html so React Router can handle routing. This is standard SPA
-            behaviour — the server always returns the shell HTML, and the
-            JavaScript app determines what to render based on the URL.
+            If full_path matches a real file in dist/ (e.g. primary-logo-no-wordmark.svg),
+            serve that file directly.  Otherwise fall through to index.html
+            for SPA client-side routing.
             """
+            # Serve real static files (SVG, PNG, etc.) from dist root
+            candidate = _admin_shopify_dist / full_path
+            if candidate.is_file() and ".." not in full_path:
+                return FileResponse(str(candidate))
             return FileResponse(str(_admin_shopify_dist / "index.html"), headers=_SHOPIFY_NO_CACHE)
 
         @app.get("/admin/shopify", include_in_schema=False)
@@ -90,9 +93,14 @@ def mount_static_apps(app: FastAPI) -> None:
         async def _admin_provider_spa(full_path: str) -> FileResponse:
             """Catch-all route for the provider admin console SPA.
 
-            All client-side routes (/, /tenants, /deployments, /billing, /sla)
-            return the same index.html so React Router can handle routing.
+            If full_path matches a real file in dist/ (e.g. primary-logo-no-wordmark.svg),
+            serve that file directly.  Otherwise fall through to index.html
+            for SPA client-side routing.
             """
+            # Serve real static files (SVG, PNG, etc.) from dist root
+            candidate = _admin_provider_dist / full_path
+            if candidate.is_file() and ".." not in full_path:
+                return FileResponse(str(candidate))
             return FileResponse(str(_admin_provider_dist / "index.html"), headers=_PROVIDER_NO_CACHE)
 
         @app.get("/admin/provider", include_in_schema=False)
