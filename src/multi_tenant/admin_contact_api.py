@@ -2,12 +2,12 @@
 
 Provides a single endpoint for authenticated admin users to send messages
 directly to the service provider (support requests, feature requests,
-information requests). Messages are delivered via Azure Communication
-Services (ACS) email.
+information requests). Messages are delivered via SMTP (primary) or
+Azure Communication Services (fallback).
 
 Dependencies:
     - middleware.py: get_tenant_context, TenantContext
-    - alert_delivery.py: EmailAlertChannel (sender address constant)
+    - alert_delivery.py: send_acs_email (ACS fallback)
 
 © 2026 Remaker Digital, a DBA of VanDusen & Palmeter, LLC. All rights reserved.
 """
@@ -141,26 +141,69 @@ async def _send_contact_email(
     subject: str,
     html_body: str,
 ) -> bool:
-    """Send contact email via ACS. Returns True on success."""
-    conn_str = os.environ.get("AZURE_COMM_CONNECTION_STRING", "")
-    if not conn_str:
-        logger.warning(
-            "AZURE_COMM_CONNECTION_STRING not configured — contact email skipped"
-        )
-        return False
+    """Send contact email via SMTP or ACS.
 
-    try:
-        from src.multi_tenant.alert_delivery import send_acs_email
+    Provider selection: SMTP (Titan) > ACS > skip.
+    """
+    import os as _os
 
-        status = await send_acs_email(conn_str, to_email, subject, html_body)
-        if status == "Succeeded":
-            logger.info("Contact email sent to %s", to_email)
+    # --- Provider 1: SMTP (Titan or other SMTP provider) ---
+    smtp_host = _os.environ.get("SMTP_HOST", "")
+    if smtp_host:
+        import smtplib
+        from email.mime.multipart import MIMEMultipart
+        from email.mime.text import MIMEText
+
+        smtp_port = int(_os.environ.get("SMTP_PORT", "587"))
+        smtp_user = _os.environ.get("SMTP_USERNAME", "")
+        smtp_pass = _os.environ.get("SMTP_PASSWORD", "")
+        smtp_from = _os.environ.get("SMTP_FROM", smtp_user)
+
+        try:
+            msg = MIMEMultipart("alternative")
+            msg["From"] = f"Agent Red <{smtp_from}>"
+            msg["To"] = to_email
+            msg["Subject"] = subject
+            msg.attach(MIMEText(html_body, "html"))
+
+            if smtp_port == 465:
+                with smtplib.SMTP_SSL(smtp_host, smtp_port, timeout=10) as server:
+                    if smtp_user and smtp_pass:
+                        server.login(smtp_user, smtp_pass)
+                    server.send_message(msg)
+            else:
+                with smtplib.SMTP(smtp_host, smtp_port, timeout=10) as server:
+                    server.ehlo()
+                    if smtp_port != 25:
+                        server.starttls()
+                    if smtp_user and smtp_pass:
+                        server.login(smtp_user, smtp_pass)
+                    server.send_message(msg)
+
+            logger.info("Contact email sent via SMTP to %s", to_email)
             return True
-        logger.warning("Contact email status=%s (expected Succeeded)", status)
-        return False
-    except Exception:
-        logger.exception("Contact email send failed")
-        return False
+        except Exception:
+            logger.exception("SMTP contact email failed — trying ACS fallback")
+            # Fall through to ACS provider
+
+    # --- Provider 2: Azure Communication Services (fallback) ---
+    conn_str = _os.environ.get("AZURE_COMM_CONNECTION_STRING", "")
+    if conn_str:
+        try:
+            from src.multi_tenant.alert_delivery import send_acs_email
+
+            status = await send_acs_email(conn_str, to_email, subject, html_body)
+            if status == "Succeeded":
+                logger.info("Contact email sent via ACS to %s", to_email)
+                return True
+            logger.warning("Contact email status=%s (expected Succeeded)", status)
+            return False
+        except Exception:
+            logger.exception("ACS contact email send failed")
+            return False
+
+    logger.warning("No email provider configured — contact email skipped")
+    return False
 
 
 # ---------------------------------------------------------------------------

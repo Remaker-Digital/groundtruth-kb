@@ -1,7 +1,7 @@
 """Trial expiry warning emails — sent at 7, 3, and 1 day(s) before trial end.
 
 Follows the same dual-provider pattern as welcome_email.py and
-widget_otp_verification.py (ACS primary, SMTP fallback, returns bool).
+widget_otp_verification.py (SMTP primary, ACS fallback, returns bool).
 
 Called by the trial expiry warning background task in background.py.
 
@@ -113,7 +113,7 @@ async def send_trial_expiry_warning(
         logger.warning("Unknown warning tier %r for tenant %s", warning_tier, tenant_id[:8])
         return False
 
-    from src.multi_tenant.alert_delivery import EmailAlertChannel, _EMAIL_WRAPPER
+    from src.multi_tenant.alert_delivery import _EMAIL_WRAPPER
     from src.multi_tenant.welcome_email import _build_admin_login_url
 
     days_label = {"7d": "7 days", "3d": "3 days", "1d": "1 day"}[warning_tier]
@@ -131,25 +131,7 @@ async def send_trial_expiry_warning(
     full_html = _EMAIL_WRAPPER.format(body=html_body)
     subject = config["subject"]
 
-    # --- Provider 1: Azure Communication Services ---
-    conn_str = os.environ.get("AZURE_COMM_CONNECTION_STRING", "")
-    if conn_str:
-        try:
-            from src.multi_tenant.alert_delivery import send_acs_email
-
-            status = await send_acs_email(conn_str, to_email, subject, full_html)
-            sent = status == "Succeeded"
-            if sent:
-                logger.info(
-                    "Trial expiry warning sent via ACS: tenant=%s tier=%s email=%s",
-                    tenant_id[:8], warning_tier, to_email,
-                )
-            return sent
-        except Exception:
-            logger.exception("ACS trial expiry email failed: tenant=%s", tenant_id[:8])
-            return False
-
-    # --- Provider 2: SMTP fallback ---
+    # --- Provider 1: SMTP (Titan or other SMTP provider) ---
     smtp_host = os.environ.get("SMTP_HOST", "")
     if smtp_host:
         import smtplib
@@ -159,10 +141,11 @@ async def send_trial_expiry_warning(
         smtp_port = int(os.environ.get("SMTP_PORT", "587"))
         smtp_user = os.environ.get("SMTP_USERNAME", "")
         smtp_pass = os.environ.get("SMTP_PASSWORD", "")
+        smtp_from = os.environ.get("SMTP_FROM", smtp_user)
 
         try:
             msg = MIMEMultipart("alternative")
-            msg["From"] = f"Agent Red <{EmailAlertChannel.SENDER_ADDRESS}>"
+            msg["From"] = f"Agent Red <{smtp_from}>"
             msg["To"] = to_email
             msg["Subject"] = subject
             msg.attach(MIMEText(full_html, "html"))
@@ -182,12 +165,30 @@ async def send_trial_expiry_warning(
                     server.send_message(msg)
 
             logger.info(
-                "Trial expiry warning sent via SMTP: tenant=%s tier=%s",
-                tenant_id[:8], warning_tier,
+                "Trial expiry warning sent via SMTP: tenant=%s tier=%s host=%s",
+                tenant_id[:8], warning_tier, smtp_host,
             )
             return True
         except Exception:
-            logger.exception("SMTP trial expiry email failed: tenant=%s", tenant_id[:8])
+            logger.exception("SMTP trial expiry email failed: tenant=%s — trying ACS fallback", tenant_id[:8])
+            # Fall through to ACS provider
+
+    # --- Provider 2: Azure Communication Services (fallback) ---
+    conn_str = os.environ.get("AZURE_COMM_CONNECTION_STRING", "")
+    if conn_str:
+        try:
+            from src.multi_tenant.alert_delivery import send_acs_email
+
+            status = await send_acs_email(conn_str, to_email, subject, full_html)
+            sent = status == "Succeeded"
+            if sent:
+                logger.info(
+                    "Trial expiry warning sent via ACS: tenant=%s tier=%s email=%s",
+                    tenant_id[:8], warning_tier, to_email,
+                )
+            return sent
+        except Exception:
+            logger.exception("ACS trial expiry email failed: tenant=%s", tenant_id[:8])
             return False
 
     logger.warning("No email provider — skipping trial expiry warning for %s", tenant_id[:8])

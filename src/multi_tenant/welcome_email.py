@@ -1,8 +1,8 @@
 """Welcome email — sent once when a new tenant is provisioned.
 
 Delivers the merchant's initial credentials (superadmin API key, widget key),
-admin console URL, and onboarding guidance. Follows the same dual-provider
-pattern as widget_otp_verification.py (ACS primary, SMTP fallback, returns bool).
+admin console URL, and onboarding guidance. Follows a dual-provider pattern:
+SMTP primary (Titan), ACS fallback. Returns bool.
 
 Call sites:
     - stripe_webhooks.handle_checkout_completed()  (Stripe checkout)
@@ -140,7 +140,7 @@ async def send_welcome_email(
         logger.warning("No email address — skipping welcome email for %s", tenant_id[:8])
         return False
 
-    from src.multi_tenant.alert_delivery import EmailAlertChannel, _EMAIL_WRAPPER
+    from src.multi_tenant.alert_delivery import _EMAIL_WRAPPER
 
     resolved_url = _build_admin_login_url(admin_login_url)
 
@@ -154,7 +154,46 @@ async def send_welcome_email(
     full_html = _EMAIL_WRAPPER.format(body=html_body)
     subject = "Welcome to Agent Red — Your account is ready"
 
-    # --- Provider 1: Azure Communication Services ---
+    # --- Provider 1: SMTP (Titan or other SMTP provider) ---
+    smtp_host = os.environ.get("SMTP_HOST", "")
+    if smtp_host:
+        import smtplib
+        from email.mime.multipart import MIMEMultipart
+        from email.mime.text import MIMEText
+
+        smtp_port = int(os.environ.get("SMTP_PORT", "587"))
+        smtp_user = os.environ.get("SMTP_USERNAME", "")
+        smtp_pass = os.environ.get("SMTP_PASSWORD", "")
+        smtp_from = os.environ.get("SMTP_FROM", smtp_user)
+
+        try:
+            msg = MIMEMultipart("alternative")
+            msg["From"] = f"Agent Red <{smtp_from}>"
+            msg["To"] = to_email
+            msg["Subject"] = subject
+            msg.attach(MIMEText(full_html, "html"))
+
+            if smtp_port == 465:
+                with smtplib.SMTP_SSL(smtp_host, smtp_port, timeout=10) as server:
+                    if smtp_user and smtp_pass:
+                        server.login(smtp_user, smtp_pass)
+                    server.send_message(msg)
+            else:
+                with smtplib.SMTP(smtp_host, smtp_port, timeout=10) as server:
+                    server.ehlo()
+                    if smtp_port != 25:
+                        server.starttls()
+                    if smtp_user and smtp_pass:
+                        server.login(smtp_user, smtp_pass)
+                    server.send_message(msg)
+
+            logger.info("Welcome email sent via SMTP: tenant=%s email=%s host=%s", tenant_id[:8], to_email, smtp_host)
+            return True
+        except Exception:
+            logger.exception("SMTP welcome email send failed: tenant=%s — trying ACS fallback", tenant_id[:8])
+            # Fall through to ACS provider
+
+    # --- Provider 2: Azure Communication Services (fallback) ---
     conn_str = os.environ.get("AZURE_COMM_CONNECTION_STRING", "")
     if conn_str:
         try:
@@ -174,44 +213,6 @@ async def send_welcome_email(
             raise
         except Exception:
             logger.exception("ACS welcome email send failed: tenant=%s", tenant_id[:8])
-            return False
-
-    # --- Provider 2: SMTP fallback ---
-    smtp_host = os.environ.get("SMTP_HOST", "")
-    if smtp_host:
-        import smtplib
-        from email.mime.multipart import MIMEMultipart
-        from email.mime.text import MIMEText
-
-        smtp_port = int(os.environ.get("SMTP_PORT", "587"))
-        smtp_user = os.environ.get("SMTP_USERNAME", "")
-        smtp_pass = os.environ.get("SMTP_PASSWORD", "")
-
-        try:
-            msg = MIMEMultipart("alternative")
-            msg["From"] = f"Agent Red <{EmailAlertChannel.SENDER_ADDRESS}>"
-            msg["To"] = to_email
-            msg["Subject"] = subject
-            msg.attach(MIMEText(full_html, "html"))
-
-            if smtp_port == 465:
-                with smtplib.SMTP_SSL(smtp_host, smtp_port, timeout=10) as server:
-                    if smtp_user and smtp_pass:
-                        server.login(smtp_user, smtp_pass)
-                    server.send_message(msg)
-            else:
-                with smtplib.SMTP(smtp_host, smtp_port, timeout=10) as server:
-                    server.ehlo()
-                    if smtp_port != 25:
-                        server.starttls()
-                    if smtp_user and smtp_pass:
-                        server.login(smtp_user, smtp_pass)
-                    server.send_message(msg)
-
-            logger.info("Welcome email sent via SMTP: tenant=%s email=%s", tenant_id[:8], to_email)
-            return True
-        except Exception:
-            logger.exception("SMTP welcome email send failed: tenant=%s", tenant_id[:8])
             return False
 
     logger.warning("No email provider configured — skipping welcome email for %s", tenant_id[:8])

@@ -42,7 +42,7 @@ from fastapi import APIRouter, Query, Request
 from fastapi.responses import JSONResponse
 from pydantic import BaseModel, Field
 
-from src.multi_tenant.alert_delivery import EmailAlertChannel, _EMAIL_WRAPPER
+from src.multi_tenant.alert_delivery import _EMAIL_WRAPPER
 
 logger = logging.getLogger(__name__)
 
@@ -185,19 +185,13 @@ def verify_magic_link_session_token(token: str) -> dict | None:
 
 
 async def _send_magic_link_email(to_email: str, html_body: str) -> bool:
-    """Send magic link email via ACS or SMTP."""
+    """Send magic link email via SMTP or ACS.
+
+    Provider selection: SMTP (Titan) > ACS > skip.
+    """
     subject = "[Agent Red] Sign In Link"
-    conn_str = os.environ.get("AZURE_COMM_CONNECTION_STRING", "")
-    if conn_str:
-        try:
-            from src.multi_tenant.alert_delivery import send_acs_email
 
-            status = await send_acs_email(conn_str, to_email, subject, html_body)
-            return status == "Succeeded"
-        except Exception:
-            logger.exception("ACS email send failed for magic link")
-            return False
-
+    # --- Provider 1: SMTP (Titan or other SMTP provider) ---
     smtp_host = os.environ.get("SMTP_HOST", "")
     if smtp_host:
         import smtplib
@@ -207,32 +201,43 @@ async def _send_magic_link_email(to_email: str, html_body: str) -> bool:
         smtp_port = int(os.environ.get("SMTP_PORT", "587"))
         smtp_user = os.environ.get("SMTP_USERNAME", "")
         smtp_pass = os.environ.get("SMTP_PASSWORD", "")
-        from_addr = os.environ.get(
-            "SMTP_FROM_ADDRESS", EmailAlertChannel.SENDER_ADDRESS,
-        )
+        smtp_from = os.environ.get("SMTP_FROM", smtp_user)
 
         try:
             msg = MIMEMultipart("alternative")
-            msg["From"] = f"Agent Red <{from_addr}>"
+            msg["From"] = f"Agent Red <{smtp_from}>"
             msg["To"] = to_email
             msg["Subject"] = subject
             msg.attach(MIMEText(html_body, "html"))
 
             if smtp_port == 465:
-                with smtplib.SMTP_SSL(smtp_host, smtp_port) as server:
+                with smtplib.SMTP_SSL(smtp_host, smtp_port, timeout=10) as server:
                     if smtp_user:
                         server.login(smtp_user, smtp_pass)
                     server.send_message(msg)
             else:
-                with smtplib.SMTP(smtp_host, smtp_port) as server:
-                    if smtp_port == 587:
+                with smtplib.SMTP(smtp_host, smtp_port, timeout=10) as server:
+                    server.ehlo()
+                    if smtp_port != 25:
                         server.starttls()
                     if smtp_user:
                         server.login(smtp_user, smtp_pass)
                     server.send_message(msg)
             return True
         except Exception:
-            logger.exception("SMTP email send failed for magic link")
+            logger.exception("SMTP email send failed for magic link — trying ACS fallback")
+            # Fall through to ACS provider
+
+    # --- Provider 2: Azure Communication Services (fallback) ---
+    conn_str = os.environ.get("AZURE_COMM_CONNECTION_STRING", "")
+    if conn_str:
+        try:
+            from src.multi_tenant.alert_delivery import send_acs_email
+
+            status = await send_acs_email(conn_str, to_email, subject, html_body)
+            return status == "Succeeded"
+        except Exception:
+            logger.exception("ACS email send failed for magic link")
             return False
 
     logger.warning("No email provider configured for magic link delivery")

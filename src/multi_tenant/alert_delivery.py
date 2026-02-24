@@ -767,9 +767,11 @@ class EmailAlertChannel(AlertChannel):
                 error="SMTP_HOST not configured",
             )
 
+        smtp_from = os.environ.get("SMTP_FROM", smtp_user) or self.SENDER_ADDRESS
+
         try:
             msg = MIMEMultipart("alternative")
-            msg["From"] = f"Agent Red <{self.SENDER_ADDRESS}>"
+            msg["From"] = f"Agent Red <{smtp_from}>"
             msg["To"] = to_email
             msg["Subject"] = subject
             msg["X-Alert-Id"] = alert.alert_id
@@ -815,7 +817,7 @@ class EmailAlertChannel(AlertChannel):
     async def deliver(self, alert: Alert) -> ChannelResult:
         """Send an email notification for the alert.
 
-        Provider selection: Azure Comm Services > SMTP > skip.
+        Provider selection: SMTP (Titan) > Azure Comm Services > skip.
         Recipient resolution: preferences.notification_email > tenant.customer_email.
         """
         import os
@@ -839,29 +841,35 @@ class EmailAlertChannel(AlertChannel):
         # Render email content
         subject, html_body = _render_email(alert)
 
-        # Try Azure Communication Services first
-        if os.environ.get("AZURE_COMM_CONNECTION_STRING"):
-            return await self._send_via_azure_comm(
+        # Try SMTP first (Titan or other SMTP provider)
+        if os.environ.get("SMTP_HOST"):
+            result = await self._send_via_smtp(
                 to_email, subject, html_body, alert,
             )
+            if result.success:
+                return result
+            logger.warning(
+                "SMTP delivery failed, trying ACS fallback: alert_id=%s error=%s",
+                alert.alert_id, result.error,
+            )
 
-        # Fall back to SMTP
-        if os.environ.get("SMTP_HOST"):
-            return await self._send_via_smtp(
+        # Fall back to Azure Communication Services
+        if os.environ.get("AZURE_COMM_CONNECTION_STRING"):
+            return await self._send_via_azure_comm(
                 to_email, subject, html_body, alert,
             )
 
         # No provider configured — log and skip
         logger.warning(
             "EmailAlertChannel: no email provider configured "
-            "(set AZURE_COMM_CONNECTION_STRING or SMTP_HOST). "
+            "(set SMTP_HOST or AZURE_COMM_CONNECTION_STRING). "
             "alert_id=%s to=%s skipped.",
             alert.alert_id, to_email,
         )
         return ChannelResult(
             channel_name=self.name,
             success=False,
-            error="no email provider configured (AZURE_COMM_CONNECTION_STRING or SMTP_HOST)",
+            error="no email provider configured (SMTP_HOST or AZURE_COMM_CONNECTION_STRING)",
         )
 
 

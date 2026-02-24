@@ -200,7 +200,7 @@ async def _send_api_key_email(
     smtp_port = int(os.environ.get("SMTP_PORT", "587"))
     smtp_user = os.environ.get("SMTP_USERNAME", "")
     smtp_pass = os.environ.get("SMTP_PASSWORD", "")
-    sender = os.environ.get("SMTP_FROM_ADDRESS", "noreply@agentred.com")
+    smtp_from = os.environ.get("SMTP_FROM", smtp_user) or "noreply@agentred.com"
 
     if not smtp_host:
         logger.warning("SMTP_HOST not configured — cannot send API key reset email")
@@ -266,7 +266,7 @@ async def _send_api_key_email(
 
     try:
         msg = MIMEMultipart("alternative")
-        msg["From"] = f"Agent Red <{sender}>"
+        msg["From"] = f"Agent Red <{smtp_from}>"
         msg["To"] = to_email
         msg["Subject"] = subject
         msg.attach(MIMEText(plain_body, "plain"))

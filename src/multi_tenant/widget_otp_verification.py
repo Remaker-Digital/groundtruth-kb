@@ -423,27 +423,17 @@ async def _send_otp_email(
     otp_code: str,
     tenant_id: str,
 ) -> bool:
-    """Send an OTP email using ACS or SMTP.
+    """Send an OTP email using SMTP or ACS.
 
-    Reuses the same provider selection logic as email_verification.py.
+    Provider selection: SMTP (Titan) > ACS > skip.
     """
-    from src.multi_tenant.alert_delivery import EmailAlertChannel, _EMAIL_WRAPPER
+    from src.multi_tenant.alert_delivery import _EMAIL_WRAPPER
 
     html_body = _OTP_EMAIL_BODY.format(code=otp_code)
     full_html = _EMAIL_WRAPPER.format(body=html_body)
     subject = "Your verification code"
 
-    conn_str = os.environ.get("AZURE_COMM_CONNECTION_STRING", "")
-    if conn_str:
-        try:
-            from src.multi_tenant.alert_delivery import send_acs_email
-
-            status = await send_acs_email(conn_str, to_email, subject, full_html)
-            return status == "Succeeded"
-        except Exception:
-            logger.exception("ACS email send failed for widget OTP")
-            return False
-
+    # --- Provider 1: SMTP (Titan or other SMTP provider) ---
     smtp_host = os.environ.get("SMTP_HOST", "")
     if smtp_host:
         import smtplib
@@ -453,10 +443,11 @@ async def _send_otp_email(
         smtp_port = int(os.environ.get("SMTP_PORT", "587"))
         smtp_user = os.environ.get("SMTP_USERNAME", "")
         smtp_pass = os.environ.get("SMTP_PASSWORD", "")
+        smtp_from = os.environ.get("SMTP_FROM", smtp_user)
 
         try:
             msg = MIMEMultipart("alternative")
-            msg["From"] = f"Agent Red <{EmailAlertChannel.SENDER_ADDRESS}>"
+            msg["From"] = f"Agent Red <{smtp_from}>"
             msg["To"] = to_email
             msg["Subject"] = subject
             msg.attach(MIMEText(full_html, "html"))
@@ -476,7 +467,19 @@ async def _send_otp_email(
                     server.send_message(msg)
             return True
         except Exception:
-            logger.exception("SMTP email send failed for widget OTP")
+            logger.exception("SMTP email send failed for widget OTP — trying ACS fallback")
+            # Fall through to ACS provider
+
+    # --- Provider 2: Azure Communication Services (fallback) ---
+    conn_str = os.environ.get("AZURE_COMM_CONNECTION_STRING", "")
+    if conn_str:
+        try:
+            from src.multi_tenant.alert_delivery import send_acs_email
+
+            status = await send_acs_email(conn_str, to_email, subject, full_html)
+            return status == "Succeeded"
+        except Exception:
+            logger.exception("ACS email send failed for widget OTP")
             return False
 
     logger.warning("No email provider configured for widget OTP")
