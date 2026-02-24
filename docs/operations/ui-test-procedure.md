@@ -410,6 +410,13 @@ Run after Page 0A (system is now re-activated with brand_name + brand_voice set)
 | 2.19d | Empty state — filter no match | "No matching conversations" + "Try adjusting your filter." when filter yields 0 results | |
 | 2.19e | Filter clears selected | When search or filter produces no results, selected conversation is cleared (Issue 3a) | |
 
+#### 2.20 Message role display (D72 regression)
+
+| # | Test | Expected | Status |
+|---|------|----------|--------|
+| 2.20 | AI messages display as "Agent Red" | Messages with `role: 'ai'` from backend render with "Agent Red AI" label, right-aligned, agent styling — NOT as "Customer" (D72 regression) | |
+| 2.20a | Agent role backward compat | Messages with `role: 'agent'` also render as "Agent Red AI" (legacy format) | |
+
 ---
 
 ### Page 3: Team Members
@@ -1024,7 +1031,7 @@ Run after Page 0A (system is now re-activated with brand_name + brand_voice set)
 | 7.11a | Template variable — click inserts token | Clicking \<FIRST_NAME\> appends token to greeting message textarea | |
 | 7.11b | Template variable — preview resolves tokens | Greeting bubble in preview shows "Sarah" instead of \<FIRST_NAME\>, "Johnson" for \<LAST_NAME\>, etc. | |
 | 7.11c | Pre-chat form toggle — renders | Switch with label "Pre-chat form", HelpTooltip, description text | |
-| 7.11d | Pre-chat form toggle — default ON | Switch is ON by default (preChatFormEnabled: true, AUTH-1 Cycle 15). For pre-Cycle-15 tenants, may be OFF until re-initialized. | |
+| 7.11d | Pre-chat form toggle — default OFF | Switch is OFF by default (preChatFormEnabled: false, D70 fix). Pre-chat form is opt-in — merchants enable when ready. For tenants that previously had it ON, may remain ON until re-initialized. | |
 | 7.11e | Pre-chat form toggle — ON reveals field chips | Toggling ON shows Chip.Group with 4 field chips: Name, Email, Phone, Company | |
 | 7.11f | Pre-chat field chips — default selection | Name and Email chips selected by default (preChatFields: ['name', 'email']) | |
 | 7.11g | Pre-chat field chips — toggle selection | Clicking Phone chip adds it to selection; clicking Email deselects it | |
@@ -1594,6 +1601,12 @@ Run after Page 0A (system is now re-activated with brand_name + brand_voice set)
 | D64 | Quick Actions | Status badges truncated ("Act...") — Status column `w={80}` too narrow for "Active" badge text | S26 | Fixed — Status column widened to `w={100}`; Prompt template column capped at `maxWidth: 300` | 6.9 |
 | D67 | Quick Actions | Auto-open toggle non-functional — `PageAssignmentResponse` model missing `auto_open` and `auto_open_delay_ms` fields; GET endpoint returned assignments without these values, so frontend always saw `undefined` → `false` after refetch | S26 | Fixed — added both fields to response model + builder function; toggle state now round-trips correctly | 6.8 |
 | D68 | Quick Actions | Page assignments (slot changes, auto-open, delay) save directly to assignments document instead of writing to draft configuration — violates Save→Activate model where all AI Configuration pages write to draft and only commit on Activate | S26 | Fixed S27 — `_ensure_qa_draft()` called before `upsert_page_assignment` and `delete_page_assignment`; draft-first repo methods now write to draft; Discard reverts assignments | 6.7, 6.8, 6.10 |
+| D69 | Email (backend) | `SENDER_ADDRESS` constant changed to `agentredcx.com` during branding — custom domain not linked in ACS → all emails fail DomainNotLinked | S86 | Fixed v1.57.13 — reverted to Azure managed domain. Lesson: never change `SENDER_ADDRESS` without verifying ACS domain linkage | (unit tests) |
+| D70 | Widget Config | Pre-chat form enabled by default (`fields.yaml` platform_default `enabled: true`) — blocks storefront visitors with identity form | S86 | Fixed v1.57.14 — changed platform_default to `false`. Pre-chat form is opt-in | 7.11d |
+| D71 | Widget (Shopify) | ConsentBanner.tsx `borderRadiusMd` — not a valid Mantine style token → TS build error | S86 | Fixed v1.57.14 — changed to `borderRadius` | (build gate) |
+| D72 | Inbox | AI responses render as "Customer" — `ConversationMessage.role` type had `'agent'` but backend sends `'ai'` | S86 | Fixed v1.57.15 — added `'ai'` to role union. Display maps `'ai'`→"Agent Red" | 2.20 |
+| D73 | Email (backend) | ACS 429 rate-limit hangs 62 min — SDK default RetryPolicy waits on `retry-after` header. Frontend shows "Unknown error" | S86 | Fixed v1.57.16 — `RetryPolicy(retry_total=2, retry_backoff_max=5)`. 429 → `RuntimeError` chain to resend endpoint | (unit: `test_acs_rate_limit_propagates_runtime_error`) |
+| D74 | Email (backend) | SMTP From uses ACS `DoNotReply@` address — Titan rejects mismatched From | S86 | Fixed v1.57.16 — all 9 modules use `SMTP_FROM` env var. ACS address only in ACS path | (118 email unit tests) |
 
 ---
 

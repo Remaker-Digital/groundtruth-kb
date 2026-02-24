@@ -1833,7 +1833,7 @@ Navigate to `$PROVIDER_URL/`.
 | P.1g | **Data-binding: Recent deployments** — `javascript_tool(tabId, "document.querySelectorAll('table tbody tr').length > 0 || document.body.innerText.includes('No recent')")` — deployment table has rows OR shows explicit empty state |
 | P.1h | `computer(action:'screenshot')` — capture visual state |
 
-#### P.2 Tenant Directory (12 tests)
+#### P.2 Tenant Directory (14 tests)
 
 Navigate to `$PROVIDER_URL/tenants`.
 
@@ -1850,7 +1850,9 @@ Navigate to `$PROVIDER_URL/tenants`.
 | P.2i | **Data-binding: Tier filter dropdown** — `find("Tier", tabId)` → click select → `javascript_tool(tabId, "document.querySelectorAll('[role=option]').length")` — dropdown has ≥ 2 options (e.g., starter, professional) |
 | P.2j | **Data-binding: Channel filter dropdown** — `find("Channel", tabId)` → click select → `javascript_tool(tabId, "document.querySelectorAll('[role=option]').length")` — dropdown has ≥ 1 option |
 | P.2k | **Data-binding: Shop domain** — `javascript_tool(tabId, "document.body.innerText.match(/\\.myshopify\\.com/)?.[0]")` — shop domain column shows a domain string (or "--" if billing_channel is not shopify) |
-| P.2l | `computer(action:'screenshot')` — capture visual state |
+| P.2l | **Data-binding: Static status filter options** — `find("Status", tabId)` → click select → `javascript_tool(tabId, "[...document.querySelectorAll('[role=option]')].map(o => o.textContent).join(',')")` — dropdown includes ALL lifecycle states: active, trial, expired, suspended, inactive, cancelled (static list, not dynamically populated from current data). Regression for D85/S85. |
+| P.2m | **Welcome email resend** — `find("remaker-digital-001", tabId)` → click row → find "Resend Welcome Email" button → click → verify success toast appears. `read_console_messages(onlyErrors:true)` — zero console errors. Regression for D74/S86. |
+| P.2n | `computer(action:'screenshot')` — capture visual state |
 
 #### P.3 Deployment History (7 tests)
 
