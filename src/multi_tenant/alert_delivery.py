@@ -42,6 +42,61 @@ logger = logging.getLogger(__name__)
 
 
 # ---------------------------------------------------------------------------
+# Shared async-safe ACS email helper
+# ---------------------------------------------------------------------------
+
+
+SENDER_ADDRESS = "DoNotReply@agentredcx.com"
+
+
+def _send_acs_email_sync(
+    conn_str: str,
+    sender: str,
+    to_email: str,
+    subject: str,
+    html_body: str,
+) -> str:
+    """Send an email via Azure Communication Services (synchronous).
+
+    This function is designed to be called via ``asyncio.to_thread()``
+    so that *none* of the blocking ACS SDK operations (client creation,
+    begin_send, poller.result) starve the async event loop.
+
+    Returns the delivery status string (e.g. "Succeeded").
+    """
+    from azure.communication.email import EmailClient
+
+    client = EmailClient.from_connection_string(conn_str)
+    message = {
+        "senderAddress": sender,
+        "recipients": {"to": [{"address": to_email}]},
+        "content": {"subject": subject, "html": html_body},
+    }
+    poller = client.begin_send(message)
+    result = poller.result()
+    return getattr(result, "status", "unknown")
+
+
+async def send_acs_email(
+    conn_str: str,
+    to_email: str,
+    subject: str,
+    html_body: str,
+    *,
+    sender: str = SENDER_ADDRESS,
+) -> str:
+    """Async wrapper for ACS email send — fully offloaded to thread pool.
+
+    Returns the delivery status string (e.g. "Succeeded").
+    """
+    import asyncio
+
+    return await asyncio.to_thread(
+        _send_acs_email_sync, conn_str, sender, to_email, subject, html_body,
+    )
+
+
+# ---------------------------------------------------------------------------
 # Enums
 # ---------------------------------------------------------------------------
 
@@ -620,23 +675,7 @@ class EmailAlertChannel(AlertChannel):
             )
 
         try:
-            from azure.communication.email import EmailClient
-
-            client = EmailClient.from_connection_string(conn_str)
-            message = {
-                "senderAddress": self.SENDER_ADDRESS,
-                "recipients": {
-                    "to": [{"address": to_email}],
-                },
-                "content": {
-                    "subject": subject,
-                    "html": html_body,
-                },
-            }
-            poller = client.begin_send(message)
-            import asyncio
-            result = await asyncio.to_thread(poller.result)
-            status = getattr(result, "status", "unknown")
+            status = await send_acs_email(conn_str, to_email, subject, html_body)
 
             if status == "Succeeded":
                 logger.info(

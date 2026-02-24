@@ -436,18 +436,10 @@ async def _send_otp_email(
     conn_str = os.environ.get("AZURE_COMM_CONNECTION_STRING", "")
     if conn_str:
         try:
-            from azure.communication.email import EmailClient
+            from src.multi_tenant.alert_delivery import send_acs_email
 
-            client = EmailClient.from_connection_string(conn_str)
-            message = {
-                "senderAddress": EmailAlertChannel.SENDER_ADDRESS,
-                "recipients": {"to": [{"address": to_email}]},
-                "content": {"subject": subject, "html": full_html},
-            }
-            poller = client.begin_send(message)
-            import asyncio
-            result = await asyncio.to_thread(poller.result)
-            return getattr(result, "status", "") == "Succeeded"
+            status = await send_acs_email(conn_str, to_email, subject, full_html)
+            return status == "Succeeded"
         except Exception:
             logger.exception("ACS email send failed for widget OTP")
             return False
