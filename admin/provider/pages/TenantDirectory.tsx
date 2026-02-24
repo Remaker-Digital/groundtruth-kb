@@ -90,11 +90,24 @@ const PAGE_SIZE = 25;
 
 const STATUS_COLORS: Record<string, string> = {
   active: 'green',
+  provisioning: 'yellow',
   trial: 'blue',
   suspended: 'orange',
   deactivated: 'red',
   pending: 'yellow',
   trial_expired: 'red',
+  past_due: 'orange',
+  grace_period: 'yellow',
+};
+
+/** Human-readable labels for tenant status values. */
+const STATUS_LABELS: Record<string, string> = {
+  active: 'active',
+  provisioning: 'provisioning',
+  trial_expired: 'expired',
+  past_due: 'past due',
+  grace_period: 'grace period',
+  deactivated: 'deactivated',
 };
 
 const TIER_COLORS: Record<string, string> = {
@@ -102,6 +115,15 @@ const TIER_COLORS: Record<string, string> = {
   PROFESSIONAL: 'blue',
   ENTERPRISE: 'violet',
 };
+
+const STATUS_OPTIONS = [
+  { value: 'active', label: 'Active' },
+  { value: 'provisioning', label: 'Provisioning' },
+  { value: 'trial_expired', label: 'Expired' },
+  { value: 'past_due', label: 'Past due' },
+  { value: 'grace_period', label: 'Grace period' },
+  { value: 'deactivated', label: 'Deactivated' },
+];
 
 const TIER_OPTIONS = [
   { value: 'trial', label: 'Trial' },
@@ -281,7 +303,11 @@ export function TenantDirectoryPage() {
       });
       if (res.ok) {
         const data = await res.json();
-        onNotify(`Welcome email sent to ${data.sentTo}`, 'success');
+        if (data.sent) {
+          onNotify(`Welcome email sent to ${data.sentTo}`, 'success');
+        } else {
+          onNotify(data.message || `Email delivery failed for ${data.sentTo}`, 'error');
+        }
       } else {
         const err = await res.json().catch(() => ({ detail: 'Unknown error' }));
         onNotify(`Failed to resend: ${err.detail || res.statusText}`, 'error');
@@ -374,7 +400,7 @@ export function TenantDirectoryPage() {
             clearable
             value={statusFilter}
             onChange={setStatusFilter}
-            data={summary ? Object.keys(summary.byStatus ?? {}).map(s => ({ value: s, label: s })) : []}
+            data={STATUS_OPTIONS}
             size="sm"
             w={180}
           />
@@ -443,7 +469,7 @@ export function TenantDirectoryPage() {
                           color={STATUS_COLORS[t.status] ?? 'gray'}
                           size="sm"
                         >
-                          {t.status}
+                          {STATUS_LABELS[t.status] ?? t.status}
                         </Badge>
                       </Table.Td>
                       <Table.Td>
