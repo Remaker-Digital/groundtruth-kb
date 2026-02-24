@@ -486,13 +486,17 @@ _EMAIL_WRAPPER = """<!DOCTYPE html>
 <body style="margin:0;padding:0;background:#141414;font-family:Inter,-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,sans-serif">
 <table width="100%" cellpadding="0" cellspacing="0" style="background:#141414;padding:32px 0">
 <tr><td align="center">
-<table width="600" cellpadding="0" cellspacing="0" style="background:#ffffff;border-radius:8px;overflow:hidden">
-<tr><td style="background:#141414;padding:24px 32px">
+<table width="600" cellpadding="0" cellspacing="0">
+<tr><td style="padding:24px 32px 16px">
   <img src="https://agentredcx.com/img/email-logo-light.png?v=2"
        alt="Agent Red Customer Experience" width="220" height="auto"
        style="display:block;max-width:220px;height:auto;border:0" />
 </td></tr>
+<tr><td>
+<table width="100%" cellpadding="0" cellspacing="0" style="background:#ffffff;border-radius:8px;overflow:hidden">
 <tr><td style="padding:32px">{body}</td></tr>
+</table>
+</td></tr>
 <tr><td style="padding:16px 32px">
   <p style="margin:0;color:#9ca3af;font-size:12px;text-align:center">
     Agent Red Customer Experience &mdash; a product of <a href="https://remakerdigital.com" style="color:#ff3621;text-decoration:none">Remaker Digital</a>

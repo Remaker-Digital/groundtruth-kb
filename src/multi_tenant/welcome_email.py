@@ -66,8 +66,9 @@ _WELCOME_EMAIL_BODY = """
      padding:16px;margin:16px 0">
   <strong style="color:#92400e">Security Notice</strong>
   <p style="color:#92400e;margin:8px 0 0;font-size:13px">
-    Store these keys securely. They will not be shown again.
-    If lost, you can regenerate them from the admin dashboard.
+    Store these keys securely. If lost, you can regenerate your API key
+    by requesting a new key at the login prompt. Your chat widget key
+    and API URL are available from your admin console.
   </p>
 </div>
 
