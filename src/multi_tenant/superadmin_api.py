@@ -871,16 +871,25 @@ async def resend_welcome_email(
     if hasattr(tier_name, "value"):
         tier_name = tier_name.value
 
-    sent = await send_welcome_email(
-        to_email=email_addr,
-        tenant_id=tenant_id,
-        superadmin_key="(use your existing key — not shown for security)",
-        widget_key="(use your existing key — not shown for security)",
-        tier=tier_name,
-    )
+    try:
+        sent = await send_welcome_email(
+            to_email=email_addr,
+            tenant_id=tenant_id,
+            superadmin_key="(use your existing key — not shown for security)",
+            widget_key="(use your existing key — not shown for security)",
+            tier=tier_name,
+        )
+    except RuntimeError as exc:
+        # Rate-limit (429) or ACS HTTP error — return actionable message
+        return ResendWelcomeEmailResponse(
+            tenant_id=tenant_id,
+            sent_to=email_addr,
+            sent=False,
+            message=str(exc),
+        )
 
     # Audit log
-    if _audit_repo:
+    if _audit_repo and sent:
         now_iso = datetime.now(timezone.utc).isoformat()
         try:
             await _audit_repo.create(

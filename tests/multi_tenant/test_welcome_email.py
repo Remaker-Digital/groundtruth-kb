@@ -273,6 +273,34 @@ class TestSendWelcomeEmail:
         assert result is False
 
     @pytest.mark.asyncio
+    async def test_acs_rate_limit_propagates_runtime_error(self):
+        """429 rate-limit from ACS raises RuntimeError, not swallowed.
+
+        Regression test for S86: ACS 429 PerSubscriptionPerHourLimitExceeded
+        caused SDK to hang for 60+ minutes. The fix makes begin_send() fail
+        fast, raising RuntimeError that callers can surface to the user.
+        """
+        from azure.core.exceptions import HttpResponseError
+
+        exc_429 = HttpResponseError(response=MagicMock(status_code=429))
+        exc_429.status_code = 429
+
+        mock_client = MagicMock()
+        mock_client.begin_send.side_effect = exc_429
+
+        with (
+            patch.dict("os.environ", {"AZURE_COMM_CONNECTION_STRING": "endpoint=test;key=test"}),
+            patch("azure.communication.email.EmailClient") as mock_cls,
+            patch("azure.core.pipeline.policies.RetryPolicy"),
+        ):
+            mock_cls.from_connection_string.return_value = mock_client
+            with pytest.raises(RuntimeError, match="rate limit exceeded"):
+                await send_welcome_email(
+                    to_email="merchant@example.com",
+                    tenant_id="t-rate-limit",
+                )
+
+    @pytest.mark.asyncio
     async def test_no_provider_returns_false(self):
         """Returns False when neither ACS nor SMTP is configured."""
         with patch.dict("os.environ", {}, clear=True):

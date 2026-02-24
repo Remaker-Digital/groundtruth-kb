@@ -63,16 +63,55 @@ def _send_acs_email_sync(
     begin_send, poller.result) starve the async event loop.
 
     Returns the delivery status string (e.g. "Succeeded").
+    Raises RuntimeError for rate-limit (429) or other HTTP errors so
+    callers can surface actionable messages instead of hanging.
+
+    NOTE: The SDK's default retry policy honours the 429 ``retry-after``
+    header, which ACS can set to 3600+ seconds.  This would block the
+    entire request for over an hour.  We override the retry policy with
+    a 10-second total retry budget so 429 fails fast instead of hanging.
+
+    © 2026 Remaker Digital, a DBA of VanDusen & Palmeter, LLC. All rights reserved.
     """
     from azure.communication.email import EmailClient
+    from azure.core.exceptions import HttpResponseError
+    from azure.core.pipeline.policies import RetryPolicy
 
-    client = EmailClient.from_connection_string(conn_str)
+    # Short retry budget: max 2 retries, 10s total — prevents 429 from
+    # blocking the request for 60+ minutes (ACS hourly limit retry-after).
+    retry_policy = RetryPolicy(
+        retry_total=2,
+        retry_backoff_factor=1,
+        retry_backoff_max=5,
+    )
+    client = EmailClient.from_connection_string(
+        conn_str,
+        retry_policy=retry_policy,
+    )
     message = {
         "senderAddress": sender,
         "recipients": {"to": [{"address": to_email}]},
         "content": {"subject": subject, "html": html_body},
     }
-    poller = client.begin_send(message)
+    try:
+        poller = client.begin_send(message)
+    except HttpResponseError as exc:
+        # 429 should now surface here thanks to the short retry policy.
+        if exc.status_code == 429:
+            retry_after = getattr(exc, "retry_after", None) or "unknown"
+            logger.warning(
+                "ACS rate-limited (429): retry_after=%s to=%s",
+                retry_after, to_email,
+            )
+            raise RuntimeError(
+                f"Email rate limit exceeded — retry in {retry_after} seconds"
+            ) from exc
+        logger.error(
+            "ACS begin_send HTTP error %s: %s", exc.status_code, exc.message,
+        )
+        raise RuntimeError(
+            f"ACS email error ({exc.status_code}): {exc.message}"
+        ) from exc
     result = poller.result(timeout=60)  # 60s max — prevent indefinite hang
     return getattr(result, "status", "unknown")
 

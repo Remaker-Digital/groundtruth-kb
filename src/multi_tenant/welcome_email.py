@@ -167,6 +167,11 @@ async def send_welcome_email(
             else:
                 logger.warning("ACS welcome email status=%s: tenant=%s", status, tenant_id[:8])
             return sent
+        except RuntimeError as exc:
+            # Rate-limit (429) or HTTP error from ACS — propagate so caller
+            # can surface a user-friendly message instead of generic failure.
+            logger.warning("ACS welcome email failed: tenant=%s error=%s", tenant_id[:8], exc)
+            raise
         except Exception:
             logger.exception("ACS welcome email send failed: tenant=%s", tenant_id[:8])
             return False
