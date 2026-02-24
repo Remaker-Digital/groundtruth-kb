@@ -2,7 +2,7 @@
 
 **Type:** Operational Plan
 **Created:** 2026-02-23 (Session 77)
-**Status:** ACTIVE — current framework for all work
+**Status:** ACTIVE — Steps 1-3 COMPLETE, Step 4 (beta feedback) in progress, Step 5 (staging) PROVISIONED
 **Release version:** v1.57.0 (beta) → v1.58.0 (next)
 
 ---
@@ -32,17 +32,19 @@
 | Image | `api-gateway:v1.57.0` (pinned at release freeze) |
 | Tenants | `remaker-digital-001` + 2 beta customer tenants |
 
-### Staging (Parallel)
+### Staging (Parallel) — PROVISIONED (Session 87, 2026-02-24)
 
 | Resource | Value |
 |----------|-------|
-| Container App | `agent-red-staging` (NEW — to be provisioned) |
-| FQDN | TBD (assigned at provisioning) |
-| Cosmos DB | `cosmos-agentred-eastus` / database: `agentred-staging` (NEW — same account, isolated database) |
-| Key Vault | `kv-agentred-staging` (NEW) |
+| Container App | `agent-red-staging` |
+| FQDN | `agent-red-staging.orangeglacier-f566a4e7.eastus.azurecontainerapps.io` |
+| Cosmos DB | `cosmos-agentred-eastus` / database: `agentred-staging` (same account, isolated database) |
+| Key Vault | `kv-agentred-staging` (RBAC, `https://kv-agentred-staging.vault.azure.net/`) |
 | ACR | `acragentredeastus.azurecr.io` (shared) |
-| Image | Current development build from `main` |
-| Tenants | `staging-001` (seeded for upgrade testing) |
+| Image | `api-gateway:v1.57.20` (ACR ca33) |
+| Tenants | `staging-001` (seeded, tier=starter, config activated) |
+| Managed Identity | `c473bb82-3c68-4425-8503-81c81982d306` (Key Vault Secrets Officer) |
+| Min/Max Replicas | 0/1 (scales to zero when idle) |
 
 ---
 
