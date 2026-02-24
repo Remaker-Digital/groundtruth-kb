@@ -100,6 +100,7 @@ AUTH_EXEMPT_PREFIXES = (
     "/redoc",
     "/openapi.json",
     "/widget.js",
+    "/widget/",
     "/api/webhooks/",
     "/api/shopify/gdpr/",
     "/api/checkout/",

@@ -936,29 +936,6 @@ export const StandaloneLayout: React.FC<StandaloneLayoutProps> = ({
                 );
               })}
 
-            {/* Documentation — external link */}
-            <NavLink
-              label="Documentation"
-              component="a"
-              href={DOCS_URL}
-              target="_blank"
-              rel="noopener noreferrer"
-              leftSection={
-                <ThemeIcon
-                  variant={isDark ? 'default' : 'light'}
-                  size="sm"
-                  color="gray"
-                  style={isDark ? { background: 'transparent', border: 'none' } : undefined}
-                >
-                  <Icons.docs />
-                </ThemeIcon>
-              }
-              rightSection={<Icons.externalLink />}
-              style={{
-                borderRadius: 8,
-                marginBottom: 2,
-              }}
-            />
           </AppShell.Section>
 
           {/* Footer */}
