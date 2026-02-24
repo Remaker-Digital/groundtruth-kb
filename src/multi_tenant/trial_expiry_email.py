@@ -43,11 +43,11 @@ _EXPIRY_WARNING_BODY = """
 </ul>
 
 <div style="text-align:center;margin:24px 0">
-  <span style="display:inline-block;padding:12px 32px;background:#3B82F6;
+  <a href="{admin_login_url}" style="display:inline-block;padding:12px 32px;background:#3B82F6;
        color:#ffffff;border-radius:6px;font-size:14px;font-weight:600;
        text-decoration:none">
-    Upgrade Now
-  </span>
+    Sign in to Dashboard
+  </a>
 </div>
 
 <p style="color:#9ca3af;font-size:12px;line-height:1.5;margin:16px 0 0">
@@ -114,6 +114,7 @@ async def send_trial_expiry_warning(
         return False
 
     from src.multi_tenant.alert_delivery import EmailAlertChannel, _EMAIL_WRAPPER
+    from src.multi_tenant.welcome_email import _build_admin_login_url
 
     days_label = {"7d": "7 days", "3d": "3 days", "1d": "1 day"}[warning_tier]
 
@@ -125,6 +126,7 @@ async def send_trial_expiry_warning(
         badge_border=config["badge_border"],
         badge_color=config["badge_color"],
         tenant_id=tenant_id,
+        admin_login_url=_build_admin_login_url(),
     )
     full_html = _EMAIL_WRAPPER.format(body=html_body)
     subject = config["subject"]
