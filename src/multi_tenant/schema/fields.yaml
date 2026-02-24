@@ -1270,7 +1270,7 @@ fields:
     field_type: object
     validation: {}
     platform_default:
-      enabled: true
+      enabled: false
       fields:
         - name: name
           label: Name

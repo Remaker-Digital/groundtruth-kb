@@ -890,6 +890,32 @@ export function WidgetPage() {
                   )}
                 </div>
 
+                {/* API URL display */}
+                <div>
+                  <Text size="sm" fw={500} mb={6}>API URL</Text>
+                  <Group gap="xs" align="flex-end">
+                    <TextInput
+                      value={apiBaseUrl}
+                      readOnly
+                      size="sm"
+                      style={{ flex: 1 }}
+                      styles={{ input: { fontFamily: 'monospace', fontSize: '12px' } }}
+                    />
+                    <CopyButton value={apiBaseUrl}>
+                      {({ copied, copy }) => (
+                        <Tooltip label={copied ? 'Copied' : 'Copy URL'}>
+                          <ActionIcon color={copied ? 'green' : 'action'} onClick={copy} variant="subtle" size="lg">
+                            {copied ? '\u2713' : '\uD83D\uDCCB'}
+                          </ActionIcon>
+                        </Tooltip>
+                      )}
+                    </CopyButton>
+                  </Group>
+                  <Text size="xs" c="dimmed" mt={4}>
+                    Shopify merchants: paste this URL into the Agent Red theme block settings.
+                  </Text>
+                </div>
+
                 {/* Embed code snippet */}
                 {displayKey && (
                   <div>

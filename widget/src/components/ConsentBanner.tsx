@@ -60,7 +60,7 @@ export const ConsentBanner: FunctionComponent<ConsentBannerProps> = ({
             color: '#FFFFFF',
             backgroundColor: tokens.colorPrimary,
             border: 'none',
-            borderRadius: tokens.borderRadiusMd,
+            borderRadius: tokens.borderRadius,
             cursor: 'pointer',
           }}
         >
@@ -77,7 +77,7 @@ export const ConsentBanner: FunctionComponent<ConsentBannerProps> = ({
             color: tokens.colorTextSecondary,
             backgroundColor: 'transparent',
             border: `1px solid ${tokens.colorBorder}`,
-            borderRadius: tokens.borderRadiusMd,
+            borderRadius: tokens.borderRadius,
             cursor: 'pointer',
           }}
         >
