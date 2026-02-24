@@ -493,7 +493,7 @@ _EMAIL_WRAPPER = """<!DOCTYPE html>
        style="display:block;max-width:220px;height:auto;border:0" />
 </td></tr>
 <tr><td>
-<table width="100%" cellpadding="0" cellspacing="0" style="background:#ffffff;border-radius:8px;overflow:hidden">
+<table width="100%" cellpadding="0" cellspacing="0" style="background:#ffffff;overflow:hidden">
 <tr><td style="padding:32px">{body}</td></tr>
 </table>
 </td></tr>
@@ -533,22 +533,22 @@ def _render_email(alert: Alert) -> tuple[str, str]:
         # Usage alerts
         AlertType.USAGE_80_PCT: (
             '<h2 style="margin:0 0 16px;color:#111827;font-size:20px">Approaching Usage Limit</h2>'
-            '<div style="display:inline-block;padding:4px 12px;border-radius:12px;'
+            '<div style="display:inline-block;padding:4px 12px;'
             f'background:{badge_color};color:#fff;font-size:12px;font-weight:600">'
             '{severity}</div>'
             '<p style="color:#374151;line-height:1.6;margin:16px 0">{message}</p>'
-            '<div style="background:#fef3c7;border:1px solid #fcd34d;border-radius:6px;padding:16px;margin:16px 0">'
+            '<div style="background:#fef3c7;border:1px solid #fcd34d;padding:16px;margin:16px 0">'
             '<strong style="color:#92400e">Recommendation:</strong>'
             '<p style="color:#92400e;margin:8px 0 0">Purchase a conversation pack to avoid overage charges '
             'and ensure uninterrupted service.</p></div>'
         ),
         AlertType.USAGE_100_PCT: (
             '<h2 style="margin:0 0 16px;color:#111827;font-size:20px">Conversation Allowance Exhausted</h2>'
-            '<div style="display:inline-block;padding:4px 12px;border-radius:12px;'
+            '<div style="display:inline-block;padding:4px 12px;'
             f'background:{badge_color};color:#fff;font-size:12px;font-weight:600">'
             '{severity}</div>'
             '<p style="color:#374151;line-height:1.6;margin:16px 0">{message}</p>'
-            '<div style="background:#fee2e2;border:1px solid #fca5a5;border-radius:6px;padding:16px;margin:16px 0">'
+            '<div style="background:#fee2e2;border:1px solid #fca5a5;padding:16px;margin:16px 0">'
             '<strong style="color:#991b1b">Action Required:</strong>'
             '<p style="color:#991b1b;margin:8px 0 0">Your included conversations are exhausted. '
             'Additional conversations will draw from pack balance or incur per-conversation overage charges.</p></div>'
@@ -556,11 +556,11 @@ def _render_email(alert: Alert) -> tuple[str, str]:
         # Trial expiry
         AlertType.TRIAL_EXPIRING: (
             '<h2 style="margin:0 0 16px;color:#111827;font-size:20px">Trial Expiring Soon</h2>'
-            '<div style="display:inline-block;padding:4px 12px;border-radius:12px;'
+            '<div style="display:inline-block;padding:4px 12px;'
             f'background:{badge_color};color:#fff;font-size:12px;font-weight:600">'
             '{severity}</div>'
             '<p style="color:#374151;line-height:1.6;margin:16px 0">{message}</p>'
-            '<div style="background:#eff6ff;border:1px solid #93c5fd;border-radius:6px;padding:16px;margin:16px 0">'
+            '<div style="background:#eff6ff;border:1px solid #93c5fd;padding:16px;margin:16px 0">'
             '<strong style="color:#1e40af">Upgrade to keep your setup:</strong>'
             '<p style="color:#1e40af;margin:8px 0 0">Your AI configuration, knowledge base, and conversation '
             'history will be preserved when you subscribe to any paid plan.</p></div>'
@@ -568,14 +568,14 @@ def _render_email(alert: Alert) -> tuple[str, str]:
         # API key delivery
         AlertType.API_KEY_GENERATED: (
             '<h2 style="margin:0 0 16px;color:#111827;font-size:20px">API Key Generated</h2>'
-            '<div style="display:inline-block;padding:4px 12px;border-radius:12px;'
+            '<div style="display:inline-block;padding:4px 12px;'
             f'background:{badge_color};color:#fff;font-size:12px;font-weight:600">'
             '{severity}</div>'
             '<p style="color:#374151;line-height:1.6;margin:16px 0">{message}</p>'
-            '<div style="background:#f3f4f6;border:1px solid #d1d5db;border-radius:6px;'
+            '<div style="background:#f3f4f6;border:1px solid #d1d5db;'
             'padding:16px;margin:16px 0;font-family:\'JetBrains Mono\',monospace">'
             '<code style="word-break:break-all;color:#111827;font-size:14px">{api_key}</code></div>'
-            '<div style="background:#fef3c7;border:1px solid #fcd34d;border-radius:6px;padding:16px;margin:16px 0">'
+            '<div style="background:#fef3c7;border:1px solid #fcd34d;padding:16px;margin:16px 0">'
             '<strong style="color:#92400e">Security Notice:</strong>'
             '<p style="color:#92400e;margin:8px 0 0">Store this key securely. It will not be shown again. '
             'If lost, generate a new key from the admin dashboard.</p></div>'
@@ -584,7 +584,7 @@ def _render_email(alert: Alert) -> tuple[str, str]:
         AlertType.TEAM_INVITE: (
             '<h2 style="margin:0 0 16px;color:#111827;font-size:20px">Team Invitation</h2>'
             '<p style="color:#374151;line-height:1.6;margin:16px 0">{message}</p>'
-            '<div style="background:#eff6ff;border:1px solid #93c5fd;border-radius:6px;padding:16px;margin:16px 0">'
+            '<div style="background:#eff6ff;border:1px solid #93c5fd;padding:16px;margin:16px 0">'
             '<strong style="color:#1e40af">Getting Started:</strong>'
             '<p style="color:#1e40af;margin:8px 0 0">Log in to the Agent Red admin dashboard with your '
             'email address to access your team workspace.</p></div>'
@@ -592,11 +592,11 @@ def _render_email(alert: Alert) -> tuple[str, str]:
         # Escalation
         AlertType.ESCALATION: (
             '<h2 style="margin:0 0 16px;color:#111827;font-size:20px">Customer Escalation</h2>'
-            '<div style="display:inline-block;padding:4px 12px;border-radius:12px;'
+            '<div style="display:inline-block;padding:4px 12px;'
             f'background:{badge_color};color:#fff;font-size:12px;font-weight:600">'
             '{severity}</div>'
             '<p style="color:#374151;line-height:1.6;margin:16px 0">{message}</p>'
-            '<div style="background:#fef3c7;border:1px solid #fcd34d;border-radius:6px;padding:16px;margin:16px 0">'
+            '<div style="background:#fef3c7;border:1px solid #fcd34d;padding:16px;margin:16px 0">'
             '<strong style="color:#92400e">Action Required:</strong>'
             '<p style="color:#92400e;margin:8px 0 0">A customer conversation has been escalated and needs your attention. '
             'Log in to the Agent Red admin dashboard to view the conversation.</p></div>'
@@ -604,11 +604,11 @@ def _render_email(alert: Alert) -> tuple[str, str]:
         # Outage / SLA
         AlertType.OUTAGE_NOTIFICATION: (
             '<h2 style="margin:0 0 16px;color:#111827;font-size:20px">Service Notification</h2>'
-            '<div style="display:inline-block;padding:4px 12px;border-radius:12px;'
+            '<div style="display:inline-block;padding:4px 12px;'
             f'background:{badge_color};color:#fff;font-size:12px;font-weight:600">'
             '{severity}</div>'
             '<p style="color:#374151;line-height:1.6;margin:16px 0">{message}</p>'
-            '<div style="background:#fee2e2;border:1px solid #fca5a5;border-radius:6px;padding:16px;margin:16px 0">'
+            '<div style="background:#fee2e2;border:1px solid #fca5a5;padding:16px;margin:16px 0">'
             '<strong style="color:#991b1b">Status:</strong>'
             '<p style="color:#991b1b;margin:8px 0 0">Our team is actively investigating. '
             'You will receive a follow-up notification when the issue is resolved.</p></div>'
@@ -618,7 +618,7 @@ def _render_email(alert: Alert) -> tuple[str, str]:
     # Select body template or use generic fallback
     body_tmpl = body_templates.get(alert.alert_type, (
         '<h2 style="margin:0 0 16px;color:#111827;font-size:20px">{title}</h2>'
-        '<div style="display:inline-block;padding:4px 12px;border-radius:12px;'
+        '<div style="display:inline-block;padding:4px 12px;'
         f'background:{badge_color};color:#fff;font-size:12px;font-weight:600">'
         '{severity}</div>'
         '<p style="color:#374151;line-height:1.6;margin:16px 0">{message}</p>'

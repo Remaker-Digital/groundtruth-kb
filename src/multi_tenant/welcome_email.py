@@ -31,14 +31,13 @@ _WELCOME_EMAIL_BODY = """
   Your account is ready. Here are your credentials to get started.
 </p>
 
-<div style="background:#fff7ed;border:1px solid #fed7aa;border-radius:6px;
-     padding:16px;margin:16px 0;text-align:center">
+<div style="background:#fff7ed;border:1px solid #fed7aa;padding:16px;margin:16px 0;text-align:center">
   <p style="margin:0 0 12px;color:#9a3412;font-size:13px;font-weight:600">
     Your Admin Dashboard
   </p>
   <a href="{admin_login_url}" style="display:inline-block;padding:10px 24px;
      background:#ff3621;color:#ffffff;font-size:14px;font-weight:600;
-     text-decoration:none;border-radius:6px">
+     text-decoration:none">
     Sign in to Dashboard
   </a>
   <p style="margin:8px 0 0;color:#9a3412;font-size:12px">
@@ -46,24 +45,27 @@ _WELCOME_EMAIL_BODY = """
   </p>
 </div>
 
-<div style="background:#f3f4f6;border:1px solid #d1d5db;border-radius:6px;
-     padding:16px;margin:16px 0">
+<div style="background:#f3f4f6;border:1px solid #d1d5db;padding:16px;margin:16px 0">
   <p style="margin:0 0 8px;color:#6b7280;font-size:12px;font-weight:600;
        text-transform:uppercase;letter-spacing:0.05em">Admin API Key</p>
   <code style="word-break:break-all;color:#111827;font-size:14px;
        font-family:'JetBrains Mono',SFMono-Regular,ui-monospace,monospace">{superadmin_key}</code>
+  <p style="margin:8px 0 0;color:#6b7280;font-size:12px;line-height:1.4">
+    If lost, you can regenerate your API key by requesting a new key at the login prompt.
+  </p>
 </div>
 
-<div style="background:#f3f4f6;border:1px solid #d1d5db;border-radius:6px;
-     padding:16px;margin:16px 0">
+<div style="background:#f3f4f6;border:1px solid #d1d5db;padding:16px;margin:16px 0">
   <p style="margin:0 0 8px;color:#6b7280;font-size:12px;font-weight:600;
        text-transform:uppercase;letter-spacing:0.05em">Widget Key</p>
   <code style="word-break:break-all;color:#111827;font-size:14px;
        font-family:'JetBrains Mono',SFMono-Regular,ui-monospace,monospace">{widget_key}</code>
+  <p style="margin:8px 0 0;color:#6b7280;font-size:12px;line-height:1.4">
+    Your chat widget key and API URL are available from your admin console.
+  </p>
 </div>
 
-<div style="background:#fef3c7;border:1px solid #fcd34d;border-radius:6px;
-     padding:16px;margin:16px 0">
+<div style="background:#fef3c7;border:1px solid #fcd34d;padding:16px;margin:16px 0">
   <strong style="color:#92400e">Security Notice</strong>
   <p style="color:#92400e;margin:8px 0 0;font-size:13px">
     Store these keys securely. If lost, you can regenerate your API key
