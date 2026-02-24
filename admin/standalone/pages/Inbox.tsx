@@ -279,7 +279,7 @@ function MessageBubble({
     );
   }
 
-  const isAgent = message.role === 'agent';
+  const isAgent = message.role === 'ai';
   const senderName = isAgent
     ? 'Agent Red AI'
     : 'Customer';

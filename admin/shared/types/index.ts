@@ -166,7 +166,7 @@ export type ConversationStatus = 'active' | 'ended' | 'escalated' | 'resolved' |
 
 export interface ConversationMessage {
   messageId: string | null;
-  role: 'customer' | 'agent' | 'system';
+  role: 'customer' | 'ai' | 'system' | 'human_agent' | 'escalation_agent';
   content: string;
   timestamp: string | null;
   metadata?: Record<string, unknown> | null;
