@@ -105,7 +105,9 @@ def _build_admin_login_url(explicit_url: str | None = None) -> str:
     prod = os.environ.get("PROD_URL", "")
     if prod:
         return f"{prod.rstrip('/')}/admin/standalone/"
-    return "https://agentredcx.com/docs/getting-started"
+    # Fallback: production API gateway admin console.
+    # The FQDN is stable (Azure Container Apps environment-scoped).
+    return "https://agent-red-api-gateway.orangeglacier-f566a4e7.eastus.azurecontainerapps.io/admin/standalone/"
 
 
 async def send_welcome_email(

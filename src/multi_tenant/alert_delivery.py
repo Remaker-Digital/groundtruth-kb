@@ -394,8 +394,9 @@ _EMAIL_WRAPPER = """<!DOCTYPE html>
 <tr><td align="center">
 <table width="600" cellpadding="0" cellspacing="0" style="background:#ffffff;border-radius:8px;overflow:hidden;box-shadow:0 1px 3px rgba(0,0,0,0.1)">
 <tr><td style="background:#141414;padding:24px 32px">
-  <span style="color:#ff3621;font-size:20px;font-weight:700">Agent Red</span>
-  <span style="color:#a0a0a0;font-size:14px;margin-left:8px">Customer Experience</span>
+  <img src="https://agentredcx.com/img/email-logo-light.png"
+       alt="Agent Red Customer Experience" width="220" height="auto"
+       style="display:block;max-width:220px;height:auto;border:0" />
 </td></tr>
 <tr><td style="padding:32px">{body}</td></tr>
 <tr><td style="background:#f9fafb;padding:16px 32px;border-top:1px solid #e5e7eb">

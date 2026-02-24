@@ -791,6 +791,121 @@ async def create_tenant(
 
 
 # ---------------------------------------------------------------------------
+# Resend Welcome Email
+# ---------------------------------------------------------------------------
+
+
+class ResendWelcomeEmailResponse(CamelCaseModel):
+    """Response from resending a welcome email."""
+
+    tenant_id: str
+    sent_to: str
+    sent: bool
+    message: str
+
+
+@router.post(
+    "/tenants/{tenant_id}/resend-welcome-email",
+    response_model=ResendWelcomeEmailResponse,
+    summary="Resend welcome email to a tenant",
+    description=(
+        "Re-sends the welcome/onboarding email to the tenant's registered "
+        "email address. The email includes the admin login URL and onboarding "
+        "steps but does NOT include raw API keys (those are only available at "
+        "creation time). Use this after correcting email templates or when "
+        "the original email was not received."
+    ),
+    responses={
+        404: {"description": "Tenant not found"},
+        422: {"description": "No email address on record for this tenant"},
+        503: {"description": "Service not initialized"},
+    },
+)
+async def resend_welcome_email(
+    tenant_id: str,
+    ctx: TenantContext = Depends(require_role(TeamMemberRole.SUPERADMIN)),
+) -> ResendWelcomeEmailResponse:
+    """Resend the welcome email to a tenant's registered email."""
+    if not _tenant_repo or not _prefs_repo:
+        raise HTTPException(status_code=503, detail="Service not initialized")
+
+    # Only the SPA tenant can manage other tenants
+    _SPA_TENANT_ID = "remaker-digital-001"
+    if ctx.tenant_id != _SPA_TENANT_ID:
+        raise HTTPException(
+            status_code=403,
+            detail="Only the service provider tenant can resend welcome emails",
+        )
+
+    # Read the target tenant
+    tenant = await _tenant_repo.read(tenant_id, tenant_id)
+    if not tenant:
+        raise HTTPException(status_code=404, detail=f"Tenant {tenant_id} not found")
+
+    # Find the email address — check preferences first, then tenant record
+    email_addr: str | None = None
+    try:
+        prefs = await _prefs_repo.get_active(tenant_id)
+        if prefs:
+            email_addr = getattr(prefs, "notification_email", None) or getattr(
+                prefs, "customer_email", None
+            )
+    except Exception:
+        pass
+
+    if not email_addr:
+        email_addr = getattr(tenant, "customer_email", None)
+
+    if not email_addr:
+        raise HTTPException(
+            status_code=422,
+            detail=f"No email address on record for tenant {tenant_id[:12]}. "
+            "Set a notification_email or customer_email first.",
+        )
+
+    # Send the welcome email (without raw keys — they're hashed and irrecoverable)
+    from src.multi_tenant.welcome_email import send_welcome_email
+
+    tier_name = getattr(tenant, "tier", "unknown")
+    if hasattr(tier_name, "value"):
+        tier_name = tier_name.value
+
+    sent = await send_welcome_email(
+        to_email=email_addr,
+        tenant_id=tenant_id,
+        superadmin_key="(use your existing key — not shown for security)",
+        widget_key="(use your existing key — not shown for security)",
+        tier=tier_name,
+    )
+
+    # Audit log
+    if _audit_repo:
+        now_iso = datetime.now(timezone.utc).isoformat()
+        try:
+            await _audit_repo.create(
+                {
+                    "id": f"audit:{tenant_id}:resend-welcome:{now_iso}",
+                    "tenant_id": tenant_id,
+                    "event_type": AuditEventType.TENANT_UPDATED.value,
+                    "actor": ctx.tenant_id,
+                    "description": f"Welcome email resent to {email_addr}",
+                    "timestamp": now_iso,
+                    "metadata": {"action": "resend_welcome_email", "email": email_addr},
+                },
+                partition_key=tenant_id,
+            )
+        except Exception:
+            logger.warning("Audit log failed for resend-welcome-email: %s", tenant_id[:8])
+
+    return ResendWelcomeEmailResponse(
+        tenant_id=tenant_id,
+        sent_to=email_addr,
+        sent=sent,
+        message="Welcome email sent successfully" if sent else "Email delivery failed — check provider configuration",
+    )
+
+
+# ---------------------------------------------------------------------------
 # WI-EXPIRY-1: Tenant access expiry management
 # ---------------------------------------------------------------------------
 

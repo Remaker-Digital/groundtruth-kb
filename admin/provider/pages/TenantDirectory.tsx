@@ -269,6 +269,30 @@ export function TenantDirectoryPage() {
     [handleSetExpiry],
   );
 
+  // ---- Resend welcome email ----
+
+  const [resendLoading, setResendLoading] = useState<string | null>(null);
+
+  const handleResendWelcome = useCallback(async (tenantId: string) => {
+    setResendLoading(tenantId);
+    try {
+      const res = await apiFetch(`/api/superadmin/tenants/${tenantId}/resend-welcome-email`, {
+        method: 'POST',
+      });
+      if (res.ok) {
+        const data = await res.json();
+        onNotify(`Welcome email sent to ${data.sentTo}`, 'success');
+      } else {
+        const err = await res.json().catch(() => ({ detail: 'Unknown error' }));
+        onNotify(`Failed to resend: ${err.detail || res.statusText}`, 'error');
+      }
+    } catch {
+      onNotify('Network error resending welcome email', 'error');
+    } finally {
+      setResendLoading(null);
+    }
+  }, [apiFetch, onNotify]);
+
   // Fetch summary on mount
   useEffect(() => {
     let cancelled = false;
@@ -453,6 +477,13 @@ export function TenantDirectoryPage() {
                             </ActionIcon>
                           </Menu.Target>
                           <Menu.Dropdown>
+                            <Menu.Item
+                              disabled={resendLoading === t.tenantId}
+                              onClick={() => handleResendWelcome(t.tenantId)}
+                            >
+                              {resendLoading === t.tenantId ? 'Sending…' : 'Resend Welcome Email'}
+                            </Menu.Item>
+                            <Menu.Divider />
                             <Menu.Item
                               onClick={() => {
                                 setExpiryTenant(t);
