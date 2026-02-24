@@ -9,6 +9,91 @@ All notable changes to Agent Red Customer Experience are documented here.
 
 ---
 
+## v1.57.20 — Staging environment and email polish (2026-02-24)
+
+### Parallel staging environment
+
+A complete parallel staging environment has been provisioned for validating the next release before applying it to the beta production environment. The staging environment includes its own Container App, isolated Cosmos DB database, and dedicated Key Vault. It scales to zero when idle, incurring no cost outside of active testing.
+
+### Email template improvements
+
+- **Helper text:** Recovery instructions added below the Admin API Key and Widget Key code blocks in the welcome email, guiding merchants on how to retrieve credentials if they lose the initial email.
+- **Visual consistency:** All border-radius removed from email template elements for a cleaner, sharper appearance across all email clients.
+- **Template structure:** Both welcome email and system alert templates updated.
+
+---
+
+## v1.57.19 — Email architecture overhaul (2026-02-24)
+
+### SMTP-first email delivery
+
+All nine email modules have been restructured to use Titan SMTP as the primary delivery provider, with Azure Communication Services as a fallback. This resolves rate limiting issues with Azure managed email domains and provides faster, more reliable email delivery (average 3 seconds to inbox).
+
+### Email template redesign
+
+- **Dark theme wrapper:** The shared email template now uses a dark (#141414) outer background with the Agent Red logo and footer rendered directly on the dark surface, creating a premium branded appearance.
+- **Logo hosting:** Email logo served from agentredcx.com with cache-busting to ensure email clients always display the current version.
+- **Security notice:** Updated wording per owner feedback on credential recovery instructions.
+
+### Widget and inbox fixes
+
+- **Pre-chat form:** Defaults to OFF for new and existing tenants. Merchants can enable it from the Widget page when explicit customer identification is desired before chat.
+- **Inbox message display:** Fixed a role mapping issue where AI-generated responses were rendered on the customer side of the conversation view. The TypeScript message role type now correctly maps the backend `ai` role to the agent display column.
+- **Shopify extension v18:** Updated widget bundle deployed to Shopify CDN with latest widget changes.
+
+### Infrastructure
+
+- **ACS rate-limit protection:** Azure Communication Services SDK configured with aggressive retry limits (2 retries, 5-second max backoff) to prevent indefinite blocking when the email quota is exceeded.
+
+---
+
+## v1.57.12 — Widget key rotation fix (2026-02-24)
+
+### Critical fixes
+
+- **Widget key rotation:** Fixed a document ID format issue where the rotation endpoint used an incorrect ID pattern to locate the preferences document. The endpoint now correctly discovers the document ID before patching, ensuring rotated keys are immediately reflected in the admin UI.
+- **Cache invalidation:** Direct Cosmos DB patches now trigger config cache invalidation, preventing stale data from being served for up to 60 seconds after key rotation.
+- **Resend welcome email:** Fixed false-success toast notifications — the frontend now checks both HTTP status and delivery confirmation flag before showing success.
+
+### Email improvements
+
+- **Thread pool offload:** All email send operations moved to background thread pool execution across eight modules, preventing I/O blocking on the main event loop.
+- **Expired tenant filter:** The Provider Console tenant directory now includes an "Expired" status filter option with a complete set of static filter labels for all tenant lifecycle states.
+
+---
+
+## v1.57.7 — Widget key display and welcome email branding (2026-02-24)
+
+### Widget key display and rotation
+
+A new **Installation** section has been added to the Widget page, giving merchants direct access to their widget key and embed code.
+
+- **Widget key visibility:** The widget key is displayed in a read-only monospace field with a one-click copy button.
+- **Embed code snippet:** A ready-to-use HTML script tag is shown with the merchant's actual widget key and API URL pre-filled, along with a copy button and placement instructions.
+- **Key rotation:** A "Rotate key" button opens a confirmation dialog explaining that rotation immediately invalidates the current key. After rotation, the new key is displayed instantly.
+- **Empty state:** Before configuration activation, the section shows a clear message directing merchants to complete and activate their configuration.
+
+### Avatar upload fix
+
+The avatar upload size limit has been increased from 500 characters (intended for external URLs) to 400,000 characters, correctly supporting base64-encoded data URIs for images up to 256KB. Validation errors are now surfaced with descriptive messages instead of a generic failure.
+
+### Welcome email branding
+
+- **Resend endpoint:** A new superadmin API endpoint allows re-sending the welcome email with current credentials for any tenant.
+- **Customer profile display:** The Inbox sidebar now shows the customer's verified email address and verification status from the identity preprocessor pipeline.
+
+---
+
+## v1.57.5 — Provider Console hardening (2026-02-24)
+
+### Bug fixes
+
+- **Provider Console data validation:** Seven Provider Console components corrected to pass both partition key and document ID to repository read operations. Previously, the systemic single-argument pattern caused silent data lookup failures.
+- **NATS health reporting:** Three code paths in the Provider Console incorrectly reported NATS as "deployed" based on manager object existence rather than actual connection status. Fixed to check connection state.
+- **SPA static file serving:** Logo and favicon files in the Provider and Shopify SPA build outputs are now served correctly instead of falling through to the SPA catch-all route.
+
+---
+
 ## v1.57.4 — Beta verification and quality hardening (2026-02-23)
 
 ### Beta readiness (v1.57.0)

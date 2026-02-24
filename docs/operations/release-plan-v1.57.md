@@ -29,8 +29,8 @@
 | Cosmos DB | `cosmos-agentred-eastus` / database: `agentred` |
 | Key Vault | `kv-agentred-eastus` |
 | ACR | `acragentredeastus.azurecr.io` |
-| Image | `api-gateway:v1.57.0` (pinned at release freeze) |
-| Tenants | `remaker-digital-001` + 2 beta customer tenants |
+| Image | `api-gateway:v1.57.19` (pinned — hotfixed from v1.57.0 through S86 rapid deploys) |
+| Tenants | `remaker-digital-001` + 4 beta customer tenants |
 
 ### Staging (Parallel) — PROVISIONED (Session 87, 2026-02-24)
 
