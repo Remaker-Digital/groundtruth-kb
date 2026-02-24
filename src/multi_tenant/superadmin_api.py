@@ -855,8 +855,8 @@ async def set_tenant_expiry(
             detail="Expiry management is restricted to the service provider.",
         )
 
-    # Read current tenant
-    tenant_doc = await _tenant_repo.read(tenant_id)
+    # Read current tenant (partition_key = document_id for tenant docs)
+    tenant_doc = await _tenant_repo.read(tenant_id, tenant_id)
     if tenant_doc is None:
         raise HTTPException(status_code=404, detail=f"Tenant {tenant_id} not found")
 
@@ -1304,15 +1304,15 @@ async def queue_depth(
     _ctx: TenantContext = Depends(require_role(TeamMemberRole.SUPERADMIN)),
 ) -> QueueDepthResponse:
     """Get queue depth and job health metrics across all tenants."""
-    if _nats_mgr is None:
-        # NATS not deployed — return empty response (not an error)
+    if _nats_mgr is None or not _nats_mgr.is_connected:
+        # NATS not deployed or not connected — return empty response.
+        # NATS is decommissioned (USE_AGENT_CONTAINERS=false) so this
+        # is the expected path.  The frontend shows a "Not Deployed" badge.
         return QueueDepthResponse(
             nats_deployed=False,
             total_tenants=0, total_messages=0, total_bytes=0,
             tenants=[], errors=[],
         )
-    if not _nats_mgr.is_connected:
-        raise HTTPException(status_code=503, detail="NATS is not connected")
 
     if _tenant_repo is None:
         raise HTTPException(status_code=503, detail="Service not configured")
@@ -1388,7 +1388,7 @@ async def compliance_summary(
 
             # Read tenant doc for tier + grace period
             try:
-                tenant_doc = await _tenant_repo.read(tid)
+                tenant_doc = await _tenant_repo.read(tid, tid)
                 if tenant_doc:
                     info.tier = tenant_doc.get("tier")
                     gp_end = tenant_doc.get("grace_period_ends_at")
@@ -1408,7 +1408,7 @@ async def compliance_summary(
             # Read preferences for PII scrubbing
             if _prefs_repo is not None:
                 try:
-                    prefs = await _prefs_repo.read(tid)
+                    prefs = await _prefs_repo.get_active(tid)
                     if prefs and prefs.get("pii_scrubbing"):
                         info.pii_scrubbing_enabled = True
                         pii_count += 1
@@ -1510,7 +1510,7 @@ async def secret_posture(
 
             # Get tier from tenant doc
             try:
-                tenant_doc = await _tenant_repo.read(tid)
+                tenant_doc = await _tenant_repo.read(tid, tid)
                 if tenant_doc:
                     info.tier = tenant_doc.get("tier")
             except Exception:
@@ -1623,10 +1623,12 @@ async def integration_health(
             "message": f"Circuit breaker registry unavailable: {exc}",
         })
 
-    # NATS connectivity — distinguish "not deployed" from "deployed but disconnected"
-    nats_deployed = _nats_mgr is not None
+    # NATS connectivity — distinguish "not deployed" from "deployed but disconnected".
+    # NATS is decommissioned (USE_AGENT_CONTAINERS=false), so treat an
+    # unconnected manager as "not deployed" rather than alarming on every
+    # page load.
     nats_connected = False
-    if nats_deployed:
+    if _nats_mgr is not None:
         try:
             nats_connected = _nats_mgr.is_connected
         except Exception as exc:
@@ -1634,6 +1636,7 @@ async def integration_health(
                 "subsystem": "nats",
                 "message": f"NATS status check failed: {exc}",
             })
+    nats_deployed = nats_connected  # Only report as deployed if actually connected
 
     # MCP integration status
     mcp_integrations: list[McpIntegrationStatus] = []
@@ -1650,7 +1653,7 @@ async def integration_health(
 
             for tid in tenant_ids:
                 try:
-                    prefs = await _prefs_repo.read(tid)
+                    prefs = await _prefs_repo.get_active(tid)
                     if prefs:
                         # Shopify Storefront MCP
                         if prefs.get("mcp_storefront_enabled"):

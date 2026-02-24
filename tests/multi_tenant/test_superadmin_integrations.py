@@ -57,6 +57,7 @@ def mock_tenant_repo():
 def mock_prefs_repo():
     repo = MagicMock()
     repo.read = AsyncMock()
+    repo.get_active = AsyncMock()
     return repo
 
 
@@ -103,7 +104,7 @@ class TestIntegrationHealthHappyPath:
     ):
         """All systems healthy → overall_healthy=True."""
         mock_cb_cls.return_value.health_summary.return_value = HEALTHY_CB_SUMMARY
-        mock_prefs_repo.read.side_effect = [
+        mock_prefs_repo.get_active.side_effect = [
             {"mcp_storefront_enabled": True, "mcp_storefront_status": "connected"},
             {"stripe_mcp_enabled": True, "stripe_mcp_status": "connected"},
             {},
@@ -130,7 +131,7 @@ class TestIntegrationHealthHappyPath:
     ):
         """Returns correct number of circuit breakers."""
         mock_cb_cls.return_value.health_summary.return_value = HEALTHY_CB_SUMMARY
-        mock_prefs_repo.read.return_value = {}
+        mock_prefs_repo.get_active.return_value = {}
         configure_superadmin_services(
             tenant_repo=mock_tenant_repo,
             audit_repo=MagicMock(),
@@ -149,7 +150,7 @@ class TestIntegrationHealthHappyPath:
     ):
         """Per-breaker details are populated correctly."""
         mock_cb_cls.return_value.health_summary.return_value = HEALTHY_CB_SUMMARY
-        mock_prefs_repo.read.return_value = {}
+        mock_prefs_repo.get_active.return_value = {}
         configure_superadmin_services(
             tenant_repo=mock_tenant_repo,
             audit_repo=MagicMock(),
@@ -180,7 +181,7 @@ class TestCircuitBreakerStates:
     ):
         """Open circuit breaker → any_breaker_open=True, overall_healthy=False."""
         mock_cb_cls.return_value.health_summary.return_value = OPEN_CB_SUMMARY
-        mock_prefs_repo.read.return_value = {}
+        mock_prefs_repo.get_active.return_value = {}
         configure_superadmin_services(
             tenant_repo=mock_tenant_repo,
             audit_repo=MagicMock(),
@@ -200,7 +201,7 @@ class TestCircuitBreakerStates:
     ):
         """Half-open breaker state is reported."""
         mock_cb_cls.return_value.health_summary.return_value = OPEN_CB_SUMMARY
-        mock_prefs_repo.read.return_value = {}
+        mock_prefs_repo.get_active.return_value = {}
         configure_superadmin_services(
             tenant_repo=mock_tenant_repo,
             audit_repo=MagicMock(),
@@ -221,7 +222,7 @@ class TestCircuitBreakerStates:
     ):
         """Registry exception → goes to errors[], empty breakers."""
         mock_cb_cls.return_value.health_summary.side_effect = RuntimeError("Registry down")
-        mock_prefs_repo.read.return_value = {}
+        mock_prefs_repo.get_active.return_value = {}
         configure_superadmin_services(
             tenant_repo=mock_tenant_repo,
             audit_repo=MagicMock(),
@@ -249,7 +250,7 @@ class TestNATSConnectivity:
     ):
         """NATS connected → nats_connected=True."""
         mock_cb_cls.return_value.health_summary.return_value = HEALTHY_CB_SUMMARY
-        mock_prefs_repo.read.return_value = {}
+        mock_prefs_repo.get_active.return_value = {}
         configure_superadmin_services(
             tenant_repo=mock_tenant_repo,
             audit_repo=MagicMock(),
@@ -266,10 +267,10 @@ class TestNATSConnectivity:
     async def test_nats_disconnected(
         self, mock_cb_cls, mock_nats_mgr, mock_tenant_repo, mock_prefs_repo, superadmin_ctx
     ):
-        """NATS disconnected → nats_connected=False, overall_healthy=False."""
+        """NATS disconnected → nats_deployed=False (decommissioned), overall_healthy=True."""
         mock_cb_cls.return_value.health_summary.return_value = HEALTHY_CB_SUMMARY
         mock_nats_mgr.is_connected = False
-        mock_prefs_repo.read.return_value = {}
+        mock_prefs_repo.get_active.return_value = {}
         configure_superadmin_services(
             tenant_repo=mock_tenant_repo,
             audit_repo=MagicMock(),
@@ -280,7 +281,8 @@ class TestNATSConnectivity:
         result = await integration_health(_ctx=superadmin_ctx)
 
         assert result.nats_connected is False
-        assert result.overall_healthy is False
+        assert result.nats_deployed is False
+        assert result.overall_healthy is True
 
     @pytest.mark.asyncio
     @patch("src.multi_tenant.pipeline_resilience.ServiceCircuitBreakerRegistry")
@@ -289,7 +291,7 @@ class TestNATSConnectivity:
     ):
         """NATS manager None → nats_connected=False."""
         mock_cb_cls.return_value.health_summary.return_value = HEALTHY_CB_SUMMARY
-        mock_prefs_repo.read.return_value = {}
+        mock_prefs_repo.get_active.return_value = {}
         configure_superadmin_services(
             tenant_repo=mock_tenant_repo,
             audit_repo=MagicMock(),
@@ -316,7 +318,7 @@ class TestMCPIntegrationStatus:
     ):
         """MCP integrations with mixed tenant states."""
         mock_cb_cls.return_value.health_summary.return_value = HEALTHY_CB_SUMMARY
-        mock_prefs_repo.read.side_effect = [
+        mock_prefs_repo.get_active.side_effect = [
             {
                 "mcp_storefront_enabled": True,
                 "mcp_storefront_status": "connected",
@@ -357,7 +359,7 @@ class TestMCPIntegrationStatus:
     ):
         """No tenants with MCP → zero counts."""
         mock_cb_cls.return_value.health_summary.return_value = HEALTHY_CB_SUMMARY
-        mock_prefs_repo.read.return_value = {}
+        mock_prefs_repo.get_active.return_value = {}
         configure_superadmin_services(
             tenant_repo=mock_tenant_repo,
             audit_repo=MagicMock(),
@@ -397,7 +399,7 @@ class TestMCPIntegrationStatus:
     ):
         """Individual prefs read failure is silently skipped."""
         mock_cb_cls.return_value.health_summary.return_value = HEALTHY_CB_SUMMARY
-        mock_prefs_repo.read.side_effect = [
+        mock_prefs_repo.get_active.side_effect = [
             {"mcp_storefront_enabled": True, "mcp_storefront_status": "connected"},
             RuntimeError("Cosmos error"),
             {},

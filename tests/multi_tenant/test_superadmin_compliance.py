@@ -70,6 +70,7 @@ def mock_tenant_repo():
 def mock_prefs_repo():
     repo = MagicMock()
     repo.read = AsyncMock()
+    repo.get_active = AsyncMock()
     return repo
 
 
@@ -112,7 +113,7 @@ class TestComplianceSummaryHappyPath:
             {"tier": "professional", "grace_period_ends_at": None},
             {"tier": "starter", "grace_period_ends_at": None},
         ]
-        mock_prefs_repo.read.side_effect = [
+        mock_prefs_repo.get_active.side_effect = [
             {"pii_scrubbing": True},
             {"pii_scrubbing": False},
         ]
@@ -140,7 +141,7 @@ class TestComplianceSummaryHappyPath:
         mock_tenant_repo.read.side_effect = [
             {"tier": "professional"}, {"tier": "starter"},
         ]
-        mock_prefs_repo.read.side_effect = [
+        mock_prefs_repo.get_active.side_effect = [
             {"pii_scrubbing": True},
             {"pii_scrubbing": True},
         ]
@@ -165,7 +166,7 @@ class TestComplianceSummaryHappyPath:
         mock_tenant_repo.read.side_effect = [
             {"tier": "starter"}, {"tier": "starter"},
         ]
-        mock_prefs_repo.read.side_effect = [
+        mock_prefs_repo.get_active.side_effect = [
             {"pii_scrubbing": False},
             {},
         ]
@@ -200,7 +201,7 @@ class TestComplianceGracePeriod:
             {"tier": "professional", "grace_period_ends_at": future},
             {"tier": "starter"},
         ]
-        mock_prefs_repo.read.side_effect = [{}, {}]
+        mock_prefs_repo.get_active.side_effect = [{}, {}]
         mock_audit_repo._container.query_items = MagicMock(
             return_value=FakeAsyncIterator([])
         )
@@ -227,7 +228,7 @@ class TestComplianceGracePeriod:
             {"tier": "professional", "grace_period_ends_at": past},
             {"tier": "starter"},
         ]
-        mock_prefs_repo.read.side_effect = [{}, {}]
+        mock_prefs_repo.get_active.side_effect = [{}, {}]
         mock_audit_repo._container.query_items = MagicMock(
             return_value=FakeAsyncIterator([])
         )
@@ -247,7 +248,7 @@ class TestComplianceGracePeriod:
     ):
         """No grace_period_ends_at → not in grace period."""
         mock_tenant_repo.read.side_effect = [{"tier": "starter"}, {"tier": "starter"}]
-        mock_prefs_repo.read.side_effect = [{}, {}]
+        mock_prefs_repo.get_active.side_effect = [{}, {}]
         mock_audit_repo._container.query_items = MagicMock(
             return_value=FakeAsyncIterator([])
         )
@@ -275,7 +276,7 @@ class TestComplianceDSAR:
     ):
         """DSAR events from audit log are counted per tenant."""
         mock_tenant_repo.read.side_effect = [{"tier": "professional"}, {"tier": "starter"}]
-        mock_prefs_repo.read.side_effect = [{}, {}]
+        mock_prefs_repo.get_active.side_effect = [{}, {}]
 
         # First tenant: 2 DSAR events; second: 1
         call_count = 0
@@ -313,7 +314,7 @@ class TestComplianceDSAR:
     ):
         """No DSAR events → zero count."""
         mock_tenant_repo.read.side_effect = [{"tier": "starter"}]
-        mock_prefs_repo.read.side_effect = [{}]
+        mock_prefs_repo.get_active.side_effect = [{}]
         mock_tenant_repo.list_active_tenant_ids.return_value = ["t-001"]
         mock_audit_repo._container.query_items = MagicMock(
             return_value=FakeAsyncIterator([])
@@ -361,7 +362,7 @@ class TestComplianceSummaryErrors:
             {"tier": "professional"},
             RuntimeError("Cosmos timeout"),  # caught by inner try/except
         ]
-        mock_prefs_repo.read.side_effect = [
+        mock_prefs_repo.get_active.side_effect = [
             {"pii_scrubbing": True},
             RuntimeError("Cosmos timeout"),  # caught by inner try/except
         ]
@@ -411,7 +412,7 @@ class TestComplianceSummaryErrors:
     ):
         """Audit repo None → DSAR fields default to 0, no crash."""
         mock_tenant_repo.read.side_effect = [{"tier": "starter"}, {"tier": "starter"}]
-        mock_prefs_repo.read.side_effect = [{}, {}]
+        mock_prefs_repo.get_active.side_effect = [{}, {}]
         configure_superadmin_services(
             tenant_repo=mock_tenant_repo,
             audit_repo=None,

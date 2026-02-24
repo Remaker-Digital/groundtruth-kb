@@ -216,20 +216,20 @@ class TestQueueDepthErrors:
     """Error handling tests for GET /api/superadmin/queues."""
 
     @pytest.mark.asyncio
-    async def test_nats_disconnected_503(self, mock_nats_mgr, mock_tenant_repo, superadmin_ctx):
-        """NATS disconnected returns 503."""
+    async def test_nats_disconnected_returns_not_deployed(self, mock_nats_mgr, mock_tenant_repo, superadmin_ctx):
+        """NATS disconnected returns 200 with nats_deployed=False (decommissioned)."""
         mock_nats_mgr.is_connected = False
         configure_superadmin_services(
             tenant_repo=mock_tenant_repo,
             audit_repo=MagicMock(),
             nats_mgr=mock_nats_mgr,
         )
-        from fastapi import HTTPException
         from src.multi_tenant.superadmin_api import queue_depth
 
-        with pytest.raises(HTTPException) as exc_info:
-            await queue_depth(_ctx=superadmin_ctx)
-        assert exc_info.value.status_code == 503
+        result = await queue_depth(_ctx=superadmin_ctx)
+        assert result.nats_deployed is False
+        assert result.total_tenants == 0
+        assert result.tenants == []
 
     @pytest.mark.asyncio
     async def test_nats_not_deployed_returns_empty(self, mock_tenant_repo, superadmin_ctx):

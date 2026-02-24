@@ -6,7 +6,7 @@ hide_title: true
 ---
 
 <div style={{textAlign: 'center', marginBottom: '2rem'}}>
-  <img src="/img/agent-red-logo.svg" alt="Agent Red" style={{maxHeight: '240px', marginBottom: '180px'}} />
+  <img src="/img/agent-red-logo.svg" alt="Agent Red" style={{maxHeight: '240px', marginTop: '100px', marginBottom: '80px'}} />
   <h1 style={{fontSize: '2.5rem', marginBottom: '0.25rem'}}>Agent Red Customer Experience</h1>
   <p style={{fontSize: '1.1rem', opacity: 0.7}}>
     A product of <a href="https://remakerdigital.com" target="_blank" rel="noopener noreferrer">Remaker Digital</a>
