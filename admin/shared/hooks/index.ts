@@ -27,6 +27,7 @@ export {
   useConfigSchema,
   useConfigVersions,
   useUpdateConfig,
+  useRotateWidgetKey,
   useNamedConfigs,
   useSaveNamedConfig,
   useActivateNamedConfig,

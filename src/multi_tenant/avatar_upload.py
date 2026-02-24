@@ -109,7 +109,9 @@ async def upload_avatar(
     )
 
     if not result or not result.success:
-        raise HTTPException(status_code=500, detail="Failed to save avatar.")
+        errors = getattr(result, "errors", []) if result else []
+        detail = "; ".join(str(e) for e in errors) if errors else "Failed to save avatar."
+        raise HTTPException(status_code=500, detail=detail)
 
     logger.info(
         "Avatar uploaded for tenant %s: %d bytes, %s",

@@ -830,7 +830,7 @@ fields:
     display_name: Agent avatar
     field_type: string
     validation:
-      max_length: 500
+      max_length: 400000
     platform_default: null
     tier_gate: all
     onboarding_step: 9

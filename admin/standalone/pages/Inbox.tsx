@@ -647,6 +647,8 @@ export function InboxPage() {
           criticPassed: null,
           escalationCategory: null,
           archivedAt: null,
+          customerVerified: false,
+          identityEmail: null,
         };
       }
     }
@@ -1125,14 +1127,46 @@ export function InboxPage() {
 
                 <Divider />
 
-                {/* Customer profile placeholder */}
+                {/* Customer profile */}
                 <Box p="md">
                   <Text size="xs" fw={600} c="dimmed" mb={8}>
                     Customer profile
                   </Text>
-                  <Text size="xs" c="dimmed" fs="italic">
-                    Customer details will be available once the customer profile API is connected.
-                  </Text>
+                  <Stack gap={6}>
+                    {selectedConversation.customerName && (
+                      <Group gap={8} wrap="nowrap">
+                        <Text size="xs" c="dimmed" style={{ width: 80, flexShrink: 0 }}>Name</Text>
+                        <Text size="sm">{selectedConversation.customerName}</Text>
+                      </Group>
+                    )}
+                    {selectedConversation.identityEmail && (
+                      <Group gap={8} wrap="nowrap">
+                        <Text size="xs" c="dimmed" style={{ width: 80, flexShrink: 0 }}>Email</Text>
+                        <Text size="sm">{selectedConversation.identityEmail}</Text>
+                      </Group>
+                    )}
+                    {selectedConversation.customerId && (
+                      <Group gap={8} wrap="nowrap">
+                        <Text size="xs" c="dimmed" style={{ width: 80, flexShrink: 0 }}>Customer ID</Text>
+                        <Text size="sm" ff="monospace" style={{ fontSize: 11 }}>{selectedConversation.customerId}</Text>
+                      </Group>
+                    )}
+                    <Group gap={8} wrap="nowrap">
+                      <Text size="xs" c="dimmed" style={{ width: 80, flexShrink: 0 }}>Verified</Text>
+                      <Badge
+                        size="xs"
+                        variant="light"
+                        color={selectedConversation.customerVerified ? 'green' : 'gray'}
+                      >
+                        {selectedConversation.customerVerified ? 'Verified' : 'Anonymous'}
+                      </Badge>
+                    </Group>
+                    {!selectedConversation.customerName && !selectedConversation.customerId && !selectedConversation.identityEmail && (
+                      <Text size="xs" c="dimmed" fs="italic">
+                        No customer identity collected in this conversation.
+                      </Text>
+                    )}
+                  </Stack>
                 </Box>
               </>
             ) : (

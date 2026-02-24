@@ -189,6 +189,9 @@ export interface InboxConversation {
   criticPassed: boolean | null;
   escalationCategory: string | null;
   archivedAt: string | null;
+  // Customer identity (AUTH-5 / P0-AUTH-FIX)
+  customerVerified: boolean;
+  identityEmail: string | null;
 }
 
 // ---------------------------------------------------------------------------

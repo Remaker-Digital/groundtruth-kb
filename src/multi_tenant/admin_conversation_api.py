@@ -79,6 +79,9 @@ class AdminConversationSummary(CamelCaseModel):
     model_used: str | None = None
     critic_passed: bool | None = None
     archived_at: str | None = None
+    # Customer identity (AUTH-5 / P0-AUTH-FIX)
+    customer_verified: bool = False
+    identity_email: str | None = None
 
 
 class AdminConversationListResponse(CamelCaseModel):
@@ -114,6 +117,9 @@ class AdminConversationDetailResponse(CamelCaseModel):
     critic_passed: bool | None = None
     archived_at: str | None = None
     internal_notes: list[dict[str, Any]] = Field(default_factory=list)
+    # Customer identity (AUTH-5 / P0-AUTH-FIX)
+    customer_verified: bool = False
+    identity_email: str | None = None
 
 
 class MessageEntry(CamelCaseModel):
@@ -474,6 +480,8 @@ async def list_conversations(
             model_used=c.get("model_used"),
             critic_passed=c.get("critic_passed"),
             archived_at=c.get("archived_at"),
+            customer_verified=c.get("customer_verified", False),
+            identity_email=c.get("identity_email"),
         )
         for c in conversations_raw
     ]
@@ -711,6 +719,8 @@ async def get_conversation_detail(
         critic_passed=doc.get("critic_passed"),
         archived_at=doc.get("archived_at"),
         internal_notes=doc.get("internal_notes", []),
+        customer_verified=doc.get("customer_verified", False),
+        identity_email=doc.get("identity_email"),
     )
 
 

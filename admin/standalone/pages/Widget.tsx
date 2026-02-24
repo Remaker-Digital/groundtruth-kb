@@ -21,9 +21,15 @@ import {
   Divider,
   LoadingOverlay,
   useComputedColorScheme,
+  Modal,
+  Alert,
+  CopyButton,
+  Tooltip,
+  ActionIcon,
+  Code,
 } from '@mantine/core';
 import { useAppContext } from '../layouts/StandaloneLayout';
-import { useConfig, useUpdateConfig } from '../../shared/hooks/index';
+import { useConfig, useUpdateConfig, useRotateWidgetKey } from '../../shared/hooks/index';
 import { useAvatarUpload, useDeleteAvatar } from '../../shared/hooks/useAvatar';
 import { HelpTooltip } from '../../shared/HelpTooltip';
 import { tokens } from '../../shared/theme/styles';
@@ -754,12 +760,23 @@ export function WidgetPage() {
   const { updateConfig: saveConfig, loading: saving, error: saveError } = useUpdateConfig(apiFetch);
   const avatarUpload = useAvatarUpload(apiFetch);
   const avatarDelete = useDeleteAvatar(apiFetch);
+  const { rotateWidgetKey, loading: rotating, error: rotateError } = useRotateWidgetKey(apiFetch);
 
   const computedColorScheme = useComputedColorScheme('dark');
   const adminIsDark = computedColorScheme === 'dark';
 
   const [config, setConfig] = useState<WidgetConfig>({ ...DEFAULT_WIDGET_CONFIG });
   const [initialized, setInitialized] = useState(false);
+
+  // Widget key installation state
+  const [rotateModalOpen, setRotateModalOpen] = useState(false);
+  const [newKey, setNewKey] = useState<string | null>(null);
+  const widgetKey = (configResult.data?.config?.widget_key as string | undefined) || null;
+  const displayKey = newKey || widgetKey;
+  const apiBaseUrl = ((typeof import.meta !== 'undefined' && import.meta.env?.VITE_API_URL) as string) || window.location.origin;
+  const embedSnippet = displayKey
+    ? `<script\n  src="${apiBaseUrl}/widget.js"\n  data-widget-key="${displayKey}"\n  data-api-url="${apiBaseUrl}"\n></script>`
+    : '';
 
   // Populate form from API config when loaded
   useEffect(() => {
@@ -791,6 +808,17 @@ export function WidgetPage() {
     }
   }
 
+  async function handleRotateWidgetKey() {
+    const result = await rotateWidgetKey();
+    if (result?.newWidgetKey) {
+      setNewKey(result.newWidgetKey);
+      configResult.refetch();
+      onNotify('Widget key rotated. Update the embed code on your website.', 'success');
+      refreshActivationStatus();
+    }
+    setRotateModalOpen(false);
+  }
+
   return (
     <Stack gap="lg" pos="relative">
       <LoadingOverlay visible={configResult.loading && !initialized} />
@@ -808,6 +836,89 @@ export function WidgetPage() {
         {/* Left column - Form controls */}
         <Box style={{ flex: '0 0 55%', maxWidth: '55%' }}>
           <Stack gap="md">
+            {/* Installation Section — widget key + embed code */}
+            <Paper p="lg" radius="md" withBorder>
+              <SectionHeader
+                tooltip="Your widget key authenticates the chat widget on your website. The embed code snippet goes in your site's HTML."
+                docLink={`${DOCS_BASE}/widget-appearance`}
+              >
+                Installation
+              </SectionHeader>
+              <Divider mb="md" />
+              <Stack gap="md">
+                {/* Widget key display */}
+                <div>
+                  <Text size="sm" fw={500} mb={6}>Widget key</Text>
+                  {displayKey ? (
+                    <>
+                      <Group gap="xs" align="flex-end">
+                        <TextInput
+                          value={displayKey}
+                          readOnly
+                          size="sm"
+                          style={{ flex: 1 }}
+                          styles={{ input: { fontFamily: 'monospace', fontSize: '12px' } }}
+                        />
+                        <CopyButton value={displayKey}>
+                          {({ copied, copy }) => (
+                            <Tooltip label={copied ? 'Copied' : 'Copy key'}>
+                              <ActionIcon color={copied ? 'green' : 'action'} onClick={copy} variant="subtle" size="lg">
+                                {copied ? '\u2713' : '\uD83D\uDCCB'}
+                              </ActionIcon>
+                            </Tooltip>
+                          )}
+                        </CopyButton>
+                        <Button
+                          color="red"
+                          variant="outline"
+                          size="sm"
+                          onClick={() => { setNewKey(null); setRotateModalOpen(true); }}
+                        >
+                          Rotate key
+                        </Button>
+                      </Group>
+                      {newKey && (
+                        <Alert color="green" mt="sm" radius="md">
+                          New widget key generated. Update the embed code on your website.
+                        </Alert>
+                      )}
+                    </>
+                  ) : (
+                    <Alert color="yellow" radius="md">
+                      No widget key found. Activate your configuration to generate one.
+                    </Alert>
+                  )}
+                </div>
+
+                {/* Embed code snippet */}
+                {displayKey && (
+                  <div>
+                    <Group justify="space-between" mb={6}>
+                      <Text size="sm" fw={500}>Embed code</Text>
+                      <CopyButton value={embedSnippet}>
+                        {({ copied, copy }) => (
+                          <Button
+                            size="compact-xs"
+                            variant="subtle"
+                            color={copied ? 'green' : 'action'}
+                            onClick={copy}
+                          >
+                            {copied ? 'Copied!' : 'Copy snippet'}
+                          </Button>
+                        )}
+                      </CopyButton>
+                    </Group>
+                    <Text size="xs" c="dimmed" mb={8}>
+                      Paste this snippet before the closing &lt;/body&gt; tag on every page where you want the chat widget.
+                    </Text>
+                    <Code block style={{ fontSize: 12 }}>
+                      {embedSnippet}
+                    </Code>
+                  </div>
+                )}
+              </Stack>
+            </Paper>
+
             {/* Appearance Section */}
             <Paper p="lg" radius="md" withBorder>
               <SectionHeader tooltip="Colors, position, size, and visual style of the chat widget on your storefront." docLink={`${DOCS_BASE}/widget-appearance`}>Appearance</SectionHeader>
@@ -1178,6 +1289,36 @@ export function WidgetPage() {
           </Paper>
         </Box>
       </Group>
+
+      {/* Widget key rotation confirmation modal */}
+      <Modal
+        opened={rotateModalOpen}
+        onClose={() => setRotateModalOpen(false)}
+        title="Rotate widget key"
+        centered
+        size="sm"
+      >
+        <Stack gap="md">
+          <Alert color="red" variant="light" radius="md">
+            Rotating the widget key will <strong>immediately invalidate</strong> the current key.
+            Any website using the old key will stop working until the embed code is updated.
+          </Alert>
+          <Text size="sm">Are you sure you want to rotate the widget key?</Text>
+          {rotateError && (
+            <Alert color="red" variant="light" radius="md">
+              {rotateError}
+            </Alert>
+          )}
+          <Group justify="flex-end" gap="sm">
+            <Button variant="default" onClick={() => setRotateModalOpen(false)}>
+              Cancel
+            </Button>
+            <Button color="red" onClick={handleRotateWidgetKey} loading={rotating}>
+              Rotate key
+            </Button>
+          </Group>
+        </Stack>
+      </Modal>
     </Stack>
   );
 }

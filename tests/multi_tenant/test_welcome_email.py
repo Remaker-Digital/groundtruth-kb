@@ -210,6 +210,7 @@ class TestSendWelcomeEmail:
         with (
             patch.dict("os.environ", {
                 "AZURE_COMM_CONNECTION_STRING": "endpoint=test;key=test",
+                "STANDALONE_ADMIN_URL": "",
                 "PROD_URL": "https://myapp.test.io",
             }),
             patch("azure.communication.email.EmailClient") as mock_cls,

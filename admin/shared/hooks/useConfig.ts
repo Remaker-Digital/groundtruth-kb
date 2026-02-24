@@ -69,6 +69,43 @@ export function useUpdateConfig(apiFetch: ApiFetch) {
 }
 
 // ---------------------------------------------------------------------------
+// Widget key rotation
+// ---------------------------------------------------------------------------
+
+export function useRotateWidgetKey(apiFetch: ApiFetch) {
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+
+  const rotateWidgetKey = useCallback(
+    async (): Promise<{ newWidgetKey: string; message: string } | null> => {
+      setLoading(true);
+      setError(null);
+      try {
+        const resp = await apiFetch('/api/keys/rotate-widget-key', { method: 'POST' });
+        if (!resp.ok) {
+          let detail = `Rotation failed (HTTP ${resp.status})`;
+          try {
+            const body = await resp.json();
+            if (typeof body?.detail === 'string') detail = body.detail;
+          } catch { /* not JSON */ }
+          throw new Error(detail);
+        }
+        return await resp.json();
+      } catch (err: unknown) {
+        const msg = err instanceof Error ? err.message : 'Widget key rotation failed';
+        setError(msg);
+        return null;
+      } finally {
+        setLoading(false);
+      }
+    },
+    [apiFetch],
+  );
+
+  return { rotateWidgetKey, loading, error };
+}
+
+// ---------------------------------------------------------------------------
 // Named Configuration hooks (C3)
 // ---------------------------------------------------------------------------
 
