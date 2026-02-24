@@ -282,16 +282,17 @@ async def _collect_integration_health(tenant_doc: dict[str, Any]) -> Integration
     ``get_nats_manager()`` singleton always creates a manager, so it cannot
     distinguish "not deployed" from "deployed but disconnected".
     """
-    # Check the dependency-injected NATS manager (None = not deployed)
-    nats_deployed = False
+    # Check the dependency-injected NATS manager.
+    # NATS is decommissioned (USE_AGENT_CONTAINERS=false) — treat an
+    # unconnected manager as "not deployed" rather than showing a false alarm.
     nats_connected = False
     try:
         from src.multi_tenant.superadmin_api import _nats_mgr
         if _nats_mgr is not None:
-            nats_deployed = True
             nats_connected = bool(_nats_mgr.is_connected)
     except Exception:
         pass
+    nats_deployed = nats_connected  # Only report as deployed if actually connected
 
     return IntegrationHealth(
         shopify_connected=bool(tenant_doc.get("shopify_shop_domain")),

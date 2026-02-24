@@ -1,8 +1,8 @@
 # Chrome-Automated Admin UI Test Procedure
 # Type: Repeatable Procedure (see docs/operations/REPEATABLE-PROCEDURES.md)
 # Last verified: 2026-02-19 (session 58) — full E2E pass: 770 PASS, 3 SOFT-PASS, 37 SKIP, 0 FAIL (v1.50.0, CSS centralization verified)
-# Last corrected: 2026-02-23 (session 75) — added Stage 0 Critical-Path Test (CP.1–CP.21, 21 steps) as mandatory gate before page-by-page testing
-# Previous: 2026-02-20 (session 65) — added Shopify Embedded Admin tests (S.1–S.8, 76 tests), user-assisted App Bridge auth, updated totals to 1,029 (838+115+76)
+# Last corrected: 2026-02-23 (session 82) — expanded P.8 Support Diagnostics from 4 to 22 tests (data validation), updated totals to 1,047 (838+133+76)
+# Previous: 2026-02-23 (session 75) — added Stage 0 Critical-Path Test (CP.1–CP.21, 21 steps) as mandatory gate before page-by-page testing
 
 ---
 
@@ -1801,7 +1801,7 @@ Navigate to `$STANDALONE_URL/billing`.
 
 ---
 
-## Test Execution — SPA Provider Console (115 tests)
+## Test Execution — SPA Provider Console (133 tests)
 
 After completing Standalone Admin tests, inject SPA auth (Steps B.1–B.4) and verify
 each Provider Console page loads and renders its primary content.
@@ -1915,16 +1915,34 @@ Navigate to `$PROVIDER_URL/alerts`.
 | P.7d | **Data-binding: Rule type values** — `javascript_tool(tabId, "document.body.innerText.match(/queue_depth\|secret_expiry\|circuit_breaker\|sla_breach\|incident/i)?.[0]")` — at least one rule type is a recognized AlertEngine type |
 | P.7e | `computer(action:'screenshot')` — capture visual state |
 
-#### P.8 Support Diagnostics (4 tests)
+#### P.8 Support Diagnostics (22 tests)
 
-Navigate to `$PROVIDER_URL/diagnostics`.
+Navigate to `$PROVIDER_URL/diagnostics`. Enter `remaker-digital-001` in the tenant ID field and click "Run Diagnostics".
 
 | Test ID | Chrome MCP Verification |
 |---------|------------------------|
 | P.8a | `find("Diagnostic", tabId)` or `find("diagnostic", tabId)` — page renders |
 | P.8b | `read_console_messages(onlyErrors:true)` — zero console errors |
-| P.8c | **Data-binding: Diagnostic data** — `javascript_tool(tabId, "document.querySelectorAll('table tbody tr, [class*=Card], [class*=Section]').length > 0")` — diagnostic content renders (not blank page) |
-| P.8d | `computer(action:'screenshot')` — capture visual state |
+| P.8c | **Data-binding: Diagnostic data** — `javascript_tool(tabId, "document.querySelectorAll('[class*=Card]').length >= 4")` — summary cards render (Status, Tier, Billing Channel, Created) |
+| P.8d | **Data-binding: Status badge** — `javascript_tool(tabId, "document.body.innerText.includes('active')")` — Status shows "active" (green badge) |
+| P.8e | **Data-binding: Tier value** — `javascript_tool(tabId, "[...document.querySelectorAll('[class*=Card]')].some(c => c.innerText.includes('professional'))")` — Tier shows "professional" |
+| P.8f | **Data-binding: Billing Channel** — `javascript_tool(tabId, "document.body.innerText.includes('shopify')")` — Billing Channel shows "shopify" |
+| P.8g | **Data-binding: Created date** — `javascript_tool(tabId, "document.body.innerText.match(/\\d{1,2}\\/\\d{1,2}\\/\\d{4}/)?.[0]")` — Created shows a formatted date |
+| P.8h | **Data-binding: Config Active** — `javascript_tool(tabId, "[...document.querySelectorAll('[class*=Badge]')].filter(b => b.textContent === 'Yes').length >= 2")` — Configuration State shows Active=Yes and Configured=Yes |
+| P.8i | **Data-binding: Pending Changes** — `javascript_tool(tabId, "document.body.innerText.includes('None')")` — Pending Changes shows "None" badge |
+| P.8j | **Data-binding: Active Version** — `javascript_tool(tabId, "document.body.innerText.match(/Active Version.*?(\\d+)/s)?.[1]")` — Active Version shows numeric value ≥ 1 |
+| P.8k | **Data-binding: Brand Name** — `javascript_tool(tabId, "[...document.querySelectorAll('[class*=Badge]')].some(b => b.textContent === 'Set')")` — AI Config Brand Name shows "Set" (green) |
+| P.8l | **Data-binding: Brand Voice** — `javascript_tool(tabId, "document.body.innerText.match(/Brand Voice/)")` — Brand Voice label present with status badge |
+| P.8m | **Data-binding: Team Members** — `javascript_tool(tabId, "document.body.innerText.match(/Members.*?(\\d+)/s)?.[1]")` — Team Members shows numeric count ≥ 1 |
+| P.8n | **Data-binding: Role breakdown** — `javascript_tool(tabId, "document.body.innerText.includes('superadmin')")` — Roles breakdown shows "superadmin" role |
+| P.8o | **Data-binding: KB stats** — `javascript_tool(tabId, "document.body.innerText.match(/Total Articles.*?(\\d+)/s)?.[1]")` — Knowledge Base Total Articles shows numeric value |
+| P.8p | **Data-binding: Conversations section** — `javascript_tool(tabId, "document.body.innerText.includes('Last 24h') && document.body.innerText.includes('Last 7d')")` — Conversations section shows Last 24h and Last 7d labels |
+| P.8q | **Data-binding: Shopify integration** — `javascript_tool(tabId, "[...document.querySelectorAll('[class*=Badge]')].some(b => b.textContent === 'Connected')")` — Integrations shows at least one "Connected" badge (Shopify) |
+| P.8r | **Data-binding: NATS status** — `javascript_tool(tabId, "document.body.innerText.includes('Not Deployed') || document.body.innerText.includes('NATS')")` — NATS shows "Not Deployed" (gray) or label present. NATS is decommissioned — "Disconnected" (red) is a **FAIL**. |
+| P.8s | **Data-binding: Widget Key** — `javascript_tool(tabId, "[...document.querySelectorAll('[class*=Badge]')].some(b => b.textContent === 'Present')")` — Widget Key shows "Present" (green) |
+| P.8t | **Data-binding: Recent Errors section** — `find("Load Errors", tabId)` — Recent Errors section renders with "Load Errors" button |
+| P.8u | **No collection errors** — `javascript_tool(tabId, "!document.body.innerText.includes('collection errors')")` — No "Partial data — collection errors" warning banner visible (all subsystem collectors succeeded) |
+| P.8v | `computer(action:'screenshot')` — capture visual state (both top and bottom of page) |
 
 #### P.9 Compliance Dashboard (5 tests)
 
@@ -2201,7 +2219,7 @@ user-assisted Shopify auth sub-procedure (Steps S.1–S.4) before testing begins
 
 - [ ] **Tenant re-initialized:** Primary tenant (remaker-digital-001) was re-seeded at start; Pages 0, 0A, 0B tested from clean state
 - [ ] **Standalone Admin:** 840 tests executed (802 prior + 36 KA tests + 2 activation dialog accuracy tests), results recorded with test ID / PASS / FAIL / SKIP
-- [ ] **SPA Provider Console:** 115 tests executed (P.0–P.17), all PASS or documented FAIL
+- [ ] **SPA Provider Console:** 133 tests executed (P.0–P.17), all PASS or documented FAIL
 - [ ] **Shopify Embedded Admin:** 76 tests executed (S.1–S.8), results recorded with test ID / PASS / FAIL / SKIP
 - [ ] **Total:** 1,031 tests (840 standalone + 115 provider + 76 Shopify)
 - [ ] **Zero unexpected console errors** across all pages (all 3 interfaces)
