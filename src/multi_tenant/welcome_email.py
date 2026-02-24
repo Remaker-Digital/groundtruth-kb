@@ -158,7 +158,9 @@ async def send_welcome_email(
     # --- Provider 1: SMTP (Titan or other SMTP provider) ---
     smtp_host = os.environ.get("SMTP_HOST", "")
     if smtp_host:
+        import io
         import smtplib
+        import socket
         from email.mime.multipart import MIMEMultipart
         from email.mime.text import MIMEText
 
@@ -174,19 +176,46 @@ async def send_welcome_email(
             msg["Subject"] = subject
             msg.attach(MIMEText(full_html, "html"))
 
+            local_hostname = socket.getfqdn()
+            logger.info(
+                "SMTP diag: tenant=%s to=%s host=%s port=%s local_hostname=%s",
+                tenant_id[:8], to_email, smtp_host, smtp_port, local_hostname,
+            )
+
             if smtp_port == 465:
-                with smtplib.SMTP_SSL(smtp_host, smtp_port, timeout=10) as server:
+                with smtplib.SMTP_SSL(smtp_host, smtp_port, timeout=15) as server:
+                    # Log EHLO response for diagnostics
+                    ehlo_resp = getattr(server, "ehlo_resp", b"(none)")
+                    logger.info("SMTP diag EHLO resp: %s", ehlo_resp[:200] if ehlo_resp else "(none)")
+
                     if smtp_user and smtp_pass:
                         server.login(smtp_user, smtp_pass)
-                    server.send_message(msg)
+
+                    # Use sendmail for detailed response capture
+                    msg_str = msg.as_string()
+                    refused = server.sendmail(smtp_from, [to_email], msg_str)
+
+                    # Capture the last server response (DATA response with queue ID)
+                    last_code = getattr(server, "last_code", None)
+                    last_msg = getattr(server, "last_msg", None)
+
+                    logger.info(
+                        "SMTP diag result: tenant=%s refused=%s last_code=%s last_msg=%s",
+                        tenant_id[:8], refused, last_code, last_msg,
+                    )
             else:
-                with smtplib.SMTP(smtp_host, smtp_port, timeout=10) as server:
+                with smtplib.SMTP(smtp_host, smtp_port, timeout=15) as server:
                     server.ehlo()
                     if smtp_port != 25:
                         server.starttls()
                     if smtp_user and smtp_pass:
                         server.login(smtp_user, smtp_pass)
-                    server.send_message(msg)
+                    msg_str = msg.as_string()
+                    refused = server.sendmail(smtp_from, [to_email], msg_str)
+                    logger.info(
+                        "SMTP diag result: tenant=%s refused=%s",
+                        tenant_id[:8], refused,
+                    )
 
             logger.info("Welcome email sent via SMTP: tenant=%s email=%s host=%s", tenant_id[:8], to_email, smtp_host)
             return True
