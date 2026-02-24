@@ -488,7 +488,7 @@ _EMAIL_WRAPPER = """<!DOCTYPE html>
 <tr><td align="center">
 <table width="600" cellpadding="0" cellspacing="0" style="background:#ffffff;border-radius:8px;overflow:hidden">
 <tr><td style="background:#141414;padding:24px 32px">
-  <img src="https://agentredcx.com/img/email-logo-light.png"
+  <img src="https://agentredcx.com/img/email-logo-light.png?v=2"
        alt="Agent Red Customer Experience" width="220" height="auto"
        style="display:block;max-width:220px;height:auto;border:0" />
 </td></tr>
