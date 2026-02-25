@@ -24,7 +24,7 @@ This document consolidates every testable requirement from 8 source documents in
 | Gaps deferred to 1.1 | 72 | 72 |
 | Python test functions | ~1,496 | ~4,791 (grep); 4,518 (pytest collected) |
 | Python test files | 53 | 90+ |
-| Child Repeatable Procedures | 0 | **10** |
+| Child Repeatable Procedures | 0 | **11** |
 | Non-functional procedure assertions | 0 | **274** |
 | UI browser tests | 51 | **917** |
 | Critical path steps | 0 | **21** |
@@ -624,11 +624,32 @@ Items that cannot be automated. Each must be documented with evidence (screensho
 
 **Gate:** All 8 items documented with evidence.
 
+### Phase 16: Widget Visual Regression
+
+Automated structural and CSS property tests for the widget UI. Uses Playwright headless browser against the Vite dev server with mocked API responses. Catches structural regressions (missing elements, broken aria-labels) and visual regressions (wrong colors, missing animations, broken spacing).
+
+**Procedure:** `docs/operations/visual-regression-test-procedure.md` (Layers 1-2)
+
+| Layer | What it tests | Assertion count |
+|-------|--------------|-----------------|
+| Layer 1 | DOM structure: SDK lifecycle, header, greeting, input bar, dimensions, accessibility | ~16 |
+| Layer 2 | CSS properties: brand colors, typography, spacing, dark mode, animations, bubbles | ~14 |
+| Layer 3 | Visual quality (interactive Claude Vision round-trip) | 10-point checklist |
+
+**Pre-requisites:** `widget/node_modules` installed, Playwright chromium browser available.
+
+**Command:**
+```powershell
+pytest tests/visual/ -v -m visual --timeout=60
+```
+
+**Gate:** All Layer 1 and Layer 2 tests PASS (≥30 assertions). Layer 3 is advisory.
+
 ---
 
 ## 10. Success Criteria for 1.0 GA (v2.0)
 
-**The release is gated on ALL 15 phases passing.** No phase may be skipped or marked "conditional."
+**The release is gated on ALL 16 phases passing.** No phase may be skipped or marked "conditional."
 
 | # | Phase | Target | Minimum Acceptable |
 |---|-------|--------|-------------------|
@@ -647,6 +668,7 @@ Items that cannot be automated. Each must be documented with evidence (screensho
 | 13 | SPA Provisioning + Critical Path | 25/25 PASS (4 provisioning + 21 CP) | 25/25 |
 | 14 | Upgrade Verification | 35/35 match | 35/35 |
 | 15 | Manual Verification | 8/8 documented | 8/8 |
+| 16 | Widget Visual Regression | ≥30 PASS, 0 FAIL | ≥30 PASS, 0 FAIL |
 
 ### Aggregate Totals
 
@@ -659,7 +681,8 @@ Items that cannot be automated. Each must be documented with evidence (screensho
 | Total provisioning + critical path steps (Phase 13) | 25 |
 | Total upgrade assertions (Phase 14) | 35 |
 | Total manual items (Phase 15) | 8 |
-| **Grand total test points** | **~6,114** |
+| Total widget visual tests (Phase 16) | ~30 |
+| **Grand total test points** | **~6,144** |
 
 ### Pre-existing Failure Policy
 
