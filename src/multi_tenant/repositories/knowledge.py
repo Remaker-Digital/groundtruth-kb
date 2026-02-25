@@ -309,3 +309,150 @@ class KnowledgeBaseRepository(TenantScopedRepository):
             ),
             parameters=[{"name": "@limit", "value": limit}],
         )
+
+    # --- Website source management ---
+
+    async def list_website_sources(
+        self,
+        tenant_id: str,
+    ) -> list[dict[str, Any]]:
+        """List active website sources for a tenant."""
+        return await self.query(
+            tenant_id=tenant_id,
+            query_text=(
+                "SELECT * FROM c "
+                "WHERE c.doc_type = 'website_source' "
+                "AND c.is_active = true "
+                "ORDER BY c.created_at DESC"
+            ),
+        )
+
+    async def count_website_sources(
+        self,
+        tenant_id: str,
+    ) -> int:
+        """Count active website sources for tier-limit enforcement."""
+        return await self.query_count(
+            tenant_id=tenant_id,
+            query_text=(
+                "SELECT VALUE COUNT(1) FROM c "
+                "WHERE c.doc_type = 'website_source' "
+                "AND c.is_active = true"
+            ),
+        )
+
+    async def get_source_by_domain(
+        self,
+        tenant_id: str,
+        domain: str,
+    ) -> dict[str, Any] | None:
+        """Find an active website source by domain (duplicate check)."""
+        results = await self.query(
+            tenant_id=tenant_id,
+            query_text=(
+                "SELECT * FROM c "
+                "WHERE c.doc_type = 'website_source' "
+                "AND c.domain = @domain "
+                "AND c.is_active = true"
+            ),
+            parameters=[{"name": "@domain", "value": domain}],
+            max_items=1,
+        )
+        return results[0] if results else None
+
+    async def update_website_source(
+        self,
+        tenant_id: str,
+        source_id: str,
+        **fields: Any,
+    ) -> dict[str, Any]:
+        """Patch specific fields on a website source document."""
+        now = datetime.now(timezone.utc).isoformat()
+        operations = [
+            {"op": "set", "path": f"/{key}", "value": value}
+            for key, value in fields.items()
+        ]
+        operations.append({"op": "set", "path": "/updated_at", "value": now})
+        return await self.patch(
+            tenant_id=tenant_id,
+            document_id=source_id,
+            operations=operations,
+        )
+
+    async def soft_delete_website_source(
+        self,
+        tenant_id: str,
+        source_id: str,
+    ) -> dict[str, Any]:
+        """Soft-delete a website source (set is_active = false)."""
+        return await self.update_website_source(
+            tenant_id, source_id, is_active=False, status="paused",
+        )
+
+    async def list_kb_entries_by_source(
+        self,
+        tenant_id: str,
+        domain: str,
+    ) -> list[dict[str, Any]]:
+        """List KB entries created by website crawl for a given domain.
+
+        Used during re-crawl to build the content_hash map for
+        incremental change detection (skip unchanged pages).
+
+        Returns lightweight projection: id, source_url, content_hash.
+        """
+        return await self.query(
+            tenant_id=tenant_id,
+            query_text=(
+                "SELECT c.id, c.source_url, c.content_hash, c.is_active "
+                "FROM c "
+                "WHERE c.source_type = 'website_crawl' "
+                "AND c.is_active = true "
+                "AND CONTAINS(c.source_url, @domain)"
+            ),
+            parameters=[{"name": "@domain", "value": domain}],
+        )
+
+    async def soft_delete_kb_entries_by_source(
+        self,
+        tenant_id: str,
+        domain: str,
+    ) -> int:
+        """Soft-delete all KB entries from a website crawl source.
+
+        Used when deleting a website source to cascade-remove its entries.
+        Returns the number of entries soft-deleted.
+        """
+        entries = await self.list_kb_entries_by_source(tenant_id, domain)
+        count = 0
+        for entry in entries:
+            if entry.get("is_active"):
+                await self.soft_delete(tenant_id, entry["id"])
+                count += 1
+        return count
+
+    async def list_sources_due_for_crawl(
+        self,
+        limit: int = 10,
+    ) -> list[dict[str, Any]]:
+        """Find website sources across all tenants that are due for re-crawl.
+
+        Cross-partition query used by the background refresh scheduler.
+        Filters: auto_refresh enabled, not currently crawling, past due.
+        """
+        now = datetime.now(timezone.utc).isoformat()
+        return await self.cross_partition_query(
+            query_text=(
+                "SELECT * FROM c "
+                "WHERE c.doc_type = 'website_source' "
+                "AND c.is_active = true "
+                "AND c.auto_refresh = true "
+                "AND c.status != 'crawling' "
+                "AND (c.next_crawl_at = null OR c.next_crawl_at <= @now) "
+                "OFFSET 0 LIMIT @limit"
+            ),
+            parameters=[
+                {"name": "@now", "value": now},
+                {"name": "@limit", "value": limit},
+            ],
+        )

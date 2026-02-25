@@ -26,7 +26,7 @@ from src.app.lifecycle import (
     register_startup_handlers,
     register_shutdown_handlers,
 )
-from src.app.background import register_idle_scanner, register_sla_snapshots, register_alert_evaluation, register_ingestion_processor, register_archival_sweep, register_trial_scanner, register_trial_warning, register_expiry_scanner, register_expiry_warning, register_vectorization_scanner
+from src.app.background import register_idle_scanner, register_sla_snapshots, register_alert_evaluation, register_ingestion_processor, register_archival_sweep, register_trial_scanner, register_trial_warning, register_expiry_scanner, register_expiry_warning, register_vectorization_scanner, register_website_refresh
 from src.app.health import register_health_endpoints
 
 # ---------------------------------------------------------------------------
@@ -50,6 +50,7 @@ register_trial_warning(app)
 register_expiry_scanner(app)
 register_expiry_warning(app)
 register_vectorization_scanner(app)
+register_website_refresh(app)
 register_health_endpoints(app)
 
 # ---------------------------------------------------------------------------

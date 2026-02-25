@@ -487,11 +487,14 @@ class KnowledgeRetrievalAgent(AgentRedBaseAgent):
             for _score, article in top_results:
                 title = article.get("title", "Untitled")
                 content = article.get("content", "")
-                context_parts.append(f"### {title}\n{content}")
+                source_url = article.get("source_url", "")
+                url_line = f"\nSource: {source_url}" if source_url else ""
+                context_parts.append(f"### {title}{url_line}\n{content}")
                 sources.append({
                     "id": article.get("id", ""),
                     "title": title,
                     "entry_type": article.get("entry_type", ""),
+                    "source_url": source_url,
                 })
 
             context = "\n\n".join(context_parts)

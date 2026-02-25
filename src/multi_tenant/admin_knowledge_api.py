@@ -1504,3 +1504,363 @@ async def get_scan_result(
         low_count=result.low_count,
         scan_duration_ms=result.scan_duration_ms,
     )
+
+
+# ---------------------------------------------------------------------------
+# Website Source management — automated crawling (S89)
+# ---------------------------------------------------------------------------
+
+
+class WebsiteSourceResponse(CamelCaseModel):
+    """A single website source configuration."""
+
+    id: str
+    tenant_id: str
+    domain: str
+    start_url: str
+    max_pages: int = 25
+    entry_type: str = "article"
+    auto_refresh: bool = True
+    refresh_interval_hours: int = 24
+    status: str = "pending"
+    last_crawled_at: str | None = None
+    next_crawl_at: str | None = None
+    pages_discovered: int = 0
+    pages_crawled: int = 0
+    articles_created: int = 0
+    total_chars: int = 0
+    error_message: str | None = None
+    created_at: str
+    updated_at: str
+
+
+class WebsiteSourceListResponse(CamelCaseModel):
+    """List of website sources for a tenant."""
+
+    tenant_id: str
+    sources: list[WebsiteSourceResponse]
+    total_count: int
+
+
+class CreateWebsiteSourceRequest(CamelCaseModel):
+    """Request body for POST /api/admin/knowledge/sources."""
+
+    start_url: str = Field(
+        min_length=1,
+        max_length=2000,
+        description="Starting URL for the website crawl",
+    )
+    max_pages: int = Field(
+        default=25,
+        ge=1,
+        le=100,
+        description="Maximum pages to crawl per cycle",
+    )
+    entry_type: str = Field(
+        default="article",
+        description="KB entry type for crawled pages",
+    )
+    auto_refresh: bool = Field(
+        default=True,
+        description="Enable automatic re-crawling",
+    )
+    refresh_interval_hours: int = Field(
+        default=24,
+        ge=6,
+        le=168,
+        description="Hours between automatic re-crawls (6-168)",
+    )
+
+
+class UpdateWebsiteSourceRequest(CamelCaseModel):
+    """Request body for PUT /api/admin/knowledge/sources/{id}."""
+
+    max_pages: int | None = Field(default=None, ge=1, le=100)
+    auto_refresh: bool | None = None
+    refresh_interval_hours: int | None = Field(default=None, ge=6, le=168)
+    status: str | None = Field(
+        default=None,
+        description="Set to 'paused' to pause or 'active' to resume",
+    )
+
+
+class WebsiteSourceActionResponse(CamelCaseModel):
+    """Response for source action endpoints (crawl, delete)."""
+
+    success: bool
+    message: str
+    source_id: str | None = None
+
+
+def _source_to_response(doc: dict[str, Any]) -> WebsiteSourceResponse:
+    """Convert a raw Cosmos document to a WebsiteSourceResponse."""
+    return WebsiteSourceResponse(
+        id=doc["id"],
+        tenant_id=doc["tenant_id"],
+        domain=doc.get("domain", ""),
+        start_url=doc.get("start_url", ""),
+        max_pages=doc.get("max_pages", 25),
+        entry_type=doc.get("entry_type", "article"),
+        auto_refresh=doc.get("auto_refresh", True),
+        refresh_interval_hours=doc.get("refresh_interval_hours", 24),
+        status=doc.get("status", "pending"),
+        last_crawled_at=doc.get("last_crawled_at"),
+        next_crawl_at=doc.get("next_crawl_at"),
+        pages_discovered=doc.get("pages_discovered", 0),
+        pages_crawled=doc.get("pages_crawled", 0),
+        articles_created=doc.get("articles_created", 0),
+        total_chars=doc.get("total_chars", 0),
+        error_message=doc.get("error_message"),
+        created_at=doc.get("created_at", ""),
+        updated_at=doc.get("updated_at", ""),
+    )
+
+
+@router.get("/sources", response_model=WebsiteSourceListResponse)
+async def list_website_sources(
+    ctx: TenantContext = Depends(get_tenant_context),
+) -> WebsiteSourceListResponse:
+    """List all website sources for the authenticated tenant."""
+    repo = KnowledgeBaseRepository()
+    sources = await repo.list_website_sources(ctx.tenant_id)
+    return WebsiteSourceListResponse(
+        tenant_id=ctx.tenant_id,
+        sources=[_source_to_response(s) for s in sources],
+        total_count=len(sources),
+    )
+
+
+@router.post("/sources", response_model=WebsiteSourceResponse, status_code=201)
+async def create_website_source(
+    body: CreateWebsiteSourceRequest,
+    ctx: TenantContext = Depends(get_tenant_context),
+) -> WebsiteSourceResponse:
+    """Add a new website source and trigger the first crawl."""
+    from urllib.parse import urlparse
+
+    from src.multi_tenant.cosmos_schema import WebsiteSourceDocument
+    from src.multi_tenant.website_crawl_service import get_tier_limits
+
+    # --- Validate URL ---
+    try:
+        parsed = urlparse(body.start_url)
+        if parsed.scheme not in ("http", "https") or not parsed.netloc:
+            raise ValueError("Invalid URL scheme or missing host")
+        domain = parsed.netloc.lower().removeprefix("www.")
+    except Exception:
+        raise HTTPException(status_code=422, detail="Invalid URL. Must be a valid http(s) URL.")
+
+    repo = KnowledgeBaseRepository()
+
+    # --- Tier limit enforcement ---
+    tier = ctx.tier or "starter"
+    limits = get_tier_limits(tier)
+    current_count = await repo.count_website_sources(ctx.tenant_id)
+    if current_count >= limits["max_sources"]:
+        raise HTTPException(
+            status_code=409,
+            detail=f"Website source limit reached ({limits['max_sources']} for {tier} tier). "
+                   f"Upgrade your plan or remove an existing source.",
+        )
+
+    # --- Enforce tier page limit ---
+    effective_max_pages = min(body.max_pages, limits["max_pages"])
+
+    # --- Enforce tier refresh interval ---
+    effective_interval = max(body.refresh_interval_hours, limits["min_refresh_hours"])
+
+    # --- Duplicate domain check ---
+    existing = await repo.get_source_by_domain(ctx.tenant_id, domain)
+    if existing:
+        raise HTTPException(
+            status_code=409,
+            detail=f"A website source for domain '{domain}' already exists.",
+        )
+
+    # --- Create the source document ---
+    now = datetime.now(timezone.utc).isoformat()
+    doc = WebsiteSourceDocument(
+        id=str(uuid.uuid4()),
+        tenant_id=ctx.tenant_id,
+        domain=domain,
+        start_url=body.start_url,
+        max_pages=effective_max_pages,
+        entry_type=body.entry_type,
+        auto_refresh=body.auto_refresh,
+        refresh_interval_hours=effective_interval,
+        status="pending",
+        created_at=now,
+        updated_at=now,
+    )
+    await repo.create(ctx.tenant_id, doc)
+    logger.info(
+        "Website source created: tenant=%s domain=%s max_pages=%d",
+        ctx.tenant_id[:8], domain, effective_max_pages,
+    )
+
+    # --- Trigger first crawl via ingestion job ---
+    try:
+        from src.multi_tenant.cosmos_schema import IngestionJobDocument, IngestionJobType
+        job = IngestionJobDocument(
+            id=str(uuid.uuid4()),
+            tenant_id=ctx.tenant_id,
+            job_type=IngestionJobType.WEBSITE_REFRESH.value,
+            status="pending",
+            source_config={"source_id": doc.id},
+            created_at=now,
+            updated_at=now,
+        )
+        await repo.create(ctx.tenant_id, job)
+    except Exception:
+        logger.warning(
+            "Failed to create initial crawl job for source %s (non-fatal)",
+            doc.id[:8],
+            exc_info=True,
+        )
+
+    return _source_to_response(doc.model_dump())
+
+
+@router.get("/sources/{source_id}", response_model=WebsiteSourceResponse)
+async def get_website_source(
+    source_id: str,
+    ctx: TenantContext = Depends(get_tenant_context),
+) -> WebsiteSourceResponse:
+    """Get details for a single website source."""
+    repo = KnowledgeBaseRepository()
+    try:
+        doc = await repo.read(ctx.tenant_id, source_id)
+    except (DocumentNotFoundError, Exception):
+        raise HTTPException(status_code=404, detail="Website source not found.")
+
+    if doc.get("doc_type") != "website_source":
+        raise HTTPException(status_code=404, detail="Website source not found.")
+
+    return _source_to_response(doc)
+
+
+@router.put("/sources/{source_id}", response_model=WebsiteSourceResponse)
+async def update_website_source(
+    source_id: str,
+    body: UpdateWebsiteSourceRequest,
+    ctx: TenantContext = Depends(get_tenant_context),
+) -> WebsiteSourceResponse:
+    """Update a website source configuration."""
+    from src.multi_tenant.website_crawl_service import get_tier_limits
+
+    repo = KnowledgeBaseRepository()
+
+    # Verify source exists and is a website source
+    try:
+        existing = await repo.read(ctx.tenant_id, source_id)
+    except (DocumentNotFoundError, Exception):
+        raise HTTPException(status_code=404, detail="Website source not found.")
+
+    if existing.get("doc_type") != "website_source":
+        raise HTTPException(status_code=404, detail="Website source not found.")
+
+    # Build update fields
+    fields: dict[str, Any] = {}
+    tier = ctx.tier or "starter"
+    limits = get_tier_limits(tier)
+
+    if body.max_pages is not None:
+        fields["max_pages"] = min(body.max_pages, limits["max_pages"])
+    if body.auto_refresh is not None:
+        fields["auto_refresh"] = body.auto_refresh
+    if body.refresh_interval_hours is not None:
+        fields["refresh_interval_hours"] = max(body.refresh_interval_hours, limits["min_refresh_hours"])
+    if body.status is not None:
+        if body.status not in ("paused", "active"):
+            raise HTTPException(status_code=422, detail="Status must be 'paused' or 'active'.")
+        fields["status"] = body.status
+
+    if not fields:
+        return _source_to_response(existing)
+
+    updated = await repo.update_website_source(ctx.tenant_id, source_id, **fields)
+    return _source_to_response(updated)
+
+
+@router.delete("/sources/{source_id}", response_model=WebsiteSourceActionResponse)
+async def delete_website_source(
+    source_id: str,
+    ctx: TenantContext = Depends(get_tenant_context),
+) -> WebsiteSourceActionResponse:
+    """Soft-delete a website source and its KB entries."""
+    repo = KnowledgeBaseRepository()
+
+    try:
+        doc = await repo.read(ctx.tenant_id, source_id)
+    except (DocumentNotFoundError, Exception):
+        raise HTTPException(status_code=404, detail="Website source not found.")
+
+    if doc.get("doc_type") != "website_source":
+        raise HTTPException(status_code=404, detail="Website source not found.")
+
+    domain = doc.get("domain", "")
+
+    # Soft-delete the source itself
+    await repo.soft_delete_website_source(ctx.tenant_id, source_id)
+
+    # Cascade soft-delete KB entries from this source
+    deleted_count = 0
+    if domain:
+        deleted_count = await repo.soft_delete_kb_entries_by_source(ctx.tenant_id, domain)
+
+    logger.info(
+        "Website source deleted: tenant=%s source=%s domain=%s kb_entries_deleted=%d",
+        ctx.tenant_id[:8], source_id[:8], domain, deleted_count,
+    )
+
+    return WebsiteSourceActionResponse(
+        success=True,
+        message=f"Website source deleted. {deleted_count} KB entries removed.",
+        source_id=source_id,
+    )
+
+
+@router.post("/sources/{source_id}/crawl", response_model=WebsiteSourceActionResponse)
+async def trigger_crawl(
+    source_id: str,
+    ctx: TenantContext = Depends(get_tenant_context),
+) -> WebsiteSourceActionResponse:
+    """Manually trigger a re-crawl for a website source."""
+    from src.multi_tenant.cosmos_schema import IngestionJobDocument, IngestionJobType
+
+    repo = KnowledgeBaseRepository()
+
+    try:
+        doc = await repo.read(ctx.tenant_id, source_id)
+    except (DocumentNotFoundError, Exception):
+        raise HTTPException(status_code=404, detail="Website source not found.")
+
+    if doc.get("doc_type") != "website_source":
+        raise HTTPException(status_code=404, detail="Website source not found.")
+
+    if doc.get("status") == "crawling":
+        raise HTTPException(status_code=409, detail="A crawl is already in progress.")
+
+    # Create ingestion job for the crawl
+    now = datetime.now(timezone.utc).isoformat()
+    job = IngestionJobDocument(
+        id=str(uuid.uuid4()),
+        tenant_id=ctx.tenant_id,
+        job_type=IngestionJobType.WEBSITE_REFRESH.value,
+        status="pending",
+        source_config={"source_id": source_id},
+        created_at=now,
+        updated_at=now,
+    )
+    await repo.create(ctx.tenant_id, job)
+
+    logger.info(
+        "Manual crawl triggered: tenant=%s source=%s domain=%s",
+        ctx.tenant_id[:8], source_id[:8], doc.get("domain", ""),
+    )
+
+    return WebsiteSourceActionResponse(
+        success=True,
+        message="Crawl job created. The source will be re-crawled shortly.",
+        source_id=source_id,
+    )

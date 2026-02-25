@@ -1242,3 +1242,93 @@ def register_vectorization_scanner(app: FastAPI) -> None:
     """Register vectorization scanner startup/shutdown handlers on the FastAPI app."""
     app.on_event("startup")(_startup_vectorization_scanner)
     app.on_event("shutdown")(_shutdown_vectorization_scanner)
+
+
+# ---------------------------------------------------------------------------
+# Website source auto-refresh scanner
+# ---------------------------------------------------------------------------
+
+_WEBSITE_REFRESH_INTERVAL = 900  # 15 minutes
+_WEBSITE_REFRESH_STARTUP_DELAY = 120  # 2 minutes (let other services start first)
+_WEBSITE_REFRESH_SOURCES_PER_TICK = 3  # Max sources to process per tick
+
+_website_refresh_task: asyncio.Task | None = None  # type: ignore[type-arg]
+
+
+async def _website_refresh_loop() -> None:
+    """Periodic background task that triggers re-crawls for due website sources.
+
+    Checks for website sources past their next_crawl_at timestamp and
+    creates ingestion jobs with job_type=WEBSITE_REFRESH for each.
+    Limits processing to a few sources per tick to avoid overload.
+    """
+    await asyncio.sleep(_WEBSITE_REFRESH_STARTUP_DELAY)
+
+    while True:
+        try:
+            from src.multi_tenant.repositories.knowledge import KnowledgeBaseRepository
+            from src.multi_tenant.storefront_ingestion import get_ingestion_service
+            from src.multi_tenant.cosmos_schema import IngestionJobType
+
+            repo = KnowledgeBaseRepository()
+            ingestion = get_ingestion_service()
+
+            due_sources = await repo.list_sources_due_for_crawl(
+                limit=_WEBSITE_REFRESH_SOURCES_PER_TICK,
+            )
+
+            for source in due_sources:
+                tenant_id = source["tenant_id"]
+                source_id = source["id"]
+                try:
+                    await ingestion.start_ingestion(
+                        tenant_id=tenant_id,
+                        job_type=IngestionJobType.WEBSITE_REFRESH.value,
+                        source_config={"source_id": source_id},
+                    )
+                    logger.info(
+                        "Website refresh: queued crawl for tenant=%s source=%s domain=%s",
+                        tenant_id[:8], source_id[:8], source.get("domain", "?"),
+                    )
+                except Exception:
+                    logger.debug(
+                        "Website refresh: failed to queue crawl for %s/%s",
+                        tenant_id[:8], source_id[:8],
+                        exc_info=True,
+                    )
+
+            if due_sources:
+                logger.info(
+                    "Website refresh scanner: queued %d source re-crawls",
+                    len(due_sources),
+                )
+        except Exception:
+            logger.debug("Website refresh scanner cycle failed", exc_info=True)
+
+        await asyncio.sleep(_WEBSITE_REFRESH_INTERVAL)
+
+
+async def _startup_website_refresh() -> None:
+    """Start the website refresh scanner background task."""
+    global _website_refresh_task  # noqa: PLW0603
+    _website_refresh_task = asyncio.create_task(_website_refresh_loop())
+    logger.info("Website refresh scanner started (15-min interval, 2-min startup delay)")
+
+
+async def _shutdown_website_refresh() -> None:
+    """Cancel the website refresh scanner background task."""
+    global _website_refresh_task  # noqa: PLW0603
+    if _website_refresh_task and not _website_refresh_task.done():
+        _website_refresh_task.cancel()
+        try:
+            await _website_refresh_task
+        except asyncio.CancelledError:
+            pass
+        logger.info("Website refresh scanner stopped")
+    _website_refresh_task = None
+
+
+def register_website_refresh(app: FastAPI) -> None:
+    """Register website refresh scanner startup/shutdown handlers on the FastAPI app."""
+    app.on_event("startup")(_startup_website_refresh)
+    app.on_event("shutdown")(_shutdown_website_refresh)

@@ -673,6 +673,69 @@ class KnowledgeBaseDocument(BaseModel):
     updated_at: str = Field(description="Last update timestamp")
 
 
+class WebsiteSourceStatus(str, Enum):
+    """Status of a website crawl source."""
+
+    PENDING = "pending"
+    CRAWLING = "crawling"
+    ACTIVE = "active"
+    FAILED = "failed"
+    PAUSED = "paused"
+
+
+class WebsiteSourceDocument(BaseModel):
+    """Saved website crawl source for automated knowledge ingestion.
+
+    Stored in the ``knowledge_bases`` container alongside KB entries, using
+    ``doc_type = "website_source"`` as discriminator.  The background refresh
+    loop checks ``next_crawl_at`` and triggers re-crawls with content change
+    detection to keep KB entries fresh.
+
+    Partition key: /tenant_id
+    """
+
+    id: str = Field(description="Document ID (UUID)")
+    tenant_id: str = Field(description="Partition key — tenant owning this source")
+    doc_type: str = Field(
+        default="website_source",
+        description="Discriminator to distinguish from KnowledgeBaseDocument",
+    )
+
+    # Source configuration
+    domain: str = Field(description="Normalized domain (e.g. example.myshopify.com)")
+    start_url: str = Field(description="Seed URL for crawling")
+    max_pages: int = Field(default=25, ge=1, le=100, description="Maximum pages to crawl (1-100)")
+    crawl_depth: int = Field(default=3, ge=1, le=10, description="Maximum link-following depth")
+    entry_type: str = Field(default="article", description="Default KB entry type for crawled pages")
+
+    # Schedule
+    auto_refresh: bool = Field(default=True, description="Enable periodic re-crawling")
+    refresh_interval_hours: int = Field(
+        default=24, ge=6, le=168,
+        description="Hours between automatic re-crawls (6-168)",
+    )
+
+    # Status tracking
+    status: str = Field(
+        default=WebsiteSourceStatus.PENDING.value,
+        description="pending | crawling | active | failed | paused",
+    )
+    last_crawled_at: str | None = Field(default=None, description="ISO 8601 last crawl completion")
+    next_crawl_at: str | None = Field(default=None, description="ISO 8601 next scheduled crawl")
+
+    # Progress metrics (from most recent crawl)
+    pages_discovered: int = Field(default=0, description="Total URLs found during last crawl")
+    pages_crawled: int = Field(default=0, description="Pages successfully parsed")
+    articles_created: int = Field(default=0, description="KB entries currently linked to this source")
+    total_chars: int = Field(default=0, description="Total content characters across all pages")
+    error_message: str | None = Field(default=None, description="Error from last failed crawl")
+
+    # Lifecycle
+    is_active: bool = Field(default=True, description="Soft delete flag")
+    created_at: str = Field(description="Creation timestamp (ISO 8601)")
+    updated_at: str = Field(description="Last update timestamp (ISO 8601)")
+
+
 # ---------------------------------------------------------------------------
 # Document models — Collection 6: memory_vectors
 # ---------------------------------------------------------------------------
@@ -1372,6 +1435,7 @@ class IngestionJobType(str, Enum):
     SHOPIFY = "shopify"
     URL = "url"
     CATEGORY_TEMPLATE = "category_template"
+    WEBSITE_REFRESH = "website_refresh"
 
 
 class IngestionJobStatus(str, Enum):

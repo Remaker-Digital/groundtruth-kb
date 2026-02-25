@@ -940,7 +940,9 @@ class KnowledgeVectorizer:
             if len(content) > available:
                 truncated = truncated.rsplit(" ", 1)[0] + "..."
 
-            part = f"[{entry_type.upper()}] {title}\n{truncated}"
+            source_url = result.get("source_url", "")
+            url_line = f"\nSource: {source_url}" if source_url else ""
+            part = f"[{entry_type.upper()}] {title}{url_line}\n{truncated}"
             context_parts.append(part)
             total_chars += len(part)
 
@@ -950,6 +952,7 @@ class KnowledgeVectorizer:
                 "score": round(float(rrf_score), 4),
                 "type": entry_type,
                 "retrieval_mode": _get_result_mode(result),
+                "source_url": source_url,
             })
 
         retrieval_mode = "hybrid"

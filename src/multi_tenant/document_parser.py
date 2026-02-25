@@ -28,6 +28,7 @@ Dependencies:
 from __future__ import annotations
 
 import csv
+import hashlib
 import io
 import logging
 import os
@@ -68,7 +69,7 @@ CHARS_PER_TOKEN = 4  # approximation for English text
 URL_FETCH_TIMEOUT = 30  # seconds
 MAX_URL_REDIRECTS = 5
 CRAWL_DEFAULT_MAX_PAGES = 10
-CRAWL_MAX_PAGES_HARD_LIMIT = 50
+CRAWL_MAX_PAGES_HARD_LIMIT = 100
 CRAWLER_USER_AGENT = "AgentRed-KnowledgeBot/1.0 (+https://agentredcx.com/bot)"
 CRAWL_DELAY_SECONDS = 1.0  # Polite delay between page fetches
 
@@ -878,6 +879,303 @@ async def crawl_url(
         max_pages,
     )
     return results
+
+
+# ---------------------------------------------------------------------------
+# Website crawl — incremental with sitemap + change detection
+# ---------------------------------------------------------------------------
+
+
+def compute_content_hash(text: str) -> str:
+    """SHA-256 hex digest of text content for change detection."""
+    return hashlib.sha256(text.encode("utf-8")).hexdigest()
+
+
+@dataclass
+class WebsiteCrawlResult:
+    """Result of an incremental website crawl with change tracking."""
+
+    results: list[ParseResult] = field(default_factory=list)
+    new_urls: list[str] = field(default_factory=list)
+    changed_urls: list[str] = field(default_factory=list)
+    unchanged_urls: list[str] = field(default_factory=list)
+    removed_urls: list[str] = field(default_factory=list)
+    failed_urls: list[str] = field(default_factory=list)
+    pages_discovered: int = 0
+    pages_crawled: int = 0
+    total_chars: int = 0
+    error: str | None = None
+
+    @property
+    def articles_created(self) -> int:
+        return len(self.new_urls) + len(self.changed_urls)
+
+
+async def parse_sitemap(
+    base_url: str,
+    client: Any,
+) -> list[str]:
+    """Parse sitemap.xml to discover crawlable URLs.
+
+    Handles both standard sitemaps and sitemap index files.
+    Returns empty list if no sitemap exists (graceful fallback).
+    """
+    from urllib.parse import urlparse
+
+    parsed = urlparse(base_url)
+    sitemap_url = f"{parsed.scheme}://{parsed.netloc}/sitemap.xml"
+    domain = parsed.netloc.lower()
+
+    try:
+        resp = await client.get(sitemap_url)
+        if resp.status_code != 200:
+            logger.debug("No sitemap at %s (status %d)", sitemap_url, resp.status_code)
+            return []
+
+        content_type = resp.headers.get("content-type", "")
+        if "xml" not in content_type and "text" not in content_type:
+            logger.debug("Sitemap at %s has unexpected content-type: %s", sitemap_url, content_type)
+            return []
+
+        from bs4 import BeautifulSoup
+
+        soup = BeautifulSoup(resp.text, "html.parser")
+        urls: list[str] = []
+
+        # Check for sitemap index (contains <sitemap><loc> entries)
+        sitemap_tags = soup.find_all("sitemap")
+        if sitemap_tags:
+            # Recurse into child sitemaps (limit to 5 to avoid explosion)
+            for sitemap_tag in sitemap_tags[:5]:
+                loc = sitemap_tag.find("loc")
+                if loc and loc.string:
+                    child_urls = await _parse_sitemap_single(loc.string.strip(), client, domain)
+                    urls.extend(child_urls)
+        else:
+            # Standard sitemap with <url><loc> entries
+            urls = _extract_sitemap_urls(soup, domain)
+
+        logger.info("Sitemap: found %d URLs from %s", len(urls), sitemap_url)
+        return urls
+
+    except Exception as exc:
+        logger.debug("Sitemap parsing failed for %s: %s", sitemap_url, exc)
+        return []
+
+
+async def _parse_sitemap_single(
+    sitemap_url: str,
+    client: Any,
+    domain: str,
+) -> list[str]:
+    """Parse a single sitemap XML file."""
+    try:
+        resp = await client.get(sitemap_url)
+        if resp.status_code != 200:
+            return []
+        from bs4 import BeautifulSoup
+
+        soup = BeautifulSoup(resp.text, "html.parser")
+        return _extract_sitemap_urls(soup, domain)
+    except Exception:
+        return []
+
+
+def _extract_sitemap_urls(soup: Any, domain: str) -> list[str]:
+    """Extract <url><loc> entries filtered to the target domain."""
+    from urllib.parse import urlparse
+
+    urls: list[str] = []
+    for url_tag in soup.find_all("url"):
+        loc = url_tag.find("loc")
+        if loc and loc.string:
+            href = loc.string.strip()
+            parsed = urlparse(href)
+            if parsed.netloc.lower() == domain and parsed.scheme in ("http", "https"):
+                urls.append(href)
+    return urls
+
+
+async def crawl_website(
+    start_url: str,
+    max_pages: int = CRAWL_DEFAULT_MAX_PAGES,
+    existing_hashes: dict[str, str] | None = None,
+    use_sitemap: bool = True,
+    chunk_size: int = DEFAULT_CHUNK_SIZE,
+    chunk_overlap: int = DEFAULT_CHUNK_OVERLAP,
+) -> WebsiteCrawlResult:
+    """Crawl a website with incremental change detection and sitemap support.
+
+    Enhanced version of crawl_url() for the automated website source feature.
+    When existing_hashes is provided, pages with matching content hashes
+    are skipped (unchanged), enabling efficient incremental re-crawls.
+
+    Args:
+        start_url: Seed URL to begin crawling from.
+        max_pages: Maximum pages to fetch (clamped to hard limit).
+        existing_hashes: Map of URL → content_hash from previous crawl.
+            If None, all pages are treated as new.
+        use_sitemap: Whether to try sitemap.xml for URL discovery.
+        chunk_size: Target chunk size in tokens.
+        chunk_overlap: Overlap between chunks.
+
+    Returns:
+        WebsiteCrawlResult with parsed pages and change tracking stats.
+    """
+    try:
+        from bs4 import BeautifulSoup  # noqa: F811
+    except ImportError:
+        return WebsiteCrawlResult(
+            error="Website crawling requires 'beautifulsoup4'. "
+                  "Install: pip install beautifulsoup4>=4.12.0",
+        )
+
+    import asyncio
+
+    import httpx
+    from urllib.parse import urljoin, urlparse
+
+    max_pages = max(1, min(max_pages, CRAWL_MAX_PAGES_HARD_LIMIT))
+    start_parsed = urlparse(start_url)
+    base_domain = start_parsed.netloc.lower()
+    existing = existing_hashes or {}
+
+    result = WebsiteCrawlResult()
+    visited: set[str] = set()
+    queue: list[str] = [start_url]
+
+    async with httpx.AsyncClient(
+        follow_redirects=True,
+        max_redirects=MAX_URL_REDIRECTS,
+        timeout=URL_FETCH_TIMEOUT,
+        headers={"User-Agent": CRAWLER_USER_AGENT},
+    ) as client:
+        # --- robots.txt ---
+        from urllib.robotparser import RobotFileParser
+
+        rp = RobotFileParser()
+        robots_url = f"{start_parsed.scheme}://{base_domain}/robots.txt"
+        try:
+            robots_resp = await client.get(robots_url)
+            if robots_resp.status_code == 200:
+                rp.parse(robots_resp.text.splitlines())
+        except Exception:
+            pass
+
+        # --- Sitemap discovery ---
+        if use_sitemap:
+            sitemap_urls = await parse_sitemap(start_url, client)
+            for surl in sitemap_urls:
+                normalised = urlparse(surl)._replace(fragment="").geturl()
+                if normalised not in visited:
+                    queue.append(surl)
+
+        # --- BFS crawl loop ---
+        pages_fetched = 0
+        crawled_urls: set[str] = set()
+
+        while queue and len(result.results) + len(result.unchanged_urls) < max_pages:
+            url = queue.pop(0)
+            normalised = urlparse(url)._replace(fragment="").geturl()
+            if normalised in visited:
+                continue
+            visited.add(normalised)
+            result.pages_discovered += 1
+
+            if not rp.can_fetch(CRAWLER_USER_AGENT, url):
+                continue
+
+            if pages_fetched > 0:
+                await asyncio.sleep(CRAWL_DELAY_SECONDS)
+
+            try:
+                response = await client.get(url)
+                response.raise_for_status()
+                pages_fetched += 1
+            except Exception as fetch_exc:
+                logger.warning("Website crawl: failed to fetch %s: %s", url, fetch_exc)
+                result.failed_urls.append(normalised)
+                continue
+
+            content_type = response.headers.get("content-type", "")
+            if "text/html" not in content_type and "application/xhtml" not in content_type:
+                continue
+
+            if len(response.content) > MAX_URL_SIZE:
+                continue
+
+            html = response.text
+            crawled_urls.add(normalised)
+
+            # --- Extract same-domain links for the queue ---
+            try:
+                soup = BeautifulSoup(html, "html.parser")
+                for anchor in soup.find_all("a", href=True):
+                    href = anchor["href"]
+                    absolute = urljoin(url, href)
+                    link_parsed = urlparse(absolute)
+                    if (
+                        link_parsed.scheme in ("http", "https")
+                        and link_parsed.netloc.lower() == base_domain
+                    ):
+                        clean = link_parsed._replace(fragment="").geturl()
+                        if clean not in visited:
+                            queue.append(clean)
+            except Exception:
+                pass
+
+            # --- Change detection ---
+            # Strip non-content for hash (same cleanup as parse_url)
+            for tag in soup.find_all(["script", "style", "nav", "footer", "header", "aside", "noscript"]):
+                tag.decompose()
+            main = soup.find("main") or soup.find("article") or soup.find("div", {"role": "main"})
+            raw_text = (main or soup.find("body") or soup).get_text(separator="\n\n", strip=True)
+            content_hash = compute_content_hash(raw_text)
+
+            if normalised in existing and existing[normalised] == content_hash:
+                result.unchanged_urls.append(normalised)
+                result.pages_crawled += 1
+                continue
+
+            # --- Parse this page (new or changed) ---
+            page_result = await parse_url(
+                url, chunk_size=chunk_size, chunk_overlap=chunk_overlap,
+            )
+            if page_result.success:
+                # Attach content_hash to each chunk's metadata for storage
+                for chunk in page_result.chunks:
+                    chunk.metadata["content_hash"] = content_hash
+                    chunk.metadata["crawl_source_url"] = normalised
+
+                result.results.append(page_result)
+                result.total_chars += page_result.total_chars
+                result.pages_crawled += 1
+
+                if normalised in existing:
+                    result.changed_urls.append(normalised)
+                else:
+                    result.new_urls.append(normalised)
+            else:
+                result.failed_urls.append(normalised)
+
+    # --- Detect removed pages ---
+    if existing:
+        for old_url in existing:
+            if old_url not in crawled_urls and old_url not in result.unchanged_urls:
+                result.removed_urls.append(old_url)
+
+    logger.info(
+        "Website crawl complete: start=%s new=%d changed=%d unchanged=%d "
+        "removed=%d failed=%d total_pages=%d",
+        start_url,
+        len(result.new_urls),
+        len(result.changed_urls),
+        len(result.unchanged_urls),
+        len(result.removed_urls),
+        len(result.failed_urls),
+        result.pages_crawled,
+    )
+    return result
 
 
 # ---------------------------------------------------------------------------

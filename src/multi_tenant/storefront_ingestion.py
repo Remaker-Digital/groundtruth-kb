@@ -338,6 +338,8 @@ class StorefrontIngestionService:
                 result = await self._process_url(tenant_id, job_id, source_config)
             elif job_type == IngestionJobType.CATEGORY_TEMPLATE.value:
                 result = await self._process_template(tenant_id, job_id, source_config)
+            elif job_type == IngestionJobType.WEBSITE_REFRESH.value:
+                result = await self._process_website_refresh(tenant_id, job_id, source_config)
             else:
                 raise ValueError(f"Unknown job type: {job_type}")
 
@@ -834,6 +836,44 @@ class StorefrontIngestionService:
             "total_chars": result.get("total_chars", 0),
             "pages_crawled": 0,
             "entry_ids": result.get("entry_ids", []),
+        }
+
+    # -------------------------------------------------------------------
+    # Website refresh ingestion path
+    # -------------------------------------------------------------------
+
+    async def _process_website_refresh(
+        self,
+        tenant_id: str,
+        job_id: str,
+        source_config: dict[str, Any],
+    ) -> dict[str, Any]:
+        """Execute a website source re-crawl via the crawl service."""
+        from src.multi_tenant.website_crawl_service import crawl_website_source
+
+        source_id = source_config.get("source_id")
+        if not source_id:
+            raise ValueError("source_config must include 'source_id'")
+
+        try:
+            await self._job_repo.patch(
+                tenant_id, job_id,
+                [{"op": "set", "path": "/progress_percent", "value": 10}],
+            )
+        except Exception:
+            pass
+
+        result = await crawl_website_source(tenant_id, source_id)
+
+        if "error" in result:
+            raise RuntimeError(result["error"])
+
+        return {
+            "articles_created": result.get("articles_created", 0),
+            "articles_failed": result.get("failed_pages", 0),
+            "total_chars": result.get("total_chars", 0),
+            "pages_crawled": result.get("pages_crawled", 0),
+            "entry_ids": [],
         }
 
     # -------------------------------------------------------------------
