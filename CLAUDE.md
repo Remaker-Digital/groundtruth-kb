@@ -60,6 +60,12 @@ When evaluating options, prioritize in order:
 
 **Avoid vague generalizations** ("simpler," "harder," "more complex"). State specifically what is gained or lost: which protocols, failure modes, components, test coverage implications. Token usage and elapsed time are not meaningful concerns.
 
+### Protected Behaviors & Removal Rule
+
+**Never remove code, tests, features, or procedure entries without explicit owner approval in the current session.** If something looks wrong, unnecessary, or like a bug — ASK rather than act. The absence of documentation for a behavior means "I don't know its purpose" — not "it has no purpose."
+
+The file `docs/PROTECTED-BEHAVIORS.md` lists behaviors with machine-verifiable assertions. The Build & Deploy procedure's Phase 0 regression gate checks these before every build. When adding a new protected behavior, update both the registry and the regression gate.
+
 ### Continuous Improvement Feedback
 
 Provide brief inline coaching notes (prefixed with "💡 **Feedback:**" at the end of responses) when observing:

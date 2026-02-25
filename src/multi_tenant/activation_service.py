@@ -531,7 +531,7 @@ class ActivationService:
             else:
                 return ValidationResult(
                     can_activate=False,
-                    hard_errors=[{"field": "_system", "message": "No draft to activate"}],
+                    hard_errors=[{"field": "_system", "message": "Save your configuration first. Go to Agent Configuration, review your settings, and click 'Save draft inputs' before activating."}],
                 )
 
         hard_errors: list[dict[str, str]] = []
@@ -658,7 +658,7 @@ class ActivationService:
                         )
                     return ActivationResult(
                         success=False,
-                        errors=[{"field": "_system", "message": "No draft to activate"}],
+                        errors=[{"field": "_system", "message": "Save your configuration first. Go to Agent Configuration, review your settings, and click 'Save draft inputs' before activating."}],
                     )
 
                 active = await self._prefs_repo.get_active(tenant_id)

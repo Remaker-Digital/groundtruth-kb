@@ -90,27 +90,37 @@ export const MemoryPrivacyPage: React.FC = () => {
   const isEnterprise = tier === 'enterprise';
 
   const handleSave = useCallback(async () => {
-    // Field names must match backend config field registry
+    // Field names must match backend config field registry.
+    // Only include tier-gated fields when the tenant meets the gate.
     const updates: Record<string, unknown> = {
       memory_enabled: memoryEnabled,
-      pattern_learning_enabled: crossSessionLearning,
       data_retention_days: parseInt(retentionDays, 10),
       pii_scrubbing: piiScrubbing,
       consent_collection_enabled: consentRequired,
       customer_identification_mode: identificationMode,
     };
 
+    // Pro+ fields — only send when the tenant tier allows it
+    if (isProOrHigher) {
+      updates.pattern_learning_enabled = crossSessionLearning;
+    }
+
     const result = await updateConfig(updates);
     if (result?.success) {
       onNotify('Draft memory & privacy settings saved.', 'success');
       refreshActivationStatus();
     } else {
-      onNotify(result?.message ?? 'Failed to save settings.', 'error');
+      // Surface the actual validation error from the hook, not a generic fallback
+      const detail = result?.message
+        || error
+        || 'Failed to save settings. Please check your plan tier and try again.';
+      onNotify(detail, 'error');
     }
   }, [
     memoryEnabled, conversationMemory, crossSessionLearning, retentionDays,
     piiScrubbing, consentRequired, autoDeleteOnRequest, patternDecayDays,
-    identificationMode, updateConfig, onNotify, refreshActivationStatus,
+    identificationMode, isProOrHigher, updateConfig, error, onNotify,
+    refreshActivationStatus,
   ]);
 
   // Loading state

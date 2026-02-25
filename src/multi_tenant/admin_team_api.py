@@ -554,10 +554,102 @@ async def create_team_member(
         payload={"email": request.email, "role": request.role, "display_name": request.display_name or ""},
     )
 
+    # Fire-and-forget: send team invitation email to the invitee
+    try:
+        import asyncio
+        from src.multi_tenant.alert_delivery import send_team_invite_alert
+
+        inviter = getattr(ctx, "team_member_email", None) or "Your team administrator"
+        asyncio.ensure_future(
+            send_team_invite_alert(
+                tenant_id=ctx.tenant_id,
+                invitee_email=request.email,
+                inviter_name=inviter,
+                role=request.role,
+            )
+        )
+    except Exception:
+        logger.debug("Team invite alert skipped (alert service not configured)")
+
     response = _build_member_response(doc.model_dump(), ctx.tenant_id)
     # Attach the raw API key — returned ONCE, never stored or retrievable
     response.user_api_key = raw_api_key
     return response
+
+
+# ---------------------------------------------------------------------------
+# POST /api/team/{member_id}/resend-invite — Re-send team invitation
+# ---------------------------------------------------------------------------
+
+
+class ResendInviteResponse(CamelCaseModel):
+    """Response for re-send invitation."""
+
+    success: bool
+    message: str
+
+
+@router.post(
+    "/{member_id}/resend-invite",
+    response_model=ResendInviteResponse,
+    summary="Re-send team invitation",
+    description="Re-sends the invitation email to an existing team member. "
+    "Only admins and superadmins may re-send invitations.",
+    responses={
+        404: {"description": "Team member not found"},
+        503: {"description": "Team management services not initialized"},
+    },
+)
+async def resend_team_invite(
+    member_id: str,
+    ctx: TenantContext = Depends(get_tenant_context),
+) -> ResendInviteResponse:
+    """Re-send the invitation email to an existing team member."""
+    repo = _get_repo()
+
+    # Look up the member
+    doc = await repo.read(ctx.tenant_id, member_id)
+    if doc is None:
+        raise HTTPException(status_code=404, detail="Team member not found")
+
+    member_email = doc.get("email")
+    member_role = doc.get("role", "agent")
+
+    if not member_email:
+        raise HTTPException(
+            status_code=400,
+            detail="Team member has no email address",
+        )
+
+    # Fire-and-forget: re-send invitation email
+    try:
+        import asyncio
+        from src.multi_tenant.alert_delivery import send_team_invite_alert
+
+        inviter = getattr(ctx, "team_member_email", None) or "Your team administrator"
+        asyncio.ensure_future(
+            send_team_invite_alert(
+                tenant_id=ctx.tenant_id,
+                invitee_email=member_email,
+                inviter_name=inviter,
+                role=member_role,
+            )
+        )
+        logger.info(
+            "Re-sent team invite: email=%s tenant=%s",
+            member_email, ctx.tenant_id[:8],
+        )
+    except Exception as exc:
+        logger.warning("Failed to re-send team invite: %s", exc)
+        return ResendInviteResponse(
+            success=False,
+            message="Could not send invitation email. Please try again.",
+        )
+
+    return ResendInviteResponse(
+        success=True,
+        message=f"Invitation re-sent to {member_email}",
+    )
 
 
 # ---------------------------------------------------------------------------

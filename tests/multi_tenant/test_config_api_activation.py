@@ -429,7 +429,7 @@ class TestActivateDraft:
         """Activation fails with 422 when no draft exists."""
         mock_activation_service.activate.return_value = ActivationResult(
             success=False,
-            errors=[{"field": "_system", "message": "No draft to activate"}],
+            errors=[{"field": "_system", "message": "Save your configuration first. Go to Agent Configuration, review your settings, and click 'Save draft inputs' before activating."}],
         )
 
         resp = client.post("/api/config/draft/activate")
@@ -438,7 +438,7 @@ class TestActivateDraft:
         detail = resp.json()["detail"]
         assert detail["success"] is False
         assert any(
-            e["message"] == "No draft to activate" for e in detail["errors"]
+            e["message"] == "Save your configuration first. Go to Agent Configuration, review your settings, and click 'Save draft inputs' before activating." for e in detail["errors"]
         )
 
     def test_passes_actor_to_service(

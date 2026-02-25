@@ -584,9 +584,10 @@ def _render_email(alert: Alert) -> tuple[str, str]:
         AlertType.TEAM_INVITE: (
             '<h2 style="margin:0 0 16px;color:#111827;font-size:20px">Team Invitation</h2>'
             '<p style="color:#374151;line-height:1.6;margin:16px 0">{message}</p>'
+            '{admin_link_block}'
             '<div style="background:#eff6ff;border:1px solid #93c5fd;padding:16px;margin:16px 0">'
             '<strong style="color:#1e40af">Getting Started:</strong>'
-            '<p style="color:#1e40af;margin:8px 0 0">Log in to the Agent Red admin dashboard with your '
+            '<p style="color:#1e40af;margin:8px 0 0">Log in with your '
             'email address to access your team workspace.</p></div>'
         ),
         # Escalation
@@ -624,12 +625,25 @@ def _render_email(alert: Alert) -> tuple[str, str]:
         '<p style="color:#374151;line-height:1.6;margin:16px 0">{message}</p>'
     ))
 
+    # Build optional admin link block for team invites
+    admin_url = alert.metadata.get("admin_url", "")
+    if admin_url:
+        admin_link_block = (
+            '<div style="text-align:center;margin:24px 0">'
+            f'<a href="{admin_url}" style="display:inline-block;padding:12px 32px;'
+            'background:#3B82F6;color:#fff;text-decoration:none;font-weight:600;'
+            'font-size:16px;border-radius:6px">Open Admin Dashboard</a></div>'
+        )
+    else:
+        admin_link_block = ""
+
     # Format template with alert fields
     format_kwargs = {
         "title": alert.title,
         "severity": alert.severity.value.upper(),
         "message": alert.message,
         "api_key": alert.metadata.get("api_key", ""),
+        "admin_link_block": admin_link_block,
     }
     body_html = body_tmpl.format(**format_kwargs)
     full_html = _EMAIL_WRAPPER.format(body=body_html)
@@ -826,12 +840,20 @@ class EmailAlertChannel(AlertChannel):
         """
         import os
 
-        # Team invites go to the invitee, not the tenant owner
+        # Route to specific recipients based on alert type:
+        #   TEAM_INVITE  → invitee's email
+        #   ESCALATION   → assigned agent / superadmin (via recipient_emails)
+        #   Everything else → tenant notification_email / customer_email
         if (
             alert.alert_type == AlertType.TEAM_INVITE
             and alert.metadata.get("invitee_email")
         ):
             to_email = alert.metadata["invitee_email"]
+        elif (
+            alert.alert_type == AlertType.ESCALATION
+            and alert.metadata.get("recipient_emails")
+        ):
+            to_email = alert.metadata["recipient_emails"][0]
         else:
             to_email = await self._resolve_recipient(alert.tenant_id)
 
@@ -1219,23 +1241,40 @@ async def send_team_invite_alert(
     Returns:
         DeliveryResult, or None if no service is configured.
     """
+    import os
+
     service = get_alert_service()
     if service is None:
         return None
 
+    base_url = os.environ.get("APP_BASE_URL", "").rstrip("/")
+    admin_url = f"{base_url}/admin/standalone/" if base_url else ""
+
+    message_parts = [
+        f"{inviter_name} has invited you to join their Agent Red team "
+        f"as a {role}.",
+    ]
+    if admin_url:
+        message_parts.append(
+            f"Log in to the admin dashboard at {admin_url} with your "
+            f"email address ({invitee_email}) to get started."
+        )
+    else:
+        message_parts.append(
+            f"Log in to the Agent Red admin dashboard with your "
+            f"email address ({invitee_email}) to get started."
+        )
+
     alert = create_alert(
         tenant_id=tenant_id,
         alert_type=AlertType.TEAM_INVITE,
-        title=f"You've been invited to join a team",
-        message=(
-            f"{inviter_name} has invited you to join their Agent Red team "
-            f"as a {role}. Log in to the Agent Red admin dashboard with "
-            f"your email address ({invitee_email}) to get started."
-        ),
+        title="You've been invited to join a team",
+        message=" ".join(message_parts),
         metadata={
             "invitee_email": invitee_email,
             "inviter_name": inviter_name,
             "role": role,
+            "admin_url": admin_url,
         },
     )
 

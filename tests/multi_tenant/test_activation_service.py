@@ -761,7 +761,7 @@ class TestValidateForActivation:
         )
 
         assert result.can_activate is False
-        assert any("No draft" in e["message"] for e in result.hard_errors)
+        assert any("Save your configuration first" in e["message"] for e in result.hard_errors)
 
     @pytest.mark.asyncio
     async def test_hard_block_empty_brand_name(self):
@@ -1134,7 +1134,7 @@ class TestActivate:
         )
 
         assert result.success is False
-        assert any("No draft" in e["message"] for e in result.errors)
+        assert any("Save your configuration first" in e["message"] for e in result.errors)
 
     @pytest.mark.asyncio
     async def test_activate_without_prior_active(self):

@@ -60,24 +60,81 @@ This procedure is **build-focused** — it covers the artifact compilation and d
 
 ---
 
+## Phase 0: Protected Behavior Regression Gate
+
+**This phase runs BEFORE any build.** It verifies that all protected behaviors documented in `docs/PROTECTED-BEHAVIORS.md` still exist in the codebase. If any assertion fails, the build is BLOCKED until the regression is investigated and resolved.
+
+### Step 0.1: Run Regression Assertions
+
+```
+ACTION:    Execute each grep assertion from PROTECTED-BEHAVIORS.md:
+
+           grep -c "injectWidget" admin/standalone/layouts/StandaloneLayout.tsx        → ≥1  (PB-001)
+           grep -c "icon-master.svg" admin/standalone/index.html                       → ≥1  (PB-002)
+           grep -c "icon-master.svg" admin/provider/index.html                         → ≥1  (PB-003)
+           grep -c "Save your configuration first" src/multi_tenant/activation_service.py → ≥2  (PB-010)
+           grep -c "isProOrHigher" admin/standalone/pages/MemoryPrivacy.tsx             → ≥1  (PB-011)
+           grep -c "send_team_invite_alert" src/multi_tenant/admin_team_api.py          → ≥1  (PB-020)
+           grep -c "admin_url" src/multi_tenant/alert_delivery.py                      → ≥2  (PB-021)
+           grep -c "resend-invite" src/multi_tenant/admin_team_api.py                  → ≥1  (PB-022)
+           grep -c "find_superadmin_email" src/chat/pipeline/critic_escalation.py       → ≥1  (PB-023)
+           grep -c "recipient_emails" src/multi_tenant/alert_delivery.py               → ≥3  (PB-023)
+           grep -c "VITE_API_URL" docs/operations/build-deploy-procedure.md            → ≥1  (PB-030)
+
+EXPECTED:  ALL assertions pass (counts meet or exceed thresholds).
+
+ON FAIL:   STOP. Do not proceed to Phase 1.
+           Identify which PB-NNN failed. Read the entry in PROTECTED-BEHAVIORS.md
+           for context. A failed assertion means a protected behavior was removed —
+           this is a regression that must be investigated before building.
+
+           DO NOT fix by removing the assertion. Fix by restoring the behavior.
+```
+
+---
+
 ## Phase 1: Build Artifacts
 
 All 4 build targets must be built fresh before every ACR build. **Do not skip any target**, even if you believe it hasn't changed — the Dockerfile copies whatever is on disk, and `.gitignore`'d dist directories may be stale from a prior session.
 
+### Step 1.0: Clear Baked-In API URL
+
+**This step prevents the admin SPAs from hardcoding a specific API endpoint.**
+
+Vite bakes `import.meta.env.VITE_API_URL` into the JS bundle at build time. The local `.env.local` files contain the production FQDN (used for dev-server proxying), but Docker-deployed SPAs must use **same-origin relative URLs** so they auto-adapt to whatever host serves them.
+
+```
+ACTION:    For each admin SPA, write an empty VITE_API_URL override:
+           echo "VITE_API_URL=" > $PROJECT_ROOT/admin/standalone/.env.local
+           echo "VITE_API_URL=" > $PROJECT_ROOT/admin/shopify/.env.local
+           echo "VITE_API_URL=" > $PROJECT_ROOT/admin/provider/.env.local
+
+EXPECTED:  Each .env.local contains only "VITE_API_URL="
+
+VERIFY:    cat $PROJECT_ROOT/admin/standalone/.env.local → "VITE_API_URL="
+
+NOTE:      The prebuild hook (sync-admin-env.ps1) will overwrite these if you use
+           `npm run build`. Steps 1.1–1.3 use `npx tsc && npx vite build` to bypass
+           the sync hook. After Phase 1 completes, restore the original .env.local
+           files by running: scripts/sync-admin-env.ps1
+```
+
 ### Step 1.1: Build Standalone Admin SPA
 
 ```
-ACTION:    cd $PROJECT_ROOT/admin/standalone && npm run build
+ACTION:    cd $PROJECT_ROOT/admin/standalone && npx tsc && npx vite build
 EXPECTED:  "✓ built in" message, exit code 0
 VERIFY:    ls $PROJECT_ROOT/admin/standalone/dist/index.html
            ls $PROJECT_ROOT/admin/standalone/dist/assets/*.js
+           grep -c "orangeglacier" $PROJECT_ROOT/admin/standalone/dist/assets/*.js → 0
 ON FAIL:   Check for TypeScript or import errors. Fix before proceeding.
+           If grep finds "orangeglacier", Step 1.0 was not applied — re-run it.
 ```
 
 ### Step 1.2: Build Shopify Admin SPA
 
 ```
-ACTION:    cd $PROJECT_ROOT/admin/shopify && npm run build
+ACTION:    cd $PROJECT_ROOT/admin/shopify && npx tsc && npx vite build
 EXPECTED:  "✓ built in" message, exit code 0
 VERIFY:    ls $PROJECT_ROOT/admin/shopify/dist/index.html
            ls $PROJECT_ROOT/admin/shopify/dist/assets/*.js
@@ -87,7 +144,7 @@ ON FAIL:   Check for TypeScript or import errors. Fix before proceeding.
 ### Step 1.3: Build Provider Admin SPA
 
 ```
-ACTION:    cd $PROJECT_ROOT/admin/provider && npm run build
+ACTION:    cd $PROJECT_ROOT/admin/provider && npx tsc && npx vite build
 EXPECTED:  "✓ built in" message, exit code 0
 VERIFY:    ls $PROJECT_ROOT/admin/provider/dist/index.html
            ls $PROJECT_ROOT/admin/provider/dist/assets/*.js

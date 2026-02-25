@@ -714,6 +714,24 @@ class ConversationSession:
 
         return best_id
 
+    async def find_superadmin_email(self, tenant_id: str) -> str | None:
+        """Return the email address of the tenant's superadmin.
+
+        Used as the fallback recipient for escalation notifications when
+        no specific escalation agent is assigned.
+
+        Returns the email, or None if no team_repo is configured or no
+        superadmin exists.
+        """
+        if not self._team_repo:
+            return None
+
+        members = await self._team_repo.list_members(tenant_id)
+        for m in members:
+            if m.get("role") == "superadmin" and m.get("is_active", True):
+                return m.get("email")
+        return None
+
     # -------------------------------------------------------------------
     # Escalation — conversation state
     # -------------------------------------------------------------------

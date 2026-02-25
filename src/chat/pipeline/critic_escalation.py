@@ -224,14 +224,32 @@ class CriticEscalationMixin:
             assigned_to=assigned_agent_id,
         )
 
-        # Fire-and-forget: notify assigned escalation agents
+        # Resolve escalation notification recipients:
+        #   1. Assigned agent's email (extracted from doc ID {tenant}:{email})
+        #   2. Fallback: superadmin's email
+        recipient_emails: list[str] = []
+        if assigned_agent_id and ":" in assigned_agent_id:
+            agent_email = assigned_agent_id.split(":", 1)[1]
+            if agent_email:
+                recipient_emails = [agent_email]
+
+        if not recipient_emails:
+            try:
+                superadmin_email = await self._session.find_superadmin_email(tenant_id)
+                if superadmin_email:
+                    recipient_emails = [superadmin_email]
+            except Exception:
+                logger.debug("Superadmin lookup failed — escalation alert will use tenant notification email")
+
+        # Fire-and-forget: notify escalation recipient
         try:
             from src.multi_tenant.alert_delivery import send_escalation_alert
 
             logger.info(
-                "Firing escalation alert: tenant=%s conversation=%s reason=%s urgency=%s category=%s assigned=%s",
+                "Firing escalation alert: tenant=%s conversation=%s reason=%s urgency=%s category=%s assigned=%s recipients=%s",
                 tenant_id, conversation_id, reason[:80], urgency,
                 category, assigned_agent_id or "unassigned",
+                recipient_emails or ["tenant-default"],
             )
             asyncio.ensure_future(
                 send_escalation_alert(
@@ -242,6 +260,7 @@ class CriticEscalationMixin:
                     context_summary=context_summary,
                     escalation_category=category,
                     assigned_to=assigned_agent_id,
+                    recipient_emails=recipient_emails or None,
                 )
             )
         except Exception:
