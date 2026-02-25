@@ -82,6 +82,10 @@ const PANEL_STYLES = `
     from { opacity: 0; transform: translateY(100%); }
     to { opacity: 1; transform: translateY(0); }
   }
+  @keyframes ar-shimmer {
+    0% { background-position: -200% 0; }
+    100% { background-position: 200% 0; }
+  }
   * {
     box-sizing: border-box;
     margin: 0;
@@ -505,6 +509,7 @@ export const Panel: FunctionComponent<PanelProps> = ({
         agentAvatarUrl={agentAvatarUrl}
         logoUrl={logoUrl}
         headerText={config.widget_header_text || null}
+        gradientEnd={config.widget_header_gradient_end || null}
         onClose={handleCloseWidget}
         onDragStart={handleDragStart}
       />
@@ -530,9 +535,9 @@ export const Panel: FunctionComponent<PanelProps> = ({
         />
       )}
 
-      {/* Main content area — switches based on view */}
+      {/* Main content area — switches based on view with fade transition */}
       {state.view === 'conversation' && (
-        <>
+        <div style={{ display: 'contents', animation: 'ar-fade-in 0.2s ease-out' }}>
           <MessageList
             tokens={tokens}
             locale={locale}
@@ -601,70 +606,80 @@ export const Panel: FunctionComponent<PanelProps> = ({
             showBranding={showBranding}
             inputPlaceholder={config.widget_input_placeholder || null}
           />
-        </>
+        </div>
       )}
 
       {/* Pre-chat form */}
       {state.view === 'prechat' && config.widget_prechat_form && (
-        <PreChatForm
-          tokens={tokens}
-          locale={locale}
-          formConfig={config.widget_prechat_form as { fields: { name: string; label: string; type: 'text' | 'email' | 'textarea'; required: boolean; placeholder?: string }[] }}
-          onSubmit={handlePreChatSubmit}
-          onSkip={handlePreChatSkip}
-          isLoading={state.isLoading}
-        />
+        <div style={{ display: 'contents', animation: 'ar-fade-in 0.2s ease-out' }}>
+          <PreChatForm
+            tokens={tokens}
+            locale={locale}
+            formConfig={config.widget_prechat_form as { fields: { name: string; label: string; type: 'text' | 'email' | 'textarea'; required: boolean; placeholder?: string }[] }}
+            onSubmit={handlePreChatSubmit}
+            onSkip={handlePreChatSkip}
+            isLoading={state.isLoading}
+          />
+        </div>
       )}
 
       {/* OTP verification (AUTH-3) */}
       {state.view === 'otp' && state.customerEmail && (
-        <OtpVerification
-          tokens={tokens}
-          locale={locale}
-          email={state.customerEmail}
-          onVerify={handleOtpVerify}
-          onSkip={
-            ((config as Record<string, unknown>).customer_email_verification as string) === 'optional'
-              ? handleOtpSkip
-              : undefined
-          }
-          onResend={handleOtpResend}
-          isLoading={state.isLoading}
-          error={state.otpError ?? undefined}
-        />
+        <div style={{ display: 'contents', animation: 'ar-fade-in 0.2s ease-out' }}>
+          <OtpVerification
+            tokens={tokens}
+            locale={locale}
+            email={state.customerEmail}
+            onVerify={handleOtpVerify}
+            onSkip={
+              ((config as Record<string, unknown>).customer_email_verification as string) === 'optional'
+                ? handleOtpSkip
+                : undefined
+            }
+            onResend={handleOtpResend}
+            isLoading={state.isLoading}
+            error={state.otpError ?? undefined}
+          />
+        </div>
       )}
 
       {/* Post-chat rating */}
       {state.view === 'rating' && (
-        <ChatRating
-          tokens={tokens}
-          locale={locale}
-          onSubmit={handleRatingSubmit}
-          onNewConversation={handleNewConversation}
-          isLoading={state.isLoading}
-        />
+        <div style={{ display: 'contents', animation: 'ar-fade-in 0.2s ease-out' }}>
+          <ChatRating
+            tokens={tokens}
+            locale={locale}
+            onSubmit={handleRatingSubmit}
+            onNewConversation={handleNewConversation}
+            isLoading={state.isLoading}
+          />
+        </div>
       )}
 
       {/* Issue report form (C7) */}
       {state.view === 'issue_report' && (
-        <IssueReport
-          tokens={tokens}
-          locale={locale}
-          onSubmit={handleIssueSubmit}
-          onCancel={handleIssueCancel}
-          isLoading={state.isLoading}
-        />
+        <div style={{ display: 'contents', animation: 'ar-fade-in 0.2s ease-out' }}>
+          <IssueReport
+            tokens={tokens}
+            locale={locale}
+            onSubmit={handleIssueSubmit}
+            onCancel={handleIssueCancel}
+            isLoading={state.isLoading}
+          />
+        </div>
       )}
 
       {/* Offline form */}
       {state.view === 'offline_form' && (
-        <OfflineForm
-          tokens={tokens}
-          locale={locale}
-          offlineMessage={config.widget_offline_message || null}
-          onSubmit={handleOfflineSubmit}
-          isLoading={state.isLoading}
-        />
+        <div style={{ display: 'contents', animation: 'ar-fade-in 0.2s ease-out' }}>
+          <OfflineForm
+            tokens={tokens}
+            locale={locale}
+            offlineMessage={config.widget_offline_message || null}
+            onSubmit={handleOfflineSubmit}
+            isLoading={state.isLoading}
+          />
+        </div>
       )}
     </div>
   );

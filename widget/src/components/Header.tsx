@@ -29,6 +29,8 @@ interface HeaderProps {
   agentAvatarUrl: string | null;
   logoUrl: string | null;
   headerText: string | null;
+  /** Optional second color for a left→right gradient header. */
+  gradientEnd: string | null;
   onClose: () => void;
   /** Enable drag-to-reposition by mousedown on header (WI #253). */
   onDragStart?: (e: MouseEvent) => void;
@@ -46,16 +48,22 @@ export const Header: FunctionComponent<HeaderProps> = ({
   agentAvatarUrl,
   logoUrl,
   headerText,
+  gradientEnd,
   onClose,
   onDragStart,
 }) => {
   const displayTitle = headerText || locale.headerTitle;
 
+  // Header background: gradient when a second color is configured, flat otherwise
+  const headerBg = gradientEnd
+    ? `linear-gradient(135deg, ${tokens.colorPrimary} 0%, ${gradientEnd} 100%)`
+    : tokens.colorPrimary;
+
   return (
     <div
       style={{
         height: tokens.headerHeight,
-        backgroundColor: tokens.colorPrimary,
+        background: headerBg,
         color: tokens.colorPrimaryText,
         display: 'flex',
         alignItems: 'center',

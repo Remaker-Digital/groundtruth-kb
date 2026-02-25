@@ -15,9 +15,75 @@
  * © 2026 Remaker Digital, a DBA of VanDusen & Palmeter, LLC. All rights reserved.
  */
 
-import { FunctionComponent } from 'preact';
+import { FunctionComponent, VNode } from 'preact';
 import type { DesignTokens } from '@/theme/tokens';
 import type { Message } from '@/state/store';
+
+// ---------------------------------------------------------------------------
+// Markdown link parser — converts [text](url) to clickable <a> elements
+// ---------------------------------------------------------------------------
+
+const MARKDOWN_LINK_RE = /\[([^\]]+)\]\((https?:\/\/[^)]+)\)/g;
+
+function renderWithLinks(
+  text: string,
+  tokens: DesignTokens,
+  linkColor: string,
+): (string | VNode)[] {
+  const parts: (string | VNode)[] = [];
+  let lastIndex = 0;
+  let match: RegExpExecArray | null;
+
+  // Reset regex state for each call
+  MARKDOWN_LINK_RE.lastIndex = 0;
+
+  while ((match = MARKDOWN_LINK_RE.exec(text)) !== null) {
+    // Text before the link
+    if (match.index > lastIndex) {
+      parts.push(text.slice(lastIndex, match.index));
+    }
+    // The clickable link — target="_top" opens in the parent frame (not the widget iframe)
+    parts.push(
+      <a
+        href={match[2]}
+        target="_top"
+        rel="noopener noreferrer"
+        style={{
+          color: linkColor,
+          textDecoration: 'underline',
+          textUnderlineOffset: '2px',
+          fontWeight: tokens.fontWeightMedium,
+          cursor: 'pointer',
+        }}
+      >
+        {match[1]}
+      </a>
+    );
+    lastIndex = match.index + match[0].length;
+  }
+
+  // Remaining text after last link
+  if (lastIndex < text.length) {
+    parts.push(text.slice(lastIndex));
+  }
+
+  return parts.length > 0 ? parts : [text];
+}
+
+/** Extract unique source domains from markdown links in message text. */
+function extractSourceDomains(text: string): string[] {
+  MARKDOWN_LINK_RE.lastIndex = 0;
+  const domains = new Set<string>();
+  let match: RegExpExecArray | null;
+  while ((match = MARKDOWN_LINK_RE.exec(text)) !== null) {
+    try {
+      const url = new URL(match[2]);
+      // Strip "www." prefix for cleaner display
+      domains.add(url.hostname.replace(/^www\./, ''));
+    } catch { /* invalid URL — skip */ }
+  }
+  return Array.from(domains);
+}
 
 // ---------------------------------------------------------------------------
 // Props
@@ -84,6 +150,11 @@ export const MessageBubble: FunctionComponent<MessageBubbleProps> = ({
 
   const isCustomer = message.role === 'customer';
 
+  // Entrance animation — messages slide up and fade in.
+  // Only animate recent messages (within the last 2 seconds) to avoid
+  // replaying animations on scroll or when loading history.
+  const isRecent = Date.now() - message.timestamp < 2000;
+
   return (
     <div
       style={{
@@ -92,6 +163,9 @@ export const MessageBubble: FunctionComponent<MessageBubbleProps> = ({
         alignItems: 'flex-end',
         padding: `${tokens.space1} ${tokens.space4}`,
         gap: tokens.space2,
+        ...(isRecent ? {
+          animation: 'ar-fade-in 0.25s ease-out both',
+        } : {}),
       }}
     >
       {/* Agent avatar column */}
@@ -191,8 +265,14 @@ export const MessageBubble: FunctionComponent<MessageBubbleProps> = ({
             </div>
           )}
 
-          {/* Message content */}
-          <span>{message.content}</span>
+          {/* Message content — renders markdown [text](url) as clickable links */}
+          <span>
+            {renderWithLinks(
+              message.content,
+              tokens,
+              isCustomer ? tokens.colorCustomerBubbleText : tokens.colorPrimary,
+            )}
+          </span>
 
           {/* Streaming cursor */}
           {message.streaming && (
@@ -212,7 +292,7 @@ export const MessageBubble: FunctionComponent<MessageBubbleProps> = ({
           )}
         </div>
 
-        {/* Timestamp */}
+        {/* Timestamp + source attribution */}
         <div
           style={{
             fontSize: tokens.fontSizeXs,
@@ -225,6 +305,35 @@ export const MessageBubble: FunctionComponent<MessageBubbleProps> = ({
         >
           {formatTime(message.timestamp)}
         </div>
+
+        {/* Source citation — shown below agent messages that reference KB articles */}
+        {!isCustomer && !message.streaming && (() => {
+          const domains = extractSourceDomains(message.content);
+          if (domains.length === 0) return null;
+          return (
+            <div
+              style={{
+                display: 'flex',
+                alignItems: 'center',
+                gap: tokens.space1,
+                marginTop: '2px',
+                padding: `0 ${tokens.space1}`,
+                fontSize: tokens.fontSizeXs,
+                fontFamily: tokens.fontFamily,
+                color: tokens.colorTextMuted,
+                lineHeight: 1,
+              }}
+            >
+              <SourceIcon size={10} />
+              <span>
+                {domains.length === 1
+                  ? domains[0]
+                  : `${domains[0]} +${domains.length - 1}`
+                }
+              </span>
+            </div>
+          );
+        })()}
       </div>
     </div>
   );
@@ -277,10 +386,13 @@ export const TypingIndicator: FunctionComponent<{
       )}
     </div>
 
-    {/* Typing bubble */}
+    {/* Typing bubble — shimmer background indicates thinking */}
     <div
       style={{
         backgroundColor: tokens.colorAgentBubble,
+        backgroundImage: `linear-gradient(90deg, ${tokens.colorAgentBubble} 25%, ${tokens.colorSurfaceHover} 50%, ${tokens.colorAgentBubble} 75%)`,
+        backgroundSize: '200% 100%',
+        animation: 'ar-shimmer 2s ease-in-out infinite, ar-fade-in 0.25s ease-out both',
         padding: `${tokens.space2} ${tokens.space3}`,
         borderRadius: tokens.borderRadiusLg,
         borderBottomLeftRadius: tokens.borderRadiusSm,
@@ -320,6 +432,26 @@ export const TypingIndicator: FunctionComponent<{
 // ---------------------------------------------------------------------------
 // Icons (inline SVG)
 // ---------------------------------------------------------------------------
+
+/** Small link/globe icon for source citations. */
+function SourceIcon({ size }: { size: number }) {
+  return (
+    <svg
+      width={size}
+      height={size}
+      viewBox="0 0 24 24"
+      fill="none"
+      stroke="currentColor"
+      stroke-width="2"
+      stroke-linecap="round"
+      stroke-linejoin="round"
+    >
+      <circle cx="12" cy="12" r="10" />
+      <line x1="2" y1="12" x2="22" y2="12" />
+      <path d="M12 2a15.3 15.3 0 0 1 4 10 15.3 15.3 0 0 1-4 10 15.3 15.3 0 0 1-4-10 15.3 15.3 0 0 1 4-10z" />
+    </svg>
+  );
+}
 
 function RetractedIcon({ size }: { size: number }) {
   return (
