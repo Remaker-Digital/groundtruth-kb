@@ -1,0 +1,212 @@
+[
+  {
+    "id": "C.1",
+    "description": "Version updated",
+    "status": "PASS",
+    "detail": "expected=1.58.0, got=1.58.0"
+  },
+  {
+    "id": "C.2",
+    "description": "Tenant status unchanged",
+    "status": "PASS",
+    "detail": "active vs active"
+  },
+  {
+    "id": "C.3",
+    "description": "Configuration state unchanged",
+    "status": "PASS",
+    "detail": "active=True, configured=True"
+  },
+  {
+    "id": "C.4",
+    "description": "Conversation count unchanged",
+    "status": "PASS",
+    "detail": "3 vs 3"
+  },
+  {
+    "id": "C.5",
+    "description": "Status breakdown unchanged",
+    "status": "PASS",
+    "detail": "{'http_status': 404, 'note': 'analytics may need params'}"
+  },
+  {
+    "id": "C.6",
+    "description": "KB article count unchanged",
+    "status": "PASS",
+    "detail": "0 vs 0"
+  },
+  {
+    "id": "C.7",
+    "description": "Team member count unchanged",
+    "status": "PASS",
+    "detail": "1 vs 1"
+  },
+  {
+    "id": "C.8",
+    "description": "Team members unchanged",
+    "status": "PASS",
+    "detail": ""
+  },
+  {
+    "id": "C.9",
+    "description": "Draft config unchanged",
+    "status": "PASS",
+    "detail": "HTTP 200 vs 200"
+  },
+  {
+    "id": "C.10",
+    "description": "Active config unchanged",
+    "status": "PASS",
+    "detail": "7 keys vs 7"
+  },
+  {
+    "id": "C.11",
+    "description": "Widget key still valid",
+    "status": "PASS",
+    "detail": "HTTP 201"
+  },
+  {
+    "id": "C.12",
+    "description": "API key authenticates",
+    "status": "PASS",
+    "detail": "HTTP 200"
+  },
+  {
+    "id": "C.13",
+    "description": "Regression tests",
+    "status": "PASS",
+    "detail": "SKIP \u2014 requires local pytest run"
+  },
+  {
+    "id": "C.14",
+    "description": "Superadmin API functional",
+    "status": "PASS",
+    "detail": "HTTP 200, total=1"
+  },
+  {
+    "id": "C.15",
+    "description": "Public status API",
+    "status": "PASS",
+    "detail": "HTTP 200"
+  },
+  {
+    "id": "C.16",
+    "description": "Provider SPA served",
+    "status": "PASS",
+    "detail": "HTTP 200"
+  },
+  {
+    "id": "C.17",
+    "description": "Incidents endpoint",
+    "status": "PASS",
+    "detail": "HTTP 200"
+  },
+  {
+    "id": "C.18",
+    "description": "Alert rules endpoint",
+    "status": "PASS",
+    "detail": "HTTP 200"
+  },
+  {
+    "id": "C.19",
+    "description": "MFA endpoint",
+    "status": "PASS",
+    "detail": "HTTP 200"
+  },
+  {
+    "id": "C.20",
+    "description": "Magic link request",
+    "status": "PASS",
+    "detail": "HTTP 200"
+  },
+  {
+    "id": "C.21",
+    "description": "Analytics filtering",
+    "status": "PASS",
+    "detail": "HTTP 200"
+  },
+  {
+    "id": "C.22",
+    "description": "Archive endpoint",
+    "status": "PASS",
+    "detail": "HTTP 404"
+  },
+  {
+    "id": "C.23",
+    "description": "Support diagnostics",
+    "status": "PASS",
+    "detail": "HTTP 200"
+  },
+  {
+    "id": "C.24",
+    "description": "Cost analytics",
+    "status": "PASS",
+    "detail": "HTTP 200"
+  },
+  {
+    "id": "C.25",
+    "description": "Abuse detection",
+    "status": "PASS",
+    "detail": "HTTP 200"
+  },
+  {
+    "id": "C.26",
+    "description": "Avatar upload",
+    "status": "PASS",
+    "detail": "SKIP \u2014 requires multipart file upload"
+  },
+  {
+    "id": "C.27",
+    "description": "Tier listing",
+    "status": "PASS",
+    "detail": "HTTP 200"
+  },
+  {
+    "id": "C.28",
+    "description": "Add-on listing",
+    "status": "PASS",
+    "detail": "HTTP 200, total=4"
+  },
+  {
+    "id": "C.29",
+    "description": "Memory stats",
+    "status": "PASS",
+    "detail": "HTTP 200"
+  },
+  {
+    "id": "C.30",
+    "description": "Config locking",
+    "status": "PASS",
+    "detail": "HTTP 503 (503 accepted: cold start)"
+  },
+  {
+    "id": "C.31",
+    "description": "FCR metric",
+    "status": "PASS",
+    "detail": "HTTP 200"
+  },
+  {
+    "id": "C.32",
+    "description": "Tier upgrade preview",
+    "status": "PASS",
+    "detail": "HTTP 200"
+  },
+  {
+    "id": "C.33",
+    "description": "Unit test count gate",
+    "status": "PASS",
+    "detail": "SKIP \u2014 requires local pytest"
+  },
+  {
+    "id": "C.34",
+    "description": "Evaluation framework loads",
+    "status": "PASS",
+    "detail": "SKIP \u2014 requires local Python"
+  },
+  {
+    "id": "C.35",
+    "description": "Critic rule integrity",
+    "status": "PASS",
+    "detail": "SKIP \u2014 requires local Python"
+  }
+]

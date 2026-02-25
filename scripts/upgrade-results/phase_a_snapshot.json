@@ -1,0 +1,34 @@
+{
+  "A1_version": "1.58.0",
+  "A2_status": "active",
+  "A3_activation": {
+    "is_active": true,
+    "is_configured": true,
+    "has_pending_changes": false,
+    "active_version": 1
+  },
+  "A4_conversation_count": 3,
+  "A5_status_breakdown": {
+    "http_status": 404,
+    "note": "analytics may need params"
+  },
+  "A6_kb_count": 0,
+  "A7_team_count": 1,
+  "A8_team_members": [
+    {
+      "displayName": "Owner",
+      "role": "superadmin"
+    }
+  ],
+  "A9_draft_status": 200,
+  "A10_config_keys": [
+    "config",
+    "from_cache",
+    "quick_actions",
+    "state",
+    "tenant_id",
+    "tier",
+    "version"
+  ],
+  "A11_widget_key_exists": true
+}
