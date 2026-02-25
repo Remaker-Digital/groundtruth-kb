@@ -46,10 +46,11 @@ class TestExpiryWarningTemplate:
             badge_border=config["badge_border"],
             badge_color=config["badge_color"],
             tenant_id="t-test",
+            admin_login_url="https://example.com/admin/standalone/",
         )
         assert days_label in rendered
         assert config["urgency_intro"] in rendered
-        assert "Upgrade Now" in rendered
+        assert "Sign in to Dashboard" in rendered
         assert "t-test" in rendered
 
 

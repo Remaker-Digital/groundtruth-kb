@@ -330,7 +330,7 @@ class TestRotateWidgetKeyDualWrite:
                 fake_repo,
             ),
             patch(
-                "src.multi_tenant.repository.PreferencesRepository",
+                "src.multi_tenant.repositories.preferences.PreferencesRepository",
                 return_value=fake_prefs_repo,
             ),
         ):
@@ -375,7 +375,7 @@ class TestRotateWidgetKeyDualWrite:
                 fake_repo,
             ),
             patch(
-                "src.multi_tenant.repository.PreferencesRepository",
+                "src.multi_tenant.repositories.preferences.PreferencesRepository",
                 return_value=fake_prefs_repo,
             ),
         ):
