@@ -30,6 +30,7 @@ A Repeatable Procedure is **not**:
 | Production regression suite | *(inline — see Section 5)* | Active |
 | Azure environment setup | `docs/operations/CATASTROPHIC-RECOVERY-RUNBOOK.md` | Active |
 | AGNTCY platform adoption | `docs/operations/agntcy-platform-adoption-procedure.md` | Active |
+| Build & deploy (staging/production) | `docs/operations/build-deploy-procedure.md` | Active |
 | Admin UI lint (a11y) | *(inline — see Section 5)* | Active |
 | External URL reachability | `docs/operations/external-url-reachability-procedure.md` | Active |
 | Chrome-automated UI test | `docs/operations/chrome-ui-test-procedure.md` | Active |
@@ -42,10 +43,11 @@ A Repeatable Procedure is **not**:
 | Data integrity & backup verification | `docs/operations/data-integrity-test-procedure.md` | Active |
 
 > **Cross-procedure dependencies:**
+> - *Build & deploy* must be executed before *Non-disruptive upgrade verification*, *Production regression suite*, and any other procedure that requires a fresh deployment. All 4 build targets (3 admin SPAs + widget) must pass the freshness gate before ACR build.
 > - *Admin UI test* depends on *Tenant initialization*. After initialization, all post-conditions (Steps 2-5) must pass before the UI test pre-flight will pass.
 > - *Chrome-automated UI test* depends on *Tenant initialization* (same dependency as manual UI test). Also depends on *External URL reachability* Group 1 + Group 2 passing.
 > - *External URL reachability* has no initialization dependency — can run as a standalone health check after any deployment.
-> - *Non-disruptive upgrade verification* wraps *Production deployment* with pre/post data integrity checks.
+> - *Non-disruptive upgrade verification* wraps *Build & deploy* with pre/post data integrity checks.
 > - *Tenant initialization* is destructive. Use *Non-disruptive upgrade verification* when existing data must be preserved.
 > - *Load testing* depends on production being healthy and Locust being installed. Uses existing `tests/performance/locustfile.py`.
 > - *Tenant isolation verification* depends on both tenants (remaker-digital-001 and test-customer-001) being seeded with data.
@@ -426,4 +428,4 @@ When creating or modifying code, test scripts, or documentation:
 ---
 
 *© 2026 Remaker Digital, a DBA of VanDusen & Palmeter, LLC. All rights reserved.*
-*Last Updated: 2026-02-19*
+*Last Updated: 2026-02-25*
