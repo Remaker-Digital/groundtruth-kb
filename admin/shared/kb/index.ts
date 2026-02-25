@@ -60,3 +60,6 @@ export type { EmptyStateProps } from './EmptyState';
 
 export { ErrorBanner } from './ErrorBanner';
 export type { ErrorBannerProps } from './ErrorBanner';
+
+export { WebsiteSourcesPanel } from './WebsiteSourcesPanel';
+export type { WebsiteSourcesPanelProps } from './WebsiteSourcesPanel';

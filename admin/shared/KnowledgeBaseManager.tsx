@@ -50,6 +50,7 @@ import {
   LoadingSpinner,
   EmptyState,
   ErrorBanner,
+  WebsiteSourcesPanel,
 } from './kb';
 
 // ---------------------------------------------------------------------------
@@ -74,6 +75,7 @@ export const KnowledgeBaseManager: React.FC<BaseComponentProps> = ({
 }) => {
   // View state: 'list', 'editor', or 'import'
   const [view, setView] = useState<'list' | 'editor' | 'import'>('list');
+  const [kbTab, setKbTab] = useState<'articles' | 'sources'>('articles');
   const [editingArticle, setEditingArticle] = useState<Partial<KBArticle> | null>(null);
   const [deleting, setDeleting] = useState(false);
   const [uploadResult, setUploadResult] = useState<KBUploadResult | null>(null);
@@ -361,6 +363,40 @@ export const KnowledgeBaseManager: React.FC<BaseComponentProps> = ({
         minHeight: '500px',
       }}
     >
+      {/* KB section tabs */}
+      <div style={{ display: 'flex', gap: '0', borderBottom: `1px solid ${COLOR_BORDER}` }}>
+        {([
+          { key: 'articles' as const, label: 'Articles' },
+          { key: 'sources' as const, label: 'Website Sources' },
+        ]).map(({ key, label }) => (
+          <button
+            key={key}
+            onClick={() => setKbTab(key)}
+            style={{
+              padding: '12px 24px',
+              border: 'none',
+              borderBottom: kbTab === key ? `2px solid ${BRAND_PRIMARY}` : '2px solid transparent',
+              backgroundColor: 'transparent',
+              color: kbTab === key ? BRAND_PRIMARY : COLOR_TEXT_SECONDARY,
+              fontWeight: kbTab === key ? 600 : 400,
+              fontSize: '14px',
+              fontFamily: FONT_FAMILY,
+              cursor: 'pointer',
+              transition: 'all 0.15s ease',
+            }}
+          >
+            {label}
+          </button>
+        ))}
+      </div>
+
+      {/* Website Sources tab */}
+      {kbTab === 'sources' && (
+        <WebsiteSourcesPanel apiFetch={apiFetch} onNotify={onNotify} />
+      )}
+
+      {/* Articles tab */}
+      {kbTab === 'articles' && <>
       {/* Header */}
       <div
         style={{
@@ -792,6 +828,7 @@ export const KnowledgeBaseManager: React.FC<BaseComponentProps> = ({
           </table>
         </div>
       )}
+      </>}
     </div>
   );
 };

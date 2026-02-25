@@ -125,3 +125,17 @@ export type {
 // Config Suggestions (KA-7: Knowledge Automation)
 export { useConfigSuggestions } from './useSuggestions';
 export type { ConfigSuggestion, SuggestionMap } from './useSuggestions';
+
+// Website Sources (automated website crawling)
+export {
+  useWebsiteSources,
+  useCreateWebsiteSource,
+  useUpdateWebsiteSource,
+  useDeleteWebsiteSource,
+  useTriggerCrawl,
+} from './useWebsiteSources';
+export type {
+  WebsiteSource,
+  WebsiteSourceList,
+  WebsiteSourceAction,
+} from './useWebsiteSources';
