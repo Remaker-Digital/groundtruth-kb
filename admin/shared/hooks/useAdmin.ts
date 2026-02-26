@@ -38,7 +38,13 @@ export function useInviteTeamMember(apiFetch: ApiFetch) {
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({ email, role, display_name }),
         });
-        if (!resp.ok) throw new Error(`${resp.status}`);
+        if (!resp.ok) {
+          const data = await resp.json().catch(() => ({}));
+          if (resp.status === 409) {
+            throw new Error(data.detail || 'A team member with this email already exists.');
+          }
+          throw new Error(data.detail || `Failed to invite team member (${resp.status}).`);
+        }
         return await resp.json();
       } catch (err: unknown) {
         const msg = err instanceof Error ? err.message : 'Invite failed';

@@ -1,12 +1,15 @@
 # New Work Items Backlog — Agent Red Customer Experience
 
-> **Status:** Living document — tracks work items identified from Test Coverage Audit and subsequent implementation sprints
+> **FROZEN (S96):** Status tracking has moved to the **Knowledge Database** (`tools/knowledge-db/`).
+> This markdown file is now a historical reference only. Do not update statuses here.
+> Canonical source of truth: `tools/knowledge-db/knowledge.db` — view at `http://localhost:8090/specs`
+>
 > **Project:** Agent Red Customer Experience
 > **Owner:** Remaker Digital (DBA of VanDusen & Palmeter, LLC)
 > **Created:** 2026-01-31
-> **Last Updated:** 2026-02-11
+> **Last Updated:** 2026-02-11 (frozen 2026-02-25)
 > **Numbering:** Continues from Master Plan Review WI #1-100
-> **Review Status:** Updated with completion statuses from 2026-01-31 and 2026-02-01 implementation sprints
+> **Review Status:** Migrated to Knowledge Database with append-only change control (S96)
 
 ---
 
@@ -868,6 +871,23 @@ After initial activation, when the admin opens the Setup Wizard:
 - **Scope:** Widget configuration (standalone + Shopify admin)
 - **Description:** Add an "AI greeting" toggle to the greeting message settings. When enabled, the AI generates a personalized greeting for each new chat session based on the customer's profile context (name, order history, previous interactions) instead of displaying a static template. When disabled, the current static greeting message behavior is preserved. Requires pipeline integration: the greeting is generated as the first agent response before the customer's first message, using the same response generation agent with a greeting-specific prompt.
 - **Estimate:** ~2-3 days
+
+## 28. S95 UI Coverage Testing Findings (WI #297-299)
+
+**NEW — Added 2026-02-25.** Three non-blocking findings from S95 UI coverage testing (156 tests across 14 admin pages, Light + Dark mode). The critical bug (Cosmos DB patch limit) was fixed in commit `fa2f28af`.
+
+| WI | Title | Priority | Scope | Details |
+|----|-------|----------|-------|---------|
+| #297 | Enforce min=1 for `max_turns` on server | P2 | API | `max_turns=0` is accepted by the server but makes no functional sense (zero conversation turns). Add `ge=1` validator to the `max_turns` field in the config schema so the API rejects 0 with a 422 error. Currently only the admin UI enforces min=1 via the NumberInput control. |
+| #298 | Align `max_ai_turns_before_escalation` client/server max | P2 | Admin + API | The admin NumberInput allows values up to 100 (default Mantine max), but the server enforces a max of 50. Align by setting `max={50}` on the NumberInput in the Configuration page. Currently a merchant could enter 75, save successfully client-side, only to get a 422 from the server. |
+| #299 | Friendly error message for HTTP 409 duplicate team invite | P2 | Admin | When inviting a team member with an email that already exists, the server returns HTTP 409. The admin displays raw "409" text instead of a friendly message like "This email address has already been invited." Add error response parsing in the Team page invite handler to display the server's error detail or a fallback friendly message. |
+
+**Notes:**
+- WI #297 and #298 are quick validation fixes (one server-side, one client-side).
+- WI #299 requires error response handling in the Team page's invite submission logic.
+- All three are non-blocking for the current release — the UI works correctly in normal usage.
+
+**Total estimate:** ~1 day
 
 ---
 

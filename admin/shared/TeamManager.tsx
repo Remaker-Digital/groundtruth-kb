@@ -241,6 +241,32 @@ export const TeamManager: React.FC<BaseComponentProps> = ({
   }, [apiFetch, onNotify, team]);
 
   // -------------------------------------------------------------------------
+  // Active/inactive toggle (WI #280)
+  // -------------------------------------------------------------------------
+
+  const handleToggleActive = useCallback(async (member: TeamMember) => {
+    const newActive = !member.isActive;
+    try {
+      const resp = await apiFetch(`/api/admin/team/${member.id}`, {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ is_active: newActive }),
+      });
+      if (!resp.ok) throw new Error(`${resp.status}`);
+      onNotify(
+        newActive
+          ? `${member.displayName || member.email} is now active.`
+          : `${member.displayName || member.email} has been disabled.`,
+        'success',
+      );
+      team.refetch();
+    } catch (err: unknown) {
+      const msg = err instanceof Error ? err.message : 'Status update failed';
+      onNotify(`Failed to update status: ${msg}`, 'error');
+    }
+  }, [apiFetch, onNotify, team]);
+
+  // -------------------------------------------------------------------------
   // Loading state
   // -------------------------------------------------------------------------
 
@@ -382,6 +408,7 @@ export const TeamManager: React.FC<BaseComponentProps> = ({
                   isDark={isDark}
                   onRoleChange={handleInlineRoleChange}
                   onCategoryToggle={handleCategoryToggle}
+                  onToggleActive={handleToggleActive}
                   onRemove={(m) => {
                     setConfirmMember(m);
                     setConfirmAction('remove');

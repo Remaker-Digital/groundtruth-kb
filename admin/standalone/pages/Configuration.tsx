@@ -786,8 +786,8 @@ export const ConfigurationPage: React.FC = () => {
                     label={<>Max turns <HelpTooltip text="Maximum number of back-and-forth exchanges before the conversation is automatically ended and marked as resolved." docLink={`${DOCS_BASE}/escalation-settings`} /></>}
                     value={form.maxTurns}
                     onChange={(val) => updateField('maxTurns', Number(val) || 50)}
-                    min={5}
-                    max={200}
+                    min={1}
+                    max={50}
                   />
                 </Group>
               </Stack>

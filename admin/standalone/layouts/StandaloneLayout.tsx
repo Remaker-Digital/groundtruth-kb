@@ -358,6 +358,9 @@ export const StandaloneLayout: React.FC<StandaloneLayoutProps> = ({
   const [discarding, setDiscarding] = useState(false);
   const [configRefreshKey, setConfigRefreshKey] = useState(0);
 
+  // ---- Test mode indicator (WI #247) ----------------------------------------
+  const [testModeEnabled, setTestModeEnabled] = useState(false);
+
   // Poll activation status every 30s (replaces ActivationBanner's internal polling)
   const fetchActivationStatus = useCallback(async () => {
     try {
@@ -445,6 +448,22 @@ export const StandaloneLayout: React.FC<StandaloneLayoutProps> = ({
 
   // Config group visible only for superadmin / admin
   const canSeeConfigGroup = !userRole || ['superadmin', 'admin'].includes(userRole);
+
+  // ---- Test mode fetch (WI #247) ------------------------------------------
+  useEffect(() => {
+    if (!tenantContext) return;
+    apiFetch('/api/config?page_type=all')
+      .then(async (resp) => {
+        if (!resp.ok) return;
+        const data = await resp.json();
+        const cfg = data?.config || {};
+        setTestModeEnabled(
+          cfg.test_mode_enabled === true
+          || cfg.testModeEnabled === true
+        );
+      })
+      .catch(() => { /* non-fatal */ });
+  }, [tenantContext, apiFetch, configRefreshKey]);
 
   // ---- Chat widget injection (auto-embed for admin users) ----------------
   // Widget is shown only when the tenant is Active (is_active === true).
@@ -959,6 +978,26 @@ export const StandaloneLayout: React.FC<StandaloneLayoutProps> = ({
 
         {/* ---- Main content ---- */}
         <AppShell.Main>
+          {/* WI #247: Test mode banner — persistent warning when test mode is active */}
+          {testModeEnabled && (
+            <Box
+              px="md"
+              py={8}
+              style={{
+                background: isDark ? 'rgba(234, 179, 8, 0.15)' : 'rgba(234, 179, 8, 0.12)',
+                borderBottom: `1px solid ${isDark ? 'rgba(234, 179, 8, 0.3)' : 'rgba(234, 179, 8, 0.25)'}`,
+              }}
+            >
+              <Group gap={8} justify="center">
+                <Text size="sm" fw={600} c={isDark ? 'yellow.3' : 'yellow.9'}>
+                  ⚠ Test Mode Active
+                </Text>
+                <Text size="xs" c={isDark ? 'yellow.4' : 'yellow.8'}>
+                  — Conversations are tagged as test and excluded from billing.
+                </Text>
+              </Group>
+            </Box>
+          )}
           {error && (
             <Box p="md" c="red">
               Failed to load: {error}

@@ -107,6 +107,8 @@ export interface TeamMemberRowProps {
   isDark: boolean;
   onRoleChange: (member: TeamMember, newRole: TeamRole) => void;
   onCategoryToggle: (member: TeamMember, categoryId: string) => void;
+  /** WI #280: Toggle active/inactive status for a team member. */
+  onToggleActive: (member: TeamMember) => void;
   onRemove: (member: TeamMember) => void;
 }
 

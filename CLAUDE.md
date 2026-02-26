@@ -132,6 +132,44 @@ The file `.claude/SCHEDULE.md` contains pre-planned prompts that are automatical
 
 **Claude's permissions:** Claude may append new groups to SCHEDULE.md when anticipating future housekeeping needs (e.g., "after this deployment, remind me to update the procedure"). The owner can delete groups to cancel, or reorder groups to change priority.
 
+### Knowledge Database
+
+The **Knowledge Database** (`tools/knowledge-db/knowledge.db`) is the canonical source of truth for all specifications, test procedures, and operational procedures. It replaces the markdown backlog (now FROZEN) with an append-only SQLite store providing change control, version history, and machine-verifiable assertions. Web UI: `localhost:8090` (run `python tools/knowledge-db/app.py`).
+
+**Core principle — append-only:** No rows are ever updated or deleted. Every change creates a new versioned record with `changed_by`, `changed_at`, and `change_reason`. Current state = latest version per ID.
+
+**Claude is the sole writer.** The owner observes through the read-only web UI. When the owner spots a discrepancy, they tell Claude, and Claude creates a corrected version.
+
+**Python API** (always use this — never edit SQLite directly or modify `seed.py` for status changes):
+
+```python
+import sys; sys.path.insert(0, "tools/knowledge-db")
+from db import KnowledgeDB
+
+db = KnowledgeDB()
+db.get_spec("245")                       # Latest version
+db.list_specs(status="implemented")      # Filtered list
+db.get_summary()                         # Counts by status
+db.update_spec("245", changed_by="claude",
+               change_reason="Verified in S97",
+               status="implemented")
+db.close()                               # Always close when done
+```
+
+**When to update the database:**
+
+| Trigger | Action |
+|---------|--------|
+| Implement a specified WI | `update_spec(id, status="implemented", change_reason="...")` |
+| Verify an implemented WI passes tests | `update_spec(id, status="verified", change_reason="...")` |
+| Discover a wrong status | `update_spec(id, status=corrected, change_reason="...")` |
+| Modify a test/operational procedure | Create new version via `insert_test_procedure()` or `insert_op_procedure()` |
+| Retire a spec (no longer applicable) | `update_spec(id, status="retired", change_reason="...")` |
+
+**Session-start hook:** `.claude/hooks/assertion-check.py` runs all assertions at session start. Failing specs with status `"specified"` are expected (not yet implemented). Failing specs with status `"implemented"` or `"verified"` indicate **regressions** requiring investigation.
+
+**Do not modify** `docs/BACKLOG-NEW-WORK-ITEMS.md` — it is FROZEN. The Knowledge Database is the canonical source.
+
 ### Adding Commercial Features
 
 1. Create features in `src/` exclusively
@@ -169,5 +207,5 @@ All 19 cycles deployed. Full history: `memory/build-deploy-roadmap.md`.
 ---
 
 *© 2026 Remaker Digital, a DBA of VanDusen & Palmeter, LLC. All rights reserved.*
-*Last Updated: 2026-02-24*
-*Version: 57.20.0*
+*Last Updated: 2026-02-25*
+*Version: 58.2.0*

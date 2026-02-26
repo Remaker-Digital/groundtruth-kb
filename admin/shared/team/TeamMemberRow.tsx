@@ -23,12 +23,14 @@ export const TeamMemberRow: React.FC<TeamMemberRowProps> = ({
   isDark,
   onRoleChange,
   onCategoryToggle,
+  onToggleActive,
   onRemove,
 }) => {
   const isOwner = member.role === 'superadmin';
+  const isInactive = member.isActive === false;
 
   return (
-    <tr key={member.id} style={s.tr(false)}>
+    <tr key={member.id} style={{ ...s.tr(false), opacity: isInactive ? 0.5 : 1, transition: 'opacity 0.2s ease' }}>
       {/* Member info */}
       <td style={s.td}>
         <div style={s.memberInfo}>
@@ -122,7 +124,32 @@ export const TeamMemberRow: React.FC<TeamMemberRowProps> = ({
 
       {/* Actions */}
       <td style={{ ...s.td, textAlign: 'right' }}>
-        <div style={{ ...s.actionRow, justifyContent: 'flex-end' }}>
+        <div style={{ ...s.actionRow, justifyContent: 'flex-end', gap: 6 }}>
+          {/* WI #280: Active/inactive toggle — not available for superadmin */}
+          {!isOwner && (
+            <button
+              type="button"
+              style={{
+                ...s.iconButton,
+                padding: '2px 8px',
+                borderRadius: 10,
+                fontSize: 11,
+                fontWeight: 500,
+                border: `1px solid ${isInactive ? (isDark ? '#7f1d1d' : '#fca5a5') : (isDark ? '#14532d' : '#86efac')}`,
+                background: isInactive ? (isDark ? '#450a0a' : '#fef2f2') : (isDark ? '#052e16' : '#f0fdf4'),
+                color: isInactive ? (isDark ? '#fca5a5' : '#dc2626') : (isDark ? '#86efac' : '#16a34a'),
+                cursor: 'pointer',
+                lineHeight: '18px',
+                whiteSpace: 'nowrap',
+                transition: 'all 0.15s ease',
+              }}
+              title={isInactive ? 'Enable this team member' : 'Disable this team member'}
+              aria-label={isInactive ? 'Enable member' : 'Disable member'}
+              onClick={() => onToggleActive(member)}
+            >
+              {isInactive ? 'Disabled' : 'Active'}
+            </button>
+          )}
           {!isOwner && (
             <button
               style={s.iconButton}
