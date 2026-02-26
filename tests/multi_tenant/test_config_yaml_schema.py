@@ -343,6 +343,215 @@ class TestExport:
 
 
 # ---------------------------------------------------------------------------
+# Field pipeline completeness tests (regression — S103 gradient toggle bug)
+# ---------------------------------------------------------------------------
+
+
+class TestFieldPipelineCompleteness:
+    """Verify that every widget_* field in fields.yaml is mapped through
+    the full pipeline: fields.yaml → cosmos_schema → field_mapping.
+
+    The gradient toggle bug (S103) occurred because widget_header_gradient_enabled
+    was defined in the admin UI but missing from field_mapping.py, cosmos_schema.py,
+    and fields.yaml. These tests ensure no widget field is ever orphaned again.
+    """
+
+    # Known discrepancies — fields added to one layer but not yet wired to all.
+    # These are tracked as tech debt. When fixed, remove from these sets and the
+    # tests will automatically verify full-pipeline coverage.
+    _YAML_ONLY_NOT_IN_MAPPING = {
+        "widget_greeting_mode",          # S99: added to YAML, not wired to mapping
+        "widget_panel_width",            # S99: added to YAML, not wired to mapping
+        "widget_quick_actions_enabled",  # In YAML + Cosmos, not in field_mapping
+        "widget_shadow_intensity",       # S99: added to YAML, not wired to mapping
+    }
+    _MAPPING_ONLY_NOT_IN_YAML = {
+        "widget_agent_bubble_color",          # In mapping, YAML definition pending
+        "widget_agent_bubble_text_color",     # In mapping, YAML definition pending
+        "widget_customer_bubble_color",       # In mapping, YAML definition pending
+        "widget_customer_bubble_text_color",  # In mapping, YAML definition pending
+        "widget_key",                         # Internal field, not user-configurable
+        "widget_launcher_shape",              # In mapping, YAML definition pending
+    }
+    _YAML_ONLY_NOT_IN_COSMOS = {
+        "widget_greeting_mode",     # S99: added to YAML, not in Cosmos schema
+        "widget_panel_width",       # S99: added to YAML, not in Cosmos schema
+        "widget_shadow_intensity",  # S99: added to YAML, not in Cosmos schema
+    }
+
+    def test_all_widget_yaml_fields_in_field_mapping(self):
+        """Every widget_* field in fields.yaml must appear in _PREFS_DIRECT_FIELDS."""
+        from src.multi_tenant.config.field_mapping import _PREFS_DIRECT_FIELDS
+        registry = get_field_registry()
+        widget_yaml_fields = {name for name in registry if name.startswith("widget_")}
+        widget_mapping_fields = {name for name in _PREFS_DIRECT_FIELDS if name.startswith("widget_")}
+        missing = widget_yaml_fields - widget_mapping_fields - self._YAML_ONLY_NOT_IN_MAPPING
+        assert not missing, (
+            f"Widget fields in fields.yaml but NOT in field_mapping.py _PREFS_DIRECT_FIELDS: "
+            f"{sorted(missing)}. Add them to field_mapping.py to ensure they flow to the widget."
+        )
+
+    def test_all_widget_mapping_fields_in_yaml(self):
+        """Every widget_* field in _PREFS_DIRECT_FIELDS must exist in fields.yaml."""
+        from src.multi_tenant.config.field_mapping import _PREFS_DIRECT_FIELDS
+        registry = get_field_registry()
+        widget_yaml_fields = {name for name in registry if name.startswith("widget_")}
+        widget_mapping_fields = {name for name in _PREFS_DIRECT_FIELDS if name.startswith("widget_")}
+        extra = widget_mapping_fields - widget_yaml_fields - self._MAPPING_ONLY_NOT_IN_YAML
+        assert not extra, (
+            f"Widget fields in field_mapping.py but NOT in fields.yaml: {sorted(extra)}. "
+            f"Add them to fields.yaml for validation and documentation."
+        )
+
+    def test_all_widget_yaml_fields_in_cosmos_schema(self):
+        """Every widget_* field in fields.yaml must exist on PreferencesDocument."""
+        from src.multi_tenant.cosmos_schema import PreferencesDocument
+        registry = get_field_registry()
+        widget_yaml_fields = {name for name in registry if name.startswith("widget_")}
+        schema_fields = set(PreferencesDocument.model_fields.keys())
+        missing = widget_yaml_fields - schema_fields - self._YAML_ONLY_NOT_IN_COSMOS
+        assert not missing, (
+            f"Widget fields in fields.yaml but NOT in PreferencesDocument: {sorted(missing)}. "
+            f"Add them to cosmos_schema.py to ensure persistence."
+        )
+
+    def test_known_discrepancy_count_shrinks(self):
+        """Alert when known discrepancies are fixed — remove them from the allowlists."""
+        from src.multi_tenant.config.field_mapping import _PREFS_DIRECT_FIELDS
+        from src.multi_tenant.cosmos_schema import PreferencesDocument
+        registry = get_field_registry()
+        yaml_fields = {name for name in registry if name.startswith("widget_")}
+        mapping_fields = {name for name in _PREFS_DIRECT_FIELDS if name.startswith("widget_")}
+        cosmos_fields = set(PreferencesDocument.model_fields.keys())
+
+        # If a "known discrepancy" field was added to the target layer, remove it
+        # from the allowlist so the test becomes stricter over time.
+        yaml_not_mapping_fixed = self._YAML_ONLY_NOT_IN_MAPPING & mapping_fields
+        mapping_not_yaml_fixed = self._MAPPING_ONLY_NOT_IN_YAML & yaml_fields
+        yaml_not_cosmos_fixed = self._YAML_ONLY_NOT_IN_COSMOS & cosmos_fields
+        all_fixed = yaml_not_mapping_fixed | mapping_not_yaml_fixed | yaml_not_cosmos_fixed
+        assert not all_fixed, (
+            f"These 'known discrepancy' fields have been fixed! Remove from allowlists: "
+            f"{sorted(all_fixed)}"
+        )
+
+    def test_widget_appearance_fields_set_equals_widget_prefix_filter(self):
+        """_WIDGET_APPEARANCE_FIELDS should be exactly the widget_* subset of _PREFS_DIRECT_FIELDS."""
+        from src.multi_tenant.config.field_mapping import (
+            _PREFS_DIRECT_FIELDS,
+            _WIDGET_APPEARANCE_FIELDS,
+        )
+        expected = frozenset(f for f in _PREFS_DIRECT_FIELDS if f.startswith("widget_"))
+        assert _WIDGET_APPEARANCE_FIELDS == expected, (
+            f"_WIDGET_APPEARANCE_FIELDS is out of sync. "
+            f"Missing: {expected - _WIDGET_APPEARANCE_FIELDS}, "
+            f"Extra: {_WIDGET_APPEARANCE_FIELDS - expected}"
+        )
+
+    def test_widget_gradient_enabled_in_full_pipeline(self):
+        """Explicit regression test for the S103 gradient toggle bug.
+
+        widget_header_gradient_enabled must exist in all 3 layers:
+        fields.yaml, cosmos_schema.py, and field_mapping.py.
+        """
+        from src.multi_tenant.config.field_mapping import _PREFS_DIRECT_FIELDS
+        from src.multi_tenant.cosmos_schema import PreferencesDocument
+
+        field_name = "widget_header_gradient_enabled"
+
+        # Layer 1: fields.yaml
+        registry = get_field_registry()
+        assert field_name in registry, f"{field_name} missing from fields.yaml"
+
+        # Layer 2: cosmos_schema.py
+        assert field_name in PreferencesDocument.model_fields, (
+            f"{field_name} missing from PreferencesDocument"
+        )
+
+        # Layer 3: field_mapping.py
+        assert field_name in _PREFS_DIRECT_FIELDS, (
+            f"{field_name} missing from _PREFS_DIRECT_FIELDS"
+        )
+
+
+class TestSetupChecklistFieldNames:
+    """Verify that the Dashboard setup checklist references valid field names.
+
+    The setup checklist bug (S103) used 'display_name' instead of 'brand_name'.
+    These tests verify that all field names used in checklist logic exist in the
+    config schema, preventing similar silent failures.
+    """
+
+    def test_brand_name_field_exists(self):
+        """The checklist checks config.brand_name — verify it exists."""
+        registry = get_field_registry()
+        assert "brand_name" in registry, "brand_name not in registry"
+        assert registry["brand_name"].platform_default == "My Store"
+
+    def test_brand_voice_field_exists(self):
+        """The checklist checks config.brand_voice — verify it exists."""
+        registry = get_field_registry()
+        assert "brand_voice" in registry, "brand_voice not in registry"
+
+    def test_custom_instructions_field_exists(self):
+        """The checklist checks config.custom_instructions — verify it exists."""
+        registry = get_field_registry()
+        assert "custom_instructions" in registry
+
+    def test_business_category_does_not_exist(self):
+        """business_category is referenced in the setup checklist but is not a real field.
+
+        The checklist condition is: custom_instructions || business_category || brand_voice
+        Since business_category doesn't exist, it's always falsy — but brand_voice
+        and custom_instructions cover the check. If business_category is ever added
+        as a real field, remove this test and update the checklist logic.
+        """
+        registry = get_field_registry()
+        assert "business_category" not in registry
+
+    def test_widget_primary_color_field_exists(self):
+        """The checklist checks config.widget_primary_color — verify it exists."""
+        registry = get_field_registry()
+        assert "widget_primary_color" in registry
+        assert registry["widget_primary_color"].platform_default == "#ff3621"
+
+    def test_display_name_does_not_exist(self):
+        """Negative test: 'display_name' should NOT be in the registry.
+
+        The S103 bug used config.display_name instead of config.brand_name.
+        If display_name is ever added, this test alerts us to update the
+        checklist (or rename the field deliberately).
+        """
+        registry = get_field_registry()
+        assert "display_name" not in registry, (
+            "display_name was added to registry — update Dashboard.tsx "
+            "setup checklist if this field should replace brand_name"
+        )
+
+
+class TestTenantLookupResponseSchema:
+    """Verify TenantLookupResponse includes brand_name field.
+
+    The brand name display bug (S103) required adding brand_name to the
+    lookup response so standalone tenants show their name in the navbar.
+    """
+
+    def test_tenant_lookup_response_has_brand_name(self):
+        from src.integrations.provisioning import TenantLookupResponse
+        fields = TenantLookupResponse.model_fields
+        assert "brand_name" in fields, (
+            "TenantLookupResponse missing brand_name field — "
+            "standalone tenants won't show their name in the admin navbar"
+        )
+
+    def test_tenant_lookup_response_brand_name_optional(self):
+        """brand_name should be optional (None for unconfigured tenants)."""
+        from src.integrations.provisioning import TenantLookupResponse
+        field_info = TenantLookupResponse.model_fields["brand_name"]
+        assert field_info.default is None, "brand_name should default to None"
+
+
+# ---------------------------------------------------------------------------
 # Backward compatibility tests
 # ---------------------------------------------------------------------------
 
