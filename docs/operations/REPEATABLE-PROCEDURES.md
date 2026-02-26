@@ -41,6 +41,7 @@ A Repeatable Procedure is **not**:
 | Conversation quality regression | `docs/operations/conversation-quality-test-procedure.md` | Active |
 | Resilience & failover testing | `docs/operations/resilience-failover-test-procedure.md` | Active |
 | Data integrity & backup verification | `docs/operations/data-integrity-test-procedure.md` | Active |
+| Session wrap-up | `docs/operations/session-wrap-up-procedure.md` | Active |
 
 > **Cross-procedure dependencies:**
 > - *Build & deploy* must be executed before *Non-disruptive upgrade verification*, *Production regression suite*, and any other procedure that requires a fresh deployment. All 4 build targets (3 admin SPAs + widget) must pass the freshness gate before ACR build.

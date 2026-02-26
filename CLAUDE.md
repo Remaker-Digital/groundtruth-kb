@@ -15,7 +15,7 @@ This document provides active guidance for AI assistants working on the Agent Re
 |-----------|-------|
 | **Project Name** | Agent Red Customer Experience |
 | **Type** | Commercial SaaS Product (Shopify + Standalone) |
-| **Status** | Beta Prime v1.57.19 PINNED. Staging v1.57.20. Release Plan Step 4 (beta feedback) IN PROGRESS. See `memory/MEMORY.md` for full status. |
+| **Status** | Production v1.58.3. Staging v1.58.1-rc3. Release Plan Step 4 (beta feedback) IN PROGRESS. See `memory/MEMORY.md` for full status. |
 | **Owner** | Remaker Digital (DBA of VanDusen & Palmeter, LLC) |
 
 ### Copyright Notice
@@ -131,6 +131,21 @@ The file `.claude/SCHEDULE.md` contains pre-planned prompts that are automatical
 **Trigger types:** `always` (next prompt), `session_end` (wrap-up keywords detected), `after:N` (after N prompts).
 
 **Claude's permissions:** Claude may append new groups to SCHEDULE.md when anticipating future housekeeping needs (e.g., "after this deployment, remind me to update the procedure"). The owner can delete groups to cancel, or reorder groups to change priority.
+
+### Session Wrap-Up & Handoff
+
+At the end of every working session, execute the **Session Wrap-Up Repeatable Procedure** (`docs/operations/session-wrap-up-procedure.md`). This is triggered automatically by the Session Scheduler when wrap-up keywords are detected ("wrap up", "done", "end session", etc.) or can be invoked manually.
+
+**5-phase procedure:** (1) Update Knowledge DB, MEMORY.md, CLAUDE.md → (2) Verify Repeatable Procedures → (3) External updates (docs site, GitHub project/wiki) → (4) Staging deployment (with risk gate) → (5) Generate and store next-session handoff prompt.
+
+**Session handoff prompt:** The final step stores a structured prompt in the Knowledge Database via `db.insert_session_prompt()`. The next session's SessionStart hook automatically retrieves and displays it. This eliminates the need for the owner to craft session-start prompts manually.
+
+**Python API for session prompts:**
+```python
+db.insert_session_prompt("S97", "Continue work on...", context={...})  # Store
+db.get_next_session_prompt()                                            # Retrieve (unconsumed)
+db.consume_session_prompt("S97")                                        # Mark as used
+```
 
 ### Knowledge Database
 

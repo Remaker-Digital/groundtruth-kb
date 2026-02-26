@@ -79,6 +79,16 @@ CREATE TABLE IF NOT EXISTS assertion_runs (
     triggered_by TEXT NOT NULL
 );
 
+CREATE TABLE IF NOT EXISTS session_prompts (
+    rowid INTEGER PRIMARY KEY AUTOINCREMENT,
+    session_id TEXT NOT NULL,
+    created_at TEXT NOT NULL,
+    consumed_at TEXT,
+    prompt_text TEXT NOT NULL,
+    context TEXT,
+    UNIQUE(session_id)
+);
+
 -- Views: current state = latest version per ID
 CREATE VIEW IF NOT EXISTS current_specifications AS
 SELECT s.* FROM specifications s
@@ -473,6 +483,69 @@ class KnowledgeDB:
                ) m ON a.spec_id = m.spec_id AND a.rowid = m.max_rowid
                ORDER BY a.spec_id"""
         ).fetchall()
+        return [_row_to_dict(r) for r in rows]
+
+    # ------------------------------------------------------------------
+    # Session Prompts
+    # ------------------------------------------------------------------
+
+    def insert_session_prompt(
+        self,
+        session_id: str,
+        prompt_text: str,
+        context: dict[str, Any] | None = None,
+    ) -> dict[str, Any]:
+        """Store a next-session handoff prompt.
+
+        Args:
+            session_id: The session that generated this prompt (e.g. "S97").
+            prompt_text: The full prompt text for the next session.
+            context: Optional structured context (WIs changed, test counts, etc.).
+        """
+        conn = self._get_conn()
+        conn.execute(
+            """INSERT OR REPLACE INTO session_prompts
+               (session_id, created_at, consumed_at, prompt_text, context)
+               VALUES (?, ?, NULL, ?, ?)""",
+            (session_id, _now(), prompt_text,
+             json.dumps(context) if context else None),
+        )
+        conn.commit()
+        return self.get_session_prompt(session_id)
+
+    def get_session_prompt(self, session_id: str) -> dict[str, Any] | None:
+        """Get a specific session's handoff prompt."""
+        row = self._get_conn().execute(
+            "SELECT * FROM session_prompts WHERE session_id = ?",
+            (session_id,),
+        ).fetchone()
+        return _row_to_dict(row) if row else None
+
+    def get_next_session_prompt(self) -> dict[str, Any] | None:
+        """Get the latest unconsumed handoff prompt (FIFO: most recent wins)."""
+        row = self._get_conn().execute(
+            """SELECT * FROM session_prompts
+               WHERE consumed_at IS NULL
+               ORDER BY rowid DESC LIMIT 1"""
+        ).fetchone()
+        return _row_to_dict(row) if row else None
+
+    def consume_session_prompt(self, session_id: str) -> None:
+        """Mark a session prompt as consumed (used to start a session)."""
+        conn = self._get_conn()
+        conn.execute(
+            "UPDATE session_prompts SET consumed_at = ? WHERE session_id = ?",
+            (_now(), session_id),
+        )
+        conn.commit()
+
+    def list_session_prompts(self, *, include_consumed: bool = False) -> list[dict[str, Any]]:
+        """List session prompts, optionally including consumed ones."""
+        if include_consumed:
+            query = "SELECT * FROM session_prompts ORDER BY rowid DESC"
+        else:
+            query = "SELECT * FROM session_prompts WHERE consumed_at IS NULL ORDER BY rowid DESC"
+        rows = self._get_conn().execute(query).fetchall()
         return [_row_to_dict(r) for r in rows]
 
     # ------------------------------------------------------------------
