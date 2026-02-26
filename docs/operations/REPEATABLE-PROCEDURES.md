@@ -42,6 +42,7 @@ A Repeatable Procedure is **not**:
 | Resilience & failover testing | `docs/operations/resilience-failover-test-procedure.md` | Active |
 | Data integrity & backup verification | `docs/operations/data-integrity-test-procedure.md` | Active |
 | Session wrap-up | `docs/operations/session-wrap-up-procedure.md` | Active |
+| Pre-flight deployment checklist | `docs/operations/pre-flight-deployment-checklist.md` | Active |
 
 > **Cross-procedure dependencies:**
 > - *Build & deploy* must be executed before *Non-disruptive upgrade verification*, *Production regression suite*, and any other procedure that requires a fresh deployment. All 4 build targets (3 admin SPAs + widget) must pass the freshness gate before ACR build.
@@ -57,6 +58,7 @@ A Repeatable Procedure is **not**:
 > - *Conversation quality regression* depends on NATS being connected (AI pipeline functional). Cannot run if chat is unavailable.
 > - *Resilience & failover testing* does NOT require all dependencies to be healthy — it tests behavior under degradation.
 > - *Data integrity & backup verification* depends on Azure CLI access and Cosmos DB being accessible.
+> - *Pre-flight deployment checklist* incorporates *Build & deploy*, *Protected Behaviors*, *Upgrade Verification*, and *Production regression suite*. Must be executed for every staging and production deployment. Phase D (tenant provisioning) is the concluding gate and requires `SUPERADMIN_PREVIEW_API_KEY`.
 
 ---
 

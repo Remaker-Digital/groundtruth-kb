@@ -36,8 +36,8 @@ ENVIRONMENTS = {
         "fqdn": "agent-red-api-gateway.orangeglacier-f566a4e7.eastus.azurecontainerapps.io",
         "container_app": "agent-red-api-gateway",
         "tenant_id": "remaker-digital-001",
-        "api_key": "ar_user_rema_kVmptiMy8_tLcbJfHNnkRe4OUc0OsXgK",
-        "widget_key": "pk_live_c79a2bd0b3d4_e08ad86502f3329b7a5a04cabbf360a1",
+        "api_key": "ar_user_rema_QU5f2jBq0Z4SXYoyFd9zOmTEjQ7gj4j7",
+        "widget_key": "pk_live_c79a2bd0b3d4_ab04f5d5d4cbe783db863c16aba9eb94",
         "resource_group": "Agent-Red",
     },
 }
@@ -251,11 +251,13 @@ def phase_c(env: dict, snapshot: dict, new_version: str) -> list[dict]:
     else:
         check("C.3", "Configuration state unchanged", False, f"HTTP {s}")
 
-    # C.4 Conversation count unchanged (camelCase: totalCount)
+    # C.4 Conversation count not decreased (growth OK, loss = data corruption)
     s, d, _ = api_call(fqdn, "/api/admin/conversations?limit=1", key)
     tc = d.get("totalCount", d.get("total_count", -1)) if isinstance(d, dict) else -1
-    check("C.4", "Conversation count unchanged", tc == snapshot.get("A4_conversation_count"),
-          f"{tc} vs {snapshot.get('A4_conversation_count')}")
+    snap_count = snapshot.get("A4_conversation_count", -1)
+    count_ok = isinstance(tc, int) and isinstance(snap_count, int) and tc >= snap_count
+    check("C.4", "Conversation count not decreased", count_ok,
+          f"{tc} vs {snap_count} (growth OK)")
 
     # C.5 Status breakdown unchanged
     s, d, _ = api_call(fqdn, "/api/admin/analytics/summary", key)
