@@ -962,6 +962,7 @@ class PreferencesDocument(BaseModel):
     widget_dark_mode: bool | None = Field(default=None, description="Use dark color scheme")
     widget_color_mode: str | None = Field(default=None, description="light | dark | auto")
     widget_header_gradient_end: str | None = Field(default=None, description="Hex color for header gradient end (#RRGGBB)")
+    widget_header_gradient_enabled: bool | None = Field(default=None, description="Enable header gradient (left→right color blend)")
     widget_font_family: str | None = Field(default=None, description="CSS font-family value")
     widget_border_radius: int | None = Field(default=None, description="Border radius for widget panels (px)")
     widget_launcher_size: int | None = Field(default=None, description="Launcher button diameter (px)")

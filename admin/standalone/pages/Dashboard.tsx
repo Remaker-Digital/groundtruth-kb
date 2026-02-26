@@ -124,8 +124,8 @@ function SetupChecklist({ config, activationStatus }: {
 }) {
   if (!config || !activationStatus) return null;
   const checks = [
-    { label: 'Brand name configured', done: Boolean(config.display_name && config.display_name !== 'My Store') },
-    { label: 'AI instructions or category selected', done: Boolean(config.custom_instructions || config.business_category) },
+    { label: 'Brand name configured', done: Boolean(config.brand_name && config.brand_name !== 'My Store') },
+    { label: 'AI instructions or category selected', done: Boolean(config.custom_instructions || config.business_category || config.brand_voice) },
     { label: 'Knowledge base has content', done: Boolean(config.kb_entry_count && Number(config.kb_entry_count) > 0) },
     { label: 'Widget appearance customized', done: Boolean(config.widget_primary_color && config.widget_primary_color !== '#ff3621') },
     { label: 'System activated', done: Boolean(activationStatus.is_active) },
@@ -217,11 +217,16 @@ export function DashboardPage() {
       {/* Page header */}
       <Group justify="space-between" align="flex-end">
         <div>
-          {tenantContext?.shopDomain && (
-            <Title order={2} mb={40}>
-              {tenantContext.shopDomain.replace('.myshopify.com', '')}
-            </Title>
-          )}
+          {(() => {
+            const storeName = tenantContext?.shopDomain
+              ? tenantContext.shopDomain.replace('.myshopify.com', '')
+              : configResult.data?.config?.brand_name
+                ? String(configResult.data.config.brand_name)
+                : null;
+            return storeName ? (
+              <Text size="lg" fw={600} c="dimmed" mb={4}>{storeName}</Text>
+            ) : null;
+          })()}
           <Title order={2}>Dashboard</Title>
           <Text c="dimmed" size="sm">
             Overview of your customer experience performance

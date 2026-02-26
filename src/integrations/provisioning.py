@@ -141,6 +141,7 @@ class TenantLookupResponse(BaseModel):
     billing_channel: BillingChannel | None = None
     has_stripe_billing: bool = False
     shopify_shop_domain: str | None = None
+    brand_name: str | None = None
 
 
 # ---------------------------------------------------------------------------
@@ -987,6 +988,22 @@ async def _lookup_by_api_key(api_key: str) -> dict[str, Any] | None:
     return None
 
 
+async def _read_brand_name(tenant_id: str) -> str | None:
+    """Read brand_name from the tenant's active config (lightweight single-field read).
+
+    Used to enrich the tenant lookup response so the admin navbar can display
+    the brand name without a separate config fetch.
+    """
+    try:
+        from src.multi_tenant.config.config_processor import get_config_processor
+        processor = get_config_processor()
+        result = await processor.get_config(tenant_id)
+        return result.config.get("brand_name") if result and result.config else None
+    except Exception as exc:
+        logger.debug("brand_name read failed for %s: %s", tenant_id, exc)
+        return None
+
+
 # ---------------------------------------------------------------------------
 # Endpoints
 # ---------------------------------------------------------------------------
@@ -1029,14 +1046,18 @@ async def lookup_tenant_endpoint(
     if api_key and not stripe_customer_id and not shop:
         doc = await _lookup_by_api_key(api_key)
         if doc:
+            tenant_id = doc.get("tenant_id") or doc.get("id")
+            # Enrich with brand_name from active config (lightweight read)
+            brand_name = await _read_brand_name(tenant_id) if tenant_id else None
             return TenantLookupResponse(
                 found=True,
-                tenant_id=doc.get("tenant_id") or doc.get("id"),
+                tenant_id=tenant_id,
                 status=doc.get("status"),
                 tier=doc.get("tier"),
                 billing_channel=doc.get("billing_channel"),
                 has_stripe_billing=bool(doc.get("stripe_customer_id")),
                 shopify_shop_domain=doc.get("shopify_shop_domain"),
+                brand_name=brand_name,
             )
         raise HTTPException(status_code=401, detail="Invalid API key.")
 
@@ -1055,6 +1076,9 @@ async def lookup_tenant_endpoint(
     if not tenant:
         return TenantLookupResponse(found=False)
 
+    # Enrich with brand_name from active config
+    brand_name = await _read_brand_name(tenant.tenant_id)
+
     return TenantLookupResponse(
         found=True,
         tenant_id=tenant.tenant_id,
@@ -1063,6 +1087,7 @@ async def lookup_tenant_endpoint(
         billing_channel=tenant.billing_channel,
         has_stripe_billing=bool(tenant.stripe_customer_id),
         shopify_shop_domain=tenant.shopify_shop_domain,
+        brand_name=brand_name,
     )
 
 

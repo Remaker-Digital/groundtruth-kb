@@ -120,6 +120,7 @@ export interface WidgetConfig {
   widget_dark_mode?: boolean | null;
   widget_color_mode?: 'light' | 'dark' | 'auto' | null;
   widget_header_gradient_end?: string | null;
+  widget_header_gradient_enabled?: boolean | null;
   widget_font_family?: string | null;
   widget_border_radius?: number | null;
   widget_launcher_size?: number | null;

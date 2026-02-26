@@ -62,9 +62,9 @@ def _reset_registry():
 class TestRegistryLoading:
     """Test that YAML fields load correctly."""
 
-    def test_registry_loads_83_fields(self):
+    def test_registry_loads_84_fields(self):
         registry = get_field_registry()
-        assert len(registry) == 83
+        assert len(registry) == 84
 
     def test_all_fields_have_required_attributes(self):
         registry = get_field_registry()

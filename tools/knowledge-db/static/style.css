@@ -286,3 +286,25 @@ a:hover { text-decoration: underline; }
     white-space: pre-wrap;
     line-height: 1.6;
 }
+
+/* Environment badges */
+.env-badge {
+    font-size: 0.7rem;
+    font-weight: 600;
+    padding: 0.15rem 0.5rem;
+    border-radius: 3px;
+    text-transform: uppercase;
+    letter-spacing: 0.04em;
+}
+
+.env-production { color: #f87171; background: rgba(248, 113, 113, 0.12); }
+.env-staging { color: #fbbf24; background: rgba(251, 191, 36, 0.12); }
+.env-shared { color: #60a5fa; background: rgba(96, 165, 250, 0.12); }
+.env-development { color: #34d399; background: rgba(52, 211, 153, 0.12); }
+
+/* Sensitive value mask */
+.sensitive-mask {
+    color: var(--text-muted);
+    font-size: 0.75rem;
+    letter-spacing: 0.15em;
+}

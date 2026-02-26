@@ -94,6 +94,22 @@ CREATE TABLE IF NOT EXISTS session_prompts (
     context TEXT
 );
 
+CREATE TABLE IF NOT EXISTS environment_config (
+    rowid INTEGER PRIMARY KEY AUTOINCREMENT,
+    id TEXT NOT NULL,
+    version INTEGER NOT NULL,
+    environment TEXT NOT NULL,
+    category TEXT NOT NULL,
+    key TEXT NOT NULL,
+    value TEXT NOT NULL,
+    sensitive INTEGER NOT NULL DEFAULT 0,
+    notes TEXT,
+    changed_by TEXT NOT NULL,
+    changed_at TEXT NOT NULL,
+    change_reason TEXT NOT NULL,
+    UNIQUE(id, version)
+);
+
 -- Indexes for query performance (append-only tables grow monotonically)
 CREATE INDEX IF NOT EXISTS idx_specs_id_version ON specifications(id, version);
 CREATE INDEX IF NOT EXISTS idx_specs_status ON specifications(status);
@@ -102,6 +118,8 @@ CREATE INDEX IF NOT EXISTS idx_test_procs_id_version ON test_procedures(id, vers
 CREATE INDEX IF NOT EXISTS idx_op_procs_id_version ON operational_procedures(id, version);
 CREATE INDEX IF NOT EXISTS idx_assertion_runs_spec ON assertion_runs(spec_id, rowid);
 CREATE INDEX IF NOT EXISTS idx_session_prompts_session ON session_prompts(session_id, rowid);
+CREATE INDEX IF NOT EXISTS idx_env_config_id_version ON environment_config(id, version);
+CREATE INDEX IF NOT EXISTS idx_env_config_env_cat ON environment_config(environment, category);
 
 -- Views: current state = latest version per ID
 CREATE VIEW IF NOT EXISTS current_specifications AS
@@ -118,6 +136,11 @@ CREATE VIEW IF NOT EXISTS current_operational_procedures AS
 SELECT o.* FROM operational_procedures o
 INNER JOIN (SELECT id, MAX(version) AS max_v FROM operational_procedures GROUP BY id) m
 ON o.id = m.id AND o.version = m.max_v;
+
+CREATE VIEW IF NOT EXISTS current_environment_config AS
+SELECT e.* FROM environment_config e
+INNER JOIN (SELECT id, MAX(version) AS max_v FROM environment_config GROUP BY id) m
+ON e.id = m.id AND e.version = m.max_v;
 """
 
 
@@ -475,6 +498,119 @@ class KnowledgeDB:
         return [_row_to_dict(r) for r in rows]
 
     # ------------------------------------------------------------------
+    # Environment Config
+    # ------------------------------------------------------------------
+
+    def _next_env_version(self, config_id: str) -> int:
+        row = self._get_conn().execute(
+            "SELECT MAX(version) FROM environment_config WHERE id = ?", (config_id,)
+        ).fetchone()
+        return (row[0] or 0) + 1
+
+    def insert_env_config(
+        self,
+        id: str,
+        environment: str,
+        category: str,
+        key: str,
+        value: str,
+        changed_by: str,
+        change_reason: str,
+        *,
+        sensitive: bool = False,
+        notes: str | None = None,
+    ) -> dict[str, Any]:
+        """Insert a new version of an environment config entry.
+
+        Args:
+            id: Unique identifier (e.g., "prod-api-gateway-fqdn", "prod-tenant-remaker-widget-key").
+            environment: Environment name ("production", "staging", "shared").
+            category: Config category ("url", "credential", "infrastructure", "tenant").
+            key: Human-readable key name (e.g., "API Gateway FQDN", "Widget Key").
+            value: The actual value (URL, key, etc.).
+            sensitive: If True, value is masked in web UI display (shown as ****).
+            notes: Optional context (e.g., "Re-seeded S95", "Tenant: remaker-digital-001").
+        """
+        version = self._next_env_version(id)
+        conn = self._get_conn()
+        conn.execute(
+            """INSERT INTO environment_config
+               (id, version, environment, category, key, value, sensitive,
+                notes, changed_by, changed_at, change_reason)
+               VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)""",
+            (id, version, environment, category, key, value, int(sensitive),
+             notes, changed_by, _now(), change_reason),
+        )
+        conn.commit()
+        return self.get_env_config(id)
+
+    def update_env_config(
+        self,
+        id: str,
+        changed_by: str,
+        change_reason: str,
+        **fields: Any,
+    ) -> dict[str, Any]:
+        """Create a new version of an env config entry, carrying forward unchanged fields."""
+        current = self.get_env_config(id)
+        if not current:
+            raise ValueError(f"Environment config {id} not found")
+
+        version = self._next_env_version(id)
+        environment = fields.get("environment", current["environment"])
+        category = fields.get("category", current["category"])
+        key = fields.get("key", current["key"])
+        value = fields.get("value", current["value"])
+        sensitive = fields.get("sensitive", current["sensitive"])
+        notes = fields.get("notes", current["notes"])
+
+        conn = self._get_conn()
+        conn.execute(
+            """INSERT INTO environment_config
+               (id, version, environment, category, key, value, sensitive,
+                notes, changed_by, changed_at, change_reason)
+               VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)""",
+            (id, version, environment, category, key, value, int(sensitive),
+             notes, changed_by, _now(), change_reason),
+        )
+        conn.commit()
+        return self.get_env_config(id)
+
+    def get_env_config(self, config_id: str) -> dict[str, Any] | None:
+        """Get the current (latest) version of an environment config entry."""
+        row = self._get_conn().execute(
+            "SELECT * FROM current_environment_config WHERE id = ?", (config_id,)
+        ).fetchone()
+        return _row_to_dict(row) if row else None
+
+    def list_env_config(
+        self,
+        *,
+        environment: str | None = None,
+        category: str | None = None,
+    ) -> list[dict[str, Any]]:
+        """List current environment config entries with optional filters."""
+        query = "SELECT * FROM current_environment_config WHERE 1=1"
+        params: list[Any] = []
+        if environment:
+            query += " AND environment = ?"
+            params.append(environment)
+        if category:
+            query += " AND category = ?"
+            params.append(category)
+        query += " ORDER BY environment, category, key"
+        rows = self._get_conn().execute(query, params).fetchall()
+        return [_row_to_dict(r) for r in rows]
+
+    def get_env_config_history(self, config_id: str) -> list[dict[str, Any]]:
+        """Get all versions of an environment config entry, newest first."""
+        rows = self._get_conn().execute(
+            "SELECT * FROM environment_config WHERE id = ? ORDER BY version DESC",
+            (config_id,),
+        ).fetchall()
+        return [_row_to_dict(r) for r in rows]
+
+    # ------------------------------------------------------------------
     # Assertion Runs
     # ------------------------------------------------------------------
 
@@ -672,12 +808,13 @@ class KnowledgeDB:
         params: list[Any] = []
 
         tables = {
-            "specifications": ("id", "specifications"),
-            "test_procedures": ("id", "test_procedures"),
-            "operational_procedures": ("id", "operational_procedures"),
+            "specifications": ("id", "specifications", "title"),
+            "test_procedures": ("id", "test_procedures", "title"),
+            "operational_procedures": ("id", "operational_procedures", "title"),
+            "environment_config": ("id", "environment_config", "key"),
         }
 
-        for tbl_key, (id_col, tbl_name) in tables.items():
+        for tbl_key, (id_col, tbl_name, title_col) in tables.items():
             if table and table != tbl_key:
                 continue
             where = ""
@@ -686,7 +823,7 @@ class KnowledgeDB:
                 params.append(changed_by)
             parts.append(
                 f"SELECT '{tbl_key}' AS table_name, {id_col} AS record_id, "
-                f"version, title, changed_by, changed_at, change_reason "
+                f"version, {title_col} AS title, changed_by, changed_at, change_reason "
                 f"FROM {tbl_name}{where}"
             )
 
@@ -719,7 +856,7 @@ class KnowledgeDB:
 
         conn = self._get_conn()
         tables = ["specifications", "test_procedures", "operational_procedures",
-                   "assertion_runs", "session_prompts"]
+                   "assertion_runs", "session_prompts", "environment_config"]
         export = {"exported_at": _now(), "tables": {}}
         for table in tables:
             rows = conn.execute(f"SELECT * FROM {table} ORDER BY rowid").fetchall()
@@ -770,6 +907,10 @@ class KnowledgeDB:
             "SELECT COUNT(*) FROM specifications"
         ).fetchone()[0]
 
+        env_count = conn.execute(
+            "SELECT COUNT(*) FROM current_environment_config"
+        ).fetchone()[0]
+
         return {
             "spec_counts": spec_counts,
             "spec_total": sum(spec_counts.values()),
@@ -779,6 +920,7 @@ class KnowledgeDB:
             "assertions_total": assertion_stats["total"] or 0,
             "assertions_passed": assertion_stats["passed"] or 0,
             "assertions_failed": (assertion_stats["total"] or 0) - (assertion_stats["passed"] or 0),
+            "env_config_count": env_count,
         }
 
 

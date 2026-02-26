@@ -178,6 +178,38 @@ async def op_detail(request: Request, proc_id: str):
     })
 
 
+@app.get("/env", response_class=HTMLResponse)
+async def env_list(
+    request: Request,
+    environment: str = Query(None),
+    category: str = Query(None),
+):
+    configs = db.list_env_config(environment=environment, category=category)
+    all_configs = db.list_env_config()
+    environments = sorted(set(c["environment"] for c in all_configs))
+    categories = sorted(set(c["category"] for c in all_configs))
+    return templates.TemplateResponse("env.html", {
+        "request": request,
+        "configs": configs,
+        "environments": environments,
+        "categories": categories,
+        "filters": {"environment": environment, "category": category},
+    })
+
+
+@app.get("/env/{config_id:path}", response_class=HTMLResponse)
+async def env_detail(request: Request, config_id: str):
+    config = db.get_env_config(config_id)
+    if not config:
+        return HTMLResponse("<h1>Environment config not found</h1>", status_code=404)
+    history = db.get_env_config_history(config_id)
+    return templates.TemplateResponse("env_detail.html", {
+        "request": request,
+        "config": config,
+        "history": history,
+    })
+
+
 @app.get("/history", response_class=HTMLResponse)
 async def history(
     request: Request,

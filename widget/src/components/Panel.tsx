@@ -509,7 +509,7 @@ export const Panel: FunctionComponent<PanelProps> = ({
         agentAvatarUrl={agentAvatarUrl}
         logoUrl={logoUrl}
         headerText={config.widget_header_text || null}
-        gradientEnd={config.widget_header_gradient_end || null}
+        gradientEnd={config.widget_header_gradient_enabled !== false && config.widget_header_gradient_end ? config.widget_header_gradient_end : null}
         onClose={handleCloseWidget}
         onDragStart={handleDragStart}
       />

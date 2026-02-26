@@ -74,6 +74,7 @@ interface TenantContext {
   billingChannel: BillingChannel;
   hasStripeBilling: boolean;
   shopDomain?: string;
+  brandName?: string;
 }
 
 interface AppContextValue {
@@ -279,6 +280,7 @@ export const StandaloneLayout: React.FC<StandaloneLayoutProps> = ({
             billingChannel: (data.billing_channel || 'stripe') as BillingChannel,
             hasStripeBilling: data.has_stripe_billing ?? false,
             shopDomain: data.shopify_shop_domain || undefined,
+            brandName: data.brand_name || undefined,
           });
           setLoading(false);
         }
@@ -610,19 +612,41 @@ export const StandaloneLayout: React.FC<StandaloneLayoutProps> = ({
               </Tooltip>
             </Group>
             <Group gap="sm">
-              {/* Storefront name + link */}
-              {tenantContext?.shopDomain && (
-                <Tooltip label={`Open ${tenantContext.shopDomain}`} position="bottom">
-                  <a
-                    href={`https://${tenantContext.shopDomain}`}
-                    target="_blank"
-                    rel="noopener noreferrer"
+              {/* Storefront / brand name + link */}
+              {(tenantContext?.shopDomain || tenantContext?.brandName) && (
+                tenantContext.shopDomain ? (
+                  <Tooltip label={`Open ${tenantContext.shopDomain}`} position="bottom">
+                    <a
+                      href={`https://${tenantContext.shopDomain}`}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="ar-link-shop"
+                      style={{
+                        display: 'flex',
+                        alignItems: 'center',
+                        gap: 6,
+                        textDecoration: 'none',
+                        color: tokens.textMuted,
+                        padding: '4px 10px',
+                        borderRadius: 6,
+                        background: 'var(--ar-storefront-link-bg)',
+                        fontSize: 13,
+                      }}
+                    >
+                      <Icons.storefront />
+                      <span style={{ maxWidth: 180, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                        {tenantContext.shopDomain.replace('.myshopify.com', '')}
+                      </span>
+                      <Icons.externalLink />
+                    </a>
+                  </Tooltip>
+                ) : (
+                  <span
                     className="ar-link-shop"
                     style={{
                       display: 'flex',
                       alignItems: 'center',
                       gap: 6,
-                      textDecoration: 'none',
                       color: tokens.textMuted,
                       padding: '4px 10px',
                       borderRadius: 6,
@@ -632,11 +656,10 @@ export const StandaloneLayout: React.FC<StandaloneLayoutProps> = ({
                   >
                     <Icons.storefront />
                     <span style={{ maxWidth: 180, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
-                      {tenantContext.shopDomain.replace('.myshopify.com', '')}
+                      {tenantContext.brandName}
                     </span>
-                    <Icons.externalLink />
-                  </a>
-                </Tooltip>
+                  </span>
+                )
               )}
               {tenantContext && (
                 <Tooltip

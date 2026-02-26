@@ -54,6 +54,7 @@ _PREFS_DIRECT_FIELDS: set[str] = {
     "widget_dark_mode",
     "widget_color_mode",
     "widget_header_gradient_end",
+    "widget_header_gradient_enabled",
     "widget_font_family",
     "widget_border_radius",
     "widget_launcher_size",

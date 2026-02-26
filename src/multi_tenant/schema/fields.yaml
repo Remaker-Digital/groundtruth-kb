@@ -973,6 +973,20 @@ fields:
     pii_classification: none
     injected_in_prompt: false
 
+  - field_name: widget_header_gradient_enabled
+    display_name: Enable header gradient
+    field_type: boolean
+    platform_default: false
+    tier_gate: all
+    onboarding_step: 9
+    step_order: 24
+    tooltip: When enabled, the header blends left and right colors into a gradient.
+    description: Controls whether the widget header shows a gradient from primary color to the gradient end color. When disabled, the header uses a solid primary color.
+    doc_link: "https://docs.agentred.ai/configuration/widget-appearance#header-gradient"
+    affects_agents: []
+    pii_classification: none
+    injected_in_prompt: false
+
   - field_name: widget_font_family
     display_name: Font family
     field_type: string
