@@ -516,6 +516,30 @@ class TestSaveDraftUpdateExisting:
 
         assert result.version == 5
 
+    @pytest.mark.asyncio
+    async def test_patch_batches_over_10_fields(self):
+        """Regression: >10 changes must be batched to stay within Cosmos
+        DB's 10-operation-per-patch limit (S95 widget save bug)."""
+        draft = _make_draft_doc()
+        active = _make_active_doc()
+        service, prefs_repo, _, _, _ = _make_service(active=active, draft=draft)
+
+        # 24 widget fields — exceeds the Cosmos 10-op limit
+        changes = {f"widget_field_{i}": f"value_{i}" for i in range(24)}
+
+        with patch(_VALIDATE_CONFIG_PATH, _mock_validate_ok()):
+            result = await service.save_draft(
+                STARTER_TENANT_ID, TenantTier.STARTER, changes, "admin",
+            )
+
+        assert result.success is True
+        # Should have been split into 3 batches (10 + 10 + 4)
+        assert prefs_repo.patch.await_count == 3
+        # Each call must have ≤10 operations
+        for call in prefs_repo.patch.await_args_list:
+            ops = call.kwargs.get("operations", call[1].get("operations", []))
+            assert len(ops) <= 10, f"Batch exceeded 10 ops: {len(ops)}"
+
 
 # =========================================================================
 # Test: save_draft — validation errors and warnings

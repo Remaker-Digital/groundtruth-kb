@@ -530,6 +530,36 @@ class TestUpdateKnowledgeEntry:
 
         vec.embed_entry.assert_called_once()
 
+    @pytest.mark.asyncio
+    async def test_update_status_and_category(self, mock_ctx, mock_repo):
+        """Regression: PUT must persist status and category changes (S95 bug)."""
+        import src.multi_tenant.admin_knowledge_api as mod
+
+        mod._knowledge_repo = mock_repo
+        mod._knowledge_vectorizer = None
+
+        from src.multi_tenant.admin_knowledge_api import (
+            UpdateKnowledgeEntryRequest,
+            update_knowledge_entry,
+        )
+
+        request = UpdateKnowledgeEntryRequest(status="published", category="FAQ")
+
+        with (
+            patch("src.multi_tenant.admin_knowledge_api._signal_kb_draft", new_callable=AsyncMock),
+            patch("src.multi_tenant.staleness_service.classify_staleness", return_value=None),
+        ):
+            result = await update_knowledge_entry("entry-001", request=request, ctx=mock_ctx)
+
+        assert result.status == "published"
+        assert result.category == "FAQ"
+        # Verify patch was called with status and category operations
+        mock_repo.patch.assert_called_once()
+        ops = mock_repo.patch.call_args.kwargs.get("operations", [])
+        paths = [op["path"] for op in ops]
+        assert "/status" in paths, "status not included in patch operations"
+        assert "/category" in paths, "category not included in patch operations"
+
 
 # ---------------------------------------------------------------------------
 # Unit tests: delete_knowledge_entry

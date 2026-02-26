@@ -250,16 +250,21 @@ class ActivationService:
                     for key, value in changes.items():
                         draft[key] = value
 
-                    # Patch the existing draft document
-                    operations = [
+                    # Patch the existing draft document.
+                    # Cosmos DB limits patch to 10 operations per request,
+                    # so batch into groups of 10.
+                    all_ops = [
                         {"op": "set", "path": f"/{key}", "value": value}
                         for key, value in changes.items()
                     ]
-                    await self._prefs_repo.patch(
-                        tenant_id=tenant_id,
-                        document_id=draft["id"],
-                        operations=operations,
-                    )
+                    _COSMOS_PATCH_LIMIT = 10
+                    for i in range(0, len(all_ops), _COSMOS_PATCH_LIMIT):
+                        batch = all_ops[i : i + _COSMOS_PATCH_LIMIT]
+                        await self._prefs_repo.patch(
+                            tenant_id=tenant_id,
+                            document_id=draft["id"],
+                            operations=batch,
+                        )
 
                     logger.info(
                         "Updated draft for tenant=%s: %d fields changed",

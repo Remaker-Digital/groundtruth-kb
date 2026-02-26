@@ -180,6 +180,15 @@ class UpdateKnowledgeEntryRequest(CamelCaseModel):
         default=None,
         description="Whether entry is searchable",
     )
+    category: str | None = Field(
+        default=None,
+        max_length=200,
+        description="Article category (e.g. Shipping, Returns, Product Info)",
+    )
+    status: str | None = Field(
+        default=None,
+        description="Article status: published, draft, or archived",
+    )
 
 
 class DeleteKnowledgeEntryResponse(CamelCaseModel):
@@ -960,6 +969,10 @@ async def update_knowledge_entry(
         operations.append({"op": "set", "path": "/language", "value": request.language})
     if request.is_active is not None:
         operations.append({"op": "set", "path": "/is_active", "value": request.is_active})
+    if request.category is not None:
+        operations.append({"op": "set", "path": "/category", "value": request.category})
+    if request.status is not None:
+        operations.append({"op": "set", "path": "/status", "value": request.status})
 
     await repo.patch(
         tenant_id=ctx.tenant_id,
@@ -983,6 +996,10 @@ async def update_knowledge_entry(
         updated["language"] = request.language
     if request.is_active is not None:
         updated["is_active"] = request.is_active
+    if request.category is not None:
+        updated["category"] = request.category
+    if request.status is not None:
+        updated["status"] = request.status
     updated["updated_at"] = now
 
     logger.info(

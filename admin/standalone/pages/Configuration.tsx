@@ -155,8 +155,8 @@ interface ConfigFormState {
 const DEFAULTS: ConfigFormState = {
   brandName: '',
   brandVoice: '',
-  formality: 'professional',
-  responseLength: 'moderate',
+  formality: 'balanced',
+  responseLength: 'standard',
   returnWindow: 30,
   refundPolicy: '',
   shippingPolicy: '',
@@ -545,21 +545,21 @@ export const ConfigurationPage: React.FC = () => {
                     label="Formality"
                     data={[
                       { value: 'casual', label: 'Casual' },
-                      { value: 'professional', label: 'Professional' },
+                      { value: 'balanced', label: 'Professional' },
                       { value: 'formal', label: 'Formal' },
                     ]}
                     value={form.formality}
-                    onChange={(val) => updateField('formality', val || 'professional')}
+                    onChange={(val) => updateField('formality', val || 'balanced')}
                   />
                   <Select
                     label="Response length"
                     data={[
                       { value: 'concise', label: 'Concise' },
-                      { value: 'moderate', label: 'Moderate' },
+                      { value: 'standard', label: 'Moderate' },
                       { value: 'detailed', label: 'Detailed' },
                     ]}
                     value={form.responseLength}
-                    onChange={(val) => updateField('responseLength', val || 'moderate')}
+                    onChange={(val) => updateField('responseLength', val || 'standard')}
                   />
                 </Group>
               </Stack>
