@@ -528,79 +528,81 @@ export const KnowledgeBasePage: React.FC = () => {
         </Text>
       </div>
 
-      {/* Top bar: Search + Filters + Action buttons */}
+      {/* Top bar: Search on row 1, Filters + Action buttons on row 2 */}
       <Paper p="md" radius="md" withBorder>
-        <Group justify="space-between" wrap="wrap" gap="sm">
-          <Group gap="sm" wrap="wrap" style={{ flex: 1 }}>
-            <TextInput
-              placeholder="Search articles..."
-              leftSection={<SearchIcon />}
-              value={search}
-              onChange={(e) => setSearch(e.currentTarget.value)}
-              style={{ minWidth: 220, flex: 1, maxWidth: 360 }}
-            />
-            <Select
-              label="Category"
-              placeholder="Category"
-              data={CATEGORIES}
-              value={categoryFilter}
-              onChange={setCategoryFilter}
-              clearable={false}
-              w={160}
-            />
-            <Select
-              label="Status"
-              placeholder="Status"
-              data={STATUSES}
-              value={statusFilter}
-              onChange={setStatusFilter}
-              clearable={false}
-              w={140}
-            />
+        <Stack gap="sm">
+          {/* Row 1: Search input, left-aligned */}
+          <TextInput
+            placeholder="Search articles..."
+            leftSection={<SearchIcon />}
+            value={search}
+            onChange={(e) => setSearch(e.currentTarget.value)}
+            style={{ maxWidth: 360 }}
+          />
+          {/* Row 2: Filters + actions, bottom-justified */}
+          <Group justify="space-between" wrap="wrap" gap="sm" align="flex-end">
+            <Group gap="sm" wrap="wrap" align="flex-end">
+              <Select
+                placeholder="Category"
+                data={CATEGORIES}
+                value={categoryFilter}
+                onChange={setCategoryFilter}
+                clearable={false}
+                w={160}
+              />
+              <Select
+                placeholder="Status"
+                data={STATUSES}
+                value={statusFilter}
+                onChange={setStatusFilter}
+                clearable={false}
+                w={140}
+              />
+            </Group>
+            <Group gap="sm">
+              <Tooltip label="Detect duplicate, overlapping, or contradictory entries that may cause inconsistent AI responses" multiline w={260} withArrow>
+                <Button
+                  leftSection={<ScanIcon />}
+                  variant="default"
+                  onClick={() => handleScan(false)}
+                  loading={scanning}
+                  disabled={articles.length === 0}
+                >
+                  Scan for conflicts
+                </Button>
+              </Tooltip>
+              <Tooltip label="Download all knowledge base entries as a CSV file for backup or editing" multiline w={220} withArrow>
+                <Button
+                  leftSection={<DownloadIcon />}
+                  variant="default"
+                  onClick={handleExport}
+                  loading={exporting}
+                  disabled={articles.length === 0}
+                >
+                  Export CSV
+                </Button>
+              </Tooltip>
+              <Tooltip label="Upload PDF, DOCX, CSV, or TXT files, or import from a URL to bulk-create entries" multiline w={240} withArrow>
+                <Button
+                  leftSection={<UploadIcon />}
+                  variant="default"
+                  onClick={handleOpenImport}
+                >
+                  Import
+                </Button>
+              </Tooltip>
+              <Tooltip label="Create a new knowledge base article. Articles give your AI specific information to reference when answering customer questions." multiline w={260} withArrow>
+                <Button
+                  leftSection={<PlusIcon />}
+                  color={ACTION_BLUE}
+                  onClick={handleAddArticle}
+                >
+                  Add article
+                </Button>
+              </Tooltip>
+            </Group>
           </Group>
-          <Group gap="sm">
-            <Tooltip label="Detect duplicate, overlapping, or contradictory entries that may cause inconsistent AI responses" multiline w={260} withArrow>
-              <Button
-                leftSection={<ScanIcon />}
-                variant="default"
-                onClick={() => handleScan(false)}
-                loading={scanning}
-                disabled={articles.length === 0}
-              >
-                Scan for conflicts
-              </Button>
-            </Tooltip>
-            <Tooltip label="Download all knowledge base entries as a CSV file for backup or editing" multiline w={220} withArrow>
-              <Button
-                leftSection={<DownloadIcon />}
-                variant="default"
-                onClick={handleExport}
-                loading={exporting}
-                disabled={articles.length === 0}
-              >
-                Export CSV
-              </Button>
-            </Tooltip>
-            <Tooltip label="Upload PDF, DOCX, CSV, or TXT files, or import from a URL to bulk-create entries" multiline w={240} withArrow>
-              <Button
-                leftSection={<UploadIcon />}
-                variant="default"
-                onClick={handleOpenImport}
-              >
-                Import
-              </Button>
-            </Tooltip>
-            <Tooltip label="Create a new knowledge base article. Articles give your AI specific information to reference when answering customer questions." multiline w={260} withArrow>
-              <Button
-                leftSection={<PlusIcon />}
-                color={ACTION_BLUE}
-                onClick={handleAddArticle}
-              >
-                Add article
-              </Button>
-            </Tooltip>
-          </Group>
-        </Group>
+        </Stack>
       </Paper>
 
       {/* Summary stats -- 5 cards: Total, Published, Draft, Archived, Needs Attention */}
