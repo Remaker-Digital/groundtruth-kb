@@ -9,6 +9,48 @@ All notable changes to Agent Red Customer Experience are documented here.
 
 ---
 
+## v1.59.0 — Unified Auth, 2FA, and RBAC (2026-02-26)
+
+### Unified authentication and 2FA
+
+A comprehensive security overhaul brings multi-factor authentication and role-based access control enforcement to the tenant admin console.
+
+- **Team member identity in magic links:** Magic link authentication sessions now correctly identify the team member who clicked the link, preserving their role and permissions throughout the session. Multi-tenant disambiguation handles team members who belong to multiple tenants.
+- **SMS-based two-factor authentication:** Team members can enable 2FA via SMS verification. After API key login, a second challenge step requires a one-time code sent to the team member's registered phone number.
+- **MFA management API:** Six new endpoints for managing MFA enrollment — check status, enroll, confirm enrollment, disable, and grant or revoke opt-out for team members who cannot use SMS.
+- **Brute-force mitigation:** Failed 2FA attempts are tracked with exponential backoff and lockout after repeated failures.
+
+### RBAC enforcement
+
+- **Middleware-level enforcement:** A new `enforce_rbac` middleware layer validates that the authenticated team member's role has permission to access the requested API path. Previously, role checks were only applied in the frontend.
+- **17 admin-only path prefixes:** API paths under `/api/admin/` require admin or superadmin role. Escalation agents and viewers are restricted to their permitted endpoints.
+- **Frontend route protection:** New `ProtectedRoute` component wraps admin pages, redirecting unauthorized roles to their permitted landing page.
+- **2FA challenge component:** A `TwoFaChallenge` component presents the SMS verification step during login when the team member has MFA enabled.
+
+### Admin UI improvements
+
+- **Setup checklist:** A new guided checklist helps merchants track onboarding progress — configure brand, add knowledge, customize widget, and activate.
+- **Named configuration delete:** Merchants can now delete saved configuration snapshots.
+- **Configuration timestamps:** Saved configurations display their creation and last-modified timestamps.
+- **Favicon and PWA manifest:** The standalone admin now has proper favicons and a Progressive Web App manifest for installability.
+- **Test mode diff view:** A visual diff showing configuration differences between live and test mode.
+- **3 new configuration fields:** `shadow_intensity`, `panel_width`, and `greeting_mode` added to the widget configuration.
+
+### Knowledge Database infrastructure
+
+- **Event-sourced session prompts:** The session handoff system now uses event sourcing for reliability.
+- **7 database indexes:** Query performance improved with targeted indexes on frequently accessed columns.
+- **WAL mode:** SQLite Write-Ahead Logging enabled for concurrent read/write safety.
+- **JSON export:** New `db.export_json()` method for full logical backups.
+- **Audit cadence:** Automatic integrity audits every 5th session with configurable intervals.
+
+### Tests
+
+- 113 new tests across 4 test files (RBAC enforcement, MFA auth, team MFA API, magic link auth improvements)
+- 4,539+ total tests, 0 failures
+
+---
+
 ## v1.57.20 — Staging environment and email polish (2026-02-24)
 
 ### Parallel staging environment

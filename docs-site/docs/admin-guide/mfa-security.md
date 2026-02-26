@@ -31,6 +31,39 @@ During MFA setup, you receive 10 single-use backup codes. Each code can only be 
 
 To regenerate backup codes, disable and re-enable MFA from the MFA Settings page.
 
+## SMS-based 2FA for team members
+
+In addition to Provider console TOTP, tenant admin team members can enable SMS-based two-factor authentication for an extra layer of account security.
+
+### How it works
+
+1. Navigate to **Team** in the sidebar.
+2. Select your team member profile or ask an admin to enable MFA on your account.
+3. Register your phone number.
+4. Verify via a one-time SMS code.
+
+After enrollment, logging in requires two steps:
+
+1. **API key login** — enter your API key as usual.
+2. **SMS challenge** — enter the 6-digit code sent to your registered phone number.
+
+### MFA management
+
+Admins can manage MFA settings for all team members:
+
+| Action | Description |
+|--------|-------------|
+| **Check status** | View whether a team member has MFA enabled, enrolled, and phone verified |
+| **Grant opt-out** | Allow a team member to bypass MFA (for members who cannot use SMS) |
+| **Revoke opt-out** | Remove the opt-out exemption, requiring MFA enrollment |
+| **Disable** | Turn off MFA for a team member |
+
+### Brute-force protection
+
+Failed 2FA attempts are tracked. After repeated failures, the account is temporarily locked with exponential backoff to prevent unauthorized access.
+
+---
+
 ## Magic link authentication
 
 For tenant admin team members, Agent Red offers passwordless login via magic links:
@@ -40,7 +73,7 @@ For tenant admin team members, Agent Red offers passwordless login via magic lin
 3. Check your inbox for the magic link email.
 4. Click the link to be automatically authenticated.
 
-Magic links expire after 15 minutes and can only be used once.
+Magic links expire after 15 minutes and can only be used once. Magic link sessions now correctly identify the team member who clicked the link, preserving their role and permissions throughout the session.
 
 ---
 
