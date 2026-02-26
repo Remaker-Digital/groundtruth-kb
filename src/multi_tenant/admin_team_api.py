@@ -96,6 +96,12 @@ class TeamMemberResponse(CamelCaseModel):
     updated_at: str
     last_login_at: str | None = None
     invited_by: str | None = None
+    # MFA fields (WI #295)
+    mfa_enabled: bool = False
+    mfa_opt_out: bool = False
+    mfa_enrolled_at: str | None = None
+    phone_number_set: bool = False
+    phone_verified: bool = False
 
 
 class TeamListResponse(CamelCaseModel):
@@ -176,21 +182,24 @@ class UpdateTeamMemberRequest(CamelCaseModel):
 _team_repo: TeamMemberRepository | None = None
 _audit_repo: AuditLogRepository | None = None
 _conv_repo: ConversationRepository | None = None
+_mfa_totp_service: Any = None
 
 
 def configure_admin_team_services(
     team_repo: TeamMemberRepository,
     audit_repo: AuditLogRepository | None = None,
     conv_repo: ConversationRepository | None = None,
+    mfa_totp_service: Any = None,
 ) -> None:
     """Wire the admin team API to its backing repository.
 
     Called during app startup after TeamMemberRepository is initialised.
     """
-    global _team_repo, _audit_repo, _conv_repo
+    global _team_repo, _audit_repo, _conv_repo, _mfa_totp_service
     _team_repo = team_repo
     _audit_repo = audit_repo
     _conv_repo = conv_repo
+    _mfa_totp_service = mfa_totp_service
     logger.info("Admin team management API services configured")
 
 
@@ -245,6 +254,12 @@ def _build_member_response(doc: dict[str, Any], tenant_id: str) -> TeamMemberRes
         updated_at=doc.get("updated_at", ""),
         last_login_at=doc.get("last_login_at"),
         invited_by=doc.get("invited_by"),
+        # MFA fields (WI #295)
+        mfa_enabled=doc.get("mfa_enabled", False),
+        mfa_opt_out=doc.get("mfa_opt_out", False),
+        mfa_enrolled_at=doc.get("mfa_enrolled_at"),
+        phone_number_set=bool(doc.get("phone_number")),
+        phone_verified=doc.get("phone_verified", False),
     )
 
 
@@ -966,3 +981,291 @@ async def rotate_user_api_key(
         user_api_key_prefix=key_prefix,
         rotated_at=now,
     )
+
+
+# ---------------------------------------------------------------------------
+# MFA management endpoints (WI #295 Phase 4)
+# ---------------------------------------------------------------------------
+
+
+class MfaStatusResponse(CamelCaseModel):
+    """MFA enrollment status for a team member."""
+
+    mfa_enabled: bool = False
+    enrolled_at: str | None = None
+    backup_codes_remaining: int = 0
+    mfa_opt_out: bool = False
+    phone_number_set: bool = False
+    phone_verified: bool = False
+
+
+class MfaEnrollStartResponse(CamelCaseModel):
+    """MFA enrollment artifacts — returned once, cannot be retrieved again."""
+
+    qr_code_data_url: str
+    provisioning_uri: str
+    backup_codes: list[str]
+
+
+class MfaEnrollConfirmRequest(CamelCaseModel):
+    """Confirm MFA enrollment with a TOTP code."""
+
+    code: str = Field(description="6-digit TOTP code from authenticator app")
+    backup_code_hashes: list[str] = Field(description="Hashed backup codes from enrollment")
+
+
+class MfaDisableRequest(CamelCaseModel):
+    """Disable MFA — requires current TOTP code for confirmation."""
+
+    code: str = Field(description="6-digit TOTP code to confirm identity")
+
+
+def _get_mfa_service():
+    """Get the MfaTotpService, raising 503 if not initialised."""
+    if _mfa_totp_service is None:
+        raise HTTPException(
+            status_code=503,
+            detail="MFA services not initialised",
+        )
+    return _mfa_totp_service
+
+
+@router.get(
+    "/{member_id}/mfa/status",
+    response_model=MfaStatusResponse,
+    summary="Get MFA enrollment status",
+)
+async def get_mfa_status(
+    member_id: str,
+    ctx: TenantContext = Depends(get_tenant_context),
+) -> MfaStatusResponse:
+    """Get MFA enrollment status for a team member.
+
+    Admins can check any member's status. Non-admins can only check their own.
+    """
+    repo = _get_repo()
+
+    # Non-admins can only check their own status
+    caller_role = getattr(ctx, "team_member_role", None)
+    caller_id = getattr(ctx, "team_member_id", None)
+    if caller_role and caller_role not in (TeamMemberRole.SUPERADMIN, TeamMemberRole.ADMIN):
+        if caller_id != member_id:
+            raise HTTPException(status_code=403, detail="Cannot view other members' MFA status")
+
+    try:
+        doc = await repo.read(ctx.tenant_id, member_id)
+    except DocumentNotFoundError:
+        raise HTTPException(status_code=404, detail=f"Team member {member_id} not found")
+
+    return MfaStatusResponse(
+        mfa_enabled=doc.get("mfa_enabled", False),
+        enrolled_at=doc.get("mfa_enrolled_at"),
+        backup_codes_remaining=len(doc.get("mfa_backup_code_hashes", [])),
+        mfa_opt_out=doc.get("mfa_opt_out", False),
+        phone_number_set=bool(doc.get("phone_number")),
+        phone_verified=doc.get("phone_verified", False),
+    )
+
+
+@router.post(
+    "/{member_id}/mfa/enroll",
+    response_model=MfaEnrollStartResponse,
+    summary="Start MFA enrollment",
+)
+async def start_mfa_enrollment(
+    member_id: str,
+    ctx: TenantContext = Depends(get_tenant_context),
+) -> MfaEnrollStartResponse:
+    """Start TOTP MFA enrollment for a team member.
+
+    Returns a QR code, provisioning URI, and backup codes.
+    The backup codes are shown ONCE and cannot be retrieved again.
+    """
+    repo = _get_repo()
+    mfa = _get_mfa_service()
+
+    # Only the member themselves or an admin can enroll
+    caller_role = getattr(ctx, "team_member_role", None)
+    caller_id = getattr(ctx, "team_member_id", None)
+    if caller_role and caller_role not in (TeamMemberRole.SUPERADMIN, TeamMemberRole.ADMIN):
+        if caller_id != member_id:
+            raise HTTPException(status_code=403, detail="Cannot enroll MFA for other members")
+
+    try:
+        doc = await repo.read(ctx.tenant_id, member_id)
+    except DocumentNotFoundError:
+        raise HTTPException(status_code=404, detail=f"Team member {member_id} not found")
+
+    if doc.get("mfa_enabled"):
+        raise HTTPException(status_code=400, detail="MFA is already enrolled. Disable first to re-enroll.")
+
+    result = await mfa.start_enrollment(doc)
+
+    return MfaEnrollStartResponse(
+        qr_code_data_url=result["qr_code_data_url"],
+        provisioning_uri=result["provisioning_uri"],
+        backup_codes=result["backup_codes"],
+    )
+
+
+@router.post(
+    "/{member_id}/mfa/confirm",
+    summary="Confirm MFA enrollment",
+)
+async def confirm_mfa_enrollment(
+    member_id: str,
+    body: MfaEnrollConfirmRequest,
+    ctx: TenantContext = Depends(get_tenant_context),
+):
+    """Confirm MFA enrollment by verifying the first TOTP code.
+
+    Must be called after start_mfa_enrollment. The provided code proves
+    the authenticator app is correctly configured.
+    """
+    repo = _get_repo()
+    mfa = _get_mfa_service()
+
+    # Only the member themselves or an admin can confirm
+    caller_role = getattr(ctx, "team_member_role", None)
+    caller_id = getattr(ctx, "team_member_id", None)
+    if caller_role and caller_role not in (TeamMemberRole.SUPERADMIN, TeamMemberRole.ADMIN):
+        if caller_id != member_id:
+            raise HTTPException(status_code=403, detail="Cannot confirm MFA for other members")
+
+    try:
+        doc = await repo.read(ctx.tenant_id, member_id)
+    except DocumentNotFoundError:
+        raise HTTPException(status_code=404, detail=f"Team member {member_id} not found")
+
+    confirmed = await mfa.confirm_enrollment(doc, body.code, body.backup_code_hashes)
+    if not confirmed:
+        raise HTTPException(status_code=401, detail="Invalid TOTP code. Please try again.")
+
+    await _audit(AuditEventType.TEAM_MEMBER_UPDATED, ctx.tenant_id,
+                 actor=member_id, payload={"action": "mfa_enrolled"})
+
+    return {"status": "enrolled", "message": "MFA enrollment confirmed successfully."}
+
+
+@router.post(
+    "/{member_id}/mfa/disable",
+    summary="Disable MFA",
+)
+async def disable_mfa(
+    member_id: str,
+    body: MfaDisableRequest,
+    ctx: TenantContext = Depends(get_tenant_context),
+):
+    """Disable MFA for a team member. Requires a valid TOTP code.
+
+    Superadmins can disable any member's MFA. Other users can only
+    disable their own MFA.
+    """
+    repo = _get_repo()
+    mfa = _get_mfa_service()
+
+    caller_role = getattr(ctx, "team_member_role", None)
+    caller_id = getattr(ctx, "team_member_id", None)
+    caller_is_superadmin = caller_role == TeamMemberRole.SUPERADMIN
+
+    # Only the member or a superadmin can disable MFA
+    if not caller_is_superadmin and caller_id != member_id:
+        raise HTTPException(status_code=403, detail="Cannot disable MFA for other members")
+
+    try:
+        doc = await repo.read(ctx.tenant_id, member_id)
+    except DocumentNotFoundError:
+        raise HTTPException(status_code=404, detail=f"Team member {member_id} not found")
+
+    if not doc.get("mfa_enabled"):
+        raise HTTPException(status_code=400, detail="MFA is not enrolled.")
+
+    disabled = await mfa.disable_mfa(doc, body.code)
+    if not disabled:
+        raise HTTPException(status_code=401, detail="Invalid TOTP code.")
+
+    await _audit(AuditEventType.TEAM_MEMBER_UPDATED, ctx.tenant_id,
+                 actor=member_id, payload={"action": "mfa_disabled"})
+
+    return {"status": "disabled", "message": "MFA has been disabled."}
+
+
+@router.post(
+    "/{member_id}/mfa/grant-opt-out",
+    summary="Grant MFA opt-out (superadmin only)",
+)
+async def grant_mfa_opt_out(
+    member_id: str,
+    ctx: TenantContext = Depends(get_tenant_context),
+):
+    """Grant a team member an MFA opt-out. Superadmin only.
+
+    When opted out, the member skips 2FA even if they have an admin role.
+    This is a deliberate bypass for specific business needs.
+    """
+    repo = _get_repo()
+
+    caller_role = getattr(ctx, "team_member_role", None)
+    if caller_role != TeamMemberRole.SUPERADMIN:
+        raise HTTPException(status_code=403, detail="Only superadmin can grant MFA opt-out")
+
+    try:
+        doc = await repo.read(ctx.tenant_id, member_id)
+    except DocumentNotFoundError:
+        raise HTTPException(status_code=404, detail=f"Team member {member_id} not found")
+
+    now = datetime.now(timezone.utc).isoformat()
+    await repo.patch(
+        tenant_id=ctx.tenant_id,
+        document_id=member_id,
+        operations=[
+            {"op": "set", "path": "/mfa_opt_out", "value": True},
+            {"op": "set", "path": "/updated_at", "value": now},
+        ],
+    )
+
+    await _audit(AuditEventType.TEAM_MEMBER_UPDATED, ctx.tenant_id,
+                 actor=getattr(ctx, "team_member_id", "admin"),
+                 payload={"action": "mfa_opt_out_granted", "member_id": member_id})
+
+    return {"status": "opt_out_granted", "message": f"MFA opt-out granted for member {member_id}."}
+
+
+@router.post(
+    "/{member_id}/mfa/revoke-opt-out",
+    summary="Revoke MFA opt-out (superadmin only)",
+)
+async def revoke_mfa_opt_out(
+    member_id: str,
+    ctx: TenantContext = Depends(get_tenant_context),
+):
+    """Revoke a team member's MFA opt-out. Superadmin only.
+
+    The member will be required to complete 2FA on next admin login.
+    """
+    repo = _get_repo()
+
+    caller_role = getattr(ctx, "team_member_role", None)
+    if caller_role != TeamMemberRole.SUPERADMIN:
+        raise HTTPException(status_code=403, detail="Only superadmin can revoke MFA opt-out")
+
+    try:
+        doc = await repo.read(ctx.tenant_id, member_id)
+    except DocumentNotFoundError:
+        raise HTTPException(status_code=404, detail=f"Team member {member_id} not found")
+
+    now = datetime.now(timezone.utc).isoformat()
+    await repo.patch(
+        tenant_id=ctx.tenant_id,
+        document_id=member_id,
+        operations=[
+            {"op": "set", "path": "/mfa_opt_out", "value": False},
+            {"op": "set", "path": "/updated_at", "value": now},
+        ],
+    )
+
+    await _audit(AuditEventType.TEAM_MEMBER_UPDATED, ctx.tenant_id,
+                 actor=getattr(ctx, "team_member_id", "admin"),
+                 payload={"action": "mfa_opt_out_revoked", "member_id": member_id})
+
+    return {"status": "opt_out_revoked", "message": f"MFA opt-out revoked for member {member_id}."}

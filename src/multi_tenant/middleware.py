@@ -469,8 +469,10 @@ class TenantAuthMiddleware(BaseHTTPMiddleware):
     async def _auth_magic_link_session(self, token: str) -> TenantContext:
         """Authenticate via magic link session JWT.
 
-        The JWT contains tenant_id (sub) and email. We resolve the
-        tenant from the JWT claims and build a TenantContext.
+        The JWT contains tenant_id (sub), email, and optionally
+        member_id + role (for team member sessions). We resolve the
+        tenant from the JWT claims, then populate the full team member
+        identity on the TenantContext.
         """
         payload = verify_magic_link_session_token(token)
         if payload is None:
@@ -492,7 +494,7 @@ class TenantAuthMiddleware(BaseHTTPMiddleware):
         from src.multi_tenant.repositories import TenantRepository
 
         tenant_repo = TenantRepository()
-        tenant = await tenant_repo.read(tenant_id)
+        tenant = await tenant_repo.read(tenant_id, tenant_id)
         if tenant is None:
             raise AuthenticationError(
                 f"No tenant found for session token: {tenant_id}",
@@ -503,6 +505,45 @@ class TenantAuthMiddleware(BaseHTTPMiddleware):
         self._check_trial_expiry(tenant_id, tier, trial_expires_at)
         self._check_access_expiry(tenant_id, expires_at)
 
+        # Extract team member identity from JWT claims
+        member_id = payload.get("member_id")
+        role_str = payload.get("role")
+        role: TeamMemberRole | None = None
+        escalation_cats: tuple[str, ...] = ()
+
+        if member_id and role_str:
+            try:
+                role = TeamMemberRole(role_str)
+            except ValueError:
+                role = TeamMemberRole.VIEWER
+
+            # For escalation agents, resolve their category assignments
+            if role in (
+                TeamMemberRole.ESCALATION_AGENT,
+                TeamMemberRole.VIEWER,
+            ):
+                try:
+                    from src.multi_tenant.repositories import (
+                        TeamMemberRepository,
+                    )
+                    team_repo = TeamMemberRepository()
+                    member_doc = await team_repo.read(tenant_id, member_id)
+                    escalation_cats = tuple(
+                        member_doc.get("escalation_categories", []),
+                    )
+                except Exception:
+                    logger.warning(
+                        "Failed to resolve escalation categories: "
+                        "tenant=%s member=%s",
+                        tenant_id, member_id,
+                    )
+
+        logger.debug(
+            "Magic link session resolved: tenant=%s email=%s "
+            "member=%s role=%s",
+            tenant_id, payload.get("email"), member_id, role_str,
+        )
+
         return TenantContext(
             tenant_id=tenant_id,
             tier=tier,
@@ -511,6 +552,9 @@ class TenantAuthMiddleware(BaseHTTPMiddleware):
             trial_expires_at=trial_expires_at,
             rate_limit_rpm=rl_rpm,
             team_member_email=payload.get("email"),
+            team_member_id=member_id,
+            team_member_role=role,
+            escalation_categories=escalation_cats,
         )
 
 
@@ -522,6 +566,9 @@ class TenantAuthMiddleware(BaseHTTPMiddleware):
 async def get_tenant_context(request: Request) -> TenantContext:
     """FastAPI dependency: extract TenantContext from request state.
 
+    Also enforces RBAC: non-admin roles are blocked from admin-only
+    paths (config, analytics, billing, etc.). Inbox paths remain open.
+
     Usage:
         @router.get("/data")
         async def handler(ctx: TenantContext = Depends(get_tenant_context)):
@@ -530,6 +577,8 @@ async def get_tenant_context(request: Request) -> TenantContext:
     Raises:
         HTTPException 401: If no TenantContext is present (should not
             happen if TenantAuthMiddleware is installed).
+        HTTPException 403: If the caller's role lacks permission for
+            the requested path (WI #295 Phase 3).
     """
     ctx = getattr(request.state, "tenant_context", None)
     if ctx is None:
@@ -537,6 +586,7 @@ async def get_tenant_context(request: Request) -> TenantContext:
             status_code=401,
             detail="Not authenticated. TenantContext not found in request.",
         )
+    enforce_rbac(request.url.path, ctx)
     return ctx
 
 
@@ -641,6 +691,102 @@ def require_write_role() -> Callable:
     Viewers and escalation agents are read-only.
     """
     return require_role(TeamMemberRole.SUPERADMIN, TeamMemberRole.ADMIN)
+
+
+def require_admin_or_above() -> Callable:
+    """FastAPI dependency: require admin or superadmin role.
+
+    Used for protecting read endpoints that should not be accessible
+    to escalation_agent or viewer roles (config, analytics, billing,
+    team management, etc.). Inbox endpoints remain open to all roles.
+
+    This is functionally identical to require_write_role() but
+    named for clarity when protecting read-only endpoints.
+    """
+    return require_role(TeamMemberRole.SUPERADMIN, TeamMemberRole.ADMIN)
+
+
+# ---------------------------------------------------------------------------
+# RBAC path enforcement (WI #295 Phase 3)
+# ---------------------------------------------------------------------------
+
+# Path prefixes restricted to admin/superadmin roles.
+# Non-admin roles (escalation_agent, viewer) get 403 on these paths.
+_ADMIN_ONLY_PREFIXES = (
+    "/api/config",
+    "/api/analytics",
+    "/api/audit",
+    "/api/gdpr",
+    "/api/admin/api-keys",
+    "/api/admin/knowledge",
+    "/api/admin/integrations",
+    "/api/admin/quick-actions",
+    "/api/admin/profiles",
+    "/api/admin/avatar",
+    "/api/admin/contact",
+    "/api/admin/ingestion",
+    "/api/cost",
+    "/api/admin/memory",
+    "/api/admin/tier-upgrade",
+    "/api/admin/config-lock",
+    "/api/admin/team",
+)
+
+# Paths within admin-only prefixes that remain open to all roles.
+_RBAC_OPEN_PATHS = (
+    "/api/admin/team/whoami",
+)
+
+# Paths open to all authenticated roles (inbox).
+_ALL_ROLES_PREFIXES = (
+    "/api/admin/conversations",
+    "/api/admin/team/whoami",
+    "/api/chat",
+)
+
+_ADMIN_ROLE_VALUES = {
+    TeamMemberRole.SUPERADMIN,
+    TeamMemberRole.ADMIN,
+}
+
+
+def is_admin_only_path(path: str) -> bool:
+    """Check if a path requires admin role access.
+
+    Returns True if the path is under an admin-only prefix and
+    is NOT explicitly listed as open to all roles.
+    """
+    if any(path.startswith(p) for p in _RBAC_OPEN_PATHS):
+        return False
+    if any(path.startswith(p) for p in _ALL_ROLES_PREFIXES):
+        return False
+    return any(path.startswith(p) for p in _ADMIN_ONLY_PREFIXES)
+
+
+def enforce_rbac(path: str, ctx: "TenantContext") -> None:
+    """Enforce RBAC on the given path for the given context.
+
+    Raises HTTPException(403) if the caller lacks permission.
+    No-op for admin/superadmin roles, tenant-level API keys (no role),
+    or non-restricted paths.
+    """
+    if not is_admin_only_path(path):
+        return
+
+    caller_role = getattr(ctx, "team_member_role", None)
+
+    # Tenant-level API key (ar_live_) or Shopify JWT → treated as admin
+    if caller_role is None:
+        return
+
+    if caller_role in _ADMIN_ROLE_VALUES:
+        return
+
+    from fastapi import HTTPException
+    raise HTTPException(
+        status_code=403,
+        detail="Insufficient permissions. Admin access required.",
+    )
 
 
 # ---------------------------------------------------------------------------

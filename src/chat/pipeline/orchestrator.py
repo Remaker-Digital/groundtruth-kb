@@ -114,6 +114,12 @@ class ChatPipeline(AgentDispatchMixin, CriticEscalationMixin, AnalyticsMixin):
         # Knowledge base repository for direct retrieval
         self._kb_repo = kb_repo
 
+        # WI #138: Customer context pre-computation / warm-up cache.
+        # Layer 1 profile is immutable within a conversation, so we cache it
+        # after the first fetch to avoid repeated Cosmos DB reads on every turn.
+        # Key: "tenant_id:customer_id", Value: profile or None.
+        self._profile_cache: dict[str, CustomerProfileDocument | None] = {}
+
         # -------------------------------------------------------------------
         # Phase 2.4: A2A agent instances (in-process)
         #
@@ -174,6 +180,42 @@ class ChatPipeline(AgentDispatchMixin, CriticEscalationMixin, AnalyticsMixin):
         self._esc_agent = EscalationHandlerAgent(openai_client=self._openai_client)
         self._an_agent = AnalyticsCollectorAgent()
         self._cr_agent = CriticSupervisorAgent(openai_client=self._openai_client)
+
+    # -------------------------------------------------------------------
+    # WI #138: Pre-computation / warm-up
+    # -------------------------------------------------------------------
+
+    async def warm_up(
+        self,
+        tenant_id: str,
+        customer_id: str | None,
+        tier: "TenantTier | None" = None,
+    ) -> None:
+        """Pre-load customer context before the first message arrives.
+
+        Called when the SSE connection opens (before the first customer
+        message). Pre-fetches the Layer 1 customer profile and caches it
+        so that ``execute()`` skips the Cosmos DB read on the first turn.
+
+        This is fire-and-forget — failures are silently logged. The
+        pipeline falls back to on-demand loading if warm-up is skipped.
+        """
+        if not customer_id:
+            return
+        cache_key = f"{tenant_id}:{customer_id}"
+        if cache_key in self._profile_cache:
+            return  # Already warmed up
+        try:
+            profile = await self._profile_service.get_profile(tenant_id, customer_id)
+            self._profile_cache[cache_key] = profile
+            logger.debug("Warmed up profile for %s:%s", tenant_id, customer_id)
+        except Exception:
+            logger.debug("Warm-up profile fetch failed for %s -- will retry in execute()", customer_id)
+
+    def invalidate_profile_cache(self, tenant_id: str, customer_id: str) -> None:
+        """Invalidate a cached profile (e.g. after mid-conversation verification)."""
+        cache_key = f"{tenant_id}:{customer_id}"
+        self._profile_cache.pop(cache_key, None)
 
     # -------------------------------------------------------------------
     # Main pipeline entry point
@@ -627,15 +669,27 @@ class ChatPipeline(AgentDispatchMixin, CriticEscalationMixin, AnalyticsMixin):
         query: str,
         trace: DecisionTraceBuilder,
     ) -> CustomerProfileDocument | None:
-        """Load Layer 1 profile and Layer 2 memory context."""
+        """Load Layer 1 profile (cached) and Layer 2 memory context (per-turn).
+
+        WI #138: Layer 1 profile is cached at conversation level to avoid
+        repeated Cosmos DB reads. Layer 2 memory search is query-dependent
+        and runs fresh each turn.
+        """
         if not customer_id:
             return None
 
-        try:
-            profile = await self._profile_service.get_profile(tenant_id, customer_id)
-        except Exception:
-            logger.debug("Profile lookup failed for %s -- continuing without", customer_id)
-            return None
+        # Layer 1: profile (cached per conversation — WI #138)
+        cache_key = f"{tenant_id}:{customer_id}"
+        if cache_key in self._profile_cache:
+            profile = self._profile_cache[cache_key]
+        else:
+            try:
+                profile = await self._profile_service.get_profile(tenant_id, customer_id)
+                self._profile_cache[cache_key] = profile
+            except Exception:
+                logger.debug("Profile lookup failed for %s -- continuing without", customer_id)
+                self._profile_cache[cache_key] = None
+                return None
 
         # Layer 2: semantic history search (consent-gated)
         if profile and self._vectorizer:

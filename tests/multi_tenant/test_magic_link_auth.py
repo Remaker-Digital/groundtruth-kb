@@ -1,4 +1,4 @@
-"""Tests for magic link authentication (ML-01 to ML-22).
+"""Tests for magic link authentication (ML-01 to ML-29).
 
 Covers the full magic link lifecycle:
     - Request endpoint (POST /api/auth/magic-link/request)
@@ -8,6 +8,9 @@ Covers the full magic link lifecycle:
     - Single-use token consumption
     - JWT session token creation and verification
     - Middleware X-Session-Token integration
+    - Team member identity in sessions (WI #295 Phase 1)
+    - Multi-tenant disambiguation
+    - member_id + role in JWT claims
 
 Test plan reference: §5.10 (Magic Link Auth)
 
@@ -222,7 +225,10 @@ class TestRequestEndpoint:
 
     @pytest.mark.asyncio
     async def test_ml14_unknown_email_returns_200(self, mock_request, mock_tenant_repo, mock_token_repo):
+        mock_team = AsyncMock()
+        mock_team.find_all_by_email = AsyncMock(return_value=[])
         with (
+            patch("src.multi_tenant.repositories.TeamMemberRepository", return_value=mock_team),
             patch("src.multi_tenant.repositories.TenantRepository", return_value=mock_tenant_repo),
             patch("src.multi_tenant.repositories.VerificationTokenRepository", return_value=mock_token_repo),
         ):
@@ -234,8 +240,11 @@ class TestRequestEndpoint:
     async def test_ml15_known_email_creates_token_and_sends(
         self, mock_request, mock_tenant_repo, mock_token_repo, sample_tenant,
     ):
+        mock_team = AsyncMock()
+        mock_team.find_all_by_email = AsyncMock(return_value=[])
         mock_tenant_repo.find_by_customer_email.return_value = sample_tenant
         with (
+            patch("src.multi_tenant.repositories.TeamMemberRepository", return_value=mock_team),
             patch("src.multi_tenant.repositories.TenantRepository", return_value=mock_tenant_repo),
             patch("src.multi_tenant.repositories.VerificationTokenRepository", return_value=mock_token_repo),
             patch("src.multi_tenant.magic_link_auth._send_magic_link_email", new_callable=AsyncMock, return_value=True),
@@ -260,12 +269,18 @@ class TestRequestEndpoint:
 
     @pytest.mark.asyncio
     async def test_ml17_email_case_normalized(self, mock_request, mock_tenant_repo, mock_token_repo):
+        mock_team = AsyncMock()
+        mock_team.find_all_by_email = AsyncMock(return_value=[])
         mock_tenant_repo.find_by_customer_email.return_value = None
         with (
+            patch("src.multi_tenant.repositories.TeamMemberRepository", return_value=mock_team),
             patch("src.multi_tenant.repositories.TenantRepository", return_value=mock_tenant_repo),
             patch("src.multi_tenant.repositories.VerificationTokenRepository", return_value=mock_token_repo),
         ):
             await request_magic_link(MagicLinkRequest(email="  Test@Example.Com  "), mock_request)
+        # Team member search happens first with normalized email
+        mock_team.find_all_by_email.assert_called_once_with("test@example.com")
+        # Then falls through to tenant owner lookup
         mock_tenant_repo.find_by_customer_email.assert_called_once_with("test@example.com")
 
 
@@ -340,3 +355,217 @@ class TestVerifyEndpoint:
         import json
         body = json.loads(resp.body)
         assert body["error"] == "server_error"
+
+
+# ---------------------------------------------------------------------------
+# WI #295 Phase 1: Team member identity in magic link sessions
+# ---------------------------------------------------------------------------
+
+
+@pytest.fixture()
+def mock_team_repo():
+    """Mock TeamMemberRepository."""
+    repo = AsyncMock()
+    repo.find_all_by_email = AsyncMock(return_value=[])
+    repo.read = AsyncMock(return_value=None)
+    return repo
+
+
+@pytest.fixture()
+def sample_team_member():
+    """Sample team member document."""
+    return {
+        "id": "member-001",
+        "tenant_id": "tenant-abc-123",
+        "email": "agent@example.com",
+        "display_name": "Agent Smith",
+        "role": "escalation_agent",
+        "is_active": True,
+        "escalation_categories": ["billing", "returns"],
+    }
+
+
+@pytest.fixture()
+def sample_admin_member():
+    """Sample admin team member document."""
+    return {
+        "id": "member-002",
+        "tenant_id": "tenant-abc-123",
+        "email": "admin@example.com",
+        "display_name": "Admin User",
+        "role": "admin",
+        "is_active": True,
+    }
+
+
+class TestSessionTokenWithMemberIdentity:
+    """ML-23 to ML-24: JWT carries member_id and role claims."""
+
+    def test_ml23_session_token_includes_member_id_and_role(self):
+        token, _ = create_magic_link_session_token(
+            "t-1", "agent@test.com",
+            member_id="member-001",
+            role="escalation_agent",
+        )
+        payload = jwt.decode(token, _JWT_SECRET, algorithms=["HS256"])
+        assert payload["sub"] == "t-1"
+        assert payload["email"] == "agent@test.com"
+        assert payload["member_id"] == "member-001"
+        assert payload["role"] == "escalation_agent"
+        assert payload["type"] == "magic_link_session"
+
+    def test_ml24_session_token_omits_null_member_fields(self):
+        """Tenant-owner tokens (no member_id) should not carry member claims."""
+        token, _ = create_magic_link_session_token("t-1", "owner@test.com")
+        payload = jwt.decode(token, _JWT_SECRET, algorithms=["HS256"])
+        assert "member_id" not in payload
+        assert "role" not in payload
+
+
+class TestTeamMemberMagicLinkRequest:
+    """ML-25 to ML-27: Request endpoint resolves team members."""
+
+    @pytest.mark.asyncio
+    async def test_ml25_team_member_email_creates_token_with_member_id(
+        self, mock_request, mock_team_repo, mock_tenant_repo, mock_token_repo,
+        sample_team_member, sample_tenant,
+    ):
+        """Team member email → creates token with member_id."""
+        mock_team_repo.find_all_by_email.return_value = [sample_team_member]
+        mock_tenant_repo.read.return_value = sample_tenant
+
+        with (
+            patch("src.multi_tenant.repositories.TeamMemberRepository", return_value=mock_team_repo),
+            patch("src.multi_tenant.repositories.TenantRepository", return_value=mock_tenant_repo),
+            patch("src.multi_tenant.repositories.VerificationTokenRepository", return_value=mock_token_repo),
+            patch("src.multi_tenant.magic_link_auth._send_magic_link_email", new_callable=AsyncMock, return_value=True),
+        ):
+            result = await request_magic_link(
+                MagicLinkRequest(email="agent@example.com"), mock_request,
+            )
+
+        assert isinstance(result, MagicLinkRequestResponse)
+        # Token should be created with member_id
+        mock_token_repo.create_token.assert_called_once()
+        call_kwargs = mock_token_repo.create_token.call_args
+        assert call_kwargs.kwargs.get("member_id") == "member-001"
+
+    @pytest.mark.asyncio
+    async def test_ml26_multi_tenant_sends_multi_button_email(
+        self, mock_request, mock_team_repo, mock_tenant_repo, mock_token_repo,
+    ):
+        """Email in two tenants → single email with two sign-in buttons."""
+        member_a = {
+            "id": "m-a", "tenant_id": "t-a", "email": "shared@example.com",
+            "role": "admin", "is_active": True,
+        }
+        member_b = {
+            "id": "m-b", "tenant_id": "t-b", "email": "shared@example.com",
+            "role": "escalation_agent", "is_active": True,
+        }
+        mock_team_repo.find_all_by_email.return_value = [member_a, member_b]
+        mock_tenant_repo.read.side_effect = [
+            {"id": "t-a", "shop_domain": "store-a.myshopify.com"},
+            {"id": "t-b", "business_name": "Brand B"},
+        ]
+
+        send_mock = AsyncMock(return_value=True)
+        with (
+            patch("src.multi_tenant.repositories.TeamMemberRepository", return_value=mock_team_repo),
+            patch("src.multi_tenant.repositories.TenantRepository", return_value=mock_tenant_repo),
+            patch("src.multi_tenant.repositories.VerificationTokenRepository", return_value=mock_token_repo),
+            patch("src.multi_tenant.magic_link_auth._send_magic_link_email", send_mock),
+        ):
+            await request_magic_link(
+                MagicLinkRequest(email="shared@example.com"), mock_request,
+            )
+
+        # Two tokens created (one per tenant)
+        assert mock_token_repo.create_token.call_count == 2
+        # Single email sent
+        send_mock.assert_called_once()
+        # Email body contains both tenant labels
+        email_html = send_mock.call_args[0][1]
+        assert "store-a.myshopify.com" in email_html
+        assert "Brand B" in email_html
+
+    @pytest.mark.asyncio
+    async def test_ml27_owner_fallback_when_no_team_member(
+        self, mock_request, mock_team_repo, mock_tenant_repo,
+        mock_token_repo, sample_tenant,
+    ):
+        """Email not in team_members but is tenant owner → standard flow."""
+        mock_team_repo.find_all_by_email.return_value = []
+        mock_tenant_repo.find_by_customer_email.return_value = sample_tenant
+
+        with (
+            patch("src.multi_tenant.repositories.TeamMemberRepository", return_value=mock_team_repo),
+            patch("src.multi_tenant.repositories.TenantRepository", return_value=mock_tenant_repo),
+            patch("src.multi_tenant.repositories.VerificationTokenRepository", return_value=mock_token_repo),
+            patch("src.multi_tenant.magic_link_auth._send_magic_link_email", new_callable=AsyncMock, return_value=True),
+        ):
+            result = await request_magic_link(
+                MagicLinkRequest(email="merchant@example.com"), mock_request,
+            )
+
+        assert isinstance(result, MagicLinkRequestResponse)
+        # Token created without member_id (owner path)
+        mock_token_repo.create_token.assert_called_once()
+        call_kwargs = mock_token_repo.create_token.call_args
+        # member_id should not be in kwargs for owner path
+        assert "member_id" not in call_kwargs.kwargs
+
+
+class TestVerifyWithMemberIdentity:
+    """ML-28 to ML-29: Verify endpoint carries member identity to JWT."""
+
+    @pytest.mark.asyncio
+    async def test_ml28_verify_with_member_id_includes_role_in_jwt(
+        self, mock_token_repo, mock_team_repo, sample_admin_member,
+    ):
+        """Token with member_id → verify resolves role → JWT has claims."""
+        mock_token_repo.consume_token.return_value = {
+            "tenant_id": "tenant-abc-123",
+            "email": "admin@example.com",
+            "member_id": "member-002",
+        }
+        mock_team_repo.read.return_value = sample_admin_member
+
+        with (
+            patch("src.multi_tenant.repositories.VerificationTokenRepository", return_value=mock_token_repo),
+            patch("src.multi_tenant.repositories.TeamMemberRepository", return_value=mock_team_repo),
+        ):
+            resp = await verify_magic_link(token="valid-token")
+
+        import json
+        assert resp.status_code == 200
+        body = json.loads(resp.body)
+
+        # Verify JWT carries member identity
+        payload = verify_magic_link_session_token(body["session_token"])
+        assert payload is not None
+        assert payload["member_id"] == "member-002"
+        assert payload["role"] == "admin"
+
+    @pytest.mark.asyncio
+    async def test_ml29_verify_owner_token_no_member_claims(
+        self, mock_token_repo,
+    ):
+        """Owner token (no member_id) → JWT has no member_id/role."""
+        mock_token_repo.consume_token.return_value = {
+            "tenant_id": "tenant-abc-123",
+            "email": "merchant@example.com",
+            # No member_id — owner path
+        }
+
+        with patch("src.multi_tenant.repositories.VerificationTokenRepository", return_value=mock_token_repo):
+            resp = await verify_magic_link(token="valid-owner-token")
+
+        import json
+        assert resp.status_code == 200
+        body = json.loads(resp.body)
+
+        payload = verify_magic_link_session_token(body["session_token"])
+        assert payload is not None
+        assert "member_id" not in payload
+        assert "role" not in payload

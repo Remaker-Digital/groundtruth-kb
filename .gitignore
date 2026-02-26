@@ -207,3 +207,7 @@ legal/contracts/signed/
 *.token
 
 # © 2026 Remaker Digital, a DBA of VanDusen & Palmeter, LLC. All rights reserved.
+
+# Knowledge DB exports and backups (local only)
+tools/knowledge-db/knowledge-export-*.json
+tools/knowledge-db/knowledge.db.backup-*

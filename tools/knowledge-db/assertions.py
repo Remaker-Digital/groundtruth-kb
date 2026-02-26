@@ -31,12 +31,25 @@ PROJECT_ROOT = Path(__file__).resolve().parent.parent.parent
 from db import KnowledgeDB
 
 
+_MAX_FILE_SIZE = 10 * 1024 * 1024  # 10 MB — skip binary/huge files
+
+
 def _read_file_safe(file_path: Path) -> str | None:
-    """Read file contents, returning None if the file doesn't exist or can't be read."""
+    """Read file contents, returning None if the file doesn't exist, is too large, or can't be read."""
     try:
+        if file_path.stat().st_size > _MAX_FILE_SIZE:
+            return None
         return file_path.read_text(encoding="utf-8", errors="replace")
     except (OSError, PermissionError):
         return None
+
+
+_VALID_ASSERTION_TYPES = {"grep", "glob", "grep_absent"}
+_REQUIRED_FIELDS = {
+    "grep": ("type", "pattern", "file", "description"),
+    "glob": ("type", "pattern", "description"),
+    "grep_absent": ("type", "pattern", "file", "description"),
+}
 
 
 def run_single_assertion(assertion: dict[str, Any]) -> dict[str, Any]:
@@ -55,6 +68,19 @@ def run_single_assertion(assertion: dict[str, Any]) -> dict[str, Any]:
     a_type = assertion.get("type", "")
     pattern = assertion.get("pattern", "")
     description = assertion.get("description", "")
+
+    # Validate assertion definition
+    if a_type not in _VALID_ASSERTION_TYPES:
+        return {
+            "type": a_type, "description": description, "passed": False,
+            "detail": f"Invalid assertion type: {a_type!r}. Valid: {_VALID_ASSERTION_TYPES}",
+        }
+    for field in _REQUIRED_FIELDS.get(a_type, ()):
+        if not assertion.get(field):
+            return {
+                "type": a_type, "description": description, "passed": False,
+                "detail": f"Missing required field '{field}' for assertion type '{a_type}'",
+            }
     result: dict[str, Any] = {
         "type": a_type,
         "description": description,

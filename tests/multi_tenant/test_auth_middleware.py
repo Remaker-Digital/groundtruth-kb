@@ -662,3 +662,111 @@ class TestTenantContext:
         assert ctx.shop_domain == "store.myshopify.com"
         assert ctx.user_id == "user-42"
         assert ctx.session_id == "sid-abc"
+
+
+# ---------------------------------------------------------------------------
+# WI #295 Phase 1: Magic link session with team member identity (MW-ML-1 to MW-ML-2)
+# ---------------------------------------------------------------------------
+
+
+class TestMagicLinkSessionMemberIdentity:
+    """MW-ML-1 to MW-ML-2: _auth_magic_link_session resolves member identity."""
+
+    @pytest.mark.asyncio
+    async def test_mw_ml01_magic_link_session_populates_member_fields(self):
+        """Session JWT with member_id + role → TenantContext carries them."""
+        import jwt as _jwt
+        from src.multi_tenant.magic_link_auth import _JWT_SECRET
+
+        # Create a JWT with member_id and role claims
+        from datetime import timedelta
+        now = datetime.now(timezone.utc)
+        payload = {
+            "sub": "t-001",
+            "email": "agent@test.com",
+            "type": "magic_link_session",
+            "member_id": "member-001",
+            "role": "escalation_agent",
+            "iat": int(now.timestamp()),
+            "exp": int((now + timedelta(hours=8)).timestamp()),
+        }
+        session_token = _jwt.encode(payload, _JWT_SECRET, algorithm="HS256")
+
+        # Mock tenant lookup
+        mock_tenant_repo = AsyncMock()
+        mock_tenant_repo.read.return_value = {
+            "id": "t-001",
+            "tenant_id": "t-001",
+            "status": "active",
+            "tier": "professional",
+        }
+
+        # Mock team member lookup for escalation categories
+        mock_team_repo = AsyncMock()
+        mock_team_repo.read.return_value = {
+            "id": "member-001",
+            "tenant_id": "t-001",
+            "email": "agent@test.com",
+            "role": "escalation_agent",
+            "escalation_categories": ["billing", "returns"],
+        }
+
+        middleware = TenantAuthMiddleware(MagicMock())
+        configure_tenant_resolution(
+            resolve_by_shop_domain=AsyncMock(),
+            resolve_by_api_key_hash=AsyncMock(),
+        )
+
+        with (
+            patch("src.multi_tenant.repositories.TenantRepository", return_value=mock_tenant_repo),
+            patch("src.multi_tenant.repositories.TeamMemberRepository", return_value=mock_team_repo),
+        ):
+            ctx = await middleware._auth_magic_link_session(session_token)
+
+        assert ctx.tenant_id == "t-001"
+        assert ctx.auth_method == "magic_link_session"
+        assert ctx.team_member_id == "member-001"
+        assert ctx.team_member_email == "agent@test.com"
+        assert ctx.team_member_role == TeamMemberRole.ESCALATION_AGENT
+        assert ctx.escalation_categories == ("billing", "returns")
+
+    @pytest.mark.asyncio
+    async def test_mw_ml02_magic_link_session_owner_has_no_member_fields(self):
+        """Owner session JWT (no member_id) → TenantContext has None member fields."""
+        import jwt as _jwt
+        from src.multi_tenant.magic_link_auth import _JWT_SECRET
+
+        from datetime import timedelta
+        now = datetime.now(timezone.utc)
+        payload = {
+            "sub": "t-001",
+            "email": "owner@test.com",
+            "type": "magic_link_session",
+            "iat": int(now.timestamp()),
+            "exp": int((now + timedelta(hours=8)).timestamp()),
+        }
+        session_token = _jwt.encode(payload, _JWT_SECRET, algorithm="HS256")
+
+        mock_tenant_repo = AsyncMock()
+        mock_tenant_repo.read.return_value = {
+            "id": "t-001",
+            "tenant_id": "t-001",
+            "status": "active",
+            "tier": "professional",
+        }
+
+        middleware = TenantAuthMiddleware(MagicMock())
+        configure_tenant_resolution(
+            resolve_by_shop_domain=AsyncMock(),
+            resolve_by_api_key_hash=AsyncMock(),
+        )
+
+        with patch("src.multi_tenant.repositories.TenantRepository", return_value=mock_tenant_repo):
+            ctx = await middleware._auth_magic_link_session(session_token)
+
+        assert ctx.tenant_id == "t-001"
+        assert ctx.auth_method == "magic_link_session"
+        assert ctx.team_member_email == "owner@test.com"
+        assert ctx.team_member_id is None
+        assert ctx.team_member_role is None
+        assert ctx.escalation_categories == ()

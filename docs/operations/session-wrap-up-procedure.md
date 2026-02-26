@@ -154,15 +154,31 @@ Build a structured handoff prompt containing:
 4. **Blockers or decisions needed** — Anything requiring owner input
 5. **Open items** — Work that was started but not completed
 
-### Step 5.2: Store handoff prompt in Knowledge DB
+### Step 5.2: Check audit cadence and store handoff prompt
+
+Before storing the handoff prompt, check whether the **next** session should be an audit session:
 
 ```python
 import sys; sys.path.insert(0, "tools/knowledge-db")
 from db import KnowledgeDB
 db = KnowledgeDB()
+
+# Determine next session ID
+current_session = "S<N>"
+next_session_num = db.parse_session_number(current_session) + 1
+next_session_id = f"S{next_session_num}"
+
+# Build prompt — prepend audit directive if next session is an audit interval
+prompt_parts = []
+if db.is_audit_session(next_session_id):
+    prompt_parts.append(db.get_audit_directive())
+    prompt_parts.append("")  # blank line separator
+
+prompt_parts.append("<the regular handoff prompt text>")
+
 db.insert_session_prompt(
-    session_id="S<N>",
-    prompt_text="<the full prompt>",
+    session_id=current_session,
+    prompt_text="\n".join(prompt_parts),
     context={
         "production_version": "<version>",
         "test_count": <N>,
@@ -171,12 +187,15 @@ db.insert_session_prompt(
         "wis_verified": ["<id>", ...],
         "next_tasks": ["<task>", ...],
         "blockers": ["<blocker>", ...],
+        "is_audit_session": db.is_audit_session(next_session_id),
     },
 )
 db.close()
 ```
 
-**Verification:** The next session's SessionStart hook will automatically read and display this prompt.
+**Audit cadence:** Every 5th session (S100, S105, S110, ...) is an audit session. The audit directive instructs the next session to perform a fresh-context review of KB integrity, documentation accuracy, procedure validity, and design debt before starting new feature work. The interval is configurable via `KnowledgeDB.AUDIT_INTERVAL`.
+
+**Verification:** The next session's SessionStart hook will automatically read and display this prompt, including the audit directive if applicable.
 
 ### Step 5.3: Clean up artifacts
 

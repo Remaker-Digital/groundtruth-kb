@@ -30,10 +30,20 @@ import {
   ActionIcon,
   Collapse,
   Tooltip,
+  Modal,
+  Table,
   useComputedColorScheme,
 } from '@mantine/core';
 import { useAppContext } from '../layouts/StandaloneLayout';
-import { useConfig, useUpdateConfig, useConfigSuggestions } from '../../shared/hooks/index';
+import {
+  useConfig,
+  useUpdateConfig,
+  useConfigSuggestions,
+  useNamedConfigs,
+  useSaveNamedConfig,
+  useActivateNamedConfig,
+  useDeleteNamedConfig,
+} from '../../shared/hooks/index';
 import { HelpTooltip } from '../../shared/HelpTooltip';
 import { LabelWithSuggestion } from '../../shared/components/SuggestionBadge';
 import { LoadingState } from '../../shared/LoadingState';
@@ -359,6 +369,14 @@ export const ConfigurationPage: React.FC = () => {
   const suggestionsResult = useConfigSuggestions(apiFetch);
   const suggestions: SuggestionMap = suggestionsResult.data ?? {};
 
+  // Named configurations (C3) — WI #266 delete + WI #267 timestamps
+  const namedResult = useNamedConfigs(apiFetch);
+  const { saveNamed, loading: savingNamed } = useSaveNamedConfig(apiFetch);
+  const { activateNamed, loading: activatingNamed } = useActivateNamedConfig(apiFetch);
+  const { deleteNamed, loading: deletingNamed } = useDeleteNamedConfig(apiFetch);
+  const [showSaveModal, setShowSaveModal] = useState(false);
+  const [saveAsName, setSaveAsName] = useState('');
+
   const computedColorScheme = useComputedColorScheme('dark');
   const isDark = computedColorScheme === 'dark';
 
@@ -470,6 +488,62 @@ export const ConfigurationPage: React.FC = () => {
     }
   };
 
+  // Named configuration handlers (WI #266, #267)
+  const handleSaveNamed = async () => {
+    const name = saveAsName.trim();
+    if (!name) return;
+    const result = await saveNamed(name);
+    if (result) {
+      setShowSaveModal(false);
+      setSaveAsName('');
+      onNotify(`Configuration "${name}" saved.`, 'success');
+      namedResult.refetch();
+    } else {
+      onNotify('Failed to save named configuration.', 'error');
+    }
+  };
+
+  const handleActivateNamed = async (name: string) => {
+    const result = await activateNamed(name);
+    if (result) {
+      onNotify(`Configuration "${name}" activated.`, 'success');
+      namedResult.refetch();
+      configResult.refetch();
+      refreshActivationStatus();
+    } else {
+      onNotify(`Failed to activate configuration "${name}".`, 'error');
+    }
+  };
+
+  const handleDeleteNamed = async (name: string) => {
+    const ok = await deleteNamed(name);
+    if (ok) {
+      onNotify(`Configuration "${name}" deleted.`, 'success');
+      namedResult.refetch();
+    } else {
+      onNotify(`Failed to delete configuration "${name}".`, 'error');
+    }
+  };
+
+  /** Format ISO date to readable relative/absolute string. */
+  const formatDate = (iso: string): string => {
+    try {
+      const d = new Date(iso);
+      const now = new Date();
+      const diffMs = now.getTime() - d.getTime();
+      const diffMins = Math.floor(diffMs / 60000);
+      if (diffMins < 1) return 'Just now';
+      if (diffMins < 60) return `${diffMins}m ago`;
+      const diffHrs = Math.floor(diffMins / 60);
+      if (diffHrs < 24) return `${diffHrs}h ago`;
+      const diffDays = Math.floor(diffHrs / 24);
+      if (diffDays < 7) return `${diffDays}d ago`;
+      return d.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: d.getFullYear() !== now.getFullYear() ? 'numeric' : undefined });
+    } catch {
+      return iso;
+    }
+  };
+
   // Loading state
   if (configResult.loading && !configResult.data) {
     return <LoadingState text="Loading configuration" />;
@@ -503,6 +577,137 @@ export const ConfigurationPage: React.FC = () => {
           <Text size="sm">{saveError}</Text>
         </Alert>
       )}
+
+      {/* Saved Configurations (WI #266 delete, WI #267 timestamps) */}
+      {(() => {
+        const configs = namedResult.data?.configs ?? [];
+        if (namedResult.loading && !namedResult.data) return null;
+        const activeConfig = configs.find((c) => c.isActive);
+        return (
+          <Paper p="lg" radius="md" withBorder>
+            <Group justify="space-between" mb={configs.length > 0 ? 'md' : 0}>
+              <Text fw={600}>
+                Saved configurations
+                <HelpTooltip text="Save snapshots of your current configuration and switch between them. The active configuration is applied to your AI agent." docLink={`${DOCS_BASE}/named-configs`} />
+              </Text>
+              <Button
+                size="xs"
+                variant="light"
+                color={ACTION_BLUE}
+                onClick={() => { setSaveAsName(''); setShowSaveModal(true); }}
+                disabled={savingNamed}
+              >
+                Save current as…
+              </Button>
+            </Group>
+            {configs.length === 0 ? (
+              <Text size="sm" c="dimmed">
+                No saved configurations yet. Click "Save current as…" to create a reusable snapshot.
+              </Text>
+            ) : (
+              <Table verticalSpacing="xs" highlightOnHover>
+                <Table.Thead>
+                  <Table.Tr>
+                    <Table.Th>Name</Table.Th>
+                    <Table.Th>Saved</Table.Th>
+                    <Table.Th>Fields</Table.Th>
+                    <Table.Th style={{ width: 140, textAlign: 'right' }}>Actions</Table.Th>
+                  </Table.Tr>
+                </Table.Thead>
+                <Table.Tbody>
+                  {configs.map((c) => (
+                    <Table.Tr key={c.name}>
+                      <Table.Td>
+                        <Group gap={8} wrap="nowrap">
+                          <Text size="sm" fw={c.isActive ? 600 : 400}>{c.name}</Text>
+                          {c.isActive && <Badge size="xs" color="teal" variant="light">Active</Badge>}
+                          {c.isDefault && <Badge size="xs" color="gray" variant="light">Default</Badge>}
+                        </Group>
+                      </Table.Td>
+                      <Table.Td>
+                        <Tooltip label={new Date(c.createdAt).toLocaleString()} withArrow>
+                          <Text size="sm" c="dimmed">{formatDate(c.createdAt)}</Text>
+                        </Tooltip>
+                      </Table.Td>
+                      <Table.Td>
+                        <Badge size="sm" variant="light" color="gray">{c.fieldCount} fields</Badge>
+                      </Table.Td>
+                      <Table.Td>
+                        <Group gap={4} justify="flex-end" wrap="nowrap">
+                          {!c.isActive && (
+                            <Button
+                              size="compact-xs"
+                              variant="light"
+                              color={ACTION_BLUE}
+                              onClick={() => handleActivateNamed(c.name)}
+                              loading={activatingNamed}
+                            >
+                              Activate
+                            </Button>
+                          )}
+                          {!c.isDefault && !c.isActive && (
+                            <Button
+                              size="compact-xs"
+                              variant="light"
+                              color="red"
+                              onClick={() => handleDeleteNamed(c.name)}
+                              loading={deletingNamed}
+                            >
+                              Delete
+                            </Button>
+                          )}
+                        </Group>
+                      </Table.Td>
+                    </Table.Tr>
+                  ))}
+                </Table.Tbody>
+              </Table>
+            )}
+            {activeConfig && (
+              <Text size="xs" c="dimmed" mt="sm">
+                Active: <strong>{activeConfig.name}</strong> (v{activeConfig.version}, last saved {formatDate(activeConfig.createdAt)})
+              </Text>
+            )}
+          </Paper>
+        );
+      })()}
+
+      {/* Save Configuration Modal */}
+      <Modal
+        opened={showSaveModal}
+        onClose={() => setShowSaveModal(false)}
+        title="Save configuration as"
+        size="sm"
+        centered
+      >
+        <Stack gap="md">
+          <TextInput
+            label="Configuration name"
+            placeholder='e.g. "Holiday", "Black Friday", "Default v2"'
+            value={saveAsName}
+            onChange={(e) => setSaveAsName(e.currentTarget.value)}
+            maxLength={64}
+            data-autofocus
+            onKeyDown={(e) => {
+              if (e.key === 'Enter' && saveAsName.trim()) handleSaveNamed();
+            }}
+          />
+          {saveAsName.trim().toLowerCase() === 'default' && (
+            <Text size="xs" c="yellow">This will overwrite the Default configuration snapshot.</Text>
+          )}
+          <Group justify="flex-end">
+            <Button variant="default" onClick={() => setShowSaveModal(false)}>Cancel</Button>
+            <Button
+              color={ACTION_BLUE}
+              onClick={handleSaveNamed}
+              disabled={!saveAsName.trim()}
+              loading={savingNamed}
+            >
+              Save configuration
+            </Button>
+          </Group>
+        </Stack>
+      </Modal>
 
       {/* Configuration form */}
       <Stack gap="lg">

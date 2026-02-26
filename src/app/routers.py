@@ -37,6 +37,7 @@ from src.multi_tenant.admin_quick_action_api import router as admin_quick_action
 from src.multi_tenant.superadmin_api import router as superadmin_router
 from src.multi_tenant.email_verification import router as email_verify_router
 from src.multi_tenant.magic_link_auth import router as magic_link_router
+from src.multi_tenant.admin_mfa_auth import router as admin_mfa_auth_router
 from src.multi_tenant.status_api import router as status_router
 from src.multi_tenant.support_diagnostics import router as diagnostics_router
 from src.multi_tenant.abuse_detection import router as abuse_router
@@ -83,6 +84,7 @@ def register_routers(app: FastAPI) -> None:
     app.include_router(superadmin_router)
     app.include_router(email_verify_router)
     app.include_router(magic_link_router)
+    app.include_router(admin_mfa_auth_router)
     app.include_router(status_router)
     app.include_router(diagnostics_router)
     app.include_router(abuse_router)

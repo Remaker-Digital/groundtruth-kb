@@ -28,6 +28,9 @@ import {
   Divider,
   Box,
   TextInput,
+  Textarea,
+  Switch,
+  Anchor,
 } from '@mantine/core';
 import type { ApiFetch } from '../hooks';
 
@@ -117,6 +120,8 @@ export const OnboardingWizard: React.FC<Props> = ({
   const [suggestionsLoading, setSuggestionsLoading] = useState(false);
   const [activating, setActivating] = useState(false);
   const [activateError, setActivateError] = useState<string | null>(null);
+  const [testMode, setTestMode] = useState(false);
+  const [customInstructions, setCustomInstructions] = useState('');
   const pollRef = useRef<ReturnType<typeof setInterval> | null>(null);
 
   // The effective ingestion URL for non-Shopify merchants
@@ -342,6 +347,14 @@ export const OnboardingWizard: React.FC<Props> = ({
         fields[s.fieldName] = s.value;
       }
 
+      // Include test mode and custom instructions from wizard
+      if (testMode) {
+        fields.test_mode_enabled = true;
+      }
+      if (customInstructions.trim()) {
+        fields.custom_instructions = customInstructions.trim();
+      }
+
       // Ensure mandatory fields have values — fall back to inference
       if (!fields.brand_name) {
         const inferred = inferBrandName();
@@ -385,7 +398,7 @@ export const OnboardingWizard: React.FC<Props> = ({
     } finally {
       setActivating(false);
     }
-  }, [suggestions, apiFetch, onNavigate, shopDomain, selectedTemplate]);
+  }, [suggestions, apiFetch, onNavigate, shopDomain, selectedTemplate, testMode, customInstructions]);
 
   // Navigate to config page (fallback for manual review)
   const handleGoToConfig = useCallback(() => {
@@ -405,6 +418,8 @@ export const OnboardingWizard: React.FC<Props> = ({
     setSuggestions(null);
     setActivating(false);
     setActivateError(null);
+    setTestMode(false);
+    setCustomInstructions('');
     if (pollRef.current) {
       clearInterval(pollRef.current);
       pollRef.current = null;
@@ -433,7 +448,7 @@ export const OnboardingWizard: React.FC<Props> = ({
           <Text fw={600} size="lg">
             {step === 1 && 'Set up your AI assistant'}
             {step === 2 && 'Building your knowledge base'}
-            {step === 3 && 'Ready to activate'}
+            {step === 3 && 'Custom AI instructions'}
           </Text>
         </Group>
       }
@@ -513,6 +528,17 @@ export const OnboardingWizard: React.FC<Props> = ({
               size="sm"
             />
           )}
+
+          {/* Test mode selector — lets merchants try the AI without billing */}
+          <Divider />
+          <Switch
+            label="Test mode"
+            description="Start in test mode — conversations are tagged as test and excluded from billing. You can switch to standard mode later."
+            checked={testMode}
+            onChange={(e) => setTestMode(e.currentTarget.checked)}
+            size="sm"
+            color="yellow"
+          />
 
           <Group justify="space-between" mt="xs">
             <Button variant="subtle" color="dimmed" onClick={handleClose} size="sm">
@@ -641,10 +667,34 @@ export const OnboardingWizard: React.FC<Props> = ({
             </Group>
           ) : (
             <>
-              <Text size="sm" c="dimmed">
-                Based on your knowledge base, we've prepared these configuration
-                settings. Click <strong>Activate now</strong> to go live immediately.
-              </Text>
+              <Group justify="space-between" align="flex-start">
+                <Text size="sm" c="dimmed" style={{ flex: 1 }}>
+                  Optionally add custom instructions to shape how your AI assistant
+                  responds. Then click <strong>Activate now</strong> to go live
+                  {testMode ? ' in test mode' : ''}.
+                </Text>
+                {testMode && (
+                  <Badge color="yellow" variant="light" size="sm">
+                    Test mode
+                  </Badge>
+                )}
+              </Group>
+
+              <Textarea
+                label="Custom instructions (optional)"
+                placeholder="e.g., Always recommend our premium products first. Never discuss competitor pricing. Use a warm, conversational tone."
+                description="These instructions guide your AI's behavior in every conversation. You can edit them later on the Agent Configuration page."
+                value={customInstructions}
+                onChange={(e) => setCustomInstructions(e.currentTarget.value)}
+                minRows={3}
+                maxRows={6}
+                autosize
+                size="sm"
+              />
+
+              {suggestions && suggestions.length > 0 && (
+                <Divider label="Suggested settings" labelPosition="center" />
+              )}
 
               {suggestions && suggestions.length > 0 ? (
                 <Stack gap="xs">
@@ -684,6 +734,19 @@ export const OnboardingWizard: React.FC<Props> = ({
               )}
 
               <Divider />
+
+              <Text size="xs" c="dimmed">
+                For full control, use the sidebar:{' '}
+                <Anchor size="xs" onClick={() => { onClose(); onNavigate?.('/configuration'); }}>
+                  Agent Configuration
+                </Anchor>{', '}
+                <Anchor size="xs" onClick={() => { onClose(); onNavigate?.('/knowledge-base'); }}>
+                  Knowledge Base
+                </Anchor>{', '}
+                <Anchor size="xs" onClick={() => { onClose(); onNavigate?.('/widget'); }}>
+                  Widget Configuration
+                </Anchor>
+              </Text>
 
               <Group justify="space-between">
                 <Button variant="subtle" color="dimmed" onClick={handleClose} size="sm">

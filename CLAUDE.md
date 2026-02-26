@@ -7,6 +7,19 @@ This document provides active guidance for AI assistants working on the Agent Re
 > **📁 Historical archive** (session logs, technical decisions): `CLAUDE_ARCHIVE.md` — read when investigating historical decisions.
 > **📁 Session memory** (operational patterns, lessons): `~/.claude/projects/.../memory/MEMORY.md` — loaded automatically.
 
+### CLAUDE.md vs MEMORY.md Boundary
+
+| File | Role | Content | Update frequency |
+|------|------|---------|-----------------|
+| **CLAUDE.md** | Rules & architecture | How to work with this project: procedures, patterns, evaluation criteria, protected behaviors. | Rarely — only when rules or architecture change. |
+| **MEMORY.md** | State & history | What has happened: current versions, test counts, recent sessions, quick reference values, topic file index. | Every session — updated during wrap-up. |
+
+**Rule of thumb:** If it tells Claude *what to do*, it goes in CLAUDE.md. If it tells Claude *what has been done*, it goes in MEMORY.md. Version numbers, image tags, and environment values go in MEMORY.md only.
+
+### Session ID Convention
+
+Session IDs follow the format `S{N}` where N is a monotonically increasing integer. The current session ID is derived by reading MEMORY.md's "Recent Sessions" section and incrementing the highest session number by 1. For example, if the most recent entry is "S97:", the current session is S98.
+
 ---
 
 ## Project Identity
@@ -15,7 +28,7 @@ This document provides active guidance for AI assistants working on the Agent Re
 |-----------|-------|
 | **Project Name** | Agent Red Customer Experience |
 | **Type** | Commercial SaaS Product (Shopify + Standalone) |
-| **Status** | Production v1.58.3. Staging v1.58.1-rc3. Release Plan Step 4 (beta feedback) IN PROGRESS. See `memory/MEMORY.md` for full status. |
+| **Status** | See `memory/MEMORY.md` "Current Status" for versions, test counts, and release progress. |
 | **Owner** | Remaker Digital (DBA of VanDusen & Palmeter, LLC) |
 
 ### Copyright Notice
@@ -140,11 +153,15 @@ At the end of every working session, execute the **Session Wrap-Up Repeatable Pr
 
 **Session handoff prompt:** The final step stores a structured prompt in the Knowledge Database via `db.insert_session_prompt()`. The next session's SessionStart hook automatically retrieves and displays it. This eliminates the need for the owner to craft session-start prompts manually.
 
+**Audit cadence:** Every 5th session (S100, S105, ...) is automatically flagged as an **audit session**. During wrap-up, the handoff generator checks `db.is_audit_session(next_session_id)` and prepends `db.get_audit_directive()` to the prompt. Audit sessions perform a fresh-context review of KB integrity, documentation accuracy, procedures, and design debt before starting new work. The interval is configurable via `KnowledgeDB.AUDIT_INTERVAL` (default: 5).
+
 **Python API for session prompts:**
 ```python
 db.insert_session_prompt("S97", "Continue work on...", context={...})  # Store
 db.get_next_session_prompt()                                            # Retrieve (unconsumed)
 db.consume_session_prompt("S97")                                        # Mark as used
+db.is_audit_session("S100")                                             # True (100 % 5 == 0)
+db.get_audit_directive()                                                # Audit instructions text
 ```
 
 ### Knowledge Database
@@ -154,6 +171,8 @@ The **Knowledge Database** (`tools/knowledge-db/knowledge.db`) is the canonical 
 **Core principle — append-only:** No rows are ever updated or deleted. Every change creates a new versioned record with `changed_by`, `changed_at`, and `change_reason`. Current state = latest version per ID.
 
 **Claude is the sole writer.** The owner observes through the read-only web UI. When the owner spots a discrepancy, they tell Claude, and Claude creates a corrected version.
+
+**Retention policy:** Never delete. All rows are retained indefinitely (~20 KB/session, 400 GB budget = ~57,000 years). Use `db.export_json()` for logical backups.
 
 **Python API** (always use this — never edit SQLite directly or modify `seed.py` for status changes):
 
@@ -168,6 +187,7 @@ db.get_summary()                         # Counts by status
 db.update_spec("245", changed_by="claude",
                change_reason="Verified in S97",
                status="implemented")
+db.export_json()                         # Full logical backup (JSON)
 db.close()                               # Always close when done
 ```
 
@@ -183,7 +203,7 @@ db.close()                               # Always close when done
 
 **Session-start hook:** `.claude/hooks/assertion-check.py` runs all assertions at session start. Failing specs with status `"specified"` are expected (not yet implemented). Failing specs with status `"implemented"` or `"verified"` indicate **regressions** requiring investigation.
 
-**Do not modify** `docs/BACKLOG-NEW-WORK-ITEMS.md` — it is FROZEN. The Knowledge Database is the canonical source.
+**Do not modify** `docs/archive/BACKLOG-NEW-WORK-ITEMS-FROZEN.md` — it is FROZEN and archived. The Knowledge Database is the canonical source of truth for all specifications.
 
 ### Adding Commercial Features
 

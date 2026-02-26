@@ -77,8 +77,8 @@ class TestSaveDraft:
                 inputs.nth(i).fill("TestCo Updated")
                 break
 
-        # Click save
-        save_btn = admin_config_page.locator("button", has_text="Save").first
+        # Click save draft (specific selector to avoid matching "Save current as…")
+        save_btn = admin_config_page.locator("button", has_text="Save draft inputs").first
         save_btn.click()
         admin_config_page.wait_for_timeout(500)
 

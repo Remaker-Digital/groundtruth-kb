@@ -131,6 +131,31 @@ class TeamMemberRepository(TenantScopedRepository):
             ),
         )
 
+    async def find_all_by_email(
+        self, email: str,
+    ) -> list[dict[str, Any]]:
+        """Find all active team members matching an email across all tenants.
+
+        Cross-partition query used at magic link request time when the
+        tenant is not yet known. Returns all matching active members
+        (one email can appear in multiple tenants).
+
+        Args:
+            email: Email address to search (should be pre-normalized to
+                lowercase).
+
+        Returns:
+            List of team member documents (may be empty).
+        """
+        return await self.cross_partition_query(
+            query_text=(
+                "SELECT * FROM c "
+                "WHERE c.email = @email "
+                "AND c.is_active = true"
+            ),
+            parameters=[{"name": "@email", "value": email}],
+        )
+
     async def find_by_user_api_key_hash(
         self, key_hash: str,
     ) -> dict[str, Any] | None:

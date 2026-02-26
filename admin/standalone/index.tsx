@@ -40,6 +40,8 @@ import { TeamPage } from './pages/Team';
 import { IntegrationsPage } from './pages/Integrations';
 import { QuickActionsPage } from './pages/QuickActions';
 import { MemoryPrivacyPage } from './pages/MemoryPrivacy';
+import { ProtectedRoute } from './components/ProtectedRoute';
+import { TwoFaChallenge } from './components/TwoFaChallenge';
 
 // ---------------------------------------------------------------------------
 // Auth state
@@ -49,6 +51,14 @@ import { MemoryPrivacyPage } from './pages/MemoryPrivacy';
 interface AuthCredential {
   type: 'api_key' | 'session_token';
   value: string;
+}
+
+/** Pending 2FA state — returned when magic link verify requires 2FA. */
+interface Pending2faState {
+  pendingToken: string;
+  tenantId: string;
+  email: string;
+  mfaMethods: string[];
 }
 
 function getStoredAuth(): AuthCredential | null {
@@ -113,6 +123,7 @@ const App: React.FC = () => {
   const [auth, setAuth] = React.useState<AuthCredential | null>(getStoredAuth);
   const [verifying, setVerifying] = React.useState(false);
   const [verifyError, setVerifyError] = React.useState<string | null>(null);
+  const [pending2fa, setPending2fa] = React.useState<Pending2faState | null>(null);
 
   // Handle magic link verification on mount
   React.useEffect(() => {
@@ -124,6 +135,19 @@ const App: React.FC = () => {
       .then(async (resp) => {
         if (resp.ok) {
           const data = await resp.json();
+
+          // Two-stage auth: 2FA required for admin roles
+          if (data.requires_2fa && data.pending_2fa_token) {
+            setPending2fa({
+              pendingToken: data.pending_2fa_token,
+              tenantId: data.tenant_id,
+              email: data.email,
+              mfaMethods: data.mfa_methods || ['totp'],
+            });
+            window.history.replaceState({}, '', '/admin/standalone/');
+            return;
+          }
+
           storeSessionToken(data.session_token);
           setAuth({ type: 'session_token', value: data.session_token });
           // Clean URL
@@ -153,6 +177,19 @@ const App: React.FC = () => {
     clearAuth();
     setAuth(null);
     setVerifyError(null);
+    setPending2fa(null);
+  }, []);
+
+  /** Called when 2FA challenge succeeds — receives the full session token. */
+  const handle2faComplete = React.useCallback((sessionToken: string) => {
+    storeSessionToken(sessionToken);
+    setAuth({ type: 'session_token', value: sessionToken });
+    setPending2fa(null);
+  }, []);
+
+  /** Cancel 2FA — go back to login. */
+  const handle2faCancel = React.useCallback(() => {
+    setPending2fa(null);
   }, []);
 
   // Show verifying state while checking magic link
@@ -165,6 +202,19 @@ const App: React.FC = () => {
           <div style={{ fontSize: '14px', color: '#808080' }}>Verifying your sign-in link</div>
         </div>
       </div>
+    );
+  }
+
+  // 2FA challenge screen — shown after magic link verify requires 2FA
+  if (pending2fa) {
+    return (
+      <TwoFaChallenge
+        pendingToken={pending2fa.pendingToken}
+        email={pending2fa.email}
+        mfaMethods={pending2fa.mfaMethods}
+        onComplete={handle2faComplete}
+        onCancel={handle2faCancel}
+      />
     );
   }
 
@@ -185,17 +235,48 @@ const App: React.FC = () => {
       <BrowserRouter basename="/admin/standalone">
         <StandaloneLayout auth={auth} onLogout={handleLogout}>
           <Routes>
+            {/* Open to all roles */}
             <Route path="/" element={<DashboardPage />} />
             <Route path="/inbox" element={<InboxPage />} />
-            <Route path="/analytics" element={<Navigate to="/" replace />} />
-            <Route path="/configuration" element={<ConfigurationPage />} />
-            <Route path="/knowledge-base" element={<KnowledgeBasePage />} />
-            <Route path="/widget" element={<WidgetPage />} />
-            <Route path="/quick-actions" element={<QuickActionsPage />} />
-            <Route path="/billing" element={<BillingPage />} />
             <Route path="/team" element={<TeamPage />} />
-            <Route path="/integrations" element={<IntegrationsPage />} />
-            <Route path="/memory-privacy" element={<MemoryPrivacyPage />} />
+            <Route path="/analytics" element={<Navigate to="/" replace />} />
+
+            {/* Admin-only routes (WI #295 Phase 4) */}
+            <Route path="/configuration" element={
+              <ProtectedRoute allowedRoles={['superadmin', 'admin']}>
+                <ConfigurationPage />
+              </ProtectedRoute>
+            } />
+            <Route path="/knowledge-base" element={
+              <ProtectedRoute allowedRoles={['superadmin', 'admin']}>
+                <KnowledgeBasePage />
+              </ProtectedRoute>
+            } />
+            <Route path="/widget" element={
+              <ProtectedRoute allowedRoles={['superadmin', 'admin']}>
+                <WidgetPage />
+              </ProtectedRoute>
+            } />
+            <Route path="/quick-actions" element={
+              <ProtectedRoute allowedRoles={['superadmin', 'admin']}>
+                <QuickActionsPage />
+              </ProtectedRoute>
+            } />
+            <Route path="/billing" element={
+              <ProtectedRoute allowedRoles={['superadmin', 'admin']}>
+                <BillingPage />
+              </ProtectedRoute>
+            } />
+            <Route path="/integrations" element={
+              <ProtectedRoute allowedRoles={['superadmin', 'admin']}>
+                <IntegrationsPage />
+              </ProtectedRoute>
+            } />
+            <Route path="/memory-privacy" element={
+              <ProtectedRoute allowedRoles={['superadmin', 'admin']}>
+                <MemoryPrivacyPage />
+              </ProtectedRoute>
+            } />
             <Route path="*" element={<Navigate to="/" replace />} />
           </Routes>
         </StandaloneLayout>

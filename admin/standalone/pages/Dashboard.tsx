@@ -16,6 +16,9 @@ import {
   SegmentedControl,
   Divider,
   Loader,
+  Alert,
+  List,
+  ThemeIcon,
   useComputedColorScheme,
 } from '@mantine/core';
 import {
@@ -35,6 +38,7 @@ import {
   useIntentBreakdown,
   useKnowledgeGaps,
 } from '../../shared/hooks/index';
+import { useConfig, useActivationStatus } from '../../shared/hooks/useConfig';
 import { HelpTooltip } from '../../shared/HelpTooltip';
 import { agentDisplayLabel } from '../../shared/AnalyticsOverview';
 import { tokens } from '../../shared/theme/styles';
@@ -111,6 +115,46 @@ function formatLastSeen(dateStr: string): string {
 }
 
 // ---------------------------------------------------------------------------
+// Setup Checklist (WI #288) — shows incomplete setup steps
+// ---------------------------------------------------------------------------
+
+function SetupChecklist({ config, activationStatus }: {
+  config?: Record<string, unknown>;
+  activationStatus?: { is_active: boolean; is_configured: boolean };
+}) {
+  if (!config || !activationStatus) return null;
+  const checks = [
+    { label: 'Brand name configured', done: Boolean(config.display_name && config.display_name !== 'My Store') },
+    { label: 'AI instructions or category selected', done: Boolean(config.custom_instructions || config.business_category) },
+    { label: 'Knowledge base has content', done: Boolean(config.kb_entry_count && Number(config.kb_entry_count) > 0) },
+    { label: 'Widget appearance customized', done: Boolean(config.widget_primary_color && config.widget_primary_color !== '#ff3621') },
+    { label: 'System activated', done: Boolean(activationStatus.is_active) },
+  ];
+  const doneCount = checks.filter((c) => c.done).length;
+  if (doneCount >= checks.length) return null;
+  return (
+    <Alert variant="light" color="blue" title={`Setup progress: ${doneCount}/${checks.length} complete`}>
+      <List size="sm" spacing={4}>
+        {checks.map((c) => (
+          <List.Item
+            key={c.label}
+            icon={
+              <ThemeIcon color={c.done ? 'teal' : 'gray'} size={18} radius="xl" variant="light">
+                <Text size="xs">{c.done ? '\u2713' : '\u2013'}</Text>
+              </ThemeIcon>
+            }
+          >
+            <Text size="sm" c={c.done ? 'dimmed' : undefined} td={c.done ? 'line-through' : undefined}>
+              {c.label}
+            </Text>
+          </List.Item>
+        ))}
+      </List>
+    </Alert>
+  );
+}
+
+// ---------------------------------------------------------------------------
 // DashboardPage — combined overview + analytics
 // ---------------------------------------------------------------------------
 
@@ -128,6 +172,8 @@ export function DashboardPage() {
   const conversations = useInboxConversations(apiFetch);
   const intents = useIntentBreakdown(apiFetch);
   const gaps = useKnowledgeGaps(apiFetch);
+  const configResult = useConfig(apiFetch);
+  const activationStatus = useActivationStatus(apiFetch);
 
   const computedColorScheme = useComputedColorScheme('dark');
   const isDark = computedColorScheme === 'dark';
@@ -195,6 +241,25 @@ export function DashboardPage() {
           />
         </Group>
       </Group>
+
+      {/* Go-Live: Initial setup checklist (WI #288) */}
+      <SetupChecklist config={configResult.data?.config} activationStatus={activationStatus.data ?? undefined} />
+
+      {/* Go-Live: Test mode diff checklist (WI #289) */}
+      {Boolean(configResult.data?.config?.test_mode_enabled) && (
+        <Alert variant="light" color="yellow" title="Test mode is active">
+          <Text size="sm" mb="xs">While in test mode:</Text>
+          <List size="sm" spacing={4}>
+            <List.Item><Text size="sm">Conversations are tagged as <strong>test</strong> and excluded from billing.</Text></List.Item>
+            <List.Item><Text size="sm">A yellow test mode banner appears at the top of the admin.</Text></List.Item>
+            <List.Item><Text size="sm">Analytics include test conversations (filter by tag to separate).</Text></List.Item>
+            <List.Item><Text size="sm">Widget behavior is identical to standard mode for realistic testing.</Text></List.Item>
+          </List>
+          <Text size="sm" mt="xs" c="dimmed">
+            When ready, switch to standard mode on the Agent Configuration page.
+          </Text>
+        </Alert>
+      )}
 
       {/* Stat cards — 5 cards with detail sub-labels + help tooltips (WI #259) */}
       <SimpleGrid cols={{ base: 1, xs: 2, md: 3 }} spacing="md">

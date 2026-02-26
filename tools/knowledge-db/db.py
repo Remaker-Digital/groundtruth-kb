@@ -3,6 +3,11 @@ Knowledge Database — Append-only SQLite store for specifications, test procedu
 and operational procedures. No UPDATE in place, no DELETE. Every mutation creates
 a new versioned record. Claude is the sole writer; the owner observes via read-only UI.
 
+RETENTION POLICY: Never delete. All rows are retained indefinitely. At ~20 KB per
+session (~48 assertion runs + spec updates), 400 GB of storage supports ~57,000 years
+of daily sessions. Storage is not a constraint. No pruning, archival, or compaction
+is needed or desired. Use export_json() for logical backups.
+
 (c) 2026 Remaker Digital, a DBA of VanDusen & Palmeter, LLC. All rights reserved.
 """
 
@@ -82,12 +87,21 @@ CREATE TABLE IF NOT EXISTS assertion_runs (
 CREATE TABLE IF NOT EXISTS session_prompts (
     rowid INTEGER PRIMARY KEY AUTOINCREMENT,
     session_id TEXT NOT NULL,
+    version INTEGER NOT NULL DEFAULT 1,
+    event_type TEXT NOT NULL DEFAULT 'created',
     created_at TEXT NOT NULL,
-    consumed_at TEXT,
     prompt_text TEXT NOT NULL,
-    context TEXT,
-    UNIQUE(session_id)
+    context TEXT
 );
+
+-- Indexes for query performance (append-only tables grow monotonically)
+CREATE INDEX IF NOT EXISTS idx_specs_id_version ON specifications(id, version);
+CREATE INDEX IF NOT EXISTS idx_specs_status ON specifications(status);
+CREATE INDEX IF NOT EXISTS idx_specs_changed_at ON specifications(changed_at);
+CREATE INDEX IF NOT EXISTS idx_test_procs_id_version ON test_procedures(id, version);
+CREATE INDEX IF NOT EXISTS idx_op_procs_id_version ON operational_procedures(id, version);
+CREATE INDEX IF NOT EXISTS idx_assertion_runs_spec ON assertion_runs(spec_id, rowid);
+CREATE INDEX IF NOT EXISTS idx_session_prompts_session ON session_prompts(session_id, rowid);
 
 -- Views: current state = latest version per ID
 CREATE VIEW IF NOT EXISTS current_specifications AS
@@ -111,16 +125,20 @@ def _now() -> str:
     return datetime.now(timezone.utc).isoformat(timespec="seconds")
 
 
-def spec_sort_key(spec_id: str) -> tuple[int, ...]:
+def spec_sort_key(spec_id: str) -> tuple:
     """Convert decimal ID to tuple for correct numeric ordering.
 
-    "245" → (245,), "245.2" → (245, 2), "245.10" → (245, 10)
-    This ensures 245.2 sorts before 245.10 (unlike lexicographic TEXT sort).
+    "245" → (1, 245,), "245.2" → (1, 245, 2), "245.10" → (1, 245, 10)
+    "PB-001" → (0, "PB-001")   (prefix-based IDs sort before numeric IDs)
+
+    This ensures 245.2 sorts before 245.10 (unlike lexicographic TEXT sort),
+    and non-numeric IDs (like PB-*) sort into their own group at the top.
     """
     try:
-        return tuple(int(x) for x in spec_id.split("."))
+        return (1,) + tuple(int(x) for x in spec_id.split("."))
     except (ValueError, AttributeError):
-        return (0,)
+        # Non-numeric IDs (PB-001, etc.) — sort lexicographically in group 0
+        return (0, spec_id)
 
 
 def get_parent_id(spec_id: str) -> str | None:
@@ -219,17 +237,28 @@ class KnowledgeDB:
 
         version = self._next_spec_version(id)
         # Merge: new fields override current values
+        # Use _UNSET sentinel so callers can explicitly pass None or [] to clear fields
+        _UNSET = object()
         title = fields.get("title", current["title"])
         description = fields.get("description", current["description"])
         priority = fields.get("priority", current["priority"])
         scope = fields.get("scope", current["scope"])
         section = fields.get("section", current["section"])
         handle = fields.get("handle", current["handle"])
-        tags = fields.get("tags", current.get("_tags_parsed"))
-        tags_json = json.dumps(tags) if tags else current["tags"]
         status = fields.get("status", current["status"])
-        assertions = fields.get("assertions", current.get("_assertions_parsed"))
-        assertions_json = json.dumps(assertions) if assertions else current["assertions"]
+
+        # Tags and assertions: use 'is not _UNSET' to allow explicit [] or None
+        raw_tags = fields.get("tags", _UNSET)
+        if raw_tags is not _UNSET:
+            tags_json = json.dumps(raw_tags) if raw_tags is not None else None
+        else:
+            tags_json = current["tags"]
+
+        raw_assertions = fields.get("assertions", _UNSET)
+        if raw_assertions is not _UNSET:
+            assertions_json = json.dumps(raw_assertions) if raw_assertions is not None else None
+        else:
+            assertions_json = current["assertions"]
 
         conn = self._get_conn()
         conn.execute(
@@ -284,7 +313,9 @@ class KnowledgeDB:
             query += " AND handle = ?"
             params.append(handle)
         if tag:
-            # Tags stored as JSON array — use LIKE for containment check
+            # Tags stored as JSON array — LIKE gives approximate containment.
+            # Known limitation: "admin" matches both ["admin"] and ["non-admin"].
+            # Exact matching would require a junction table (overkill at current scale).
             query += " AND tags LIKE ?"
             params.append(f'%"{tag}"%')
         if search:
@@ -489,64 +520,145 @@ class KnowledgeDB:
     # Session Prompts
     # ------------------------------------------------------------------
 
+    def _next_session_prompt_version(self, session_id: str) -> int:
+        row = self._get_conn().execute(
+            "SELECT MAX(version) FROM session_prompts WHERE session_id = ?",
+            (session_id,),
+        ).fetchone()
+        return (row[0] or 0) + 1
+
     def insert_session_prompt(
         self,
         session_id: str,
         prompt_text: str,
         context: dict[str, Any] | None = None,
     ) -> dict[str, Any]:
-        """Store a next-session handoff prompt.
+        """Store a next-session handoff prompt (append-only).
 
         Args:
             session_id: The session that generated this prompt (e.g. "S97").
             prompt_text: The full prompt text for the next session.
             context: Optional structured context (WIs changed, test counts, etc.).
+
+        Multiple calls for the same session_id create versioned records.
         """
+        version = self._next_session_prompt_version(session_id)
         conn = self._get_conn()
         conn.execute(
-            """INSERT OR REPLACE INTO session_prompts
-               (session_id, created_at, consumed_at, prompt_text, context)
-               VALUES (?, ?, NULL, ?, ?)""",
-            (session_id, _now(), prompt_text,
+            """INSERT INTO session_prompts
+               (session_id, version, event_type, created_at, prompt_text, context)
+               VALUES (?, ?, 'created', ?, ?, ?)""",
+            (session_id, version, _now(), prompt_text,
              json.dumps(context) if context else None),
         )
         conn.commit()
         return self.get_session_prompt(session_id)
 
     def get_session_prompt(self, session_id: str) -> dict[str, Any] | None:
-        """Get a specific session's handoff prompt."""
+        """Get the latest event for a specific session's handoff prompt."""
         row = self._get_conn().execute(
-            "SELECT * FROM session_prompts WHERE session_id = ?",
+            """SELECT * FROM session_prompts
+               WHERE session_id = ? ORDER BY rowid DESC LIMIT 1""",
             (session_id,),
         ).fetchone()
         return _row_to_dict(row) if row else None
 
     def get_next_session_prompt(self) -> dict[str, Any] | None:
-        """Get the latest unconsumed handoff prompt (FIFO: most recent wins)."""
+        """Get the latest unconsumed handoff prompt.
+
+        A prompt is unconsumed if its most recent event is 'created' (not 'consumed').
+        Returns the most recently created prompt that hasn't been consumed.
+        """
+        # Find session_ids whose latest event is 'created'
         row = self._get_conn().execute(
-            """SELECT * FROM session_prompts
-               WHERE consumed_at IS NULL
-               ORDER BY rowid DESC LIMIT 1"""
+            """SELECT p.* FROM session_prompts p
+               INNER JOIN (
+                   SELECT session_id, MAX(rowid) AS max_rowid
+                   FROM session_prompts GROUP BY session_id
+               ) m ON p.session_id = m.session_id AND p.rowid = m.max_rowid
+               WHERE p.event_type = 'created'
+               ORDER BY p.rowid DESC LIMIT 1"""
         ).fetchone()
         return _row_to_dict(row) if row else None
 
     def consume_session_prompt(self, session_id: str) -> None:
-        """Mark a session prompt as consumed (used to start a session)."""
+        """Record consumption of a session prompt (append-only — inserts new row)."""
+        current = self.get_session_prompt(session_id)
+        if not current:
+            return
+        version = self._next_session_prompt_version(session_id)
         conn = self._get_conn()
         conn.execute(
-            "UPDATE session_prompts SET consumed_at = ? WHERE session_id = ?",
-            (_now(), session_id),
+            """INSERT INTO session_prompts
+               (session_id, version, event_type, created_at, prompt_text, context)
+               VALUES (?, ?, 'consumed', ?, ?, ?)""",
+            (session_id, version, _now(),
+             current.get("prompt_text", ""),
+             current.get("context")),
         )
         conn.commit()
 
     def list_session_prompts(self, *, include_consumed: bool = False) -> list[dict[str, Any]]:
         """List session prompts, optionally including consumed ones."""
         if include_consumed:
-            query = "SELECT * FROM session_prompts ORDER BY rowid DESC"
+            rows = self._get_conn().execute(
+                "SELECT * FROM session_prompts ORDER BY rowid DESC"
+            ).fetchall()
         else:
-            query = "SELECT * FROM session_prompts WHERE consumed_at IS NULL ORDER BY rowid DESC"
-        rows = self._get_conn().execute(query).fetchall()
+            # Only show sessions whose latest event is 'created'
+            rows = self._get_conn().execute(
+                """SELECT p.* FROM session_prompts p
+                   INNER JOIN (
+                       SELECT session_id, MAX(rowid) AS max_rowid
+                       FROM session_prompts GROUP BY session_id
+                   ) m ON p.session_id = m.session_id AND p.rowid = m.max_rowid
+                   WHERE p.event_type = 'created'
+                   ORDER BY p.rowid DESC"""
+            ).fetchall()
         return [_row_to_dict(r) for r in rows]
+
+    # ------------------------------------------------------------------
+    # Audit Cadence
+    # ------------------------------------------------------------------
+
+    AUDIT_INTERVAL = 5  # every 5 sessions
+
+    @staticmethod
+    def parse_session_number(session_id: str) -> int | None:
+        """Extract the numeric part from a session ID like 'S98'. Returns None if not parseable."""
+        import re
+        m = re.match(r"[Ss](\d+)$", session_id.strip())
+        return int(m.group(1)) if m else None
+
+    def is_audit_session(self, next_session_id: str, interval: int | None = None) -> bool:
+        """Check whether the given session should be an audit session.
+
+        Audit sessions occur every `interval` sessions (default: AUDIT_INTERVAL).
+        S100, S105, S110, ... are audit sessions at interval=5.
+        """
+        n = self.parse_session_number(next_session_id)
+        if n is None:
+            return False
+        return n % (interval or self.AUDIT_INTERVAL) == 0
+
+    @staticmethod
+    def get_audit_directive() -> str:
+        """Return the standard audit session directive text."""
+        return (
+            "AUDIT SESSION: This is a scheduled self-care session. Before starting "
+            "new feature work, perform a fresh-context review:\n"
+            "1. Knowledge DB integrity — run assertions, check for status drift, "
+            "verify append-only invariants hold\n"
+            "2. MEMORY.md and CLAUDE.md — accuracy, staleness, contradictions, "
+            "line count within limits\n"
+            "3. Repeatable Procedures — still accurate? Any procedure defects "
+            "from recent sessions?\n"
+            "4. Open design debt — any patterns from recent sessions that need "
+            "cleanup or consolidation?\n"
+            "5. Hooks and scheduler — verify all hooks execute without errors "
+            "(check stderr output)\n"
+            "Report findings to the owner before proceeding with regular work."
+        )
 
     # ------------------------------------------------------------------
     # Global History
@@ -584,6 +696,43 @@ class KnowledgeDB:
         query = " UNION ALL ".join(parts) + f" ORDER BY changed_at DESC LIMIT {limit}"
         rows = self._get_conn().execute(query, params).fetchall()
         return [_row_to_dict(r) for r in rows]
+
+    # ------------------------------------------------------------------
+    # Export / Backup
+    # ------------------------------------------------------------------
+
+    def export_json(self, output_path: str | Path | None = None) -> str:
+        """Export the entire database as a JSON file (all tables, all rows).
+
+        This is a full logical backup — every row from every table, preserving
+        the complete append-only history. The export can be used to reconstruct
+        the database from scratch if the SQLite file is lost or corrupted.
+
+        Args:
+            output_path: Where to write the JSON. Defaults to sibling of the DB
+                         file with a UTC timestamp suffix.
+
+        Returns:
+            The path to the written file.
+        """
+        from datetime import datetime, timezone
+
+        conn = self._get_conn()
+        tables = ["specifications", "test_procedures", "operational_procedures",
+                   "assertion_runs", "session_prompts"]
+        export = {"exported_at": _now(), "tables": {}}
+        for table in tables:
+            rows = conn.execute(f"SELECT * FROM {table} ORDER BY rowid").fetchall()
+            export["tables"][table] = [_row_to_dict(r) for r in rows]
+
+        if output_path is None:
+            timestamp = datetime.now(timezone.utc).strftime("%Y%m%dT%H%M%SZ")
+            output_path = self.db_path.parent / f"knowledge-export-{timestamp}.json"
+        else:
+            output_path = Path(output_path)
+
+        output_path.write_text(json.dumps(export, indent=2, default=str), encoding="utf-8")
+        return str(output_path)
 
     # ------------------------------------------------------------------
     # Summary stats
@@ -635,11 +784,13 @@ class KnowledgeDB:
 
 def _row_to_dict(row: sqlite3.Row) -> dict[str, Any]:
     d = dict(row)
-    # Parse JSON fields for convenience
-    for key in ("assertions", "results", "variables", "steps", "known_failure_modes", "tags"):
+    # Parse JSON fields — expose as both "field_parsed" (clean) and "_field_parsed" (legacy)
+    for key in ("assertions", "results", "variables", "steps", "known_failure_modes", "tags", "context"):
         if key in d and d[key] and isinstance(d[key], str):
             try:
-                d[f"_{key}_parsed"] = json.loads(d[key])
+                parsed = json.loads(d[key])
+                d[f"{key}_parsed"] = parsed
+                d[f"_{key}_parsed"] = parsed  # backward compat
             except (json.JSONDecodeError, TypeError):
                 pass
     return d

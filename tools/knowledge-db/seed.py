@@ -576,11 +576,33 @@ def seed_op_procedures(db: KnowledgeDB, dry_run: bool = False) -> int:
 def main() -> int:
     parser = argparse.ArgumentParser(description="Seed the knowledge database")
     parser.add_argument("--dry-run", action="store_true", help="Print counts without writing")
+    parser.add_argument(
+        "--force", action="store_true",
+        help="Required to actually delete and re-create the database. "
+             "Without this flag, seed refuses to destroy an existing DB."
+    )
     args = parser.parse_args()
 
-    # Delete existing DB if re-seeding
+    # Safety guard: never delete without --force
     db_path = Path(__file__).parent / "knowledge.db"
     if not args.dry_run and db_path.exists():
+        if not args.force:
+            print("ERROR: Database already exists. Re-seeding will DESTROY all runtime state")
+            print("       (assertion_runs, session_prompts, API-applied updates).")
+            print()
+            print("  To proceed anyway:  python seed.py --force")
+            print("  To preview only:    python seed.py --dry-run")
+            print()
+            print(f"  Database: {db_path} ({db_path.stat().st_size:,} bytes)")
+            return 1
+
+        # Backup before delete (never-delete policy — keep the old DB)
+        import shutil
+        from datetime import datetime, timezone
+        timestamp = datetime.now(timezone.utc).strftime("%Y%m%dT%H%M%SZ")
+        backup_path = db_path.parent / f"knowledge.db.backup-{timestamp}"
+        shutil.copy2(str(db_path), str(backup_path))
+        print(f"Backed up to: {backup_path}")
         db_path.unlink()
         print(f"Deleted existing database: {db_path}")
 

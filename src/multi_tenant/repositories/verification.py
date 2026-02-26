@@ -49,6 +49,8 @@ class VerificationTokenRepository:
         tenant_id: str,
         email: str,
         ttl: int = TTL_VERIFICATION_TOKEN,
+        *,
+        member_id: str | None = None,
     ) -> dict[str, Any]:
         """Persist a verification token document.
 
@@ -58,6 +60,9 @@ class VerificationTokenRepository:
             tenant_id: Tenant this token belongs to.
             email: Email address being verified.
             ttl: Time-to-live in seconds (default: 10 minutes).
+            member_id: Optional team member document ID. When present,
+                the verification flow can carry member identity through
+                to JWT issuance without an additional DB lookup.
 
         Returns:
             Created document dict.
@@ -76,6 +81,8 @@ class VerificationTokenRepository:
             "created_at": datetime.now(timezone.utc).isoformat(),
             "ttl": ttl,
         }
+        if member_id is not None:
+            doc["member_id"] = member_id
         try:
             result = await self._container.create_item(body=doc)
             logger.info(

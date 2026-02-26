@@ -502,7 +502,6 @@ export const QuickActionsPage: React.FC = () => {
                 <Table verticalSpacing="sm" horizontalSpacing="md">
                   <Table.Thead>
                     <Table.Tr>
-                      <Table.Th w={40}>Order</Table.Th>
                       <Table.Th w={50}>Icon</Table.Th>
                       <Table.Th>Label</Table.Th>
                       <Table.Th style={{ maxWidth: 300 }}>Prompt template</Table.Th>
@@ -513,7 +512,7 @@ export const QuickActionsPage: React.FC = () => {
                   <Table.Tbody>
                     {actions.length === 0 && (
                       <Table.Tr>
-                        <Table.Td colSpan={6}>
+                        <Table.Td colSpan={5}>
                           <Stack gap="md" py="lg" px="md" align="center">
                             <Text ta="center" c="dimmed" size="sm">
                               No quick actions yet. Start with one of these examples or create your own.
@@ -541,9 +540,6 @@ export const QuickActionsPage: React.FC = () => {
                     )}
                     {actions.map((action) => (
                       <Table.Tr key={action.id}>
-                        <Table.Td>
-                          <Text size="sm" c="dimmed">{action.sortOrder}</Text>
-                        </Table.Td>
                         <Table.Td>
                           <Text size="lg">{action.icon || '—'}</Text>
                         </Table.Td>

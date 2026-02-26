@@ -109,6 +109,7 @@ AUTH_EXEMPT_PREFIXES = (
     "/api/tenants/",
     "/api/admin/api-keys/reset",
     "/api/auth/magic-link",
+    "/api/auth/2fa",
     "/api/status",
     "/admin/",
 )
