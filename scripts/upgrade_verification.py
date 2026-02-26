@@ -217,6 +217,20 @@ def phase_c(env: dict, snapshot: dict, new_version: str) -> list[dict]:
     tid = env["tenant_id"]
 
     results = []
+    _api_call_count = [0]  # mutable counter for rate limiting
+
+    # Shadow the module-level api_call with a rate-limited version.
+    # Starter tier = 10 requests/minute. Phase C makes ~30 authenticated calls.
+    # Pause for 65s every 8 calls to stay within the rate limit window.
+    _orig_api_call = globals()["api_call"]
+    def api_call(fqdn_: str, path: str, api_key: str | None = None,
+                 method: str = "GET", body: dict | None = None,
+                 timeout: int = 30):
+        _api_call_count[0] += 1
+        if _api_call_count[0] > 1 and _api_call_count[0] % 8 == 0:
+            print(f"    ... rate limit cooldown (call {_api_call_count[0]}, pausing 65s) ...")
+            time.sleep(65)
+        return _orig_api_call(fqdn_, path, api_key, method, body, timeout)
 
     def check(aid: str, desc: str, passed: bool, detail: str = ""):
         status = "PASS" if passed else "FAIL"
@@ -228,9 +242,11 @@ def phase_c(env: dict, snapshot: dict, new_version: str) -> list[dict]:
     print("=" * 60)
 
     # C.1 Version updated (from X-Product-Version header)
+    # Strip 'v' prefix for comparison — API returns bare semver (e.g. "1.60.0")
     s, d, h = api_call(fqdn, "/ready")
     ver = h.get("x-product-version", "?")
-    check("C.1", "Version updated", ver == new_version, f"expected={new_version}, got={ver}")
+    expected_bare = new_version.lstrip("v")
+    check("C.1", "Version updated", ver == expected_bare, f"expected={expected_bare}, got={ver}")
 
     # C.2 Tenant status unchanged (state field)
     s, d, _ = api_call(fqdn, "/api/config", key)

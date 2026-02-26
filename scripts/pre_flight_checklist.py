@@ -167,10 +167,11 @@ def phase_c(fqdn: str, api_key: str, widget_key: str, new_version: str) -> list[
     """Post-deploy platform verification against a live environment."""
     results = []
 
-    # C.1 — Version header
+    # C.1 — Version header (strip 'v' prefix for comparison — API returns bare semver)
     status, body, hdrs = api_call(fqdn, "/health")
     pv = hdrs.get("x-product-version", "")
-    if status == 200 and pv == new_version:
+    expected_bare = new_version.lstrip("v")
+    if status == 200 and pv == expected_bare:
         results.append(_pass("C.1", "Version header matches", f"X-Product-Version: {pv}"))
     elif status == 200:
         results.append(_fail("C.1", "Version header matches",
@@ -247,6 +248,11 @@ def phase_c(fqdn: str, api_key: str, widget_key: str, new_version: str) -> list[
     else:
         results.append(_fail("C.9", "Security headers", f"Missing: {', '.join(missing)}"))
 
+    # Rate limit cooldown — C.1-C.9 consume ~10 API calls.
+    # The upgrade verification subprocess needs its own rate budget.
+    print("    ... waiting 65s for rate limit cooldown before upgrade verification ...")
+    time.sleep(65)
+
     # C.10 — Existing tenant data (upgrade verification Phase C)
     # This requires a Phase A snapshot to exist. Check for it.
     env_name = "production" if "api-gateway" in fqdn else "staging"
@@ -261,7 +267,7 @@ def phase_c(fqdn: str, api_key: str, widget_key: str, new_version: str) -> list[
                  "phase-c", "--env", env_name,
                  "--snapshot", str(snapshot_path),
                  "--new-version", new_version],
-                capture_output=True, text=True, cwd=str(PROJECT_ROOT), timeout=120,
+                capture_output=True, text=True, cwd=str(PROJECT_ROOT), timeout=600,
             )
             # Parse actual PASS/FAIL counts from output (e.g., "35 PASS, 0 FAIL")
             import re as _re
