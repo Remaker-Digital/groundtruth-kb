@@ -110,6 +110,34 @@ CREATE TABLE IF NOT EXISTS environment_config (
     UNIQUE(id, version)
 );
 
+CREATE TABLE IF NOT EXISTS documents (
+    rowid INTEGER PRIMARY KEY AUTOINCREMENT,
+    id TEXT NOT NULL,
+    version INTEGER NOT NULL,
+    title TEXT NOT NULL,
+    category TEXT NOT NULL,
+    content TEXT,
+    tags TEXT,
+    status TEXT NOT NULL,
+    source_path TEXT,
+    changed_by TEXT NOT NULL,
+    changed_at TEXT NOT NULL,
+    change_reason TEXT NOT NULL,
+    UNIQUE(id, version)
+);
+
+CREATE TABLE IF NOT EXISTS test_coverage (
+    rowid INTEGER PRIMARY KEY AUTOINCREMENT,
+    spec_id TEXT NOT NULL,
+    test_file TEXT NOT NULL,
+    test_class TEXT,
+    test_function TEXT NOT NULL,
+    confidence TEXT NOT NULL DEFAULT 'high',
+    match_reason TEXT,
+    created_at TEXT NOT NULL,
+    created_by TEXT NOT NULL
+);
+
 -- Indexes for query performance (append-only tables grow monotonically)
 CREATE INDEX IF NOT EXISTS idx_specs_id_version ON specifications(id, version);
 CREATE INDEX IF NOT EXISTS idx_specs_status ON specifications(status);
@@ -120,6 +148,10 @@ CREATE INDEX IF NOT EXISTS idx_assertion_runs_spec ON assertion_runs(spec_id, ro
 CREATE INDEX IF NOT EXISTS idx_session_prompts_session ON session_prompts(session_id, rowid);
 CREATE INDEX IF NOT EXISTS idx_env_config_id_version ON environment_config(id, version);
 CREATE INDEX IF NOT EXISTS idx_env_config_env_cat ON environment_config(environment, category);
+CREATE INDEX IF NOT EXISTS idx_docs_id_version ON documents(id, version);
+CREATE INDEX IF NOT EXISTS idx_docs_category ON documents(category);
+CREATE INDEX IF NOT EXISTS idx_test_cov_spec ON test_coverage(spec_id);
+CREATE INDEX IF NOT EXISTS idx_test_cov_file ON test_coverage(test_file);
 
 -- Views: current state = latest version per ID
 CREATE VIEW IF NOT EXISTS current_specifications AS
@@ -141,6 +173,11 @@ CREATE VIEW IF NOT EXISTS current_environment_config AS
 SELECT e.* FROM environment_config e
 INNER JOIN (SELECT id, MAX(version) AS max_v FROM environment_config GROUP BY id) m
 ON e.id = m.id AND e.version = m.max_v;
+
+CREATE VIEW IF NOT EXISTS current_documents AS
+SELECT d.* FROM documents d
+INNER JOIN (SELECT id, MAX(version) AS max_v FROM documents GROUP BY id) m
+ON d.id = m.id AND d.version = m.max_v;
 """
 
 
@@ -611,6 +648,184 @@ class KnowledgeDB:
         return [_row_to_dict(r) for r in rows]
 
     # ------------------------------------------------------------------
+    # Documents
+    # ------------------------------------------------------------------
+
+    def _next_doc_version(self, doc_id: str) -> int:
+        row = self._get_conn().execute(
+            "SELECT MAX(version) FROM documents WHERE id = ?", (doc_id,)
+        ).fetchone()
+        return (row[0] or 0) + 1
+
+    def insert_document(
+        self,
+        id: str,
+        title: str,
+        category: str,
+        status: str,
+        changed_by: str,
+        change_reason: str,
+        *,
+        content: str | None = None,
+        tags: list[str] | None = None,
+        source_path: str | None = None,
+    ) -> dict[str, Any]:
+        """Insert a new version of a document."""
+        version = self._next_doc_version(id)
+        tags_json = json.dumps(tags) if tags else None
+        conn = self._get_conn()
+        conn.execute(
+            """INSERT INTO documents
+               (id, version, title, category, content, tags, status,
+                source_path, changed_by, changed_at, change_reason)
+               VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)""",
+            (id, version, title, category, content, tags_json, status,
+             source_path, changed_by, _now(), change_reason),
+        )
+        conn.commit()
+        return self.get_document(id)
+
+    def update_document(
+        self,
+        id: str,
+        changed_by: str,
+        change_reason: str,
+        **fields: Any,
+    ) -> dict[str, Any]:
+        """Create a new version of a document, carrying forward unchanged fields."""
+        current = self.get_document(id)
+        if not current:
+            raise ValueError(f"Document {id} not found")
+
+        version = self._next_doc_version(id)
+        _UNSET = object()
+        title = fields.get("title", current["title"])
+        category = fields.get("category", current["category"])
+        content = fields.get("content", current["content"])
+        status = fields.get("status", current["status"])
+        source_path = fields.get("source_path", current["source_path"])
+
+        raw_tags = fields.get("tags", _UNSET)
+        if raw_tags is not _UNSET:
+            tags_json = json.dumps(raw_tags) if raw_tags is not None else None
+        else:
+            tags_json = current["tags"]
+
+        conn = self._get_conn()
+        conn.execute(
+            """INSERT INTO documents
+               (id, version, title, category, content, tags, status,
+                source_path, changed_by, changed_at, change_reason)
+               VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)""",
+            (id, version, title, category, content, tags_json, status,
+             source_path, changed_by, _now(), change_reason),
+        )
+        conn.commit()
+        return self.get_document(id)
+
+    def get_document(self, doc_id: str) -> dict[str, Any] | None:
+        row = self._get_conn().execute(
+            "SELECT * FROM current_documents WHERE id = ?", (doc_id,)
+        ).fetchone()
+        return _row_to_dict(row) if row else None
+
+    def list_documents(
+        self, *, category: str | None = None, status: str | None = None,
+        tag: str | None = None,
+    ) -> list[dict[str, Any]]:
+        query = "SELECT * FROM current_documents WHERE 1=1"
+        params: list[Any] = []
+        if category:
+            query += " AND category = ?"
+            params.append(category)
+        if status:
+            query += " AND status = ?"
+            params.append(status)
+        if tag:
+            query += " AND tags LIKE ?"
+            params.append(f'%"{tag}"%')
+        query += " ORDER BY id"
+        rows = self._get_conn().execute(query, params).fetchall()
+        return [_row_to_dict(r) for r in rows]
+
+    # ------------------------------------------------------------------
+    # Test Coverage
+    # ------------------------------------------------------------------
+
+    def insert_test_coverage(
+        self,
+        spec_id: str,
+        test_file: str,
+        test_function: str,
+        created_by: str,
+        *,
+        test_class: str | None = None,
+        confidence: str = "high",
+        match_reason: str | None = None,
+    ) -> None:
+        """Record a test-to-spec mapping."""
+        conn = self._get_conn()
+        conn.execute(
+            """INSERT INTO test_coverage
+               (spec_id, test_file, test_class, test_function,
+                confidence, match_reason, created_at, created_by)
+               VALUES (?, ?, ?, ?, ?, ?, ?, ?)""",
+            (spec_id, test_file, test_class, test_function,
+             confidence, match_reason, _now(), created_by),
+        )
+        conn.commit()
+
+    def insert_test_coverage_batch(
+        self,
+        mappings: list[dict],
+        created_by: str,
+    ) -> int:
+        """Batch-insert test coverage mappings. Returns count inserted."""
+        conn = self._get_conn()
+        count = 0
+        for m in mappings:
+            conn.execute(
+                """INSERT INTO test_coverage
+                   (spec_id, test_file, test_class, test_function,
+                    confidence, match_reason, created_at, created_by)
+                   VALUES (?, ?, ?, ?, ?, ?, ?, ?)""",
+                (m["spec_id"], m["test_file"], m.get("test_class"),
+                 m["test_function"], m.get("confidence", "high"),
+                 m.get("match_reason"), _now(), created_by),
+            )
+            count += 1
+        conn.commit()
+        return count
+
+    def get_test_coverage_for_spec(self, spec_id: str) -> list[dict[str, Any]]:
+        """Get all test mappings for a spec."""
+        rows = self._get_conn().execute(
+            "SELECT * FROM test_coverage WHERE spec_id = ? ORDER BY test_file, test_function",
+            (spec_id,),
+        ).fetchall()
+        return [_row_to_dict(r) for r in rows]
+
+    def get_test_coverage_summary(self) -> dict[str, Any]:
+        """Get coverage statistics."""
+        conn = self._get_conn()
+        total_mappings = conn.execute("SELECT COUNT(*) FROM test_coverage").fetchone()[0]
+        specs_covered = conn.execute(
+            "SELECT COUNT(DISTINCT spec_id) FROM test_coverage"
+        ).fetchone()[0]
+        tests_mapped = conn.execute(
+            "SELECT COUNT(DISTINCT test_file || ':' || test_function) FROM test_coverage"
+        ).fetchone()[0]
+        by_confidence = dict(conn.execute(
+            "SELECT confidence, COUNT(*) FROM test_coverage GROUP BY confidence"
+        ).fetchall())
+        return {
+            "total_mappings": total_mappings,
+            "specs_covered": specs_covered,
+            "tests_mapped": tests_mapped,
+            "by_confidence": by_confidence,
+        }
+
+    # ------------------------------------------------------------------
     # Assertion Runs
     # ------------------------------------------------------------------
 
@@ -812,6 +1027,7 @@ class KnowledgeDB:
             "test_procedures": ("id", "test_procedures", "title"),
             "operational_procedures": ("id", "operational_procedures", "title"),
             "environment_config": ("id", "environment_config", "key"),
+            "documents": ("id", "documents", "title"),
         }
 
         for tbl_key, (id_col, tbl_name, title_col) in tables.items():
@@ -856,7 +1072,8 @@ class KnowledgeDB:
 
         conn = self._get_conn()
         tables = ["specifications", "test_procedures", "operational_procedures",
-                   "assertion_runs", "session_prompts", "environment_config"]
+                   "assertion_runs", "session_prompts", "environment_config",
+                   "documents", "test_coverage"]
         export = {"exported_at": _now(), "tables": {}}
         for table in tables:
             rows = conn.execute(f"SELECT * FROM {table} ORDER BY rowid").fetchall()
@@ -911,6 +1128,14 @@ class KnowledgeDB:
             "SELECT COUNT(*) FROM current_environment_config"
         ).fetchone()[0]
 
+        doc_count = conn.execute(
+            "SELECT COUNT(*) FROM current_documents"
+        ).fetchone()[0]
+
+        # Test coverage stats
+        cov_mappings = conn.execute("SELECT COUNT(*) FROM test_coverage").fetchone()[0]
+        cov_specs = conn.execute("SELECT COUNT(DISTINCT spec_id) FROM test_coverage").fetchone()[0]
+
         return {
             "spec_counts": spec_counts,
             "spec_total": sum(spec_counts.values()),
@@ -921,6 +1146,9 @@ class KnowledgeDB:
             "assertions_passed": assertion_stats["passed"] or 0,
             "assertions_failed": (assertion_stats["total"] or 0) - (assertion_stats["passed"] or 0),
             "env_config_count": env_count,
+            "document_count": doc_count,
+            "test_coverage_mappings": cov_mappings,
+            "test_coverage_specs": cov_specs,
         }
 
 
