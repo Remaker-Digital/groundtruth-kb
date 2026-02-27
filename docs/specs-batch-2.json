@@ -1,0 +1,947 @@
+[
+  {
+    "id": "BATCH2-001",
+    "text": "The strategic direction shall prioritize conversation quality over cost reduction, with four priorities in order: (1) quality of individual conversations, (2) consistency across conversations, (3) operational visibility, (4) cost efficiency.",
+    "source_session": "361ec1c6",
+    "source_type": "owner_directive",
+    "domain": "GENERAL"
+  },
+  {
+    "id": "BATCH2-002",
+    "text": "Implement CQ-1: conversation quality scoring infrastructure that evaluates every conversation on a 1-5 scale.",
+    "source_session": "361ec1c6",
+    "source_type": "owner_approval",
+    "domain": "CONVERSATIONS"
+  },
+  {
+    "id": "BATCH2-003",
+    "text": "Implement CQ-2: quality threshold alerting that notifies when conversation quality falls below a configurable threshold.",
+    "source_session": "361ec1c6",
+    "source_type": "owner_approval",
+    "domain": "CONVERSATIONS"
+  },
+  {
+    "id": "BATCH2-004",
+    "text": "Implement CQ-3: quality trend dashboard showing quality metrics over time on the admin Dashboard page.",
+    "source_session": "361ec1c6",
+    "source_type": "owner_approval",
+    "domain": "ADMIN_UI"
+  },
+  {
+    "id": "BATCH2-005",
+    "text": "Implement CQ-4: automated quality regression detection that identifies drops in conversation quality.",
+    "source_session": "361ec1c6",
+    "source_type": "owner_approval",
+    "domain": "CONVERSATIONS"
+  },
+  {
+    "id": "BATCH2-006",
+    "text": "Implement CQ-5: per-topic quality breakdown showing quality scores segmented by conversation topic.",
+    "source_session": "361ec1c6",
+    "source_type": "owner_approval",
+    "domain": "CONVERSATIONS"
+  },
+  {
+    "id": "BATCH2-007",
+    "text": "Implement CQ-6: quality-aware escalation that factors conversation quality into escalation decisions.",
+    "source_session": "361ec1c6",
+    "source_type": "owner_approval",
+    "domain": "CONVERSATIONS"
+  },
+  {
+    "id": "BATCH2-008",
+    "text": "Implement CQ-7: merchant quality configuration allowing merchants to set quality thresholds and preferences.",
+    "source_session": "361ec1c6",
+    "source_type": "owner_approval",
+    "domain": "CONFIG"
+  },
+  {
+    "id": "BATCH2-009",
+    "text": "Implement CQ-8: quality feedback loop that uses quality scores to improve future responses.",
+    "source_session": "361ec1c6",
+    "source_type": "owner_approval",
+    "domain": "CONVERSATIONS"
+  },
+  {
+    "id": "BATCH2-010",
+    "text": "Implement CQ-9: quality reporting API exposing quality metrics through a REST endpoint.",
+    "source_session": "361ec1c6",
+    "source_type": "owner_approval",
+    "domain": "API"
+  },
+  {
+    "id": "BATCH2-011",
+    "text": "The widget iframe shall use height 100% to fill its container.",
+    "source_session": "374f3bd5",
+    "source_type": "owner_approval",
+    "domain": "WIDGET_UI"
+  },
+  {
+    "id": "BATCH2-012",
+    "text": "The admin SPA shall read shopify-api-key from a meta tag for Shopify App Bridge initialization.",
+    "source_session": "374f3bd5",
+    "source_type": "owner_approval",
+    "domain": "ADMIN_UI"
+  },
+  {
+    "id": "BATCH2-013",
+    "text": "The admin SPA BrowserRouter shall use a basename derived from the Shopify app URL for correct routing.",
+    "source_session": "374f3bd5",
+    "source_type": "owner_approval",
+    "domain": "ADMIN_UI"
+  },
+  {
+    "id": "BATCH2-014",
+    "text": "All admin UI formatters shall apply null-safety checks using optional chaining or nullish coalescing (e.g., Object.entries(field ?? {})).",
+    "source_session": "374f3bd5",
+    "source_type": "owner_approval",
+    "domain": "ADMIN_UI"
+  },
+  {
+    "id": "BATCH2-015",
+    "text": "URL branch exclusion shall be supported as a future widget configuration feature, allowing merchants to specify URL patterns where the widget should not appear.",
+    "source_session": "3af2f167",
+    "source_type": "owner_directive",
+    "domain": "WIDGET_UI"
+  },
+  {
+    "id": "BATCH2-016",
+    "text": "A mobile-optimized widget variant shall be provided as a future feature for small-screen devices.",
+    "source_session": "3af2f167",
+    "source_type": "owner_directive",
+    "domain": "WIDGET_UI"
+  },
+  {
+    "id": "BATCH2-017",
+    "text": "Transcript CSV export shall be provided as a future feature allowing merchants to export conversation transcripts.",
+    "source_session": "3af2f167",
+    "source_type": "owner_directive",
+    "domain": "CONVERSATIONS"
+  },
+  {
+    "id": "BATCH2-018",
+    "text": "A Campaigns agent shall be implemented as a future feature for proactive outreach messaging.",
+    "source_session": "3af2f167",
+    "source_type": "owner_directive",
+    "domain": "CONVERSATIONS"
+  },
+  {
+    "id": "BATCH2-019",
+    "text": "Every new widget_* field must exist in four places: fields.yaml, field_mapping.py, cosmos_schema.py, and the widget TypeScript type definition. Missing from any layer makes the field invisible to the widget.",
+    "source_session": "3af2f167",
+    "source_type": "owner_approval",
+    "domain": "CONFIG"
+  },
+  {
+    "id": "BATCH2-020",
+    "text": "The setup checklist shall not be shown to tenants that are already active (i.e., have completed initial activation).",
+    "source_session": "3af2f167",
+    "source_type": "owner_directive",
+    "domain": "ADMIN_UI"
+  },
+  {
+    "id": "BATCH2-021",
+    "text": "The gradient toggle configuration control shall toggle the header gradient effect in the widget.",
+    "source_session": "3af2f167",
+    "source_type": "owner_directive",
+    "domain": "CONFIG"
+  },
+  {
+    "id": "BATCH2-022",
+    "text": "The Hugo chat UI shall be used as a functional reference for the widget chat experience.",
+    "source_session": "3af2f167",
+    "source_type": "owner_directive",
+    "domain": "WIDGET_UI"
+  },
+  {
+    "id": "BATCH2-023",
+    "text": "The standalone admin console shall include a tenant provisioning form for creating new tenants via the SPA.",
+    "source_session": "3afe87cc",
+    "source_type": "owner_directive",
+    "domain": "PROVISIONING"
+  },
+  {
+    "id": "BATCH2-024",
+    "text": "A Shopify purchase event shall trigger automated tenant provisioning without manual intervention.",
+    "source_session": "3afe87cc",
+    "source_type": "owner_directive",
+    "domain": "PROVISIONING"
+  },
+  {
+    "id": "BATCH2-025",
+    "text": "The widget shall implement an in-conversation authentication flow with 5 steps: (1) detect auth-required intent, (2) present auth prompt, (3) verify credentials, (4) resume conversation with authenticated context, (5) persist auth state.",
+    "source_session": "3afe87cc",
+    "source_type": "owner_directive",
+    "domain": "AUTH"
+  },
+  {
+    "id": "BATCH2-026",
+    "text": "Harrison Corp and Kidsely shall be provisioned as beta test tenants.",
+    "source_session": "3afe87cc",
+    "source_type": "owner_directive",
+    "domain": "PROVISIONING"
+  },
+  {
+    "id": "BATCH2-027",
+    "text": "The AGNTCY multi-agent platform shall be adopted as the underlying agent orchestration framework.",
+    "source_session": "3d6d4bab",
+    "source_type": "owner_approval",
+    "domain": "GENERAL"
+  },
+  {
+    "id": "BATCH2-028",
+    "text": "The agent pipeline shall use a 6-agent containerized architecture: Intent Classifier, Knowledge Retrieval, Response Generator, Critic/Supervisor, Escalation Handler, Analytics Collector.",
+    "source_session": "3d6d4bab",
+    "source_type": "owner_approval",
+    "domain": "GENERAL"
+  },
+  {
+    "id": "BATCH2-029",
+    "text": "Agent Red shall retain its own widget, admin console, and configuration layer (not replaced by AGNTCY equivalents).",
+    "source_session": "3d6d4bab",
+    "source_type": "owner_approval",
+    "domain": "GENERAL"
+  },
+  {
+    "id": "BATCH2-030",
+    "text": "Tidio shall be the primary functional reference for feature parity and UX patterns.",
+    "source_session": "4249eb26",
+    "source_type": "owner_directive",
+    "domain": "GENERAL"
+  },
+  {
+    "id": "BATCH2-031",
+    "text": "Zapier shall be the visual styling reference for admin UI design patterns.",
+    "source_session": "4249eb26",
+    "source_type": "owner_directive",
+    "domain": "ADMIN_UI"
+  },
+  {
+    "id": "BATCH2-032",
+    "text": "Persistent Customer Memory (PCM) shall be the launch pillar differentiator distinguishing Agent Red from competitors.",
+    "source_session": "4249eb26",
+    "source_type": "owner_directive",
+    "domain": "GENERAL"
+  },
+  {
+    "id": "BATCH2-033",
+    "text": "The product shall be renamed from 'Customer Engagement' to 'Customer Experience'.",
+    "source_session": "4249eb26",
+    "source_type": "owner_directive",
+    "domain": "GENERAL"
+  },
+  {
+    "id": "BATCH2-034",
+    "text": "The brand primary color shall be #C41E2A (later updated to #ff3621).",
+    "source_session": "4249eb26",
+    "source_type": "owner_directive",
+    "domain": "GENERAL"
+  },
+  {
+    "id": "BATCH2-035",
+    "text": "The widget shall support named configuration controls (predefined options) at launch, not arbitrary CSS customization.",
+    "source_session": "4249eb26",
+    "source_type": "owner_directive",
+    "domain": "CONFIG"
+  },
+  {
+    "id": "BATCH2-036",
+    "text": "Refactoring R1 (ConfigProcessor extraction) shall be approved and implemented.",
+    "source_session": "432f59fd",
+    "source_type": "owner_approval",
+    "domain": "CONFIG"
+  },
+  {
+    "id": "BATCH2-037",
+    "text": "Refactoring R2 (response model consolidation) shall be implemented at P1 priority.",
+    "source_session": "432f59fd",
+    "source_type": "owner_approval",
+    "domain": "API"
+  },
+  {
+    "id": "BATCH2-038",
+    "text": "Refactoring R3 (middleware chain simplification) shall be deferred to post-launch.",
+    "source_session": "432f59fd",
+    "source_type": "owner_approval",
+    "domain": "API"
+  },
+  {
+    "id": "BATCH2-039",
+    "text": "Refactoring R4 (test fixture consolidation) shall be implemented at P1 priority.",
+    "source_session": "432f59fd",
+    "source_type": "owner_approval",
+    "domain": "TESTING"
+  },
+  {
+    "id": "BATCH2-040",
+    "text": "Refactoring R5 (Cosmos client singleton) shall be rejected — current pattern is acceptable.",
+    "source_session": "432f59fd",
+    "source_type": "owner_approval",
+    "domain": "API"
+  },
+  {
+    "id": "BATCH2-041",
+    "text": "Refactoring R6 (error handler unification) shall be implemented at P2 priority.",
+    "source_session": "432f59fd",
+    "source_type": "owner_approval",
+    "domain": "API"
+  },
+  {
+    "id": "BATCH2-042",
+    "text": "Refactoring R7 (import path normalization) shall be implemented as a quick win.",
+    "source_session": "432f59fd",
+    "source_type": "owner_approval",
+    "domain": "GENERAL"
+  },
+  {
+    "id": "BATCH2-043",
+    "text": "Refactoring R8 (dead code removal) shall be implemented as a quick win.",
+    "source_session": "432f59fd",
+    "source_type": "owner_approval",
+    "domain": "GENERAL"
+  },
+  {
+    "id": "BATCH2-044",
+    "text": "Refactoring R9a (type annotation completion) shall be implemented at P0 priority.",
+    "source_session": "432f59fd",
+    "source_type": "owner_approval",
+    "domain": "GENERAL"
+  },
+  {
+    "id": "BATCH2-045",
+    "text": "Refactoring R10 (AGNTCY Phase 3 alignment) shall be implemented as part of AGNTCY Phase 3.",
+    "source_session": "432f59fd",
+    "source_type": "owner_approval",
+    "domain": "GENERAL"
+  },
+  {
+    "id": "BATCH2-046",
+    "text": "All tests created during implementation must be added to Repeatable Procedures for future regression testing.",
+    "source_session": "432f59fd",
+    "source_type": "owner_directive",
+    "domain": "TESTING"
+  },
+  {
+    "id": "BATCH2-047",
+    "text": "CSS centralization shall be implemented across all admin UI components, extracting inline styles to shared CSS modules.",
+    "source_session": "438169a2",
+    "source_type": "owner_approval",
+    "domain": "ADMIN_UI"
+  },
+  {
+    "id": "BATCH2-048",
+    "text": "The admin UI shall be re-tested after all CSS centralization changes are applied.",
+    "source_session": "438169a2",
+    "source_type": "owner_directive",
+    "domain": "TESTING"
+  },
+  {
+    "id": "BATCH2-049",
+    "text": "A 'Contact Us' button shall be added to the admin UI that composes an email to support@remakerdigital.com with a topic dropdown and auto-populated tenant/member identity in the email body.",
+    "source_session": "438169a2",
+    "source_type": "owner_directive",
+    "domain": "ADMIN_UI"
+  },
+  {
+    "id": "BATCH2-050",
+    "text": "The Provider Console shall be renamed to 'Service Provider Console'.",
+    "source_session": "438169a2",
+    "source_type": "owner_directive",
+    "domain": "ADMIN_UI"
+  },
+  {
+    "id": "BATCH2-051",
+    "text": "The logo used in the admin UI shall be the version without 'Agent Red' text (icon only or primary-logo-no-wordmark).",
+    "source_session": "438169a2",
+    "source_type": "owner_directive",
+    "domain": "ADMIN_UI"
+  },
+  {
+    "id": "BATCH2-052",
+    "text": "UI test procedures shall include data-binding verification across 5 categories: (1) form fields bound to API data, (2) display elements reflecting API state, (3) action buttons triggering correct API calls, (4) error states from API failures, (5) loading states during API calls.",
+    "source_session": "438169a2",
+    "source_type": "owner_directive",
+    "domain": "TESTING"
+  },
+  {
+    "id": "BATCH2-053",
+    "text": "Seven test procedures shall be created: UI, Chrome MCP, load, isolation, security, rate limit, and quality.",
+    "source_session": "438169a2",
+    "source_type": "owner_approval",
+    "domain": "TESTING"
+  },
+  {
+    "id": "BATCH2-054",
+    "text": "Test procedures 4 (isolation) and 8 (resilience) shall be merged into a combined procedure.",
+    "source_session": "438169a2",
+    "source_type": "owner_approval",
+    "domain": "TESTING"
+  },
+  {
+    "id": "BATCH2-055",
+    "text": "The NATS connection issue shall be resolved using Option B (the selected fix approach).",
+    "source_session": "438169a2",
+    "source_type": "owner_approval",
+    "domain": "OPS"
+  },
+  {
+    "id": "BATCH2-056",
+    "text": "The 'Intents' section shall be renamed to use accessible, non-technical language (e.g., 'Topic Breakdown').",
+    "source_session": "43e01cea",
+    "source_type": "owner_directive",
+    "domain": "ADMIN_UI"
+  },
+  {
+    "id": "BATCH2-057",
+    "text": "All tooltip documentation links shall be tracked in a central registry for maintenance.",
+    "source_session": "43e01cea",
+    "source_type": "owner_directive",
+    "domain": "ADMIN_UI"
+  },
+  {
+    "id": "BATCH2-058",
+    "text": "The 'Assign to agent' control shall be removed from the conversation inbox UI.",
+    "source_session": "43e01cea",
+    "source_type": "owner_directive",
+    "domain": "ADMIN_UI"
+  },
+  {
+    "id": "BATCH2-059",
+    "text": "Escalation notifications shall be sent via email to team members (not as an in-app 'assign to agent' action).",
+    "source_session": "43e01cea",
+    "source_type": "owner_directive",
+    "domain": "EMAIL"
+  },
+  {
+    "id": "BATCH2-060",
+    "text": "Inbox search shall search conversation content (message text), not just metadata fields.",
+    "source_session": "43e01cea",
+    "source_type": "owner_directive",
+    "domain": "ADMIN_UI"
+  },
+  {
+    "id": "BATCH2-061",
+    "text": "Conversation archival shall be supported as a future feature for moving old conversations to an archived state.",
+    "source_session": "43e01cea",
+    "source_type": "owner_directive",
+    "domain": "CONVERSATIONS"
+  },
+  {
+    "id": "BATCH2-062",
+    "text": "Unknown customers shall be identified by a combination of: session ID, Shopify credentials (if available), email verification, and asserted identities.",
+    "source_session": "43e01cea",
+    "source_type": "owner_directive",
+    "domain": "AUTH"
+  },
+  {
+    "id": "BATCH2-063",
+    "text": "The Persistent Customer Memory (PCM) identity system shall depend on customer identification resolution before storing cross-session data.",
+    "source_session": "43e01cea",
+    "source_type": "owner_directive",
+    "domain": "AUTH"
+  },
+  {
+    "id": "BATCH2-064",
+    "text": "The configuration activation model shall use a three-state lifecycle: Active (live config) -> Pending (unsaved draft changes) -> Activate (with validation gates). Discard reverts to Active. Roll back restores previous version.",
+    "source_session": "43e01cea",
+    "source_type": "owner_directive",
+    "domain": "CONFIG"
+  },
+  {
+    "id": "BATCH2-065",
+    "text": "The vestigial auto-open behavior in the widget shall be removed.",
+    "source_session": "43e01cea",
+    "source_type": "owner_directive",
+    "domain": "WIDGET_UI"
+  },
+  {
+    "id": "BATCH2-066",
+    "text": "The Offline form shall be removed from the widget.",
+    "source_session": "43e01cea",
+    "source_type": "owner_directive",
+    "domain": "WIDGET_UI"
+  },
+  {
+    "id": "BATCH2-067",
+    "text": "The Custom launcher feature shall require a file upload mechanism for custom launcher images.",
+    "source_session": "43e01cea",
+    "source_type": "owner_directive",
+    "domain": "WIDGET_UI"
+  },
+  {
+    "id": "BATCH2-068",
+    "text": "The widget 'Auto' color mode shall automatically match the admin UI's current color scheme.",
+    "source_session": "43e01cea",
+    "source_type": "owner_directive",
+    "domain": "WIDGET_UI"
+  },
+  {
+    "id": "BATCH2-069",
+    "text": "All integration tooltips shall be present and functional on the Integrations page.",
+    "source_session": "43e01cea",
+    "source_type": "owner_directive",
+    "domain": "ADMIN_UI"
+  },
+  {
+    "id": "BATCH2-070",
+    "text": "Integration name text shall be displayed at 22px font size.",
+    "source_session": "43e01cea",
+    "source_type": "owner_directive",
+    "domain": "ADMIN_UI"
+  },
+  {
+    "id": "BATCH2-071",
+    "text": "The tier badge on the Billing page shall reflect the tenant's actual subscription entitlement (not a hardcoded value).",
+    "source_session": "43e01cea",
+    "source_type": "owner_directive",
+    "domain": "BILLING"
+  },
+  {
+    "id": "BATCH2-072",
+    "text": "All tier-gated features shall enforce backend tier gates — UI disabling alone is insufficient.",
+    "source_session": "43e01cea",
+    "source_type": "owner_directive",
+    "domain": "API"
+  },
+  {
+    "id": "BATCH2-073",
+    "text": "The billing purchase button shall be functional (not broken/disabled).",
+    "source_session": "43e01cea",
+    "source_type": "owner_directive",
+    "domain": "BILLING"
+  },
+  {
+    "id": "BATCH2-074",
+    "text": "The billing management box shall be removed from the Billing page UI.",
+    "source_session": "43e01cea",
+    "source_type": "owner_directive",
+    "domain": "BILLING"
+  },
+  {
+    "id": "BATCH2-075",
+    "text": "Upsell presentation shall follow the pattern of 'Conversation Packs' — clear value proposition with purchase flow.",
+    "source_session": "43e01cea",
+    "source_type": "owner_directive",
+    "domain": "BILLING"
+  },
+  {
+    "id": "BATCH2-076",
+    "text": "Unimplemented integrations shall display 'Coming Soon' labels instead of appearing as functional.",
+    "source_session": "44b2841c",
+    "source_type": "owner_directive",
+    "domain": "ADMIN_UI"
+  },
+  {
+    "id": "BATCH2-077",
+    "text": "All non-proper-noun UI labels shall use sentence case (e.g., 'Brand voice' not 'Brand Voice').",
+    "source_session": "44b2841c",
+    "source_type": "owner_directive",
+    "domain": "ADMIN_UI"
+  },
+  {
+    "id": "BATCH2-078",
+    "text": "The LUIT-SA (Large UI Test - Standalone Admin) 93-step test procedure shall be executed to completion, fixing all defects encountered until all steps pass.",
+    "source_session": "44b2841c",
+    "source_type": "owner_directive",
+    "domain": "TESTING"
+  },
+  {
+    "id": "BATCH2-079",
+    "text": "The widget tenant config endpoint shall pass appearance fields (colors, fonts, dimensions) as data attributes on the widget container element.",
+    "source_session": "45b458bc",
+    "source_type": "owner_directive",
+    "domain": "WIDGET_UI"
+  },
+  {
+    "id": "BATCH2-080",
+    "text": "The Critic agent prompt shall not block responses that contain the customer's own name (false-positive PII blocking).",
+    "source_session": "45b458bc",
+    "source_type": "owner_directive",
+    "domain": "CONVERSATIONS"
+  },
+  {
+    "id": "BATCH2-081",
+    "text": "Conversation history from the current session shall be passed to the response generator to maintain conversational context.",
+    "source_session": "45b458bc",
+    "source_type": "owner_directive",
+    "domain": "CONVERSATIONS"
+  },
+  {
+    "id": "BATCH2-082",
+    "text": "Chat quality shall be iteratively improved through testing and prompt refinement until merchant-acceptable quality is achieved.",
+    "source_session": "45b458bc",
+    "source_type": "owner_directive",
+    "domain": "CONVERSATIONS"
+  },
+  {
+    "id": "BATCH2-083",
+    "text": "Cosmos DB full initialization shall create all 10 containers with DiskANN vector index and correct partition keys, unique key policies, and composite indexes.",
+    "source_session": "4a4409a6",
+    "source_type": "owner_approval",
+    "domain": "PROVISIONING"
+  },
+  {
+    "id": "BATCH2-084",
+    "text": "WI #93-96 (Layer 4 Fine-Tuning Pipeline) shall be implemented with a 7-stage pipeline: Collect, Cleanse, Format, Train, Compare, Evaluate, Deploy.",
+    "source_session": "4a4409a6",
+    "source_type": "owner_approval",
+    "domain": "CONVERSATIONS"
+  },
+  {
+    "id": "BATCH2-085",
+    "text": "Layer 3 PatternExtractionService shall be integrated into SystemPromptBuilder, injecting pattern context only for Response Generator and Escalation Handler agents.",
+    "source_session": "4a4409a6",
+    "source_type": "owner_approval",
+    "domain": "CONVERSATIONS"
+  },
+  {
+    "id": "BATCH2-086",
+    "text": "The coverage gate in CI shall be set to 50% minimum (raised from 20%).",
+    "source_session": "4a4409a6",
+    "source_type": "owner_approval",
+    "domain": "TESTING"
+  },
+  {
+    "id": "BATCH2-087",
+    "text": "Stripe webhook IP allowlisting shall be implemented as defense-in-depth, gated by the STRIPE_IP_ALLOWLIST_ENABLED environment variable.",
+    "source_session": "4a4409a6",
+    "source_type": "owner_approval",
+    "domain": "API"
+  },
+  {
+    "id": "BATCH2-088",
+    "text": "Session wrap-up shall include updating knowledge base, cleaning artifacts, committing to GitHub, updating the GitHub project and wiki, and providing a next-session initialization prompt.",
+    "source_session": "4a4409a6",
+    "source_type": "owner_directive",
+    "domain": "OPS"
+  },
+  {
+    "id": "BATCH2-089",
+    "text": "The tenant shall be re-seeded to a clean initial state (0 conversations) before performing functional UI testing.",
+    "source_session": "4ba0d6d5",
+    "source_type": "owner_approval",
+    "domain": "TESTING"
+  },
+  {
+    "id": "BATCH2-090",
+    "text": "The activation failure message in the preflight dialog shall end with 'be activated.' instead of 'go live.'.",
+    "source_session": "4ba0d6d5",
+    "source_type": "owner_directive",
+    "domain": "ADMIN_UI"
+  },
+  {
+    "id": "BATCH2-091",
+    "text": "All save success messages in draft mode shall include the 'Draft' prefix (e.g., 'Draft configuration saved successfully.' not 'Configuration saved successfully.').",
+    "source_session": "4ba0d6d5",
+    "source_type": "owner_directive",
+    "domain": "ADMIN_UI"
+  },
+  {
+    "id": "BATCH2-092",
+    "text": "German, Portuguese, Japanese, Chinese, and Korean shall be removed from the language selector UI. Spanish and French shall be displayed but greyed-out (disabled, not operable).",
+    "source_session": "4ba0d6d5",
+    "source_type": "owner_directive",
+    "domain": "ADMIN_UI"
+  },
+  {
+    "id": "BATCH2-093",
+    "text": "The sidebar heading shall read 'AI CONFIGURATION' instead of 'CONFIGURATION'.",
+    "source_session": "4ba0d6d5",
+    "source_type": "owner_directive",
+    "domain": "ADMIN_UI"
+  },
+  {
+    "id": "BATCH2-094",
+    "text": "The 'Deactivate' button text shall not be truncated — the full word must be visible in the sidebar button group.",
+    "source_session": "4ba0d6d5",
+    "source_type": "owner_directive",
+    "domain": "ADMIN_UI"
+  },
+  {
+    "id": "BATCH2-095",
+    "text": "Discard action shall trigger a configuration re-fetch in all child pages so form fields display the current active values (not empty placeholders).",
+    "source_session": "4ba0d6d5",
+    "source_type": "owner_directive",
+    "domain": "ADMIN_UI"
+  },
+  {
+    "id": "BATCH2-096",
+    "text": "All owner instructions from UI testing sessions shall be written into the relevant Repeatable Procedures for future regression tests.",
+    "source_session": "4ba0d6d5",
+    "source_type": "owner_directive",
+    "domain": "TESTING"
+  },
+  {
+    "id": "BATCH2-097",
+    "text": "The agentredcx.com documentation site shall be updated with details of new features and UI changes after each deployment.",
+    "source_session": "4ba0d6d5",
+    "source_type": "owner_directive",
+    "domain": "OPS"
+  },
+  {
+    "id": "BATCH2-098",
+    "text": "The next session initialization prompt shall load all UI-related knowledge but take no action until the owner begins manual functional testing.",
+    "source_session": "4ba0d6d5",
+    "source_type": "owner_directive",
+    "domain": "OPS"
+  },
+  {
+    "id": "BATCH2-099",
+    "text": "GDPR compliance webhooks, session token authentication, and App Bridge Save Bar API shall be added to the project backlog.",
+    "source_session": "4c947331",
+    "source_type": "owner_directive",
+    "domain": "API"
+  },
+  {
+    "id": "BATCH2-100",
+    "text": "A comprehensive item-by-item review of all outstanding work items shall be conducted, producing a Master-Plan-Review status report capturing all decisions.",
+    "source_session": "4c947331",
+    "source_type": "owner_directive",
+    "domain": "OPS"
+  },
+  {
+    "id": "BATCH2-101",
+    "text": "All required logo image formats and dimensions shall be documented, with a documented procedure for end-to-end logo updates across all project assets.",
+    "source_session": "4c947331",
+    "source_type": "owner_directive",
+    "domain": "GENERAL"
+  },
+  {
+    "id": "BATCH2-102",
+    "text": "iubenda shall be adopted as the legal compliance provider (Option 4: iubenda for privacy/terms, LegalZoom retained for other legal purposes).",
+    "source_session": "4c947331",
+    "source_type": "owner_directive",
+    "domain": "GENERAL"
+  },
+  {
+    "id": "BATCH2-103",
+    "text": "Language support priorities: Spanish (Mexico) and French (Canada) near-term, Portuguese (Brazil) and UK English medium-term.",
+    "source_session": "4c947331",
+    "source_type": "owner_directive",
+    "domain": "GENERAL"
+  },
+  {
+    "id": "BATCH2-104",
+    "text": "Technical work (implementation, test case creation, testing/results analysis, new capabilities) shall have elevated priority over creative/content work. This is a permanent project bias.",
+    "source_session": "4c947331",
+    "source_type": "owner_directive",
+    "domain": "GENERAL"
+  },
+  {
+    "id": "BATCH2-105",
+    "text": "TenantScopedRepository shall be mandatory for all data access — no direct Cosmos DB queries bypassing tenant isolation.",
+    "source_session": "4c947331",
+    "source_type": "owner_approval",
+    "domain": "API"
+  },
+  {
+    "id": "BATCH2-106",
+    "text": "Cosmos DB partition key shall be tenant_id for all tenant-scoped collections.",
+    "source_session": "4c947331",
+    "source_type": "owner_approval",
+    "domain": "PROVISIONING"
+  },
+  {
+    "id": "BATCH2-107",
+    "text": "NATS topics shall be tenant-scoped using the pattern {tenant_id}.{agent} for conversation pipeline isolation.",
+    "source_session": "4c947331",
+    "source_type": "owner_approval",
+    "domain": "API"
+  },
+  {
+    "id": "BATCH2-108",
+    "text": "Dual authentication shall be supported: Shopify session tokens (signed JWT) for Shopify merchants, API keys (SHA-256 hash) for direct customers.",
+    "source_session": "4c947331",
+    "source_type": "owner_approval",
+    "domain": "AUTH"
+  },
+  {
+    "id": "BATCH2-109",
+    "text": "Per-tenant rate limits shall be tiered by plan: Starter 10/min, Professional 50/min, Enterprise 200/min.",
+    "source_session": "4c947331",
+    "source_type": "owner_approval",
+    "domain": "API"
+  },
+  {
+    "id": "BATCH2-110",
+    "text": "Per-tenant secrets shall be stored in Azure Key Vault using the naming convention tenant-{id}-{type}.",
+    "source_session": "4c947331",
+    "source_type": "owner_approval",
+    "domain": "AUTH"
+  },
+  {
+    "id": "BATCH2-111",
+    "text": "PII scrubbing shall be applied at the logging layer — no customer-identifiable data in Application Insights telemetry.",
+    "source_session": "4c947331",
+    "source_type": "owner_approval",
+    "domain": "API"
+  },
+  {
+    "id": "BATCH2-112",
+    "text": "Channel-specific grace periods shall be enforced: 48hr for Shopify (mandatory per Shopify requirements), 30-day for Stripe (per SLA).",
+    "source_session": "4c947331",
+    "source_type": "owner_approval",
+    "domain": "API"
+  },
+  {
+    "id": "BATCH2-113",
+    "text": "DataExportService and DataDeletionService shall be implemented for GDPR data subject request handling.",
+    "source_session": "4c947331",
+    "source_type": "owner_approval",
+    "domain": "API"
+  },
+  {
+    "id": "BATCH2-114",
+    "text": "Consent management shall be implemented for Persistent Customer Memory — consent gates PCM Layers 2-4, denial triggers L2-4 data deletion.",
+    "source_session": "4c947331",
+    "source_type": "owner_approval",
+    "domain": "API"
+  },
+  {
+    "id": "BATCH2-115",
+    "text": "tenant_id shall be included on all Application Insights telemetry for per-tenant observability.",
+    "source_session": "4c947331",
+    "source_type": "owner_approval",
+    "domain": "OPS"
+  },
+  {
+    "id": "BATCH2-116",
+    "text": "A correlation ID chain shall be maintained across all 6 agents in the conversation pipeline for end-to-end request tracing.",
+    "source_session": "4c947331",
+    "source_type": "owner_approval",
+    "domain": "OPS"
+  },
+  {
+    "id": "BATCH2-117",
+    "text": "An append-only audit log shall be maintained for all tenant operations.",
+    "source_session": "4c947331",
+    "source_type": "owner_approval",
+    "domain": "OPS"
+  },
+  {
+    "id": "BATCH2-118",
+    "text": "Noisy neighbor prevention shall use Option B+ (the selected supervisor recovery approach addressing unsupervised session risk).",
+    "source_session": "4c947331",
+    "source_type": "owner_approval",
+    "domain": "API"
+  },
+  {
+    "id": "BATCH2-119",
+    "text": "Backup handling shall include encryption, key management, and a known process for offloading to warm or cold storage. Data shall be retained for years to support future model training and predictive pattern identification.",
+    "source_session": "4c947331",
+    "source_type": "owner_directive",
+    "domain": "OPS"
+  },
+  {
+    "id": "BATCH2-120",
+    "text": "The tenant config interface shall include: (1) a distinct config processor separate from any GUI, (2) A/B testing of customer populations, (3) a simplified decision-making UI, (4) step-by-step initial setup workflow, (5) pervasive tooltips and documentation links for every config decision, (6) recent data adjacent to config inputs to inform decisions.",
+    "source_session": "4c947331",
+    "source_type": "owner_directive",
+    "domain": "CONFIG"
+  },
+  {
+    "id": "BATCH2-121",
+    "text": "A work item shall be created to investigate: (A) customer satisfaction impact of reducing P50 response latency below 1,500ms, and (B) cost of options to reduce P50 to minimum including custom AI models and fine-tuning, producing a cost/benefit chart.",
+    "source_session": "4c947331",
+    "source_type": "owner_directive",
+    "domain": "GENERAL"
+  },
+  {
+    "id": "BATCH2-122",
+    "text": "The PCM customer profile shall include: (1) historical purchase information (product ID, date, rating/review), (2) historical product questions from previous chats, (3) geographic region codes for geography-aware RAG, (4) marketing segmentation codes for campaign-aware RAG, (5) jurisdiction codes for terms/conditions applicability, (6) historical shopping cart contents (purchased or not).",
+    "source_session": "4c947331",
+    "source_type": "owner_directive",
+    "domain": "CONVERSATIONS"
+  },
+  {
+    "id": "BATCH2-123",
+    "text": "A response explainability feature shall be implemented ('Why did you recommend that product?') providing audit-friendly explanations of AI response generation factors.",
+    "source_session": "4c947331",
+    "source_type": "owner_directive",
+    "domain": "CONVERSATIONS"
+  },
+  {
+    "id": "BATCH2-124",
+    "text": "Metering documentation shall map directly to billing practices, since billing will be regularly investigated by merchants who dispute charges.",
+    "source_session": "4c947331",
+    "source_type": "owner_directive",
+    "domain": "BILLING"
+  },
+  {
+    "id": "BATCH2-125",
+    "text": "The chat API module shall implement 6 endpoints: POST /conversations, POST /message, GET /stream/{id}, GET /conversations/{id}, POST /conversations/{id}/end, WS /ws/{id}.",
+    "source_session": "525888ab",
+    "source_type": "owner_approval",
+    "domain": "API"
+  },
+  {
+    "id": "BATCH2-126",
+    "text": "Publishable widget key authentication (WI-170) shall be implemented with pk_live_ prefix format, SHA-256 hashing, scoped to /api/chat/* and /ws/chat/* paths only.",
+    "source_session": "525888ab",
+    "source_type": "owner_approval",
+    "domain": "AUTH"
+  },
+  {
+    "id": "BATCH2-127",
+    "text": "The Trial tier shall be implemented with: 50 conversation limit, 5 rpm rate limit, 2 concurrent sessions, 14-day history retention, Layer 1 PCM only, 0 overage rate, 14-day duration.",
+    "source_session": "525888ab",
+    "source_type": "owner_approval",
+    "domain": "PROVISIONING"
+  },
+  {
+    "id": "BATCH2-128",
+    "text": "Trial expiry shall be enforced at the middleware level — every request checks trial_expires_at before reaching endpoint handlers.",
+    "source_session": "525888ab",
+    "source_type": "owner_approval",
+    "domain": "AUTH"
+  },
+  {
+    "id": "BATCH2-129",
+    "text": "A priority ordering of all outstanding work items shall be maintained and followed when proposing tasks for completion.",
+    "source_session": "525888ab",
+    "source_type": "owner_directive",
+    "domain": "OPS"
+  },
+  {
+    "id": "BATCH2-130",
+    "text": "The Conversation Inbox API (WI-171) shall provide 5 endpoints on /api/admin/conversations: list, detail, messages, assign agent, and add internal note.",
+    "source_session": "525888ab",
+    "source_type": "owner_approval",
+    "domain": "API"
+  },
+  {
+    "id": "BATCH2-131",
+    "text": "The Knowledge Base CRUD API (WI-175) shall provide 5 endpoints on /api/admin/knowledge: list, detail, create, update, and soft-delete.",
+    "source_session": "525888ab",
+    "source_type": "owner_approval",
+    "domain": "API"
+  },
+  {
+    "id": "BATCH2-132",
+    "text": "The Analytics APIs (WI-176-178) shall provide 3 endpoints: GET /api/analytics/summary, GET /api/analytics/intents, GET /api/analytics/gaps.",
+    "source_session": "525888ab",
+    "source_type": "owner_approval",
+    "domain": "API"
+  },
+  {
+    "id": "BATCH2-133",
+    "text": "The Team Management API (WI-179) shall use a dedicated team_members Cosmos DB collection (not an embedded array in the tenant document) with 4 roles: Owner, Admin, Agent, Viewer.",
+    "source_session": "525888ab",
+    "source_type": "owner_approval",
+    "domain": "TEAM"
+  },
+  {
+    "id": "BATCH2-134",
+    "text": "The GDPR REST API (WI-180) shall provide 5 endpoints on /api/gdpr: export (tenant/customer scope), delete (with grace period and force override), read consent, update tenant consent, and update customer consent.",
+    "source_session": "525888ab",
+    "source_type": "owner_approval",
+    "domain": "API"
+  },
+  {
+    "id": "BATCH2-135",
+    "text": "Shopify GDPR mandatory webhooks (WI-35) shall be implemented: customers/data_request, customers/redact, shop/redact.",
+    "source_session": "525888ab",
+    "source_type": "owner_approval",
+    "domain": "API"
+  }
+]

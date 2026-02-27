@@ -1,0 +1,639 @@
+[
+  {
+    "id": "BATCH3A-001",
+    "text": "All remaining P1 pre-launch tests MUST be completed without pausing for owner input between tests",
+    "source_session": "56871ea9",
+    "source_type": "owner_directive",
+    "domain": "TESTING"
+  },
+  {
+    "id": "BATCH3A-002",
+    "text": "The configuration wizard MUST be removed from the admin UI",
+    "source_session": "56edabbb",
+    "source_type": "owner_directive",
+    "domain": "ADMIN_UI"
+  },
+  {
+    "id": "BATCH3A-003",
+    "text": "Test mode MUST be removed from the admin UI",
+    "source_session": "56edabbb",
+    "source_type": "owner_directive",
+    "domain": "ADMIN_UI"
+  },
+  {
+    "id": "BATCH3A-004",
+    "text": "The configuration system MUST use a Save-then-Activate model where changes are saved but not active until explicitly activated",
+    "source_session": "56edabbb",
+    "source_type": "owner_directive",
+    "domain": "CONFIG"
+  },
+  {
+    "id": "BATCH3A-005",
+    "text": "Four configuration pages (Agent Config, Knowledge Base, Quick Actions, Widget Config) MUST use SAVED to ACTIVATED state transitions",
+    "source_session": "56edabbb",
+    "source_type": "owner_directive",
+    "domain": "CONFIG"
+  },
+  {
+    "id": "BATCH3A-006",
+    "text": "The Activate option MUST only appear when there are unapplied (saved but not yet activated) changes",
+    "source_session": "56edabbb",
+    "source_type": "owner_directive",
+    "domain": "CONFIG"
+  },
+  {
+    "id": "BATCH3A-007",
+    "text": "The Restore option MUST reverse all saved-but-not-activated changes back to the prior known activated state",
+    "source_session": "56edabbb",
+    "source_type": "owner_directive",
+    "domain": "CONFIG"
+  },
+  {
+    "id": "BATCH3A-008",
+    "text": "Activation MUST apply all three configurable pages (Agent Config, KB, Quick Actions) together as a single atomic action",
+    "source_session": "56edabbb",
+    "source_type": "owner_directive",
+    "domain": "CONFIG"
+  },
+  {
+    "id": "BATCH3A-009",
+    "text": "Restore MUST revert all three configurable pages together as a single atomic action",
+    "source_session": "56edabbb",
+    "source_type": "owner_directive",
+    "domain": "CONFIG"
+  },
+  {
+    "id": "BATCH3A-010",
+    "text": "A configuration state check MUST run before activation and fail with an error if the configuration is not sufficiently complete",
+    "source_session": "56edabbb",
+    "source_type": "owner_directive",
+    "domain": "CONFIG"
+  },
+  {
+    "id": "BATCH3A-011",
+    "text": "Option B approved: configuration snapshots MUST be stored immediately; history UI is deferred to a future release",
+    "source_session": "56edabbb",
+    "source_type": "owner_approval",
+    "domain": "CONFIG"
+  },
+  {
+    "id": "BATCH3A-012",
+    "text": "WI #63 (tenant-scoped configuration system) approved for implementation",
+    "source_session": "5a765ef0",
+    "source_type": "owner_approval",
+    "domain": "CONFIG"
+  },
+  {
+    "id": "BATCH3A-013",
+    "text": "WI #64 (configuration validation layer) approved for implementation",
+    "source_session": "5a765ef0",
+    "source_type": "owner_approval",
+    "domain": "CONFIG"
+  },
+  {
+    "id": "BATCH3A-014",
+    "text": "WI #65 (configuration migration system) approved for implementation",
+    "source_session": "5a765ef0",
+    "source_type": "owner_approval",
+    "domain": "CONFIG"
+  },
+  {
+    "id": "BATCH3A-015",
+    "text": "WI #29 (secrets management via Azure Key Vault) approved for implementation",
+    "source_session": "5a765ef0",
+    "source_type": "owner_approval",
+    "domain": "OPS"
+  },
+  {
+    "id": "BATCH3A-016",
+    "text": "WI #47 (KEDA autoscaling) approved for implementation",
+    "source_session": "5a765ef0",
+    "source_type": "owner_approval",
+    "domain": "OPS"
+  },
+  {
+    "id": "BATCH3A-017",
+    "text": "WI #48 (Terraform infrastructure-as-code) approved for implementation",
+    "source_session": "5a765ef0",
+    "source_type": "owner_approval",
+    "domain": "OPS"
+  },
+  {
+    "id": "BATCH3A-018",
+    "text": "WI #83-88 (persistent memory system: conversation memory, entity extraction, context window, memory privacy, memory search, cross-conversation learning) approved for implementation",
+    "source_session": "5a765ef0",
+    "source_type": "owner_approval",
+    "domain": "CONVERSATIONS"
+  },
+  {
+    "id": "BATCH3A-019",
+    "text": "WI #52 (horizontal pod autoscaling) approved for implementation",
+    "source_session": "5a765ef0",
+    "source_type": "owner_approval",
+    "domain": "OPS"
+  },
+  {
+    "id": "BATCH3A-020",
+    "text": "WI #55 (monitoring and alerting) approved for implementation",
+    "source_session": "5a765ef0",
+    "source_type": "owner_approval",
+    "domain": "OPS"
+  },
+  {
+    "id": "BATCH3A-021",
+    "text": "WI #58 (CI/CD pipeline) approved for implementation",
+    "source_session": "5a765ef0",
+    "source_type": "owner_approval",
+    "domain": "OPS"
+  },
+  {
+    "id": "BATCH3A-022",
+    "text": "WI #59 (blue-green deployment) approved for implementation",
+    "source_session": "5a765ef0",
+    "source_type": "owner_approval",
+    "domain": "OPS"
+  },
+  {
+    "id": "BATCH3A-023",
+    "text": "WI #77 (API documentation with OpenAPI/Swagger) approved for implementation",
+    "source_session": "5a765ef0",
+    "source_type": "owner_approval",
+    "domain": "DOCS"
+  },
+  {
+    "id": "BATCH3A-024",
+    "text": "WI #78 (SLA monitoring and reporting) approved for implementation",
+    "source_session": "5a765ef0",
+    "source_type": "owner_approval",
+    "domain": "OPS"
+  },
+  {
+    "id": "BATCH3A-025",
+    "text": "100% of admin interfaces MUST be tested",
+    "source_session": "5af7ba3b",
+    "source_type": "owner_directive",
+    "domain": "TESTING"
+  },
+  {
+    "id": "BATCH3A-026",
+    "text": "100% of all admin/configuration options MUST be tested",
+    "source_session": "5af7ba3b",
+    "source_type": "owner_directive",
+    "domain": "TESTING"
+  },
+  {
+    "id": "BATCH3A-027",
+    "text": "Multi-tenant scale, security, and failure mode scenarios MUST be tested",
+    "source_session": "5af7ba3b",
+    "source_type": "owner_directive",
+    "domain": "TESTING"
+  },
+  {
+    "id": "BATCH3A-028",
+    "text": "Adversarial testing MUST be performed in the production environment",
+    "source_session": "5af7ba3b",
+    "source_type": "owner_directive",
+    "domain": "TESTING"
+  },
+  {
+    "id": "BATCH3A-029",
+    "text": "A demo/tryout environment MUST be provided for customers before subscription purchase",
+    "source_session": "5af7ba3b",
+    "source_type": "owner_directive",
+    "domain": "PROVISIONING"
+  },
+  {
+    "id": "BATCH3A-030",
+    "text": "All newly identified tests from the coverage audit MUST be added to the comprehensive test plan",
+    "source_session": "5af7ba3b",
+    "source_type": "owner_directive",
+    "domain": "TESTING"
+  },
+  {
+    "id": "BATCH3A-031",
+    "text": "All newly identified work items from the coverage report MUST be enumerated and added to the backlog",
+    "source_session": "5af7ba3b",
+    "source_type": "owner_directive",
+    "domain": "GENERAL"
+  },
+  {
+    "id": "BATCH3A-032",
+    "text": "The Shopify embedded admin and the standalone admin MUST be functionally equivalent — every feature available in one shell MUST be available in the other",
+    "source_session": "5b1c8361",
+    "source_type": "owner_directive",
+    "domain": "ADMIN_UI"
+  },
+  {
+    "id": "BATCH3A-033",
+    "text": "Every admin UI element MUST have a mouseover tooltip with a brief explanation of the element's purpose",
+    "source_session": "5b1c8361",
+    "source_type": "owner_directive",
+    "domain": "ADMIN_UI"
+  },
+  {
+    "id": "BATCH3A-034",
+    "text": "Every tooltip MUST include a link to the relevant documentation page that opens in a new browser tab",
+    "source_session": "5b1c8361",
+    "source_type": "owner_directive",
+    "domain": "ADMIN_UI"
+  },
+  {
+    "id": "BATCH3A-035",
+    "text": "WI #226 (tooltips with documentation links) approved for implementation",
+    "source_session": "5b1c8361",
+    "source_type": "owner_approval",
+    "domain": "ADMIN_UI"
+  },
+  {
+    "id": "BATCH3A-036",
+    "text": "Claude is delegated priority choice for WI #209-225 (RAG infrastructure) implementation order",
+    "source_session": "5b1c8361",
+    "source_type": "owner_directive",
+    "domain": "GENERAL"
+  },
+  {
+    "id": "BATCH3A-037",
+    "text": "Shopify merchant category images MUST be included for marketing purposes",
+    "source_session": "5b1c8361",
+    "source_type": "owner_directive",
+    "domain": "SHOPIFY"
+  },
+  {
+    "id": "BATCH3A-038",
+    "text": "A security assessment of the local development environment MUST be performed",
+    "source_session": "5b1c8361",
+    "source_type": "owner_directive",
+    "domain": "OPS"
+  },
+  {
+    "id": "BATCH3A-039",
+    "text": "The standalone admin console MUST include links to product documentation",
+    "source_session": "5c7c0bb9",
+    "source_type": "owner_directive",
+    "domain": "ADMIN_UI"
+  },
+  {
+    "id": "BATCH3A-040",
+    "text": "The standalone admin sticky navbar MUST display the merchant's Shopify storefront name",
+    "source_session": "5c7c0bb9",
+    "source_type": "owner_directive",
+    "domain": "ADMIN_UI"
+  },
+  {
+    "id": "BATCH3A-041",
+    "text": "The standalone admin sticky navbar MUST include a link to the merchant's Shopify storefront",
+    "source_session": "5c7c0bb9",
+    "source_type": "owner_directive",
+    "domain": "ADMIN_UI"
+  },
+  {
+    "id": "BATCH3A-042",
+    "text": "The Shopify embedded admin MUST include a cross-navigation link to the standalone admin console",
+    "source_session": "5c7c0bb9",
+    "source_type": "owner_directive",
+    "domain": "SHOPIFY"
+  },
+  {
+    "id": "BATCH3A-043",
+    "text": "Documentation links MUST be included in the Shopify app submission materials",
+    "source_session": "5c7c0bb9",
+    "source_type": "owner_directive",
+    "domain": "SHOPIFY"
+  },
+  {
+    "id": "BATCH3A-044",
+    "text": "The widget 'Powered by Agent Red' link MUST point to agentredcx.com (not remakerdigital.com)",
+    "source_session": "5c7c0bb9",
+    "source_type": "owner_directive",
+    "domain": "WIDGET_UI"
+  },
+  {
+    "id": "BATCH3A-045",
+    "text": "The Inbox page MUST be a read-only transcript viewer — chat input MUST be removed entirely",
+    "source_session": "5d5d1bd0",
+    "source_type": "owner_directive",
+    "domain": "ADMIN_UI"
+  },
+  {
+    "id": "BATCH3A-046",
+    "text": "Escalation agents MUST have read-only access to the Inbox page",
+    "source_session": "5d5d1bd0",
+    "source_type": "owner_directive",
+    "domain": "TEAM"
+  },
+  {
+    "id": "BATCH3A-047",
+    "text": "The 4-role architecture MUST be implemented: superadmin, admin, escalation_agent, viewer",
+    "source_session": "5d5d1bd0",
+    "source_type": "owner_approval",
+    "domain": "AUTH"
+  },
+  {
+    "id": "BATCH3A-048",
+    "text": "The superadmin role MUST be hidden from the team management UI and cannot be deleted",
+    "source_session": "5d5d1bd0",
+    "source_type": "owner_directive",
+    "domain": "AUTH"
+  },
+  {
+    "id": "BATCH3A-049",
+    "text": "The admin role MUST have full access to all admin features",
+    "source_session": "5d5d1bd0",
+    "source_type": "owner_directive",
+    "domain": "AUTH"
+  },
+  {
+    "id": "BATCH3A-050",
+    "text": "The viewer role MUST have read-only access to all admin pages",
+    "source_session": "5d5d1bd0",
+    "source_type": "owner_directive",
+    "domain": "AUTH"
+  },
+  {
+    "id": "BATCH3A-051",
+    "text": "Option C approved: per-user API key authentication model where each API key is linked to an approved team member email address",
+    "source_session": "5d5d1bd0",
+    "source_type": "owner_approval",
+    "domain": "AUTH"
+  },
+  {
+    "id": "BATCH3A-052",
+    "text": "Team members MUST NOT be able to change their own email addresses — email is an admin-controlled identity field",
+    "source_session": "5d5d1bd0",
+    "source_type": "owner_directive",
+    "domain": "TEAM"
+  },
+  {
+    "id": "BATCH3A-053",
+    "text": "A whoami endpoint MUST be implemented to return the authenticated user's identity and role",
+    "source_session": "5d5d1bd0",
+    "source_type": "owner_approval",
+    "domain": "API"
+  },
+  {
+    "id": "BATCH3A-054",
+    "text": "Nine default escalation keywords MUST be pre-configured for new tenants",
+    "source_session": "5d5d1bd0",
+    "source_type": "owner_directive",
+    "domain": "CONVERSATIONS"
+  },
+  {
+    "id": "BATCH3A-055",
+    "text": "Integration card logos MUST use a 180x180 pixel square container",
+    "source_session": "5f56d0f4",
+    "source_type": "owner_directive",
+    "domain": "ADMIN_UI"
+  },
+  {
+    "id": "BATCH3A-056",
+    "text": "Integration card logo images MUST fill the container naturally with no explicit size constraints on the img element",
+    "source_session": "5f56d0f4",
+    "source_type": "owner_directive",
+    "domain": "ADMIN_UI"
+  },
+  {
+    "id": "BATCH3A-057",
+    "text": "All interactive buttons in the admin UI MUST have visible hover states",
+    "source_session": "5f56d0f4",
+    "source_type": "owner_directive",
+    "domain": "ADMIN_UI"
+  },
+  {
+    "id": "BATCH3A-058",
+    "text": "Every tooltip MUST contain brief descriptive text AND a link to the corresponding documentation page with an anchor to the relevant section",
+    "source_session": "5f56d0f4",
+    "source_type": "owner_directive",
+    "domain": "ADMIN_UI"
+  },
+  {
+    "id": "BATCH3A-059",
+    "text": "The Dashboard page MUST NOT have an All/Production/Test environment selector control",
+    "source_session": "5f56d0f4",
+    "source_type": "owner_directive",
+    "domain": "ADMIN_UI"
+  },
+  {
+    "id": "BATCH3A-060",
+    "text": "The sidebar logo MUST have separate dark mode and light mode variants",
+    "source_session": "5f56d0f4",
+    "source_type": "owner_directive",
+    "domain": "ADMIN_UI"
+  },
+  {
+    "id": "BATCH3A-061",
+    "text": "The light mode sidebar logo MUST use NEW-BLOCK-LOGO-HORIZONTAL-LIGHT.svg",
+    "source_session": "5f56d0f4",
+    "source_type": "owner_directive",
+    "domain": "ADMIN_UI"
+  },
+  {
+    "id": "BATCH3A-062",
+    "text": "The dark mode sidebar logo MUST use NEW-BLOCK-LOGO-HORIZONTAL-DARK.svg",
+    "source_session": "5f56d0f4",
+    "source_type": "owner_directive",
+    "domain": "ADMIN_UI"
+  },
+  {
+    "id": "BATCH3A-063",
+    "text": "Dark mode page background color MUST be #141414",
+    "source_session": "6531e517",
+    "source_type": "owner_directive",
+    "domain": "ADMIN_UI"
+  },
+  {
+    "id": "BATCH3A-064",
+    "text": "Dark mode card/surface background color MUST be #1f1f1f",
+    "source_session": "6531e517",
+    "source_type": "owner_directive",
+    "domain": "ADMIN_UI"
+  },
+  {
+    "id": "BATCH3A-065",
+    "text": "Dark mode card border color MUST be #272727",
+    "source_session": "6531e517",
+    "source_type": "owner_directive",
+    "domain": "ADMIN_UI"
+  },
+  {
+    "id": "BATCH3A-066",
+    "text": "Dark mode header and sidebar background color MUST be #0a0a0a",
+    "source_session": "6531e517",
+    "source_type": "owner_directive",
+    "domain": "ADMIN_UI"
+  },
+  {
+    "id": "BATCH3A-067",
+    "text": "Table row borders MUST use the standard box border color (#272727)",
+    "source_session": "6531e517",
+    "source_type": "owner_directive",
+    "domain": "ADMIN_UI"
+  },
+  {
+    "id": "BATCH3A-068",
+    "text": "Input and selection field borders MUST use the standard box border color (#272727)",
+    "source_session": "6531e517",
+    "source_type": "owner_directive",
+    "domain": "ADMIN_UI"
+  },
+  {
+    "id": "BATCH3A-069",
+    "text": "Section heading underlines MUST use the standard box border color (#272727)",
+    "source_session": "6531e517",
+    "source_type": "owner_directive",
+    "domain": "ADMIN_UI"
+  },
+  {
+    "id": "BATCH3A-070",
+    "text": "Grey button borders MUST use the standard box border color (#272727)",
+    "source_session": "6531e517",
+    "source_type": "owner_directive",
+    "domain": "ADMIN_UI"
+  },
+  {
+    "id": "BATCH3A-071",
+    "text": "Accordion and expander borders MUST use the standard box border color (#272727)",
+    "source_session": "6531e517",
+    "source_type": "owner_directive",
+    "domain": "ADMIN_UI"
+  },
+  {
+    "id": "BATCH3A-072",
+    "text": "Inbox pane backgrounds MUST use the sidebar background color (#0a0a0a)",
+    "source_session": "6531e517",
+    "source_type": "owner_directive",
+    "domain": "ADMIN_UI"
+  },
+  {
+    "id": "BATCH3A-073",
+    "text": "Search field borders MUST use the standard box border color (#272727)",
+    "source_session": "6531e517",
+    "source_type": "owner_directive",
+    "domain": "ADMIN_UI"
+  },
+  {
+    "id": "BATCH3A-074",
+    "text": "RAG lookup tag borders MUST use the standard box border color (#272727)",
+    "source_session": "6531e517",
+    "source_type": "owner_directive",
+    "domain": "ADMIN_UI"
+  },
+  {
+    "id": "BATCH3A-075",
+    "text": "Chat bubble grey background MUST use the sidebar active-page highlight color",
+    "source_session": "6531e517",
+    "source_type": "owner_directive",
+    "domain": "ADMIN_UI"
+  },
+  {
+    "id": "BATCH3A-076",
+    "text": "Highlighted/selected conversation row background MUST use the sidebar active-page highlight color",
+    "source_session": "6531e517",
+    "source_type": "owner_directive",
+    "domain": "ADMIN_UI"
+  },
+  {
+    "id": "BATCH3A-077",
+    "text": "The Remaker Digital logo contains its own wordmark — no separate text label MUST be rendered next to the logo",
+    "source_session": "6531e517",
+    "source_type": "owner_directive",
+    "domain": "ADMIN_UI"
+  },
+  {
+    "id": "BATCH3A-078",
+    "text": "The sidebar logo MUST render in its natural colors with no CSS filter applied",
+    "source_session": "6531e517",
+    "source_type": "owner_directive",
+    "domain": "ADMIN_UI"
+  },
+  {
+    "id": "BATCH3A-079",
+    "text": "Dark mode color hierarchy MUST follow: chrome #0a0a0a (darkest) -> page #141414 -> surface #1f1f1f -> border #272727 (lightest dark element)",
+    "source_session": "6531e517",
+    "source_type": "owner_directive",
+    "domain": "ADMIN_UI"
+  },
+  {
+    "id": "BATCH3A-080",
+    "text": "All Mantine component borders MUST be standardized to the same border color (#272727) for visual consistency",
+    "source_session": "6531e517",
+    "source_type": "owner_directive",
+    "domain": "ADMIN_UI"
+  },
+  {
+    "id": "BATCH3A-081",
+    "text": "WI #209 (KB vectorization and embedding pipeline) approved for implementation",
+    "source_session": "5b1c8361",
+    "source_type": "owner_approval",
+    "domain": "CONVERSATIONS"
+  },
+  {
+    "id": "BATCH3A-082",
+    "text": "WI #210 (document upload support for PDF, DOCX, CSV, and URL sources) approved for implementation",
+    "source_session": "5b1c8361",
+    "source_type": "owner_approval",
+    "domain": "ADMIN_UI"
+  },
+  {
+    "id": "BATCH3A-083",
+    "text": "WI #211 (hybrid BM25 plus vector retrieval for knowledge base queries) approved for implementation",
+    "source_session": "5b1c8361",
+    "source_type": "owner_approval",
+    "domain": "CONVERSATIONS"
+  },
+  {
+    "id": "BATCH3A-084",
+    "text": "WI #212 (KB document staleness management and re-indexing) approved for implementation",
+    "source_session": "5b1c8361",
+    "source_type": "owner_approval",
+    "domain": "CONVERSATIONS"
+  },
+  {
+    "id": "BATCH3A-085",
+    "text": "WI #213 (semantic caching for repeated knowledge base queries) approved for implementation",
+    "source_session": "5b1c8361",
+    "source_type": "owner_approval",
+    "domain": "CONVERSATIONS"
+  },
+  {
+    "id": "BATCH3A-086",
+    "text": "The escalation_agent role MUST be restricted to read-only Inbox access only — no access to configuration, team, or settings pages",
+    "source_session": "5d5d1bd0",
+    "source_type": "owner_directive",
+    "domain": "AUTH"
+  },
+  {
+    "id": "BATCH3A-087",
+    "text": "Per-user API keys MUST follow the format ar_user_* with the key cryptographically linked to a specific team member email",
+    "source_session": "5d5d1bd0",
+    "source_type": "owner_directive",
+    "domain": "AUTH"
+  },
+  {
+    "id": "BATCH3A-088",
+    "text": "Grey buttons in the admin UI MUST use the standard box border color (#272727) for their border",
+    "source_session": "6531e517",
+    "source_type": "owner_directive",
+    "domain": "ADMIN_UI"
+  },
+  {
+    "id": "BATCH3A-089",
+    "text": "The Save button MUST persist configuration changes to storage without making them live",
+    "source_session": "56edabbb",
+    "source_type": "owner_directive",
+    "domain": "CONFIG"
+  },
+  {
+    "id": "BATCH3A-090",
+    "text": "The Activate button MUST make previously saved configuration changes live and active for the widget",
+    "source_session": "56edabbb",
+    "source_type": "owner_directive",
+    "domain": "CONFIG"
+  },
+  {
+    "id": "BATCH3A-091",
+    "text": "Widget Config page MUST also participate in the Save-then-Activate state model alongside Agent Config, KB, and Quick Actions",
+    "source_session": "56edabbb",
+    "source_type": "owner_directive",
+    "domain": "CONFIG"
+  }
+]

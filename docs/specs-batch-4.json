@@ -1,0 +1,1066 @@
+[
+  {
+    "id": "BATCH4-001",
+    "text": "Team member deletion MUST be a hard delete that removes the Cosmos DB document entirely",
+    "source_session": "7f9d73ab-dee7-46ca-bd33-10e25234e700",
+    "source_type": "owner_directive",
+    "domain": "TEAM"
+  },
+  {
+    "id": "BATCH4-002",
+    "text": "There MUST NOT be any soft deletion option for team members",
+    "source_session": "7f9d73ab-dee7-46ca-bd33-10e25234e700",
+    "source_type": "owner_directive",
+    "domain": "TEAM"
+  },
+  {
+    "id": "BATCH4-003",
+    "text": "All team member actions (addition, deletion, role change, status change) MUST be stored in an audit log",
+    "source_session": "7f9d73ab-dee7-46ca-bd33-10e25234e700",
+    "source_type": "owner_directive",
+    "domain": "TEAM"
+  },
+  {
+    "id": "BATCH4-004",
+    "text": "Deletion of a team member can only be reversed by adding the user again using the '+ Invite member' process",
+    "source_session": "7f9d73ab-dee7-46ca-bd33-10e25234e700",
+    "source_type": "owner_directive",
+    "domain": "TEAM"
+  },
+  {
+    "id": "BATCH4-005",
+    "text": "The system MUST NOT be in an 'Active' state if mandatory inputs are missing",
+    "source_session": "7f9d73ab-dee7-46ca-bd33-10e25234e700",
+    "source_type": "owner_directive",
+    "domain": "CONFIG"
+  },
+  {
+    "id": "BATCH4-006",
+    "text": "When the tenant environment is initialized, it MUST NOT be in an 'Active' state",
+    "source_session": "7f9d73ab-dee7-46ca-bd33-10e25234e700",
+    "source_type": "owner_directive",
+    "domain": "CONFIG"
+  },
+  {
+    "id": "BATCH4-007",
+    "text": "The merchant admin MUST provide mandatory inputs and choose to activate the configuration explicitly",
+    "source_session": "7f9d73ab-dee7-46ca-bd33-10e25234e700",
+    "source_type": "owner_directive",
+    "domain": "CONFIG"
+  },
+  {
+    "id": "BATCH4-008",
+    "text": "New tenant provisioning and health check MUST be fully automated with 100% success rate and no manual involvement (P0 blocker)",
+    "source_session": "81d2168b-a365-4897-a195-e6426063edf0",
+    "source_type": "owner_directive",
+    "domain": "PROVISIONING"
+  },
+  {
+    "id": "BATCH4-009",
+    "text": "The SPA console MUST have a control (e.g., button) which triggers the automated deployment of a new tenant",
+    "source_session": "81d2168b-a365-4897-a195-e6426063edf0",
+    "source_type": "owner_directive",
+    "domain": "PROVISIONING"
+  },
+  {
+    "id": "BATCH4-010",
+    "text": "When a tenant is activated with a 'Trial' entitlement, the time of activation MUST be recorded and the expiration date MUST be set to 15 days in the future",
+    "source_session": "81d2168b-a365-4897-a195-e6426063edf0",
+    "source_type": "owner_directive",
+    "domain": "BILLING"
+  },
+  {
+    "id": "BATCH4-011",
+    "text": "If the merchant administrator upgrades the entitlement from Trial, the time of upgrade and new entitlement MUST be recorded and the expiration MUST be set to 31 days in the future",
+    "source_session": "81d2168b-a365-4897-a195-e6426063edf0",
+    "source_type": "owner_directive",
+    "domain": "BILLING"
+  },
+  {
+    "id": "BATCH4-012",
+    "text": "If the entitlement is set to 'cancelled', the tenancy MUST continue to operate normally until the next scheduled expiration check",
+    "source_session": "81d2168b-a365-4897-a195-e6426063edf0",
+    "source_type": "owner_directive",
+    "domain": "BILLING"
+  },
+  {
+    "id": "BATCH4-013",
+    "text": "An expired tenancy MUST remain accessible to the merchant administrator but MUST be set to an inactive 'Expired' state with a 'Deletion' date set to 31 days in the future",
+    "source_session": "81d2168b-a365-4897-a195-e6426063edf0",
+    "source_type": "owner_directive",
+    "domain": "BILLING"
+  },
+  {
+    "id": "BATCH4-014",
+    "text": "While a tenancy is Expired, the widget key MUST be disabled (not allowed)",
+    "source_session": "81d2168b-a365-4897-a195-e6426063edf0",
+    "source_type": "owner_directive",
+    "domain": "BILLING"
+  },
+  {
+    "id": "BATCH4-015",
+    "text": "While a tenancy is Expired, the activation control in the merchant admin UI MUST display the message 'Expired'",
+    "source_session": "81d2168b-a365-4897-a195-e6426063edf0",
+    "source_type": "owner_directive",
+    "domain": "BILLING"
+  },
+  {
+    "id": "BATCH4-016",
+    "text": "If a merchant administrator interacts with the activation control while in 'Expired' state, a pop-up MUST offer the option to purchase a Starter, Professional or Enterprise license",
+    "source_session": "81d2168b-a365-4897-a195-e6426063edf0",
+    "source_type": "owner_directive",
+    "domain": "BILLING"
+  },
+  {
+    "id": "BATCH4-017",
+    "text": "The merchant superadmin MUST receive notification emails for: initial Trial activation, entitlement changes, tenancy expiration, 15 days prior to deletion, and tenancy deletion",
+    "source_session": "81d2168b-a365-4897-a195-e6426063edf0",
+    "source_type": "owner_directive",
+    "domain": "EMAIL"
+  },
+  {
+    "id": "BATCH4-018",
+    "text": "The repeatable procedure for test tenancy and SPA console instance creation MUST ensure URLs and API keys are always added to env.local before the procedures are complete",
+    "source_session": "81d2168b-a365-4897-a195-e6426063edf0",
+    "source_type": "owner_directive",
+    "domain": "OPS"
+  },
+  {
+    "id": "BATCH4-019",
+    "text": "A master procedure for end-to-end testing MUST exist that specifies sub-procedures, execution order, and is iteratively corrected until a complete run has no errors or omissions",
+    "source_session": "81d2168b-a365-4897-a195-e6426063edf0",
+    "source_type": "owner_directive",
+    "domain": "TESTING"
+  },
+  {
+    "id": "BATCH4-020",
+    "text": "The Setup wizard dismissal MUST be associated with a specific session, so when an administrator logs in with a new session and the system has never been in an active state, the Setup wizard MUST be triggered",
+    "source_session": "81d2168b-a365-4897-a195-e6426063edf0",
+    "source_type": "owner_directive",
+    "domain": "ADMIN_UI"
+  },
+  {
+    "id": "BATCH4-021",
+    "text": "The 'Subscribe' button on the Billing page MUST function correctly",
+    "source_session": "81d2168b-a365-4897-a195-e6426063edf0",
+    "source_type": "owner_directive",
+    "domain": "BILLING"
+  },
+  {
+    "id": "BATCH4-022",
+    "text": "The 'Category' and 'Status' select menus on the Knowledge Base page MUST have text labels indicating what each menu is for",
+    "source_session": "81d2168b-a365-4897-a195-e6426063edf0",
+    "source_type": "owner_directive",
+    "domain": "ADMIN_UI"
+  },
+  {
+    "id": "BATCH4-023",
+    "text": "System activation MUST NOT report failure while the system actually transitions to 'Active' state — the result reported to the user MUST match the actual state",
+    "source_session": "81d2168b-a365-4897-a195-e6426063edf0",
+    "source_type": "owner_directive",
+    "domain": "CONFIG"
+  },
+  {
+    "id": "BATCH4-024",
+    "text": "When a customer attempts to chat, the system MUST make every attempt to authenticate and identify them — customer identification and authentication for every conversation is critical (P0)",
+    "source_session": "81d2168b-a365-4897-a195-e6426063edf0",
+    "source_type": "owner_directive",
+    "domain": "AUTH"
+  },
+  {
+    "id": "BATCH4-025",
+    "text": "Anonymous chat sessions MUST be discouraged because they undermine the value of Persistent Customer Memory",
+    "source_session": "81d2168b-a365-4897-a195-e6426063edf0",
+    "source_type": "owner_directive",
+    "domain": "AUTH"
+  },
+  {
+    "id": "BATCH4-026",
+    "text": "Customer identification mechanisms MUST include magic links and any other available authentication methods",
+    "source_session": "81d2168b-a365-4897-a195-e6426063edf0",
+    "source_type": "owner_directive",
+    "domain": "AUTH"
+  },
+  {
+    "id": "BATCH4-027",
+    "text": "Closing the chat widget with the 'X' button MUST NOT leave the widget in the wrong state",
+    "source_session": "81d2168b-a365-4897-a195-e6426063edf0",
+    "source_type": "owner_directive",
+    "domain": "WIDGET_UI"
+  },
+  {
+    "id": "BATCH4-028",
+    "text": "AUTH-1: Name and email MUST be required before AI responds. If the customer refuses, the AI MUST respond with a warning about lost benefits (orders, account info, loyalty, rewards). Chat may proceed after warning.",
+    "source_session": "81d2168b-a365-4897-a195-e6426063edf0",
+    "source_type": "owner_directive",
+    "domain": "AUTH"
+  },
+  {
+    "id": "BATCH4-029",
+    "text": "The escalation window MUST be limited to 24 hours after resolution",
+    "source_session": "81d2168b-a365-4897-a195-e6426063edf0",
+    "source_type": "owner_approval",
+    "domain": "CONVERSATIONS"
+  },
+  {
+    "id": "BATCH4-030",
+    "text": "There MUST be a limit (time, total conversation memory/storage) on the number of conversations in the inbox, beyond which conversations are automatically archived (not searchable, but exportable as CSV)",
+    "source_session": "81d2168b-a365-4897-a195-e6426063edf0",
+    "source_type": "owner_directive",
+    "domain": "CONVERSATIONS"
+  },
+  {
+    "id": "BATCH4-031",
+    "text": "OTP verification MUST be mandatory — not for security, but to authenticate customers for Persistent Customer Memory record-keeping",
+    "source_session": "81d2168b-a365-4897-a195-e6426063edf0",
+    "source_type": "owner_directive",
+    "domain": "AUTH"
+  },
+  {
+    "id": "BATCH4-032",
+    "text": "When asking for the customer's email, the system MUST ask to 'verify their identity' with no additional explanation — no justification or over-explanation needed",
+    "source_session": "81d2168b-a365-4897-a195-e6426063edf0",
+    "source_type": "owner_directive",
+    "domain": "AUTH"
+  },
+  {
+    "id": "BATCH4-033",
+    "text": "The warning for anonymous customers MUST NOT be skipped — customers who choose not to identify themselves MUST know what benefits they lose and MUST confirm after the warning is displayed",
+    "source_session": "81d2168b-a365-4897-a195-e6426063edf0",
+    "source_type": "owner_directive",
+    "domain": "AUTH"
+  },
+  {
+    "id": "BATCH4-034",
+    "text": "The warning is deliberate friction to discourage anonymity in an e-commerce context",
+    "source_session": "81d2168b-a365-4897-a195-e6426063edf0",
+    "source_type": "owner_directive",
+    "domain": "AUTH"
+  },
+  {
+    "id": "BATCH4-035",
+    "text": "Customer identification MUST NOT be deprioritized or deferred unless the owner explicitly agrees — this is a permanent priority mandate",
+    "source_session": "81d2168b-a365-4897-a195-e6426063edf0",
+    "source_type": "owner_directive",
+    "domain": "AUTH"
+  },
+  {
+    "id": "BATCH4-036",
+    "text": "The knowledge base and repeatable procedures MUST be updated after each implementation cycle to reduce the risk of errors when context is lost due to compaction",
+    "source_session": "81d2168b-a365-4897-a195-e6426063edf0",
+    "source_type": "owner_directive",
+    "domain": "OPS"
+  },
+  {
+    "id": "BATCH4-037",
+    "text": "The knowledge base MUST be reviewed to reduce unnecessary context window usage by enhancing modularization and co-location of interdependent information",
+    "source_session": "81d2168b-a365-4897-a195-e6426063edf0",
+    "source_type": "owner_directive",
+    "domain": "OPS"
+  },
+  {
+    "id": "BATCH4-038",
+    "text": "Session wrap-up MUST include: detailed knowledge base updates, repeatable procedure confirmation, artifact cleanup, agentredcx.com updates, git commit/push, GitHub project/wiki updates, production deployment (unless advised against), and next-session prompt",
+    "source_session": "81d2168b-a365-4897-a195-e6426063edf0",
+    "source_type": "owner_directive",
+    "domain": "OPS"
+  },
+  {
+    "id": "BATCH4-039",
+    "text": "For the interactive UI review, each element MUST be evaluated for: (1) necessity given current plan, (2) correct text and presentation type, (3) correct behavior on interaction, (4) revealed controls also evaluated, (5) image visibility, (6) correct colors for Light/Dark mode, (7) mandatory inputs marked with red asterisk",
+    "source_session": "864a42f3-0173-4225-b3b9-ff060d79ea6c",
+    "source_type": "owner_directive",
+    "domain": "TESTING"
+  },
+  {
+    "id": "BATCH4-040",
+    "text": "Elements that cannot be fully functionally evaluated offline MUST be noted in the knowledge base for production verification",
+    "source_session": "864a42f3-0173-4225-b3b9-ff060d79ea6c",
+    "source_type": "owner_directive",
+    "domain": "TESTING"
+  },
+  {
+    "id": "BATCH4-041",
+    "text": "Plan-gated elements MUST be tested per entitlement tier — a full set of tests may be needed for each plan (Trial, Starter, Professional, Enterprise)",
+    "source_session": "864a42f3-0173-4225-b3b9-ff060d79ea6c",
+    "source_type": "owner_directive",
+    "domain": "TESTING"
+  },
+  {
+    "id": "BATCH4-042",
+    "text": "All tooltip links in the admin UI MUST point to valid, existing documentation pages on agentredcx.com",
+    "source_session": "864a42f3-0173-4225-b3b9-ff060d79ea6c",
+    "source_type": "owner_directive",
+    "domain": "ADMIN_UI"
+  },
+  {
+    "id": "BATCH4-043",
+    "text": "A master list of all required tooltips and their documentation URLs MUST be maintained and addressed as a single work item",
+    "source_session": "864a42f3-0173-4225-b3b9-ff060d79ea6c",
+    "source_type": "owner_directive",
+    "domain": "ADMIN_UI"
+  },
+  {
+    "id": "BATCH4-044",
+    "text": "The storefront name on the Dashboard MUST have 40px margin below it, above the word 'Dashboard'",
+    "source_session": "864a42f3-0173-4225-b3b9-ff060d79ea6c",
+    "source_type": "owner_directive",
+    "domain": "ADMIN_UI"
+  },
+  {
+    "id": "BATCH4-045",
+    "text": "The storefront name text size MUST match that of the word 'Dashboard' — it MUST NOT be visually secondary",
+    "source_session": "864a42f3-0173-4225-b3b9-ff060d79ea6c",
+    "source_type": "owner_directive",
+    "domain": "ADMIN_UI"
+  },
+  {
+    "id": "BATCH4-046",
+    "text": "The page body background on the Team page MUST be dark, and the team member list and '+ Invite member' MUST be grouped within a single box (not a box within a box)",
+    "source_session": "864a42f3-0173-4225-b3b9-ff060d79ea6c",
+    "source_type": "owner_directive",
+    "domain": "ADMIN_UI"
+  },
+  {
+    "id": "BATCH4-047",
+    "text": "The role permissions tooltip content MUST be arranged in a table with vertically consistent content rows",
+    "source_session": "864a42f3-0173-4225-b3b9-ff060d79ea6c",
+    "source_type": "owner_directive",
+    "domain": "ADMIN_UI"
+  },
+  {
+    "id": "BATCH4-048",
+    "text": "The role permissions tooltip MUST have 12px spacing between rows and use regular sentence case (not ALL-CAPS) for descriptive text",
+    "source_session": "864a42f3-0173-4225-b3b9-ff060d79ea6c",
+    "source_type": "owner_directive",
+    "domain": "ADMIN_UI"
+  },
+  {
+    "id": "BATCH4-049",
+    "text": "The 'Remove' buttons for team members MUST be trash-can icons in the same style as the light/dark toggle, with correct styling for both Light and Dark modes",
+    "source_session": "864a42f3-0173-4225-b3b9-ff060d79ea6c",
+    "source_type": "owner_directive",
+    "domain": "ADMIN_UI"
+  },
+  {
+    "id": "BATCH4-050",
+    "text": "The 'Inactive' state change MUST be triggered when the admin saves configuration changes that remove mandatory fields — must work as a client-server round trip, not just client-side",
+    "source_session": "864a42f3-0173-4225-b3b9-ff060d79ea6c",
+    "source_type": "owner_directive",
+    "domain": "CONFIG"
+  },
+  {
+    "id": "BATCH4-051",
+    "text": "The Knowledge Base 'Category' and 'Status' columns MUST NOT show grey circles (empty badges) — they must display actual values",
+    "source_session": "864a42f3-0173-4225-b3b9-ff060d79ea6c",
+    "source_type": "owner_directive",
+    "domain": "ADMIN_UI"
+  },
+  {
+    "id": "BATCH4-052",
+    "text": "The Knowledge Base 'Scan for conflicts' control MUST have a tooltip",
+    "source_session": "864a42f3-0173-4225-b3b9-ff060d79ea6c",
+    "source_type": "owner_directive",
+    "domain": "ADMIN_UI"
+  },
+  {
+    "id": "BATCH4-053",
+    "text": "The Knowledge Base 'Import' control MUST have a tooltip",
+    "source_session": "864a42f3-0173-4225-b3b9-ff060d79ea6c",
+    "source_type": "owner_directive",
+    "domain": "ADMIN_UI"
+  },
+  {
+    "id": "BATCH4-054",
+    "text": "The Knowledge Base 'Needs attention' display area MUST have a tooltip",
+    "source_session": "864a42f3-0173-4225-b3b9-ff060d79ea6c",
+    "source_type": "owner_directive",
+    "domain": "ADMIN_UI"
+  },
+  {
+    "id": "BATCH4-055",
+    "text": "The Widget 'Greeting message' MUST have a tooltip explaining that it does not affect AI behavior and is not AI generated",
+    "source_session": "864a42f3-0173-4225-b3b9-ff060d79ea6c",
+    "source_type": "owner_directive",
+    "domain": "WIDGET_UI"
+  },
+  {
+    "id": "BATCH4-056",
+    "text": "A future work item MUST be created for an 'AI Greeting' option toggle that, when enabled, lets the AI generate greeting messages for new chat sessions",
+    "source_session": "864a42f3-0173-4225-b3b9-ff060d79ea6c",
+    "source_type": "owner_directive",
+    "domain": "WIDGET_UI"
+  },
+  {
+    "id": "BATCH4-057",
+    "text": "The Widget 'Pre-chat form' MUST have a tooltip informing that the account associated with the customer at login may not be a reliable identifier, that if discerning multiple users sharing one Shopify account matters they should ask users to identify themselves, and that information collected is not verified and not related to security",
+    "source_session": "864a42f3-0173-4225-b3b9-ff060d79ea6c",
+    "source_type": "owner_directive",
+    "domain": "WIDGET_UI"
+  },
+  {
+    "id": "BATCH4-058",
+    "text": "The Integrations partner logos MUST NOT have added vertical padding/margin, the dark grey boxes MUST be horizontally-oriented rectangles (not vertically-oriented), logo height MUST be 260px",
+    "source_session": "864a42f3-0173-4225-b3b9-ff060d79ea6c",
+    "source_type": "owner_directive",
+    "domain": "ADMIN_UI"
+  },
+  {
+    "id": "BATCH4-059",
+    "text": "Integration text and buttons grouped with a logo MUST be positioned to the right of the logo, with nothing below the logo",
+    "source_session": "864a42f3-0173-4225-b3b9-ff060d79ea6c",
+    "source_type": "owner_directive",
+    "domain": "ADMIN_UI"
+  },
+  {
+    "id": "BATCH4-060",
+    "text": "The Integrations page MUST NOT have a large dark-grey box containing multiple lighter grey boxes — the page body MUST be standard dark grey with lighter-grey boxes arranged in a column centered in the display area (remove one layer of box nesting)",
+    "source_session": "864a42f3-0173-4225-b3b9-ff060d79ea6c",
+    "source_type": "owner_directive",
+    "domain": "ADMIN_UI"
+  },
+  {
+    "id": "BATCH4-061",
+    "text": "SPA stands for 'Service Provider Administrator' (Remaker Digital employee), NOT 'Single Page Application'. Superadmin/admin refers to merchant users (customers), NOT Remaker Digital employees.",
+    "source_session": "88d8fddf-acb2-4d6f-8798-9a7f33febae4",
+    "source_type": "owner_directive",
+    "domain": "GENERAL"
+  },
+  {
+    "id": "BATCH4-062",
+    "text": "Tests of all externally reachable URLs MUST be added to the Repeatable Procedures for testing",
+    "source_session": "88d8fddf-acb2-4d6f-8798-9a7f33febae4",
+    "source_type": "owner_directive",
+    "domain": "TESTING"
+  },
+  {
+    "id": "BATCH4-063",
+    "text": "Repeatable Procedures for automated testing of UI via Chrome MUST be created, with Chrome access used to the maximum extent to automate all UI validation and readiness/correctness testing",
+    "source_session": "88d8fddf-acb2-4d6f-8798-9a7f33febae4",
+    "source_type": "owner_directive",
+    "domain": "TESTING"
+  },
+  {
+    "id": "BATCH4-064",
+    "text": "For each UI element validation: (1) ensure it is displaying, (2) it displays correct information, (3) inputs can be manipulated to produce correct response, (4) inputs are populated with valid information, (5) changing input results in correct state change, (6) control activation results in correct state change, (7) input validation is correct with warning/failure/explanation, (8) each disposition is tested with appropriate messages",
+    "source_session": "88d8fddf-acb2-4d6f-8798-9a7f33febae4",
+    "source_type": "owner_directive",
+    "domain": "TESTING"
+  },
+  {
+    "id": "BATCH4-065",
+    "text": "Merchant and SPA admin URLs, API keys and passwords MUST be added to env.local after every build or URL/API key change event",
+    "source_session": "88d8fddf-acb2-4d6f-8798-9a7f33febae4",
+    "source_type": "owner_directive",
+    "domain": "OPS"
+  },
+  {
+    "id": "BATCH4-066",
+    "text": "Competitive analysis (market metrics, competitor capabilities comparison, future features assessment) MUST be saved to the knowledge base for use during roadmap planning sessions",
+    "source_session": "88d8fddf-acb2-4d6f-8798-9a7f33febae4",
+    "source_type": "owner_directive",
+    "domain": "GENERAL"
+  },
+  {
+    "id": "BATCH4-067",
+    "text": "The Provider Console login page MUST say 'Service Provider Administration', NOT 'SUPERADMIN API key'",
+    "source_session": "88d8fddf-acb2-4d6f-8798-9a7f33febae4",
+    "source_type": "owner_directive",
+    "domain": "ADMIN_UI"
+  },
+  {
+    "id": "BATCH4-068",
+    "text": "When performing interactive UI tests: if inputs are required, provide inputs; if the system handles different inputs differently, try all types; if an input blocks another test, provide the blocking input first; tests MAY be multi-step sub-procedures to maximize coverage",
+    "source_session": "88d8fddf-acb2-4d6f-8798-9a7f33febae4",
+    "source_type": "owner_directive",
+    "domain": "TESTING"
+  },
+  {
+    "id": "BATCH4-069",
+    "text": "A mock tenant script MUST be able to set the state of an environment to approximate a fresh tenant for testing purposes",
+    "source_session": "88d8fddf-acb2-4d6f-8798-9a7f33febae4",
+    "source_type": "owner_directive",
+    "domain": "TESTING"
+  },
+  {
+    "id": "BATCH4-070",
+    "text": "It is acceptable to take the test environment offline (Deactivation) for testing purposes",
+    "source_session": "88d8fddf-acb2-4d6f-8798-9a7f33febae4",
+    "source_type": "owner_approval",
+    "domain": "TESTING"
+  },
+  {
+    "id": "BATCH4-071",
+    "text": "Entitlement enforcement MUST be testable via a private control that validates the UI enforces configuration based on entitlements data, with changes reflected in real-time when a customer upgrades or purchases an optional feature",
+    "source_session": "88d8fddf-acb2-4d6f-8798-9a7f33febae4",
+    "source_type": "owner_directive",
+    "domain": "TESTING"
+  },
+  {
+    "id": "BATCH4-072",
+    "text": "The test tenant MUST be created with superadmin email 'info@remakerdigital.com' to allow API key reset requests, starting in initialized state",
+    "source_session": "88d8fddf-acb2-4d6f-8798-9a7f33febae4",
+    "source_type": "owner_directive",
+    "domain": "TESTING"
+  },
+  {
+    "id": "BATCH4-073",
+    "text": "The test tenant MUST have 9 team members: superadmin, admin, sales escalation target, support escalation target, service escalation target, account escalation target, technical assistance escalation target, general inquiry escalation target, and viewer",
+    "source_session": "88d8fddf-acb2-4d6f-8798-9a7f33febae4",
+    "source_type": "owner_directive",
+    "domain": "TESTING"
+  },
+  {
+    "id": "BATCH4-074",
+    "text": "The test tenant MUST have 19 conversations: 6 merchant pages with 2 quick actions each (12 conversations with escalation triggers routed to each target), 2 unassigned for manual escalation testing, and 1 un-escalated for archive control testing",
+    "source_session": "88d8fddf-acb2-4d6f-8798-9a7f33febae4",
+    "source_type": "owner_directive",
+    "domain": "TESTING"
+  },
+  {
+    "id": "BATCH4-075",
+    "text": "The test tenant MUST have 7 KB documents uploaded: 4 to test each document type (CSV, PDF, DOCX, TXT) and remainder to test edit, archive, scan for conflicts, add article, import, and search",
+    "source_session": "88d8fddf-acb2-4d6f-8798-9a7f33febae4",
+    "source_type": "owner_directive",
+    "domain": "TESTING"
+  },
+  {
+    "id": "BATCH4-076",
+    "text": "Some test KB documents MUST have searchable identities (session, email, customer ID) for testing search across all fields; two MUST be initiated as sessions; one MUST use email-based in-conversation authentication",
+    "source_session": "88d8fddf-acb2-4d6f-8798-9a7f33febae4",
+    "source_type": "owner_directive",
+    "domain": "TESTING"
+  },
+  {
+    "id": "BATCH4-077",
+    "text": "Escalation emails MUST be sent to team members with distinct email addresses that are manually verifiable via clickable links that add authenticated email addresses to conversation identity metadata shown in the Inbox detail area",
+    "source_session": "88d8fddf-acb2-4d6f-8798-9a7f33febae4",
+    "source_type": "owner_directive",
+    "domain": "TESTING"
+  },
+  {
+    "id": "BATCH4-078",
+    "text": "The PNG image upload and crop/scale function for the Agent avatar is NOT implemented yet — this is a priority outage that MUST be implemented",
+    "source_session": "88d8fddf-acb2-4d6f-8798-9a7f33febae4",
+    "source_type": "owner_directive",
+    "domain": "ADMIN_UI"
+  },
+  {
+    "id": "BATCH4-079",
+    "text": "Test conversations MUST go through the AI pipeline (not bypass it) to allow testing of SPA console tracing, monitoring, and stats — no data should take non-production paths through the system",
+    "source_session": "88d8fddf-acb2-4d6f-8798-9a7f33febae4",
+    "source_type": "owner_directive",
+    "domain": "TESTING"
+  },
+  {
+    "id": "BATCH4-080",
+    "text": "It is NOT critical that the seeded test tenancy be linked to Shopify — some merchant customers will not be Shopify customers; Shopify integration can be tested separately on the Agent Red Storefront (blanco-9939)",
+    "source_session": "88d8fddf-acb2-4d6f-8798-9a7f33febae4",
+    "source_type": "owner_directive",
+    "domain": "TESTING"
+  },
+  {
+    "id": "BATCH4-081",
+    "text": "Once the Simulated Customer Tenant is created, its known state MUST make it easier to test non-disruptive upgrade, entitlement changes, and license entitlement enforcement",
+    "source_session": "88d8fddf-acb2-4d6f-8798-9a7f33febae4",
+    "source_type": "owner_directive",
+    "domain": "TESTING"
+  },
+  {
+    "id": "BATCH4-082",
+    "text": "Work items MUST be grouped and ordered into build/deploy/test cycles, each fully tested before the next begins",
+    "source_session": "81d2168b-a365-4897-a195-e6426063edf0",
+    "source_type": "owner_directive",
+    "domain": "OPS"
+  },
+  {
+    "id": "BATCH4-083",
+    "text": "The Role permissions block on the Team page MUST be relocated to a tooltip on the 'Role' column header — it MUST NOT be displayed as a page section",
+    "source_session": "864a42f3-0173-4225-b3b9-ff060d79ea6c",
+    "source_type": "owner_directive",
+    "domain": "ADMIN_UI"
+  },
+  {
+    "id": "BATCH4-084",
+    "text": "The '+ Invite member' button MUST be grouped with the Team member list",
+    "source_session": "864a42f3-0173-4225-b3b9-ff060d79ea6c",
+    "source_type": "owner_directive",
+    "domain": "ADMIN_UI"
+  },
+  {
+    "id": "BATCH4-085",
+    "text": "The Admin role dropdown for team members MUST NOT have a purple fill color — it must use the correct role-specific color",
+    "source_session": "864a42f3-0173-4225-b3b9-ff060d79ea6c",
+    "source_type": "owner_directive",
+    "domain": "ADMIN_UI"
+  },
+  {
+    "id": "BATCH4-086",
+    "text": "The Dashboard test mode filter (All/Production/Test switcher) MUST be removed since test mode no longer exists",
+    "source_session": "864a42f3-0173-4225-b3b9-ff060d79ea6c",
+    "source_type": "owner_directive",
+    "domain": "ADMIN_UI"
+  },
+  {
+    "id": "BATCH4-087",
+    "text": "It is acceptable to pause re-testing of code paths believed unaffected by changes and focus on testing only changed paths, with a full end-to-end test run once all new implementation work items are finished",
+    "source_session": "88d8fddf-acb2-4d6f-8798-9a7f33febae4",
+    "source_type": "owner_approval",
+    "domain": "TESTING"
+  },
+  {
+    "id": "BATCH4-088",
+    "text": "The 'Saved configurations' section MUST be removed from the Configuration page — it is vestigial, deprecated by the Activate/Discard/Roll-back model",
+    "source_session": "7f9d73ab-dee7-46ca-bd33-10e25234e700",
+    "source_type": "owner_directive",
+    "domain": "ADMIN_UI"
+  },
+  {
+    "id": "BATCH4-089",
+    "text": "The 'Preview' panel MUST be removed from the Configuration page — static preview is not useful since admins can use the chat widget directly",
+    "source_session": "7f9d73ab-dee7-46ca-bd33-10e25234e700",
+    "source_type": "owner_directive",
+    "domain": "ADMIN_UI"
+  },
+  {
+    "id": "BATCH4-090",
+    "text": "No effort estimates MUST be provided — focus on quality (correctness, completeness, absence of defects)",
+    "source_session": "88d8fddf-acb2-4d6f-8798-9a7f33febae4",
+    "source_type": "owner_directive",
+    "domain": "GENERAL"
+  },
+  {
+    "id": "BATCH4-091",
+    "text": "Integration logo containers MUST use 180px x 180px dimensions with border-radius 8px, dark background (#141414), and 1px solid border (#272727)",
+    "source_session": "8b198594-6332-498e-965d-fad69298ed5e",
+    "source_type": "owner_directive",
+    "domain": "ADMIN_UI"
+  },
+  {
+    "id": "BATCH4-092",
+    "text": "Integration logo images MUST use object-fit: contain and display: block within their container",
+    "source_session": "8b198594-6332-498e-965d-fad69298ed5e",
+    "source_type": "owner_directive",
+    "domain": "ADMIN_UI"
+  },
+  {
+    "id": "BATCH4-093",
+    "text": "The feature \"Cross-session learning\" on the pricing/features page MUST have a tooltip",
+    "source_session": "8b198594-6332-498e-965d-fad69298ed5e",
+    "source_type": "owner_directive",
+    "domain": "ADMIN_UI"
+  },
+  {
+    "id": "BATCH4-094",
+    "text": "The feature \"Dedicated model training\" on the pricing/features page MUST have a tooltip",
+    "source_session": "8b198594-6332-498e-965d-fad69298ed5e",
+    "source_type": "owner_directive",
+    "domain": "ADMIN_UI"
+  },
+  {
+    "id": "BATCH4-095",
+    "text": "The feature \"Data retention & privacy\" on the pricing/features page MUST have a tooltip",
+    "source_session": "8b198594-6332-498e-965d-fad69298ed5e",
+    "source_type": "owner_directive",
+    "domain": "ADMIN_UI"
+  },
+  {
+    "id": "BATCH4-096",
+    "text": "Every tooltip in the admin UI MUST include a link to documentation",
+    "source_session": "8b198594-6332-498e-965d-fad69298ed5e",
+    "source_type": "owner_directive",
+    "domain": "ADMIN_UI"
+  },
+  {
+    "id": "BATCH4-097",
+    "text": "Every documentation link in a tooltip MUST resolve to content that describes the capability which is the subject of the tooltip",
+    "source_session": "8b198594-6332-498e-965d-fad69298ed5e",
+    "source_type": "owner_directive",
+    "domain": "ADMIN_UI"
+  },
+  {
+    "id": "BATCH4-098",
+    "text": "Widget error messages (e.g., \"Failed to start conversation\") MUST use a medium grey background color, NOT the brand primary color (#ff3621)",
+    "source_session": "8d07b150-b77c-4c59-b7cd-af4880269606",
+    "source_type": "owner_directive",
+    "domain": "WIDGET_UI"
+  },
+  {
+    "id": "BATCH4-099",
+    "text": "The Shopify embedded admin MUST load without errors and show the dashboard when opened from Shopify Admin > Apps",
+    "source_session": "8d07b150-b77c-4c59-b7cd-af4880269606",
+    "source_type": "owner_directive",
+    "domain": "ADMIN_UI"
+  },
+  {
+    "id": "BATCH4-100",
+    "text": "The Configuration page MUST render fields, validate inputs, and save changes successfully",
+    "source_session": "8d07b150-b77c-4c59-b7cd-af4880269606",
+    "source_type": "owner_directive",
+    "domain": "ADMIN_UI"
+  },
+  {
+    "id": "BATCH4-101",
+    "text": "Knowledge Base MUST allow adding a test entry, and the entry MUST appear in the list and be editable and deletable",
+    "source_session": "8d07b150-b77c-4c59-b7cd-af4880269606",
+    "source_type": "owner_directive",
+    "domain": "KNOWLEDGE_BASE"
+  },
+  {
+    "id": "BATCH4-102",
+    "text": "The Widget page MUST allow copying the widget install snippet or key",
+    "source_session": "8d07b150-b77c-4c59-b7cd-af4880269606",
+    "source_type": "owner_directive",
+    "domain": "ADMIN_UI"
+  },
+  {
+    "id": "BATCH4-103",
+    "text": "The widget preview MUST render and support open/close interaction",
+    "source_session": "8d07b150-b77c-4c59-b7cd-af4880269606",
+    "source_type": "owner_directive",
+    "domain": "WIDGET_UI"
+  },
+  {
+    "id": "BATCH4-104",
+    "text": "The Inbox page MUST load the conversations list (empty state is acceptable)",
+    "source_session": "8d07b150-b77c-4c59-b7cd-af4880269606",
+    "source_type": "owner_directive",
+    "domain": "ADMIN_UI"
+  },
+  {
+    "id": "BATCH4-105",
+    "text": "The Analytics page MUST render charts (empty state is acceptable)",
+    "source_session": "8d07b150-b77c-4c59-b7cd-af4880269606",
+    "source_type": "owner_directive",
+    "domain": "ADMIN_UI"
+  },
+  {
+    "id": "BATCH4-106",
+    "text": "The Team page MUST load the member list (empty state is acceptable)",
+    "source_session": "8d07b150-b77c-4c59-b7cd-af4880269606",
+    "source_type": "owner_directive",
+    "domain": "ADMIN_UI"
+  },
+  {
+    "id": "BATCH4-107",
+    "text": "Widget chat responses MUST include streaming (tokens appear progressively)",
+    "source_session": "8d07b150-b77c-4c59-b7cd-af4880269606",
+    "source_type": "owner_directive",
+    "domain": "WIDGET_UI"
+  },
+  {
+    "id": "BATCH4-108",
+    "text": "Conversation transcripts in Inbox MUST show timestamps and metadata",
+    "source_session": "8d07b150-b77c-4c59-b7cd-af4880269606",
+    "source_type": "owner_directive",
+    "domain": "CONVERSATIONS"
+  },
+  {
+    "id": "BATCH4-109",
+    "text": "Escalation keywords MUST cause the conversation to appear in the Inbox",
+    "source_session": "8d07b150-b77c-4c59-b7cd-af4880269606",
+    "source_type": "owner_directive",
+    "domain": "CONVERSATIONS"
+  },
+  {
+    "id": "BATCH4-110",
+    "text": "Refreshing the admin MUST preserve the session (no re-authentication required)",
+    "source_session": "8d07b150-b77c-4c59-b7cd-af4880269606",
+    "source_type": "owner_directive",
+    "domain": "AUTH"
+  },
+  {
+    "id": "BATCH4-111",
+    "text": "The standalone admin password gate MUST reappear after logging out or clearing cookies",
+    "source_session": "8d07b150-b77c-4c59-b7cd-af4880269606",
+    "source_type": "owner_directive",
+    "domain": "AUTH"
+  },
+  {
+    "id": "BATCH4-112",
+    "text": "The widget toggle position ON MUST be to the right, and OFF MUST be to the left",
+    "source_session": "8d07b150-b77c-4c59-b7cd-af4880269606",
+    "source_type": "owner_directive",
+    "domain": "WIDGET_UI"
+  },
+  {
+    "id": "BATCH4-113",
+    "text": "blanco-9939.myshopify.com is THE production storefront; no separate \"Remaker Digital\" storefront is to be created",
+    "source_session": "8d07b150-b77c-4c59-b7cd-af4880269606",
+    "source_type": "owner_directive",
+    "domain": "GENERAL"
+  },
+  {
+    "id": "BATCH4-114",
+    "text": "SMTP email MUST use Titan Email (smtp.titan.email, port 465, SSL/TLS) as the primary provider",
+    "source_session": "8d07b150-b77c-4c59-b7cd-af4880269606",
+    "source_type": "owner_directive",
+    "domain": "EMAIL"
+  },
+  {
+    "id": "BATCH4-115",
+    "text": "Titan Email connection MUST use mike@remakerdigital.com as the sender address",
+    "source_session": "8d07b150-b77c-4c59-b7cd-af4880269606",
+    "source_type": "owner_directive",
+    "domain": "EMAIL"
+  },
+  {
+    "id": "BATCH4-116",
+    "text": "The system MUST have a notification mechanism for errors such as loss of email connectivity or other failed connections (Azure Monitor alert rules)",
+    "source_session": "8d07b150-b77c-4c59-b7cd-af4880269606",
+    "source_type": "owner_directive",
+    "domain": "OPS"
+  },
+  {
+    "id": "BATCH4-117",
+    "text": "Billing-related buttons (\"Manage Subscription\", \"Manage Billing\") MUST be hidden when the tenant has no Stripe billing configured",
+    "source_session": "8d07b150-b77c-4c59-b7cd-af4880269606",
+    "source_type": "owner_approval",
+    "domain": "BILLING"
+  },
+  {
+    "id": "BATCH4-118",
+    "text": "The entitlement tier badge MUST display with proper capitalization (e.g., \"Professional\" not \"professional\")",
+    "source_session": "8e902599-c7cf-45a5-adb0-1fcf1e3dd2a7",
+    "source_type": "owner_directive",
+    "domain": "ADMIN_UI"
+  },
+  {
+    "id": "BATCH4-119",
+    "text": "There MUST be an entitlement mode selector available during testing that allows testers to change the entitlement tier being tested",
+    "source_session": "8e902599-c7cf-45a5-adb0-1fcf1e3dd2a7",
+    "source_type": "owner_directive",
+    "domain": "TESTING"
+  },
+  {
+    "id": "BATCH4-120",
+    "text": "When a tenant is initialized, dashboard charts and analytics MUST NOT include any conversation data that has not actually occurred",
+    "source_session": "8e902599-c7cf-45a5-adb0-1fcf1e3dd2a7",
+    "source_type": "owner_directive",
+    "domain": "PROVISIONING"
+  },
+  {
+    "id": "BATCH4-121",
+    "text": "The system MUST NOT show \"Active\" state when mandatory inputs are missing (e.g., Brand name is required but empty)",
+    "source_session": "8e902599-c7cf-45a5-adb0-1fcf1e3dd2a7",
+    "source_type": "owner_directive",
+    "domain": "CONFIG"
+  },
+  {
+    "id": "BATCH4-122",
+    "text": "When mandatory fields are missing and the admin clicks \"Activate\", the UI MUST immediately list all missing mandatory fields across all four config sections (Agent Configuration, Knowledge Base, Quick Actions, Widget Configuration)",
+    "source_session": "8e902599-c7cf-45a5-adb0-1fcf1e3dd2a7",
+    "source_type": "owner_directive",
+    "domain": "CONFIG"
+  },
+  {
+    "id": "BATCH4-123",
+    "text": "The missing-field validation on Activate MUST NOT use a two-step dialog flow; it MUST show all missing fields immediately in a single display",
+    "source_session": "8e902599-c7cf-45a5-adb0-1fcf1e3dd2a7",
+    "source_type": "owner_directive",
+    "domain": "CONFIG"
+  },
+  {
+    "id": "BATCH4-124",
+    "text": "Provisioning MUST be migrated from in-memory dicts to Cosmos DB TenantRepository (WI-C1)",
+    "source_session": "92157d27-e38d-4b6e-8449-ebc06c5f7877",
+    "source_type": "owner_approval",
+    "domain": "PROVISIONING"
+  },
+  {
+    "id": "BATCH4-125",
+    "text": "auto_provision_superadmin() MUST be wired into handle_checkout_completed webhook handler (WI-C2)",
+    "source_session": "92157d27-e38d-4b6e-8449-ebc06c5f7877",
+    "source_type": "owner_approval",
+    "domain": "PROVISIONING"
+  },
+  {
+    "id": "BATCH4-126",
+    "text": "All owner instructions MUST be written into the relevant Repeatable Procedures for future regression tests",
+    "source_session": "92157d27-e38d-4b6e-8449-ebc06c5f7877",
+    "source_type": "owner_directive",
+    "domain": "OPS"
+  },
+  {
+    "id": "BATCH4-127",
+    "text": "The agentredcx.com documentation site MUST be updated with details of new features and UI changes after each session",
+    "source_session": "92157d27-e38d-4b6e-8449-ebc06c5f7877",
+    "source_type": "owner_directive",
+    "domain": "OPS"
+  },
+  {
+    "id": "BATCH4-128",
+    "text": "The upgrade verification procedure MUST be parameterized with a TARGET_ENVIRONMENT variable so it works for both staging and production",
+    "source_session": "932f37de-7201-4de0-b1ad-29abd9883a64",
+    "source_type": "owner_directive",
+    "domain": "OPS"
+  },
+  {
+    "id": "BATCH4-129",
+    "text": "The seed_tenant.py script MUST correctly generate widget keys that pass auth (dual-write hash to TenantDocument)",
+    "source_session": "932f37de-7201-4de0-b1ad-29abd9883a64",
+    "source_type": "owner_directive",
+    "domain": "PROVISIONING"
+  },
+  {
+    "id": "BATCH4-130",
+    "text": "A seed-generated widget key MUST be testable against the live staging endpoint to verify auth works",
+    "source_session": "932f37de-7201-4de0-b1ad-29abd9883a64",
+    "source_type": "owner_approval",
+    "domain": "TESTING"
+  },
+  {
+    "id": "BATCH4-131",
+    "text": "The admin console top-right corner logo MUST use primary-logo-no-wordmark.svg (the text embedded in this logo is NOT a wordmark)",
+    "source_session": "948a5a5f-dc20-45ac-8a05-46005af35214",
+    "source_type": "owner_directive",
+    "domain": "ADMIN_UI"
+  },
+  {
+    "id": "BATCH4-132",
+    "text": "The term \"wordmark\" refers specifically to \"Customer Experience\", not the text in primary-logo-no-wordmark.svg",
+    "source_session": "948a5a5f-dc20-45ac-8a05-46005af35214",
+    "source_type": "owner_directive",
+    "domain": "GENERAL"
+  },
+  {
+    "id": "BATCH4-133",
+    "text": "Merchants MUST be able to request a new API key when they lose or forget their credentials",
+    "source_session": "948a5a5f-dc20-45ac-8a05-46005af35214",
+    "source_type": "owner_directive",
+    "domain": "AUTH"
+  },
+  {
+    "id": "BATCH4-134",
+    "text": "Merchants MUST be able to reset their standalone admin passwords via email confirmation",
+    "source_session": "948a5a5f-dc20-45ac-8a05-46005af35214",
+    "source_type": "owner_directive",
+    "domain": "AUTH"
+  },
+  {
+    "id": "BATCH4-135",
+    "text": "The password reset flow MUST be: click \"change password\" -> enter email address -> check email for confirmation link",
+    "source_session": "948a5a5f-dc20-45ac-8a05-46005af35214",
+    "source_type": "owner_directive",
+    "domain": "AUTH"
+  },
+  {
+    "id": "BATCH4-136",
+    "text": "The Widget Configurator color input MUST allow the user to input a color value (not just an eyedropper)",
+    "source_session": "948a5a5f-dc20-45ac-8a05-46005af35214",
+    "source_type": "owner_directive",
+    "domain": "ADMIN_UI"
+  },
+  {
+    "id": "BATCH4-137",
+    "text": "The Admin UI MUST include a chat widget so administrative users can manually verify behavior for the account",
+    "source_session": "948a5a5f-dc20-45ac-8a05-46005af35214",
+    "source_type": "owner_directive",
+    "domain": "ADMIN_UI"
+  },
+  {
+    "id": "BATCH4-138",
+    "text": "Administrative users using the admin chat widget MUST be treated as customers who never buy anything",
+    "source_session": "948a5a5f-dc20-45ac-8a05-46005af35214",
+    "source_type": "owner_directive",
+    "domain": "ADMIN_UI"
+  },
+  {
+    "id": "BATCH4-139",
+    "text": "Escalation notification emails MUST support multiple categories: Sales, Support, Service, Account, Technical Assistance, General Inquiry",
+    "source_session": "948a5a5f-dc20-45ac-8a05-46005af35214",
+    "source_type": "owner_directive",
+    "domain": "CONFIG"
+  },
+  {
+    "id": "BATCH4-140",
+    "text": "Each escalation category MUST have its own set of escalation keywords that do not overlap with keyword sets used for other categories",
+    "source_session": "948a5a5f-dc20-45ac-8a05-46005af35214",
+    "source_type": "owner_directive",
+    "domain": "CONFIG"
+  },
+  {
+    "id": "BATCH4-141",
+    "text": "Each escalation category MUST have its own notification email address",
+    "source_session": "948a5a5f-dc20-45ac-8a05-46005af35214",
+    "source_type": "owner_directive",
+    "domain": "CONFIG"
+  },
+  {
+    "id": "BATCH4-142",
+    "text": "The Admin UI MUST have the chat widget activated by default (not requiring manual enablement)",
+    "source_session": "948a5a5f-dc20-45ac-8a05-46005af35214",
+    "source_type": "owner_directive",
+    "domain": "ADMIN_UI"
+  },
+  {
+    "id": "BATCH4-143",
+    "text": "Product documentation MUST be vectorized and added to RAG so admin users can ask questions about admin tools while viewing data and making configuration changes (future work)",
+    "source_session": "948a5a5f-dc20-45ac-8a05-46005af35214",
+    "source_type": "owner_directive",
+    "domain": "KNOWLEDGE_BASE"
+  },
+  {
+    "id": "BATCH4-144",
+    "text": "Test cases MUST be added to the test plan to verify admin chat widget functionality prior to launch",
+    "source_session": "948a5a5f-dc20-45ac-8a05-46005af35214",
+    "source_type": "owner_directive",
+    "domain": "TESTING"
+  },
+  {
+    "id": "BATCH4-145",
+    "text": "Standalone admin credentials (API key, preview password, and access URL) MUST be documented in the GitHub wiki for UX specialist access",
+    "source_session": "948a5a5f-dc20-45ac-8a05-46005af35214",
+    "source_type": "owner_directive",
+    "domain": "OPS"
+  },
+  {
+    "id": "BATCH4-146",
+    "text": "SystemPromptBuilder (#70) MUST be implemented as a Tier 2 work item",
+    "source_session": "96d7226f-f8fa-4a52-995a-ca15e00f68af",
+    "source_type": "owner_approval",
+    "domain": "API"
+  },
+  {
+    "id": "BATCH4-147",
+    "text": "A/B testing MUST use a foundation model to design, run, and evaluate tests to reduce burden on the merchant",
+    "source_session": "96d7226f-f8fa-4a52-995a-ca15e00f68af",
+    "source_type": "owner_directive",
+    "domain": "CONFIG"
+  },
+  {
+    "id": "BATCH4-148",
+    "text": "A/B test prompts MUST contain current configuration, and prompt responses MUST contain variations on that configuration (different persona descriptions, escalation thresholds, response length, formality level, enabled features)",
+    "source_session": "96d7226f-f8fa-4a52-995a-ca15e00f68af",
+    "source_type": "owner_directive",
+    "domain": "CONFIG"
+  },
+  {
+    "id": "BATCH4-149",
+    "text": "The A/B test user experience MUST reduce human input to simple choices: which users are in the test group, when should the test be applied, when should the test end, which proposed AI-generated configuration to apply, and how to visualize KPIs",
+    "source_session": "96d7226f-f8fa-4a52-995a-ca15e00f68af",
+    "source_type": "owner_directive",
+    "domain": "CONFIG"
+  },
+  {
+    "id": "BATCH4-150",
+    "text": "A/B test KPI visualization MUST support: satisfaction survey responses, session length, conversions to revenue, escalations to support, escalations to sales, loyalty account conversions, and other business-relevant metrics",
+    "source_session": "96d7226f-f8fa-4a52-995a-ca15e00f68af",
+    "source_type": "owner_directive",
+    "domain": "CONFIG"
+  },
+  {
+    "id": "BATCH4-151",
+    "text": "The A/B test workflow MUST include an \"I'm feeling lucky\" button that prompts an AI model for a variation on the current configuration with user commentary/preferences and data",
+    "source_session": "96d7226f-f8fa-4a52-995a-ca15e00f68af",
+    "source_type": "owner_directive",
+    "domain": "CONFIG"
+  },
+  {
+    "id": "BATCH4-152",
+    "text": "The merchant's role in A/B testing MUST be narrowly scoped to editorial review and test-approval; AI handles test design, execution, and evaluation",
+    "source_session": "96d7226f-f8fa-4a52-995a-ca15e00f68af",
+    "source_type": "owner_directive",
+    "domain": "CONFIG"
+  }
+]

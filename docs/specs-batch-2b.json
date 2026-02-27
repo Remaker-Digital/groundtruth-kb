@@ -1,0 +1,1559 @@
+[
+  {
+    "title": "fields.yaml defines 84 field definitions",
+    "section": "CONFIG",
+    "tags": [
+      "config",
+      "fields-yaml"
+    ],
+    "source_file": "src/multi_tenant/schema/fields.yaml"
+  },
+  {
+    "title": "Constant TTL_USAGE_PERIOD = 35",
+    "section": "CONFIG",
+    "tags": [
+      "config",
+      "ttl"
+    ],
+    "source_file": "src/multi_tenant/cosmos_schema.py"
+  },
+  {
+    "title": "Constant TTL_IDEMPOTENCY = 7",
+    "section": "CONFIG",
+    "tags": [
+      "config",
+      "ttl"
+    ],
+    "source_file": "src/multi_tenant/cosmos_schema.py"
+  },
+  {
+    "title": "Constant TTL_AUDIT_LOG = 365",
+    "section": "CONFIG",
+    "tags": [
+      "config",
+      "ttl"
+    ],
+    "source_file": "src/multi_tenant/cosmos_schema.py"
+  },
+  {
+    "title": "Constant TTL_PACK_BALANCE = 90",
+    "section": "CONFIG",
+    "tags": [
+      "config",
+      "ttl"
+    ],
+    "source_file": "src/multi_tenant/cosmos_schema.py"
+  },
+  {
+    "title": "Constant TTL_SLA_SNAPSHOTS = 90",
+    "section": "CONFIG",
+    "tags": [
+      "config",
+      "ttl"
+    ],
+    "source_file": "src/multi_tenant/cosmos_schema.py"
+  },
+  {
+    "title": "Constant TTL_VERIFICATION_TOKEN = 10",
+    "section": "CONFIG",
+    "tags": [
+      "config",
+      "ttl"
+    ],
+    "source_file": "src/multi_tenant/cosmos_schema.py"
+  },
+  {
+    "title": "Constant TTL_INCIDENTS = 365",
+    "section": "CONFIG",
+    "tags": [
+      "config",
+      "ttl"
+    ],
+    "source_file": "src/multi_tenant/cosmos_schema.py"
+  },
+  {
+    "title": "Constant TTL_ALERT_HISTORY = 90",
+    "section": "CONFIG",
+    "tags": [
+      "config",
+      "ttl"
+    ],
+    "source_file": "src/multi_tenant/cosmos_schema.py"
+  },
+  {
+    "title": "Constant TTL_INGESTION_JOBS = 30",
+    "section": "CONFIG",
+    "tags": [
+      "config",
+      "ttl"
+    ],
+    "source_file": "src/multi_tenant/cosmos_schema.py"
+  },
+  {
+    "title": "GET /summary endpoint in admin_analytics_api",
+    "section": "API",
+    "tags": [
+      "api",
+      "admin_analytics_api"
+    ],
+    "source_file": "src/multi_tenant/admin_analytics_api.py"
+  },
+  {
+    "title": "GET /intents endpoint in admin_analytics_api",
+    "section": "API",
+    "tags": [
+      "api",
+      "admin_analytics_api"
+    ],
+    "source_file": "src/multi_tenant/admin_analytics_api.py"
+  },
+  {
+    "title": "GET /gaps endpoint in admin_analytics_api",
+    "section": "API",
+    "tags": [
+      "api",
+      "admin_analytics_api"
+    ],
+    "source_file": "src/multi_tenant/admin_analytics_api.py"
+  },
+  {
+    "title": "admin_analytics_api router prefix is '/api/analytics'",
+    "section": "API",
+    "tags": [
+      "api",
+      "admin_analytics_api"
+    ],
+    "source_file": "src/multi_tenant/admin_analytics_api.py"
+  },
+  {
+    "title": "POST /rotate endpoint in admin_apikey_api",
+    "section": "API",
+    "tags": [
+      "api",
+      "admin_apikey_api"
+    ],
+    "source_file": "src/multi_tenant/admin_apikey_api.py"
+  },
+  {
+    "title": "POST /reset endpoint in admin_apikey_api",
+    "section": "API",
+    "tags": [
+      "api",
+      "admin_apikey_api"
+    ],
+    "source_file": "src/multi_tenant/admin_apikey_api.py"
+  },
+  {
+    "title": "admin_apikey_api router prefix is '/api/admin/api-keys'",
+    "section": "API",
+    "tags": [
+      "api",
+      "admin_apikey_api"
+    ],
+    "source_file": "src/multi_tenant/admin_apikey_api.py"
+  },
+  {
+    "title": "GET /export endpoint in admin_audit_api",
+    "section": "API",
+    "tags": [
+      "api",
+      "admin_audit_api"
+    ],
+    "source_file": "src/multi_tenant/admin_audit_api.py"
+  },
+  {
+    "title": "admin_audit_api router prefix is '/api/audit'",
+    "section": "API",
+    "tags": [
+      "api",
+      "admin_audit_api"
+    ],
+    "source_file": "src/multi_tenant/admin_audit_api.py"
+  },
+  {
+    "title": "POST /contact endpoint in admin_contact_api",
+    "section": "API",
+    "tags": [
+      "api",
+      "admin_contact_api"
+    ],
+    "source_file": "src/multi_tenant/admin_contact_api.py"
+  },
+  {
+    "title": "admin_contact_api router prefix is '/api/admin'",
+    "section": "API",
+    "tags": [
+      "api",
+      "admin_contact_api"
+    ],
+    "source_file": "src/multi_tenant/admin_contact_api.py"
+  },
+  {
+    "title": "POST /search endpoint in admin_conversation_api",
+    "section": "API",
+    "tags": [
+      "api",
+      "admin_conversation_api"
+    ],
+    "source_file": "src/multi_tenant/admin_conversation_api.py"
+  },
+  {
+    "title": "GET /{conversation_id} endpoint in admin_conversation_api",
+    "section": "API",
+    "tags": [
+      "api",
+      "admin_conversation_api"
+    ],
+    "source_file": "src/multi_tenant/admin_conversation_api.py"
+  },
+  {
+    "title": "GET /{conversation_id}/messages endpoint in admin_conversation_api",
+    "section": "API",
+    "tags": [
+      "api",
+      "admin_conversation_api"
+    ],
+    "source_file": "src/multi_tenant/admin_conversation_api.py"
+  },
+  {
+    "title": "POST /{conversation_id}/assign endpoint in admin_conversation_api",
+    "section": "API",
+    "tags": [
+      "api",
+      "admin_conversation_api"
+    ],
+    "source_file": "src/multi_tenant/admin_conversation_api.py"
+  },
+  {
+    "title": "POST /{conversation_id}/escalate endpoint in admin_conversation_api",
+    "section": "API",
+    "tags": [
+      "api",
+      "admin_conversation_api"
+    ],
+    "source_file": "src/multi_tenant/admin_conversation_api.py"
+  },
+  {
+    "title": "POST /{conversation_id}/resolve endpoint in admin_conversation_api",
+    "section": "API",
+    "tags": [
+      "api",
+      "admin_conversation_api"
+    ],
+    "source_file": "src/multi_tenant/admin_conversation_api.py"
+  },
+  {
+    "title": "POST /{conversation_id}/notes endpoint in admin_conversation_api",
+    "section": "API",
+    "tags": [
+      "api",
+      "admin_conversation_api"
+    ],
+    "source_file": "src/multi_tenant/admin_conversation_api.py"
+  },
+  {
+    "title": "POST /{conversation_id}/archive endpoint in admin_conversation_api",
+    "section": "API",
+    "tags": [
+      "api",
+      "admin_conversation_api"
+    ],
+    "source_file": "src/multi_tenant/admin_conversation_api.py"
+  },
+  {
+    "title": "POST /{conversation_id}/unarchive endpoint in admin_conversation_api",
+    "section": "API",
+    "tags": [
+      "api",
+      "admin_conversation_api"
+    ],
+    "source_file": "src/multi_tenant/admin_conversation_api.py"
+  },
+  {
+    "title": "admin_conversation_api router prefix is '/api/admin/conversations'",
+    "section": "API",
+    "tags": [
+      "api",
+      "admin_conversation_api"
+    ],
+    "source_file": "src/multi_tenant/admin_conversation_api.py"
+  },
+  {
+    "title": "GET /{customer_id} endpoint in admin_customer_profile_api",
+    "section": "API",
+    "tags": [
+      "api",
+      "admin_customer_profile_api"
+    ],
+    "source_file": "src/multi_tenant/admin_customer_profile_api.py"
+  },
+  {
+    "title": "PUT /{customer_id}/consent endpoint in admin_customer_profile_api",
+    "section": "API",
+    "tags": [
+      "api",
+      "admin_customer_profile_api"
+    ],
+    "source_file": "src/multi_tenant/admin_customer_profile_api.py"
+  },
+  {
+    "title": "POST /{customer_id}/sync endpoint in admin_customer_profile_api",
+    "section": "API",
+    "tags": [
+      "api",
+      "admin_customer_profile_api"
+    ],
+    "source_file": "src/multi_tenant/admin_customer_profile_api.py"
+  },
+  {
+    "title": "DELETE /{customer_id} endpoint in admin_customer_profile_api",
+    "section": "API",
+    "tags": [
+      "api",
+      "admin_customer_profile_api"
+    ],
+    "source_file": "src/multi_tenant/admin_customer_profile_api.py"
+  },
+  {
+    "title": "admin_customer_profile_api router prefix is '/api/admin/profiles'",
+    "section": "API",
+    "tags": [
+      "api",
+      "admin_customer_profile_api"
+    ],
+    "source_file": "src/multi_tenant/admin_customer_profile_api.py"
+  },
+  {
+    "title": "POST /export endpoint in admin_gdpr_api",
+    "section": "API",
+    "tags": [
+      "api",
+      "admin_gdpr_api"
+    ],
+    "source_file": "src/multi_tenant/admin_gdpr_api.py"
+  },
+  {
+    "title": "POST /delete endpoint in admin_gdpr_api",
+    "section": "API",
+    "tags": [
+      "api",
+      "admin_gdpr_api"
+    ],
+    "source_file": "src/multi_tenant/admin_gdpr_api.py"
+  },
+  {
+    "title": "GET /consent endpoint in admin_gdpr_api",
+    "section": "API",
+    "tags": [
+      "api",
+      "admin_gdpr_api"
+    ],
+    "source_file": "src/multi_tenant/admin_gdpr_api.py"
+  },
+  {
+    "title": "PUT /consent endpoint in admin_gdpr_api",
+    "section": "API",
+    "tags": [
+      "api",
+      "admin_gdpr_api"
+    ],
+    "source_file": "src/multi_tenant/admin_gdpr_api.py"
+  },
+  {
+    "title": "PUT /consent/customer endpoint in admin_gdpr_api",
+    "section": "API",
+    "tags": [
+      "api",
+      "admin_gdpr_api"
+    ],
+    "source_file": "src/multi_tenant/admin_gdpr_api.py"
+  },
+  {
+    "title": "admin_gdpr_api router prefix is '/api/gdpr'",
+    "section": "API",
+    "tags": [
+      "api",
+      "admin_gdpr_api"
+    ],
+    "source_file": "src/multi_tenant/admin_gdpr_api.py"
+  },
+  {
+    "title": "POST /ingest endpoint in admin_ingestion_api",
+    "section": "API",
+    "tags": [
+      "api",
+      "admin_ingestion_api"
+    ],
+    "source_file": "src/multi_tenant/admin_ingestion_api.py"
+  },
+  {
+    "title": "GET /ingest/status endpoint in admin_ingestion_api",
+    "section": "API",
+    "tags": [
+      "api",
+      "admin_ingestion_api"
+    ],
+    "source_file": "src/multi_tenant/admin_ingestion_api.py"
+  },
+  {
+    "title": "POST /ingest/cancel endpoint in admin_ingestion_api",
+    "section": "API",
+    "tags": [
+      "api",
+      "admin_ingestion_api"
+    ],
+    "source_file": "src/multi_tenant/admin_ingestion_api.py"
+  },
+  {
+    "title": "GET /templates endpoint in admin_ingestion_api",
+    "section": "API",
+    "tags": [
+      "api",
+      "admin_ingestion_api"
+    ],
+    "source_file": "src/multi_tenant/admin_ingestion_api.py"
+  },
+  {
+    "title": "GET /suggestions endpoint in admin_ingestion_api",
+    "section": "API",
+    "tags": [
+      "api",
+      "admin_ingestion_api"
+    ],
+    "source_file": "src/multi_tenant/admin_ingestion_api.py"
+  },
+  {
+    "title": "POST /templates/{category_id}/apply endpoint in admin_ingestion_api",
+    "section": "API",
+    "tags": [
+      "api",
+      "admin_ingestion_api"
+    ],
+    "source_file": "src/multi_tenant/admin_ingestion_api.py"
+  },
+  {
+    "title": "admin_ingestion_api router prefix is '/api/admin/knowledge'",
+    "section": "API",
+    "tags": [
+      "api",
+      "admin_ingestion_api"
+    ],
+    "source_file": "src/multi_tenant/admin_ingestion_api.py"
+  },
+  {
+    "title": "GET /{integration_type} endpoint in admin_integration_api",
+    "section": "API",
+    "tags": [
+      "api",
+      "admin_integration_api"
+    ],
+    "source_file": "src/multi_tenant/admin_integration_api.py"
+  },
+  {
+    "title": "PUT /{integration_type} endpoint in admin_integration_api",
+    "section": "API",
+    "tags": [
+      "api",
+      "admin_integration_api"
+    ],
+    "source_file": "src/multi_tenant/admin_integration_api.py"
+  },
+  {
+    "title": "POST /{integration_type}/activate endpoint in admin_integration_api",
+    "section": "API",
+    "tags": [
+      "api",
+      "admin_integration_api"
+    ],
+    "source_file": "src/multi_tenant/admin_integration_api.py"
+  },
+  {
+    "title": "POST /{integration_type}/deactivate endpoint in admin_integration_api",
+    "section": "API",
+    "tags": [
+      "api",
+      "admin_integration_api"
+    ],
+    "source_file": "src/multi_tenant/admin_integration_api.py"
+  },
+  {
+    "title": "DELETE /{integration_type} endpoint in admin_integration_api",
+    "section": "API",
+    "tags": [
+      "api",
+      "admin_integration_api"
+    ],
+    "source_file": "src/multi_tenant/admin_integration_api.py"
+  },
+  {
+    "title": "POST /stripe/credentials endpoint in admin_integration_api",
+    "section": "API",
+    "tags": [
+      "api",
+      "admin_integration_api"
+    ],
+    "source_file": "src/multi_tenant/admin_integration_api.py"
+  },
+  {
+    "title": "POST /stripe/test endpoint in admin_integration_api",
+    "section": "API",
+    "tags": [
+      "api",
+      "admin_integration_api"
+    ],
+    "source_file": "src/multi_tenant/admin_integration_api.py"
+  },
+  {
+    "title": "GET /stripe/tools endpoint in admin_integration_api",
+    "section": "API",
+    "tags": [
+      "api",
+      "admin_integration_api"
+    ],
+    "source_file": "src/multi_tenant/admin_integration_api.py"
+  },
+  {
+    "title": "DELETE /stripe/credentials endpoint in admin_integration_api",
+    "section": "API",
+    "tags": [
+      "api",
+      "admin_integration_api"
+    ],
+    "source_file": "src/multi_tenant/admin_integration_api.py"
+  },
+  {
+    "title": "admin_integration_api router prefix is '/api/admin/integrations'",
+    "section": "API",
+    "tags": [
+      "api",
+      "admin_integration_api"
+    ],
+    "source_file": "src/multi_tenant/admin_integration_api.py"
+  },
+  {
+    "title": "GET /export endpoint in admin_knowledge_api",
+    "section": "API",
+    "tags": [
+      "api",
+      "admin_knowledge_api"
+    ],
+    "source_file": "src/multi_tenant/admin_knowledge_api.py"
+  },
+  {
+    "title": "GET /staleness endpoint in admin_knowledge_api",
+    "section": "API",
+    "tags": [
+      "api",
+      "admin_knowledge_api"
+    ],
+    "source_file": "src/multi_tenant/admin_knowledge_api.py"
+  },
+  {
+    "title": "GET /stale endpoint in admin_knowledge_api",
+    "section": "API",
+    "tags": [
+      "api",
+      "admin_knowledge_api"
+    ],
+    "source_file": "src/multi_tenant/admin_knowledge_api.py"
+  },
+  {
+    "title": "GET /{entry_id} endpoint in admin_knowledge_api",
+    "section": "API",
+    "tags": [
+      "api",
+      "admin_knowledge_api"
+    ],
+    "source_file": "src/multi_tenant/admin_knowledge_api.py"
+  },
+  {
+    "title": "GET /{entry_id}/chunks endpoint in admin_knowledge_api",
+    "section": "API",
+    "tags": [
+      "api",
+      "admin_knowledge_api"
+    ],
+    "source_file": "src/multi_tenant/admin_knowledge_api.py"
+  },
+  {
+    "title": "PUT /{entry_id} endpoint in admin_knowledge_api",
+    "section": "API",
+    "tags": [
+      "api",
+      "admin_knowledge_api"
+    ],
+    "source_file": "src/multi_tenant/admin_knowledge_api.py"
+  },
+  {
+    "title": "DELETE /{entry_id} endpoint in admin_knowledge_api",
+    "section": "API",
+    "tags": [
+      "api",
+      "admin_knowledge_api"
+    ],
+    "source_file": "src/multi_tenant/admin_knowledge_api.py"
+  },
+  {
+    "title": "POST /upload endpoint in admin_knowledge_api",
+    "section": "API",
+    "tags": [
+      "api",
+      "admin_knowledge_api"
+    ],
+    "source_file": "src/multi_tenant/admin_knowledge_api.py"
+  },
+  {
+    "title": "POST /import-url endpoint in admin_knowledge_api",
+    "section": "API",
+    "tags": [
+      "api",
+      "admin_knowledge_api"
+    ],
+    "source_file": "src/multi_tenant/admin_knowledge_api.py"
+  },
+  {
+    "title": "POST /{entry_id}/verify endpoint in admin_knowledge_api",
+    "section": "API",
+    "tags": [
+      "api",
+      "admin_knowledge_api"
+    ],
+    "source_file": "src/multi_tenant/admin_knowledge_api.py"
+  },
+  {
+    "title": "POST /scan endpoint in admin_knowledge_api",
+    "section": "API",
+    "tags": [
+      "api",
+      "admin_knowledge_api"
+    ],
+    "source_file": "src/multi_tenant/admin_knowledge_api.py"
+  },
+  {
+    "title": "GET /scan/result endpoint in admin_knowledge_api",
+    "section": "API",
+    "tags": [
+      "api",
+      "admin_knowledge_api"
+    ],
+    "source_file": "src/multi_tenant/admin_knowledge_api.py"
+  },
+  {
+    "title": "GET /sources endpoint in admin_knowledge_api",
+    "section": "API",
+    "tags": [
+      "api",
+      "admin_knowledge_api"
+    ],
+    "source_file": "src/multi_tenant/admin_knowledge_api.py"
+  },
+  {
+    "title": "POST /sources endpoint in admin_knowledge_api",
+    "section": "API",
+    "tags": [
+      "api",
+      "admin_knowledge_api"
+    ],
+    "source_file": "src/multi_tenant/admin_knowledge_api.py"
+  },
+  {
+    "title": "GET /sources/{source_id} endpoint in admin_knowledge_api",
+    "section": "API",
+    "tags": [
+      "api",
+      "admin_knowledge_api"
+    ],
+    "source_file": "src/multi_tenant/admin_knowledge_api.py"
+  },
+  {
+    "title": "PUT /sources/{source_id} endpoint in admin_knowledge_api",
+    "section": "API",
+    "tags": [
+      "api",
+      "admin_knowledge_api"
+    ],
+    "source_file": "src/multi_tenant/admin_knowledge_api.py"
+  },
+  {
+    "title": "DELETE /sources/{source_id} endpoint in admin_knowledge_api",
+    "section": "API",
+    "tags": [
+      "api",
+      "admin_knowledge_api"
+    ],
+    "source_file": "src/multi_tenant/admin_knowledge_api.py"
+  },
+  {
+    "title": "POST /sources/{source_id}/crawl endpoint in admin_knowledge_api",
+    "section": "API",
+    "tags": [
+      "api",
+      "admin_knowledge_api"
+    ],
+    "source_file": "src/multi_tenant/admin_knowledge_api.py"
+  },
+  {
+    "title": "admin_knowledge_api router prefix is '/api/admin/knowledge'",
+    "section": "API",
+    "tags": [
+      "api",
+      "admin_knowledge_api"
+    ],
+    "source_file": "src/multi_tenant/admin_knowledge_api.py"
+  },
+  {
+    "title": "GET /assignments endpoint in admin_quick_action_api",
+    "section": "API",
+    "tags": [
+      "api",
+      "admin_quick_action_api"
+    ],
+    "source_file": "src/multi_tenant/admin_quick_action_api.py"
+  },
+  {
+    "title": "PUT /assignments endpoint in admin_quick_action_api",
+    "section": "API",
+    "tags": [
+      "api",
+      "admin_quick_action_api"
+    ],
+    "source_file": "src/multi_tenant/admin_quick_action_api.py"
+  },
+  {
+    "title": "DELETE /assignments/{page_type} endpoint in admin_quick_action_api",
+    "section": "API",
+    "tags": [
+      "api",
+      "admin_quick_action_api"
+    ],
+    "source_file": "src/multi_tenant/admin_quick_action_api.py"
+  },
+  {
+    "title": "GET /{action_id} endpoint in admin_quick_action_api",
+    "section": "API",
+    "tags": [
+      "api",
+      "admin_quick_action_api"
+    ],
+    "source_file": "src/multi_tenant/admin_quick_action_api.py"
+  },
+  {
+    "title": "PUT /{action_id} endpoint in admin_quick_action_api",
+    "section": "API",
+    "tags": [
+      "api",
+      "admin_quick_action_api"
+    ],
+    "source_file": "src/multi_tenant/admin_quick_action_api.py"
+  },
+  {
+    "title": "DELETE /{action_id} endpoint in admin_quick_action_api",
+    "section": "API",
+    "tags": [
+      "api",
+      "admin_quick_action_api"
+    ],
+    "source_file": "src/multi_tenant/admin_quick_action_api.py"
+  },
+  {
+    "title": "POST /seed endpoint in admin_quick_action_api",
+    "section": "API",
+    "tags": [
+      "api",
+      "admin_quick_action_api"
+    ],
+    "source_file": "src/multi_tenant/admin_quick_action_api.py"
+  },
+  {
+    "title": "admin_quick_action_api router prefix is '/api/admin/quick-actions'",
+    "section": "API",
+    "tags": [
+      "api",
+      "admin_quick_action_api"
+    ],
+    "source_file": "src/multi_tenant/admin_quick_action_api.py"
+  },
+  {
+    "title": "GET /whoami endpoint in admin_team_api",
+    "section": "API",
+    "tags": [
+      "api",
+      "admin_team_api"
+    ],
+    "source_file": "src/multi_tenant/admin_team_api.py"
+  },
+  {
+    "title": "GET /{member_id} endpoint in admin_team_api",
+    "section": "API",
+    "tags": [
+      "api",
+      "admin_team_api"
+    ],
+    "source_file": "src/multi_tenant/admin_team_api.py"
+  },
+  {
+    "title": "POST /{member_id}/resend-invite endpoint in admin_team_api",
+    "section": "API",
+    "tags": [
+      "api",
+      "admin_team_api"
+    ],
+    "source_file": "src/multi_tenant/admin_team_api.py"
+  },
+  {
+    "title": "PUT /{member_id} endpoint in admin_team_api",
+    "section": "API",
+    "tags": [
+      "api",
+      "admin_team_api"
+    ],
+    "source_file": "src/multi_tenant/admin_team_api.py"
+  },
+  {
+    "title": "DELETE /{member_id} endpoint in admin_team_api",
+    "section": "API",
+    "tags": [
+      "api",
+      "admin_team_api"
+    ],
+    "source_file": "src/multi_tenant/admin_team_api.py"
+  },
+  {
+    "title": "POST /{member_id}/rotate-key endpoint in admin_team_api",
+    "section": "API",
+    "tags": [
+      "api",
+      "admin_team_api"
+    ],
+    "source_file": "src/multi_tenant/admin_team_api.py"
+  },
+  {
+    "title": "GET /{member_id}/mfa/status endpoint in admin_team_api",
+    "section": "API",
+    "tags": [
+      "api",
+      "admin_team_api"
+    ],
+    "source_file": "src/multi_tenant/admin_team_api.py"
+  },
+  {
+    "title": "POST /{member_id}/mfa/enroll endpoint in admin_team_api",
+    "section": "API",
+    "tags": [
+      "api",
+      "admin_team_api"
+    ],
+    "source_file": "src/multi_tenant/admin_team_api.py"
+  },
+  {
+    "title": "POST /{member_id}/mfa/confirm endpoint in admin_team_api",
+    "section": "API",
+    "tags": [
+      "api",
+      "admin_team_api"
+    ],
+    "source_file": "src/multi_tenant/admin_team_api.py"
+  },
+  {
+    "title": "POST /{member_id}/mfa/disable endpoint in admin_team_api",
+    "section": "API",
+    "tags": [
+      "api",
+      "admin_team_api"
+    ],
+    "source_file": "src/multi_tenant/admin_team_api.py"
+  },
+  {
+    "title": "POST /{member_id}/mfa/grant-opt-out endpoint in admin_team_api",
+    "section": "API",
+    "tags": [
+      "api",
+      "admin_team_api"
+    ],
+    "source_file": "src/multi_tenant/admin_team_api.py"
+  },
+  {
+    "title": "POST /{member_id}/mfa/revoke-opt-out endpoint in admin_team_api",
+    "section": "API",
+    "tags": [
+      "api",
+      "admin_team_api"
+    ],
+    "source_file": "src/multi_tenant/admin_team_api.py"
+  },
+  {
+    "title": "admin_team_api router prefix is '/api/admin/team'",
+    "section": "API",
+    "tags": [
+      "api",
+      "admin_team_api"
+    ],
+    "source_file": "src/multi_tenant/admin_team_api.py"
+  },
+  {
+    "title": "GET /api/status endpoint in status_api",
+    "section": "API",
+    "tags": [
+      "api",
+      "status_api"
+    ],
+    "source_file": "src/multi_tenant/status_api.py"
+  },
+  {
+    "title": "GET /tenants endpoint in superadmin_api",
+    "section": "API",
+    "tags": [
+      "api",
+      "superadmin_api"
+    ],
+    "source_file": "src/multi_tenant/superadmin_api.py"
+  },
+  {
+    "title": "GET /tenants/summary endpoint in superadmin_api",
+    "section": "API",
+    "tags": [
+      "api",
+      "superadmin_api"
+    ],
+    "source_file": "src/multi_tenant/superadmin_api.py"
+  },
+  {
+    "title": "PUT /tenants/{tenant_id}/tier endpoint in superadmin_api",
+    "section": "API",
+    "tags": [
+      "api",
+      "superadmin_api"
+    ],
+    "source_file": "src/multi_tenant/superadmin_api.py"
+  },
+  {
+    "title": "POST /tenants endpoint in superadmin_api",
+    "section": "API",
+    "tags": [
+      "api",
+      "superadmin_api"
+    ],
+    "source_file": "src/multi_tenant/superadmin_api.py"
+  },
+  {
+    "title": "POST /tenants/{tenant_id}/resend-welcome-email endpoint in superadmin_api",
+    "section": "API",
+    "tags": [
+      "api",
+      "superadmin_api"
+    ],
+    "source_file": "src/multi_tenant/superadmin_api.py"
+  },
+  {
+    "title": "PATCH /tenants/{tenant_id}/expiry endpoint in superadmin_api",
+    "section": "API",
+    "tags": [
+      "api",
+      "superadmin_api"
+    ],
+    "source_file": "src/multi_tenant/superadmin_api.py"
+  },
+  {
+    "title": "GET /deployments endpoint in superadmin_api",
+    "section": "API",
+    "tags": [
+      "api",
+      "superadmin_api"
+    ],
+    "source_file": "src/multi_tenant/superadmin_api.py"
+  },
+  {
+    "title": "GET /dashboard endpoint in superadmin_api",
+    "section": "API",
+    "tags": [
+      "api",
+      "superadmin_api"
+    ],
+    "source_file": "src/multi_tenant/superadmin_api.py"
+  },
+  {
+    "title": "GET /billing/health endpoint in superadmin_api",
+    "section": "API",
+    "tags": [
+      "api",
+      "superadmin_api"
+    ],
+    "source_file": "src/multi_tenant/superadmin_api.py"
+  },
+  {
+    "title": "GET /sla/trends endpoint in superadmin_api",
+    "section": "API",
+    "tags": [
+      "api",
+      "superadmin_api"
+    ],
+    "source_file": "src/multi_tenant/superadmin_api.py"
+  },
+  {
+    "title": "GET /queues endpoint in superadmin_api",
+    "section": "API",
+    "tags": [
+      "api",
+      "superadmin_api"
+    ],
+    "source_file": "src/multi_tenant/superadmin_api.py"
+  },
+  {
+    "title": "GET /compliance endpoint in superadmin_api",
+    "section": "API",
+    "tags": [
+      "api",
+      "superadmin_api"
+    ],
+    "source_file": "src/multi_tenant/superadmin_api.py"
+  },
+  {
+    "title": "GET /secrets/posture endpoint in superadmin_api",
+    "section": "API",
+    "tags": [
+      "api",
+      "superadmin_api"
+    ],
+    "source_file": "src/multi_tenant/superadmin_api.py"
+  },
+  {
+    "title": "GET /integrations/health endpoint in superadmin_api",
+    "section": "API",
+    "tags": [
+      "api",
+      "superadmin_api"
+    ],
+    "source_file": "src/multi_tenant/superadmin_api.py"
+  },
+  {
+    "title": "GET /incidents endpoint in superadmin_api",
+    "section": "API",
+    "tags": [
+      "api",
+      "superadmin_api"
+    ],
+    "source_file": "src/multi_tenant/superadmin_api.py"
+  },
+  {
+    "title": "POST /incidents endpoint in superadmin_api",
+    "section": "API",
+    "tags": [
+      "api",
+      "superadmin_api"
+    ],
+    "source_file": "src/multi_tenant/superadmin_api.py"
+  },
+  {
+    "title": "GET /incidents/{incident_id} endpoint in superadmin_api",
+    "section": "API",
+    "tags": [
+      "api",
+      "superadmin_api"
+    ],
+    "source_file": "src/multi_tenant/superadmin_api.py"
+  },
+  {
+    "title": "POST /incidents/{incident_id}/update endpoint in superadmin_api",
+    "section": "API",
+    "tags": [
+      "api",
+      "superadmin_api"
+    ],
+    "source_file": "src/multi_tenant/superadmin_api.py"
+  },
+  {
+    "title": "POST /incidents/{incident_id}/resolve endpoint in superadmin_api",
+    "section": "API",
+    "tags": [
+      "api",
+      "superadmin_api"
+    ],
+    "source_file": "src/multi_tenant/superadmin_api.py"
+  },
+  {
+    "title": "GET /alerts/rules endpoint in superadmin_api",
+    "section": "API",
+    "tags": [
+      "api",
+      "superadmin_api"
+    ],
+    "source_file": "src/multi_tenant/superadmin_api.py"
+  },
+  {
+    "title": "POST /alerts/rules endpoint in superadmin_api",
+    "section": "API",
+    "tags": [
+      "api",
+      "superadmin_api"
+    ],
+    "source_file": "src/multi_tenant/superadmin_api.py"
+  },
+  {
+    "title": "PUT /alerts/rules/{rule_id} endpoint in superadmin_api",
+    "section": "API",
+    "tags": [
+      "api",
+      "superadmin_api"
+    ],
+    "source_file": "src/multi_tenant/superadmin_api.py"
+  },
+  {
+    "title": "DELETE /alerts/rules/{rule_id} endpoint in superadmin_api",
+    "section": "API",
+    "tags": [
+      "api",
+      "superadmin_api"
+    ],
+    "source_file": "src/multi_tenant/superadmin_api.py"
+  },
+  {
+    "title": "GET /alerts/history endpoint in superadmin_api",
+    "section": "API",
+    "tags": [
+      "api",
+      "superadmin_api"
+    ],
+    "source_file": "src/multi_tenant/superadmin_api.py"
+  },
+  {
+    "title": "POST /alerts/history/{alert_id}/acknowledge endpoint in superadmin_api",
+    "section": "API",
+    "tags": [
+      "api",
+      "superadmin_api"
+    ],
+    "source_file": "src/multi_tenant/superadmin_api.py"
+  },
+  {
+    "title": "POST /alerts/evaluate endpoint in superadmin_api",
+    "section": "API",
+    "tags": [
+      "api",
+      "superadmin_api"
+    ],
+    "source_file": "src/multi_tenant/superadmin_api.py"
+  },
+  {
+    "title": "GET /mfa/status endpoint in superadmin_api",
+    "section": "API",
+    "tags": [
+      "api",
+      "superadmin_api"
+    ],
+    "source_file": "src/multi_tenant/superadmin_api.py"
+  },
+  {
+    "title": "POST /mfa/enroll endpoint in superadmin_api",
+    "section": "API",
+    "tags": [
+      "api",
+      "superadmin_api"
+    ],
+    "source_file": "src/multi_tenant/superadmin_api.py"
+  },
+  {
+    "title": "POST /mfa/confirm endpoint in superadmin_api",
+    "section": "API",
+    "tags": [
+      "api",
+      "superadmin_api"
+    ],
+    "source_file": "src/multi_tenant/superadmin_api.py"
+  },
+  {
+    "title": "POST /mfa/verify endpoint in superadmin_api",
+    "section": "API",
+    "tags": [
+      "api",
+      "superadmin_api"
+    ],
+    "source_file": "src/multi_tenant/superadmin_api.py"
+  },
+  {
+    "title": "POST /mfa/disable endpoint in superadmin_api",
+    "section": "API",
+    "tags": [
+      "api",
+      "superadmin_api"
+    ],
+    "source_file": "src/multi_tenant/superadmin_api.py"
+  },
+  {
+    "title": "POST /mfa/backup-verify endpoint in superadmin_api",
+    "section": "API",
+    "tags": [
+      "api",
+      "superadmin_api"
+    ],
+    "source_file": "src/multi_tenant/superadmin_api.py"
+  },
+  {
+    "title": "GET /costs endpoint in superadmin_api",
+    "section": "API",
+    "tags": [
+      "api",
+      "superadmin_api"
+    ],
+    "source_file": "src/multi_tenant/superadmin_api.py"
+  },
+  {
+    "title": "GET /abuse/signals endpoint in superadmin_api",
+    "section": "API",
+    "tags": [
+      "api",
+      "superadmin_api"
+    ],
+    "source_file": "src/multi_tenant/superadmin_api.py"
+  },
+  {
+    "title": "POST /abuse/tenant/{tenant_id}/flag endpoint in superadmin_api",
+    "section": "API",
+    "tags": [
+      "api",
+      "superadmin_api"
+    ],
+    "source_file": "src/multi_tenant/superadmin_api.py"
+  },
+  {
+    "title": "superadmin_api router prefix is '/api/superadmin'",
+    "section": "API",
+    "tags": [
+      "api",
+      "superadmin_api"
+    ],
+    "source_file": "src/multi_tenant/superadmin_api.py"
+  },
+  {
+    "title": "POST /validate endpoint in tenant_config_api",
+    "section": "API",
+    "tags": [
+      "api",
+      "tenant_config_api"
+    ],
+    "source_file": "src/multi_tenant/tenant_config_api.py"
+  },
+  {
+    "title": "POST /reset endpoint in tenant_config_api",
+    "section": "API",
+    "tags": [
+      "api",
+      "tenant_config_api"
+    ],
+    "source_file": "src/multi_tenant/tenant_config_api.py"
+  },
+  {
+    "title": "GET /diff endpoint in tenant_config_api",
+    "section": "API",
+    "tags": [
+      "api",
+      "tenant_config_api"
+    ],
+    "source_file": "src/multi_tenant/tenant_config_api.py"
+  },
+  {
+    "title": "GET /schema endpoint in tenant_config_api",
+    "section": "API",
+    "tags": [
+      "api",
+      "tenant_config_api"
+    ],
+    "source_file": "src/multi_tenant/tenant_config_api.py"
+  },
+  {
+    "title": "GET /versions endpoint in tenant_config_api",
+    "section": "API",
+    "tags": [
+      "api",
+      "tenant_config_api"
+    ],
+    "source_file": "src/multi_tenant/tenant_config_api.py"
+  },
+  {
+    "title": "GET /versions/{version} endpoint in tenant_config_api",
+    "section": "API",
+    "tags": [
+      "api",
+      "tenant_config_api"
+    ],
+    "source_file": "src/multi_tenant/tenant_config_api.py"
+  },
+  {
+    "title": "GET /named endpoint in tenant_config_api",
+    "section": "API",
+    "tags": [
+      "api",
+      "tenant_config_api"
+    ],
+    "source_file": "src/multi_tenant/tenant_config_api.py"
+  },
+  {
+    "title": "POST /named endpoint in tenant_config_api",
+    "section": "API",
+    "tags": [
+      "api",
+      "tenant_config_api"
+    ],
+    "source_file": "src/multi_tenant/tenant_config_api.py"
+  },
+  {
+    "title": "POST /named/{name}/activate endpoint in tenant_config_api",
+    "section": "API",
+    "tags": [
+      "api",
+      "tenant_config_api"
+    ],
+    "source_file": "src/multi_tenant/tenant_config_api.py"
+  },
+  {
+    "title": "DELETE /named/{name} endpoint in tenant_config_api",
+    "section": "API",
+    "tags": [
+      "api",
+      "tenant_config_api"
+    ],
+    "source_file": "src/multi_tenant/tenant_config_api.py"
+  },
+  {
+    "title": "GET /widget-appearances endpoint in tenant_config_api",
+    "section": "API",
+    "tags": [
+      "api",
+      "tenant_config_api"
+    ],
+    "source_file": "src/multi_tenant/tenant_config_api.py"
+  },
+  {
+    "title": "POST /widget-appearances endpoint in tenant_config_api",
+    "section": "API",
+    "tags": [
+      "api",
+      "tenant_config_api"
+    ],
+    "source_file": "src/multi_tenant/tenant_config_api.py"
+  },
+  {
+    "title": "POST /widget-appearances/{name}/activate endpoint in tenant_config_api",
+    "section": "API",
+    "tags": [
+      "api",
+      "tenant_config_api"
+    ],
+    "source_file": "src/multi_tenant/tenant_config_api.py"
+  },
+  {
+    "title": "DELETE /widget-appearances/{name} endpoint in tenant_config_api",
+    "section": "API",
+    "tags": [
+      "api",
+      "tenant_config_api"
+    ],
+    "source_file": "src/multi_tenant/tenant_config_api.py"
+  },
+  {
+    "title": "POST /rollback endpoint in tenant_config_api",
+    "section": "API",
+    "tags": [
+      "api",
+      "tenant_config_api"
+    ],
+    "source_file": "src/multi_tenant/tenant_config_api.py"
+  },
+  {
+    "title": "GET /activation-status endpoint in tenant_config_api",
+    "section": "API",
+    "tags": [
+      "api",
+      "tenant_config_api"
+    ],
+    "source_file": "src/multi_tenant/tenant_config_api.py"
+  },
+  {
+    "title": "POST /deactivate endpoint in tenant_config_api",
+    "section": "API",
+    "tags": [
+      "api",
+      "tenant_config_api"
+    ],
+    "source_file": "src/multi_tenant/tenant_config_api.py"
+  },
+  {
+    "title": "GET /draft endpoint in tenant_config_api",
+    "section": "API",
+    "tags": [
+      "api",
+      "tenant_config_api"
+    ],
+    "source_file": "src/multi_tenant/tenant_config_api.py"
+  },
+  {
+    "title": "GET /draft/preflight endpoint in tenant_config_api",
+    "section": "API",
+    "tags": [
+      "api",
+      "tenant_config_api"
+    ],
+    "source_file": "src/multi_tenant/tenant_config_api.py"
+  },
+  {
+    "title": "POST /draft/activate endpoint in tenant_config_api",
+    "section": "API",
+    "tags": [
+      "api",
+      "tenant_config_api"
+    ],
+    "source_file": "src/multi_tenant/tenant_config_api.py"
+  },
+  {
+    "title": "POST /draft/discard endpoint in tenant_config_api",
+    "section": "API",
+    "tags": [
+      "api",
+      "tenant_config_api"
+    ],
+    "source_file": "src/multi_tenant/tenant_config_api.py"
+  },
+  {
+    "title": "POST /restore endpoint in tenant_config_api",
+    "section": "API",
+    "tags": [
+      "api",
+      "tenant_config_api"
+    ],
+    "source_file": "src/multi_tenant/tenant_config_api.py"
+  },
+  {
+    "title": "tenant_config_api router prefix is '/api/config'",
+    "section": "API",
+    "tags": [
+      "api",
+      "tenant_config_api"
+    ],
+    "source_file": "src/multi_tenant/tenant_config_api.py"
+  },
+  {
+    "title": "GET /usage endpoint in usage_dashboard_api",
+    "section": "API",
+    "tags": [
+      "api",
+      "usage_dashboard_api"
+    ],
+    "source_file": "src/multi_tenant/usage_dashboard_api.py"
+  },
+  {
+    "title": "GET /usage/daily endpoint in usage_dashboard_api",
+    "section": "API",
+    "tags": [
+      "api",
+      "usage_dashboard_api"
+    ],
+    "source_file": "src/multi_tenant/usage_dashboard_api.py"
+  },
+  {
+    "title": "GET /conversations endpoint in usage_dashboard_api",
+    "section": "API",
+    "tags": [
+      "api",
+      "usage_dashboard_api"
+    ],
+    "source_file": "src/multi_tenant/usage_dashboard_api.py"
+  },
+  {
+    "title": "GET /conversations/export endpoint in usage_dashboard_api",
+    "section": "API",
+    "tags": [
+      "api",
+      "usage_dashboard_api"
+    ],
+    "source_file": "src/multi_tenant/usage_dashboard_api.py"
+  },
+  {
+    "title": "GET /conversations/{conversation_id} endpoint in usage_dashboard_api",
+    "section": "API",
+    "tags": [
+      "api",
+      "usage_dashboard_api"
+    ],
+    "source_file": "src/multi_tenant/usage_dashboard_api.py"
+  },
+  {
+    "title": "usage_dashboard_api router prefix is '/api/dashboard'",
+    "section": "API",
+    "tags": [
+      "api",
+      "usage_dashboard_api"
+    ],
+    "source_file": "src/multi_tenant/usage_dashboard_api.py"
+  },
+  {
+    "title": "API_VERSION = '1.0.0'",
+    "section": "API",
+    "tags": [
+      "api",
+      "versioning"
+    ],
+    "source_file": "src/multi_tenant/api_versioning.py"
+  },
+  {
+    "title": "PRODUCT_VERSION = '1.60.0'",
+    "section": "API",
+    "tags": [
+      "api",
+      "versioning"
+    ],
+    "source_file": "src/multi_tenant/api_versioning.py"
+  },
+  {
+    "title": "Config model class 'ConfigUpdateResult'",
+    "section": "CONFIG",
+    "tags": [
+      "config",
+      "models"
+    ],
+    "source_file": "src/multi_tenant/config/models.py"
+  },
+  {
+    "title": "Config model class 'ConfigReadResult'",
+    "section": "CONFIG",
+    "tags": [
+      "config",
+      "models"
+    ],
+    "source_file": "src/multi_tenant/config/models.py"
+  },
+  {
+    "title": "Config model class 'ConfigVersionInfo'",
+    "section": "CONFIG",
+    "tags": [
+      "config",
+      "models"
+    ],
+    "source_file": "src/multi_tenant/config/models.py"
+  },
+  {
+    "title": "Config model class 'ConfigRollbackResult'",
+    "section": "CONFIG",
+    "tags": [
+      "config",
+      "models"
+    ],
+    "source_file": "src/multi_tenant/config/models.py"
+  },
+  {
+    "title": "TIER_RANK defines ordering for tier/gate ranking",
+    "section": "CONFIG",
+    "tags": [
+      "config",
+      "validation"
+    ],
+    "source_file": "src/multi_tenant/schema/validation.py"
+  },
+  {
+    "title": "GATE_RANK defines ordering for tier/gate ranking",
+    "section": "CONFIG",
+    "tags": [
+      "config",
+      "validation"
+    ],
+    "source_file": "src/multi_tenant/schema/validation.py"
+  }
+]

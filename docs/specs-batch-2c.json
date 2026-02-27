@@ -1,0 +1,1316 @@
+[
+  {
+    "title": "Mount widget launcher inside Shadow DOM attached to document.body",
+    "section": "WIDGET_UI",
+    "tags": ["launcher", "shadow-dom", "mount"],
+    "source_file": "widget/src/index.ts"
+  },
+  {
+    "title": "Create widget panel inside cross-origin iframe for CSS isolation",
+    "section": "WIDGET_UI",
+    "tags": ["panel", "iframe", "isolation"],
+    "source_file": "widget/src/index.ts"
+  },
+  {
+    "title": "Require data-widget-key attribute on script tag for widget initialization",
+    "section": "WIDGET_UI",
+    "tags": ["boot", "widget-key", "required"],
+    "source_file": "widget/src/index.ts"
+  },
+  {
+    "title": "Require data-api-url attribute on script tag for API endpoint resolution",
+    "section": "WIDGET_UI",
+    "tags": ["boot", "api-url", "required"],
+    "source_file": "widget/src/index.ts"
+  },
+  {
+    "title": "Support 10 data-attribute overrides for Shopify Liquid template injection",
+    "section": "WIDGET_UI",
+    "tags": ["shopify", "data-attributes", "overrides"],
+    "source_file": "widget/src/index.ts"
+  },
+  {
+    "title": "Pass Shopify customer identity via data-shopify-customer-id and data-shopify-customer-hmac attributes",
+    "section": "WIDGET_UI",
+    "tags": ["shopify", "customer-identity", "hmac"],
+    "source_file": "widget/src/index.ts"
+  },
+  {
+    "title": "Fetch widget config from /api/config endpoint with page_type and page_handle query params",
+    "section": "WIDGET_UI",
+    "tags": ["config", "api", "page-context"],
+    "source_file": "widget/src/index.ts"
+  },
+  {
+    "title": "Expose AgentRed SDK on window with open, close, toggle, isOpen, setUnreadCount, hide, show, destroy methods",
+    "section": "WIDGET_UI",
+    "tags": ["sdk", "api", "window"],
+    "source_file": "widget/src/index.ts"
+  },
+  {
+    "title": "Dispatch agentred:ready CustomEvent on window after widget initialization completes",
+    "section": "WIDGET_UI",
+    "tags": ["sdk", "event", "ready"],
+    "source_file": "widget/src/index.ts"
+  },
+  {
+    "title": "Support auto-open behavior with configurable delay from widget_auto_open_delay",
+    "section": "WIDGET_UI",
+    "tags": ["auto-open", "delay", "behavior"],
+    "source_file": "widget/src/index.ts"
+  },
+  {
+    "title": "Play notification sound via AudioContext at 800Hz frequency with 0.1 gain for 0.15 seconds",
+    "section": "WIDGET_UI",
+    "tags": ["sound", "notification", "audio-context"],
+    "source_file": "widget/src/index.ts"
+  },
+  {
+    "title": "Support drag-to-reposition panel with sessionStorage persistence across page loads",
+    "section": "WIDGET_UI",
+    "tags": ["drag", "reposition", "session-storage"],
+    "source_file": "widget/src/index.ts"
+  },
+  {
+    "title": "Define message types: customer, agent, and system with streaming and retracted flags",
+    "section": "WIDGET_UI",
+    "tags": ["state", "message", "types"],
+    "source_file": "widget/src/state/store.ts"
+  },
+  {
+    "title": "Define widget views: closed, prechat, otp, conversation, rating, offline_form, issue_report",
+    "section": "WIDGET_UI",
+    "tags": ["state", "views", "navigation"],
+    "source_file": "widget/src/state/store.ts"
+  },
+  {
+    "title": "Increment unread count only for agent messages when panel is closed",
+    "section": "WIDGET_UI",
+    "tags": ["state", "unread", "counter"],
+    "source_file": "widget/src/state/store.ts"
+  },
+  {
+    "title": "Preserve shopifyCustomer identity fields during resetConversation",
+    "section": "WIDGET_UI",
+    "tags": ["state", "shopify", "reset"],
+    "source_file": "widget/src/state/store.ts"
+  },
+  {
+    "title": "Define DesignTokens interface with colors, typography, spacing, borders, shadows, sizing, transitions, z-index",
+    "section": "WIDGET_UI",
+    "tags": ["tokens", "interface", "design-system"],
+    "source_file": "widget/src/theme/tokens.ts"
+  },
+  {
+    "title": "Resolve WidgetConfig to DesignTokens via resolveTokens function",
+    "section": "WIDGET_UI",
+    "tags": ["tokens", "resolution", "config"],
+    "source_file": "widget/src/theme/tokens.ts"
+  },
+  {
+    "title": "Default primary color to #ff3621 (Agent Red brand)",
+    "section": "WIDGET_UI",
+    "tags": ["tokens", "color", "default"],
+    "source_file": "widget/src/theme/tokens.ts"
+  },
+  {
+    "title": "Use 4px base grid spacing system (Zapier reference pattern)",
+    "section": "WIDGET_UI",
+    "tags": ["tokens", "spacing", "grid"],
+    "source_file": "widget/src/theme/tokens.ts"
+  },
+  {
+    "title": "Default font family to Inter with system font fallback chain",
+    "section": "WIDGET_UI",
+    "tags": ["tokens", "typography", "font"],
+    "source_file": "widget/src/theme/tokens.ts"
+  },
+  {
+    "title": "Calculate WCAG contrast text color using luminance threshold of 0.36",
+    "section": "WIDGET_UI",
+    "tags": ["tokens", "contrast", "wcag"],
+    "source_file": "widget/src/theme/tokens.ts"
+  },
+  {
+    "title": "Support three color modes: light, dark, and auto (prefers-color-scheme)",
+    "section": "WIDGET_UI",
+    "tags": ["tokens", "color-mode", "dark-mode"],
+    "source_file": "widget/src/theme/tokens.ts"
+  },
+  {
+    "title": "Support four shadow intensity levels: none, subtle, standard, heavy with dark mode variants",
+    "section": "WIDGET_UI",
+    "tags": ["tokens", "shadow", "intensity"],
+    "source_file": "widget/src/theme/tokens.ts"
+  },
+  {
+    "title": "Support three panel width presets: compact 320px, standard 380px, wide 440px",
+    "section": "WIDGET_UI",
+    "tags": ["tokens", "panel-width", "presets"],
+    "source_file": "widget/src/theme/tokens.ts"
+  },
+  {
+    "title": "Set panel height to fixed 520px",
+    "section": "WIDGET_UI",
+    "tags": ["tokens", "panel-height", "sizing"],
+    "source_file": "widget/src/theme/tokens.ts"
+  },
+  {
+    "title": "Support three launcher shapes: circle, rounded-square (16px radius), pill (28px radius)",
+    "section": "WIDGET_UI",
+    "tags": ["tokens", "launcher", "shape"],
+    "source_file": "widget/src/theme/tokens.ts"
+  },
+  {
+    "title": "Set z-index values starting at 2147483640 for launcher, 2147483641 for panel, 2147483642 for overlay",
+    "section": "WIDGET_UI",
+    "tags": ["tokens", "z-index", "stacking"],
+    "source_file": "widget/src/theme/tokens.ts"
+  },
+  {
+    "title": "Support custom agent bubble and customer bubble colors with contrast text auto-calculation",
+    "section": "WIDGET_UI",
+    "tags": ["tokens", "bubble-colors", "custom"],
+    "source_file": "widget/src/theme/tokens.ts"
+  },
+  {
+    "title": "Define QuickActionButton interface with id, label, prompt_template, and optional icon",
+    "section": "WIDGET_UI",
+    "tags": ["tokens", "quick-actions", "interface"],
+    "source_file": "widget/src/theme/tokens.ts"
+  },
+  {
+    "title": "Provide 63 English locale strings covering all widget text areas",
+    "section": "WIDGET_UI",
+    "tags": ["locale", "i18n", "strings"],
+    "source_file": "widget/src/locale/en.ts"
+  },
+  {
+    "title": "Connect to SSE endpoint GET /api/chat/stream/{conversation_id} with widget_key query param",
+    "section": "WIDGET_UI",
+    "tags": ["sse", "streaming", "connection"],
+    "source_file": "widget/src/transport/sse.ts"
+  },
+  {
+    "title": "Handle 7 SSE event types: stage, token, validated, done, retracted, error, agent_typing",
+    "section": "WIDGET_UI",
+    "tags": ["sse", "events", "protocol"],
+    "source_file": "widget/src/transport/sse.ts"
+  },
+  {
+    "title": "Include tab_id query param for multi-tab coordination in SSE connections",
+    "section": "WIDGET_UI",
+    "tags": ["sse", "multi-tab", "coordination"],
+    "source_file": "widget/src/transport/sse.ts"
+  },
+  {
+    "title": "Support Last-Event-ID reconnection for SSE stream resumption",
+    "section": "WIDGET_UI",
+    "tags": ["sse", "reconnection", "resume"],
+    "source_file": "widget/src/transport/sse.ts"
+  },
+  {
+    "title": "Limit SSE reconnect to max 10 attempts with exponential backoff (1s base, 30s max)",
+    "section": "WIDGET_UI",
+    "tags": ["sse", "reconnect", "backoff"],
+    "source_file": "widget/src/transport/sse.ts"
+  },
+  {
+    "title": "Set streamComplete flag to prevent reconnection after done event",
+    "section": "WIDGET_UI",
+    "tags": ["sse", "stream-complete", "lifecycle"],
+    "source_file": "widget/src/transport/sse.ts"
+  },
+  {
+    "title": "Display default retraction fallback text when message is retracted by Critic agent",
+    "section": "WIDGET_UI",
+    "tags": ["sse", "retraction", "fallback"],
+    "source_file": "widget/src/transport/sse.ts"
+  },
+  {
+    "title": "Authenticate HTTP requests with X-Widget-Key header",
+    "section": "WIDGET_UI",
+    "tags": ["http", "auth", "header"],
+    "source_file": "widget/src/transport/http.ts"
+  },
+  {
+    "title": "Implement fetchWidgetConfig HTTP method with page_type and page_handle params",
+    "section": "WIDGET_UI",
+    "tags": ["http", "config", "fetch"],
+    "source_file": "widget/src/transport/http.ts"
+  },
+  {
+    "title": "Implement startConversation HTTP method with visitor identity object",
+    "section": "WIDGET_UI",
+    "tags": ["http", "conversation", "start"],
+    "source_file": "widget/src/transport/http.ts"
+  },
+  {
+    "title": "Handle 409 HTTP status for conversations escalated to human agent",
+    "section": "WIDGET_UI",
+    "tags": ["http", "escalation", "conflict"],
+    "source_file": "widget/src/transport/http.ts"
+  },
+  {
+    "title": "Construct visitor object with Shopify, email, and OTP identity signals",
+    "section": "WIDGET_UI",
+    "tags": ["http", "visitor", "identity"],
+    "source_file": "widget/src/transport/http.ts"
+  },
+  {
+    "title": "Implement submitRating, reportIssue, submitConsent, sendOtp, verifyOtp HTTP methods",
+    "section": "WIDGET_UI",
+    "tags": ["http", "endpoints", "actions"],
+    "source_file": "widget/src/transport/http.ts"
+  },
+  {
+    "title": "Connect WebSocket to /api/chat/ws/{conversation_id} for typing and agent messages",
+    "section": "WIDGET_UI",
+    "tags": ["websocket", "connection", "realtime"],
+    "source_file": "widget/src/transport/ws.ts"
+  },
+  {
+    "title": "Send 30-second ping keepalive messages on WebSocket connection",
+    "section": "WIDGET_UI",
+    "tags": ["websocket", "keepalive", "ping"],
+    "source_file": "widget/src/transport/ws.ts"
+  },
+  {
+    "title": "Implement typing indicator with 5-second auto-stop debounce",
+    "section": "WIDGET_UI",
+    "tags": ["websocket", "typing", "debounce"],
+    "source_file": "widget/src/transport/ws.ts"
+  },
+  {
+    "title": "Limit WebSocket reconnect to max 10 attempts with 2s base and 30s max backoff",
+    "section": "WIDGET_UI",
+    "tags": ["websocket", "reconnect", "backoff"],
+    "source_file": "widget/src/transport/ws.ts"
+  },
+  {
+    "title": "Handle WebSocket events: agent_typing, agent_stopped_typing, agent_message, conversation_ended, pong",
+    "section": "WIDGET_UI",
+    "tags": ["websocket", "events", "protocol"],
+    "source_file": "widget/src/transport/ws.ts"
+  },
+  {
+    "title": "Detect 8 page types from Shopify data attributes or URL patterns: home, product, collection, cart, search, blog, page, other",
+    "section": "WIDGET_UI",
+    "tags": ["template-vars", "page-type", "detection"],
+    "source_file": "widget/src/utils/templateVars.ts"
+  },
+  {
+    "title": "Substitute 6 template variables in quick action prompts: page_type, page_handle, page_title, page_url, product_title, collection_title",
+    "section": "WIDGET_UI",
+    "tags": ["template-vars", "substitution", "quick-actions"],
+    "source_file": "widget/src/utils/templateVars.ts"
+  },
+  {
+    "title": "Leave unresolved template variables as-is in output text",
+    "section": "WIDGET_UI",
+    "tags": ["template-vars", "fallback", "unresolved"],
+    "source_file": "widget/src/utils/templateVars.ts"
+  },
+  {
+    "title": "Render launcher as floating action button in Shadow DOM with configurable position and offsets",
+    "section": "WIDGET_UI",
+    "tags": ["launcher", "position", "offsets"],
+    "source_file": "widget/src/components/Launcher.tsx"
+  },
+  {
+    "title": "Support 3 launcher icon options: chat, headset, help SVG icons",
+    "section": "WIDGET_UI",
+    "tags": ["launcher", "icons", "svg"],
+    "source_file": "widget/src/components/Launcher.tsx"
+  },
+  {
+    "title": "Show close icon (X) on launcher when panel is open",
+    "section": "WIDGET_UI",
+    "tags": ["launcher", "close-icon", "toggle"],
+    "source_file": "widget/src/components/Launcher.tsx"
+  },
+  {
+    "title": "Display unread badge on launcher capped at 9+",
+    "section": "WIDGET_UI",
+    "tags": ["launcher", "unread-badge", "counter"],
+    "source_file": "widget/src/components/Launcher.tsx"
+  },
+  {
+    "title": "Apply hover color change and scale transform on launcher open state",
+    "section": "WIDGET_UI",
+    "tags": ["launcher", "hover", "animation"],
+    "source_file": "widget/src/components/Launcher.tsx"
+  },
+  {
+    "title": "Compose panel with Header, MessageList, InputBar, and conditional views (prechat, otp, rating, offline, issue report)",
+    "section": "WIDGET_UI",
+    "tags": ["panel", "composition", "views"],
+    "source_file": "widget/src/components/Panel.tsx"
+  },
+  {
+    "title": "Define 6 CSS animations: blink, typing-dot, spin, fade-in, slide-up, shimmer",
+    "section": "WIDGET_UI",
+    "tags": ["panel", "animations", "css"],
+    "source_file": "widget/src/components/Panel.tsx"
+  },
+  {
+    "title": "Show ConnectionBanner with reconnecting and error states",
+    "section": "WIDGET_UI",
+    "tags": ["panel", "connection-banner", "status"],
+    "source_file": "widget/src/components/Panel.tsx"
+  },
+  {
+    "title": "Apply gradient header when header_gradient_enabled and header_gradient_end are configured",
+    "section": "WIDGET_UI",
+    "tags": ["panel", "gradient", "header"],
+    "source_file": "widget/src/components/Panel.tsx"
+  },
+  {
+    "title": "Auto-start conversation for Shopify customers with identity passthrough",
+    "section": "WIDGET_UI",
+    "tags": ["panel", "shopify", "auto-start"],
+    "source_file": "widget/src/components/Panel.tsx"
+  },
+  {
+    "title": "Allow OTP skip only when verification mode is optional",
+    "section": "WIDGET_UI",
+    "tags": ["panel", "otp", "skip"],
+    "source_file": "widget/src/components/Panel.tsx"
+  },
+  {
+    "title": "Render header with agent avatar (custom URL or default initials), name, title, online status dot, close button",
+    "section": "WIDGET_UI",
+    "tags": ["header", "avatar", "status"],
+    "source_file": "widget/src/components/Header.tsx"
+  },
+  {
+    "title": "Support drag-to-reposition via mousedown event on header bar",
+    "section": "WIDGET_UI",
+    "tags": ["header", "drag", "mousedown"],
+    "source_file": "widget/src/components/Header.tsx"
+  },
+  {
+    "title": "Apply 135-degree gradient background on header when gradient is enabled",
+    "section": "WIDGET_UI",
+    "tags": ["header", "gradient", "135deg"],
+    "source_file": "widget/src/components/Header.tsx"
+  },
+  {
+    "title": "Display optional logo in header from widget_logo_url config",
+    "section": "WIDGET_UI",
+    "tags": ["header", "logo", "branding"],
+    "source_file": "widget/src/components/Header.tsx"
+  },
+  {
+    "title": "Auto-scroll message list to bottom on new messages",
+    "section": "WIDGET_UI",
+    "tags": ["message-list", "auto-scroll", "behavior"],
+    "source_file": "widget/src/components/MessageList.tsx"
+  },
+  {
+    "title": "Show scroll-to-latest button when user scrolls up more than 40px from bottom",
+    "section": "WIDGET_UI",
+    "tags": ["message-list", "scroll-button", "threshold"],
+    "source_file": "widget/src/components/MessageList.tsx"
+  },
+  {
+    "title": "Render day separators (Today, Yesterday, or formatted date) between message groups",
+    "section": "WIDGET_UI",
+    "tags": ["message-list", "day-separator", "grouping"],
+    "source_file": "widget/src/components/MessageList.tsx"
+  },
+  {
+    "title": "Group consecutive agent messages and hide avatar on subsequent messages",
+    "section": "WIDGET_UI",
+    "tags": ["message-list", "grouping", "avatar"],
+    "source_file": "widget/src/components/MessageList.tsx"
+  },
+  {
+    "title": "Show typing indicator with animated dots during agent response",
+    "section": "WIDGET_UI",
+    "tags": ["message-list", "typing", "indicator"],
+    "source_file": "widget/src/components/MessageList.tsx"
+  },
+  {
+    "title": "Display greeting message area with quick action buttons at conversation start",
+    "section": "WIDGET_UI",
+    "tags": ["message-list", "greeting", "quick-actions"],
+    "source_file": "widget/src/components/MessageList.tsx"
+  },
+  {
+    "title": "Align customer bubbles right with primary color, agent bubbles left with surface color, system messages centered with muted style",
+    "section": "WIDGET_UI",
+    "tags": ["bubble", "alignment", "colors"],
+    "source_file": "widget/src/components/MessageBubble.tsx"
+  },
+  {
+    "title": "Parse markdown links [text](url) in messages with target=_top attribute",
+    "section": "WIDGET_UI",
+    "tags": ["bubble", "markdown", "links"],
+    "source_file": "widget/src/components/MessageBubble.tsx"
+  },
+  {
+    "title": "Show streaming cursor animation during token-by-token response delivery",
+    "section": "WIDGET_UI",
+    "tags": ["bubble", "streaming", "cursor"],
+    "source_file": "widget/src/components/MessageBubble.tsx"
+  },
+  {
+    "title": "Style retracted messages with opacity 0.7, red left border, and Message revised label",
+    "section": "WIDGET_UI",
+    "tags": ["bubble", "retraction", "styling"],
+    "source_file": "widget/src/components/MessageBubble.tsx"
+  },
+  {
+    "title": "Extract and display source citation domains from links in agent messages",
+    "section": "WIDGET_UI",
+    "tags": ["bubble", "citations", "domains"],
+    "source_file": "widget/src/components/MessageBubble.tsx"
+  },
+  {
+    "title": "Limit message bubble max width to 75% of container",
+    "section": "WIDGET_UI",
+    "tags": ["bubble", "max-width", "layout"],
+    "source_file": "widget/src/components/MessageBubble.tsx"
+  },
+  {
+    "title": "Display message timestamps in 12-hour format",
+    "section": "WIDGET_UI",
+    "tags": ["bubble", "timestamp", "format"],
+    "source_file": "widget/src/components/MessageBubble.tsx"
+  },
+  {
+    "title": "Implement auto-growing textarea in input bar with height range 66px-140px (3-5 lines)",
+    "section": "WIDGET_UI",
+    "tags": ["input-bar", "textarea", "auto-grow"],
+    "source_file": "widget/src/components/InputBar.tsx"
+  },
+  {
+    "title": "Use Enter to send message and Shift+Enter for newline in input bar",
+    "section": "WIDGET_UI",
+    "tags": ["input-bar", "keyboard", "shortcuts"],
+    "source_file": "widget/src/components/InputBar.tsx"
+  },
+  {
+    "title": "Enforce 2000 character max input with visual warning at 90% threshold",
+    "section": "WIDGET_UI",
+    "tags": ["input-bar", "char-limit", "warning"],
+    "source_file": "widget/src/components/InputBar.tsx"
+  },
+  {
+    "title": "Render 32px circular send button with primary color in input bar",
+    "section": "WIDGET_UI",
+    "tags": ["input-bar", "send-button", "sizing"],
+    "source_file": "widget/src/components/InputBar.tsx"
+  },
+  {
+    "title": "Show file upload button when widget_file_upload_enabled is true",
+    "section": "WIDGET_UI",
+    "tags": ["input-bar", "file-upload", "conditional"],
+    "source_file": "widget/src/components/InputBar.tsx"
+  },
+  {
+    "title": "Display Powered by Agent Red branding link to agentredcx.com below input bar",
+    "section": "WIDGET_UI",
+    "tags": ["input-bar", "branding", "link"],
+    "source_file": "widget/src/components/InputBar.tsx"
+  },
+  {
+    "title": "Render quick action pill buttons with max 2 visible, surface color, border, hover effect",
+    "section": "WIDGET_UI",
+    "tags": ["quick-actions", "pills", "styling"],
+    "source_file": "widget/src/components/QuickActions.tsx"
+  },
+  {
+    "title": "Limit quick action button max width to 280px with icon and label",
+    "section": "WIDGET_UI",
+    "tags": ["quick-actions", "max-width", "icon"],
+    "source_file": "widget/src/components/QuickActions.tsx"
+  },
+  {
+    "title": "Apply fade-in animation on quick action button appearance",
+    "section": "WIDGET_UI",
+    "tags": ["quick-actions", "animation", "fade-in"],
+    "source_file": "widget/src/components/QuickActions.tsx"
+  },
+  {
+    "title": "Render chat rating with thumbs up/down buttons (56px circles) and optional comment textarea",
+    "section": "WIDGET_UI",
+    "tags": ["rating", "thumbs", "feedback"],
+    "source_file": "widget/src/components/ChatRating.tsx"
+  },
+  {
+    "title": "Show success state with checkmark and New conversation button after rating submission",
+    "section": "WIDGET_UI",
+    "tags": ["rating", "success", "reset"],
+    "source_file": "widget/src/components/ChatRating.tsx"
+  },
+  {
+    "title": "Provide 4 issue report types as radio-style buttons: wrong_information, rude_response, not_helpful, other",
+    "section": "WIDGET_UI",
+    "tags": ["issue-report", "types", "radio"],
+    "source_file": "widget/src/components/IssueReport.tsx"
+  },
+  {
+    "title": "Enforce 2000 character max on issue report details textarea with height range 80-160px",
+    "section": "WIDGET_UI",
+    "tags": ["issue-report", "textarea", "limits"],
+    "source_file": "widget/src/components/IssueReport.tsx"
+  },
+  {
+    "title": "Render offline form with required name, email (validated), and message fields",
+    "section": "WIDGET_UI",
+    "tags": ["offline-form", "fields", "validation"],
+    "source_file": "widget/src/components/OfflineForm.tsx"
+  },
+  {
+    "title": "Display custom offline message from widget_offline_message config",
+    "section": "WIDGET_UI",
+    "tags": ["offline-form", "message", "custom"],
+    "source_file": "widget/src/components/OfflineForm.tsx"
+  },
+  {
+    "title": "Build dynamic pre-chat form from widget_prechat_form config supporting text, email, textarea field types",
+    "section": "WIDGET_UI",
+    "tags": ["prechat-form", "dynamic", "fields"],
+    "source_file": "widget/src/components/PreChatForm.tsx"
+  },
+  {
+    "title": "Validate required fields and email format in pre-chat form before submission",
+    "section": "WIDGET_UI",
+    "tags": ["prechat-form", "validation", "required"],
+    "source_file": "widget/src/components/PreChatForm.tsx"
+  },
+  {
+    "title": "Provide Continue as guest skip link on pre-chat form",
+    "section": "WIDGET_UI",
+    "tags": ["prechat-form", "guest", "skip"],
+    "source_file": "widget/src/components/PreChatForm.tsx"
+  },
+  {
+    "title": "Render OTP verification with 6 individual digit input boxes with auto-advance",
+    "section": "WIDGET_UI",
+    "tags": ["otp", "input", "auto-advance"],
+    "source_file": "widget/src/components/OtpVerification.tsx"
+  },
+  {
+    "title": "Support backspace navigation and clipboard paste in OTP input",
+    "section": "WIDGET_UI",
+    "tags": ["otp", "backspace", "paste"],
+    "source_file": "widget/src/components/OtpVerification.tsx"
+  },
+  {
+    "title": "Enforce 60-second resend cooldown for OTP codes",
+    "section": "WIDGET_UI",
+    "tags": ["otp", "resend", "cooldown"],
+    "source_file": "widget/src/components/OtpVerification.tsx"
+  },
+  {
+    "title": "Display PCM consent banner with Allow and No thanks buttons with fade-in animation",
+    "section": "WIDGET_UI",
+    "tags": ["consent", "banner", "pcm"],
+    "source_file": "widget/src/components/ConsentBanner.tsx"
+  },
+  {
+    "title": "Style consent banner with surface background and border-bottom separator",
+    "section": "WIDGET_UI",
+    "tags": ["consent", "styling", "separator"],
+    "source_file": "widget/src/components/ConsentBanner.tsx"
+  },
+  {
+    "title": "Authenticate Shopify session tokens as JWT HS256 with 10-second clock leeway and 9 required claims",
+    "section": "AUTH",
+    "tags": ["shopify", "jwt", "session-token"],
+    "source_file": "src/multi_tenant/auth.py"
+  },
+  {
+    "title": "Authenticate API keys using SHA-256 hash comparison against stored hashes",
+    "section": "AUTH",
+    "tags": ["api-key", "sha256", "hash"],
+    "source_file": "src/multi_tenant/auth.py"
+  },
+  {
+    "title": "Authenticate widget keys with pk_live_ prefix scoped to /api/chat/ and /api/config paths",
+    "section": "AUTH",
+    "tags": ["widget-key", "scope", "path-restriction"],
+    "source_file": "src/multi_tenant/auth.py"
+  },
+  {
+    "title": "Generate widget keys in format pk_live_{12-char-tenant-hash}_{32-char-random}",
+    "section": "AUTH",
+    "tags": ["widget-key", "format", "generation"],
+    "source_file": "src/multi_tenant/auth.py"
+  },
+  {
+    "title": "Generate per-user API keys in format ar_user_{4-char-prefix}_{urlsafe-random}",
+    "section": "AUTH",
+    "tags": ["api-key", "per-user", "format"],
+    "source_file": "src/multi_tenant/auth.py"
+  },
+  {
+    "title": "Define TenantContext frozen dataclass with tenant_id, tier, status, auth_method, is_widget_auth, trial_expires_at, rate_limit_rpm, Shopify fields, team member identity fields",
+    "section": "AUTH",
+    "tags": ["tenant-context", "dataclass", "frozen"],
+    "source_file": "src/multi_tenant/auth.py"
+  },
+  {
+    "title": "Exempt auth-free paths: /health, /ready, /docs, /api/webhooks/, /api/auth/magic-link, /api/auth/2fa, /api/auth/verify-email",
+    "section": "AUTH",
+    "tags": ["auth-exempt", "paths", "public"],
+    "source_file": "src/multi_tenant/auth.py"
+  },
+  {
+    "title": "Resolve authentication in priority order: Shopify JWT then API key then widget key then magic link session",
+    "section": "AUTH",
+    "tags": ["auth-chain", "priority", "resolution"],
+    "source_file": "src/multi_tenant/middleware.py"
+  },
+  {
+    "title": "Enforce RBAC with 17 admin-only path prefixes blocking viewer and escalation_agent roles",
+    "section": "AUTH",
+    "tags": ["rbac", "admin-only", "enforcement"],
+    "source_file": "src/multi_tenant/middleware.py"
+  },
+  {
+    "title": "Allow /api/admin/team/whoami path for all roles regardless of RBAC restrictions",
+    "section": "AUTH",
+    "tags": ["rbac", "whoami", "exception"],
+    "source_file": "src/multi_tenant/middleware.py"
+  },
+  {
+    "title": "Implement per-tenant sliding window rate limiting: Starter 10rpm, Professional 50rpm, Enterprise 200rpm",
+    "section": "AUTH",
+    "tags": ["rate-limit", "sliding-window", "tiers"],
+    "source_file": "src/multi_tenant/middleware.py"
+  },
+  {
+    "title": "Support per-tenant rate_limit_rpm override via tenant config",
+    "section": "AUTH",
+    "tags": ["rate-limit", "override", "custom"],
+    "source_file": "src/multi_tenant/middleware.py"
+  },
+  {
+    "title": "Return X-RateLimit-Limit, X-RateLimit-Remaining, X-RateLimit-Reset headers on every response",
+    "section": "AUTH",
+    "tags": ["rate-limit", "headers", "response"],
+    "source_file": "src/multi_tenant/middleware.py"
+  },
+  {
+    "title": "Return 429 with Retry-After header when rate limit exceeded",
+    "section": "AUTH",
+    "tags": ["rate-limit", "429", "retry-after"],
+    "source_file": "src/multi_tenant/middleware.py"
+  },
+  {
+    "title": "Check trial expiry and block expired trial tenants",
+    "section": "AUTH",
+    "tags": ["trial", "expiry", "blocking"],
+    "source_file": "src/multi_tenant/middleware.py"
+  },
+  {
+    "title": "Check access expiry and block expired access tenants",
+    "section": "AUTH",
+    "tags": ["access", "expiry", "blocking"],
+    "source_file": "src/multi_tenant/middleware.py"
+  },
+  {
+    "title": "Provide require_tier() dependency factory for endpoint-level tier gating",
+    "section": "AUTH",
+    "tags": ["dependency", "tier", "gating"],
+    "source_file": "src/multi_tenant/middleware.py"
+  },
+  {
+    "title": "Provide require_role() dependency factory for endpoint-level role gating",
+    "section": "AUTH",
+    "tags": ["dependency", "role", "gating"],
+    "source_file": "src/multi_tenant/middleware.py"
+  },
+  {
+    "title": "Enforce 1MB request body limit at ASGI level via RequestBodyLimitMiddleware",
+    "section": "AUTH",
+    "tags": ["security", "body-limit", "1mb"],
+    "source_file": "src/multi_tenant/security_middleware.py"
+  },
+  {
+    "title": "Exempt /api/chat/stream path from body limit middleware",
+    "section": "AUTH",
+    "tags": ["security", "body-limit", "exempt"],
+    "source_file": "src/multi_tenant/security_middleware.py"
+  },
+  {
+    "title": "Enforce 50-level JSON depth limit via JsonDepthValidationMiddleware",
+    "section": "AUTH",
+    "tags": ["security", "json-depth", "50-levels"],
+    "source_file": "src/multi_tenant/security_middleware.py"
+  },
+  {
+    "title": "Set security headers: X-Content-Type-Options nosniff, X-Frame-Options DENY, X-XSS-Protection, Referrer-Policy strict-origin-when-cross-origin, Permissions-Policy, Cache-Control, HSTS",
+    "section": "AUTH",
+    "tags": ["security", "headers", "hardening"],
+    "source_file": "src/multi_tenant/security_middleware.py"
+  },
+  {
+    "title": "Apply CSP frame-ancestors header instead of X-Frame-Options DENY for Shopify admin paths",
+    "section": "AUTH",
+    "tags": ["security", "csp", "shopify"],
+    "source_file": "src/multi_tenant/security_middleware.py"
+  },
+  {
+    "title": "Record SLA latency via Server-Timing header on responses",
+    "section": "AUTH",
+    "tags": ["security", "server-timing", "latency"],
+    "source_file": "src/multi_tenant/security_middleware.py"
+  },
+  {
+    "title": "Issue pending_2fa JWT with 10-minute lifetime, HS256 algorithm, and type pending_2fa_session",
+    "section": "AUTH",
+    "tags": ["2fa", "pending-token", "jwt"],
+    "source_file": "src/multi_tenant/admin_mfa_auth.py"
+  },
+  {
+    "title": "Limit brute-force to 5 failed 2FA attempts per pending token",
+    "section": "AUTH",
+    "tags": ["2fa", "brute-force", "5-attempts"],
+    "source_file": "src/multi_tenant/admin_mfa_auth.py"
+  },
+  {
+    "title": "Require 2FA only for admin and superadmin roles, skip for viewer and escalation_agent",
+    "section": "AUTH",
+    "tags": ["2fa", "admin-only", "role-check"],
+    "source_file": "src/multi_tenant/admin_mfa_auth.py"
+  },
+  {
+    "title": "Allow mfa_opt_out bypass for admins granted opt-out by superadmin",
+    "section": "AUTH",
+    "tags": ["2fa", "opt-out", "bypass"],
+    "source_file": "src/multi_tenant/admin_mfa_auth.py"
+  },
+  {
+    "title": "Skip 2FA challenge for admins with no MFA enrolled (bootstrap case)",
+    "section": "AUTH",
+    "tags": ["2fa", "bootstrap", "no-enrollment"],
+    "source_file": "src/multi_tenant/admin_mfa_auth.py"
+  },
+  {
+    "title": "Issue full 8-hour session JWT after successful 2FA verification",
+    "section": "AUTH",
+    "tags": ["2fa", "session", "8-hour"],
+    "source_file": "src/multi_tenant/admin_mfa_auth.py"
+  },
+  {
+    "title": "Implement TOTP verification endpoint POST /api/auth/2fa/totp/verify consuming pending JWT",
+    "section": "AUTH",
+    "tags": ["2fa", "totp", "verify-endpoint"],
+    "source_file": "src/multi_tenant/admin_mfa_auth.py"
+  },
+  {
+    "title": "Implement backup code verification endpoint POST /api/auth/2fa/totp/backup-verify consuming used codes",
+    "section": "AUTH",
+    "tags": ["2fa", "backup", "verify-endpoint"],
+    "source_file": "src/multi_tenant/admin_mfa_auth.py"
+  },
+  {
+    "title": "Implement SMS OTP request endpoint POST /api/auth/2fa/sms/request for verified phone numbers",
+    "section": "AUTH",
+    "tags": ["2fa", "sms", "request-endpoint"],
+    "source_file": "src/multi_tenant/admin_mfa_auth.py"
+  },
+  {
+    "title": "Implement SMS OTP verify endpoint POST /api/auth/2fa/sms/verify with brute-force protection",
+    "section": "AUTH",
+    "tags": ["2fa", "sms", "verify-endpoint"],
+    "source_file": "src/multi_tenant/admin_mfa_auth.py"
+  },
+  {
+    "title": "Mask phone number in SMS OTP response as first 3 digits + *** + last 2 digits",
+    "section": "AUTH",
+    "tags": ["2fa", "sms", "phone-mask"],
+    "source_file": "src/multi_tenant/admin_mfa_auth.py"
+  },
+  {
+    "title": "Track brute-force attempts in-memory per pending token fingerprint (tenant_id + member_id)",
+    "section": "AUTH",
+    "tags": ["2fa", "brute-force", "tracking"],
+    "source_file": "src/multi_tenant/admin_mfa_auth.py"
+  },
+  {
+    "title": "Send 6-digit SMS OTP codes via Azure Communication Services",
+    "section": "AUTH",
+    "tags": ["sms", "otp", "azure-acs"],
+    "source_file": "src/multi_tenant/sms_mfa_service.py"
+  },
+  {
+    "title": "Store SMS OTP codes as SHA-256 hashes with 10-minute TTL in verification_tokens collection",
+    "section": "AUTH",
+    "tags": ["sms", "otp", "hash-storage"],
+    "source_file": "src/multi_tenant/sms_mfa_service.py"
+  },
+  {
+    "title": "Use token_id format sms_otp_{member_id} for SMS OTP storage",
+    "section": "AUTH",
+    "tags": ["sms", "otp", "token-format"],
+    "source_file": "src/multi_tenant/sms_mfa_service.py"
+  },
+  {
+    "title": "Consume SMS OTP codes on verification (single-use)",
+    "section": "AUTH",
+    "tags": ["sms", "otp", "single-use"],
+    "source_file": "src/multi_tenant/sms_mfa_service.py"
+  },
+  {
+    "title": "Degrade gracefully when ACS_SMS_FROM environment variable is not configured",
+    "section": "AUTH",
+    "tags": ["sms", "graceful-degradation", "config"],
+    "source_file": "src/multi_tenant/sms_mfa_service.py"
+  },
+  {
+    "title": "Generate 32-byte base32 TOTP secrets using pyotp for authenticator app enrollment",
+    "section": "AUTH",
+    "tags": ["totp", "secret", "generation"],
+    "source_file": "src/multi_tenant/mfa_totp.py"
+  },
+  {
+    "title": "Build otpauth:// URI with AgentRed issuer name for authenticator app provisioning",
+    "section": "AUTH",
+    "tags": ["totp", "provisioning-uri", "otpauth"],
+    "source_file": "src/multi_tenant/mfa_totp.py"
+  },
+  {
+    "title": "Generate QR code as base64 PNG data URL for TOTP enrollment",
+    "section": "AUTH",
+    "tags": ["totp", "qr-code", "data-url"],
+    "source_file": "src/multi_tenant/mfa_totp.py"
+  },
+  {
+    "title": "Verify TOTP codes with 6 digits, 30-second interval, and +/- 1 window tolerance",
+    "section": "AUTH",
+    "tags": ["totp", "verify", "window"],
+    "source_file": "src/multi_tenant/mfa_totp.py"
+  },
+  {
+    "title": "Generate 10 single-use backup codes as 8-character alphanumeric strings (no I/O/0/1 for clarity)",
+    "section": "AUTH",
+    "tags": ["totp", "backup-codes", "generation"],
+    "source_file": "src/multi_tenant/mfa_totp.py"
+  },
+  {
+    "title": "Hash backup codes with SHA-256 for storage and verify by hash comparison",
+    "section": "AUTH",
+    "tags": ["totp", "backup-codes", "hash"],
+    "source_file": "src/multi_tenant/mfa_totp.py"
+  },
+  {
+    "title": "Remove matched backup code hash from list on successful verification (consumption)",
+    "section": "AUTH",
+    "tags": ["totp", "backup-codes", "consume"],
+    "source_file": "src/multi_tenant/mfa_totp.py"
+  },
+  {
+    "title": "Store TOTP seeds in Azure Key Vault with naming convention user-{member_id}-totp-seed",
+    "section": "AUTH",
+    "tags": ["totp", "key-vault", "storage"],
+    "source_file": "src/multi_tenant/mfa_totp.py"
+  },
+  {
+    "title": "Create 8-hour MFA session JWT with HS256 and type mfa_session after TOTP verification",
+    "section": "AUTH",
+    "tags": ["totp", "session-jwt", "8-hour"],
+    "source_file": "src/multi_tenant/mfa_totp.py"
+  },
+  {
+    "title": "Require valid TOTP code to disable MFA (identity confirmation before removal)",
+    "section": "AUTH",
+    "tags": ["totp", "disable", "confirm"],
+    "source_file": "src/multi_tenant/mfa_totp.py"
+  },
+  {
+    "title": "Delete TOTP seed from Key Vault and clear MFA fields on member document when MFA is disabled",
+    "section": "AUTH",
+    "tags": ["totp", "disable", "cleanup"],
+    "source_file": "src/multi_tenant/mfa_totp.py"
+  },
+  {
+    "title": "Send magic link sign-in email POST /api/auth/magic-link/request (public, rate-limited)",
+    "section": "AUTH",
+    "tags": ["magic-link", "request", "public"],
+    "source_file": "src/multi_tenant/magic_link_auth.py"
+  },
+  {
+    "title": "Rate-limit magic link requests to 3 per 5 minutes per IP address",
+    "section": "AUTH",
+    "tags": ["magic-link", "rate-limit", "ip"],
+    "source_file": "src/multi_tenant/magic_link_auth.py"
+  },
+  {
+    "title": "Return uniform 200 response on magic link request regardless of email existence (anti-enumeration)",
+    "section": "AUTH",
+    "tags": ["magic-link", "anti-enumeration", "200"],
+    "source_file": "src/multi_tenant/magic_link_auth.py"
+  },
+  {
+    "title": "Resolve magic link recipient by searching team_members first, then falling back to tenant customer_email",
+    "section": "AUTH",
+    "tags": ["magic-link", "resolution", "team-members"],
+    "source_file": "src/multi_tenant/magic_link_auth.py"
+  },
+  {
+    "title": "Send multi-button magic link email when email matches team members in multiple tenants",
+    "section": "AUTH",
+    "tags": ["magic-link", "multi-tenant", "disambiguation"],
+    "source_file": "src/multi_tenant/magic_link_auth.py"
+  },
+  {
+    "title": "Expire magic link tokens after 15 minutes via Cosmos DB TTL auto-expiry",
+    "section": "AUTH",
+    "tags": ["magic-link", "ttl", "15-minutes"],
+    "source_file": "src/multi_tenant/magic_link_auth.py"
+  },
+  {
+    "title": "Consume magic link tokens on verification (single-use, cannot be reused)",
+    "section": "AUTH",
+    "tags": ["magic-link", "single-use", "consume"],
+    "source_file": "src/multi_tenant/magic_link_auth.py"
+  },
+  {
+    "title": "Issue 8-hour session JWT with magic_link_session type including optional member_id and role claims",
+    "section": "AUTH",
+    "tags": ["magic-link", "session-jwt", "claims"],
+    "source_file": "src/multi_tenant/magic_link_auth.py"
+  },
+  {
+    "title": "Route to pending 2FA challenge when magic link verifies an admin with MFA enabled",
+    "section": "AUTH",
+    "tags": ["magic-link", "2fa-routing", "admin"],
+    "source_file": "src/multi_tenant/magic_link_auth.py"
+  },
+  {
+    "title": "Return available MFA methods (totp, sms, backup) when 2FA challenge is required",
+    "section": "AUTH",
+    "tags": ["magic-link", "mfa-methods", "availability"],
+    "source_file": "src/multi_tenant/magic_link_auth.py"
+  },
+  {
+    "title": "Rate-limit email verification requests to 3 per 5 minutes per IP address",
+    "section": "EMAIL",
+    "tags": ["verification", "rate-limit", "ip"],
+    "source_file": "src/multi_tenant/email_verification.py"
+  },
+  {
+    "title": "Send email verification link with 10-minute expiry via POST /api/auth/verify-email/request",
+    "section": "EMAIL",
+    "tags": ["verification", "link", "10-minutes"],
+    "source_file": "src/multi_tenant/email_verification.py"
+  },
+  {
+    "title": "Return uniform response on verification request to prevent email enumeration",
+    "section": "EMAIL",
+    "tags": ["verification", "anti-enumeration", "uniform"],
+    "source_file": "src/multi_tenant/email_verification.py"
+  },
+  {
+    "title": "Generate verification token using secrets.token_urlsafe(32)",
+    "section": "EMAIL",
+    "tags": ["verification", "token", "urlsafe"],
+    "source_file": "src/multi_tenant/email_verification.py"
+  },
+  {
+    "title": "Consume verification token on confirm (single-use) via GET /api/auth/verify-email/confirm",
+    "section": "EMAIL",
+    "tags": ["verification", "confirm", "single-use"],
+    "source_file": "src/multi_tenant/email_verification.py"
+  },
+  {
+    "title": "Render branded HTML confirmation page with dark theme on successful email verification",
+    "section": "EMAIL",
+    "tags": ["verification", "confirm-page", "branded"],
+    "source_file": "src/multi_tenant/email_verification.py"
+  },
+  {
+    "title": "Render branded HTML error page with specific failure reason on verification failure",
+    "section": "EMAIL",
+    "tags": ["verification", "error-page", "branded"],
+    "source_file": "src/multi_tenant/email_verification.py"
+  },
+  {
+    "title": "Update notification_email and email_verified fields in preferences after successful verification",
+    "section": "EMAIL",
+    "tags": ["verification", "preferences", "update"],
+    "source_file": "src/multi_tenant/email_verification.py"
+  },
+  {
+    "title": "Use dual-provider email delivery: SMTP (Titan) primary, ACS (Azure) fallback",
+    "section": "EMAIL",
+    "tags": ["delivery", "dual-provider", "fallback"],
+    "source_file": "src/multi_tenant/email_verification.py"
+  },
+  {
+    "title": "Configure SMTP via SMTP_HOST, SMTP_PORT, SMTP_USERNAME, SMTP_PASSWORD, SMTP_FROM environment variables",
+    "section": "EMAIL",
+    "tags": ["delivery", "smtp", "env-config"],
+    "source_file": "src/multi_tenant/email_verification.py"
+  },
+  {
+    "title": "Support SMTP_SSL on port 465 and STARTTLS on other ports",
+    "section": "EMAIL",
+    "tags": ["delivery", "smtp", "tls"],
+    "source_file": "src/multi_tenant/email_verification.py"
+  },
+  {
+    "title": "Use AZURE_COMM_CONNECTION_STRING environment variable for ACS email fallback",
+    "section": "EMAIL",
+    "tags": ["delivery", "acs", "connection-string"],
+    "source_file": "src/multi_tenant/email_verification.py"
+  },
+  {
+    "title": "Set From address as Agent Red <{smtp_from}> for all outgoing emails",
+    "section": "EMAIL",
+    "tags": ["delivery", "from-address", "branding"],
+    "source_file": "src/multi_tenant/email_verification.py"
+  },
+  {
+    "title": "Wrap all email bodies in _EMAIL_WRAPPER template from alert_delivery module",
+    "section": "EMAIL",
+    "tags": ["delivery", "wrapper", "template"],
+    "source_file": "src/multi_tenant/email_verification.py"
+  },
+  {
+    "title": "Set verification email subject to [Agent Red] Verify Your Email Address",
+    "section": "EMAIL",
+    "tags": ["verification", "subject", "branded"],
+    "source_file": "src/multi_tenant/email_verification.py"
+  },
+  {
+    "title": "Send welcome email with superadmin API key, widget key, admin console URL, and next steps guidance",
+    "section": "EMAIL",
+    "tags": ["welcome", "credentials", "onboarding"],
+    "source_file": "src/multi_tenant/welcome_email.py"
+  },
+  {
+    "title": "Include security notice in welcome email warning to store keys securely",
+    "section": "EMAIL",
+    "tags": ["welcome", "security-notice", "warning"],
+    "source_file": "src/multi_tenant/welcome_email.py"
+  },
+  {
+    "title": "Display plan tier and tenant ID in welcome email footer",
+    "section": "EMAIL",
+    "tags": ["welcome", "footer", "metadata"],
+    "source_file": "src/multi_tenant/welcome_email.py"
+  },
+  {
+    "title": "Resolve admin login URL from STANDALONE_ADMIN_URL then PROD_URL then hardcoded fallback",
+    "section": "EMAIL",
+    "tags": ["welcome", "login-url", "resolution"],
+    "source_file": "src/multi_tenant/welcome_email.py"
+  },
+  {
+    "title": "Set welcome email subject to Welcome to Agent Red — Your account is ready",
+    "section": "EMAIL",
+    "tags": ["welcome", "subject", "branded"],
+    "source_file": "src/multi_tenant/welcome_email.py"
+  },
+  {
+    "title": "Call send_welcome_email from 4 provisioning call sites: Stripe checkout, Shopify billing, trial signup, SPA manual",
+    "section": "EMAIL",
+    "tags": ["welcome", "call-sites", "provisioning"],
+    "source_file": "src/multi_tenant/welcome_email.py"
+  },
+  {
+    "title": "Never raise exceptions from welcome email — return bool, do not block provisioning",
+    "section": "EMAIL",
+    "tags": ["welcome", "error-handling", "non-blocking"],
+    "source_file": "src/multi_tenant/welcome_email.py"
+  },
+  {
+    "title": "Send trial expiry warning emails at 7-day, 3-day, and 1-day intervals before trial end",
+    "section": "EMAIL",
+    "tags": ["trial-expiry", "warnings", "intervals"],
+    "source_file": "src/multi_tenant/trial_expiry_email.py"
+  },
+  {
+    "title": "Apply urgency-specific styling per warning tier: blue (7d), amber (3d), red (1d) badges",
+    "section": "EMAIL",
+    "tags": ["trial-expiry", "urgency", "badge-colors"],
+    "source_file": "src/multi_tenant/trial_expiry_email.py"
+  },
+  {
+    "title": "Use escalating subject lines: ends in 7 days, ends in 3 days, ends tomorrow",
+    "section": "EMAIL",
+    "tags": ["trial-expiry", "subjects", "escalating"],
+    "source_file": "src/multi_tenant/trial_expiry_email.py"
+  },
+  {
+    "title": "Inform merchants that widget stops accepting new conversations when trial ends but config and history are preserved",
+    "section": "EMAIL",
+    "tags": ["trial-expiry", "consequences", "preservation"],
+    "source_file": "src/multi_tenant/trial_expiry_email.py"
+  },
+  {
+    "title": "Send access expiry warning emails at 7-day, 3-day, and 1-day intervals before access end",
+    "section": "EMAIL",
+    "tags": ["access-expiry", "warnings", "intervals"],
+    "source_file": "src/multi_tenant/access_expiry_email.py"
+  },
+  {
+    "title": "Differentiate access expiry emails from trial expiry by referencing service provider contact instead of upgrade prompt",
+    "section": "EMAIL",
+    "tags": ["access-expiry", "messaging", "service-provider"],
+    "source_file": "src/multi_tenant/access_expiry_email.py"
+  },
+  {
+    "title": "Apply same urgency badge styling to access expiry as trial expiry: blue (7d), amber (3d), red (1d)",
+    "section": "EMAIL",
+    "tags": ["access-expiry", "urgency", "badge-colors"],
+    "source_file": "src/multi_tenant/access_expiry_email.py"
+  },
+  {
+    "title": "Set magic link email subject to [Agent Red] Sign In Link with branded CTA button",
+    "section": "EMAIL",
+    "tags": ["magic-link", "subject", "branded"],
+    "source_file": "src/multi_tenant/magic_link_auth.py"
+  },
+  {
+    "title": "Render multi-tenant magic link email with separate sign-in buttons per tenant showing tenant label",
+    "section": "EMAIL",
+    "tags": ["magic-link", "multi-tenant", "buttons"],
+    "source_file": "src/multi_tenant/magic_link_auth.py"
+  },
+  {
+    "title": "Include safe-to-ignore disclaimer in magic link and verification emails",
+    "section": "EMAIL",
+    "tags": ["email", "disclaimer", "safety"],
+    "source_file": "src/multi_tenant/magic_link_auth.py"
+  },
+  {
+    "title": "Load industry-specific KB templates from JSON files indexed by _registry.json",
+    "section": "EMAIL",
+    "tags": ["template-loader", "registry", "json"],
+    "source_file": "src/multi_tenant/template_loader.py"
+  },
+  {
+    "title": "Apply category templates to tenant KB with append or replace merge modes",
+    "section": "EMAIL",
+    "tags": ["template-loader", "apply", "merge-mode"],
+    "source_file": "src/multi_tenant/template_loader.py"
+  },
+  {
+    "title": "Vectorize created template articles after KB insertion via knowledge_vectorizer",
+    "section": "EMAIL",
+    "tags": ["template-loader", "vectorization", "embedding"],
+    "source_file": "src/multi_tenant/template_loader.py"
+  },
+  {
+    "title": "Cache loaded templates in memory after first load for subsequent requests",
+    "section": "EMAIL",
+    "tags": ["template-loader", "cache", "memory"],
+    "source_file": "src/multi_tenant/template_loader.py"
+  },
+  {
+    "title": "Return config_suggestions including brand_voice, escalation_keywords, greeting_message per category",
+    "section": "EMAIL",
+    "tags": ["template-loader", "suggestions", "category"],
+    "source_file": "src/multi_tenant/template_loader.py"
+  },
+  {
+    "title": "Render widget configuration page with 55% form / 45% live preview two-column layout",
+    "section": "WIDGET_UI",
+    "tags": ["admin", "layout", "two-column"],
+    "source_file": "admin/standalone/pages/Widget.tsx"
+  },
+  {
+    "title": "Display live widget preview with simulated browser chrome background",
+    "section": "WIDGET_UI",
+    "tags": ["admin", "preview", "live"],
+    "source_file": "admin/standalone/pages/Widget.tsx"
+  },
+  {
+    "title": "Provide Installation section with widget key display, copy button, API URL, and embed code snippet",
+    "section": "WIDGET_UI",
+    "tags": ["admin", "installation", "embed-code"],
+    "source_file": "admin/standalone/pages/Widget.tsx"
+  },
+  {
+    "title": "Provide widget key rotation with confirmation modal warning about immediate invalidation",
+    "section": "WIDGET_UI",
+    "tags": ["admin", "key-rotation", "modal"],
+    "source_file": "admin/standalone/pages/Widget.tsx"
+  },
+  {
+    "title": "Provide Appearance section with color pickers, gradient toggle, font, border radius slider, launcher size slider, position selector, color mode, panel width, shadow intensity controls",
+    "section": "WIDGET_UI",
+    "tags": ["admin", "appearance", "controls"],
+    "source_file": "admin/standalone/pages/Widget.tsx"
+  },
+  {
+    "title": "Implement ColorField with Mantine ColorPicker, hex input validation (#RRGGBB), and 8 default swatches",
+    "section": "WIDGET_UI",
+    "tags": ["admin", "color-picker", "swatches"],
+    "source_file": "admin/standalone/pages/Widget.tsx"
+  },
+  {
+    "title": "Support header gradient with side-by-side left/right color pickers and enable toggle",
+    "section": "WIDGET_UI",
+    "tags": ["admin", "gradient", "side-by-side"],
+    "source_file": "admin/standalone/pages/Widget.tsx"
+  },
+  {
+    "title": "Provide Behavior section with greeting toggle, greeting mode (static/AI-generated), pre-chat form toggle with field chips, sound toggle",
+    "section": "WIDGET_UI",
+    "tags": ["admin", "behavior", "controls"],
+    "source_file": "admin/standalone/pages/Widget.tsx"
+  },
+  {
+    "title": "Support 4 greeting template variables with click-to-insert buttons: FIRST_NAME, LAST_NAME, FULL_NAME, COMPANY",
+    "section": "WIDGET_UI",
+    "tags": ["admin", "greeting", "template-vars"],
+    "source_file": "admin/standalone/pages/Widget.tsx"
+  },
+  {
+    "title": "Provide Content section with header title, subtitle, input placeholder, agent display name, and avatar upload",
+    "section": "WIDGET_UI",
+    "tags": ["admin", "content", "fields"],
+    "source_file": "admin/standalone/pages/Widget.tsx"
+  },
+  {
+    "title": "Implement avatar upload drop zone supporting PNG/JPEG with 256KB max size",
+    "section": "WIDGET_UI",
+    "tags": ["admin", "avatar", "upload"],
+    "source_file": "admin/standalone/pages/Widget.tsx"
+  },
+  {
+    "title": "Show avatar preview with remove button when avatar is uploaded, drop zone when not",
+    "section": "WIDGET_UI",
+    "tags": ["admin", "avatar", "preview"],
+    "source_file": "admin/standalone/pages/Widget.tsx"
+  },
+  {
+    "title": "Map 25 widget_* API fields to local WidgetConfig form state via configToWidgetConfig",
+    "section": "WIDGET_UI",
+    "tags": ["admin", "field-mapping", "api"],
+    "source_file": "admin/standalone/pages/Widget.tsx"
+  },
+  {
+    "title": "Provide Reset to defaults and Save draft inputs action buttons",
+    "section": "WIDGET_UI",
+    "tags": ["admin", "actions", "save-reset"],
+    "source_file": "admin/standalone/pages/Widget.tsx"
+  },
+  {
+    "title": "Apply sticky positioning to preview panel that follows scroll",
+    "section": "WIDGET_UI",
+    "tags": ["admin", "preview", "sticky"],
+    "source_file": "admin/standalone/pages/Widget.tsx"
+  },
+  {
+    "title": "Show AI-generated greeting preview as italic text when greeting mode is ai_generated",
+    "section": "WIDGET_UI",
+    "tags": ["admin", "preview", "ai-greeting"],
+    "source_file": "admin/standalone/pages/Widget.tsx"
+  },
+  {
+    "title": "Render preview launcher as decorative-only (no click handler) with correct icon and sizing",
+    "section": "WIDGET_UI",
+    "tags": ["admin", "preview", "launcher"],
+    "source_file": "admin/standalone/pages/Widget.tsx"
+  }
+]

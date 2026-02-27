@@ -1,0 +1,492 @@
+[
+  {
+    "id": "BATCH3B-001",
+    "text": "The SPA console (Service Provider Administrator console) MUST provide a graphical UI for observing traffic, monitoring consumption, tracking issues, and observing budget versus spend.",
+    "source_session": "66eb04ae",
+    "source_type": "owner_directive",
+    "domain": "ADMIN_UI"
+  },
+  {
+    "id": "BATCH3B-002",
+    "text": "The SPA console is a separate admin UI from the merchant admin — it is the platform operator's tool for managing all tenants and the entire deployment.",
+    "source_session": "66eb04ae",
+    "source_type": "owner_directive",
+    "domain": "ADMIN_UI"
+  },
+  {
+    "id": "BATCH3B-003",
+    "text": "Effort estimates MUST NOT be presented to the owner. No metric other than elapsed real-world time is acceptable if estimates are ever requested.",
+    "source_session": "66eb04ae",
+    "source_type": "owner_directive",
+    "domain": "GENERAL"
+  },
+  {
+    "id": "BATCH3B-004",
+    "text": "The primary focus MUST be on quality: correctness, completeness, and absence of defects — not effort.",
+    "source_session": "66eb04ae",
+    "source_type": "owner_directive",
+    "domain": "GENERAL"
+  },
+  {
+    "id": "BATCH3B-005",
+    "text": "Azure Communication Services MUST be used as the email provider.",
+    "source_session": "66eb04ae",
+    "source_type": "owner_directive",
+    "domain": "EMAIL"
+  },
+  {
+    "id": "BATCH3B-006",
+    "text": "All non-superseded blocked capabilities (including C8 and C9) MUST be included in the release scope.",
+    "source_session": "66eb04ae",
+    "source_type": "owner_directive",
+    "domain": "GENERAL"
+  },
+  {
+    "id": "BATCH3B-007",
+    "text": "Launch timing is the owner's decision. Claude MUST disregard any concern for launch deadlines and not use launch as a reasoning factor.",
+    "source_session": "66eb04ae",
+    "source_type": "owner_directive",
+    "domain": "GENERAL"
+  },
+  {
+    "id": "BATCH3B-008",
+    "text": "The build stage MUST be executed according to a strict checklist and Repeatable Procedure so that build errors can be tracked and corrected.",
+    "source_session": "697d8270",
+    "source_type": "owner_directive",
+    "domain": "OPS"
+  },
+  {
+    "id": "BATCH3B-009",
+    "text": "The chat widget MUST display on the tenant admin console when the AI Configuration status is Active. This is core product behavior that has been working for 30+ builds.",
+    "source_session": "697d8270",
+    "source_type": "owner_directive",
+    "domain": "WIDGET_UI"
+  },
+  {
+    "id": "BATCH3B-010",
+    "text": "All issues reported by beta customers MUST be corrected immediately and fixes MUST be pushed to the beta (production) environment with highest priority.",
+    "source_session": "697d8270",
+    "source_type": "owner_directive",
+    "domain": "OPS"
+  },
+  {
+    "id": "BATCH3B-011",
+    "text": "Error messages shown to users MUST be user-friendly — not technical internal strings like '_system: No draft to activate'.",
+    "source_session": "697d8270",
+    "source_type": "owner_directive",
+    "domain": "ADMIN_UI"
+  },
+  {
+    "id": "BATCH3B-012",
+    "text": "When a tenant admin attempts to activate configuration without a saved draft, the error message MUST read: 'Save your configuration first. Go to Agent Configuration, review your settings, and click Save draft inputs before activating.'",
+    "source_session": "697d8270",
+    "source_type": "owner_directive",
+    "domain": "CONFIG"
+  },
+  {
+    "id": "BATCH3B-013",
+    "text": "Tier-gated features (e.g., Memory & Privacy pro+ fields) MUST NOT be submitted to the API when the tenant is on a lower tier. The frontend MUST filter out tier-gated fields before save.",
+    "source_session": "697d8270",
+    "source_type": "owner_directive",
+    "domain": "CONFIG"
+  },
+  {
+    "id": "BATCH3B-014",
+    "text": "When a save operation fails, the actual error from the backend MUST be surfaced to the user — not a generic 'Failed to save settings' message.",
+    "source_session": "697d8270",
+    "source_type": "owner_directive",
+    "domain": "ADMIN_UI"
+  },
+  {
+    "id": "BATCH3B-015",
+    "text": "The admin console MUST have a favicon.",
+    "source_session": "697d8270",
+    "source_type": "owner_directive",
+    "domain": "ADMIN_UI"
+  },
+  {
+    "id": "BATCH3B-016",
+    "text": "Team member invitation emails MUST be sent when a team member is invited. The system MUST NOT rely on the admin manually sharing API keys.",
+    "source_session": "697d8270",
+    "source_type": "owner_directive",
+    "domain": "EMAIL"
+  },
+  {
+    "id": "BATCH3B-017",
+    "text": "A Protected Behaviors registry MUST be maintained to prevent uncontrolled regressions. Behaviors with machine-verifiable assertions MUST be checked before every build.",
+    "source_session": "697d8270",
+    "source_type": "owner_approval",
+    "domain": "TESTING"
+  },
+  {
+    "id": "BATCH3B-018",
+    "text": "Administrators MUST have 2FA enabled by default, with explicit opt-out only if the superadmin allows it.",
+    "source_session": "6d40ef9b",
+    "source_type": "owner_directive",
+    "domain": "AUTH"
+  },
+  {
+    "id": "BATCH3B-019",
+    "text": "2FA MUST support two options: (1) SMS and (2) authenticator app (e.g., MS Authenticator, Google Authenticator).",
+    "source_session": "6d40ef9b",
+    "source_type": "owner_directive",
+    "domain": "AUTH"
+  },
+  {
+    "id": "BATCH3B-020",
+    "text": "Escalation agents (non-administrators) do NOT require 2FA because they cannot alter system configuration.",
+    "source_session": "6d40ef9b",
+    "source_type": "owner_directive",
+    "domain": "AUTH"
+  },
+  {
+    "id": "BATCH3B-021",
+    "text": "Administrators MUST have all of the same access as the superadmin, with the exception that the superadmin account is not visible to any other user and cannot be disabled.",
+    "source_session": "6d40ef9b",
+    "source_type": "owner_directive",
+    "domain": "AUTH"
+  },
+  {
+    "id": "BATCH3B-022",
+    "text": "All non-administrators MUST only have permission to interact with the inbox.",
+    "source_session": "6d40ef9b",
+    "source_type": "owner_directive",
+    "domain": "AUTH"
+  },
+  {
+    "id": "BATCH3B-023",
+    "text": "Auth, 2FA, and RBAC are tightly coupled and MUST be dealt with at the same time as a unified implementation.",
+    "source_session": "6d40ef9b",
+    "source_type": "owner_directive",
+    "domain": "AUTH"
+  },
+  {
+    "id": "BATCH3B-024",
+    "text": "The superadmin MUST either register a telephone number for 2FA or 2FA enrollment MUST be enforced before the first activation, with an explicit opt-out choice if they want to bypass it.",
+    "source_session": "6d40ef9b",
+    "source_type": "owner_directive",
+    "domain": "AUTH"
+  },
+  {
+    "id": "BATCH3B-025",
+    "text": "Auth flow MUST be: email address to get the magic link, then 2FA when you land on the auth gate. No passwords.",
+    "source_session": "6d40ef9b",
+    "source_type": "owner_directive",
+    "domain": "AUTH"
+  },
+  {
+    "id": "BATCH3B-026",
+    "text": "A time series chart (WI #300) MUST be developed showing improvements over time with annotations for specific changes in working practices (e.g., knowledge base introduction, database introduction).",
+    "source_session": "6d40ef9b",
+    "source_type": "owner_directive",
+    "domain": "GENERAL"
+  },
+  {
+    "id": "BATCH3B-027",
+    "text": "The 1.0 release MUST be a full GA release for general availability — not a beta or soft launch.",
+    "source_session": "6f396504",
+    "source_type": "owner_directive",
+    "domain": "GENERAL"
+  },
+  {
+    "id": "BATCH3B-028",
+    "text": "The Agent Red website MUST initially be hosted within the remakerdigital.com domain (under an 'Applications' category). A standalone Agent Red website on Azure is deferred to the 1.1 release.",
+    "source_session": "6f396504",
+    "source_type": "owner_directive",
+    "domain": "GENERAL"
+  },
+  {
+    "id": "BATCH3B-029",
+    "text": "The GitHub wiki MUST use diagrams, charts, tables, mermaid and other graphical representations wherever possible. The wiki will be used by design and UX consultants to understand the system.",
+    "source_session": "6f396504",
+    "source_type": "owner_directive",
+    "domain": "GENERAL"
+  },
+  {
+    "id": "BATCH3B-030",
+    "text": "Affiliate revenue from third-party integrations is deferred until after launch.",
+    "source_session": "71813dc0",
+    "source_type": "owner_directive",
+    "domain": "BILLING"
+  },
+  {
+    "id": "BATCH3B-031",
+    "text": "Team member deletion MUST be a hard delete — no soft delete.",
+    "source_session": "7225af46",
+    "source_type": "owner_directive",
+    "domain": "TEAM"
+  },
+  {
+    "id": "BATCH3B-032",
+    "text": "All team member actions MUST be stored in an audit log.",
+    "source_session": "7225af46",
+    "source_type": "owner_directive",
+    "domain": "TEAM"
+  },
+  {
+    "id": "BATCH3B-033",
+    "text": "The Status checkbox MUST be removed from team management.",
+    "source_session": "7225af46",
+    "source_type": "owner_directive",
+    "domain": "TEAM"
+  },
+  {
+    "id": "BATCH3B-034",
+    "text": "Configuration MUST NOT be 'Active' when mandatory inputs are missing. The system MUST prevent activation without all required fields.",
+    "source_session": "7225af46",
+    "source_type": "owner_directive",
+    "domain": "CONFIG"
+  },
+  {
+    "id": "BATCH3B-035",
+    "text": "The seed script MUST initialize tenants with config_state='draft', NOT 'active'.",
+    "source_session": "7225af46",
+    "source_type": "owner_directive",
+    "domain": "PROVISIONING"
+  },
+  {
+    "id": "BATCH3B-036",
+    "text": "The 'Saved configurations' feature MUST be removed from the Configuration page (vestigial).",
+    "source_session": "7225af46",
+    "source_type": "owner_directive",
+    "domain": "ADMIN_UI"
+  },
+  {
+    "id": "BATCH3B-037",
+    "text": "The 'Preview' panel MUST be removed from the Configuration page.",
+    "source_session": "7225af46",
+    "source_type": "owner_directive",
+    "domain": "ADMIN_UI"
+  },
+  {
+    "id": "BATCH3B-038",
+    "text": "Deployment, tests, tenant provisioning, and Azure environment setup MUST be governed by Repeatable Procedures (structured SOPs with pinned variables, verification gates, and known failure modes).",
+    "source_session": "7225af46",
+    "source_type": "owner_approval",
+    "domain": "OPS"
+  },
+  {
+    "id": "BATCH3B-039",
+    "text": "When errors occur during a Repeatable Procedure, the error MUST be treated as informative — the procedure itself MUST be corrected, not just the immediate issue.",
+    "source_session": "7225af46",
+    "source_type": "owner_directive",
+    "domain": "OPS"
+  },
+  {
+    "id": "BATCH3B-040",
+    "text": "The system MUST support a minimum of 50 concurrent tenants at launch.",
+    "source_session": "722db7a9",
+    "source_type": "owner_directive",
+    "domain": "GENERAL"
+  },
+  {
+    "id": "BATCH3B-041",
+    "text": "SPA = Service Provider Administrator. Each merchant tenant has a superadmin plus administrators. The SPA console is the owner's cross-tenant management tool.",
+    "source_session": "722db7a9",
+    "source_type": "owner_directive",
+    "domain": "ADMIN_UI"
+  },
+  {
+    "id": "BATCH3B-042",
+    "text": "Complete testing of everything already implemented is the top priority — higher than implementing new features.",
+    "source_session": "792e6abc",
+    "source_type": "owner_directive",
+    "domain": "TESTING"
+  },
+  {
+    "id": "BATCH3B-043",
+    "text": "After testing is complete, implement new UI/UX features to close the gap with competitors.",
+    "source_session": "792e6abc",
+    "source_type": "owner_directive",
+    "domain": "GENERAL"
+  },
+  {
+    "id": "BATCH3B-044",
+    "text": "The entire system MUST be tested in the production Azure environment before testing is considered complete.",
+    "source_session": "792e6abc",
+    "source_type": "owner_directive",
+    "domain": "TESTING"
+  },
+  {
+    "id": "BATCH3B-045",
+    "text": "The Azure OpenAI Service resource in East US 2 is exclusively for Agent Red. No other applications share these credentials.",
+    "source_session": "792e6abc",
+    "source_type": "owner_directive",
+    "domain": "OPS"
+  },
+  {
+    "id": "BATCH3B-046",
+    "text": "The .env.local file MUST be kept up-to-date for production deployment at all times.",
+    "source_session": "792e6abc",
+    "source_type": "owner_directive",
+    "domain": "OPS"
+  },
+  {
+    "id": "BATCH3B-047",
+    "text": "Performance and load tests, Azure provisioning/scaling/multitenancy/monitoring/metering tests MUST be included in the test plan.",
+    "source_session": "792e6abc",
+    "source_type": "owner_directive",
+    "domain": "TESTING"
+  },
+  {
+    "id": "BATCH3B-048",
+    "text": "Session wrap-up MUST include: knowledge base updates, cleanup of unnecessary artifacts, commit and push to GitHub, GitHub project/wiki updates, and a next-session initialization prompt.",
+    "source_session": "792e6abc",
+    "source_type": "owner_directive",
+    "domain": "OPS"
+  },
+  {
+    "id": "BATCH3B-049",
+    "text": "The admin UI API version numbering MUST track the API version so administrators can report the specific version when encountering issues.",
+    "source_session": "7ac291d4",
+    "source_type": "owner_directive",
+    "domain": "ADMIN_UI"
+  },
+  {
+    "id": "BATCH3B-050",
+    "text": "Documentation tooltip links MUST resolve directly to the specific anchored content on the target docs page, not to the page as a whole.",
+    "source_session": "7ac291d4",
+    "source_type": "owner_directive",
+    "domain": "ADMIN_UI"
+  },
+  {
+    "id": "BATCH3B-051",
+    "text": "Documentation links that are broken or return 404 MUST be treated as a significant concern requiring immediate remediation.",
+    "source_session": "7ac291d4",
+    "source_type": "owner_directive",
+    "domain": "ADMIN_UI"
+  },
+  {
+    "id": "BATCH3B-052",
+    "text": "When creating a new tenant, the environment MUST be seeded with default values via a seed process. The seed script serves as both initialization and functional evaluation.",
+    "source_session": "7ac291d4",
+    "source_type": "owner_directive",
+    "domain": "PROVISIONING"
+  },
+  {
+    "id": "BATCH3B-053",
+    "text": "Service recovery documentation MUST retain all information needed to recreate the environment from scratch, including noting any key invalidation that would affect customers.",
+    "source_session": "7ac291d4",
+    "source_type": "owner_directive",
+    "domain": "OPS"
+  },
+  {
+    "id": "BATCH3B-054",
+    "text": "The system MUST be recoverable from a catastrophic failure (like Azure account termination) with no major impact to customers.",
+    "source_session": "7ac291d4",
+    "source_type": "owner_directive",
+    "domain": "OPS"
+  },
+  {
+    "id": "BATCH3B-055",
+    "text": "End-to-end automated tests MUST verify the setup is complete and correct AND baseline performance on a freshly initialized system.",
+    "source_session": "7ac291d4",
+    "source_type": "owner_directive",
+    "domain": "TESTING"
+  },
+  {
+    "id": "BATCH3B-056",
+    "text": "The chat widget MUST NOT display on the admin console when AI Configuration is not Active. The widget visibility MUST be tied to the activation status.",
+    "source_session": "7ac291d4",
+    "source_type": "owner_directive",
+    "domain": "WIDGET_UI"
+  },
+  {
+    "id": "BATCH3B-057",
+    "text": "Dashboard 'Conversation volume' data MUST NOT show data from prior to the system's initialization date. Data from a prior environment MUST NOT leak into a freshly reconstructed system.",
+    "source_session": "7ac291d4",
+    "source_type": "owner_directive",
+    "domain": "ADMIN_UI"
+  },
+  {
+    "id": "BATCH3B-058",
+    "text": "Dashboard metrics (e.g., escalation count) MUST accurately reflect actual data. If no escalated messages exist in the system, the dashboard MUST show 0 escalated.",
+    "source_session": "7ac291d4",
+    "source_type": "owner_directive",
+    "domain": "ADMIN_UI"
+  },
+  {
+    "id": "BATCH3B-059",
+    "text": "All tooltip links across the admin UI MUST resolve to page-specific anchors on the documentation site, not to the generic page.",
+    "source_session": "7ac291d4",
+    "source_type": "owner_directive",
+    "domain": "ADMIN_UI"
+  },
+  {
+    "id": "BATCH3B-060",
+    "text": "A color palette worksheet MUST be created for the graphic designer showing all UI element types with their current hex colors in both Dark/Light mode, with input fields for new values.",
+    "source_session": "6f396504",
+    "source_type": "owner_directive",
+    "domain": "ADMIN_UI"
+  },
+  {
+    "id": "BATCH3B-061",
+    "text": "A Remaker Digital Shopify storefront MUST be considered for dual purpose: selling Agent Red subscriptions AND deploying Agent Red as the store's chat system (live demo).",
+    "source_session": "6f396504",
+    "source_type": "owner_approval",
+    "domain": "GENERAL"
+  },
+  {
+    "id": "BATCH3B-062",
+    "text": "All remaining 1.0 release work items that are not blocked by owner input MUST proceed in parallel while the owner works on blocking items.",
+    "source_session": "6f396504",
+    "source_type": "owner_directive",
+    "domain": "GENERAL"
+  },
+  {
+    "id": "BATCH3B-063",
+    "text": "Provider Admin Monitoring requirements RB-1, RB-2, RB-7, RB-8 MUST remain Release-Blocking priority.",
+    "source_session": "722db7a9",
+    "source_type": "owner_directive",
+    "domain": "ADMIN_UI"
+  },
+  {
+    "id": "BATCH3B-064",
+    "text": "Provider Admin Monitoring requirements C-1, C-2, C-3, C-4 MUST remain Critical priority.",
+    "source_session": "722db7a9",
+    "source_type": "owner_directive",
+    "domain": "ADMIN_UI"
+  },
+  {
+    "id": "BATCH3B-065",
+    "text": "Provider Admin Monitoring requirements HV-5 (status page) and HV-3 (integration reliability) MUST be upgraded to Critical priority.",
+    "source_session": "722db7a9",
+    "source_type": "owner_directive",
+    "domain": "ADMIN_UI"
+  },
+  {
+    "id": "BATCH3B-066",
+    "text": "Memory issues (uncontrolled memory loss, context drift) MUST be treated as CRITICAL priority and diagnosed immediately when detected.",
+    "source_session": "697d8270",
+    "source_type": "owner_directive",
+    "domain": "GENERAL"
+  },
+  {
+    "id": "BATCH3B-067",
+    "text": "Uncontrolled regressions (features silently removed, tests silently dropped from procedures) MUST be prevented by a Protected Behaviors strategy.",
+    "source_session": "697d8270",
+    "source_type": "owner_directive",
+    "domain": "TESTING"
+  },
+  {
+    "id": "BATCH3B-068",
+    "text": "Code, tests, features, and procedure entries MUST NEVER be removed without explicit owner approval in the current session.",
+    "source_session": "697d8270",
+    "source_type": "owner_directive",
+    "domain": "GENERAL"
+  },
+  {
+    "id": "BATCH3B-069",
+    "text": "The Docusaurus docs site MUST serve pages under the /docs/ URL prefix. Admin UI tooltip links use /docs/* URLs.",
+    "source_session": "7ac291d4",
+    "source_type": "owner_approval",
+    "domain": "ADMIN_UI"
+  },
+  {
+    "id": "BATCH3B-070",
+    "text": "VITE_API_URL MUST be empty when building admin SPAs for Docker deployment, so SPAs use same-origin relative URLs. The build procedure MUST clear this variable before building.",
+    "source_session": "697d8270",
+    "source_type": "owner_directive",
+    "domain": "OPS"
+  }
+]

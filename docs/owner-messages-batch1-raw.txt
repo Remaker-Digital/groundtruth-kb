@@ -1,0 +1,1822 @@
+### SESSION=00d2a0f0-37de-4346-93e0-c41c131ed892 MSG=1 LEN=2157
+Continue work on Agent Red Customer Experience commercial project.
+Location: E:\Claude-Playground\CLAUDE-PROJECTS\Agent Red Customer Engagement
+Key files: CLAUDE.md, memory/MEMORY.md, memory/wizard-redesign.md, memory/admin-ui.md, docs/BACKLOG-NEW-WORK-ITEMS.md
+Current status: Session 5 complete. Production v1.20.0 healthy (not updated this session — deferred). Commit 74ff21c pushed. 2,043 tests (0 failures). GitHub issues #71-77 created for 46 UX work items (WI #249-294).
+Session 5 completed:
+- WI #246: Replaced standalone Onboarding.tsx (1,497→97 lines) with shared OnboardingWizard wrapper
+- Owner UX review: 46 new work items documented across 11 admin page categories
+- Wizard redesign confirmed: 8-step dual-mode (initial setup + test mode), 13 AI-behavior fields classified
+- Three design decisions confirmed: (1) Custom AI instructions = field in Agent config, (2) Post-activation wizard = test-mode-only, (3) Sidebar pages = immediate-commit
+- Memory files updated: wizard-redesign.md (NEW), admin-ui.md (expanded), MEMORY.md (session 5 checkpoint)
+- GitHub project board: 7 issues (#71-77), all Ready/P1/sized
+- GitHub wiki: Project-Status, UX-Review-Session-5 (NEW), sidebar updated
+Resume: Prioritize and begin implementing the 46 UX work items. Recommended implementation order:
+1. Quick wins first: page renames (#262, #268, #276, #278), slider labels (#264), hover colors (#282) — ~1 day
+2. Navigation restructure (#283-284): merge Analytics into Dashboard, reorder sidebar — ~2-3 days
+3. HelpTooltip pattern (#259, #260, #263, #272, #281): define shared component, tooltip copy, doc links — ~2 days
+4. Widget configuration (#269-271): color labels, gradient toggle, side-by-side pickers — ~1.5 days
+5. Team page (#275, #277, #279, #280): role selector, tooltips, enable/disable toggle — ~3 days
+6. Quick Actions (#273-274): page assignments checklist, inline template variables — ~1.5 days
+7. Widget/Chat UI (#255-257): input height, scroll controls, position offset — ~3 days
+8. Wizard redesign (#285-294): largest item, ~8-12 days, break into 5 phases
+Deploy to production after completing groups 1-4 (visible batch of improvements).
+---END---
+
+### SESSION=00d2a0f0-37de-4346-93e0-c41c131ed892 MSG=2 LEN=12
+Yes, please.
+---END---
+
+### SESSION=00d2a0f0-37de-4346-93e0-c41c131ed892 MSG=3 LEN=22
+Great. Please proceed.
+---END---
+
+### SESSION=00d2a0f0-37de-4346-93e0-c41c131ed892 MSG=5 LEN=557
+Before we proceed on these issues I have a question: When a new user is created, do we send them a welcome email? 
+
+Perhaps it would be helpful to automatically send newly-added users a strong password, which they can change if they choose. If we did this, I think it would also be helpful to expire those passwords periodically and flag the user as not-active so the merchant admin can take action to delete the account or resend the welcome email with a new temporary password.
+
+I am somewhat concerned about security, specifically password custodianship.
+---END---
+
+### SESSION=00d2a0f0-37de-4346-93e0-c41c131ed892 MSG=6 LEN=44
+Yes, that's a good approach. Please proceed.
+---END---
+
+### SESSION=00d2a0f0-37de-4346-93e0-c41c131ed892 MSG=7 LEN=22
+Good. Please continue.
+---END---
+
+### SESSION=00d2a0f0-37de-4346-93e0-c41c131ed892 MSG=9 LEN=49
+Are there any user interface changes outstanding?
+---END---
+
+### SESSION=00d2a0f0-37de-4346-93e0-c41c131ed892 MSG=13 LEN=15
+Please proceed.
+---END---
+
+### SESSION=00d2a0f0-37de-4346-93e0-c41c131ed892 MSG=16 LEN=102
+This is good to know. When you propose priorities, do you always consider this or should I specify it?
+---END---
+
+### SESSION=00d2a0f0-37de-4346-93e0-c41c131ed892 MSG=17 LEN=117
+Thank you for the feedback. I enjoy feedback. I would like you to teach me how to interact with you more effectively.
+---END---
+
+### SESSION=00d2a0f0-37de-4346-93e0-c41c131ed892 MSG=18 LEN=398
+That is good feedback. I sometimes make physical errors using the keyboard, I sometimes forget things and I am often impatient. I believe that I also let scope creep and should often be more cautious. I appreciate your flexibility. I am very impressed with Opus 4.6. I believe this is a very noticeable change in your ability to plan and execute much more complex work of the kind we are doing now.
+---END---
+
+### SESSION=035c268d-41ba-4c0a-b6fc-37dfa16f49ab MSG=1 LEN=3314
+Continue work on Agent Red Customer Experience commercial project.
+Location: E:\Claude-Playground\CLAUDE-PROJECTS\Agent Red Customer Engagement
+Key files: CLAUDE.md, docs/PROJECT-PLAN.md, docs/BACKLOG-NEW-WORK-ITEMS.md, docs/COMPREHENSIVE-TEST-PLAN.md
+Current status: ALL CORE PHASES COMPLETE. ALL TESTING COMPLETE (P0-P3 + adversarial + performance + integration). Phases 0-2.2 COMPLETE (38 multi_tenant modules, ~25,000 lines). Phase 2.5 Layers 1-2 COMPLETE (3 modules). Phase 3.0 ALL BUILD PHASES COMPLETE (Chat API 6 endpoints + SSE, widget 20 files ~3,200 lines, Shopify Theme App Extension, admin shared 9 components ~5,400 lines, Shopify admin shell ~2,700 lines, standalone admin shell ~2,800 lines — both build-validated). Renderable HTML prototype COMPLETE — both shells (Mantine + Polaris) with 9 standalone + 7 Shopify pages, full mock data, dark mode, brand palette Option A (#C41E2A), shell switcher (28 files in prototype/). Operational readiness COMPLETE. Security hardening COMPLETE. Pipeline optimization COMPLETE. Trial environment COMPLETE. Competitive pricing VERIFIED (all 5 competitors, 2026-02-01 — Agent Red 4-21x cheaper). Azure infrastructure provisioned: aoai-agentred-eastus2, cosmos-agentred-eastus2, kv-agentred-eastus2 (all East US 2). Integration testing with real Stripe test mode + Shopify partner sandbox + Azure services COMPLETE (42 tests). 1,196 tests passing (1,154 unit + 42 integration), 0 warnings. 19 routers, 67 routes, 9 middleware layers. Shopify Partner app deployed (client_id: 4c6cf726cd1f9f5389caf48f78af9735) and installed on blanco-9939.myshopify.com dev store.
+Remaining work (priority order): (1) Prototype visual review — owner examining renderable prototype, feedback expected on layouts/workflows/styling, (2) Cosmos DB full initialization (create all 10 containers with DiskANN vector index), (3) Azure OpenAI custom subdomain, (4) Phase 2.5 Layer 3 PatternExtractionService (Professional+, WI #90-92), (5) CI improvements (coverage reports, parallel jobs — WI #105, #107), (6) SSE enhancements (client-side retry, metering, multi-tab — WI #131-133), (7) API completeness (customer profiles, OpenAPI — WI #142, #147), (8) Remaining security (API key rotation, Stripe IP allowlisting — WI #159, #162), (9) Add-on integration tests (Mailchimp, Zendesk, GA4), (10) Creative assets for Shopify App Store (icon, screenshots, demo video — blocked on design).
+Important context: Tidio is the primary functional reference. Zapier is the visual styling reference. Persistent Customer Memory (Layers 1-2) is the launch pillar differentiator. All competitor pricing verified 2026-02-01 — see docs/research/UI-UX-COMPETITIVE-ANALYSIS.md. 12 remaining backlog items listed in docs/BACKLOG-NEW-WORK-ITEMS.md §9 (Remaining Work Items table). Prototype runs via `cd prototype && npm run dev` (port 3000). Stripe CLI configured for local webhook forwarding (stripe listen). Azure credentials in .env.local — production deployment uses Managed Identity (not API keys). Iterative working style: one item at a time, honest assessment, approval before implementation, aggressive scope cutting.
+Please review CLAUDE.md, then proceed with the highest-priority remaining work item, presenting one item at a time for review per the iterative working style documented in CLAUDE.md.
+---END---
+
+### SESSION=035c268d-41ba-4c0a-b6fc-37dfa16f49ab MSG=2 LEN=411
+I have some changes to request:
+
+Please use this new logo version in the upper left of the page E:\Claude-Playground\CLAUDE-PROJECTS\Agent Red Customer Engagement\branding\logo\SVG\primary-logo-no-wordmark.svg
+
+Please add the wordmark "Customer Experience" to the right of the logo.
+
+I would like Dark Mode to be the default.
+
+Are you able to assess the style, colors and layout of the UI example in this image?
+---END---
+
+### SESSION=035c268d-41ba-4c0a-b6fc-37dfa16f49ab MSG=3 LEN=411
+I have some changes to request:
+
+Please use this new logo version in the upper left of the page E:\Claude-Playground\CLAUDE-PROJECTS\Agent Red Customer Engagement\branding\logo\SVG\primary-logo-no-wordmark.svg
+
+Please add the wordmark "Customer Experience" to the right of the logo.
+
+I would like Dark Mode to be the default.
+
+Are you able to assess the style, colors and layout of the UI example in this image?
+---END---
+
+### SESSION=035c268d-41ba-4c0a-b6fc-37dfa16f49ab MSG=4 LEN=359
+Yes, this is much better. 
+
+I have two requests: 
+
+1) On the Dark Mode page: I think it would be better to use a palette of greys for Dark Mode, similar to this image, rather than blue/purple. I think the main page display areas should have a thinner border in Dark Mode.
+
+2) The sticky navbar at the top of the page should be medium-light grey in Light Mode.
+---END---
+
+### SESSION=035c268d-41ba-4c0a-b6fc-37dfa16f49ab MSG=6 LEN=156
+Note the white background on the conversation filter control is incorrect. Also note the incorrect (light pink) background color of the CONVERSATION HISTORY
+---END---
+
+### SESSION=035c268d-41ba-4c0a-b6fc-37dfa16f49ab MSG=7 LEN=222
+Note the dark red background of the Agent Red AI text in the conversation view. I believe it should be a lighter grey, with the Agent Red icon-master displayed to the right of the text "Agent Red AI" near each AI response.
+---END---
+
+### SESSION=035c268d-41ba-4c0a-b6fc-37dfa16f49ab MSG=8 LEN=218
+All pages now look good in both Dark Mode and Light Mode and are comprehensive. 
+
+Is it possible to have  Dark Mode option for the chat widget and the Live Preview?
+
+This has turned out very well. It is a very good 1.0
+---END---
+
+### SESSION=035c268d-41ba-4c0a-b6fc-37dfa16f49ab MSG=9 LEN=44
+Note that the Polaris tab is non-functional.
+---END---
+
+### SESSION=035c268d-41ba-4c0a-b6fc-37dfa16f49ab MSG=10 LEN=23
+Polaris is working now.
+---END---
+
+### SESSION=035c268d-41ba-4c0a-b6fc-37dfa16f49ab MSG=11 LEN=93
+This is very good. Let's consider this design finished. We can proceed to the next work item.
+---END---
+
+### SESSION=035c268d-41ba-4c0a-b6fc-37dfa16f49ab MSG=12 LEN=78
+I just toggled back to Standalone and the dark grey text problem has returned.
+---END---
+
+### SESSION=035c268d-41ba-4c0a-b6fc-37dfa16f49ab MSG=14 LEN=29
+Polaris now had a light font.
+---END---
+
+### SESSION=035c268d-41ba-4c0a-b6fc-37dfa16f49ab MSG=15 LEN=49
+I just tried both. They are displaying correctly.
+---END---
+
+### SESSION=035c268d-41ba-4c0a-b6fc-37dfa16f49ab MSG=16 LEN=552
+Is this a good opportunity to start a fresh session?
+
+If so, please:
+
+- update your knowledge base with all new architecture/design decisions and work items
+- clean up any unnecessary artifacts
+- commit and push to GitHub (https://github.com/mike-remakerdigital/agent-red)
+- update the GitHub project (https://github.com/users/mike-remakerdigital/projects/1)
+- update the GitHub wiki (https://github.com/mike-remakerdigital/agent-red/wiki)
+- provide a prompt which I can use to initialize the next session and continue working on prioritized work items
+---END---
+
+### SESSION=059e24cc-781f-4f4f-8d3c-fe7921d0f964 MSG=1 LEN=2383
+Continue work on Agent Red Customer Experience commercial project.
+Location: E:\Claude-Playground\CLAUDE-PROJECTS\Agent Red Customer Engagement
+Key files: CLAUDE.md, docs/architecture/UI-UX-ARCHITECTURE-DECISIONS.md, docs/COMPREHENSIVE-TEST-PLAN.md, docs/BACKLOG-NEW-WORK-ITEMS.md
+Current status: Phases 0-2.2 COMPLETE. Phase 2.5 Layers 1-2 COMPLETE. Phase 3.0 ALL BUILD PHASES COMPLETE (Chat API, widget frontend, Shopify Theme App Extension, admin shared components, Shopify admin shell, standalone admin shell). Operational readiness COMPLETE. Security hardening COMPLETE. Pipeline optimization COMPLETE. Trial environment COMPLETE. Competitive pricing VERIFIED (all 5 competitors — Agent Red 4-21x cheaper). 777 tests passing, 0 warnings. 38 multi_tenant modules (~25,000 lines). 31 admin frontend files (~10,900 lines). 20 widget files (~3,200 lines). 17 routers, 66 routes, 8 middleware layers. Logo set updated (3 assets × SVG+PNG: icon-master, primary-logo-dark, primary-logo-light).
+Next priority: Please prepare an order of priority for all known outstanding work issues in this project and follow this order when proposing tasks for completion. Remaining major areas: (1) Admin frontend build validation (npm install, TypeScript compile, bundle check for admin/shopify and admin/standalone), (2) Widget bundle → Theme App Extension copy, (3) P2 launch quality tests (~135 tests, COMPREHENSIVE-TEST-PLAN.md §6), (4) Integration testing with real Stripe test mode and Shopify partner sandbox, (5) Creative assets for Shopify App Store (icon, screenshots, demo video — blocked on design), (6) Phase 2.5 Layer 3 PatternExtractionService (Professional+, WI #90-92), (7) Remaining backlog items (CI improvements #105-107, SSE enhancements #131-133, API completeness #142-146).
+Important context: Tidio is the primary functional reference. Zapier is the visual styling reference. Persistent Customer Memory (Layers 1-2) is the launch pillar differentiator. All competitor pricing now verified — use updated figures from docs/research/UI-UX-COMPETITIVE-ANALYSIS.md. Iterative working style: one item at a time, honest assessment, approval before implementation, aggressive scope cutting.
+Please review CLAUDE.md, then proceed with the highest-priority remaining technical work item, presenting one item at a time for review per the iterative working style documented in CLAUDE.md.
+---END---
+
+### SESSION=059e24cc-781f-4f4f-8d3c-fe7921d0f964 MSG=2 LEN=11
+Yes please.
+---END---
+
+### SESSION=059e24cc-781f-4f4f-8d3c-fe7921d0f964 MSG=4 LEN=15
+Please proceed.
+---END---
+
+### SESSION=059e24cc-781f-4f4f-8d3c-fe7921d0f964 MSG=5 LEN=16
+Please continue.
+---END---
+
+### SESSION=059e24cc-781f-4f4f-8d3c-fe7921d0f964 MSG=6 LEN=341
+I would like to return to these work items in the next session. 
+
+Please:
+
+- update your knowledge base with all new architecture/design decisions and work items
+- clean up any unnecessary artifacts
+- commit and push to GitHub
+- update the GitHub project
+- provide a prompt which I can use to initialize the next session and continue working
+---END---
+
+### SESSION=059e24cc-781f-4f4f-8d3c-fe7921d0f964 MSG=8 LEN=10
+Thank you.
+---END---
+
+### SESSION=089b25e6-e24c-4c9d-ba2f-2bc687fba067 MSG=1 LEN=3206
+BE AWARE: The previous session ended with a "Prompt is too long" message.
+
+Continue work on Agent Red Customer Experience commercial project.
+Location: E:\Claude-Playground\CLAUDE-PROJECTS\Agent Red Customer Engagement
+Key files: CLAUDE.md, docs/PROJECT-PLAN.md, docs/BACKLOG-NEW-WORK-ITEMS.md, docs/tests/LUIT-SA-TEST-RESULTS.md
+Current status: ALL CORE PHASES COMPLETE. API Gateway v1.11.4. LUIT-SA end-to-end UI test COMPLETE — 49/50 executable steps passed (98%), 1 FAIL (DOCX upload 500, python-docx missing), 43 BLOCKED (unimplemented capabilities C1-C16). 12 fixes applied during test: sentence case sweep (40+ labels), wizard state persistence, inbox empty state, stepper checkmark, integration logos (5 services × dark/light SVGs), toast notifications, confirmation modals, chat widget injection, TestModeService frontend, dashboard/config/wizard label fixes. All fixes deployed and retested.
+Production: API Gateway FQDN: agent-red-api-gateway.lemonriver-f59f94b7.eastus2.azurecontainerapps.io. Standalone admin: /admin/standalone/ (password-gated). Shopify embedded admin: /admin/shopify/. Chat widget live on blanco-9939.myshopify.com. 9 Container Apps on Azure (agentred-prod-rg, East US 2). Terraform clean. 1,656+ unit + 42 integration tests, 0 failures.
+Remaining work (priority order):
+(1) Fix DOCX upload — add python-docx>=1.1.0 to requirements.txt, redeploy (trivial, P0 from LUIT-SA)
+(2) Rebuild standalone admin SPA and deploy — LUIT-SA fixes are in source but admin/standalone/dist/ needs rebuild + deploy to match v1.11.4 backend
+(3) UX consultant evaluation (WI #203) — Mazel evaluates workflows on live storefront + standalone admin
+(4) Creative assets for Shopify App Store (icon 1200x1200, key benefit images 3×1600x1200, screenshots) — owner/designer tasks
+(5) Shopify App Store submission — blocked by creative assets, requires app review (~7 business days)
+(6) Blocked capabilities from LUIT-SA (43 steps across C1-C16) — categorized by priority in docs/tests/LUIT-SA-TEST-RESULTS.md:
+- Medium priority: C2 (Test Mode full infra, 18 steps), C3 (AI persona preview, 3), C4 (Widget configurator, 5), C10 (Integration OAuth, 2)
+- Low priority: C1 (period filtering, 5), C5-C9 (misc UX, 7), C12-C16 (misc, 6)
+(7) Persistent Memory metrics dashboard + 5 A/B production tests (Decision #32) — requires conversation volume
+(8) Implement Zendesk/Mailchimp/GA4 backend API clients (currently "Coming Soon" in UI)
+Important context: Iterative working style — one item at a time, honest assessment, approval before implementation. Prototype approved and frozen (Mazel dark mode palette). ChatPipeline uses direct Azure OpenAI calls (USE_AGENT_CONTAINERS=false). Brand primary color #ff3621. Sentence case style rule for all UI labels. Four-tier dark mode depth: chrome #0a0a0a → page #141414 → surface #1f1f1f → border #272727.
+Please review CLAUDE.md, then proceed with the highest-priority remaining work item, presenting one item at a time for review per the iterative working style documented in CLAUDE.md.
+
+NOTE 1: The "integrations" logos (in the Stand-alone Admin UI) for Zendesk, Google Analytics, Mailchimp, Stripe and Shopify are too small. They should have a height of 150px.
+---END---
+
+### SESSION=089b25e6-e24c-4c9d-ba2f-2bc687fba067 MSG=2 LEN=355
+Please continue. When this is completed, turn your priorities back to the Stand-alone UI step-by-step test script. Please iterate and repeat that test until you have a 100% pass. IF this is unclear, please feel free to ask me clarifying questions. If you have no questions, please continue. We are getting very close to submitting to Shopify for approval.
+---END---
+
+### SESSION=089b25e6-e24c-4c9d-ba2f-2bc687fba067 MSG=7 LEN=884
+Good. Before we submit, I would like to investigate all documents which contain requirements and combine them into the master test plan. I would then like to synthesize all requirements into a single master test. This master test may require addition of new tests and new implementation work: we should identify gaps and decide the disposition of each new work item case-by-case. Once the Master Test has been prepared and all tests are ready, we need to complete that master test with 100% pass rate. The master test must also include the work required to freeze the 1.0 release and create a parallel (production-capable) dev/test environment for the 1.1 release and a detailed, tested plan to execute a non-disruptive upgrade of the production 1.0 environment to the 1.1 release. Once we have proven that we are able to do this, we are ready for submission to the Shopify app store.
+---END---
+
+### SESSION=089b25e6-e24c-4c9d-ba2f-2bc687fba067 MSG=16 LEN=15
+Please proceed.
+---END---
+
+### SESSION=089b25e6-e24c-4c9d-ba2f-2bc687fba067 MSG=17 LEN=173
+Note that env.local contains the SHOPIFY_USERNAME and SHOPIFY_PASSWORD. You may use these credentials to access the Shopify developer account and assist with the submission.
+---END---
+
+### SESSION=089b25e6-e24c-4c9d-ba2f-2bc687fba067 MSG=19 LEN=40
+I have restarted both chrome and claude.
+---END---
+
+### SESSION=089b25e6-e24c-4c9d-ba2f-2bc687fba067 MSG=21 LEN=178
+I have created an account on ibuenda. I am logged in with the credentials in env.local (IBUENDA_USERNAME and IBUENDA_PASSWORD). Please access the session using Chrome and assist.
+---END---
+
+### SESSION=089b25e6-e24c-4c9d-ba2f-2bc687fba067 MSG=23 LEN=62
+I have completed the upgrade. Please review the current state.
+---END---
+
+### SESSION=089b25e6-e24c-4c9d-ba2f-2bc687fba067 MSG=26 LEN=73
+I have added IBUENDA_PRIVACY_POLICY_URL to the env.local for easy access.
+---END---
+
+### SESSION=089b25e6-e24c-4c9d-ba2f-2bc687fba067 MSG=27 LEN=39
+Corrected to IUBENDA_PRIVACY_POLICY_URL
+---END---
+
+### SESSION=089b25e6-e24c-4c9d-ba2f-2bc687fba067 MSG=28 LEN=199
+Let's return to Shopify and finish the submission. I have configured Chrome to display 1600 x 816 (I cannot display 900 height on this system). Can you recommend the screenshots that are appropriate?
+---END---
+
+### SESSION=089b25e6-e24c-4c9d-ba2f-2bc687fba067 MSG=29 LEN=20
+Please capture them.
+---END---
+
+### SESSION=089b25e6-e24c-4c9d-ba2f-2bc687fba067 MSG=31 LEN=30
+Thank you. I'm proceeding now.
+---END---
+
+### SESSION=089b25e6-e24c-4c9d-ba2f-2bc687fba067 MSG=32 LEN=267
+Can you use E:\Claude-Playground\CLAUDE-PROJECTS\Agent Red Customer Engagement\PPTX-template-and-skill\
+
+?
+
+If so, can you use this template to generate 3 key benefit slides (adjust the format of the slides for 1600c1200)? I will export those slides as PNG 1600x1200.
+---END---
+
+### SESSION=089b25e6-e24c-4c9d-ba2f-2bc687fba067 MSG=34 LEN=140
+Key benefits slides are here E:\Claude-Playground\CLAUDE-PROJECTS\Agent Red Customer Engagement\docs\shopify\screenshots\key-benefit-slides\
+---END---
+
+### SESSION=089b25e6-e24c-4c9d-ba2f-2bc687fba067 MSG=35 LEN=242
+Please make a note - this is a small work item for the next batch. The stand-alone admin UI is launching with a chat UI that is not using the Agent Red colors, and it doesn't take the colors set by the live preview . It looks a little sloppy.
+---END---
+
+### SESSION=089b25e6-e24c-4c9d-ba2f-2bc687fba067 MSG=36 LEN=364
+Exactly. We need to configure the Standalone Admin which we are using for our Agent Red storefront so that it is a standard customer admin, integrated and behaving exactly as if it were a stand-alone admin for any other merchant storefront. In that case, we would expect the default colors and styling to match Agent Red, and from there the merchant can customize.
+---END---
+
+### SESSION=089b25e6-e24c-4c9d-ba2f-2bc687fba067 MSG=37 LEN=37
+Yes. That was my concern. You get it.
+---END---
+
+### SESSION=089b25e6-e24c-4c9d-ba2f-2bc687fba067 MSG=38 LEN=676
+I'm still working on the Shopify video. While I am doing that, please proceed with the work of creating a detailed step-by-step process, including provisioning scripts and a regression test package for the future non-disruptive upgrade of the current 1.0 deployment to the 1.1. We need to be extremely confident that we are able to execute future upgrades to the production environment non-disruptively and we need to test them BEFORE we get the approval from Shopify for the 1.0 listing. Once we have live customers we will not be able to tolerate any disruption if the service. I am very concerned that we practice doing such upgrades and have not missed anything important.
+---END---
+
+### SESSION=089b25e6-e24c-4c9d-ba2f-2bc687fba067 MSG=41 LEN=260
+Very good. Thank you.
+
+I would also like to synch with the AGNTCY project on GitHub and make sure that anything we changed is pushed back to that project so it can be integrated.
+
+https://github.com/Remaker-Digital/AGNTCY-muti-agent-deployment-customer-service
+---END---
+
+### SESSION=089b25e6-e24c-4c9d-ba2f-2bc687fba067 MSG=42 LEN=100
+Agreed. nothing should flow back to AGNTCY except fixes to open-source artifacts we require, if any.
+---END---
+
+### SESSION=089b25e6-e24c-4c9d-ba2f-2bc687fba067 MSG=43 LEN=21
+Excellent. Thank you.
+---END---
+
+### SESSION=089b25e6-e24c-4c9d-ba2f-2bc687fba067 MSG=44 LEN=732
+Is this a good opportunity to start a fresh session?
+
+If so, please:
+
+- update your knowledge base with all new architecture/design decisions, project enhancements and future (or incomplete) work items
+- clean up all unnecessary artifacts, such as expired temp files, scratch files or obsolete (unused or superceeded) documents
+- commit and push to GitHub (https://github.com/mike-remakerdigital/agent-red)
+- update the GitHub project (https://github.com/users/mike-remakerdigital/projects/1)
+- update the GitHub wiki with all new content describing this project (https://github.com/mike-remakerdigital/agent-red/wiki) 
+- provide a prompt which I can use to initialize the next session and continue working on prioritized work items
+---END---
+
+### SESSION=0bb3785b-a9fa-410d-89e9-9fe95ab42c52 MSG=1 LEN=37
+Please continue the Agent Red project
+---END---
+
+### SESSION=0bb3785b-a9fa-410d-89e9-9fe95ab42c52 MSG=2 LEN=375
+Have we executed all tests on the current production environment? Have we been able to develop additional tests? Are we confident that every UI element is displaying correct data and behaves correctly when manipulated? Have we tested the conversation quality? I believe that we have not fully verified that the production environment is error-free and ready for customer use.
+---END---
+
+### SESSION=0bb3785b-a9fa-410d-89e9-9fe95ab42c52 MSG=3 LEN=390
+We need to implement and adhere to a standard pre-flight checklist that we execute for any production deployment. That checklist must always conclude with a detailed, live verification that a customer tenant can be created and configured with no errors or defects. This must be a very thorough check with minimal opportunity for uncontrolled regression or oversight of critical information.
+---END---
+
+### SESSION=0bb3785b-a9fa-410d-89e9-9fe95ab42c52 MSG=5 LEN=10
+Excellent!
+---END---
+
+### SESSION=0bb3785b-a9fa-410d-89e9-9fe95ab42c52 MSG=6 LEN=11
+Yes please.
+---END---
+
+### SESSION=0bb3785b-a9fa-410d-89e9-9fe95ab42c52 MSG=7 LEN=40
+Let's wrap-up and start a fresh session.
+---END---
+
+### SESSION=0bb3785b-a9fa-410d-89e9-9fe95ab42c52 MSG=8 LEN=252
+This is a layout tweak for the future:
+
+Please adjust this layout so that Category, Status, Scan for conflicts, Export CSV Import and + Add article are all on one row, bottom-justified with the Search input on the line above, bottom and left justified.
+---END---
+
+### SESSION=0bb3785b-a9fa-410d-89e9-9fe95ab42c52 MSG=11 LEN=15
+Please proceed.
+---END---
+
+### SESSION=0e4130df-f02e-4bca-81cb-fd04ddce3f71 MSG=1 LEN=3338
+BE AWARE: The previous session ended with a "Prompt is too long" message.
+
+Continue work on Agent Red Customer Experience commercial project.
+Location: E:\Claude-Playground\CLAUDE-PROJECTS\Agent Red Customer Engagement
+Key files: CLAUDE.md, docs/PROJECT-PLAN.md, docs/BACKLOG-NEW-WORK-ITEMS.md, docs/tests/LUIT-SA-TEST-RESULTS.md
+Current status: ALL CORE PHASES COMPLETE. API Gateway v1.11.4. LUIT-SA end-to-end UI test COMPLETE — 49/50 executable steps passed (98%), 1 FAIL (DOCX upload 500, python-docx missing), 43 BLOCKED (unimplemented capabilities C1-C16). 12 fixes applied during test: sentence case sweep (40+ labels), wizard state persistence, inbox empty state, stepper checkmark, integration logos (5 services × dark/light SVGs), toast notifications, confirmation modals, chat widget injection, TestModeService frontend, dashboard/config/wizard label fixes. All fixes deployed and retested.
+Production: API Gateway FQDN: agent-red-api-gateway.lemonriver-f59f94b7.eastus2.azurecontainerapps.io. Standalone admin: /admin/standalone/ (password-gated). Shopify embedded admin: /admin/shopify/. Chat widget live on blanco-9939.myshopify.com. 9 Container Apps on Azure (agentred-prod-rg, East US 2). Terraform clean. 1,656+ unit + 42 integration tests, 0 failures.
+Remaining work (priority order):
+(1) Fix DOCX upload — add python-docx>=1.1.0 to requirements.txt, redeploy (trivial, P0 from LUIT-SA)
+(2) Rebuild standalone admin SPA and deploy — LUIT-SA fixes are in source but admin/standalone/dist/ needs rebuild + deploy to match v1.11.4 backend
+(3) UX consultant evaluation (WI #203) — Mazel evaluates workflows on live storefront + standalone admin
+(4) Creative assets for Shopify App Store (icon 1200x1200, key benefit images 3×1600x1200, screenshots) — owner/designer tasks
+(5) Shopify App Store submission — blocked by creative assets, requires app review (~7 business days)
+(6) Blocked capabilities from LUIT-SA (43 steps across C1-C16) — categorized by priority in docs/tests/LUIT-SA-TEST-RESULTS.md:
+    - Medium priority: C2 (Test Mode full infra, 18 steps), C3 (AI persona preview, 3), C4 (Widget configurator, 5), C10 (Integration OAuth, 2)
+    - Low priority: C1 (period filtering, 5), C5-C9 (misc UX, 7), C12-C16 (misc, 6)
+(7) Persistent Memory metrics dashboard + 5 A/B production tests (Decision #32) — requires conversation volume
+(8) Implement Zendesk/Mailchimp/GA4 backend API clients (currently "Coming Soon" in UI)
+Important context: Iterative working style — one item at a time, honest assessment, approval before implementation. Prototype approved and frozen (Mazel dark mode palette). ChatPipeline uses direct Azure OpenAI calls (USE_AGENT_CONTAINERS=false). Brand primary color #ff3621. Sentence case style rule for all UI labels. Four-tier dark mode depth: chrome #0a0a0a → page #141414 → surface #1f1f1f → border #272727.
+Please review CLAUDE.md, then proceed with the highest-priority remaining work item, presenting one item at a time for review per the iterative working style documented in CLAUDE.md.
+
+NOTE 1: The "integrations" logos (in the Stand-alone Admin UI) for Zendesk, Google Analytics, Mailchimp, Stripe and Shopify are too small. They should have a height of 150px.
+
+NOTE 2: The default colors for the chat widget (in the Stand-alone Admin UI) should be Agent Red colors, rather than blue.
+---END---
+
+### SESSION=0f00d99b-758a-43a5-988a-f4cfddf9f740 MSG=1 LEN=1329
+Fixed test method for draft activation API call
+Fixed test method for draft activation API call
+Now let me run the full suite again.
+Ran E2E tests and identified failures requiring fixes
+Ran E2E tests and identified failures requiring fixes
+Show more
+70 passed, 3 skipped, 1 failed! Massive progress. Only 1 remaining failure — the Activate button.
+The API calls show that clicking "Activate" first triggers GET /api/config/draft and GET /api/config/draft/preflight — a preflight check before the actual activation. The preflight returns {} (catch-all response), which might indicate no draft exists, so the UI doesn't proceed to the POST. I need to mock the preflight endpoint.
+Ran pytest for activation button visibility test, test failed with exit code 1
+Ran pytest for activation button visibility test, test failed with exit code 1
+Show more
+Playwright CSS selector issue — can't mix CSS selectors with text= pseudo-selectors in a comma-separated list. Let me simplify.
+Ran e2e test for activate button visibility and clickability
+Ran e2e test for activate button visibility and clickability
+Show more
+All fixed. Let me run the complete E2E suite one final time to confirm.
+Ran final E2E test suite successfully with all tests passing
+Ran final E2E test suite successfully with all tests passing
+Show more
+Prompt is too long
+---END---
+
+### SESSION=0f00d99b-758a-43a5-988a-f4cfddf9f740 MSG=2 LEN=135
+Is the latest build deployed to production and have the end=to-end tests been completed? I did not notice that you tested the UI fully.
+---END---
+
+### SESSION=0f00d99b-758a-43a5-988a-f4cfddf9f740 MSG=3 LEN=813
+Let me be very clear:
+
+1) We did not actually test the v1.57.19 end-to-end because the test plan and harness was deficient.
+2) Because we have never completed an end-to-end test, we have never actually frozen.
+3) We need to complete end-to-end testing in the beta environment before we can freeze the beta build.
+4) At this moment, there is no reason to distinguish the v1.57.19 from the v1.58.1-rc3 in terms of production readiness.
+5) Therefore, we should execute the original plan and start with the current code-base: commit, build and deploy to production (not staging), then complete our end-to-end tests. 
+6) When we have 100% coverage and all tests pass, we can declare the first production release (v1.58.1-rc3) frozen and proceed to build/test future features in the staging environment.
+
+Is this clear?
+---END---
+
+### SESSION=0f00d99b-758a-43a5-988a-f4cfddf9f740 MSG=4 LEN=217
+Yes. Please commit everything that is not yet committed, build a new release, push it to production, and complete the end-to-end tests. When we have 100% test coverage and all tests pass, then we can declare a freeze.
+---END---
+
+### SESSION=0f00d99b-758a-43a5-988a-f4cfddf9f740 MSG=6 LEN=88
+I need to test it manually. I am not confident that we have 100% coverage on the UI yet.
+---END---
+
+### SESSION=0f00d99b-758a-43a5-988a-f4cfddf9f740 MSG=7 LEN=137
+Yes, please proceed with the automated check. I will observe and interject with question or additional tests when/if something is missed.
+---END---
+
+### SESSION=0f00d99b-758a-43a5-988a-f4cfddf9f740 MSG=8 LEN=152
+Was this environment initialized? I did not observe the wizard pop-up and it appears that there are still traces of data from February 23 in the system.
+---END---
+
+### SESSION=0f00d99b-758a-43a5-988a-f4cfddf9f740 MSG=9 LEN=1166
+Please note: it is NOT POSSIBLE to complete end-to-end tests on a system that has not been freshly initialized.
+
+Also note: When I say "100% coverage" of UI, I mean that every possible input and value for every possible state has been checked. Every button has been pushed, every selection possible has been selected, every possible state for a given set of inputs has been "Saved", every element that displays system state is displaying correct information, Light/Dark modes have been applied for every test to confirm that the UI is respecting the UI style, every type of deliberate misconfiguration has been attempted. I mean 100% coverage on everything.
+
+With this in mind, the only way to test the "first log-in" case is to initialize the environment and start testing in the role of a superadmin who has never before accessed this environment. This includes testing the "I lost my API keys" path, Team member creation, re-issuance of Team member API keys, removal of team members...
+
+Please articulate what "100% test coverage" means if what I have described is not what you are attempting to do? Is there a miscommunication on my part? What term should I use?
+---END---
+
+### SESSION=0f00d99b-758a-43a5-988a-f4cfddf9f740 MSG=10 LEN=319
+It is completely immaterial how much "effort" is involved. I only understand three metrics: (1) tokens consumed, (2) elapsed time, and (3) probability of uncontrollable regression because of fix/break/fix/break recurrence.
+
+Please do not use abstract references to "effort". That term is not meaningful in this context.
+---END---
+
+### SESSION=0f00d99b-758a-43a5-988a-f4cfddf9f740 MSG=22 LEN=87
+Please propose a prompt which I can use to resume this testing work in a fresh session.
+---END---
+
+### SESSION=16edb809-e478-41c4-a560-f8066e83a41c MSG=1 LEN=966
+Continue work on Agent Red Customer Experience commercial project.
+Location: E:\Claude-Playground\CLAUDE-PROJECTS\Agent Red Customer Engagement
+Key files: CLAUDE.md, memory/MEMORY.md
+Current status: Production v1.30.3 HEALTHY (ACR build cae, 2026-02-14). 2,217 unit tests, 0 failures.
+Next: Owner functional review of v1.30.3 — run Page 0 (Initial Provisioned State) visual verification.
+Context:
+- Tenant has been freshly re-seeded with all merchant-configurable fields empty
+- Widget key: pk_live_c79a2bd0_88b011b3
+- Superadmin API key: ar_user_rema_d85NHqfnNcujPEhIz_zUibEmcwJe8I9F
+- Admin UI: https://agent-red-api-gateway.orangeglacier-f566a4e7.eastus.azurecontainerapps.io/admin/standalone/
+Start by reading docs/operations/ui-test-procedure.md and begin with Page 0 assertions.
+After Page 0 passes, continue with Pages 1-10.
+Session-end gate: Before closing, verify all owner instructions have been codified
+as testable assertions in the Repeatable Procedure.
+---END---
+
+### SESSION=16edb809-e478-41c4-a560-f8066e83a41c MSG=2 LEN=19
+Chrome is restarted
+---END---
+
+### SESSION=16edb809-e478-41c4-a560-f8066e83a41c MSG=4 LEN=727
+* I have a question about "Save changes" and "Discard": if the user enters information on the "Agent configuration" page and then navigates away, can we automatically save their inputs as draft inputs and remove the "Save changes" control and the "Discard" control (because they are redundant)?
+* "professional" should be "Professional" (capitalization).
+* We already have the state "Pending" displayed in the CONFIGURATION control group, and the badge "Inactive" has no meaning and should be removed.
+* "Brand voice" should be mandatory.
+* Our current language support is only English, correct? We intend to support Spanish and French as soon as possible, but all other languages are planned for the future (to be determined).
+---END---
+
+### SESSION=16edb809-e478-41c4-a560-f8066e83a41c MSG=5 LEN=1361
+let me re-phrase.
+
+* All changes made to the CONFIGURATION page group are drafts until they are activated using the "Activate" control. Therefore, the control "Save changes" is not correctly labeled, since changes are retained as draft inputs but they are not "Saved". 
+* The CONFIGURATION control group has the control "Activate", which combines the notion of saving and activating into one operation.
+* The CONFIGURATION control group has the control "Discard", which removes all draft inputs and returns those inputs to the current state of the system as it is in operation.
+* The CONFIGURATION control group has the control "Roll back", which removes all draft inputs and returns the system to the state it was in the last time changes were activated.
+* The "Discard" and "Save changes" controls at the top of the Agent configuration page have unclear meaning, because they preset the user with a state model for the "Agent configuration" page which is not aligned with the Activate/Discard/Roll back model used for the CONFIGURATION group as a whole.
+
+If we need to be able to "Save changes" to this page so we don't lose data if the user navigates elsewhere, then we should re-label it "Save draft inputs". There should not be an option to "Discard" at the top of the page because "Discard" is already an option as part of the CONFIGURATION control group.
+---END---
+
+### SESSION=16edb809-e478-41c4-a560-f8066e83a41c MSG=6 LEN=525
+Yes, that appears correct. The "Save draft inputs" control should always be at the bottom of the page in order to maintain consistency. E.g., the workflows for "Agent configuration", "Knowledge base", Quick actions" and "Widget configuration" are all the same: admin starts at the top of each page, enters data or makes changes as they scroll down the page, and at the bottom has a control to "Save draft inputs". All of the inputs for these pages are within the state model of the CONFIGURATION (Activate/Discard/Roll back).
+---END---
+
+### SESSION=16edb809-e478-41c4-a560-f8066e83a41c MSG=7 LEN=11
+Yes please.
+---END---
+
+### SESSION=16edb809-e478-41c4-a560-f8066e83a41c MSG=9 LEN=369
+* There have not been 42 Billable conversations. If this is a fresh deployment, this tenant should be in an "initial" state, therefore there cannot be any data about prior conversations. The "Total conversations" count of 42 must be an error. The "Resolution rate" may be 100% (or 0%), but there cannot have been "42 resolved", since there have not been any to resolve.
+---END---
+
+### SESSION=16edb809-e478-41c4-a560-f8066e83a41c MSG=10 LEN=328
+Please add this information to the Repeatable Procedure for tenant provisioning and initialization. Please add this information to the Repeatable Procedure for testing as well, or add a reference to the Repeatable Procedure for tenant provisioning and initialization. We do not want to repeat erroneous procedures in the future.
+---END---
+
+### SESSION=16edb809-e478-41c4-a560-f8066e83a41c MSG=11 LEN=64
+Great. have you updated env.local with the correct keys and URL?
+---END---
+
+### SESSION=16edb809-e478-41c4-a560-f8066e83a41c MSG=12 LEN=87
+Please add this check and update to the Repeatable Procedures wherever it is necessary.
+---END---
+
+### SESSION=16edb809-e478-41c4-a560-f8066e83a41c MSG=13 LEN=652
+Proposal: This is an important principle: all transient keys and values, transient URLs or other variables with values that change between builds or tenant environments should not be hardcoded anywhere. In all cases, those values should either be retrieved from the tenant's secure configuration information database or from the env.local of the development environment. 
+
+If this proposal seems correct, please add this instruction to any Repeatable Procedures which may require it and ensure that we test all code to enforce this requirement.
+
+If this proposal seems incorrect or you have an alternate proposal, please inform me and ask for my input.
+---END---
+
+### SESSION=16edb809-e478-41c4-a560-f8066e83a41c MSG=15 LEN=138
+Thank you.
+
+I would like to begin manual functional testing of the admin UI. Can you confirm the state of the production test environment?
+---END---
+
+### SESSION=16edb809-e478-41c4-a560-f8066e83a41c MSG=16 LEN=1515
+* The test admin production deployment is not "Active" , it is "Pending": this is because it is freshly initialized and has never been activated. 
+* Logically, the widget should not be usable if the system is not active and has never been active.
+* Since the chat widget is not displayed, there should not be any bot traffic creating conversation.
+* It is also reasonable to assume that a merchant may want to disable the chat widget even if it is in an active configuration.
+* It is reasonable to add an "inactive" state to our state model for CONFIGURATION: the "Activate" control currently has a yellow disposition (meaning: error, incomplete mandatory inputs) and a green disposition (meaning: ready to activate, all mandatory inputs are validated). I would like to add a red disposition as  well to that control labeled "Deactivate". This control should have this disposition by default, and as long as no draft configuration changes have been made, it should stay red, with the label "Disable". The disposition should change to "Activate" (yellow or green) as soon as a draft configuration change has been made.
+* When the configuration of a system becomes "Active", the widget should immediately become available.
+* If this seems clear and you have no alternate proposal, please add this to the implementation and to the Repeatable Process for tenant provisioning and Repeatable Process for end-to-end testing.
+* If you have an alternate implementation proposal or need further clarification, please explain.
+---END---
+
+### SESSION=16edb809-e478-41c4-a560-f8066e83a41c MSG=17 LEN=1193
+Clarification:
+*  I am calling this button the "activation control". 
+* it  should have three dispositions: Red/"Deactivate" (meaning: disable the widget), Green/"Activate" (meaning: ready to activate) and yellow/"Activate" (meaning: activation is blocked by missing mandatory configuration). 
+* When the system is initialized, the system is "Inactive" and some mandatory inputs are unavailable (have never been provided), therefore it must have the yellow/"Activate" disposition. 
+* Once a system is active, the default state of the activation control is red/"Disable", because the system is configured and active and no draft configuration changes have been committed. 
+* Once some, but not all the mandatory, configuration changes have been saved as draft configuration, the activation control is yellow/"Activate", because draft configuration changes are insufficient for activation.
+* Once a draft configuration change has been made that includes all mandatory configuration changes, the activation control should have the disposition green/"Activate" and if triggered will commit the draft configuration changes and make the system active in that configuration.
+Does this clarify things?
+---END---
+
+### SESSION=16edb809-e478-41c4-a560-f8066e83a41c MSG=18 LEN=228
+Deactivate behavior: it should go through a confirmation dialog
+Re-activation after deactivate: After deactivating, the merchant's active config still exists, therefore the activation control is green/"Activate".
+
+Is this clear?
+---END---
+
+### SESSION=16edb809-e478-41c4-a560-f8066e83a41c MSG=20 LEN=138
+Is it helpful for us to standardize our language in order to improve consistency? For example, I refer to this as an "activation control".
+---END---
+
+### SESSION=16edb809-e478-41c4-a560-f8066e83a41c MSG=21 LEN=295
+Yes, a glossary is an important idea. We should build a glossary and try to encourage me to adhere to that glossary when we are discussing system components.
+
+I would like to propose a few examples from the graphical UI work. I will provide some images from the UI and tell you what I call them:
+---END---
+
+### SESSION=16edb809-e478-41c4-a560-f8066e83a41c MSG=22 LEN=31
+I refer to these as "controls".
+---END---
+
+### SESSION=16edb809-e478-41c4-a560-f8066e83a41c MSG=23 LEN=35
+I also refer to these as "Controls"
+---END---
+
+### SESSION=16edb809-e478-41c4-a560-f8066e83a41c MSG=24 LEN=87
+Examples of "controls": buttons, selectors, filters, checkboxes, radio buttons, toggles
+---END---
+
+### SESSION=16edb809-e478-41c4-a560-f8066e83a41c MSG=25 LEN=26
+I refer to these a "cards"
+---END---
+
+### SESSION=16edb809-e478-41c4-a560-f8066e83a41c MSG=26 LEN=116
+Yes, a card is a container and may contain controls and information and inputs. These are examples of "information".
+---END---
+
+### SESSION=16edb809-e478-41c4-a560-f8066e83a41c MSG=27 LEN=30
+These are examples of "pages".
+---END---
+
+### SESSION=16edb809-e478-41c4-a560-f8066e83a41c MSG=28 LEN=33
+These are examples of an "input".
+---END---
+
+### SESSION=16edb809-e478-41c4-a560-f8066e83a41c MSG=29 LEN=19
+These are "pickers"
+---END---
+
+### SESSION=16edb809-e478-41c4-a560-f8066e83a41c MSG=30 LEN=21
+These are "controls".
+---END---
+
+### SESSION=16edb809-e478-41c4-a560-f8066e83a41c MSG=31 LEN=36
+This is the "configuration manager".
+---END---
+
+### SESSION=16edb809-e478-41c4-a560-f8066e83a41c MSG=32 LEN=36
+These are the "configuration pages".
+---END---
+
+### SESSION=16edb809-e478-41c4-a560-f8066e83a41c MSG=33 LEN=96
+This is all I have now. Do you want to propose more, advise changes or ask clarifying questions?
+---END---
+
+### SESSION=16edb809-e478-41c4-a560-f8066e83a41c MSG=34 LEN=103
+I call this an "error banner". If it were a pop-up (overlay), I would have called it an "error pop-up".
+---END---
+
+### SESSION=16edb809-e478-41c4-a560-f8066e83a41c MSG=36 LEN=356
+I distinguish "control" from "input" in this way: a control triggers the change of state of the system, but an "input" elaborates the future desired state of the system when the next control is triggered. For example: none of the inputs on the configuration pages are controls except for the "Save draft inputs" control and the "Reset to defaults" control.
+---END---
+
+### SESSION=16edb809-e478-41c4-a560-f8066e83a41c MSG=37 LEN=42
+Yes, you have it right. This is a control:
+---END---
+
+### SESSION=16edb809-e478-41c4-a560-f8066e83a41c MSG=38 LEN=102
+I tend to think of a logically interdependent group of elements bounded by a bordered box are a "card"
+---END---
+
+### SESSION=16edb809-e478-41c4-a560-f8066e83a41c MSG=39 LEN=79
+Yes, "tooltip" and "table" are also terms I understand how to use consistently.
+---END---
+
+### SESSION=16edb809-e478-41c4-a560-f8066e83a41c MSG=40 LEN=41
+I also understand that this is a "badge".
+---END---
+
+### SESSION=16edb809-e478-41c4-a560-f8066e83a41c MSG=41 LEN=317
+This is good. Please make a note in your knowledge base to ensure that I use glossary terms consistently. If it seems like I may not be but my meaning is not clear, please ask me to choose the correct term from the glossary, or offer me a choice between candidate terms which you think might actually be my intention.
+---END---
+
+### SESSION=16edb809-e478-41c4-a560-f8066e83a41c MSG=42 LEN=32
+Yes, this is correct. Thank you.
+---END---
+
+### SESSION=16edb809-e478-41c4-a560-f8066e83a41c MSG=43 LEN=1184
+Now that we have clarified the state model and created a glossary, I would like to move on to manual functional testing of the latest build.
+
+Before we resume testing, we should wrap-up this session.
+
+Please:
+- make very detailed and comprehensive updates to your knowledge base with all new architecture/design decisions, project enhancements and future (or incomplete) work items
+- confirm that all of my instructions been written into the relevant Repeatable Procedures for future regression tests
+- clean up all unnecessary artifacts, such as expired temp files, scratch files or obsolete (unused or superseded) documents
+- Update the agentredcx.com content with details of new features and/or UI changes
+- commit and push to GitHub (https://github.com/mike-remakerdigital/agent-red)
+- update the GitHub project (https://github.com/users/mike-remakerdigital/projects/1)
+- update the GitHub wiki with all new content describing this project (https://github.com/mike-remakerdigital/agent-red/wiki)
+- Push the latest build to production (unless you recommend against it)
+- provide a prompt which I can use to initialize the next session and continue working on prioritized work items
+---END---
+
+### SESSION=17371b33-b7a1-45b0-bddd-d753493ce970 MSG=1 LEN=1832
+Continue work on Agent Red Customer Engagement commercial project.
+Location: E:\Claude-Playground\CLAUDE-PROJECTS\Agent Red Customer Engagement
+Key files: CLAUDE.md, docs/Master-Plan-Review-01-30-2026.md, docs/COMPREHENSIVE-TEST-PLAN.md, docs/BACKLOG-NEW-WORK-ITEMS.md
+Current status: Phases 0-1.4 complete. Phase 2.1 e-commerce ~85% complete (10 billing modules). Phase 2.2 Tier 1 Critical ALL COMPLETE (7 modules). Tier 2 High ALL COMPLETE (21 modules, ~9,500 lines). Phase 2.5 Layers 1-2 COMPLETE (3 modules). All middleware wired in main.py (4 middleware in correct order). 125 tests passing (30 persistent memory + 57 auth/middleware + 38 provisioning/webhooks). Architecture review complete (32 decisions, 100 work items). Cost model validated (76-90% margins). Independent Cursor audit remediated (2026-01-31). Test coverage audit complete (2026-01-31): ~880 tests enumerated in comprehensive test plan (125 existing, ~755 planned). 63 new work items identified (WI #101-163) covering test infrastructure, merchant web UI, trial environment, SSE streaming, pipeline optimization, API completeness, operational readiness, and security hardening.
+Next priority: Test infrastructure setup (WI #101-104: pyproject.toml, requirements-test.txt, conftest.py, GitHub Actions CI). 
+Then P0 launch-blocker tests (~160 tests: HTTP billing endpoints, middleware pipeline, ConversationMeter, CriticPolicy, Cosmos repository, health endpoints). See docs/COMPREHENSIVE-TEST-PLAN.md §4 for full P0 breakdown. New backlog items (WI #101-163) are staged for prioritization review — see docs/BACKLOG-NEW-WORK-ITEMS.md.
+
+Please review CLAUDE.md and the Comprehensive Test Plan, then proceed with the highest-priority remaining technical work item, presenting one item at a time for review per the iterative working style documented in CLAUDE.md.
+---END---
+
+### SESSION=17371b33-b7a1-45b0-bddd-d753493ce970 MSG=2 LEN=20
+YEs, please proceed.
+---END---
+
+### SESSION=17371b33-b7a1-45b0-bddd-d753493ce970 MSG=3 LEN=12
+Yes, please.
+---END---
+
+### SESSION=17371b33-b7a1-45b0-bddd-d753493ce970 MSG=4 LEN=11
+YEs please.
+---END---
+
+### SESSION=17371b33-b7a1-45b0-bddd-d753493ce970 MSG=5 LEN=10
+Yes please
+---END---
+
+### SESSION=17371b33-b7a1-45b0-bddd-d753493ce970 MSG=8 LEN=11
+Yes please.
+---END---
+
+### SESSION=17371b33-b7a1-45b0-bddd-d753493ce970 MSG=10 LEN=11
+Yes please.
+---END---
+
+### SESSION=17371b33-b7a1-45b0-bddd-d753493ce970 MSG=11 LEN=11
+Yes please.
+---END---
+
+### SESSION=17371b33-b7a1-45b0-bddd-d753493ce970 MSG=12 LEN=391
+Is this a good opportunity to start a fresh session?
+
+If so, please:
+
+- update your knowledge base with all new architecture/design decisions and work items (priority: technical implementation/testing)
+- clean up any unnecessary artifacts
+- commit and push to GitHub
+- note progress in the GitHub project
+- provide a prompt which I can use to initialize the next session and continue working
+---END---
+
+### SESSION=17546613-0ed1-4abb-9072-87c06d83f8c1 MSG=1 LEN=105
+Can you inspect the last session and resume from where it was halted with the error "Prompt is too long"?
+---END---
+
+### SESSION=17546613-0ed1-4abb-9072-87c06d83f8c1 MSG=4 LEN=11
+Yes please.
+---END---
+
+### SESSION=17546613-0ed1-4abb-9072-87c06d83f8c1 MSG=5 LEN=192
+The user should not need to know their current password in order to change it. They should enter their email address and receive a confirmation link which allows them to choose a new password.
+---END---
+
+### SESSION=17546613-0ed1-4abb-9072-87c06d83f8c1 MSG=6 LEN=38
+IS this ready to deploy to production?
+---END---
+
+### SESSION=17546613-0ed1-4abb-9072-87c06d83f8c1 MSG=7 LEN=508
+the SMTP credentials are in env.local. We are using TITAN_PASSWORD and TITAN_USER_ID
+
+Incoming server: imap.titan.email
+
+Port: 993
+
+Encryption method: SSL/TLS
+
+Outgoing server: smtp.titan.email
+
+Port: 465
+
+Encryption method: SSL/TLS
+
+Nonetheless if you are looking to configure your email box on Outlook using POP/SMTP, you can use the following configurations:
+
+Incoming server: pop.titan.email
+
+Port: 995
+
+Encryption method: SSL/TLS
+
+Outgoing server: smtp.titan.email
+
+Port: 465
+
+Encryption method: SSL/TLS
+---END---
+
+### SESSION=17546613-0ed1-4abb-9072-87c06d83f8c1 MSG=9 LEN=101
+I clicked the link immediately but it had already expired.
+
+Note: the logo is displaying incorrectly.
+---END---
+
+### SESSION=17546613-0ed1-4abb-9072-87c06d83f8c1 MSG=10 LEN=21
+is this session over?
+---END---
+
+### SESSION=1aa024e9-4628-4a9b-962b-cd4a66d537a6 MSG=1 LEN=820
+Continue work on Agent Red Customer Experience commercial project.
+Location: E:\Claude-Playground\CLAUDE-PROJECTS\Agent Red Customer Engagement
+Key files: CLAUDE.md, memory/MEMORY.md
+Current status: Production v1.26.0 HEALTHY. 2,283 tests (0 failures). Next: Owner manual functional testing of production admin UI — continue review from Inbox onward (pages reviewed in session 12: Dashboard, Inbox, Team, Agent Config, KB, Quick Actions, Widget Config, Integrations, Memory & Privacy, Billing; most issues resolved in sessions 13-16). Session 16 changes now deployed: team hard-delete, three-state config badge, removed Saved Configurations/Preview panels, improved error messages. Repeatable Procedures framework established (6 active SOPs). Start by opening the production admin UI for interactive page-by-page review.
+---END---
+
+### SESSION=1aa024e9-4628-4a9b-962b-cd4a66d537a6 MSG=2 LEN=287
+The "Conversation volume" chart is showing conversations which could not have happened, since they are in the past, before this environment was deployed.
+
+The tooltips (e.g., "Customer satisfaction") contain links which do not point directly at the appropriate documentation page anchor.
+---END---
+
+### SESSION=1aa024e9-4628-4a9b-962b-cd4a66d537a6 MSG=3 LEN=25
+Proceed to inbox, please.
+---END---
+
+### SESSION=1aa024e9-4628-4a9b-962b-cd4a66d537a6 MSG=4 LEN=317
+I attempted to search for this message using the search term "product" and it did not show in the results. 
+
+When I selected "Escalate to a human agent" I was not asked to which team member or which category of escalation. What did "Escalate to human" actually do? It did not show up when I used the "Esc (0)" filter.
+---END---
+
+### SESSION=1aa024e9-4628-4a9b-962b-cd4a66d537a6 MSG=5 LEN=405
+First, I have a request:
+
+Please treat these UI tests as "Repeatable Processes", and follow the process each time. When you identify a defect, or when I do, add a test for that defect to the procedure and then proceed to find a fix or solution. Please add this request to your knowledge base so we can ensure that this guidance is followed each time we begin testing as a specifically identified activity.
+---END---
+
+### SESSION=1aa024e9-4628-4a9b-962b-cd4a66d537a6 MSG=6 LEN=11
+Yes please.
+---END---
+
+### SESSION=1aa024e9-4628-4a9b-962b-cd4a66d537a6 MSG=8 LEN=375
+Thanks. 
+
+Please propose a prompt for a new session. In the new session I will manually perform functional tests. Claude should add a test for each issue I identify to the admin UI testing Repeatable Procedure. This will help us avoid regression and allow Claude to execute the same tests independently in the future.
+
+If this is not clear please ask me clarifying questions.
+---END---
+
+### SESSION=204a450e-e227-4a5a-b795-b9e7c7e191d4 MSG=1 LEN=6996
+Continue work on Agent Red Customer Experience commercial project.
+Location: E:\Claude-Playground\CLAUDE-PROJECTS\Agent Red Customer Engagement
+Key files: CLAUDE.md, memory/MEMORY.md, docs/operations/SHOPIFY-APP-REVIEW-PREFLIGHT-CHECKLIST.md
+
+Current status: Production v1.17.0 healthy. Commit 5e2391f contains
+v1.18.0 code (HMAC multi-replica token fix + logo SVG fix + 20 new tests).
+Code pushed to GitHub. Wiki and docs site updated. 2,037 tests passing,
+0 failures.
+
+Priority tasks for this session:
+
+Deploy v1.18.0 to production (ACR build + Container App revision update).
+Follow deployment checklist in memory/deployment.md. This fixes the
+broken forgot-password flow (HMAC tokens) and corrupted logo.
+Set SHOPIFY_API_KEY + SHOPIFY_API_SECRET env vars on Container App
+(P0 blocker for Shopify JWT verification + tenant lookup).
+P1 manual tests: Chrome incognito session token, plan upgrade/downgrade,
+billing flow (test: true → false).
+Deploy docs site updates to agentredcx.com (GitHub Pages).
+Recent commits on main:
+
+5e2391f Fix HMAC reset tokens for multi-replica, fix logo data URI, add docs
+dcb6f48 Replace change-password with email-based forgot-password flow
+2f45c9e Fix widget panel drop-shadow not visible on storefront
+fd7908e Fix P1 issues (#10, #12, #13), add Quick Action Prompt Buttons
+GitHub issues #69 (HMAC fix) and #70 (logo fix) created and closed.
+Issue #17 (Shopify submission) updated with current status.
+Wiki Home and Project Status pages updated.
+
+Show more
+
+
+Looking at the session priorities, let me start by reading the deployment checklist and checking the current state.
+
+
+Reviewed deployment documentation and checked recent git commit history
+Show more
+
+Good. Commit 5e2391f is on main with the v1.18.0 changes. Let me check if the build context script exists and if there are any frontend changes that need building first.
+
+
+Verified build context script and checked frontend changes in git history
+
+No frontend changes in v1.18.0 — only backend (HMAC tokens + logo data URI). No need to rebuild SPAs. Let me check the Dockerfile to confirm the build context script covers everything needed, then create the build context and kick off the ACR build.
+
+
+Read PowerShell build context configuration script
+
+Good. Let me verify the SPA dist directories exist and the Dockerfile, then create the build context and start the ACR build.
+
+
+Verified all three distribution builds missing and need rebuilding
+
+The dist directories are missing — likely gitignored. I need to check if they're in the Dockerfile as multi-stage builds or if they need to be pre-built. Let me check the Dockerfile.
+
+
+Read Dockerfile for Agent Red Customer Engagement API
+
+The Dockerfile expects pre-built dist directories. I need to build all three SPAs before creating the build context. Let me check if the build tools are available and build them.
+
+
+Verified package.json exists in three project directories
+
+Let me check if node_modules exist or if we need npm install first, and also check the build scripts.
+
+
+Attempted to check node_modules status across three project directories; commands failed due to syntax errors
+
+Bash is running under bash, not cmd. Let me use bash-compatible syntax.
+
+
+Verified all three project node_modules directories exist
+
+All node_modules present. Now let me build all three SPAs in parallel.
+
+
+Built three production bundles: standalone admin, Shopify admin, and widget
+Show more
+Show more
+Show more
+
+All three builds succeeded:
+
+Standalone admin: 1,034 KB JS + 201 KB CSS
+Shopify admin: 667 KB JS + 441 KB CSS
+Widget: 69.5 KB (~20 KB gzip)
+Now let me check if the widget dist has the expected widget.js filename (the build context script copies widget/dist/).
+
+
+Listed widget distribution build output files
+
+Good, the widget is agent-red-widget.iife.js. The Dockerfile COPY widget/dist/ ./widget/dist/ copies the whole directory, so this is fine. Now let me create the build context and start the ACR build.
+
+
+Created minimal ACR build context for Docker deployment
+
+Build context created. Now let me verify it has all the right files and start the ACR build.
+
+
+Verified build output structure for admin and widget distributions
+Show more
+
+Build context looks good. Let me start the ACR build. Per the deployment notes, the Windows CLI may crash with UnicodeEncodeError — I'll need to verify via az acr task list-runs if it does.
+
+
+Built Docker image api-gateway:v1.18.0 in ACR
+
+ACR build is running in background. Let me check on it periodically. Per the deployment notes, the Windows az CLI often crashes with UnicodeEncodeError during pip install log streaming but the remote build still succeeds. Let me wait a bit and check progress.
+
+
+Checked ACR build progress, found charmap encoding error in pip install
+Show more
+
+As expected — the Windows CLI crashed with UnicodeEncodeError during pip install log streaming. The remote build typically still succeeds. Let me check the ACR task runs to verify.
+
+
+Checked Azure Container Registry build status successfully
+Show more
+
+ACR build ch43 Succeeded in 2:21. The image api-gateway:v1.18.0 is now in ACR. Now let me deploy it to the Container App and check the current revision.
+
+
+Listed Container App revisions for agent-red-api-gateway
+
+Current revision is 0000006 running v1.17.0 with 2 replicas. Let me deploy the new image.
+
+
+API Error: 500 {"type":"error","error":{"type":"api_error","message":"Internal server error"},"request_id":"req_011CY2WDshnGQuGhiN7mR7Qb"}
+Show more
+
+Deployment succeeded. New revision 0000007 created with image api-gateway:v1.18.0. I can see SHOPIFY_API_KEY and SHOPIFY_API_SECRET are already in the env var list. Let me now:
+
+Wait for the new revision to become healthy
+Deactivate the old revision
+Verify health endpoints
+
+Verified API gateway health and readiness endpoints operational
+
+Both /health and /ready return 200. Now let me check revisions and deactivate the old one.
+
+
+Listed container app revisions for agent-red-api-gateway deployment
+
+Only one active revision (0000007) — the old one was auto-deactivated since activeRevisionsMode: Single. No manual deactivation needed.
+
+Let me do a quick smoke test of the forgot-password page to verify the logo fix is live.
+
+
+Verified forgot-password endpoint returns 404 error
+
+Let me check the actual route for the forgot-password page.
+
+
+Verified SVG logo data URI on forgot-password page
+Grep
+forgot.password|reset.password
+362:    f'  <a href="/admin/standalone/_forgot-password" class="link">Forgot your password?</a>'
+403:  <form method="POST" action="/admin/standalone/_forgot-password">
+450:  <form method="POST" action="/admin/standalone/_reset-password">
+Show more
+Bash
+curl -s https://agent-red-api-gateway.lemonriver-f59f94b7.eastus2.azurecontainerapps.io/admin/standalone/_forgot-password | grep -o 'data:image/[^"]*' | head -c 80
+Tool output
+
+API Error: 400 {"type":"error","error":{"type":"invalid_request_error","message":"Could not process image"},"request_id":"req_011CY2WXoU3CNYG4wLMVsLoo"}
+---END---
+
+### SESSION=204a450e-e227-4a5a-b795-b9e7c7e191d4 MSG=2 LEN=86
+I requested a new password, then entered my new password. I was directed to this page.
+---END---
+
+### SESSION=204a450e-e227-4a5a-b795-b9e7c7e191d4 MSG=3 LEN=77
+The problem is the same. I changed my password and was directed to this page.
+---END---
+
+### SESSION=204a450e-e227-4a5a-b795-b9e7c7e191d4 MSG=4 LEN=29
+I did not receive an API key.
+---END---
+
+### SESSION=204a450e-e227-4a5a-b795-b9e7c7e191d4 MSG=6 LEN=37
+Note: the chat widget is not present.
+---END---
+
+### SESSION=204a450e-e227-4a5a-b795-b9e7c7e191d4 MSG=7 LEN=167
+The chat UI and widget need to be available on the Admin console so the administrator can test the agent without accessing the storefront. This was working previously.
+---END---
+
+### SESSION=204a450e-e227-4a5a-b795-b9e7c7e191d4 MSG=8 LEN=66
+I tried the link to agentredcx.com and the link was HTTP not HTTPS
+---END---
+
+### SESSION=204a450e-e227-4a5a-b795-b9e7c7e191d4 MSG=9 LEN=179
+We previously implemented a feature that allows click-able messages with hidden prompts to be displayed in the message pane. That feature is not visible here. Can you investigate?
+---END---
+
+### SESSION=204a450e-e227-4a5a-b795-b9e7c7e191d4 MSG=12 LEN=285
+Yes, this what I was looking for.  I added the delays in this case to help verify that system events (like failures of replicas, changes from other users happening in parallel) would be tolerated. E.g., we don't want to rebuild an image just to change a password or request an API key.
+---END---
+
+### SESSION=204a450e-e227-4a5a-b795-b9e7c7e191d4 MSG=13 LEN=325
+These changes should be made now.
+
+Context for this request: We are doing a UX review with Mazel. Mazel is providing feedback by telephone and I am making requests as they come. Mazel will prepare a more detailed set of use cases soon, but we have been tackling large issues sequentially, as they are discovered. All of Mazel
+---END---
+
+### SESSION=204a450e-e227-4a5a-b795-b9e7c7e191d4 MSG=15 LEN=210
+While we are waiting, please propose a prioritized set of work items we can work through while we wait for Mazel to provide written cases. Mazel is specifically concerned with the implementation of "Test mode".
+---END---
+
+### SESSION=204a450e-e227-4a5a-b795-b9e7c7e191d4 MSG=16 LEN=596
+I believe that your proposal matches the previous feedback (case) from Mazel. I believe that Mazel made one error in the case: the toggle for "test mode" had to be the first step in the setup wizard flow, since this is what we use to grey-out fields that cannot be changes for the "B" test group in isolation, so the only inputs that should be available for the "B" test group should be those related to prompting and changes to chat AI behavior. 
+
+Mazel will review what we provide and include updated cases which may require additional modification.
+
+Please proceed with the plan you described.
+---END---
+
+### SESSION=204a450e-e227-4a5a-b795-b9e7c7e191d4 MSG=19 LEN=97
+Mazel needs to use this UI for his evaluation. Is everything deployed and ready to manually test?
+---END---
+
+### SESSION=204a450e-e227-4a5a-b795-b9e7c7e191d4 MSG=20 LEN=20
+Yes, please proceed.
+---END---
+
+### SESSION=204a450e-e227-4a5a-b795-b9e7c7e191d4 MSG=21 LEN=686
+Please add a work item for resolution in the next batch of updates:
+
+(1) the color configuration of the chat widget is not picked up by the widget after being saved.
+(2) the greeting message "Hi there! How can I help you today <FIRST_NAME>?"  is not picked up by the widget.
+(3) the "quick actions" are empty with no examples in the initial setup
+(4) the "Icon" input on the "Create quick action" dialog does not contain any guidance or examples for where to obtain an icon or how to find and add one
+(5) there is not need to ask for "Sort order", since the order is set for each page
+(6) the quick actions do not appear in the chat UI on the administration page and cannot be previewed
+---END---
+
+### SESSION=204a450e-e227-4a5a-b795-b9e7c7e191d4 MSG=22 LEN=143
+The "Test mode" toggle does not appear on the nav bar at the top of the page and it does not appear as the first item in the Setup wizard flow.
+---END---
+
+### SESSION=204a450e-e227-4a5a-b795-b9e7c7e191d4 MSG=23 LEN=248
+Yes please. I am doing a quick check before I send the new link to Mazel. I am manually checking several pages and there may be other items. I would like to get these fixed beforehand. Please make fixes and wait to push until I give you the signal.
+---END---
+
+### SESSION=204a450e-e227-4a5a-b795-b9e7c7e191d4 MSG=25 LEN=43
+Thank you. Additional review is proceeding.
+---END---
+
+### SESSION=204a450e-e227-4a5a-b795-b9e7c7e191d4 MSG=26 LEN=841
+- There is no visible control for the drop-shadow on the widget or chat UI
+- Thee are no controls for changing the widget icon or the Agent Red avatar at the top of the chat UI
+- In the greetings options there is no explanation of what the pre-chat form or offline form do
+- The chat UI has a fixed width that is very narrow and should have a control that allows users to expand it horizontally
+- The chat UI cannot be click-dragged to other regions of the browser window
+- The auto-open should be set per-page, as part of the Quick Actions configuration
+- The input area of the chat UI should have three text lines of height
+- The chat display area of the chat UI has no scroll-bars or control
+- Configuring the position of the launcher should include controls for vertical and horizontal offset from the edges of the browser display area (
+---END---
+
+### SESSION=204a450e-e227-4a5a-b795-b9e7c7e191d4 MSG=27 LEN=426
+- The dashboard should display the name of the merchant's storefront in large type, above the word "Dashboard"
+- Each display area of the dashboard should have a tooltip/link to the relevant documentation so admin users will know what the displayed information means (Total conversations, Avg response time, Resolution rate, Customer satisfaction, Escalation rate, Daily conversation volume, Recent conversations, Top intents)
+---END---
+
+### SESSION=204a450e-e227-4a5a-b795-b9e7c7e191d4 MSG=28 LEN=111
+- "Scan for conflicts", "Export to CSV", and "Import" should have on-hover tooltips with links to documentation
+---END---
+
+### SESSION=204a450e-e227-4a5a-b795-b9e7c7e191d4 MSG=29 LEN=340
+Each display area of the analytics page should have a tooltip/link to the relevant documentation so admin users will know what the displayed information means (Total conversations, Avg response time, Resolution rate, Customer satisfaction, Escalation rate, Daily conversation volume, Recent conversations, Intents breakdown, Knowledge gaps)
+---END---
+
+### SESSION=204a450e-e227-4a5a-b795-b9e7c7e191d4 MSG=30 LEN=920
+- This page should be called "Agent configuration", rather than just "Configuration"
+- Each display area of the Configuration page should have a tooltip/link to the relevant documentation so admin users will know what the displayed information means (Brand & persona, Policies, Escalation, Custom instructions, Language, Test mode)
+- The slider in "Escalation" should have the word "Conservative left-justified and the word "Aggressive" right-justified so that neither word extends beyond the width of the slider control
+- Configuration should be named, and it should be possible to select and apply a named & saved configuration from a list of previously saved configurations (this is to allow customers to restore a previously created configuration)
+- it should be possible to delete previously saved configurations
+- Each previously saved configuration should have a date-stamp indicating the last time it was applied
+---END---
+
+### SESSION=204a450e-e227-4a5a-b795-b9e7c7e191d4 MSG=31 LEN=438
+- This page should be called "Widget configuration" rather than just "Widget"
+- The "Primary color" should be renamed "Header left color" 
+- The "Header gradient end" should be renamed "Header right color"
+- There should be a toggle to enable/disable gradient, and the default should be disabled, with the entire header using the Header left color
+- The Header left color and Header right color should be side-by-side, rather than stacked
+---END---
+
+### SESSION=204a450e-e227-4a5a-b795-b9e7c7e191d4 MSG=32 LEN=376
+- Page assignments should display all available pages in a single column, rather than having the page selected via the Page type drop-down menu
+- Prompt template variables should be displayed below the "Prompt template" input box, in the same manner as the "Greeting message" input area on the Widget configuration page, rather than being described using a tab as they are now
+---END---
+
+### SESSION=204a450e-e227-4a5a-b795-b9e7c7e191d4 MSG=33 LEN=627
+- The "Role" selector should replace the textual role names displayed and the selector should not be in the "Actions" column
+- "Member" should be "Team member"
+- "Roles & permissions" should be an on-hover tool-tip pop-up for the column heading "Role", rather than a section of the page
+- "Agent" should be "Escalation agent"
+- When the "Escalation agent" role is selected for a team member, that team member should also be assigned to one or more "Escalation" responsibilities (Sales, Support, Service, Account, Technical assistance, General inquiry)
+- it should be possible to toggle each team member between enabled/disabled
+---END---
+
+### SESSION=204a450e-e227-4a5a-b795-b9e7c7e191d4 MSG=34 LEN=408
+- Each display area of the Billing & usage page should have a tooltip/link to the relevant documentation so admin users will know what the displayed information means (Current plan, Conversations used, Pack balance, Current overage, Estimated overage cost, Daily usage)
+- The on-hover background color for the "Purchase" buttons should be the same as the on-hover background color used for sidebar menu items
+---END---
+
+### SESSION=204a450e-e227-4a5a-b795-b9e7c7e191d4 MSG=35 LEN=351
+The order of pages on the sidebar should be changed to:
+
+1) Dashboard: analytics and dashboard content should be combined here into one page and the Analytics page should be removed entirely
+2) Inbox
+3) Team
+4) Agent configuration
+5) Knowledge base
+6) Quick actions
+7) Widget configuration
+8) Integrations
+9) Billing
+10) Setup wizard
+11) Documentation
+---END---
+
+### SESSION=204a450e-e227-4a5a-b795-b9e7c7e191d4 MSG=36 LEN=3906
+The Wizard is for (1) configuring Test mode and (2) ensuring that merchants complete the configuration of Agent Red for initial activation
+
+For first-time activation: the Wizard is primarily a check-list that tells the merchant which parts of the system setup need to be completed before the service can be used.
+
+For Test mode: the Wizard allows ai-specific configuration to be changed for a subset of users. 
+
+Each step of the process should reflect the pages linked from the sidebar, in order:
+
+1: Mode (Test mode or Standard mode)
+2: Team (only visible during initial setup)
+2: Agent configuration
+3: Knowledge base
+4: Quick actions
+5: Widget configuration (only visible during initial setup)
+6: Integrations (only visible during initial setup)
+7: Go live
+
+Each of these steps should expose all of the fields/inputs for each page referenced: 
+(A) For first-time setup, the complete contents of those pages will be accessible via the associated Wizard step.
+(B) When in Test mode, only the fields which can be modified for the test group should be change-able, and these fields should be the ones that affect prompting and AI behavior.
+
+Specific changes to this setup wizard flow as it appears on the page now:
+- (As previously noted) the first step in the setup wizard flow should be the toggle to select "Test group configuration" or "Primary configuration"
+- "Brand & tone" should be removed from the wizard and added to the Configuration page instead
+- "Languages" step should only appear if the wizard is in test mode (otherwise, it is already on the Configuration page)
+- "Response style" should only be in the Wizard when in Test mode and should be added to the Configuration page 
+- "Knowledge base" should be removed from the wizard and added to the Knowledge base page instead
+- "Business policies" should be removed from the wizard and added to the Configuration page instead
+- "Escalation rules" should be removed from the wizard and added to the Team members page instead
+- "Integrations" should be removed from the wizard and added to the Team members page instead
+- "Memory and privacy" should be removed from the wizard and should be added as a dedicated page accessed via the sidebar menu page instead
+- "Widget appearance" should be removed from the Wizard
+- "Review and launch" should be re-named "Custom AI instructions" and should not include a test-mode toggle
+-  In Test mode, the "Go live" should provide a check-list of values which have been changed from the Standard mode values, so that the merchant can easily see which values they have modified for Test mode
+- In Standard mode (E.g., for a first-time setup) the "Go live" check-list should provide a list of the mandatory inputs required for the system to operate
+
+Example case - Initial setup:
+- Merchant subscribes and receives access to the system
+- Merchant admin (Admin) logs in and observes that the system state is marked "Inactive" on the nav menu (in the same position as the "Test mode" indicator)
+- A "Welcome" message pop-up appears and reminds the Admin that the system is not yet active, which the admin dismisses
+- When the Admin attempts to click the "Inactive" indicator in the sticky nav-bar, they are taken to the Wizard
+- The Admin progresses through the wizard and provides the minimum inputs for the system to be activated (these are all empty/default settings which must be populated/selected)
+- Upon completion of all required inputs, the option to "Go live" is available and the checklist indicates which required inputs have been completed and reminds the Admin that Knowledge, Integrations and Team members should be added for optimal results.
+- The admin clicks "Activate standard mode" and the system activates, causing the widget to become available for users
+- The Admin then selects "Setup wizard" again and notices that the Standard mode/Test mode toggle is in the "Standard mode" position
+---END---
+
+### SESSION=204a450e-e227-4a5a-b795-b9e7c7e191d4 MSG=37 LEN=953
+(continuing the case)
+
+- The admin selects the "Test mode" option from the Wizard toggle and proceeds to step through each page of configurable options, with only the AI-behavior choices exposed for changes
+- The admin skips a step and proceeds to "Go live"
+- The "Go live" checklist indicates checkmarks for each input that has been altered from "Standard mode" and notices that one of the settings that should have been changed has not been
+- The Admin returns to the Wizard step in question and makes the change that was previously overlooked, then returns to the "Go live" step
+- The Admin notes that the item that was previously overlooked is no longer marked with a yellow X, and now has a green check-mark
+- The admin selects the percentage of new sessions that should be randomly added to the test group and clicks the "Activate test mode" button
+- Test mode activates and the mode indicator in the sticky nav-bar switches to display "Test mode"
+---END---
+
+### SESSION=204a450e-e227-4a5a-b795-b9e7c7e191d4 MSG=38 LEN=489
+These changes are becoming complex, so please ask me any clarifying questions when we review the new work items. I have not yet indicated which inputs should be change-able for Test mode, but you should evaluate based on your understanding and I will make another pass once Mazel sees the UI after these changes have been made and the updated admin has been pushed to prod for evaluation.
+
+If you have any questions, we should step through them one-by-one before admin UI changes are made.
+---END---
+
+### SESSION=204a450e-e227-4a5a-b795-b9e7c7e191d4 MSG=39 LEN=767
+(A) is correct. 
+
+- We want to have an initial path through the Wizard that forces the Admin to enter all information/choices which are required before Agent Red can become active for the first time - this is now "Standard mode"
+- Once Agent Red is active, all further changes to "Standard mode" are committed and activated in each page of this UI indicated by the navigable items on the sidebar.
+- If the Admin wants to make changes to AI behavior in a controlled way, they make those changes via the Test mode path through the wizard - each aspect of system configuration that relates to AI behavior is exposed as an alterable option which will affect only users that are in the "Test mode" group, and the Admin can change any or all of those inputs as they prefer.
+---END---
+
+### SESSION=204a450e-e227-4a5a-b795-b9e7c7e191d4 MSG=40 LEN=1323
+This is a good question. We have two options:
+
+(1) The wizard is used ONLY for (a) initial setup and (b) Test mode setup
+or
+(2) The wizard is also usable for changes in AI behavior in Standard mode which should/may be comitted in a single action, at the end of the Wizard path.
+
+I believe this is the choice: if we allow configuration changes in Standard mode to be comitted ("Saved") within each page, we may find that some changes (e.g., to Agent configuration) become active before changes to other aspects (E.g., Quick actions). This may result in periods where the Standard configuration is functional but not fully aligned across all aspects. This may not be a problem in most cases.
+
+On the other hand, we may find that comprehensive changes that touch multiple aspects of the system should be activated simultaneously, even in Standard mode. In this case, a "Standard mode" path through the Wizard would eliminate the possibility of temporary inconsistencies.
+
+There is an alternative: we make sure that all input changes are "Saved" but not necessarily activated until the Admin explicitly makes the decision to "Activate" configuration changes to the system as a whole. We do not currently have this notion beyond the initial Standard configuration path through the Wizard.
+
+Is this clear? Do you have an opinion?
+---END---
+
+### SESSION=204a450e-e227-4a5a-b795-b9e7c7e191d4 MSG=41 LEN=221
+I agree. It is very difficult to identify the subtle implications of this choice without seeing it or having any user feedback to consider. We may need to adjust this later, but proceed with Option 1 at this time, please.
+---END---
+
+### SESSION=204a450e-e227-4a5a-b795-b9e7c7e191d4 MSG=43 LEN=262
+Yes, I think this looks right.
+
+Before we lose this context, please add detailed notes to your knowledge base describing each new work item. I am concerned that this session is becoming quite extensive, with a lot of detail that we will lose in the next session.
+---END---
+
+### SESSION=204a450e-e227-4a5a-b795-b9e7c7e191d4 MSG=44 LEN=960
+Great. Let's wrap-up this session and start a fresh session to go over the details and prioritization and get to work on the changes.
+
+Please:
+
+- update your knowledge base with all new architecture/design decisions, project enhancements and future (or incomplete) work items
+- clean up all unnecessary artifacts, such as expired temp files, scratch files or obsolete (unused or superseded) documents
+- Update the agentredcx.com content with details of new features and/or UI changes
+- commit and push to GitHub (https://github.com/mike-remakerdigital/agent-red)
+- update the GitHub project (https://github.com/users/mike-remakerdigital/projects/1)
+- update the GitHub wiki with all new content describing this project (https://github.com/mike-remakerdigital/agent-red/wiki) 
+- Push the latest build to production (unless you recommend against it)
+- provide a prompt which I can use to initialize the next session and continue working on prioritized work items
+---END---
+
+### SESSION=241a4b91-5b1e-4f1e-9ce7-36fdf3e4a85d MSG=1 LEN=2776
+Continue work on Agent Red Customer Experience commercial project.
+Location: E:\Claude-Playground\CLAUDE-PROJECTS\Agent Red Customer Engagement
+Key files: CLAUDE.md, docs/PROJECT-PLAN.md, docs/BACKLOG-NEW-WORK-ITEMS.md
+Current status: API Gateway v1.7.0 deployed. Storefront onboarding complete (tenant #1 provisioned, KB seeded, widget configured, marketing pages created). TWO CRITICAL BLOCKERS remain before AI behavior testing can begin.
+GitHub: https://github.com/mike-remakerdigital/agent-red
+GitHub project: https://github.com/users/mike-remakerdigital/projects/1
+GitHub wiki: https://github.com/mike-remakerdigital/agent-red/wiki
+
+CRITICAL BLOCKER #1 — Config Persistence Bug (Issue #31, WI #206):
+PUT /api/config returns {"success": true, "version": 1} with correct changes, but GET /api/config returns {"version": 0} with platform defaults. TenantConfigProcessor was not wired to Cosmos DB repos at startup — fixed in v1.7.0 (_startup_config_processor + _startup_dashboard_services added to main.py) — but bug persists. Investigate PreferencesRepository.create_version() in src/multi_tenant/repository.py. Check: (1) is it swallowing exceptions, (2) document ID format (provisioning script uses {tenant_id}_preferences_v1), (3) partition key alignment, (4) 60s cache TTL in TenantConfigProcessor.
+Key credentials: API key ar_e7432afd91bd466c2ec10aa0dbaaf9665577a6bfb68aee16, tenant_id remaker-digital-001, shop blanco-9939.myshopify.com.
+
+CRITICAL BLOCKER #2 — ChatPipeline needs direct Azure OpenAI fallback (Issue #32, WI #207):
+src/chat/pipeline.py calls AGNTCY agent containers via HTTP for IC/KR/RG stages, but these containers are ActivationFailed (demo mode images). No fallback exists. Need to add direct Azure OpenAI calls for: (1) Intent Classification (GPT-4o-mini), (2) Knowledge Retrieval (text-embedding-3-large + Cosmos DB vector search), (3) Response Generation (GPT-4o streaming), (4) Critic Validation (GPT-4o-mini). Azure OpenAI endpoint: https://aoai-agentred-eastus2.openai.azure.com/. Cosmos DB: cosmos-agentred-eastus2. Key Vault: kv-agentred-eastus2.
+
+AFTER BLOCKERS RESOLVED — AI Behavior Testing Baseline (7 dimensions, prioritized):
+(1) Response quality baseline, (2) Intent classification accuracy, (3) Critic effectiveness, (4) CSAT analytics, (5) Knowledge Retrieval quality, (6) Persistent Memory impact, (7) Configuration change impact.
+Marketing validation needed: PCM value proposition — "Agent Red learns about your customers' concerns, interests, tastes and preferences, improving continuously during the entire span of your commercial relationship."
+
+Iterative working style: one item at a time, honest assessment, approval before implementation, aggressive scope cutting. Start with CRITICAL BLOCKER #1 (config persistence bug).
+---END---
+
+### SESSION=241a4b91-5b1e-4f1e-9ce7-36fdf3e4a85d MSG=2 LEN=11
+Yes please.
+---END---
+
+### SESSION=241a4b91-5b1e-4f1e-9ce7-36fdf3e4a85d MSG=3 LEN=11
+Yes please.
+---END---
+
+### SESSION=241a4b91-5b1e-4f1e-9ce7-36fdf3e4a85d MSG=5 LEN=756
+I have a few updates:
+
+(1) There is a 503 error on the admin dashboard (see the screenshot)
+
+(2) The Agent Red logos have been updated:
+E:\Claude-Playground\CLAUDE-PROJECTS\Agent Red Customer Engagement\branding\logo\SVG\icon-master.svg
+E:\Claude-Playground\CLAUDE-PROJECTS\Agent Red Customer Engagement\branding\logo\SVG\primary-logo-no-wordmark.svg
+E:\Claude-Playground\CLAUDE-PROJECTS\Agent Red Customer Engagement\branding\logo\PNG\icon-master.png
+E:\Claude-Playground\CLAUDE-PROJECTS\Agent Red Customer Engagement\branding\logo\PNG\primary-logo-no-wordmark.png
+
+Please replace all current logo images with these new logo images.
+
+(3) We need to keep an eye on the stand-alone Admin Interface. Can you provide a URL where our UX designer can access it?
+---END---
+
+### SESSION=241a4b91-5b1e-4f1e-9ce7-36fdf3e4a85d MSG=7 LEN=116
+Agreed. Item 3: Option B is the best choice. We should secure it with a simple password to avoid casual trespassers.
+---END---
+
+### SESSION=241a4b91-5b1e-4f1e-9ce7-36fdf3e4a85d MSG=8 LEN=552
+Is this a good opportunity to start a fresh session?
+
+If so, please:
+
+- update your knowledge base with all new architecture/design decisions and work items
+- clean up any unnecessary artifacts
+- commit and push to GitHub (https://github.com/mike-remakerdigital/agent-red)
+- update the GitHub project (https://github.com/users/mike-remakerdigital/projects/1)
+- update the GitHub wiki (https://github.com/mike-remakerdigital/agent-red/wiki)
+- provide a prompt which I can use to initialize the next session and continue working on prioritized work items
+---END---
+
+### SESSION=25631a0f-8e25-4035-bb3a-293678703c6e MSG=1 LEN=4804
+Continue work on Agent Red Customer Experience commercial project.
+Location: E:\Claude-Playground\CLAUDE-PROJECTS\Agent Red Customer Engagement
+Key files: CLAUDE.md, docs/PROJECT-PLAN.md, docs/BACKLOG-NEW-WORK-ITEMS.md, docs/COMPREHENSIVE-TEST-PLAN.md
+Current status: ALL CORE PHASES COMPLETE. Phases 0-2.2 COMPLETE (38 multi_tenant modules, ~25,000 lines). Phase 2.5 Layers 1-2 COMPLETE (3 modules). Phase 3.0 ALL BUILD PHASES COMPLETE (Chat API 6 endpoints + SSE, widget 20 files ~3,200 lines, Shopify Theme App Extension, admin shared 9 components ~5,400 lines, Shopify admin shell ~2,700 lines, standalone admin shell ~2,800 lines — both build-validated). Operational readiness COMPLETE. Security hardening COMPLETE. Pipeline optimization COMPLETE. Trial environment COMPLETE. Competitive pricing VERIFIED (all 5 competitors, 2026-02-01 — Agent Red 4-21x cheaper). Integration testing with real Stripe test mode + Shopify partner sandbox + Azure services COMPLETE (42 tests). Azure infrastructure provisioned in East US 2: aoai-agentred-eastus2 (GPT-4o, GPT-4o-mini, text-embedding-3-large), cosmos-agentred-eastus2 (Serverless, EnableNoSQLVectorSearch, database: agentred), kv-agentred-eastus2 (RBAC-enabled). 1,196 tests passing (1,154 unit + 42 integration), 0 warnings. 19 routers, 67 routes, 9 middleware layers. Shopify Partner app deployed (client_id: 4c6cf726cd1f9f5389caf48f78af9735) and installed on blanco-9939.myshopify.com dev store.
+Remaining work (priority order): (1) P1: UI/UX feature implementation — close competitive gap with Tidio/Gorgias, (2) P2: Cosmos DB full initialization — create all 10 containers with DiskANN vector index, (3) P2: Azure OpenAI custom subdomain — SDK compatibility for production, (4) P2: Layer 3 PatternExtractionService (Professional+, WI #90-92), (5) P2: CI improvements (coverage reports, parallel jobs — WI #105, #107), (6) P2: SSE enhancements (client-side retry, compression, multi-tab — WI #131-133), (7) P3: API completeness (customer profiles, OpenAPI schema — WI #142, #147), (8) P3: Remaining security (API key rotation, Stripe IP allowlisting — WI #159, #162), (9) P3: Add-on integration tests (Mailchimp, Zendesk, GA4 — API keys present, no tests), (10) Blocked: Creative assets (app icon, screenshots, demo video — blocked on design), (11) Blocked: Shopify App Store submission (blocked on creative assets).
+Important context: Tidio is the primary functional reference. Zapier is the visual styling reference. Persistent Customer Memory (Layers 1-2) is the launch pillar differentiator. All competitor pricing verified 2026-02-01 — see docs/research/UI-UX-COMPETITIVE-ANALYSIS.md. 12 remaining backlog items listed in docs/BACKLOG-NEW-WORK-ITEMS.md §9 (Remaining Work Items table). Stripe CLI configured for local webhook forwarding (stripe listen). Stripe Tax requires account verification — sandbox tests accept 502. Mixed billing intervals (annual base + monthly overage) not supported in single Checkout. Azure credentials in .env.local are for development/testing; production will use Managed Identity. Iterative working style: one item at a time, honest assessment, approval before implementation, aggressive scope cutting.
+Please review CLAUDE.md, then proceed with the highest-priority remaining technical work item, presenting one item at a time for review per the iterative working style documented in CLAUDE.md.
+
+I would like to clarify our priorities and launch plan. I have reviewed the current documents (wiki) and I am uncertain about the plan.
+
+I would like to simplify and clarify our plan by categorizing all work:
+
+(1) Agent Red Customer Experience Release 1.0: This is the release that we launch with, and the first customer will be our "beta" customer. This is a full-featured and competitive release, comparable to Tidio (features, usability, etc.).
+
+(2) Agent Red Customer Experience Release 1.1: This is the presumed release that contains everything we have discussed so far but have not decided to include in 1.0.
+
+(3) Agent Red Customer Experience Release 1.x: This is a placeholder release which will follow 1.1 and contains all features and capabilities we have not yet evaluated.
+
+The pricing and packaging decisions do not imply a distinction between releases. The scope of the "base" license is not equivalent to the scope of the 1.0 release. These ideas are orthogonal, meaning that the "base" product and one or more optional features may be required for 1.0.
+
+Since we made several decisions prior to obtaining full competitor information and having a full details about UI and UX requirements, I believe we should review the launch plan and ensure that the contents of each release are fully translated to project milestones and test plan.
+
+Please provide you assessment and ask any clarifying questions.
+---END---
+
+### SESSION=25631a0f-8e25-4035-bb3a-293678703c6e MSG=2 LEN=372
+Can you include details about UI and UX elements? User Experience is critical: the user experience for 1.0 must be polished and refined: comparable (ideally superior) in styling and usability to the Tidio chat UI toolset. Customer users must be able to access the chat UI on mobile or desktop (responsive, web-based) and the Admin UI can support desktop users (web-based).
+---END---
+
+### SESSION=25631a0f-8e25-4035-bb3a-293678703c6e MSG=3 LEN=1175
+This is a very good representation of the plan. Overall, I agree, although some details (how we approach implementing the responsive client) might be significantly more or less sophisticated than I can tell from this level of detail.
+
+I would like to do another detailed inspection of Tidio and a (new competitor) CX provider, such as Front (https://front.com/).
+
+The customer and merchant UI is very important - any issues with the graphical UI (either native app or web UI) may overshadow the in-session communication benefits we offer with Agent Red. In either case, the UI must be a high priority.
+
+I also think the bringing WhatsApp and MMS support forward should be evaluated again, with a specific look at the overall.
+
+I would like to do more detailed analysis of what our direct (or near-adjacent) competitors are doing and what is considered the norm by major on-line service providers.
+
+If we can't reach the customer through a chat interface that they find effortless to use, that effort will diminish the perceived usability of our entire system, no matter how well it otherwise works.
+
+Please consider this and ask clarifying questions or offer your assessment.
+---END---
+
+### SESSION=25631a0f-8e25-4035-bb3a-293678703c6e MSG=4 LEN=177
+I would also like to know if thee are AI tools or design patterns (like Replit, https://replit.com/products/design) that are available via API or open-source which we could use.
+---END---
+
+### SESSION=25631a0f-8e25-4035-bb3a-293678703c6e MSG=5 LEN=2647
+Several excellent open-source UI toolkits are available for building modern, responsive web applications. Top choices often depend on your preferred web framework (React, Vue, Angular, or vanilla JS) and design philosophy. 
+Here are some of the most popular and highly-regarded options:
+Tailwind CSS: This is a utility-first CSS framework that provides low-level utility classes to build custom designs directly in your HTML. It is highly customizable, very popular for modern web development, and numerous free and premium component libraries (like Flowbite and HyperUI) are built on top of it to speed up workflows.
+MUI (Material UI): A comprehensive set of React UI components that implement Google's Material Design. It is one of the most popular component libraries for React, offering a vast number of pre-built, accessible components.
+Chakra UI: Another popular React component library known for its simplicity, accessibility, and consistent design patterns. All components are dark mode compatible by default.
+Ant Design: An enterprise-level UI library primarily used in the React ecosystem, featuring a distinct design language and a wide array of 70+ components suitable for complex application interfaces.
+Bootstrap: Arguably the most well-known front-end framework, it provides a robust grid system and hundreds of responsive components with a mobile-first philosophy. It is framework-agnostic and also has specific integrations, such as React Bootstrap.
+Ionic: An open-source UI toolkit specifically designed for building high-quality, performant mobile and desktop apps using web technologies (HTML, CSS, JavaScript). It provides native-style components with integrations for Angular, React, and Vue.
+Mantine: A free and open-source React component library offering over a hundred fully responsive components, a modern aesthetic, and built-in theming capabilities that many developers find intuitive. 
+Key Considerations When Choosing
+The best toolkit for your project depends on several factors: 
+Framework Compatibility: Most modern toolkits are designed to work seamlessly with specific JavaScript frameworks (React, Vue, etc.).
+Customization Needs: Some libraries offer extensive out-of-the-box components with a specific look (e.g., Material UI), while others (e.g., Tailwind CSS) provide building blocks for highly custom designs.
+Design Philosophy: Consider whether you prefer a utility-first approach, a pre-designed component library, or a full-fledged framework with a strong opinion on design language.
+Target Audience: An internal enterprise application might have different UI needs than a public-facing e-commerce site.
+---END---
+
+### SESSION=25631a0f-8e25-4035-bb3a-293678703c6e MSG=6 LEN=4831
+Yes, this level of detail is really helpful. I have read the entire report and I understand most items and agree with your recommendations. Here are my notes/questions:
+
+New Work Required for 1.0
+
+- Is an "Email channel" (forwarding0based) similar to escalation-to-email: A customer is notified that they are being escalated and is asked to provide an email address where they can be reached with a reply (or the UI may present an email address known by the merchant). The merchant replies via email. In the future, Agent Red will observe all email with that customer related to that escalated session and add that to its customer knowledge for future use.
+
+- The App Icon is already available and has been added to the Shopify app configuration.
+
+Explicitly NOT in 1.0
+
+- A/B testing framework: This term may be a little off-the-mark. My concerns intersect with the notion of formal "A/B Testing", but not in the way you imply. The ability to change system behavior, such as tweaking persona/prompts or otherwise changing the way the system interacts with users will have consequences that are hard to predict. The ability to define a "B" test group and apply changes, then observe whether those changes cause degradation of KPI is important. Group selection could be as simple as round-robin for new sessions, a geography, a campaign tag associated with the customer, or any other suitable customer attribute. The "B" test group could be relatively small, although it must be large enough for obvious catastrophic consequences to be avoided. I am not talking about A/B testing in the usual marketing sense of the word, in which statistical analysis is used to tease apart the vagaries of user behavior and make predictions about incremental benefits. Think of our version of A/B testing as defensive, whereas most A/B testing (where the term is applied) is more offensive.
+
+Release 1.1: Post-Launch (or earlier) Enhancements for consideration
+
+Enhancements to Persistent Customer Memory (utility / performance)
+Performance: Faster retrieval (e.g. hybrid search, better chunking, caching of hot profiles), or lighter embeddings for latency-sensitive paths.
+Utility: Richer L1 profile (e.g. inferred segments, next-best-action hints), or “summary of last N conversations” for context.
+Layer 3: Implement PatternExtractionService (Professional+); cross-session patterns improve relevance without full fine-tuning.
+Layer 4: Offer fine-tuning via OpenAI API (no per-model hosting) for Enterprise; avoid Azure-hosted fine-tuned models to dodge the $1,836/mo per-model cost.
+Fit: Directly strengthens the core differentiator and supports tiered upsell (Pro/Enterprise).
+Suggestions:
+Prioritize Layer 3 and retrieval/performance (measurable impact on “utility/performance”).
+Document enhancement options in docs/architecture/ (e.g. PER-CUSTOMER or PERSISTENT-CUSTOMER-MEMORY-METRICS) with success metrics and tier eligibility.
+
+“Campaign” agent (sessions ? marketing campaigns)
+Assessment: Persistent Memory already has structured profiles, consent, and vectorization; adding campaign identifiers and campaign content to that model is a natural extension.
+You’d need: (a) data model for campaigns and linkage to sessions/profiles, (b) ingestion of campaign metadata (and optionally creative/copy) for vectorization, (c) an agent (or pipeline step) that uses campaign context in responses and possibly suggests or explains campaigns, (d) clear rules for consent and use of campaign/demographic data (GDPR, existing consent manager).
+Fit: Aligns with e?commerce ICP (promos, segments, campaigns). Differentiates from “pure” support bots if you tie support conversations to campaigns and make that visible/actionable.
+Risks / design choices:
+Scope: “Campaign” could mean: attribution only (which campaign led to this session), or full “campaign agent” that recommends/explains campaigns, or both. Starting with attribution + storing campaign/demographic identifiers in L1 and vectorizing campaign details for RAG keeps the first phase bounded.
+Integrations: Push notifications and “management of campaign demographic identifiers” may imply integrations (e.g. Mailchimp, Klaviyo, or your own campaign service). That’s additional surface area; worth scoping as Phase 2 of the Campaign agent.
+Consent: Campaign and demographic data must flow through the same consent/PII rules as the rest of Persistent Memory.
+Suggestion:
+Define a Campaign Agent / Campaign Context design doc: data model (campaign id, segment/demographic flags, optional copy), where it sits in the pipeline (e.g. after Intent or Knowledge Retrieval), how it’s exposed to Response Generator and Critic, and how it appears in explainability. Then implement attribution + L1/L2 enrichment first; full “campaign agent” behaviors (recommendations, copy serving) as a second step.
+---END---
+
+### SESSION=25631a0f-8e25-4035-bb3a-293678703c6e MSG=7 LEN=404
+Yeah, baby! Now I can see the full scope. This has helped me to envision the system much more fully. 
+
+On the subject of UI kit, You recommend Mantine V7. How does it compare with Ayro (https://uideck.com/blog/bootstrap-ui-kits), for example? Mantine V7 seems to have many components, but less of a focus on layout. Do you believe that Mantine V7 is sufficiently prescriptive to avoid bad layout choices?
+---END---
+
+### SESSION=25631a0f-8e25-4035-bb3a-293678703c6e MSG=8 LEN=344
+Thank you for that excellent research and explanation. I am satisfied that your choice of Mantine v7 is correct. 
+
+Is it possible to render your specs as static HTML+CSS+Mantine pages that I can visually inspect and comment on? I want to see workflows, UI layout, choice of presentation style for information (graphs/charts/trees/mermaid/etc.).
+---END---
+
+### SESSION=25631a0f-8e25-4035-bb3a-293678703c6e MSG=10 LEN=331
+Please update these to use the current logo files: E:\Claude-Playground\CLAUDE-PROJECTS\Agent Red Customer Engagement\branding\logo
+
+Please confirm that the styling matches the "Option A" displayed in this document: file:///E:/Claude-Playground/CLAUDE-PROJECTS/Agent%20Red%20Customer%20Engagement/branding/colors/color-palette.html
+---END---
+
+### SESSION=25631a0f-8e25-4035-bb3a-293678703c6e MSG=11 LEN=329
+The logo in the upper left corner should be primary-logo-light.svg (or primary-logo-dark.svg for Dark mode).
+
+The text "Agent Red Customer Experience" is not necessary (except as a tooltip/on-hover label or alt text)
+
+Please note: Dark Mode is an important detail. We mentioned this previously this decision might have been lost.
+---END---
+
+### SESSION=25631a0f-8e25-4035-bb3a-293678703c6e MSG=13 LEN=654
+Wonderful. I'm examining it now. Thank you very much. This has been an extremely productive session.
+
+Is this a good opportunity to start a fresh session?
+
+If so, please:
+
+- update your knowledge base with all new architecture/design decisions and work items
+- clean up any unnecessary artifacts
+- commit and push to GitHub (https://github.com/mike-remakerdigital/agent-red)
+- update the GitHub project (https://github.com/users/mike-remakerdigital/projects/1)
+- update the GitHub wiki (https://github.com/mike-remakerdigital/agent-red/wiki)
+- provide a prompt which I can use to initialize the next session and continue working on prioritized work items
+---END---
+
+### SESSION=27be78fe-c16f-4bac-a1a1-2f763d8c5aa4 MSG=1 LEN=4030
+Continue work on Agent Red Customer Experience commercial project.
+Location: E:\Claude-Playground\CLAUDE-PROJECTS\Agent Red Customer Engagement
+Key files: CLAUDE.md, docs/PROJECT-PLAN.md, docs/BACKLOG-NEW-WORK-ITEMS.md, docs/COMPREHENSIVE-TEST-PLAN.md
+Current status: Phase 6.0 Launch Preparation. ALL CORE PHASES COMPLETE. Prototype owner-approved and design-frozen (2026-02-03). 1,235 unit + 42 integration = 1,277 tests, 0 failures. 41 multi_tenant modules (~28,000 lines). 19 routers, 67 routes, 9 middleware. Phase 2.5 Persistent Customer Memory ALL 4 LAYERS COMPLETE. Phase 3.0 ALL BUILD PHASES COMPLETE. Azure infrastructure provisioned (aoai-agentred-eastus2, cosmos-agentred-eastus2, kv-agentred-eastus2). Shopify Partner app deployed. Competitive pricing VERIFIED (4-21x cheaper than all 5 competitors). GitHub wiki has 49 pages including 4 design/UX consultant-focused pages with Mermaid diagrams.
+
+Last session completed (2026-02-03):
+- Dockerfile + .dockerignore (production container config)
+- Widget IIFE bundle built (58KB / 17KB gzip) and copied to Shopify Theme App Extension
+- Knowledge base seed data (32 articles, 26KB) in scripts/seed_knowledge_base.py
+- Favicons and app icons (ICO, Apple Touch, PWA 192/512)
+- Color palette worksheet for graphic designer
+- PROJECT-PLAN.md v3.0.0 with launch preparation phases
+- BACKLOG-NEW-WORK-ITEMS.md updated with WIs #196-204
+- CLAUDE.md v21.0.0 with storefront strategy and external team info
+- Azure OpenAI custom subdomain confirmed already configured
+- GitHub issues #21/#22 closed, #25/#26/#27 created
+- Wiki: 4 new consultant pages (Design Reference, Widget Spec, Admin Spec, Memory) with 20+ diagrams
+
+Open GitHub issues (priority order):
+1. #25 — Production deployment: Docker images to ACR + Terraform apply (WI #196-197) [P0]
+2. #26 — Remaker Digital storefront: Shopify store + Agent Red as tenant #1 + live demo (WI #199-202) [P0, blocked on #25]
+3. #27 — UX consultant evaluation: Mazel workflow review (WI #203) [P1, blocked on #26]
+4. #17 — Shopify App Store submission [blocked on #10 creative assets]
+5. #10 — Creative assets for App Store [blocked on graphic designer]
+6. #14 — CI improvements: coverage gate, parallel jobs (WI #105, #107)
+7. #15 — SSE enhancements: client retry, compression, multi-tab (WI #131-133)
+8. #16 — API completeness: pagination, bulk ops, webhook retry
+
+Remaining backlog (not blocked):
+- WI #105: pytest coverage gate in CI
+- WI #107: Performance test infrastructure
+- WI #131-133: SSE client-side retry, metering integration, multi-tab
+- WI #137-139: Pipeline post-launch optimizations
+- WI #142: Customer profile public endpoints
+- WI #147: OpenAPI schema generation
+- WI #159: API key rotation mechanism
+- WI #162: Stripe webhook IP allowlisting
+- WI #204: Color palette worksheet review (blocked on designer)
+
+External team in parallel:
+- Graphic designer: Refining admin UI color palette (working from branding/color-palette-worksheet.html)
+- UX consultant (Mazel): Will evaluate core merchant workflows once live system is available
+
+Remaker Digital storefront strategy (decided 2026-02-03):
+- Create Shopify storefront as dual-purpose: sell Agent Red + deploy Agent Red as its own chat (tenant #1 dogfooding)
+- Serves as live demo URL for App Store listing and affiliate content
+- Knowledge base pre-seeded with 32 Agent Red product articles
+- Mazel evaluates: onboarding, Shopify integration, widget testing, escalation workflows
+
+Next priority: Production deployment sprint (#25) — push Docker image to ACR, run Terraform apply, verify Container Apps health. This unblocks the storefront (#26), which unblocks Mazel's UX evaluation (#27).
+
+Important context: Tidio = functional reference. Zapier = visual reference. Persistent Customer Memory = launch pillar differentiator. Iterative working style: one item at a time, honest assessment, approval before implementation, aggressive scope cutting. Wiki at https://github.com/mike-remakerdigital/agent-red/wiki — 49 pages including Design & UX consultant section.
+---END---
+
+### SESSION=27be78fe-c16f-4bac-a1a1-2f763d8c5aa4 MSG=2 LEN=975
+Before we proceed with other work, I have received a mock-up of the dark-mode for the stand-alone admin UI. The designer was not able to use the worksheet because it was not clear how each element of the page was labeled and there was an error in the template (the "9. Complete Token Reference Table" was rendered incorrectly and had no input fields).
+
+She has given me an SVG file and asked whether we could extract the color changes from it. She changed the page background colors, element container background colors, header/sidebar background colors and the highlight box underneath the current active item (from a shade of red to a medium grey). She suggested that the Light Mode was fine as it is, except for changing the sticky top navbar background to match the Dark Mode color for the same element.
+
+Can you parse this document and use it as a guide?
+
+E:\Claude-Playground\CLAUDE-PROJECTS\Agent Red Customer Engagement\prototype\public\agent-red-dark-mode-mockup.svg
+---END---
+
+### SESSION=27be78fe-c16f-4bac-a1a1-2f763d8c5aa4 MSG=3 LEN=65
+I think we should apply all of the designer's changes, if we can.
+---END---
+
+### SESSION=27be78fe-c16f-4bac-a1a1-2f763d8c5aa4 MSG=4 LEN=53
+I closed Chrome and re-opened it. this is what I see:
+---END---
+
+### SESSION=27be78fe-c16f-4bac-a1a1-2f763d8c5aa4 MSG=6 LEN=371
+This is what I see. I notice 3 things:
+
+1) The color of the active selection text in the sidebar is red, and it should be white.
+2) The taupe border (#938a87) is .2px in the mockup and looks too bold if the border is wider. IF we cannot make it more narrow, perhaps we need to change it to #363636
+3) The background of the chat history is too bright and should be #2A2A2A
+---END---
+
+### SESSION=27be78fe-c16f-4bac-a1a1-2f763d8c5aa4 MSG=7 LEN=69
+I made an error: the background of the chat history should be #19191A
+---END---
+
+### SESSION=27be78fe-c16f-4bac-a1a1-2f763d8c5aa4 MSG=8 LEN=67
+OK. These changes are good. We will use this as our plan-of-record.
+---END---
+
+### SESSION=27be78fe-c16f-4bac-a1a1-2f763d8c5aa4 MSG=9 LEN=163
+Oops. One more thing: the Light/Dark toggle should retain Dark Mode colors even in Light mode, since the sticky nav bar retains it's dark grey color in Light Mode.
+---END---
+
+### SESSION=27ebc281-6419-46b3-a53c-98caa30e7eac MSG=1 LEN=300
+Please correct me if I am mistaken: Does compaction is a method of freeing context window (tokens) without starting an entirely new session? If so, does the reduction in tokens used achieved through characterizing, summarizing and abbreviating historical information, resulting in a loss of fidelity?
+---END---
+
+### SESSION=27ebc281-6419-46b3-a53c-98caa30e7eac MSG=2 LEN=232
+So there are cases where compaction results in drift? E.g., the loss of fidelity allows for more cases of retroactive continuity? Perhaps certain decisions are misremembered, or certain facts are assumed to exist because of context?
+---END---
+
+### SESSION=27ebc281-6419-46b3-a53c-98caa30e7eac MSG=3 LEN=131
+Is it time to inspect the knowledge base, MEMORY.md and CLAUDE.md and look for ways to enhance modularity and minimize token waste?
+---END---
+
+### SESSION=27ebc281-6419-46b3-a53c-98caa30e7eac MSG=4 LEN=305
+Is it time to also inspect every assertion and claim in memory to identify and remediate flaws, inaccuracies or incomplete memories? If you are going to load all of the memory files into the context window, doesn't it make sense to perform all operations on a given knowledge document in the same session?
+---END---
+
+### SESSION=27ebc281-6419-46b3-a53c-98caa30e7eac MSG=5 LEN=269
+This process will probably span multiple sessions. Can we plan in special transient documents to capture relevant details to facilitate seamless handoff? Can you guess what information might be relevant to upcoming stages and pre-sort and curate it for future sessions?
+---END---
+
+### SESSION=27ebc281-6419-46b3-a53c-98caa30e7eac MSG=6 LEN=177
+Please make an additional personality and style note: 
+
+Mike values honest feedback: never exaggerate the quality or impact of his input.
+
+After that, please proceed to phase 1.
+---END---
+
+### SESSION=28f7c629-f6b0-4e71-bc35-cb5dc3b1ab70 MSG=1 LEN=1096
+Continue work on Agent Red Customer Experience commercial project.
+Location: E:\Claude-Playground\CLAUDE-PROJECTS\Agent Red Customer Engagement
+Key files: CLAUDE.md, memory/MEMORY.md
+Current status: Production v1.26.0 deployed. 95 UI tests across 10 pages, all PASS. Local fixes for D4+D6 not yet deployed.
+Task: Owner interactive functional testing — defect capture mode.
+I will manually test the production admin UI and report defects as I find them. For each defect I report:
+1. Add a regression test to `docs/operations/ui-test-procedure.md` under the appropriate page section (use the next available test number for that page)
+2. Add the defect to the Defect Log table at the bottom of the procedure (use the next D-number)
+3. Investigate root cause and propose a fix
+4. Wait for my approval before applying the fix
+Do NOT navigate the browser or take screenshots unless I ask. I will describe what I see and you will operate in listen → document → investigate → propose mode.
+Reference: `docs/operations/ui-test-procedure.md` (Repeatable Procedure), `memory/ui-testing.md` (session history)
+---END---
+
+### SESSION=28f7c629-f6b0-4e71-bc35-cb5dc3b1ab70 MSG=2 LEN=96
+Before I proceed, please fix all known defects and then push the updated admin UI to production.
+---END---
+
+### SESSION=28f7c629-f6b0-4e71-bc35-cb5dc3b1ab70 MSG=3 LEN=585
+* The "Conversation volume" chart is displaying historical data which cannot exist, since this environment only happened on February 13
+* The "Conversation volume" chart does not change correctly when the 7d/14d/30d/90d timeframe control is changed: the duration displayed in the chart should match the selected timeframe, irrespective of whether there is data for that entire timeframe. E.g., today is February 14, so when I select "90d" as the timeframe for the data displayed on the chart, therefore the chart should display the data for the timeframe of November 16 to February 14.
+---END---
+
+### SESSION=28f7c629-f6b0-4e71-bc35-cb5dc3b1ab70 MSG=4 LEN=222
+Please add fixes to the work item backlog as P0. We will make all fixes once I am done with my review, so they can be grouped and coalesced as needed to avoid potential regressions because of unanticipated interdependence.
+---END---
+
+### SESSION=28f7c629-f6b0-4e71-bc35-cb5dc3b1ab70 MSG=5 LEN=624
+I will now move to Agent configuration. This is because i want to test CONFIGURATION and then return to "Inbox" and "Team members".
+
+* The status "Not configured" cannot be correct, because test messages have been sent (we saw them in the dashboard). If the environment were "Not configured", it would not have been possible to send valid test messages.
+* There is no state "Not configured" in our state model. The configuration can only be in the states "Activated" or "Pending"
+* The option to "Roll back" cannot exist, since this environment has never been "Activated" and there is no previous activated state to restore.
+---END---
+
+### SESSION=28f7c629-f6b0-4e71-bc35-cb5dc3b1ab70 MSG=6 LEN=579
+Additional clarification: since it is not possible to send valid messages in a system that is not "Activated", we either need to (a) initialize a tenant  environment in a state that is "Activated" or (b) create a new version of initialized state used for our own testing purposes which is fully "Activated", so we can send valid test messages or (c) initialize the test environment in a "Pending" state and then begin testing by completing the activation of the environment and then sending valid test messages before continuing to test the Inbox and Team members (and the rest).
+---END---
+
+### SESSION=28f7c629-f6b0-4e71-bc35-cb5dc3b1ab70 MSG=7 LEN=29
+Agreed. C is the best choice.
+---END---
+
+### SESSION=28f7c629-f6b0-4e71-bc35-cb5dc3b1ab70 MSG=8 LEN=419
+* I inputted a "Brand name" called "Test brand name" and attempted to save the Agent configuration. I received an error: "Save failed, Failed to save configuration: 'dict' object has no attribute 'model_dump'"
+* The "Discard" option is non-functional
+* It is not possible to close the "Save failed" banner - the "X" close control is non-functional
+* I cannot continue testing "Agent configuration" until these are fixed
+---END---
+
+### SESSION=28f7c629-f6b0-4e71-bc35-cb5dc3b1ab70 MSG=9 LEN=1371
+* I created a Knowledge base article called "Test article" and saved it successfully. The "Category and "Status" of that article are not visible in the list of articles. None of the articles are displaying "Category" or "Status", and therefore the category and status filters return no results.
+* The state of the CONFIGURATION did not change to "Pending" when I successfully saved the new article. When I saved the new article, the configuration should have switched to "Pending", because the changed configuration does not reflect the current state of the system. When I created the new article, the state should be "Pending" and the "Activate" option should change to yellow, because not all required inputs are provided for activation (if I clicked the yellow "Activate" control, a banner should have popped up indicating which mandatory inputs were missing from the configuration and must be added before it can be activated). The "Discard" option should have changed to blue and by clicking that control the article I created should have been either (a) deleted or (b) changed to "Draft" mode. 
+* When I clicked the "Archive article" control, the system message indicated success, but there was no other indication that the article was not present and in use. The articles titled "Test article" is displaying a "Freshness" value of "--", which has no clear meaning.
+---END---
+
+### SESSION=28f7c629-f6b0-4e71-bc35-cb5dc3b1ab70 MSG=10 LEN=62
+* There is no way to restore an article that has been archived
+---END---
+
+### SESSION=28f7c629-f6b0-4e71-bc35-cb5dc3b1ab70 MSG=11 LEN=362
+KB changes should participate in the Save→Activate flow:
+* (a) Full integration: KB creates/edits/deletes call save_draft() to mark config as Pending. Activation deploys the KB state alongside other config. Discard reverts KB changes.
+
+This is because AI chat behavior is affected by available knowledge. Adding knowledge may change the contents of AI responses.
+---END---
+
+### SESSION=28f7c629-f6b0-4e71-bc35-cb5dc3b1ab70 MSG=12 LEN=180
+* I created a new Quick action and the CONFIGURATION state did not change (same problems as noted previously).
+* The "Auto-open" control is non-functional and could not be enabled.
+---END---
+
+### SESSION=28f7c629-f6b0-4e71-bc35-cb5dc3b1ab70 MSG=13 LEN=505
+* The merchant will not have a URL for the "Agent avatar URL". IF the merchant wants to change the avatar for the chat UI, we must allow them to upload a PNG file and we will need to validate it (it is a valid PNG) and re-size it. If the uploaded PNG does not have the correct aspect ratio, we must allow the merchant admin to position the viewable part of the uploaded PNG so we can crop the undesirable parts of the image so that the re-sized image has the correct aspect ratio for display as an avatar.
+---END---
+
+### SESSION=28f7c629-f6b0-4e71-bc35-cb5dc3b1ab70 MSG=14 LEN=313
+* Correct. This is not a defect, it is a design change. Please add tests to check that the new design is present and functional. I will test the new component when it is present and we may add new tests on the next round of functional testing, which I will perform after the current set of changes have been made.
+---END---
+
+### SESSION=28f7c629-f6b0-4e71-bc35-cb5dc3b1ab70 MSG=15 LEN=260
+* The widget does not trigger the chat window, even though there are no missing mandatory inputs for the chat UI
+* The "Save changes" control generated an error: "Error, Failed to save: Failed to save configuration: 'dict' object has no attribute 'model_dump'"
+---END---
+
+### SESSION=28f7c629-f6b0-4e71-bc35-cb5dc3b1ab70 MSG=17 LEN=389
+* I am testing the admin experience for a merchant who as the "professional" entitlement, but I was able to change the "Cross-session learning" toggle to "Enabled". The "Cross-session learning" option is part of the "Professional+" entitlement (and "Enterprise") and therefore either (a) should cause the "Save changes" control to fail or (b) should be greyed out (i.e., is not changeable)
+---END---
+
+### SESSION=28f7c629-f6b0-4e71-bc35-cb5dc3b1ab70 MSG=18 LEN=757
+* Add-on modules should each indicate which entitlements are required for activation (All, Starter, Pro, Pro+, Enterprise)
+* Add-on modules which are not available for the current tier should not be subscribe-able, and the "Subscribe" control should indicate the minimum entitlement required for activation
+* The "Upgrade" path of entitlements should be displayed and should allow the admin to view "Starter", then "Pro", then "Pro+" then "Enterprise" in order of entitlement completeness, with an option to "Upgrade" to each one. Completing an "Upgrade" should change the available Add-on modules which present a "Subscribe" option (the Add-on options which are not available at the current level of entitlement should be greyed out and not Subscribe-able)
+---END---
+
+### SESSION=28f7c629-f6b0-4e71-bc35-cb5dc3b1ab70 MSG=19 LEN=152
+The option for "Priority support" will not be available at the time of launch. We should defer this to post-launch and remove it from the Add-on options
+---END---
+
+### SESSION=28f7c629-f6b0-4e71-bc35-cb5dc3b1ab70 MSG=20 LEN=110
+I believe we should also defer to "White-label package" to post-launch as well and remove it from the admin UI
+---END---
+
+### SESSION=28f7c629-f6b0-4e71-bc35-cb5dc3b1ab70 MSG=21 LEN=283
+Further functional testing is not possible until the outstanding issues have been fixed and we have deployed the updated version to production. Please proceed with all fixes and updated, then build and deploy. Once that is complete, I will do another iteration of functional testing.
+---END---
+
+### SESSION=28f7c629-f6b0-4e71-bc35-cb5dc3b1ab70 MSG=23 LEN=122
+Please propose a prompt which will put Claude in the best state to continue with the next iteration of functional testing.
+---END---
+
+### SESSION=28f7c629-f6b0-4e71-bc35-cb5dc3b1ab70 MSG=24 LEN=10
+Thank you.
+---END---
+
+### SESSION=2ae0b744-51ad-450d-be92-3d68e1046e11 MSG=1 LEN=4030
+Continue work on Agent Red Customer Experience commercial project.
+Location: E:\Claude-Playground\CLAUDE-PROJECTS\Agent Red Customer Engagement
+Key files: CLAUDE.md, docs/PROJECT-PLAN.md, docs/BACKLOG-NEW-WORK-ITEMS.md, docs/COMPREHENSIVE-TEST-PLAN.md
+Current status: Phase 6.0 Launch Preparation. ALL CORE PHASES COMPLETE. Prototype owner-approved and design-frozen (2026-02-03). 1,235 unit + 42 integration = 1,277 tests, 0 failures. 41 multi_tenant modules (~28,000 lines). 19 routers, 67 routes, 9 middleware. Phase 2.5 Persistent Customer Memory ALL 4 LAYERS COMPLETE. Phase 3.0 ALL BUILD PHASES COMPLETE. Azure infrastructure provisioned (aoai-agentred-eastus2, cosmos-agentred-eastus2, kv-agentred-eastus2). Shopify Partner app deployed. Competitive pricing VERIFIED (4-21x cheaper than all 5 competitors). GitHub wiki has 49 pages including 4 design/UX consultant-focused pages with Mermaid diagrams.
+
+Last session completed (2026-02-03):
+- Dockerfile + .dockerignore (production container config)
+- Widget IIFE bundle built (58KB / 17KB gzip) and copied to Shopify Theme App Extension
+- Knowledge base seed data (32 articles, 26KB) in scripts/seed_knowledge_base.py
+- Favicons and app icons (ICO, Apple Touch, PWA 192/512)
+- Color palette worksheet for graphic designer
+- PROJECT-PLAN.md v3.0.0 with launch preparation phases
+- BACKLOG-NEW-WORK-ITEMS.md updated with WIs #196-204
+- CLAUDE.md v21.0.0 with storefront strategy and external team info
+- Azure OpenAI custom subdomain confirmed already configured
+- GitHub issues #21/#22 closed, #25/#26/#27 created
+- Wiki: 4 new consultant pages (Design Reference, Widget Spec, Admin Spec, Memory) with 20+ diagrams
+
+Open GitHub issues (priority order):
+1. #25 — Production deployment: Docker images to ACR + Terraform apply (WI #196-197) [P0]
+2. #26 — Remaker Digital storefront: Shopify store + Agent Red as tenant #1 + live demo (WI #199-202) [P0, blocked on #25]
+3. #27 — UX consultant evaluation: Mazel workflow review (WI #203) [P1, blocked on #26]
+4. #17 — Shopify App Store submission [blocked on #10 creative assets]
+5. #10 — Creative assets for App Store [blocked on graphic designer]
+6. #14 — CI improvements: coverage gate, parallel jobs (WI #105, #107)
+7. #15 — SSE enhancements: client retry, compression, multi-tab (WI #131-133)
+8. #16 — API completeness: pagination, bulk ops, webhook retry
+
+Remaining backlog (not blocked):
+- WI #105: pytest coverage gate in CI
+- WI #107: Performance test infrastructure
+- WI #131-133: SSE client-side retry, metering integration, multi-tab
+- WI #137-139: Pipeline post-launch optimizations
+- WI #142: Customer profile public endpoints
+- WI #147: OpenAPI schema generation
+- WI #159: API key rotation mechanism
+- WI #162: Stripe webhook IP allowlisting
+- WI #204: Color palette worksheet review (blocked on designer)
+
+External team in parallel:
+- Graphic designer: Refining admin UI color palette (working from branding/color-palette-worksheet.html)
+- UX consultant (Mazel): Will evaluate core merchant workflows once live system is available
+
+Remaker Digital storefront strategy (decided 2026-02-03):
+- Create Shopify storefront as dual-purpose: sell Agent Red + deploy Agent Red as its own chat (tenant #1 dogfooding)
+- Serves as live demo URL for App Store listing and affiliate content
+- Knowledge base pre-seeded with 32 Agent Red product articles
+- Mazel evaluates: onboarding, Shopify integration, widget testing, escalation workflows
+
+Next priority: Production deployment sprint (#25) — push Docker image to ACR, run Terraform apply, verify Container Apps health. This unblocks the storefront (#26), which unblocks Mazel's UX evaluation (#27).
+
+Important context: Tidio = functional reference. Zapier = visual reference. Persistent Customer Memory = launch pillar differentiator. Iterative working style: one item at a time, honest assessment, approval before implementation, aggressive scope cutting. Wiki at https://github.com/mike-remakerdigital/agent-red/wiki — 49 pages including Design & UX consultant section.
+---END---
+
+### SESSION=2ae0b744-51ad-450d-be92-3d68e1046e11 MSG=3 LEN=325
+I would like to make sure that the Azure environment is in 100% correct state and has been fully tested before we do #26 or #27.
+
+I also have a small change to request to the Admin UI: the Light/Dark toggle should retain Dark Mode colors even in Light Mode, since the sticky nav header retains Dark Mode colors in Light Mode.
+---END---
+
+### SESSION=2ae0b744-51ad-450d-be92-3d68e1046e11 MSG=4 LEN=722
+You did very good work. This was challenging. it is very important that you retain all knowledge about setting up and administering Azure resources, wherever possible. 
+
+Is this a good opportunity to start a fresh session?
+
+If so, please:
+
+- update your knowledge base with all new architecture/design decisions and work items
+- clean up any unnecessary artifacts
+- commit and push to GitHub (https://github.com/mike-remakerdigital/agent-red)
+- update the GitHub project (https://github.com/users/mike-remakerdigital/projects/1)
+- update the GitHub wiki (https://github.com/mike-remakerdigital/agent-red/wiki)
+- provide a prompt which I can use to initialize the next session and continue working on prioritized work items
+---END---
+
+### SESSION=2bb20935-93f7-41f2-ae59-c7f9df62ca40 MSG=1 LEN=2584
+Continue work on Agent Red Customer Experience commercial project.
+Location: E:\Claude-Playground\CLAUDE-PROJECTS\Agent Red Customer Engagement
+Key files: CLAUDE.md, docs/architecture/UI-UX-ARCHITECTURE-DECISIONS.md, docs/COMPREHENSIVE-TEST-PLAN.md, docs/BACKLOG-NEW-WORK-ITEMS.md
+Current status: Phases 0-2.2 COMPLETE. Phase 2.5 Layers 1-2 COMPLETE. Phase 3.0 ALL BUILD PHASES COMPLETE (Chat API, widget frontend, Shopify Theme App Extension, admin shared components, Shopify admin shell, standalone admin shell — both admin shells compile and bundle successfully). Operational readiness COMPLETE. Security hardening COMPLETE. Pipeline optimization COMPLETE. Trial environment COMPLETE. Competitive pricing VERIFIED (all 5 competitors — Agent Red 4-21x cheaper). P0+P1+P2 test suites COMPLETE. 999 tests passing, 0 warnings. 38 multi_tenant modules (~25,000 lines). 31 admin frontend files (~10,900 lines). 20 widget files (~3,200 lines). 17 routers, 66 routes, 8 middleware layers.
+Next priority: Please prepare an order of priority for all known outstanding work issues in this project and follow this order when proposing tasks for completion. Remaining major areas: (1) P3 post-launch tests (~90 tests, COMPREHENSIVE-TEST-PLAN.md §7), (2) Adversarial/security tests (~45 tests, §8), (3) Widget bundle → Theme App Extension copy, (4) Phase 2.5 Layer 3 PatternExtractionService (Professional+, WI #90-92), (5) Integration testing with real Stripe test mode and Shopify partner sandbox, (6) Creative assets for Shopify App Store (icon, screenshots, demo video — blocked on design), (7) CI improvements (#105-107: coverage reports, parallel test jobs, branch protection), (8) SSE enhancements (#131-133: client-side retry, event compression, multi-tab coordination), (9) API completeness (#142-146: pagination standardization, bulk operations, webhook retry), (10) Performance/load tests (~30 tests, §9).
+Important context: Tidio is the primary functional reference. Zapier is the visual styling reference. Persistent Customer Memory (Layers 1-2) is the launch pillar differentiator. All competitor pricing now verified — use updated figures from docs/research/UI-UX-COMPETITIVE-ANALYSIS.md. Iterative working style: one item at a time, honest assessment, approval before implementation, aggressive scope cutting.
+
+Please review CLAUDE.md.
+
+The URL to the GitHub repo for this project has changed and this account has been upgraded to "Professional": https://github.com/mike-remakerdigital/agent-red
+
+(1) update all references to the old repo URL
+(2) Publish all material to the wiki
+---END---
+
+### SESSION=2bb20935-93f7-41f2-ae59-c7f9df62ca40 MSG=2 LEN=116
+Very good. Please push all artifacts to the repo and bring the project up to date, including all outstanding issues.
+---END---
+
+### SESSION=2bb20935-93f7-41f2-ae59-c7f9df62ca40 MSG=3 LEN=10
+Thank you.
+---END---
+

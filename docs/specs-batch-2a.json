@@ -1,0 +1,722 @@
+[
+  {
+    "title": "Analytics page title is 'Analytics'",
+    "section": "ADMIN_UI",
+    "tags": [
+      "Analytics",
+      "page-title"
+    ],
+    "source_file": "admin/standalone/pages/Analytics.tsx"
+  },
+  {
+    "title": "Analytics SegmentedControl offers options: 7d, 7d, 14d, 14d, 30d, 30d",
+    "section": "ADMIN_UI",
+    "tags": [
+      "Analytics",
+      "segmented-control"
+    ],
+    "source_file": "admin/standalone/pages/Analytics.tsx"
+  },
+  {
+    "title": "Billing has 'Purchase' button",
+    "section": "ADMIN_UI",
+    "tags": [
+      "Billing",
+      "button"
+    ],
+    "source_file": "admin/standalone/pages/Billing.tsx"
+  },
+  {
+    "title": "Billing has 'Manage subscription' button",
+    "section": "ADMIN_UI",
+    "tags": [
+      "Billing",
+      "button"
+    ],
+    "source_file": "admin/standalone/pages/Billing.tsx"
+  },
+  {
+    "title": "Billing has 'Manage billing' button",
+    "section": "ADMIN_UI",
+    "tags": [
+      "Billing",
+      "button"
+    ],
+    "source_file": "admin/standalone/pages/Billing.tsx"
+  },
+  {
+    "title": "Billing page title is 'Billing & usage'",
+    "section": "ADMIN_UI",
+    "tags": [
+      "Billing",
+      "page-title"
+    ],
+    "source_file": "admin/standalone/pages/Billing.tsx"
+  },
+  {
+    "title": "Billing page title is 'Billing & usage'",
+    "section": "ADMIN_UI",
+    "tags": [
+      "Billing",
+      "page-title"
+    ],
+    "source_file": "admin/standalone/pages/Billing.tsx"
+  },
+  {
+    "title": "Configuration has 'Configuration name' input field",
+    "section": "ADMIN_UI",
+    "tags": [
+      "Configuration",
+      "form-field"
+    ],
+    "source_file": "admin/standalone/pages/Configuration.tsx"
+  },
+  {
+    "title": "Configuration has 'Brand name' input field",
+    "section": "ADMIN_UI",
+    "tags": [
+      "Configuration",
+      "form-field"
+    ],
+    "source_file": "admin/standalone/pages/Configuration.tsx"
+  },
+  {
+    "title": "Configuration has 'Brand voice' input field",
+    "section": "ADMIN_UI",
+    "tags": [
+      "Configuration",
+      "form-field"
+    ],
+    "source_file": "admin/standalone/pages/Configuration.tsx"
+  },
+  {
+    "title": "Configuration has 'Formality' input field",
+    "section": "ADMIN_UI",
+    "tags": [
+      "Configuration",
+      "form-field"
+    ],
+    "source_file": "admin/standalone/pages/Configuration.tsx"
+  },
+  {
+    "title": "Configuration has 'Response length' input field",
+    "section": "ADMIN_UI",
+    "tags": [
+      "Configuration",
+      "form-field"
+    ],
+    "source_file": "admin/standalone/pages/Configuration.tsx"
+  },
+  {
+    "title": "Configuration has 'Return window' input field",
+    "section": "ADMIN_UI",
+    "tags": [
+      "Configuration",
+      "form-field"
+    ],
+    "source_file": "admin/standalone/pages/Configuration.tsx"
+  },
+  {
+    "title": "Configuration has 'Refund policy' input field",
+    "section": "ADMIN_UI",
+    "tags": [
+      "Configuration",
+      "form-field"
+    ],
+    "source_file": "admin/standalone/pages/Configuration.tsx"
+  },
+  {
+    "title": "Configuration has 'Shipping policy' input field",
+    "section": "ADMIN_UI",
+    "tags": [
+      "Configuration",
+      "form-field"
+    ],
+    "source_file": "admin/standalone/pages/Configuration.tsx"
+  },
+  {
+    "title": "Configuration has 'Notification email' input field",
+    "section": "ADMIN_UI",
+    "tags": [
+      "Configuration",
+      "form-field"
+    ],
+    "source_file": "admin/standalone/pages/Configuration.tsx"
+  },
+  {
+    "title": "Configuration has '<>Idle timeout <HelpTooltip text=' input field",
+    "section": "ADMIN_UI",
+    "tags": [
+      "Configuration",
+      "form-field"
+    ],
+    "source_file": "admin/standalone/pages/Configuration.tsx"
+  },
+  {
+    "title": "Configuration has '<>Max turns <HelpTooltip text=' input field",
+    "section": "ADMIN_UI",
+    "tags": [
+      "Configuration",
+      "form-field"
+    ],
+    "source_file": "admin/standalone/pages/Configuration.tsx"
+  },
+  {
+    "title": "Configuration has 'Primary language' input field",
+    "section": "ADMIN_UI",
+    "tags": [
+      "Configuration",
+      "form-field"
+    ],
+    "source_file": "admin/standalone/pages/Configuration.tsx"
+  },
+  {
+    "title": "Configuration has 'Retry' button",
+    "section": "ADMIN_UI",
+    "tags": [
+      "Configuration",
+      "button"
+    ],
+    "source_file": "admin/standalone/pages/Configuration.tsx"
+  },
+  {
+    "title": "Configuration has 'setShowSaveModal(false)}>Cancel' button",
+    "section": "ADMIN_UI",
+    "tags": [
+      "Configuration",
+      "button"
+    ],
+    "source_file": "admin/standalone/pages/Configuration.tsx"
+  },
+  {
+    "title": "Configuration has 'Save configuration' button",
+    "section": "ADMIN_UI",
+    "tags": [
+      "Configuration",
+      "button"
+    ],
+    "source_file": "admin/standalone/pages/Configuration.tsx"
+  },
+  {
+    "title": "Configuration page title is 'Agent configuration'",
+    "section": "ADMIN_UI",
+    "tags": [
+      "Configuration",
+      "page-title"
+    ],
+    "source_file": "admin/standalone/pages/Configuration.tsx"
+  },
+  {
+    "title": "Dashboard page title is 'Dashboard'",
+    "section": "ADMIN_UI",
+    "tags": [
+      "Dashboard",
+      "page-title"
+    ],
+    "source_file": "admin/standalone/pages/Dashboard.tsx"
+  },
+  {
+    "title": "Dashboard SegmentedControl offers options: 7d, 7d, 14d, 14d, 30d, 30d",
+    "section": "ADMIN_UI",
+    "tags": [
+      "Dashboard",
+      "segmented-control"
+    ],
+    "source_file": "admin/standalone/pages/Dashboard.tsx"
+  },
+  {
+    "title": "Inbox has 'Category' input field",
+    "section": "ADMIN_UI",
+    "tags": [
+      "Inbox",
+      "form-field"
+    ],
+    "source_file": "admin/standalone/pages/Inbox.tsx"
+  },
+  {
+    "title": "Inbox has 'Assign to agent' input field",
+    "section": "ADMIN_UI",
+    "tags": [
+      "Inbox",
+      "form-field"
+    ],
+    "source_file": "admin/standalone/pages/Inbox.tsx"
+  },
+  {
+    "title": "Inbox has 'Cancel' button",
+    "section": "ADMIN_UI",
+    "tags": [
+      "Inbox",
+      "button"
+    ],
+    "source_file": "admin/standalone/pages/Inbox.tsx"
+  },
+  {
+    "title": "Inbox SegmentedControl offers options: all, active, escalated, resolved, Archived, archived",
+    "section": "ADMIN_UI",
+    "tags": [
+      "Inbox",
+      "segmented-control"
+    ],
+    "source_file": "admin/standalone/pages/Inbox.tsx"
+  },
+  {
+    "title": "Integrations page title is 'Integrations'",
+    "section": "ADMIN_UI",
+    "tags": [
+      "Integrations",
+      "page-title"
+    ],
+    "source_file": "admin/standalone/pages/Integrations.tsx"
+  },
+  {
+    "title": "KnowledgeBase has 'Title' input field",
+    "section": "ADMIN_UI",
+    "tags": [
+      "KnowledgeBase",
+      "form-field"
+    ],
+    "source_file": "admin/standalone/pages/KnowledgeBase.tsx"
+  },
+  {
+    "title": "KnowledgeBase has 'Category' input field",
+    "section": "ADMIN_UI",
+    "tags": [
+      "KnowledgeBase",
+      "form-field"
+    ],
+    "source_file": "admin/standalone/pages/KnowledgeBase.tsx"
+  },
+  {
+    "title": "KnowledgeBase has 'Content' input field",
+    "section": "ADMIN_UI",
+    "tags": [
+      "KnowledgeBase",
+      "form-field"
+    ],
+    "source_file": "admin/standalone/pages/KnowledgeBase.tsx"
+  },
+  {
+    "title": "KnowledgeBase has 'Status' input field",
+    "section": "ADMIN_UI",
+    "tags": [
+      "KnowledgeBase",
+      "form-field"
+    ],
+    "source_file": "admin/standalone/pages/KnowledgeBase.tsx"
+  },
+  {
+    "title": "KnowledgeBase has 'Website URL' input field",
+    "section": "ADMIN_UI",
+    "tags": [
+      "KnowledgeBase",
+      "form-field"
+    ],
+    "source_file": "admin/standalone/pages/KnowledgeBase.tsx"
+  },
+  {
+    "title": "KnowledgeBase has 'Retry' button",
+    "section": "ADMIN_UI",
+    "tags": [
+      "KnowledgeBase",
+      "button"
+    ],
+    "source_file": "admin/standalone/pages/KnowledgeBase.tsx"
+  },
+  {
+    "title": "KnowledgeBase has 'Cancel' button",
+    "section": "ADMIN_UI",
+    "tags": [
+      "KnowledgeBase",
+      "button"
+    ],
+    "source_file": "admin/standalone/pages/KnowledgeBase.tsx"
+  },
+  {
+    "title": "KnowledgeBase has 'Import' button",
+    "section": "ADMIN_UI",
+    "tags": [
+      "KnowledgeBase",
+      "button"
+    ],
+    "source_file": "admin/standalone/pages/KnowledgeBase.tsx"
+  },
+  {
+    "title": "KnowledgeBase has 'Close' button",
+    "section": "ADMIN_UI",
+    "tags": [
+      "KnowledgeBase",
+      "button"
+    ],
+    "source_file": "admin/standalone/pages/KnowledgeBase.tsx"
+  },
+  {
+    "title": "KnowledgeBase page title is 'Knowledge base'",
+    "section": "ADMIN_UI",
+    "tags": [
+      "KnowledgeBase",
+      "page-title"
+    ],
+    "source_file": "admin/standalone/pages/KnowledgeBase.tsx"
+  },
+  {
+    "title": "KnowledgeBase page title is 'Knowledge base'",
+    "section": "ADMIN_UI",
+    "tags": [
+      "KnowledgeBase",
+      "page-title"
+    ],
+    "source_file": "admin/standalone/pages/KnowledgeBase.tsx"
+  },
+  {
+    "title": "KnowledgeBase page title is 'Import successful'",
+    "section": "ADMIN_UI",
+    "tags": [
+      "KnowledgeBase",
+      "page-title"
+    ],
+    "source_file": "admin/standalone/pages/KnowledgeBase.tsx"
+  },
+  {
+    "title": "KnowledgeBase has 'file' tab",
+    "section": "ADMIN_UI",
+    "tags": [
+      "KnowledgeBase",
+      "tabs"
+    ],
+    "source_file": "admin/standalone/pages/KnowledgeBase.tsx"
+  },
+  {
+    "title": "KnowledgeBase has 'url' tab",
+    "section": "ADMIN_UI",
+    "tags": [
+      "KnowledgeBase",
+      "tabs"
+    ],
+    "source_file": "admin/standalone/pages/KnowledgeBase.tsx"
+  },
+  {
+    "title": "MemoryPrivacy has 'Data retention period' input field",
+    "section": "ADMIN_UI",
+    "tags": [
+      "MemoryPrivacy",
+      "form-field"
+    ],
+    "source_file": "admin/standalone/pages/MemoryPrivacy.tsx"
+  },
+  {
+    "title": "MemoryPrivacy has 'PII scrubbing' toggle switch",
+    "section": "ADMIN_UI",
+    "tags": [
+      "MemoryPrivacy",
+      "switch"
+    ],
+    "source_file": "admin/standalone/pages/MemoryPrivacy.tsx"
+  },
+  {
+    "title": "MemoryPrivacy has 'Consent required' toggle switch",
+    "section": "ADMIN_UI",
+    "tags": [
+      "MemoryPrivacy",
+      "switch"
+    ],
+    "source_file": "admin/standalone/pages/MemoryPrivacy.tsx"
+  },
+  {
+    "title": "MemoryPrivacy has 'Automatic deletion on request' toggle switch",
+    "section": "ADMIN_UI",
+    "tags": [
+      "MemoryPrivacy",
+      "switch"
+    ],
+    "source_file": "admin/standalone/pages/MemoryPrivacy.tsx"
+  },
+  {
+    "title": "MemoryPrivacy has 'Save draft inputs' button",
+    "section": "ADMIN_UI",
+    "tags": [
+      "MemoryPrivacy",
+      "button"
+    ],
+    "source_file": "admin/standalone/pages/MemoryPrivacy.tsx"
+  },
+  {
+    "title": "MemoryPrivacy page title is 'Memory & privacy'",
+    "section": "ADMIN_UI",
+    "tags": [
+      "MemoryPrivacy",
+      "page-title"
+    ],
+    "source_file": "admin/standalone/pages/MemoryPrivacy.tsx"
+  },
+  {
+    "title": "MemoryPrivacy page title is 'Memory & privacy'",
+    "section": "ADMIN_UI",
+    "tags": [
+      "MemoryPrivacy",
+      "page-title"
+    ],
+    "source_file": "admin/standalone/pages/MemoryPrivacy.tsx"
+  },
+  {
+    "title": "MemoryPrivacy SegmentedControl offers options: off, Off, gentle, Gentle, standard, Standard",
+    "section": "ADMIN_UI",
+    "tags": [
+      "MemoryPrivacy",
+      "segmented-control"
+    ],
+    "source_file": "admin/standalone/pages/MemoryPrivacy.tsx"
+  },
+  {
+    "title": "QuickActions has 'Button label' input field",
+    "section": "ADMIN_UI",
+    "tags": [
+      "QuickActions",
+      "form-field"
+    ],
+    "source_file": "admin/standalone/pages/QuickActions.tsx"
+  },
+  {
+    "title": "QuickActions has 'Prompt template' input field",
+    "section": "ADMIN_UI",
+    "tags": [
+      "QuickActions",
+      "form-field"
+    ],
+    "source_file": "admin/standalone/pages/QuickActions.tsx"
+  },
+  {
+    "title": "QuickActions has 'Icon (optional' input field",
+    "section": "ADMIN_UI",
+    "tags": [
+      "QuickActions",
+      "form-field"
+    ],
+    "source_file": "admin/standalone/pages/QuickActions.tsx"
+  },
+  {
+    "title": "QuickActions has 'Active' toggle switch",
+    "section": "ADMIN_UI",
+    "tags": [
+      "QuickActions",
+      "switch"
+    ],
+    "source_file": "admin/standalone/pages/QuickActions.tsx"
+  },
+  {
+    "title": "QuickActions has 'Cancel' button",
+    "section": "ADMIN_UI",
+    "tags": [
+      "QuickActions",
+      "button"
+    ],
+    "source_file": "admin/standalone/pages/QuickActions.tsx"
+  },
+  {
+    "title": "QuickActions page title is 'Quick actions'",
+    "section": "ADMIN_UI",
+    "tags": [
+      "QuickActions",
+      "page-title"
+    ],
+    "source_file": "admin/standalone/pages/QuickActions.tsx"
+  },
+  {
+    "title": "QuickActions page title is 'Quick actions'",
+    "section": "ADMIN_UI",
+    "tags": [
+      "QuickActions",
+      "page-title"
+    ],
+    "source_file": "admin/standalone/pages/QuickActions.tsx"
+  },
+  {
+    "title": "QuickActions has 'prompts' tab",
+    "section": "ADMIN_UI",
+    "tags": [
+      "QuickActions",
+      "tabs"
+    ],
+    "source_file": "admin/standalone/pages/QuickActions.tsx"
+  },
+  {
+    "title": "QuickActions has 'assignments' tab",
+    "section": "ADMIN_UI",
+    "tags": [
+      "QuickActions",
+      "tabs"
+    ],
+    "source_file": "admin/standalone/pages/QuickActions.tsx"
+  },
+  {
+    "title": "Team page title is 'Team members'",
+    "section": "ADMIN_UI",
+    "tags": [
+      "Team",
+      "page-title"
+    ],
+    "source_file": "admin/standalone/pages/Team.tsx"
+  },
+  {
+    "title": "Widget has 'Font family' input field",
+    "section": "ADMIN_UI",
+    "tags": [
+      "Widget",
+      "form-field"
+    ],
+    "source_file": "admin/standalone/pages/Widget.tsx"
+  },
+  {
+    "title": "Widget has 'Launcher icon' input field",
+    "section": "ADMIN_UI",
+    "tags": [
+      "Widget",
+      "form-field"
+    ],
+    "source_file": "admin/standalone/pages/Widget.tsx"
+  },
+  {
+    "title": "Widget has 'Horizontal offset' input field",
+    "section": "ADMIN_UI",
+    "tags": [
+      "Widget",
+      "form-field"
+    ],
+    "source_file": "admin/standalone/pages/Widget.tsx"
+  },
+  {
+    "title": "Widget has 'Vertical offset' input field",
+    "section": "ADMIN_UI",
+    "tags": [
+      "Widget",
+      "form-field"
+    ],
+    "source_file": "admin/standalone/pages/Widget.tsx"
+  },
+  {
+    "title": "Widget has '<>Greeting message <HelpTooltip text=' input field",
+    "section": "ADMIN_UI",
+    "tags": [
+      "Widget",
+      "form-field"
+    ],
+    "source_file": "admin/standalone/pages/Widget.tsx"
+  },
+  {
+    "title": "Widget has 'Header title' input field",
+    "section": "ADMIN_UI",
+    "tags": [
+      "Widget",
+      "form-field"
+    ],
+    "source_file": "admin/standalone/pages/Widget.tsx"
+  },
+  {
+    "title": "Widget has 'Header subtitle' input field",
+    "section": "ADMIN_UI",
+    "tags": [
+      "Widget",
+      "form-field"
+    ],
+    "source_file": "admin/standalone/pages/Widget.tsx"
+  },
+  {
+    "title": "Widget has 'Input placeholder' input field",
+    "section": "ADMIN_UI",
+    "tags": [
+      "Widget",
+      "form-field"
+    ],
+    "source_file": "admin/standalone/pages/Widget.tsx"
+  },
+  {
+    "title": "Widget has 'Agent display name' input field",
+    "section": "ADMIN_UI",
+    "tags": [
+      "Widget",
+      "form-field"
+    ],
+    "source_file": "admin/standalone/pages/Widget.tsx"
+  },
+  {
+    "title": "Widget has 'Enable header gradient' toggle switch",
+    "section": "ADMIN_UI",
+    "tags": [
+      "Widget",
+      "switch"
+    ],
+    "source_file": "admin/standalone/pages/Widget.tsx"
+  },
+  {
+    "title": "Widget has 'Greeting message' toggle switch",
+    "section": "ADMIN_UI",
+    "tags": [
+      "Widget",
+      "switch"
+    ],
+    "source_file": "admin/standalone/pages/Widget.tsx"
+  },
+  {
+    "title": "Widget has '<>Pre-chat form <HelpTooltip text=' toggle switch",
+    "section": "ADMIN_UI",
+    "tags": [
+      "Widget",
+      "switch"
+    ],
+    "source_file": "admin/standalone/pages/Widget.tsx"
+  },
+  {
+    "title": "Widget has 'Sound notifications' toggle switch",
+    "section": "ADMIN_UI",
+    "tags": [
+      "Widget",
+      "switch"
+    ],
+    "source_file": "admin/standalone/pages/Widget.tsx"
+  },
+  {
+    "title": "Widget has 'Reset to defaults' button",
+    "section": "ADMIN_UI",
+    "tags": [
+      "Widget",
+      "button"
+    ],
+    "source_file": "admin/standalone/pages/Widget.tsx"
+  },
+  {
+    "title": "Widget has 'Save draft inputs' button",
+    "section": "ADMIN_UI",
+    "tags": [
+      "Widget",
+      "button"
+    ],
+    "source_file": "admin/standalone/pages/Widget.tsx"
+  },
+  {
+    "title": "Widget has 'Rotate key' button",
+    "section": "ADMIN_UI",
+    "tags": [
+      "Widget",
+      "button"
+    ],
+    "source_file": "admin/standalone/pages/Widget.tsx"
+  },
+  {
+    "title": "Widget page title is 'Widget configuration'",
+    "section": "ADMIN_UI",
+    "tags": [
+      "Widget",
+      "page-title"
+    ],
+    "source_file": "admin/standalone/pages/Widget.tsx"
+  },
+  {
+    "title": "Widget SegmentedControl offers options: Static, static, AI-generated, ai_generated",
+    "section": "ADMIN_UI",
+    "tags": [
+      "Widget",
+      "segmented-control"
+    ],
+    "source_file": "admin/standalone/pages/Widget.tsx"
+  }
+]

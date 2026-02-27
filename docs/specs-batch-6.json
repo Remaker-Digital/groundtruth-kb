@@ -1,0 +1,842 @@
+[
+  {
+    "id": "BATCH6-001",
+    "text": "The Team page Role column MUST use select menus, not badges, for selecting a team member's role",
+    "source_session": "cba9699d-64d8-41d4-a232-90ea6430dc3d",
+    "source_type": "owner_directive",
+    "domain": "ADMIN_UI"
+  },
+  {
+    "id": "BATCH6-002",
+    "text": "The Team page MUST provide a toggle to enable/disable a team member's status",
+    "source_session": "cba9699d-64d8-41d4-a232-90ea6430dc3d",
+    "source_type": "owner_directive",
+    "domain": "ADMIN_UI"
+  },
+  {
+    "id": "BATCH6-003",
+    "text": "Each Team member with the 'Agent' role MUST have select boxes for escalation categories: Service, Support, Sales, Account, Technical Assistance, and General Inquiry",
+    "source_session": "cba9699d-64d8-41d4-a232-90ea6430dc3d",
+    "source_type": "owner_directive",
+    "domain": "ADMIN_UI"
+  },
+  {
+    "id": "BATCH6-004",
+    "text": "Upgrade and deployment scripts MUST implement data integrity safeguards to prevent team member data loss during deployments",
+    "source_session": "cba9699d-64d8-41d4-a232-90ea6430dc3d",
+    "source_type": "owner_directive",
+    "domain": "OPS"
+  },
+  {
+    "id": "BATCH6-005",
+    "text": "Verbose logging MUST be enabled on every part of the system during pre-production work",
+    "source_session": "cba9699d-64d8-41d4-a232-90ea6430dc3d",
+    "source_type": "owner_directive",
+    "domain": "OPS"
+  },
+  {
+    "id": "BATCH6-006",
+    "text": "A 'Clean re-install' or 'Reset' configuration MUST exist that includes example records and values sufficient for a merchant administrator to study as best-practice examples (e.g., every prompt or quick action has an easy-to-grasp example)",
+    "source_session": "cba9699d-64d8-41d4-a232-90ea6430dc3d",
+    "source_type": "owner_directive",
+    "domain": "CONFIG"
+  },
+  {
+    "id": "BATCH6-007",
+    "text": "A 'superadmin' role MUST exist that cannot be deleted or barred from changing any configuration",
+    "source_session": "cba9699d-64d8-41d4-a232-90ea6430dc3d",
+    "source_type": "owner_directive",
+    "domain": "AUTH"
+  },
+  {
+    "id": "BATCH6-008",
+    "text": "The superadmin MUST only be visible to the superadmin — other users MUST NOT see the superadmin team member in the UI",
+    "source_session": "cba9699d-64d8-41d4-a232-90ea6430dc3d",
+    "source_type": "owner_directive",
+    "domain": "AUTH"
+  },
+  {
+    "id": "BATCH6-009",
+    "text": "Superadmin credentials MUST be sent to the account holder's email address for safekeeping",
+    "source_session": "cba9699d-64d8-41d4-a232-90ea6430dc3d",
+    "source_type": "owner_directive",
+    "domain": "EMAIL"
+  },
+  {
+    "id": "BATCH6-010",
+    "text": "An additional 'standard' admin account MUST be created for hand-off to the customer email address, which MUST be a different email address from the superadmin",
+    "source_session": "cba9699d-64d8-41d4-a232-90ea6430dc3d",
+    "source_type": "owner_directive",
+    "domain": "PROVISIONING"
+  },
+  {
+    "id": "BATCH6-011",
+    "text": "The role name 'Agent' MUST be changed to 'Escalation agent'",
+    "source_session": "cba9699d-64d8-41d4-a232-90ea6430dc3d",
+    "source_type": "owner_directive",
+    "domain": "TEAM"
+  },
+  {
+    "id": "BATCH6-012",
+    "text": "The 'Escalation agent' role MUST have no admin access — they are humans to whom escalations are directed",
+    "source_session": "cba9699d-64d8-41d4-a232-90ea6430dc3d",
+    "source_type": "owner_directive",
+    "domain": "TEAM"
+  },
+  {
+    "id": "BATCH6-013",
+    "text": "The SPA console MUST be able to initiate tenant provisioning — this is a mandatory requirement",
+    "source_session": "cf0c0907-9182-49c0-b973-e971bd5370ad",
+    "source_type": "owner_directive",
+    "domain": "PROVISIONING"
+  },
+  {
+    "id": "BATCH6-014",
+    "text": "SPA tenant provisioning inputs MUST include: Merchant Name, merchant URL, merchant superadmin email, and entitlement type (Trial, Starter, Professional, or Enterprise)",
+    "source_session": "cf0c0907-9182-49c0-b973-e971bd5370ad",
+    "source_type": "owner_directive",
+    "domain": "PROVISIONING"
+  },
+  {
+    "id": "BATCH6-015",
+    "text": "Both SPA console and Purchase Event tenant provisioning MUST be fully automated with no involvement from Remaker Digital during the entire process",
+    "source_session": "cf0c0907-9182-49c0-b973-e971bd5370ad",
+    "source_type": "owner_directive",
+    "domain": "PROVISIONING"
+  },
+  {
+    "id": "BATCH6-016",
+    "text": "Tenant provisioning MUST never fail silently and MUST recover from faults",
+    "source_session": "cf0c0907-9182-49c0-b973-e971bd5370ad",
+    "source_type": "owner_directive",
+    "domain": "PROVISIONING"
+  },
+  {
+    "id": "BATCH6-017",
+    "text": "The customer identity flow MUST follow this sequence: (1) AI greeting and Quick Actions presented when chat opens, (2) customer inputs message or selects Quick Action, (3) AI checks Shopify auth and whether email is known — if NOT, AI requests it, (4) customer chooses anonymous or provides email, (5) if email provided, OTP sent, customer enters code, authenticated",
+    "source_session": "cf0c0907-9182-49c0-b973-e971bd5370ad",
+    "source_type": "owner_directive",
+    "domain": "AUTH"
+  },
+  {
+    "id": "BATCH6-018",
+    "text": "There MUST NOT be a pre-chat form blocking the AI greeting — the greeting and Quick Actions MUST appear immediately when the chat UI opens",
+    "source_session": "cf0c0907-9182-49c0-b973-e971bd5370ad",
+    "source_type": "owner_directive",
+    "domain": "WIDGET_UI"
+  },
+  {
+    "id": "BATCH6-019",
+    "text": "Customer identity flow is a P0 requirement along with SPA console UI for new tenant provisioning",
+    "source_session": "cf0c0907-9182-49c0-b973-e971bd5370ad",
+    "source_type": "owner_directive",
+    "domain": "AUTH"
+  },
+  {
+    "id": "BATCH6-020",
+    "text": "All testing MUST be modularized to allow cooling cycles and/or use multiple cores in bursts to prevent heat-related system instability",
+    "source_session": "cf0c0907-9182-49c0-b973-e971bd5370ad",
+    "source_type": "owner_directive",
+    "domain": "TESTING"
+  },
+  {
+    "id": "BATCH6-021",
+    "text": "A functional test harness is mandatory — untestable implementation is unacceptable",
+    "source_session": "cf0c0907-9182-49c0-b973-e971bd5370ad",
+    "source_type": "owner_directive",
+    "domain": "TESTING"
+  },
+  {
+    "id": "BATCH6-022",
+    "text": "The critical-path test script (CP.1-CP.21) MUST be executed first with 100% pass rate as the first stage of admin UI testing",
+    "source_session": "cf0c0907-9182-49c0-b973-e971bd5370ad",
+    "source_type": "owner_directive",
+    "domain": "TESTING"
+  },
+  {
+    "id": "BATCH6-023",
+    "text": "If critical-path errors are encountered, testing MUST immediately cease and new work items MUST be planned to resolve defects before resuming from the beginning",
+    "source_session": "cf0c0907-9182-49c0-b973-e971bd5370ad",
+    "source_type": "owner_directive",
+    "domain": "TESTING"
+  },
+  {
+    "id": "BATCH6-024",
+    "text": "End-to-end tests MUST start with complete initialization of the tenancy — all pre-existing data deleted, tenancy in same state as freshly provisioned",
+    "source_session": "cf0c0907-9182-49c0-b973-e971bd5370ad",
+    "source_type": "owner_directive",
+    "domain": "TESTING"
+  },
+  {
+    "id": "BATCH6-025",
+    "text": "Every run of end-to-end tests MUST re-seed the tenant for a clean state in every respect",
+    "source_session": "cf0c0907-9182-49c0-b973-e971bd5370ad",
+    "source_type": "owner_directive",
+    "domain": "TESTING"
+  },
+  {
+    "id": "BATCH6-026",
+    "text": "When a tenancy is created, the superadmin MUST automatically receive a welcome email containing the URL to their Merchant administration console and the API key",
+    "source_session": "cf0c0907-9182-49c0-b973-e971bd5370ad",
+    "source_type": "owner_directive",
+    "domain": "EMAIL"
+  },
+  {
+    "id": "BATCH6-027",
+    "text": "Seed data MUST NOT include team members — the only team member in a freshly provisioned tenancy MUST be the superadmin logging in for the first time",
+    "source_session": "cf0c0907-9182-49c0-b973-e971bd5370ad",
+    "source_type": "owner_directive",
+    "domain": "PROVISIONING"
+  },
+  {
+    "id": "BATCH6-028",
+    "text": "For a non-disruptive upgrade in production, API and widget keys MUST NOT be disturbed and all configuration MUST be retained",
+    "source_session": "cf0c0907-9182-49c0-b973-e971bd5370ad",
+    "source_type": "owner_directive",
+    "domain": "OPS"
+  },
+  {
+    "id": "BATCH6-029",
+    "text": "The release plan MUST follow: (1) complete testing with 100% pass, (2) freeze release and branch, (3) provision beta tenants, (4) gather feedback, (5) enhance next release on parallel production, (6) non-disruptive upgrade",
+    "source_session": "cf0c0907-9182-49c0-b973-e971bd5370ad",
+    "source_type": "owner_directive",
+    "domain": "OPS"
+  },
+  {
+    "id": "BATCH6-030",
+    "text": "The Master Test Plan MUST be updated whenever testing Repeatable Procedures are created or updated",
+    "source_session": "cf0c0907-9182-49c0-b973-e971bd5370ad",
+    "source_type": "owner_directive",
+    "domain": "TESTING"
+  },
+  {
+    "id": "BATCH6-031",
+    "text": "All tests MUST result in either a PASS, a FAIL, or a correction of the test — no other outcomes accepted",
+    "source_session": "cf0c0907-9182-49c0-b973-e971bd5370ad",
+    "source_type": "owner_directive",
+    "domain": "TESTING"
+  },
+  {
+    "id": "BATCH6-032",
+    "text": "If a test is corrected, the updated Repeatable Procedure MUST be re-executed to verify the correction is valid",
+    "source_session": "cf0c0907-9182-49c0-b973-e971bd5370ad",
+    "source_type": "owner_directive",
+    "domain": "TESTING"
+  },
+  {
+    "id": "BATCH6-033",
+    "text": "Tag-and-branch-forward (Model A) MUST be used as the branching model — no long-lived development branches",
+    "source_session": "cf0c0907-9182-49c0-b973-e971bd5370ad",
+    "source_type": "owner_approval",
+    "domain": "OPS"
+  },
+  {
+    "id": "BATCH6-034",
+    "text": "Beta tenant provisioning MUST use SPA manual provisioning via the Provider Console, not the seed script",
+    "source_session": "cf0c0907-9182-49c0-b973-e971bd5370ad",
+    "source_type": "owner_approval",
+    "domain": "PROVISIONING"
+  },
+  {
+    "id": "BATCH6-035",
+    "text": "A provisioning smoke test MUST be added as a formal step before real beta provisioning",
+    "source_session": "cf0c0907-9182-49c0-b973-e971bd5370ad",
+    "source_type": "owner_approval",
+    "domain": "TESTING"
+  },
+  {
+    "id": "BATCH6-036",
+    "text": "A completely isolated parallel production environment (staging) MUST exist for testing non-disruptive upgrade procedures and next-release validation",
+    "source_session": "cf0c0907-9182-49c0-b973-e971bd5370ad",
+    "source_type": "owner_directive",
+    "domain": "OPS"
+  },
+  {
+    "id": "BATCH6-037",
+    "text": "The SPA provisioning test MUST serve as the pre-test leading directly to the critical-path test",
+    "source_session": "cf0c0907-9182-49c0-b973-e971bd5370ad",
+    "source_type": "owner_directive",
+    "domain": "TESTING"
+  },
+  {
+    "id": "BATCH6-038",
+    "text": "SPA console MUST provide a means to set manually-created tenancies to EXPIRE at a future date — without this, manually created tenancies exist indefinitely",
+    "source_session": "cf0c0907-9182-49c0-b973-e971bd5370ad",
+    "source_type": "owner_directive",
+    "domain": "PROVISIONING"
+  },
+  {
+    "id": "BATCH6-039",
+    "text": "When a manual test is performed by the owner, an automated test MUST be created (added to the testing Repeatable Procedure) to emulate the manual test in future runs",
+    "source_session": "cf0c0907-9182-49c0-b973-e971bd5370ad",
+    "source_type": "owner_directive",
+    "domain": "TESTING"
+  },
+  {
+    "id": "BATCH6-040",
+    "text": "If the owner finds an issue during manual testing, a regression test MUST be added to prevent it from recurring — this MUST be general guidance loaded for each session",
+    "source_session": "cf0c0907-9182-49c0-b973-e971bd5370ad",
+    "source_type": "owner_directive",
+    "domain": "TESTING"
+  },
+  {
+    "id": "BATCH6-041",
+    "text": "The beta is of no value if Persistent Customer Memory features are not working correctly — PCM MUST NOT be deferred",
+    "source_session": "cf0c0907-9182-49c0-b973-e971bd5370ad",
+    "source_type": "owner_directive",
+    "domain": "CONVERSATIONS"
+  },
+  {
+    "id": "BATCH6-042",
+    "text": "The vectorize_conversation background scanner MUST use Option A (background scanner) to wire vectorization",
+    "source_session": "cf0c0907-9182-49c0-b973-e971bd5370ad",
+    "source_type": "owner_approval",
+    "domain": "CONVERSATIONS"
+  },
+  {
+    "id": "BATCH6-043",
+    "text": "Dedicated model training add-on MUST be deferred to post-launch and used as a trigger for fresh marketing activity ('continuous innovation' proof point)",
+    "source_session": "d71ff852-02a3-4654-a7e8-966565121730",
+    "source_type": "owner_directive",
+    "domain": "BILLING"
+  },
+  {
+    "id": "BATCH6-044",
+    "text": "Rewardful affiliate integration MUST be set up for the affiliate program",
+    "source_session": "d71ff852-02a3-4654-a7e8-966565121730",
+    "source_type": "owner_directive",
+    "domain": "BILLING"
+  },
+  {
+    "id": "BATCH6-045",
+    "text": "Rewardful requires Stripe live mode — it does not support Stripe test mode",
+    "source_session": "d71ff852-02a3-4654-a7e8-966565121730",
+    "source_type": "owner_directive",
+    "domain": "BILLING"
+  },
+  {
+    "id": "BATCH6-046",
+    "text": "The AGNTCY open-source project and Agent Red MUST be strictly isolated — Agent Red MUST interact with AGNTCY exclusively via GitHub, not share local artifacts or Docker containers",
+    "source_session": "d93ad730-ef60-4233-9f9d-d3a00bea72aa",
+    "source_type": "owner_directive",
+    "domain": "GENERAL"
+  },
+  {
+    "id": "BATCH6-047",
+    "text": "Work items MUST be presented one at a time with information and choices, pausing for owner input before proceeding — this is the preferred iterative working style",
+    "source_session": "d93ad730-ef60-4233-9f9d-d3a00bea72aa",
+    "source_type": "owner_directive",
+    "domain": "GENERAL"
+  },
+  {
+    "id": "BATCH6-048",
+    "text": "Brand primary color MUST be #ff3621 (orange-red)",
+    "source_session": "d93ad730-ef60-4233-9f9d-d3a00bea72aa",
+    "source_type": "owner_directive",
+    "domain": "ADMIN_UI"
+  },
+  {
+    "id": "BATCH6-049",
+    "text": "Typography MUST use Inter for body text and JetBrains Mono for code (Option A)",
+    "source_session": "d93ad730-ef60-4233-9f9d-d3a00bea72aa",
+    "source_type": "owner_approval",
+    "domain": "ADMIN_UI"
+  },
+  {
+    "id": "BATCH6-050",
+    "text": "Logo concept 3 (The Beacon/AR monogram) MUST be used as the brand logo",
+    "source_session": "d93ad730-ef60-4233-9f9d-d3a00bea72aa",
+    "source_type": "owner_approval",
+    "domain": "GENERAL"
+  },
+  {
+    "id": "BATCH6-051",
+    "text": "Documentation quality framework MUST include Vale config, markdownlint config, CI workflow, and feature inventory",
+    "source_session": "da525157-e573-427d-a45f-395dce4b9f15",
+    "source_type": "owner_directive",
+    "domain": "GENERAL"
+  },
+  {
+    "id": "BATCH6-052",
+    "text": "Mermaid diagrams MUST be consistently used wherever they could illustrate relationships between system elements, APIs, or input/output standards",
+    "source_session": "da525157-e573-427d-a45f-395dce4b9f15",
+    "source_type": "owner_directive",
+    "domain": "GENERAL"
+  },
+  {
+    "id": "BATCH6-053",
+    "text": "Platform analysis MUST pay special attention to addressable market size, partner diversity (positive indicator), and partner program benefits — joining an ecosystem with established competitors that can be matched on technology/features/quality but beaten dramatically on price",
+    "source_session": "da525157-e573-427d-a45f-395dce4b9f15",
+    "source_type": "owner_directive",
+    "domain": "GENERAL"
+  },
+  {
+    "id": "BATCH6-054",
+    "text": "The Knowledge Database MUST never delete any records — retention policy is 'never delete' with ~400GB budget (~57,000 years of history)",
+    "source_session": "dd5e6b51-6f54-44ee-bad1-3fe2b13a878b",
+    "source_type": "owner_directive",
+    "domain": "GENERAL"
+  },
+  {
+    "id": "BATCH6-055",
+    "text": "Periodic audit sessions MUST occur with a clean context for self-care and inventory/inspection of assets and plans",
+    "source_session": "dd5e6b51-6f54-44ee-bad1-3fe2b13a878b",
+    "source_type": "owner_directive",
+    "domain": "OPS"
+  },
+  {
+    "id": "BATCH6-056",
+    "text": "Every 5th session (S100, S105, ...) MUST be automatically flagged as an audit session using handoff-embedded cadence (Option A)",
+    "source_session": "dd5e6b51-6f54-44ee-bad1-3fe2b13a878b",
+    "source_type": "owner_approval",
+    "domain": "OPS"
+  },
+  {
+    "id": "BATCH6-057",
+    "text": "Remaining work items MUST be grouped by overlapping knowledge for efficient implementation",
+    "source_session": "dd5e6b51-6f54-44ee-bad1-3fe2b13a878b",
+    "source_type": "owner_directive",
+    "domain": "GENERAL"
+  },
+  {
+    "id": "BATCH6-058",
+    "text": "When evaluating options, MUST prioritize: (1) implementation quality (efficiency, robustness, reliability, usability), (2) desirability (competitive, differentiating, superior usability), (3) downstream confidence (documentation, maintenance, testing)",
+    "source_session": "de0ba860-c58c-4cb3-907e-4a46af56c2bf",
+    "source_type": "owner_directive",
+    "domain": "GENERAL"
+  },
+  {
+    "id": "BATCH6-059",
+    "text": "Avoid generalizations such as 'simpler' or 'harder' — state specifically what is gained or lost: which protocols, failure modes, components, test coverage implications",
+    "source_session": "de0ba860-c58c-4cb3-907e-4a46af56c2bf",
+    "source_type": "owner_directive",
+    "domain": "GENERAL"
+  },
+  {
+    "id": "BATCH6-060",
+    "text": "The pipeline budget MUST reflect a P50 of 7,000ms and a timeout at 8,000ms",
+    "source_session": "de0ba860-c58c-4cb3-907e-4a46af56c2bf",
+    "source_type": "owner_directive",
+    "domain": "API"
+  },
+  {
+    "id": "BATCH6-061",
+    "text": "Stream-then-validate (Option A) MUST be used for the pipeline response delivery pattern",
+    "source_session": "de0ba860-c58c-4cb3-907e-4a46af56c2bf",
+    "source_type": "owner_approval",
+    "domain": "API"
+  },
+  {
+    "id": "BATCH6-062",
+    "text": "The sidebar footer logo MUST use NEW-BLOCK-LOGO-HORIZONTAL.svg, and the text 'Remaker Digital' MUST NOT be duplicated since the logo contains it in SVG form",
+    "source_session": "e492ae9b-1b0e-49a2-a426-d86594f8cafd",
+    "source_type": "owner_directive",
+    "domain": "ADMIN_UI"
+  },
+  {
+    "id": "BATCH6-063",
+    "text": "The header top-right logo MUST use primary-logo-no-wordmark.svg",
+    "source_session": "e492ae9b-1b0e-49a2-a426-d86594f8cafd",
+    "source_type": "owner_directive",
+    "domain": "ADMIN_UI"
+  },
+  {
+    "id": "BATCH6-064",
+    "text": "API keys MUST NOT be regenerated on each deployment — a solution MUST allow API keys to be retained after image updates",
+    "source_session": "e492ae9b-1b0e-49a2-a426-d86594f8cafd",
+    "source_type": "owner_directive",
+    "domain": "API"
+  },
+  {
+    "id": "BATCH6-065",
+    "text": "The Admin Console MUST be a fully functional administrative tool, NOT a mock-up or prototype for a UX designer",
+    "source_session": "e492ae9b-1b0e-49a2-a426-d86594f8cafd",
+    "source_type": "owner_directive",
+    "domain": "ADMIN_UI"
+  },
+  {
+    "id": "BATCH6-066",
+    "text": "The Admin Console MUST work correctly for real customers — it MUST NOT be less than fully functional in any way",
+    "source_session": "e492ae9b-1b0e-49a2-a426-d86594f8cafd",
+    "source_type": "owner_directive",
+    "domain": "ADMIN_UI"
+  },
+  {
+    "id": "BATCH6-067",
+    "text": "Seed data representing a not-real customer MUST be created that populates the admin UI with realistic data",
+    "source_session": "e492ae9b-1b0e-49a2-a426-d86594f8cafd",
+    "source_type": "owner_directive",
+    "domain": "PROVISIONING"
+  },
+  {
+    "id": "BATCH6-068",
+    "text": "The sidebar footer MUST display 'Agent Red Customer Experience' above the version number, and below it: 'Brought to you by remakerdigital.com. Copyright (c) 2026 Remaker Digital, a DBA of VanDusen & Palmeter, LLC. All rights reserved.'",
+    "source_session": "e492ae9b-1b0e-49a2-a426-d86594f8cafd",
+    "source_type": "owner_directive",
+    "domain": "ADMIN_UI"
+  },
+  {
+    "id": "BATCH6-069",
+    "text": "The logo corners MUST be 90 degrees, NOT rounded",
+    "source_session": "e492ae9b-1b0e-49a2-a426-d86594f8cafd",
+    "source_type": "owner_directive",
+    "domain": "GENERAL"
+  },
+  {
+    "id": "BATCH6-070",
+    "text": "The admin UI MUST use the designer-approved dark mode palette: chrome #0a0a0a, page #141414, surface #1f1f1f, border #272727",
+    "source_session": "e492ae9b-1b0e-49a2-a426-d86594f8cafd",
+    "source_type": "owner_directive",
+    "domain": "ADMIN_UI"
+  },
+  {
+    "id": "BATCH6-071",
+    "text": "Knowledge base article creation process MUST support RAG requirements including document upload, vectorization, staleness/obsolescence management, performance KPIs, cleansing, and monitoring/tuning",
+    "source_session": "e492ae9b-1b0e-49a2-a426-d86594f8cafd",
+    "source_type": "owner_directive",
+    "domain": "KNOWLEDGE_BASE"
+  },
+  {
+    "id": "BATCH6-072",
+    "text": "RAG configuration MUST cover both merchant-provided documents/information and Persistent Customer Memory feature",
+    "source_session": "e492ae9b-1b0e-49a2-a426-d86594f8cafd",
+    "source_type": "owner_directive",
+    "domain": "KNOWLEDGE_BASE"
+  },
+  {
+    "id": "BATCH6-073",
+    "text": "Category images representing the 10 most popular Shopify merchant categories MUST be created showing Agent Red as a helpful assistant in physical-world scenarios",
+    "source_session": "e8dd94d6-cf5a-406e-81fb-ae80022cbd71",
+    "source_type": "owner_directive",
+    "domain": "GENERAL"
+  },
+  {
+    "id": "BATCH6-074",
+    "text": "20 branding images generated by OpenAI MUST be placed in branding/images/ directory for the Agent Red storefront",
+    "source_session": "e8dd94d6-cf5a-406e-81fb-ae80022cbd71",
+    "source_type": "owner_directive",
+    "domain": "GENERAL"
+  },
+  {
+    "id": "BATCH6-075",
+    "text": "Remaining 1.0 release work items MUST include: (1) UI validation, (2) Shopify approval verification, (3) launch process, (4) PCM test data, (5) competitor comparison table, (6) tooltip alignment, (7) automated merchant notifications",
+    "source_session": "e8dd94d6-cf5a-406e-81fb-ae80022cbd71",
+    "source_type": "owner_directive",
+    "domain": "GENERAL"
+  },
+  {
+    "id": "BATCH6-076",
+    "text": "Automated notification MUST be sent to merchants for technical outages, threshold breaches (hard technical and license constraints), and when API keys are available",
+    "source_session": "e8dd94d6-cf5a-406e-81fb-ae80022cbd71",
+    "source_type": "owner_directive",
+    "domain": "EMAIL"
+  },
+  {
+    "id": "BATCH6-077",
+    "text": "Protected logo files MUST NOT be modified: icon-master.svg, primary-logo-no-wordmark.svg, icon-master.png, primary-logo-no-wordmark.png",
+    "source_session": "ed7edafd-a0cc-409e-8fa4-7dce82dc5d25",
+    "source_type": "owner_directive",
+    "domain": "GENERAL"
+  },
+  {
+    "id": "BATCH6-078",
+    "text": "Beta customer provisioning MUST use the Starter tier with no expiry date during the beta period",
+    "source_session": "f0010805-7a55-4ad4-ab1a-16ad9b2ecf37",
+    "source_type": "owner_directive",
+    "domain": "PROVISIONING"
+  },
+  {
+    "id": "BATCH6-079",
+    "text": "The knowledge base MUST be built by ingesting/crawling the merchant's storefront URL and its sublinks to generate configuration including knowledge articles",
+    "source_session": "cf0c0907-9182-49c0-b973-e971bd5370ad",
+    "source_type": "owner_directive",
+    "domain": "KNOWLEDGE_BASE"
+  },
+  {
+    "id": "BATCH6-080",
+    "text": "Storefront ingestion/crawling MUST block progress through the setup wizard — it MUST NOT be a background task run in parallel",
+    "source_session": "cf0c0907-9182-49c0-b973-e971bd5370ad",
+    "source_type": "owner_directive",
+    "domain": "KNOWLEDGE_BASE"
+  },
+  {
+    "id": "BATCH6-081",
+    "text": "The merchant superadmin MUST be able to watch the ingestion happen if possible — it should be a visible, foreground process",
+    "source_session": "cf0c0907-9182-49c0-b973-e971bd5370ad",
+    "source_type": "owner_directive",
+    "domain": "KNOWLEDGE_BASE"
+  },
+  {
+    "id": "BATCH6-082",
+    "text": "The brand_name MUST be inferred from the storefront or set arbitrarily based on the merchant type category during setup wizard",
+    "source_session": "cf0c0907-9182-49c0-b973-e971bd5370ad",
+    "source_type": "owner_directive",
+    "domain": "CONFIG"
+  },
+  {
+    "id": "BATCH6-083",
+    "text": "CONDITIONAL PASS MUST NOT be accepted for the 1.0 GA release gate — any test that does not cleanly PASS must be fixed or documented as 1.1 deferral with justification",
+    "source_session": "cf0c0907-9182-49c0-b973-e971bd5370ad",
+    "source_type": "owner_directive",
+    "domain": "TESTING"
+  },
+  {
+    "id": "BATCH6-084",
+    "text": "No pre-existing failures MUST be accepted for the 1.0 GA release gate — known failing tests must be fixed or removed with justification before execution begins",
+    "source_session": "cf0c0907-9182-49c0-b973-e971bd5370ad",
+    "source_type": "owner_directive",
+    "domain": "TESTING"
+  },
+  {
+    "id": "BATCH6-085",
+    "text": "When beta feedback fixes are made, all changes MUST be applied in the next release version — beta prime runs a pinned release image",
+    "source_session": "cf0c0907-9182-49c0-b973-e971bd5370ad",
+    "source_type": "owner_directive",
+    "domain": "OPS"
+  },
+  {
+    "id": "BATCH6-086",
+    "text": "Non-disruptive upgrade MUST be proven on staging before applying to beta prime production",
+    "source_session": "cf0c0907-9182-49c0-b973-e971bd5370ad",
+    "source_type": "owner_directive",
+    "domain": "OPS"
+  },
+  {
+    "id": "BATCH6-087",
+    "text": "The 'Escalate to human' feature MUST ask which person or escalation role to escalate to — auto-escalation without selection is a defect",
+    "source_session": "cf0c0907-9182-49c0-b973-e971bd5370ad",
+    "source_type": "owner_directive",
+    "domain": "CONVERSATIONS"
+  },
+  {
+    "id": "BATCH6-088",
+    "text": "The 'Assign to agent' dropdown in the escalation modal MUST show available team members, not just 'Auto-assign (best available)'",
+    "source_session": "cf0c0907-9182-49c0-b973-e971bd5370ad",
+    "source_type": "owner_directive",
+    "domain": "ADMIN_UI"
+  },
+  {
+    "id": "BATCH6-089",
+    "text": "The SSE identity stream MUST send a synthetic 'stage' event before 'token' events so the widget creates a message bubble for identity preprocessor responses",
+    "source_session": "cf0c0907-9182-49c0-b973-e971bd5370ad",
+    "source_type": "owner_directive",
+    "domain": "API"
+  },
+  {
+    "id": "BATCH6-090",
+    "text": "The wizard 'Activate now' MUST properly handle array values (e.g., escalation_keywords) by keeping them as arrays, not joining into comma-separated strings",
+    "source_session": "cf0c0907-9182-49c0-b973-e971bd5370ad",
+    "source_type": "owner_directive",
+    "domain": "ADMIN_UI"
+  },
+  {
+    "id": "BATCH6-091",
+    "text": "Error messages in the activation dialog MUST handle both string errors and {field_name, message} object errors — no [object Object] display",
+    "source_session": "cf0c0907-9182-49c0-b973-e971bd5370ad",
+    "source_type": "owner_directive",
+    "domain": "ADMIN_UI"
+  },
+  {
+    "id": "BATCH6-092",
+    "text": "The wizard storefront step MUST show a 'Storefront detected' indicator when shopDomain is already set",
+    "source_session": "cf0c0907-9182-49c0-b973-e971bd5370ad",
+    "source_type": "owner_directive",
+    "domain": "ADMIN_UI"
+  },
+  {
+    "id": "BATCH6-093",
+    "text": "Build and deploy one more time before making the go/no-go decision on freezing for beta customers",
+    "source_session": "cf0c0907-9182-49c0-b973-e971bd5370ad",
+    "source_type": "owner_directive",
+    "domain": "OPS"
+  },
+  {
+    "id": "BATCH6-094",
+    "text": "PCM feature MUST be fully operational for the beta — vectorization scanner, consent handling, and memory retrieval all working",
+    "source_session": "cf0c0907-9182-49c0-b973-e971bd5370ad",
+    "source_type": "owner_directive",
+    "domain": "CONVERSATIONS"
+  },
+  {
+    "id": "BATCH6-095",
+    "text": "The widget consent collection UI MUST be implemented for customers to grant/deny data memory consent",
+    "source_session": "cf0c0907-9182-49c0-b973-e971bd5370ad",
+    "source_type": "owner_directive",
+    "domain": "WIDGET_UI"
+  },
+  {
+    "id": "BATCH6-096",
+    "text": "Copyright notice '© 2026 Remaker Digital, a DBA of VanDusen & Palmeter, LLC. All rights reserved.' MUST be included in all new work",
+    "source_session": "d93ad730-ef60-4233-9f9d-d3a00bea72aa",
+    "source_type": "owner_directive",
+    "domain": "GENERAL"
+  },
+  {
+    "id": "BATCH6-097",
+    "text": "Technical work MUST have elevated priority over creative/content work — technical implementation, testing, and new capabilities prioritized above creative assets and marketing",
+    "source_session": "cf0c0907-9182-49c0-b973-e971bd5370ad",
+    "source_type": "owner_directive",
+    "domain": "GENERAL"
+  },
+  {
+    "id": "BATCH6-098",
+    "text": "No effort estimates — focus on quality (correctness, completeness, absence of defects)",
+    "source_session": "de0ba860-c58c-4cb3-907e-4a46af56c2bf",
+    "source_type": "owner_directive",
+    "domain": "GENERAL"
+  },
+  {
+    "id": "BATCH6-099",
+    "text": "Never remove code, tests, features, or procedure entries without explicit owner approval in the current session",
+    "source_session": "cf0c0907-9182-49c0-b973-e971bd5370ad",
+    "source_type": "owner_directive",
+    "domain": "GENERAL"
+  },
+  {
+    "id": "BATCH6-100",
+    "text": "The wizard MUST auto-present on first login for a freshly provisioned tenant with no prior configuration",
+    "source_session": "cf0c0907-9182-49c0-b973-e971bd5370ad",
+    "source_type": "owner_directive",
+    "domain": "ADMIN_UI"
+  },
+  {
+    "id": "BATCH6-101",
+    "text": "The RRF (Reciprocal Rank Fusion) scores MUST be normalized to a 0-1 range so they can exceed the MIN_RELEVANCE_SCORE threshold",
+    "source_session": "e8dd94d6-cf5a-406e-81fb-ae80022cbd71",
+    "source_type": "owner_directive",
+    "domain": "KNOWLEDGE_BASE"
+  },
+  {
+    "id": "BATCH6-102",
+    "text": "The KB seed script MUST be idempotent — running it multiple times MUST NOT create duplicate entries",
+    "source_session": "e8dd94d6-cf5a-406e-81fb-ae80022cbd71",
+    "source_type": "owner_directive",
+    "domain": "KNOWLEDGE_BASE"
+  },
+  {
+    "id": "BATCH6-103",
+    "text": "The Add article dialog MUST allow upload of documents (not just text entry)",
+    "source_session": "e492ae9b-1b0e-49a2-a426-d86594f8cafd",
+    "source_type": "owner_directive",
+    "domain": "ADMIN_UI"
+  },
+  {
+    "id": "BATCH6-104",
+    "text": "GitHub repository MUST be strictly associated with the project board and vice-versa",
+    "source_session": "d93ad730-ef60-4233-9f9d-d3a00bea72aa",
+    "source_type": "owner_directive",
+    "domain": "GENERAL"
+  },
+  {
+    "id": "BATCH6-105",
+    "text": "Quality framework MUST implement the Diataxis documentation framework with quality standards applied before writing guides",
+    "source_session": "da525157-e573-427d-a45f-395dce4b9f15",
+    "source_type": "owner_directive",
+    "domain": "GENERAL"
+  },
+  {
+    "id": "BATCH6-106",
+    "text": "Sentence case MUST be used for all UI labels throughout the admin interface",
+    "source_session": "e8dd94d6-cf5a-406e-81fb-ae80022cbd71",
+    "source_type": "owner_directive",
+    "domain": "ADMIN_UI"
+  },
+  {
+    "id": "BATCH6-107",
+    "text": "Honest feedback MUST be provided — never exaggerate quality or impact of owner's input",
+    "source_session": "de0ba860-c58c-4cb3-907e-4a46af56c2bf",
+    "source_type": "owner_directive",
+    "domain": "GENERAL"
+  },
+  {
+    "id": "BATCH6-108",
+    "text": "Knowledge Database session_prompts table MUST follow append-only event sourcing pattern — no UPDATE or DELETE operations",
+    "source_session": "dd5e6b51-6f54-44ee-bad1-3fe2b13a878b",
+    "source_type": "owner_directive",
+    "domain": "GENERAL"
+  },
+  {
+    "id": "BATCH6-109",
+    "text": "The seed.py script MUST require a --force flag to prevent accidental data destruction",
+    "source_session": "dd5e6b51-6f54-44ee-bad1-3fe2b13a878b",
+    "source_type": "owner_directive",
+    "domain": "GENERAL"
+  },
+  {
+    "id": "BATCH6-110",
+    "text": "The WI #296 AI-generated greeting message MUST be moved from Post-launch to Group 3 for implementation",
+    "source_session": "dd5e6b51-6f54-44ee-bad1-3fe2b13a878b",
+    "source_type": "owner_directive",
+    "domain": "CONFIG"
+  },
+  {
+    "id": "BATCH6-111",
+    "text": "The Stripe product catalog MUST include subscription tiers (Starter, Professional, Enterprise) with monthly and annual pricing plus metered overage using Stripe Billing Meters",
+    "source_session": "d71ff852-02a3-4654-a7e8-966565121730",
+    "source_type": "owner_directive",
+    "domain": "BILLING"
+  },
+  {
+    "id": "BATCH6-112",
+    "text": "The Stripe product catalog MUST include conversation packs (1K, 5K, 20K) and add-on modules (Multi-Language, Advanced Analytics, Priority Support)",
+    "source_session": "d71ff852-02a3-4654-a7e8-966565121730",
+    "source_type": "owner_directive",
+    "domain": "BILLING"
+  },
+  {
+    "id": "BATCH6-113",
+    "text": "Shopify and Stripe partner program approval criteria and enhanced relationship benefits MUST be documented",
+    "source_session": "da525157-e573-427d-a45f-395dce4b9f15",
+    "source_type": "owner_directive",
+    "domain": "GENERAL"
+  },
+  {
+    "id": "BATCH6-114",
+    "text": "The activation dialog field tags MUST accurately reflect actual configuration field states — no inaccurate labels for fields like google_analytics_enabled or fine_tuning_enabled",
+    "source_session": "cf0c0907-9182-49c0-b973-e971bd5370ad",
+    "source_type": "owner_directive",
+    "domain": "ADMIN_UI"
+  },
+  {
+    "id": "BATCH6-115",
+    "text": "The AI MUST proactively ask for the customer's email address in its FIRST response per the P0 identity mandate",
+    "source_session": "cf0c0907-9182-49c0-b973-e971bd5370ad",
+    "source_type": "owner_directive",
+    "domain": "AUTH"
+  },
+  {
+    "id": "BATCH6-116",
+    "text": "The widget_greeting_message field MUST NOT be set to empty string during deactivation — empty string overrides platform defaults, while None allows defaults to apply",
+    "source_session": "cf0c0907-9182-49c0-b973-e971bd5370ad",
+    "source_type": "owner_directive",
+    "domain": "CONFIG"
+  },
+  {
+    "id": "BATCH6-117",
+    "text": "The Admin Console MUST be accessible via standalone URL with password gate followed by API key authentication — two-layer auth",
+    "source_session": "e492ae9b-1b0e-49a2-a426-d86594f8cafd",
+    "source_type": "owner_directive",
+    "domain": "AUTH"
+  },
+  {
+    "id": "BATCH6-118",
+    "text": "All API responses MUST use camelCase field names (displayName, overallStatus, fcrRate, totalCount, statusBreakdown)",
+    "source_session": "e492ae9b-1b0e-49a2-a426-d86594f8cafd",
+    "source_type": "owner_directive",
+    "domain": "API"
+  },
+  {
+    "id": "BATCH6-119",
+    "text": "The Diataxis documentation framework MUST be used with updated plan incorporating quality standards before writing content",
+    "source_session": "da525157-e573-427d-a45f-395dce4b9f15",
+    "source_type": "owner_approval",
+    "domain": "GENERAL"
+  },
+  {
+    "id": "BATCH6-120",
+    "text": "Vector search and BM25 MUST be parallelized using asyncio.gather() for knowledge retrieval performance",
+    "source_session": "e8dd94d6-cf5a-406e-81fb-ae80022cbd71",
+    "source_type": "owner_directive",
+    "domain": "KNOWLEDGE_BASE"
+  }
+]

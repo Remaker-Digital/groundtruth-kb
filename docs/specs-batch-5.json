@@ -1,0 +1,877 @@
+[
+  {
+    "id": "BATCH5-001",
+    "text": "The standalone admin password page MUST display the primary-logo-no-wordmark.svg (or PNG equivalent) as the logo, not a text-based 'Agent Red' heading.",
+    "source_session": "9af315bb-0718-4d48-8019-dbd685fc841e",
+    "source_type": "owner_directive",
+    "domain": "ADMIN_UI"
+  },
+  {
+    "id": "BATCH5-002",
+    "text": "Test Mode MUST route X% of real storefront visitors to the AI agent configured with the test workflow while other visitors get the store's existing experience.",
+    "source_session": "9af315bb-0718-4d48-8019-dbd685fc841e",
+    "source_type": "owner_directive",
+    "domain": "CONFIG"
+  },
+  {
+    "id": "BATCH5-003",
+    "text": "The selection of 'Test Mode' or 'Production' MUST be presented as the first step of the wizard workflow.",
+    "source_session": "9af315bb-0718-4d48-8019-dbd685fc841e",
+    "source_type": "owner_directive",
+    "domain": "ADMIN_UI"
+  },
+  {
+    "id": "BATCH5-004",
+    "text": "Inputs or options which are not changeable in Test Mode MUST be greyed out or otherwise inaccessible (e.g., Brand Name).",
+    "source_session": "9af315bb-0718-4d48-8019-dbd685fc841e",
+    "source_type": "owner_directive",
+    "domain": "ADMIN_UI"
+  },
+  {
+    "id": "BATCH5-005",
+    "text": "The Test Mode option MUST NOT be available until all necessary inputs have been selected for the first time and a complete configuration is in a 'Production' state.",
+    "source_session": "9af315bb-0718-4d48-8019-dbd685fc841e",
+    "source_type": "owner_directive",
+    "domain": "CONFIG"
+  },
+  {
+    "id": "BATCH5-006",
+    "text": "The very first time through the wizard, Test Mode MUST NOT be available.",
+    "source_session": "9af315bb-0718-4d48-8019-dbd685fc841e",
+    "source_type": "owner_directive",
+    "domain": "CONFIG"
+  },
+  {
+    "id": "BATCH5-007",
+    "text": "In Test Mode setup, only parts of the configuration related to AI behavior MUST be available: brand voice, languages, response style, escalation keywords, etc.",
+    "source_session": "9af315bb-0718-4d48-8019-dbd685fc841e",
+    "source_type": "owner_directive",
+    "domain": "CONFIG"
+  },
+  {
+    "id": "BATCH5-008",
+    "text": "When entering Test Mode configuration, all pre-existing values and settings MUST be kept as defaults; only the changeable values and settings define the scope of the test.",
+    "source_session": "9af315bb-0718-4d48-8019-dbd685fc841e",
+    "source_type": "owner_directive",
+    "domain": "CONFIG"
+  },
+  {
+    "id": "BATCH5-009",
+    "text": "All users MUST be able to report an issue to the merchant (escalation).",
+    "source_session": "9af315bb-0718-4d48-8019-dbd685fc841e",
+    "source_type": "owner_directive",
+    "domain": "CONVERSATIONS"
+  },
+  {
+    "id": "BATCH5-010",
+    "text": "There MUST be a dedicated page for integration configuration and activation/deactivation in the admin UI.",
+    "source_session": "9af315bb-0718-4d48-8019-dbd685fc841e",
+    "source_type": "owner_directive",
+    "domain": "ADMIN_UI"
+  },
+  {
+    "id": "BATCH5-011",
+    "text": "Integration configuration and activation/deactivation MUST also have a step in the Setup Wizard.",
+    "source_session": "9af315bb-0718-4d48-8019-dbd685fc841e",
+    "source_type": "owner_directive",
+    "domain": "ADMIN_UI"
+  },
+  {
+    "id": "BATCH5-012",
+    "text": "The option to disable the escalation/report-issue message MUST be available for Professional and Enterprise tiers but MUST remain mandatory for the Starter (entry-level) tier.",
+    "source_session": "9af315bb-0718-4d48-8019-dbd685fc841e",
+    "source_type": "owner_approval",
+    "domain": "CONFIG"
+  },
+  {
+    "id": "BATCH5-013",
+    "text": "The standalone admin dashboard MUST confirm that the Brand Name and logo are displayed prominently in the header.",
+    "source_session": "9af315bb-0718-4d48-8019-dbd685fc841e",
+    "source_type": "owner_directive",
+    "domain": "ADMIN_UI"
+  },
+  {
+    "id": "BATCH5-014",
+    "text": "The service operating mode toggle MUST be displayed in the sticky nav bar area.",
+    "source_session": "9af315bb-0718-4d48-8019-dbd685fc841e",
+    "source_type": "owner_directive",
+    "domain": "ADMIN_UI"
+  },
+  {
+    "id": "BATCH5-015",
+    "text": "The Knowledge Base MUST support adding a test article that appears in the list and can be edited and deleted.",
+    "source_session": "9af315bb-0718-4d48-8019-dbd685fc841e",
+    "source_type": "owner_directive",
+    "domain": "KNOWLEDGE_BASE"
+  },
+  {
+    "id": "BATCH5-016",
+    "text": "The Knowledge Base MUST support importing PDF, DOCX, CSV, and TXT documents that appear in the list and can be edited and deleted.",
+    "source_session": "9af315bb-0718-4d48-8019-dbd685fc841e",
+    "source_type": "owner_directive",
+    "domain": "KNOWLEDGE_BASE"
+  },
+  {
+    "id": "BATCH5-017",
+    "text": "The Knowledge Base MUST support importing a URL that appears in the list and can be edited and deleted.",
+    "source_session": "9af315bb-0718-4d48-8019-dbd685fc841e",
+    "source_type": "owner_directive",
+    "domain": "KNOWLEDGE_BASE"
+  },
+  {
+    "id": "BATCH5-018",
+    "text": "The Critic prompt MUST distinguish between 'exposing internal system prompts' (correctly block) vs 'describing marketed product features' (should allow).",
+    "source_session": "9af315bb-0718-4d48-8019-dbd685fc841e",
+    "source_type": "owner_directive",
+    "domain": "CONVERSATIONS"
+  },
+  {
+    "id": "BATCH5-019",
+    "text": "ALL copy-of-record information MUST be in the GitHub Wiki, except information that SHOULD NOT be in the wiki and is instead in artifacts in the Git repo.",
+    "source_session": "9af315bb-0718-4d48-8019-dbd685fc841e",
+    "source_type": "owner_directive",
+    "domain": "OPS"
+  },
+  {
+    "id": "BATCH5-020",
+    "text": "The system MUST have a documented procedure for non-disruptive upgrade of the current deployment environment.",
+    "source_session": "9af315bb-0718-4d48-8019-dbd685fc841e",
+    "source_type": "owner_directive",
+    "domain": "OPS"
+  },
+  {
+    "id": "BATCH5-021",
+    "text": "The system MUST have a documented procedure for non-disruptive testing of new releases in parallel with the existing deployment (isolated but functionally identical).",
+    "source_session": "9af315bb-0718-4d48-8019-dbd685fc841e",
+    "source_type": "owner_directive",
+    "domain": "OPS"
+  },
+  {
+    "id": "BATCH5-022",
+    "text": "The system MUST have a documented process for creating a branch for new release development, testing and deployment.",
+    "source_session": "9af315bb-0718-4d48-8019-dbd685fc841e",
+    "source_type": "owner_directive",
+    "domain": "OPS"
+  },
+  {
+    "id": "BATCH5-023",
+    "text": "The system MUST have a documented procedure for rollback of a production deployment in case of a failed or defective upgrade.",
+    "source_session": "9af315bb-0718-4d48-8019-dbd685fc841e",
+    "source_type": "owner_directive",
+    "domain": "OPS"
+  },
+  {
+    "id": "BATCH5-024",
+    "text": "The documentation website (agentredcx.com) 'Welcome' word MUST be removed from the main page so that the logo is at the top of the pane with 180px of bottom margin, pushing 'Agent Red Customer Experience, A product of Remaker Digital' text further down.",
+    "source_session": "98f13810-002b-45c3-b531-0b65ee17dd14",
+    "source_type": "owner_directive",
+    "domain": "GENERAL"
+  },
+  {
+    "id": "BATCH5-025",
+    "text": "The Knowledge Database MUST use an append-only SQLite database with 3 tables: (a) specifications, (b) test procedures, and (c) operational procedures.",
+    "source_session": "a2700066-1b16-4434-abf1-cd7dc6e9b5db",
+    "source_type": "owner_directive",
+    "domain": "OPS"
+  },
+  {
+    "id": "BATCH5-026",
+    "text": "The Knowledge Database MUST exclude delete operations; all changes MUST generate a new entry with the changed entry kept in the trail.",
+    "source_session": "a2700066-1b16-4434-abf1-cd7dc6e9b5db",
+    "source_type": "owner_directive",
+    "domain": "OPS"
+  },
+  {
+    "id": "BATCH5-027",
+    "text": "The Knowledge Database MUST have a graphical UI allowing the owner to see the state of repeatable procedures, tests, specifications and user stories.",
+    "source_session": "a2700066-1b16-4434-abf1-cd7dc6e9b5db",
+    "source_type": "owner_directive",
+    "domain": "OPS"
+  },
+  {
+    "id": "BATCH5-028",
+    "text": "The Knowledge Database graphical UI MUST only provide a read interface (filter, order, sort, search) to the owner; the owner MUST NOT have the ability to make any changes.",
+    "source_session": "a2700066-1b16-4434-abf1-cd7dc6e9b5db",
+    "source_type": "owner_directive",
+    "domain": "OPS"
+  },
+  {
+    "id": "BATCH5-029",
+    "text": "All changes to the Knowledge Database MUST be made only by Claude.",
+    "source_session": "a2700066-1b16-4434-abf1-cd7dc6e9b5db",
+    "source_type": "owner_directive",
+    "domain": "OPS"
+  },
+  {
+    "id": "BATCH5-030",
+    "text": "The end-to-end test procedure MUST start with creation of a fresh tenant, initialization, then move through all tests covering Starter, Professional, and Enterprise tiers.",
+    "source_session": "a2700066-1b16-4434-abf1-cd7dc6e9b5db",
+    "source_type": "owner_directive",
+    "domain": "TESTING"
+  },
+  {
+    "id": "BATCH5-031",
+    "text": "Session wrap-up MUST include storing a structured prompt in the Knowledge Database that the next session can retrieve for initialization.",
+    "source_session": "a2700066-1b16-4434-abf1-cd7dc6e9b5db",
+    "source_type": "owner_directive",
+    "domain": "OPS"
+  },
+  {
+    "id": "BATCH5-032",
+    "text": "Pricing MUST have a very low entry point with a 12-24 element matrix of compelling scaling tiers and high-value feature options.",
+    "source_session": "a505517d-9656-404e-9b2a-a494eef03480",
+    "source_type": "owner_directive",
+    "domain": "BILLING"
+  },
+  {
+    "id": "BATCH5-033",
+    "text": "Pricing MUST target 80% gross margin over cost of goods sold at list prices.",
+    "source_session": "a505517d-9656-404e-9b2a-a494eef03480",
+    "source_type": "owner_directive",
+    "domain": "BILLING"
+  },
+  {
+    "id": "BATCH5-034",
+    "text": "Pricing MUST be 50% lower cost than the nearest technologically comparable competitor at a comparable level of capability and quality.",
+    "source_session": "a505517d-9656-404e-9b2a-a494eef03480",
+    "source_type": "owner_directive",
+    "domain": "BILLING"
+  },
+  {
+    "id": "BATCH5-035",
+    "text": "Pricing MUST include usage-based overage charges with defined thresholds for AI model use per tier.",
+    "source_session": "a505517d-9656-404e-9b2a-a494eef03480",
+    "source_type": "owner_directive",
+    "domain": "BILLING"
+  },
+  {
+    "id": "BATCH5-036",
+    "text": "Transparent usage pricing MUST be implemented as a competitive advantage (transparent usage reduces customer dissatisfaction and improves retention).",
+    "source_session": "a505517d-9656-404e-9b2a-a494eef03480",
+    "source_type": "owner_directive",
+    "domain": "BILLING"
+  },
+  {
+    "id": "BATCH5-037",
+    "text": "Pricing MUST start with an itemized structure (Option C), allowing future bundles and promotions rather than starting with bundled pricing that would require list price adjustments.",
+    "source_session": "a505517d-9656-404e-9b2a-a494eef03480",
+    "source_type": "owner_approval",
+    "domain": "BILLING"
+  },
+  {
+    "id": "BATCH5-038",
+    "text": "The path to production MUST ALWAYS require: (a) commit, build and test end-to-end in the STAGING environment with 100% test coverage and 100% success rate, then (b) deploy to PRODUCTION.",
+    "source_session": "a93b4de5-9066-40d6-820e-aad90d9adb02",
+    "source_type": "owner_directive",
+    "domain": "OPS"
+  },
+  {
+    "id": "BATCH5-039",
+    "text": "Admins and superadmins MUST be able to re-send team invitation emails to existing team members.",
+    "source_session": "a93b4de5-9066-40d6-820e-aad90d9adb02",
+    "source_type": "owner_directive",
+    "domain": "TEAM"
+  },
+  {
+    "id": "BATCH5-040",
+    "text": "Escalation routing MUST route to the assigned agent with superadmin fallback.",
+    "source_session": "a93b4de5-9066-40d6-820e-aad90d9adb02",
+    "source_type": "owner_directive",
+    "domain": "CONVERSATIONS"
+  },
+  {
+    "id": "BATCH5-041",
+    "text": "A Session Scheduler MUST run as a hook that periodically loads SCHEDULE.md and injects pre-planned prompts into the conversation on behalf of the user.",
+    "source_session": "a9e8d160-4609-4c56-ba68-b921337a7341",
+    "source_type": "owner_directive",
+    "domain": "OPS"
+  },
+  {
+    "id": "BATCH5-042",
+    "text": "SCHEDULE.md MUST contain groupings of sequential prompts arranged so that groups are executed in sequence, with the first group always chosen and deleted once all prompts in that group have been communicated.",
+    "source_session": "a9e8d160-4609-4c56-ba68-b921337a7341",
+    "source_type": "owner_directive",
+    "domain": "OPS"
+  },
+  {
+    "id": "BATCH5-043",
+    "text": "Claude MUST have permission to update SCHEDULE.md to add future events based on predictions about when certain operations will be required.",
+    "source_session": "a9e8d160-4609-4c56-ba68-b921337a7341",
+    "source_type": "owner_directive",
+    "domain": "OPS"
+  },
+  {
+    "id": "BATCH5-044",
+    "text": "The Knowledge Base MUST support automated site crawling (not just document upload) to reduce merchant administrative effort.",
+    "source_session": "a9e8d160-4609-4c56-ba68-b921337a7341",
+    "source_type": "owner_directive",
+    "domain": "KNOWLEDGE_BASE"
+  },
+  {
+    "id": "BATCH5-045",
+    "text": "The widget MUST support clickable textual 'Quick Action' buttons in the chat messaging area that trigger pre-made prompts seeded with page-specific information.",
+    "source_session": "aa1bb8fe-ea79-4d0d-b1f0-56205a08a260",
+    "source_type": "owner_directive",
+    "domain": "WIDGET_UI"
+  },
+  {
+    "id": "BATCH5-046",
+    "text": "Quick Action buttons in the widget MUST scroll upward out of the viewing area if a manual prompt is written and sent, as if they were ordinary text at the start of a chat.",
+    "source_session": "aa1bb8fe-ea79-4d0d-b1f0-56205a08a260",
+    "source_type": "owner_directive",
+    "domain": "WIDGET_UI"
+  },
+  {
+    "id": "BATCH5-047",
+    "text": "The system MUST be able to identify which page the widget is loading on (via unique identifiers) to lazy-load the correct Quick Action content.",
+    "source_session": "aa1bb8fe-ea79-4d0d-b1f0-56205a08a260",
+    "source_type": "owner_directive",
+    "domain": "WIDGET_UI"
+  },
+  {
+    "id": "BATCH5-048",
+    "text": "The admin UI MUST include a page allowing a merchant to activate Quick Action buttons per page, assign up to two button/prompts per page from a list, and create/modify/delete the button/prompts.",
+    "source_session": "aa1bb8fe-ea79-4d0d-b1f0-56205a08a260",
+    "source_type": "owner_directive",
+    "domain": "ADMIN_UI"
+  },
+  {
+    "id": "BATCH5-049",
+    "text": "Each page type MUST support exactly two Quick Action button slots that merchants can toggle on/off and assign content to.",
+    "source_session": "aa1bb8fe-ea79-4d0d-b1f0-56205a08a260",
+    "source_type": "owner_directive",
+    "domain": "ADMIN_UI"
+  },
+  {
+    "id": "BATCH5-050",
+    "text": "The documentation website (agentredcx.com) footer MUST NOT have a blue background; it MUST use a color from the Agent Red palette.",
+    "source_session": "b3be1c6b-489b-4645-8204-d8e10c21fa08",
+    "source_type": "owner_directive",
+    "domain": "GENERAL"
+  },
+  {
+    "id": "BATCH5-051",
+    "text": "The public documentation at agentredcx.com MUST offer detailed guidance on every input exposed via the standalone admin console, including what the input is for, system behavior when values change, and optimization guidance.",
+    "source_session": "b3be1c6b-489b-4645-8204-d8e10c21fa08",
+    "source_type": "owner_directive",
+    "domain": "GENERAL"
+  },
+  {
+    "id": "BATCH5-052",
+    "text": "The admin suite MUST include a Knowledge Base conflict/duplication scanner tool that identifies conflicts or duplications and provides instructions for resolution.",
+    "source_session": "b3be1c6b-489b-4645-8204-d8e10c21fa08",
+    "source_type": "owner_directive",
+    "domain": "KNOWLEDGE_BASE"
+  },
+  {
+    "id": "BATCH5-053",
+    "text": "The logo set MUST include icon-master (SVG+PNG), primary-logo-dark (SVG+PNG, for dark backgrounds), and primary-logo-light (SVG+PNG, for light backgrounds).",
+    "source_session": "b6f5870b-3c78-439f-ac88-47225cc2c22d",
+    "source_type": "owner_directive",
+    "domain": "GENERAL"
+  },
+  {
+    "id": "BATCH5-054",
+    "text": "primary-logo-dark MUST be 'AGENT RED' + 'CUSTOMER EXPERIENCE' subtitle, for dark backgrounds.",
+    "source_session": "b6f5870b-3c78-439f-ac88-47225cc2c22d",
+    "source_type": "owner_directive",
+    "domain": "GENERAL"
+  },
+  {
+    "id": "BATCH5-055",
+    "text": "primary-logo-light MUST be 'AGENT RED' + 'CUSTOMER EXPERIENCE' subtitle, for light backgrounds.",
+    "source_session": "b6f5870b-3c78-439f-ac88-47225cc2c22d",
+    "source_type": "owner_directive",
+    "domain": "GENERAL"
+  },
+  {
+    "id": "BATCH5-056",
+    "text": "The SVG comment in primary-logo-light.svg MUST read 'Light Background'.",
+    "source_session": "b6f5870b-3c78-439f-ac88-47225cc2c22d",
+    "source_type": "owner_directive",
+    "domain": "GENERAL"
+  },
+  {
+    "id": "BATCH5-057",
+    "text": "The 'Sign in to Dashboard' link in the welcome email MUST resolve to the tenancy admin UI, NOT to agentredcx.com/docs/getting-started/.",
+    "source_session": "b899437d-7bb9-4008-be06-5327b7d3aabe",
+    "source_type": "owner_directive",
+    "domain": "EMAIL"
+  },
+  {
+    "id": "BATCH5-058",
+    "text": "The welcome email MUST display the Agent Red logo, not a text-based 'Agent Red' heading.",
+    "source_session": "b899437d-7bb9-4008-be06-5327b7d3aabe",
+    "source_type": "owner_directive",
+    "domain": "EMAIL"
+  },
+  {
+    "id": "BATCH5-059",
+    "text": "The merchant admin UI MUST display the widget key so merchants can view it.",
+    "source_session": "b899437d-7bb9-4008-be06-5327b7d3aabe",
+    "source_type": "owner_directive",
+    "domain": "ADMIN_UI"
+  },
+  {
+    "id": "BATCH5-060",
+    "text": "The merchant admin UI MUST allow merchants to regenerate the widget key in case a key is compromised.",
+    "source_session": "b899437d-7bb9-4008-be06-5327b7d3aabe",
+    "source_type": "owner_directive",
+    "domain": "ADMIN_UI"
+  },
+  {
+    "id": "BATCH5-061",
+    "text": "The Tenant Directory (Provider Console) MUST include an 'Expired' status filter to filter tenant entries.",
+    "source_session": "b899437d-7bb9-4008-be06-5327b7d3aabe",
+    "source_type": "owner_directive",
+    "domain": "ADMIN_UI"
+  },
+  {
+    "id": "BATCH5-062",
+    "text": "The sidebar MUST NOT contain a duplicate documentation link if one already exists in the top nav bar; only the top nav bar documentation link MUST be retained.",
+    "source_session": "b899437d-7bb9-4008-be06-5327b7d3aabe",
+    "source_type": "owner_directive",
+    "domain": "ADMIN_UI"
+  },
+  {
+    "id": "BATCH5-063",
+    "text": "The email template MUST include text below the ADMIN API KEY: 'If lost, you can regenerate your API key by requesting a new key at the login prompt.'",
+    "source_session": "b899437d-7bb9-4008-be06-5327b7d3aabe",
+    "source_type": "owner_directive",
+    "domain": "EMAIL"
+  },
+  {
+    "id": "BATCH5-064",
+    "text": "The email template MUST include text below the WIDGET KEY: 'Your chat widget key and API URL are available from your admin console.'",
+    "source_session": "b899437d-7bb9-4008-be06-5327b7d3aabe",
+    "source_type": "owner_directive",
+    "domain": "EMAIL"
+  },
+  {
+    "id": "BATCH5-065",
+    "text": "The email template MUST NOT have inner boxes with corners with a large radius; objects in the email template MUST NOT have rounded corners.",
+    "source_session": "b899437d-7bb9-4008-be06-5327b7d3aabe",
+    "source_type": "owner_directive",
+    "domain": "EMAIL"
+  },
+  {
+    "id": "BATCH5-066",
+    "text": "AI agent responses MUST be included in conversation transcripts displayed in the admin inbox.",
+    "source_session": "b899437d-7bb9-4008-be06-5327b7d3aabe",
+    "source_type": "owner_directive",
+    "domain": "CONVERSATIONS"
+  },
+  {
+    "id": "BATCH5-067",
+    "text": "New build/test MUST be performed in a parallel (staging) environment; beta production MUST remain stable and undisturbed during development.",
+    "source_session": "b899437d-7bb9-4008-be06-5327b7d3aabe",
+    "source_type": "owner_directive",
+    "domain": "OPS"
+  },
+  {
+    "id": "BATCH5-068",
+    "text": "The logo on the login screen of the SPA console MUST be functional and correctly rendered (not broken).",
+    "source_session": "bafd642a-a8c1-4f94-b4a0-e733a9ac98be",
+    "source_type": "owner_directive",
+    "domain": "ADMIN_UI"
+  },
+  {
+    "id": "BATCH5-069",
+    "text": "Completion of an end-to-end test as per the Master Test Plan MUST be required before any release can proceed past Step 2.",
+    "source_session": "bafd642a-a8c1-4f94-b4a0-e733a9ac98be",
+    "source_type": "owner_directive",
+    "domain": "TESTING"
+  },
+  {
+    "id": "BATCH5-070",
+    "text": "The sidebar label 'Team' MUST be renamed to 'Team members'.",
+    "source_session": "bff6101f-33e8-4151-9844-ed77c80f7d84",
+    "source_type": "owner_directive",
+    "domain": "ADMIN_UI"
+  },
+  {
+    "id": "BATCH5-071",
+    "text": "The sidebar selections 'Agent configuration', 'Knowledge base', 'Quick actions', and 'Widget configuration' MUST be grouped within one layout box that indicates they have a special relationship.",
+    "source_session": "bff6101f-33e8-4151-9844-ed77c80f7d84",
+    "source_type": "owner_directive",
+    "domain": "ADMIN_UI"
+  },
+  {
+    "id": "BATCH5-072",
+    "text": "The grouped configuration items box MUST include a control displaying the state of those grouped items and allowing 'Activate' changes, 'Roll-back' changes, or 'Discard' changes to restore all inputs to their currently Active state.",
+    "source_session": "bff6101f-33e8-4151-9844-ed77c80f7d84",
+    "source_type": "owner_directive",
+    "domain": "ADMIN_UI"
+  },
+  {
+    "id": "BATCH5-073",
+    "text": "The 'Activate' option MUST only be illuminated/enabled if changes to any of the configuration pages have been 'Saved' but not yet 'Activated'.",
+    "source_session": "bff6101f-33e8-4151-9844-ed77c80f7d84",
+    "source_type": "owner_directive",
+    "domain": "ADMIN_UI"
+  },
+  {
+    "id": "BATCH5-074",
+    "text": "A tooltip MUST be added to the 'Professional' plan-type indicator in the sticky top navbar explaining what the plan means and what subscription plans are available.",
+    "source_session": "bff6101f-33e8-4151-9844-ed77c80f7d84",
+    "source_type": "owner_directive",
+    "domain": "ADMIN_UI"
+  },
+  {
+    "id": "BATCH5-075",
+    "text": "All empty but essential inputs MUST be marked with the traditional red asterisk indicating that an appropriate input is required.",
+    "source_session": "bff6101f-33e8-4151-9844-ed77c80f7d84",
+    "source_type": "owner_directive",
+    "domain": "ADMIN_UI"
+  },
+  {
+    "id": "BATCH5-076",
+    "text": "The system MUST have a documented procedure for a comprehensive data loss or corruption audit.",
+    "source_session": "bff6101f-33e8-4151-9844-ed77c80f7d84",
+    "source_type": "owner_directive",
+    "domain": "OPS"
+  },
+  {
+    "id": "BATCH5-077",
+    "text": "The system MUST have a documented procedure for restoring a production deployment after a catastrophic failure or data loss/corruption.",
+    "source_session": "bff6101f-33e8-4151-9844-ed77c80f7d84",
+    "source_type": "owner_directive",
+    "domain": "OPS"
+  },
+  {
+    "id": "BATCH5-078",
+    "text": "The customer memory personalization approach MUST be referred to as 'Persistent Customer Memory'.",
+    "source_session": "c720e4ad-1bfd-439a-9521-750d68ada9dd",
+    "source_type": "owner_directive",
+    "domain": "GENERAL"
+  },
+  {
+    "id": "BATCH5-079",
+    "text": "The four-layer personalization stack (Persistent Customer Memory) MUST be highlighted in marketing materials, documentation, website and anywhere business value pillars are enumerated.",
+    "source_session": "c720e4ad-1bfd-439a-9521-750d68ada9dd",
+    "source_type": "owner_directive",
+    "domain": "GENERAL"
+  },
+  {
+    "id": "BATCH5-080",
+    "text": "Test cases and metrics MUST be identified to quantify the benefits of Persistent Customer Memory.",
+    "source_session": "c720e4ad-1bfd-439a-9521-750d68ada9dd",
+    "source_type": "owner_directive",
+    "domain": "TESTING"
+  },
+  {
+    "id": "BATCH5-081",
+    "text": "A fresh deployment MUST be in its initialized state with zero conversations and not in 'Active' state.",
+    "source_session": "c7e4b222-dc59-4a87-927a-d3697c0a697b",
+    "source_type": "owner_directive",
+    "domain": "PROVISIONING"
+  },
+  {
+    "id": "BATCH5-082",
+    "text": "Activation MUST trigger the enablement of the widget on both the admin UI and the merchant's storefront.",
+    "source_session": "c7e4b222-dc59-4a87-927a-d3697c0a697b",
+    "source_type": "owner_directive",
+    "domain": "CONFIG"
+  },
+  {
+    "id": "BATCH5-083",
+    "text": "Web crawlers MUST be blocked from triggering billable conversations OR crawler conversations MUST be classified as non-billable.",
+    "source_session": "c7e4b222-dc59-4a87-927a-d3697c0a697b",
+    "source_type": "owner_directive",
+    "domain": "WIDGET_UI"
+  },
+  {
+    "id": "BATCH5-084",
+    "text": "When escalating a conversation, the admin MUST either (a) choose a category causing Agent Red to send an escalation email to one of the Escalation agents handling that category, or (b) choose a specific Escalation agent as the target.",
+    "source_session": "c7e4b222-dc59-4a87-927a-d3697c0a697b",
+    "source_type": "owner_directive",
+    "domain": "CONVERSATIONS"
+  },
+  {
+    "id": "BATCH5-085",
+    "text": "Once an escalation category or specific Escalation agent has been selected, that user MUST receive an escalation email with information about the escalation.",
+    "source_session": "c7e4b222-dc59-4a87-927a-d3697c0a697b",
+    "source_type": "owner_directive",
+    "domain": "CONVERSATIONS"
+  },
+  {
+    "id": "BATCH5-086",
+    "text": "Once a conversation has been escalated, the assigned Team member MUST be the only Team member with permission to operate the 'Resolve conversation' control for that conversation.",
+    "source_session": "c7e4b222-dc59-4a87-927a-d3697c0a697b",
+    "source_type": "owner_directive",
+    "domain": "CONVERSATIONS"
+  },
+  {
+    "id": "BATCH5-087",
+    "text": "The 'Escalation agent' role MUST ensure correct routing of escalations to Team members based on escalation category, for both manual and AI-initiated escalations.",
+    "source_session": "c7e4b222-dc59-4a87-927a-d3697c0a697b",
+    "source_type": "owner_directive",
+    "domain": "CONVERSATIONS"
+  },
+  {
+    "id": "BATCH5-088",
+    "text": "The conversation status 'Completed' MUST be renamed to 'Resolved' for consistency with the 'Resolve conversation' control label.",
+    "source_session": "c7e4b222-dc59-4a87-927a-d3697c0a697b",
+    "source_type": "owner_directive",
+    "domain": "CONVERSATIONS"
+  },
+  {
+    "id": "BATCH5-089",
+    "text": "When a conversation has been escalated, the conversation information displayed MUST include identifying the Team member who was the target of the escalation and the escalation type/category.",
+    "source_session": "c7e4b222-dc59-4a87-927a-d3697c0a697b",
+    "source_type": "owner_directive",
+    "domain": "CONVERSATIONS"
+  },
+  {
+    "id": "BATCH5-090",
+    "text": "The Team members table MUST include a column displaying the number of unresolved escalations assigned to each team member.",
+    "source_session": "c7e4b222-dc59-4a87-927a-d3697c0a697b",
+    "source_type": "owner_directive",
+    "domain": "TEAM"
+  },
+  {
+    "id": "BATCH5-091",
+    "text": "'Idle timeout' and 'Max turns' agent configuration fields MUST each have tooltips.",
+    "source_session": "c7e4b222-dc59-4a87-927a-d3697c0a697b",
+    "source_type": "owner_directive",
+    "domain": "ADMIN_UI"
+  },
+  {
+    "id": "BATCH5-092",
+    "text": "Article rows in the Knowledge Base MUST display the 'Category', 'Status', and 'Freshness' of each article.",
+    "source_session": "c7e4b222-dc59-4a87-927a-d3697c0a697b",
+    "source_type": "owner_directive",
+    "domain": "KNOWLEDGE_BASE"
+  },
+  {
+    "id": "BATCH5-093",
+    "text": "When a tenant is initialized, there MUST NOT be any articles; initialization MUST verify that all existing articles are removed.",
+    "source_session": "c7e4b222-dc59-4a87-927a-d3697c0a697b",
+    "source_type": "owner_directive",
+    "domain": "PROVISIONING"
+  },
+  {
+    "id": "BATCH5-094",
+    "text": "Initialization MUST create a tenancy that contains no configuration or information from prior to initialization.",
+    "source_session": "c7e4b222-dc59-4a87-927a-d3697c0a697b",
+    "source_type": "owner_directive",
+    "domain": "PROVISIONING"
+  },
+  {
+    "id": "BATCH5-095",
+    "text": "Initialization MUST be a distinct Repeatable Procedure that always concludes the process of provisioning a tenant.",
+    "source_session": "c7e4b222-dc59-4a87-927a-d3697c0a697b",
+    "source_type": "owner_directive",
+    "domain": "OPS"
+  },
+  {
+    "id": "BATCH5-096",
+    "text": "When a new version is deployed, all articles, configuration, history and other tenant data MUST be inspected and noted prior to the non-disruptive upgrade for post-upgrade verification.",
+    "source_session": "c7e4b222-dc59-4a87-927a-d3697c0a697b",
+    "source_type": "owner_directive",
+    "domain": "OPS"
+  },
+  {
+    "id": "BATCH5-097",
+    "text": "If an article has the status 'Archived', the option to archive MUST be replaced with the option to 'Restore' that article (with a new icon representing the Restore action).",
+    "source_session": "c7e4b222-dc59-4a87-927a-d3697c0a697b",
+    "source_type": "owner_directive",
+    "domain": "KNOWLEDGE_BASE"
+  },
+  {
+    "id": "BATCH5-098",
+    "text": "The 'Actions' column on the Knowledge Base articles list MUST have a tooltip explaining what each action does.",
+    "source_session": "c7e4b222-dc59-4a87-927a-d3697c0a697b",
+    "source_type": "owner_directive",
+    "domain": "KNOWLEDGE_BASE"
+  },
+  {
+    "id": "BATCH5-099",
+    "text": "The Quick Actions 'Status' column MUST be wide enough to fully display status badges without truncation (e.g., 'Active' MUST NOT show as 'Act...').",
+    "source_session": "c7e4b222-dc59-4a87-927a-d3697c0a697b",
+    "source_type": "owner_directive",
+    "domain": "ADMIN_UI"
+  },
+  {
+    "id": "BATCH5-100",
+    "text": "The Quick Actions page MUST include options to 'Save draft inputs' and 'Reset to defaults'.",
+    "source_session": "c7e4b222-dc59-4a87-927a-d3697c0a697b",
+    "source_type": "owner_directive",
+    "domain": "ADMIN_UI"
+  },
+  {
+    "id": "BATCH5-101",
+    "text": "The 'Auto-open' toggle on the Quick Actions page assignments MUST be operable.",
+    "source_session": "c7e4b222-dc59-4a87-927a-d3697c0a697b",
+    "source_type": "owner_directive",
+    "domain": "ADMIN_UI"
+  },
+  {
+    "id": "BATCH5-102",
+    "text": "Testing Repeatable Procedures MUST include tests that verify: (1) test PII injected into a conversation is correctly scrubbed, (2) consent prompt appears, (3) a GDPR deletion request successfully deletes all system information for the identified customer.",
+    "source_session": "c7e4b222-dc59-4a87-927a-d3697c0a697b",
+    "source_type": "owner_directive",
+    "domain": "TESTING"
+  },
+  {
+    "id": "BATCH5-103",
+    "text": "All fixes and additions MUST be tested when executing Repeatable Procedure(s) for regression testing after each build/deploy/initialize cycle.",
+    "source_session": "c7e4b222-dc59-4a87-927a-d3697c0a697b",
+    "source_type": "owner_directive",
+    "domain": "TESTING"
+  },
+  {
+    "id": "BATCH5-104",
+    "text": "All owner tests and verifications from manual testing sessions MUST be added to the Repeatable Procedure for future regression tests.",
+    "source_session": "c7e4b222-dc59-4a87-927a-d3697c0a697b",
+    "source_type": "owner_directive",
+    "domain": "TESTING"
+  },
+  {
+    "id": "BATCH5-105",
+    "text": "stripe.exe MUST be added to .gitignore to prevent accidental commit of the binary.",
+    "source_session": "c8be0361-9d3d-464e-8a33-7dba481ca4f2",
+    "source_type": "owner_directive",
+    "domain": "OPS"
+  },
+  {
+    "id": "BATCH5-106",
+    "text": "MCP support MUST be implemented as a prerequisite for credible claims of contemporary 'Agentic' implementation.",
+    "source_session": "c7e4b222-dc59-4a87-927a-d3697c0a697b",
+    "source_type": "owner_directive",
+    "domain": "GENERAL"
+  },
+  {
+    "id": "BATCH5-107",
+    "text": "Effort estimates MUST NOT be provided; focus MUST be on quality (correctness, completeness, absence of defects) rather than time estimates.",
+    "source_session": "a2700066-1b16-4434-abf1-cd7dc6e9b5db",
+    "source_type": "owner_directive",
+    "domain": "GENERAL"
+  },
+  {
+    "id": "BATCH5-108",
+    "text": "Claude MUST actively offer feedback on the owner's inputs during working sessions, including guidance on clarity, consistency, and effectiveness.",
+    "source_session": "9a7f93e4-5994-4b23-a672-413791501371",
+    "source_type": "owner_directive",
+    "domain": "GENERAL"
+  },
+  {
+    "id": "BATCH5-109",
+    "text": "Technical work (implementation, testing, new capabilities) MUST have elevated priority over creative/content work (marketing, cosmetic).",
+    "source_session": "9af315bb-0718-4d48-8019-dbd685fc841e",
+    "source_type": "owner_directive",
+    "domain": "GENERAL"
+  },
+  {
+    "id": "BATCH5-110",
+    "text": "The system MUST implement a four-layer personalization stack: (1) Session context, (2) Cross-session customer memory, (3) Vectorized interaction history for customer-specific RAG, (4) Periodic retraining on accumulated cleansed data.",
+    "source_session": "c720e4ad-1bfd-439a-9521-750d68ada9dd",
+    "source_type": "owner_directive",
+    "domain": "CONVERSATIONS"
+  },
+  {
+    "id": "BATCH5-111",
+    "text": "The UI review process MUST be granular and iterative: start with Dashboard in Dark Mode, then switch to Light Mode, then proceed page-by-page.",
+    "source_session": "bff6101f-33e8-4151-9844-ed77c80f7d84",
+    "source_type": "owner_directive",
+    "domain": "TESTING"
+  },
+  {
+    "id": "BATCH5-112",
+    "text": "When examining a page during UI review, each input MUST be checked, each section expanded, and all elements flexed to reveal hidden elements and UI behaviors.",
+    "source_session": "bff6101f-33e8-4151-9844-ed77c80f7d84",
+    "source_type": "owner_directive",
+    "domain": "TESTING"
+  },
+  {
+    "id": "BATCH5-113",
+    "text": "Agent Red implementation roadmap priorities MUST be: (1) Improve customer experience, (2) Improve merchant administrator experience, (3) Implement with high quality to reduce CAC and churn.",
+    "source_session": "a9e8d160-4609-4c56-ba68-b921337a7341",
+    "source_type": "owner_directive",
+    "domain": "GENERAL"
+  },
+  {
+    "id": "BATCH5-114",
+    "text": "Agent Red MUST focus on reducing merchant administrative load in 4 areas: widget configuration, knowledge curation, Quick Actions creation/evaluation, and AI analysis/tuning/customization.",
+    "source_session": "a9e8d160-4609-4c56-ba68-b921337a7341",
+    "source_type": "owner_directive",
+    "domain": "GENERAL"
+  },
+  {
+    "id": "BATCH5-115",
+    "text": "The Knowledge Database MUST maintain a snapshot of current state in a form outside the database (e.g., GitHub Wiki) for external reference.",
+    "source_session": "bac4ecb8-2187-4ac4-b612-1fcd61c03722",
+    "source_type": "owner_directive",
+    "domain": "OPS"
+  },
+  {
+    "id": "BATCH5-116",
+    "text": "A thorough comparison of the knowledge base, existing GitHub Wiki, implementation, and test/ops Repeatable Procedures MUST be performed to bring all 4 systems into alignment.",
+    "source_session": "bac4ecb8-2187-4ac4-b612-1fcd61c03722",
+    "source_type": "owner_directive",
+    "domain": "OPS"
+  },
+  {
+    "id": "BATCH5-117",
+    "text": "The Shopify storefront MUST be configured with up-to-date product descriptions, polished pages, and template matching Agent Red brand colors and visual style before designer engagement.",
+    "source_session": "b3be1c6b-489b-4645-8204-d8e10c21fa08",
+    "source_type": "owner_directive",
+    "domain": "GENERAL"
+  },
+  {
+    "id": "BATCH5-118",
+    "text": "Never remove code, tests, features, or procedure entries without explicit owner approval in the current session.",
+    "source_session": "a2700066-1b16-4434-abf1-cd7dc6e9b5db",
+    "source_type": "owner_directive",
+    "domain": "GENERAL"
+  },
+  {
+    "id": "BATCH5-119",
+    "text": "WI #139 (PTU) MUST be deferred, not implemented for current release.",
+    "source_session": "bac4ecb8-2187-4ac4-b612-1fcd61c03722",
+    "source_type": "owner_directive",
+    "domain": "GENERAL"
+  },
+  {
+    "id": "BATCH5-120",
+    "text": "CLAUDE.md historical information MUST be decomposed: rename to CLAUDE_ARCHIVE.md and create a pruned CLAUDE.md with a reference to the archive.",
+    "source_session": "b3be1c6b-489b-4645-8204-d8e10c21fa08",
+    "source_type": "owner_approval",
+    "domain": "OPS"
+  },
+  {
+    "id": "BATCH5-121",
+    "text": "The chat UI pre-chat form MUST NOT block the user if it is not explicitly enabled in the merchant's configuration.",
+    "source_session": "b899437d-7bb9-4008-be06-5327b7d3aabe",
+    "source_type": "owner_directive",
+    "domain": "WIDGET_UI"
+  },
+  {
+    "id": "BATCH5-122",
+    "text": "Conversation filter counts MUST be consistent: the sum of all status filter counts MUST equal the 'All' conversations count.",
+    "source_session": "c7e4b222-dc59-4a87-927a-d3697c0a697b",
+    "source_type": "owner_directive",
+    "domain": "CONVERSATIONS"
+  },
+  {
+    "id": "BATCH5-123",
+    "text": "Knowledge Base article category filtering MUST return articles matching the selected category, including manually created articles with that category assigned.",
+    "source_session": "c7e4b222-dc59-4a87-927a-d3697c0a697b",
+    "source_type": "owner_directive",
+    "domain": "KNOWLEDGE_BASE"
+  },
+  {
+    "id": "BATCH5-124",
+    "text": "The ConversationMeter feature MUST be approved and implemented as designed.",
+    "source_session": "b42d0b91-b354-4b24-9095-5d74722735ff",
+    "source_type": "owner_approval",
+    "domain": "BILLING"
+  },
+  {
+    "id": "BATCH5-125",
+    "text": "A fail-closed Critic policy MUST be implemented as designed.",
+    "source_session": "b42d0b91-b354-4b24-9095-5d74722735ff",
+    "source_type": "owner_approval",
+    "domain": "CONVERSATIONS"
+  }
+]

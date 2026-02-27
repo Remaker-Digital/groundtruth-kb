@@ -1,0 +1,843 @@
+[
+  {
+    "title": "Agent class 'AnalyticsCollectorAgent' in analytics_collector",
+    "section": "AGENTS",
+    "tags": [
+      "agents",
+      "analytics_collector"
+    ],
+    "source_file": "src/agents/analytics_collector.py"
+  },
+  {
+    "title": "analytics_collector has process method",
+    "section": "AGENTS",
+    "tags": [
+      "agents",
+      "analytics_collector"
+    ],
+    "source_file": "src/agents/analytics_collector.py"
+  },
+  {
+    "title": "Agent class 'AgentRedBaseAgent' in base",
+    "section": "AGENTS",
+    "tags": [
+      "agents",
+      "base"
+    ],
+    "source_file": "src/agents/base.py"
+  },
+  {
+    "title": "base has process method",
+    "section": "AGENTS",
+    "tags": [
+      "agents",
+      "base"
+    ],
+    "source_file": "src/agents/base.py"
+  },
+  {
+    "title": "Agent class 'CriticSupervisorAgent' in critic_supervisor",
+    "section": "AGENTS",
+    "tags": [
+      "agents",
+      "critic_supervisor"
+    ],
+    "source_file": "src/agents/critic_supervisor.py"
+  },
+  {
+    "title": "critic_supervisor uses env var AZURE_CR_MODEL (default: gpt-4o-mini)",
+    "section": "AGENTS",
+    "tags": [
+      "agents",
+      "critic_supervisor",
+      "config"
+    ],
+    "source_file": "src/agents/critic_supervisor.py"
+  },
+  {
+    "title": "critic_supervisor has process method",
+    "section": "AGENTS",
+    "tags": [
+      "agents",
+      "critic_supervisor"
+    ],
+    "source_file": "src/agents/critic_supervisor.py"
+  },
+  {
+    "title": "Agent class 'EscalationHandlerAgent' in escalation_handler",
+    "section": "AGENTS",
+    "tags": [
+      "agents",
+      "escalation_handler"
+    ],
+    "source_file": "src/agents/escalation_handler.py"
+  },
+  {
+    "title": "escalation_handler uses env var AZURE_IC_MODEL (default: gpt-4o-mini)",
+    "section": "AGENTS",
+    "tags": [
+      "agents",
+      "escalation_handler",
+      "config"
+    ],
+    "source_file": "src/agents/escalation_handler.py"
+  },
+  {
+    "title": "escalation_handler has process method",
+    "section": "AGENTS",
+    "tags": [
+      "agents",
+      "escalation_handler"
+    ],
+    "source_file": "src/agents/escalation_handler.py"
+  },
+  {
+    "title": "Agent class 'IntentClassifierAgent' in intent_classifier",
+    "section": "AGENTS",
+    "tags": [
+      "agents",
+      "intent_classifier"
+    ],
+    "source_file": "src/agents/intent_classifier.py"
+  },
+  {
+    "title": "intent_classifier uses env var AZURE_IC_MODEL (default: gpt-4o-mini)",
+    "section": "AGENTS",
+    "tags": [
+      "agents",
+      "intent_classifier",
+      "config"
+    ],
+    "source_file": "src/agents/intent_classifier.py"
+  },
+  {
+    "title": "intent_classifier has process method",
+    "section": "AGENTS",
+    "tags": [
+      "agents",
+      "intent_classifier"
+    ],
+    "source_file": "src/agents/intent_classifier.py"
+  },
+  {
+    "title": "Agent class 'KnowledgeRetrievalAgent' in knowledge_retrieval",
+    "section": "AGENTS",
+    "tags": [
+      "agents",
+      "knowledge_retrieval"
+    ],
+    "source_file": "src/agents/knowledge_retrieval.py"
+  },
+  {
+    "title": "knowledge_retrieval has process method",
+    "section": "AGENTS",
+    "tags": [
+      "agents",
+      "knowledge_retrieval"
+    ],
+    "source_file": "src/agents/knowledge_retrieval.py"
+  },
+  {
+    "title": "Agent class 'ResponseGeneratorAgent' in response_generator",
+    "section": "AGENTS",
+    "tags": [
+      "agents",
+      "response_generator"
+    ],
+    "source_file": "src/agents/response_generator.py"
+  },
+  {
+    "title": "response_generator uses env var AZURE_RG_MODEL (default: gpt-4o)",
+    "section": "AGENTS",
+    "tags": [
+      "agents",
+      "response_generator",
+      "config"
+    ],
+    "source_file": "src/agents/response_generator.py"
+  },
+  {
+    "title": "response_generator has process method",
+    "section": "AGENTS",
+    "tags": [
+      "agents",
+      "response_generator"
+    ],
+    "source_file": "src/agents/response_generator.py"
+  },
+  {
+    "title": "response_generator has generate_stream method",
+    "section": "AGENTS",
+    "tags": [
+      "agents",
+      "response_generator"
+    ],
+    "source_file": "src/agents/response_generator.py"
+  },
+  {
+    "title": "Test fixture '_reset_pre_auth_rate_limiter'",
+    "section": "TESTING",
+    "tags": [
+      "testing",
+      "fixtures"
+    ],
+    "source_file": "tests/conftest.py"
+  },
+  {
+    "title": "Test fixture 'starter_context'",
+    "section": "TESTING",
+    "tags": [
+      "testing",
+      "fixtures"
+    ],
+    "source_file": "tests/conftest.py"
+  },
+  {
+    "title": "Test fixture 'professional_context'",
+    "section": "TESTING",
+    "tags": [
+      "testing",
+      "fixtures"
+    ],
+    "source_file": "tests/conftest.py"
+  },
+  {
+    "title": "Test fixture 'enterprise_context'",
+    "section": "TESTING",
+    "tags": [
+      "testing",
+      "fixtures"
+    ],
+    "source_file": "tests/conftest.py"
+  },
+  {
+    "title": "Test fixture 'mock_cosmos'",
+    "section": "TESTING",
+    "tags": [
+      "testing",
+      "fixtures"
+    ],
+    "source_file": "tests/conftest.py"
+  },
+  {
+    "title": "Test fixture 'mock_nats'",
+    "section": "TESTING",
+    "tags": [
+      "testing",
+      "fixtures"
+    ],
+    "source_file": "tests/conftest.py"
+  },
+  {
+    "title": "Test fixture 'mock_keyvault'",
+    "section": "TESTING",
+    "tags": [
+      "testing",
+      "fixtures"
+    ],
+    "source_file": "tests/conftest.py"
+  },
+  {
+    "title": "Test fixture 'mock_circuit_breakers'",
+    "section": "TESTING",
+    "tags": [
+      "testing",
+      "fixtures"
+    ],
+    "source_file": "tests/conftest.py"
+  },
+  {
+    "title": "Test fixture 'app_client'",
+    "section": "TESTING",
+    "tags": [
+      "testing",
+      "fixtures"
+    ],
+    "source_file": "tests/conftest.py"
+  },
+  {
+    "title": "Test fixture 'starter_client'",
+    "section": "TESTING",
+    "tags": [
+      "testing",
+      "fixtures"
+    ],
+    "source_file": "tests/conftest.py"
+  },
+  {
+    "title": "Test fixture 'professional_client'",
+    "section": "TESTING",
+    "tags": [
+      "testing",
+      "fixtures"
+    ],
+    "source_file": "tests/conftest.py"
+  },
+  {
+    "title": "Test fixture 'enterprise_client'",
+    "section": "TESTING",
+    "tags": [
+      "testing",
+      "fixtures"
+    ],
+    "source_file": "tests/conftest.py"
+  },
+  {
+    "title": "Test tenant ID 't-starter-001'",
+    "section": "TESTING",
+    "tags": [
+      "testing",
+      "tenants"
+    ],
+    "source_file": "tests/conftest.py"
+  },
+  {
+    "title": "Test tenant ID 't-pro-002'",
+    "section": "TESTING",
+    "tags": [
+      "testing",
+      "tenants"
+    ],
+    "source_file": "tests/conftest.py"
+  },
+  {
+    "title": "Test tenant ID 't-ent-003'",
+    "section": "TESTING",
+    "tags": [
+      "testing",
+      "tenants"
+    ],
+    "source_file": "tests/conftest.py"
+  },
+  {
+    "title": "seed_tenant 0: partition cleanup — all tenant docs deleted before",
+    "section": "OPS",
+    "tags": [
+      "ops",
+      "seed_tenant"
+    ],
+    "source_file": "scripts/seed_tenant.py"
+  },
+  {
+    "title": "seed_tenant 0: deletes all docs including conversations. Do NOT u",
+    "section": "OPS",
+    "tags": [
+      "ops",
+      "seed_tenant"
+    ],
+    "source_file": "scripts/seed_tenant.py"
+  },
+  {
+    "title": "seed_tenant 5: (KB article seeding) was removed in S26. Initializ",
+    "section": "OPS",
+    "tags": [
+      "ops",
+      "seed_tenant"
+    ],
+    "source_file": "scripts/seed_tenant.py"
+  },
+  {
+    "title": "seed_tenant 0: Clean tenant partition (delete all existing docume",
+    "section": "OPS",
+    "tags": [
+      "ops",
+      "seed_tenant"
+    ],
+    "source_file": "scripts/seed_tenant.py"
+  },
+  {
+    "title": "seed_tenant 1: (containers exist) but is listed",
+    "section": "OPS",
+    "tags": [
+      "ops",
+      "seed_tenant"
+    ],
+    "source_file": "scripts/seed_tenant.py"
+  },
+  {
+    "title": "seed_tenant 0: because it conceptually precedes data creation.",
+    "section": "OPS",
+    "tags": [
+      "ops",
+      "seed_tenant"
+    ],
+    "source_file": "scripts/seed_tenant.py"
+  },
+  {
+    "title": "seed_tenant 0: Clean Tenant Partition\")",
+    "section": "OPS",
+    "tags": [
+      "ops",
+      "seed_tenant"
+    ],
+    "source_file": "scripts/seed_tenant.py"
+  },
+  {
+    "title": "seed_tenant 1: Create Cosmos DB containers",
+    "section": "OPS",
+    "tags": [
+      "ops",
+      "seed_tenant"
+    ],
+    "source_file": "scripts/seed_tenant.py"
+  },
+  {
+    "title": "seed_tenant 1: Cosmos DB Containers\")",
+    "section": "OPS",
+    "tags": [
+      "ops",
+      "seed_tenant"
+    ],
+    "source_file": "scripts/seed_tenant.py"
+  },
+  {
+    "title": "seed_tenant 2: Create tenant document",
+    "section": "OPS",
+    "tags": [
+      "ops",
+      "seed_tenant"
+    ],
+    "source_file": "scripts/seed_tenant.py"
+  },
+  {
+    "title": "seed_tenant 2: Tenant Document\")",
+    "section": "OPS",
+    "tags": [
+      "ops",
+      "seed_tenant"
+    ],
+    "source_file": "scripts/seed_tenant.py"
+  },
+  {
+    "title": "seed_tenant 3: Create preferences document",
+    "section": "OPS",
+    "tags": [
+      "ops",
+      "seed_tenant"
+    ],
+    "source_file": "scripts/seed_tenant.py"
+  },
+  {
+    "title": "seed_tenant 3: Preferences (Draft — merchant fields empty)\")",
+    "section": "OPS",
+    "tags": [
+      "ops",
+      "seed_tenant"
+    ],
+    "source_file": "scripts/seed_tenant.py"
+  },
+  {
+    "title": "seed_tenant 2: (required for activation)",
+    "section": "OPS",
+    "tags": [
+      "ops",
+      "seed_tenant"
+    ],
+    "source_file": "scripts/seed_tenant.py"
+  },
+  {
+    "title": "seed_tenant 4: Create team members",
+    "section": "OPS",
+    "tags": [
+      "ops",
+      "seed_tenant"
+    ],
+    "source_file": "scripts/seed_tenant.py"
+  },
+  {
+    "title": "seed_tenant 4: Team Members\")",
+    "section": "OPS",
+    "tags": [
+      "ops",
+      "seed_tenant"
+    ],
+    "source_file": "scripts/seed_tenant.py"
+  },
+  {
+    "title": "seed_tenant 5: Seed knowledge base",
+    "section": "OPS",
+    "tags": [
+      "ops",
+      "seed_tenant"
+    ],
+    "source_file": "scripts/seed_tenant.py"
+  },
+  {
+    "title": "seed_tenant 5: Knowledge Base\")",
+    "section": "OPS",
+    "tags": [
+      "ops",
+      "seed_tenant"
+    ],
+    "source_file": "scripts/seed_tenant.py"
+  },
+  {
+    "title": "seed_tenant 6: Platform config (tier defaults)",
+    "section": "OPS",
+    "tags": [
+      "ops",
+      "seed_tenant"
+    ],
+    "source_file": "scripts/seed_tenant.py"
+  },
+  {
+    "title": "seed_tenant 6: Platform Config (Tier Defaults)\")",
+    "section": "OPS",
+    "tags": [
+      "ops",
+      "seed_tenant"
+    ],
+    "source_file": "scripts/seed_tenant.py"
+  },
+  {
+    "title": "seed_tenant 7: Demo data (optional)",
+    "section": "OPS",
+    "tags": [
+      "ops",
+      "seed_tenant"
+    ],
+    "source_file": "scripts/seed_tenant.py"
+  },
+  {
+    "title": "seed_tenant 7: Demo Data\")",
+    "section": "OPS",
+    "tags": [
+      "ops",
+      "seed_tenant"
+    ],
+    "source_file": "scripts/seed_tenant.py"
+  },
+  {
+    "title": "seed_tenant 8: SEED SUMMARY\")",
+    "section": "OPS",
+    "tags": [
+      "ops",
+      "seed_tenant"
+    ],
+    "source_file": "scripts/seed_tenant.py"
+  },
+  {
+    "title": "seed_tenant results: print(\"-\" * 65)",
+    "section": "OPS",
+    "tags": [
+      "ops",
+      "seed_tenant"
+    ],
+    "source_file": "scripts/seed_tenant.py"
+  },
+  {
+    "title": "seed_tenant 5: (KB articles) removed — initialization yields zero",
+    "section": "OPS",
+    "tags": [
+      "ops",
+      "seed_tenant"
+    ],
+    "source_file": "scripts/seed_tenant.py"
+  },
+  {
+    "title": "seed_tenant 4: runs AFTER demo data so superadmin with API key ha",
+    "section": "OPS",
+    "tags": [
+      "ops",
+      "seed_tenant"
+    ],
+    "source_file": "scripts/seed_tenant.py"
+  },
+  {
+    "title": "upgrade_verification A: + Phase C.",
+    "section": "OPS",
+    "tags": [
+      "ops",
+      "upgrade_verification"
+    ],
+    "source_file": "scripts/upgrade_verification.py"
+  },
+  {
+    "title": "upgrade_verification A: Pre-deployment snapshot",
+    "section": "OPS",
+    "tags": [
+      "ops",
+      "upgrade_verification"
+    ],
+    "source_file": "scripts/upgrade_verification.py"
+  },
+  {
+    "title": "upgrade_verification A: Pre-Deployment Snapshot\")",
+    "section": "OPS",
+    "tags": [
+      "ops",
+      "upgrade_verification"
+    ],
+    "source_file": "scripts/upgrade_verification.py"
+  },
+  {
+    "title": "upgrade_verification C: Post-deployment verification",
+    "section": "OPS",
+    "tags": [
+      "ops",
+      "upgrade_verification"
+    ],
+    "source_file": "scripts/upgrade_verification.py"
+  },
+  {
+    "title": "upgrade_verification C: makes ~30 authenticated calls.",
+    "section": "OPS",
+    "tags": [
+      "ops",
+      "upgrade_verification"
+    ],
+    "source_file": "scripts/upgrade_verification.py"
+  },
+  {
+    "title": "upgrade_verification C: Post-Deployment Verification\")",
+    "section": "OPS",
+    "tags": [
+      "ops",
+      "upgrade_verification"
+    ],
+    "source_file": "scripts/upgrade_verification.py"
+  },
+  {
+    "title": "upgrade_verification A: snapshot JSON (for phase-c)\")",
+    "section": "OPS",
+    "tags": [
+      "ops",
+      "upgrade_verification"
+    ],
+    "source_file": "scripts/upgrade_verification.py"
+  },
+  {
+    "title": "upgrade_verification A: {len(all_envs)} tenants\\n\")",
+    "section": "OPS",
+    "tags": [
+      "ops",
+      "upgrade_verification"
+    ],
+    "source_file": "scripts/upgrade_verification.py"
+  },
+  {
+    "title": "upgrade_verification C: {len(all_envs)} tenants\\n\")",
+    "section": "OPS",
+    "tags": [
+      "ops",
+      "upgrade_verification"
+    ],
+    "source_file": "scripts/upgrade_verification.py"
+  },
+  {
+    "title": "pre_flight_checklist s: A — Pre-Build Verification (source-level, local)",
+    "section": "OPS",
+    "tags": [
+      "ops",
+      "pre_flight_checklist"
+    ],
+    "source_file": "scripts/pre_flight_checklist.py"
+  },
+  {
+    "title": "pre_flight_checklist D: SSE streaming",
+    "section": "OPS",
+    "tags": [
+      "ops",
+      "pre_flight_checklist"
+    ],
+    "source_file": "scripts/pre_flight_checklist.py"
+  },
+  {
+    "title": "pre_flight_checklist A: — Pre-Build Verification",
+    "section": "OPS",
+    "tags": [
+      "ops",
+      "pre_flight_checklist"
+    ],
+    "source_file": "scripts/pre_flight_checklist.py"
+  },
+  {
+    "title": "pre_flight_checklist C: — Post-Deploy Platform Verification",
+    "section": "OPS",
+    "tags": [
+      "ops",
+      "pre_flight_checklist"
+    ],
+    "source_file": "scripts/pre_flight_checklist.py"
+  },
+  {
+    "title": "pre_flight_checklist A: snapshot to exist. Check for it.",
+    "section": "OPS",
+    "tags": [
+      "ops",
+      "pre_flight_checklist"
+    ],
+    "source_file": "scripts/pre_flight_checklist.py"
+  },
+  {
+    "title": "pre_flight_checklist A: snapshot at {snapshot_path}. \"",
+    "section": "OPS",
+    "tags": [
+      "ops",
+      "pre_flight_checklist"
+    ],
+    "source_file": "scripts/pre_flight_checklist.py"
+  },
+  {
+    "title": "pre_flight_checklist s: C.1–C.10 consume 15+ API calls.",
+    "section": "OPS",
+    "tags": [
+      "ops",
+      "pre_flight_checklist"
+    ],
+    "source_file": "scripts/pre_flight_checklist.py"
+  },
+  {
+    "title": "pre_flight_checklist D: — Live Tenant Provisioning Verification",
+    "section": "OPS",
+    "tags": [
+      "ops",
+      "pre_flight_checklist"
+    ],
+    "source_file": "scripts/pre_flight_checklist.py"
+  },
+  {
+    "title": "pre_flight_checklist D: without tenant credentials",
+    "section": "OPS",
+    "tags": [
+      "ops",
+      "pre_flight_checklist"
+    ],
+    "source_file": "scripts/pre_flight_checklist.py"
+  },
+  {
+    "title": "pre_flight_checklist D: summary (computed by caller)",
+    "section": "OPS",
+    "tags": [
+      "ops",
+      "pre_flight_checklist"
+    ],
+    "source_file": "scripts/pre_flight_checklist.py"
+  },
+  {
+    "title": "pre_flight_checklist A: pre-build failures\"",
+    "section": "OPS",
+    "tags": [
+      "ops",
+      "pre_flight_checklist"
+    ],
+    "source_file": "scripts/pre_flight_checklist.py"
+  },
+  {
+    "title": "pre_flight_checklist C: post-deploy failures\"",
+    "section": "OPS",
+    "tags": [
+      "ops",
+      "pre_flight_checklist"
+    ],
+    "source_file": "scripts/pre_flight_checklist.py"
+  },
+  {
+    "title": "pre_flight_checklist D: tenant provisioning failures\"",
+    "section": "OPS",
+    "tags": [
+      "ops",
+      "pre_flight_checklist"
+    ],
+    "source_file": "scripts/pre_flight_checklist.py"
+  },
+  {
+    "title": "pre_flight_checklist D: — from environment",
+    "section": "OPS",
+    "tags": [
+      "ops",
+      "pre_flight_checklist"
+    ],
+    "source_file": "scripts/pre_flight_checklist.py"
+  },
+  {
+    "title": "pre_flight_checklist A: if \"A\" in phases_to_run:",
+    "section": "OPS",
+    "tags": [
+      "ops",
+      "pre_flight_checklist"
+    ],
+    "source_file": "scripts/pre_flight_checklist.py"
+  },
+  {
+    "title": "pre_flight_checklist B: is manual — print reminder",
+    "section": "OPS",
+    "tags": [
+      "ops",
+      "pre_flight_checklist"
+    ],
+    "source_file": "scripts/pre_flight_checklist.py"
+  },
+  {
+    "title": "pre_flight_checklist B: — Build & Deploy (MANUAL)\")",
+    "section": "OPS",
+    "tags": [
+      "ops",
+      "pre_flight_checklist"
+    ],
+    "source_file": "scripts/pre_flight_checklist.py"
+  },
+  {
+    "title": "pre_flight_checklist B: steps are executed manually or via upgrade.ps1.\")",
+    "section": "OPS",
+    "tags": [
+      "ops",
+      "pre_flight_checklist"
+    ],
+    "source_file": "scripts/pre_flight_checklist.py"
+  },
+  {
+    "title": "pre_flight_checklist A: snapshot:\")",
+    "section": "OPS",
+    "tags": [
+      "ops",
+      "pre_flight_checklist"
+    ],
+    "source_file": "scripts/pre_flight_checklist.py"
+  },
+  {
+    "title": "pre_flight_checklist C: if \"C\" in phases_to_run:",
+    "section": "OPS",
+    "tags": [
+      "ops",
+      "pre_flight_checklist"
+    ],
+    "source_file": "scripts/pre_flight_checklist.py"
+  },
+  {
+    "title": "pre_flight_checklist D: if \"D\" in phases_to_run:",
+    "section": "OPS",
+    "tags": [
+      "ops",
+      "pre_flight_checklist"
+    ],
+    "source_file": "scripts/pre_flight_checklist.py"
+  },
+  {
+    "title": "pre_flight_checklist D: requires the SPA superadmin key to provision tenan",
+    "section": "OPS",
+    "tags": [
+      "ops",
+      "pre_flight_checklist"
+    ],
+    "source_file": "scripts/pre_flight_checklist.py"
+  },
+  {
+    "title": "Hook 'assertion-check.py' for session automation",
+    "section": "OPS",
+    "tags": [
+      "ops",
+      "hooks"
+    ],
+    "source_file": ".claude/hooks/assertion-check.py"
+  },
+  {
+    "title": "Hook 'scheduler.py' for session automation",
+    "section": "OPS",
+    "tags": [
+      "ops",
+      "hooks"
+    ],
+    "source_file": ".claude/hooks/scheduler.py"
+  }
+]

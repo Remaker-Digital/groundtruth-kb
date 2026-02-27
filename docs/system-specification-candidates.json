@@ -1,0 +1,759 @@
+{
+  "total_candidates": 106,
+  "category_counts": {
+    "ACTIVATION_CONFIG": 25,
+    "AUTH_IDENTITY": 10,
+    "CONVERSATIONS": 11,
+    "DATA_INTEGRITY": 4,
+    "DEPLOYMENT_OPS": 4,
+    "KNOWLEDGE_BASE": 11,
+    "TEAM_MANAGEMENT": 3,
+    "TESTING_QA": 12,
+    "UNCATEGORIZED": 17,
+    "WIDGET_UI": 9
+  },
+  "candidates": [
+    {
+      "id": "CANDIDATE-001",
+      "category": "ACTIVATION_CONFIG",
+      "text": "- This page should be called \"Widget configuration\" rather than just \"Widget\"\n- The \"Primary color\" should be renamed \"Header left color\" \n- The \"Header gradient end\" should be renamed \"Header right color\"\n- There should be a toggle to enable/disable gradient, and the default should be disabled, with the entire header using the Header left color\n- The Header left color and Header right color should be side-by-side, rather than stacked",
+      "source_file": "204a450e-e22",
+      "strength": 6
+    },
+    {
+      "id": "CANDIDATE-002",
+      "category": "ACTIVATION_CONFIG",
+      "text": "* Add-on modules should each indicate which entitlements are required for activation (All, Starter, Pro, Pro+, Enterprise)\n* Add-on modules which are not available for the current tier should not be subscribe-able, and the \"Subscribe\" control should indicate the minimum entitlement required for activation\n* The \"Upgrade\" path of entitlements should be displayed and should allow the admin to view \"Starter\", then \"Pro\", then \"Pro+\" then \"Enterprise\" in order of entitlement completeness, with an op...",
+      "source_file": "28f7c629-f6b",
+      "strength": 3
+    },
+    {
+      "id": "CANDIDATE-003",
+      "category": "ACTIVATION_CONFIG",
+      "text": "- This page should be called \"Agent configuration\", rather than just \"Configuration\"\n- Each display area of the Configuration page should have a tooltip/link to the relevant documentation so admin users will know what the displayed information means (Brand & persona, Policies, Escalation, Custom instructions, Language, Test mode)\n- The slider in \"Escalation\" should have the word \"Conservative left-justified and the word \"Aggressive\" right-justified so that neither word extends beyond the width o...",
+      "source_file": "204a450e-e22",
+      "strength": 3
+    },
+    {
+      "id": "CANDIDATE-004",
+      "category": "ACTIVATION_CONFIG",
+      "text": "* Non-existent test traffic is still visible in the \"Conversation volume\" chart\n* The state of the system cannot be \"Active\", since some mandatory inputs are not present in this configuration (E.g., because \"Brand name\" has no value and is marked as mandatory. The state of the system is therefore \"Pending\", and the \"Activate\" control should be yellow. If the admin clicks the yellow \"Activate\" control, the UI should pop an alert that lists the inputs in sections \"Agent configuration\", \"Knowledge ...",
+      "source_file": "8e902599-c7c",
+      "strength": 3
+    },
+    {
+      "id": "CANDIDATE-005",
+      "category": "ACTIVATION_CONFIG",
+      "text": "Those are good notes. I have additional comments:\n\n* On the sidebar, \"Team\" should be \"Team members\"\n* On the sidebar, the selections \"Agent configuration\", \"Knowledge base\", \"Quick actions\" and \"Widget configuration\" should be grouped within one layout box that clearly indicates that they have a special relationship with each other. In that same box, there should be a control which displays the state of those grouped items and allows for the option to \"Activate\" changes made to any input on any...",
+      "source_file": "bff6101f-33e",
+      "strength": 3
+    },
+    {
+      "id": "CANDIDATE-006",
+      "category": "ACTIVATION_CONFIG",
+      "text": "Why did you skip testing the configuration wizard? The testing Repeatable Procedure MUST test the wizard. \n\nIt must be possible for the admin to launch the configuration wizard at ant time. A control must be added to the \"AI CINFIGURAION\" card which will start the wizard. The wizard must always auto-start when the system is accessed for the first time following initialization.",
+      "source_file": "fd9de566-fc3",
+      "strength": 3
+    },
+    {
+      "id": "CANDIDATE-007",
+      "category": "ACTIVATION_CONFIG",
+      "text": "I believe that your proposal matches the previous feedback (case) from Mazel. I believe that Mazel made one error in the case: the toggle for \"test mode\" had to be the first step in the setup wizard flow, since this is what we use to grey-out fields that cannot be changes for the \"B\" test group in isolation, so the only inputs that should be available for the \"B\" test group should be those related to prompting and changes to chat AI behavior. \n\nMazel will review what we provide and include updat...",
+      "source_file": "204a450e-e22",
+      "strength": 3
+    },
+    {
+      "id": "CANDIDATE-008",
+      "category": "ACTIVATION_CONFIG",
+      "text": "The order of pages on the sidebar should be changed to:\n\n1) Dashboard: analytics and dashboard content should be combined here into one page and the Analytics page should be removed entirely\n2) Inbox\n3) Team\n4) Agent configuration\n5) Knowledge base\n6) Quick actions\n7) Widget configuration\n8) Integrations\n9) Billing\n10) Setup wizard\n11) Documentation",
+      "source_file": "204a450e-e22",
+      "strength": 3
+    },
+    {
+      "id": "CANDIDATE-009",
+      "category": "ACTIVATION_CONFIG",
+      "text": "We need to implement and adhere to a standard pre-flight checklist that we execute for any production deployment. That checklist must always conclude with a detailed, live verification that a customer tenant can be created and configured with no errors or defects. This must be a very thorough check with minimal opportunity for uncontrolled regression or oversight of critical information.",
+      "source_file": "0bb3785b-a9f",
+      "strength": 2
+    },
+    {
+      "id": "CANDIDATE-010",
+      "category": "ACTIVATION_CONFIG",
+      "text": "General comment for all inputs: if an input is empty but is essential for the intended use of the system that input should be marked with the traditional red asterisk, which indicates that an appropriate input is required. This will usually be more extensive during the configuration for first-use, but is always helpful for human users. Is this clear?",
+      "source_file": "bff6101f-33e",
+      "strength": 2
+    },
+    {
+      "id": "CANDIDATE-011",
+      "category": "ACTIVATION_CONFIG",
+      "text": "The system cannot be in an \"Active\" state if mandatory inputs are missing. When the tenant environment is initialized, it cannot be in an \"Active\" state (and should not be). The merchant admin must provide mandatory inputs and choose to activate the configuration.",
+      "source_file": "7f9d73ab-dee",
+      "strength": 2
+    },
+    {
+      "id": "CANDIDATE-012",
+      "category": "ACTIVATION_CONFIG",
+      "text": "Yes. The client-side dismissal should be associated with a specific session, so when an administrator logs in with a new session, if the system has never been in an active state before, the Setup wizard pop-up should be triggered.",
+      "source_file": "81d2168b-a36",
+      "strength": 2
+    },
+    {
+      "id": "CANDIDATE-013",
+      "category": "ACTIVATION_CONFIG",
+      "text": "The Admin UI should have the Chat widget activated by default. All admin users should be treated as if they were customers who never purchase anything. Int he future, we would like to have the product documentation vectorized and added to RAG so administrative users can ask questions about admin tools while they are viewing data and making configuration changes.",
+      "source_file": "948a5a5f-dc2",
+      "strength": 2
+    },
+    {
+      "id": "CANDIDATE-014",
+      "category": "ACTIVATION_CONFIG",
+      "text": "Seed data must NOT include team members. The only team member in a freshly provisioned tenancy should be the superadmin who is logging in for the first time.\n\nAlso note: for a non-disruptive upgrade in production, we must ensure that API and widget keys are not disturbed and that all configuration is retained, Has this been tested yet?",
+      "source_file": "cf0c0907-918",
+      "strength": 2
+    },
+    {
+      "id": "CANDIDATE-015",
+      "category": "ACTIVATION_CONFIG",
+      "text": "Search fields (or other input boxes) should use the same standard box border color. \n\nRAG lookup information (e.g., \"INVENTORY-CHECK\") should use the standard box border color as well.\n\nThe grey background color for each chat bubble and behind the highlighted conversation should be the same as the background for the active page on the sidebar.",
+      "source_file": "6531e517-f6d",
+      "strength": 1
+    },
+    {
+      "id": "CANDIDATE-016",
+      "category": "ACTIVATION_CONFIG",
+      "text": "- Page assignments should display all available pages in a single column, rather than having the page selected via the Page type drop-down menu\n- Prompt template variables should be displayed below the \"Prompt template\" input box, in the same manner as the \"Greeting message\" input area on the Widget configuration page, rather than being described using a tab as they are now",
+      "source_file": "204a450e-e22",
+      "strength": 1
+    },
+    {
+      "id": "CANDIDATE-017",
+      "category": "ACTIVATION_CONFIG",
+      "text": "* I am testing the admin experience for a merchant who as the \"professional\" entitlement, but I was able to change the \"Cross-session learning\" toggle to \"Enabled\". The \"Cross-session learning\" option is part of the \"Professional+\" entitlement (and \"Enterprise\") and therefore either (a) should cause the \"Save changes\" control to fail or (b) should be greyed out (i.e., is not changeable)",
+      "source_file": "28f7c629-f6b",
+      "strength": 1
+    },
+    {
+      "id": "CANDIDATE-018",
+      "category": "ACTIVATION_CONFIG",
+      "text": "Correct: my request is that clicking Activate when mandatory fields are missing should immediately show which fields are missing across all four config sections, rather than requiring the user to go through the two-step dialog flow.",
+      "source_file": "8e902599-c7c",
+      "strength": 1
+    },
+    {
+      "id": "CANDIDATE-019",
+      "category": "ACTIVATION_CONFIG",
+      "text": "The CONFIGURATION cannot be \"Active\" because the mandatory input \"Brand name\" is empty. The error is still there in 1.30.0",
+      "source_file": "fac8122f-972",
+      "strength": 1
+    },
+    {
+      "id": "CANDIDATE-020",
+      "category": "ACTIVATION_CONFIG",
+      "text": "Page 0 tests (0.1–0.17) must not be skipped. We need to test the first-time activation flow. Please initialize and re-seed, then test that flow. This is the top priority for testing. Repeat this process until you have successfully completed the Page 0 tests (0.1–0.17).",
+      "source_file": "fd9de566-fc3",
+      "strength": 1
+    },
+    {
+      "id": "CANDIDATE-021",
+      "category": "ACTIVATION_CONFIG",
+      "text": "The logos are still small. They should be 260px height and 320px width.\n\nThere is no :onhover change to the background color for either \"Deactivate\" or \"Disconnect\". This does not seem to be the standard style for buttons in this UI.",
+      "source_file": "8b198594-633",
+      "strength": 1
+    },
+    {
+      "id": "CANDIDATE-022",
+      "category": "ACTIVATION_CONFIG",
+      "text": "There is a problem with the logo on the standalone admin password page. The logo should be E:\\Claude-Playground\\CLAUDE-PROJECTS\\Agent Red Customer Engagement\\branding\\logo\\SVG\\primary-logo-no-wordmark.svg or E:\\Claude-Playground\\CLAUDE-PROJECTS\\Agent Red Customer Engagement\\branding\\logo\\PNG\\primary-logo-no-wordmark.png (two versions of the same illustration).",
+      "source_file": "9af315bb-071",
+      "strength": 1
+    },
+    {
+      "id": "CANDIDATE-023",
+      "category": "ACTIVATION_CONFIG",
+      "text": "Yes, the very first time through the wizard \"Test Mode\" is not available.\n\nMazel was suggesting that the only parts of the configuration that should be available in \"Test Mode\" setup are those related to AI behavior: brand voice, languages, response style, escalation keywords, etc. Mazel",
+      "source_file": "9af315bb-071",
+      "strength": 1
+    },
+    {
+      "id": "CANDIDATE-024",
+      "category": "ACTIVATION_CONFIG",
+      "text": "Please verify the version of this build. If this is a fresh deployment, it should be in its initial state. This deployment appears to have 109 conversations and it is in \"Active\" state, which is incorrect for a freshly initialized system. Please note this is the test procedure: check to ensure the system is in an initialized state.",
+      "source_file": "c7e4b222-dc5",
+      "strength": 1
+    },
+    {
+      "id": "CANDIDATE-025",
+      "category": "ACTIVATION_CONFIG",
+      "text": "When the system became \"Active\" the widget did not appear. Activation should trigger the enablement of the widget on the admin UI and the merchant's storefront.",
+      "source_file": "c7e4b222-dc5",
+      "strength": 1
+    },
+    {
+      "id": "CANDIDATE-026",
+      "category": "AUTH_IDENTITY",
+      "text": "- The \"Role\" selector should replace the textual role names displayed and the selector should not be in the \"Actions\" column\n- \"Member\" should be \"Team member\"\n- \"Roles & permissions\" should be an on-hover tool-tip pop-up for the column heading \"Role\", rather than a section of the page\n- \"Agent\" should be \"Escalation agent\"\n- When the \"Escalation agent\" role is selected for a team member, that team member should also be assigned to one or more \"Escalation\" responsibilities (Sales, Support, Servi...",
+      "source_file": "204a450e-e22",
+      "strength": 5
+    },
+    {
+      "id": "CANDIDATE-027",
+      "category": "AUTH_IDENTITY",
+      "text": "Also note that there are some requested changes that are not visible on this \"Team\" page. I believe they were lost or overlooked.\n\n* The \"Role\" column should be select menus, not badges. This column is where a Team member's role is selected\n* There is no way to enable a disabled team member - status should be a toggle enabled/disabled\n* Each Team member may be a target for escalation for one or more of Service, Support, Sales, Account, Technical Assistance or General inquiry - these should be se...",
+      "source_file": "cba9699d-64d",
+      "strength": 3
+    },
+    {
+      "id": "CANDIDATE-028",
+      "category": "AUTH_IDENTITY",
+      "text": "OTP verification should be mandatory, but not for security reasons. We want the customer to authenticate so we can keep the records of their chat sessions - this is the essential requirement for Persistent Customer memory. If we can not authenticate a chat conversation, we cannot benefit from PCM.",
+      "source_file": "81d2168b-a36",
+      "strength": 2
+    },
+    {
+      "id": "CANDIDATE-029",
+      "category": "AUTH_IDENTITY",
+      "text": "When a customer attempts to chat, we must make every attempt to authenticate and identify them, We do not want anonymous chat sessions, since that undermines the value of \"Persistent Customer Memory\". That includes magic links or whatever other mechanisms are available. Customer identification and authentication for every conversation is critical.",
+      "source_file": "81d2168b-a36",
+      "strength": 2
+    },
+    {
+      "id": "CANDIDATE-030",
+      "category": "AUTH_IDENTITY",
+      "text": "The user should not need to know their current password in order to change it. They should enter their email address and receive a confirmation link which allows them to choose a new password.",
+      "source_file": "17546613-0ed",
+      "strength": 1
+    },
+    {
+      "id": "CANDIDATE-031",
+      "category": "AUTH_IDENTITY",
+      "text": "I agree. I have also been considering security.\n\nI believe that administrators must also have 2FA enabled by default, with explicit opt-out if the superadmin allows it. I think there should be 2 options:  (1) SMS or (2) authenticator app (MS Authenticator, Google authenticator, etc.)\n\nPlease add this to your memory as a future enhancement candidate.",
+      "source_file": "6d40ef9b-3c0",
+      "strength": 1
+    },
+    {
+      "id": "CANDIDATE-032",
+      "category": "AUTH_IDENTITY",
+      "text": "The previous API key does not work. What is the new API key?\n\nNote for the future: you should not generate new API keys each time you deploy. You should find a solution which allows API keys to be retained after updates to images.",
+      "source_file": "e492ae9b-1b0",
+      "strength": 1
+    },
+    {
+      "id": "CANDIDATE-033",
+      "category": "AUTH_IDENTITY",
+      "text": "I prefer C. I think an API key linked to an approved email address is fine. They can request a new API key as long as they still have access to the email address they were initialized with. They should not have the ability to change their email addresses in any case - that is an admin point of control that protects access.",
+      "source_file": "5d5d1bd0-cb5",
+      "strength": 1
+    },
+    {
+      "id": "CANDIDATE-034",
+      "category": "AUTH_IDENTITY",
+      "text": "The purpose of assigning the role \"Escalation agent\" to a Team member is to ensure correct routing of escalations to Team members based on the escalation category. This should be the case for both manual escalations and AI-initiated escalations.",
+      "source_file": "c7e4b222-dc5",
+      "strength": 1
+    },
+    {
+      "id": "CANDIDATE-035",
+      "category": "AUTH_IDENTITY",
+      "text": "I have 2 questions before you continue with priority work items.\n\n(1) See the screenshot - note that the Agent Red logo is not displayed. The red AR mark and the wordmark \"Agent Red\" should be replaced with our logo.\n\n(2) How do I get an API key?",
+      "source_file": "e492ae9b-1b0",
+      "strength": 1
+    },
+    {
+      "id": "CANDIDATE-036",
+      "category": "CONVERSATIONS",
+      "text": "* There have not been 42 Billable conversations. If this is a fresh deployment, this tenant should be in an \"initial\" state, therefore there cannot be any data about prior conversations. The \"Total conversations\" count of 42 must be an error. The \"Resolution rate\" may be 100% (or 0%), but there cannot have been \"42 resolved\", since there have not been any to resolve.",
+      "source_file": "16edb809-e47",
+      "strength": 2
+    },
+    {
+      "id": "CANDIDATE-037",
+      "category": "CONVERSATIONS",
+      "text": "* Clicking a \"purchase\" button triggers an error\n* Billing management: This element (box) should be removed\n* All optional features should be presented in the same way \"Conversation packs\" are, in order to present administrators with the option to purchase/upgrade while they are actively engaged with tasks which are likely to motivate an upgrade decision - this is a significant revenue opportunity",
+      "source_file": "43e01cea-989",
+      "strength": 2
+    },
+    {
+      "id": "CANDIDATE-038",
+      "category": "CONVERSATIONS",
+      "text": "Mazel suggested that all merchants should have the option to disable this message. I think we should keep it mandatory for the entry-level. I agree with your suggestion.",
+      "source_file": "9af315bb-071",
+      "strength": 1
+    },
+    {
+      "id": "CANDIDATE-039",
+      "category": "CONVERSATIONS",
+      "text": "Thee should be more than one Escalation Notification Email: E.g., Sales, Support, Service, Account, Technical Assistance, General Inquiry. Each of those should correspond with a set of escalation keyword sets which do not overlap with keyword sets used for other escalation types.",
+      "source_file": "948a5a5f-dc2",
+      "strength": 1
+    },
+    {
+      "id": "CANDIDATE-040",
+      "category": "CONVERSATIONS",
+      "text": "Note the dark red background of the Agent Red AI text in the conversation view. I believe it should be a lighter grey, with the Agent Red icon-master displayed to the right of the text \"Agent Red AI\" near each AI response.",
+      "source_file": "035c268d-41b",
+      "strength": 1
+    },
+    {
+      "id": "CANDIDATE-041",
+      "category": "CONVERSATIONS",
+      "text": "I made an error: the background of the chat history should be #19191A",
+      "source_file": "27be78fe-c16",
+      "strength": 1
+    },
+    {
+      "id": "CANDIDATE-042",
+      "category": "CONVERSATIONS",
+      "text": "I agree. The chat/pipeline.py refactor should be done as part of AGNTCY Phase 3.",
+      "source_file": "432f59fd-9bf",
+      "strength": 1
+    },
+    {
+      "id": "CANDIDATE-043",
+      "category": "CONVERSATIONS",
+      "text": "\"Completed\" status should be renamed to \"Resolved\" for consistency with the \"Resolve conversation\" control label, because these refer to the same state.",
+      "source_file": "c7e4b222-dc5",
+      "strength": 1
+    },
+    {
+      "id": "CANDIDATE-044",
+      "category": "CONVERSATIONS",
+      "text": "When a conversation has been escalated, the conversation information displayed should include identifying the Team member who was the target of the escalation and the escalation type/category.",
+      "source_file": "c7e4b222-dc5",
+      "strength": 1
+    },
+    {
+      "id": "CANDIDATE-045",
+      "category": "CONVERSATIONS",
+      "text": "This order is good. All of these must be completed pre-launch, so the order of implementation is determined by quality and efficiency considerations.\n\nPlease ensure that all fixes/additions will be tested when we execute the Repeatable Procedure(s) for regression testing when we validate the implementation after the next build/deploy/initialize cycle.",
+      "source_file": "c7e4b222-dc5",
+      "strength": 1
+    },
+    {
+      "id": "CANDIDATE-046",
+      "category": "CONVERSATIONS",
+      "text": "Is this a fix?: \"However, vectorize_conversation() is not called from any endpoint or background task. The trigger point is missing — it should be called either at conversation end or via a background scanner.\"",
+      "source_file": "cf0c0907-918",
+      "strength": 1
+    },
+    {
+      "id": "CANDIDATE-047",
+      "category": "DATA_INTEGRITY",
+      "text": "* The Agent Red logo should be used without the added text \"Agent Red\"\n* The text \"Provider Console\" should read \"Service Provider Console\"",
+      "source_file": "438169a2-c81",
+      "strength": 1
+    },
+    {
+      "id": "CANDIDATE-048",
+      "category": "DATA_INTEGRITY",
+      "text": "The integrations partner logos seem to have added vertical padding/margin. The dark grey boxes containing the logos do not need any vertical padding and do not need to be square. The height of each logo should be increased to 260px.",
+      "source_file": "864a42f3-017",
+      "strength": 1
+    },
+    {
+      "id": "CANDIDATE-049",
+      "category": "DATA_INTEGRITY",
+      "text": "The logo in the upper left corner should be primary-logo-light.svg (or primary-logo-dark.svg for Dark mode).\n\nThe text \"Agent Red Customer Experience\" is not necessary (except as a tooltip/on-hover label or alt text)\n\nPlease note: Dark Mode is an important detail. We mentioned this previously this decision might have been lost.",
+      "source_file": "25631a0f-8e2",
+      "strength": 1
+    },
+    {
+      "id": "CANDIDATE-050",
+      "category": "DATA_INTEGRITY",
+      "text": "Wow. This looks excellent. This blog post should be semi-technical: the audience is senior technical executives/leaders who are coming up to speed on Claude Code and the platform is LinkedIn.",
+      "source_file": "32cae8f6-7db",
+      "strength": 1
+    },
+    {
+      "id": "CANDIDATE-051",
+      "category": "DEPLOYMENT_OPS",
+      "text": "Before we proceed, please review all log files and examine the data describing this prod deployment. Please look for any signs of data loss or corruption. This is an extremely high priority, since we must never lose customer data during upgrades or maintenance operations and we had a loss recently.",
+      "source_file": "bff6101f-33e",
+      "strength": 1
+    },
+    {
+      "id": "CANDIDATE-052",
+      "category": "DEPLOYMENT_OPS",
+      "text": "Please propose the work items/issues which should be grouped into build/deploy/test cycles looking forward 3 cycles.",
+      "source_file": "432f59fd-9bf",
+      "strength": 1
+    },
+    {
+      "id": "CANDIDATE-053",
+      "category": "DEPLOYMENT_OPS",
+      "text": "The dashboard should not have an \"All/Production/Test\" control, since we removed this feature from the plan.",
+      "source_file": "5f56d0f4-17e",
+      "strength": 1
+    },
+    {
+      "id": "CANDIDATE-054",
+      "category": "DEPLOYMENT_OPS",
+      "text": "Work item: The SPA console must have a control (e.g., button) which triggers the automated deployment of a new tenant.",
+      "source_file": "81d2168b-a36",
+      "strength": 1
+    },
+    {
+      "id": "CANDIDATE-055",
+      "category": "KNOWLEDGE_BASE",
+      "text": "I would like to make a proposal:\n\nWe should be using a database which has mechanisms for change control and history that are deterministic (e.g., a database engine). The knowledge for this project should not be accessed as files on a disk: they should be in a database structure, with change management applied by an arbitrary database manager. We should be able to use the database to look back on the history of knowledge artifacts and repeatable procedures. Your working process should replace dir...",
+      "source_file": "a2700066-1b1",
+      "strength": 4
+    },
+    {
+      "id": "CANDIDATE-056",
+      "category": "KNOWLEDGE_BASE",
+      "text": "Yes, I agree. This should be well documented. We should create a new work item: exploitability (\"Why did you recommend that product?\") is relevant to auditors and possibly to customers or business users. We may not know exactly why a given response was generated, but we will have some clues we can use to investigate, or point to as a partially-satisfying answer.",
+      "source_file": "4c947331-389",
+      "strength": 1
+    },
+    {
+      "id": "CANDIDATE-057",
+      "category": "KNOWLEDGE_BASE",
+      "text": "Thank you. We currently have access to an Azure staging environment. The required credentials are in the env.local. If any additional resources are required for Azure testing, please advise.",
+      "source_file": "792e6abc-def",
+      "strength": 1
+    },
+    {
+      "id": "CANDIDATE-058",
+      "category": "KNOWLEDGE_BASE",
+      "text": "I selected \"Archive article\" and received a success message. It is not clear what \"Archiving\" an article does. The \"Actions\" column requires a tooltip. IF an article has the status \"Archived\" then the option to archive that article should be replaced with the option to \"Restore\" that article (which presents a new icon representing the \"Restore\" action.",
+      "source_file": "c7e4b222-dc5",
+      "strength": 1
+    },
+    {
+      "id": "CANDIDATE-059",
+      "category": "KNOWLEDGE_BASE",
+      "text": "- \"Scan for conflicts\", \"Export to CSV\", and \"Import\" should have on-hover tooltips with links to documentation",
+      "source_file": "204a450e-e22",
+      "strength": 1
+    },
+    {
+      "id": "CANDIDATE-060",
+      "category": "KNOWLEDGE_BASE",
+      "text": "Each display area of the analytics page should have a tooltip/link to the relevant documentation so admin users will know what the displayed information means (Total conversations, Avg response time, Resolution rate, Customer satisfaction, Escalation rate, Daily conversation volume, Recent conversations, Intents breakdown, Knowledge gaps)",
+      "source_file": "204a450e-e22",
+      "strength": 1
+    },
+    {
+      "id": "CANDIDATE-061",
+      "category": "KNOWLEDGE_BASE",
+      "text": "Good. Thank you.\n\nIf I ask you to create a prompt for the next session with a focus on debugging the Admin UI, will that alter the knowledge you load to initialize the context window? Can you propose a set of knowledge documents which should be loaded in order to optimize that session?",
+      "source_file": "7f9d73ab-dee",
+      "strength": 1
+    },
+    {
+      "id": "CANDIDATE-062",
+      "category": "KNOWLEDGE_BASE",
+      "text": "Please update your knowledge base and any testing Repeatable Procedures that are required for future testing of new code. Please do this after each cycle in order to reduce the potential for errors when the memory of your work has been lost because of compaction.",
+      "source_file": "81d2168b-a36",
+      "strength": 1
+    },
+    {
+      "id": "CANDIDATE-063",
+      "category": "KNOWLEDGE_BASE",
+      "text": "The links in the tooltips are all non-functional. Each tooltip should be associated with a specific section of our published documentation that explains that tooltip in more detail (with context). Please inventory the UI and note every tooltip, then ensure that the URLs provided are all correct and that the URLS are maintained in every update of the documentation in the future.",
+      "source_file": "864a42f3-017",
+      "strength": 1
+    },
+    {
+      "id": "CANDIDATE-064",
+      "category": "KNOWLEDGE_BASE",
+      "text": "Is this a good time to start a fresh session? If so, please inspect and update your knowledge base and suggest a prompt that I should use to begin a fresh session.",
+      "source_file": "a505517d-965",
+      "strength": 1
+    },
+    {
+      "id": "CANDIDATE-065",
+      "category": "KNOWLEDGE_BASE",
+      "text": "I agree. Our desired architecture is a four-layer personalization stack. This is an important differentiation opportunity that should be highlighted in marketing materials, documentation, web site and anywhere we want to enumerate our two pillars of our business value: (1) Best customer experience for (2) the best price.",
+      "source_file": "c720e4ad-1bf",
+      "strength": 1
+    },
+    {
+      "id": "CANDIDATE-066",
+      "category": "TEAM_MANAGEMENT",
+      "text": "All user actions should be stored in an audit log, including deletion and addition and changes of status. Deletion of a user is a hard operation that can only be reversed by adding the user again, using the \"+ Invite member\" process. There should not be any \"Soft deletion\" option.",
+      "source_file": "2cb388a7-541",
+      "strength": 2
+    },
+    {
+      "id": "CANDIDATE-067",
+      "category": "TEAM_MANAGEMENT",
+      "text": "This is incorrect. The page body background should be dark and the team member list and \"+ Invite member\" should be grouped within a single box, since they are related. My previous comment was referring to the fact that the box containing those items was the only element within another box, which was on the page background. We did not need a box within a box. We only needed one box.",
+      "source_file": "864a42f3-017",
+      "strength": 2
+    },
+    {
+      "id": "CANDIDATE-068",
+      "category": "TEAM_MANAGEMENT",
+      "text": "I can confirm: the pages at http://localhost:3300/admin/standalone/billing are the corrected pages that must be used for the prod deployment. The pages which were pushed are obsolete.",
+      "source_file": "43e01cea-989",
+      "strength": 1
+    },
+    {
+      "id": "CANDIDATE-069",
+      "category": "TESTING_QA",
+      "text": "It MUST be possible for the SPA console to initiate a tenant provisioning operation. This is a mandatory requirement. In both the case of triggering via SPA console and Purchase Event Trigger, the tenant provisioning must be fully automated, with no involvement from us during the entire process. It must never fail silently, and it must recover from faults. This is a critical requirement. We need to design, implement and test this before we take any other actions.\n\nThe SPA should be able to input...",
+      "source_file": "3afe87cc-20a",
+      "strength": 4
+    },
+    {
+      "id": "CANDIDATE-070",
+      "category": "TESTING_QA",
+      "text": "There are  few problems to fix:\n\n- The logo in the bottom left (on the sidebar) of the page is incorrect. It should be E:\\Claude-Playground\\CLAUDE-PROJECTS\\Agent Red Customer Engagement\\branding\\logo\\SVG\\NEW-BLOCK-LOGO-HORIZONTAL.svg. The text \"Remaker Digital\" should be removed, as this logo contains that test in SVG form and shouldn't be duplicated.\n\n- The logo in the top right (on the sticky nav bar) should be E:\\Claude-Playground\\CLAUDE-PROJECTS\\Agent Red Customer Engagement\\branding\\logo\\SV...",
+      "source_file": "e492ae9b-1b0",
+      "strength": 3
+    },
+    {
+      "id": "CANDIDATE-071",
+      "category": "TESTING_QA",
+      "text": "This is good to know. When you propose priorities, do you always consider this or should I specify it?",
+      "source_file": "00d2a0f0-37d",
+      "strength": 1
+    },
+    {
+      "id": "CANDIDATE-072",
+      "category": "TESTING_QA",
+      "text": "If we could complete a sandbox checkout then we should. If not, we may need to run a test and buy our own product a few times to make sure it works correctly. I can provide payment info when we get to this test.",
+      "source_file": "9af315bb-071",
+      "strength": 1
+    },
+    {
+      "id": "CANDIDATE-073",
+      "category": "TESTING_QA",
+      "text": "Support for Spanish (Mexico) and French (Canada) are important in the near term. Portugese (Brazil), UK English (UK) are medium-term priorities.  If ibuenda has better support for those languages then I believe we should proceed with your Option 4 and specify that our plan-of-record is to use ibuenda.",
+      "source_file": "4c947331-389",
+      "strength": 1
+    },
+    {
+      "id": "CANDIDATE-074",
+      "category": "TESTING_QA",
+      "text": "When there are errors, such as a loss of connectivity to send email, or a failed connection of some other kind, how will I receive notification? Should we set up PagerDuty or some other mechanism?",
+      "source_file": "8d07b150-b77",
+      "strength": 1
+    },
+    {
+      "id": "CANDIDATE-075",
+      "category": "TESTING_QA",
+      "text": "Before we proceed, please update the wiki with a section specifically covering these 4 requirements. We want to ensure that ALL copy-of-record information is in the Wiki, except for information that SHOULD NOT be in the wiki and is instead in artifacts in our Git repo.",
+      "source_file": "9af315bb-071",
+      "strength": 1
+    },
+    {
+      "id": "CANDIDATE-076",
+      "category": "TESTING_QA",
+      "text": "Excellent work. Thank you.\n\nThe Azure account should be re-enabled now. I was just notified that the suspension has been lifted. Please resume the testing that you were executing when the last session was ended because of the Azure suspension.",
+      "source_file": "b3be1c6b-489",
+      "strength": 1
+    },
+    {
+      "id": "CANDIDATE-077",
+      "category": "TESTING_QA",
+      "text": "Yes. We must have a functional test harness, since untestable implementation is unacceptable.",
+      "source_file": "cf0c0907-918",
+      "strength": 1
+    },
+    {
+      "id": "CANDIDATE-078",
+      "category": "TESTING_QA",
+      "text": "Please locate the master test plan that specifies the order of child Repeatable Procedures. This should have been created several sessions ago.",
+      "source_file": "cf0c0907-918",
+      "strength": 1
+    },
+    {
+      "id": "CANDIDATE-079",
+      "category": "TESTING_QA",
+      "text": "OK. I agree: SPA manual provisioning via the Provider Console. Yes, provisioning smoke test should be added as a formal step.",
+      "source_file": "cf0c0907-918",
+      "strength": 1
+    },
+    {
+      "id": "CANDIDATE-080",
+      "category": "TESTING_QA",
+      "text": "When I perform a manual test please ensure that an automated test is created (added to the testing Repeatable Procedure) to emulate my manual test in future test runs. IF I find an issue, we need to add the fix to our regression tests to prevent it from recurring. This must be general guidance loaded for each session.",
+      "source_file": "cf0c0907-918",
+      "strength": 1
+    },
+    {
+      "id": "CANDIDATE-081",
+      "category": "UNCATEGORIZED",
+      "text": "Are we having problems because (a) the state model is not clearly explained or (b) we are simply experiencing errors implementing it?\n\nNote 1:  in this screen shot there is no \"Roll back\" control visible. That control should be visible but not operable (greyed out) because there is no prior state to roll back to.\n\nNote: 2: The system cannot be \"Active\" because mandatory inputs are missing (e.g, \"Brand name\"). The initialized state of the system should be \"Pending\"",
+      "source_file": "fac8122f-972",
+      "strength": 3
+    },
+    {
+      "id": "CANDIDATE-082",
+      "category": "UNCATEGORIZED",
+      "text": "This is the most critical issue: it MUST be possible for tenants to be automatically provisioned via (1) the trigger from a purchase event and (2) via the SPA console. These requirements were detailed and should have been written down and implemented. Please confirm that these implementations are complete.",
+      "source_file": "3afe87cc-20a",
+      "strength": 2
+    },
+    {
+      "id": "CANDIDATE-083",
+      "category": "UNCATEGORIZED",
+      "text": "Yes, this is much better. \n\nI have two requests: \n\n1) On the Dark Mode page: I think it would be better to use a palette of greys for Dark Mode, similar to this image, rather than blue/purple. I think the main page display areas should have a thinner border in Dark Mode.\n\n2) The sticky navbar at the top of the page should be medium-light grey in Light Mode.",
+      "source_file": "035c268d-41b",
+      "strength": 2
+    },
+    {
+      "id": "CANDIDATE-084",
+      "category": "UNCATEGORIZED",
+      "text": "* There should be a tooltip for each integration\n* The text name for each integration should be 22px instead of 15px",
+      "source_file": "43e01cea-989",
+      "strength": 2
+    },
+    {
+      "id": "CANDIDATE-085",
+      "category": "UNCATEGORIZED",
+      "text": "All issues with Beta customers must be corrected immediately and fixes must be pushed to the beta environment. Do this ASAP.",
+      "source_file": "697d8270-e5b",
+      "strength": 2
+    },
+    {
+      "id": "CANDIDATE-086",
+      "category": "UNCATEGORIZED",
+      "text": "The SPA console is blocking launch. I require a graphical UI that allows me to observe traffic, monitor consumption, track issues and observe the budget versus spend, etc. This is NOT deferred.\n\nplease provide me with a detailed breakdown of what has been deferred. We are being unnecessarily conservative about the content of this release. There should be very little work deferred to post-launch.",
+      "source_file": "66eb04ae-89d",
+      "strength": 1
+    },
+    {
+      "id": "CANDIDATE-087",
+      "category": "UNCATEGORIZED",
+      "text": "There should only be one: mike-remakerdigital\n\nThe other 2 choices are not correct and should be removed.",
+      "source_file": "fd9de566-fc3",
+      "strength": 1
+    },
+    {
+      "id": "CANDIDATE-088",
+      "category": "UNCATEGORIZED",
+      "text": "These changes should be made now.\n\nContext for this request: We are doing a UX review with Mazel. Mazel is providing feedback by telephone and I am making requests as they come. Mazel will prepare a more detailed set of use cases soon, but we have been tackling large issues sequentially, as they are discovered. All of Mazel",
+      "source_file": "204a450e-e22",
+      "strength": 1
+    },
+    {
+      "id": "CANDIDATE-089",
+      "category": "UNCATEGORIZED",
+      "text": "I agree. Persistent Customer Memory is both technically meaningful and relatively easy for non technical merchants to understand, in principle. This will be enough to drive the narrative of promoter and affiliate content. This should be the pillar of the launch.\n\nYou are working with me in a way that I feel is effective. Thank you. Please retain this if you can.",
+      "source_file": "4249eb26-19e",
+      "strength": 1
+    },
+    {
+      "id": "CANDIDATE-090",
+      "category": "UNCATEGORIZED",
+      "text": "I think this should be moved to a low priority, deferred.",
+      "source_file": "432f59fd-9bf",
+      "strength": 1
+    },
+    {
+      "id": "CANDIDATE-091",
+      "category": "UNCATEGORIZED",
+      "text": "Got it. That is helpful. I was not sure whether providing the full-window made it easier to interpret and if so, by how much, and when should I crop versus full-window.",
+      "source_file": "7f9d73ab-dee",
+      "strength": 1
+    },
+    {
+      "id": "CANDIDATE-092",
+      "category": "UNCATEGORIZED",
+      "text": "Work item: the new tenant provisioning and health check must be fully automated so that it happens successfully 100% of the time with no involvement from us. This is a P0 blocker.",
+      "source_file": "81d2168b-a36",
+      "strength": 1
+    },
+    {
+      "id": "CANDIDATE-093",
+      "category": "UNCATEGORIZED",
+      "text": "The contents of this tooltip should be arranged in a table that is vertically consistent for all content rows. This looks jumbled.",
+      "source_file": "864a42f3-017",
+      "strength": 1
+    },
+    {
+      "id": "CANDIDATE-094",
+      "category": "UNCATEGORIZED",
+      "text": "Mazel's suggestion was that all users should be able to report an issue to the merchant. <azel",
+      "source_file": "9af315bb-071",
+      "strength": 1
+    },
+    {
+      "id": "CANDIDATE-095",
+      "category": "UNCATEGORIZED",
+      "text": "Thank you.\n\nWhen I refer to you, what name should I use?",
+      "source_file": "b3be1c6b-489",
+      "strength": 1
+    },
+    {
+      "id": "CANDIDATE-096",
+      "category": "UNCATEGORIZED",
+      "text": "Please note: \n* #6 is complete\n* #22 is not post-launch. It should be completed before launch\n\nPlease proceed with work items 1-5. Do not stop to collect my input unless you encounter a problem and need a decision from me before it can be resolved.",
+      "source_file": "bff6101f-33e",
+      "strength": 1
+    },
+    {
+      "id": "CANDIDATE-097",
+      "category": "UNCATEGORIZED",
+      "text": "The beta is of no value if the Persistent Customer memory features are not working correctly. This cannot be deferred.\n\nCan you enumerate the items that have been deferred? I am concerned that we are accidently deferring important features.",
+      "source_file": "cf0c0907-918",
+      "strength": 1
+    },
+    {
+      "id": "CANDIDATE-098",
+      "category": "WIDGET_UI",
+      "text": "- There is no visible control for the drop-shadow on the widget or chat UI\n- Thee are no controls for changing the widget icon or the Agent Red avatar at the top of the chat UI\n- In the greetings options there is no explanation of what the pre-chat form or offline form do\n- The chat UI has a fixed width that is very narrow and should have a control that allows users to expand it horizontally\n- The chat UI cannot be click-dragged to other regions of the browser window\n- The auto-open should be se...",
+      "source_file": "204a450e-e22",
+      "strength": 3
+    },
+    {
+      "id": "CANDIDATE-099",
+      "category": "WIDGET_UI",
+      "text": "Can you include details about UI and UX elements? User Experience is critical: the user experience for 1.0 must be polished and refined: comparable (ideally superior) in styling and usability to the Tidio chat UI toolset. Customer users must be able to access the chat UI on mobile or desktop (responsive, web-based) and the Admin UI can support desktop users (web-based).",
+      "source_file": "25631a0f-8e2",
+      "strength": 3
+    },
+    {
+      "id": "CANDIDATE-100",
+      "category": "WIDGET_UI",
+      "text": "This is what I see. I notice 3 things:\n\n1) The color of the active selection text in the sidebar is red, and it should be white.\n2) The taupe border (#938a87) is .2px in the mockup and looks too bold if the border is wider. IF we cannot make it more narrow, perhaps we need to change it to #363636\n3) The background of the chat history is too bright and should be #2A2A2A",
+      "source_file": "27be78fe-c16",
+      "strength": 2
+    },
+    {
+      "id": "CANDIDATE-101",
+      "category": "WIDGET_UI",
+      "text": "The logo in the top right corner of the admin console is not correct. That logo should be primary-logo-no-wordmark.svg. the text embedded in this logo should not be considered a \"wordmark\". The \"wordmark\" is \"Customer Experience\".",
+      "source_file": "948a5a5f-dc2",
+      "strength": 2
+    },
+    {
+      "id": "CANDIDATE-102",
+      "category": "WIDGET_UI",
+      "text": "I agree. Please enumerate any flaws or errors which may result from our attempt to scan or ingest data from the storefront.\n\nAlso note: if the storefront is not detectable, we may need to ask the merchant administrator to provide the target storefront URL. Our mechanism for accessing data and building a knowledge base should cover (1) merchants using Shopify and (2) non-Shopify merchants.",
+      "source_file": "fd9de566-fc3",
+      "strength": 1
+    },
+    {
+      "id": "CANDIDATE-103",
+      "category": "WIDGET_UI",
+      "text": "This ordering of priorities is very good. I have one minor change: the perceived quality of the GUI affects perceived conversation quality. These are behaviorally interdependent. Improving the stability, usability and feature set of the Chat UI should be ranked highly (e.g., Hugo chat UI is the best overall example to match).",
+      "source_file": "3af2f167-33d",
+      "strength": 1
+    },
+    {
+      "id": "CANDIDATE-104",
+      "category": "WIDGET_UI",
+      "text": "The widget \"Live preview\" is now broken. When I click the widget to launch the chat UI, the live preview disappears. When I click it again, the live preview re-appears. The chat UI doesn't appear on the admin UI pages. The Chat UI should appear on the UI pages exactly as it does on the respective storefront.\n\nWhy does this keep changing? This is an example of uncontrolled regression.",
+      "source_file": "3af2f167-33d",
+      "strength": 1
+    },
+    {
+      "id": "CANDIDATE-105",
+      "category": "WIDGET_UI",
+      "text": "\"Greeting message\" should have a tooltip explaining that this message does not affect the behavior of the AI and is not AI generated. It is worth adding a work item for the future to make this an option. (E.g., When the \"AI Greeting\" option is toggled to the \"on\" position, the AI generates the greeting message for new chat sessions.)",
+      "source_file": "864a42f3-017",
+      "strength": 1
+    },
+    {
+      "id": "CANDIDATE-106",
+      "category": "WIDGET_UI",
+      "text": "This should be red. The color was lightened for some reason - please revert it",
+      "source_file": "88d8fddf-acb",
+      "strength": 1
+    }
+  ]
+}

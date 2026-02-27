@@ -1,0 +1,472 @@
+[
+  {
+    "title": "alerts.get_rule() returns dict[str, Any] | None",
+    "section": "INFRASTRUCTURE",
+    "tags": [
+      "repository",
+      "alerts"
+    ],
+    "source_file": "src/multi_tenant/repositories/alerts.py"
+  },
+  {
+    "title": "alerts.find_rule() returns dict[str, Any] | None",
+    "section": "INFRASTRUCTURE",
+    "tags": [
+      "repository",
+      "alerts"
+    ],
+    "source_file": "src/multi_tenant/repositories/alerts.py"
+  },
+  {
+    "title": "alerts.list_all() returns list[dict[str, Any]]",
+    "section": "INFRASTRUCTURE",
+    "tags": [
+      "repository",
+      "alerts"
+    ],
+    "source_file": "src/multi_tenant/repositories/alerts.py"
+  },
+  {
+    "title": "alerts.list_enabled() returns list[dict[str, Any]]",
+    "section": "INFRASTRUCTURE",
+    "tags": [
+      "repository",
+      "alerts"
+    ],
+    "source_file": "src/multi_tenant/repositories/alerts.py"
+  },
+  {
+    "title": "alerts.delete_rule() returns bool",
+    "section": "INFRASTRUCTURE",
+    "tags": [
+      "repository",
+      "alerts"
+    ],
+    "source_file": "src/multi_tenant/repositories/alerts.py"
+  },
+  {
+    "title": "alerts.list_recent() returns list[dict[str, Any]]",
+    "section": "INFRASTRUCTURE",
+    "tags": [
+      "repository",
+      "alerts"
+    ],
+    "source_file": "src/multi_tenant/repositories/alerts.py"
+  },
+  {
+    "title": "alerts.get_last_trigger_for_rule() returns dict[str, Any] | None",
+    "section": "INFRASTRUCTURE",
+    "tags": [
+      "repository",
+      "alerts"
+    ],
+    "source_file": "src/multi_tenant/repositories/alerts.py"
+  },
+  {
+    "title": "base.create() returns dict[str, Any]",
+    "section": "INFRASTRUCTURE",
+    "tags": [
+      "repository",
+      "base"
+    ],
+    "source_file": "src/multi_tenant/repositories/base.py"
+  },
+  {
+    "title": "base.read() returns dict[str, Any]",
+    "section": "INFRASTRUCTURE",
+    "tags": [
+      "repository",
+      "base"
+    ],
+    "source_file": "src/multi_tenant/repositories/base.py"
+  },
+  {
+    "title": "base.upsert() returns dict[str, Any]",
+    "section": "INFRASTRUCTURE",
+    "tags": [
+      "repository",
+      "base"
+    ],
+    "source_file": "src/multi_tenant/repositories/base.py"
+  },
+  {
+    "title": "base.delete() returns None",
+    "section": "INFRASTRUCTURE",
+    "tags": [
+      "repository",
+      "base"
+    ],
+    "source_file": "src/multi_tenant/repositories/base.py"
+  },
+  {
+    "title": "Repository class 'ConversationRepository' in conversation.py",
+    "section": "INFRASTRUCTURE",
+    "tags": [
+      "repository",
+      "conversation"
+    ],
+    "source_file": "src/multi_tenant/repositories/conversation.py"
+  },
+  {
+    "title": "conversation.count_non_archived() returns int",
+    "section": "INFRASTRUCTURE",
+    "tags": [
+      "repository",
+      "conversation"
+    ],
+    "source_file": "src/multi_tenant/repositories/conversation.py"
+  },
+  {
+    "title": "Repository class 'CustomerProfileRepository' in customer.py",
+    "section": "INFRASTRUCTURE",
+    "tags": [
+      "repository",
+      "customer"
+    ],
+    "source_file": "src/multi_tenant/repositories/customer.py"
+  },
+  {
+    "title": "incidents.get_incident() returns dict[str, Any] | None",
+    "section": "INFRASTRUCTURE",
+    "tags": [
+      "repository",
+      "incidents"
+    ],
+    "source_file": "src/multi_tenant/repositories/incidents.py"
+  },
+  {
+    "title": "incidents.find_incident() returns dict[str, Any] | None",
+    "section": "INFRASTRUCTURE",
+    "tags": [
+      "repository",
+      "incidents"
+    ],
+    "source_file": "src/multi_tenant/repositories/incidents.py"
+  },
+  {
+    "title": "incidents.list_active() returns list[dict[str, Any]]",
+    "section": "INFRASTRUCTURE",
+    "tags": [
+      "repository",
+      "incidents"
+    ],
+    "source_file": "src/multi_tenant/repositories/incidents.py"
+  },
+  {
+    "title": "incidents.list_all() returns list[dict[str, Any]]",
+    "section": "INFRASTRUCTURE",
+    "tags": [
+      "repository",
+      "incidents"
+    ],
+    "source_file": "src/multi_tenant/repositories/incidents.py"
+  },
+  {
+    "title": "Repository class 'KnowledgeBaseRepository' in knowledge.py",
+    "section": "INFRASTRUCTURE",
+    "tags": [
+      "repository",
+      "knowledge"
+    ],
+    "source_file": "src/multi_tenant/repositories/knowledge.py"
+  },
+  {
+    "title": "Repository class 'MemoryVectorRepository' in memory.py",
+    "section": "INFRASTRUCTURE",
+    "tags": [
+      "repository",
+      "memory"
+    ],
+    "source_file": "src/multi_tenant/repositories/memory.py"
+  },
+  {
+    "title": "Repository class 'PlatformConfigRepository' in platform.py",
+    "section": "INFRASTRUCTURE",
+    "tags": [
+      "repository",
+      "platform"
+    ],
+    "source_file": "src/multi_tenant/repositories/platform.py"
+  },
+  {
+    "title": "Repository class 'AuditLogRepository' in platform.py",
+    "section": "INFRASTRUCTURE",
+    "tags": [
+      "repository",
+      "platform"
+    ],
+    "source_file": "src/multi_tenant/repositories/platform.py"
+  },
+  {
+    "title": "platform.list_by_type() returns list[dict[str, Any]]",
+    "section": "INFRASTRUCTURE",
+    "tags": [
+      "repository",
+      "platform"
+    ],
+    "source_file": "src/multi_tenant/repositories/platform.py"
+  },
+  {
+    "title": "Repository class 'PreferencesRepository' in preferences.py",
+    "section": "INFRASTRUCTURE",
+    "tags": [
+      "repository",
+      "preferences"
+    ],
+    "source_file": "src/multi_tenant/repositories/preferences.py"
+  },
+  {
+    "title": "preferences.get_active() returns dict[str, Any] | None",
+    "section": "INFRASTRUCTURE",
+    "tags": [
+      "repository",
+      "preferences"
+    ],
+    "source_file": "src/multi_tenant/repositories/preferences.py"
+  },
+  {
+    "title": "preferences.get_draft() returns dict[str, Any] | None",
+    "section": "INFRASTRUCTURE",
+    "tags": [
+      "repository",
+      "preferences"
+    ],
+    "source_file": "src/multi_tenant/repositories/preferences.py"
+  },
+  {
+    "title": "preferences.get_previous() returns dict[str, Any] | None",
+    "section": "INFRASTRUCTURE",
+    "tags": [
+      "repository",
+      "preferences"
+    ],
+    "source_file": "src/multi_tenant/repositories/preferences.py"
+  },
+  {
+    "title": "preferences.get_current() returns dict[str, Any] | None",
+    "section": "INFRASTRUCTURE",
+    "tags": [
+      "repository",
+      "preferences"
+    ],
+    "source_file": "src/multi_tenant/repositories/preferences.py"
+  },
+  {
+    "title": "preferences.get_quick_actions() returns list[dict[str, Any]]",
+    "section": "INFRASTRUCTURE",
+    "tags": [
+      "repository",
+      "preferences"
+    ],
+    "source_file": "src/multi_tenant/repositories/preferences.py"
+  },
+  {
+    "title": "preferences.get_quick_actions_active() returns list[dict[str, Any]]",
+    "section": "INFRASTRUCTURE",
+    "tags": [
+      "repository",
+      "preferences"
+    ],
+    "source_file": "src/multi_tenant/repositories/preferences.py"
+  },
+  {
+    "title": "Constant SNAPSHOT_TYPE_HOURLY = \"hourly\" in sla_snapshots",
+    "section": "INFRASTRUCTURE",
+    "tags": [
+      "repository",
+      "sla_snapshots",
+      "constant"
+    ],
+    "source_file": "src/multi_tenant/repositories/sla_snapshots.py"
+  },
+  {
+    "title": "Constant SNAPSHOT_TYPE_DAILY = \"daily\" in sla_snapshots",
+    "section": "INFRASTRUCTURE",
+    "tags": [
+      "repository",
+      "sla_snapshots",
+      "constant"
+    ],
+    "source_file": "src/multi_tenant/repositories/sla_snapshots.py"
+  },
+  {
+    "title": "Repository class 'TeamMemberRepository' in team.py",
+    "section": "INFRASTRUCTURE",
+    "tags": [
+      "repository",
+      "team"
+    ],
+    "source_file": "src/multi_tenant/repositories/team.py"
+  },
+  {
+    "title": "Repository class 'TenantRepository' in tenant.py",
+    "section": "INFRASTRUCTURE",
+    "tags": [
+      "repository",
+      "tenant"
+    ],
+    "source_file": "src/multi_tenant/repositories/tenant.py"
+  },
+  {
+    "title": "tenant.list_active_tenant_ids() returns list[str]",
+    "section": "INFRASTRUCTURE",
+    "tags": [
+      "repository",
+      "tenant"
+    ],
+    "source_file": "src/multi_tenant/repositories/tenant.py"
+  },
+  {
+    "title": "tenant.list_expired_trials() returns list[dict[str, Any]]",
+    "section": "INFRASTRUCTURE",
+    "tags": [
+      "repository",
+      "tenant"
+    ],
+    "source_file": "src/multi_tenant/repositories/tenant.py"
+  },
+  {
+    "title": "tenant.list_expiring_trials() returns list[dict[str, Any]]",
+    "section": "INFRASTRUCTURE",
+    "tags": [
+      "repository",
+      "tenant"
+    ],
+    "source_file": "src/multi_tenant/repositories/tenant.py"
+  },
+  {
+    "title": "tenant.list_expired_tenants() returns list[dict[str, Any]]",
+    "section": "INFRASTRUCTURE",
+    "tags": [
+      "repository",
+      "tenant"
+    ],
+    "source_file": "src/multi_tenant/repositories/tenant.py"
+  },
+  {
+    "title": "tenant.list_expiring_tenants() returns list[dict[str, Any]]",
+    "section": "INFRASTRUCTURE",
+    "tags": [
+      "repository",
+      "tenant"
+    ],
+    "source_file": "src/multi_tenant/repositories/tenant.py"
+  },
+  {
+    "title": "Repository class 'UsageRepository' in usage.py",
+    "section": "INFRASTRUCTURE",
+    "tags": [
+      "repository",
+      "usage"
+    ],
+    "source_file": "src/multi_tenant/repositories/usage.py"
+  },
+  {
+    "title": "Middleware function verify_api_key() in auth",
+    "section": "INFRASTRUCTURE",
+    "tags": [
+      "middleware",
+      "auth"
+    ],
+    "source_file": "src/multi_tenant/auth.py"
+  },
+  {
+    "title": "Middleware function verify_user_api_key() in auth",
+    "section": "INFRASTRUCTURE",
+    "tags": [
+      "middleware",
+      "auth"
+    ],
+    "source_file": "src/multi_tenant/auth.py"
+  },
+  {
+    "title": "Middleware function verify_widget_key() in auth",
+    "section": "INFRASTRUCTURE",
+    "tags": [
+      "middleware",
+      "auth"
+    ],
+    "source_file": "src/multi_tenant/auth.py"
+  },
+  {
+    "title": "Security header 'X-API-Key' set by auth",
+    "section": "INFRASTRUCTURE",
+    "tags": [
+      "middleware",
+      "security-headers"
+    ],
+    "source_file": "src/multi_tenant/auth.py"
+  },
+  {
+    "title": "Security header 'X-Widget-Key' set by auth",
+    "section": "INFRASTRUCTURE",
+    "tags": [
+      "middleware",
+      "security-headers"
+    ],
+    "source_file": "src/multi_tenant/auth.py"
+  },
+  {
+    "title": "Middleware function size_limited_receive() in security_middleware",
+    "section": "INFRASTRUCTURE",
+    "tags": [
+      "middleware",
+      "security_middleware"
+    ],
+    "source_file": "src/multi_tenant/security_middleware.py"
+  },
+  {
+    "title": "Middleware function dispatch() in security_middleware",
+    "section": "INFRASTRUCTURE",
+    "tags": [
+      "middleware",
+      "security_middleware"
+    ],
+    "source_file": "src/multi_tenant/security_middleware.py"
+  },
+  {
+    "title": "Middleware function send_with_security_headers() in security_middleware",
+    "section": "INFRASTRUCTURE",
+    "tags": [
+      "middleware",
+      "security_middleware"
+    ],
+    "source_file": "src/multi_tenant/security_middleware.py"
+  },
+  {
+    "title": "Security header 'X-Content-Type-Options' set by security_middleware",
+    "section": "INFRASTRUCTURE",
+    "tags": [
+      "middleware",
+      "security-headers"
+    ],
+    "source_file": "src/multi_tenant/security_middleware.py"
+  },
+  {
+    "title": "Security header 'X-Frame-Options' set by security_middleware",
+    "section": "INFRASTRUCTURE",
+    "tags": [
+      "middleware",
+      "security-headers"
+    ],
+    "source_file": "src/multi_tenant/security_middleware.py"
+  },
+  {
+    "title": "Security header 'X-XSS-Protection' set by security_middleware",
+    "section": "INFRASTRUCTURE",
+    "tags": [
+      "middleware",
+      "security-headers"
+    ],
+    "source_file": "src/multi_tenant/security_middleware.py"
+  },
+  {
+    "title": "Security header 'X-Frame-Options' set by security_middleware",
+    "section": "INFRASTRUCTURE",
+    "tags": [
+      "middleware",
+      "security-headers"
+    ],
+    "source_file": "src/multi_tenant/security_middleware.py"
+  }
+]

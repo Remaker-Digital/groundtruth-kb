@@ -1,0 +1,1248 @@
+[
+  {
+    "id": "BATCH1-001",
+    "text": "The sidebar nav label for the Configuration page MUST read 'Agent configuration'",
+    "source_session": "00d2a0f0-37de-4346-93e0-c41c131ed892",
+    "source_type": "owner_directive",
+    "domain": "ADMIN_UI"
+  },
+  {
+    "id": "BATCH1-002",
+    "text": "The sidebar nav label for the Widget page MUST read 'Widget configuration'",
+    "source_session": "00d2a0f0-37de-4346-93e0-c41c131ed892",
+    "source_type": "owner_directive",
+    "domain": "ADMIN_UI"
+  },
+  {
+    "id": "BATCH1-003",
+    "text": "The Team page table header column MUST read 'Team member' instead of 'Member'",
+    "source_session": "00d2a0f0-37de-4346-93e0-c41c131ed892",
+    "source_type": "owner_directive",
+    "domain": "ADMIN_UI"
+  },
+  {
+    "id": "BATCH1-004",
+    "text": "The role label for the 'agent' role MUST read 'Escalation agent' instead of 'Agent'",
+    "source_session": "00d2a0f0-37de-4346-93e0-c41c131ed892",
+    "source_type": "owner_directive",
+    "domain": "ADMIN_UI"
+  },
+  {
+    "id": "BATCH1-005",
+    "text": "The Escalation slider MUST display 'Conservative' left-justified and 'Aggressive' right-justified, neither extending beyond the slider width",
+    "source_session": "00d2a0f0-37de-4346-93e0-c41c131ed892",
+    "source_type": "owner_directive",
+    "domain": "ADMIN_UI"
+  },
+  {
+    "id": "BATCH1-006",
+    "text": "The Purchase button hover color MUST darken on hover",
+    "source_session": "00d2a0f0-37de-4346-93e0-c41c131ed892",
+    "source_type": "owner_directive",
+    "domain": "ADMIN_UI"
+  },
+  {
+    "id": "BATCH1-007",
+    "text": "Analytics page content MUST be merged into the Dashboard page",
+    "source_session": "00d2a0f0-37de-4346-93e0-c41c131ed892",
+    "source_type": "owner_directive",
+    "domain": "ADMIN_UI"
+  },
+  {
+    "id": "BATCH1-008",
+    "text": "The Analytics sidebar nav item MUST be removed after merging into Dashboard",
+    "source_session": "00d2a0f0-37de-4346-93e0-c41c131ed892",
+    "source_type": "owner_directive",
+    "domain": "ADMIN_UI"
+  },
+  {
+    "id": "BATCH1-009",
+    "text": "Newly added team members MUST receive a welcome email with a temporary strong password",
+    "source_session": "00d2a0f0-37de-4346-93e0-c41c131ed892",
+    "source_type": "owner_directive",
+    "domain": "AUTH"
+  },
+  {
+    "id": "BATCH1-010",
+    "text": "Temporary passwords for team members MUST expire periodically",
+    "source_session": "00d2a0f0-37de-4346-93e0-c41c131ed892",
+    "source_type": "owner_directive",
+    "domain": "AUTH"
+  },
+  {
+    "id": "BATCH1-011",
+    "text": "Users with expired passwords MUST be flagged as not-active so the merchant admin can take action",
+    "source_session": "00d2a0f0-37de-4346-93e0-c41c131ed892",
+    "source_type": "owner_directive",
+    "domain": "AUTH"
+  },
+  {
+    "id": "BATCH1-012",
+    "text": "Team members MUST be able to change their temporary password",
+    "source_session": "00d2a0f0-37de-4346-93e0-c41c131ed892",
+    "source_type": "owner_directive",
+    "domain": "AUTH"
+  },
+  {
+    "id": "BATCH1-013",
+    "text": "The admin logo in the upper left MUST use primary-logo-no-wordmark.svg",
+    "source_session": "035c268d-41ba-4c0a-b6fc-37dfa16f49ab",
+    "source_type": "owner_directive",
+    "domain": "ADMIN_UI"
+  },
+  {
+    "id": "BATCH1-014",
+    "text": "The wordmark 'Customer Experience' MUST appear to the right of the logo",
+    "source_session": "035c268d-41ba-4c0a-b6fc-37dfa16f49ab",
+    "source_type": "owner_directive",
+    "domain": "ADMIN_UI"
+  },
+  {
+    "id": "BATCH1-015",
+    "text": "Dark Mode MUST be the default mode",
+    "source_session": "035c268d-41ba-4c0a-b6fc-37dfa16f49ab",
+    "source_type": "owner_directive",
+    "domain": "ADMIN_UI"
+  },
+  {
+    "id": "BATCH1-016",
+    "text": "Dark Mode MUST use a palette of greys rather than blue/purple",
+    "source_session": "035c268d-41ba-4c0a-b6fc-37dfa16f49ab",
+    "source_type": "owner_directive",
+    "domain": "ADMIN_UI"
+  },
+  {
+    "id": "BATCH1-017",
+    "text": "The main page display areas MUST have a thinner border in Dark Mode",
+    "source_session": "035c268d-41ba-4c0a-b6fc-37dfa16f49ab",
+    "source_type": "owner_directive",
+    "domain": "ADMIN_UI"
+  },
+  {
+    "id": "BATCH1-018",
+    "text": "The sticky navbar at the top of the page MUST be medium-light grey in Light Mode",
+    "source_session": "035c268d-41ba-4c0a-b6fc-37dfa16f49ab",
+    "source_type": "owner_directive",
+    "domain": "ADMIN_UI"
+  },
+  {
+    "id": "BATCH1-019",
+    "text": "The conversation filter control background MUST NOT be white in Dark Mode",
+    "source_session": "035c268d-41ba-4c0a-b6fc-37dfa16f49ab",
+    "source_type": "owner_directive",
+    "domain": "ADMIN_UI"
+  },
+  {
+    "id": "BATCH1-020",
+    "text": "The conversation history background MUST NOT be light pink",
+    "source_session": "035c268d-41ba-4c0a-b6fc-37dfa16f49ab",
+    "source_type": "owner_directive",
+    "domain": "ADMIN_UI"
+  },
+  {
+    "id": "BATCH1-021",
+    "text": "The Agent Red AI label in conversation view MUST have a lighter grey background, not dark red",
+    "source_session": "035c268d-41ba-4c0a-b6fc-37dfa16f49ab",
+    "source_type": "owner_directive",
+    "domain": "ADMIN_UI"
+  },
+  {
+    "id": "BATCH1-022",
+    "text": "The Agent Red icon-master MUST be displayed to the right of the text 'Agent Red AI' near each AI response",
+    "source_session": "035c268d-41ba-4c0a-b6fc-37dfa16f49ab",
+    "source_type": "owner_directive",
+    "domain": "ADMIN_UI"
+  },
+  {
+    "id": "BATCH1-023",
+    "text": "The chat widget MUST support a Dark Mode option",
+    "source_session": "035c268d-41ba-4c0a-b6fc-37dfa16f49ab",
+    "source_type": "owner_directive",
+    "domain": "WIDGET_UI"
+  },
+  {
+    "id": "BATCH1-024",
+    "text": "The Live Preview MUST support a Dark Mode option",
+    "source_session": "035c268d-41ba-4c0a-b6fc-37dfa16f49ab",
+    "source_type": "owner_directive",
+    "domain": "WIDGET_UI"
+  },
+  {
+    "id": "BATCH1-025",
+    "text": "Integration logos for Zendesk, Google Analytics, Mailchimp, Stripe and Shopify MUST have a height of 150px",
+    "source_session": "089b25e6-e24c-4c9d-ba2f-2bc687fba067",
+    "source_type": "owner_directive",
+    "domain": "ADMIN_UI"
+  },
+  {
+    "id": "BATCH1-026",
+    "text": "A master test plan MUST synthesize all requirements into a single test with 100% pass rate before submission",
+    "source_session": "089b25e6-e24c-4c9d-ba2f-2bc687fba067",
+    "source_type": "owner_directive",
+    "domain": "TESTING"
+  },
+  {
+    "id": "BATCH1-027",
+    "text": "The master test MUST include a tested plan to execute a non-disruptive upgrade of the production environment",
+    "source_session": "089b25e6-e24c-4c9d-ba2f-2bc687fba067",
+    "source_type": "owner_directive",
+    "domain": "OPS"
+  },
+  {
+    "id": "BATCH1-028",
+    "text": "A parallel production-capable dev/test environment MUST be created for future releases",
+    "source_session": "089b25e6-e24c-4c9d-ba2f-2bc687fba067",
+    "source_type": "owner_directive",
+    "domain": "OPS"
+  },
+  {
+    "id": "BATCH1-029",
+    "text": "Non-disruptive upgrade MUST be proven before getting Shopify app store approval",
+    "source_session": "089b25e6-e24c-4c9d-ba2f-2bc687fba067",
+    "source_type": "owner_directive",
+    "domain": "OPS"
+  },
+  {
+    "id": "BATCH1-030",
+    "text": "The standalone admin chat UI MUST use Agent Red colors, not default blue",
+    "source_session": "089b25e6-e24c-4c9d-ba2f-2bc687fba067",
+    "source_type": "owner_directive",
+    "domain": "WIDGET_UI"
+  },
+  {
+    "id": "BATCH1-031",
+    "text": "The standalone admin MUST behave exactly as if it were a standard customer admin for any merchant storefront",
+    "source_session": "089b25e6-e24c-4c9d-ba2f-2bc687fba067",
+    "source_type": "owner_directive",
+    "domain": "ADMIN_UI"
+  },
+  {
+    "id": "BATCH1-032",
+    "text": "The default widget colors and styling MUST match Agent Red brand colors, customizable from there by the merchant",
+    "source_session": "089b25e6-e24c-4c9d-ba2f-2bc687fba067",
+    "source_type": "owner_directive",
+    "domain": "WIDGET_UI"
+  },
+  {
+    "id": "BATCH1-033",
+    "text": "A detailed step-by-step process for non-disruptive upgrade MUST include provisioning scripts and a regression test package",
+    "source_session": "089b25e6-e24c-4c9d-ba2f-2bc687fba067",
+    "source_type": "owner_directive",
+    "domain": "OPS"
+  },
+  {
+    "id": "BATCH1-034",
+    "text": "Only fixes to open-source artifacts MUST flow back to the AGNTCY project, nothing else",
+    "source_session": "089b25e6-e24c-4c9d-ba2f-2bc687fba067",
+    "source_type": "owner_directive",
+    "domain": "GENERAL"
+  },
+  {
+    "id": "BATCH1-035",
+    "text": "A standard pre-flight checklist MUST be executed for any production deployment",
+    "source_session": "0bb3785b-a9fa-410d-89e9-9fe95ab42c52",
+    "source_type": "owner_directive",
+    "domain": "OPS"
+  },
+  {
+    "id": "BATCH1-036",
+    "text": "The pre-flight checklist MUST always conclude with a detailed live verification that a customer tenant can be created and configured with no errors or defects",
+    "source_session": "0bb3785b-a9fa-410d-89e9-9fe95ab42c52",
+    "source_type": "owner_directive",
+    "domain": "OPS"
+  },
+  {
+    "id": "BATCH1-037",
+    "text": "The KB page toolbar layout MUST have Search input on top row (left-justified), and Category, Status, Scan for conflicts, Export CSV, Import, and + Add article all on one row below (bottom-justified)",
+    "source_session": "0bb3785b-a9fa-410d-89e9-9fe95ab42c52",
+    "source_type": "owner_directive",
+    "domain": "ADMIN_UI"
+  },
+  {
+    "id": "BATCH1-038",
+    "text": "The default chat widget colors MUST be Agent Red colors rather than blue",
+    "source_session": "0e4130df-f02e-4bca-81cb-fd04ddce3f71",
+    "source_type": "owner_directive",
+    "domain": "WIDGET_UI"
+  },
+  {
+    "id": "BATCH1-039",
+    "text": "End-to-end tests MUST be run on a freshly initialized environment, not one with stale data",
+    "source_session": "0f00d99b-758a-43a5-988a-f4cfddf9f740",
+    "source_type": "owner_directive",
+    "domain": "TESTING"
+  },
+  {
+    "id": "BATCH1-040",
+    "text": "100% UI test coverage means every possible input and value for every possible state has been checked",
+    "source_session": "0f00d99b-758a-43a5-988a-f4cfddf9f740",
+    "source_type": "owner_directive",
+    "domain": "TESTING"
+  },
+  {
+    "id": "BATCH1-041",
+    "text": "100% UI test coverage MUST include every button pushed, every selection selected, every state for a given set of inputs saved",
+    "source_session": "0f00d99b-758a-43a5-988a-f4cfddf9f740",
+    "source_type": "owner_directive",
+    "domain": "TESTING"
+  },
+  {
+    "id": "BATCH1-042",
+    "text": "100% UI test coverage MUST include Light/Dark mode verification for every test",
+    "source_session": "0f00d99b-758a-43a5-988a-f4cfddf9f740",
+    "source_type": "owner_directive",
+    "domain": "TESTING"
+  },
+  {
+    "id": "BATCH1-043",
+    "text": "100% UI test coverage MUST include testing every type of deliberate misconfiguration",
+    "source_session": "0f00d99b-758a-43a5-988a-f4cfddf9f740",
+    "source_type": "owner_directive",
+    "domain": "TESTING"
+  },
+  {
+    "id": "BATCH1-044",
+    "text": "UI testing MUST include the first-login case on a freshly initialized environment as superadmin",
+    "source_session": "0f00d99b-758a-43a5-988a-f4cfddf9f740",
+    "source_type": "owner_directive",
+    "domain": "TESTING"
+  },
+  {
+    "id": "BATCH1-045",
+    "text": "UI testing MUST include the 'I lost my API keys' path",
+    "source_session": "0f00d99b-758a-43a5-988a-f4cfddf9f740",
+    "source_type": "owner_directive",
+    "domain": "TESTING"
+  },
+  {
+    "id": "BATCH1-046",
+    "text": "UI testing MUST include team member creation, re-issuance of team member API keys, and removal of team members",
+    "source_session": "0f00d99b-758a-43a5-988a-f4cfddf9f740",
+    "source_type": "owner_directive",
+    "domain": "TESTING"
+  },
+  {
+    "id": "BATCH1-047",
+    "text": "The term 'effort' MUST NOT be used in project discussions; use tokens consumed, elapsed time, or probability of regression instead",
+    "source_session": "0f00d99b-758a-43a5-988a-f4cfddf9f740",
+    "source_type": "owner_directive",
+    "domain": "GENERAL"
+  },
+  {
+    "id": "BATCH1-048",
+    "text": "The 'Save changes' control on configuration pages MUST be relabeled 'Save draft inputs'",
+    "source_session": "16edb809-e478-41c4-a560-f8066e83a41c",
+    "source_type": "owner_directive",
+    "domain": "ADMIN_UI"
+  },
+  {
+    "id": "BATCH1-049",
+    "text": "The page-level 'Discard' control at the top of configuration pages MUST be removed (Discard is only in the CONFIGURATION control group)",
+    "source_session": "16edb809-e478-41c4-a560-f8066e83a41c",
+    "source_type": "owner_directive",
+    "domain": "ADMIN_UI"
+  },
+  {
+    "id": "BATCH1-050",
+    "text": "The tier label 'professional' MUST be capitalized as 'Professional'",
+    "source_session": "16edb809-e478-41c4-a560-f8066e83a41c",
+    "source_type": "owner_directive",
+    "domain": "ADMIN_UI"
+  },
+  {
+    "id": "BATCH1-051",
+    "text": "The 'Inactive' badge MUST be removed when the CONFIGURATION control group already shows 'Pending' state",
+    "source_session": "16edb809-e478-41c4-a560-f8066e83a41c",
+    "source_type": "owner_directive",
+    "domain": "ADMIN_UI"
+  },
+  {
+    "id": "BATCH1-052",
+    "text": "Brand voice MUST be a mandatory configuration field",
+    "source_session": "16edb809-e478-41c4-a560-f8066e83a41c",
+    "source_type": "owner_directive",
+    "domain": "CONFIG"
+  },
+  {
+    "id": "BATCH1-053",
+    "text": "Language support at launch MUST be English only, with Spanish and French planned next",
+    "source_session": "16edb809-e478-41c4-a560-f8066e83a41c",
+    "source_type": "owner_directive",
+    "domain": "CONFIG"
+  },
+  {
+    "id": "BATCH1-054",
+    "text": "All configuration page changes are drafts until activated using the 'Activate' control",
+    "source_session": "16edb809-e478-41c4-a560-f8066e83a41c",
+    "source_type": "owner_directive",
+    "domain": "CONFIG"
+  },
+  {
+    "id": "BATCH1-055",
+    "text": "The 'Save draft inputs' control MUST always be at the bottom of each configuration page",
+    "source_session": "16edb809-e478-41c4-a560-f8066e83a41c",
+    "source_type": "owner_directive",
+    "domain": "ADMIN_UI"
+  },
+  {
+    "id": "BATCH1-056",
+    "text": "Agent configuration, Knowledge base, Quick actions, and Widget configuration pages MUST all follow the same workflow: start at top, enter data scrolling down, Save draft inputs control at bottom",
+    "source_session": "16edb809-e478-41c4-a560-f8066e83a41c",
+    "source_type": "owner_directive",
+    "domain": "ADMIN_UI"
+  },
+  {
+    "id": "BATCH1-057",
+    "text": "A freshly initialized tenant MUST show zero conversations on the Dashboard (no synthetic historical data)",
+    "source_session": "16edb809-e478-41c4-a560-f8066e83a41c",
+    "source_type": "owner_directive",
+    "domain": "PROVISIONING"
+  },
+  {
+    "id": "BATCH1-058",
+    "text": "All transient keys, values, URLs, and variables that change between builds or tenant environments MUST NOT be hardcoded; they MUST be retrieved from tenant config database or env.local",
+    "source_session": "16edb809-e478-41c4-a560-f8066e83a41c",
+    "source_type": "owner_directive",
+    "domain": "CONFIG"
+  },
+  {
+    "id": "BATCH1-059",
+    "text": "The widget MUST NOT be usable if the system is not active and has never been activated",
+    "source_session": "16edb809-e478-41c4-a560-f8066e83a41c",
+    "source_type": "owner_directive",
+    "domain": "WIDGET_UI"
+  },
+  {
+    "id": "BATCH1-060",
+    "text": "The activation control MUST have three dispositions: Red/'Deactivate' (disable widget), Green/'Activate' (ready to activate), Yellow/'Activate' (blocked by missing mandatory config)",
+    "source_session": "16edb809-e478-41c4-a560-f8066e83a41c",
+    "source_type": "owner_directive",
+    "domain": "ADMIN_UI"
+  },
+  {
+    "id": "BATCH1-061",
+    "text": "When the system is initialized and some mandatory inputs are missing, the activation control MUST show Yellow/'Activate' disposition",
+    "source_session": "16edb809-e478-41c4-a560-f8066e83a41c",
+    "source_type": "owner_directive",
+    "domain": "ADMIN_UI"
+  },
+  {
+    "id": "BATCH1-062",
+    "text": "Once the system is active with no draft changes, the activation control default MUST be Red/'Disable'",
+    "source_session": "16edb809-e478-41c4-a560-f8066e83a41c",
+    "source_type": "owner_directive",
+    "domain": "ADMIN_UI"
+  },
+  {
+    "id": "BATCH1-063",
+    "text": "Once all mandatory draft config changes are present, the activation control MUST show Green/'Activate'",
+    "source_session": "16edb809-e478-41c4-a560-f8066e83a41c",
+    "source_type": "owner_directive",
+    "domain": "ADMIN_UI"
+  },
+  {
+    "id": "BATCH1-064",
+    "text": "When configuration becomes Active, the widget MUST immediately become available",
+    "source_session": "16edb809-e478-41c4-a560-f8066e83a41c",
+    "source_type": "owner_directive",
+    "domain": "CONFIG"
+  },
+  {
+    "id": "BATCH1-065",
+    "text": "The Deactivate action MUST go through a confirmation dialog",
+    "source_session": "16edb809-e478-41c4-a560-f8066e83a41c",
+    "source_type": "owner_directive",
+    "domain": "ADMIN_UI"
+  },
+  {
+    "id": "BATCH1-066",
+    "text": "After deactivating, the active config still exists, so the activation control MUST show Green/'Activate'",
+    "source_session": "16edb809-e478-41c4-a560-f8066e83a41c",
+    "source_type": "owner_directive",
+    "domain": "ADMIN_UI"
+  },
+  {
+    "id": "BATCH1-067",
+    "text": "A UI glossary MUST be maintained and Claude MUST encourage consistent use of glossary terms",
+    "source_session": "16edb809-e478-41c4-a560-f8066e83a41c",
+    "source_type": "owner_directive",
+    "domain": "GENERAL"
+  },
+  {
+    "id": "BATCH1-068",
+    "text": "Glossary term: 'control' = element that triggers a change of system state (buttons, selectors, filters, checkboxes, radio buttons, toggles)",
+    "source_session": "16edb809-e478-41c4-a560-f8066e83a41c",
+    "source_type": "owner_directive",
+    "domain": "GENERAL"
+  },
+  {
+    "id": "BATCH1-069",
+    "text": "Glossary term: 'input' = element that elaborates the future desired state when the next control is triggered",
+    "source_session": "16edb809-e478-41c4-a560-f8066e83a41c",
+    "source_type": "owner_directive",
+    "domain": "GENERAL"
+  },
+  {
+    "id": "BATCH1-070",
+    "text": "Glossary term: 'card' = a logically interdependent group of elements bounded by a bordered box, may contain controls, information, and inputs",
+    "source_session": "16edb809-e478-41c4-a560-f8066e83a41c",
+    "source_type": "owner_directive",
+    "domain": "GENERAL"
+  },
+  {
+    "id": "BATCH1-071",
+    "text": "Glossary term: 'page' = a full admin UI view accessed via sidebar navigation",
+    "source_session": "16edb809-e478-41c4-a560-f8066e83a41c",
+    "source_type": "owner_directive",
+    "domain": "GENERAL"
+  },
+  {
+    "id": "BATCH1-072",
+    "text": "Glossary term: 'picker' = a color or date selection element",
+    "source_session": "16edb809-e478-41c4-a560-f8066e83a41c",
+    "source_type": "owner_directive",
+    "domain": "GENERAL"
+  },
+  {
+    "id": "BATCH1-073",
+    "text": "Glossary term: 'configuration manager' = the top-level CONFIGURATION control group (Activate/Discard/Roll back)",
+    "source_session": "16edb809-e478-41c4-a560-f8066e83a41c",
+    "source_type": "owner_directive",
+    "domain": "GENERAL"
+  },
+  {
+    "id": "BATCH1-074",
+    "text": "Glossary term: 'configuration pages' = the individual pages within the configuration manager",
+    "source_session": "16edb809-e478-41c4-a560-f8066e83a41c",
+    "source_type": "owner_directive",
+    "domain": "GENERAL"
+  },
+  {
+    "id": "BATCH1-075",
+    "text": "Glossary term: 'error banner' = inline error notification; 'error pop-up' = overlay error notification",
+    "source_session": "16edb809-e478-41c4-a560-f8066e83a41c",
+    "source_type": "owner_directive",
+    "domain": "GENERAL"
+  },
+  {
+    "id": "BATCH1-076",
+    "text": "Glossary term: 'badge' = a small label indicator (e.g., status badge, role badge)",
+    "source_session": "16edb809-e478-41c4-a560-f8066e83a41c",
+    "source_type": "owner_directive",
+    "domain": "GENERAL"
+  },
+  {
+    "id": "BATCH1-077",
+    "text": "The standalone admin MUST be secured with a simple password to avoid casual trespassers",
+    "source_session": "241a4b91-5b1e-4f1e-9ce7-36fdf3e4a85d",
+    "source_type": "owner_directive",
+    "domain": "AUTH"
+  },
+  {
+    "id": "BATCH1-078",
+    "text": "All current logo images MUST be replaced with the updated files from branding/logo/SVG/ and branding/logo/PNG/",
+    "source_session": "241a4b91-5b1e-4f1e-9ce7-36fdf3e4a85d",
+    "source_type": "owner_directive",
+    "domain": "ADMIN_UI"
+  },
+  {
+    "id": "BATCH1-079",
+    "text": "Release 1.0 MUST be full-featured and competitive, comparable to Tidio in features and usability",
+    "source_session": "25631a0f-8e25-4035-bb3a-293678703c6e",
+    "source_type": "owner_directive",
+    "domain": "GENERAL"
+  },
+  {
+    "id": "BATCH1-080",
+    "text": "The 1.0 user experience MUST be polished and refined, comparable or superior in styling and usability to Tidio",
+    "source_session": "25631a0f-8e25-4035-bb3a-293678703c6e",
+    "source_type": "owner_directive",
+    "domain": "GENERAL"
+  },
+  {
+    "id": "BATCH1-081",
+    "text": "The chat UI MUST be responsive and web-based, supporting both mobile and desktop customer users",
+    "source_session": "25631a0f-8e25-4035-bb3a-293678703c6e",
+    "source_type": "owner_directive",
+    "domain": "WIDGET_UI"
+  },
+  {
+    "id": "BATCH1-082",
+    "text": "The Admin UI MUST support desktop users (web-based)",
+    "source_session": "25631a0f-8e25-4035-bb3a-293678703c6e",
+    "source_type": "owner_directive",
+    "domain": "ADMIN_UI"
+  },
+  {
+    "id": "BATCH1-083",
+    "text": "Pricing and packaging decisions are orthogonal to release scope — base product plus optional features may be required for 1.0",
+    "source_session": "25631a0f-8e25-4035-bb3a-293678703c6e",
+    "source_type": "owner_directive",
+    "domain": "BILLING"
+  },
+  {
+    "id": "BATCH1-084",
+    "text": "The admin UI logo in upper left corner MUST be primary-logo-light.svg (or primary-logo-dark.svg for Dark mode)",
+    "source_session": "25631a0f-8e25-4035-bb3a-293678703c6e",
+    "source_type": "owner_directive",
+    "domain": "ADMIN_UI"
+  },
+  {
+    "id": "BATCH1-085",
+    "text": "The text 'Agent Red Customer Experience' MUST NOT appear as visible text — only as tooltip/on-hover label or alt text",
+    "source_session": "25631a0f-8e25-4035-bb3a-293678703c6e",
+    "source_type": "owner_directive",
+    "domain": "ADMIN_UI"
+  },
+  {
+    "id": "BATCH1-086",
+    "text": "Dark Mode MUST be supported as an important detail of the admin UI",
+    "source_session": "25631a0f-8e25-4035-bb3a-293678703c6e",
+    "source_type": "owner_directive",
+    "domain": "ADMIN_UI"
+  },
+  {
+    "id": "BATCH1-087",
+    "text": "Mantine v7 MUST be used as the UI component library for the standalone admin",
+    "source_session": "25631a0f-8e25-4035-bb3a-293678703c6e",
+    "source_type": "owner_approval",
+    "domain": "ADMIN_UI"
+  },
+  {
+    "id": "BATCH1-088",
+    "text": "The active selection text color in the sidebar MUST be white, not red",
+    "source_session": "27be78fe-c16f-4bac-a1a1-2f763d8c5aa4",
+    "source_type": "owner_directive",
+    "domain": "ADMIN_UI"
+  },
+  {
+    "id": "BATCH1-089",
+    "text": "The chat history background color MUST be #19191A",
+    "source_session": "27be78fe-c16f-4bac-a1a1-2f763d8c5aa4",
+    "source_type": "owner_directive",
+    "domain": "ADMIN_UI"
+  },
+  {
+    "id": "BATCH1-090",
+    "text": "If the taupe border (#938a87) cannot be 0.2px, the border color MUST be changed to #363636",
+    "source_session": "27be78fe-c16f-4bac-a1a1-2f763d8c5aa4",
+    "source_type": "owner_directive",
+    "domain": "ADMIN_UI"
+  },
+  {
+    "id": "BATCH1-091",
+    "text": "The Light/Dark toggle MUST retain Dark Mode colors even in Light Mode, since the sticky nav bar retains dark grey in Light Mode",
+    "source_session": "27be78fe-c16f-4bac-a1a1-2f763d8c5aa4",
+    "source_type": "owner_directive",
+    "domain": "ADMIN_UI"
+  },
+  {
+    "id": "BATCH1-092",
+    "text": "The owner personality note MUST record: Mike values honest feedback — never exaggerate the quality or impact of his input",
+    "source_session": "27ebc281-6419-46b3-a53c-98caa30e7eac",
+    "source_type": "owner_directive",
+    "domain": "GENERAL"
+  },
+  {
+    "id": "BATCH1-093",
+    "text": "Conversation volume chart MUST show data only from the actual deployment date, not synthetic historical data",
+    "source_session": "1aa024e9-4628-4a9b-962b-cd4a66d537a6",
+    "source_type": "owner_directive",
+    "domain": "ADMIN_UI"
+  },
+  {
+    "id": "BATCH1-094",
+    "text": "Dashboard tooltips MUST contain links that point directly to the appropriate documentation page anchor",
+    "source_session": "1aa024e9-4628-4a9b-962b-cd4a66d537a6",
+    "source_type": "owner_directive",
+    "domain": "ADMIN_UI"
+  },
+  {
+    "id": "BATCH1-095",
+    "text": "Inbox search MUST return results matching the search term (e.g., searching 'product' must find messages containing 'product')",
+    "source_session": "1aa024e9-4628-4a9b-962b-cd4a66d537a6",
+    "source_type": "owner_directive",
+    "domain": "ADMIN_UI"
+  },
+  {
+    "id": "BATCH1-096",
+    "text": "Escalation action MUST ask which team member or which escalation category to route to",
+    "source_session": "1aa024e9-4628-4a9b-962b-cd4a66d537a6",
+    "source_type": "owner_directive",
+    "domain": "CONVERSATIONS"
+  },
+  {
+    "id": "BATCH1-097",
+    "text": "Escalated conversations MUST show up when using the escalation filter",
+    "source_session": "1aa024e9-4628-4a9b-962b-cd4a66d537a6",
+    "source_type": "owner_directive",
+    "domain": "CONVERSATIONS"
+  },
+  {
+    "id": "BATCH1-098",
+    "text": "UI tests MUST be treated as Repeatable Processes — when a defect is identified, add a test for it to the procedure before finding a fix",
+    "source_session": "1aa024e9-4628-4a9b-962b-cd4a66d537a6",
+    "source_type": "owner_directive",
+    "domain": "TESTING"
+  },
+  {
+    "id": "BATCH1-099",
+    "text": "The chat widget and chat UI MUST be available on the admin console so the administrator can test the agent without accessing the storefront",
+    "source_session": "204a450e-e227-4a5a-b795-b9e7c7e191d4",
+    "source_type": "owner_directive",
+    "domain": "ADMIN_UI"
+  },
+  {
+    "id": "BATCH1-100",
+    "text": "Documentation links MUST use HTTPS, not HTTP",
+    "source_session": "204a450e-e227-4a5a-b795-b9e7c7e191d4",
+    "source_type": "owner_directive",
+    "domain": "GENERAL"
+  },
+  {
+    "id": "BATCH1-101",
+    "text": "Quick action prompt buttons with hidden prompts MUST be displayed in the message pane",
+    "source_session": "204a450e-e227-4a5a-b795-b9e7c7e191d4",
+    "source_type": "owner_directive",
+    "domain": "WIDGET_UI"
+  },
+  {
+    "id": "BATCH1-102",
+    "text": "Widget color configuration MUST be picked up by the widget after being saved",
+    "source_session": "204a450e-e227-4a5a-b795-b9e7c7e191d4",
+    "source_type": "owner_directive",
+    "domain": "WIDGET_UI"
+  },
+  {
+    "id": "BATCH1-103",
+    "text": "Greeting message (e.g., 'Hi there! How can I help you today <FIRST_NAME>?') MUST be picked up by the widget after being saved",
+    "source_session": "204a450e-e227-4a5a-b795-b9e7c7e191d4",
+    "source_type": "owner_directive",
+    "domain": "WIDGET_UI"
+  },
+  {
+    "id": "BATCH1-104",
+    "text": "Quick actions MUST have examples pre-populated in the initial setup",
+    "source_session": "204a450e-e227-4a5a-b795-b9e7c7e191d4",
+    "source_type": "owner_directive",
+    "domain": "ADMIN_UI"
+  },
+  {
+    "id": "BATCH1-105",
+    "text": "The 'Icon' input on the 'Create quick action' dialog MUST contain guidance or examples for where to obtain an icon",
+    "source_session": "204a450e-e227-4a5a-b795-b9e7c7e191d4",
+    "source_type": "owner_directive",
+    "domain": "ADMIN_UI"
+  },
+  {
+    "id": "BATCH1-106",
+    "text": "The 'Sort order' input MUST be removed from quick action creation since order is set per page",
+    "source_session": "204a450e-e227-4a5a-b795-b9e7c7e191d4",
+    "source_type": "owner_directive",
+    "domain": "ADMIN_UI"
+  },
+  {
+    "id": "BATCH1-107",
+    "text": "Quick actions MUST appear in the chat UI on the administration page for preview",
+    "source_session": "204a450e-e227-4a5a-b795-b9e7c7e191d4",
+    "source_type": "owner_directive",
+    "domain": "WIDGET_UI"
+  },
+  {
+    "id": "BATCH1-108",
+    "text": "The 'Test mode' toggle MUST appear on the nav bar at the top of the page",
+    "source_session": "204a450e-e227-4a5a-b795-b9e7c7e191d4",
+    "source_type": "owner_directive",
+    "domain": "ADMIN_UI"
+  },
+  {
+    "id": "BATCH1-109",
+    "text": "The 'Test mode' toggle MUST be the first step in the setup wizard flow",
+    "source_session": "204a450e-e227-4a5a-b795-b9e7c7e191d4",
+    "source_type": "owner_directive",
+    "domain": "ADMIN_UI"
+  },
+  {
+    "id": "BATCH1-110",
+    "text": "There MUST be no visible control for widget drop-shadow on the widget config page (it needs to be added)",
+    "source_session": "204a450e-e227-4a5a-b795-b9e7c7e191d4",
+    "source_type": "owner_directive",
+    "domain": "ADMIN_UI"
+  },
+  {
+    "id": "BATCH1-111",
+    "text": "There MUST be controls for changing the widget icon and the Agent Red avatar at the top of the chat UI",
+    "source_session": "204a450e-e227-4a5a-b795-b9e7c7e191d4",
+    "source_type": "owner_directive",
+    "domain": "ADMIN_UI"
+  },
+  {
+    "id": "BATCH1-112",
+    "text": "Pre-chat form and offline form greeting options MUST have explanations of what they do",
+    "source_session": "204a450e-e227-4a5a-b795-b9e7c7e191d4",
+    "source_type": "owner_directive",
+    "domain": "ADMIN_UI"
+  },
+  {
+    "id": "BATCH1-113",
+    "text": "The chat UI MUST have a control that allows users to expand it horizontally (resizable width)",
+    "source_session": "204a450e-e227-4a5a-b795-b9e7c7e191d4",
+    "source_type": "owner_directive",
+    "domain": "WIDGET_UI"
+  },
+  {
+    "id": "BATCH1-114",
+    "text": "The chat UI MUST be click-draggable to other regions of the browser window",
+    "source_session": "204a450e-e227-4a5a-b795-b9e7c7e191d4",
+    "source_type": "owner_directive",
+    "domain": "WIDGET_UI"
+  },
+  {
+    "id": "BATCH1-115",
+    "text": "Auto-open MUST be configurable per-page as part of Quick Actions configuration",
+    "source_session": "204a450e-e227-4a5a-b795-b9e7c7e191d4",
+    "source_type": "owner_directive",
+    "domain": "ADMIN_UI"
+  },
+  {
+    "id": "BATCH1-116",
+    "text": "The chat UI input area MUST have three text lines of height",
+    "source_session": "204a450e-e227-4a5a-b795-b9e7c7e191d4",
+    "source_type": "owner_directive",
+    "domain": "WIDGET_UI"
+  },
+  {
+    "id": "BATCH1-117",
+    "text": "The chat display area MUST have scroll-bars or scroll controls",
+    "source_session": "204a450e-e227-4a5a-b795-b9e7c7e191d4",
+    "source_type": "owner_directive",
+    "domain": "WIDGET_UI"
+  },
+  {
+    "id": "BATCH1-118",
+    "text": "Launcher position configuration MUST include controls for vertical and horizontal offset from the edges of the browser display area",
+    "source_session": "204a450e-e227-4a5a-b795-b9e7c7e191d4",
+    "source_type": "owner_directive",
+    "domain": "ADMIN_UI"
+  },
+  {
+    "id": "BATCH1-119",
+    "text": "The dashboard MUST display the merchant's storefront name in large type above the word 'Dashboard'",
+    "source_session": "204a450e-e227-4a5a-b795-b9e7c7e191d4",
+    "source_type": "owner_directive",
+    "domain": "ADMIN_UI"
+  },
+  {
+    "id": "BATCH1-120",
+    "text": "Each dashboard display area MUST have a tooltip/link to relevant documentation (Total conversations, Avg response time, Resolution rate, Customer satisfaction, Escalation rate, Daily conversation volume, Recent conversations, Top intents)",
+    "source_session": "204a450e-e227-4a5a-b795-b9e7c7e191d4",
+    "source_type": "owner_directive",
+    "domain": "ADMIN_UI"
+  },
+  {
+    "id": "BATCH1-121",
+    "text": "'Scan for conflicts', 'Export to CSV', and 'Import' MUST have on-hover tooltips with links to documentation",
+    "source_session": "204a450e-e227-4a5a-b795-b9e7c7e191d4",
+    "source_type": "owner_directive",
+    "domain": "ADMIN_UI"
+  },
+  {
+    "id": "BATCH1-122",
+    "text": "Each analytics display area MUST have a tooltip/link to relevant documentation (Intents breakdown, Knowledge gaps, etc.)",
+    "source_session": "204a450e-e227-4a5a-b795-b9e7c7e191d4",
+    "source_type": "owner_directive",
+    "domain": "ADMIN_UI"
+  },
+  {
+    "id": "BATCH1-123",
+    "text": "Each Configuration page section MUST have a tooltip/link to documentation (Brand & persona, Policies, Escalation, Custom instructions, Language, Test mode)",
+    "source_session": "204a450e-e227-4a5a-b795-b9e7c7e191d4",
+    "source_type": "owner_directive",
+    "domain": "ADMIN_UI"
+  },
+  {
+    "id": "BATCH1-124",
+    "text": "The 'Primary color' label MUST be renamed to 'Header left color'",
+    "source_session": "204a450e-e227-4a5a-b795-b9e7c7e191d4",
+    "source_type": "owner_directive",
+    "domain": "ADMIN_UI"
+  },
+  {
+    "id": "BATCH1-125",
+    "text": "The 'Header gradient end' label MUST be renamed to 'Header right color'",
+    "source_session": "204a450e-e227-4a5a-b795-b9e7c7e191d4",
+    "source_type": "owner_directive",
+    "domain": "ADMIN_UI"
+  },
+  {
+    "id": "BATCH1-126",
+    "text": "There MUST be a toggle to enable/disable gradient on the widget header",
+    "source_session": "204a450e-e227-4a5a-b795-b9e7c7e191d4",
+    "source_type": "owner_directive",
+    "domain": "ADMIN_UI"
+  },
+  {
+    "id": "BATCH1-127",
+    "text": "The gradient toggle default MUST be disabled, with the entire header using the Header left color",
+    "source_session": "204a450e-e227-4a5a-b795-b9e7c7e191d4",
+    "source_type": "owner_directive",
+    "domain": "ADMIN_UI"
+  },
+  {
+    "id": "BATCH1-128",
+    "text": "The Header left color and Header right color pickers MUST be side-by-side rather than stacked",
+    "source_session": "204a450e-e227-4a5a-b795-b9e7c7e191d4",
+    "source_type": "owner_directive",
+    "domain": "ADMIN_UI"
+  },
+  {
+    "id": "BATCH1-129",
+    "text": "Configurations MUST be nameable and it MUST be possible to select and apply a named saved configuration from a list of previously saved configurations",
+    "source_session": "204a450e-e227-4a5a-b795-b9e7c7e191d4",
+    "source_type": "owner_directive",
+    "domain": "CONFIG"
+  },
+  {
+    "id": "BATCH1-130",
+    "text": "It MUST be possible to delete previously saved configurations",
+    "source_session": "204a450e-e227-4a5a-b795-b9e7c7e191d4",
+    "source_type": "owner_directive",
+    "domain": "CONFIG"
+  },
+  {
+    "id": "BATCH1-131",
+    "text": "Each previously saved configuration MUST have a date-stamp indicating the last time it was applied",
+    "source_session": "204a450e-e227-4a5a-b795-b9e7c7e191d4",
+    "source_type": "owner_directive",
+    "domain": "CONFIG"
+  },
+  {
+    "id": "BATCH1-132",
+    "text": "Page assignments MUST display all available pages in a single column, not via a drop-down menu",
+    "source_session": "204a450e-e227-4a5a-b795-b9e7c7e191d4",
+    "source_type": "owner_directive",
+    "domain": "ADMIN_UI"
+  },
+  {
+    "id": "BATCH1-133",
+    "text": "Prompt template variables MUST be displayed below the Prompt template input box (like greeting message variables), not in a separate tab",
+    "source_session": "204a450e-e227-4a5a-b795-b9e7c7e191d4",
+    "source_type": "owner_directive",
+    "domain": "ADMIN_UI"
+  },
+  {
+    "id": "BATCH1-134",
+    "text": "The Role selector MUST replace the textual role names displayed inline, not in the Actions column",
+    "source_session": "204a450e-e227-4a5a-b795-b9e7c7e191d4",
+    "source_type": "owner_directive",
+    "domain": "ADMIN_UI"
+  },
+  {
+    "id": "BATCH1-135",
+    "text": "'Roles & permissions' MUST be an on-hover tooltip pop-up for the 'Role' column heading, not a separate page section",
+    "source_session": "204a450e-e227-4a5a-b795-b9e7c7e191d4",
+    "source_type": "owner_directive",
+    "domain": "ADMIN_UI"
+  },
+  {
+    "id": "BATCH1-136",
+    "text": "When 'Escalation agent' role is selected, the team member MUST also be assigned to one or more escalation categories (Sales, Support, Service, Account, Technical assistance, General inquiry)",
+    "source_session": "204a450e-e227-4a5a-b795-b9e7c7e191d4",
+    "source_type": "owner_directive",
+    "domain": "TEAM"
+  },
+  {
+    "id": "BATCH1-137",
+    "text": "It MUST be possible to toggle each team member between enabled and disabled",
+    "source_session": "204a450e-e227-4a5a-b795-b9e7c7e191d4",
+    "source_type": "owner_directive",
+    "domain": "TEAM"
+  },
+  {
+    "id": "BATCH1-138",
+    "text": "Each Billing & usage display area MUST have a tooltip/link to documentation (Current plan, Conversations used, Pack balance, Current overage, Estimated overage cost, Daily usage)",
+    "source_session": "204a450e-e227-4a5a-b795-b9e7c7e191d4",
+    "source_type": "owner_directive",
+    "domain": "ADMIN_UI"
+  },
+  {
+    "id": "BATCH1-139",
+    "text": "The Purchase button hover color MUST match the sidebar menu item hover color",
+    "source_session": "204a450e-e227-4a5a-b795-b9e7c7e191d4",
+    "source_type": "owner_directive",
+    "domain": "ADMIN_UI"
+  },
+  {
+    "id": "BATCH1-140",
+    "text": "Sidebar page order MUST be: 1) Dashboard, 2) Inbox, 3) Team, 4) Agent configuration, 5) Knowledge base, 6) Quick actions, 7) Widget configuration, 8) Integrations, 9) Billing, 10) Setup wizard, 11) Documentation",
+    "source_session": "204a450e-e227-4a5a-b795-b9e7c7e191d4",
+    "source_type": "owner_directive",
+    "domain": "ADMIN_UI"
+  },
+  {
+    "id": "BATCH1-141",
+    "text": "The Wizard MUST have two purposes: (1) configuring Test mode and (2) ensuring merchants complete configuration for initial activation",
+    "source_session": "204a450e-e227-4a5a-b795-b9e7c7e191d4",
+    "source_type": "owner_directive",
+    "domain": "ADMIN_UI"
+  },
+  {
+    "id": "BATCH1-142",
+    "text": "Wizard step order MUST be: 1) Mode, 2) Team (initial setup only), 3) Agent configuration, 4) Knowledge base, 5) Quick actions, 6) Widget configuration (initial setup only), 7) Integrations (initial setup only), 8) Go live",
+    "source_session": "204a450e-e227-4a5a-b795-b9e7c7e191d4",
+    "source_type": "owner_directive",
+    "domain": "ADMIN_UI"
+  },
+  {
+    "id": "BATCH1-143",
+    "text": "In Test mode, only fields affecting prompting and AI behavior MUST be changeable in the wizard",
+    "source_session": "204a450e-e227-4a5a-b795-b9e7c7e191d4",
+    "source_type": "owner_directive",
+    "domain": "ADMIN_UI"
+  },
+  {
+    "id": "BATCH1-144",
+    "text": "In Test mode, the Go live step MUST show a checklist of values changed from Standard mode values",
+    "source_session": "204a450e-e227-4a5a-b795-b9e7c7e191d4",
+    "source_type": "owner_directive",
+    "domain": "ADMIN_UI"
+  },
+  {
+    "id": "BATCH1-145",
+    "text": "In Standard mode (first-time setup), the Go live checklist MUST list mandatory inputs required for system operation",
+    "source_session": "204a450e-e227-4a5a-b795-b9e7c7e191d4",
+    "source_type": "owner_directive",
+    "domain": "ADMIN_UI"
+  },
+  {
+    "id": "BATCH1-146",
+    "text": "When the system is Inactive, a 'Welcome' message pop-up MUST appear reminding the admin the system is not yet active",
+    "source_session": "204a450e-e227-4a5a-b795-b9e7c7e191d4",
+    "source_type": "owner_directive",
+    "domain": "ADMIN_UI"
+  },
+  {
+    "id": "BATCH1-147",
+    "text": "The 'Inactive' indicator in the sticky nav-bar MUST navigate to the Wizard when clicked",
+    "source_session": "204a450e-e227-4a5a-b795-b9e7c7e191d4",
+    "source_type": "owner_directive",
+    "domain": "ADMIN_UI"
+  },
+  {
+    "id": "BATCH1-148",
+    "text": "'Review and launch' wizard step MUST be renamed to 'Custom AI instructions'",
+    "source_session": "204a450e-e227-4a5a-b795-b9e7c7e191d4",
+    "source_type": "owner_directive",
+    "domain": "ADMIN_UI"
+  },
+  {
+    "id": "BATCH1-149",
+    "text": "The Wizard MUST be used ONLY for (a) initial setup and (b) Test mode setup (Option 1 — not for Standard mode changes post-activation)",
+    "source_session": "204a450e-e227-4a5a-b795-b9e7c7e191d4",
+    "source_type": "owner_approval",
+    "domain": "ADMIN_UI"
+  },
+  {
+    "id": "BATCH1-150",
+    "text": "Once Agent Red is active, all Standard mode changes MUST be committed and activated per-page via sidebar navigation",
+    "source_session": "204a450e-e227-4a5a-b795-b9e7c7e191d4",
+    "source_type": "owner_directive",
+    "domain": "CONFIG"
+  },
+  {
+    "id": "BATCH1-151",
+    "text": "The admin MUST be able to select the percentage of new sessions randomly added to the test group",
+    "source_session": "204a450e-e227-4a5a-b795-b9e7c7e191d4",
+    "source_type": "owner_directive",
+    "domain": "CONFIG"
+  },
+  {
+    "id": "BATCH1-152",
+    "text": "When test mode activates, the mode indicator in the sticky nav-bar MUST switch to display 'Test mode'",
+    "source_session": "204a450e-e227-4a5a-b795-b9e7c7e191d4",
+    "source_type": "owner_directive",
+    "domain": "ADMIN_UI"
+  },
+  {
+    "id": "BATCH1-153",
+    "text": "The password reset flow MUST NOT require the user to know their current password; they enter email and receive a confirmation link to choose a new password",
+    "source_session": "17546613-0ed1-4abb-9072-87c06d83f8c1",
+    "source_type": "owner_directive",
+    "domain": "AUTH"
+  },
+  {
+    "id": "BATCH1-154",
+    "text": "Email sending MUST use Titan SMTP with credentials from env.local (TITAN_USER_ID, TITAN_PASSWORD) via smtp.titan.email:465 SSL/TLS",
+    "source_session": "17546613-0ed1-4abb-9072-87c06d83f8c1",
+    "source_type": "owner_directive",
+    "domain": "EMAIL"
+  },
+  {
+    "id": "BATCH1-155",
+    "text": "Conversation volume chart duration MUST match the selected timeframe (7d/14d/30d/90d) irrespective of data availability",
+    "source_session": "28f7c629-f6b0-4e71-bc35-cb5dc3b1ab70",
+    "source_type": "owner_directive",
+    "domain": "ADMIN_UI"
+  },
+  {
+    "id": "BATCH1-156",
+    "text": "Conversation volume chart MUST NOT display historical data from before the environment deployment date",
+    "source_session": "28f7c629-f6b0-4e71-bc35-cb5dc3b1ab70",
+    "source_type": "owner_directive",
+    "domain": "ADMIN_UI"
+  },
+  {
+    "id": "BATCH1-157",
+    "text": "Configuration status 'Not configured' MUST NOT exist; valid states are 'Activated' and 'Pending' only",
+    "source_session": "28f7c629-f6b0-4e71-bc35-cb5dc3b1ab70",
+    "source_type": "owner_directive",
+    "domain": "CONFIG"
+  },
+  {
+    "id": "BATCH1-158",
+    "text": "The 'Roll back' option MUST NOT be available if the environment has never been Activated",
+    "source_session": "28f7c629-f6b0-4e71-bc35-cb5dc3b1ab70",
+    "source_type": "owner_directive",
+    "domain": "CONFIG"
+  },
+  {
+    "id": "BATCH1-159",
+    "text": "Test environment testing MUST begin with a Pending state tenant, complete activation, then send test messages before testing Inbox and other pages (Option C)",
+    "source_session": "28f7c629-f6b0-4e71-bc35-cb5dc3b1ab70",
+    "source_type": "owner_approval",
+    "domain": "TESTING"
+  },
+  {
+    "id": "BATCH1-160",
+    "text": "The 'Discard' control MUST be functional and must work correctly",
+    "source_session": "28f7c629-f6b0-4e71-bc35-cb5dc3b1ab70",
+    "source_type": "owner_directive",
+    "domain": "ADMIN_UI"
+  },
+  {
+    "id": "BATCH1-161",
+    "text": "The error banner close ('X') control MUST be functional",
+    "source_session": "28f7c629-f6b0-4e71-bc35-cb5dc3b1ab70",
+    "source_type": "owner_directive",
+    "domain": "ADMIN_UI"
+  },
+  {
+    "id": "BATCH1-162",
+    "text": "Knowledge base articles MUST display Category and Status in the article list",
+    "source_session": "28f7c629-f6b0-4e71-bc35-cb5dc3b1ab70",
+    "source_type": "owner_directive",
+    "domain": "ADMIN_UI"
+  },
+  {
+    "id": "BATCH1-163",
+    "text": "Category and Status filters on the KB page MUST return results that match the filter criteria",
+    "source_session": "28f7c629-f6b0-4e71-bc35-cb5dc3b1ab70",
+    "source_type": "owner_directive",
+    "domain": "ADMIN_UI"
+  },
+  {
+    "id": "BATCH1-164",
+    "text": "KB changes MUST participate in the Save-then-Activate flow: KB creates/edits/deletes mark config as Pending, activation deploys KB state alongside other config, Discard reverts KB changes",
+    "source_session": "28f7c629-f6b0-4e71-bc35-cb5dc3b1ab70",
+    "source_type": "owner_directive",
+    "domain": "KNOWLEDGE_BASE"
+  },
+  {
+    "id": "BATCH1-165",
+    "text": "The KB 'Freshness' value MUST NOT display '--' (must have a clear meaning)",
+    "source_session": "28f7c629-f6b0-4e71-bc35-cb5dc3b1ab70",
+    "source_type": "owner_directive",
+    "domain": "ADMIN_UI"
+  },
+  {
+    "id": "BATCH1-166",
+    "text": "There MUST be a way to restore (unarchive) an article that has been archived",
+    "source_session": "28f7c629-f6b0-4e71-bc35-cb5dc3b1ab70",
+    "source_type": "owner_directive",
+    "domain": "KNOWLEDGE_BASE"
+  },
+  {
+    "id": "BATCH1-167",
+    "text": "Quick action creation MUST mark config as Pending in the CONFIGURATION state",
+    "source_session": "28f7c629-f6b0-4e71-bc35-cb5dc3b1ab70",
+    "source_type": "owner_directive",
+    "domain": "CONFIG"
+  },
+  {
+    "id": "BATCH1-168",
+    "text": "The Auto-open control on Quick Actions MUST be functional",
+    "source_session": "28f7c629-f6b0-4e71-bc35-cb5dc3b1ab70",
+    "source_type": "owner_directive",
+    "domain": "ADMIN_UI"
+  },
+  {
+    "id": "BATCH1-169",
+    "text": "The Agent avatar MUST be uploaded as a PNG file (not a URL), with validation, resize, and aspect ratio crop capabilities",
+    "source_session": "28f7c629-f6b0-4e71-bc35-cb5dc3b1ab70",
+    "source_type": "owner_directive",
+    "domain": "ADMIN_UI"
+  },
+  {
+    "id": "BATCH1-170",
+    "text": "The 'Cross-session learning' toggle MUST be greyed out or cause save to fail for tiers below Professional+",
+    "source_session": "28f7c629-f6b0-4e71-bc35-cb5dc3b1ab70",
+    "source_type": "owner_directive",
+    "domain": "ADMIN_UI"
+  },
+  {
+    "id": "BATCH1-171",
+    "text": "Add-on modules MUST each indicate which entitlements are required for activation (Starter, Pro, Pro+, Enterprise)",
+    "source_session": "28f7c629-f6b0-4e71-bc35-cb5dc3b1ab70",
+    "source_type": "owner_directive",
+    "domain": "BILLING"
+  },
+  {
+    "id": "BATCH1-172",
+    "text": "Add-on modules not available for the current tier MUST NOT be subscribable; the Subscribe control MUST show the minimum required entitlement",
+    "source_session": "28f7c629-f6b0-4e71-bc35-cb5dc3b1ab70",
+    "source_type": "owner_directive",
+    "domain": "BILLING"
+  },
+  {
+    "id": "BATCH1-173",
+    "text": "The Upgrade path MUST display entitlement tiers in order (Starter -> Pro -> Pro+ -> Enterprise) with an option to Upgrade to each",
+    "source_session": "28f7c629-f6b0-4e71-bc35-cb5dc3b1ab70",
+    "source_type": "owner_directive",
+    "domain": "BILLING"
+  },
+  {
+    "id": "BATCH1-174",
+    "text": "Completing an Upgrade MUST change the available subscribable add-on modules to match the new entitlement level",
+    "source_session": "28f7c629-f6b0-4e71-bc35-cb5dc3b1ab70",
+    "source_type": "owner_directive",
+    "domain": "BILLING"
+  },
+  {
+    "id": "BATCH1-175",
+    "text": "The 'Priority support' add-on MUST be deferred to post-launch and removed from the admin UI",
+    "source_session": "28f7c629-f6b0-4e71-bc35-cb5dc3b1ab70",
+    "source_type": "owner_directive",
+    "domain": "BILLING"
+  },
+  {
+    "id": "BATCH1-176",
+    "text": "The 'White-label package' add-on MUST be deferred to post-launch and removed from the admin UI",
+    "source_session": "28f7c629-f6b0-4e71-bc35-cb5dc3b1ab70",
+    "source_type": "owner_directive",
+    "domain": "BILLING"
+  },
+  {
+    "id": "BATCH1-177",
+    "text": "The Light/Dark toggle MUST retain Dark Mode colors even in Light Mode since the sticky nav header retains Dark Mode colors in Light Mode",
+    "source_session": "2ae0b744-51ad-450d-be92-3d68e1046e11",
+    "source_type": "owner_directive",
+    "domain": "ADMIN_UI"
+  },
+  {
+    "id": "BATCH1-178",
+    "text": "All references to the old GitHub repo URL MUST be updated to the new URL: https://github.com/mike-remakerdigital/agent-red",
+    "source_session": "2bb20935-93f7-41f2-ae59-c7f9df62ca40",
+    "source_type": "owner_directive",
+    "domain": "GENERAL"
+  }
+]

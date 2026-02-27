@@ -1,0 +1,90 @@
+{
+  "run_at": "2026-02-26T05:17:33.964537",
+  "environment": "production",
+  "new_version": "1.59.0",
+  "verdict": "ROLLBACK REQUIRED \u2014 Phase C post-deploy failures",
+  "phases": {
+    "C": [
+      {
+        "id": "C.1",
+        "description": "Version header matches",
+        "status": "PASS",
+        "detail": "X-Product-Version: 1.59.0"
+      },
+      {
+        "id": "C.2",
+        "description": "Health endpoint healthy",
+        "status": "PASS",
+        "detail": "product_version=1.59.0"
+      },
+      {
+        "id": "C.3",
+        "description": "Ready endpoint",
+        "status": "WARN",
+        "detail": "status=ready but nats.connected=false (lazy init)"
+      },
+      {
+        "id": "C.4",
+        "description": "Standalone SPA",
+        "status": "PASS",
+        "detail": "HTTP 200, text/html"
+      },
+      {
+        "id": "C.5",
+        "description": "Shopify SPA",
+        "status": "PASS",
+        "detail": "HTTP 200, text/html"
+      },
+      {
+        "id": "C.6",
+        "description": "Provider SPA",
+        "status": "PASS",
+        "detail": "HTTP 200, text/html"
+      },
+      {
+        "id": "C.7",
+        "description": "Widget.js accessible",
+        "status": "PASS",
+        "detail": "82609 bytes"
+      },
+      {
+        "id": "C.8",
+        "description": "OpenAPI spec",
+        "status": "PASS",
+        "detail": "HTTP 200"
+      },
+      {
+        "id": "C.9",
+        "description": "Security headers",
+        "status": "PASS",
+        "detail": "nosniff + X-Frame-Options present"
+      },
+      {
+        "id": "C.10",
+        "description": "Upgrade verification (35 assertions)",
+        "status": "FAIL",
+        "detail": "IL  Config locking \u2014 HTTP 401\n  C.31  FAIL  FCR metric \u2014 HTTP 401\n  C.32  FAIL  Tier upgrade preview \u2014 HTTP 401\n  C.33  PASS  Unit test count gate \u2014 SKIP \u2014 requires local pytest\n  C.34  PASS  Evaluation framework loads \u2014 SKIP \u2014 requires local Python\n  C.35  PASS  Critic rule integrity \u2014 SKIP \u2014 requires local Python\n============================================================\n\nResults: 9 PASS, 26 FAIL out of 35 assertions\n\nResults saved to scripts\\upgrade-results\\phase_c_remaker-digital-001.json"
+      },
+      {
+        "id": "C.11",
+        "description": "Tier 0 regression (17 tests)",
+        "status": "SKIP",
+        "detail": "No tests collected. Check PROD_URL connectivity."
+      },
+      {
+        "id": "C.12",
+        "description": "Tier 1 regression (20 tests)",
+        "status": "SKIP",
+        "detail": "No tests collected. Check PROD_URL connectivity."
+      }
+    ]
+  },
+  "summary": {
+    "C": {
+      "PASS": 8,
+      "WARN": 1,
+      "FAIL": 1,
+      "SKIP": 2
+    }
+  }
+}
