@@ -901,3 +901,22 @@ def admin_kb_page(admin_page: Page) -> Page:
 def admin_inbox_page(admin_page: Page) -> Page:
     """Navigate to the Inbox page."""
     return _navigate_admin_to(admin_page, "Inbox", "Inbox")
+
+
+@pytest.fixture()
+def admin_billing_page(admin_page: Page) -> Page:
+    """Navigate to the Billing page."""
+    return _navigate_admin_to(admin_page, "Billing", "Billing")
+
+
+@pytest.fixture()
+def admin_quick_actions_page(admin_page: Page) -> Page:
+    """Navigate to the Quick Actions page."""
+    return _navigate_admin_to(admin_page, "Quick actions", "Quick actions")
+
+
+@pytest.fixture()
+def admin_integrations_page(admin_page: Page) -> Page:
+    """Navigate to the Integrations page."""
+    # Integrations page may not have a visible heading — just navigate and settle
+    return _navigate_admin_to(admin_page, "Integrations", None)

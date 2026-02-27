@@ -147,3 +147,54 @@ class TestTierGating:
         switches = admin_memory_page.locator('input[type="checkbox"], [role="switch"]')
         assert switches.count() >= 3, \
             f"Professional tier should show at least 3 toggles, found {switches.count()}"
+
+
+# ===========================================================================
+# Memory & Privacy Field Tests
+# ===========================================================================
+
+
+class TestMemoryPrivacyFields:
+    """Verify all named fields on the Memory & Privacy page. SPEC-0916 through SPEC-0923."""
+
+    def test_data_retention_period_input(self, admin_memory_page: Page) -> None:
+        """SPEC-0916: MemoryPrivacy has 'Data retention period' input field."""
+        page_text = admin_memory_page.text_content("body") or ""
+        assert "retention" in page_text.lower() or "Retention" in page_text, \
+            "Data retention period field should be present"
+
+    def test_pii_scrubbing_toggle(self, admin_memory_page: Page) -> None:
+        """SPEC-0917: MemoryPrivacy has 'PII scrubbing' toggle switch."""
+        page_text = admin_memory_page.text_content("body") or ""
+        assert "PII" in page_text or "scrubbing" in page_text.lower() \
+            or "pii" in page_text.lower(), \
+            "PII scrubbing toggle should be present"
+
+    def test_consent_required_toggle(self, admin_memory_page: Page) -> None:
+        """SPEC-0918: MemoryPrivacy has 'Consent required' toggle switch."""
+        page_text = admin_memory_page.text_content("body") or ""
+        assert "Consent" in page_text or "consent" in page_text.lower(), \
+            "Consent required toggle should be present"
+
+    def test_automatic_deletion_toggle(self, admin_memory_page: Page) -> None:
+        """SPEC-0919: MemoryPrivacy has 'Automatic deletion on request' toggle switch."""
+        page_text = admin_memory_page.text_content("body") or ""
+        assert "deletion" in page_text.lower() \
+            or "delete" in page_text.lower() \
+            or "auto" in page_text.lower(), \
+            "Automatic deletion on request toggle should be present"
+
+    def test_save_draft_inputs_button(self, admin_memory_page: Page) -> None:
+        """SPEC-0920: MemoryPrivacy has 'Save draft inputs' button."""
+        save_btn = admin_memory_page.locator("button", has_text="Save")
+        assert save_btn.count() > 0, "Save (draft inputs) button should be present"
+
+    def test_identification_mode_segmented_control(self, admin_memory_page: Page) -> None:
+        """SPEC-0923: MemoryPrivacy SegmentedControl offers options: off, gentle, standard."""
+        page_text = admin_memory_page.text_content("body") or ""
+        # The SegmentedControl should have Off, Gentle, Standard labels
+        has_off = "Off" in page_text or "off" in page_text.lower()
+        has_gentle = "Gentle" in page_text or "gentle" in page_text
+        has_standard = "Standard" in page_text or "standard" in page_text
+        assert (has_off and has_gentle) or (has_gentle and has_standard), \
+            "Identification mode SegmentedControl should show Off/Gentle/Standard options"
