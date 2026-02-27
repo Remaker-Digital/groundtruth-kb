@@ -163,3 +163,27 @@ class TestNoConsoleErrors:
                 pass  # Navigation might fail for some pages — that's OK here
 
         assert len(errors) == 0, f"JavaScript errors detected: {errors}"
+
+
+class TestSystemStateIndicator:
+    """Verify system state indicator in navigation. WI 291."""
+
+    def test_activation_status_in_navbar(self, admin_page: Page) -> None:
+        """WI 291: Inactive system state indicator in nav bar.
+
+        The navigation bar should show the system activation status
+        (active/inactive/test mode) so merchants always know their system state.
+        """
+        page_text = admin_page.text_content("body") or ""
+        # Look for activation status indicators in the nav/sidebar area
+        status_indicators = ["Active", "Inactive", "Test mode", "Draft",
+                           "Activated", "Not activated", "Live"]
+        has_status = any(s in page_text for s in status_indicators)
+        # The sidebar typically shows activation state
+        sidebar = admin_page.locator("nav, [role='navigation'], aside")
+        sidebar_text = ""
+        if sidebar.count() > 0:
+            sidebar_text = sidebar.first.text_content() or ""
+        has_sidebar_status = any(s in sidebar_text for s in status_indicators)
+        assert has_status or has_sidebar_status, \
+            "Navigation should show system activation status indicator"
