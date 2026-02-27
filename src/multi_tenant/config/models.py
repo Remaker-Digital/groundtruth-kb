@@ -12,6 +12,7 @@ from typing import Any
 
 from pydantic import BaseModel, Field
 
+from src.multi_tenant.api_models import CamelCaseModel
 from src.multi_tenant.tenant_config_schema import ConfigValidationResult
 
 
@@ -55,8 +56,14 @@ class ConfigVersionInfo(BaseModel):
     config_name: str | None = Field(default=None, description="Named configuration label")
 
 
-class NamedConfigSummary(BaseModel):
-    """Summary of a named configuration."""
+class NamedConfigSummary(CamelCaseModel):
+    """Summary of a named configuration.
+
+    Uses CamelCaseModel so JSON serialization matches the frontend TypeScript
+    interface (createdAt, isActive, isDefault, fieldCount, createdBy).
+    Without this, the API returns snake_case and the frontend gets undefined
+    for all multi-word fields → "Invalid Date", missing badges, etc. (S104 fix).
+    """
 
     name: str = Field(description="Configuration name")
     version: int = Field(description="Version number this name points to")

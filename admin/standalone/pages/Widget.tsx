@@ -363,7 +363,8 @@ function resolvePanelWidthPx(preset: WidgetConfig['panelWidth']): string {
 }
 
 function WidgetPreview({ config, adminIsDark }: { config: WidgetConfig; adminIsDark: boolean }) {
-  const [chatOpen, setChatOpen] = useState(true);
+  // Preview is always static — chat panel always visible so merchants see the
+  // full widget appearance.  No open/close toggle (that's storefront behavior).
   const isRight = config.position === 'bottom-right';
   const dk = config.colorMode === 'auto' ? adminIsDark : config.colorMode === 'dark';
 
@@ -422,8 +423,8 @@ function WidgetPreview({ config, adminIsDark }: { config: WidgetConfig; adminIsD
         </Box>
       </Box>
 
-      {/* Chat panel */}
-      {chatOpen && <Box
+      {/* Chat panel — always visible in preview (no toggle) */}
+      <Box
         style={{
           position: 'absolute',
           bottom: 80,
@@ -646,11 +647,10 @@ function WidgetPreview({ config, adminIsDark }: { config: WidgetConfig; adminIsD
             Powered by <span style={{ fontWeight: 600, color: config.primaryColor }}>Agent Red</span>
           </Text>
         </Box>
-      </Box>}
+      </Box>
 
-      {/* Launcher button */}
+      {/* Launcher button — decorative in preview, no click handler */}
       <Box
-        onClick={() => setChatOpen((o) => !o)}
         style={{
           position: 'absolute',
           bottom: Math.round(config.positionOffsetY * 0.5),
@@ -663,9 +663,8 @@ function WidgetPreview({ config, adminIsDark }: { config: WidgetConfig; adminIsD
           display: 'flex',
           alignItems: 'center',
           justifyContent: 'center',
-          cursor: 'pointer',
+          cursor: 'default',
           zIndex: 3,
-          transition: 'transform 0.15s ease',
         }}
       >
         <LauncherIcon icon={config.launcherIcon} size={config.launcherSize} />

@@ -123,11 +123,24 @@ function SetupChecklist({ config, activationStatus }: {
   activationStatus?: { is_active: boolean; is_configured: boolean };
 }) {
   if (!config || !activationStatus) return null;
+
+  // Active tenants have completed setup by definition — activation requires
+  // configuration.  Showing an incomplete checklist on an active system is
+  // contradictory and erodes merchant trust.  (S103 fix)
+  if (activationStatus.is_active) return null;
+
   const checks = [
     { label: 'Brand name configured', done: Boolean(config.brand_name && config.brand_name !== 'My Store') },
-    { label: 'AI instructions or category selected', done: Boolean(config.custom_instructions || config.business_category || config.brand_voice) },
-    { label: 'Knowledge base has content', done: Boolean(config.kb_entry_count && Number(config.kb_entry_count) > 0) },
-    { label: 'Widget appearance customized', done: Boolean(config.widget_primary_color && config.widget_primary_color !== '#ff3621') },
+    { label: 'AI instructions or category selected', done: Boolean(config.custom_instructions || config.brand_voice) },
+    // Widget appearance: any customization counts — color change, position,
+    // gradient toggle, launcher icon, etc.  Not just color !== default.
+    { label: 'Widget appearance customized', done: Boolean(
+      (config.widget_primary_color && config.widget_primary_color !== '#ff3621')
+      || (config.widget_position && config.widget_position !== 'bottom-right')
+      || config.widget_header_gradient_enabled === true
+      || (config.widget_launcher_icon && config.widget_launcher_icon !== 'chat')
+      || (config.widget_background_color && config.widget_background_color !== '#ffffff')
+    ) },
     { label: 'System activated', done: Boolean(activationStatus.is_active) },
   ];
   const doneCount = checks.filter((c) => c.done).length;

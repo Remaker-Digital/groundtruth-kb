@@ -455,26 +455,33 @@ async def get_config(
     tier = _resolve_tier(ctx)
 
     if state == "draft":
-        # Admin UI requesting draft for editing
+        # Admin UI requesting draft for editing.
+        # IMPORTANT: Always start from the full resolved active config and
+        # overlay draft changes.  Returning only the changed fields caused
+        # the admin UI to lose un-changed values (widget_key, colors, etc.)
+        # which broke Installation display, embed snippets, and more (S104).
         activation_svc = get_activation_service()
+        active_result = await processor.get_config(ctx.tenant_id, tier)
         draft_state = await activation_svc.get_draft_state(ctx.tenant_id, tier)
         if draft_state.has_pending_changes:
+            # Merge: full active config + draft overrides
+            merged_config = dict(active_result.config)
+            merged_config.update(draft_state.draft_config)
             return ConfigResponse(
                 tenant_id=ctx.tenant_id,
                 tier=tier.value,
                 version=draft_state.draft_version or 0,
-                config=draft_state.draft_config,
+                config=merged_config,
                 from_cache=False,
                 state="draft",
             )
-        # No draft — fall through to active
-        result = await processor.get_config(ctx.tenant_id, tier)
+        # No draft — return active as-is
         return ConfigResponse(
-            tenant_id=result.tenant_id,
-            tier=result.tier,
-            version=result.version,
-            config=result.config,
-            from_cache=result.from_cache,
+            tenant_id=active_result.tenant_id,
+            tier=active_result.tier,
+            version=active_result.version,
+            config=active_result.config,
+            from_cache=active_result.from_cache,
             state="active",
         )
 
