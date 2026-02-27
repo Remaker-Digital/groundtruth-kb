@@ -1,6 +1,6 @@
 # CLAUDE.md - Agent Red Customer Experience
 
-This document provides active guidance for AI assistants working on the Agent Red Customer Experience commercial project. It is loaded at the start of every session.
+This document provides active guidance for AI assistants working on the Agent Red Customer Experience commercial project. It is loaded at the start of every session. **GOV-01: This file MUST NOT exceed 300 lines.** Move detail to topic files when approaching the limit.
 
 > **📁 Reference data** (legal, pricing, infrastructure, AGNTCY rules): `CLAUDE-REFERENCE.md` — read on demand.
 > **📁 Architecture** (project structure, module inventory): `CLAUDE-ARCHITECTURE.md` — read on demand.
@@ -14,7 +14,7 @@ This document provides active guidance for AI assistants working on the Agent Re
 | **CLAUDE.md** | Rules & architecture | How to work with this project: procedures, patterns, evaluation criteria, protected behaviors. | Rarely — only when rules or architecture change. |
 | **MEMORY.md** | State & history | What has happened: current versions, test counts, recent sessions, quick reference values, topic file index. | Every session — updated during wrap-up. |
 
-**Rule of thumb:** If it tells Claude *what to do*, it goes in CLAUDE.md. If it tells Claude *what has been done*, it goes in MEMORY.md. Version numbers, image tags, and environment values go in MEMORY.md only.
+**Rule of thumb:** If it tells Claude *what to do*, it goes in CLAUDE.md. If it tells Claude *what has been done*, it goes in MEMORY.md. Version numbers, image tags, and environment values go in MEMORY.md only. **Project knowledge** (specifications, procedures, decisions, domain knowledge) goes in the **Knowledge Database** — not in markdown files.
 
 ### Session ID Convention
 
@@ -38,6 +38,57 @@ All new work in this repository must include:
 ```
 © 2026 Remaker Digital, a DBA of VanDusen & Palmeter, LLC. All rights reserved.
 ```
+
+---
+
+## Specification Discipline
+
+Specifications are the protocol for recording agreement between owner and Claude about what is being implemented. They are the shared artifact — the owner does not read code or write tests; Claude does not set business requirements. The specification is the mutual understanding. See `memory/specification-discipline.md` for history, examples, and phase progress.
+
+### What Is a Specification?
+
+A specification is a **requirement** — a business decision that affects customers or the business. The terms are interchangeable.
+
+**The litmus test:** "Would a different choice affect the customer or the business?" If yes, it's a specification. If no, it's an implementation detail.
+
+| IS a specification | NOT a specification |
+|---|---|
+| Intent taxonomy, tier pricing, conversation handling rules, privacy commitments, UI field inventory, integration choices (Shopify, MCP), quality criteria | Database schema, middleware ordering, startup sequence, API response shapes, env vars, internal module structure |
+
+Specifications should be **as stable as the business need.** Leave maximum room for implementation variation — the implementation may change, but the specification should remain stable. Specs function as a **decision log** (what was agreed and why), not a **build specification** (how to construct the system).
+
+### Principles (GOV-01 through GOV-08 in Knowledge DB)
+
+1. **Specs are the negotiation artifact.** When the owner requests a change or identifies a flaw, Claude's first priority is creating/updating a specification. Testing and implementation proceed only after mutual understanding is established.
+
+2. **Specs are immutable without owner consent.** Once recorded, a spec cannot be changed, retired, or contradicted without owner approval. Claude proposes; the owner decides.
+
+3. **Spec granularity is driven by test unambiguity.** Specs are as detailed as business goals require — some broad, some granular. The binding constraint: every test derived from a spec MUST produce an unambiguous PASS/FAIL. If tests would be ambiguous, refine the spec.
+
+4. **Specs mature through use.** Initial specs represent the best understanding at the time. When owner testing reveals a gap, the spec is refined — add specificity, remove ambiguity. This iterative refinement is normal maturation, not a defect.
+
+5. **Fix the spec first, not the code.** When testing reveals an error, correct the specification first. Revised specs produce revised tests that automatically flag incorrect implementation. Jumping to a code fix without updating the spec leaves ambiguity in place.
+
+6. **Specify on contact.** Pre-existing unspecified elements are *uncontrolled*, not defects. They become *controlled* when touched — via owner feedback, re-testing, or modification. New work (S106+) requires spec-first always.
+
+7. **No bug fixes during testing.** When a defect is discovered during testing or spec-maturation, do NOT fix it. Review the spec and test, then record the defect as a backlog work item in the Knowledge DB. Bug fixes occur in separate implementation sessions following spec-first workflow. The backlog is the bridge between discovery and correction.
+
+8. **Knowledge Database is the single source of truth.** All specifications, procedures, backlog items, and project knowledge live in the Knowledge DB. The only markdown files are CLAUDE.md (rules) and MEMORY.md (state/history). No operational artifacts in standalone markdown — the DB provides change history, versioning, and queryability that files cannot.
+
+### Workflow
+
+**When making any change:** update the specification first, then the implementation, then verify the test passes. For complex changes, this expands to: extract specs → record in KB → check contradictions → derive tests → implement → verify.
+
+### Specification Forms
+
+Specs are form-agnostic. Valid forms: external standard reference, user story, textual description, image reference, metric. The only requirement: unambiguous enough to test and implement.
+
+### Change Control
+
+- Created via `db.insert_spec()` / `db.update_spec()` with `changed_by` and `change_reason`
+- Status: `specified` → `implemented` → `verified` (or `retired` with owner approval)
+- Append-only versioning — every change creates a new record
+- Deduplication resolves at test time, not during extraction
 
 ---
 
@@ -81,16 +132,7 @@ The file `docs/PROTECTED-BEHAVIORS.md` lists behaviors with machine-verifiable a
 
 ### Continuous Improvement Feedback
 
-Provide brief inline coaching notes (prefixed with "💡 **Feedback:**" at the end of responses) when observing:
-
-- **Terminology inconsistency** — Standard terms: "WI #NNN" for numbered work items, "work item" for generic, "task" for ad-hoc, "issue" for GitHub Issues
-- **Bare approvals that could carry steering** — suggest a one-sentence clarification
-- **Approve-then-constrain pattern** — note combining into one message is more efficient
-- **Open-ended questions** — suggest a format (table, list, yes/no with evidence)
-- **Credential exposure** — flag secrets pasted into chat
-- **Missing structure** — suggest bullets or numbers
-
-Skip feedback when the message is already clear. Only flag genuine opportunities.
+Provide brief inline coaching notes (prefixed with "💡 **Feedback:**") when observing: terminology inconsistency, bare approvals that could carry steering, credential exposure, or missing structure. Skip when the message is already clear.
 
 ### Work Priority Bias
 
@@ -98,112 +140,39 @@ Skip feedback when the message is already clear. Only flag genuine opportunities
 
 ### Master Test Plan
 
-The **Master Test Plan** (`docs/MASTER-TEST-PLAN-1.0.md`) is the single canonical document that defines what must be tested and in what order for the 1.0 GA release. It specifies a 15-phase ordered execution sequence where each phase is a child Repeatable Procedure. All 15 phases must pass for the release gate to clear.
-
-**Maintenance rules:**
-- Whenever a testing Repeatable Procedure is **created**, it MUST be added to the Master Test Plan as a new phase or within an existing phase.
-- Whenever a testing Repeatable Procedure is **updated** (assertions added, removed, or modified), the Master Test Plan MUST be updated to reflect the new test counts, pass criteria, and any changed phase gates.
-- The Master Test Plan's §10 Success Criteria table MUST always be consistent with the individual child procedures it references.
-
-**Test outcome rules:**
-- Every test in every procedure MUST result in one of three outcomes:
-  1. **PASS** — the test executed and produced the expected result.
-  2. **FAIL** — the test executed and produced an unexpected result. A FAIL blocks the release gate. The root cause must be investigated and fixed (either in the product code or the test itself).
-  3. **Correction** — the test itself was found to be incorrect (wrong expected value, stale endpoint, outdated assertion). When a test is corrected, the corrected procedure MUST be re-executed to verify the correction is valid. A corrected test that has not been re-verified does not count as PASS.
-- **CONDITIONAL PASS is not accepted.** Any test that does not cleanly PASS must be either fixed (product or test) and re-run, or documented as a 1.1 deferral with justification.
-- **No pre-existing failures are accepted** for the 1.0 GA release gate. Known failing tests must be fixed or removed with justification before the release gate execution begins.
+The **Master Test Plan** (`docs/MASTER-TEST-PLAN-1.0.md`) defines the 15-phase ordered test sequence for the 1.0 GA release. All phases must pass for the release gate to clear. When test procedures are created or updated, the Master Test Plan MUST be updated to match. Test outcomes: PASS, FAIL (blocks release), or Correction (re-execute to verify). No CONDITIONAL PASS accepted.
 
 ### Release Plan
 
-The **Release Plan** (`docs/operations/release-plan-v1.57.md`) is the governing framework for all current work. It defines an 8-step process from Master Test Plan execution through beta deployment and non-disruptive upgrade.
-
-**Key terminology:**
-- **Beta (Prime)** — the production environment serving beta customers. Runs a pinned release image.
-- **Staging** — an isolated parallel production environment for validating the next release and proving non-disruptive upgrade.
-- All beta feedback fixes are developed on `main` toward v1.58.0.
-- Non-disruptive upgrade is proven on Staging before applying to Beta (Prime).
-
-**Branching model:** Tag-and-branch-forward (Model A). No long-lived development branches. `main` always moves forward.
+The **Release Plan** (`docs/operations/release-plan-v1.57.md`) governs the 8-step process from test execution through beta deployment. **Beta (Prime)** = production for beta customers. **Staging** = parallel environment for upgrade validation. Branching: tag-and-branch-forward, `main` always moves forward.
 
 ### Repeatable Procedures
 
-Some operational tasks are governed by **Repeatable Procedures** — structured SOPs with pinned variables, verification gates, and known failure modes. The specification is defined in `docs/operations/REPEATABLE-PROCEDURES.md`.
-
-When executing a Repeatable Procedure:
-- Follow the steps exactly as written, using the declared variables
-- If an error occurs, classify it as a **procedure defect** or **environment transient** (see spec Section 3)
-- For procedure defects: fix the procedure document before continuing, not just the immediate issue
-- For environment transients: retry, do not modify the procedure
-
-Active procedures are listed in `docs/operations/REPEATABLE-PROCEDURES.md`. Key procedures: release plan (`release-plan-v1.57.md`), deploy/rollback scripts, seed/test tenant scripts, initialization, upgrade verification (parameterized for staging/production), and 8 test procedures (UI, Chrome MCP, load, isolation, security, rate limit, quality, resilience, data integrity).
+Structured SOPs with pinned variables and verification gates (`docs/operations/REPEATABLE-PROCEDURES.md`). Follow steps exactly. Errors: classify as **procedure defect** (fix the doc) or **environment transient** (retry). Key procedures: release plan, deploy/rollback, seed/test tenant, initialization, upgrade verification, and 8 test procedures.
 
 ### Session Scheduler
 
-The file `.claude/SCHEDULE.md` contains pre-planned prompts that are automatically injected via a `UserPromptSubmit` hook (`.claude/hooks/scheduler.py`). Groups of sequential prompts are processed FIFO — one prompt per user message.
-
-**Trigger types:** `always` (next prompt), `session_end` (wrap-up keywords detected), `after:N` (after N prompts).
-
-**Claude's permissions:** Claude may append new groups to SCHEDULE.md when anticipating future housekeeping needs (e.g., "after this deployment, remind me to update the procedure"). The owner can delete groups to cancel, or reorder groups to change priority.
+`.claude/SCHEDULE.md` contains pre-planned prompts injected via `UserPromptSubmit` hook. Triggers: `always`, `session_end`, `after:N`. Claude may append new groups; owner can delete/reorder.
 
 ### Session Wrap-Up & Handoff
 
-At the end of every working session, execute the **Session Wrap-Up Repeatable Procedure** (`docs/operations/session-wrap-up-procedure.md`). This is triggered automatically by the Session Scheduler when wrap-up keywords are detected ("wrap up", "done", "end session", etc.) or can be invoked manually.
+Execute the **Session Wrap-Up Repeatable Procedure** (`docs/operations/session-wrap-up-procedure.md`) at end of session — triggered automatically by Session Scheduler on wrap-up keywords or invoked manually. 5-phase: (1) Update KB/MEMORY/CLAUDE → (2) Verify procedures → (3) External updates → (4) Staging deploy (risk gate) → (5) Generate handoff prompt.
 
-**5-phase procedure:** (1) Update Knowledge DB, MEMORY.md, CLAUDE.md → (2) Verify Repeatable Procedures → (3) External updates (docs site, GitHub project/wiki) → (4) Staging deployment (with risk gate) → (5) Generate and store next-session handoff prompt.
-
-**Session handoff prompt:** The final step stores a structured prompt in the Knowledge Database via `db.insert_session_prompt()`. The next session's SessionStart hook automatically retrieves and displays it. This eliminates the need for the owner to craft session-start prompts manually.
-
-**Audit cadence:** Every 5th session (S100, S105, ...) is automatically flagged as an **audit session**. During wrap-up, the handoff generator checks `db.is_audit_session(next_session_id)` and prepends `db.get_audit_directive()` to the prompt. Audit sessions perform a fresh-context review of KB integrity, documentation accuracy, procedures, and design debt before starting new work. The interval is configurable via `KnowledgeDB.AUDIT_INTERVAL` (default: 5).
-
-**Python API for session prompts:**
-```python
-db.insert_session_prompt("S97", "Continue work on...", context={...})  # Store
-db.get_next_session_prompt()                                            # Retrieve (unconsumed)
-db.consume_session_prompt("S97")                                        # Mark as used
-db.is_audit_session("S100")                                             # True (100 % 5 == 0)
-db.get_audit_directive()                                                # Audit instructions text
-```
+Handoff prompts are stored via `db.insert_session_prompt()` and auto-retrieved at next session start. Every 5th session is an **audit session** (KB integrity, doc accuracy, design debt review).
 
 ### Knowledge Database
 
-The **Knowledge Database** (`tools/knowledge-db/knowledge.db`) is the canonical source of truth for all specifications, test procedures, and operational procedures. It replaces the markdown backlog (now FROZEN) with an append-only SQLite store providing change control, version history, and machine-verifiable assertions. Web UI: `localhost:8090` (run `python tools/knowledge-db/app.py`).
+The **Knowledge Database** (`tools/knowledge-db/knowledge.db`) is the canonical source of truth for all specifications, test procedures, and operational procedures. Append-only SQLite with change control and version history. Web UI: `localhost:8090`. Claude is the sole writer; owner observes via read-only UI.
 
-**Core principle — append-only:** No rows are ever updated or deleted. Every change creates a new versioned record with `changed_by`, `changed_at`, and `change_reason`. Current state = latest version per ID.
+**Always use the Python API** — never edit SQLite directly. Key operations: `db.insert_spec()`, `db.update_spec()`, `db.get_spec()`, `db.list_specs()`, `db.get_summary()`, `db.export_json()`. Status flow: `specified` → `implemented` → `verified` (or `retired`).
 
-**Claude is the sole writer.** The owner observes through the read-only web UI. When the owner spots a discrepancy, they tell Claude, and Claude creates a corrected version.
+**Session-start hook** (`.claude/hooks/assertion-check.py`) runs assertions automatically. Failing `specified` = expected. Failing `implemented`/`verified` = regression.
 
-**Retention policy:** Never delete. All rows are retained indefinitely (~20 KB/session, 400 GB budget = ~57,000 years). Use `db.export_json()` for logical backups.
-
-**Python API** (always use this — never edit SQLite directly or modify `seed.py` for status changes):
-
-```python
-import sys; sys.path.insert(0, "tools/knowledge-db")
-from db import KnowledgeDB
-
-db = KnowledgeDB()
-db.get_spec("245")                       # Latest version
-db.list_specs(status="implemented")      # Filtered list
-db.get_summary()                         # Counts by status
-db.update_spec("245", changed_by="claude",
-               change_reason="Verified in S97",
-               status="implemented")
-db.export_json()                         # Full logical backup (JSON)
-db.close()                               # Always close when done
-```
-
-**When to update the database:**
-
-| Trigger | Action |
-|---------|--------|
-| Implement a specified WI | `update_spec(id, status="implemented", change_reason="...")` |
-| Verify an implemented WI passes tests | `update_spec(id, status="verified", change_reason="...")` |
-| Discover a wrong status | `update_spec(id, status=corrected, change_reason="...")` |
-| Modify a test/operational procedure | Create new version via `insert_test_procedure()` or `insert_op_procedure()` |
-| Retire a spec (no longer applicable) | `update_spec(id, status="retired", change_reason="...")` |
-
-**Session-start hook:** `.claude/hooks/assertion-check.py` runs all assertions at session start. Failing specs with status `"specified"` are expected (not yet implemented). Failing specs with status `"implemented"` or `"verified"` indicate **regressions** requiring investigation.
-
-**Do not modify** `docs/archive/BACKLOG-NEW-WORK-ITEMS-FROZEN.md` — it is FROZEN and archived. The Knowledge Database is the canonical source of truth for all specifications.
+**Knowledge boundary — anti-drift rules:**
+- **All project knowledge lives in the KB.** Specifications, procedures, backlog items, decisions, and domain knowledge → `db.insert_spec()`, `db.insert_document()`, or `db.insert_procedure()`.
+- **DO NOT create new markdown files** to store project knowledge. When tempted to create a `.md` file, ask: "Should this be a KB document instead?" The answer is almost always yes.
+- **Permitted markdown exceptions:** CLAUDE.md (bootstrap rules), MEMORY.md + `memory/*.md` topic files (session state, operational patterns for cross-session continuity), external-facing published docs (wiki, website, legal, branding).
+- **Topic files are NOT canonical** for specifications or procedures — they are Claude's operational memory for patterns and lessons. The KB is the source of truth.
 
 ### Adding Commercial Features
 
@@ -242,5 +211,5 @@ All 19 cycles deployed. Full history: `memory/build-deploy-roadmap.md`.
 ---
 
 *© 2026 Remaker Digital, a DBA of VanDusen & Palmeter, LLC. All rights reserved.*
-*Last Updated: 2026-02-25*
-*Version: 58.2.0*
+*Last Updated: 2026-02-26*
+*Version: 60.3.0*
