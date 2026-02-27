@@ -435,3 +435,102 @@ class TestSmsOtp:
         body = json.loads(resp.body)
         assert resp.status_code == 401
         assert body["error"] == "invalid_code"
+
+
+# ---------------------------------------------------------------------------
+# SPEC-1289: Return available MFA methods when 2FA required
+# ---------------------------------------------------------------------------
+
+
+class TestSpec1289MfaMethods:
+    """SPEC-1289: Return available MFA methods when 2FA required."""
+
+    @pytest.mark.asyncio
+    async def test_spec1289_admin_with_totp_gets_totp_method(
+        self, admin_member,
+    ):
+        """SPEC-1289: Admin with mfa_enabled gets 'totp' in methods."""
+        from src.multi_tenant.magic_link_auth import _get_available_mfa_methods
+        methods = _get_available_mfa_methods(admin_member)
+        assert "totp" in methods
+
+    @pytest.mark.asyncio
+    async def test_spec1289_admin_with_backup_codes_gets_backup_method(
+        self, admin_member,
+    ):
+        """SPEC-1289: Admin with backup code hashes gets 'backup' in methods."""
+        from src.multi_tenant.magic_link_auth import _get_available_mfa_methods
+        methods = _get_available_mfa_methods(admin_member)
+        assert "backup" in methods
+
+    @pytest.mark.asyncio
+    async def test_spec1289_admin_with_phone_gets_sms_method(self):
+        """SPEC-1289: Admin with verified phone + SMS available gets 'sms' in methods."""
+        from src.multi_tenant.magic_link_auth import _get_available_mfa_methods
+        member = {
+            "mfa_enabled": True,
+            "mfa_backup_code_hashes": [],
+            "phone_number": "+12125551234",
+            "phone_verified": True,
+        }
+        with patch("src.multi_tenant.sms_mfa_service.is_sms_available", return_value=True):
+            methods = _get_available_mfa_methods(member)
+        assert "sms" in methods
+
+    @pytest.mark.asyncio
+    async def test_spec1289_admin_without_phone_no_sms(self):
+        """SPEC-1289: Admin without verified phone does not get 'sms'."""
+        from src.multi_tenant.magic_link_auth import _get_available_mfa_methods
+        member = {
+            "mfa_enabled": True,
+            "mfa_backup_code_hashes": [],
+            "phone_number": None,
+            "phone_verified": False,
+        }
+        methods = _get_available_mfa_methods(member)
+        assert "sms" not in methods
+
+    @pytest.mark.asyncio
+    async def test_spec1289_no_member_doc_returns_empty(self):
+        """SPEC-1289: None member_doc returns empty methods list."""
+        from src.multi_tenant.magic_link_auth import _get_available_mfa_methods
+        methods = _get_available_mfa_methods(None)
+        assert methods == []
+
+    @pytest.mark.asyncio
+    async def test_spec1289_verify_endpoint_returns_mfa_methods(self):
+        """SPEC-1289: Magic link verify returns mfa_methods in 2FA response."""
+        from src.multi_tenant.magic_link_auth import verify_magic_link
+
+        mock_token_repo = AsyncMock()
+        mock_token_repo.consume_token = AsyncMock(return_value={
+            "tenant_id": "t-001",
+            "email": "admin@test.com",
+            "member_id": "member-admin",
+        })
+
+        mock_team_repo = AsyncMock()
+        mock_team_repo.read = AsyncMock(return_value={
+            "id": "member-admin",
+            "tenant_id": "t-001",
+            "email": "admin@test.com",
+            "role": "admin",
+            "mfa_enabled": True,
+            "mfa_backup_code_hashes": ["hash1"],
+            "phone_number": None,
+            "phone_verified": False,
+        })
+
+        with (
+            patch("src.multi_tenant.repositories.VerificationTokenRepository", return_value=mock_token_repo),
+            patch("src.multi_tenant.repositories.TeamMemberRepository", return_value=mock_team_repo),
+        ):
+            resp = await verify_magic_link(token="valid-token")
+
+        import json
+        body = json.loads(resp.body)
+        assert resp.status_code == 200
+        assert body["requires_2fa"] is True
+        assert "mfa_methods" in body
+        assert "totp" in body["mfa_methods"]
+        assert "backup" in body["mfa_methods"]

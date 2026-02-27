@@ -569,3 +569,163 @@ class TestVerifyWithMemberIdentity:
         assert payload is not None
         assert "member_id" not in payload
         assert "role" not in payload
+
+
+# ---------------------------------------------------------------------------
+# SPEC-1281: Magic link rate limit 3 per 5 min per IP
+# ---------------------------------------------------------------------------
+
+
+class TestSpec1281RateLimit:
+    """SPEC-1281: Magic link rate limit 3 per 5 min per IP."""
+
+    def test_spec1281_rate_max_is_3(self):
+        """SPEC-1281: _RATE_MAX is 3."""
+        assert _RATE_MAX == 3
+
+    def test_spec1281_rate_window_is_300_seconds(self):
+        """SPEC-1281: _RATE_WINDOW is 300 seconds (5 minutes)."""
+        assert _RATE_WINDOW == 300.0
+
+    def test_spec1281_first_three_requests_not_limited(self):
+        """SPEC-1281: First 3 requests from same IP are allowed."""
+        ip = "10.0.1.1"
+        for i in range(_RATE_MAX):
+            assert _is_rate_limited(ip) is False, f"Request {i+1} should not be limited"
+
+    def test_spec1281_fourth_request_is_limited(self):
+        """SPEC-1281: 4th request from same IP within 5 min is blocked."""
+        ip = "10.0.1.2"
+        for _ in range(_RATE_MAX):
+            _is_rate_limited(ip)
+        assert _is_rate_limited(ip) is True
+
+    def test_spec1281_different_ips_independent(self):
+        """SPEC-1281: Rate limits are independent per IP."""
+        ip_a = "10.0.1.3"
+        ip_b = "10.0.1.4"
+        for _ in range(_RATE_MAX):
+            _is_rate_limited(ip_a)
+        # ip_a exhausted, ip_b still clean
+        assert _is_rate_limited(ip_a) is True
+        assert _is_rate_limited(ip_b) is False
+
+    def test_spec1281_expired_entries_reset(self):
+        """SPEC-1281: Entries older than 5 minutes are cleaned up."""
+        ip = "10.0.1.5"
+        # Pre-populate with entries beyond the window
+        _rate_limit[ip] = [time.time() - _RATE_WINDOW - 10] * _RATE_MAX
+        # Should not be limited (old entries expire)
+        assert _is_rate_limited(ip) is False
+
+
+# ---------------------------------------------------------------------------
+# SPEC-1282: Uniform 200 response on magic link (anti-enumeration)
+# ---------------------------------------------------------------------------
+
+
+class TestSpec1282UniformResponse:
+    """SPEC-1282: Uniform 200 response on magic link (anti-enumeration)."""
+
+    @pytest.mark.asyncio
+    async def test_spec1282_unknown_email_returns_200(self, mock_request, mock_tenant_repo, mock_token_repo):
+        """SPEC-1282: Unknown email returns 200 (no enumeration leak)."""
+        mock_team = AsyncMock()
+        mock_team.find_all_by_email = AsyncMock(return_value=[])
+        mock_tenant_repo.find_by_customer_email.return_value = None
+
+        with (
+            patch("src.multi_tenant.repositories.TeamMemberRepository", return_value=mock_team),
+            patch("src.multi_tenant.repositories.TenantRepository", return_value=mock_tenant_repo),
+            patch("src.multi_tenant.repositories.VerificationTokenRepository", return_value=mock_token_repo),
+        ):
+            result = await request_magic_link(
+                MagicLinkRequest(email="nonexistent@nowhere.com"), mock_request,
+            )
+        assert isinstance(result, MagicLinkRequestResponse)
+        # No token created
+        mock_token_repo.create_token.assert_not_called()
+
+    @pytest.mark.asyncio
+    async def test_spec1282_known_email_returns_200(
+        self, mock_request, mock_tenant_repo, mock_token_repo, sample_tenant,
+    ):
+        """SPEC-1282: Known email also returns 200 (same shape)."""
+        mock_team = AsyncMock()
+        mock_team.find_all_by_email = AsyncMock(return_value=[])
+        mock_tenant_repo.find_by_customer_email.return_value = sample_tenant
+
+        with (
+            patch("src.multi_tenant.repositories.TeamMemberRepository", return_value=mock_team),
+            patch("src.multi_tenant.repositories.TenantRepository", return_value=mock_tenant_repo),
+            patch("src.multi_tenant.repositories.VerificationTokenRepository", return_value=mock_token_repo),
+            patch("src.multi_tenant.magic_link_auth._send_magic_link_email", new_callable=AsyncMock, return_value=True),
+        ):
+            result = await request_magic_link(
+                MagicLinkRequest(email="merchant@example.com"), mock_request,
+            )
+        assert isinstance(result, MagicLinkRequestResponse)
+
+    @pytest.mark.asyncio
+    async def test_spec1282_rate_limited_returns_200(self, mock_request):
+        """SPEC-1282: Rate-limited requests also return 200 (anti-enumeration)."""
+        for _ in range(_RATE_MAX):
+            _is_rate_limited(mock_request.client.host)
+        result = await request_magic_link(
+            MagicLinkRequest(email="any@test.com"), mock_request,
+        )
+        assert isinstance(result, MagicLinkRequestResponse)
+
+    def test_spec1282_response_message_is_generic(self):
+        """SPEC-1282: Response message does not reveal if email exists."""
+        resp = MagicLinkRequestResponse()
+        assert "if an account" in resp.message.lower()
+
+
+# ---------------------------------------------------------------------------
+# SPEC-1286: Single-use magic link tokens
+# ---------------------------------------------------------------------------
+
+
+class TestSpec1286SingleUseTokens:
+    """SPEC-1286: Single-use magic link tokens."""
+
+    @pytest.mark.asyncio
+    async def test_spec1286_verify_calls_consume_token(self, mock_token_repo):
+        """SPEC-1286: verify_magic_link calls consume_token (not read)."""
+        mock_token_repo.consume_token.return_value = {
+            "tenant_id": "t-1",
+            "email": "user@test.com",
+        }
+        with patch("src.multi_tenant.repositories.VerificationTokenRepository", return_value=mock_token_repo):
+            await verify_magic_link(token="my-token")
+
+        # Must call consume_token, which atomically reads + deletes
+        mock_token_repo.consume_token.assert_called_once_with(
+            token_id="my-token",
+            token_type=_TOKEN_TYPE,
+        )
+
+    @pytest.mark.asyncio
+    async def test_spec1286_consumed_token_returns_400(self, mock_token_repo):
+        """SPEC-1286: Already-consumed token returns 400 (token is None)."""
+        mock_token_repo.consume_token.return_value = None
+        with patch("src.multi_tenant.repositories.VerificationTokenRepository", return_value=mock_token_repo):
+            resp = await verify_magic_link(token="already-used")
+        assert resp.status_code == 400
+        import json
+        body = json.loads(resp.body)
+        assert body["error"] == "invalid_token"
+        assert "already been used" in body["message"]
+
+    @pytest.mark.asyncio
+    async def test_spec1286_token_type_is_magic_link(self, mock_token_repo):
+        """SPEC-1286: Token type used for magic links is 'magic_link'."""
+        assert _TOKEN_TYPE == "magic_link"
+        mock_token_repo.consume_token.return_value = None
+        with patch("src.multi_tenant.repositories.VerificationTokenRepository", return_value=mock_token_repo):
+            await verify_magic_link(token="any")
+        mock_token_repo.consume_token.assert_called_once_with(
+            token_id="any",
+            token_type="magic_link",
+        )

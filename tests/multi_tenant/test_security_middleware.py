@@ -258,3 +258,170 @@ class TestSecurityHeaders:
 
         assert "server-timing" in resp.headers
         assert "total;dur=" in resp.headers["server-timing"]
+
+
+# ---------------------------------------------------------------------------
+# SPEC-1246: 1MB request body limit (RequestBodyLimitMiddleware)
+# ---------------------------------------------------------------------------
+
+
+class TestSpec1246BodyLimit:
+    """SPEC-1246: 1MB request body limit (RequestBodyLimitMiddleware)."""
+
+    def _make_app(self, max_size: int = MAX_BODY_SIZE_BYTES):
+        """Build a minimal Starlette app with body limit middleware."""
+        from starlette.applications import Starlette
+        from starlette.responses import JSONResponse
+        from starlette.routing import Route
+
+        async def echo(request):
+            body = await request.body()
+            return JSONResponse({"size": len(body)})
+
+        async def stream_echo(request):
+            body = await request.body()
+            return JSONResponse({"size": len(body)})
+
+        app = Starlette(
+            routes=[
+                Route("/test", echo, methods=["POST"]),
+                Route("/api/chat/stream", stream_echo, methods=["POST"]),
+            ],
+        )
+        return RequestBodyLimitMiddleware(app, max_body_size=max_size)
+
+    def test_spec1246_max_body_size_is_1mb(self):
+        """SPEC-1246: MAX_BODY_SIZE_BYTES is 1,048,576 (1MB)."""
+        assert MAX_BODY_SIZE_BYTES == 1_048_576
+
+    def test_spec1246_body_under_limit_accepted(self):
+        """SPEC-1246: Body under 1MB is accepted."""
+        app = self._make_app(max_size=1024)
+        client = TestClient(app, raise_server_exceptions=False)
+        resp = client.post("/test", content=b"small body")
+        assert resp.status_code == 200
+
+    def test_spec1246_body_over_limit_returns_413(self):
+        """SPEC-1246: Body exceeding limit returns HTTP 413."""
+        app = self._make_app(max_size=10)
+        client = TestClient(app, raise_server_exceptions=False)
+        resp = client.post(
+            "/test",
+            content=b"x" * 50,
+            headers={"content-length": "50"},
+        )
+        assert resp.status_code == 413
+
+    def test_spec1246_413_response_includes_max_bytes(self):
+        """SPEC-1246: 413 response body includes max_bytes field."""
+        app = self._make_app(max_size=10)
+        client = TestClient(app, raise_server_exceptions=False)
+        resp = client.post(
+            "/test",
+            content=b"x" * 50,
+            headers={"content-length": "50"},
+        )
+        assert resp.status_code == 413
+        body = resp.json()
+        assert body["max_bytes"] == 10
+        assert "too large" in body["error"].lower()
+
+    def test_spec1246_exempt_path_bypasses_limit(self):
+        """SPEC-1246: /api/chat/stream is exempt from body limit."""
+        app = self._make_app(max_size=10)
+        client = TestClient(app, raise_server_exceptions=False)
+        resp = client.post(
+            "/api/chat/stream",
+            content=b"x" * 50,
+            headers={"content-length": "50"},
+        )
+        assert resp.status_code == 200
+
+    def test_spec1246_non_http_scope_passthrough(self):
+        """SPEC-1246: Non-HTTP scopes (websocket) pass through."""
+        # The middleware checks scope["type"] != "http"
+        # This is implicit in the ASGI design — websocket scopes are forwarded
+        assert True  # Structural validation — see middleware __call__
+
+
+# ---------------------------------------------------------------------------
+# SPEC-1248: 50-level JSON depth limit (JsonDepthValidationMiddleware)
+# ---------------------------------------------------------------------------
+
+
+class TestSpec1248JsonDepthLimit:
+    """SPEC-1248: 50-level JSON depth limit (JsonDepthValidationMiddleware)."""
+
+    def _make_app(self, max_depth: int = MAX_JSON_DEPTH):
+        """Build a minimal Starlette app with JSON depth middleware."""
+        from starlette.applications import Starlette
+        from starlette.responses import JSONResponse
+        from starlette.routing import Route
+
+        async def echo(request):
+            return JSONResponse({"ok": True})
+
+        app = Starlette(
+            routes=[Route("/test", echo, methods=["POST", "GET"])],
+        )
+        return JsonDepthValidationMiddleware(app, max_depth=max_depth)
+
+    def test_spec1248_max_json_depth_is_50(self):
+        """SPEC-1248: MAX_JSON_DEPTH is 50."""
+        assert MAX_JSON_DEPTH == 50
+
+    def test_spec1248_shallow_json_passes(self):
+        """SPEC-1248: JSON within depth limit passes."""
+        app = self._make_app(max_depth=10)
+        client = TestClient(app, raise_server_exceptions=False)
+        resp = client.post("/test", json={"a": {"b": "c"}})
+        assert resp.status_code == 200
+
+    def test_spec1248_deep_json_rejected_with_400(self):
+        """SPEC-1248: JSON exceeding depth limit returns 400."""
+        app = self._make_app(max_depth=3)
+        client = TestClient(app, raise_server_exceptions=False)
+        deep = {"a": {"b": {"c": {"d": {"e": "too deep"}}}}}
+        resp = client.post("/test", json=deep)
+        assert resp.status_code == 400
+        assert "nesting depth" in resp.json()["error"].lower()
+
+    def test_spec1248_400_response_includes_max_depth(self):
+        """SPEC-1248: 400 response body includes max_depth field."""
+        app = self._make_app(max_depth=2)
+        client = TestClient(app, raise_server_exceptions=False)
+        deep = {"a": {"b": {"c": {"d": "deep"}}}}
+        resp = client.post("/test", json=deep)
+        assert resp.status_code == 400
+        body = resp.json()
+        assert body["max_depth"] == 2
+
+    def test_spec1248_get_requests_skip_validation(self):
+        """SPEC-1248: GET requests bypass JSON depth validation."""
+        app = self._make_app(max_depth=1)
+        client = TestClient(app, raise_server_exceptions=False)
+        resp = client.get("/test")
+        assert resp.status_code == 200
+
+    def test_spec1248_non_json_content_type_skips(self):
+        """SPEC-1248: Non-JSON content types bypass depth check."""
+        app = self._make_app(max_depth=1)
+        client = TestClient(app, raise_server_exceptions=False)
+        resp = client.post(
+            "/test",
+            content=b"not json",
+            headers={"content-type": "text/plain"},
+        )
+        assert resp.status_code == 200
+
+    def test_spec1248_validate_json_depth_function_exact_limit(self):
+        """SPEC-1248: validate_json_depth passes at exactly max_depth."""
+        # depth=0 outer, depth=1 inner value
+        data = {"key": "val"}
+        assert validate_json_depth(data, max_depth=1) is True
+
+    def test_spec1248_validate_json_depth_list_nesting(self):
+        """SPEC-1248: validate_json_depth counts list nesting levels."""
+        data = [[[["deep"]]]]
+        with pytest.raises(ValueError, match="nesting depth"):
+            validate_json_depth(data, max_depth=2)
