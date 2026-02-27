@@ -1,7 +1,8 @@
 """
-Knowledge Database — Append-only SQLite store for specifications, test procedures,
-and operational procedures. No UPDATE in place, no DELETE. Every mutation creates
-a new versioned record. Claude is the sole writer; the owner observes via read-only UI.
+Knowledge Database — Append-only SQLite store for project artifacts: specifications,
+tests, test plans, work items, backlog snapshots, operational procedures, documents,
+and environment config. No UPDATE in place, no DELETE. Every mutation creates a new
+versioned record. Claude is the sole writer; the owner observes via read-only UI.
 
 RETENTION POLICY: Never delete. All rows are retained indefinitely. At ~20 KB per
 session (~48 assertion runs + spec updates), 400 GB of storage supports ~57,000 years
@@ -138,6 +139,92 @@ CREATE TABLE IF NOT EXISTS test_coverage (
     created_by TEXT NOT NULL
 );
 
+CREATE TABLE IF NOT EXISTS tests (
+    rowid INTEGER PRIMARY KEY AUTOINCREMENT,
+    id TEXT NOT NULL,
+    version INTEGER NOT NULL,
+    title TEXT NOT NULL,
+    spec_id TEXT NOT NULL,
+    test_type TEXT NOT NULL,
+    test_file TEXT,
+    test_class TEXT,
+    test_function TEXT,
+    description TEXT,
+    expected_outcome TEXT NOT NULL,
+    last_result TEXT,
+    last_executed_at TEXT,
+    changed_by TEXT NOT NULL,
+    changed_at TEXT NOT NULL,
+    change_reason TEXT NOT NULL,
+    UNIQUE(id, version)
+);
+
+CREATE TABLE IF NOT EXISTS test_plans (
+    rowid INTEGER PRIMARY KEY AUTOINCREMENT,
+    id TEXT NOT NULL,
+    version INTEGER NOT NULL,
+    title TEXT NOT NULL,
+    description TEXT,
+    status TEXT NOT NULL,
+    changed_by TEXT NOT NULL,
+    changed_at TEXT NOT NULL,
+    change_reason TEXT NOT NULL,
+    UNIQUE(id, version)
+);
+
+CREATE TABLE IF NOT EXISTS test_plan_phases (
+    rowid INTEGER PRIMARY KEY AUTOINCREMENT,
+    id TEXT NOT NULL,
+    version INTEGER NOT NULL,
+    plan_id TEXT NOT NULL,
+    phase_order INTEGER NOT NULL,
+    title TEXT NOT NULL,
+    description TEXT,
+    gate_criteria TEXT NOT NULL,
+    test_ids TEXT,
+    last_result TEXT,
+    last_executed_at TEXT,
+    changed_by TEXT NOT NULL,
+    changed_at TEXT NOT NULL,
+    change_reason TEXT NOT NULL,
+    UNIQUE(id, version)
+);
+
+CREATE TABLE IF NOT EXISTS work_items (
+    rowid INTEGER PRIMARY KEY AUTOINCREMENT,
+    id TEXT NOT NULL,
+    version INTEGER NOT NULL,
+    title TEXT NOT NULL,
+    description TEXT,
+    origin TEXT NOT NULL,
+    component TEXT NOT NULL,
+    source_spec_id TEXT,
+    source_test_id TEXT,
+    failure_description TEXT,
+    resolution_status TEXT NOT NULL,
+    priority TEXT,
+    changed_by TEXT NOT NULL,
+    changed_at TEXT NOT NULL,
+    change_reason TEXT NOT NULL,
+    UNIQUE(id, version)
+);
+
+CREATE TABLE IF NOT EXISTS backlog_snapshots (
+    rowid INTEGER PRIMARY KEY AUTOINCREMENT,
+    id TEXT NOT NULL,
+    version INTEGER NOT NULL,
+    title TEXT NOT NULL,
+    description TEXT,
+    snapshot_at TEXT NOT NULL,
+    work_item_ids TEXT NOT NULL,
+    summary_by_origin TEXT,
+    summary_by_component TEXT,
+    changed_by TEXT NOT NULL,
+    changed_at TEXT NOT NULL,
+    change_reason TEXT NOT NULL,
+    UNIQUE(id, version)
+);
+
 -- Indexes for query performance (append-only tables grow monotonically)
 CREATE INDEX IF NOT EXISTS idx_specs_id_version ON specifications(id, version);
 CREATE INDEX IF NOT EXISTS idx_specs_status ON specifications(status);
@@ -152,6 +239,15 @@ CREATE INDEX IF NOT EXISTS idx_docs_id_version ON documents(id, version);
 CREATE INDEX IF NOT EXISTS idx_docs_category ON documents(category);
 CREATE INDEX IF NOT EXISTS idx_test_cov_spec ON test_coverage(spec_id);
 CREATE INDEX IF NOT EXISTS idx_test_cov_file ON test_coverage(test_file);
+CREATE INDEX IF NOT EXISTS idx_tests_id_version ON tests(id, version);
+CREATE INDEX IF NOT EXISTS idx_tests_spec_id ON tests(spec_id);
+CREATE INDEX IF NOT EXISTS idx_test_plans_id_version ON test_plans(id, version);
+CREATE INDEX IF NOT EXISTS idx_tpp_id_version ON test_plan_phases(id, version);
+CREATE INDEX IF NOT EXISTS idx_tpp_plan_id ON test_plan_phases(plan_id);
+CREATE INDEX IF NOT EXISTS idx_work_items_id_version ON work_items(id, version);
+CREATE INDEX IF NOT EXISTS idx_work_items_status ON work_items(resolution_status);
+CREATE INDEX IF NOT EXISTS idx_work_items_origin ON work_items(origin);
+CREATE INDEX IF NOT EXISTS idx_backlog_id_version ON backlog_snapshots(id, version);
 
 -- Views: current state = latest version per ID
 CREATE VIEW IF NOT EXISTS current_specifications AS
@@ -178,6 +274,31 @@ CREATE VIEW IF NOT EXISTS current_documents AS
 SELECT d.* FROM documents d
 INNER JOIN (SELECT id, MAX(version) AS max_v FROM documents GROUP BY id) m
 ON d.id = m.id AND d.version = m.max_v;
+
+CREATE VIEW IF NOT EXISTS current_tests AS
+SELECT t.* FROM tests t
+INNER JOIN (SELECT id, MAX(version) AS max_v FROM tests GROUP BY id) m
+ON t.id = m.id AND t.version = m.max_v;
+
+CREATE VIEW IF NOT EXISTS current_test_plans AS
+SELECT t.* FROM test_plans t
+INNER JOIN (SELECT id, MAX(version) AS max_v FROM test_plans GROUP BY id) m
+ON t.id = m.id AND t.version = m.max_v;
+
+CREATE VIEW IF NOT EXISTS current_test_plan_phases AS
+SELECT t.* FROM test_plan_phases t
+INNER JOIN (SELECT id, MAX(version) AS max_v FROM test_plan_phases GROUP BY id) m
+ON t.id = m.id AND t.version = m.max_v;
+
+CREATE VIEW IF NOT EXISTS current_work_items AS
+SELECT w.* FROM work_items w
+INNER JOIN (SELECT id, MAX(version) AS max_v FROM work_items GROUP BY id) m
+ON w.id = m.id AND w.version = m.max_v;
+
+CREATE VIEW IF NOT EXISTS current_backlog_snapshots AS
+SELECT b.* FROM backlog_snapshots b
+INNER JOIN (SELECT id, MAX(version) AS max_v FROM backlog_snapshots GROUP BY id) m
+ON b.id = m.id AND b.version = m.max_v;
 """
 
 
@@ -235,6 +356,19 @@ class KnowledgeDB:
         conn = self._get_conn()
         conn.executescript(SCHEMA_SQL)
         conn.commit()
+        self._migrate_schema()
+
+    def _migrate_schema(self) -> None:
+        """Apply incremental migrations that cannot be expressed as CREATE IF NOT EXISTS."""
+        conn = self._get_conn()
+        # Migration 1: Add 'type' column to specifications (S113)
+        cols = {row[1] for row in conn.execute("PRAGMA table_info(specifications)").fetchall()}
+        if "type" not in cols:
+            conn.execute("ALTER TABLE specifications ADD COLUMN type TEXT DEFAULT 'requirement'")
+            # Backfill based on ID patterns
+            conn.execute("UPDATE specifications SET type = 'governance' WHERE id LIKE 'GOV-%'")
+            conn.execute("UPDATE specifications SET type = 'protected_behavior' WHERE id LIKE 'PB-%'")
+            conn.commit()
 
     def close(self) -> None:
         if self._conn:
@@ -266,8 +400,13 @@ class KnowledgeDB:
         handle: str | None = None,
         tags: list[str] | None = None,
         assertions: list[dict] | None = None,
+        type: str = "requirement",
     ) -> dict[str, Any]:
-        """Insert a new version of a specification."""
+        """Insert a new version of a specification.
+
+        Args:
+            type: Specification type — 'requirement', 'governance', or 'protected_behavior'.
+        """
         version = self._next_spec_version(id)
         assertions_json = json.dumps(assertions) if assertions else None
         tags_json = json.dumps(tags) if tags else None
@@ -275,10 +414,10 @@ class KnowledgeDB:
         conn.execute(
             """INSERT INTO specifications
                (id, version, title, description, priority, scope, section,
-                handle, tags, status, assertions, changed_by, changed_at, change_reason)
-               VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)""",
+                handle, tags, status, assertions, type, changed_by, changed_at, change_reason)
+               VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)""",
             (id, version, title, description, priority, scope, section,
-             handle, tags_json, status, assertions_json, changed_by, _now(), change_reason),
+             handle, tags_json, status, assertions_json, type, changed_by, _now(), change_reason),
         )
         conn.commit()
         return self.get_spec(id)
@@ -306,6 +445,7 @@ class KnowledgeDB:
         section = fields.get("section", current["section"])
         handle = fields.get("handle", current["handle"])
         status = fields.get("status", current["status"])
+        spec_type = fields.get("type", current.get("type", "requirement"))
 
         # Tags and assertions: use 'is not _UNSET' to allow explicit [] or None
         raw_tags = fields.get("tags", _UNSET)
@@ -324,10 +464,10 @@ class KnowledgeDB:
         conn.execute(
             """INSERT INTO specifications
                (id, version, title, description, priority, scope, section,
-                handle, tags, status, assertions, changed_by, changed_at, change_reason)
-               VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)""",
+                handle, tags, status, assertions, type, changed_by, changed_at, change_reason)
+               VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)""",
             (id, version, title, description, priority, scope, section,
-             handle, tags_json, status, assertions_json, changed_by, _now(), change_reason),
+             handle, tags_json, status, assertions_json, spec_type, changed_by, _now(), change_reason),
         )
         conn.commit()
         return self.get_spec(id)
@@ -412,7 +552,7 @@ class KnowledgeDB:
     # Test Procedures
     # ------------------------------------------------------------------
 
-    def _next_test_version(self, proc_id: str) -> int:
+    def _next_test_proc_version(self, proc_id: str) -> int:
         row = self._get_conn().execute(
             "SELECT MAX(version) FROM test_procedures WHERE id = ?", (proc_id,)
         ).fetchone()
@@ -431,7 +571,7 @@ class KnowledgeDB:
         last_execution_status: str | None = None,
         last_executed_at: str | None = None,
     ) -> dict[str, Any]:
-        version = self._next_test_version(id)
+        version = self._next_test_proc_version(id)
         conn = self._get_conn()
         conn.execute(
             """INSERT INTO test_procedures
@@ -826,6 +966,581 @@ class KnowledgeDB:
         }
 
     # ------------------------------------------------------------------
+    # Tests (individual test artifacts)
+    # ------------------------------------------------------------------
+
+    def _next_test_version(self, test_id: str) -> int:
+        row = self._get_conn().execute(
+            "SELECT MAX(version) FROM tests WHERE id = ?", (test_id,)
+        ).fetchone()
+        return (row[0] or 0) + 1
+
+    def insert_test(
+        self,
+        id: str,
+        title: str,
+        spec_id: str,
+        test_type: str,
+        expected_outcome: str,
+        changed_by: str,
+        change_reason: str,
+        *,
+        test_file: str | None = None,
+        test_class: str | None = None,
+        test_function: str | None = None,
+        description: str | None = None,
+        last_result: str | None = None,
+        last_executed_at: str | None = None,
+    ) -> dict[str, Any]:
+        """Insert a new version of a test artifact.
+
+        Args:
+            id: Unique identifier (e.g., "TEST-0001").
+            spec_id: The specification this test verifies (required).
+            test_type: 'unit', 'integration', 'e2e', 'manual', or 'assertion'.
+            expected_outcome: What constitutes PASS — stated in human-readable terms.
+        """
+        version = self._next_test_version(id)
+        conn = self._get_conn()
+        conn.execute(
+            """INSERT INTO tests
+               (id, version, title, spec_id, test_type, test_file, test_class,
+                test_function, description, expected_outcome, last_result,
+                last_executed_at, changed_by, changed_at, change_reason)
+               VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)""",
+            (id, version, title, spec_id, test_type, test_file, test_class,
+             test_function, description, expected_outcome, last_result,
+             last_executed_at, changed_by, _now(), change_reason),
+        )
+        conn.commit()
+        return self.get_test(id)
+
+    def update_test(
+        self,
+        id: str,
+        changed_by: str,
+        change_reason: str,
+        **fields: Any,
+    ) -> dict[str, Any]:
+        """Create a new version of a test, carrying forward unchanged fields."""
+        current = self.get_test(id)
+        if not current:
+            raise ValueError(f"Test {id} not found")
+        version = self._next_test_version(id)
+        title = fields.get("title", current["title"])
+        spec_id = fields.get("spec_id", current["spec_id"])
+        test_type = fields.get("test_type", current["test_type"])
+        test_file = fields.get("test_file", current["test_file"])
+        test_class = fields.get("test_class", current["test_class"])
+        test_function = fields.get("test_function", current["test_function"])
+        description = fields.get("description", current["description"])
+        expected_outcome = fields.get("expected_outcome", current["expected_outcome"])
+        last_result = fields.get("last_result", current["last_result"])
+        last_executed_at = fields.get("last_executed_at", current["last_executed_at"])
+        conn = self._get_conn()
+        conn.execute(
+            """INSERT INTO tests
+               (id, version, title, spec_id, test_type, test_file, test_class,
+                test_function, description, expected_outcome, last_result,
+                last_executed_at, changed_by, changed_at, change_reason)
+               VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)""",
+            (id, version, title, spec_id, test_type, test_file, test_class,
+             test_function, description, expected_outcome, last_result,
+             last_executed_at, changed_by, _now(), change_reason),
+        )
+        conn.commit()
+        return self.get_test(id)
+
+    def get_test(self, test_id: str) -> dict[str, Any] | None:
+        row = self._get_conn().execute(
+            "SELECT * FROM current_tests WHERE id = ?", (test_id,)
+        ).fetchone()
+        return _row_to_dict(row) if row else None
+
+    def get_test_history(self, test_id: str) -> list[dict[str, Any]]:
+        rows = self._get_conn().execute(
+            "SELECT * FROM tests WHERE id = ? ORDER BY version DESC", (test_id,)
+        ).fetchall()
+        return [_row_to_dict(r) for r in rows]
+
+    def list_tests(
+        self,
+        *,
+        spec_id: str | None = None,
+        test_type: str | None = None,
+        last_result: str | None = None,
+    ) -> list[dict[str, Any]]:
+        """List current tests with optional filters."""
+        query = "SELECT * FROM current_tests WHERE 1=1"
+        params: list[Any] = []
+        if spec_id:
+            query += " AND spec_id = ?"
+            params.append(spec_id)
+        if test_type:
+            query += " AND test_type = ?"
+            params.append(test_type)
+        if last_result:
+            query += " AND last_result = ?"
+            params.append(last_result)
+        query += " ORDER BY id"
+        rows = self._get_conn().execute(query, params).fetchall()
+        return [_row_to_dict(r) for r in rows]
+
+    def get_tests_for_spec(self, spec_id: str) -> list[dict[str, Any]]:
+        """Get all current tests that verify a given specification."""
+        return self.list_tests(spec_id=spec_id)
+
+    def get_untested_specs(self) -> list[dict[str, Any]]:
+        """Get specifications that have no tests linked to them."""
+        rows = self._get_conn().execute(
+            """SELECT s.* FROM current_specifications s
+               LEFT JOIN current_tests t ON t.spec_id = s.id
+               WHERE t.id IS NULL
+               ORDER BY s.id"""
+        ).fetchall()
+        result = [_row_to_dict(r) for r in rows]
+        result.sort(key=lambda r: spec_sort_key(r["id"]))
+        return result
+
+    # ------------------------------------------------------------------
+    # Test Plans
+    # ------------------------------------------------------------------
+
+    def _next_plan_version(self, plan_id: str) -> int:
+        row = self._get_conn().execute(
+            "SELECT MAX(version) FROM test_plans WHERE id = ?", (plan_id,)
+        ).fetchone()
+        return (row[0] or 0) + 1
+
+    def insert_test_plan(
+        self,
+        id: str,
+        title: str,
+        status: str,
+        changed_by: str,
+        change_reason: str,
+        *,
+        description: str | None = None,
+    ) -> dict[str, Any]:
+        """Insert a new version of a test plan.
+
+        Args:
+            status: 'draft', 'active', or 'retired'.
+        """
+        version = self._next_plan_version(id)
+        conn = self._get_conn()
+        conn.execute(
+            """INSERT INTO test_plans
+               (id, version, title, description, status,
+                changed_by, changed_at, change_reason)
+               VALUES (?, ?, ?, ?, ?, ?, ?, ?)""",
+            (id, version, title, description, status,
+             changed_by, _now(), change_reason),
+        )
+        conn.commit()
+        return self.get_test_plan(id)
+
+    def update_test_plan(
+        self,
+        id: str,
+        changed_by: str,
+        change_reason: str,
+        **fields: Any,
+    ) -> dict[str, Any]:
+        """Create a new version of a test plan, carrying forward unchanged fields."""
+        current = self.get_test_plan(id)
+        if not current:
+            raise ValueError(f"Test plan {id} not found")
+        version = self._next_plan_version(id)
+        title = fields.get("title", current["title"])
+        description = fields.get("description", current["description"])
+        status = fields.get("status", current["status"])
+        conn = self._get_conn()
+        conn.execute(
+            """INSERT INTO test_plans
+               (id, version, title, description, status,
+                changed_by, changed_at, change_reason)
+               VALUES (?, ?, ?, ?, ?, ?, ?, ?)""",
+            (id, version, title, description, status,
+             changed_by, _now(), change_reason),
+        )
+        conn.commit()
+        return self.get_test_plan(id)
+
+    def get_test_plan(self, plan_id: str) -> dict[str, Any] | None:
+        row = self._get_conn().execute(
+            "SELECT * FROM current_test_plans WHERE id = ?", (plan_id,)
+        ).fetchone()
+        return _row_to_dict(row) if row else None
+
+    def get_test_plan_history(self, plan_id: str) -> list[dict[str, Any]]:
+        rows = self._get_conn().execute(
+            "SELECT * FROM test_plans WHERE id = ? ORDER BY version DESC", (plan_id,)
+        ).fetchall()
+        return [_row_to_dict(r) for r in rows]
+
+    def list_test_plans(self, *, status: str | None = None) -> list[dict[str, Any]]:
+        query = "SELECT * FROM current_test_plans WHERE 1=1"
+        params: list[Any] = []
+        if status:
+            query += " AND status = ?"
+            params.append(status)
+        query += " ORDER BY id"
+        rows = self._get_conn().execute(query, params).fetchall()
+        return [_row_to_dict(r) for r in rows]
+
+    def get_active_test_plan(self) -> dict[str, Any] | None:
+        """Get the currently active test plan (status='active'). Returns None if no active plan."""
+        plans = self.list_test_plans(status="active")
+        return plans[0] if plans else None
+
+    # ------------------------------------------------------------------
+    # Test Plan Phases
+    # ------------------------------------------------------------------
+
+    def _next_phase_version(self, phase_id: str) -> int:
+        row = self._get_conn().execute(
+            "SELECT MAX(version) FROM test_plan_phases WHERE id = ?", (phase_id,)
+        ).fetchone()
+        return (row[0] or 0) + 1
+
+    def insert_test_plan_phase(
+        self,
+        id: str,
+        plan_id: str,
+        phase_order: int,
+        title: str,
+        gate_criteria: str,
+        changed_by: str,
+        change_reason: str,
+        *,
+        description: str | None = None,
+        test_ids: list[str] | None = None,
+        last_result: str | None = None,
+        last_executed_at: str | None = None,
+    ) -> dict[str, Any]:
+        """Insert a new version of a test plan phase.
+
+        Args:
+            plan_id: Which test plan this phase belongs to.
+            phase_order: Execution sequence (1, 2, 3...).
+            gate_criteria: What constitutes PASS for this phase.
+            test_ids: JSON-serializable list of test IDs in this phase.
+        """
+        version = self._next_phase_version(id)
+        test_ids_json = json.dumps(test_ids) if test_ids else None
+        conn = self._get_conn()
+        conn.execute(
+            """INSERT INTO test_plan_phases
+               (id, version, plan_id, phase_order, title, description,
+                gate_criteria, test_ids, last_result, last_executed_at,
+                changed_by, changed_at, change_reason)
+               VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)""",
+            (id, version, plan_id, phase_order, title, description,
+             gate_criteria, test_ids_json, last_result, last_executed_at,
+             changed_by, _now(), change_reason),
+        )
+        conn.commit()
+        return self.get_test_plan_phase(id)
+
+    def update_test_plan_phase(
+        self,
+        id: str,
+        changed_by: str,
+        change_reason: str,
+        **fields: Any,
+    ) -> dict[str, Any]:
+        """Create a new version of a test plan phase, carrying forward unchanged fields."""
+        current = self.get_test_plan_phase(id)
+        if not current:
+            raise ValueError(f"Test plan phase {id} not found")
+        version = self._next_phase_version(id)
+        _UNSET = object()
+        plan_id = fields.get("plan_id", current["plan_id"])
+        phase_order = fields.get("phase_order", current["phase_order"])
+        title = fields.get("title", current["title"])
+        description = fields.get("description", current["description"])
+        gate_criteria = fields.get("gate_criteria", current["gate_criteria"])
+        last_result = fields.get("last_result", current["last_result"])
+        last_executed_at = fields.get("last_executed_at", current["last_executed_at"])
+        raw_test_ids = fields.get("test_ids", _UNSET)
+        if raw_test_ids is not _UNSET:
+            test_ids_json = json.dumps(raw_test_ids) if raw_test_ids is not None else None
+        else:
+            test_ids_json = current["test_ids"]
+        conn = self._get_conn()
+        conn.execute(
+            """INSERT INTO test_plan_phases
+               (id, version, plan_id, phase_order, title, description,
+                gate_criteria, test_ids, last_result, last_executed_at,
+                changed_by, changed_at, change_reason)
+               VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)""",
+            (id, version, plan_id, phase_order, title, description,
+             gate_criteria, test_ids_json, last_result, last_executed_at,
+             changed_by, _now(), change_reason),
+        )
+        conn.commit()
+        return self.get_test_plan_phase(id)
+
+    def get_test_plan_phase(self, phase_id: str) -> dict[str, Any] | None:
+        row = self._get_conn().execute(
+            "SELECT * FROM current_test_plan_phases WHERE id = ?", (phase_id,)
+        ).fetchone()
+        return _row_to_dict(row) if row else None
+
+    def list_test_plan_phases(self, plan_id: str) -> list[dict[str, Any]]:
+        """List current phases for a test plan, ordered by phase_order."""
+        rows = self._get_conn().execute(
+            "SELECT * FROM current_test_plan_phases WHERE plan_id = ? ORDER BY phase_order",
+            (plan_id,),
+        ).fetchall()
+        return [_row_to_dict(r) for r in rows]
+
+    # ------------------------------------------------------------------
+    # Work Items
+    # ------------------------------------------------------------------
+
+    def _next_work_item_version(self, item_id: str) -> int:
+        row = self._get_conn().execute(
+            "SELECT MAX(version) FROM work_items WHERE id = ?", (item_id,)
+        ).fetchone()
+        return (row[0] or 0) + 1
+
+    def insert_work_item(
+        self,
+        id: str,
+        title: str,
+        origin: str,
+        component: str,
+        resolution_status: str,
+        changed_by: str,
+        change_reason: str,
+        *,
+        description: str | None = None,
+        source_spec_id: str | None = None,
+        source_test_id: str | None = None,
+        failure_description: str | None = None,
+        priority: str | None = None,
+    ) -> dict[str, Any]:
+        """Insert a new version of a work item.
+
+        Args:
+            origin: 'regression', 'defect', or 'new'.
+            component: From the component taxonomy (e.g., 'agent_implementation', 'customer_interface').
+            resolution_status: 'open', 'in_progress', 'resolved', or 'verified'.
+            source_spec_id: The specification this work item relates to (required for all origins).
+            source_test_id: The test that revealed the failure (required for regression/defect).
+            failure_description: What failed and why (required for regression/defect).
+        """
+        version = self._next_work_item_version(id)
+        conn = self._get_conn()
+        conn.execute(
+            """INSERT INTO work_items
+               (id, version, title, description, origin, component,
+                source_spec_id, source_test_id, failure_description,
+                resolution_status, priority,
+                changed_by, changed_at, change_reason)
+               VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)""",
+            (id, version, title, description, origin, component,
+             source_spec_id, source_test_id, failure_description,
+             resolution_status, priority,
+             changed_by, _now(), change_reason),
+        )
+        conn.commit()
+        return self.get_work_item(id)
+
+    def update_work_item(
+        self,
+        id: str,
+        changed_by: str,
+        change_reason: str,
+        **fields: Any,
+    ) -> dict[str, Any]:
+        """Create a new version of a work item, carrying forward unchanged fields."""
+        current = self.get_work_item(id)
+        if not current:
+            raise ValueError(f"Work item {id} not found")
+        version = self._next_work_item_version(id)
+        title = fields.get("title", current["title"])
+        description = fields.get("description", current["description"])
+        origin = fields.get("origin", current["origin"])
+        component = fields.get("component", current["component"])
+        source_spec_id = fields.get("source_spec_id", current["source_spec_id"])
+        source_test_id = fields.get("source_test_id", current["source_test_id"])
+        failure_description = fields.get("failure_description", current["failure_description"])
+        resolution_status = fields.get("resolution_status", current["resolution_status"])
+        priority = fields.get("priority", current["priority"])
+        conn = self._get_conn()
+        conn.execute(
+            """INSERT INTO work_items
+               (id, version, title, description, origin, component,
+                source_spec_id, source_test_id, failure_description,
+                resolution_status, priority,
+                changed_by, changed_at, change_reason)
+               VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)""",
+            (id, version, title, description, origin, component,
+             source_spec_id, source_test_id, failure_description,
+             resolution_status, priority,
+             changed_by, _now(), change_reason),
+        )
+        conn.commit()
+        return self.get_work_item(id)
+
+    def get_work_item(self, item_id: str) -> dict[str, Any] | None:
+        row = self._get_conn().execute(
+            "SELECT * FROM current_work_items WHERE id = ?", (item_id,)
+        ).fetchone()
+        return _row_to_dict(row) if row else None
+
+    def get_work_item_history(self, item_id: str) -> list[dict[str, Any]]:
+        rows = self._get_conn().execute(
+            "SELECT * FROM work_items WHERE id = ? ORDER BY version DESC", (item_id,)
+        ).fetchall()
+        return [_row_to_dict(r) for r in rows]
+
+    def list_work_items(
+        self,
+        *,
+        origin: str | None = None,
+        component: str | None = None,
+        resolution_status: str | None = None,
+        priority: str | None = None,
+        source_spec_id: str | None = None,
+    ) -> list[dict[str, Any]]:
+        """List current work items with optional filters."""
+        query = "SELECT * FROM current_work_items WHERE 1=1"
+        params: list[Any] = []
+        if origin:
+            query += " AND origin = ?"
+            params.append(origin)
+        if component:
+            query += " AND component = ?"
+            params.append(component)
+        if resolution_status:
+            query += " AND resolution_status = ?"
+            params.append(resolution_status)
+        if priority:
+            query += " AND priority = ?"
+            params.append(priority)
+        if source_spec_id:
+            query += " AND source_spec_id = ?"
+            params.append(source_spec_id)
+        query += " ORDER BY id"
+        rows = self._get_conn().execute(query, params).fetchall()
+        return [_row_to_dict(r) for r in rows]
+
+    def get_open_work_items(self) -> list[dict[str, Any]]:
+        """Get all work items that are not yet verified (the active backlog)."""
+        rows = self._get_conn().execute(
+            """SELECT * FROM current_work_items
+               WHERE resolution_status != 'verified'
+               ORDER BY priority, id"""
+        ).fetchall()
+        return [_row_to_dict(r) for r in rows]
+
+    # ------------------------------------------------------------------
+    # Backlog Snapshots
+    # ------------------------------------------------------------------
+
+    def _next_backlog_version(self, snapshot_id: str) -> int:
+        row = self._get_conn().execute(
+            "SELECT MAX(version) FROM backlog_snapshots WHERE id = ?", (snapshot_id,)
+        ).fetchone()
+        return (row[0] or 0) + 1
+
+    def insert_backlog_snapshot(
+        self,
+        id: str,
+        title: str,
+        work_item_ids: list[str],
+        changed_by: str,
+        change_reason: str,
+        *,
+        description: str | None = None,
+        snapshot_at: str | None = None,
+        summary_by_origin: dict | None = None,
+        summary_by_component: dict | None = None,
+    ) -> dict[str, Any]:
+        """Insert a new backlog snapshot.
+
+        Args:
+            work_item_ids: Ordered list of active work item IDs (priority order).
+            summary_by_origin: Counts by origin (e.g., {"regression": 2, "defect": 5, "new": 12}).
+            summary_by_component: Counts by component.
+        """
+        version = self._next_backlog_version(id)
+        conn = self._get_conn()
+        conn.execute(
+            """INSERT INTO backlog_snapshots
+               (id, version, title, description, snapshot_at, work_item_ids,
+                summary_by_origin, summary_by_component,
+                changed_by, changed_at, change_reason)
+               VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)""",
+            (id, version, title, description, snapshot_at or _now(),
+             json.dumps(work_item_ids),
+             json.dumps(summary_by_origin) if summary_by_origin else None,
+             json.dumps(summary_by_component) if summary_by_component else None,
+             changed_by, _now(), change_reason),
+        )
+        conn.commit()
+        return self.get_backlog_snapshot(id)
+
+    def get_backlog_snapshot(self, snapshot_id: str) -> dict[str, Any] | None:
+        row = self._get_conn().execute(
+            "SELECT * FROM current_backlog_snapshots WHERE id = ?", (snapshot_id,)
+        ).fetchone()
+        return _row_to_dict(row) if row else None
+
+    def get_backlog_snapshot_history(self, snapshot_id: str) -> list[dict[str, Any]]:
+        rows = self._get_conn().execute(
+            "SELECT * FROM backlog_snapshots WHERE id = ? ORDER BY version DESC",
+            (snapshot_id,),
+        ).fetchall()
+        return [_row_to_dict(r) for r in rows]
+
+    def list_backlog_snapshots(self, *, limit: int = 20) -> list[dict[str, Any]]:
+        """List backlog snapshots, most recent first."""
+        rows = self._get_conn().execute(
+            "SELECT * FROM current_backlog_snapshots ORDER BY snapshot_at DESC LIMIT ?",
+            (limit,),
+        ).fetchall()
+        return [_row_to_dict(r) for r in rows]
+
+    def create_backlog_snapshot_from_current(
+        self,
+        snapshot_id: str,
+        changed_by: str,
+        change_reason: str,
+        *,
+        title: str | None = None,
+        description: str | None = None,
+    ) -> dict[str, Any]:
+        """Create a backlog snapshot from the current state of open work items.
+
+        Queries all non-verified work items, captures their IDs in priority order,
+        and computes summary counts by origin and component.
+        """
+        open_items = self.get_open_work_items()
+        work_item_ids = [item["id"] for item in open_items]
+        summary_origin: dict[str, int] = {}
+        summary_component: dict[str, int] = {}
+        for item in open_items:
+            o = item.get("origin", "unknown")
+            c = item.get("component", "unknown")
+            summary_origin[o] = summary_origin.get(o, 0) + 1
+            summary_component[c] = summary_component.get(c, 0) + 1
+        return self.insert_backlog_snapshot(
+            id=snapshot_id,
+            title=title or f"Backlog snapshot {snapshot_id}",
+            work_item_ids=work_item_ids,
+            changed_by=changed_by,
+            change_reason=change_reason,
+            description=description,
+            summary_by_origin=summary_origin,
+            summary_by_component=summary_component,
+        )
+
+    # ------------------------------------------------------------------
     # Assertion Runs
     # ------------------------------------------------------------------
 
@@ -1028,6 +1743,11 @@ class KnowledgeDB:
             "operational_procedures": ("id", "operational_procedures", "title"),
             "environment_config": ("id", "environment_config", "key"),
             "documents": ("id", "documents", "title"),
+            "tests": ("id", "tests", "title"),
+            "test_plans": ("id", "test_plans", "title"),
+            "test_plan_phases": ("id", "test_plan_phases", "title"),
+            "work_items": ("id", "work_items", "title"),
+            "backlog_snapshots": ("id", "backlog_snapshots", "title"),
         }
 
         for tbl_key, (id_col, tbl_name, title_col) in tables.items():
@@ -1073,7 +1793,8 @@ class KnowledgeDB:
         conn = self._get_conn()
         tables = ["specifications", "test_procedures", "operational_procedures",
                    "assertion_runs", "session_prompts", "environment_config",
-                   "documents", "test_coverage"]
+                   "documents", "test_coverage", "tests", "test_plans",
+                   "test_plan_phases", "work_items", "backlog_snapshots"]
         export = {"exported_at": _now(), "tables": {}}
         for table in tables:
             rows = conn.execute(f"SELECT * FROM {table} ORDER BY rowid").fetchall()
@@ -1132,9 +1853,21 @@ class KnowledgeDB:
             "SELECT COUNT(*) FROM current_documents"
         ).fetchone()[0]
 
-        # Test coverage stats
+        # Test coverage stats (legacy — superseded by tests table)
         cov_mappings = conn.execute("SELECT COUNT(*) FROM test_coverage").fetchone()[0]
         cov_specs = conn.execute("SELECT COUNT(DISTINCT spec_id) FROM test_coverage").fetchone()[0]
+
+        # New artifact counts
+        test_artifact_count = conn.execute("SELECT COUNT(*) FROM current_tests").fetchone()[0]
+        test_plan_count = conn.execute("SELECT COUNT(*) FROM current_test_plans").fetchone()[0]
+        test_plan_phase_count = conn.execute("SELECT COUNT(*) FROM current_test_plan_phases").fetchone()[0]
+
+        wi_stats = conn.execute(
+            "SELECT resolution_status, COUNT(*) as cnt FROM current_work_items GROUP BY resolution_status"
+        ).fetchall()
+        work_item_counts = {r["resolution_status"]: r["cnt"] for r in wi_stats}
+
+        backlog_count = conn.execute("SELECT COUNT(*) FROM current_backlog_snapshots").fetchone()[0]
 
         return {
             "spec_counts": spec_counts,
@@ -1149,13 +1882,21 @@ class KnowledgeDB:
             "document_count": doc_count,
             "test_coverage_mappings": cov_mappings,
             "test_coverage_specs": cov_specs,
+            "test_artifact_count": test_artifact_count,
+            "test_plan_count": test_plan_count,
+            "test_plan_phase_count": test_plan_phase_count,
+            "work_item_counts": work_item_counts,
+            "work_item_total": sum(work_item_counts.values()),
+            "backlog_snapshot_count": backlog_count,
         }
 
 
 def _row_to_dict(row: sqlite3.Row) -> dict[str, Any]:
     d = dict(row)
     # Parse JSON fields — expose as both "field_parsed" (clean) and "_field_parsed" (legacy)
-    for key in ("assertions", "results", "variables", "steps", "known_failure_modes", "tags", "context"):
+    for key in ("assertions", "results", "variables", "steps", "known_failure_modes",
+                 "tags", "context", "test_ids", "work_item_ids",
+                 "summary_by_origin", "summary_by_component"):
         if key in d and d[key] and isinstance(d[key], str):
             try:
                 parsed = json.loads(d[key])
