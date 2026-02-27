@@ -1,0 +1,381 @@
+"""
+Insert test coverage mappings for the 26 previously unmapped test files.
+Session S112 — analysis by 3 parallel agents.
+
+Usage: python scripts/insert_test_coverage_s112.py
+"""
+import sys
+sys.path.insert(0, "tools/knowledge-db")
+from db import KnowledgeDB
+
+db = KnowledgeDB()
+
+# All mappings from 3 agent batches, parsed into tuples:
+# (test_file, test_class, test_function, spec_handle, confidence, match_reason)
+MAPPINGS = [
+    # === BATCH 1: agents + chat + evaluation ===
+    # tests/agents/test_critic_supervisor.py
+    ("tests/agents/test_critic_supervisor.py", "TestCriticVerdicts", "test_cs_01_approved_response", "SPEC-1400", "high", "Tests CriticSupervisorAgent class — direct class instantiation and process() method"),
+    ("tests/agents/test_critic_supervisor.py", "TestCriticVerdicts", "test_cs_01_approved_response", "SPEC-1402", "high", "Tests process() method of critic_supervisor agent"),
+    ("tests/agents/test_critic_supervisor.py", "TestCriticVerdicts", "test_cs_02_rejected_response", "SPEC-1400", "high", "Tests CriticSupervisorAgent rejection path"),
+    ("tests/agents/test_critic_supervisor.py", "TestCriticVerdicts", "test_cs_03_modified_response", "SPEC-1400", "high", "Tests CriticSupervisorAgent modification path"),
+    ("tests/agents/test_critic_supervisor.py", "TestCriticVerdicts", "test_cs_04_modified_without_text_is_rejection", "SPEC-1400", "high", "Tests modified verdict without text treated as rejection"),
+    ("tests/agents/test_critic_supervisor.py", "TestFailClosed", "test_cs_05_no_client_blocks", "SPEC-0751", "high", "Verifies fail-closed Critic policy when no OpenAI client"),
+    ("tests/agents/test_critic_supervisor.py", "TestFailClosed", "test_cs_06_openai_exception_blocks", "SPEC-0751", "high", "Verifies fail-closed Critic policy on OpenAI API exception"),
+    ("tests/agents/test_critic_supervisor.py", "TestFailClosed", "test_cs_07_json_parse_failure_rejects", "SPEC-0751", "high", "Verifies fail-closed: invalid JSON defaults to rejected"),
+    ("tests/agents/test_critic_supervisor.py", "TestFailClosed", "test_cs_08_unknown_verdict_rejects", "SPEC-0751", "high", "Verifies fail-closed: unknown verdict treated as rejected"),
+    ("tests/agents/test_critic_supervisor.py", "TestCriticPromptConstruction", "test_cs_09_kb_titles_included_in_prompt", "SPEC-0258", "high", "Tests KB titles included in Critic prompt to prevent false-positive PII blocking"),
+    ("tests/agents/test_critic_supervisor.py", "TestCriticPromptConstruction", "test_cs_09_kb_titles_included_in_prompt", "SPEC-0644", "high", "Tests Critic distinguishes marketed product features from internal prompts"),
+    ("tests/agents/test_critic_supervisor.py", "TestCriticPromptConstruction", "test_cs_11_uses_json_mode", "SPEC-1401", "high", "Tests critic_supervisor uses gpt-4o-mini with json_object format"),
+    ("tests/agents/test_critic_supervisor.py", "TestCriticPromptConstruction", "test_cs_12_result_includes_metadata", "SPEC-1401", "high", "Tests Critic model name matches gpt-4o-mini in result"),
+    ("tests/agents/test_critic_supervisor.py", "TestCriticIdentity", "test_cs_13_agent_type", "SPEC-1400", "high", "Tests agent_type is 'critic-supervisor'"),
+    ("tests/agents/test_critic_supervisor.py", "TestCriticIdentity", "test_cs_14_configure", "SPEC-1400", "high", "Tests configure() method injects client"),
+    ("tests/agents/test_critic_supervisor.py", "TestCriticIdentity", "test_cs_15_fail_closed_result_structure", "SPEC-0751", "high", "Tests _fail_closed_result structure"),
+    ("tests/agents/test_critic_supervisor.py", "TestCriticJailbreakDetection", "test_cs_16_rule7_covers_indirect_compliance", "SPEC-0644", "high", "Tests immutable Critic prompt Rule 7 for indirect prompt injection"),
+    ("tests/agents/test_critic_supervisor.py", "TestCriticJailbreakDetection", "test_cs_17_rule7_covers_system_prompt_extraction", "SPEC-0644", "high", "Tests Critic prompt coverage for system prompt extraction"),
+    ("tests/agents/test_critic_supervisor.py", "TestCriticJailbreakDetection", "test_cs_18_rule7_three_subrules_present", "SPEC-0644", "high", "Tests Critic prompt Rule 7 has all three sub-rules"),
+    ("tests/agents/test_critic_supervisor.py", "TestCriticJailbreakDetection", "test_cs_19_indirect_jailbreak_rejected", "SPEC-0751", "high", "Tests fail-closed Critic rejects indirect jailbreak"),
+    ("tests/agents/test_critic_supervisor.py", "TestCriticJailbreakDetection", "test_cs_19_indirect_jailbreak_rejected", "SPEC-0644", "high", "Tests Critic correctly rejects AI response complying with jailbreak"),
+    ("tests/agents/test_critic_supervisor.py", "TestCriticJailbreakDetection", "test_cs_20_system_prompt_extraction_rejected", "SPEC-0644", "high", "Tests Critic rejects response revealing internal instructions"),
+    ("tests/agents/test_critic_supervisor.py", "TestCriticJailbreakDetection", "test_cs_20_system_prompt_extraction_rejected", "SPEC-0751", "high", "Tests fail-closed blocks system-prompt extraction"),
+
+    # tests/agents/test_escalation_handler.py
+    ("tests/agents/test_escalation_handler.py", "TestEscalationAnalysis", "test_eh_01_extracts_reason_and_urgency", "SPEC-1403", "high", "Tests EscalationHandlerAgent process() method"),
+    ("tests/agents/test_escalation_handler.py", "TestEscalationAnalysis", "test_eh_01_extracts_reason_and_urgency", "SPEC-1405", "high", "Tests escalation_handler extracts reason, urgency, context_summary"),
+    ("tests/agents/test_escalation_handler.py", "TestEscalationAnalysis", "test_eh_02_low_urgency_escalation", "SPEC-1403", "high", "Tests urgency level extraction — low urgency path"),
+    ("tests/agents/test_escalation_handler.py", "TestEscalationAnalysis", "test_eh_03_includes_system_prompt", "SPEC-1403", "high", "Tests EscalationHandlerAgent passes system prompt to OpenAI"),
+    ("tests/agents/test_escalation_handler.py", "TestEscalationAnalysis", "test_eh_04_uses_json_mode", "SPEC-1404", "high", "Tests escalation_handler uses json_object response format"),
+    ("tests/agents/test_escalation_handler.py", "TestEscalationFallback", "test_eh_05_no_client_returns_default", "SPEC-1403", "high", "Tests graceful fallback when no OpenAI client"),
+    ("tests/agents/test_escalation_handler.py", "TestEscalationFallback", "test_eh_06_openai_exception_returns_default", "SPEC-1403", "high", "Tests graceful handling of OpenAI API exceptions"),
+    ("tests/agents/test_escalation_handler.py", "TestEscalationFallback", "test_eh_07_json_parse_failure", "SPEC-1403", "high", "Tests JSON parse failure returns default values"),
+    ("tests/agents/test_escalation_handler.py", "TestEscalationFallback", "test_eh_08_partial_json_uses_defaults", "SPEC-1403", "high", "Tests partial JSON uses defaults for missing fields"),
+    ("tests/agents/test_escalation_handler.py", "TestEscalationFallback", "test_eh_09_empty_response_content", "SPEC-1403", "high", "Tests empty model response uses defaults"),
+    ("tests/agents/test_escalation_handler.py", "TestEscalationIdentity", "test_eh_10_agent_type", "SPEC-1403", "high", "Tests agent_type is 'escalation-handler'"),
+    ("tests/agents/test_escalation_handler.py", "TestEscalationIdentity", "test_eh_11_configure", "SPEC-1403", "high", "Tests configure() method injects client"),
+    ("tests/agents/test_escalation_handler.py", "TestEscalationCategory", "test_eh_12_category_in_response", "SPEC-0614", "high", "Tests escalation category detection"),
+    ("tests/agents/test_escalation_handler.py", "TestEscalationCategory", "test_eh_12_category_in_response", "SPEC-0613", "high", "Tests escalation category extraction supports named categories"),
+    ("tests/agents/test_escalation_handler.py", "TestEscalationCategory", "test_eh_13_category_fallback_no_client", "SPEC-1403", "high", "Tests general_inquiry as default fallback category"),
+    ("tests/agents/test_escalation_handler.py", "TestEscalationCategory", "test_eh_14_category_fallback_on_error", "SPEC-1403", "high", "Tests general_inquiry on API error"),
+
+    # tests/agents/test_intent_classifier.py
+    ("tests/agents/test_intent_classifier.py", "TestClassification", "test_ic_01_classifies_greeting", "SPEC-1406", "high", "Tests IntentClassifierAgent greeting classification"),
+    ("tests/agents/test_intent_classifier.py", "TestClassification", "test_ic_01_classifies_greeting", "SPEC-1489", "high", "Tests greeting is recognized in 17-intent taxonomy"),
+    ("tests/agents/test_intent_classifier.py", "TestClassification", "test_ic_02_classifies_product_question", "SPEC-1489", "high", "Tests product_question is recognized in taxonomy"),
+    ("tests/agents/test_intent_classifier.py", "TestClassification", "test_ic_03_all_taxonomy_intents_recognized", "SPEC-1489", "high", "Validates all 17 intents in INTENT_TAXONOMY accepted"),
+    ("tests/agents/test_intent_classifier.py", "TestClassification", "test_ic_03_all_taxonomy_intents_recognized", "SPEC-1406", "high", "Tests IntentClassifierAgent accepts all taxonomy intents"),
+    ("tests/agents/test_intent_classifier.py", "TestClassificationEdgeCases", "test_ic_04_no_openai_client_returns_default", "SPEC-1489", "high", "Tests fallback to general_inquiry when no client"),
+    ("tests/agents/test_intent_classifier.py", "TestClassificationEdgeCases", "test_ic_05_unknown_intent_normalized_to_general_inquiry", "SPEC-1489", "high", "Tests unknown intents normalized to general_inquiry"),
+    ("tests/agents/test_intent_classifier.py", "TestClassificationEdgeCases", "test_ic_06_json_parse_failure_returns_default", "SPEC-1489", "high", "Tests general_inquiry default on JSON parse failure"),
+    ("tests/agents/test_intent_classifier.py", "TestClassificationEdgeCases", "test_ic_07_empty_response_content", "SPEC-1489", "high", "Tests general_inquiry fallback on empty response"),
+    ("tests/agents/test_intent_classifier.py", "TestClassificationEdgeCases", "test_ic_08_confidence_coerced_to_float", "SPEC-1406", "high", "Tests confidence float coercion"),
+    ("tests/agents/test_intent_classifier.py", "TestIntentClassifierIdentity", "test_ic_10_agent_type", "SPEC-1406", "high", "Tests agent_type and create_agent_topic()"),
+    ("tests/agents/test_intent_classifier.py", "TestIntentClassifierIdentity", "test_ic_11_configure_sets_client", "SPEC-1406", "high", "Tests configure() injects OpenAI client"),
+    ("tests/agents/test_intent_classifier.py", "TestIntentClassifierIdentity", "test_ic_12_handle_message_integration", "SPEC-1398", "high", "Tests AgentRedBaseAgent A2A protocol"),
+    ("tests/agents/test_intent_classifier.py", "TestIntentClassifierIdentity", "test_ic_12_handle_message_integration", "SPEC-1406", "high", "Tests IntentClassifierAgent full handle_message() round-trip"),
+
+    # tests/agents/test_knowledge_retrieval_mcp.py
+    ("tests/agents/test_knowledge_retrieval_mcp.py", "TestKrMcpMergeStrategy", "test_krmcp_01_both_populated", "SPEC-1409", "high", "Tests KnowledgeRetrievalAgent _merge_results with both sources"),
+    ("tests/agents/test_knowledge_retrieval_mcp.py", "TestKrMcpMergeStrategy", "test_krmcp_02_kb_only", "SPEC-1409", "high", "Tests KB-only merge path"),
+    ("tests/agents/test_knowledge_retrieval_mcp.py", "TestKrMcpMergeStrategy", "test_krmcp_03_mcp_only", "SPEC-1409", "high", "Tests MCP-only merge path"),
+    ("tests/agents/test_knowledge_retrieval_mcp.py", "TestKrMcpMergeStrategy", "test_krmcp_04_sources_combined_with_type_tags", "SPEC-1409", "high", "Tests source tagging KB vs MCP"),
+    ("tests/agents/test_knowledge_retrieval_mcp.py", "TestKrMcpMergeStrategy", "test_krmcp_05_mcp_trace_preserved", "SPEC-1409", "high", "Tests mcp_trace preserved in merged result"),
+    ("tests/agents/test_knowledge_retrieval_mcp.py", "TestFindSearchTool", "test_krmcp_06_search_prefix_preferred", "SPEC-1409", "high", "Tests search_ prefix preferred"),
+    ("tests/agents/test_knowledge_retrieval_mcp.py", "TestFindSearchTool", "test_krmcp_07_fallback_to_first", "SPEC-1409", "high", "Tests fallback to first tool"),
+    ("tests/agents/test_knowledge_retrieval_mcp.py", "TestFindSearchTool", "test_krmcp_08_empty_returns_none", "SPEC-1409", "high", "Tests empty tool list returns None"),
+    ("tests/agents/test_knowledge_retrieval_mcp.py", "TestKrMcpAugmentation", "test_krmcp_09_mcp_augments_kb", "SPEC-1409", "high", "Tests process() with MCP augmentation"),
+    ("tests/agents/test_knowledge_retrieval_mcp.py", "TestKrMcpAugmentation", "test_krmcp_09_mcp_augments_kb", "SPEC-0732", "medium", "Tests MCP integration in KnowledgeRetrievalAgent"),
+    ("tests/agents/test_knowledge_retrieval_mcp.py", "TestKrMcpAugmentation", "test_krmcp_10_mcp_failure_fallthrough", "SPEC-1409", "high", "Tests MCP failure graceful fallthrough"),
+    ("tests/agents/test_knowledge_retrieval_mcp.py", "TestKrMcpAugmentation", "test_krmcp_11_no_configs_skips_mcp", "SPEC-1409", "high", "Tests empty mcp_configs skips MCP"),
+    ("tests/agents/test_knowledge_retrieval_mcp.py", "TestKrMcpAugmentation", "test_krmcp_14_try_mcp_success", "SPEC-1409", "high", "Tests _try_mcp_augmentation success"),
+    ("tests/agents/test_knowledge_retrieval_mcp.py", "TestKrMcpBackwardCompat", "test_krmcp_19_no_mcp_fields_in_payload", "SPEC-1409", "high", "Tests backward compat without MCP fields"),
+    ("tests/agents/test_knowledge_retrieval_mcp.py", "TestKrMcpBackwardCompat", "test_krmcp_20_empty_tenant_id", "SPEC-1409", "high", "Tests empty tenant_id returns empty result"),
+
+    # tests/chat/test_consent_endpoint.py
+    ("tests/chat/test_consent_endpoint.py", "TestConsentEndpoint", "test_consent_granted_updates_profile", "SPEC-0292", "high", "Tests consent management — granting updates profile"),
+    ("tests/chat/test_consent_endpoint.py", "TestConsentEndpoint", "test_consent_granted_updates_profile", "SPEC-1168", "high", "Tests submitConsent endpoint — granted path"),
+    ("tests/chat/test_consent_endpoint.py", "TestConsentEndpoint", "test_consent_denied_updates_profile", "SPEC-0292", "high", "Tests consent denial updates profile"),
+    ("tests/chat/test_consent_endpoint.py", "TestConsentEndpoint", "test_consent_denied_updates_profile", "SPEC-1168", "high", "Tests submitConsent endpoint — denied path"),
+    ("tests/chat/test_consent_endpoint.py", "TestConsentEndpoint", "test_consent_invalid_status_raises_422", "SPEC-1168", "high", "Tests invalid consent_status raises 422"),
+    ("tests/chat/test_consent_endpoint.py", "TestConsentEndpoint", "test_consent_conversation_not_found_raises_404", "SPEC-1168", "high", "Tests non-existent conversation raises 404"),
+    ("tests/chat/test_consent_endpoint.py", "TestConsentEndpoint", "test_consent_audit_logged", "SPEC-0295", "high", "Tests consent change audit-logged"),
+    ("tests/chat/test_consent_endpoint.py", "TestConsentModels", "test_consent_update_request_granted", "SPEC-1168", "high", "Tests ConsentUpdateRequest model"),
+
+    # tests/chat/test_pipeline_escalation.py
+    ("tests/chat/test_pipeline_escalation.py", "TestPipelineEscalation", "test_pe_01_passes_category_to_session", "SPEC-0713", "high", "Tests escalation category flows to session"),
+    ("tests/chat/test_pipeline_escalation.py", "TestPipelineEscalation", "test_pe_01_passes_category_to_session", "SPEC-0666", "high", "Tests escalation routing routes to assigned agent"),
+    ("tests/chat/test_pipeline_escalation.py", "TestPipelineEscalation", "test_pe_02_auto_assigns_agent", "SPEC-0713", "high", "Tests auto-assignment via find_best_agent"),
+    ("tests/chat/test_pipeline_escalation.py", "TestPipelineEscalation", "test_pe_02_auto_assigns_agent", "SPEC-0666", "high", "Tests find_best_agent result passed to escalate_conversation"),
+    ("tests/chat/test_pipeline_escalation.py", "TestPipelineEscalation", "test_pe_03_no_agent_available_proceeds", "SPEC-0666", "high", "Tests escalation with assigned_to=None"),
+
+    # tests/chat/test_session_escalation.py
+    ("tests/chat/test_session_escalation.py", "TestEscalateConversation", "test_se_01_sets_category_and_assigned_to", "SPEC-0713", "high", "Tests escalation_category and assigned_to patched on document"),
+    ("tests/chat/test_session_escalation.py", "TestEscalateConversation", "test_se_01_sets_category_and_assigned_to", "SPEC-0666", "high", "Tests escalate_conversation writes fields"),
+    ("tests/chat/test_session_escalation.py", "TestFindBestAgent", "test_se_03_returns_lowest_workload", "SPEC-0716", "high", "Tests load balancing — fewest unresolved escalations selected"),
+    ("tests/chat/test_session_escalation.py", "TestFindBestAgent", "test_se_04_respects_concurrency_cap", "SPEC-0716", "high", "Tests concurrency cap enforcement"),
+    ("tests/chat/test_session_escalation.py", "TestFindBestAgent", "test_se_05_returns_none_when_no_match", "SPEC-0713", "high", "Tests None when no agents handle category"),
+    ("tests/chat/test_session_escalation.py", "TestFindBestAgent", "test_se_06_falls_back_to_general_inquiry", "SPEC-0613", "high", "Tests General Inquiry fallback"),
+
+    # tests/chat/test_session_pii_scrubbing.py
+    ("tests/chat/test_session_pii_scrubbing.py", "TestPiiScrubberConfig", "test_scrubber_disabled_by_default", "SPEC-0289", "high", "Tests PII scrubbing disabled by default"),
+    ("tests/chat/test_session_pii_scrubbing.py", "TestPiiScrubberConfig", "test_set_pii_scrubber_enabled", "SPEC-0289", "high", "Tests enabling PII scrubbing"),
+    ("tests/chat/test_session_pii_scrubbing.py", "TestCustomerMessagePiiScrubbing", "test_scrubs_email_when_enabled", "SPEC-0289", "high", "Tests email redaction when enabled"),
+    ("tests/chat/test_session_pii_scrubbing.py", "TestCustomerMessagePiiScrubbing", "test_scrubs_phone_when_enabled", "SPEC-0289", "high", "Tests phone redaction when enabled"),
+    ("tests/chat/test_session_pii_scrubbing.py", "TestCustomerMessagePiiScrubbing", "test_scrubs_multiple_pii_patterns", "SPEC-0289", "high", "Tests multiple PII patterns redacted"),
+    ("tests/chat/test_session_pii_scrubbing.py", "TestAiMessagePiiScrubbing", "test_scrubs_email_in_ai_response", "SPEC-0289", "high", "Tests PII scrubbing in AI responses"),
+    ("tests/chat/test_session_pii_scrubbing.py", "TestAiMessagePiiScrubbing", "test_disabled_after_toggle", "SPEC-0289", "high", "Tests scrubbing stops after toggle to False"),
+
+    # tests/evaluation/test_deepeval_scaffold.py
+    ("tests/evaluation/test_deepeval_scaffold.py", "TestDeepEvalConfig", "test_de_01_thresholds_are_sensible", "SPEC-0183", "high", "Tests CQ-4 DeepEval thresholds"),
+    ("tests/evaluation/test_deepeval_scaffold.py", "TestDeepEvalConfig", "test_de_02_eval_model_configured", "SPEC-0183", "high", "Tests CQ-4 evaluation model configured"),
+    ("tests/evaluation/test_deepeval_scaffold.py", "TestDeepEvalAdapter", "test_de_04_empty_scenarios_returns_empty", "SPEC-0183", "high", "Tests empty golden dataset returns empty"),
+    ("tests/evaluation/test_deepeval_scaffold.py", "TestDeepEvalAdapter", "test_de_05_missing_responses_skipped", "SPEC-0183", "high", "Tests scenarios without responses skipped"),
+    ("tests/evaluation/test_deepeval_scaffold.py", "TestDeepEvalRunner", "test_de_07_unavailable_returns_status", "SPEC-0183", "high", "Tests graceful degradation when DeepEval unavailable"),
+    ("tests/evaluation/test_deepeval_scaffold.py", "TestDeepEvalRunner", "test_de_09_create_metrics_graceful", "SPEC-0183", "high", "Tests create_metrics returns 3 metrics or empty"),
+
+    # === BATCH 2: evaluation + integrations + multi_tenant ===
+    # tests/evaluation/test_quality_pilot.py
+    ("tests/evaluation/test_quality_pilot.py", "TestGoldenDataset", "test_qp_01_dataset_file_exists", "SPEC-0180", "high", "CQ-1 quality scoring — golden dataset existence"),
+    ("tests/evaluation/test_quality_pilot.py", "TestGoldenDataset", "test_qp_03_scenario_schema", "SPEC-0180", "high", "CQ-1 schema validation for evaluation scenarios"),
+    ("tests/evaluation/test_quality_pilot.py", "TestGoldenDataset", "test_qp_05_category_coverage", "SPEC-1489", "high", "Intent taxonomy coverage in golden dataset"),
+    ("tests/evaluation/test_quality_pilot.py", "TestGoldenDataset", "test_qp_05c_jailbreak_scenarios_present", "SPEC-0258", "high", "Critic jailbreak adversarial test coverage"),
+    ("tests/evaluation/test_quality_pilot.py", "TestEvaluateResponse", "test_qp_06_ideal_response_scores_high", "SPEC-0180", "high", "CQ-1 evaluate_response() scoring logic"),
+    ("tests/evaluation/test_quality_pilot.py", "TestEvaluateResponse", "test_qp_07_missing_phrases_lowers_relevancy", "SPEC-0180", "high", "CQ-1 relevancy dimension scoring"),
+    ("tests/evaluation/test_quality_pilot.py", "TestEvaluateResponse", "test_qp_08_excluded_phrase_lowers_faithfulness", "SPEC-0180", "high", "CQ-1 faithfulness dimension scoring"),
+    ("tests/evaluation/test_quality_pilot.py", "TestEvaluateResponse", "test_qp_09_escalation_mismatch_detected", "SPEC-0185", "high", "CQ-6 quality-aware escalation accuracy"),
+    ("tests/evaluation/test_quality_pilot.py", "TestEvaluateResponse", "test_qp_11b_jailbreak_empty_response_is_perfect", "SPEC-0258", "high", "Critic must block jailbreak responses"),
+    ("tests/evaluation/test_quality_pilot.py", "TestPilotReport", "test_qp_13_run_pilot_with_ideal_responses", "SPEC-0180", "high", "CQ-1 aggregate pilot report"),
+    ("tests/evaluation/test_quality_pilot.py", "TestPilotReport", "test_qp_15_category_scores_populated", "SPEC-0184", "high", "CQ-5 per-topic quality breakdown"),
+    ("tests/evaluation/test_quality_pilot.py", "TestPilotReport", "test_qp_17_scenario_result_threshold", "SPEC-0180", "high", "CQ-1 threshold 3.5 on 1-5 scale"),
+
+    # tests/integrations/test_shopify_gdpr_webhooks.py
+    ("tests/integrations/test_shopify_gdpr_webhooks.py", "TestGDPRValidHMAC", "test_valid_hmac_returns_200", "SPEC-0313", "high", "Shopify GDPR webhooks return 200 with valid HMAC"),
+    ("tests/integrations/test_shopify_gdpr_webhooks.py", "TestGDPRInvalidHMAC", "test_invalid_hmac_returns_401", "SPEC-0313", "high", "Shopify GDPR webhooks reject invalid HMAC"),
+    ("tests/integrations/test_shopify_gdpr_webhooks.py", "TestGDPRInvalidHMAC", "test_missing_hmac_returns_401", "SPEC-0313", "high", "Missing HMAC returns 401"),
+
+    # tests/integrations/test_spa_provisioning.py
+    ("tests/integrations/test_spa_provisioning.py", "TestSpaProvisionTenant", "test_happy_path_all_steps_succeed", "SPEC-0764", "high", "SPA provisioning happy path"),
+    ("tests/integrations/test_spa_provisioning.py", "TestSpaProvisionTenant", "test_happy_path_all_steps_succeed", "SPEC-0766", "high", "Fully automated provisioning"),
+    ("tests/integrations/test_spa_provisioning.py", "TestSpaProvisionTenant", "test_partial_failure_superadmin_fails", "SPEC-0767", "high", "Never fail silently — partial failure returns errors"),
+    ("tests/integrations/test_spa_provisioning.py", "TestSpaProvisionTenant", "test_welcome_email_called_with_email", "SPEC-0777", "high", "Superadmin receives welcome email"),
+    ("tests/integrations/test_spa_provisioning.py", "TestSpaProvisionTenant", "test_welcome_email_called_with_email", "SPEC-1310", "high", "send_welcome_email from SPA provisioning"),
+    ("tests/integrations/test_spa_provisioning.py", "TestSpaProvisionTenant", "test_welcome_email_failure_appended_to_errors", "SPEC-1311", "high", "Never raise from welcome email"),
+    ("tests/integrations/test_spa_provisioning.py", "TestSpaProvisionTenant", "test_welcome_email_failure_appended_to_errors", "SPEC-0767", "high", "Email failure appended to errors"),
+
+    # tests/integrations/test_stripe_checkout_deep.py
+    ("tests/integrations/test_stripe_checkout_deep.py", "TestStripeCheckoutDeep", "test_scd01_automatic_tax_enabled", "SPEC-0862", "high", "Stripe Checkout automatic_tax"),
+    ("tests/integrations/test_stripe_checkout_deep.py", "TestStripeCheckoutDeep", "test_scd03_checkout_mode_subscription", "SPEC-0862", "high", "Stripe mode=subscription"),
+    ("tests/integrations/test_stripe_checkout_deep.py", "TestStripeCheckoutDeep", "test_scd07_metadata_includes_tier_and_interval", "SPEC-0599", "high", "auto_provision wired into checkout_completed"),
+    ("tests/integrations/test_stripe_checkout_deep.py", "TestStripeCheckoutDeep", "test_scd07_metadata_includes_tier_and_interval", "SPEC-0862", "high", "Subscription tiers in metadata"),
+    ("tests/integrations/test_stripe_checkout_deep.py", "TestStripeCheckoutDeep", "test_scd08_referral_sets_client_reference_id", "SPEC-0795", "high", "Rewardful affiliate attribution"),
+    ("tests/integrations/test_stripe_checkout_deep.py", "TestStripeCheckoutDeep", "test_scd10_invalid_tier_returns_400", "SPEC-0862", "high", "Unknown tier rejected"),
+
+    # tests/migrations/test_migration_framework.py
+    ("tests/migrations/test_migration_framework.py", "TestDataClasses", "test_migration_record_fields", "SPEC-0327", "high", "WI-65 migration system MigrationRecord"),
+    ("tests/migrations/test_migration_framework.py", "TestMigrationDiscovery", "test_discovers_baseline_migration", "SPEC-0327", "high", "Migration discovery"),
+    ("tests/migrations/test_migration_framework.py", "TestMigrationDiscovery", "test_migrations_sorted_by_version", "SPEC-0327", "high", "Forward-only version ordering"),
+    ("tests/migrations/test_migration_framework.py", "TestAppliedVersions", "test_records_applied_version", "SPEC-0327", "high", "Applied version persistence"),
+    ("tests/migrations/test_migration_framework.py", "TestApplyAll", "test_apply_baseline", "SPEC-0327", "high", "Apply baseline migration"),
+    ("tests/migrations/test_migration_framework.py", "TestApplyAll", "test_apply_is_idempotent", "SPEC-0327", "high", "Idempotent application"),
+    ("tests/migrations/test_migration_framework.py", "TestBaselineMigration", "test_baseline_up_is_noop", "SPEC-0327", "high", "Baseline migration is no-op"),
+
+    # tests/multi_tenant/test_admin_integration_api.py
+    ("tests/multi_tenant/test_admin_integration_api.py", "TestHelpers", "test_ia_01_tier_meets_gate_none", "SPEC-0250", "high", "Backend tier gates — null gate all pass"),
+    ("tests/multi_tenant/test_admin_integration_api.py", "TestHelpers", "test_ia_02_tier_meets_gate_below", "SPEC-0250", "high", "Lower tier fails professional gate"),
+    ("tests/multi_tenant/test_admin_integration_api.py", "TestHelpers", "test_ia_03_tier_meets_gate_at_or_above", "SPEC-0250", "high", "Same or higher tier passes"),
+    ("tests/multi_tenant/test_admin_integration_api.py", "TestHelpers", "test_ia_04_build_summary_shopify", "SPEC-0636", "high", "Integration configuration page"),
+    ("tests/multi_tenant/test_admin_integration_api.py", "TestHelpers", "test_ia_05_build_summary_zendesk_tier_unmet", "SPEC-0254", "high", "Coming_soon for unimplemented integrations"),
+    ("tests/multi_tenant/test_admin_integration_api.py", "TestListAndGet", "test_ia_06_list_returns_all_types", "SPEC-0636", "high", "List returns all integration types"),
+    ("tests/multi_tenant/test_admin_integration_api.py", "TestMutations", "test_ia_09_activate_coming_soon_rejected", "SPEC-0254", "high", "Activation of coming_soon rejected"),
+    ("tests/multi_tenant/test_admin_integration_api.py", "TestMutations", "test_ia_10_activate_tier_gate_rejected", "SPEC-0250", "high", "Activate tier gate check"),
+    ("tests/multi_tenant/test_admin_integration_api.py", "TestMutations", "test_ia_11_deactivate_sets_disabled", "SPEC-1004", "high", "Deactivate sets disabled"),
+    ("tests/multi_tenant/test_admin_integration_api.py", "TestMutations", "test_ia_12_update_rejects_invalid_fields", "SPEC-1002", "high", "Rejects invalid config keys"),
+    ("tests/multi_tenant/test_admin_integration_api.py", "TestMutations", "test_ia_13_disconnect_clears_credentials", "SPEC-1005", "high", "Disconnect clears Key Vault secrets"),
+
+    # tests/multi_tenant/test_conversation_vectorizer_deep.py
+    ("tests/multi_tenant/test_conversation_vectorizer_deep.py", "TestCVD04ConsentNotAsked", "test_not_asked_returns_empty", "SPEC-0292", "high", "NOT_ASKED consent blocks vectorization"),
+    ("tests/multi_tenant/test_conversation_vectorizer_deep.py", "TestCVD05ConsentDenied", "test_denied_returns_empty", "SPEC-0292", "high", "DENIED consent blocks vectorization"),
+    ("tests/multi_tenant/test_conversation_vectorizer_deep.py", "TestCVD06ConsentGranted", "test_granted_processes_chunks", "SPEC-0292", "high", "GRANTED consent allows vectorization"),
+    ("tests/multi_tenant/test_conversation_vectorizer_deep.py", "TestCVD06ConsentGranted", "test_granted_calls_repo_upsert", "SPEC-0793", "high", "Vectorize scanner triggers upsert"),
+    ("tests/multi_tenant/test_conversation_vectorizer_deep.py", "TestCVD07SearchConsentDenied", "test_denied_search_returns_empty", "SPEC-0292", "high", "Denied consent blocks history search"),
+    ("tests/multi_tenant/test_conversation_vectorizer_deep.py", "TestCVD08SearchStarterDepth", "test_starter_passes_since_date", "SPEC-1490", "high", "Starter tier 90-day history retention"),
+    ("tests/multi_tenant/test_conversation_vectorizer_deep.py", "TestCVD09SearchEnterpriseDepth", "test_enterprise_passes_none_since", "SPEC-1492", "high", "Enterprise unlimited history"),
+    ("tests/multi_tenant/test_conversation_vectorizer_deep.py", "TestCVD10CompressWithinBudget", "test_output_within_budget", "SPEC-0259", "high", "Conversation history within token budget"),
+    ("tests/multi_tenant/test_conversation_vectorizer_deep.py", "TestCVD13SinceDateStarter", "test_starter_returns_90d_cutoff", "SPEC-1490", "high", "Starter _compute_since_date 90d"),
+    ("tests/multi_tenant/test_conversation_vectorizer_deep.py", "TestCVD14SinceDateProfessional", "test_professional_returns_365d_cutoff", "SPEC-1491", "high", "Professional 365d retention"),
+    ("tests/multi_tenant/test_conversation_vectorizer_deep.py", "TestCVD15SinceDateEnterprise", "test_enterprise_returns_none", "SPEC-1492", "high", "Enterprise unlimited"),
+
+    # tests/multi_tenant/test_fcr_metric.py
+    ("tests/multi_tenant/test_fcr_metric.py", "TestFCR02AllResolvedNoFollowups", "test_all_fcr_when_no_followups", "SPEC-0188", "high", "CQ-9 FCR when all resolved"),
+    ("tests/multi_tenant/test_fcr_metric.py", "TestFCR03SomeFollowups", "test_partial_fcr", "SPEC-0188", "high", "CQ-9 partial FCR calculation"),
+    ("tests/multi_tenant/test_fcr_metric.py", "TestFCR05DateRangeFiltering", "test_since_and_until_in_query", "SPEC-0310", "high", "Analytics date-range filtering"),
+    ("tests/multi_tenant/test_fcr_metric.py", "TestFCR07MultipleResolvedSameCustomer", "test_multiple_resolved_partial_followup", "SPEC-0188", "high", "Per-conversation FCR accuracy"),
+    ("tests/multi_tenant/test_fcr_metric.py", "TestFCR08AnalyticsSummaryResponse", "test_fcr_fields_in_summary_response", "SPEC-0188", "high", "FCR in analytics summary"),
+    ("tests/multi_tenant/test_fcr_metric.py", "TestFCR09BoundaryExactly72Hours", "test_followup_at_exactly_72h_is_fcr", "SPEC-0188", "high", "72h boundary — exactly 72h is FCR"),
+    ("tests/multi_tenant/test_fcr_metric.py", "TestFCR10Boundary71h59m", "test_followup_at_71h59m_is_repeat", "SPEC-0188", "high", "72h boundary — 71h59m is repeat"),
+
+    # tests/multi_tenant/test_mcp_client.py
+    ("tests/multi_tenant/test_mcp_client.py", "TestMcpServerConfig", "test_mcp_01_valid_config", "SPEC-0732", "high", "MCP core config dataclass"),
+    ("tests/multi_tenant/test_mcp_client.py", "TestShopDomainValidation", "test_mcp_04_matching_domains", "SPEC-0283", "high", "Tenant isolation shop domain guard"),
+    ("tests/multi_tenant/test_mcp_client.py", "TestShopDomainValidation", "test_mcp_05_mismatched_domains", "SPEC-0283", "high", "Mismatched domains rejected"),
+    ("tests/multi_tenant/test_mcp_client.py", "TestToolClassification", "test_mcp_09_read_prefix", "SPEC-0732", "high", "MCP tool classification read prefix"),
+    ("tests/multi_tenant/test_mcp_client.py", "TestPolicyGate", "test_mcp_15_read_allowed_on_readonly", "SPEC-0732", "high", "Read-only policy gate allows reads"),
+    ("tests/multi_tenant/test_mcp_client.py", "TestPolicyGate", "test_mcp_16_mutate_blocked_on_readonly", "SPEC-0732", "high", "Read-only gate blocks mutations"),
+    ("tests/multi_tenant/test_mcp_client.py", "TestAgentRedMcpClient", "test_mcp_18_connect_discovers_tools", "SPEC-0732", "high", "MCP connect() discovers tools"),
+    ("tests/multi_tenant/test_mcp_client.py", "TestAgentRedMcpClient", "test_mcp_19_call_tool_success", "SPEC-0732", "high", "MCP call_tool() success"),
+    ("tests/multi_tenant/test_mcp_client.py", "TestAgentRedMcpClient", "test_mcp_20_call_tool_timeout", "SPEC-0732", "high", "MCP timeout raises McpTimeoutError"),
+    ("tests/multi_tenant/test_mcp_client.py", "TestAgentRedMcpClient", "test_mcp_21_breaker_open_blocks", "SPEC-0732", "high", "Circuit breaker blocks"),
+    ("tests/multi_tenant/test_mcp_client.py", "TestAgentRedMcpClient", "test_mcp_23_pii_scrub_arguments", "SPEC-0732", "high", "PII scrubber on MCP args"),
+    ("tests/multi_tenant/test_mcp_client.py", "TestBuildStorefrontConfig", "test_mcp_25_url_format", "SPEC-0732", "high", "Storefront MCP config URL format"),
+    ("tests/multi_tenant/test_mcp_client.py", "TestResolveMcpConfigs", "test_mcp_31_explicit_priority", "SPEC-0732", "high", "Explicit MCP config priority"),
+    ("tests/multi_tenant/test_mcp_client.py", "TestResolveMcpConfigs", "test_mcp_32_auto_populate_shopify", "SPEC-0732", "high", "Auto-populate storefront config"),
+    ("tests/multi_tenant/test_mcp_client.py", "TestCreateTenantMcpClient", "test_mcp_35_valid_domain_passes", "SPEC-0283", "high", "MCP factory domain check passes"),
+    ("tests/multi_tenant/test_mcp_client.py", "TestCreateTenantMcpClient", "test_mcp_36_mismatched_domain_raises", "SPEC-0283", "high", "MCP factory domain mismatch raises"),
+
+    # === BATCH 3: remaining multi_tenant + security + unit ===
+    # tests/multi_tenant/test_mutation_policy.py
+    ("tests/multi_tenant/test_mutation_policy.py", "TestEvaluateRequest", "test_mpol_07_mutations_disabled_blocks", "SPEC-0732", "high", "Policy gate blocks when disabled"),
+    ("tests/multi_tenant/test_mutation_policy.py", "TestEvaluateRequest", "test_mpol_08_mutations_enabled_approves", "SPEC-0732", "high", "Policy gate allows when enabled"),
+    ("tests/multi_tenant/test_mutation_policy.py", "TestEvaluateRequest", "test_mpol_09_allowed_operations_pass", "SPEC-0732", "high", "Allowlist permits listed operations"),
+    ("tests/multi_tenant/test_mutation_policy.py", "TestEvaluateRequest", "test_mpol_10_allowed_operations_block", "SPEC-0732", "high", "Allowlist blocks unlisted operations"),
+    ("tests/multi_tenant/test_mutation_policy.py", "TestEvaluateRequest", "test_mpol_11_conversation_limit_blocks", "SPEC-0732", "high", "Per-conversation mutation cap"),
+    ("tests/multi_tenant/test_mutation_policy.py", "TestEvaluateRequest", "test_mpol_15_default_policy_always_blocks", "SPEC-0732", "high", "Default policy blocks all mutations"),
+
+    # tests/multi_tenant/test_structured_logging.py
+    ("tests/multi_tenant/test_structured_logging.py", "TestStructuredJsonFormatter", "test_sl_02_tenant_context_included", "SPEC-0293", "high", "tenant_id in log records"),
+    ("tests/multi_tenant/test_structured_logging.py", "TestDevelopmentFormatter", "test_sl_07_tenant_context_truncated", "SPEC-0293", "high", "tenant_id truncated in dev output"),
+    ("tests/multi_tenant/test_structured_logging.py", "TestConfigureLogging", "test_sl_08_production_uses_json_formatter", "SPEC-0289", "high", "Production JSON formatter"),
+
+    # tests/multi_tenant/test_usage_dashboard.py
+    ("tests/multi_tenant/test_usage_dashboard.py", "TestGetUsageDashboard", "test_ud04_get_usage_returns_dashboard", "110", "high", "Usage dashboard data endpoint"),
+    ("tests/multi_tenant/test_usage_dashboard.py", "TestGetDailyVolume", "test_ud07_daily_volume_returns_days", "110", "high", "Daily volume chart data"),
+    ("tests/multi_tenant/test_usage_dashboard.py", "TestListConversations", "test_ud09_list_conversations", "111", "high", "Paginated conversation list"),
+    ("tests/multi_tenant/test_usage_dashboard.py", "TestListConversations", "test_ud10_list_conversations_pagination", "111", "high", "Pagination params"),
+    ("tests/multi_tenant/test_usage_dashboard.py", "TestGetConversationDetail", "test_ud12_get_detail", "111", "high", "Conversation billing detail"),
+    ("tests/multi_tenant/test_usage_dashboard.py", "TestExportCSV", "test_ud14_export_csv", "SPEC-0291", "medium", "CSV export for GDPR requests"),
+
+    # tests/security/test_rate_limiting_live.py
+    ("tests/security/test_rate_limiting_live.py", "TestRateLimitEnforcement", "test_rl01_starter_within_limit", "SPEC-1238", "high", "Starter 10rpm — within limit"),
+    ("tests/security/test_rate_limiting_live.py", "TestRateLimitEnforcement", "test_rl02_starter_exceeds_limit", "SPEC-1238", "high", "Starter exceeds limit → 429"),
+    ("tests/security/test_rate_limiting_live.py", "TestRateLimitEnforcement", "test_rl02_starter_exceeds_limit", "SPEC-1241", "high", "429 response on rate limit exceeded"),
+    ("tests/security/test_rate_limiting_live.py", "TestRateLimitEnforcement", "test_rl03_professional_within_limit", "SPEC-1238", "high", "Professional 50rpm — within limit"),
+    ("tests/security/test_rate_limiting_live.py", "TestRateLimitEnforcement", "test_rl05_429_has_retry_after", "SPEC-1241", "high", "429 includes Retry-After header"),
+    ("tests/security/test_rate_limiting_live.py", "TestRateLimitEnforcement", "test_rl07_rate_limit_window_resets", "SPEC-1238", "high", "Sliding window reset"),
+    ("tests/security/test_rate_limiting_live.py", "TestRateLimitEnforcement", "test_rl08_per_tenant_independent", "SPEC-1238", "high", "Per-tenant independent rate limits"),
+    ("tests/security/test_rate_limiting_live.py", "TestCrossTenantIsolation", "test_rl10_tenant_a_unaffected", "SPEC-1238", "high", "Cross-tenant isolation verified"),
+    ("tests/security/test_rate_limiting_live.py", "TestBurstResilience", "test_rl13_concurrent_burst_single_tenant", "SPEC-1238", "high", "Burst resilience — no 500s"),
+    ("tests/security/test_rate_limiting_live.py", "TestBurstResilience", "test_rl15_rapid_sequential_no_crash", "SPEC-1238", "high", "Rapid sequential no crash"),
+
+    # tests/test_env_loader.py
+    ("tests/test_env_loader.py", "TestParseEnvFile", "test_r7_01_parses_key_value_pairs", "SPEC-0220", "high", "R7 env file parser"),
+    ("tests/test_env_loader.py", "TestParseEnvFile", "test_r7_02_skips_comments_and_blanks", "SPEC-0220", "high", "R7 parser ignores comments"),
+    ("tests/test_env_loader.py", "TestParseEnvFile", "test_r7_04_returns_empty_for_missing_file", "SPEC-0450", "high", "Missing .env.local graceful"),
+    ("tests/test_env_loader.py", "TestLoadEnvLocal", "test_r7_08_setdefault_mode", "SPEC-0058", "high", "Setdefault preserves existing vars"),
+    ("tests/test_env_loader.py", "TestLoadEnvLocal", "test_r7_09_override_mode", "SPEC-0539", "high", "Override mode overwrites"),
+    ("tests/test_env_loader.py", "TestLoadEnvLocal", "test_r7_12_missing_file_silent", "SPEC-0450", "high", "Missing file silently ignored"),
+
+    # tests/unit/test_avatar_upload.py
+    ("tests/unit/test_avatar_upload.py", "TestAvatarUpload", "test_upload_png_success", "SPEC-0169", "high", "Avatar PNG upload"),
+    ("tests/unit/test_avatar_upload.py", "TestAvatarUpload", "test_upload_png_success", "SPEC-1337", "high", "Avatar drop zone PNG"),
+    ("tests/unit/test_avatar_upload.py", "TestAvatarUpload", "test_upload_jpeg_success", "SPEC-1337", "high", "Avatar JPEG upload"),
+    ("tests/unit/test_avatar_upload.py", "TestAvatarUpload", "test_upload_rejects_invalid_type", "SPEC-0169", "high", "Avatar type validation"),
+    ("tests/unit/test_avatar_upload.py", "TestAvatarUpload", "test_upload_rejects_oversized_file", "SPEC-1337", "high", "Avatar 256KB max"),
+    ("tests/unit/test_avatar_upload.py", "TestAvatarUpload", "test_upload_calls_save_draft", "SPEC-0169", "high", "Avatar save_draft integration"),
+    ("tests/unit/test_avatar_upload.py", "TestAvatarUpload", "test_upload_calls_save_draft", "SPEC-0552", "high", "PNG upload resolves priority outage"),
+
+    # tests/unit/test_shopify_customer_verification.py
+    ("tests/unit/test_shopify_customer_verification.py", "TestGenerateIdentitySecret", "test_generates_64_char_hex", "SPEC-1130", "high", "Identity secret generation"),
+    ("tests/unit/test_shopify_customer_verification.py", "TestVerifyShopifyCustomerHmac", "test_valid_hmac_returns_true", "SPEC-1130", "high", "HMAC verification success"),
+    ("tests/unit/test_shopify_customer_verification.py", "TestVerifyShopifyCustomerHmac", "test_valid_hmac_returns_true", "SPEC-0286", "high", "Shopify session token auth path"),
+    ("tests/unit/test_shopify_customer_verification.py", "TestVerifyShopifyCustomerHmac", "test_invalid_hmac_returns_false", "SPEC-1130", "high", "HMAC verification failure"),
+    ("tests/unit/test_shopify_customer_verification.py", "TestVerifyShopifyCustomerHmac", "test_tampered_customer_id_fails", "SPEC-1130", "high", "HMAC tamper protection"),
+    ("tests/unit/test_shopify_customer_verification.py", "TestVerifyShopifyCustomerHmac", "test_no_secret_configured_returns_false", "SPEC-1130", "high", "No secret fails safely"),
+    ("tests/unit/test_shopify_customer_verification.py", "TestVerifyShopifyCustomerHmac", "test_gid_format_customer_id", "SPEC-1130", "high", "Shopify GID format verified"),
+    ("tests/unit/test_shopify_customer_verification.py", "TestVerifyShopifyCustomerHmac", "test_uses_correct_secret_type", "SPEC-0288", "high", "CUSTOMER_IDENTITY_SECRET from Key Vault"),
+
+    # tests/unit/test_stripe_webhooks.py
+    ("tests/unit/test_stripe_webhooks.py", "TestIdempotency", "test_first_event_not_duplicate", "162", "high", "Stripe webhook idempotency first event"),
+    ("tests/unit/test_stripe_webhooks.py", "TestIdempotency", "test_second_event_is_duplicate", "162", "high", "Duplicate event detected"),
+    ("tests/unit/test_stripe_webhooks.py", "TestIPAllowlist", "test_disabled_always_allows", "SPEC-0265", "high", "IP allowlist disabled allows all"),
+    ("tests/unit/test_stripe_webhooks.py", "TestIPAllowlist", "test_stripe_ip_allowed", "162", "high", "Known Stripe IP allowed"),
+    ("tests/unit/test_stripe_webhooks.py", "TestIPAllowlist", "test_unknown_ip_rejected", "162", "high", "Unknown IP rejected"),
+    ("tests/unit/test_stripe_webhooks.py", "TestStripeWebhook", "test_invalid_signature", "162", "high", "Invalid signature returns 400"),
+    ("tests/unit/test_stripe_webhooks.py", "TestStripeWebhook", "test_duplicate_event_returns_200", "162", "high", "Duplicate returns 200"),
+    ("tests/unit/test_stripe_webhooks.py", "TestHandleCheckoutCompleted", "test_subscription_checkout", "SPEC-0202", "high", "checkout.session.completed triggers provisioning"),
+    ("tests/unit/test_stripe_webhooks.py", "TestHandleCheckoutCompleted", "test_subscription_checkout", "SPEC-0599", "high", "auto_provision_superadmin wired in"),
+    ("tests/unit/test_stripe_webhooks.py", "TestHandleCheckoutCompleted", "test_superadmin_failure_does_not_block_provisioning", "SPEC-0599", "high", "Superadmin failure non-blocking"),
+    ("tests/unit/test_stripe_webhooks.py", "TestHandleSubscriptionCreated", "test_activates_tenant", "SPEC-0202", "high", "subscription.created activates tenant"),
+    ("tests/unit/test_stripe_webhooks.py", "TestHandleSubscriptionDeleted", "test_deactivates_tenant", "113", "high", "subscription.deleted deactivates tenant"),
+    ("tests/unit/test_stripe_webhooks.py", "TestHandlePaymentSucceeded", "test_subscription_renewal_resets_usage", "113", "high", "Renewal resets usage counters"),
+    ("tests/unit/test_stripe_webhooks.py", "TestHandlePaymentFailed", "test_flags_payment_issue", "113", "high", "Payment failed flags issue"),
+]
+
+def resolve_spec_id(handle: str) -> str | None:
+    """Resolve a spec handle to its spec ID."""
+    c = db._get_conn()
+    # Try by handle first
+    row = c.execute(
+        "SELECT id FROM current_specifications WHERE handle = ? AND status != 'retired'",
+        (handle,)
+    ).fetchone()
+    if row:
+        return row[0]
+    # Try as numeric ID (for WIs like 110, 113, etc.)
+    row = c.execute(
+        "SELECT id FROM current_specifications WHERE id = ? AND status != 'retired'",
+        (handle,)
+    ).fetchone()
+    if row:
+        return row[0]
+    return None
+
+# Check for existing mappings to avoid duplicates
+existing = set()
+c = db._get_conn()
+for row in c.execute("SELECT spec_id, test_file, test_function FROM test_coverage").fetchall():
+    existing.add((row[0], row[1], row[2]))
+
+inserted = 0
+skipped_dup = 0
+skipped_unresolved = 0
+unresolved_handles = set()
+
+for test_file, test_class, test_function, spec_handle, confidence, match_reason in MAPPINGS:
+    spec_id = resolve_spec_id(spec_handle)
+    if spec_id is None:
+        skipped_unresolved += 1
+        unresolved_handles.add(spec_handle)
+        continue
+
+    # Normalize path
+    test_file_norm = test_file.replace("\\", "/")
+
+    # Skip if already exists
+    if (spec_id, test_file_norm, test_function) in existing:
+        skipped_dup += 1
+        continue
+
+    c.execute(
+        """INSERT INTO test_coverage
+           (spec_id, test_file, test_class, test_function, confidence, match_reason, created_at, created_by)
+           VALUES (?, ?, ?, ?, ?, ?, datetime('now'), 'S112-coverage-mapping')""",
+        (spec_id, test_file_norm, test_class, test_function, confidence, match_reason)
+    )
+    existing.add((spec_id, test_file_norm, test_function))
+    inserted += 1
+
+c.execute("COMMIT")
+
+# Report
+total_mappings = c.execute("SELECT COUNT(*) FROM test_coverage").fetchone()[0]
+unique_files = len(set(r[0] for r in c.execute("SELECT DISTINCT test_file FROM test_coverage").fetchall()))
+unique_specs = len(set(r[0] for r in c.execute("SELECT DISTINCT spec_id FROM test_coverage").fetchall()))
+
+print(f"Inserted: {inserted}")
+print(f"Skipped (duplicate): {skipped_dup}")
+print(f"Skipped (unresolved handle): {skipped_unresolved}")
+if unresolved_handles:
+    print(f"Unresolved handles: {sorted(unresolved_handles)}")
+print(f"\nNew totals:")
+print(f"  Total mappings: {total_mappings}")
+print(f"  Unique test files: {unique_files}")
+print(f"  Unique specs covered: {unique_specs}")
