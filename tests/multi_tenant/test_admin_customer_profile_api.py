@@ -293,3 +293,34 @@ class TestSyncAndDelete:
             with pytest.raises(HTTPException) as exc_info:
                 await delete_profile(CUSTOMER_ID, ctx=_ctx())
             assert exc_info.value.status_code == 404
+
+
+# ---------------------------------------------------------------------------
+# CP-13 to CP-14: Router prefix and empty list
+# ---------------------------------------------------------------------------
+
+
+class TestRouterAndEmptyList:
+    """Router prefix verification and list_profiles with zero results."""
+
+    def test_cp_13_router_prefix_is_api_admin_profiles(self):
+        """Router prefix must be /api/admin/profiles."""
+        assert router.prefix == "/api/admin/profiles"
+
+    @pytest.mark.asyncio
+    async def test_cp_14_list_profiles_empty(self):
+        """list_profiles returns total=0 and empty profiles when repo returns nothing."""
+        from src.multi_tenant.admin_customer_profile_api import list_profiles
+
+        mock_repo = MagicMock()
+        mock_repo.query_count = AsyncMock(return_value=0)
+        mock_repo.query = AsyncMock(return_value=[])
+
+        with patch("src.multi_tenant.admin_customer_profile_api._get_repo", return_value=mock_repo):
+            result = await list_profiles(
+                consent_status=None, offset=0, limit=50, ctx=_ctx(),
+            )
+
+        assert result.total == 0
+        assert result.profiles == []
+        assert result.tenant_id == TENANT_ID

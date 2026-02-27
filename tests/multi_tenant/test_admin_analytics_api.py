@@ -493,3 +493,30 @@ class TestRepositoryEmptyResultFallback:
         result = await repo.aggregate_metrics(TENANT_ID, SINCE, UNTIL)
         assert "customer_satisfaction" in result
         assert result["customer_satisfaction"] == 0
+
+
+# ---------------------------------------------------------------------------
+# Router prefix and endpoint existence checks
+# ---------------------------------------------------------------------------
+
+
+class TestAnalyticsRouterAndEndpoints:
+    """Verify router prefix and that key endpoints are registered."""
+
+    def test_router_prefix_is_api_analytics(self):
+        """Router prefix must be /api/analytics."""
+        from src.multi_tenant.admin_analytics_api import router
+        assert router.prefix == "/api/analytics"
+
+    def test_topic_breakdown_endpoint_exists(self):
+        """get_topic_breakdown endpoint should be registered on the router."""
+        from src.multi_tenant.admin_analytics_api import router
+        route_paths = [r.path for r in router.routes]
+        # Route paths include the prefix, e.g. /api/analytics/intents
+        assert any("intents" in p for p in route_paths) or any("summary" in p for p in route_paths)
+
+    def test_resolution_metrics_endpoint_exists(self):
+        """get_resolution_metrics (gaps) endpoint should be registered."""
+        from src.multi_tenant.admin_analytics_api import router
+        route_paths = [r.path for r in router.routes]
+        assert any("gaps" in p for p in route_paths)

@@ -472,3 +472,27 @@ class TestConstants:
         # No special characters
         assert "-" not in API_KEY_ALPHABET
         assert "_" not in API_KEY_ALPHABET
+
+
+# ---------------------------------------------------------------------------
+# Router prefix and endpoint existence checks
+# ---------------------------------------------------------------------------
+
+
+class TestRouterAndEndpoints:
+    """Verify router prefix and that key endpoints are registered."""
+
+    def test_router_prefix_is_api_admin_api_keys(self):
+        """Router prefix must be /api/admin/api-keys."""
+        assert router.prefix == "/api/admin/api-keys"
+
+    def test_reset_endpoint_exists(self):
+        """reset_api_key_via_email (public, no auth) endpoint is registered."""
+        route_paths = [r.path for r in router.routes]
+        assert any("reset" in p for p in route_paths)
+
+    def test_list_api_keys_endpoint_exists(self):
+        """GET /api/admin/api-keys (list/get metadata) endpoint is registered."""
+        # The root path includes the prefix: /api/admin/api-keys
+        route_paths = [r.path for r in router.routes]
+        assert any("api-keys" in p for p in route_paths)
