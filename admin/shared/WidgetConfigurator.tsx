@@ -1903,7 +1903,7 @@ export const WidgetConfigurator: React.FC<BaseComponentProps> = ({
               <select
                 style={s.select}
                 value={localConfig.widget_locale}
-                onChange={(e) => updateField('widget_locale', e.target.value as WidgetConfigShape['widget_locale'])}
+                onChange={(e) => updateField('widget_locale', e.target.value as WidgetConfig['widget_locale'])}
               >
                 <option value="auto">Auto-detect</option>
                 <option value="en">English</option>
