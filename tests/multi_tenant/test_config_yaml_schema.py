@@ -361,9 +361,7 @@ class TestFieldPipelineCompleteness:
     # tests will automatically verify full-pipeline coverage.
     _YAML_ONLY_NOT_IN_MAPPING = {
         "widget_greeting_mode",          # S99: added to YAML, not wired to mapping
-        "widget_panel_width",            # S99: added to YAML, not wired to mapping
         "widget_quick_actions_enabled",  # In YAML + Cosmos, not in field_mapping
-        "widget_shadow_intensity",       # S99: added to YAML, not wired to mapping
     }
     _MAPPING_ONLY_NOT_IN_YAML = {
         "widget_agent_bubble_color",          # In mapping, YAML definition pending
@@ -375,8 +373,6 @@ class TestFieldPipelineCompleteness:
     }
     _YAML_ONLY_NOT_IN_COSMOS = {
         "widget_greeting_mode",     # S99: added to YAML, not in Cosmos schema
-        "widget_panel_width",       # S99: added to YAML, not in Cosmos schema
-        "widget_shadow_intensity",  # S99: added to YAML, not in Cosmos schema
     }
 
     def test_all_widget_yaml_fields_in_field_mapping(self):

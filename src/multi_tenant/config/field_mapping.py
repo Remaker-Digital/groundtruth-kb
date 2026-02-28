@@ -51,6 +51,10 @@ _PREFS_DIRECT_FIELDS: set[str] = {
     "widget_logo_url",
     "widget_show_branding",
     "widget_mobile_enabled",
+    "widget_mobile_fullscreen",
+    "widget_mobile_position",
+    "widget_mobile_offset_x",
+    "widget_mobile_offset_y",
     "widget_dark_mode",
     "widget_color_mode",
     "widget_header_gradient_end",
@@ -66,6 +70,10 @@ _PREFS_DIRECT_FIELDS: set[str] = {
     "widget_customer_bubble_color",
     "widget_customer_bubble_text_color",
     "widget_launcher_shape",
+    "widget_shadow_intensity",
+    "widget_panel_width",
+    "widget_panel_height",
+    "widget_locale",
     # Widget appearance — behavior (14 fields)
     "widget_offline_message",
     "widget_auto_open",
@@ -87,6 +95,9 @@ _PREFS_DIRECT_FIELDS: set[str] = {
     "widget_header_text",
     "widget_input_placeholder",
     "widget_page_rules",
+    # Widget engagement triggers (WI-0816)
+    "widget_exit_intent_enabled",
+    "widget_scroll_depth_trigger",
     # Integrations (C10)
     "shopify_sync_enabled",
     "zendesk_escalation_enabled",

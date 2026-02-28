@@ -117,6 +117,10 @@ export interface WidgetConfig {
   widget_logo_url?: string | null;
   widget_show_branding?: boolean | null;
   widget_mobile_enabled?: boolean | null;
+  widget_mobile_fullscreen?: boolean | null;
+  widget_mobile_position?: 'bottom-right' | 'bottom-left' | null;
+  widget_mobile_offset_x?: number | null;
+  widget_mobile_offset_y?: number | null;
   widget_dark_mode?: boolean | null;
   widget_color_mode?: 'light' | 'dark' | 'auto' | null;
   widget_header_gradient_end?: string | null;
@@ -149,10 +153,14 @@ export interface WidgetConfig {
   widget_header_text?: string | null;
   widget_input_placeholder?: string | null;
   widget_page_rules?: string[] | null;
+  widget_exit_intent_enabled?: boolean | null;
+  widget_scroll_depth_trigger?: number | null;
   widget_shadow_intensity?: 'none' | 'subtle' | 'standard' | 'heavy' | null;
   widget_position_offset_x?: number | null;
   widget_position_offset_y?: number | null;
   widget_panel_width?: 'compact' | 'standard' | 'wide' | null;
+  widget_panel_height?: 'short' | 'standard' | 'tall' | null;
+  widget_locale?: 'auto' | 'en' | 'es' | 'fr' | 'de' | 'pt' | 'ja' | 'zh' | 'ko' | null;
   // Non-widget fields used for display
   brand_name?: string | null;
   // Quick action buttons for the current page context (WI #228)
@@ -255,6 +263,7 @@ export function resolveTokens(config: WidgetConfig): DesignTokens {
   const launcherShape = config.widget_launcher_shape || 'circle';
   const shadowIntensity = config.widget_shadow_intensity || 'standard';
   const panelWidthPreset = config.widget_panel_width || 'standard';
+  const panelHeightPreset = config.widget_panel_height || 'standard';
 
   // Shared structural tokens (Zapier-derived)
   const base: Omit<DesignTokens,
@@ -312,7 +321,9 @@ export function resolveTokens(config: WidgetConfig): DesignTokens {
     panelWidth: panelWidthPreset === 'compact' ? '320px'
       : panelWidthPreset === 'wide' ? '440px'
       : '380px',
-    panelHeight: '520px',
+    panelHeight: panelHeightPreset === 'short' ? '420px'
+      : panelHeightPreset === 'tall' ? '620px'
+      : '520px',
     headerHeight: '64px',
     inputBarHeight: '56px',
     avatarSize: '40px',

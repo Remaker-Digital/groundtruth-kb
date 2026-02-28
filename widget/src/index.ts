@@ -27,10 +27,11 @@
  */
 
 import { h, render } from 'preact';
-import type { WidgetConfig } from '@/theme/tokens';
+import type { WidgetConfig, DesignTokens } from '@/theme/tokens';
 import { resolveTokens } from '@/theme/tokens';
-import { en } from '@/locale/en';
 import type { Locale } from '@/locale/en';
+import type { LocaleCode } from '@/locale';
+import { resolveLocaleCode, getLocalePack } from '@/locale';
 import { createStore } from '@/state/store';
 import { configureTransport, fetchWidgetConfig } from '@/transport/http';
 import { detectPageContext } from '@/utils/templateVars';
@@ -58,6 +59,14 @@ interface AgentRedSDK {
   show(): void;
   /** Destroy the widget and clean up. */
   destroy(): void;
+  /** Switch widget UI language at runtime (WI-0819). */
+  setLocale(code: LocaleCode): void;
+  /** Override design tokens at runtime (WI-0819). */
+  setTheme(overrides: Partial<DesignTokens>): void;
+  /** Merge partial config overrides at runtime (WI-0820). */
+  setConfigPartial(overrides: Partial<WidgetConfig>): void;
+  /** Update page targeting rules at runtime (WI-0820). */
+  setTargetingRules(rules: string[]): void;
 }
 
 // ---------------------------------------------------------------------------
@@ -99,6 +108,7 @@ interface AgentRedSDK {
     'data-auto-open': 'widget_auto_open',
     'data-auto-open-delay': 'widget_auto_open_delay',
     'data-mobile-enabled': 'widget_mobile_enabled',
+    'data-mobile-fullscreen': 'widget_mobile_fullscreen',
     'data-sound-enabled': 'widget_sound_enabled',
     'data-greeting': 'widget_greeting_message',
     'data-header-text': 'widget_header_text',
@@ -245,14 +255,21 @@ async function init(
 
   // ---- Launcher rendering -------------------------------------------------
 
+  // Mobile detection for launcher positioning (SPEC-1510)
+  const isMobileDevice = isMobile();
+
   function renderLauncher() {
     const state = store.getState();
     render(
       h(Launcher, {
         tokens,
-        position: config.widget_position || 'bottom-right',
-        offsetX: config.widget_position_offset_x ?? config.widget_offset_x ?? 20,
-        offsetY: config.widget_position_offset_y ?? config.widget_offset_y ?? 20,
+        position: (isMobileDevice && config.widget_mobile_position) || config.widget_position || 'bottom-right',
+        offsetX: isMobileDevice
+          ? (config.widget_mobile_offset_x ?? config.widget_position_offset_x ?? config.widget_offset_x ?? 20)
+          : (config.widget_position_offset_x ?? config.widget_offset_x ?? 20),
+        offsetY: isMobileDevice
+          ? (config.widget_mobile_offset_y ?? config.widget_position_offset_y ?? config.widget_offset_y ?? 20)
+          : (config.widget_position_offset_y ?? config.widget_offset_y ?? 20),
         isOpen: state.view !== 'closed',
         unreadCount: state.unreadCount,
         launcherIcon: (config.widget_launcher_icon as 'chat' | 'headset' | 'help') || 'chat',
@@ -270,28 +287,54 @@ async function init(
 
   function createPanelIframe(): HTMLIFrameElement {
     const iframe = document.createElement('iframe');
-    const position = config.widget_position || 'bottom-right';
-    const offsetX = config.widget_position_offset_x ?? config.widget_offset_x ?? 20;
-    const offsetY = config.widget_position_offset_y ?? config.widget_offset_y ?? 20;
+    const mobile = isMobile();
+    // Mobile position/offset overrides (SPEC-1510) — fall back to desktop values
+    const position = (mobile && config.widget_mobile_position) || config.widget_position || 'bottom-right';
+    const offsetX = mobile
+      ? (config.widget_mobile_offset_x ?? config.widget_position_offset_x ?? config.widget_offset_x ?? 20)
+      : (config.widget_position_offset_x ?? config.widget_offset_x ?? 20);
+    const offsetY = mobile
+      ? (config.widget_mobile_offset_y ?? config.widget_position_offset_y ?? config.widget_offset_y ?? 20)
+      : (config.widget_position_offset_y ?? config.widget_offset_y ?? 20);
     const launcherSize = 60;
     const gap = 12;
 
-    iframe.style.cssText = [
-      'position: fixed',
-      `bottom: ${offsetY + launcherSize + gap}px`,
-      position === 'bottom-right' ? `right: ${offsetX}px` : `left: ${offsetX}px`,
-      `width: ${tokens.panelWidth}`,
-      `height: ${tokens.panelHeight}`,
-      'border: none',
-      `border-radius: ${tokens.borderRadiusLg}`,
-      `box-shadow: ${tokens.shadowLg}`,
-      `z-index: ${tokens.zIndexPanel}`,
-      'opacity: 0',
-      'transform: translateY(12px) scale(0.95)',
-      `transition: opacity ${tokens.transitionNormal}, transform ${tokens.transitionNormal}`,
-      'pointer-events: none',
-      'overflow: hidden',
-    ].join('; ');
+    // Mobile fullscreen: panel fills entire viewport (SPEC-1509)
+    const mobileFullscreen = mobile && config.widget_mobile_fullscreen === true;
+
+    iframe.style.cssText = mobileFullscreen
+      ? [
+          'position: fixed',
+          'top: 0',
+          'left: 0',
+          'width: 100vw',
+          'height: 100vh',
+          'border: none',
+          'border-radius: 0',
+          'box-shadow: none',
+          `z-index: ${tokens.zIndexPanel}`,
+          'opacity: 0',
+          'transform: translateY(12px)',
+          `transition: opacity ${tokens.transitionNormal}, transform ${tokens.transitionNormal}`,
+          'pointer-events: none',
+          'overflow: hidden',
+        ].join('; ')
+      : [
+          'position: fixed',
+          `bottom: ${offsetY + launcherSize + gap}px`,
+          position === 'bottom-right' ? `right: ${offsetX}px` : `left: ${offsetX}px`,
+          `width: ${tokens.panelWidth}`,
+          `height: ${tokens.panelHeight}`,
+          'border: none',
+          `border-radius: ${tokens.borderRadiusLg}`,
+          `box-shadow: ${tokens.shadowLg}`,
+          `z-index: ${tokens.zIndexPanel}`,
+          'opacity: 0',
+          'transform: translateY(12px) scale(0.95)',
+          `transition: opacity ${tokens.transitionNormal}, transform ${tokens.transitionNormal}`,
+          'pointer-events: none',
+          'overflow: hidden',
+        ].join('; ');
 
     iframe.setAttribute('title', 'Agent Red Chat');
     iframe.setAttribute('allow', 'microphone; camera');
@@ -397,17 +440,23 @@ async function init(
     }
   });
 
+  // Mobile fullscreen flag — computed once for panel lifecycle (SPEC-1509)
+  const mobileFullscreen = isMobile() && config.widget_mobile_fullscreen === true;
+
   function showPanel() {
     if (!panelIframe) {
       panelIframe = createPanelIframe();
 
       // Restore persisted drag position from sessionStorage (WI #253)
-      const saved = loadDragPosition();
-      if (saved) {
-        const w = panelIframe.offsetWidth || parseInt(tokens.panelWidth, 10);
-        const h = panelIframe.offsetHeight || parseInt(tokens.panelHeight, 10);
-        const { left, top } = clampToViewport(saved.left, saved.top, w, h);
-        applyDragPosition(panelIframe, left, top);
+      // Skip in mobile fullscreen — panel is fixed at 0,0
+      if (!mobileFullscreen) {
+        const saved = loadDragPosition();
+        if (saved) {
+          const w = panelIframe.offsetWidth || parseInt(tokens.panelWidth, 10);
+          const h = panelIframe.offsetHeight || parseInt(tokens.panelHeight, 10);
+          const { left, top } = clampToViewport(saved.left, saved.top, w, h);
+          applyDragPosition(panelIframe, left, top);
+        }
       }
     }
 
@@ -418,7 +467,7 @@ async function init(
       requestAnimationFrame(() => {
         if (panelIframe) {
           panelIframe.style.opacity = '1';
-          panelIframe.style.transform = 'translateY(0) scale(1)';
+          panelIframe.style.transform = mobileFullscreen ? 'translateY(0)' : 'translateY(0) scale(1)';
           panelIframe.style.pointerEvents = 'auto';
         }
       });
@@ -428,7 +477,7 @@ async function init(
   function hidePanel() {
     if (panelIframe) {
       panelIframe.style.opacity = '0';
-      panelIframe.style.transform = 'translateY(12px) scale(0.95)';
+      panelIframe.style.transform = mobileFullscreen ? 'translateY(12px)' : 'translateY(12px) scale(0.95)';
       panelIframe.style.pointerEvents = 'none';
     }
   }
@@ -440,7 +489,15 @@ async function init(
     showPanel();
   }
 
+  // userManuallyClosedWidget — tracks whether the visitor has opened then closed
+  // the widget during this page session, used by exit-intent and scroll-depth
+  // triggers to avoid re-opening after the visitor dismissed the widget.
+  let userManuallyClosedWidget = false;
+
   function closeWidget() {
+    if (store.getState().view !== 'closed') {
+      userManuallyClosedWidget = true;
+    }
     store.setState({ view: 'closed' });
     hidePanel();
   }
@@ -462,6 +519,41 @@ async function init(
         openWidget();
       }
     }, delay);
+  }
+
+  // ---- Exit-intent trigger (SPEC-1507) ------------------------------------
+  // Desktop only — auto-open when mouse leaves viewport. Fires at most once.
+  // Must NOT fire if widget was manually opened and closed.
+
+  if (config.widget_exit_intent_enabled && !isMobile()) {
+    const exitIntentHandler = () => {
+      if (store.getState().view === 'closed' && !userManuallyClosedWidget) {
+        openWidget();
+      }
+      document.documentElement.removeEventListener('mouseleave', exitIntentHandler);
+    };
+    document.documentElement.addEventListener('mouseleave', exitIntentHandler);
+  }
+
+  // ---- Scroll-depth trigger (SPEC-1508) ----------------------------------
+  // Auto-open when visitor scrolls past configured % of document height.
+  // Fires at most once. Must NOT fire if widget was manually opened and closed.
+
+  const scrollThreshold = config.widget_scroll_depth_trigger;
+  if (typeof scrollThreshold === 'number' && scrollThreshold >= 1 && scrollThreshold <= 100) {
+    const scrollHandler = () => {
+      const scrollTop = window.scrollY || document.documentElement.scrollTop;
+      const docHeight = document.documentElement.scrollHeight - window.innerHeight;
+      if (docHeight <= 0) return; // Not scrollable
+      const scrollPercent = (scrollTop / docHeight) * 100;
+      if (scrollPercent >= scrollThreshold) {
+        if (store.getState().view === 'closed' && !userManuallyClosedWidget) {
+          openWidget();
+        }
+        window.removeEventListener('scroll', scrollHandler);
+      }
+    };
+    window.addEventListener('scroll', scrollHandler, { passive: true });
   }
 
   // ---- Sound notification -------------------------------------------------
@@ -523,6 +615,39 @@ async function init(
       try { sessionStorage.removeItem(DRAG_STORAGE_KEY); } catch { /* ignore */ }
       delete (window as unknown as Record<string, unknown>).AgentRed;
     },
+    setLocale: (code: LocaleCode) => {
+      const pack = getLocalePack(code);
+      const cfg = store.getState().config;
+      // Merchant overrides always take precedence over locale pack
+      store.setState({
+        locale: {
+          ...pack,
+          ...(cfg.widget_header_text ? { headerTitle: cfg.widget_header_text } : {}),
+          ...(cfg.widget_input_placeholder ? { inputPlaceholder: cfg.widget_input_placeholder } : {}),
+          ...(cfg.widget_offline_message ? { offlineMessage: cfg.widget_offline_message } : {}),
+        },
+      });
+    },
+    setTheme: (overrides: Partial<DesignTokens>) => {
+      store.setState({ tokenOverrides: overrides });
+    },
+    setConfigPartial: (overrides: Partial<WidgetConfig>) => {
+      const current = store.getState().config;
+      store.setState({ config: { ...current, ...overrides } });
+    },
+    setTargetingRules: (rules: string[]) => {
+      const current = store.getState().config;
+      const updated = { ...current, widget_page_rules: rules };
+      store.setState({ config: updated });
+      // Re-evaluate visibility with new rules
+      if (!shouldShowOnPage(updated)) {
+        shadowHost.style.display = 'none';
+        if (panelIframe) panelIframe.style.display = 'none';
+      } else {
+        shadowHost.style.display = '';
+        if (panelIframe) panelIframe.style.display = '';
+      }
+    },
   };
 
   (window as unknown as Record<string, unknown>).AgentRed = sdk;
@@ -554,19 +679,72 @@ function mountLauncherHost(): { shadowHost: HTMLElement; shadowRoot: ShadowRoot 
 // Helpers
 // ---------------------------------------------------------------------------
 
-/** Check if the current page matches the widget's page rules. */
+/** Check if the current page matches the widget's page rules (SPEC-1504, SPEC-1505).
+ *
+ * Rule prefixes:
+ *   +  = include (show widget on matching pages)
+ *   -  = exclude (hide widget on matching pages)
+ *   no prefix = include (backward compat)
+ *
+ * Precedence: exclude wins over include.
+ * Only-excludes list = show everywhere EXCEPT matches.
+ * Only-includes list = show ONLY on matches.
+ * Mixed = include unless also excluded.
+ *
+ * Match target: pathname + search (SPEC-1505), NOT just pathname.
+ */
 function shouldShowOnPage(config: WidgetConfig): boolean {
   const rules = config.widget_page_rules;
   if (!rules || rules.length === 0) return true; // no rules = show everywhere
 
-  const currentPath = window.location.pathname;
+  // SPEC-1505: Match against pathname + query string (not just pathname)
+  const matchTarget = window.location.pathname + window.location.search;
 
-  for (const rule of rules) {
-    // Simple glob matching: * matches anything
-    const regex = new RegExp(
-      '^' + rule.replace(/\*/g, '.*').replace(/\?/g, '.') + '$',
-    );
-    if (regex.test(currentPath)) return true;
+  // Parse rules into include/exclude buckets
+  const includes: RegExp[] = [];
+  const excludes: RegExp[] = [];
+
+  for (const raw of rules) {
+    const trimmed = raw.trim();
+    if (!trimmed) continue;
+
+    let mode: 'include' | 'exclude' = 'include';
+    let pattern = trimmed;
+
+    // SPEC-1504: Parse +/- prefix
+    if (trimmed.startsWith('-')) {
+      mode = 'exclude';
+      pattern = trimmed.slice(1);
+    } else if (trimmed.startsWith('+')) {
+      mode = 'include';
+      pattern = trimmed.slice(1);
+    }
+
+    // SPEC-1504: Escape regex metacharacters, then convert glob * and ?
+    const escaped = pattern
+      .replace(/[.^${}()|[\]\\]/g, '\\$&')  // escape regex specials
+      .replace(/\*/g, '.*')                   // glob * → regex .*
+      .replace(/\?/g, '.');                   // glob ? → regex .
+    const regex = new RegExp('^' + escaped + '$');
+
+    if (mode === 'exclude') {
+      excludes.push(regex);
+    } else {
+      includes.push(regex);
+    }
+  }
+
+  // SPEC-1504: Exclude always wins
+  for (const re of excludes) {
+    if (re.test(matchTarget)) return false;
+  }
+
+  // Only-exclude rules: show everywhere except matches (already handled above)
+  if (includes.length === 0) return true;
+
+  // Include rules present: show only on matches
+  for (const re of includes) {
+    if (re.test(matchTarget)) return true;
   }
 
   return false;
@@ -579,10 +757,12 @@ function isMobile(): boolean {
   );
 }
 
-/** Build locale with merchant overrides applied. */
+/** Build locale from config with auto-detect and merchant overrides. */
 function buildLocale(config: WidgetConfig): Locale {
+  const code = resolveLocaleCode(config.widget_locale);
+  const pack = getLocalePack(code);
   return {
-    ...en,
+    ...pack,
     ...(config.widget_header_text ? { headerTitle: config.widget_header_text } : {}),
     ...(config.widget_input_placeholder ? { inputPlaceholder: config.widget_input_placeholder } : {}),
     ...(config.widget_offline_message ? { offlineMessage: config.widget_offline_message } : {}),

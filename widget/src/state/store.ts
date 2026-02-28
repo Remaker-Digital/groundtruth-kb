@@ -12,7 +12,7 @@
  * © 2026 Remaker Digital, a DBA of VanDusen & Palmeter, LLC. All rights reserved.
  */
 
-import type { WidgetConfig } from '@/theme/tokens';
+import type { WidgetConfig, DesignTokens } from '@/theme/tokens';
 import type { Locale } from '@/locale/en';
 
 // ---------------------------------------------------------------------------
@@ -94,6 +94,9 @@ export interface WidgetState {
 
   // Consent (WI #87)
   consentCollected: boolean;
+
+  // Runtime overrides (WI-0819)
+  tokenOverrides: Partial<DesignTokens> | null;
 }
 
 // ---------------------------------------------------------------------------
@@ -217,6 +220,7 @@ export function createStore(config: WidgetConfig, locale: Locale): Store {
     otpError: null,
     shopifyCustomer: null,
     consentCollected: false,
+    tokenOverrides: null,
   });
   return _store;
 }

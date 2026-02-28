@@ -104,6 +104,8 @@ Specifications should be **as stable as the business need.** Specs function as a
 6. **Specify on contact.** Unspecified elements become controlled when touched.
 7. **No bug fixes during testing.** Record defects as work items; fix in separate sessions.
 8. **Knowledge Database is the single source of truth.** All project knowledge lives in the KB.
+9. **Owner input classification.** Specification language triggers spec-first workflow (GOV-09, below).
+10. **Tests must exercise exposed production interfaces.** Source inspection tests are regression supplements, not Test artifacts. Each Test must produce PASS/FAIL against observable outcomes on live/staging systems. Tests are written and linked to specs **before** implementation (GOV-10).
 
 ### Owner Input Classification Rule (GOV-09)
 

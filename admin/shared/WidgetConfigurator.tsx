@@ -60,6 +60,10 @@ interface WidgetConfig {
   widget_logo_url: string;
   widget_show_branding: boolean;
   widget_mobile_enabled: boolean;
+  widget_mobile_fullscreen: boolean;
+  widget_mobile_position: 'bottom-right' | 'bottom-left' | null;
+  widget_mobile_offset_x: number | null;
+  widget_mobile_offset_y: number | null;
   widget_dark_mode: boolean;
   widget_agent_bubble_color: string;
   widget_agent_bubble_text_color: string;
@@ -67,6 +71,8 @@ interface WidgetConfig {
   widget_customer_bubble_text_color: string;
   widget_launcher_shape: 'circle' | 'rounded-square' | 'pill';
   widget_launcher_icon: 'chat' | 'headset' | 'help';
+  widget_panel_height: 'short' | 'standard' | 'tall';
+  widget_locale: 'auto' | 'en' | 'es' | 'fr' | 'de' | 'pt' | 'ja' | 'zh' | 'ko';
   // Behavior (9)
   widget_offline_message: string;
   widget_auto_open: boolean;
@@ -77,6 +83,9 @@ interface WidgetConfig {
   widget_chat_rating_enabled: boolean;
   widget_sound_enabled: boolean;
   widget_file_upload_enabled: boolean;
+  // Engagement triggers (WI-0816)
+  widget_exit_intent_enabled: boolean;
+  widget_scroll_depth_trigger: number | null;
   // Content / Targeting (4)
   widget_greeting_message: string;
   widget_header_text: string;
@@ -96,6 +105,10 @@ const DEFAULT_CONFIG: WidgetConfig = {
   widget_logo_url: '',
   widget_show_branding: true,
   widget_mobile_enabled: true,
+  widget_mobile_fullscreen: false,
+  widget_mobile_position: null,
+  widget_mobile_offset_x: null,
+  widget_mobile_offset_y: null,
   widget_dark_mode: false,
   widget_agent_bubble_color: '',
   widget_agent_bubble_text_color: '',
@@ -103,6 +116,8 @@ const DEFAULT_CONFIG: WidgetConfig = {
   widget_customer_bubble_text_color: '',
   widget_launcher_shape: 'circle',
   widget_launcher_icon: 'chat',
+  widget_panel_height: 'standard',
+  widget_locale: 'auto',
   widget_offline_message: '',
   widget_auto_open: false,
   widget_auto_open_delay: 5,
@@ -112,6 +127,8 @@ const DEFAULT_CONFIG: WidgetConfig = {
   widget_chat_rating_enabled: false,
   widget_sound_enabled: true,
   widget_file_upload_enabled: true,
+  widget_exit_intent_enabled: false,
+  widget_scroll_depth_trigger: null,
   widget_greeting_message: '',
   widget_header_text: '',
   widget_input_placeholder: '',
@@ -1863,6 +1880,42 @@ export const WidgetConfigurator: React.FC<BaseComponentProps> = ({
                 <option value="help">Help / question mark</option>
               </select>
             </Field>
+            <Field
+              st={s}
+              label="Panel height"
+              description="Chat panel height. Short (420px) saves space; Tall (620px) for longer conversations."
+            >
+              <select
+                style={s.select}
+                value={localConfig.widget_panel_height}
+                onChange={(e) => updateField('widget_panel_height', e.target.value as 'short' | 'standard' | 'tall')}
+              >
+                <option value="short">Short (420px)</option>
+                <option value="standard">Standard (520px)</option>
+                <option value="tall">Tall (620px)</option>
+              </select>
+            </Field>
+            <Field
+              st={s}
+              label="Widget language"
+              description="Language for widget UI text. Auto detects the visitor's browser language."
+            >
+              <select
+                style={s.select}
+                value={localConfig.widget_locale}
+                onChange={(e) => updateField('widget_locale', e.target.value as WidgetConfigShape['widget_locale'])}
+              >
+                <option value="auto">Auto-detect</option>
+                <option value="en">English</option>
+                <option value="es">Espa&#241;ol</option>
+                <option value="fr">Fran&#231;ais</option>
+                <option value="de">Deutsch</option>
+                <option value="pt">Portugu&#234;s</option>
+                <option value="ja">&#26085;&#26412;&#35486;</option>
+                <option value="zh">&#20013;&#25991;</option>
+                <option value="ko">&#54620;&#44397;&#50612;</option>
+              </select>
+            </Field>
 
             <h4 style={s.sectionTitle}>Position & layout</h4>
             <Field
@@ -1985,6 +2038,52 @@ export const WidgetConfigurator: React.FC<BaseComponentProps> = ({
               value={localConfig.widget_mobile_enabled}
               onChange={(v) => updateField('widget_mobile_enabled', v)}
             />
+            <ToggleField
+              st={s}
+              label="Mobile fullscreen"
+              description="Chat panel fills the entire screen on mobile devices."
+              value={localConfig.widget_mobile_fullscreen}
+              onChange={(v) => updateField('widget_mobile_fullscreen', v)}
+            />
+            <Field
+              st={s}
+              label="Mobile position override"
+              description="Override the desktop position for mobile devices. Leave empty to inherit."
+            >
+              <select
+                style={s.select}
+                value={localConfig.widget_mobile_position || ''}
+                onChange={(e) => updateField('widget_mobile_position', e.target.value ? (e.target.value as 'bottom-right' | 'bottom-left') : null)}
+              >
+                <option value="">Inherit from desktop</option>
+                <option value="bottom-right">Bottom right</option>
+                <option value="bottom-left">Bottom left</option>
+              </select>
+            </Field>
+            <div style={{ display: 'flex', gap: 16 }}>
+              <Field st={s} label="Mobile horizontal offset (px)" description="Override for mobile. Leave empty to inherit.">
+                <input
+                  type="number"
+                  style={s.numberInput}
+                  value={localConfig.widget_mobile_offset_x ?? ''}
+                  min={0}
+                  max={100}
+                  placeholder="Inherit"
+                  onChange={(e) => updateField('widget_mobile_offset_x', e.target.value ? Math.max(0, Math.min(100, Number(e.target.value))) : null)}
+                />
+              </Field>
+              <Field st={s} label="Mobile vertical offset (px)" description="Override for mobile. Leave empty to inherit.">
+                <input
+                  type="number"
+                  style={s.numberInput}
+                  value={localConfig.widget_mobile_offset_y ?? ''}
+                  min={0}
+                  max={100}
+                  placeholder="Inherit"
+                  onChange={(e) => updateField('widget_mobile_offset_y', e.target.value ? Math.max(0, Math.min(100, Number(e.target.value))) : null)}
+                />
+              </Field>
+            </div>
           </div>
         )}
 
@@ -2070,6 +2169,31 @@ export const WidgetConfigurator: React.FC<BaseComponentProps> = ({
               value={localConfig.widget_chat_rating_enabled}
               onChange={(v) => updateField('widget_chat_rating_enabled', v)}
             />
+
+            <h4 style={s.sectionTitle}>Engagement triggers</h4>
+            <ToggleField
+              st={s}
+              label="Exit-intent auto-open"
+              description="Desktop only: auto-opens the widget when the visitor's mouse leaves the browser window. Fires once per page visit."
+              value={localConfig.widget_exit_intent_enabled}
+              onChange={(v) => updateField('widget_exit_intent_enabled', v)}
+            />
+            <Field
+              st={s}
+              label="Scroll-depth auto-open (%)"
+              description="Auto-open when visitor scrolls past this % of the page. Leave empty to disable."
+            >
+              <input
+                type="number"
+                min={1}
+                max={100}
+                step={5}
+                placeholder="Disabled"
+                style={s.input}
+                value={localConfig.widget_scroll_depth_trigger ?? ''}
+                onChange={(e) => updateField('widget_scroll_depth_trigger', e.target.value ? Math.max(1, Math.min(100, Number(e.target.value))) : null)}
+              />
+            </Field>
 
             <h4 style={s.sectionTitle}>Pre-chat form</h4>
             <Field

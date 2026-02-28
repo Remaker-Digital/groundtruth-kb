@@ -295,7 +295,7 @@ async def start_conversation(
     session = _get_session()
 
     try:
-        return await session.start_conversation(
+        response = await session.start_conversation(
             tenant_id=ctx.tenant_id,
             request=request,
             tier=ctx.tier,
@@ -308,6 +308,26 @@ async def start_conversation(
                 "Please subscribe to a paid plan to continue."
             ),
         )
+
+    # WI-0771: Fire-and-forget profile warm-up.
+    # Pre-fetch the customer profile into the pipeline cache while the
+    # customer is still composing their first message. When execute()
+    # runs, _load_customer_profile() will find a cache hit instead of
+    # making a Cosmos DB round-trip.
+    customer_id_for_warmup = (
+        (request.visitor.customer_id or request.visitor.email)
+        if request.visitor else None
+    )
+    if customer_id_for_warmup:
+        try:
+            pipeline = _get_pipeline()
+            asyncio.create_task(
+                pipeline.warm_up(ctx.tenant_id, customer_id_for_warmup, ctx.tier),
+            )
+        except Exception:
+            pass  # Non-fatal — pipeline may not be initialized in tests
+
+    return response
 
 
 # ---------------------------------------------------------------------------

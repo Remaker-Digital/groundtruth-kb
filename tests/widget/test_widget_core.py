@@ -716,3 +716,389 @@ class TestLocaleStrings:
         empty_values = re.findall(r":\s*''", en_body)
         assert len(empty_values) == 0, \
             f"All locale values must be non-empty, found {len(empty_values)} empty strings"
+
+
+# ---------------------------------------------------------------------------
+# Widget color pipeline (WI-0792 regression guard)
+# ---------------------------------------------------------------------------
+
+
+class TestWidgetColorPipeline:
+    """End-to-end widget color pipeline verification — WI-0792 regression guard.
+
+    The S103 gradient toggle bug demonstrated that a field can exist in
+    fields.yaml and the admin UI can save it, but if it's missing from
+    any pipeline layer the widget never sees it.  This class verifies
+    the entire color pipeline: config interface → resolveTokens →
+    Header background → Panel gradient wiring → API fetch.
+
+    © 2026 Remaker Digital, a DBA of VanDusen & Palmeter, LLC. All rights reserved.
+    """
+
+    # -- WidgetConfig interface (tokens.ts) ----------------------------------
+
+    def test_widget_config_has_primary_color_field(self) -> None:
+        """WidgetConfig must declare widget_primary_color optional field."""
+        source = (WIDGET_SRC / "theme" / "tokens.ts").read_text()
+        assert "widget_primary_color" in source, \
+            "WidgetConfig must include widget_primary_color field"
+
+    def test_widget_config_has_gradient_enabled_field(self) -> None:
+        """WidgetConfig must declare widget_header_gradient_enabled field."""
+        source = (WIDGET_SRC / "theme" / "tokens.ts").read_text()
+        assert "widget_header_gradient_enabled" in source, \
+            "WidgetConfig must include widget_header_gradient_enabled"
+
+    def test_widget_config_has_gradient_end_field(self) -> None:
+        """WidgetConfig must declare widget_header_gradient_end field."""
+        source = (WIDGET_SRC / "theme" / "tokens.ts").read_text()
+        assert "widget_header_gradient_end" in source, \
+            "WidgetConfig must include widget_header_gradient_end"
+
+    def test_widget_config_has_bubble_color_fields(self) -> None:
+        """WidgetConfig must declare agent and customer bubble color fields."""
+        source = (WIDGET_SRC / "theme" / "tokens.ts").read_text()
+        bubble_fields = [
+            "widget_agent_bubble_color",
+            "widget_agent_bubble_text_color",
+            "widget_customer_bubble_color",
+            "widget_customer_bubble_text_color",
+        ]
+        for field in bubble_fields:
+            assert field in source, f"WidgetConfig must include {field}"
+
+    # -- resolveTokens() color mapping (tokens.ts) ---------------------------
+
+    def test_resolve_tokens_reads_primary_color(self) -> None:
+        """resolveTokens() must read config.widget_primary_color for colorPrimary."""
+        source = (WIDGET_SRC / "theme" / "tokens.ts").read_text()
+        assert "config.widget_primary_color" in source, \
+            "resolveTokens must read config.widget_primary_color"
+
+    def test_resolve_tokens_default_primary_color(self) -> None:
+        """resolveTokens() must fall back to #ff3621 (Agent Red brand) as default."""
+        source = (WIDGET_SRC / "theme" / "tokens.ts").read_text()
+        assert "'#ff3621'" in source, \
+            "Default primary color must be #ff3621"
+        # Verify it's used as a fallback with ||
+        assert re.search(
+            r"config\.widget_primary_color\s*\|\|\s*DEFAULTS\.primaryColor",
+            source,
+        ), "Must use config.widget_primary_color || DEFAULTS.primaryColor pattern"
+
+    def test_resolve_tokens_maps_to_color_primary(self) -> None:
+        """resolveTokens() must set colorPrimary from the resolved primary color."""
+        source = (WIDGET_SRC / "theme" / "tokens.ts").read_text()
+        # Both light and dark mode paths must include colorPrimary: primary
+        color_primary_assignments = re.findall(r"colorPrimary:\s*primary", source)
+        assert len(color_primary_assignments) >= 2, (
+            f"Must assign colorPrimary: primary in both light and dark mode paths, "
+            f"found {len(color_primary_assignments)}"
+        )
+
+    def test_resolve_tokens_contrast_text_for_primary(self) -> None:
+        """resolveTokens() must compute contrast text color for primary background."""
+        source = (WIDGET_SRC / "theme" / "tokens.ts").read_text()
+        assert "contrastText(primary)" in source or "contrastText" in source, \
+            "Must compute contrast text color for primary"
+        assert "colorPrimaryText" in source, \
+            "Must set colorPrimaryText from contrast computation"
+
+    def test_resolve_tokens_primary_hover(self) -> None:
+        """resolveTokens() must derive a hover color from primary."""
+        source = (WIDGET_SRC / "theme" / "tokens.ts").read_text()
+        assert "colorPrimaryHover" in source, \
+            "Must derive colorPrimaryHover from primary"
+        # Should use darken() function
+        assert "darken(primary" in source, \
+            "Must use darken() to derive hover color"
+
+    def test_resolve_tokens_bubble_colors_from_config(self) -> None:
+        """resolveTokens() must read bubble colors from config with defaults."""
+        source = (WIDGET_SRC / "theme" / "tokens.ts").read_text()
+        assert "config.widget_agent_bubble_color" in source, \
+            "Must read config.widget_agent_bubble_color"
+        assert "config.widget_customer_bubble_color" in source, \
+            "Must read config.widget_customer_bubble_color"
+
+    # -- Header.tsx consumes tokens ------------------------------------------
+
+    def test_header_uses_color_primary(self) -> None:
+        """Header.tsx must use tokens.colorPrimary for its background."""
+        source = (WIDGET_SRC / "components" / "Header.tsx").read_text()
+        assert "tokens.colorPrimary" in source, \
+            "Header must use tokens.colorPrimary"
+
+    def test_header_supports_gradient(self) -> None:
+        """Header.tsx must support gradient background via gradientEnd prop."""
+        source = (WIDGET_SRC / "components" / "Header.tsx").read_text()
+        assert "gradientEnd" in source, \
+            "Header must accept gradientEnd prop"
+        assert "linear-gradient" in source, \
+            "Header must apply linear-gradient when gradientEnd is set"
+
+    def test_header_gradient_uses_primary_as_start(self) -> None:
+        """Header gradient must use colorPrimary as the start color."""
+        source = (WIDGET_SRC / "components" / "Header.tsx").read_text()
+        assert re.search(
+            r"tokens\.colorPrimary.*gradientEnd|gradientEnd.*tokens\.colorPrimary",
+            source,
+            re.DOTALL,
+        ), "Gradient must use tokens.colorPrimary as one endpoint"
+
+    # -- Panel.tsx wires gradient from config --------------------------------
+
+    def test_panel_passes_gradient_end_to_header(self) -> None:
+        """Panel.tsx must pass gradientEnd prop to Header from config."""
+        source = (WIDGET_SRC / "components" / "Panel.tsx").read_text()
+        assert "gradientEnd" in source, \
+            "Panel must pass gradientEnd to Header"
+        assert "widget_header_gradient_end" in source, \
+            "Panel must read widget_header_gradient_end from config"
+
+    def test_panel_conditionalizes_gradient_on_enabled_flag(self) -> None:
+        """Panel.tsx must only pass gradient when widget_header_gradient_enabled is not false."""
+        source = (WIDGET_SRC / "components" / "Panel.tsx").read_text()
+        assert "widget_header_gradient_enabled" in source, \
+            "Panel must check widget_header_gradient_enabled before passing gradient"
+
+    # -- HTTP transport fetches config with correct structure -----------------
+
+    def test_fetch_config_returns_widget_config_type(self) -> None:
+        """fetchWidgetConfig returns WidgetConfig type from /api/config."""
+        source = (WIDGET_SRC / "transport" / "http.ts").read_text()
+        assert "Promise<WidgetConfig | null>" in source, \
+            "fetchWidgetConfig must return Promise<WidgetConfig | null>"
+        assert "'/api/config'" in source, \
+            "fetchWidgetConfig must request /api/config endpoint"
+
+    def test_fetch_config_extracts_config_from_response(self) -> None:
+        """fetchWidgetConfig extracts resp.data.config from the API response."""
+        source = (WIDGET_SRC / "transport" / "http.ts").read_text()
+        assert "resp.data.config" in source, \
+            "Must extract config from resp.data.config"
+
+    # -- Python-side field pipeline ------------------------------------------
+
+    def test_python_field_registry_has_primary_color(self) -> None:
+        """widget_primary_color must exist in the Python field registry."""
+        from src.multi_tenant.config.field_mapping import get_field_registry
+        registry = get_field_registry()
+        assert "widget_primary_color" in registry, \
+            "widget_primary_color missing from field registry"
+
+    def test_python_field_registry_has_gradient_fields(self) -> None:
+        """gradient fields must exist in the Python field registry."""
+        from src.multi_tenant.config.field_mapping import get_field_registry
+        registry = get_field_registry()
+        assert "widget_header_gradient_enabled" in registry, \
+            "widget_header_gradient_enabled missing from field registry"
+        assert "widget_header_gradient_end" in registry, \
+            "widget_header_gradient_end missing from field registry"
+
+    def test_python_preferences_to_config_extracts_color(self) -> None:
+        """_preferences_to_config extracts widget_primary_color from a Cosmos doc."""
+        from src.multi_tenant.config.field_mapping import _preferences_to_config
+        mock_doc = {"widget_primary_color": "#0000FF", "irrelevant_field": "ignored"}
+        result = _preferences_to_config(mock_doc)
+        assert result.get("widget_primary_color") == "#0000FF", \
+            "Must extract widget_primary_color from preferences document"
+
+    def test_python_preferences_to_config_extracts_gradient(self) -> None:
+        """_preferences_to_config extracts gradient fields from a Cosmos doc."""
+        from src.multi_tenant.config.field_mapping import _preferences_to_config
+        mock_doc = {
+            "widget_header_gradient_enabled": True,
+            "widget_header_gradient_end": "#FF9900",
+        }
+        result = _preferences_to_config(mock_doc)
+        assert result.get("widget_header_gradient_enabled") is True, \
+            "Must extract widget_header_gradient_enabled"
+        assert result.get("widget_header_gradient_end") == "#FF9900", \
+            "Must extract widget_header_gradient_end"
+
+    def test_python_preferences_to_config_skips_none_values(self) -> None:
+        """_preferences_to_config must skip None values (not override defaults)."""
+        from src.multi_tenant.config.field_mapping import _preferences_to_config
+        mock_doc = {"widget_primary_color": None}
+        result = _preferences_to_config(mock_doc)
+        assert "widget_primary_color" not in result, \
+            "Must skip None values — they should fall back to tier defaults"
+
+
+# ---------------------------------------------------------------------------
+# WI-0813 / SPEC-1504: shouldShowOnPage +/- prefix parsing
+# WI-0814 / SPEC-1505: Match against pathname + search
+# ---------------------------------------------------------------------------
+
+
+class TestTargetingRulesParsing:
+    """Source inspection tests for targeting rule prefix parsing and URL matching."""
+
+    INDEX_TS = WIDGET_SRC / "index.ts"
+
+    def _read_index(self) -> str:
+        return self.INDEX_TS.read_text(encoding="utf-8")
+
+    # -- Prefix parsing (SPEC-1504) --
+
+    def test_strips_plus_prefix(self) -> None:
+        """shouldShowOnPage strips + prefix before building regex (SPEC-1504-A1)."""
+        src = self._read_index()
+        assert "trimmed.startsWith('+')" in src or "startsWith('+')" in src
+
+    def test_strips_minus_prefix(self) -> None:
+        """shouldShowOnPage strips - prefix before building regex (SPEC-1504-A2)."""
+        src = self._read_index()
+        assert "trimmed.startsWith('-')" in src or "startsWith('-')" in src
+
+    def test_exclude_wins_over_include(self) -> None:
+        """Exclude rules take precedence over include rules (SPEC-1504-A3)."""
+        src = self._read_index()
+        # Exclude check happens before include check
+        exclude_pos = src.find("for (const re of excludes)")
+        include_pos = src.find("for (const re of includes)")
+        assert exclude_pos > 0, "Expected excludes loop in shouldShowOnPage"
+        assert include_pos > 0, "Expected includes loop in shouldShowOnPage"
+        assert exclude_pos < include_pos, "Excludes must be checked before includes"
+
+    def test_only_exclude_shows_everywhere_except_matches(self) -> None:
+        """Only-exclude rules show widget everywhere except matches (SPEC-1504-A4)."""
+        src = self._read_index()
+        # When includes array is empty, return true (show everywhere unless excluded)
+        assert "if (includes.length === 0) return true" in src
+
+    def test_only_include_shows_only_on_matches(self) -> None:
+        """Only-include rules show widget only on matching pages (SPEC-1504-A5)."""
+        src = self._read_index()
+        # After includes loop, return false (no match = don't show)
+        lines = src.split('\n')
+        found_return_false = False
+        in_function = False
+        for line in lines:
+            if 'function shouldShowOnPage' in line:
+                in_function = True
+            if in_function and 'return false' in line:
+                found_return_false = True
+        assert found_return_false, "shouldShowOnPage must return false at end (no include match)"
+
+    def test_escapes_regex_metacharacters(self) -> None:
+        """Regex metacharacters are escaped in glob patterns (SPEC-1504-A6)."""
+        src = self._read_index()
+        # The pattern should escape regex specials like . ^ $ { } ( ) | [ ]
+        assert r"[.^${}()|[\]\\]" in src or "replace(/[" in src
+
+    # -- URL matching (SPEC-1505) --
+
+    def test_matches_pathname_plus_search(self) -> None:
+        """Match target includes window.location.search (SPEC-1505-A1)."""
+        src = self._read_index()
+        assert "window.location.search" in src
+
+    def test_match_target_includes_query_string(self) -> None:
+        """matchTarget is built from pathname + search (SPEC-1505-A2)."""
+        src = self._read_index()
+        assert "pathname + window.location.search" in src or \
+               "location.pathname + window.location.search" in src
+
+    # -- Structural correctness --
+
+    def test_include_exclude_arrays(self) -> None:
+        """shouldShowOnPage uses separate include/exclude arrays."""
+        src = self._read_index()
+        assert "const includes:" in src or "includes: RegExp[]" in src
+        assert "const excludes:" in src or "excludes: RegExp[]" in src
+
+    def test_glob_star_to_regex(self) -> None:
+        """Glob * is converted to regex .* for matching."""
+        src = self._read_index()
+        # After escaping, convert * to .*
+        assert ".replace(/\\*/g, '.*')" in src
+
+    def test_glob_question_to_regex(self) -> None:
+        """Glob ? is converted to regex . for matching."""
+        src = self._read_index()
+        assert ".replace(/\\?/g, '.')" in src
+
+
+# ===========================================================================
+# WI-0816 — Engagement triggers (exit-intent + scroll-depth)
+# ===========================================================================
+
+class TestEngagementTriggers:
+    """Source inspection tests for SPEC-1507 (exit-intent) and SPEC-1508 (scroll-depth)."""
+
+    INDEX_TS = Path(__file__).resolve().parents[2] / "widget" / "src" / "index.ts"
+    TOKENS_TS = Path(__file__).resolve().parents[2] / "widget" / "src" / "theme" / "tokens.ts"
+
+    def _read_index(self) -> str:
+        return self.INDEX_TS.read_text(encoding="utf-8")
+
+    # --- Exit-intent (SPEC-1507) ---
+
+    def test_exit_intent_mouseleave_listener(self) -> None:
+        """Exit-intent registers mouseleave on documentElement (SPEC-1507-A1)."""
+        src = self._read_index()
+        assert "document.documentElement.addEventListener('mouseleave'" in src
+
+    def test_exit_intent_listener_removed_after_trigger(self) -> None:
+        """Exit-intent listener is removed after triggering (SPEC-1507-A2)."""
+        src = self._read_index()
+        assert "document.documentElement.removeEventListener('mouseleave'" in src
+
+    def test_exit_intent_config_field_in_interface(self) -> None:
+        """widget_exit_intent_enabled field exists in WidgetConfig (SPEC-1507-A3)."""
+        src = self.TOKENS_TS.read_text(encoding="utf-8")
+        assert "widget_exit_intent_enabled" in src
+
+    def test_exit_intent_desktop_only(self) -> None:
+        """Exit-intent is desktop-only — guarded by isMobile() check."""
+        src = self._read_index()
+        assert "widget_exit_intent_enabled && !isMobile()" in src
+
+    def test_exit_intent_respects_manual_close(self) -> None:
+        """Exit-intent does not fire if widget was manually closed."""
+        src = self._read_index()
+        # The exit intent handler checks userManuallyClosedWidget
+        assert "!userManuallyClosedWidget" in src
+
+    # --- Scroll-depth (SPEC-1508) ---
+
+    def test_scroll_depth_scroll_listener(self) -> None:
+        """Scroll-depth registers scroll listener on window (SPEC-1508-A1)."""
+        src = self._read_index()
+        assert "window.addEventListener('scroll', scrollHandler" in src
+
+    def test_scroll_depth_listener_removed_after_trigger(self) -> None:
+        """Scroll-depth listener removed after triggering (SPEC-1508-A2)."""
+        src = self._read_index()
+        assert "window.removeEventListener('scroll', scrollHandler)" in src
+
+    def test_scroll_depth_config_field_in_interface(self) -> None:
+        """widget_scroll_depth_trigger field exists in WidgetConfig (SPEC-1508-A3)."""
+        src = self.TOKENS_TS.read_text(encoding="utf-8")
+        assert "widget_scroll_depth_trigger" in src
+
+    def test_scroll_depth_percentage_calculation(self) -> None:
+        """Scroll depth calculates scrollPercent from scrollTop / docHeight."""
+        src = self._read_index()
+        assert "scrollPercent" in src
+        assert "scrollHeight" in src
+
+    def test_scroll_depth_passive_listener(self) -> None:
+        """Scroll listener uses passive: true to avoid jank."""
+        src = self._read_index()
+        assert "{ passive: true }" in src
+
+    def test_scroll_depth_respects_manual_close(self) -> None:
+        """Scroll-depth does not fire if widget was manually closed."""
+        src = self._read_index()
+        # The scroll handler checks the same userManuallyClosedWidget flag
+        # Count occurrences — should appear in both exit-intent and scroll handlers
+        count = src.count("!userManuallyClosedWidget")
+        assert count >= 2, f"Expected at least 2 occurrences, found {count}"
+
+    def test_manual_close_flag_in_close_widget(self) -> None:
+        """closeWidget sets userManuallyClosedWidget = true."""
+        src = self._read_index()
+        assert "userManuallyClosedWidget = true" in src

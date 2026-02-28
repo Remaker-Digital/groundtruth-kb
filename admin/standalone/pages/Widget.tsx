@@ -91,6 +91,8 @@ interface WidgetConfig {
   positionOffsetY: number;
   shadowIntensity: 'none' | 'subtle' | 'standard' | 'heavy';
   panelWidth: 'compact' | 'standard' | 'wide';
+  panelHeight: 'short' | 'standard' | 'tall';
+  locale: 'auto' | 'en' | 'es' | 'fr' | 'de' | 'pt' | 'ja' | 'zh' | 'ko';
   colorMode: 'light' | 'dark' | 'auto';
   autoOpen: boolean;
   autoOpenDelay: number;
@@ -101,6 +103,13 @@ interface WidgetConfig {
   preChatFields: string[];
   offlineFormEnabled: boolean;
   soundEnabled: boolean;
+  mobileFullscreen: boolean;
+  mobilePosition: 'bottom-right' | 'bottom-left' | null;
+  mobileOffsetX: number | null;
+  mobileOffsetY: number | null;
+  pageRules: string[];
+  exitIntentEnabled: boolean;
+  scrollDepthTrigger: number | null;
   headerTitle: string;
   headerSubtitle: string;
   inputPlaceholder: string;
@@ -121,6 +130,8 @@ const DEFAULT_WIDGET_CONFIG: WidgetConfig = {
   positionOffsetY: 20,
   shadowIntensity: 'standard',
   panelWidth: 'standard',
+  panelHeight: 'standard',
+  locale: 'auto',
   colorMode: 'auto',
   autoOpen: false,
   autoOpenDelay: 5,
@@ -131,6 +142,13 @@ const DEFAULT_WIDGET_CONFIG: WidgetConfig = {
   preChatFields: ['name', 'email'],
   offlineFormEnabled: true,
   soundEnabled: true,
+  mobileFullscreen: false,
+  mobilePosition: null,
+  mobileOffsetX: null,
+  mobileOffsetY: null,
+  pageRules: [],
+  exitIntentEnabled: false,
+  scrollDepthTrigger: null,
   headerTitle: 'Support',
   headerSubtitle: 'We typically reply within minutes',
   inputPlaceholder: 'Type your message...',
@@ -158,6 +176,8 @@ function configToWidgetConfig(cfg: Record<string, unknown>): Partial<WidgetConfi
   if (cfg.widget_position_offset_y != null) partial.positionOffsetY = Number(cfg.widget_position_offset_y);
   if (cfg.widget_shadow_intensity != null) partial.shadowIntensity = String(cfg.widget_shadow_intensity) as WidgetConfig['shadowIntensity'];
   if (cfg.widget_panel_width != null) partial.panelWidth = String(cfg.widget_panel_width) as WidgetConfig['panelWidth'];
+  if (cfg.widget_panel_height != null) partial.panelHeight = String(cfg.widget_panel_height) as WidgetConfig['panelHeight'];
+  if (cfg.widget_locale != null) partial.locale = String(cfg.widget_locale) as WidgetConfig['locale'];
   if (cfg.widget_color_mode != null) partial.colorMode = String(cfg.widget_color_mode) as WidgetConfig['colorMode'];
   if (cfg.widget_auto_open != null) partial.autoOpen = Boolean(cfg.widget_auto_open);
   if (cfg.widget_auto_open_delay != null) partial.autoOpenDelay = Number(cfg.widget_auto_open_delay);
@@ -168,6 +188,13 @@ function configToWidgetConfig(cfg: Record<string, unknown>): Partial<WidgetConfi
   if (cfg.widget_pre_chat_fields != null && Array.isArray(cfg.widget_pre_chat_fields)) partial.preChatFields = cfg.widget_pre_chat_fields as string[];
   if (cfg.widget_offline_form_enabled != null) partial.offlineFormEnabled = Boolean(cfg.widget_offline_form_enabled);
   if (cfg.widget_sound_enabled != null) partial.soundEnabled = Boolean(cfg.widget_sound_enabled);
+  if (cfg.widget_mobile_fullscreen != null) partial.mobileFullscreen = Boolean(cfg.widget_mobile_fullscreen);
+  if (cfg.widget_mobile_position != null) partial.mobilePosition = String(cfg.widget_mobile_position) as WidgetConfig['mobilePosition'];
+  if (cfg.widget_mobile_offset_x != null) partial.mobileOffsetX = Number(cfg.widget_mobile_offset_x);
+  if (cfg.widget_mobile_offset_y != null) partial.mobileOffsetY = Number(cfg.widget_mobile_offset_y);
+  if (cfg.widget_page_rules != null && Array.isArray(cfg.widget_page_rules)) partial.pageRules = cfg.widget_page_rules as string[];
+  if (cfg.widget_exit_intent_enabled != null) partial.exitIntentEnabled = Boolean(cfg.widget_exit_intent_enabled);
+  if (cfg.widget_scroll_depth_trigger != null) partial.scrollDepthTrigger = Number(cfg.widget_scroll_depth_trigger);
   if (cfg.widget_header_title != null) partial.headerTitle = String(cfg.widget_header_title);
   if (cfg.widget_header_subtitle != null) partial.headerSubtitle = String(cfg.widget_header_subtitle);
   if (cfg.widget_input_placeholder != null) partial.inputPlaceholder = String(cfg.widget_input_placeholder);
@@ -192,6 +219,8 @@ function widgetConfigToApiFields(wc: WidgetConfig): Record<string, unknown> {
     widget_position_offset_y: wc.positionOffsetY,
     widget_shadow_intensity: wc.shadowIntensity,
     widget_panel_width: wc.panelWidth,
+    widget_panel_height: wc.panelHeight,
+    widget_locale: wc.locale,
     widget_color_mode: wc.colorMode,
     widget_auto_open: wc.autoOpen,
     widget_auto_open_delay: wc.autoOpenDelay,
@@ -202,6 +231,13 @@ function widgetConfigToApiFields(wc: WidgetConfig): Record<string, unknown> {
     widget_pre_chat_fields: wc.preChatFields,
     widget_offline_form_enabled: wc.offlineFormEnabled,
     widget_sound_enabled: wc.soundEnabled,
+    widget_mobile_fullscreen: wc.mobileFullscreen,
+    widget_mobile_position: wc.mobilePosition,
+    widget_mobile_offset_x: wc.mobileOffsetX,
+    widget_mobile_offset_y: wc.mobileOffsetY,
+    widget_page_rules: wc.pageRules.length > 0 ? wc.pageRules : null,
+    widget_exit_intent_enabled: wc.exitIntentEnabled,
+    widget_scroll_depth_trigger: wc.scrollDepthTrigger,
     widget_header_title: wc.headerTitle,
     widget_header_subtitle: wc.headerSubtitle,
     widget_input_placeholder: wc.inputPlaceholder,
@@ -362,7 +398,23 @@ function resolvePanelWidthPx(preset: WidgetConfig['panelWidth']): string {
   }
 }
 
-function WidgetPreview({ config, adminIsDark }: { config: WidgetConfig; adminIsDark: boolean }) {
+/** Resolve panel height preset to pixel value (preview scale). */
+function resolvePreviewPanelHeight(preset: WidgetConfig['panelHeight']): number {
+  switch (preset) {
+    case 'short': return 380;
+    case 'tall': return 530;
+    case 'standard':
+    default: return 460;
+  }
+}
+
+interface QuickActionPreview {
+  id: string;
+  label: string;
+  icon: string | null;
+}
+
+function WidgetPreview({ config, adminIsDark, quickActions }: { config: WidgetConfig; adminIsDark: boolean; quickActions?: QuickActionPreview[] }) {
   // Preview is always static — chat panel always visible so merchants see the
   // full widget appearance.  No open/close toggle (that's storefront behavior).
   const isRight = config.position === 'bottom-right';
@@ -430,7 +482,7 @@ function WidgetPreview({ config, adminIsDark }: { config: WidgetConfig; adminIsD
           bottom: 80,
           [isRight ? 'right' : 'left']: 16,
           width: resolvePreviewPanelWidth(config.panelWidth),
-          height: 440,
+          height: resolvePreviewPanelHeight(config.panelHeight),
           borderRadius: config.borderRadius,
           boxShadow: shadowCss(config.shadowIntensity, dk),
           background: panelBg,
@@ -547,6 +599,32 @@ function WidgetPreview({ config, adminIsDark }: { config: WidgetConfig; adminIsD
                 </Text>
               </Box>
             </Group>
+          )}
+
+          {/* Quick action pills (WI-0797) */}
+          {quickActions && quickActions.length > 0 && (
+            <Box style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 6, marginTop: 4, marginBottom: 12 }}>
+              {quickActions.slice(0, 2).map((qa) => (
+                <Box
+                  key={qa.id}
+                  style={{
+                    display: 'inline-flex',
+                    alignItems: 'center',
+                    gap: 4,
+                    padding: '5px 12px',
+                    borderRadius: 16,
+                    border: `1px solid ${dk ? '#44403c' : '#e5e7eb'}`,
+                    background: dk ? '#292524' : '#f7f7f8',
+                    fontSize: 12,
+                    color: agentBubbleText,
+                    cursor: 'default',
+                  }}
+                >
+                  {qa.icon && <span>{qa.icon}</span>}
+                  <span>{qa.label}</span>
+                </Box>
+              ))}
+            </Box>
           )}
 
           {/* Sample customer message */}
@@ -772,6 +850,7 @@ export function WidgetPage() {
 
   const [config, setConfig] = useState<WidgetConfig>({ ...DEFAULT_WIDGET_CONFIG });
   const [initialized, setInitialized] = useState(false);
+  const [previewQuickActions, setPreviewQuickActions] = useState<QuickActionPreview[]>([]);
 
   // Widget key installation state
   const [rotateModalOpen, setRotateModalOpen] = useState(false);
@@ -791,6 +870,27 @@ export function WidgetPage() {
       setInitialized(true);
     }
   }, [configResult.data, initialized]);
+
+  // Fetch quick actions for preview (WI-0797)
+  useEffect(() => {
+    (async () => {
+      try {
+        const resp = await apiFetch('/api/admin/quick-actions');
+        if (resp.ok) {
+          const data = await resp.json();
+          const actions = (data.actions || [])
+            .filter((a: { isActive?: boolean; is_active?: boolean }) => a.isActive || a.is_active)
+            .slice(0, 2)
+            .map((a: { id: string; label: string; icon?: string | null }) => ({
+              id: a.id,
+              label: a.label,
+              icon: a.icon || null,
+            }));
+          setPreviewQuickActions(actions);
+        }
+      } catch { /* preview is non-critical */ }
+    })();
+  }, [apiFetch]);
 
   function update<K extends keyof WidgetConfig>(key: K, value: WidgetConfig[K]) {
     setConfig((prev) => ({ ...prev, [key]: value }));
@@ -1103,6 +1203,42 @@ export function WidgetPage() {
                 </div>
                 <div>
                   <Text size="sm" fw={500} mb={6}>
+                    Panel height <HelpTooltip text="Set the chat panel height. Short (420px) saves screen space; Tall (620px) shows more conversation." docLink="https://agentredcx.com/docs/admin-guide/widget-appearance" />
+                  </Text>
+                  <SegmentedControl
+                    fullWidth
+                    value={config.panelHeight}
+                    onChange={(val) => update('panelHeight', val as WidgetConfig['panelHeight'])}
+                    data={[
+                      { label: 'Short', value: 'short' },
+                      { label: 'Standard', value: 'standard' },
+                      { label: 'Tall', value: 'tall' },
+                    ]}
+                    color="action"
+                  />
+                </div>
+                <div>
+                  <Text size="sm" fw={500} mb={6}>
+                    Widget language <HelpTooltip text="Language for all widget UI text. Auto detects the visitor's browser language with English fallback." docLink="https://agentredcx.com/docs/admin-guide/widget-appearance" />
+                  </Text>
+                  <Select
+                    value={config.locale}
+                    onChange={(val) => update('locale', (val || 'auto') as WidgetConfig['locale'])}
+                    data={[
+                      { label: 'Auto-detect', value: 'auto' },
+                      { label: 'English', value: 'en' },
+                      { label: 'Espa\u00f1ol', value: 'es' },
+                      { label: 'Fran\u00e7ais', value: 'fr' },
+                      { label: 'Deutsch', value: 'de' },
+                      { label: 'Portugu\u00eas', value: 'pt' },
+                      { label: '\u65e5\u672c\u8a9e', value: 'ja' },
+                      { label: '\u4e2d\u6587', value: 'zh' },
+                      { label: '\ud55c\uad6d\uc5b4', value: 'ko' },
+                    ]}
+                  />
+                </div>
+                <div>
+                  <Text size="sm" fw={500} mb={6}>
                     Panel shadow
                   </Text>
                   <SegmentedControl
@@ -1218,6 +1354,119 @@ export function WidgetPage() {
                   onChange={(e) => update('soundEnabled', e.currentTarget.checked)}
                   color="action"
                 />
+                <Divider variant="dashed" />
+                <Switch
+                  label={<>Exit-intent auto-open <HelpTooltip text="Automatically opens the widget when a desktop visitor moves their mouse out of the browser window. Fires at most once per page visit and only if the visitor hasn't already closed the widget." /></>}
+                  description="Desktop only — triggers when the mouse leaves the viewport."
+                  checked={config.exitIntentEnabled}
+                  onChange={(e) => update('exitIntentEnabled', e.currentTarget.checked)}
+                  color="action"
+                />
+                <NumberInput
+                  label={<>Scroll-depth auto-open (%) <HelpTooltip text="Automatically opens the widget when the visitor scrolls past this percentage of the page. Fires at most once per page visit and only if the visitor hasn't already closed the widget. Leave empty to disable." /></>}
+                  description="Opens the widget when the visitor scrolls past this % of the page."
+                  size="xs"
+                  min={1}
+                  max={100}
+                  step={5}
+                  suffix="%"
+                  placeholder="Disabled"
+                  value={config.scrollDepthTrigger ?? ''}
+                  onChange={(val) => update('scrollDepthTrigger', typeof val === 'number' ? val : null)}
+                />
+                <Divider variant="dashed" />
+                <Switch
+                  label="Mobile fullscreen"
+                  description="Chat panel fills the entire screen on mobile devices"
+                  checked={config.mobileFullscreen}
+                  onChange={(e) => update('mobileFullscreen', e.currentTarget.checked)}
+                  color="action"
+                />
+                <Select
+                  label="Mobile position override"
+                  description="Override the desktop position for mobile devices. Leave empty to inherit."
+                  data={[
+                    { value: '', label: 'Inherit from desktop' },
+                    { value: 'bottom-right', label: 'Bottom right' },
+                    { value: 'bottom-left', label: 'Bottom left' },
+                  ]}
+                  value={config.mobilePosition || ''}
+                  onChange={(val) => update('mobilePosition', val ? (val as WidgetConfig['mobilePosition']) : null)}
+                  clearable
+                />
+                <Group grow>
+                  <NumberInput
+                    label="Mobile horizontal offset"
+                    description="Override for mobile (px)"
+                    size="xs"
+                    min={0}
+                    max={100}
+                    step={4}
+                    suffix=" px"
+                    placeholder="Inherit"
+                    value={config.mobileOffsetX ?? ''}
+                    onChange={(val) => update('mobileOffsetX', typeof val === 'number' ? val : null)}
+                  />
+                  <NumberInput
+                    label="Mobile vertical offset"
+                    description="Override for mobile (px)"
+                    size="xs"
+                    min={0}
+                    max={100}
+                    step={4}
+                    suffix=" px"
+                    placeholder="Inherit"
+                    value={config.mobileOffsetY ?? ''}
+                    onChange={(val) => update('mobileOffsetY', typeof val === 'number' ? val : null)}
+                  />
+                </Group>
+                <Divider variant="dashed" />
+                <Text size="sm" fw={500} mb={2}>
+                  Page visibility rules <HelpTooltip text="Control which pages show the widget. Use + prefix to include, - prefix to exclude. Glob patterns (* and ?) are supported. Exclude rules take precedence over include rules." />
+                </Text>
+                {config.pageRules.length === 0 ? (
+                  <Text size="xs" c="dimmed" fs="italic">
+                    No page rules configured. The widget will appear on all pages.
+                  </Text>
+                ) : (
+                  <Stack gap={6}>
+                    {config.pageRules.map((rule, idx) => (
+                      <Group key={idx} gap="xs" wrap="nowrap">
+                        <TextInput
+                          style={{ flex: 1 }}
+                          size="xs"
+                          value={rule}
+                          placeholder="+/products/* or -/checkout"
+                          onChange={(e) => {
+                            const updated = [...config.pageRules];
+                            updated[idx] = e.currentTarget.value;
+                            update('pageRules', updated);
+                          }}
+                        />
+                        <ActionIcon
+                          size="sm"
+                          variant="subtle"
+                          color="red"
+                          onClick={() => {
+                            const updated = config.pageRules.filter((_, i) => i !== idx);
+                            update('pageRules', updated);
+                          }}
+                        >
+                          <svg width={14} height={14} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2}><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
+                        </ActionIcon>
+                      </Group>
+                    ))}
+                  </Stack>
+                )}
+                <Button
+                  size="compact-xs"
+                  variant="light"
+                  color="gray"
+                  disabled={config.pageRules.length >= 20}
+                  onClick={() => update('pageRules', [...config.pageRules, ''])}
+                >
+                  + Add rule
+                </Button>
               </Stack>
             </Paper>
 
@@ -1332,7 +1581,7 @@ export function WidgetPage() {
             <Text size="sm" fw={600} mb="sm">
               Live preview
             </Text>
-            <WidgetPreview config={config} adminIsDark={adminIsDark} />
+            <WidgetPreview config={config} adminIsDark={adminIsDark} quickActions={previewQuickActions} />
           </Paper>
         </Box>
       </Group>

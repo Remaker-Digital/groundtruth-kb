@@ -959,6 +959,10 @@ class PreferencesDocument(BaseModel):
     widget_logo_url: str | None = Field(default=None, description="URL of company logo in widget header")
     widget_show_branding: bool | None = Field(default=None, description="Show 'Powered by Agent Red' badge")
     widget_mobile_enabled: bool | None = Field(default=None, description="Show widget on mobile devices")
+    widget_mobile_fullscreen: bool | None = Field(default=None, description="Chat panel fills full viewport on mobile")
+    widget_mobile_position: str | None = Field(default=None, description="Mobile position override (bottom-right|bottom-left)")
+    widget_mobile_offset_x: int | None = Field(default=None, description="Mobile horizontal offset in pixels")
+    widget_mobile_offset_y: int | None = Field(default=None, description="Mobile vertical offset in pixels")
     widget_dark_mode: bool | None = Field(default=None, description="Use dark color scheme")
     widget_color_mode: str | None = Field(default=None, description="light | dark | auto")
     widget_header_gradient_end: str | None = Field(default=None, description="Hex color for header gradient end (#RRGGBB)")
@@ -974,6 +978,10 @@ class PreferencesDocument(BaseModel):
     widget_customer_bubble_color: str | None = Field(default=None, description="Hex color for customer message bubble background (#RRGGBB)")
     widget_customer_bubble_text_color: str | None = Field(default=None, description="Hex color for customer message bubble text (#RRGGBB)")
     widget_launcher_shape: str | None = Field(default=None, description="circle | rounded-square | pill")
+    widget_shadow_intensity: str | None = Field(default=None, description="none | subtle | standard | heavy")
+    widget_panel_width: str | None = Field(default=None, description="compact | standard | wide")
+    widget_panel_height: str | None = Field(default=None, description="short | standard | tall")
+    widget_locale: str | None = Field(default=None, description="auto | en | es | fr | de | pt | ja | zh | ko")
 
     # Behavior
     widget_offline_message: str | None = Field(default=None, description="Message when team is offline")
@@ -996,6 +1004,8 @@ class PreferencesDocument(BaseModel):
     widget_header_text: str | None = Field(default=None, description="Custom widget header/title text")
     widget_input_placeholder: str | None = Field(default=None, description="Message input placeholder text")
     widget_page_rules: list[str] = Field(default_factory=list, description="URL patterns for page visibility rules")
+    widget_exit_intent_enabled: bool = Field(default=False, description="Auto-open widget on exit intent (desktop mouseleave)")
+    widget_scroll_depth_trigger: int | None = Field(default=None, description="Auto-open widget at scroll depth percentage (1-100)")
 
     # Notifications (WI-G: email alerts)
     notification_email: str | None = Field(

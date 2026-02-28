@@ -922,6 +922,73 @@ fields:
     pii_classification: none
     injected_in_prompt: false
 
+  - field_name: widget_mobile_fullscreen
+    display_name: Mobile fullscreen
+    field_type: boolean
+    validation: {}
+    platform_default: false
+    tier_gate: all
+    onboarding_step: 9
+    step_order: 10.5
+    tooltip: Whether the chat panel fills the entire screen on mobile devices.
+    description: "When enabled, the chat panel expands to fill the full viewport (100vw x 100vh) on mobile devices instead of using the standard floating panel. The launcher button remains visible when the panel is closed."
+    doc_link: "https://docs.agentred.ai/configuration/widget-appearance#mobile-fullscreen"
+    affects_agents: []
+    pii_classification: none
+    injected_in_prompt: false
+
+  - field_name: widget_mobile_position
+    display_name: Mobile position
+    field_type: enum
+    validation:
+      allowed_values:
+        - bottom-right
+        - bottom-left
+    platform_default: null
+    tier_gate: all
+    onboarding_step: 9
+    step_order: 10.6
+    tooltip: Override the widget position on mobile devices. Leave empty to use the desktop position.
+    description: "When set, the widget launcher and panel appear in this corner on mobile devices instead of the desktop position."
+    doc_link: "https://docs.agentred.ai/configuration/widget-appearance#mobile-position"
+    affects_agents: []
+    pii_classification: none
+    injected_in_prompt: false
+
+  - field_name: widget_mobile_offset_x
+    display_name: Mobile horizontal offset
+    field_type: integer
+    validation:
+      min_value: 0.0
+      max_value: 100.0
+    platform_default: null
+    tier_gate: all
+    onboarding_step: 9
+    step_order: 10.7
+    tooltip: Horizontal distance from the edge on mobile (px). Leave empty to use the desktop offset.
+    description: "Pixels from the left or right edge on mobile devices. Overrides the desktop horizontal offset when set."
+    doc_link: "https://docs.agentred.ai/configuration/widget-appearance#mobile-position"
+    affects_agents: []
+    pii_classification: none
+    injected_in_prompt: false
+
+  - field_name: widget_mobile_offset_y
+    display_name: Mobile vertical offset
+    field_type: integer
+    validation:
+      min_value: 0.0
+      max_value: 100.0
+    platform_default: null
+    tier_gate: all
+    onboarding_step: 9
+    step_order: 10.8
+    tooltip: Vertical distance from the bottom edge on mobile (px). Leave empty to use the desktop offset.
+    description: "Pixels from the bottom edge on mobile devices. Overrides the desktop vertical offset when set."
+    doc_link: "https://docs.agentred.ai/configuration/widget-appearance#mobile-position"
+    affects_agents: []
+    pii_classification: none
+    injected_in_prompt: false
+
   - field_name: widget_dark_mode
     display_name: Dark mode
     field_type: boolean
@@ -1093,6 +1160,50 @@ fields:
     tooltip: "Chat panel width. Compact (320px) for smaller screens, Standard (380px) for most sites, Wide (440px) for content-rich conversations."
     description: "Sets the horizontal width of the chat panel. Compact fits well on mobile-first sites, Standard is the default, Wide shows more content per message."
     doc_link: "https://docs.agentred.ai/configuration/widget-appearance#panel-width"
+    affects_agents: []
+    pii_classification: none
+    injected_in_prompt: false
+
+  - field_name: widget_panel_height
+    display_name: Panel height
+    field_type: enum
+    validation:
+      allowed_values:
+        - short
+        - standard
+        - tall
+    platform_default: standard
+    tier_gate: all
+    onboarding_step: 9
+    step_order: 31.5
+    tooltip: "Chat panel height. Short (420px) for minimal footprint, Standard (520px) for most sites, Tall (620px) for longer conversations."
+    description: "Sets the vertical height of the chat panel. Short saves screen space, Standard is the default, Tall provides more message area."
+    doc_link: "https://docs.agentred.ai/configuration/widget-appearance#panel-height"
+    affects_agents: []
+    pii_classification: none
+    injected_in_prompt: false
+
+  - field_name: widget_locale
+    display_name: Widget language
+    field_type: enum
+    validation:
+      allowed_values:
+        - auto
+        - en
+        - es
+        - fr
+        - de
+        - pt
+        - ja
+        - zh
+        - ko
+    platform_default: auto
+    tier_gate: all
+    onboarding_step: 9
+    step_order: 31.6
+    tooltip: "Language for widget UI text. 'Auto' detects the visitor's browser language."
+    description: "Controls the language used for all widget interface text (buttons, labels, system messages). Auto uses the visitor's browser language with English fallback."
+    doc_link: "https://docs.agentred.ai/configuration/widget-appearance#locale"
     affects_agents: []
     pii_classification: none
     injected_in_prompt: false
@@ -1454,6 +1565,38 @@ fields:
     description: "List of URL patterns to control widget visibility. Prefix with '+' to include or '-' to exclude. Examples: '+/products/*' (show on product pages), '-/checkout' (hide on checkout), '-/admin/*' (hide on admin). If empty, the widget appears on all pages."
     placeholder: "e.g. +/products/*, -/checkout, -/admin/*"
     doc_link: "https://docs.agentred.ai/configuration/widget-appearance#page-rules"
+    affects_agents: []
+    pii_classification: none
+    injected_in_prompt: false
+
+  - field_name: widget_exit_intent_enabled
+    display_name: Exit-intent auto-open
+    field_type: boolean
+    validation: {}
+    platform_default: false
+    tier_gate: all
+    onboarding_step: 9
+    step_order: 24
+    tooltip: Automatically open the widget when the visitor's mouse leaves the viewport (desktop only).
+    description: "When enabled on desktop devices, the widget listens for the mouseleave event on the document. If the widget is closed and has not been manually opened and closed during this page session, it auto-opens once. The listener is removed after triggering. Does not fire on mobile."
+    doc_link: "https://docs.agentred.ai/configuration/widget-behavior#exit-intent"
+    affects_agents: []
+    pii_classification: none
+    injected_in_prompt: false
+
+  - field_name: widget_scroll_depth_trigger
+    display_name: Scroll-depth auto-open (%)
+    field_type: integer
+    validation:
+      min: 1
+      max: 100
+    platform_default: null
+    tier_gate: all
+    onboarding_step: 9
+    step_order: 25
+    tooltip: Automatically open the widget when the visitor scrolls past this percentage of the page.
+    description: "Set a scroll depth percentage (1-100). When a visitor scrolls past this threshold and the widget is closed (and has not been manually opened and closed during this page session), the widget auto-opens once. The scroll listener is removed after triggering. Set to empty/null to disable."
+    doc_link: "https://docs.agentred.ai/configuration/widget-behavior#scroll-depth"
     affects_agents: []
     pii_classification: none
     injected_in_prompt: false

@@ -115,8 +115,6 @@ export const Panel: FunctionComponent<PanelProps> = ({
   locale,
   onClose,
 }) => {
-  const tokens = resolveTokens(config);
-
   // Subscribe to store for reactive updates
   const [state, setState] = useState<WidgetState>(getStore().getState());
   useEffect(() => {
@@ -124,6 +122,15 @@ export const Panel: FunctionComponent<PanelProps> = ({
       setState({ ...getStore().getState() });
     });
   }, []);
+
+  // WI-0819: Reactive locale — prefer store value (updated by setLocale SDK method)
+  const activeLocale: Locale = state.locale;
+
+  // WI-0819: Merge runtime token overrides from store (set by setTheme SDK method)
+  const baseTokens = resolveTokens(config);
+  const tokens = state.tokenOverrides
+    ? { ...baseTokens, ...state.tokenOverrides }
+    : baseTokens;
 
   // SSE connection ref (lives for the lifetime of the conversation)
   const sseRef = useRef<SSEConnection | null>(null);
@@ -350,10 +357,10 @@ export const Panel: FunctionComponent<PanelProps> = ({
     } else {
       store.setState({
         isLoading: false,
-        otpError: locale.otpInvalid,
+        otpError: activeLocale.otpInvalid,
       });
     }
-  }, [beginConversation, locale]);
+  }, [beginConversation, activeLocale]);
 
   /** Resend OTP code (AUTH-3). */
   const handleOtpResend = useCallback(async () => {
@@ -503,7 +510,7 @@ export const Panel: FunctionComponent<PanelProps> = ({
       {/* Header */}
       <Header
         tokens={tokens}
-        locale={locale}
+        locale={activeLocale}
         agentName={agentName}
         agentTitle={agentTitle}
         agentAvatarUrl={agentAvatarUrl}
@@ -516,10 +523,10 @@ export const Panel: FunctionComponent<PanelProps> = ({
 
       {/* Connection status banner */}
       {state.isReconnecting && (
-        <ConnectionBanner tokens={tokens} locale={locale} type="reconnecting" />
+        <ConnectionBanner tokens={tokens} locale={activeLocale} type="reconnecting" />
       )}
       {state.error && !state.isReconnecting && (
-        <ConnectionBanner tokens={tokens} locale={locale} type="error" message={state.error} />
+        <ConnectionBanner tokens={tokens} locale={activeLocale} type="error" message={state.error} />
       )}
 
       {/* Consent banner (WI #87) — shown when consent collection is enabled */}
@@ -529,7 +536,7 @@ export const Panel: FunctionComponent<PanelProps> = ({
         && state.conversationId && (
         <ConsentBanner
           tokens={tokens}
-          locale={locale}
+          locale={activeLocale}
           onAccept={handleConsentAccept}
           onDecline={handleConsentDecline}
         />
@@ -540,7 +547,7 @@ export const Panel: FunctionComponent<PanelProps> = ({
         <div style={{ display: 'contents', animation: 'ar-fade-in 0.2s ease-out' }}>
           <MessageList
             tokens={tokens}
-            locale={locale}
+            locale={activeLocale}
             messages={state.messages}
             isAgentTyping={state.isAgentTyping}
             agentName={agentName}
@@ -591,14 +598,14 @@ export const Panel: FunctionComponent<PanelProps> = ({
                   <path d="M4 15s1-1 4-1 5 2 8 2 4-1 4-1V3s-1 1-4 1-5-2-8-2-4 1-4 1z" />
                   <line x1="4" y1="22" x2="4" y2="15" />
                 </svg>
-                {locale.reportIssue}
+                {activeLocale.reportIssue}
               </button>
             </div>
           )}
 
           <InputBar
             tokens={tokens}
-            locale={locale}
+            locale={activeLocale}
             onSend={handleSend}
             isLoading={state.isLoading}
             disabled={false}
@@ -614,7 +621,7 @@ export const Panel: FunctionComponent<PanelProps> = ({
         <div style={{ display: 'contents', animation: 'ar-fade-in 0.2s ease-out' }}>
           <PreChatForm
             tokens={tokens}
-            locale={locale}
+            locale={activeLocale}
             formConfig={config.widget_prechat_form as { fields: { name: string; label: string; type: 'text' | 'email' | 'textarea'; required: boolean; placeholder?: string }[] }}
             onSubmit={handlePreChatSubmit}
             onSkip={handlePreChatSkip}
@@ -628,7 +635,7 @@ export const Panel: FunctionComponent<PanelProps> = ({
         <div style={{ display: 'contents', animation: 'ar-fade-in 0.2s ease-out' }}>
           <OtpVerification
             tokens={tokens}
-            locale={locale}
+            locale={activeLocale}
             email={state.customerEmail}
             onVerify={handleOtpVerify}
             onSkip={
@@ -648,7 +655,7 @@ export const Panel: FunctionComponent<PanelProps> = ({
         <div style={{ display: 'contents', animation: 'ar-fade-in 0.2s ease-out' }}>
           <ChatRating
             tokens={tokens}
-            locale={locale}
+            locale={activeLocale}
             onSubmit={handleRatingSubmit}
             onNewConversation={handleNewConversation}
             isLoading={state.isLoading}
@@ -661,7 +668,7 @@ export const Panel: FunctionComponent<PanelProps> = ({
         <div style={{ display: 'contents', animation: 'ar-fade-in 0.2s ease-out' }}>
           <IssueReport
             tokens={tokens}
-            locale={locale}
+            locale={activeLocale}
             onSubmit={handleIssueSubmit}
             onCancel={handleIssueCancel}
             isLoading={state.isLoading}
@@ -674,7 +681,7 @@ export const Panel: FunctionComponent<PanelProps> = ({
         <div style={{ display: 'contents', animation: 'ar-fade-in 0.2s ease-out' }}>
           <OfflineForm
             tokens={tokens}
-            locale={locale}
+            locale={activeLocale}
             offlineMessage={config.widget_offline_message || null}
             onSubmit={handleOfflineSubmit}
             isLoading={state.isLoading}

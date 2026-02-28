@@ -173,7 +173,8 @@ html[data-mantine-color-scheme="light"] {
   transition: background-color var(--ar-transition-fast);
 }
 .ar-btn-action:hover:not(:disabled) {
-  background-color: var(--ar-action-hover);
+  background-color: var(--ar-action-hover) !important;
+  background: var(--ar-action-hover) !important;
 }
 .ar-btn-action:disabled {
   opacity: 0.5;
