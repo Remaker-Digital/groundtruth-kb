@@ -1,0 +1,123 @@
+{
+  "run_at": "2026-02-28T01:41:23.472671",
+  "environment": "production",
+  "new_version": "1.61.0",
+  "verdict": "DEPLOYMENT VERIFIED",
+  "phases": {
+    "D": [
+      {
+        "id": "D.1",
+        "description": "Create smoke tenant",
+        "status": "PASS",
+        "detail": "tenant=41bac405-d41b-413e-aea7-54c967865cb3, key=yes, widget=yes"
+      },
+      {
+        "id": "D.2",
+        "description": "Tenant in directory",
+        "status": "PASS",
+        "detail": "Superadmin directory accessible"
+      },
+      {
+        "id": "D.3",
+        "description": "Superadmin key authenticates",
+        "status": "PASS",
+        "detail": "GET /api/config \u2192 200"
+      },
+      {
+        "id": "D.4",
+        "description": "Identity correct",
+        "status": "PASS",
+        "detail": "role=superadmin"
+      },
+      {
+        "id": "D.5",
+        "description": "Clean initial state",
+        "status": "PASS",
+        "detail": "conversations=0, kb=0"
+      },
+      {
+        "id": "D.6",
+        "description": "Config draft created",
+        "status": "PASS",
+        "detail": "reset=200, update=200"
+      },
+      {
+        "id": "D.7",
+        "description": "Config activated",
+        "status": "PASS",
+        "detail": "HTTP 200"
+      },
+      {
+        "id": "D.8",
+        "description": "Activation verified",
+        "status": "PASS",
+        "detail": "is_active=True, is_configured=True"
+      },
+      {
+        "id": "D.9",
+        "description": "Widget key works",
+        "status": "PASS",
+        "detail": "conversation_id=352040af-e5fc-48ff-b0b3-92a68c75c26f"
+      },
+      {
+        "id": "D.10",
+        "description": "AI pipeline (SSE)",
+        "status": "PASS",
+        "detail": "Got token + done events"
+      },
+      {
+        "id": "D.11",
+        "description": "Conversation in inbox",
+        "status": "PASS",
+        "detail": "totalCount=1"
+      },
+      {
+        "id": "D.12",
+        "description": "KB entry created",
+        "status": "PASS",
+        "detail": "HTTP 201"
+      },
+      {
+        "id": "D.13",
+        "description": "KB entry visible",
+        "status": "PASS",
+        "detail": "total=1"
+      },
+      {
+        "id": "D.14",
+        "description": "Team member created",
+        "status": "PASS",
+        "detail": "HTTP 201, key=yes"
+      },
+      {
+        "id": "D.15",
+        "description": "RBAC blocks non-admin",
+        "status": "PASS",
+        "detail": "escalation_agent \u2192 /api/config \u2192 403"
+      },
+      {
+        "id": "D.16",
+        "description": "RBAC allows inbox",
+        "status": "PASS",
+        "detail": "escalation_agent \u2192 /api/admin/conversations \u2192 200"
+      },
+      {
+        "id": "D.17",
+        "description": "Admin SPA routes",
+        "status": "PASS",
+        "detail": "Both return 200 text/html"
+      },
+      {
+        "id": "D.18",
+        "description": "Phase D summary",
+        "status": "PASS",
+        "detail": "17 PASS, 0 FAIL, 0 SKIP, 0 WARN"
+      }
+    ]
+  },
+  "summary": {
+    "D": {
+      "PASS": 18
+    }
+  }
+}

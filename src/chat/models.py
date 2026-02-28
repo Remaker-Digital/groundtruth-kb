@@ -437,19 +437,50 @@ def error_event(
     )
 
 
-def done_event(conversation_id: str, turn_count: int) -> StreamEvent:
-    """Create a done event — stream complete for this turn."""
+def done_event(
+    conversation_id: str,
+    turn_count: int,
+    trace_id: str | None = None,
+    total_latency_ms: int | None = None,
+) -> StreamEvent:
+    """Create a done event — stream complete for this turn (SPEC-1533)."""
+    data: dict[str, Any] = {
+        "conversation_id": conversation_id,
+        "turn_count": turn_count,
+    }
+    if trace_id is not None:
+        data["trace_id"] = trace_id
+    if total_latency_ms is not None:
+        data["total_latency_ms"] = total_latency_ms
     return StreamEvent(
         event=StreamEventType.DONE,
-        data={"conversation_id": conversation_id, "turn_count": turn_count},
+        data=data,
     )
 
 
-def stage_event(stage: str, status: str, latency_ms: int | None = None) -> StreamEvent:
-    """Create a stage event — pipeline progress indicator."""
+def stage_event(
+    stage: str,
+    status: str,
+    latency_ms: int | None = None,
+    trace_id: str | None = None,
+    elapsed_ms: int | None = None,
+) -> StreamEvent:
+    """Create a stage event — pipeline progress indicator (SPEC-1533).
+
+    Args:
+        stage: Pipeline stage name (e.g. "intent-classifier").
+        status: Stage status ("started" or "completed").
+        latency_ms: Per-stage latency in milliseconds.
+        trace_id: End-to-end trace identifier (SPEC-1530).
+        elapsed_ms: Total pipeline elapsed time since entry.
+    """
     data: dict[str, Any] = {"stage": stage, "status": status}
     if latency_ms is not None:
         data["latency_ms"] = latency_ms
+    if trace_id is not None:
+        data["trace_id"] = trace_id
+    if elapsed_ms is not None:
+        data["elapsed_ms"] = elapsed_ms
     return StreamEvent(
         event=StreamEventType.STAGE,
         data=data,

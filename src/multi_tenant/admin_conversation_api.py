@@ -120,6 +120,25 @@ class AdminConversationDetailResponse(CamelCaseModel):
     # Customer identity (AUTH-5 / P0-AUTH-FIX)
     customer_verified: bool = False
     identity_email: str | None = None
+    # Pipeline trace (SPEC-1530 — end-to-end conversation tracing)
+    pipeline_trace: dict[str, Any] | None = None
+
+
+class PipelineTraceResponse(CamelCaseModel):
+    """Pipeline execution trace for a conversation (SPEC-1531).
+
+    Returns the full pipeline stage timeline for the most recent AI
+    response turn, enabling visual trace representation in the SPA console.
+    """
+
+    conversation_id: str
+    trace_id: str | None = None
+    stages: list[dict[str, Any]] = Field(default_factory=list)
+    total_latency_ms: int | None = None
+    intent: str | None = None
+    confidence: float | None = None
+    critic_passed: bool | None = None
+    model_used: str | None = None
 
 
 class MessageEntry(CamelCaseModel):
@@ -721,6 +740,7 @@ async def get_conversation_detail(
         internal_notes=doc.get("internal_notes", []),
         customer_verified=doc.get("customer_verified", False),
         identity_email=doc.get("identity_email"),
+        pipeline_trace=doc.get("pipeline_trace"),
     )
 
 
@@ -769,6 +789,55 @@ async def get_conversation_messages(
         tenant_id=ctx.tenant_id,
         message_count=len(messages),
         messages=messages,
+    )
+
+
+# ---------------------------------------------------------------------------
+# GET /api/admin/conversations/{conversation_id}/trace — Pipeline trace
+# ---------------------------------------------------------------------------
+
+
+@router.get(
+    "/{conversation_id}/trace",
+    response_model=PipelineTraceResponse,
+    summary="Get pipeline execution trace (SPEC-1531)",
+    description="Returns the pipeline execution trace for the most recent AI response turn, "
+    "including stage timings, intent classification, and critic assessment. "
+    "Used by the SPA console to visualize conversation flow.",
+    responses={
+        404: {"description": "Conversation not found or no trace available"},
+        503: {"description": "Admin conversation services not initialized"},
+    },
+)
+async def get_conversation_trace(
+    conversation_id: str,
+    ctx: TenantContext = Depends(get_tenant_context),
+) -> PipelineTraceResponse:
+    """Get the pipeline execution trace for a conversation (SPEC-1531).
+
+    Returns the full pipeline stage timeline for the most recent AI
+    response turn, enabling visual trace representation in the SPA console.
+    """
+    repo = _get_repo()
+
+    doc = await _read_conversation(repo, ctx.tenant_id, conversation_id)
+    trace = doc.get("pipeline_trace")
+
+    if trace is None:
+        raise HTTPException(
+            status_code=404,
+            detail=f"No pipeline trace found for conversation {conversation_id}",
+        )
+
+    return PipelineTraceResponse(
+        conversation_id=conversation_id,
+        trace_id=trace.get("trace_id"),
+        stages=trace.get("stages", []),
+        total_latency_ms=trace.get("total_latency_ms"),
+        intent=trace.get("intent"),
+        confidence=trace.get("confidence"),
+        critic_passed=trace.get("critic_passed"),
+        model_used=trace.get("model_used"),
     )
 
 

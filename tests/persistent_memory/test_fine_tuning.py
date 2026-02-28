@@ -345,11 +345,11 @@ class TestFT04TrainingAPI:
         stored_jobs = service._dev_jobs.get(TENANT_ENTERPRISE, [])
         assert any(j.get("job_id") == job.job_id for j in stored_jobs)
 
-    async def test_default_api_raises_not_implemented(self):
-        """Default _call_fine_tuning_api raises NotImplementedError (gated)."""
+    async def test_default_api_raises_without_client(self):
+        """_call_fine_tuning_api raises RuntimeError when OpenAI client not configured."""
         service = _make_service()
 
-        with pytest.raises(NotImplementedError, match="Layer 4 fine-tuning API"):
+        with pytest.raises(RuntimeError, match="OpenAI client not configured"):
             await service._call_fine_tuning_api(
                 [],  # training_data
                 [],  # validation_data
@@ -893,16 +893,16 @@ class TestFTS05ConsentBlocking:
 class TestFTS06ProductionGating:
     """FT-S06: Default API methods raise NotImplementedError (production gated)."""
 
-    async def test_fine_tuning_api_raises_not_implemented(self):
-        """_call_fine_tuning_api raises NotImplementedError when not overridden."""
+    async def test_fine_tuning_api_raises_without_client(self):
+        """_call_fine_tuning_api raises RuntimeError when OpenAI client not configured."""
         service = _make_service()
-        with pytest.raises(NotImplementedError, match="Layer 4 fine-tuning API"):
+        with pytest.raises(RuntimeError, match="OpenAI client not configured"):
             await service._call_fine_tuning_api([], [], BASE_MODEL)
 
-    async def test_job_status_api_raises_not_implemented(self):
-        """_check_job_status_api raises NotImplementedError when not overridden."""
+    async def test_job_status_api_raises_without_client(self):
+        """_check_job_status_api raises RuntimeError when OpenAI client not configured."""
         service = _make_service()
-        with pytest.raises(NotImplementedError, match="fine-tuning status polling"):
+        with pytest.raises(RuntimeError, match="OpenAI client not configured"):
             await service._check_job_status_api("ftjob-xxx")
 
     async def test_dev_mode_model_evaluation(self):

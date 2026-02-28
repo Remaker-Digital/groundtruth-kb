@@ -10,6 +10,8 @@ The knowledge base is the single most important factor in the quality of your AI
 
 This page covers the operational side of managing your knowledge base — creating articles, uploading documents, organizing content, and avoiding common pitfalls.
 
+![Knowledge base management page showing articles, categories, and status indicators](/img/admin/knowledge-base.png)
+
 :::info
 For settings that control how the AI *searches* the knowledge base (retrieval depth, search weights, relevance thresholds), see [Knowledge base configuration](./knowledge-base.md).
 :::

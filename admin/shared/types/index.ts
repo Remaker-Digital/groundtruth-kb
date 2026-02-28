@@ -192,6 +192,25 @@ export interface InboxConversation {
   // Customer identity (AUTH-5 / P0-AUTH-FIX)
   customerVerified: boolean;
   identityEmail: string | null;
+  // Pipeline trace (SPEC-1530)
+  pipelineTrace: PipelineTrace | null;
+}
+
+/** Pipeline execution trace for a conversation turn (SPEC-1530). */
+export interface PipelineTrace {
+  traceId: string | null;
+  stages: PipelineStage[];
+  totalLatencyMs: number | null;
+  intent: string | null;
+  confidence: number | null;
+  criticPassed: boolean | null;
+  modelUsed: string | null;
+}
+
+export interface PipelineStage {
+  stage: string;
+  elapsedMs: number;
+  succeeded: boolean;
 }
 
 // ---------------------------------------------------------------------------

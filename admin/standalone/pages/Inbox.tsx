@@ -26,13 +26,14 @@ import { useAppContext } from '../layouts/StandaloneLayout';
 import {
   useInboxConversations,
   useConversationMessages,
+  useConversationTrace,
   useEscalateConversation,
   useResolveConversation,
   useArchiveConversation,
   useSearchConversations,
   useTeamMembers,
 } from '../../shared/hooks/index';
-import type { InboxConversation, ConversationMessage, TeamMember } from '../../shared/types/index';
+import type { InboxConversation, ConversationMessage, TeamMember, PipelineTrace, PipelineStage } from '../../shared/types/index';
 import type { SearchResult } from '../../shared/hooks/index';
 import { tokens } from '../../shared/theme/styles';
 
@@ -454,6 +455,155 @@ function EscalationModal({
 }
 
 // ---------------------------------------------------------------------------
+// Pipeline Trace Visualization (SPEC-1532)
+// ---------------------------------------------------------------------------
+
+const TraceIcon = () => (
+  <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+    <polyline points="22 12 18 12 15 21 9 3 6 12 2 12" />
+  </svg>
+);
+
+/** Stage colors for the pipeline trace visualization. */
+const STAGE_COLORS: Record<string, string> = {
+  'intent-classifier': '#2563EB',
+  'knowledge-retrieval': '#059669',
+  'response-generator': '#D97706',
+  'critic-reviewer': '#7C3AED',
+};
+
+function PipelineTracePanel({
+  trace,
+  loading,
+  isDark,
+}: {
+  trace: PipelineTrace | null;
+  loading: boolean;
+  isDark: boolean;
+}) {
+  if (loading) {
+    return (
+      <Box p="md">
+        <Group gap={6} mb={8}>
+          <TraceIcon />
+          <Text size="xs" fw={600} c="dimmed">Pipeline trace</Text>
+        </Group>
+        <Box ta="center" py="sm">
+          <Loader size={14} color="gray" />
+        </Box>
+      </Box>
+    );
+  }
+
+  if (!trace) {
+    return (
+      <Box p="md">
+        <Group gap={6} mb={8}>
+          <TraceIcon />
+          <Text size="xs" fw={600} c="dimmed">Pipeline trace</Text>
+        </Group>
+        <Text size="xs" c="dimmed" fs="italic">
+          No pipeline trace available for this conversation.
+        </Text>
+      </Box>
+    );
+  }
+
+  const stages = trace.stages || [];
+  const totalMs = trace.totalLatencyMs ?? 0;
+  const barBg = isDark ? 'rgba(255,255,255,0.06)' : '#f1f3f5';
+
+  return (
+    <Box p="md">
+      <Group gap={6} mb={8}>
+        <TraceIcon />
+        <Text size="xs" fw={600} c="dimmed">Pipeline trace</Text>
+      </Group>
+
+      {/* Summary row */}
+      <Group gap={8} mb={8}>
+        {trace.intent && (
+          <Badge size="xs" variant="light" color="blue">
+            {trace.intent}
+          </Badge>
+        )}
+        {trace.criticPassed !== null && (
+          <Badge size="xs" variant="light" color={trace.criticPassed ? 'green' : 'red'}>
+            {trace.criticPassed ? 'Approved' : 'Retracted'}
+          </Badge>
+        )}
+        {totalMs > 0 && (
+          <Text size="xs" c="dimmed" ff="monospace">
+            {totalMs}ms
+          </Text>
+        )}
+      </Group>
+
+      {/* Stage timeline — horizontal bar chart */}
+      <Stack gap={4}>
+        {stages.map((s: PipelineStage, idx: number) => {
+          const color = STAGE_COLORS[s.stage] ?? '#868e96';
+          const widthPct = totalMs > 0 ? Math.max(4, (s.elapsedMs / totalMs) * 100) : 25;
+          const label = s.stage.replace(/-/g, ' ').replace(/\b\w/g, (c) => c.toUpperCase());
+
+          return (
+            <Box key={s.stage || idx}>
+              <Group gap={6} justify="space-between" wrap="nowrap">
+                <Text size="xs" c="dimmed" style={{ width: 90, flexShrink: 0, textTransform: 'capitalize' }}>
+                  {label}
+                </Text>
+                <Text size="xs" ff="monospace" c="dimmed" style={{ flexShrink: 0 }}>
+                  {s.elapsedMs}ms
+                </Text>
+              </Group>
+              <Box
+                mt={2}
+                style={{
+                  height: 6,
+                  borderRadius: 3,
+                  background: barBg,
+                  overflow: 'hidden',
+                }}
+              >
+                <Box
+                  style={{
+                    height: '100%',
+                    width: `${widthPct}%`,
+                    borderRadius: 3,
+                    background: color,
+                    opacity: s.succeeded ? 1 : 0.4,
+                    transition: 'width 0.3s ease',
+                  }}
+                />
+              </Box>
+            </Box>
+          );
+        })}
+      </Stack>
+
+      {/* Model & trace ID */}
+      <Stack gap={4} mt={8}>
+        {trace.modelUsed && (
+          <Group gap={8} wrap="nowrap">
+            <Text size="xs" c="dimmed" style={{ width: 50, flexShrink: 0 }}>Model</Text>
+            <Text size="xs" ff="monospace">{trace.modelUsed}</Text>
+          </Group>
+        )}
+        {trace.traceId && (
+          <Group gap={8} wrap="nowrap">
+            <Text size="xs" c="dimmed" style={{ width: 50, flexShrink: 0 }}>Trace</Text>
+            <Text size="xs" ff="monospace" style={{ opacity: 0.7 }}>
+              {trace.traceId.slice(0, 16)}...
+            </Text>
+          </Group>
+        )}
+      </Stack>
+    </Box>
+  );
+}
+
+
+// ---------------------------------------------------------------------------
 // Main Inbox Page
 // ---------------------------------------------------------------------------
 
@@ -483,6 +633,7 @@ export function InboxPage() {
   const { resolve, loading: resolving } = useResolveConversation(apiFetch);
   const { archive, unarchive, loading: archiving } = useArchiveConversation(apiFetch);
   const { search: searchApi, clearSearch, results: searchResults, loading: searching } = useSearchConversations(apiFetch);
+  const traceResult = useConversationTrace(apiFetch, selectedId);
   const teamResult = useTeamMembers(apiFetch);
   const memberMap = React.useMemo(() => {
     const map: Record<string, string> = {};
@@ -649,6 +800,7 @@ export function InboxPage() {
           archivedAt: null,
           customerVerified: false,
           identityEmail: null,
+          pipelineTrace: null,
         };
       }
     }
@@ -1168,6 +1320,15 @@ export function InboxPage() {
                     )}
                   </Stack>
                 </Box>
+
+                <Divider />
+
+                {/* Pipeline trace (SPEC-1532) */}
+                <PipelineTracePanel
+                  trace={traceResult.data ?? null}
+                  loading={traceResult.loading}
+                  isDark={isDark}
+                />
               </>
             ) : (
               <Box p="md">

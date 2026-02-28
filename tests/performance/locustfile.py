@@ -55,6 +55,10 @@ API_KEY = os.getenv("LOAD_TEST_API_KEY", "ar_user_rema_xsTc1hkyFupc5L4qGQojoCXCx
 WIDGET_KEY = os.getenv("LOAD_TEST_WIDGET_KEY", "pk_live_c79a2bd0_960a9c23")
 TENANT_ID = os.getenv("LOAD_TEST_TENANT_ID", "load-test-tenant")
 
+# Multi-tenant simulation (SPEC-1516: 680 merchant scale target)
+MULTI_TENANT_COUNT = int(os.getenv("LOAD_TEST_TENANT_COUNT", "680"))
+_tenant_counter = 0
+
 
 def _api_headers() -> dict[str, str]:
     """Headers for API-key-authenticated admin endpoints."""
@@ -64,6 +68,13 @@ def _api_headers() -> dict[str, str]:
 def _widget_headers() -> dict[str, str]:
     """Headers for widget-key-authenticated chat endpoints."""
     return {"X-Widget-Key": WIDGET_KEY, "Content-Type": "application/json"}
+
+
+def _next_tenant_id() -> str:
+    """Rotate through simulated tenant IDs for multi-tenant load distribution."""
+    global _tenant_counter
+    _tenant_counter = (_tenant_counter + 1) % MULTI_TENANT_COUNT
+    return f"load-tenant-{_tenant_counter:04d}"
 
 
 # ---------------------------------------------------------------------------
@@ -108,6 +119,7 @@ class WidgetCustomerTasks(TaskSet):
         """Start a new conversation when this task set begins."""
         self.conversation_id = None
         self.message_count = 0
+        self.tenant_id = _next_tenant_id()  # Multi-tenant rotation (SPEC-1516)
         self._start_conversation()
 
     def _start_conversation(self) -> None:

@@ -8,6 +8,8 @@ description: Customize the chat widget's visual design — colors, position, lau
 
 These settings control how the chat widget looks on your storefront. Changes take effect immediately for new page loads — customers who already have the widget open will see the changes when they refresh.
 
+![Widget configuration page showing installation code, appearance settings, and live preview](/img/admin/widget-configuration.png)
+
 ## Primary color
 
 | | |

@@ -8,6 +8,8 @@ description: Invite team members, assign roles, and manage access to the Agent R
 
 Team management lets you invite colleagues to the Agent Red admin console and control what each person can see and do.
 
+![Team management page showing team members, roles, and escalation assignments](/img/admin/team-members.png)
+
 ## Roles
 
 Agent Red uses four roles. Each role determines which pages a team member can access and whether they can make changes.

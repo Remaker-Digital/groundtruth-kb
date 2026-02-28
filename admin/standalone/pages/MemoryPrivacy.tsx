@@ -254,7 +254,7 @@ export const MemoryPrivacyPage: React.FC = () => {
         )}
       </Paper>
 
-      {/* Layer 4: Dedicated model training */}
+      {/* Layer 4: Dedicated model training (SPEC-1523) */}
       <Paper radius="md" withBorder p="lg">
         <Group justify="space-between" mb="md">
           <Group gap="xs">
@@ -265,6 +265,14 @@ export const MemoryPrivacyPage: React.FC = () => {
               <Badge variant="light" color="gray" size="xs">Enterprise required</Badge>
             )}
           </Group>
+          {isEnterprise && (
+            <Switch
+              label="Enable fine-tuning"
+              checked={config?.fineTuningEnabled ?? false}
+              onChange={(e) => handleConfigChange('fineTuningEnabled', e.currentTarget.checked)}
+              color={ACTION_BLUE}
+            />
+          )}
         </Group>
         <Text c="dimmed" size="sm" mb="xs">
           Per-customer AI fine-tuning on 1,000+ historical interactions for maximum
@@ -275,6 +283,48 @@ export const MemoryPrivacyPage: React.FC = () => {
           <Alert color="blue" variant="light" mt="md">
             <Text size="sm">Upgrade to Enterprise tier to access dedicated model training.</Text>
           </Alert>
+        )}
+        {isEnterprise && config?.fineTuningEnabled && (
+          <Stack mt="md" gap="md">
+            <SegmentedControl
+              value={config?.fineTuningSchedule ?? 'monthly'}
+              onChange={(val) => handleConfigChange('fineTuningSchedule', val)}
+              fullWidth
+              data={[
+                { value: 'monthly', label: 'Monthly' },
+                { value: 'weekly', label: 'Weekly' },
+                { value: 'manual', label: 'Manual only' },
+              ]}
+              color={ACTION_BLUE}
+            />
+            <Text size="xs" c="dimmed">Training schedule — how often the pipeline runs automatically.</Text>
+            <NumberInput
+              label="Minimum conversations"
+              description="Minimum conversation count before training is eligible"
+              value={config?.fineTuningMinConversations ?? 1000}
+              onChange={(val) => handleConfigChange('fineTuningMinConversations', val)}
+              min={100}
+              max={10000}
+              step={100}
+            />
+            <Button
+              variant="light"
+              color={ACTION_BLUE}
+              onClick={() => {
+                fetch('/api/admin/fine-tuning/trigger', { method: 'POST', headers: { 'Authorization': `Bearer ${apiKey}` } })
+                  .then(r => r.json())
+                  .then(() => notifications.show({ title: 'Training triggered', message: 'Fine-tuning pipeline started', color: 'green' }))
+                  .catch(() => notifications.show({ title: 'Error', message: 'Failed to trigger training', color: 'red' }));
+              }}
+            >
+              Trigger training now
+            </Button>
+            {config?.fineTuningActiveModelId && (
+              <Alert color="green" variant="light">
+                <Text size="sm">Active model: {config.fineTuningActiveModelId} (v{config.fineTuningActiveModelVersion})</Text>
+              </Alert>
+            )}
+          </Stack>
         )}
       </Paper>
 

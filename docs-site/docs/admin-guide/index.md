@@ -8,6 +8,8 @@ description: Complete reference for every setting in the Agent Red admin console
 
 This guide documents every configurable setting in the Agent Red admin console. Each page explains what the setting controls, what the system does when you change it, and how to get the best results.
 
+![Agent Red admin dashboard showing conversation analytics, resolution rate, and setup checklist](/img/admin/dashboard.png)
+
 ## Who this is for
 
 This guide is for merchants who have installed Agent Red and want to understand the full range of configuration available to them. If you have not set up Agent Red yet, start with [Initial setup](../getting-started/setup.md).

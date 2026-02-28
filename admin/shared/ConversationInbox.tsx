@@ -17,6 +17,8 @@ import type {
   InboxConversation,
   ConversationMessage,
   TeamMember,
+  PipelineTrace,
+  PipelineStage,
 } from './types';
 import {
   usePolling,
@@ -27,6 +29,7 @@ import {
   useArchiveConversation,
   useTeamMembers,
   useSearchConversations,
+  useConversationTrace,
 } from './hooks';
 import type { SearchResult } from './hooks';
 import { HelpTooltip } from './HelpTooltip';
@@ -771,6 +774,156 @@ const ErrorBanner: React.FC<{ message: string; onRetry?: () => void }> = ({ mess
 );
 
 // ---------------------------------------------------------------------------
+// Pipeline Trace Panel (SPEC-1532)
+// ---------------------------------------------------------------------------
+
+const STAGE_COLORS: Record<string, string> = {
+  intent_classifier: '#2563EB',
+  knowledge_retriever: '#059669',
+  response_generator: '#D97706',
+  critic: '#7C3AED',
+  escalation: '#DC2626',
+  analytics: '#6366F1',
+};
+
+const STAGE_LABELS: Record<string, string> = {
+  intent_classifier: 'Intent Classifier',
+  knowledge_retriever: 'Knowledge Retriever',
+  response_generator: 'Response Generator',
+  critic: 'Critic',
+  escalation: 'Escalation',
+  analytics: 'Analytics',
+};
+
+interface PipelineTracePanelProps {
+  trace: PipelineTrace | null;
+  loading?: boolean;
+}
+
+const PipelineTracePanel: React.FC<PipelineTracePanelProps> = ({ trace, loading }) => {
+  if (loading) {
+    return (
+      <div style={{ padding: '12px 16px', fontSize: '12px', color: COLOR_TEXT_SECONDARY }}>
+        Loading trace...
+      </div>
+    );
+  }
+
+  if (!trace) return null;
+
+  const totalMs = trace.totalLatencyMs ?? trace.stages.reduce((s, st) => s + st.elapsedMs, 0);
+  const maxMs = Math.max(...trace.stages.map((s) => s.elapsedMs), 1);
+
+  return (
+    <div
+      style={{
+        borderTop: `1px solid ${COLOR_BORDER}`,
+        backgroundColor: COLOR_WHITE,
+        padding: '12px 16px',
+      }}
+    >
+      <div
+        style={{
+          fontSize: '11px',
+          fontWeight: 600,
+          textTransform: 'uppercase' as const,
+          letterSpacing: '0.05em',
+          color: COLOR_TEXT_SECONDARY,
+          marginBottom: '10px',
+          display: 'flex',
+          alignItems: 'center',
+          gap: '6px',
+        }}
+      >
+        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke={COLOR_TEXT_SECONDARY} strokeWidth="2">
+          <polyline points="22,12 18,12 15,21 9,3 6,12 2,12" />
+        </svg>
+        Pipeline Trace
+      </div>
+
+      {/* Stage bars */}
+      <div style={{ display: 'flex', flexDirection: 'column', gap: '4px', marginBottom: '10px' }}>
+        {trace.stages.map((stage, idx) => {
+          const color = STAGE_COLORS[stage.stage] ?? COLOR_GRAY;
+          const label = STAGE_LABELS[stage.stage] ?? stage.stage.replace(/_/g, ' ');
+          const widthPct = Math.max((stage.elapsedMs / maxMs) * 100, 4);
+          return (
+            <div key={idx} style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+              <span
+                style={{
+                  width: '110px',
+                  fontSize: '11px',
+                  color: COLOR_TEXT_SECONDARY,
+                  textOverflow: 'ellipsis',
+                  overflow: 'hidden',
+                  whiteSpace: 'nowrap' as const,
+                  flexShrink: 0,
+                }}
+              >
+                {label}
+              </span>
+              <div style={{ flex: 1, height: '14px', backgroundColor: COLOR_LIGHT_GRAY, borderRadius: '3px', overflow: 'hidden' }}>
+                <div
+                  style={{
+                    width: `${widthPct}%`,
+                    height: '100%',
+                    backgroundColor: color,
+                    borderRadius: '3px',
+                    opacity: stage.succeeded ? 1 : 0.4,
+                  }}
+                />
+              </div>
+              <span style={{ width: '50px', fontSize: '11px', color: COLOR_TEXT_SECONDARY, textAlign: 'right' as const, flexShrink: 0, fontFamily: FONT_MONO }}>
+                {stage.elapsedMs}ms
+              </span>
+            </div>
+          );
+        })}
+      </div>
+
+      {/* Summary badges */}
+      <div style={{ display: 'flex', flexWrap: 'wrap' as const, gap: '6px', fontSize: '11px' }}>
+        {trace.intent && (
+          <span style={{ padding: '2px 8px', borderRadius: '4px', backgroundColor: '#2563EB14', color: '#2563EB', fontWeight: 500 }}>
+            {trace.intent}
+          </span>
+        )}
+        {trace.criticPassed !== null && (
+          <span
+            style={{
+              padding: '2px 8px',
+              borderRadius: '4px',
+              backgroundColor: trace.criticPassed ? '#05966914' : '#DC262614',
+              color: trace.criticPassed ? '#059669' : '#DC2626',
+              fontWeight: 500,
+            }}
+          >
+            Critic: {trace.criticPassed ? 'PASS' : 'FAIL'}
+          </span>
+        )}
+        {totalMs > 0 && (
+          <span style={{ padding: '2px 8px', borderRadius: '4px', backgroundColor: COLOR_LIGHT_GRAY, color: COLOR_TEXT_SECONDARY, fontFamily: FONT_MONO }}>
+            {totalMs}ms total
+          </span>
+        )}
+        {trace.modelUsed && (
+          <span style={{ padding: '2px 8px', borderRadius: '4px', backgroundColor: COLOR_LIGHT_GRAY, color: COLOR_TEXT_SECONDARY }}>
+            {trace.modelUsed}
+          </span>
+        )}
+      </div>
+
+      {/* Trace ID */}
+      {trace.traceId && (
+        <div style={{ marginTop: '6px', fontSize: '10px', color: COLOR_GRAY, fontFamily: FONT_MONO }}>
+          Trace: {trace.traceId}
+        </div>
+      )}
+    </div>
+  );
+};
+
+// ---------------------------------------------------------------------------
 // Main component
 // ---------------------------------------------------------------------------
 
@@ -858,6 +1011,9 @@ export const ConversationInbox: React.FC<BaseComponentProps> = ({
   }, [messages]);
 
   const selectedConversation = conversations.find((c) => c.conversationId === selectedId) || null;
+
+  // Pipeline trace for selected conversation (SPEC-1532)
+  const { data: traceResult } = useConversationTrace(apiFetch, selectedId || '');
 
   const handleAssign = useCallback(
     async (conversationId: string, agentId: string) => {
@@ -1300,6 +1456,9 @@ export const ConversationInbox: React.FC<BaseComponentProps> = ({
               ))}
               <div ref={messagesEndRef} />
             </div>
+
+            {/* Pipeline trace (SPEC-1532) */}
+            <PipelineTracePanel trace={traceResult ?? null} />
           </>
         )}
       </div>

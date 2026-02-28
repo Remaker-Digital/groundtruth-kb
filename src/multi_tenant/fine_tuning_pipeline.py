@@ -57,6 +57,8 @@ Dependencies:
 from __future__ import annotations
 
 import hashlib
+import io
+import json
 import logging
 import uuid
 from collections import Counter
@@ -65,6 +67,12 @@ from enum import Enum
 from typing import Any
 
 from pydantic import BaseModel, Field
+
+# OpenAI SDK — used for fine-tuning API and model evaluation (SPEC-1519, SPEC-1520).
+try:
+    from openai import AsyncAzureOpenAI
+except ImportError:
+    AsyncAzureOpenAI = None  # type: ignore[assignment,misc]
 
 from src.multi_tenant.cosmos_schema import (
     AuditEventType,
@@ -448,10 +456,12 @@ class FineTuningPipelineService:
         self._preferences_repo: Any = None
         self._audit_repo: Any = None
         self._pii_scrubber: Any = None
+        self._openai_client: Any = None
+        self._ft_jobs_repo: Any = None
+        self._ft_models_repo: Any = None
         self._configured: bool = False
 
-        # In-memory dev stores.
-        # Production replacement: Cosmos DB via repositories.
+        # In-memory dev stores — used when Cosmos DB repos not configured.
         self._dev_models: dict[str, list[dict[str, Any]]] = {}
         self._dev_jobs: dict[str, list[dict[str, Any]]] = {}
         self._dev_experiments: dict[str, dict[str, Any]] = {}
@@ -463,6 +473,9 @@ class FineTuningPipelineService:
         preferences_repo: Any = None,
         audit_repo: Any = None,
         pii_scrubber: Any = None,
+        openai_client: Any = None,
+        ft_jobs_repo: Any = None,
+        ft_models_repo: Any = None,
     ) -> None:
         """Inject repository dependencies.
 
@@ -471,11 +484,20 @@ class FineTuningPipelineService:
             preferences_repo: Repository for updating PreferencesDocument.
             audit_repo: Optional AuditLogRepository for event logging.
             pii_scrubber: Optional PiiScrubber for training data cleansing.
+            openai_client: AsyncAzureOpenAI client for fine-tuning API
+                and model evaluation calls (SPEC-1519, SPEC-1520).
+            ft_jobs_repo: TenantScopedRepository for fine-tuning jobs
+                (Cosmos DB persistence, SPEC-1521).
+            ft_models_repo: TenantScopedRepository for fine-tuned models
+                (Cosmos DB persistence, SPEC-1521).
         """
         self._conversation_repo = conversation_repo
         self._preferences_repo = preferences_repo
         self._audit_repo = audit_repo
         self._pii_scrubber = pii_scrubber
+        self._openai_client = openai_client
+        self._ft_jobs_repo = ft_jobs_repo
+        self._ft_models_repo = ft_models_repo
         self._configured = True
         logger.info("FineTuningPipelineService configured")
 
@@ -837,20 +859,63 @@ class FineTuningPipelineService:
         validation_data: list[dict[str, Any]],
         base_model: str,
     ) -> dict[str, Any]:
-        """Submit a fine-tuning job to the OpenAI API.
+        """Submit a fine-tuning job to the Azure OpenAI API (SPEC-1519).
 
-        This method must be overridden with a real OpenAI fine-tuning
-        integration before Layer 4 can be offered in production.
-        The default implementation raises NotImplementedError to prevent
-        placeholder data from reaching customers.
+        Uploads training and validation data as JSONL files via the
+        Files API, then creates a fine-tuning job. Returns the API
+        response dict including the job ID.
 
         Override or mock this method in tests.
         """
-        raise NotImplementedError(
-            "Layer 4 fine-tuning API is not yet connected to OpenAI. "
-            "Override _call_fine_tuning_api() with a real implementation "
-            "before enabling fine-tuning for production tenants."
+        client = self._openai_client
+        if client is None:
+            raise RuntimeError(
+                "OpenAI client not configured. Call configure(openai_client=...) "
+                "before submitting fine-tuning jobs."
+            )
+
+        # Upload training data as JSONL
+        training_jsonl = "\n".join(json.dumps(row) for row in training_data)
+        training_file = await client.files.create(
+            file=io.BytesIO(training_jsonl.encode("utf-8")),
+            purpose="fine-tune",
         )
+        logger.info("Training file uploaded: file_id=%s", training_file.id)
+
+        # Upload validation data as JSONL
+        validation_file_id: str | None = None
+        if validation_data:
+            validation_jsonl = "\n".join(json.dumps(row) for row in validation_data)
+            validation_file = await client.files.create(
+                file=io.BytesIO(validation_jsonl.encode("utf-8")),
+                purpose="fine-tune",
+            )
+            validation_file_id = validation_file.id
+            logger.info("Validation file uploaded: file_id=%s", validation_file_id)
+
+        # Create fine-tuning job
+        create_kwargs: dict[str, Any] = {
+            "training_file": training_file.id,
+            "model": base_model,
+        }
+        if validation_file_id:
+            create_kwargs["validation_file"] = validation_file_id
+
+        job = await client.fine_tuning.jobs.create(**create_kwargs)
+
+        logger.info(
+            "Fine-tuning job created: job_id=%s model=%s training_file=%s",
+            job.id, base_model, training_file.id,
+        )
+
+        return {
+            "id": job.id,
+            "status": job.status,
+            "model": base_model,
+            "training_file": training_file.id,
+            "validation_file": validation_file_id,
+            "created_at": job.created_at,
+        }
 
     async def check_job_status(
         self,
@@ -866,11 +931,18 @@ class FineTuningPipelineService:
         """
         self._ensure_configured()
 
-        # Load existing record
-        jobs = self._dev_jobs.get(tenant_id, [])
-        record_dict = next(
-            (j for j in jobs if j.get("job_id") == job_id), None,
-        )
+        # Load existing record — Cosmos DB when available, else dev store (SPEC-1521)
+        record_dict: dict[str, Any] | None = None
+        if self._ft_jobs_repo is not None:
+            try:
+                record_dict = await self._ft_jobs_repo.read(tenant_id, job_id)
+            except Exception:
+                record_dict = None
+        else:
+            jobs = self._dev_jobs.get(tenant_id, [])
+            record_dict = next(
+                (j for j in jobs if j.get("job_id") == job_id), None,
+            )
         if record_dict is None:
             return None
 
@@ -914,21 +986,33 @@ class FineTuningPipelineService:
         self,
         openai_job_id: str,
     ) -> dict[str, Any]:
-        """Poll the OpenAI API for fine-tuning job status.
+        """Poll the Azure OpenAI API for fine-tuning job status (SPEC-1519).
 
-        This method must be overridden with a real OpenAI polling
-        implementation before Layer 4 can be offered in production.
-        The default implementation raises NotImplementedError to prevent
-        fake completion status from reaching customers.
+        Returns a dict with at minimum 'status' and optionally
+        'fine_tuned_model' (when completed) or 'error' (when failed).
 
         Override or mock this method in tests.
         """
-        raise NotImplementedError(
-            "Layer 4 fine-tuning status polling is not yet connected to "
-            "OpenAI. Override _check_job_status_api() with a real "
-            "implementation before enabling fine-tuning for production "
-            "tenants."
+        client = self._openai_client
+        if client is None:
+            raise RuntimeError(
+                "OpenAI client not configured. Call configure(openai_client=...) "
+                "before polling fine-tuning jobs."
+            )
+
+        job = await client.fine_tuning.jobs.retrieve(openai_job_id)
+
+        result: dict[str, Any] = {"status": job.status}
+        if job.fine_tuned_model:
+            result["fine_tuned_model"] = job.fine_tuned_model
+        if job.error and job.error.message:
+            result["error"] = job.error.message
+
+        logger.debug(
+            "Fine-tuning job status: job_id=%s status=%s",
+            openai_job_id, job.status,
         )
+        return result
 
     # ------------------------------------------------------------------
     # Stage 5: Compare — quality gate evaluation (WI #94)
@@ -1226,16 +1310,39 @@ class FineTuningPipelineService:
         model_id: str,
         messages: list[dict[str, str]],
     ) -> str:
-        """Mockable model call for evaluation.
+        """Call the fine-tuned model for quality gate evaluation (SPEC-1520).
 
-        Default (dev mode): returns a placeholder response.
-        Production: calls the fine-tuned model via Azure OpenAI.
+        Uses the Azure OpenAI chat completions endpoint to get a real
+        model response for evaluation against quality gates.
+
+        Falls back to a placeholder string if the OpenAI client is not
+        configured (dev mode).
+
+        Override or mock this method in tests.
         """
-        return (
-            "Thank you for reaching out. I understand your concern and "
-            "I am happy to help you with this matter. Our team is dedicated "
-            "to providing the best possible support experience."
+        client = self._openai_client
+        if client is None:
+            # Dev mode fallback — allows pipeline to run without API
+            logger.debug("OpenAI client not configured — using placeholder for evaluation")
+            return (
+                "Thank you for reaching out. I understand your concern and "
+                "I am happy to help you with this matter. Our team is dedicated "
+                "to providing the best possible support experience."
+            )
+
+        response = await client.chat.completions.create(
+            model=model_id,
+            messages=messages,
+            max_tokens=512,
+            temperature=0.3,
         )
+
+        result = response.choices[0].message.content or ""
+        logger.debug(
+            "Model evaluation call: model=%s tokens=%d",
+            model_id, response.usage.total_tokens if response.usage else 0,
+        )
+        return result
 
     # ------------------------------------------------------------------
     # Stage 6: Evaluate — pass/fail decision (WI #94)
@@ -1711,7 +1818,17 @@ class FineTuningPipelineService:
         """List all fine-tuned models for a tenant, newest first."""
         self._ensure_configured()
 
-        raw_list = self._dev_models.get(tenant_id, [])
+        # Read from Cosmos DB when available, else dev store (SPEC-1521)
+        raw_list: list[dict[str, Any]] = []
+        if self._ft_models_repo is not None:
+            try:
+                raw_list = await self._ft_models_repo.list_by_partition(tenant_id)
+            except Exception as exc:
+                logger.error("Cosmos DB model list failed: %s — using dev store", exc)
+                raw_list = self._dev_models.get(tenant_id, [])
+        else:
+            raw_list = self._dev_models.get(tenant_id, [])
+
         models: list[FineTunedModelRecord] = []
         for raw in raw_list:
             try:
@@ -1783,15 +1900,22 @@ class FineTuningPipelineService:
         tenant_id: str,
         record: FineTunedModelRecord,
     ) -> None:
-        """Save a model record (in-memory dev store)."""
-        models = self._dev_models.setdefault(tenant_id, [])
+        """Save a model record — Cosmos DB when available, else dev store (SPEC-1521)."""
+        if self._ft_models_repo is not None:
+            try:
+                data = record.model_dump()
+                data["tenant_id"] = tenant_id
+                await self._ft_models_repo.upsert(data, partition_key=tenant_id)
+                return
+            except Exception as exc:
+                logger.error("Cosmos DB model save failed: %s — falling back to dev store", exc)
 
-        # Upsert by id
+        # Dev store fallback
+        models = self._dev_models.setdefault(tenant_id, [])
         for i, existing in enumerate(models):
             if existing.get("id") == record.id:
                 models[i] = record.model_dump()
                 return
-
         models.append(record.model_dump())
 
     async def _save_job(
@@ -1799,15 +1923,22 @@ class FineTuningPipelineService:
         tenant_id: str,
         record: TrainingJobRecord,
     ) -> None:
-        """Save a job record (in-memory dev store)."""
-        jobs = self._dev_jobs.setdefault(tenant_id, [])
+        """Save a job record — Cosmos DB when available, else dev store (SPEC-1521)."""
+        if self._ft_jobs_repo is not None:
+            try:
+                data = record.model_dump()
+                data["tenant_id"] = tenant_id
+                await self._ft_jobs_repo.upsert(data, partition_key=tenant_id)
+                return
+            except Exception as exc:
+                logger.error("Cosmos DB job save failed: %s — falling back to dev store", exc)
 
-        # Upsert by id
+        # Dev store fallback
+        jobs = self._dev_jobs.setdefault(tenant_id, [])
         for i, existing in enumerate(jobs):
             if existing.get("id") == record.id:
                 jobs[i] = record.model_dump()
                 return
-
         jobs.append(record.model_dump())
 
     async def _update_preferences(

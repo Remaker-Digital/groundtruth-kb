@@ -9,7 +9,7 @@ description: What you need to get Agent Red running — account provisioning, AP
 This guide walks through the steps to go from a new Agent Red account to handling your first automated customer conversation. Each section describes what happens, what you need to provide, and what configuration options are available.
 
 :::info Early Access
-Agent Red is preparing for public launch. The setup process described here reflects the planned onboarding flow. If you have early access, [contact us](https://agentredcx.com/docs/intro) for personalized onboarding assistance.
+Agent Red is in early access. If you need onboarding assistance, [contact us](https://agentredcx.com/docs/intro).
 :::
 
 ## Setup overview
@@ -38,7 +38,7 @@ When you subscribe to an Agent Red plan (Starter, Professional, or Enterprise), 
 | Tenant namespace | Isolated environment for your data, agents, and configuration |
 | Cosmos DB partition | Your data is stored in a dedicated partition with tenant-level isolation |
 | Agent instances | Six AI agents deployed and configured for your account |
-| API endpoint | A unique API endpoint for your tenant (e.g., `https://agent-red-api-gateway.lemonriver-f59f94b7.eastus2.azurecontainerapps.io/api/v1/tenant-acme`) |
+| API endpoint | A unique API endpoint for your tenant (e.g., `https://agent-red-api-gateway.orangeglacier-f566a4e7.eastus.azurecontainerapps.io/api/v1/tenant-acme`) |
 | Dashboard access | Web portal for configuration, analytics, and conversation monitoring |
 
 ### What you need to provide
@@ -74,7 +74,7 @@ Each tenant receives an API key for authenticating requests to the Agent Red API
 ### Authentication format
 
 ```bash
-curl -X POST https://agent-red-api-gateway.lemonriver-f59f94b7.eastus2.azurecontainerapps.io/api/chat/conversations \
+curl -X POST https://agent-red-api-gateway.orangeglacier-f566a4e7.eastus.azurecontainerapps.io/api/chat/conversations \
   -H "Authorization: Bearer YOUR_API_KEY" \
   -H "Content-Type: application/json" \
   -d '{"message": "Where is my order #12345?"}'
@@ -82,28 +82,20 @@ curl -X POST https://agent-red-api-gateway.lemonriver-f59f94b7.eastus2.azurecont
 
 ## 3. Connect data sources
 
-Agent Red needs access to your product and customer data to provide accurate, context-aware responses. The primary integration is Shopify, with additional integrations available as add-ons.
+Agent Red needs access to your product and customer data to provide accurate, context-aware responses. The primary integration is Shopify.
 
 ```mermaid
 flowchart TB
     subgraph Your Systems
         SH[Shopify Store]
-        ZD[Zendesk\nHelp Desk]
-        MC[Mailchimp\nEmail Marketing]
-        GA[Google\nAnalytics]
     end
 
     subgraph Agent Red
         API[API Gateway]
         KB[Knowledge Base]
-        ESC[Escalation\nRouting]
-        AN[Analytics\nDashboard]
     end
 
     SH -->|"Products, Orders,\nCustomers"| KB
-    ZD -->|"Ticket routing"| ESC
-    MC -->|"Campaign data"| AN
-    GA -->|"Visitor analytics"| AN
     API --> KB
 ```
 
@@ -125,14 +117,6 @@ The Shopify integration syncs your product catalog, order data, and customer pro
 - **Initial sync** — full catalog import when you connect your store (typically 5–15 minutes)
 - **Ongoing sync** — webhook-driven updates whenever products, orders, or inventory change
 - **Sync frequency** — real-time for order updates; every 15 minutes for catalog changes
-
-### Additional integrations (add-on)
-
-| Integration | Add-on cost | What it provides |
-|---|---|---|
-| Zendesk | Included (Pro, Enterprise) | Route escalated conversations to Zendesk tickets |
-| Mailchimp | $49/mo | Access campaign data for customer context |
-| Google Analytics | $49/mo | Correlate conversation data with site analytics |
 
 ## 4. Knowledge base setup
 

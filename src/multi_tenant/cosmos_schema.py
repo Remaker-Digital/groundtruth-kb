@@ -414,6 +414,13 @@ class ConversationDocument(BaseModel):
         "Null means not yet vectorized. Set by the vectorization background scanner.",
     )
 
+    # Pipeline trace (SPEC-1530 — end-to-end conversation tracing)
+    pipeline_trace: dict[str, Any] | None = Field(
+        default=None,
+        description="Pipeline execution trace: {trace_id, stages[], total_latency_ms, intent, "
+        "confidence, critic_passed, model_used}. Set after each AI response turn.",
+    )
+
     # TTL — no default TTL; conversations persist in hot storage until
     # archival pipeline moves them to warm/cold tiers (Decision #18+).
     ttl: int | None = Field(default=None, alias="_ts_ttl", description="Cosmos DB TTL (seconds)")

@@ -32,6 +32,7 @@ from __future__ import annotations
 import asyncio
 import json
 import logging
+import uuid
 from typing import Any
 
 from fastapi import APIRouter, Depends, HTTPException, Query, Request, WebSocket, WebSocketDisconnect
@@ -556,6 +557,9 @@ async def stream_response(
     # Extract conversation history for multi-turn context
     conversation_history = _extract_conversation_history(state, max_messages=20)
 
+    # SPEC-1530: Generate trace_id at API entry point for end-to-end tracing
+    trace_id = uuid.uuid4().hex
+
     async def event_generator():
         sse_mgr.connect(ctx.tenant_id, conversation_id, tab_id=tab_id)
         try:
@@ -578,6 +582,7 @@ async def stream_response(
                 customer_id=customer_id,
                 customer_verified=getattr(state, "customer_verified", False),
                 conversation_history=conversation_history,
+                trace_id=trace_id,  # SPEC-1530: end-to-end trace
             )
 
             async for sse_text in sse_mgr.wrap_stream(
@@ -594,6 +599,7 @@ async def stream_response(
         "Cache-Control": "no-cache",
         "Connection": "keep-alive",
         "X-Accel-Buffering": "no",
+        "X-Trace-Id": trace_id,  # SPEC-1530: trace ID in response headers
     }
     if tab_id is not None:
         response_headers["X-Tab-Count"] = str(tab_count + 1)  # Include this tab

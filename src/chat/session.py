@@ -826,6 +826,47 @@ class ConversationSession:
         return await self.get_conversation(tenant_id, doc["conversation_id"])
 
     # -------------------------------------------------------------------
+    # Metadata update (SPEC-1531 — pipeline trace persistence)
+    # -------------------------------------------------------------------
+
+    async def update_conversation_metadata(
+        self,
+        tenant_id: str,
+        conversation_id: str,
+        metadata: dict[str, Any],
+    ) -> None:
+        """Patch arbitrary metadata fields on a conversation document.
+
+        Used by the pipeline orchestrator to persist the pipeline_trace
+        (SPEC-1531) after each AI response turn. Each key in ``metadata``
+        becomes a Cosmos DB set operation on the document root.
+
+        Args:
+            tenant_id: Tenant identifier.
+            conversation_id: Target conversation.
+            metadata: Dict of field_name → value to set on the document.
+        """
+        if not metadata:
+            return
+
+        operations: list[dict[str, Any]] = [
+            {"op": "set", "path": f"/{key}", "value": value}
+            for key, value in metadata.items()
+        ]
+
+        await self._repo.patch(
+            tenant_id=tenant_id,
+            document_id=conversation_id,
+            operations=operations,
+        )
+
+        logger.debug(
+            "Conversation metadata updated: conv=%s keys=%s",
+            conversation_id,
+            list(metadata.keys()),
+        )
+
+    # -------------------------------------------------------------------
     # Internal helpers
     # -------------------------------------------------------------------
 

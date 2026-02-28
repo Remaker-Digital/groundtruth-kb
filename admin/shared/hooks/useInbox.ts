@@ -5,7 +5,7 @@
  */
 
 import { useState, useCallback } from 'react';
-import type { InboxConversation, ConversationMessage } from '../types/index';
+import type { InboxConversation, ConversationMessage, PipelineTrace } from '../types/index';
 import { useApi } from './useApi';
 import type { ApiFetch } from './useApi';
 
@@ -206,4 +206,14 @@ export function useArchiveConversation(apiFetch: ApiFetch) {
   );
 
   return { archive, unarchive, loading };
+}
+
+
+/** Fetch pipeline trace for a conversation (SPEC-1531). */
+export function useConversationTrace(apiFetch: ApiFetch, conversationId: string) {
+  return useApi<PipelineTrace>(
+    apiFetch,
+    `/api/admin/conversations/${conversationId}/trace`,
+    !!conversationId,
+  );
 }

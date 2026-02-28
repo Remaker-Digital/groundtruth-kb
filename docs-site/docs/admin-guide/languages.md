@@ -27,10 +27,6 @@ The main language for AI responses. The intent classifier uses this to optimize 
 | Language | Status |
 |----------|--------|
 | English (`en`) | Fully supported (primary) |
-| Spanish (`es`) | Coming soon |
-| French (`fr`) | Coming soon |
-
-Languages marked **Coming soon** are in active development and will be available in a near-term release. Additional languages will be added based on customer demand.
 
 **What happens when you change it:**
 - New conversations immediately use the new primary language.

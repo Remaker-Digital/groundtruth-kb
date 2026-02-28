@@ -231,6 +231,7 @@ class ChatPipeline(AgentDispatchMixin, CriticEscalationMixin, AnalyticsMixin):
         preferences: PreferencesDocument,
         customer_id: str | None = None,
         customer_verified: bool = False,
+        trace_id: str | None = None,
         conversation_history: list[dict[str, str]] | None = None,
     ) -> AsyncGenerator[StreamEvent, None]:
         """Run the full pipeline for a customer message.
@@ -261,6 +262,10 @@ class ChatPipeline(AgentDispatchMixin, CriticEscalationMixin, AnalyticsMixin):
             customer_id=customer_id or "",
         )
         tier = tenant.tier or TenantTier.STARTER
+
+        # SPEC-1530: Store trace_id for A2A header propagation
+        self._current_trace_id = trace_id or ""
+        self._current_conversation_id = conversation_id
 
         # Store tenant_id, tenant doc, and preferences for knowledge retrieval
         self._current_tenant_id = tenant_id
@@ -382,8 +387,8 @@ class ChatPipeline(AgentDispatchMixin, CriticEscalationMixin, AnalyticsMixin):
             # If IC detects escalation intent, KR results are discarded
             # and the escalation handler takes over.
             # ---------------------------------------------------------------
-            yield stage_event("intent-classifier", "started")
-            yield stage_event("knowledge-retrieval", "started")
+            yield stage_event("intent-classifier", "started", trace_id=trace_id)
+            yield stage_event("knowledge-retrieval", "started", trace_id=trace_id)
 
             # Launch both agents concurrently
             ic_task = budget.execute_with_budget(
@@ -415,6 +420,8 @@ class ChatPipeline(AgentDispatchMixin, CriticEscalationMixin, AnalyticsMixin):
             yield stage_event(
                 "intent-classifier", "completed",
                 latency_ms=int(budget.stages[0].elapsed_ms) if budget.stages else None,
+                trace_id=trace_id,
+                elapsed_ms=int(budget.elapsed_ms),
             )
 
             # ---------------------------------------------------------------
@@ -456,6 +463,8 @@ class ChatPipeline(AgentDispatchMixin, CriticEscalationMixin, AnalyticsMixin):
             yield stage_event(
                 "knowledge-retrieval", "completed",
                 latency_ms=int(budget.stages[-1].elapsed_ms) if len(budget.stages) >= 2 else None,
+                trace_id=trace_id,
+                elapsed_ms=int(budget.elapsed_ms),
             )
 
             # ---------------------------------------------------------------
@@ -466,7 +475,7 @@ class ChatPipeline(AgentDispatchMixin, CriticEscalationMixin, AnalyticsMixin):
                 conversation_id, intent,
                 len(knowledge_context), len(sources),
             )
-            yield stage_event("response-generator", "started")
+            yield stage_event("response-generator", "started", trace_id=trace_id, elapsed_ms=int(budget.elapsed_ms))
             rg_start = time.monotonic()
 
             full_response = ""
@@ -512,12 +521,14 @@ class ChatPipeline(AgentDispatchMixin, CriticEscalationMixin, AnalyticsMixin):
             yield stage_event(
                 "response-generator", "completed",
                 latency_ms=int(rg_elapsed),
+                trace_id=trace_id,
+                elapsed_ms=int(budget.elapsed_ms),
             )
 
             # ---------------------------------------------------------------
             # Phase 4: Critic validation (stream-then-validate, Decision UI-5)
             # ---------------------------------------------------------------
-            yield stage_event("critic-supervisor", "started")
+            yield stage_event("critic-supervisor", "started", trace_id=trace_id, elapsed_ms=int(budget.elapsed_ms))
 
             # Extract KB article titles so Critic knows the response
             # was generated from legitimate product knowledge.
@@ -537,6 +548,8 @@ class ChatPipeline(AgentDispatchMixin, CriticEscalationMixin, AnalyticsMixin):
             yield stage_event(
                 "critic-supervisor", "completed",
                 latency_ms=int(critic_result.latency_ms),
+                trace_id=trace_id,
+                elapsed_ms=int(budget.elapsed_ms),
             )
 
             if approved:
@@ -599,14 +612,46 @@ class ChatPipeline(AgentDispatchMixin, CriticEscalationMixin, AnalyticsMixin):
 
             # Build and store decision trace
             decision_trace = trace.build()
+
+            # SPEC-1531: Persist pipeline trace on conversation metadata
+            pipeline_trace = {
+                "trace_id": trace_id,
+                "stages": [
+                    {
+                        "stage": s.stage,
+                        "elapsed_ms": int(s.elapsed_ms),
+                        "succeeded": s.succeeded,
+                    }
+                    for s in budget.stages
+                ],
+                "total_latency_ms": int(budget.elapsed_ms),
+                "intent": intent,
+                "confidence": confidence,
+                "critic_passed": approved,
+                "model_used": response_model,
+            }
+            try:
+                await self._session.update_conversation_metadata(
+                    tenant_id=tenant_id,
+                    conversation_id=conversation_id,
+                    metadata={"pipeline_trace": pipeline_trace},
+                )
+            except Exception:
+                logger.debug("Failed to persist pipeline trace", exc_info=True)
+
             logger.debug(
-                "Pipeline complete: conv=%s intent=%s critic=%s latency=%.0fms",
-                conversation_id, intent, approved, budget.elapsed_ms,
+                "Pipeline complete: conv=%s intent=%s critic=%s latency=%.0fms trace=%s",
+                conversation_id, intent, approved, budget.elapsed_ms, trace_id,
             )
 
             # Final turn count from the session
             state = await self._session.get_conversation(tenant_id, conversation_id)
-            yield done_event(conversation_id, state.turn_count)
+            yield done_event(
+                conversation_id,
+                state.turn_count,
+                trace_id=trace_id,
+                total_latency_ms=int(budget.elapsed_ms),
+            )
 
         except PipelineTimeoutError as exc:
             logger.warning(

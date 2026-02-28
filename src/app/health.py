@@ -99,6 +99,11 @@ def register_health_endpoints(app: FastAPI) -> None:
         sem_cache = get_semantic_cache()
         result["semantic_cache"] = sem_cache.health()
 
+        # AGNTCY SDK / SLIM transport health (SPEC-1524)
+        from src.multi_tenant.agntcy_sdk_integration import get_sdk_status
+
+        result["agntcy_sdk"] = get_sdk_status()
+
         # API version (WI #140)
         from src.multi_tenant.api_versioning import API_VERSION
 

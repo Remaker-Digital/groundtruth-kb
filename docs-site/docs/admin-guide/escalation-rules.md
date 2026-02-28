@@ -138,8 +138,7 @@ Forces escalation after the conversation reaches this many back-and-forth exchan
 1. The AI sends a handoff message to the customer explaining that a human agent will take over.
 2. The conversation appears in the admin Inbox with an "Escalated" status badge.
 3. Escalation agents assigned to the matching category receive an email notification with a link to the conversation.
-4. If Zendesk integration is enabled (coming soon), a ticket is created in your Zendesk instance (Professional+ only).
-5. The AI does not send further responses in the conversation unless a team member explicitly reassigns it back to the AI.
+4. The AI does not send further responses in the conversation unless a team member explicitly reassigns it back to the AI.
 
 ---
 

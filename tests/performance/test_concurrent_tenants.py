@@ -1,7 +1,8 @@
 """14c: Performance validation — concurrent tenant load testing.
 
-Validates that the API gateway can handle 50 concurrent tenants at launch
-scale. Uses mock infrastructure to avoid live Azure dependencies.
+Validates that the API gateway can handle 680 concurrent merchant tenants
+at near-term scale (SPEC-1516). Uses mock infrastructure to avoid live
+Azure dependencies.
 
 Test structure:
     - PERF-01 to PERF-04: Single-tenant response time baselines
@@ -29,8 +30,8 @@ import pytest
 # Test fixtures
 # ---------------------------------------------------------------------------
 
-TENANT_COUNT = 50  # Launch scale target
-CONCURRENT_BATCH = 10  # Batch size for concurrent tests
+TENANT_COUNT = 680  # Near-term scale target (SPEC-1516)
+CONCURRENT_BATCH = 50  # Batch size for concurrent tests
 
 
 def _make_tenant_context(tenant_id: str) -> MagicMock:
@@ -218,8 +219,8 @@ class TestResourceIsolation:
         assert len(set(partition_keys_used)) == TENANT_COUNT
 
     def test_perf_11_launch_scale_constant(self):
-        """PERF-11: Launch scale is configured to 50 tenants."""
-        assert TENANT_COUNT == 50
+        """PERF-11: Scale target is configured to 680 tenants (SPEC-1516)."""
+        assert TENANT_COUNT == 680
 
     @pytest.mark.asyncio
     async def test_perf_12_concurrent_error_isolation(self):

@@ -57,6 +57,7 @@ export {
   useEscalateConversation,
   useResolveConversation,
   useArchiveConversation,
+  useConversationTrace,
 } from './useInbox';
 export type { SearchResult } from './useInbox';
 

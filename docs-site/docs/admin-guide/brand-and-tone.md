@@ -8,6 +8,8 @@ description: Configure your brand name, voice, greeting, and farewell to shape h
 
 These settings define your AI agent's identity and communication style. Every response the agent generates is shaped by these values — they are injected into the system prompt that guides the response generator.
 
+![Agent configuration page showing saved configurations, brand & persona settings, and escalation categories](/img/admin/agent-configuration.png)
+
 ## Brand name
 
 | | |

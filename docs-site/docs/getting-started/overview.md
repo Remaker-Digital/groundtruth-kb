@@ -8,6 +8,8 @@ description: What Agent Red Customer Experience does, how the six-agent AI pipel
 
 Agent Red Customer Experience automates customer support for e-commerce businesses using a pipeline of six specialized AI agents. Each agent handles a distinct responsibility — from classifying the customer's intent to generating a response and validating it for safety — so that conversations are resolved accurately without human intervention.
 
+![Agent Red admin dashboard](/img/admin/dashboard.png)
+
 ## The agent pipeline
 
 When a customer sends a message, it flows through the agent pipeline:
@@ -26,8 +28,8 @@ flowchart LR
     B --> J[Analytics]
 ```
 
-1. **Intent Classification** — Determines what the customer needs (order status, return request, product question, and others) across 17 supported intent categories with 98% accuracy.
-2. **Knowledge Retrieval** — Searches your product catalog, FAQ database, and policy documents using semantic vector search to find relevant context.
+1. **Intent Classification** — Determines what the customer needs (order status, return request, product question, and others) across 17 supported intent categories using GPT-4o-mini.
+2. **Knowledge Retrieval** — Searches your product catalog, FAQ database, and policy documents using hybrid semantic vector + keyword search to find relevant context.
 3. **Response Generation** — Composes a natural-language reply using the retrieved context and conversation history, personalized to your brand voice.
 4. **Critic / Supervisor** — Validates the response for factual accuracy, policy compliance, and content safety before it reaches the customer.
 5. **Escalation Detection** — Evaluates whether the conversation requires human attention (angry customer, complex issue, VIP account) and routes accordingly.
@@ -35,7 +37,7 @@ flowchart LR
 
 ## Architecture
 
-Agent Red runs on Azure Container Apps with auto-scaling. Each agent is a separate container communicating over gRPC with TLS encryption. Customer data is stored in Cosmos DB with tenant-level isolation. A dedicated Customer Memory layer stores customer profiles, vectorized conversation transcripts, and learned preferences — enabling the response generator to personalize replies based on the full history of each customer relationship.
+Agent Red runs as a unified API Gateway on Azure Container Apps (East US) with native auto-scaling. The six AI agents run in-process within the gateway, communicating via HTTP endpoints and a NATS JetStream event bus for asynchronous analytics and decoupled processing. Customer data is stored in Cosmos DB (Serverless) with tenant-level partition isolation. A dedicated Customer Memory layer stores customer profiles and vectorized conversation transcripts — enabling the response generator to personalize replies based on each customer's interaction history.
 
 ```mermaid
 graph TB
@@ -43,15 +45,14 @@ graph TB
         CU[Customer]
     end
 
-    subgraph Azure["Azure (East US 2)"]
-        AG[Application Gateway\nTLS + WAF] --> API[API Gateway]
-        API --> SLIM[SLIM Gateway\ngRPC + TLS]
-        SLIM --> IC[Intent Classifier]
-        SLIM --> KR[Knowledge Retrieval]
-        SLIM --> RG[Response Generator]
-        SLIM --> CS[Critic / Supervisor]
-        SLIM --> ESC[Escalation]
-        SLIM --> AN[Analytics]
+    subgraph Azure["Azure (East US)"]
+        API[API Gateway\nAzure Container Apps]
+        API --> IC[Intent Classifier]
+        API --> KR[Knowledge Retrieval]
+        API --> RG[Response Generator]
+        API --> CS[Critic / Supervisor]
+        API --> ESC[Escalation]
+        API --> AN[Analytics]
 
         NATS[NATS JetStream\nEvent Bus] -.-> IC
         NATS -.-> KR
@@ -66,37 +67,34 @@ graph TB
         AI[Azure OpenAI\nGPT-4o / GPT-4o-mini]
     end
 
-    CU --> AG
+    CU -->|HTTPS| API
     IC & KR & RG & CS & ESC --> AI
     IC & KR & RG & AN --> DB
     RG --> MEM
-    SLIM --> KV
+    API --> KV
 ```
 
 | Component | Technology |
 |---|---|
-| Agent runtime | Azure Container Apps (KEDA auto-scaling) |
-| Agent communication | gRPC + TLS (SLIM transport) |
-| Event bus | NATS JetStream (7-day retention) |
-| Database | Azure Cosmos DB (Serverless) |
+| Agent runtime | Azure Container Apps (native auto-scaling) |
+| Agent communication | HTTP (in-process) + NATS JetStream (async events) |
+| Database | Azure Cosmos DB (Serverless, DiskANN vector index) |
 | AI models | Azure OpenAI Service (GPT-4o, GPT-4o-mini) |
 | Embeddings | text-embedding-3-large |
 | Secrets | Azure Key Vault (Managed Identity) |
-| Customer Memory | Cosmos DB (profiles, vectors, cross-session learning) |
-| Monitoring | Application Insights (OpenTelemetry) |
+| Customer Memory | Cosmos DB (profiles + vectorized conversation transcripts) |
+| Monitoring | OpenTelemetry (Application Insights) |
 
-## Performance
+## Design targets
 
-These metrics are from the evaluated open-source foundation that Agent Red builds on:
+These are the performance targets Agent Red is designed to achieve:
 
-| Metric | Result |
+| Metric | Target |
 |---|---|
 | Response latency (P95) | < 2 seconds |
-| Throughput | 3,071 requests/second |
-| Daily user capacity | 10,000 users (with auto-scaling) |
-| Uptime SLA | 99.95% |
-| Intent classification accuracy | 98% |
-| Escalation precision / recall | 100% / 100% |
+| Uptime SLA (Enterprise) | 99.95% |
+| Concurrent tenants at launch | 50 |
+| Per-tier rate limits | Starter 10/min, Professional 50/min, Enterprise 200/min |
 
 ## Next steps
 

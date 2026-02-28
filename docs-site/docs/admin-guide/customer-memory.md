@@ -1,14 +1,16 @@
 ---
 sidebar_position: 9
 title: Customer memory and privacy
-description: Configure the four-layer Persistent Customer Memory system — conversation history, pattern learning, model training, and data retention.
+description: Configure the Persistent Customer Memory system — customer profiles, conversation history, pattern learning, and data retention.
 ---
 
 # Customer memory and privacy
 
-Agent Red's Persistent Customer Memory is a four-layer system that enables the AI to build context about each customer over time. Every conversation adds to the customer's profile, and future conversations benefit from that accumulated context.
+Agent Red's Persistent Customer Memory is a three-layer system that enables the AI to build context about each customer over time. Every conversation adds to the customer's profile, and future conversations benefit from that accumulated context.
 
 This is Agent Red's primary differentiator — no competitor has confirmed implementing per-customer vector search over historical conversation transcripts.
+
+![Memory & Privacy admin page showing the four memory layers and data retention settings](/img/admin/memory-privacy.png)
 
 ## How the layers work
 
@@ -19,8 +21,6 @@ Layer 2: Conversation memory (all tiers)
     ↓ Vectorized transcripts: semantic search across past conversations
 Layer 3: Cross-session learning (Professional+)
     ↓ Extracted patterns: communication style, topic preferences
-Layer 4: Dedicated model training (Enterprise add-on)
-    ↓ Per-customer fine-tuned AI model
 ```
 
 Each layer builds on the previous one. More layers mean more personalized responses.
@@ -104,36 +104,6 @@ Enables cross-session learning. After each conversation, the AI analyzes the tra
 
 ---
 
-## Dedicated model training
-
-| | |
-|---|---|
-| **Field** | `dedicated_model_enabled` |
-| **Type** | Toggle (on/off) |
-| **Default** | Off |
-| **Tier** | Enterprise only |
-| **Add-on** | $299/month |
-| **Affects** | Customer memory (Layer 4), response generator |
-
-Enables per-customer AI model fine-tuning. When a customer has accumulated 1,000+ conversation messages, a monthly pipeline trains a custom fine-tuned model (GPT-4o-mini) specifically for that customer's communication patterns.
-
-**How it works:**
-1. Monthly batch: conversations are collected, PII-scrubbed, and formatted as training data.
-2. Five quality gates validate the training data (hallucination, format, tone, facts, similarity).
-3. If all gates pass, the model is fine-tuned and deployed with an A/B experiment (80% control, 20% treatment).
-4. After 7 days, if the treatment model performs better, it is promoted to the primary model for that customer.
-5. Up to 3 model versions are retained. Rollback is available from the admin console.
-
-**When to enable:**
-- You have high-value customers with extensive interaction history.
-- You are on Enterprise tier and want the highest level of personalization.
-- You have budget for the $299/month add-on.
-
-**When to leave off:**
-- Most stores do not need Layer 4. Layers 1–3 provide substantial personalization at a fraction of the cost.
-
----
-
 ## PII scrubbing
 
 | | |
@@ -185,12 +155,12 @@ How long conversation data and customer memory are retained. After this period, 
 | **Default** | On |
 | **Affects** | All memory layers |
 
-When enabled, the widget asks customers to consent to memory features before storing their data. Customers who decline consent still get AI responses, but no data is stored between conversations (effectively disabling Layers 1–4 for that customer).
+When enabled, the widget asks customers to consent to memory features before storing their data. Customers who decline consent still get AI responses, but no data is stored between conversations (effectively disabling Layers 1–3 for that customer).
 
 **How consent works:**
 - Consent status is per-customer: `granted`, `denied`, or `not_asked`.
 - If consent is denied, any previously stored data for that customer is automatically deleted (GDPR Article 17 compliance).
-- Layers 2–4 require explicit consent. Layer 1 basic profile data (name from the conversation) may be retained for the duration of the conversation only.
+- Layers 2–3 require explicit consent. Layer 1 basic profile data (name from the conversation) may be retained for the duration of the conversation only.
 
 **When to disable:**
 - Your jurisdiction does not require explicit consent for storing conversation data (check with your legal team).

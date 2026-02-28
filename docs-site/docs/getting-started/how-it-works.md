@@ -49,9 +49,9 @@ sequenceDiagram
 
 ### What happens at each step
 
-**1. API Gateway receives the message.** The customer's message arrives over HTTPS. The Application Gateway terminates TLS and applies WAF rules. The API Gateway authenticates the request using the tenant's API key, attaches tenant context, and forwards the message into the agent pipeline.
+**1. API Gateway receives the message.** The customer's message arrives over HTTPS. The API Gateway authenticates the request using the tenant's API key, attaches tenant context, and forwards the message into the agent pipeline.
 
-**2. Intent Classifier determines the customer's need.** The classifier analyzes the message text and assigns one of 17 intent categories. It uses GPT-4o-mini, which provides 98% classification accuracy at a fraction of GPT-4o's cost. The classified intent determines which knowledge sources the retrieval agent searches and how the response generator frames its reply.
+**2. Intent Classifier determines the customer's need.** The classifier analyzes the message text and assigns one of 17 intent categories using GPT-4o-mini. The classified intent determines which knowledge sources the retrieval agent searches and how the response generator frames its reply.
 
 ```mermaid
 mindmap
@@ -82,7 +82,7 @@ mindmap
 
 **3. Escalation Detection runs in parallel.** While the main pipeline processes the message, the escalation agent independently evaluates whether the conversation requires a human. It assesses customer sentiment, issue complexity, account value, and conversation history. If escalation triggers, the system routes the conversation to a human agent in your help desk (Zendesk, or another connected platform) and notifies the customer that a person is taking over.
 
-Escalation achieves 100% precision (no false alarms) and 100% recall (no missed cases) on the evaluated test set.
+Escalation rules are configurable per tenant — you control which situations trigger a handoff to a human agent.
 
 **4. Knowledge Retrieval searches your data.** The retrieval agent takes the classified intent and customer message and runs a semantic vector search against your knowledge base. This includes:
 
@@ -90,7 +90,7 @@ Escalation achieves 100% precision (no false alarms) and 100% recall (no missed 
 - **FAQ database** — your custom question-and-answer pairs
 - **Policy documents** — return policies, shipping rules, warranty terms
 
-The search uses `text-embedding-3-large` embeddings stored in Cosmos DB's vector search index. It returns the top matching documents with relevance scores, achieving 100% retrieval accuracy at rank 1 on the evaluation set.
+The search uses `text-embedding-3-large` embeddings stored in Cosmos DB's DiskANN vector search index. It returns the top matching documents with relevance scores.
 
 ```mermaid
 flowchart LR
@@ -129,19 +129,19 @@ Response generation accounts for approximately 94.5% of per-conversation AI cost
 
 If validation fails, the critic returns the response to the generator with a specific rejection reason, and the generator revises it. This feedback loop runs until the response passes or reaches a maximum retry count (default: 2), at which point the system escalates to a human agent.
 
-The critic achieves 0% false positive rate (no good responses rejected) and 100% true positive rate (all unsafe responses caught) on the evaluated test set.
+The critic applies a fail-closed policy: responses are blocked unless all checks pass. This conservative approach prioritizes safety over throughput.
 
 **7. Analytics records the interaction.** The analytics agent captures structured data from every conversation: intent distribution, response quality scores, escalation rates, latency, and customer satisfaction signals. This data powers the analytics dashboard and feeds continuous improvement cycles.
 
 ## Communication protocols
 
-Agents communicate through two complementary systems: synchronous gRPC calls for the request-response pipeline, and asynchronous NATS events for analytics, logging, and decoupled processing.
+The six agents run in-process within a single API Gateway container. They communicate through two complementary systems: synchronous HTTP endpoints for the request-response pipeline, and asynchronous NATS JetStream events for analytics, logging, and decoupled processing.
 
 ```mermaid
 flowchart TB
-    subgraph Synchronous["Synchronous (gRPC + TLS)"]
+    subgraph Synchronous["Synchronous (HTTP, in-process)"]
         direction LR
-        S1[SLIM Gateway] -->|Request / Response| S2[Agent]
+        S1[API Gateway] -->|POST /agents/type/process| S2[Agent Handler]
     end
 
     subgraph Asynchronous["Asynchronous (NATS JetStream)"]
@@ -151,55 +151,46 @@ flowchart TB
     end
 ```
 
-### SLIM transport (gRPC)
+### HTTP endpoints (synchronous pipeline)
 
-SLIM (Secure Lightweight Inter-agent Messaging) handles real-time agent-to-agent communication. It provides:
-
-- **gRPC with TLS** — encrypted, authenticated communication between containers
-- **Request-response pattern** — synchronous calls for the main pipeline (intent → knowledge → response → critic)
-- **Connection pooling** — up to 100 concurrent connections with 20 keepalive connections per agent
-- **Health checks** — each agent exposes a health endpoint for Container Apps readiness probes
+Each agent exposes a POST endpoint within the API Gateway process. The main pipeline calls agents sequentially (intent → knowledge → response → critic) via internal HTTP calls. Health check endpoints are exposed for Azure Container Apps readiness probes.
 
 ### NATS JetStream (event bus)
 
-NATS provides asynchronous, durable event delivery for:
+NATS provides asynchronous event delivery with tenant-level stream isolation for:
 
 - **Analytics events** — every pipeline step publishes metrics to NATS topics
 - **Decoupled processing** — agents that do not need immediate responses communicate through events
-- **Durability** — JetStream retains events for 7 days, ensuring no data loss during transient failures
+- **Short-term durability** — JetStream retains events for 5 minutes, providing resilience during brief processing delays
 
-Each agent subscribes to a dedicated topic for routing:
+Each tenant gets isolated NATS streams to prevent cross-tenant data leakage. Agents subscribe to dedicated topics for routing:
 
 | Topic | Agent |
 |---|---|
 | `intent-classifier` | Intent Classification |
 | `knowledge-retrieval` | Knowledge Retrieval |
 | `response-generator-en` | Response Generation (English) |
-| `response-generator-fr-ca` | Response Generation (French-CA) |
 | `escalation-handler` | Escalation |
 | `analytics-collector` | Analytics |
 | `critic-supervisor` | Critic / Supervisor |
 
-## A2A message format
+## Internal message format
 
-Agents exchange messages using the Agent-to-Agent (A2A) protocol. Every message carries conversation context and workflow tracking:
+Agents exchange messages as JSON payloads over internal HTTP endpoints. Every message carries conversation context and tenant isolation:
 
 ```json
 {
-  "messageId": "msg-a7f3c9e1-4b2d-8f6a",
-  "role": "user",
-  "parts": [
-    {
-      "type": "text",
-      "text": "Where is my order #12345?"
-    }
-  ],
-  "contextId": "conv-thread-abc123",
-  "taskId": "workflow-xyz789",
+  "conversation_id": "conv-abc123",
+  "tenant_id": "tenant-acme-corp",
+  "message": "Where is my order #12345?",
+  "intent": "order_status",
+  "context": {
+    "history": [...],
+    "customer_profile": {...},
+    "retrieved_knowledge": [...]
+  },
   "metadata": {
     "language": "en",
-    "sentiment": "neutral",
-    "tenantId": "tenant-acme-corp",
     "timestamp": "2026-01-15T14:32:00Z"
   }
 }
@@ -207,44 +198,26 @@ Agents exchange messages using the Agent-to-Agent (A2A) protocol. Every message 
 
 | Field | Purpose |
 |---|---|
-| `messageId` | Unique identifier for this message |
-| `contextId` | Threads messages into a conversation (maintained across turns) |
-| `taskId` | Tracks the message through the pipeline workflow |
-| `parts` | Message content (text, structured data, or both) |
-| `metadata` | Tenant context, language, sentiment, and routing information |
+| `conversation_id` | Threads messages into a conversation (maintained across turns) |
+| `tenant_id` | Ensures tenant isolation throughout the pipeline |
+| `intent` | Classified intent from the Intent Classifier |
+| `context` | Accumulated pipeline context (history, profile, knowledge) |
+| `metadata` | Language, timestamps, and routing information |
 
-The `contextId` persists across an entire customer conversation, allowing agents to reference previous messages. The `taskId` changes with each pipeline invocation, providing end-to-end traceability in Application Insights.
+The `conversation_id` persists across an entire customer conversation, allowing agents to reference previous messages. End-to-end traceability is available through OpenTelemetry and Application Insights.
 
 ## PII protection
 
-Agent Red tokenizes personally identifiable information (PII) before sending data to external AI models. This ensures that customer names, email addresses, phone numbers, and other sensitive data never leave the Azure perimeter in plaintext.
+Agent Red provides PII protection at two levels:
 
-```mermaid
-flowchart LR
-    RAW[Customer Message\nwith PII] --> TOK[PII Tokenizer]
-    TOK --> |"TOKEN_a7f3c9e1"| AI[Azure OpenAI\nService]
-    AI --> |"TOKEN_a7f3c9e1"| DETOK[PII Detokenizer]
-    DETOK --> RESP[Response with\nReal Names]
+### Storage-layer PII scrubbing (available now)
 
-    subgraph Token Storage
-        KV[Key Vault\nPrimary]
-        DB[(Cosmos DB\nFallback)]
-    end
+When PII scrubbing is enabled in the Memory & Privacy settings, Agent Red automatically redacts email addresses and phone numbers from conversation transcripts before storing them. This protects customer data at rest while leaving the live conversation experience unchanged.
 
-    TOK --> KV
-    DETOK --> KV
-    KV -.-> |"Latency > 100ms"| DB
-```
+### Azure security perimeter
 
-### How tokenization works
+All AI processing uses Azure OpenAI Service, which means customer data stays within the Azure security perimeter. Data does not leave Azure infrastructure during conversation processing.
 
-1. The tokenizer scans the customer message for PII patterns (names, emails, phone numbers, addresses, order numbers).
-2. Each PII value is replaced with a random UUID token in the format `TOKEN_a7f3c9e1-4b2d-8f6a-9c3e`.
-3. The mapping between tokens and real values is stored in Azure Key Vault (primary) with Cosmos DB as a fallback if Key Vault latency exceeds 100ms.
-4. The tokenized message is sent to Azure OpenAI for processing.
-5. The AI response (containing tokens, not real data) is detokenized before delivery to the customer.
-
-**Exemption:** Communication with Azure OpenAI Service does not require tokenization because the data stays within the Azure security perimeter. Tokenization applies to any future integration with third-party AI services outside the Azure boundary.
 
 ## Content safety pipeline
 
@@ -270,40 +243,30 @@ flowchart TB
 | Policy compliance | Response follows business rules (refund limits, warranty terms) | Regenerate with policy context |
 | Content safety | No inappropriate, harmful, or off-brand content | Regenerate or escalate |
 
-The safety pipeline catches issues before they reach customers. On the evaluation test set, it achieved a 0% false positive rate (no unnecessary blocks) and a 100% true positive rate (all unsafe content caught).
+The safety pipeline catches issues before they reach customers. The system uses a fail-closed policy — responses are blocked unless the critic explicitly approves them.
 
-## Auto-scaling behavior
+## Scaling behavior
 
-Agent Red uses KEDA (Kubernetes Event-Driven Autoscaling) profiles on Azure Container Apps. Each agent scales independently based on its queue depth and CPU utilization.
+Agent Red runs as a unified API Gateway on Azure Container Apps with native auto-scaling. The six agents run in-process within the gateway container, so scaling is at the container level rather than per-agent.
 
 ```mermaid
 flowchart LR
-    subgraph Peak["Peak Hours (Business Day)"]
-        P1[Intent Classifier\n2-5 replicas]
-        P2[Response Generator\n2-5 replicas]
-        P3[Analytics\n1 replica]
+    subgraph ACA["Azure Container Apps"]
+        GW[API Gateway\n+ All 6 Agents\nin-process]
     end
 
-    subgraph Off["Off-Peak (Nights/Weekends)"]
-        O1[Intent Classifier\n0-1 replicas]
-        O2[Response Generator\n0-1 replicas]
-        O3[Analytics\n0-1 replicas]
-    end
-
-    Peak -->|"KEDA schedule\nscale-down"| Off
-    Off -->|"KEDA schedule\nscale-up"| Peak
+    REQ[Customer\nTraffic] --> ACA
+    ACA --> SCALE{Native\nAuto-Scale}
+    SCALE -->|"High traffic"| UP[Scale up\nreplicas]
+    SCALE -->|"No traffic"| ZERO[Scale to\nzero]
 ```
 
-| Agent | Scaling behavior | Resource allocation |
-|---|---|---|
-| Intent Classifier | Scales with request volume | 0.5 CPU, 1 GB memory |
-| Knowledge Retrieval | Scales with request volume | 0.5 CPU, 1 GB memory |
-| Response Generator | Scales with request volume (most resource-intensive) | 1.0 CPU, 2 GB memory |
-| Critic / Supervisor | Scales with response volume | 0.5 CPU, 1 GB memory |
-| Escalation | Scales with request volume | 0.25 CPU, 0.5 GB memory |
-| Analytics | Batch processing, right-sized low | 0.25 CPU, 0.5 GB memory |
-
-Scale-to-zero during off-peak hours saves approximately $20–30/month. The system handles up to 10,000 daily active users and 3,071 requests per second with auto-scaling enabled.
+| Behavior | Description |
+|---|---|
+| Scale-to-zero | Container stops when idle, restarts on first request |
+| Auto-scale up | Azure Container Apps scales replicas based on HTTP concurrency |
+| Serverless database | Cosmos DB Serverless charges only for consumed RUs — no idle cost |
+| Design target | 50 concurrent tenants at launch |
 
 ## Persistent Customer Memory
 
@@ -335,18 +298,9 @@ flowchart TB
         L3B --> L3E[Recurring\nPatterns]
     end
 
-    subgraph Layer 4 — Dedicated Model Training
-        direction LR
-        L4A["1,000+\nInteractions"] --> L4B[Fine-Tune\nPipeline]
-        L4B --> L4C{Quality\nGate}
-        L4C -- Pass --> L4D[Deploy\nPer-Customer Model]
-        L4C -- Fail --> L4E[Fallback to\nBase Model]
-    end
-
     L1B --> RG[Response Generator]
     L2D --> RG
     L3C & L3D & L3E --> RG
-    L4D --> RG
 ```
 
 ### How each layer works
@@ -378,8 +332,6 @@ sequenceDiagram
 
 **Layer 3: Cross-Session Learning (Professional and Enterprise)** — A memory framework analyzes accumulated conversations to extract durable patterns: preferred communication style, recurring issues, escalation triggers, and product preferences. These learned insights are injected alongside the customer profile, enabling the AI to adapt its tone and proactively address known issues.
 
-**Layer 4: Dedicated Model Training (Enterprise add-on, $299/month)** — For high-volume Enterprise customers with 1,000+ historical interactions, Agent Red can fine-tune a per-customer model that deeply internalizes the customer's domain vocabulary, communication style, and common workflows. A quality gate ensures the fine-tuned model meets or exceeds baseline performance before deployment. Requires explicit opt-in consent.
-
 ### Memory by tier
 
 | Layer | Starter | Professional | Enterprise |
@@ -387,16 +339,13 @@ sequenceDiagram
 | Customer Context (L1) | Included | Included | Included |
 | Conversation Memory (L2) | Included | Included | Included |
 | Cross-Session Learning (L3) | — | Included | Included |
-| Dedicated Model Training (L4) | — | — | $299/month add-on |
 
 ### Privacy and data handling
 
 - Layers 1–3 operate under GDPR/CCPA legitimate interest — no additional consent required
-- Layer 4 requires explicit opt-in consent before any training occurs
 - All memory data is tenant-isolated (customer A's memory never appears in customer B's context)
 - Customers can request deletion of their memory profile and all associated data
 - Conversation transcripts are cleansed of PII before vectorization
-- Fine-tuned models (Layer 4) are per-customer only — one customer's data never trains another customer's model
 
 See the [Privacy Policy](https://www.iubenda.com/privacy-policy/51316355) for full details on data handling and retention.
 

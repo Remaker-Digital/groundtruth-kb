@@ -36,7 +36,51 @@ class AgentDispatchMixin:
     Methods on this mixin access instance attributes set by ChatPipeline.__init__:
     _ic_agent, _kr_agent, _rg_agent, _agent_urls, _get_http_client(),
     _current_tenant_id, _current_preferences, _current_tenant.
+
+    Dispatch priority (SPEC-1525):
+        1. SLIM/NATS transport (when AGNTCY SDK transport is active)
+        2. HTTP containers (when USE_AGENT_CONTAINERS is set)
+        3. In-process direct call (default)
     """
+
+    def _transport_available(self) -> bool:
+        """Check if AGNTCY transport is available for A2A routing."""
+        try:
+            from src.multi_tenant.agntcy_sdk_integration import _transport
+            return _transport is not None
+        except Exception:
+            return False
+
+    async def _call_via_transport(
+        self,
+        agent_topic: str,
+        payload: dict[str, Any],
+    ) -> dict[str, Any]:
+        """Route an agent call through SLIM/NATS transport (SPEC-1525).
+
+        Includes tenant_id, conversation_id, and trace_id in message
+        headers for distributed tracing.
+        """
+        from src.multi_tenant.agntcy_sdk_integration import create_a2a_client
+
+        tenant_id = getattr(self, "_current_tenant_id", "")
+        conversation_id = getattr(self, "_current_conversation_id", "")
+        trace_id = getattr(self, "_current_trace_id", "")
+
+        client = create_a2a_client(agent_topic)
+        response = await client.send(
+            payload,
+            headers={
+                "X-Tenant-Id": tenant_id,
+                "X-Conversation-Id": conversation_id,
+                "X-Trace-Id": trace_id,
+            },
+        )
+        logger.debug(
+            "A2A transport call: topic=%s tenant=%s trace=%s",
+            agent_topic, tenant_id, trace_id,
+        )
+        return response if isinstance(response, dict) else {"result": response}
 
     # -------------------------------------------------------------------
     # Intent Classification
@@ -49,9 +93,17 @@ class AgentDispatchMixin:
     ) -> dict[str, Any]:
         """Classify customer intent.
 
-        Routes to Azure OpenAI directly (default) or AGNTCY container
-        based on USE_AGENT_CONTAINERS flag.
+        Routes via SLIM/NATS transport (preferred), AGNTCY HTTP containers,
+        or in-process based on configuration (SPEC-1525).
         """
+        if self._transport_available():
+            try:
+                return await self._call_via_transport(
+                    "intent-classifier",
+                    {"message": message, "system_prompt": system_prompt},
+                )
+            except Exception as exc:
+                logger.warning("Transport IC call failed, falling back: %s", exc)
         if USE_AGENT_CONTAINERS:
             return await self._call_intent_classifier_http(message, system_prompt)
         return await self._call_intent_classifier_direct(message, system_prompt)
@@ -102,9 +154,17 @@ class AgentDispatchMixin:
     ) -> dict[str, Any]:
         """Retrieve relevant knowledge for the customer message.
 
-        Routes to Azure OpenAI embeddings + Cosmos DB (default) or
-        AGNTCY container based on USE_AGENT_CONTAINERS flag.
+        Routes via SLIM/NATS transport (preferred), AGNTCY containers,
+        or in-process based on configuration (SPEC-1525).
         """
+        if self._transport_available():
+            try:
+                return await self._call_via_transport(
+                    "knowledge-retrieval",
+                    {"message": message, "intent": intent, "system_prompt": system_prompt},
+                )
+            except Exception as exc:
+                logger.warning("Transport KR call failed, falling back: %s", exc)
         if USE_AGENT_CONTAINERS:
             return await self._call_knowledge_retrieval_http(message, intent, system_prompt)
         return await self._call_knowledge_retrieval_direct(message, intent, system_prompt)

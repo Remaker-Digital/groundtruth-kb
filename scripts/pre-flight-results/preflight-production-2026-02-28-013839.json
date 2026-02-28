@@ -1,0 +1,21 @@
+{
+  "run_at": "2026-02-28T01:38:39.521813",
+  "environment": "production",
+  "new_version": "1.61.0",
+  "verdict": "DEPLOYMENT LIVE BUT DEFECTIVE \u2014 Phase D tenant provisioning failures",
+  "phases": {
+    "D": [
+      {
+        "id": "D.0",
+        "description": "SPA key required",
+        "status": "FAIL",
+        "detail": "Set SUPERADMIN_PREVIEW_API_KEY env var"
+      }
+    ]
+  },
+  "summary": {
+    "D": {
+      "FAIL": 1
+    }
+  }
+}

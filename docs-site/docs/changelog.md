@@ -9,6 +9,26 @@ All notable changes to Agent Red Customer Experience are documented here.
 
 ---
 
+## v1.61.0 — Targeting Rules, Engagement Triggers, and Documentation Audit (2026-02-28)
+
+### Targeting rules and engagement triggers
+- **Page-level targeting rules:** Configure which pages the widget appears on using URL include/exclude patterns with `+` and `-` prefix syntax. Managed from both standalone and embedded admin UIs.
+- **Exit-intent trigger:** Detect when a customer's cursor moves toward the browser close button and proactively show the widget. Configurable sensitivity and one-trigger-per-session guard.
+- **Scroll-depth trigger:** Show the widget when a customer scrolls past a configurable percentage of the page (default: 50%). Supports the full 4-layer field pipeline (fields.yaml, field_mapping, cosmos_schema, widget runtime).
+- **SDK runtime config methods:** New `setConfigPartial()` and `setTargetingRules()` methods allow programmatic widget configuration updates from the hosting page.
+
+### Documentation corrections
+- **Architecture accuracy:** Removed false claims about gRPC/SLIM transport, Application Gateway WAF, KEDA auto-scaling, and per-agent container separation. Documentation now accurately reflects the unified API Gateway architecture with HTTP endpoints and NATS JetStream event bus.
+- **Region correction:** Fixed "East US 2" references to "East US" across all documentation pages.
+- **FQDN correction:** Updated example API endpoints from a placeholder FQDN to the correct production gateway address.
+- **Performance claims:** Replaced unverified metrics (3,071 rps, 98% accuracy, 100% precision/recall) with honest design targets. Removed aspirational numbers that lacked code or test evidence.
+- **NATS retention:** Corrected 7-day retention claim to actual 5-minute retention (`MESSAGE_MAX_AGE_SECONDS = 300`).
+- **PII protection:** Clarified that PII protection consists of storage-layer scrubbing and the Azure security perimeter.
+- **Customer Memory:** Removed undocumented Layer 4 (Dedicated Model Training) from documentation. The production system provides three memory layers.
+- **Admin UI screenshots:** Added 6 production screenshots to documentation pages (dashboard, agent configuration, widget configuration, memory & privacy, team management, knowledge base).
+
+---
+
 ## v1.59.0 — Unified Auth, 2FA, and RBAC (2026-02-26)
 
 ### Unified authentication and 2FA
@@ -476,7 +496,7 @@ Service providers can now create tenants directly from the Provider Console with
 ### Mutation safety architecture
 - **Policy framework:** Per-tenant mutation policies with configurable safety gates (Critic approval, customer confirmation, operation allowlists, per-conversation rate limits).
 - **Critic-gated execution:** Six-stage mutation pipeline with fail-closed Critic validation, idempotency keys for replay prevention, and Cosmos DB audit logging.
-- **Disabled by default:** Mutation execution is built and fully tested but globally disabled. This will be enabled in a future release when the customer confirmation UX is implemented.
+- **Disabled by default:** Mutation execution is built and fully tested but globally disabled.
 
 ### Integration registry
 - **Stripe added:** The Integrations page now shows Stripe (MCP) alongside Shopify, Zendesk, Mailchimp, and Google Analytics.
@@ -591,7 +611,7 @@ The sidebar activation button now uses three color-coded states:
 
 ### Language support
 - Removed planned languages (German, Portuguese, Japanese, Chinese, Korean) from the admin UI
-- Supported languages: English (primary), Spanish (coming soon), French (coming soon)
+- Supported languages: English (primary)
 
 ### Bug fixes
 - Fixed button text truncation on "Deactivate" when all three sidebar controls are visible
@@ -853,9 +873,9 @@ Configuration changes now use a two-phase commit model. Saving a setting writes 
 - Rate limiting per tier (Starter 10/min, Professional 50/min, Enterprise 200/min)
 
 ### Infrastructure
-- 9 Azure Container Apps (East US 2)
+- Azure Container Apps (East US) with native auto-scaling
 - Cosmos DB Serverless with DiskANN vector index
-- KEDA auto-scaling with night profiles
+- NATS JetStream event bus with tenant-level stream isolation
 - Zero-downtime rolling deployment
 
 ---
