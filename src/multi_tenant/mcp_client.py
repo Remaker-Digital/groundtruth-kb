@@ -1,22 +1,29 @@
 """MCP client for external tool server integration (AGNTCY Phase 3).
 
-Wraps the ``mcp`` Python SDK with Agent Red conventions: per-tenant isolation,
+All MCP connections route through ``AgntcyFactory.create_client("MCP", ...)``
+via ``create_mcp_client()`` in ``agntcy_sdk_integration.py`` (SPEC-1534).
+No direct ``mcp`` SDK imports for client/session creation.
+
+Wraps the AGNTCY MCP client with Agent Red conventions: per-tenant isolation,
 shop_domain validation, PII scrubbing, circuit breaker, read-only policy gate,
 timeout enforcement, and decision tracing.
 
 Phase 3A scope: Shopify Storefront MCP (zero-auth, read-only, HTTP JSON-RPC 2.0).
 Phase 3B scope: Stripe MCP (authenticated, read-only, HTTP remote at mcp.stripe.com).
 
-MCP SDK usage::
+Usage via AGNTCY factory::
 
-    from mcp.client.streamable_http import streamablehttp_client
-    from mcp import ClientSession
+    from src.multi_tenant.agntcy_sdk_integration import create_mcp_client
 
-    async with streamablehttp_client(url=server_url, timeout=3.0) as (read, write, _):
-        async with ClientSession(read, write) as session:
-            await session.initialize()
-            tools = await session.list_tools()
-            result = await session.call_tool("search_products", {"query": "..."})
+    mcp_cm = create_mcp_client(
+        agent_topic="shopify-storefront",
+        server_url="https://mcp.shopify.com",
+        timeout_s=3.0,
+    )
+    async with mcp_cm as session:
+        await session.initialize()
+        tools = await session.list_tools()
+        result = await session.call_tool("search_products", {"query": "..."})
 
 © 2026 Remaker Digital, a DBA of VanDusen & Palmeter, LLC. All rights reserved.
 """
@@ -255,11 +262,12 @@ class AgentRedMcpClient:
         return list(self._available_tools)
 
     async def connect(self, auth_headers: dict[str, str] | None = None) -> None:
-        """Establish HTTP session to the MCP server and discover tools.
+        """Establish MCP session via AgntcyFactory and discover tools (SPEC-1534).
 
-        Uses ``mcp.client.streamable_http.streamablehttp_client()`` for the
-        HTTP JSON-RPC 2.0 transport and ``mcp.ClientSession`` for protocol
-        handling.
+        All MCP connections route through ``create_mcp_client()`` from
+        ``agntcy_sdk_integration.py``, which wraps
+        ``AgntcyFactory.create_client("MCP", ...)``.  No direct ``mcp`` SDK
+        imports for client/session creation.
 
         Args:
             auth_headers: Optional HTTP headers for authenticated servers
@@ -270,31 +278,21 @@ class AgentRedMcpClient:
         """
         import contextlib
 
-        from mcp import ClientSession
-        from mcp.client.streamable_http import streamablehttp_client
+        from src.multi_tenant.agntcy_sdk_integration import create_mcp_client
 
         timeout_s = self._config.timeout_ms / 1000
 
-        # Build kwargs for streamablehttp_client
-        client_kwargs: dict[str, Any] = {
-            "url": self._config.server_url,
-            "timeout": timeout_s,
-        }
-        if auth_headers:
-            client_kwargs["headers"] = auth_headers
+        # Create MCP client via AgntcyFactory (SPEC-1534)
+        mcp_client_cm = create_mcp_client(
+            agent_topic=self._config.server_name,
+            server_url=self._config.server_url,
+            timeout_s=timeout_s,
+            auth_headers=auth_headers,
+        )
 
-        # Enter the streamable HTTP context manager
+        # Enter the factory-provided context manager
         self._cm_stack = contextlib.AsyncExitStack()
-        read_stream, write_stream, _ = await self._cm_stack.enter_async_context(
-            streamablehttp_client(**client_kwargs)
-        )
-        self._read_stream = read_stream
-        self._write_stream = write_stream
-
-        # Create and initialize session
-        self._session = await self._cm_stack.enter_async_context(
-            ClientSession(read_stream, write_stream)
-        )
+        self._session = await self._cm_stack.enter_async_context(mcp_client_cm)
         await self._session.initialize()
 
         # Discover available tools
@@ -312,7 +310,7 @@ class AgentRedMcpClient:
             for t in (tools_result.tools or [])
         ]
         logger.info(
-            "MCP connected to %s: %d tools available",
+            "MCP connected to %s: %d tools available (via AgntcyFactory)",
             self._config.server_name,
             len(self._available_tools),
         )

@@ -265,11 +265,11 @@ class TestAgentRedMcpClient:
 
     @pytest.mark.asyncio
     async def test_mcp_18_connect_discovers_tools(self) -> None:
-        """MCP-18: connect() discovers available tools from server."""
+        """MCP-18: connect() discovers available tools from server via AgntcyFactory."""
         cfg = _make_config()
         client = AgentRedMcpClient(cfg)
 
-        # Mock the MCP SDK context managers (deferred imports — patch at source)
+        # Mock the AgntcyFactory MCP client (routed via create_mcp_client)
         mock_tool = SimpleNamespace(
             name="search_products",
             description="Search products",
@@ -280,17 +280,16 @@ class TestAgentRedMcpClient:
         mock_session.initialize = AsyncMock()
         mock_session.list_tools = AsyncMock(return_value=mock_tools_result)
 
-        with patch("mcp.client.streamable_http.streamablehttp_client") as mock_http:
-            mock_http.return_value.__aenter__ = AsyncMock(
-                return_value=(MagicMock(), MagicMock(), MagicMock())
-            )
-            mock_http.return_value.__aexit__ = AsyncMock(return_value=False)
+        # create_mcp_client returns a context manager that yields the session
+        mock_cm = AsyncMock()
+        mock_cm.__aenter__ = AsyncMock(return_value=mock_session)
+        mock_cm.__aexit__ = AsyncMock(return_value=False)
 
-            with patch("mcp.ClientSession") as mock_cs_cls:
-                mock_cs_cls.return_value.__aenter__ = AsyncMock(return_value=mock_session)
-                mock_cs_cls.return_value.__aexit__ = AsyncMock(return_value=False)
-
-                await client.connect()
+        with patch(
+            "src.multi_tenant.agntcy_sdk_integration.create_mcp_client",
+            return_value=mock_cm,
+        ):
+            await client.connect()
 
         assert len(client.available_tools) == 1
         assert client.available_tools[0]["name"] == "search_products"

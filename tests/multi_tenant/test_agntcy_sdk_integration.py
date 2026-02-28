@@ -429,10 +429,10 @@ class TestClientCreation:
             mod.NATS_ENDPOINT = orig
 
     @patch("src.multi_tenant.agntcy_sdk_integration.AgntcyFactory")
-    def test_asdk_18_mcp_client_fails_without_transport(
+    def test_asdk_18_mcp_client_fails_without_transport_or_url(
         self, mock_cls: MagicMock
     ) -> None:
-        """ASDK-18: create_mcp_client() raises RuntimeError when no transport."""
+        """ASDK-18: create_mcp_client() raises RuntimeError when no transport or server_url."""
         mock_factory = MagicMock()
         mock_factory.registered_protocols.return_value = []
         mock_factory.registered_transports.return_value = []
@@ -444,7 +444,7 @@ class TestClientCreation:
         try:
             mod.SLIM_ENDPOINT = ""
             mod.NATS_ENDPOINT = ""
-            with pytest.raises(RuntimeError, match="no transport available"):
+            with pytest.raises(RuntimeError, match="no transport or"):
                 create_mcp_client("some-server")
         finally:
             mod.SLIM_ENDPOINT = orig_slim

@@ -32,7 +32,7 @@ Data store registry (Decision #9):
     │  DataStoreRegistry                                              │
     │  ┌──────────────────┐  ┌──────────────────┐  ┌──────────────┐ │
     │  │ Cosmos DB         │  │ NATS JetStream   │  │ Key Vault    │ │
-    │  │ (7 collections)   │  │ (tenant stream)  │  │ (tenant keys)│ │
+    │  │ (8 collections)   │  │ (tenant stream)  │  │ (tenant keys)│ │
     │  └──────────────────┘  └──────────────────┘  └──────────────┘ │
     └─────────────────────────────────────────────────────────────────┘
 
@@ -407,10 +407,11 @@ class DataStoreAdapter(Protocol):
 
 
 class CosmosDataStoreAdapter:
-    """Data store adapter for Cosmos DB (7 tenant-scoped collections).
+    """Data store adapter for Cosmos DB (8 tenant-scoped collections).
 
     Exports and deletes data from: tenants, conversations, usage,
-    customer_profiles, knowledge_bases, memory_vectors, preferences.
+    customer_profiles, knowledge_bases, memory_vectors, preferences,
+    pii_token_mappings.
 
     Uses the TenantScopedRepository pattern — all operations go through
     the repository layer which enforces tenant_id isolation.
@@ -425,6 +426,7 @@ class CosmosDataStoreAdapter:
         knowledge_base_repo: Any,
         memory_vector_repo: Any,
         preferences_repo: Any,
+        pii_token_mappings_repo: Any | None = None,
     ) -> None:
         self._repos = {
             "tenants": tenant_repo,
@@ -435,6 +437,8 @@ class CosmosDataStoreAdapter:
             "memory_vectors": memory_vector_repo,
             "preferences": preferences_repo,
         }
+        if pii_token_mappings_repo is not None:
+            self._repos["pii_token_mappings"] = pii_token_mappings_repo
 
     @property
     def store_name(self) -> str:
@@ -443,7 +447,7 @@ class CosmosDataStoreAdapter:
     async def export_tenant_data(
         self, tenant_id: str,
     ) -> dict[str, Any]:
-        """Export all tenant data from all 7 collections."""
+        """Export all tenant data from all registered collections."""
         result: dict[str, Any] = {}
 
         for name, repo in self._repos.items():

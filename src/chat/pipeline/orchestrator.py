@@ -155,16 +155,13 @@ class ChatPipeline(AgentDispatchMixin, CriticEscalationMixin, AnalyticsMixin):
             await self._http_client.aclose()
 
     def _init_agents(self) -> None:
-        """Initialize in-process A2A agent instances.
+        """Initialize in-process A2A agent instances (SPEC-1538).
 
-        Each agent is configured with the same dependencies that were
-        previously used by the inline _call_*_direct() methods. The agents
-        are only created when USE_AGENT_CONTAINERS is False -- when True,
-        the pipeline routes to external containers via HTTP.
+        Always creates in-process agents regardless of USE_AGENT_CONTAINERS.
+        When transport or containers are available, the dispatch layer routes
+        there first. In-process agents serve as graceful fallback when
+        transport/HTTP is unavailable (SPEC-1534, WI-0850).
         """
-        if USE_AGENT_CONTAINERS:
-            return
-
         from src.agents.intent_classifier import IntentClassifierAgent
         from src.agents.knowledge_retrieval import KnowledgeRetrievalAgent
         from src.agents.response_generator import ResponseGeneratorAgent
@@ -276,6 +273,13 @@ class ChatPipeline(AgentDispatchMixin, CriticEscalationMixin, AnalyticsMixin):
         pii_enabled = getattr(preferences, "pii_scrubbing", False) is True
         self._session.set_pii_scrubber(pii_enabled)
 
+        # SPEC-1541: Root pipeline span for execution tree reconstruction
+        from src.multi_tenant.otel_tracing import trace_pipeline_root
+
+        pipeline_span = trace_pipeline_root(conversation_id)
+        pipeline_span.set_attribute("pipeline.tenant_id", tenant_id)
+        pipeline_span.set_attribute("pipeline.tier", tier.value if hasattr(tier, "value") else str(tier))
+
         try:
             # ---------------------------------------------------------------
             # Phase 0: Load customer context (Layer 1 + Layer 2)
@@ -377,12 +381,35 @@ class ChatPipeline(AgentDispatchMixin, CriticEscalationMixin, AnalyticsMixin):
                     response_model = "gpt-4o"
 
             # ---------------------------------------------------------------
+            # Phase 6: PII Tokenization (SPEC-1543)
+            #
+            # Tokenize PII in the customer message before it reaches any
+            # AI agent. The tokenized message is used for IC, KR, and RG.
+            # Original values are restored after Critic validation (SPEC-1544).
+            # ---------------------------------------------------------------
+            from src.multi_tenant.pii_tokenizer import PiiTokenizer
+
+            customer_names: list[str] = []
+            if profile:
+                if hasattr(profile, "customer_name") and profile.customer_name:
+                    customer_names.append(profile.customer_name)
+                if hasattr(profile, "first_name") and profile.first_name:
+                    customer_names.append(profile.first_name)
+
+            pii_tokenizer = PiiTokenizer(customer_names=customer_names)
+            tokenized_message = pii_tokenizer.tokenize(
+                customer_message,
+                conversation_id=conversation_id,
+                tenant_id=tenant_id,
+            )
+
+            # ---------------------------------------------------------------
             # Phase 1: Intent Classification + Knowledge Retrieval
             #
             # WI #134: IC and KR run concurrently (asyncio.gather). Both
-            # operate on the raw customer message and don't depend on each
-            # other's output. Parallelization saves ~800ms (IC 800ms budget
-            # runs in parallel with KR 1,000ms instead of sequential).
+            # operate on the tokenized customer message and don't depend on
+            # each other's output. Parallelization saves ~800ms (IC 800ms
+            # budget runs in parallel with KR 1,000ms instead of sequential).
             #
             # If IC detects escalation intent, KR results are discarded
             # and the escalation handler takes over.
@@ -390,17 +417,17 @@ class ChatPipeline(AgentDispatchMixin, CriticEscalationMixin, AnalyticsMixin):
             yield stage_event("intent-classifier", "started", trace_id=trace_id)
             yield stage_event("knowledge-retrieval", "started", trace_id=trace_id)
 
-            # Launch both agents concurrently
+            # Launch both agents concurrently (using tokenized message)
             ic_task = budget.execute_with_budget(
                 "intent-classifier",
                 self._call_intent_classifier(
-                    customer_message, prompts[AgentRole.INTENT_CLASSIFIER],
+                    tokenized_message, prompts[AgentRole.INTENT_CLASSIFIER],
                 ),
             )
             kr_task = budget.execute_with_budget(
                 "knowledge-retrieval",
                 self._call_knowledge_retrieval(
-                    customer_message, "general_inquiry", prompts[AgentRole.KNOWLEDGE_RETRIEVAL],
+                    tokenized_message, "general_inquiry", prompts[AgentRole.KNOWLEDGE_RETRIEVAL],
                 ),
             )
 
@@ -483,7 +510,7 @@ class ChatPipeline(AgentDispatchMixin, CriticEscalationMixin, AnalyticsMixin):
 
             try:
                 async for chunk in self._call_response_generator_stream(
-                    customer_message=customer_message,
+                    customer_message=tokenized_message,
                     intent=intent,
                     knowledge_context=knowledge_context,
                     system_prompt=prompts[AgentRole.RESPONSE_GENERATOR],
@@ -535,8 +562,13 @@ class ChatPipeline(AgentDispatchMixin, CriticEscalationMixin, AnalyticsMixin):
             knowledge_titles = [s.get("title", "") for s in sources if s.get("title")]
 
             approved, safe_text, critic_result = await self._validate_with_critic(
-                tenant_id, conversation_id, full_response, customer_message, budget,
+                tenant_id, conversation_id, full_response, tokenized_message, budget,
                 knowledge_titles=knowledge_titles,
+            )
+
+            # SPEC-1544: Detokenize PII in the response after Critic validation
+            safe_text = pii_tokenizer.detokenize(
+                safe_text, conversation_id, tenant_id,
             )
 
             trace.set_critic_result(
@@ -654,6 +686,7 @@ class ChatPipeline(AgentDispatchMixin, CriticEscalationMixin, AnalyticsMixin):
             )
 
         except PipelineTimeoutError as exc:
+            pipeline_span.set_attribute("pipeline.error", "timeout")
             logger.warning(
                 "Pipeline timeout: conv=%s stage=%s budget=%dms elapsed=%.0fms",
                 conversation_id, exc.stage, exc.budget_ms, exc.elapsed_ms,
@@ -667,6 +700,7 @@ class ChatPipeline(AgentDispatchMixin, CriticEscalationMixin, AnalyticsMixin):
             yield done_event(conversation_id, 0)
 
         except ServiceUnavailableError as exc:
+            pipeline_span.set_attribute("pipeline.error", "service_unavailable")
             logger.warning(
                 "Service unavailable: conv=%s service=%s",
                 conversation_id, exc.service_name,
@@ -680,6 +714,7 @@ class ChatPipeline(AgentDispatchMixin, CriticEscalationMixin, AnalyticsMixin):
             yield done_event(conversation_id, 0)
 
         except Exception as exc:
+            pipeline_span.set_attribute("pipeline.error", type(exc).__name__)
             # Include exception details in SSE event for debugging
             exc_type = type(exc).__name__
             exc_msg = str(exc)[:500]  # Truncate long messages
@@ -701,6 +736,11 @@ class ChatPipeline(AgentDispatchMixin, CriticEscalationMixin, AnalyticsMixin):
                 recoverable=True,
             )
             yield done_event(conversation_id, 0)
+
+        finally:
+            # SPEC-1541: End the root pipeline span
+            pipeline_span.set_attribute("pipeline.total_latency_ms", int(budget.elapsed_ms))
+            pipeline_span.end()
 
     # -------------------------------------------------------------------
     # Customer context loading (Layer 1 + Layer 2)

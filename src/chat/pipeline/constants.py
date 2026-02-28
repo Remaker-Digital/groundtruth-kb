@@ -16,11 +16,12 @@ import os
 # USE_AGENT_CONTAINERS controls whether the pipeline routes through AGNTCY
 # agent containers (HTTP) or calls Azure OpenAI directly.
 #
-# Default: False — use direct Azure OpenAI calls.
-# Set to "true" only when AGNTCY agent containers are healthy and serving.
+# Default: True — route through AGNTCY agent containers (SPEC-1534).
+# AGNTCY SDK is mandatory. In-process agents serve as fallback when
+# containers are unavailable, not as the primary dispatch path.
 # ---------------------------------------------------------------------------
 USE_AGENT_CONTAINERS = os.environ.get(
-    "USE_AGENT_CONTAINERS", "false"
+    "USE_AGENT_CONTAINERS", "true"
 ).lower() == "true"
 
 # Default agent URLs — overridden by environment variables in production.

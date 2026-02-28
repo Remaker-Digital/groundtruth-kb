@@ -2,7 +2,7 @@
 
 Covers:
     - API_VERSION constant exists and equals "1.0.0"
-    - PRODUCT_VERSION constant exists and equals "1.61.0"
+    - PRODUCT_VERSION constant exists and equals "1.62.0"
 
 Note: These are trivial constant checks. The ApiVersionMiddleware itself
 is tested elsewhere via integration tests.
@@ -45,7 +45,7 @@ class TestProductVersionConstant:
         assert PRODUCT_VERSION is not None
 
     def test_product_version_value(self):
-        assert PRODUCT_VERSION == "1.61.0"
+        assert PRODUCT_VERSION == "1.62.0"
 
     def test_product_version_is_string(self):
         assert isinstance(PRODUCT_VERSION, str)

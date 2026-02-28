@@ -65,6 +65,7 @@ COLLECTION_INCIDENTS = "incidents"
 COLLECTION_ALERT_RULES = "alert_rules"
 COLLECTION_ALERT_HISTORY = "alert_history"
 COLLECTION_INGESTION_JOBS = "ingestion_jobs"
+COLLECTION_PII_TOKEN_MAPPINGS = "pii_token_mappings"
 
 ALL_COLLECTIONS = [
     COLLECTION_TENANTS,
@@ -83,6 +84,7 @@ ALL_COLLECTIONS = [
     COLLECTION_ALERT_RULES,
     COLLECTION_ALERT_HISTORY,
     COLLECTION_INGESTION_JOBS,
+    COLLECTION_PII_TOKEN_MAPPINGS,
 ]
 
 # Cosmos DB Serverless — no provisioned throughput (pay per RU consumed)
@@ -102,6 +104,7 @@ TTL_VERIFICATION_TOKEN = 10 * 60           # 10 minutes (email verification link
 TTL_INCIDENTS = 365 * 24 * 60 * 60        # 1 year (incident history retention)
 TTL_ALERT_HISTORY = 90 * 24 * 60 * 60     # 90 days (alert history retention)
 TTL_INGESTION_JOBS = 30 * 24 * 60 * 60   # 30 days (ingestion job retention)
+TTL_PII_TOKEN_MAPPINGS = 7 * 24 * 60 * 60  # 7 days (PII token mapping retention)
 
 
 # ---------------------------------------------------------------------------
@@ -1522,6 +1525,44 @@ class IngestionJobDocument(BaseModel):
     ttl: int = Field(default=TTL_INGESTION_JOBS, alias="_ts_ttl")
 
 
+class PiiTokenMappingDocument(BaseModel):
+    """PII token mapping for reversible tokenization (SPEC-1545).
+
+    Stores the mapping between PII tokens (``pii-{type}-{uuid}``) and their
+    original values. Used by PiiTokenizer to detokenize responses before
+    delivery to the customer.
+
+    Each document represents one conversation's complete token mapping set.
+    Per-conversation granularity enables efficient lookup during detokenization
+    and GDPR-compliant deletion (one conversation at a time or all for a tenant).
+
+    Partition key: /tenant_id
+    TTL: 7 days (matching conversation retention window).
+    """
+
+    id: str = Field(description="Document ID: {tenant_id}:{conversation_id}")
+    tenant_id: str = Field(description="Partition key — tenant owning this conversation")
+    conversation_id: str = Field(description="Conversation these tokens belong to")
+
+    # Token mappings: list of {token, original, pii_type, created_at}
+    mappings: list[dict[str, Any]] = Field(
+        default_factory=list,
+        description=(
+            "List of token mappings. Each entry: "
+            "{token: 'pii-email-uuid', original: 'user@example.com', "
+            "pii_type: 'email', created_at: 'ISO 8601'}"
+        ),
+    )
+
+    # Metadata
+    mapping_count: int = Field(default=0, description="Number of active token mappings")
+    created_at: str = Field(description="When first mapping was created (ISO 8601)")
+    updated_at: str = Field(description="When last mapping was added (ISO 8601)")
+
+    # TTL
+    ttl: int = Field(default=TTL_PII_TOKEN_MAPPINGS, alias="_ts_ttl")
+
+
 # ---------------------------------------------------------------------------
 # Collection configuration
 # ---------------------------------------------------------------------------
@@ -1539,7 +1580,7 @@ class CollectionConfig(BaseModel):
 
 
 def get_collection_configs() -> list[CollectionConfig]:
-    """Return collection configurations for all 16 containers.
+    """Return collection configurations for all 17 containers.
 
     These configs are used by the database initialization utility
     to create containers idempotently.
@@ -1909,6 +1950,31 @@ def get_collection_configs() -> list[CollectionConfig]:
                     [
                         {"path": "/status", "order": "ascending"},
                         {"path": "/created_at", "order": "ascending"},
+                    ],
+                ],
+            },
+        ),
+        # 17. pii_token_mappings (Phase 6: reversible PII tokenization, 7-day TTL)
+        CollectionConfig(
+            name=COLLECTION_PII_TOKEN_MAPPINGS,
+            partition_key="/tenant_id",
+            default_ttl=TTL_PII_TOKEN_MAPPINGS,
+            indexing_policy={
+                "automatic": True,
+                "indexingMode": "consistent",
+                "includedPaths": [{"path": "/*"}],
+                "excludedPaths": [
+                    {"path": "/mappings/*"},
+                    {"path": '/"_etag"/?'},
+                ],
+                "compositeIndexes": [
+                    [
+                        {"path": "/tenant_id", "order": "ascending"},
+                        {"path": "/conversation_id", "order": "ascending"},
+                    ],
+                    [
+                        {"path": "/tenant_id", "order": "ascending"},
+                        {"path": "/updated_at", "order": "descending"},
                     ],
                 ],
             },

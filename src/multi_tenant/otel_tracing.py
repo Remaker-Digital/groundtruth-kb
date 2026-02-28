@@ -71,6 +71,13 @@ ATTR_AUTH_METHOD = "tenant.auth_method"
 ATTR_TIER = "tenant.tier"
 ATTR_AGENT = "pipeline.agent"
 
+# LLM token/cost attributes (SPEC-1540)
+ATTR_LLM_PROMPT_TOKENS = "llm.prompt_tokens"
+ATTR_LLM_COMPLETION_TOKENS = "llm.completion_tokens"
+ATTR_LLM_TOTAL_TOKENS = "llm.total_tokens"
+ATTR_LLM_MODEL = "llm.model"
+ATTR_LLM_COST_USD = "llm.estimated_cost_usd"
+
 # Service identification
 SERVICE_NAME = "agent-red"
 SERVICE_VERSION = "1.0.0"
@@ -236,6 +243,76 @@ class TenantLogFilter(logging.Filter):
 
 
 # ---------------------------------------------------------------------------
+# LLM Cost Attribution Model (SPEC-1540)
+# ---------------------------------------------------------------------------
+
+# Azure OpenAI pricing per 1K tokens (as of 2026-02, East US)
+# These rates are updated periodically and should match the Azure pricing page.
+LLM_COST_PER_1K_TOKENS: dict[str, dict[str, float]] = {
+    "gpt-4o": {"prompt": 0.005, "completion": 0.015},
+    "gpt-4o-mini": {"prompt": 0.00015, "completion": 0.0006},
+    "gpt-4o-2024-11-20": {"prompt": 0.005, "completion": 0.015},
+    "text-embedding-3-small": {"prompt": 0.00002, "completion": 0.0},
+    "text-embedding-3-large": {"prompt": 0.00013, "completion": 0.0},
+}
+
+
+def calculate_llm_cost(
+    model: str,
+    prompt_tokens: int,
+    completion_tokens: int,
+) -> float:
+    """Calculate estimated USD cost for an LLM API call (SPEC-1540).
+
+    Args:
+        model: Model identifier (e.g., "gpt-4o", "gpt-4o-mini").
+        prompt_tokens: Number of input tokens.
+        completion_tokens: Number of output tokens.
+
+    Returns:
+        Estimated cost in USD. Returns 0.0 for unknown models.
+    """
+    rates = LLM_COST_PER_1K_TOKENS.get(model)
+    if rates is None:
+        return 0.0
+    prompt_cost = (prompt_tokens / 1000) * rates["prompt"]
+    completion_cost = (completion_tokens / 1000) * rates["completion"]
+    return round(prompt_cost + completion_cost, 8)
+
+
+def record_token_usage(
+    span: trace.Span,
+    model: str,
+    prompt_tokens: int,
+    completion_tokens: int,
+) -> float:
+    """Record LLM token usage and cost on a span (SPEC-1540).
+
+    Sets llm.prompt_tokens, llm.completion_tokens, llm.total_tokens,
+    llm.model, and llm.estimated_cost_usd as span attributes.
+
+    Args:
+        span: The OpenTelemetry span to annotate.
+        model: Model identifier.
+        prompt_tokens: Number of input tokens.
+        completion_tokens: Number of output tokens.
+
+    Returns:
+        Estimated cost in USD.
+    """
+    total = prompt_tokens + completion_tokens
+    cost = calculate_llm_cost(model, prompt_tokens, completion_tokens)
+
+    span.set_attribute(ATTR_LLM_MODEL, model)
+    span.set_attribute(ATTR_LLM_PROMPT_TOKENS, prompt_tokens)
+    span.set_attribute(ATTR_LLM_COMPLETION_TOKENS, completion_tokens)
+    span.set_attribute(ATTR_LLM_TOTAL_TOKENS, total)
+    span.set_attribute(ATTR_LLM_COST_USD, cost)
+
+    return cost
+
+
+# ---------------------------------------------------------------------------
 # Agent-scoped tracing helper
 # ---------------------------------------------------------------------------
 
@@ -245,10 +322,11 @@ def trace_agent_operation(
     operation: str,
     conversation_id: str | None = None,
 ) -> trace.Span:
-    """Create a span for an agent pipeline operation.
+    """Create a span for an agent pipeline operation (SPEC-1539).
 
     Convenience function for instrumenting agent processing steps.
-    Automatically includes the current correlation context.
+    Automatically includes the current correlation context. Used by
+    pipeline dispatch methods to create parent-child span trees.
 
     Args:
         agent: Agent name (e.g., "intent-classifier", "response-generator").
@@ -262,6 +340,7 @@ def trace_agent_operation(
         with trace_agent_operation("intent-classifier", "classify") as span:
             result = await classify_intent(message)
             span.set_attribute("intent.result", result.intent)
+            record_token_usage(span, "gpt-4o-mini", result.prompt_tokens, result.completion_tokens)
     """
     tracer = trace.get_tracer(SERVICE_NAME, SERVICE_VERSION)
     span = tracer.start_span(
@@ -278,6 +357,41 @@ def trace_agent_operation(
                 ATTR_CONVERSATION_ID,
                 conversation_id or ctx.conversation_id,
             )
+
+    return span
+
+
+def trace_pipeline_root(
+    conversation_id: str | None = None,
+) -> trace.Span:
+    """Create the root span for a pipeline execution (SPEC-1541).
+
+    This is the top-level span that all agent operation spans are
+    children of. It represents the full pipeline.process lifecycle
+    from intent classification through response delivery.
+
+    Args:
+        conversation_id: Conversation ID for the pipeline run.
+
+    Returns:
+        An OpenTelemetry Span (use as context manager).
+    """
+    tracer = trace.get_tracer(SERVICE_NAME, SERVICE_VERSION)
+    span = tracer.start_span(
+        name="pipeline.process",
+        attributes={ATTR_AGENT: "orchestrator"},
+    )
+
+    ctx = get_correlation_context()
+    if ctx is not None:
+        span.set_attribute(ATTR_TENANT_ID, ctx.tenant_id)
+        if conversation_id or ctx.conversation_id:
+            span.set_attribute(
+                ATTR_CONVERSATION_ID,
+                conversation_id or ctx.conversation_id,
+            )
+        if ctx.trace_id:
+            span.set_attribute(ATTR_TRACE_ID, ctx.trace_id)
 
     return span
 

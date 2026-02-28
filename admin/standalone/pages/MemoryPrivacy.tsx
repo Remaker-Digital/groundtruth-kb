@@ -27,6 +27,7 @@ import {
   Alert,
   Badge,
   SegmentedControl,
+  NumberInput,
 } from '@mantine/core';
 import { useAppContext } from '../layouts/StandaloneLayout';
 import { useConfig, useUpdateConfig } from '../../shared/hooks/index';
@@ -57,7 +58,8 @@ export const MemoryPrivacyPage: React.FC = () => {
   const { data: fullConfig, loading, error } = useConfig(apiFetch);
   const { updateConfig, loading: saving } = useUpdateConfig(apiFetch);
 
-  const config = fullConfig?.config ?? {};
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const config: Record<string, any> = fullConfig?.config ?? {};
 
   // Local state for form values
   const [memoryEnabled, setMemoryEnabled] = useState(false);
@@ -88,6 +90,14 @@ export const MemoryPrivacyPage: React.FC = () => {
   const tier = tenantContext?.tier ?? 'starter';
   const isProOrHigher = tier === 'professional' || tier === 'enterprise';
   const isEnterprise = tier === 'enterprise';
+
+  // Fine-tuning inline config updates (Enterprise only, PCM Layer 4)
+  const handleConfigChange = useCallback(async (key: string, value: unknown) => {
+    const result = await updateConfig({ [key]: value });
+    if (result?.success) {
+      onNotify(`${key} updated.`, 'success');
+    }
+  }, [updateConfig, onNotify]);
 
   const handleSave = useCallback(async () => {
     // Field names must match backend config field registry.
@@ -311,10 +321,10 @@ export const MemoryPrivacyPage: React.FC = () => {
               variant="light"
               color={ACTION_BLUE}
               onClick={() => {
-                fetch('/api/admin/fine-tuning/trigger', { method: 'POST', headers: { 'Authorization': `Bearer ${apiKey}` } })
-                  .then(r => r.json())
-                  .then(() => notifications.show({ title: 'Training triggered', message: 'Fine-tuning pipeline started', color: 'green' }))
-                  .catch(() => notifications.show({ title: 'Error', message: 'Failed to trigger training', color: 'red' }));
+                apiFetch('/api/admin/fine-tuning/trigger', { method: 'POST' })
+                  .then((r: Response) => r.json())
+                  .then(() => onNotify('Fine-tuning pipeline started.', 'success'))
+                  .catch(() => onNotify('Failed to trigger training.', 'error'));
               }}
             >
               Trigger training now

@@ -40,8 +40,8 @@ class AnalyticsMixin:
     ) -> None:
         """Send analytics event asynchronously (non-blocking).
 
-        When USE_AGENT_CONTAINERS is false, delegates to the in-process
-        AnalyticsCollectorAgent. When true, sends to the AGNTCY container.
+        Routes via transport → HTTP → in-process (SPEC-1536).
+        Analytics is fire-and-forget — failures never block the pipeline.
         """
         try:
             analytics_data = {
@@ -59,6 +59,28 @@ class AnalyticsMixin:
                 "total_latency_ms": budget.elapsed_ms,
             }
 
+            # Priority 1: SLIM/NATS transport (SPEC-1536)
+            sent = False
+            try:
+                from src.multi_tenant.agntcy_sdk_integration import (
+                    _transport,
+                    create_a2a_client,
+                )
+
+                if _transport is not None:
+                    client = create_a2a_client("analytics-collector")
+                    await client.send(analytics_data, headers={
+                        "X-Tenant-Id": tenant_id,
+                        "X-Conversation-Id": conversation_id,
+                    })
+                    sent = True
+            except Exception:
+                logger.debug("Transport analytics dispatch failed — falling back")
+
+            if sent:
+                return
+
+            # Priority 2: HTTP container
             if USE_AGENT_CONTAINERS:
                 url = self._agent_urls.get("analytics-collector", "")
                 client = await self._get_http_client()
@@ -68,7 +90,7 @@ class AnalyticsMixin:
                     timeout=httpx.Timeout(connect=1.0, read=2.0, write=1.0, pool=1.0),
                 )
             else:
-                # Delegate to in-process AnalyticsCollectorAgent
+                # Priority 3: In-process agent (fallback)
                 await self._an_agent.process(analytics_data, {})
         except Exception:
             # Analytics is fire-and-forget — never block the pipeline

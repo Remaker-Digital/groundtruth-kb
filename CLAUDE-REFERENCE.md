@@ -46,7 +46,7 @@ Agent Red consumes the AGNTCY open-source project as any external third party wo
 - **License:** Open Source
 - **SDK Package:** `agntcy-app-sdk` (PyPI)
 
-AGNTCY provides six specialized AI agents. Agent Red bypasses AGNTCY agent containers (`USE_AGENT_CONTAINERS=false`) and calls Azure OpenAI directly via the API Gateway pipeline. AGNTCY containers show ActivationFailed — this is expected.
+AGNTCY SDK is the mandatory foundation for all Agent Red agent communication. Agent Red uses the `agntcy-app-sdk` for agent protocols (A2A, MCP), transport (SLIM/NATS), and factory patterns (`AgntcyFactory`). All six agents route through AGNTCY transport by default (`USE_AGENT_CONTAINERS=true`), with in-process fallback when transport is unavailable.
 
 ### How Agent Red Consumes AGNTCY
 

@@ -275,12 +275,44 @@ class CriticEscalationMixin:
         yield validated_event(conversation_id, "escalation")
         yield done_event(conversation_id, 0)
 
+    def _transport_available(self) -> bool:
+        """Check if AGNTCY transport is available (delegate to dispatch mixin)."""
+        try:
+            from src.multi_tenant.agntcy_sdk_integration import _transport
+            return _transport is not None
+        except Exception:
+            return False
+
+    async def _call_via_transport(
+        self,
+        agent_topic: str,
+        payload: dict[str, Any],
+    ) -> dict[str, Any]:
+        """Route via SLIM/NATS transport (SPEC-1536)."""
+        from src.multi_tenant.agntcy_sdk_integration import create_a2a_client
+
+        client = create_a2a_client(agent_topic)
+        response = await client.send(payload, headers={
+            "X-Tenant-Id": getattr(self, "_current_tenant_id", ""),
+            "X-Conversation-Id": getattr(self, "_current_conversation_id", ""),
+            "X-Trace-Id": getattr(self, "_current_trace_id", ""),
+        })
+        return response if isinstance(response, dict) else {"result": response}
+
     async def _call_escalation_handler(
         self,
         message: str,
         system_prompt: str,
     ) -> dict[str, Any]:
-        """Route escalation to Azure OpenAI directly or AGNTCY container."""
+        """Route escalation via transport → HTTP → in-process (SPEC-1536)."""
+        if self._transport_available():
+            try:
+                return await self._call_via_transport(
+                    "escalation-handler",
+                    {"message": message, "system_prompt": system_prompt},
+                )
+            except Exception as exc:
+                logger.warning("Transport ESC call failed, falling back: %s", exc)
         if USE_AGENT_CONTAINERS:
             return await self._call_escalation_handler_http(message, system_prompt)
         return await self._call_escalation_handler_direct(message, system_prompt)

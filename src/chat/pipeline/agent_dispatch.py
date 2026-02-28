@@ -16,6 +16,7 @@ from collections.abc import AsyncGenerator
 from typing import TYPE_CHECKING, Any
 
 import httpx
+from opentelemetry import trace
 
 from src.chat.pipeline.constants import (
     AGENT_CLASSIFY_PATH,
@@ -95,18 +96,42 @@ class AgentDispatchMixin:
 
         Routes via SLIM/NATS transport (preferred), AGNTCY HTTP containers,
         or in-process based on configuration (SPEC-1525).
+        Wrapped in trace_agent_operation() span (SPEC-1539).
         """
-        if self._transport_available():
-            try:
-                return await self._call_via_transport(
-                    "intent-classifier",
-                    {"message": message, "system_prompt": system_prompt},
+        from src.multi_tenant.otel_tracing import record_token_usage, trace_agent_operation
+
+        span = trace_agent_operation("intent-classifier", "classify")
+        try:
+            if self._transport_available():
+                try:
+                    result = await self._call_via_transport(
+                        "intent-classifier",
+                        {"message": message, "system_prompt": system_prompt},
+                    )
+                    span.set_attribute("dispatch.mode", "transport")
+                    return result
+                except Exception as exc:
+                    logger.warning("Transport IC call failed, falling back: %s", exc)
+            if USE_AGENT_CONTAINERS:
+                span.set_attribute("dispatch.mode", "http")
+                return await self._call_intent_classifier_http(message, system_prompt)
+            span.set_attribute("dispatch.mode", "in-process")
+            result = await self._call_intent_classifier_direct(message, system_prompt)
+            # Record token usage if available (SPEC-1540)
+            if "usage" in result:
+                usage = result["usage"]
+                record_token_usage(
+                    span,
+                    usage.get("model", "gpt-4o-mini"),
+                    usage.get("prompt_tokens", 0),
+                    usage.get("completion_tokens", 0),
                 )
-            except Exception as exc:
-                logger.warning("Transport IC call failed, falling back: %s", exc)
-        if USE_AGENT_CONTAINERS:
-            return await self._call_intent_classifier_http(message, system_prompt)
-        return await self._call_intent_classifier_direct(message, system_prompt)
+            return result
+        except Exception:
+            span.set_status(trace.StatusCode.ERROR)  # type: ignore[attr-defined]
+            raise
+        finally:
+            span.end()
 
     async def _call_intent_classifier_direct(
         self,
@@ -156,18 +181,32 @@ class AgentDispatchMixin:
 
         Routes via SLIM/NATS transport (preferred), AGNTCY containers,
         or in-process based on configuration (SPEC-1525).
+        Wrapped in trace_agent_operation span (SPEC-1539).
         """
-        if self._transport_available():
-            try:
-                return await self._call_via_transport(
-                    "knowledge-retrieval",
-                    {"message": message, "intent": intent, "system_prompt": system_prompt},
-                )
-            except Exception as exc:
-                logger.warning("Transport KR call failed, falling back: %s", exc)
-        if USE_AGENT_CONTAINERS:
-            return await self._call_knowledge_retrieval_http(message, intent, system_prompt)
-        return await self._call_knowledge_retrieval_direct(message, intent, system_prompt)
+        from src.multi_tenant.otel_tracing import trace_agent_operation
+
+        span = trace_agent_operation("knowledge-retrieval", "retrieve")
+        try:
+            if self._transport_available():
+                try:
+                    result = await self._call_via_transport(
+                        "knowledge-retrieval",
+                        {"message": message, "intent": intent, "system_prompt": system_prompt},
+                    )
+                    span.set_attribute("dispatch.mode", "transport")
+                    return result
+                except Exception as exc:
+                    logger.warning("Transport KR call failed, falling back: %s", exc)
+            if USE_AGENT_CONTAINERS:
+                span.set_attribute("dispatch.mode", "http")
+                return await self._call_knowledge_retrieval_http(message, intent, system_prompt)
+            span.set_attribute("dispatch.mode", "in-process")
+            return await self._call_knowledge_retrieval_direct(message, intent, system_prompt)
+        except Exception:
+            span.set_status(trace.StatusCode.ERROR)
+            raise
+        finally:
+            span.end()
 
     async def _call_knowledge_retrieval_direct(
         self,
@@ -262,13 +301,28 @@ class AgentDispatchMixin:
     ) -> AsyncGenerator[str, None]:
         """Generate a streaming AI response.
 
-        Routes to Azure OpenAI directly (default) or AGNTCY container
-        based on USE_AGENT_CONTAINERS flag.
+        Routes via transport → HTTP → in-process (SPEC-1536, SPEC-1537).
+        Transport streaming uses hybrid SSE-over-transport for the RG
+        container when SLIM/NATS is active.
 
         WI #93-96: The ``model`` parameter allows Layer 4 fine-tuned
         models to override the default gpt-4o for Enterprise tenants
         with the fine-tuning add-on enabled.
         """
+        # Priority 1: SLIM/NATS transport (SPEC-1537)
+        if self._transport_available():
+            try:
+                async for chunk in self._call_response_generator_stream_transport(
+                    customer_message, intent, knowledge_context,
+                    system_prompt, budget, model,
+                    conversation_history=conversation_history,
+                ):
+                    yield chunk
+                return
+            except Exception as exc:
+                logger.warning("Transport RG stream failed, falling back: %s", exc)
+
+        # Priority 2: HTTP container
         if USE_AGENT_CONTAINERS:
             async for chunk in self._call_response_generator_stream_http(
                 customer_message, intent, knowledge_context,
@@ -276,12 +330,68 @@ class AgentDispatchMixin:
             ):
                 yield chunk
         else:
+            # Priority 3: In-process agent (fallback)
             async for chunk in self._call_response_generator_stream_direct(
                 customer_message, intent, knowledge_context,
                 system_prompt, budget, model,
                 conversation_history=conversation_history,
             ):
                 yield chunk
+
+    async def _call_response_generator_stream_transport(
+        self,
+        customer_message: str,
+        intent: str,
+        knowledge_context: str,
+        system_prompt: str,
+        budget: PipelineTimeoutBudget,
+        model: str = "gpt-4o",
+        conversation_history: list[dict[str, str]] | None = None,
+    ) -> AsyncGenerator[str, None]:
+        """Stream response via SLIM/NATS transport (SPEC-1537).
+
+        Sends the generation request to the RG container over A2A transport
+        and receives streaming chunks back. The transport layer handles
+        chunked delivery; this method yields each chunk as it arrives.
+        """
+        from src.multi_tenant.agntcy_sdk_integration import create_a2a_client
+
+        tenant_id = getattr(self, "_current_tenant_id", "")
+        conversation_id = getattr(self, "_current_conversation_id", "")
+        trace_id = getattr(self, "_current_trace_id", "")
+
+        remaining_ms = budget.remaining_ms
+        timeout_seconds = max(0.5, remaining_ms / 1000)
+
+        client = create_a2a_client("response-generator")
+        response = await client.send(
+            {
+                "message": customer_message,
+                "intent": intent,
+                "knowledge_context": knowledge_context,
+                "system_prompt": system_prompt,
+                "model": model,
+                "conversation_history": conversation_history or [],
+                "stream": True,
+                "timeout_seconds": timeout_seconds,
+            },
+            headers={
+                "X-Tenant-Id": tenant_id,
+                "X-Conversation-Id": conversation_id,
+                "X-Trace-Id": trace_id,
+            },
+        )
+
+        # Transport may return streamed chunks as list or single response
+        if isinstance(response, dict):
+            chunks = response.get("chunks", [response.get("text", "")])
+            for chunk in chunks:
+                if chunk:
+                    yield chunk
+        elif isinstance(response, str):
+            yield response
+        else:
+            logger.warning("Unexpected transport RG response type: %s", type(response))
 
     async def _call_response_generator_stream_direct(
         self,

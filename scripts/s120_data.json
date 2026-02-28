@@ -1,0 +1,586 @@
+{
+  "specs": [
+    {
+      "id": "SPEC-1534",
+      "title": "AGNTCY SDK Mandatory for All Agent Communication",
+      "status": "specified",
+      "changed_by": "S120",
+      "change_reason": "Owner directive: AGNTCY SDK is mandatory, no relaxations",
+      "description": "AGNTCY SDK (agntcy-app-sdk) is the mandatory foundation for all agent communication, transport creation, and protocol client creation in Agent Red. No direct SDK bypass, relaxation, or opt-out is permitted.",
+      "section": "AGNTCY",
+      "type": "governance",
+      "assertions": [
+        {
+          "type": "grep",
+          "description": "AgntcyFactory is the sole factory for transport and protocol client creation",
+          "query": "AgntcyFactory",
+          "target": "src/multi_tenant/agntcy_sdk_integration.py",
+          "expected": "match"
+        },
+        {
+          "type": "grep",
+          "description": "mcp_client.py uses create_mcp_client from agntcy_sdk_integration",
+          "query": "create_mcp_client",
+          "target": "src/multi_tenant/mcp_client.py",
+          "expected": "match"
+        },
+        {
+          "type": "grep",
+          "description": "No relaxation/bypass language in adoption procedure",
+          "query": "relaxation",
+          "target": "docs/operations/agntcy-platform-adoption-procedure.md",
+          "expected": "no_match"
+        },
+        {
+          "type": "grep",
+          "description": "USE_AGENT_CONTAINERS default is true",
+          "query": "true",
+          "target": "src/chat/pipeline/constants.py",
+          "expected": "match"
+        }
+      ]
+    },
+    {
+      "id": "SPEC-1535",
+      "title": "Containerized Agent Deployment",
+      "status": "specified",
+      "changed_by": "S120",
+      "change_reason": "Phase 2 Pipeline Decomposition",
+      "description": "All 6 agents deploy as independent Container Apps with NATS/SLIM transport.",
+      "section": "AGNTCY",
+      "assertions": [
+        {
+          "type": "glob",
+          "description": "6 agent container entry points exist",
+          "query": "src/agents/containers/*_app.py",
+          "expected": "count_gte:6"
+        },
+        {
+          "type": "grep",
+          "description": "Container app factory has health endpoint",
+          "query": "/health",
+          "target": "src/agents/containers/agent_app.py",
+          "expected": "match"
+        },
+        {
+          "type": "grep",
+          "description": "USE_AGENT_CONTAINERS default is true",
+          "query": "true",
+          "target": "src/chat/pipeline/constants.py",
+          "expected": "match"
+        },
+        {
+          "type": "grep",
+          "description": "Agent dispatch routes through transport when available",
+          "query": "_transport_available",
+          "target": "src/chat/pipeline/agent_dispatch.py",
+          "expected": "match"
+        }
+      ]
+    },
+    {
+      "id": "SPEC-1536",
+      "title": "A2A Transport for All Agent Communication",
+      "status": "specified",
+      "changed_by": "S120",
+      "change_reason": "Phase 2 Pipeline Decomposition",
+      "description": "Agents communicate via A2A protocol over SLIM/NATS transport.",
+      "section": "AGNTCY",
+      "assertions": [
+        {
+          "type": "grep",
+          "description": "IC dispatch via transport",
+          "query": "intent-classifier",
+          "target": "src/chat/pipeline/agent_dispatch.py",
+          "expected": "match"
+        },
+        {
+          "type": "grep",
+          "description": "KR dispatch via transport",
+          "query": "knowledge-retrieval",
+          "target": "src/chat/pipeline/agent_dispatch.py",
+          "expected": "match"
+        },
+        {
+          "type": "grep",
+          "description": "A2A client creation uses factory",
+          "query": "create_a2a_client",
+          "target": "src/multi_tenant/agntcy_sdk_integration.py",
+          "expected": "match"
+        },
+        {
+          "type": "grep",
+          "description": "Transport uses SLIM or NATS",
+          "query": "SLIM|NATS",
+          "target": "src/multi_tenant/agntcy_sdk_integration.py",
+          "expected": "match"
+        }
+      ]
+    },
+    {
+      "id": "SPEC-1537",
+      "title": "Streaming Response Generation Over Transport",
+      "status": "specified",
+      "changed_by": "S120",
+      "change_reason": "Phase 2 Pipeline Decomposition",
+      "description": "ResponseGenerator supports SSE streaming alongside A2A protocol. Uses HTTP SSE to container for streaming (hybrid A2A + HTTP SSE).",
+      "section": "AGNTCY",
+      "assertions": [
+        {
+          "type": "grep",
+          "description": "RG container exposes /generate/stream endpoint",
+          "query": "/generate/stream",
+          "target": "src/agents/containers/response_generator_app.py",
+          "expected": "match"
+        },
+        {
+          "type": "grep",
+          "description": "Transport-aware streaming in dispatch",
+          "query": "_transport_available",
+          "target": "src/chat/pipeline/agent_dispatch.py",
+          "expected": "match"
+        }
+      ]
+    },
+    {
+      "id": "SPEC-1538",
+      "title": "Pipeline Behavior Preservation After Decomposition",
+      "status": "specified",
+      "changed_by": "S120",
+      "change_reason": "Phase 2 Pipeline Decomposition",
+      "description": "No customer-visible functional regression from pipeline decomposition.",
+      "section": "AGNTCY",
+      "assertions": [
+        {
+          "type": "grep",
+          "description": "17-intent taxonomy preserved",
+          "query": "INTENT_TAXONOMY",
+          "target": "src/chat/pipeline/constants.py",
+          "expected": "match"
+        },
+        {
+          "type": "grep",
+          "description": "Critic validation preserved",
+          "query": "CriticSupervisorAgent",
+          "target": "src/agents/critic_supervisor.py",
+          "expected": "match"
+        }
+      ]
+    },
+    {
+      "id": "SPEC-1539",
+      "title": "Per-Agent OpenTelemetry Spans",
+      "status": "specified",
+      "changed_by": "S120",
+      "change_reason": "Phase 5 OTel Tracing",
+      "description": "Each agent pipeline step emits OpenTelemetry spans with agent identity.",
+      "section": "AGNTCY",
+      "assertions": [
+        {
+          "type": "grep",
+          "description": "Root pipeline span creation",
+          "query": "pipeline.process",
+          "target": "src/chat/pipeline/orchestrator.py",
+          "expected": "match"
+        },
+        {
+          "type": "grep",
+          "description": "trace_agent_operation used in dispatch",
+          "query": "trace_agent_operation",
+          "target": "src/chat/pipeline/agent_dispatch.py",
+          "expected": "match"
+        },
+        {
+          "type": "grep",
+          "description": "ATTR_AGENT attribute in spans",
+          "query": "ATTR_AGENT",
+          "target": "src/multi_tenant/otel_tracing.py",
+          "expected": "match"
+        }
+      ]
+    },
+    {
+      "id": "SPEC-1540",
+      "title": "Token Usage and Cost Attribution",
+      "status": "specified",
+      "changed_by": "S120",
+      "change_reason": "Phase 5 OTel Tracing",
+      "description": "LLM-calling agents track token usage and estimated cost per invocation.",
+      "section": "AGNTCY",
+      "assertions": [
+        {
+          "type": "grep",
+          "description": "LLM token attributes defined",
+          "query": "ATTR_LLM_PROMPT_TOKENS",
+          "target": "src/multi_tenant/otel_tracing.py",
+          "expected": "match"
+        },
+        {
+          "type": "grep",
+          "description": "Cost calculation function exists",
+          "query": "calculate_llm_cost",
+          "target": "src/multi_tenant/otel_tracing.py",
+          "expected": "match"
+        },
+        {
+          "type": "grep",
+          "description": "Cost attribute defined",
+          "query": "ATTR_LLM_COST_USD",
+          "target": "src/multi_tenant/otel_tracing.py",
+          "expected": "match"
+        }
+      ]
+    },
+    {
+      "id": "SPEC-1541",
+      "title": "Execution Tree Reconstruction",
+      "status": "specified",
+      "changed_by": "S120",
+      "change_reason": "Phase 5 OTel Tracing",
+      "description": "Conversation pipeline execution tree is reconstructable from OTel spans with parent-child relationships.",
+      "section": "AGNTCY",
+      "assertions": [
+        {
+          "type": "grep",
+          "description": "Root span in orchestrator",
+          "query": "pipeline.process",
+          "target": "src/chat/pipeline/orchestrator.py",
+          "expected": "match"
+        },
+        {
+          "type": "grep",
+          "description": "Agent spans use trace_agent_operation",
+          "query": "trace_agent_operation",
+          "target": "src/chat/pipeline/agent_dispatch.py",
+          "expected": "match"
+        }
+      ]
+    },
+    {
+      "id": "SPEC-1542",
+      "title": "Tracing Latency Requirement",
+      "status": "specified",
+      "changed_by": "S120",
+      "change_reason": "Phase 5 OTel Tracing",
+      "description": "OpenTelemetry tracing adds less than 10 percent latency to pipeline.",
+      "section": "AGNTCY",
+      "assertions": [
+        {
+          "type": "grep",
+          "description": "Tracing is non-blocking (BatchSpanProcessor)",
+          "query": "BatchSpanProcessor",
+          "target": "src/multi_tenant/otel_tracing.py",
+          "expected": "match"
+        }
+      ]
+    },
+    {
+      "id": "SPEC-1543",
+      "title": "PII Tokenization Before External AI Calls",
+      "status": "specified",
+      "changed_by": "S120",
+      "change_reason": "Phase 6 PII Tokenization",
+      "description": "Customer PII is replaced with UUIDs before any external AI API call.",
+      "section": "AGNTCY",
+      "assertions": [
+        {
+          "type": "glob",
+          "description": "PII tokenizer module exists",
+          "query": "src/multi_tenant/pii_tokenizer.py",
+          "expected": "count_gte:1"
+        },
+        {
+          "type": "grep",
+          "description": "Tokenization in pipeline orchestrator",
+          "query": "pii_tokenizer",
+          "target": "src/chat/pipeline/orchestrator.py",
+          "expected": "match"
+        }
+      ]
+    },
+    {
+      "id": "SPEC-1544",
+      "title": "PII Detokenization Before Customer Response",
+      "status": "specified",
+      "changed_by": "S120",
+      "change_reason": "Phase 6 PII Tokenization",
+      "description": "PII tokens are replaced with original values before customer sees the response.",
+      "section": "AGNTCY",
+      "assertions": [
+        {
+          "type": "grep",
+          "description": "Detokenization function exists",
+          "query": "detokenize",
+          "target": "src/multi_tenant/pii_tokenizer.py",
+          "expected": "match"
+        },
+        {
+          "type": "grep",
+          "description": "Detokenization called in orchestrator",
+          "query": "detokenize",
+          "target": "src/chat/pipeline/orchestrator.py",
+          "expected": "match"
+        }
+      ]
+    },
+    {
+      "id": "SPEC-1545",
+      "title": "PII Token Mapping Storage",
+      "status": "specified",
+      "changed_by": "S120",
+      "change_reason": "Phase 6 PII Tokenization",
+      "description": "PII token mappings stored in Cosmos DB per-tenant with TTL.",
+      "section": "AGNTCY",
+      "assertions": [
+        {
+          "type": "grep",
+          "description": "Token mapping storage in tokenizer",
+          "query": "token_mappings",
+          "target": "src/multi_tenant/pii_tokenizer.py",
+          "expected": "match"
+        },
+        {
+          "type": "grep",
+          "description": "TTL configuration",
+          "query": "ttl",
+          "target": "src/multi_tenant/pii_tokenizer.py",
+          "expected": "match"
+        }
+      ]
+    },
+    {
+      "id": "SPEC-1546",
+      "title": "PII Tokenization Entity Detection",
+      "status": "specified",
+      "changed_by": "S120",
+      "change_reason": "Phase 6 PII Tokenization",
+      "description": "PII tokenizer detects names, emails, phones, and order numbers.",
+      "section": "AGNTCY",
+      "assertions": [
+        {
+          "type": "grep",
+          "description": "Email pattern detection",
+          "query": "email",
+          "target": "src/multi_tenant/pii_tokenizer.py",
+          "expected": "match"
+        },
+        {
+          "type": "grep",
+          "description": "Phone pattern detection",
+          "query": "phone",
+          "target": "src/multi_tenant/pii_tokenizer.py",
+          "expected": "match"
+        },
+        {
+          "type": "grep",
+          "description": "Order number detection",
+          "query": "order",
+          "target": "src/multi_tenant/pii_tokenizer.py",
+          "expected": "match"
+        }
+      ]
+    }
+  ],
+  "work_items": [
+    {
+      "id": "WI-0842",
+      "title": "Remove erroneous relaxation language from adoption procedure",
+      "origin": "defect",
+      "component": "operational_procedure",
+      "resolution_status": "open",
+      "changed_by": "S120",
+      "change_reason": "Erroneous language never approved",
+      "source_spec_id": "SPEC-1534"
+    },
+    {
+      "id": "WI-0843",
+      "title": "Remove erroneous bypasses AGNTCY language from CLAUDE-REFERENCE.md",
+      "origin": "defect",
+      "component": "operational_procedure",
+      "resolution_status": "open",
+      "changed_by": "S120",
+      "change_reason": "Has always been erroneous",
+      "source_spec_id": "SPEC-1534"
+    },
+    {
+      "id": "WI-0844",
+      "title": "Refactor mcp_client.py to use AgntcyFactory.create_client(MCP)",
+      "origin": "defect",
+      "component": "external_integration",
+      "resolution_status": "open",
+      "changed_by": "S120",
+      "change_reason": "Must use AGNTCY SDK factory",
+      "source_spec_id": "SPEC-1534"
+    },
+    {
+      "id": "WI-0845",
+      "title": "Build and push 6 agent container images to ACR",
+      "origin": "new",
+      "component": "infrastructure_automation",
+      "resolution_status": "open",
+      "changed_by": "S120",
+      "change_reason": "Phase 2 containerization",
+      "source_spec_id": "SPEC-1535"
+    },
+    {
+      "id": "WI-0846",
+      "title": "Provision Azure Container Apps for 6 agents",
+      "origin": "new",
+      "component": "infrastructure_automation",
+      "resolution_status": "open",
+      "changed_by": "S120",
+      "change_reason": "Phase 2 containerization",
+      "source_spec_id": "SPEC-1535"
+    },
+    {
+      "id": "WI-0847",
+      "title": "Streaming-over-transport for ResponseGenerator",
+      "origin": "new",
+      "component": "agent_implementation",
+      "resolution_status": "open",
+      "changed_by": "S120",
+      "change_reason": "Phase 2 RG streaming",
+      "source_spec_id": "SPEC-1537"
+    },
+    {
+      "id": "WI-0848",
+      "title": "Switch USE_AGENT_CONTAINERS default to true",
+      "origin": "new",
+      "component": "agent_implementation",
+      "resolution_status": "open",
+      "changed_by": "S120",
+      "change_reason": "Phase 2 completion",
+      "source_spec_id": "SPEC-1535"
+    },
+    {
+      "id": "WI-0849",
+      "title": "Transport-first routing for escalation and analytics dispatch",
+      "origin": "new",
+      "component": "agent_implementation",
+      "resolution_status": "open",
+      "changed_by": "S120",
+      "change_reason": "Phase 2 transport routing",
+      "source_spec_id": "SPEC-1536"
+    },
+    {
+      "id": "WI-0850",
+      "title": "Graceful fallback when transport unavailable",
+      "origin": "new",
+      "component": "agent_implementation",
+      "resolution_status": "open",
+      "changed_by": "S120",
+      "change_reason": "Phase 2 resilience",
+      "source_spec_id": "SPEC-1538"
+    },
+    {
+      "id": "WI-0851",
+      "title": "Wire trace_agent_operation into pipeline dispatch",
+      "origin": "new",
+      "component": "agent_implementation",
+      "resolution_status": "open",
+      "changed_by": "S120",
+      "change_reason": "Phase 5 OTel tracing",
+      "source_spec_id": "SPEC-1539"
+    },
+    {
+      "id": "WI-0852",
+      "title": "Capture token usage from OpenAI responses",
+      "origin": "new",
+      "component": "agent_implementation",
+      "resolution_status": "open",
+      "changed_by": "S120",
+      "change_reason": "Phase 5 token tracking",
+      "source_spec_id": "SPEC-1540"
+    },
+    {
+      "id": "WI-0853",
+      "title": "Implement cost attribution model",
+      "origin": "new",
+      "component": "agent_implementation",
+      "resolution_status": "open",
+      "changed_by": "S120",
+      "change_reason": "Phase 5 cost attribution",
+      "source_spec_id": "SPEC-1540"
+    },
+    {
+      "id": "WI-0854",
+      "title": "Root pipeline span and execution tree",
+      "origin": "new",
+      "component": "agent_implementation",
+      "resolution_status": "open",
+      "changed_by": "S120",
+      "change_reason": "Phase 5 execution tree",
+      "source_spec_id": "SPEC-1541"
+    },
+    {
+      "id": "WI-0855",
+      "title": "Latency benchmark before/after tracing",
+      "origin": "new",
+      "component": "test_harness",
+      "resolution_status": "open",
+      "changed_by": "S120",
+      "change_reason": "Phase 5 latency requirement",
+      "source_spec_id": "SPEC-1542"
+    },
+    {
+      "id": "WI-0856",
+      "title": "Create PII tokenizer module",
+      "origin": "new",
+      "component": "agent_implementation",
+      "resolution_status": "open",
+      "changed_by": "S120",
+      "change_reason": "Phase 6 PII tokenization",
+      "source_spec_id": "SPEC-1543"
+    },
+    {
+      "id": "WI-0857",
+      "title": "Cosmos DB token mapping container",
+      "origin": "new",
+      "component": "database",
+      "resolution_status": "open",
+      "changed_by": "S120",
+      "change_reason": "Phase 6 storage",
+      "source_spec_id": "SPEC-1545"
+    },
+    {
+      "id": "WI-0858",
+      "title": "Wire tokenization into pipeline orchestrator",
+      "origin": "new",
+      "component": "agent_implementation",
+      "resolution_status": "open",
+      "changed_by": "S120",
+      "change_reason": "Phase 6 pipeline integration",
+      "source_spec_id": "SPEC-1543"
+    },
+    {
+      "id": "WI-0859",
+      "title": "Wire tokenization into MCP client",
+      "origin": "new",
+      "component": "external_integration",
+      "resolution_status": "open",
+      "changed_by": "S120",
+      "change_reason": "Phase 6 MCP integration",
+      "source_spec_id": "SPEC-1543"
+    },
+    {
+      "id": "WI-0860",
+      "title": "Integrate tokenization with GDPR lifecycle",
+      "origin": "new",
+      "component": "agent_implementation",
+      "resolution_status": "open",
+      "changed_by": "S120",
+      "change_reason": "Phase 6 GDPR compliance",
+      "source_spec_id": "SPEC-1545"
+    },
+    {
+      "id": "WI-0861",
+      "title": "Demote prompt-based PII to defense-in-depth",
+      "origin": "new",
+      "component": "agent_implementation",
+      "resolution_status": "open",
+      "changed_by": "S120",
+      "change_reason": "Phase 6 infrastructure enforcement",
+      "source_spec_id": "SPEC-1543"
+    }
+  ]
+}

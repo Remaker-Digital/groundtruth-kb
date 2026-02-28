@@ -21,7 +21,7 @@
     "id": "C.4",
     "description": "Conversation count not decreased",
     "status": "PASS",
-    "detail": "3 vs 3 (growth OK)"
+    "detail": "4 vs 4 (growth OK)"
   },
   {
     "id": "C.5",

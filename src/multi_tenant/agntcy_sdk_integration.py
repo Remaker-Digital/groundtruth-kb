@@ -211,38 +211,72 @@ def create_a2a_client(
 def create_mcp_client(
     agent_topic: str,
     transport: BaseTransport | None = None,
+    *,
+    server_url: str | None = None,
+    timeout_s: float = 30.0,
+    auth_headers: dict[str, str] | None = None,
     **kwargs: Any,
 ) -> Any:
     """Create an MCP protocol client for connecting to an external tool server.
 
-    This is the Phase 3 entry point. The MCP client is an async context manager
-    that yields a ClientSession for tool discovery and invocation.
+    This is the mandatory entry point for all MCP connections (SPEC-1534).
+    Routes through AgntcyFactory.create_client("MCP", ...) to ensure all
+    MCP communication flows through the AGNTCY SDK.
+
+    Supports two modes:
+        1. **Transport-based** (A2A transport available): Uses SLIM/NATS
+           transport for MCP servers reachable via the agent mesh.
+        2. **HTTP-direct** (external servers): Uses AgntcyFactory with
+           ``server_url``, ``timeout_s``, and ``auth_headers`` for external
+           MCP servers like Shopify Storefront or Stripe.
 
     Args:
         agent_topic: The MCP server's topic/endpoint identifier.
-        transport: Optional override transport. Uses default if not provided.
+        transport: Optional override transport. Falls back to HTTP-direct
+            mode when no transport is available.
+        server_url: HTTP URL for external MCP servers. Required when no
+            transport is available.
+        timeout_s: Connection timeout in seconds (default 30).
+        auth_headers: Optional HTTP headers for authenticated servers
+            (e.g. ``{"Authorization": "Bearer sk_..."}`` for Stripe MCP).
         **kwargs: Additional kwargs passed to factory.create_client().
 
     Returns:
         MCP client (async context manager yielding ClientSession).
 
     Raises:
-        RuntimeError: If no transport is available.
+        RuntimeError: If neither transport nor server_url is available.
     """
     factory = get_agntcy_factory()
     t = transport or get_default_transport()
-    if t is None:
+
+    # Build factory kwargs
+    client_kwargs: dict[str, Any] = {
+        "agent_topic": agent_topic,
+        **kwargs,
+    }
+
+    if t is not None:
+        # Transport-based MCP (agent mesh)
+        client_kwargs["transport"] = t
+    elif server_url:
+        # HTTP-direct MCP for external servers (Shopify, Stripe, etc.)
+        client_kwargs["server_url"] = server_url
+        client_kwargs["timeout"] = timeout_s
+        if auth_headers:
+            client_kwargs["headers"] = auth_headers
+    else:
         raise RuntimeError(
-            f"Cannot create MCP client for {agent_topic}: no transport available."
+            f"Cannot create MCP client for {agent_topic}: no transport or "
+            "server_url available."
         )
 
-    client = factory.create_client(
-        "MCP",
-        agent_topic=agent_topic,
-        transport=t,
-        **kwargs,
+    client = factory.create_client("MCP", **client_kwargs)
+    logger.debug(
+        "MCP client created for topic=%s (mode=%s)",
+        agent_topic,
+        "transport" if t else "http-direct",
     )
-    logger.debug("MCP client created for topic=%s", agent_topic)
     return client
 
 
