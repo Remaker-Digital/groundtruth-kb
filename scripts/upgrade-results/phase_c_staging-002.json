@@ -3,7 +3,7 @@
     "id": "C.1",
     "description": "Version updated",
     "status": "PASS",
-    "detail": "expected=1.61.0, got=1.61.0"
+    "detail": "expected=1.62.0, got=1.62.0"
   },
   {
     "id": "C.2",
@@ -21,7 +21,7 @@
     "id": "C.4",
     "description": "Conversation count not decreased",
     "status": "PASS",
-    "detail": "4 vs 4 (growth OK)"
+    "detail": "5 vs 5 (growth OK)"
   },
   {
     "id": "C.5",
