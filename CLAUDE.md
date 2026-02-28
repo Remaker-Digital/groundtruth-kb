@@ -105,6 +105,10 @@ Specifications should be **as stable as the business need.** Specs function as a
 7. **No bug fixes during testing.** Record defects as work items; fix in separate sessions.
 8. **Knowledge Database is the single source of truth.** All project knowledge lives in the KB.
 
+### Owner Input Classification Rule (GOV-09)
+
+When the owner describes what the system **must do**, **should do**, **must include**, or states numbered criteria, classify the input as **specification language**. Before writing any code: (1) record or verify specifications in KB, (2) identify work items for any gaps, (3) add work items to the backlog, (4) present the backlog for prioritization. Only proceed to implementation after explicit prioritization approval. A `UserPromptSubmit` hook (`.claude/hooks/spec-classifier.py`) mechanically enforces this — but Claude must also self-enforce when the hook does not trigger.
+
 ### Workflow: Specification → Test → Implementation
 
 1. Owner requests change or Claude proposes → record as specification(s)
