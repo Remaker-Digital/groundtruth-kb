@@ -892,6 +892,17 @@ export function WidgetPage() {
     })();
   }, [apiFetch]);
 
+  // Dispatch draft config to the live widget on this page (SPEC-1551).
+  // The widget exposes window.AgentRed.setConfigPartial() which reactively
+  // updates the launcher and panel, giving merchants a real-time preview.
+  useEffect(() => {
+    if (!initialized) return;
+    const sdk = (window as any).AgentRed;
+    if (sdk?.setConfigPartial) {
+      sdk.setConfigPartial(widgetConfigToApiFields(config));
+    }
+  }, [config, initialized]);
+
   function update<K extends keyof WidgetConfig>(key: K, value: WidgetConfig[K]) {
     setConfig((prev) => ({ ...prev, [key]: value }));
   }
@@ -936,11 +947,8 @@ export function WidgetPage() {
         </Text>
       </div>
 
-      {/* Two-column layout: 55% form / 45% preview */}
-      <Group align="flex-start" wrap="nowrap" gap="lg" style={{ minHeight: 600 }}>
-        {/* Left column - Form controls */}
-        <Box style={{ flex: '0 0 55%', maxWidth: '55%' }}>
-          <Stack gap="md">
+      {/* Form sections — full width (live widget serves as preview) */}
+      <Stack gap="md">
             {/* Installation Section — widget key + embed code */}
             <Paper p="lg" radius="md" withBorder>
               <SectionHeader
@@ -1572,19 +1580,7 @@ export function WidgetPage() {
                 Save draft inputs
               </Button>
             </Group>
-          </Stack>
-        </Box>
-
-        {/* Right column - Live Preview */}
-        <Box style={{ flex: '0 0 calc(45% - 16px)', position: 'sticky', top: 16 }}>
-          <Paper p="md" radius="md" withBorder>
-            <Text size="sm" fw={600} mb="sm">
-              Live preview
-            </Text>
-            <WidgetPreview config={config} adminIsDark={adminIsDark} quickActions={previewQuickActions} />
-          </Paper>
-        </Box>
-      </Group>
+      </Stack>
 
       {/* Widget key rotation confirmation modal */}
       <Modal

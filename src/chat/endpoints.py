@@ -583,6 +583,10 @@ async def stream_response(
                 customer_verified=getattr(state, "customer_verified", False),
                 conversation_history=conversation_history,
                 trace_id=trace_id,  # SPEC-1530: end-to-end trace
+                team_member_role=(
+                    ctx.team_member_role.value
+                    if ctx.team_member_role else None
+                ),  # SPEC-1558: Co-pilot routing for team members
             )
 
             async for sse_text in sse_mgr.wrap_stream(

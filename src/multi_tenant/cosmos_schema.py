@@ -66,6 +66,7 @@ COLLECTION_ALERT_RULES = "alert_rules"
 COLLECTION_ALERT_HISTORY = "alert_history"
 COLLECTION_INGESTION_JOBS = "ingestion_jobs"
 COLLECTION_PII_TOKEN_MAPPINGS = "pii_token_mappings"
+COLLECTION_ADMIN_DOCUMENTATION = "admin_documentation_vectors"
 
 ALL_COLLECTIONS = [
     COLLECTION_TENANTS,
@@ -85,6 +86,7 @@ ALL_COLLECTIONS = [
     COLLECTION_ALERT_HISTORY,
     COLLECTION_INGESTION_JOBS,
     COLLECTION_PII_TOKEN_MAPPINGS,
+    COLLECTION_ADMIN_DOCUMENTATION,
 ]
 
 # Cosmos DB Serverless — no provisioned throughput (pay per RU consumed)
@@ -337,6 +339,16 @@ class ConversationDocument(BaseModel):
     # Conversation lifecycle
     status: ConversationStatus = Field(description="Current conversation status")
     customer_id: str | None = Field(default=None, description="End-customer identifier (tokenized)")
+
+    # Conversation type (SPEC-1561 — Co-pilot admin conversations)
+    conversation_type: str = Field(
+        default="customer",
+        description=(
+            "Conversation origin: 'customer' (default — storefront visitor) or "
+            "'admin_assistance' (team member querying Co-pilot from admin panel). "
+            "Admin conversations are non-billable and routed to the Co-pilot agent."
+        ),
+    )
 
     # Billing (Decision #24 — billable conversation definition)
     is_billable: bool = Field(default=True, description="Whether this conversation counts for billing")
@@ -1563,6 +1575,77 @@ class PiiTokenMappingDocument(BaseModel):
     ttl: int = Field(default=TTL_PII_TOKEN_MAPPINGS, alias="_ts_ttl")
 
 
+class AdminDocumentationDocument(BaseModel):
+    """Platform-level product documentation for the Co-pilot agent (SPEC-1559).
+
+    Stores Agent Red admin documentation vectorized for semantic search.
+    Shared across all tenants — NOT tenant-scoped. Partition key is
+    ``/document_category`` (e.g., "dashboard", "knowledge_base", "widget").
+
+    The Co-pilot agent retrieves from this collection when a team member
+    asks about Agent Red administrative features.
+
+    Partition key: /document_category
+    No TTL — documentation is permanent.
+
+    (c) 2026 Remaker Digital, a DBA of VanDusen & Palmeter, LLC.
+    """
+
+    id: str = Field(description="Document ID: {category}:{slug}")
+    document_category: str = Field(
+        description=(
+            "Partition key — admin feature area. One of: dashboard, "
+            "knowledge_base, widget_configuration, team_management, "
+            "conversations, analytics, custom_instructions, brand_tone, "
+            "business_policies, escalation_rules, integrations, "
+            "save_activate, getting_started, billing"
+        ),
+    )
+
+    # Content
+    title: str = Field(description="Documentation page title")
+    content: str = Field(description="Full documentation text (markdown)")
+    section: str | None = Field(
+        default=None,
+        description="Sub-section within the category (e.g., 'Search Weights')",
+    )
+    tags: list[str] = Field(
+        default_factory=list,
+        description="Search tags for keyword matching",
+    )
+
+    # Vector embedding (text-embedding-3-large, 3072 dims)
+    embedding: list[float] | None = Field(
+        default=None,
+        description="3072-dimensional embedding for semantic search",
+    )
+    embedding_model: str | None = Field(
+        default=None,
+        description="Model used for embedding (e.g., 'text-embedding-3-large')",
+    )
+    content_hash: str | None = Field(
+        default=None,
+        description="SHA-256 of title+content for change detection",
+    )
+    embedded_at: str | None = Field(
+        default=None,
+        description="When embedding was last computed (ISO 8601)",
+    )
+
+    # Metadata
+    source_file: str | None = Field(
+        default=None,
+        description="Original docs-site file path (e.g., 'admin-guide/knowledge-base.md')",
+    )
+    version: str | None = Field(
+        default=None,
+        description="Documentation version (tracks product version at time of ingestion)",
+    )
+    is_active: bool = Field(default=True, description="Whether this entry is searchable")
+    created_at: str = Field(description="When created (ISO 8601)")
+    updated_at: str = Field(description="When last updated (ISO 8601)")
+
+
 # ---------------------------------------------------------------------------
 # Collection configuration
 # ---------------------------------------------------------------------------
@@ -1976,6 +2059,47 @@ def get_collection_configs() -> list[CollectionConfig]:
                         {"path": "/tenant_id", "order": "ascending"},
                         {"path": "/updated_at", "order": "descending"},
                     ],
+                ],
+            },
+        ),
+        # 18. admin_documentation_vectors (SPEC-1559: Co-pilot shared docs, DiskANN)
+        CollectionConfig(
+            name=COLLECTION_ADMIN_DOCUMENTATION,
+            partition_key="/document_category",
+            vector_embedding_policy={
+                "vectorEmbeddings": [
+                    {
+                        "path": "/embedding",
+                        "dataType": "float32",
+                        "dimensions": VECTOR_DIMENSIONS,
+                        "distanceFunction": VECTOR_SIMILARITY,
+                    },
+                ],
+            },
+            indexing_policy={
+                "automatic": True,
+                "indexingMode": "consistent",
+                "includedPaths": [{"path": "/*"}],
+                "excludedPaths": [
+                    {"path": "/content/?"},
+                    {"path": "/embedding/*"},
+                    {"path": '/"_etag"/?'},
+                ],
+                "compositeIndexes": [
+                    [
+                        {"path": "/document_category", "order": "ascending"},
+                        {"path": "/is_active", "order": "ascending"},
+                    ],
+                    [
+                        {"path": "/is_active", "order": "ascending"},
+                        {"path": "/embedded_at", "order": "descending"},
+                    ],
+                ],
+                "vectorIndexes": [
+                    {
+                        "path": "/embedding",
+                        "type": "diskANN",
+                    },
                 ],
             },
         ),

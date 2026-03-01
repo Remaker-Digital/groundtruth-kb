@@ -274,9 +274,10 @@ class TestQuickActionsPreviewable:
         source = _read(self.WIDGET_PAGE)
         assert "isActive" in source
 
-    def test_passes_quick_actions_to_preview(self) -> None:
+    def test_quick_actions_state_populated(self) -> None:
+        """Quick actions are fetched and stored in state (for postMessage dispatch)."""
         source = _read(self.WIDGET_PAGE)
-        assert "quickActions={previewQuickActions}" in source
+        assert "setPreviewQuickActions" in source
 
     def test_renders_quick_action_pills(self) -> None:
         source = _read(self.WIDGET_PAGE)

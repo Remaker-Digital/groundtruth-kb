@@ -9,6 +9,40 @@ All notable changes to Agent Red Customer Experience are documented here.
 
 ---
 
+## v1.62.0 — AGNTCY Platform, PII Tokenization, and Observability (2026-02-28)
+
+### AGNTCY SDK integration
+
+Agent Red now uses the AGNTCY SDK as its mandatory foundation for all agent-to-agent communication.
+
+- **Containerized agent deployment:** All six specialized AI agents (Intent Classifier, Knowledge Retriever, Response Generator, Critic Supervisor, Escalation Handler, Analytics Collector) can run as independent containers with A2A transport.
+- **Transport-first routing:** Agent dispatch uses a three-tier approach — AGNTCY transport (preferred), HTTP fallback, in-process fallback — ensuring zero downtime during infrastructure transitions.
+- **Streaming over transport:** Response generation supports SSE streaming through the A2A transport layer for real-time customer-facing responses.
+
+### PII tokenization
+
+A new reversible PII tokenization layer protects customer data during AI processing.
+
+- **Tokenize before AI:** Customer PII (emails, phone numbers, order numbers) is replaced with reversible UUID tokens before being sent to external AI models. The AI never sees raw PII.
+- **Detokenize after validation:** After the Critic Supervisor validates the response, original values are restored before delivering to the customer.
+- **GDPR lifecycle integration:** PII token mappings are included in data export and deletion workflows. Token mappings have a 7-day TTL and are automatically cleaned up.
+
+### Observability and cost attribution
+
+- **Per-agent OpenTelemetry spans:** Every agent invocation is wrapped in a traced span with parent-child relationships forming a complete execution tree.
+- **Token usage capture:** Prompt and completion token counts from Azure OpenAI responses are recorded on each span.
+- **Cost attribution model:** Estimated costs per agent call are calculated using current model pricing (GPT-4o, GPT-4o-mini, embedding) and recorded as span attributes.
+
+### Dedicated model training (Layer 4)
+
+- **Memory & Privacy admin UI:** The new Dedicated Model Training section is now visible in the admin console for Enterprise tier merchants. Per-customer AI fine-tuning on 1,000+ historical interactions is available as an Enterprise add-on ($299/month).
+
+### Bug fixes
+
+- **MemoryPrivacy page TypeScript fix:** Resolved a TypeScript strict mode error where config property access returned `unknown` type, preventing the Memory & Privacy admin page from compiling. The page now renders all six sections correctly.
+
+---
+
 ## v1.61.0 — Targeting Rules, Engagement Triggers, and Documentation Audit (2026-02-28)
 
 ### Targeting rules and engagement triggers

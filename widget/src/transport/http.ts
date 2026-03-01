@@ -28,6 +28,9 @@ export interface TransportConfig {
   apiBaseUrl: string;
   /** Publishable widget key (pk_live_...). */
   widgetKey: string;
+  /** Admin API key for Co-pilot mode (SPEC-1562). When set, the widget
+   *  authenticates as a team member, routing messages to the Co-pilot agent. */
+  adminApiKey?: string;
 }
 
 let _config: TransportConfig | null = null;
@@ -57,16 +60,24 @@ async function request<T>(
   path: string,
   body?: unknown,
 ): Promise<ApiResponse<T>> {
-  const { apiBaseUrl, widgetKey } = getTransportConfig();
+  const { apiBaseUrl, widgetKey, adminApiKey } = getTransportConfig();
   const url = `${apiBaseUrl}${path}`;
+
+  // SPEC-1562: When an admin API key is available (Co-pilot mode),
+  // authenticate as a team member. Falls back to widget key.
+  const headers: Record<string, string> = {
+    'Content-Type': 'application/json',
+  };
+  if (adminApiKey) {
+    headers['X-API-Key'] = adminApiKey;
+  } else {
+    headers['X-Widget-Key'] = widgetKey;
+  }
 
   try {
     const res = await fetch(url, {
       method,
-      headers: {
-        'Content-Type': 'application/json',
-        'X-Widget-Key': widgetKey,
-      },
+      headers,
       body: body ? JSON.stringify(body) : undefined,
     });
 

@@ -29,6 +29,8 @@ interface WSOptions {
   apiBaseUrl: string;
   widgetKey: string;
   conversationId: string;
+  /** Admin API key for Co-pilot mode (SPEC-1562). */
+  adminApiKey?: string;
   onConnectionLost?: () => void;
   onConnectionRestored?: () => void;
 }
@@ -68,7 +70,12 @@ export class WSConnection {
     const url = new URL(
       `${wsBase}/api/chat/ws/${this.options.conversationId}`,
     );
-    url.searchParams.set('widget_key', this.options.widgetKey);
+    // SPEC-1562: Use admin API key for Co-pilot mode, widget key otherwise.
+    if (this.options.adminApiKey) {
+      url.searchParams.set('api_key', this.options.adminApiKey);
+    } else {
+      url.searchParams.set('widget_key', this.options.widgetKey);
+    }
 
     this.ws = new WebSocket(url.toString());
 

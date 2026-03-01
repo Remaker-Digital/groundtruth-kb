@@ -106,6 +106,7 @@ Specifications should be **as stable as the business need.** Specs function as a
 8. **Knowledge Database is the single source of truth.** All project knowledge lives in the KB.
 9. **Owner input classification.** Specification language triggers spec-first workflow (GOV-09, below).
 10. **Tests must exercise exposed production interfaces.** Source inspection tests are regression supplements, not Test artifacts. Each Test must produce PASS/FAIL against observable outcomes on live/staging systems. Tests are written and linked to specs **before** implementation (GOV-10).
+11. **Design decision checkpoint discipline.** At each WI/phase completion boundary, Claude must review implementation decisions for spec coverage before proceeding. Batched checkpoint, not real-time pause (GOV-11).
 
 ### Owner Input Classification Rule (GOV-09)
 

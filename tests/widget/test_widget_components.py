@@ -530,10 +530,10 @@ class TestMessageBubble:
             "MessageBubble should use SourceIcon for source citations"
         )
 
-    def test_spec_1203_max_width_75_percent(self) -> None:
-        """SPEC-1203: Message bubble max width limited to 75%."""
-        assert "maxWidth: '75%'" in self.SRC, (
-            "MessageBubble should set maxWidth: '75%'"
+    def test_spec_1203_max_width_78_percent(self) -> None:
+        """SPEC-1203: Message bubble max width limited to 78%."""
+        assert "maxWidth: '78%'" in self.SRC, (
+            "MessageBubble should set maxWidth: '78%'"
         )
 
     def test_spec_1204_timestamp_12_hour_format(self) -> None:
@@ -695,9 +695,9 @@ class TestQuickActions:
         )
 
     def test_spec_1211_pill_button_shape(self) -> None:
-        """SPEC-1211: Quick action buttons render as pill-shaped (full border radius)."""
-        assert "borderRadiusFull" in self.SRC, (
-            "QuickActions buttons should use borderRadiusFull for pill shape"
+        """SPEC-1211: Quick action buttons render as pill-shaped (16px border radius)."""
+        assert "'16px'" in self.SRC, (
+            "QuickActions buttons should use 16px border radius for pill shape"
         )
 
     def test_spec_1211_hover_effects(self) -> None:

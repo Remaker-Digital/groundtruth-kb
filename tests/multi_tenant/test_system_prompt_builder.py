@@ -648,7 +648,7 @@ class TestMiscellaneous:
     """Tests for AgentRole enum, determinism, input contract, and singleton."""
 
     def test_spb17_agent_role_enum_completeness(self):
-        """SPB-17: AgentRole enum covers all 6 pipeline agents."""
+        """SPB-17: AgentRole enum covers all 7 pipeline agents (6 AGNTCY + Co-pilot)."""
         expected_agents = {
             "intent-classifier",
             "knowledge-retrieval",
@@ -656,6 +656,7 @@ class TestMiscellaneous:
             "escalation-handler",
             "analytics-collector",
             "critic-supervisor",
+            "co-pilot",
         }
         actual_agents = {role.value for role in AgentRole}
         assert actual_agents == expected_agents

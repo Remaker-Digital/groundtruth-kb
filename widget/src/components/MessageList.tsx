@@ -229,66 +229,92 @@ export const MessageList: FunctionComponent<MessageListProps> = ({
           paddingBottom: tokens.space2,
         }}
       >
-        {/* Greeting message at top of conversation */}
+        {/* Greeting message at top of conversation — left-aligned bubble */}
         {greetingMessage && messages.length === 0 && (
-          <div
-            style={{
-              display: 'flex',
-              flexDirection: 'column',
-              alignItems: 'center',
-              padding: `${tokens.space8} ${tokens.space6}`,
-              textAlign: 'center',
-            }}
-          >
-            {/* Agent avatar - large */}
+          <>
+            {/* "Today" date separator */}
             <div
               style={{
-                width: tokens.avatarSize,
-                height: tokens.avatarSize,
-                borderRadius: tokens.borderRadiusFull,
-                backgroundColor: tokens.colorPrimary,
                 display: 'flex',
                 alignItems: 'center',
                 justifyContent: 'center',
-                color: tokens.colorPrimaryText,
-                marginBottom: tokens.space3,
-                overflow: 'hidden',
-                fontSize: tokens.fontSizeLg,
-                fontWeight: tokens.fontWeightSemibold,
-                fontFamily: tokens.fontFamily,
+                padding: `${tokens.space3} ${tokens.space4}`,
               }}
             >
-              {agentAvatarUrl ? (
-                <img
-                  src={agentAvatarUrl}
-                  alt={agentName}
-                  style={{ width: '100%', height: '100%', objectFit: 'cover' }}
-                />
-              ) : (
-                agentName.charAt(0).toUpperCase()
-              )}
+              <div
+                style={{
+                  fontSize: tokens.fontSizeXs,
+                  fontFamily: tokens.fontFamily,
+                  color: tokens.colorTextMuted,
+                  backgroundColor: tokens.colorSurface,
+                  padding: `${tokens.space1} ${tokens.space3}`,
+                  borderRadius: tokens.borderRadiusFull,
+                  fontWeight: tokens.fontWeightMedium,
+                }}
+              >
+                {locale.today}
+              </div>
             </div>
+
+            {/* Greeting bubble — agent avatar + message */}
             <div
               style={{
-                fontSize: tokens.fontSizeLg,
-                fontWeight: tokens.fontWeightSemibold,
-                fontFamily: tokens.fontFamily,
-                color: tokens.colorText,
-                marginBottom: tokens.space1,
+                display: 'flex',
+                alignItems: 'flex-start',
+                padding: `${tokens.space1} ${tokens.space4}`,
+                gap: tokens.space2,
               }}
             >
-              {agentName}
-            </div>
-            <div
-              style={{
-                fontSize: tokens.fontSizeMd,
-                fontFamily: tokens.fontFamily,
-                color: tokens.colorTextSecondary,
-                lineHeight: tokens.lineHeightNormal,
-                maxWidth: '280px',
-              }}
-            >
-              {greetingMessage}
+              {/* Agent avatar (28px) */}
+              <div
+                style={{
+                  width: tokens.avatarSizeSm,
+                  height: tokens.avatarSizeSm,
+                  borderRadius: tokens.borderRadiusFull,
+                  backgroundColor: tokens.colorPrimary,
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  color: tokens.colorPrimaryText,
+                  overflow: 'hidden',
+                  fontSize: tokens.fontSizeXs,
+                  fontWeight: tokens.fontWeightSemibold,
+                  fontFamily: tokens.fontFamily,
+                  flexShrink: 0,
+                }}
+              >
+                {agentAvatarUrl ? (
+                  <img
+                    src={agentAvatarUrl}
+                    alt={agentName}
+                    style={{ width: '100%', height: '100%', objectFit: 'cover' }}
+                  />
+                ) : (
+                  agentName.slice(0, 2).toUpperCase() || 'AR'
+                )}
+              </div>
+
+              {/* Bubble */}
+              <div
+                style={{
+                  maxWidth: '78%',
+                }}
+              >
+                <div
+                  style={{
+                    backgroundColor: tokens.colorAgentBubble,
+                    border: `1px solid ${tokens.colorAgentBubbleBorder}`,
+                    borderRadius: '4px 16px 16px 16px',
+                    padding: '10px 14px',
+                    color: tokens.colorAgentBubbleText,
+                    fontSize: tokens.fontSizeSm,
+                    fontFamily: tokens.fontFamily,
+                    lineHeight: tokens.lineHeightNormal,
+                  }}
+                >
+                  {greetingMessage}
+                </div>
+              </div>
             </div>
 
             {/* Quick action prompt buttons (WI #228) */}
@@ -300,7 +326,7 @@ export const MessageList: FunctionComponent<MessageListProps> = ({
                 disabled={false}
               />
             )}
-          </div>
+          </>
         )}
 
         {/* Messages */}

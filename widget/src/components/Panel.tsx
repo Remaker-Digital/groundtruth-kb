@@ -112,7 +112,7 @@ const PANEL_STYLES = `
 
 export const Panel: FunctionComponent<PanelProps> = ({
   config,
-  locale,
+  locale: _locale,
   onClose,
 }) => {
   // Subscribe to store for reactive updates
@@ -189,6 +189,7 @@ export const Panel: FunctionComponent<PanelProps> = ({
       apiBaseUrl: transportCfg.apiBaseUrl,
       widgetKey: transportCfg.widgetKey,
       conversationId,
+      adminApiKey: transportCfg.adminApiKey,
       onConnectionLost: () => store.setState({ isReconnecting: true }),
       onConnectionRestored: () => store.setState({ isReconnecting: false, error: null }),
     });
@@ -516,6 +517,7 @@ export const Panel: FunctionComponent<PanelProps> = ({
         agentAvatarUrl={agentAvatarUrl}
         logoUrl={logoUrl}
         headerText={config.widget_header_text || null}
+        headerSubtitle={config.widget_header_subtitle || null}
         gradientEnd={config.widget_header_gradient_enabled !== false && config.widget_header_gradient_end ? config.widget_header_gradient_end : null}
         onClose={handleCloseWidget}
         onDragStart={handleDragStart}

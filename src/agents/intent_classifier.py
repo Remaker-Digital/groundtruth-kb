@@ -28,7 +28,9 @@ logger = logging.getLogger(__name__)
 # Azure OpenAI model deployment name for intent classification
 AZURE_IC_MODEL = os.environ.get("AZURE_IC_MODEL", "gpt-4o-mini")
 
-# Intent classification taxonomy — matches AGNTCY upstream 17-intent taxonomy.
+# Intent classification taxonomy — 18-intent taxonomy (SPEC-1558).
+# admin_assistance is ONLY available for admin-key-authenticated requests;
+# the pipeline gates this intent from widget-key conversations.
 INTENT_TAXONOMY = [
     "general_inquiry",
     "product_question",
@@ -47,6 +49,7 @@ INTENT_TAXONOMY = [
     "technical_support",
     "greeting",
     "escalation",
+    "admin_assistance",
 ]
 
 

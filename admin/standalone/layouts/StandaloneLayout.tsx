@@ -509,18 +509,30 @@ export const StandaloneLayout: React.FC<StandaloneLayoutProps> = ({
         // Create the widget script tag with admin-specific overrides
         const script = document.createElement('script');
         script.id = 'agent-red-admin-widget';
-        script.src = `${apiUrl}/widget.js`;
+        // In dev mode, use base-relative URL so Vite serves the local build from public/
+        script.src = import.meta.env.DEV ? `${import.meta.env.BASE_URL}widget.js` : `${apiUrl}/widget.js`;
         script.setAttribute('data-widget-key', widgetKey);
         script.setAttribute('data-api-url', apiUrl);
         script.setAttribute('data-auto-open', 'false');
         script.setAttribute('data-auto-open-delay', '0');
         script.setAttribute('data-context', 'admin');
+        // SPEC-1562: Co-pilot mode greeting and branding overrides
+        const isCoPilot = resolvedAuth.type === 'api_key' && resolvedAuth.value;
         script.setAttribute('data-greeting',
-          config.greeting_message
-            || 'Hi! I\u2019m your Agent Red AI assistant. Ask me anything about managing your store, configuring the widget, or understanding your analytics.');
-        script.setAttribute('data-header-text', config.widget_header_text || 'Agent Red Assistant');
-        script.setAttribute('data-agent-name', config.widget_agent_display_name || 'Agent Red AI');
+          isCoPilot
+            ? 'Hi! I\u2019m your Agent Red Co-pilot. I can help you with admin tasks, configuration, analytics, and platform features. What would you like to know?'
+            : (config.greeting_message
+              || 'Hi! I\u2019m your Agent Red AI assistant. Ask me anything about managing your store, configuring the widget, or understanding your analytics.'));
+        script.setAttribute('data-header-text', isCoPilot ? 'Agent Red Co-pilot' : (config.widget_header_text || 'Agent Red Assistant'));
+        script.setAttribute('data-agent-name', isCoPilot ? 'Co-pilot' : (config.widget_agent_display_name || 'Agent Red AI'));
         script.setAttribute('data-sound-enabled', 'false');
+
+        // SPEC-1562: Pass admin API key for Co-pilot mode. When set, the
+        // widget authenticates as a team member, routing messages to the
+        // Co-pilot agent instead of the customer-facing pipeline.
+        if (resolvedAuth.type === 'api_key' && resolvedAuth.value) {
+          script.setAttribute('data-admin-key', resolvedAuth.value);
+        }
 
         // Pass widget appearance fields so the widget renders with tenant
         // brand colors immediately (without waiting for its own /api/config fetch)
@@ -552,6 +564,62 @@ export const StandaloneLayout: React.FC<StandaloneLayoutProps> = ({
       if (sdk?.destroy) sdk.destroy();
     };
   }, [tenantContext, apiFetch, activationStatus?.is_active]);
+
+  // ---- Draft config preview on Agent Configuration page -------------------
+  // When the admin is on /configuration, swap the widget to show draft config
+  // so they can preview unsaved changes. Restore active config on navigation
+  // away. Re-fetches on configRefreshKey changes (save/discard/activate).
+
+  useEffect(() => {
+    if (!tenantContext) return;
+    const isActive = activationStatus?.is_active === true;
+    if (!isActive) return; // Widget not loaded — nothing to swap
+
+    const sdk = (window as unknown as Record<string, unknown>).AgentRed as
+      { setConfigPartial?: (overrides: Record<string, unknown>) => void } | undefined;
+    if (!sdk?.setConfigPartial) return;
+
+    const onConfigPage = location.pathname === '/configuration';
+    let cancelled = false;
+
+    async function applyConfig() {
+      try {
+        // Draft config for the Configuration page; active config for all other pages
+        const endpoint = onConfigPage
+          ? '/api/config?state=draft'
+          : '/api/config?page_type=all';
+        const resp = await apiFetch(endpoint);
+        if (cancelled || !resp.ok) return;
+        const data = await resp.json();
+        const config = data?.config || {};
+
+        // Extract widget-relevant fields for setConfigPartial
+        const overrides: Record<string, unknown> = {};
+        for (const [key, val] of Object.entries(config)) {
+          if (key.startsWith('widget_') && val != null) {
+            overrides[key] = val;
+          }
+        }
+        // Map non-prefixed fields the widget recognizes
+        if (config.greeting_message != null) {
+          overrides.widget_greeting_message = config.greeting_message;
+        }
+        if (config.brand_name != null) {
+          overrides.brand_name = config.brand_name;
+        }
+
+        if (!cancelled && sdk?.setConfigPartial) {
+          sdk.setConfigPartial(overrides);
+        }
+      } catch {
+        // Non-fatal — widget continues with current config
+      }
+    }
+
+    applyConfig();
+
+    return () => { cancelled = true; };
+  }, [tenantContext, apiFetch, activationStatus?.is_active, location.pathname, configRefreshKey]);
 
   // ---- Context value -----------------------------------------------------
 

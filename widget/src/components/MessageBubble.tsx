@@ -216,7 +216,7 @@ export const MessageBubble: FunctionComponent<MessageBubbleProps> = ({
       {/* Bubble */}
       <div
         style={{
-          maxWidth: '75%',
+          maxWidth: '78%',
           display: 'flex',
           flexDirection: 'column',
           alignItems: isCustomer ? 'flex-end' : 'flex-start',
@@ -230,12 +230,10 @@ export const MessageBubble: FunctionComponent<MessageBubbleProps> = ({
             color: isCustomer
               ? tokens.colorCustomerBubbleText
               : tokens.colorAgentBubbleText,
-            padding: `${tokens.space2} ${tokens.space3}`,
-            borderRadius: tokens.borderRadiusLg,
-            // Tail: flat corner on the sender's side
-            borderBottomRightRadius: isCustomer ? tokens.borderRadiusSm : tokens.borderRadiusLg,
-            borderBottomLeftRadius: isCustomer ? tokens.borderRadiusLg : tokens.borderRadiusSm,
-            fontSize: tokens.fontSizeMd,
+            border: isCustomer ? 'none' : `1px solid ${tokens.colorAgentBubbleBorder}`,
+            padding: '10px 14px',
+            borderRadius: isCustomer ? '16px 16px 4px 16px' : '4px 16px 16px 16px',
+            fontSize: tokens.fontSizeSm,
             fontFamily: tokens.fontFamily,
             lineHeight: tokens.lineHeightNormal,
             wordBreak: 'break-word',
@@ -390,12 +388,12 @@ export const TypingIndicator: FunctionComponent<{
     <div
       style={{
         backgroundColor: tokens.colorAgentBubble,
+        border: `1px solid ${tokens.colorAgentBubbleBorder}`,
         backgroundImage: `linear-gradient(90deg, ${tokens.colorAgentBubble} 25%, ${tokens.colorSurfaceHover} 50%, ${tokens.colorAgentBubble} 75%)`,
         backgroundSize: '200% 100%',
         animation: 'ar-shimmer 2s ease-in-out infinite, ar-fade-in 0.25s ease-out both',
-        padding: `${tokens.space2} ${tokens.space3}`,
-        borderRadius: tokens.borderRadiusLg,
-        borderBottomLeftRadius: tokens.borderRadiusSm,
+        padding: '10px 14px',
+        borderRadius: '4px 16px 16px 16px',
         display: 'flex',
         alignItems: 'center',
         gap: tokens.space1,

@@ -85,6 +85,7 @@ class AgentTopic(str, Enum):
     ESCALATION_HANDLER = "escalation-handler"
     ANALYTICS_COLLECTOR = "analytics-collector"
     CRITIC_SUPERVISOR = "critic-supervisor"
+    CO_PILOT = "co-pilot"
 
 
 # ---------------------------------------------------------------------------

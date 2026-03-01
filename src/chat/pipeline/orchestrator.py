@@ -33,6 +33,7 @@ from src.chat.models import (
 from src.chat.pipeline.agent_dispatch import AgentDispatchMixin
 from src.chat.pipeline.analytics import AnalyticsMixin
 from src.chat.pipeline.constants import (
+    ADMIN_ASSISTANCE_INTENT,
     AGENT_URLS,
     ESCALATION_INTENT,
     USE_AGENT_CONTAINERS,
@@ -168,6 +169,8 @@ class ChatPipeline(AgentDispatchMixin, CriticEscalationMixin, AnalyticsMixin):
         from src.agents.escalation_handler import EscalationHandlerAgent
         from src.agents.analytics_collector import AnalyticsCollectorAgent
         from src.agents.critic_supervisor import CriticSupervisorAgent
+        from src.agents.co_pilot import CoPilotAgent
+        from src.multi_tenant.repositories.platform import AdminDocumentationRepository
 
         self._ic_agent = IntentClassifierAgent(openai_client=self._openai_client)
         self._kr_agent = KnowledgeRetrievalAgent(
@@ -177,6 +180,10 @@ class ChatPipeline(AgentDispatchMixin, CriticEscalationMixin, AnalyticsMixin):
         self._esc_agent = EscalationHandlerAgent(openai_client=self._openai_client)
         self._an_agent = AnalyticsCollectorAgent()
         self._cr_agent = CriticSupervisorAgent(openai_client=self._openai_client)
+        self._copilot_agent = CoPilotAgent(
+            openai_client=self._openai_client,
+            admin_doc_repo=AdminDocumentationRepository(),
+        )
 
     # -------------------------------------------------------------------
     # WI #138: Pre-computation / warm-up
@@ -230,6 +237,7 @@ class ChatPipeline(AgentDispatchMixin, CriticEscalationMixin, AnalyticsMixin):
         customer_verified: bool = False,
         trace_id: str | None = None,
         conversation_history: list[dict[str, str]] | None = None,
+        team_member_role: str | None = None,
     ) -> AsyncGenerator[StreamEvent, None]:
         """Run the full pipeline for a customer message.
 
@@ -248,6 +256,8 @@ class ChatPipeline(AgentDispatchMixin, CriticEscalationMixin, AnalyticsMixin):
             conversation_history: Prior messages as list of
                 {"role": "user"|"assistant", "content": "..."} dicts
                 for multi-turn context. Most recent last. Capped by caller.
+            team_member_role: If set, the user is an authenticated team
+                member. Routes to Co-pilot agent (SPEC-1558).
 
         Yields:
             StreamEvent objects (stage, token, validated/retracted, done/error).
@@ -458,6 +468,30 @@ class ChatPipeline(AgentDispatchMixin, CriticEscalationMixin, AnalyticsMixin):
                 async for event in self._handle_escalation(
                     tenant_id, conversation_id, customer_message,
                     prompts[AgentRole.ESCALATION_HANDLER], budget, trace,
+                ):
+                    yield event
+                return
+
+            # ---------------------------------------------------------------
+            # Phase 1c: Co-pilot routing (SPEC-1558)
+            #
+            # If the user is an authenticated team member OR the IC detects
+            # admin_assistance intent, route to the Co-pilot agent. The
+            # Co-pilot has its own hybrid retrieval and response generation
+            # from the shared admin_documentation_vectors collection, so
+            # we bypass the standard KR→RG→Critic pipeline.
+            # ---------------------------------------------------------------
+            if team_member_role or intent == ADMIN_ASSISTANCE_INTENT:
+                async for event in self._handle_co_pilot(
+                    tenant_id=tenant_id,
+                    conversation_id=conversation_id,
+                    customer_message=customer_message,
+                    system_prompt=prompts.get(AgentRole.CO_PILOT, ""),
+                    conversation_history=conversation_history or [],
+                    team_member_role=team_member_role or "admin",
+                    budget=budget,
+                    trace=trace,
+                    trace_id=trace_id,
                 ):
                     yield event
                 return
@@ -741,6 +775,112 @@ class ChatPipeline(AgentDispatchMixin, CriticEscalationMixin, AnalyticsMixin):
             # SPEC-1541: End the root pipeline span
             pipeline_span.set_attribute("pipeline.total_latency_ms", int(budget.elapsed_ms))
             pipeline_span.end()
+
+    # -------------------------------------------------------------------
+    # Co-pilot routing (SPEC-1557 / SPEC-1558)
+    # -------------------------------------------------------------------
+
+    async def _handle_co_pilot(
+        self,
+        tenant_id: str,
+        conversation_id: str,
+        customer_message: str,
+        system_prompt: str,
+        conversation_history: list[dict[str, str]],
+        team_member_role: str,
+        budget: "PipelineTimeoutBudget",
+        trace: "DecisionTraceBuilder",
+        trace_id: str | None = None,
+    ) -> AsyncGenerator[StreamEvent, None]:
+        """Route an admin team member message to the Co-pilot agent.
+
+        The Co-pilot performs its own hybrid retrieval from the shared
+        admin_documentation_vectors collection and generates a response.
+        This bypasses the standard KR→RG→Critic pipeline entirely.
+
+        Yields StreamEvent objects matching the SSE protocol so the
+        client receives stage/token/done events as usual.
+        """
+        yield stage_event(
+            "co-pilot", "started",
+            trace_id=trace_id,
+            elapsed_ms=int(budget.elapsed_ms),
+        )
+
+        try:
+            copilot_result = await budget.execute_with_budget(
+                "co-pilot",
+                self._call_co_pilot(
+                    message=customer_message,
+                    system_prompt=system_prompt,
+                    conversation_history=conversation_history,
+                    team_member_role=team_member_role,
+                ),
+            )
+
+            response = copilot_result.get("response", "")
+            sources = copilot_result.get("sources", [])
+
+            trace.add_stage(
+                "co-pilot",
+                model=copilot_result.get("model", "gpt-4o"),
+                latency_ms=budget.stages[-1].elapsed_ms if budget.stages else 0,
+                tokens_input=copilot_result.get("tokens_input", 0),
+                tokens_output=copilot_result.get("tokens_output", 0),
+            )
+
+            yield stage_event(
+                "co-pilot", "completed",
+                trace_id=trace_id,
+                elapsed_ms=int(budget.elapsed_ms),
+            )
+
+            # Emit the response as a single validated token (non-streamed)
+            yield token_event(response, sequence=0)
+            yield validated_event(response, trace_id=trace_id)
+
+            # Store the response in the session (SPEC-1557)
+            await self._session.add_ai_message(
+                tenant_id=tenant_id,
+                conversation_id=conversation_id,
+                content=response,
+                agents_invoked=["co-pilot"],
+                model_used=copilot_result.get("model", "gpt-4o"),
+                critic_passed=None,  # Co-pilot bypasses Critic
+            )
+
+            # Mark conversation as admin_assistance + non-billable (SPEC-1561)
+            await self._session._repo.patch(
+                tenant_id=tenant_id,
+                document_id=conversation_id,
+                operations=[
+                    {"op": "set", "path": "/conversation_type", "value": "admin_assistance"},
+                    {"op": "set", "path": "/is_billable", "value": False},
+                ],
+            )
+
+            # Fire analytics for admin conversation tracking (SPEC-1561)
+            asyncio.create_task(
+                self._fire_analytics(
+                    tenant_id, conversation_id, "admin_assistance",
+                    budget, trace,
+                )
+            )
+
+            yield done_event(trace_id=trace_id)
+
+        except (PipelineTimeoutError, Exception) as exc:
+            logger.warning(
+                "Co-pilot failed: conv=%s error=%s",
+                conversation_id, exc,
+            )
+            fallback = (
+                "I'm the Agent Red Co-pilot, but I encountered an issue. "
+                "Please try again in a moment."
+            )
+            yield token_event(fallback, sequence=0)
+            yield validated_event(fallback, trace_id=trace_id)
+            yield done_event(trace_id=trace_id)
 
     # -------------------------------------------------------------------
     # Customer context loading (Layer 1 + Layer 2)

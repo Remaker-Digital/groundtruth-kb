@@ -401,8 +401,9 @@ class TestHTTPTransport:
         source = (WIDGET_SRC / "transport" / "http.ts").read_text()
         assert "widgetKey" in source, \
             "Widget key must be read from transport config"
-        # The request function destructures { apiBaseUrl, widgetKey } from getTransportConfig()
-        assert "'X-Widget-Key': widgetKey" in source, \
+        # SPEC-1566: Widget key is conditionally set (adminApiKey takes precedence).
+        # The request function uses headers['X-Widget-Key'] = widgetKey when no admin key.
+        assert "headers['X-Widget-Key'] = widgetKey" in source, \
             "X-Widget-Key header must use widgetKey from config"
 
     def test_fetch_widget_config_function(self) -> None:

@@ -29,6 +29,8 @@ interface HeaderProps {
   agentAvatarUrl: string | null;
   logoUrl: string | null;
   headerText: string | null;
+  /** Subtitle shown below the title (e.g. "We typically reply within minutes"). */
+  headerSubtitle: string | null;
   /** Optional second color for a left→right gradient header. */
   gradientEnd: string | null;
   onClose: () => void;
@@ -44,15 +46,19 @@ export const Header: FunctionComponent<HeaderProps> = ({
   tokens,
   locale,
   agentName,
-  agentTitle,
+  agentTitle: _agentTitle,
   agentAvatarUrl,
   logoUrl,
   headerText,
+  headerSubtitle,
   gradientEnd,
   onClose,
   onDragStart,
 }) => {
   const displayTitle = headerText || locale.headerTitle;
+  const displaySubtitle = headerSubtitle || 'We typically reply within minutes';
+  // Avatar initials: first 2 chars of title (e.g. "SU" from "Support")
+  const avatarInitials = displayTitle.replace(/[^a-zA-Z]/g, '').slice(0, 2).toUpperCase() || 'AR';
 
   // Header background: gradient when a second color is configured, flat otherwise
   const headerBg = gradientEnd
@@ -92,6 +98,9 @@ export const Header: FunctionComponent<HeaderProps> = ({
           justifyContent: 'center',
           overflow: 'hidden',
           flexShrink: 0,
+          fontSize: '12px',
+          fontWeight: 700,
+          color: '#fff',
         }}
       >
         {agentAvatarUrl ? (
@@ -105,11 +114,11 @@ export const Header: FunctionComponent<HeaderProps> = ({
             }}
           />
         ) : (
-          <AgentDefaultIcon size={22} />
+          avatarInitials
         )}
       </div>
 
-      {/* Agent info */}
+      {/* Agent info — 3 rows: title / subtitle / online */}
       <div
         style={{
           marginLeft: tokens.space3,
@@ -118,9 +127,10 @@ export const Header: FunctionComponent<HeaderProps> = ({
           overflow: 'hidden',
         }}
       >
+        {/* Row 1: Title */}
         <div
           style={{
-            fontSize: tokens.fontSizeMd,
+            fontSize: tokens.fontSizeSm,
             fontWeight: tokens.fontWeightSemibold,
             fontFamily: tokens.fontFamily,
             lineHeight: tokens.lineHeightTight,
@@ -131,11 +141,26 @@ export const Header: FunctionComponent<HeaderProps> = ({
         >
           {displayTitle}
         </div>
+        {/* Row 2: Subtitle */}
         <div
           style={{
             fontSize: tokens.fontSizeXs,
             fontFamily: tokens.fontFamily,
-            opacity: 0.85,
+            color: 'rgba(255,255,255,0.85)',
+            lineHeight: 1.3,
+            whiteSpace: 'nowrap',
+            overflow: 'hidden',
+            textOverflow: 'ellipsis',
+          }}
+        >
+          {displaySubtitle}
+        </div>
+        {/* Row 3: Online indicator */}
+        <div
+          style={{
+            fontSize: '10px',
+            fontFamily: tokens.fontFamily,
+            color: 'rgba(255,255,255,0.8)',
             lineHeight: tokens.lineHeightTight,
             marginTop: '2px',
             display: 'flex',
@@ -143,7 +168,6 @@ export const Header: FunctionComponent<HeaderProps> = ({
             gap: tokens.space1,
           }}
         >
-          {/* Online status dot */}
           <span
             style={{
               width: '6px',
@@ -154,15 +178,7 @@ export const Header: FunctionComponent<HeaderProps> = ({
               flexShrink: 0,
             }}
           />
-          <span
-            style={{
-              whiteSpace: 'nowrap',
-              overflow: 'hidden',
-              textOverflow: 'ellipsis',
-            }}
-          >
-            {agentName}{agentTitle ? ` \u00B7 ${agentTitle}` : ''}
-          </span>
+          <span>Online</span>
         </div>
       </div>
 
@@ -216,19 +232,6 @@ export const Header: FunctionComponent<HeaderProps> = ({
 // ---------------------------------------------------------------------------
 // Icons (inline SVG)
 // ---------------------------------------------------------------------------
-
-function AgentDefaultIcon({ size }: { size: number }) {
-  return (
-    <svg
-      width={size}
-      height={size}
-      viewBox="0 0 24 24"
-      fill="currentColor"
-    >
-      <path d="M12 12c2.21 0 4-1.79 4-4s-1.79-4-4-4-4 1.79-4 4 1.79 4 4 4zm0 2c-2.67 0-8 1.34-8 4v2h16v-2c0-2.66-5.33-4-8-4z" />
-    </svg>
-  );
-}
 
 function CloseIcon({ size }: { size: number }) {
   return (

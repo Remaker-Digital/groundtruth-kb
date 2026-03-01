@@ -64,7 +64,7 @@ export interface Locale {
 
 export const en: Locale = {
   headerTitle: 'Chat with us',
-  inputPlaceholder: 'Type a message...',
+  inputPlaceholder: 'Type your message...',
   sendButton: 'Send',
   offlineMessage: 'Our team is currently offline. Our AI assistant is available to help you now.',
   typingIndicator: 'is typing',

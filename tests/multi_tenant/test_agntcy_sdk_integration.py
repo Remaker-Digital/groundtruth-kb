@@ -66,9 +66,9 @@ def _clean_singletons():
 class TestAgentTopicEnum:
     """ASDK-01 through ASDK-03: AgentTopic enum consistency."""
 
-    def test_asdk_01_six_agent_topics_defined(self) -> None:
-        """ASDK-01: Exactly 6 agent topics are defined."""
-        assert len(AgentTopic) == 6
+    def test_asdk_01_seven_agent_topics_defined(self) -> None:
+        """ASDK-01: Exactly 7 agent topics are defined (6 AGNTCY + Co-pilot)."""
+        assert len(AgentTopic) == 7
 
     def test_asdk_02_topic_values_match_agntcy_convention(self) -> None:
         """ASDK-02: Topic values use hyphenated lowercase (AGNTCY convention)."""
@@ -79,6 +79,7 @@ class TestAgentTopicEnum:
             "escalation-handler",
             "analytics-collector",
             "critic-supervisor",
+            "co-pilot",
         }
         actual = {t.value for t in AgentTopic}
         assert actual == expected
@@ -97,15 +98,19 @@ class TestAgentTopicEnum:
         )
 
     def test_asdk_04_topic_values_match_nats_agent_topics(self) -> None:
-        """ASDK-04: AgentTopic values match NATS AGENT_TOPICS list."""
+        """ASDK-04: NATS AGENT_TOPICS is a subset of AgentTopic (Co-pilot is in-process only)."""
         from src.multi_tenant.nats_isolation import AGENT_TOPICS
 
         agent_topic_values = {t.value for t in AgentTopic}
         nats_topics = set(AGENT_TOPICS)
-        assert agent_topic_values == nats_topics, (
-            f"AgentTopic and NATS AGENT_TOPICS diverged: "
-            f"sdk_only={agent_topic_values - nats_topics}, "
-            f"nats_only={nats_topics - agent_topic_values}"
+        # Co-pilot is in-process only — no NATS subject (SPEC-1557).
+        in_process_only = {"co-pilot"}
+        assert nats_topics <= agent_topic_values, (
+            f"NATS topics not in AgentTopic: {nats_topics - agent_topic_values}"
+        )
+        assert agent_topic_values - nats_topics == in_process_only, (
+            f"Unexpected AgentTopic without NATS subject: "
+            f"{agent_topic_values - nats_topics - in_process_only}"
         )
 
 
@@ -464,7 +469,7 @@ class TestSDKStatus:
         assert status["sdk_initialized"] is False
         assert status["transport_active"] is False
         assert isinstance(status["agent_topics"], list)
-        assert len(status["agent_topics"]) == 6
+        assert len(status["agent_topics"]) == 7
 
     @patch("src.multi_tenant.agntcy_sdk_integration.AgntcyFactory")
     def test_asdk_20_status_after_factory_init(self, mock_cls: MagicMock) -> None:
@@ -482,7 +487,7 @@ class TestSDKStatus:
 
     @patch("src.multi_tenant.agntcy_sdk_integration.AgntcyFactory")
     def test_asdk_21_status_includes_agent_topics(self, mock_cls: MagicMock) -> None:
-        """ASDK-21: Status lists all 6 agent topics."""
+        """ASDK-21: Status lists all 7 agent topics."""
         mock_factory = MagicMock()
         mock_factory.registered_protocols.return_value = []
         mock_factory.registered_transports.return_value = []
@@ -492,7 +497,8 @@ class TestSDKStatus:
         status = get_sdk_status()
         assert "intent-classifier" in status["agent_topics"]
         assert "critic-supervisor" in status["agent_topics"]
-        assert len(status["agent_topics"]) == 6
+        assert "co-pilot" in status["agent_topics"]
+        assert len(status["agent_topics"]) == 7
 
 
 # ---------------------------------------------------------------------------

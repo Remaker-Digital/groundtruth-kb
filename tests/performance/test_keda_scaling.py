@@ -65,7 +65,8 @@ KEDA_SCALING_CONFIG: dict[str, dict[str, Any]] = {
 
 # Target scale: 680 merchants (SPEC-1516)
 TARGET_MERCHANTS = 680
-PEAK_MESSAGES_PER_MERCHANT_PER_MINUTE = 5  # Peak assumption
+PEAK_CONCURRENCY_FACTOR = 0.15  # 15% simultaneous active conversations (SPEC-1567)
+PEAK_MESSAGES_PER_MERCHANT_PER_MINUTE = 5  # Peak assumption per active merchant
 AVERAGE_PROCESSING_TIME_MS = 2000  # 2s average pipeline
 
 
@@ -123,14 +124,16 @@ class TestKEDAConfiguration:
             assert cfg["scale_to_zero"] is True
 
     def test_keda_03_chat_pipeline_max_handles_680_merchants(self):
-        """KEDA-03: Chat pipeline max replicas sufficient for 680 merchants."""
+        """KEDA-03: Chat pipeline max replicas sufficient for 680 merchants at peak concurrency."""
         cfg = KEDA_SCALING_CONFIG["chat-pipeline"]
-        peak_msgs = TARGET_MERCHANTS * PEAK_MESSAGES_PER_MERCHANT_PER_MINUTE
+        concurrent_merchants = math.ceil(TARGET_MERCHANTS * PEAK_CONCURRENCY_FACTOR)
+        peak_msgs = concurrent_merchants * PEAK_MESSAGES_PER_MERCHANT_PER_MINUTE
         required = calculate_required_replicas(
             peak_msgs, AVERAGE_PROCESSING_TIME_MS, cfg["queue_depth_threshold"]
         )
         assert cfg["max_replicas"] >= required, (
-            f"Chat pipeline needs {required} replicas for {TARGET_MERCHANTS} merchants "
+            f"Chat pipeline needs {required} replicas for {concurrent_merchants} "
+            f"concurrent merchants ({PEAK_CONCURRENCY_FACTOR:.0%} of {TARGET_MERCHANTS}) "
             f"but max_replicas is {cfg['max_replicas']}"
         )
 
@@ -183,16 +186,20 @@ class TestScalingCalculations:
         assert isinstance(required, int)
 
     def test_keda_09_queue_depth_at_max_replicas(self):
-        """KEDA-09: Queue depth at max replicas is manageable."""
+        """KEDA-09: Queue depth at max replicas is manageable at peak concurrency."""
         cfg = KEDA_SCALING_CONFIG["chat-pipeline"]
+        concurrent_merchants = math.ceil(TARGET_MERCHANTS * PEAK_CONCURRENCY_FACTOR)
         queue_depth = estimate_peak_queue_depth(
-            TARGET_MERCHANTS,
+            concurrent_merchants,
             PEAK_MESSAGES_PER_MERCHANT_PER_MINUTE,
             cfg["max_replicas"],
             AVERAGE_PROCESSING_TIME_MS,
         )
-        # At max replicas, queue may still build — this documents the expectation
-        assert isinstance(queue_depth, float)
+        # At 15% concurrency and max replicas, queue should not build up
+        assert queue_depth == 0.0, (
+            f"Queue depth {queue_depth:.1f} at {concurrent_merchants} concurrent merchants "
+            f"with {cfg['max_replicas']} replicas — capacity insufficient"
+        )
 
     def test_keda_10_scale_up_triggered_by_threshold(self):
         """KEDA-10: Scale-up triggers when queue exceeds threshold."""

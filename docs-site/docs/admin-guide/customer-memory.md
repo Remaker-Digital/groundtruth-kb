@@ -6,7 +6,7 @@ description: Configure the Persistent Customer Memory system — customer profil
 
 # Customer memory and privacy
 
-Agent Red's Persistent Customer Memory is a three-layer system that enables the AI to build context about each customer over time. Every conversation adds to the customer's profile, and future conversations benefit from that accumulated context.
+Agent Red's Persistent Customer Memory is a four-layer system that enables the AI to build context about each customer over time. Every conversation adds to the customer's profile, and future conversations benefit from that accumulated context.
 
 This is Agent Red's primary differentiator — no competitor has confirmed implementing per-customer vector search over historical conversation transcripts.
 
@@ -21,6 +21,8 @@ Layer 2: Conversation memory (all tiers)
     ↓ Vectorized transcripts: semantic search across past conversations
 Layer 3: Cross-session learning (Professional+)
     ↓ Extracted patterns: communication style, topic preferences
+Layer 4: Dedicated model training (Enterprise)
+    ↓ Per-customer fine-tuned model on 1,000+ interactions
 ```
 
 Each layer builds on the previous one. More layers mean more personalized responses.
@@ -101,6 +103,35 @@ Enables cross-session learning. After each conversation, the AI analyzes the tra
 **When to leave off:**
 - Most of your customers are one-time buyers.
 - You prefer a consistent experience for all customers regardless of history.
+
+---
+
+## Dedicated model training
+
+| | |
+|---|---|
+| **Field** | `fine_tuning_enabled` |
+| **Type** | Toggle (on/off) |
+| **Default** | Off |
+| **Tier** | Enterprise (add-on: $299/month) |
+| **Affects** | Customer memory (Layer 4), response generator |
+
+Enables per-customer AI fine-tuning. After a customer accumulates 1,000+ historical interactions, Agent Red can create a fine-tuned model specifically for that customer, delivering maximum personalization.
+
+**How it works:**
+1. When a customer reaches 1,000 interactions, the system evaluates whether fine-tuning would improve response quality.
+2. A fine-tuning job is submitted to Azure OpenAI using the customer's historical data.
+3. The fine-tuned model is used for that specific customer's future conversations.
+4. Models are periodically re-trained as new interactions accumulate.
+
+**Requirements:**
+- Enterprise tier subscription.
+- Customer must have 1,000+ historical interactions.
+- Customer context (Layer 1) and Conversation memory (Layer 2) must be enabled.
+
+**When to enable:**
+- You have high-value customers with extensive interaction histories.
+- Maximum personalization justifies the per-customer training cost.
 
 ---
 

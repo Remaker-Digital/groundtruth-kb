@@ -206,7 +206,7 @@ class TestConversationArea:
         """Textarea has the default placeholder text."""
         textarea = widget_panel.locator("textarea")
         placeholder = textarea.get_attribute("placeholder")
-        assert placeholder == "Type a message...", f"Expected default placeholder, got: {placeholder}"
+        assert placeholder == "Type your message...", f"Expected default placeholder, got: {placeholder}"
 
     def test_send_button_exists(self, widget_panel: FrameLocator) -> None:
         """A send button is present in the input bar."""

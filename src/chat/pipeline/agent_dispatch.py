@@ -474,3 +474,89 @@ class AgentDispatchMixin:
                         yield data
                 elif not line.startswith("event:") and not line.startswith(":"):
                     yield line
+
+    # ------------------------------------------------------------------
+    # Co-pilot agent dispatch (SPEC-1557)
+    # ------------------------------------------------------------------
+
+    async def _call_co_pilot(
+        self,
+        message: str,
+        system_prompt: str,
+        conversation_history: list[dict[str, Any]] | None = None,
+        team_member_role: str = "admin",
+    ) -> dict[str, Any]:
+        """Dispatch to the Co-pilot agent (3-tier routing).
+
+        Args:
+            message: Team member's question.
+            system_prompt: Co-pilot system prompt (from SystemPromptBuilder).
+            conversation_history: Prior turns in this admin conversation.
+            team_member_role: Team member's role (admin, viewer, etc.).
+
+        Returns:
+            {response, sources, model, tokens_input, tokens_output}
+        """
+        from src.multi_tenant.otel_tracing import trace_agent_operation
+
+        payload = {
+            "message": message,
+            "system_prompt": system_prompt,
+            "conversation_history": conversation_history or [],
+            "team_member_role": team_member_role,
+            "tenant_id": getattr(self, "_current_tenant_id", ""),
+        }
+
+        span = trace_agent_operation(
+            "co-pilot", "assist",
+            conversation_id=getattr(self, "_current_conversation_id", None),
+        )
+        try:
+            # Tier 1: SLIM/NATS transport
+            if self._transport_available():
+                try:
+                    result = await self._call_via_transport("co-pilot", payload)
+                    span.set_attribute("dispatch.mode", "transport")
+                    return result
+                except Exception as exc:
+                    logger.warning("Transport co-pilot call failed: %s", exc)
+
+            # Tier 2: HTTP container
+            if USE_AGENT_CONTAINERS:
+                try:
+                    url = getattr(self, "_agent_urls", {}).get("co-pilot", "")
+                    if url:
+                        client = await self._get_http_client()
+                        resp = await client.post(
+                            f"{url.rstrip('/')}/process",
+                            json=payload,
+                            timeout=httpx.Timeout(connect=1.0, read=15.0, write=1.0, pool=1.0),
+                        )
+                        resp.raise_for_status()
+                        span.set_attribute("dispatch.mode", "http")
+                        return resp.json()
+                except Exception as exc:
+                    logger.warning("HTTP co-pilot call failed: %s", exc)
+
+            # Tier 3: In-process direct
+            span.set_attribute("dispatch.mode", "in-process")
+            co_pilot = getattr(self, "_copilot_agent", None)
+            if co_pilot:
+                result = await co_pilot.process(payload, {
+                    "x-tenant-id": getattr(self, "_current_tenant_id", ""),
+                    "x-conversation-id": getattr(self, "_current_conversation_id", ""),
+                })
+                return result
+
+            return {
+                "response": "Co-pilot agent is not configured.",
+                "sources": [],
+                "model": "",
+                "tokens_input": 0,
+                "tokens_output": 0,
+            }
+        except Exception:
+            span.set_status(trace.StatusCode.ERROR)
+            raise
+        finally:
+            span.end()

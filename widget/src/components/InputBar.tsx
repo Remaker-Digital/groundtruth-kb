@@ -105,16 +105,17 @@ export const InputBar: FunctionComponent<InputBarProps> = ({
     <div
       style={{
         borderTop: `${tokens.borderWidth} solid ${tokens.colorBorder}`,
-        backgroundColor: tokens.colorBackground,
+        backgroundColor: tokens.colorInputBarBg,
         flexShrink: 0,
       }}
     >
-      {/* Input row */}
+      {/* Input row — visible container with surface background */}
       <div
         style={{
           display: 'flex',
           alignItems: 'flex-end',
           padding: `${tokens.space2} ${tokens.space3}`,
+          marginTop: '5px',
           gap: tokens.space2,
         }}
       >
@@ -149,35 +150,44 @@ export const InputBar: FunctionComponent<InputBarProps> = ({
           </button>
         )}
 
-        {/* Textarea */}
-        <textarea
-          ref={textareaRef}
-          value={text}
-          onInput={handleInput}
-          onKeyDown={handleKeyDown}
-          placeholder={placeholder}
-          disabled={disabled}
-          rows={3}
-          aria-label={placeholder}
+        {/* Textarea in visible container */}
+        <div
           style={{
             flex: 1,
-            resize: 'none',
-            border: 'none',
-            outline: 'none',
-            backgroundColor: 'transparent',
-            color: tokens.colorText,
-            fontSize: tokens.fontSizeMd,
-            fontFamily: tokens.fontFamily,
-            lineHeight: tokens.lineHeightNormal,
-            padding: `${tokens.space1} 0`,
-            height: `${MIN_TEXTAREA_HEIGHT}px`,
-            maxHeight: `${MAX_TEXTAREA_HEIGHT}px`,
-            overflow: 'auto',
-            // Remove default textarea styling
-            appearance: 'none' as unknown as string,
-            WebkitAppearance: 'none',
+            backgroundColor: tokens.colorSurface,
+            borderRadius: '8px',
+            overflow: 'hidden',
           }}
-        />
+        >
+          <textarea
+            ref={textareaRef}
+            value={text}
+            onInput={handleInput}
+            onKeyDown={handleKeyDown}
+            placeholder={placeholder}
+            disabled={disabled}
+            rows={3}
+            aria-label={placeholder}
+            style={{
+              width: '100%',
+              resize: 'none',
+              border: 'none',
+              outline: 'none',
+              backgroundColor: 'transparent',
+              color: tokens.colorText,
+              fontSize: tokens.fontSizeSm,
+              fontFamily: tokens.fontFamily,
+              lineHeight: tokens.lineHeightNormal,
+              padding: '8px 14px',
+              height: `${MIN_TEXTAREA_HEIGHT}px`,
+              maxHeight: `${MAX_TEXTAREA_HEIGHT}px`,
+              overflow: 'auto',
+              // Remove default textarea styling
+              appearance: 'none' as unknown as string,
+              WebkitAppearance: 'none',
+            }}
+          />
+        </div>
 
         {/* Send button */}
         <button
@@ -189,8 +199,8 @@ export const InputBar: FunctionComponent<InputBarProps> = ({
             width: '32px',
             height: '32px',
             borderRadius: tokens.borderRadiusFull,
-            backgroundColor: canSend ? tokens.colorPrimary : tokens.colorSurface,
-            color: canSend ? tokens.colorPrimaryText : tokens.colorTextMuted,
+            backgroundColor: tokens.colorPrimary,
+            color: tokens.colorPrimaryText,
             border: 'none',
             cursor: canSend ? 'pointer' : 'default',
             display: 'flex',
@@ -224,10 +234,11 @@ export const InputBar: FunctionComponent<InputBarProps> = ({
       {/* Powered by branding */}
       {showBranding && (
         <div
+          aria-label={locale.poweredBy}
           style={{
             textAlign: 'center',
             padding: `${tokens.space1} 0 ${tokens.space2}`,
-            fontSize: tokens.fontSizeXs,
+            fontSize: '10px',
             fontFamily: tokens.fontFamily,
             color: tokens.colorTextMuted,
           }}
@@ -248,7 +259,8 @@ export const InputBar: FunctionComponent<InputBarProps> = ({
               (e.currentTarget as HTMLElement).style.color = tokens.colorTextMuted;
             }}
           >
-            {locale.poweredBy}
+            Powered by{' '}
+            <span style={{ fontWeight: 600, color: tokens.colorPrimary }}>Agent Red</span>
           </a>
         </div>
       )}
@@ -266,9 +278,14 @@ function SendIcon({ size }: { size: number }) {
       width={size}
       height={size}
       viewBox="0 0 24 24"
-      fill="currentColor"
+      fill="none"
+      stroke="currentColor"
+      stroke-width="2"
+      stroke-linecap="round"
+      stroke-linejoin="round"
     >
-      <path d="M2.01 21L23 12 2.01 3 2 10l15 2-15 2z" />
+      <line x1="22" y1="2" x2="11" y2="13" />
+      <polygon points="22 2 15 22 11 13 2 9 22 2" />
     </svg>
   );
 }

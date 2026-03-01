@@ -22,6 +22,7 @@ import { Notifications } from '@mantine/notifications';
 
 import '@mantine/core/styles.css';
 import '@mantine/notifications/styles.css';
+import '../shared/theme/tokens.css';
 
 import { agentRedTheme } from '../shared/theme/agentRedTheme';
 import { ProviderLayout } from './layouts/ProviderLayout';

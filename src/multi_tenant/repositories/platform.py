@@ -18,8 +18,10 @@ from azure.cosmos.exceptions import CosmosResourceNotFoundError
 
 from src.multi_tenant.cosmos_client import get_cosmos_manager
 from src.multi_tenant.cosmos_schema import (
+    COLLECTION_ADMIN_DOCUMENTATION,
     COLLECTION_AUDIT_LOG,
     COLLECTION_PLATFORM_CONFIG,
+    AdminDocumentationDocument,
     AuditEventType,
     AuditLogDocument,
     PlatformConfigDocument,
@@ -300,3 +302,169 @@ class AuditLogRepository(PlatformScopedRepository):
                 break
 
         return items
+
+
+# ---------------------------------------------------------------------------
+# Collection 18: AdminDocumentationRepository (SPEC-1559)
+# ---------------------------------------------------------------------------
+
+
+class AdminDocumentationRepository(PlatformScopedRepository):
+    """Repository for the admin_documentation_vectors collection.
+
+    Platform-scoped — shared across all tenants. Partition key is
+    ``/document_category`` (e.g., "dashboard", "knowledge_base").
+
+    Used by the Co-pilot agent to retrieve product documentation
+    when team members ask about Agent Red admin features.
+
+    (c) 2026 Remaker Digital, a DBA of VanDusen & Palmeter, LLC.
+    """
+
+    def __init__(self) -> None:
+        super().__init__(COLLECTION_ADMIN_DOCUMENTATION)
+
+    async def upsert_document(
+        self, doc: AdminDocumentationDocument,
+    ) -> dict[str, Any]:
+        """Create or replace a documentation entry."""
+        body = doc.model_dump(by_alias=True, exclude_none=True)
+        return await self._container.upsert_item(body=body)
+
+    async def get_by_id(
+        self, document_category: str, doc_id: str,
+    ) -> dict[str, Any] | None:
+        """Read a single documentation entry by ID."""
+        try:
+            return await self._container.read_item(
+                item=doc_id, partition_key=document_category,
+            )
+        except CosmosResourceNotFoundError:
+            return None
+
+    async def list_by_category(
+        self, document_category: str, active_only: bool = True,
+    ) -> list[dict[str, Any]]:
+        """List all documentation entries in a category."""
+        query = "SELECT * FROM c"
+        params: list[dict[str, Any]] = []
+        if active_only:
+            query += " WHERE c.is_active = true"
+
+        items: list[dict[str, Any]] = []
+        async for item in self._container.query_items(
+            query=query,
+            parameters=params,
+            partition_key=document_category,
+        ):
+            items.append(item)
+        return items
+
+    async def list_all_active(self) -> list[dict[str, Any]]:
+        """List all active documentation entries (cross-partition).
+
+        Used for full-corpus BM25 scoring and re-embedding.
+        """
+        items: list[dict[str, Any]] = []
+        async for item in self._container.query_items(
+            query="SELECT * FROM c WHERE c.is_active = true",
+            enable_cross_partition_query=True,
+        ):
+            items.append(item)
+        return items
+
+    async def list_all_lightweight(self) -> list[dict[str, Any]]:
+        """List active docs without embedding field (~24KB savings per entry).
+
+        Used for BM25 keyword scoring where embeddings are not needed.
+        """
+        items: list[dict[str, Any]] = []
+        async for item in self._container.query_items(
+            query=(
+                "SELECT c.id, c.document_category, c.title, c.content, "
+                "c.section, c.tags, c.content_hash, c.is_active "
+                "FROM c WHERE c.is_active = true"
+            ),
+            enable_cross_partition_query=True,
+        ):
+            items.append(item)
+        return items
+
+    async def vector_search(
+        self,
+        document_category: str,
+        embedding: list[float],
+        top_k: int = 5,
+    ) -> list[dict[str, Any]]:
+        """Semantic search within a specific document category.
+
+        Uses Cosmos DB DiskANN vector index with cosine similarity.
+        """
+        query_text = (
+            "SELECT c.id, c.document_category, c.title, c.content, "
+            "c.section, c.tags, c.source_file, "
+            "VectorDistance(c.embedding, @embedding) AS similarity "
+            "FROM c "
+            "WHERE c.is_active = true "
+            "ORDER BY VectorDistance(c.embedding, @embedding) "
+            "OFFSET 0 LIMIT @top_k"
+        )
+        params = [
+            {"name": "@embedding", "value": embedding},
+            {"name": "@top_k", "value": top_k},
+        ]
+
+        items: list[dict[str, Any]] = []
+        async for item in self._container.query_items(
+            query=query_text,
+            parameters=params,
+            partition_key=document_category,
+        ):
+            items.append(item)
+            if len(items) >= top_k:
+                break
+        return items
+
+    async def vector_search_all_categories(
+        self,
+        embedding: list[float],
+        top_k: int = 5,
+    ) -> list[dict[str, Any]]:
+        """Semantic search across ALL documentation categories.
+
+        Cross-partition vector search — used when the Co-pilot doesn't
+        know which category the team member's question falls into.
+        """
+        query_text = (
+            "SELECT c.id, c.document_category, c.title, c.content, "
+            "c.section, c.tags, c.source_file, "
+            "VectorDistance(c.embedding, @embedding) AS similarity "
+            "FROM c "
+            "WHERE c.is_active = true "
+            "ORDER BY VectorDistance(c.embedding, @embedding) "
+            "OFFSET 0 LIMIT @top_k"
+        )
+        params = [
+            {"name": "@embedding", "value": embedding},
+            {"name": "@top_k", "value": top_k},
+        ]
+
+        items: list[dict[str, Any]] = []
+        async for item in self._container.query_items(
+            query=query_text,
+            parameters=params,
+            enable_cross_partition_query=True,
+        ):
+            items.append(item)
+            if len(items) >= top_k:
+                break
+        return items
+
+    async def count_all(self) -> int:
+        """Count all active documentation entries."""
+        async for item in self._container.query_items(
+            query="SELECT VALUE COUNT(1) FROM c WHERE c.is_active = true",
+            enable_cross_partition_query=True,
+        ):
+            return item
+        return 0

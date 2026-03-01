@@ -192,8 +192,13 @@ class TenantAuthMiddleware(BaseHTTPMiddleware):
         if bearer_token:
             return await self._auth_shopify(bearer_token)
 
-        # Try API key (X-API-Key header)
+        # Try API key (X-API-Key header or query param for SSE/WS)
+        # SPEC-1562: EventSource and WebSocket connections cannot set custom
+        # headers, so admin widgets pass api_key as a query parameter for
+        # Co-pilot mode authentication.
         api_key = request.headers.get(API_KEY_HEADER)
+        if not api_key:
+            api_key = request.query_params.get("api_key")
         if api_key:
             return await self._auth_api_key(api_key)
 

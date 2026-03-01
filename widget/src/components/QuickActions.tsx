@@ -54,10 +54,12 @@ export const QuickActions: FunctionComponent<QuickActionsProps> = ({
     <div
       style={{
         display: 'flex',
-        flexDirection: 'column',
-        alignItems: 'center',
+        flexDirection: 'row',
+        flexWrap: 'wrap',
+        justifyContent: 'center',
         gap: tokens.space2,
         marginTop: tokens.space4,
+        padding: `0 ${tokens.space4}`,
         animation: 'ar-fade-in 0.3s ease-out',
       }}
     >
@@ -73,14 +75,14 @@ export const QuickActions: FunctionComponent<QuickActionsProps> = ({
             display: 'inline-flex',
             alignItems: 'center',
             gap: tokens.space2,
-            padding: `${tokens.space2} ${tokens.space4}`,
+            padding: '5px 12px',
             backgroundColor:
               hoveredId === action.id
                 ? tokens.colorSurfaceHover
                 : tokens.colorSurface,
-            color: tokens.colorText,
+            color: tokens.colorAgentBubbleText,
             border: `${tokens.borderWidth} solid ${tokens.colorBorder}`,
-            borderRadius: tokens.borderRadiusFull,
+            borderRadius: '16px',
             cursor: disabled ? 'not-allowed' : 'pointer',
             opacity: disabled ? 0.6 : 1,
             fontSize: tokens.fontSizeSm,

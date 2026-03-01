@@ -41,11 +41,12 @@ export default defineConfig({
         changeOrigin: true,
         secure: !!process.env.VITE_API_URL,
       },
-      '/widget.js': {
-        target: process.env.VITE_API_URL || 'http://localhost:8000',
-        changeOrigin: true,
-        secure: !!process.env.VITE_API_URL,
-      },
+      // Widget served from public/widget.js in dev mode (see StandaloneLayout.tsx)
+      // '/widget.js': {
+      //   target: process.env.VITE_API_URL || 'http://localhost:8000',
+      //   changeOrigin: true,
+      //   secure: !!process.env.VITE_API_URL,
+      // },
     },
   },
 });

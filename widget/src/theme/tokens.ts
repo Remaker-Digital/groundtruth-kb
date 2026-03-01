@@ -38,9 +38,11 @@ export interface DesignTokens {
   colorAgentBubbleText: string;
   colorCustomerBubble: string;
   colorCustomerBubbleText: string;
+  colorAgentBubbleBorder: string;
   colorError: string;
   colorSuccess: string;
   colorOverlay: string;
+  colorInputBarBg: string;
 
   // Typography (Zapier reference: clean, readable, consistent)
   fontFamily: string;
@@ -270,9 +272,10 @@ export function resolveTokens(config: WidgetConfig): DesignTokens {
     | 'colorPrimary' | 'colorPrimaryHover' | 'colorPrimaryText'
     | 'colorBackground' | 'colorSurface' | 'colorSurfaceHover'
     | 'colorBorder' | 'colorText' | 'colorTextSecondary' | 'colorTextMuted'
-    | 'colorAgentBubble' | 'colorAgentBubbleText'
+    | 'colorAgentBubble' | 'colorAgentBubbleText' | 'colorAgentBubbleBorder'
     | 'colorCustomerBubble' | 'colorCustomerBubbleText'
     | 'colorError' | 'colorSuccess' | 'colorOverlay'
+    | 'colorInputBarBg'
   > = {
     // Typography — Inter (brand), JetBrains Mono (code)
     fontFamily: customFont || "'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif",
@@ -326,7 +329,7 @@ export function resolveTokens(config: WidgetConfig): DesignTokens {
       : '520px',
     headerHeight: '64px',
     inputBarHeight: '56px',
-    avatarSize: '40px',
+    avatarSize: '36px',
     avatarSizeSm: '28px',
 
     // Transitions
@@ -346,20 +349,22 @@ export function resolveTokens(config: WidgetConfig): DesignTokens {
       colorPrimary: primary,
       colorPrimaryHover: darken(primary, -0.1),
       colorPrimaryText: contrastText(primary),
-      colorBackground: '#1A1A1A',
-      colorSurface: '#2A2A2A',
-      colorSurfaceHover: '#333333',
-      colorBorder: '#3A3A3A',
-      colorText: '#F0F0F0',
-      colorTextSecondary: '#AAAAAA',
-      colorTextMuted: '#777777',
-      colorAgentBubble: config.widget_agent_bubble_color || '#2A2A2A',
-      colorAgentBubbleText: config.widget_agent_bubble_text_color || '#F0F0F0',
+      colorBackground: '#1c1917',
+      colorSurface: '#292524',
+      colorSurfaceHover: '#44403c',
+      colorBorder: '#44403c',
+      colorText: '#f5f5f4',
+      colorTextSecondary: '#a8a29e',
+      colorTextMuted: '#57534e',
+      colorAgentBubble: config.widget_agent_bubble_color || '#292524',
+      colorAgentBubbleText: config.widget_agent_bubble_text_color || '#f5f5f4',
       colorCustomerBubble: config.widget_customer_bubble_color || primary,
       colorCustomerBubbleText: config.widget_customer_bubble_text_color || contrastText(config.widget_customer_bubble_color || primary),
+      colorAgentBubbleBorder: '#44403c',
       colorError: '#EF4444',
       colorSuccess: '#22C55E',
       colorOverlay: 'rgba(0, 0, 0, 0.6)',
+      colorInputBarBg: '#0c0a09',
     };
   }
 
@@ -379,8 +384,10 @@ export function resolveTokens(config: WidgetConfig): DesignTokens {
     colorAgentBubbleText: config.widget_agent_bubble_text_color || '#1A1A1A',
     colorCustomerBubble: config.widget_customer_bubble_color || primary,
     colorCustomerBubbleText: config.widget_customer_bubble_text_color || contrastText(config.widget_customer_bubble_color || primary),
+    colorAgentBubbleBorder: '#e9ecef',
     colorError: '#DC2626',
     colorSuccess: '#16A34A',
     colorOverlay: 'rgba(0, 0, 0, 0.4)',
+    colorInputBarBg: '#fff',
   };
 }

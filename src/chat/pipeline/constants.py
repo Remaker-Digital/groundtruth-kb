@@ -55,6 +55,9 @@ AGENT_ANALYTICS_PATH = "/collect"
 # Escalation intent value from the Intent Classifier
 ESCALATION_INTENT = "escalation"
 
+# Admin assistance intent — routes authenticated team members to Co-pilot (SPEC-1558)
+ADMIN_ASSISTANCE_INTENT = "admin_assistance"
+
 # Azure OpenAI model deployment names (match aoai-agentred-eastus2 deployments)
 AZURE_IC_MODEL = os.environ.get("AZURE_IC_MODEL", "gpt-4o-mini")
 AZURE_RG_MODEL = os.environ.get("AZURE_RG_MODEL", "gpt-4o")
@@ -65,7 +68,7 @@ AZURE_EMBEDDING_MODEL = os.environ.get(
 AZURE_EMBEDDING_DIMENSIONS = 3072
 
 # Intent classification taxonomy — the set of intents the IC can return.
-# Matches AGNTCY's upstream 17-intent taxonomy.
+# 18-intent taxonomy (SPEC-1558): AGNTCY upstream 17 + admin_assistance.
 INTENT_TAXONOMY = [
     "general_inquiry",
     "product_question",
@@ -84,6 +87,7 @@ INTENT_TAXONOMY = [
     "technical_support",
     "greeting",
     "escalation",
+    "admin_assistance",
 ]
 
 
