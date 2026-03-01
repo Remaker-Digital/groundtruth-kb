@@ -75,7 +75,7 @@ jobs:
           grep -v '^agntcy-app-sdk' requirements.txt > /tmp/requirements-filtered.txt
           pip install -r /tmp/requirements-filtered.txt
           # Install test-only deps
-          pip install pytest pytest-asyncio pytest-cov pytest-timeout pytest-xdist httpx
+          pip install pytest pytest-asyncio pytest-cov httpx
 
       - name: Resolve test paths
         id: paths

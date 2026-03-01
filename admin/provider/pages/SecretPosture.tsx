@@ -20,6 +20,7 @@ import {
   Table,
   Text,
   Title,
+  Tooltip,
 } from '@mantine/core';
 import { useProviderContext } from '../layouts/ProviderLayout';
 import { LoadingState } from '../../shared/LoadingState';
@@ -33,11 +34,14 @@ import { tokens } from '../../shared/theme/styles';
 interface TenantSecretInfo {
   tenantId: string;
   tier: string | null;
+  customerEmail: string | null;
+  shopifyShopDomain: string | null;
   secretCount: number;
   secretsByType: Record<string, number>;
   hasShopify: boolean;
   hasStripe: boolean;
   hasApiKey: boolean;
+  totpCount: number;
   oldestSecret: string | null;
   newestSecret: string | null;
   disabledSecrets: number;
@@ -159,12 +163,13 @@ export function SecretPosturePage() {
         <Table striped highlightOnHover>
           <Table.Thead>
             <Table.Tr>
-              <Table.Th>Tenant ID</Table.Th>
+              <Table.Th>Tenant<HelpTooltip text="Email or shop domain. Hover for UUID." /></Table.Th>
               <Table.Th>Tier</Table.Th>
               <Table.Th>Secrets</Table.Th>
               <Table.Th>Shopify</Table.Th>
               <Table.Th>Stripe</Table.Th>
               <Table.Th>API Key</Table.Th>
+              <Table.Th>MFA<HelpTooltip text="Number of team members with TOTP/MFA enrolled." /></Table.Th>
               <Table.Th>Disabled<HelpTooltip text="Secrets that have been revoked or expired. These should be rotated or removed." /></Table.Th>
               <Table.Th>Oldest</Table.Th>
               <Table.Th>Newest</Table.Th>
@@ -173,15 +178,28 @@ export function SecretPosturePage() {
           <Table.Tbody>
             {data.tenants.length === 0 ? (
               <Table.Tr>
-                <Table.Td colSpan={9}>
+                <Table.Td colSpan={10}>
                   <Text c="dimmed" ta="center" py="md">No secret data available</Text>
                 </Table.Td>
               </Table.Tr>
             ) : (
-              data.tenants.map((t) => (
+              data.tenants.map((t) => {
+                const displayName = t.customerEmail || t.shopifyShopDomain || t.tenantId;
+                const isUuid = displayName === t.tenantId;
+                return (
                 <Table.Tr key={t.tenantId}>
                   <Table.Td>
-                    <Text size="xs" ff="monospace" c={tokens.textSecondary}>{t.tenantId}</Text>
+                    <Tooltip label={t.tenantId} position="right" withArrow>
+                      <Text
+                        size="xs"
+                        fw={500}
+                        ff={isUuid ? 'monospace' : undefined}
+                        c={tokens.textSecondary}
+                        style={{ cursor: 'help' }}
+                      >
+                        {displayName}
+                      </Text>
+                    </Tooltip>
                   </Table.Td>
                   <Table.Td>
                     <Text size="xs" c={tokens.textMuted}>{t.tier ?? '\u2014'}</Text>
@@ -205,6 +223,11 @@ export function SecretPosturePage() {
                     </Text>
                   </Table.Td>
                   <Table.Td>
+                    <Text size="xs" fw={500} c={t.totpCount > 0 ? tokens.success : tokens.textMuted}>
+                      {t.totpCount}
+                    </Text>
+                  </Table.Td>
+                  <Table.Td>
                     <Text size="xs" fw={500} c={t.disabledSecrets > 0 ? tokens.danger : tokens.textMuted}>
                       {t.disabledSecrets}
                     </Text>
@@ -220,7 +243,8 @@ export function SecretPosturePage() {
                     </Text>
                   </Table.Td>
                 </Table.Tr>
-              ))
+                );
+              })
             )}
           </Table.Tbody>
         </Table>

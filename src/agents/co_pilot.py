@@ -51,11 +51,29 @@ BM25_K1 = 1.5
 BM25_B = 0.75
 DEFAULT_RRF_K = 60
 
-# Retrieval defaults
+# Retrieval defaults (used when no CopilotConfigDocument exists — SPEC-1576)
 DEFAULT_TOP_K = 5
 DEFAULT_VECTOR_WEIGHT = 0.7
 DEFAULT_BM25_WEIGHT = 0.3
 DEFAULT_MIN_SCORE = 0.1
+
+# Mutable runtime config — populated by configure_copilot_retrieval()
+_copilot_retrieval_config: dict[str, Any] = {}
+
+
+def configure_copilot_retrieval(config: dict[str, Any] | None) -> None:
+    """Update retrieval parameters at runtime (SPEC-1576).
+
+    Called by the superadmin API when config is saved. Changes take
+    effect on the next query without restart.
+    """
+    global _copilot_retrieval_config
+    _copilot_retrieval_config = config or {}
+
+
+def _get_retrieval_param(key: str, default: Any) -> Any:
+    """Read a retrieval parameter from runtime config or fall back to default."""
+    return _copilot_retrieval_config.get(key, default)
 
 # Stop words for BM25 tokenization
 _STOP = frozenset(
@@ -246,23 +264,28 @@ class CoPilotAgent(AgentRedBaseAgent):
                 )
                 query_embedding = embedding_response.data[0].embedding
 
+                top_k = _get_retrieval_param("top_k", DEFAULT_TOP_K)
                 vector_results = await self._admin_doc_repo.vector_search_all_categories(
                     embedding=query_embedding,
-                    top_k=DEFAULT_TOP_K * 2,  # Over-fetch for RRF merge
+                    top_k=top_k * 2,  # Over-fetch for RRF merge
                 )
 
                 # Also do BM25 for hybrid merge
-                bm25_results = await self._bm25_search(query, top_k=DEFAULT_TOP_K * 2)
+                bm25_results = await self._bm25_search(query, top_k=top_k * 2)
 
                 # Merge via Reciprocal Rank Fusion
-                results = self._rrf_merge(vector_results, bm25_results, top_k=DEFAULT_TOP_K)
+                results = self._rrf_merge(vector_results, bm25_results, top_k=top_k)
             else:
                 # Keyword-only fallback
-                results = await self._bm25_search(query, top_k=DEFAULT_TOP_K)
+                top_k = _get_retrieval_param("top_k", DEFAULT_TOP_K)
+                results = await self._bm25_search(query, top_k=top_k)
         except Exception as exc:
             logger.warning("Co-pilot vector search failed, trying keyword: %s", exc)
             try:
-                results = await self._bm25_search(query, top_k=DEFAULT_TOP_K)
+                results = await self._bm25_search(
+                    query,
+                    top_k=_get_retrieval_param("top_k", DEFAULT_TOP_K),
+                )
             except Exception:
                 return "", []
 
@@ -336,6 +359,10 @@ class CoPilotAgent(AgentRedBaseAgent):
         top_k: int = 5,
     ) -> list[dict[str, Any]]:
         """Merge vector and BM25 results using Reciprocal Rank Fusion."""
+        vector_weight = _get_retrieval_param("vector_weight", DEFAULT_VECTOR_WEIGHT)
+        bm25_weight = _get_retrieval_param("bm25_weight", DEFAULT_BM25_WEIGHT)
+        rrf_k = _get_retrieval_param("rrf_k", DEFAULT_RRF_K)
+
         scores: dict[str, float] = {}
         doc_map: dict[str, dict[str, Any]] = {}
 
@@ -344,7 +371,7 @@ class CoPilotAgent(AgentRedBaseAgent):
             if not doc_id:
                 continue
             scores[doc_id] = scores.get(doc_id, 0) + (
-                DEFAULT_VECTOR_WEIGHT / (DEFAULT_RRF_K + rank + 1)
+                vector_weight / (rrf_k + rank + 1)
             )
             doc_map[doc_id] = doc
 
@@ -353,7 +380,7 @@ class CoPilotAgent(AgentRedBaseAgent):
             if not doc_id:
                 continue
             scores[doc_id] = scores.get(doc_id, 0) + (
-                DEFAULT_BM25_WEIGHT / (DEFAULT_RRF_K + rank + 1)
+                bm25_weight / (rrf_k + rank + 1)
             )
             if doc_id not in doc_map:
                 doc_map[doc_id] = doc

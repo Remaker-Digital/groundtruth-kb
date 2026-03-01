@@ -1646,6 +1646,71 @@ class AdminDocumentationDocument(BaseModel):
     updated_at: str = Field(description="When last updated (ISO 8601)")
 
 
+class CopilotConfigDocument(BaseModel):
+    """Platform-level Co-Pilot configuration (SPEC-1575, SPEC-1576).
+
+    Stores scan schedule and retrieval tuning parameters. Single document
+    per platform with id='copilot_config', partition key 'platform'.
+    Stored in admin_documentation_vectors collection alongside docs.
+    """
+
+    id: str = Field(default="copilot_config")
+    document_category: str = Field(
+        default="platform",
+        description="Partition key — 'platform' for config documents",
+    )
+
+    # Scan schedule (SPEC-1575)
+    scan_frequency: str = Field(
+        default="manual",
+        description="Scan frequency: 'manual', 'daily', or 'weekly'",
+    )
+    scan_scope: str = Field(
+        default="docs-site",
+        description="Scope: 'docs-site', 'urls', or 'both'",
+    )
+    last_scan_at: str | None = Field(
+        default=None,
+        description="Last scan timestamp (ISO 8601)",
+    )
+    next_scan_at: str | None = Field(
+        default=None,
+        description="Next scheduled scan timestamp (ISO 8601)",
+    )
+    scan_history: list[dict[str, Any]] = Field(
+        default_factory=list,
+        description="Last 10 scan results (timestamp, created, updated, skipped, errors)",
+    )
+
+    # Retrieval parameters (SPEC-1576)
+    vector_weight: float = Field(
+        default=0.7,
+        description="Weight for vector search in RRF merge (0.0-1.0)",
+    )
+    bm25_weight: float = Field(
+        default=0.3,
+        description="Weight for BM25 search in RRF merge (0.0-1.0)",
+    )
+    rrf_k: int = Field(
+        default=60,
+        description="RRF k parameter for rank fusion (1-100)",
+    )
+    top_k: int = Field(
+        default=5,
+        description="Number of results to return (1-20)",
+    )
+    min_score: float = Field(
+        default=0.1,
+        description="Minimum relevance score threshold (0.0-1.0)",
+    )
+
+    updated_at: str = Field(description="When last updated (ISO 8601)")
+    updated_by: str | None = Field(
+        default=None,
+        description="Who last updated the config",
+    )
+
+
 # ---------------------------------------------------------------------------
 # Collection configuration
 # ---------------------------------------------------------------------------

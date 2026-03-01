@@ -2,7 +2,7 @@
  * ProviderLayout — Platform operator console shell.
  *
  * Provides:
- *   1. Grouped sidebar navigation (16 pages in 4 groups)
+ *   1. Grouped sidebar navigation (17 pages in 4 groups)
  *   2. Header with platform name, version, and logout
  *   3. Authenticated apiFetch wrapper (SUPERADMIN API key injection)
  *   4. AppContext for child pages
@@ -81,6 +81,8 @@ const NAV_GROUPS: NavGroup[] = [
       { label: 'Status Page', path: '/status', icon: 'status', description: 'Incident management' },
       { label: 'Alerts', path: '/alerts', icon: 'alerts', description: 'Alert rules & history' },
       { label: 'Diagnostics', path: '/diagnostics', icon: 'diagnostics', description: 'Support diagnostics' },
+      { label: 'Co-Pilot Knowledge', path: '/copilot-knowledge', icon: 'copilot', description: 'Knowledge management' },
+      { label: 'Pipeline Observatory', path: '/pipeline', icon: 'queue', description: 'Agent pipeline metrics' },
     ],
   },
   {

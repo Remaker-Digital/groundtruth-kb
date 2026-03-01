@@ -43,6 +43,8 @@ import { MfaSettingsPage } from './pages/MfaSettings';
 import { SupportDiagnosticsPage } from './pages/SupportDiagnostics';
 import { CostAnalyticsPage } from './pages/CostAnalytics';
 import { AbuseDetectionPage } from './pages/AbuseDetection';
+import { CopilotKnowledgePage } from './pages/CopilotKnowledge';
+import { PipelineObservatoryPage } from './pages/PipelineObservatory';
 
 // ---------------------------------------------------------------------------
 // Auth state (sessionStorage — SUPERADMIN key + MFA token)
@@ -151,6 +153,8 @@ const App: React.FC = () => {
             <Route path="/status" element={<StatusPageManagement />} />
             <Route path="/alerts" element={<AlertConfigPage />} />
             <Route path="/diagnostics" element={<SupportDiagnosticsPage />} />
+            <Route path="/copilot-knowledge" element={<CopilotKnowledgePage />} />
+            <Route path="/pipeline" element={<PipelineObservatoryPage />} />
             {/* Compliance & Security */}
             <Route path="/compliance" element={<ComplianceDashboardPage />} />
             <Route path="/secrets" element={<SecretPosturePage />} />

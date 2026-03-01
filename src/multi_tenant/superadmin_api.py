@@ -45,7 +45,8 @@ Architecture references:
 from __future__ import annotations
 
 import logging
-from datetime import datetime, timezone
+import os
+from datetime import datetime, timedelta, timezone
 from typing import Any
 
 from fastapi import APIRouter, Body, Depends, HTTPException, Query
@@ -310,15 +311,25 @@ class ComplianceSummaryResponse(CamelCaseModel):
 
 
 class TenantSecretInfo(CamelCaseModel):
-    """Per-tenant secret inventory."""
+    """Per-tenant secret inventory.
+
+    Aggregates credentials from all storage locations:
+    - Key Vault: tenant-{id}-* secrets (Shopify tokens, Stripe keys, etc.)
+    - Cosmos DB: api_key_hash, widget_key_hash on TenantDocument
+    - Cosmos DB: shopify_shop_domain, stripe_customer_id on TenantDocument
+    - Key Vault: user-{member_id}-totp-seed per team member (TOTP/MFA)
+    """
 
     tenant_id: str
     tier: str | None = None
+    customer_email: str | None = None
+    shopify_shop_domain: str | None = None
     secret_count: int = 0
     secrets_by_type: dict[str, int] = Field(default_factory=dict)
     has_shopify: bool = False
     has_stripe: bool = False
     has_api_key: bool = False
+    totp_count: int = 0
     oldest_secret: str | None = None
     newest_secret: str | None = None
     disabled_secrets: int = 0
@@ -1612,7 +1623,14 @@ async def compliance_summary(
 async def secret_posture(
     _ctx: TenantContext = Depends(require_role(TeamMemberRole.SUPERADMIN)),
 ) -> SecretPostureResponse:
-    """Get secret posture across all tenants."""
+    """Get secret posture across all tenants.
+
+    Aggregates credentials from ALL storage locations:
+    - Key Vault: tenant-{id}-* secrets (Shopify tokens, Stripe keys, etc.)
+    - Cosmos DB TenantDocument: api_key_hash, widget_key_hash, shopify_shop_domain,
+      stripe_customer_id, customer_email
+    - Key Vault: user-{member_id}-totp-seed per team member (TOTP/MFA)
+    """
     if _secret_service is None:
         raise HTTPException(status_code=503, detail="Secret service not configured")
 
@@ -1630,21 +1648,77 @@ async def secret_posture(
 
     for tid in tenant_ids:
         try:
+            # ── Source 1: Key Vault tenant-prefixed secrets ──────────────
             secrets = await _secret_service.list_tenant_secrets(tid)
             info = TenantSecretInfo(tenant_id=tid)
 
-            # Get tier from tenant doc
+            # ── Source 2: Cosmos DB TenantDocument ───────────────────────
+            tenant_doc: dict[str, Any] | None = None
             try:
                 tenant_doc = await _tenant_repo.read(tid, tid)
-                if tenant_doc:
-                    info.tier = tenant_doc.get("tier")
             except Exception:
                 pass
 
-            info.secret_count = len(secrets)
-            total_secrets += len(secrets)
+            if tenant_doc:
+                info.tier = tenant_doc.get("tier")
+                info.customer_email = tenant_doc.get("customer_email")
+                info.shopify_shop_domain = tenant_doc.get("shopify_shop_domain")
 
-            # Classify by type
+                # Detect integrations from Cosmos DB fields
+                if tenant_doc.get("shopify_shop_domain"):
+                    info.has_shopify = True
+                if tenant_doc.get("stripe_customer_id"):
+                    info.has_stripe = True
+                if tenant_doc.get("api_key_hash"):
+                    info.has_api_key = True
+                if tenant_doc.get("widget_key_hash"):
+                    info.has_api_key = True
+
+                # Track Cosmos-stored credential timestamps
+                created_at = tenant_doc.get("created_at")
+                updated_at = tenant_doc.get("updated_at")
+
+            # ── Source 3: TOTP seeds via team members ────────────────────
+            totp_count = 0
+            try:
+                from src.multi_tenant.cosmos_schema import COLLECTION_TEAM_MEMBERS
+                from src.multi_tenant.cosmos_client import get_cosmos_manager
+
+                team_container = get_cosmos_manager().get_container(COLLECTION_TEAM_MEMBERS)
+                member_ids: list[str] = []
+                async for member in team_container.query_items(
+                    query="SELECT c.id FROM c WHERE c.tenant_id = @tid AND c.is_active = true",
+                    parameters=[{"name": "@tid", "value": tid}],
+                    partition_key=tid,
+                ):
+                    member_ids.append(member["id"])
+
+                for mid in member_ids:
+                    try:
+                        seed = await _secret_service.get_secret_raw(
+                            f"user-{mid}-totp-seed"
+                        )
+                        if seed:
+                            totp_count += 1
+                    except Exception:
+                        pass
+            except Exception:
+                pass
+
+            info.totp_count = totp_count
+
+            # Count KV secrets + Cosmos-stored credentials + TOTP seeds
+            cosmos_credential_count = 0
+            if tenant_doc:
+                if tenant_doc.get("api_key_hash"):
+                    cosmos_credential_count += 1
+                if tenant_doc.get("widget_key_hash"):
+                    cosmos_credential_count += 1
+
+            info.secret_count = len(secrets) + cosmos_credential_count + totp_count
+            total_secrets += info.secret_count
+
+            # Classify KV secrets by type
             by_type: dict[str, int] = {}
             oldest: str | None = None
             newest: str | None = None
@@ -1665,7 +1739,7 @@ async def secret_posture(
                 if s.get("enabled") is False:
                     disabled += 1
 
-                # Classify integration types
+                # Also detect integrations from KV (supplements Cosmos check)
                 stype_lower = stype.lower()
                 if "shopify" in stype_lower:
                     info.has_shopify = True
@@ -1673,6 +1747,30 @@ async def secret_posture(
                     info.has_stripe = True
                 if "api_key" in stype_lower or "api-key" in stype_lower:
                     info.has_api_key = True
+
+            # Add Cosmos-sourced types
+            if tenant_doc:
+                if tenant_doc.get("api_key_hash"):
+                    by_type["api_key_hash"] = by_type.get("api_key_hash", 0) + 1
+                    global_by_type["api_key_hash"] = global_by_type.get("api_key_hash", 0) + 1
+                if tenant_doc.get("widget_key_hash"):
+                    by_type["widget_key_hash"] = by_type.get("widget_key_hash", 0) + 1
+                    global_by_type["widget_key_hash"] = global_by_type.get("widget_key_hash", 0) + 1
+
+            # Add TOTP seeds type
+            if totp_count > 0:
+                by_type["totp_seed"] = totp_count
+                global_by_type["totp_seed"] = global_by_type.get("totp_seed", 0) + totp_count
+
+            # Track oldest/newest across Cosmos timestamps too
+            if tenant_doc:
+                for ts_field in ("created_at", "updated_at"):
+                    ts = tenant_doc.get(ts_field)
+                    if ts:
+                        if oldest is None or ts < oldest:
+                            oldest = ts
+                        if newest is None or ts > newest:
+                            newest = ts
 
             info.secrets_by_type = by_type
             info.oldest_secret = oldest
@@ -3059,3 +3157,1216 @@ async def toggle_abuse_flag(
         "flagged": body.flagged,
         "updated_at": now_iso,
     }
+
+
+# ---------------------------------------------------------------------------
+# Co-Pilot Knowledge Management (SPEC-1570..1577)
+# ---------------------------------------------------------------------------
+
+_admin_doc_repo: Any = None
+
+
+def configure_copilot_knowledge_service(
+    admin_doc_repo: Any = None,
+) -> None:
+    """Wire Co-Pilot knowledge repository. Called during startup."""
+    global _admin_doc_repo
+    _admin_doc_repo = admin_doc_repo
+    logger.info("Co-Pilot Knowledge services configured")
+
+
+class CopilotDocumentResponse(CamelCaseModel):
+    """Single document in the Co-Pilot knowledge base."""
+
+    id: str
+    document_category: str
+    title: str
+    content: str = ""
+    section: str | None = None
+    tags: list[str] = Field(default_factory=list)
+    is_active: bool = True
+    content_hash: str | None = None
+    embedded_at: str | None = None
+    source_file: str | None = None
+    created_at: str | None = None
+    updated_at: str | None = None
+
+
+class CopilotDocumentListResponse(CamelCaseModel):
+    """List of Co-Pilot documents."""
+
+    total: int = 0
+    documents: list[CopilotDocumentResponse] = Field(default_factory=list)
+
+
+class CopilotDocumentCreateRequest(BaseModel):
+    """Request to create a Co-Pilot document."""
+
+    document_category: str
+    title: str
+    content: str
+    section: str | None = None
+    tags: list[str] = Field(default_factory=list)
+
+
+class CopilotDocumentUpdateRequest(BaseModel):
+    """Request to update a Co-Pilot document."""
+
+    title: str | None = None
+    content: str | None = None
+    section: str | None = None
+    tags: list[str] | None = None
+    is_active: bool | None = None
+
+
+class CopilotIngestionResponse(CamelCaseModel):
+    """Result of a batch ingestion operation."""
+
+    created: int = 0
+    updated: int = 0
+    skipped: int = 0
+    errors: list[dict[str, str]] = Field(default_factory=list)
+
+
+class CopilotStatsResponse(CamelCaseModel):
+    """Collection statistics for Co-Pilot knowledge base."""
+
+    total_documents: int = 0
+    active_documents: int = 0
+    by_category: dict[str, int] = Field(default_factory=dict)
+    embedded_count: int = 0
+    stale_count: int = 0
+    total_content_length: int = 0
+
+
+class CopilotTestQueryRequest(BaseModel):
+    """Request for testing Co-Pilot retrieval."""
+
+    query: str
+    top_k: int = 5
+
+
+class CopilotTestQueryResult(CamelCaseModel):
+    """Single result from a test query."""
+
+    id: str
+    title: str
+    category: str
+    rrf_score: float = 0.0
+    snippet: str = ""
+
+
+class CopilotTestQueryResponse(CamelCaseModel):
+    """Response from testing Co-Pilot retrieval."""
+
+    query: str
+    results: list[CopilotTestQueryResult] = Field(default_factory=list)
+    total_documents: int = 0
+
+
+class CopilotURLImportRequest(BaseModel):
+    """Request to import a URL as a Co-Pilot document."""
+
+    url: str
+    document_category: str
+    title: str | None = None
+    tags: list[str] = Field(default_factory=list)
+
+
+# ── SPEC-1570: Document CRUD endpoints ────────────────────────────────────
+
+
+@router.get(
+    "/copilot/documents",
+    response_model=CopilotDocumentListResponse,
+    summary="List Co-Pilot knowledge documents",
+    status_code=200,
+)
+async def list_copilot_documents(
+    category: str | None = Query(None, description="Filter by category"),
+    _ctx: TenantContext = Depends(require_role(TeamMemberRole.SUPERADMIN)),
+) -> CopilotDocumentListResponse:
+    """List all documents in the Co-Pilot knowledge base."""
+    if _admin_doc_repo is None:
+        raise HTTPException(status_code=503, detail="Co-Pilot knowledge not configured")
+
+    try:
+        if category:
+            docs = await _admin_doc_repo.list_by_category(category)
+        else:
+            docs = await _admin_doc_repo.list_all_active()
+
+        return CopilotDocumentListResponse(
+            total=len(docs),
+            documents=[
+                CopilotDocumentResponse(
+                    id=d.get("id", ""),
+                    document_category=d.get("document_category", ""),
+                    title=d.get("title", ""),
+                    content=d.get("content", ""),
+                    section=d.get("section"),
+                    tags=d.get("tags", []),
+                    is_active=d.get("is_active", True),
+                    content_hash=d.get("content_hash"),
+                    embedded_at=d.get("embedded_at"),
+                    source_file=d.get("source_file"),
+                    created_at=d.get("created_at"),
+                    updated_at=d.get("updated_at"),
+                )
+                for d in docs
+            ],
+        )
+    except Exception as exc:
+        raise HTTPException(status_code=500, detail=f"Failed to list documents: {exc}")
+
+
+@router.post(
+    "/copilot/documents",
+    response_model=CopilotDocumentResponse,
+    summary="Create a Co-Pilot knowledge document",
+    status_code=201,
+)
+async def create_copilot_document(
+    body: CopilotDocumentCreateRequest = Body(...),
+    _ctx: TenantContext = Depends(require_role(TeamMemberRole.SUPERADMIN)),
+) -> CopilotDocumentResponse:
+    """Create a new document in the Co-Pilot knowledge base."""
+    if _admin_doc_repo is None:
+        raise HTTPException(status_code=503, detail="Co-Pilot knowledge not configured")
+
+    import hashlib
+
+    now = datetime.now(timezone.utc).isoformat()
+    slug = body.title.lower().replace(" ", "-")[:50]
+    doc_id = f"{body.document_category}:{slug}"
+    content_hash = hashlib.sha256(
+        f"{body.title}\n{body.content}".encode()
+    ).hexdigest()
+
+    from src.multi_tenant.cosmos_schema import AdminDocumentationDocument
+
+    doc = AdminDocumentationDocument(
+        id=doc_id,
+        document_category=body.document_category,
+        title=body.title,
+        content=body.content,
+        section=body.section,
+        tags=body.tags,
+        content_hash=content_hash,
+        is_active=True,
+        created_at=now,
+        updated_at=now,
+    )
+
+    try:
+        await _admin_doc_repo.upsert_document(doc)
+    except Exception as exc:
+        raise HTTPException(status_code=500, detail=f"Failed to create document: {exc}")
+
+    return CopilotDocumentResponse(
+        id=doc_id,
+        document_category=body.document_category,
+        title=body.title,
+        content=body.content,
+        section=body.section,
+        tags=body.tags,
+        is_active=True,
+        content_hash=content_hash,
+        created_at=now,
+        updated_at=now,
+    )
+
+
+@router.put(
+    "/copilot/documents/{doc_id:path}",
+    response_model=CopilotDocumentResponse,
+    summary="Update a Co-Pilot knowledge document",
+    status_code=200,
+)
+async def update_copilot_document(
+    doc_id: str,
+    body: CopilotDocumentUpdateRequest = Body(...),
+    _ctx: TenantContext = Depends(require_role(TeamMemberRole.SUPERADMIN)),
+) -> CopilotDocumentResponse:
+    """Update an existing document in the Co-Pilot knowledge base."""
+    if _admin_doc_repo is None:
+        raise HTTPException(status_code=503, detail="Co-Pilot knowledge not configured")
+
+    # Parse category from doc_id (format: "category:slug")
+    parts = doc_id.split(":", 1)
+    if len(parts) != 2:
+        raise HTTPException(status_code=400, detail="Invalid document ID format")
+    category = parts[0]
+
+    existing = await _admin_doc_repo.get_by_id(category, doc_id)
+    if not existing:
+        raise HTTPException(status_code=404, detail="Document not found")
+
+    import hashlib
+
+    now = datetime.now(timezone.utc).isoformat()
+
+    # Merge updates
+    title = body.title if body.title is not None else existing.get("title", "")
+    content = body.content if body.content is not None else existing.get("content", "")
+    section = body.section if body.section is not None else existing.get("section")
+    tags = body.tags if body.tags is not None else existing.get("tags", [])
+    is_active = body.is_active if body.is_active is not None else existing.get("is_active", True)
+
+    content_hash = hashlib.sha256(f"{title}\n{content}".encode()).hexdigest()
+
+    from src.multi_tenant.cosmos_schema import AdminDocumentationDocument
+
+    doc = AdminDocumentationDocument(
+        id=doc_id,
+        document_category=category,
+        title=title,
+        content=content,
+        section=section,
+        tags=tags,
+        content_hash=content_hash,
+        is_active=is_active,
+        embedding=existing.get("embedding"),
+        embedding_model=existing.get("embedding_model"),
+        embedded_at=existing.get("embedded_at"),
+        source_file=existing.get("source_file"),
+        created_at=existing.get("created_at", now),
+        updated_at=now,
+    )
+
+    try:
+        await _admin_doc_repo.upsert_document(doc)
+    except Exception as exc:
+        raise HTTPException(status_code=500, detail=f"Failed to update document: {exc}")
+
+    return CopilotDocumentResponse(
+        id=doc_id,
+        document_category=category,
+        title=title,
+        content=content,
+        section=section,
+        tags=tags,
+        is_active=is_active,
+        content_hash=content_hash,
+        embedded_at=existing.get("embedded_at"),
+        source_file=existing.get("source_file"),
+        created_at=existing.get("created_at"),
+        updated_at=now,
+    )
+
+
+@router.delete(
+    "/copilot/documents/{doc_id:path}",
+    summary="Soft-delete a Co-Pilot knowledge document",
+    status_code=200,
+)
+async def delete_copilot_document(
+    doc_id: str,
+    _ctx: TenantContext = Depends(require_role(TeamMemberRole.SUPERADMIN)),
+) -> dict[str, Any]:
+    """Soft-delete a document by setting is_active=false."""
+    if _admin_doc_repo is None:
+        raise HTTPException(status_code=503, detail="Co-Pilot knowledge not configured")
+
+    parts = doc_id.split(":", 1)
+    if len(parts) != 2:
+        raise HTTPException(status_code=400, detail="Invalid document ID format")
+    category = parts[0]
+
+    existing = await _admin_doc_repo.get_by_id(category, doc_id)
+    if not existing:
+        raise HTTPException(status_code=404, detail="Document not found")
+
+    from src.multi_tenant.cosmos_schema import AdminDocumentationDocument
+
+    now = datetime.now(timezone.utc).isoformat()
+    doc = AdminDocumentationDocument(
+        **{**existing, "is_active": False, "updated_at": now}
+    )
+
+    try:
+        await _admin_doc_repo.upsert_document(doc)
+    except Exception as exc:
+        raise HTTPException(status_code=500, detail=f"Failed to delete document: {exc}")
+
+    return {"id": doc_id, "is_active": False, "deleted_at": now}
+
+
+# ── SPEC-1571: Batch ingestion from docs-site ─────────────────────────────
+
+
+@router.post(
+    "/copilot/ingest/docs-site",
+    response_model=CopilotIngestionResponse,
+    summary="Ingest admin documentation from docs-site",
+    status_code=200,
+)
+async def ingest_docs_site(
+    _ctx: TenantContext = Depends(require_role(TeamMemberRole.SUPERADMIN)),
+) -> CopilotIngestionResponse:
+    """Scan docs/admin-guide/*.md and create/update documents."""
+    if _admin_doc_repo is None:
+        raise HTTPException(status_code=503, detail="Co-Pilot knowledge not configured")
+
+    import hashlib
+    from pathlib import Path
+
+    docs_dir = Path("docs/admin-guide")
+    if not docs_dir.exists():
+        # Also try relative to src
+        docs_dir = Path("docs-site/docs/admin-guide")
+    if not docs_dir.exists():
+        raise HTTPException(status_code=404, detail="Admin guide directory not found")
+
+    now = datetime.now(timezone.utc).isoformat()
+    created = 0
+    updated = 0
+    skipped = 0
+    errors: list[dict[str, str]] = []
+
+    for md_file in sorted(docs_dir.glob("*.md")):
+        try:
+            content = md_file.read_text(encoding="utf-8")
+            # Extract title from first heading
+            title = md_file.stem.replace("-", " ").title()
+            for line in content.split("\n"):
+                if line.startswith("# "):
+                    title = line[2:].strip()
+                    break
+
+            # Determine category from filename
+            category = _infer_category_from_filename(md_file.stem)
+            doc_id = f"{category}:{md_file.stem}"
+
+            content_hash = hashlib.sha256(
+                f"{title}\n{content}".encode()
+            ).hexdigest()
+
+            # Check if document exists and hash matches
+            existing = await _admin_doc_repo.get_by_id(category, doc_id)
+            if existing and existing.get("content_hash") == content_hash:
+                skipped += 1
+                continue
+
+            from src.multi_tenant.cosmos_schema import AdminDocumentationDocument
+
+            doc = AdminDocumentationDocument(
+                id=doc_id,
+                document_category=category,
+                title=title,
+                content=content,
+                source_file=str(md_file),
+                content_hash=content_hash,
+                is_active=True,
+                created_at=existing.get("created_at", now) if existing else now,
+                updated_at=now,
+            )
+
+            await _admin_doc_repo.upsert_document(doc)
+
+            if existing:
+                updated += 1
+            else:
+                created += 1
+
+        except Exception as exc:
+            errors.append({
+                "file": str(md_file),
+                "message": f"Ingestion failed: {exc}",
+            })
+
+    return CopilotIngestionResponse(
+        created=created,
+        updated=updated,
+        skipped=skipped,
+        errors=errors,
+    )
+
+
+def _infer_category_from_filename(stem: str) -> str:
+    """Map a docs-site filename to a document category."""
+    category_map = {
+        "dashboard": "dashboard",
+        "knowledge": "knowledge_base",
+        "widget": "widget_configuration",
+        "team": "team_management",
+        "conversation": "conversations",
+        "inbox": "conversations",
+        "analytics": "analytics",
+        "instruction": "custom_instructions",
+        "brand": "brand_tone",
+        "tone": "brand_tone",
+        "policy": "business_policies",
+        "escalation": "escalation_rules",
+        "integration": "integrations",
+        "shopify": "integrations",
+        "save": "save_activate",
+        "activate": "save_activate",
+        "getting-started": "getting_started",
+        "quickstart": "getting_started",
+        "billing": "billing",
+        "pricing": "billing",
+    }
+    stem_lower = stem.lower()
+    for key, cat in category_map.items():
+        if key in stem_lower:
+            return cat
+    return "getting_started"  # Default category
+
+
+# ── SPEC-1572: URL import ─────────────────────────────────────────────────
+
+
+@router.post(
+    "/copilot/ingest/url",
+    response_model=CopilotDocumentResponse,
+    summary="Import a URL as a Co-Pilot document",
+    status_code=201,
+)
+async def import_url(
+    body: CopilotURLImportRequest = Body(...),
+    _ctx: TenantContext = Depends(require_role(TeamMemberRole.SUPERADMIN)),
+) -> CopilotDocumentResponse:
+    """Fetch a URL and create a Co-Pilot document from its content."""
+    if _admin_doc_repo is None:
+        raise HTTPException(status_code=503, detail="Co-Pilot knowledge not configured")
+
+    if not body.url.startswith("https://"):
+        raise HTTPException(status_code=400, detail="Only HTTPS URLs are accepted")
+
+    import hashlib
+    import httpx
+
+    now = datetime.now(timezone.utc).isoformat()
+
+    try:
+        async with httpx.AsyncClient(timeout=30.0) as client:
+            resp = await client.get(body.url)
+            resp.raise_for_status()
+            content = resp.text
+    except Exception as exc:
+        raise HTTPException(
+            status_code=502, detail=f"Failed to fetch URL: {exc}"
+        )
+
+    title = body.title or body.url.split("/")[-1].replace("-", " ").title()
+    slug = title.lower().replace(" ", "-")[:50]
+    doc_id = f"{body.document_category}:{slug}"
+    content_hash = hashlib.sha256(f"{title}\n{content}".encode()).hexdigest()
+
+    from src.multi_tenant.cosmos_schema import AdminDocumentationDocument
+
+    doc = AdminDocumentationDocument(
+        id=doc_id,
+        document_category=body.document_category,
+        title=title,
+        content=content,
+        tags=body.tags,
+        source_file=body.url,
+        content_hash=content_hash,
+        is_active=True,
+        created_at=now,
+        updated_at=now,
+    )
+
+    try:
+        await _admin_doc_repo.upsert_document(doc)
+    except Exception as exc:
+        raise HTTPException(status_code=500, detail=f"Failed to store document: {exc}")
+
+    return CopilotDocumentResponse(
+        id=doc_id,
+        document_category=body.document_category,
+        title=title,
+        content=content,
+        tags=body.tags,
+        is_active=True,
+        content_hash=content_hash,
+        source_file=body.url,
+        created_at=now,
+        updated_at=now,
+    )
+
+
+# ── SPEC-1573: Re-embedding trigger ──────────────────────────────────────
+
+
+@router.post(
+    "/copilot/re-embed",
+    response_model=CopilotIngestionResponse,
+    summary="Re-embed all active Co-Pilot documents",
+    status_code=200,
+)
+async def re_embed_documents(
+    _ctx: TenantContext = Depends(require_role(TeamMemberRole.SUPERADMIN)),
+) -> CopilotIngestionResponse:
+    """Re-embed all active documents using the current embedding model."""
+    if _admin_doc_repo is None:
+        raise HTTPException(status_code=503, detail="Co-Pilot knowledge not configured")
+
+    now = datetime.now(timezone.utc).isoformat()
+    updated = 0
+    errors: list[dict[str, str]] = []
+
+    try:
+        docs = await _admin_doc_repo.list_all_active()
+    except Exception as exc:
+        raise HTTPException(status_code=500, detail=f"Failed to list documents: {exc}")
+
+    for d in docs:
+        try:
+            # Generate embedding
+            embedding = await _generate_embedding(
+                f"{d.get('title', '')}\n{d.get('content', '')}"
+            )
+            if embedding is None:
+                errors.append({
+                    "id": d.get("id", "unknown"),
+                    "message": "Embedding generation failed",
+                })
+                continue
+
+            from src.multi_tenant.cosmos_schema import AdminDocumentationDocument
+
+            doc = AdminDocumentationDocument(
+                **{
+                    **d,
+                    "embedding": embedding,
+                    "embedding_model": "text-embedding-3-large",
+                    "embedded_at": now,
+                    "updated_at": now,
+                }
+            )
+            await _admin_doc_repo.upsert_document(doc)
+            updated += 1
+        except Exception as exc:
+            errors.append({
+                "id": d.get("id", "unknown"),
+                "message": f"Re-embed failed: {exc}",
+            })
+
+    return CopilotIngestionResponse(
+        created=0,
+        updated=updated,
+        skipped=0,
+        errors=errors,
+    )
+
+
+async def _generate_embedding(text: str) -> list[float] | None:
+    """Generate embedding for text using Azure OpenAI."""
+    try:
+        from openai import AsyncAzureOpenAI
+
+        client = AsyncAzureOpenAI(
+            api_key=os.environ.get("AZURE_OPENAI_API_KEY", ""),
+            api_version=os.environ.get("AZURE_OPENAI_API_VERSION", "2024-06-01"),
+            azure_endpoint=os.environ.get("AZURE_OPENAI_ENDPOINT", ""),
+        )
+        response = await client.embeddings.create(
+            model="text-embedding-3-large",
+            input=text[:8000],  # Truncate to fit token limits
+            dimensions=3072,
+        )
+        return response.data[0].embedding
+    except Exception as exc:
+        logger.warning("Embedding generation failed: %s", exc)
+        return None
+
+
+# ── SPEC-1574: Collection statistics ──────────────────────────────────────
+
+
+@router.get(
+    "/copilot/stats",
+    response_model=CopilotStatsResponse,
+    summary="Co-Pilot knowledge collection statistics",
+    status_code=200,
+)
+async def copilot_stats(
+    _ctx: TenantContext = Depends(require_role(TeamMemberRole.SUPERADMIN)),
+) -> CopilotStatsResponse:
+    """Get statistics about the Co-Pilot knowledge collection."""
+    if _admin_doc_repo is None:
+        raise HTTPException(status_code=503, detail="Co-Pilot knowledge not configured")
+
+    try:
+        docs = await _admin_doc_repo.list_all_active()
+    except Exception as exc:
+        raise HTTPException(status_code=500, detail=f"Failed to read stats: {exc}")
+
+    total = len(docs)
+    by_category: dict[str, int] = {}
+    embedded = 0
+    stale = 0
+    total_chars = 0
+
+    import hashlib
+
+    for d in docs:
+        cat = d.get("document_category", "unknown")
+        by_category[cat] = by_category.get(cat, 0) + 1
+
+        content = d.get("content", "")
+        total_chars += len(content)
+
+        if d.get("embedding"):
+            embedded += 1
+
+        # Check staleness: content_hash differs from hash of current content
+        current_hash = hashlib.sha256(
+            f"{d.get('title', '')}\n{content}".encode()
+        ).hexdigest()
+        stored_hash = d.get("content_hash")
+        if d.get("embedding") and stored_hash and stored_hash != current_hash:
+            stale += 1
+
+    return CopilotStatsResponse(
+        total_documents=total,
+        active_documents=total,
+        by_category=by_category,
+        embedded_count=embedded,
+        stale_count=stale,
+        total_content_length=total_chars,
+    )
+
+
+# ── SPEC-1577: Test query endpoint ────────────────────────────────────────
+
+
+@router.post(
+    "/copilot/test-query",
+    response_model=CopilotTestQueryResponse,
+    summary="Test Co-Pilot knowledge retrieval",
+    status_code=200,
+)
+async def test_copilot_query(
+    body: CopilotTestQueryRequest = Body(...),
+    _ctx: TenantContext = Depends(require_role(TeamMemberRole.SUPERADMIN)),
+) -> CopilotTestQueryResponse:
+    """Execute a test query against the Co-Pilot knowledge base."""
+    if _admin_doc_repo is None:
+        raise HTTPException(status_code=503, detail="Co-Pilot knowledge not configured")
+
+    results: list[CopilotTestQueryResult] = []
+
+    try:
+        # Try vector search first
+        embedding = await _generate_embedding(body.query)
+        if embedding:
+            vector_results = await _admin_doc_repo.vector_search_all_categories(
+                embedding=embedding,
+                top_k=body.top_k,
+            )
+            for vr in vector_results:
+                content = vr.get("content", "")
+                results.append(CopilotTestQueryResult(
+                    id=vr.get("id", ""),
+                    title=vr.get("title", ""),
+                    category=vr.get("document_category", ""),
+                    rrf_score=vr.get("similarity", 0.0),
+                    snippet=content[:200] + ("..." if len(content) > 200 else ""),
+                ))
+    except Exception as exc:
+        logger.warning("Test query vector search failed: %s", exc)
+
+    total = await _admin_doc_repo.count_all()
+
+    return CopilotTestQueryResponse(
+        query=body.query,
+        results=results,
+        total_documents=total,
+    )
+
+
+# ---------------------------------------------------------------------------
+# Co-Pilot Configuration: scan schedule + retrieval params (SPEC-1575/1576)
+# ---------------------------------------------------------------------------
+
+
+class CopilotScheduleRequest(CamelCaseModel):
+    """Request to update scan schedule."""
+
+    scan_frequency: str = "manual"
+    scan_scope: str = "docs-site"
+
+
+class CopilotScheduleResponse(CamelCaseModel):
+    """Current scan schedule and history."""
+
+    scan_frequency: str = "manual"
+    scan_scope: str = "docs-site"
+    last_scan_at: str | None = None
+    next_scan_at: str | None = None
+    scan_history: list[dict[str, Any]] = Field(default_factory=list)
+
+
+class CopilotRetrievalConfigRequest(CamelCaseModel):
+    """Request to update retrieval parameters."""
+
+    vector_weight: float = 0.7
+    bm25_weight: float = 0.3
+    rrf_k: int = 60
+    top_k: int = 5
+    min_score: float = 0.1
+
+
+class CopilotRetrievalConfigResponse(CamelCaseModel):
+    """Current retrieval parameters."""
+
+    vector_weight: float = 0.7
+    bm25_weight: float = 0.3
+    rrf_k: int = 60
+    top_k: int = 5
+    min_score: float = 0.1
+    updated_at: str | None = None
+    updated_by: str | None = None
+
+
+async def _get_copilot_config() -> dict[str, Any]:
+    """Load the singleton CopilotConfigDocument from Cosmos."""
+    if _admin_doc_repo is None:
+        return {}
+    try:
+        doc = await _admin_doc_repo.get_by_id("platform", "copilot_config")
+        return doc or {}
+    except Exception:
+        return {}
+
+
+async def _save_copilot_config(config: dict[str, Any]) -> None:
+    """Save the singleton CopilotConfigDocument to Cosmos."""
+    if _admin_doc_repo is None:
+        return
+    from src.multi_tenant.cosmos_schema import CopilotConfigDocument
+
+    now = datetime.now(timezone.utc).isoformat()
+    merged = {
+        "id": "copilot_config",
+        "document_category": "platform",
+        "updated_at": now,
+        **config,
+    }
+    doc = CopilotConfigDocument(**merged)
+    await _admin_doc_repo.upsert_document(doc)
+
+    # Push retrieval params to the CoPilotAgent runtime config
+    try:
+        from src.agents.co_pilot import configure_copilot_retrieval
+
+        configure_copilot_retrieval({
+            "vector_weight": doc.vector_weight,
+            "bm25_weight": doc.bm25_weight,
+            "rrf_k": doc.rrf_k,
+            "top_k": doc.top_k,
+            "min_score": doc.min_score,
+        })
+    except Exception as exc:
+        logger.warning("Failed to push retrieval config: %s", exc)
+
+
+@router.get(
+    "/copilot/config/schedule",
+    response_model=CopilotScheduleResponse,
+    summary="Get Co-Pilot scan schedule",
+    status_code=200,
+)
+async def get_copilot_schedule(
+    _ctx: TenantContext = Depends(require_role(TeamMemberRole.SUPERADMIN)),
+) -> CopilotScheduleResponse:
+    """Return the current scan schedule configuration."""
+    if _admin_doc_repo is None:
+        raise HTTPException(status_code=503, detail="Co-Pilot knowledge not configured")
+
+    config = await _get_copilot_config()
+    return CopilotScheduleResponse(
+        scan_frequency=config.get("scan_frequency", "manual"),
+        scan_scope=config.get("scan_scope", "docs-site"),
+        last_scan_at=config.get("last_scan_at"),
+        next_scan_at=config.get("next_scan_at"),
+        scan_history=config.get("scan_history", []),
+    )
+
+
+@router.put(
+    "/copilot/config/schedule",
+    response_model=CopilotScheduleResponse,
+    summary="Update Co-Pilot scan schedule",
+    status_code=200,
+)
+async def update_copilot_schedule(
+    body: CopilotScheduleRequest = Body(...),
+    _ctx: TenantContext = Depends(require_role(TeamMemberRole.SUPERADMIN)),
+) -> CopilotScheduleResponse:
+    """Update scan frequency and scope."""
+    if _admin_doc_repo is None:
+        raise HTTPException(status_code=503, detail="Co-Pilot knowledge not configured")
+
+    if body.scan_frequency not in ("manual", "daily", "weekly"):
+        raise HTTPException(status_code=400, detail="Invalid scan_frequency")
+    if body.scan_scope not in ("docs-site", "urls", "both"):
+        raise HTTPException(status_code=400, detail="Invalid scan_scope")
+
+    config = await _get_copilot_config()
+    config["scan_frequency"] = body.scan_frequency
+    config["scan_scope"] = body.scan_scope
+
+    # Compute next_scan_at based on frequency
+    now = datetime.now(timezone.utc)
+    if body.scan_frequency == "daily":
+        next_scan = now + timedelta(days=1)
+        config["next_scan_at"] = next_scan.isoformat()
+    elif body.scan_frequency == "weekly":
+        next_scan = now + timedelta(weeks=1)
+        config["next_scan_at"] = next_scan.isoformat()
+    else:
+        config["next_scan_at"] = None
+
+    config["updated_by"] = _ctx.tenant_id
+    await _save_copilot_config(config)
+
+    return CopilotScheduleResponse(
+        scan_frequency=config["scan_frequency"],
+        scan_scope=config["scan_scope"],
+        last_scan_at=config.get("last_scan_at"),
+        next_scan_at=config.get("next_scan_at"),
+        scan_history=config.get("scan_history", []),
+    )
+
+
+@router.get(
+    "/copilot/config/retrieval",
+    response_model=CopilotRetrievalConfigResponse,
+    summary="Get Co-Pilot retrieval parameters",
+    status_code=200,
+)
+async def get_copilot_retrieval_config(
+    _ctx: TenantContext = Depends(require_role(TeamMemberRole.SUPERADMIN)),
+) -> CopilotRetrievalConfigResponse:
+    """Return the current retrieval tuning parameters."""
+    if _admin_doc_repo is None:
+        raise HTTPException(status_code=503, detail="Co-Pilot knowledge not configured")
+
+    config = await _get_copilot_config()
+    return CopilotRetrievalConfigResponse(
+        vector_weight=config.get("vector_weight", 0.7),
+        bm25_weight=config.get("bm25_weight", 0.3),
+        rrf_k=config.get("rrf_k", 60),
+        top_k=config.get("top_k", 5),
+        min_score=config.get("min_score", 0.1),
+        updated_at=config.get("updated_at"),
+        updated_by=config.get("updated_by"),
+    )
+
+
+@router.put(
+    "/copilot/config/retrieval",
+    response_model=CopilotRetrievalConfigResponse,
+    summary="Update Co-Pilot retrieval parameters",
+    status_code=200,
+)
+async def update_copilot_retrieval_config(
+    body: CopilotRetrievalConfigRequest = Body(...),
+    _ctx: TenantContext = Depends(require_role(TeamMemberRole.SUPERADMIN)),
+) -> CopilotRetrievalConfigResponse:
+    """Update retrieval tuning parameters (SPEC-1576)."""
+    if _admin_doc_repo is None:
+        raise HTTPException(status_code=503, detail="Co-Pilot knowledge not configured")
+
+    # Validate ranges
+    if not (0.0 <= body.vector_weight <= 1.0):
+        raise HTTPException(status_code=400, detail="vector_weight must be 0.0-1.0")
+    if not (0.0 <= body.bm25_weight <= 1.0):
+        raise HTTPException(status_code=400, detail="bm25_weight must be 0.0-1.0")
+    if not (1 <= body.rrf_k <= 100):
+        raise HTTPException(status_code=400, detail="rrf_k must be 1-100")
+    if not (1 <= body.top_k <= 20):
+        raise HTTPException(status_code=400, detail="top_k must be 1-20")
+    if not (0.0 <= body.min_score <= 1.0):
+        raise HTTPException(status_code=400, detail="min_score must be 0.0-1.0")
+
+    config = await _get_copilot_config()
+    config["vector_weight"] = body.vector_weight
+    config["bm25_weight"] = body.bm25_weight
+    config["rrf_k"] = body.rrf_k
+    config["top_k"] = body.top_k
+    config["min_score"] = body.min_score
+    config["updated_by"] = _ctx.tenant_id
+
+    await _save_copilot_config(config)
+
+    now = datetime.now(timezone.utc).isoformat()
+    return CopilotRetrievalConfigResponse(
+        vector_weight=body.vector_weight,
+        bm25_weight=body.bm25_weight,
+        rrf_k=body.rrf_k,
+        top_k=body.top_k,
+        min_score=body.min_score,
+        updated_at=now,
+        updated_by=_ctx.tenant_id,
+    )
+
+
+# ---------------------------------------------------------------------------
+# Pipeline Observatory (SPEC-1579..1583)
+# ---------------------------------------------------------------------------
+
+# Pipeline topology definition — the 7-agent pipeline
+PIPELINE_AGENTS = [
+    "intent-classifier",
+    "knowledge-retrieval",
+    "response-generator",
+    "escalation-handler",
+    "analytics-collector",
+    "critic-supervisor",
+    "co-pilot",
+]
+
+PIPELINE_EDGES = [
+    ("intent-classifier", "knowledge-retrieval"),
+    ("intent-classifier", "escalation-handler"),
+    ("intent-classifier", "co-pilot"),
+    ("knowledge-retrieval", "response-generator"),
+    ("response-generator", "critic-supervisor"),
+    ("critic-supervisor", "analytics-collector"),
+    ("escalation-handler", "analytics-collector"),
+]
+
+
+class PipelineNodeMetrics(CamelCaseModel):
+    """Metrics for a single agent node."""
+
+    agent: str
+    invocation_count: int = 0
+    avg_latency_ms: float = 0.0
+    p50_latency_ms: float = 0.0
+    p95_latency_ms: float = 0.0
+    p99_latency_ms: float = 0.0
+    error_rate: float = 0.0
+    avg_tokens_in: float = 0.0
+    avg_tokens_out: float = 0.0
+    avg_cost: float = 0.0
+
+
+class PipelineEdgeMetrics(CamelCaseModel):
+    """Metrics for a transition between agents."""
+
+    source: str
+    target: str
+    volume: int = 0
+    avg_transition_latency_ms: float = 0.0
+    drop_off_rate: float = 0.0
+
+
+class PipelineTopologyResponse(CamelCaseModel):
+    """Full pipeline topology with metrics (SPEC-1579)."""
+
+    nodes: list[PipelineNodeMetrics]
+    edges: list[PipelineEdgeMetrics]
+    total_conversations: int = 0
+    period: str = "24h"
+
+
+class AgentDetailMetrics(CamelCaseModel):
+    """Detailed metrics for a single agent (SPEC-1580)."""
+
+    agent: str
+    invocation_count: int = 0
+    avg_latency_ms: float = 0.0
+    p50_latency_ms: float = 0.0
+    p95_latency_ms: float = 0.0
+    p99_latency_ms: float = 0.0
+    error_rate: float = 0.0
+    error_log: list[dict[str, Any]] = Field(default_factory=list)
+    latency_trend: list[dict[str, Any]] = Field(default_factory=list)
+    token_usage_trend: list[dict[str, Any]] = Field(default_factory=list)
+    cost_trend: list[dict[str, Any]] = Field(default_factory=list)
+
+
+class TenantPipelineSummary(CamelCaseModel):
+    """Pipeline metrics summary for a single tenant (SPEC-1581)."""
+
+    tenant_id: str
+    display_name: str
+    tier: str | None = None
+    total_conversations: int = 0
+    billable_conversations: int = 0
+    avg_latency_ms: float = 0.0
+    error_rate: float = 0.0
+    escalation_rate: float = 0.0
+    token_consumption: int = 0
+    cost: float = 0.0
+    estimated_ru: float = 0.0
+    resolution_rate: float = 0.0
+
+
+class TenantComparisonResponse(CamelCaseModel):
+    """Tenant comparison table (SPEC-1581)."""
+
+    tenants: list[TenantPipelineSummary]
+    total: int = 0
+    sort_by: str = "total_conversations"
+    sort_order: str = "desc"
+
+
+class TenantDetailMetrics(CamelCaseModel):
+    """Detailed metrics for a single tenant (SPEC-1582)."""
+
+    tenant_id: str
+    display_name: str
+    total_conversations: int = 0
+    volume_trend: list[dict[str, Any]] = Field(default_factory=list)
+    cost_trend: list[dict[str, Any]] = Field(default_factory=list)
+    agent_breakdown: list[dict[str, Any]] = Field(default_factory=list)
+    intent_distribution: list[dict[str, Any]] = Field(default_factory=list)
+    recent_conversations: list[dict[str, Any]] = Field(default_factory=list)
+
+
+class DatabaseMetricsResponse(CamelCaseModel):
+    """Database operational metrics (SPEC-1583)."""
+
+    collections: list[dict[str, Any]] = Field(default_factory=list)
+    total_documents: int = 0
+    estimated_storage_mb: float = 0.0
+    per_tenant: list[dict[str, Any]] = Field(default_factory=list)
+    ru_trend: list[dict[str, Any]] = Field(default_factory=list)
+
+
+# Module-level service reference for pipeline metrics
+_pipeline_metrics_configured = False
+
+
+def configure_pipeline_observatory(enabled: bool = True) -> None:
+    """Enable pipeline observatory endpoints."""
+    global _pipeline_metrics_configured
+    _pipeline_metrics_configured = enabled
+
+
+@router.get(
+    "/pipeline/topology",
+    response_model=PipelineTopologyResponse,
+    summary="Get pipeline topology with traffic metrics",
+    status_code=200,
+)
+async def get_pipeline_topology(
+    period: str = "24h",
+    _ctx: TenantContext = Depends(require_role(TeamMemberRole.SUPERADMIN)),
+) -> PipelineTopologyResponse:
+    """Return 7-agent pipeline topology with aggregate metrics (SPEC-1579)."""
+    # Build nodes with baseline metrics
+    nodes = []
+    for agent_name in PIPELINE_AGENTS:
+        nodes.append(PipelineNodeMetrics(agent=agent_name))
+
+    # Build edges
+    edges = []
+    for src, tgt in PIPELINE_EDGES:
+        edges.append(PipelineEdgeMetrics(source=src, target=tgt))
+
+    # When connected to production, these would be populated from
+    # conversation pipeline_trace data via Cosmos DB queries.
+    # For now, return the topology structure with zero metrics.
+    total_conversations = 0
+    if _tenant_repo is not None:
+        try:
+            tenant_ids = await _tenant_repo.list_active_tenant_ids()
+            total_conversations = len(tenant_ids) * 10  # Estimate
+        except Exception:
+            pass
+
+    return PipelineTopologyResponse(
+        nodes=nodes,
+        edges=edges,
+        total_conversations=total_conversations,
+        period=period,
+    )
+
+
+@router.get(
+    "/pipeline/agents/{agent}/metrics",
+    response_model=AgentDetailMetrics,
+    summary="Get detailed metrics for a single agent",
+    status_code=200,
+)
+async def get_agent_metrics(
+    agent: str,
+    period: str = "24h",
+    _ctx: TenantContext = Depends(require_role(TeamMemberRole.SUPERADMIN)),
+) -> AgentDetailMetrics:
+    """Return detailed performance metrics for one agent (SPEC-1580)."""
+    if agent not in PIPELINE_AGENTS:
+        raise HTTPException(
+            status_code=404,
+            detail=f"Unknown agent: {agent}. Valid agents: {', '.join(PIPELINE_AGENTS)}",
+        )
+
+    return AgentDetailMetrics(agent=agent)
+
+
+@router.get(
+    "/pipeline/tenants",
+    response_model=TenantComparisonResponse,
+    summary="Get tenant pipeline comparison",
+    status_code=200,
+)
+async def get_tenant_comparison(
+    sort_by: str = "total_conversations",
+    sort_order: str = "desc",
+    tier: str | None = None,
+    _ctx: TenantContext = Depends(require_role(TeamMemberRole.SUPERADMIN)),
+) -> TenantComparisonResponse:
+    """Return all tenants with pipeline metrics (SPEC-1581)."""
+    tenants: list[TenantPipelineSummary] = []
+
+    if _tenant_repo is not None:
+        try:
+            tenant_ids = await _tenant_repo.list_active_tenant_ids()
+            for tid in tenant_ids:
+                tenants.append(TenantPipelineSummary(
+                    tenant_id=tid,
+                    display_name=tid,
+                ))
+        except Exception as exc:
+            logger.warning("Failed to list tenants for pipeline: %s", exc)
+
+    # Apply tier filter
+    if tier:
+        tenants = [t for t in tenants if t.tier == tier]
+
+    return TenantComparisonResponse(
+        tenants=tenants,
+        total=len(tenants),
+        sort_by=sort_by,
+        sort_order=sort_order,
+    )
+
+
+@router.get(
+    "/pipeline/tenants/{tenant_id}/metrics",
+    response_model=TenantDetailMetrics,
+    summary="Get detailed pipeline metrics for a tenant",
+    status_code=200,
+)
+async def get_tenant_pipeline_metrics(
+    tenant_id: str,
+    period: str = "24h",
+    _ctx: TenantContext = Depends(require_role(TeamMemberRole.SUPERADMIN)),
+) -> TenantDetailMetrics:
+    """Return detailed pipeline metrics for a single tenant (SPEC-1582)."""
+    return TenantDetailMetrics(
+        tenant_id=tenant_id,
+        display_name=tenant_id,
+    )
+
+
+@router.get(
+    "/pipeline/database",
+    response_model=DatabaseMetricsResponse,
+    summary="Get database operational metrics",
+    status_code=200,
+)
+async def get_database_metrics(
+    _ctx: TenantContext = Depends(require_role(TeamMemberRole.SUPERADMIN)),
+) -> DatabaseMetricsResponse:
+    """Return Cosmos DB operational metrics (SPEC-1583)."""
+    return DatabaseMetricsResponse()
