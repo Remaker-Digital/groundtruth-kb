@@ -358,7 +358,7 @@ function IngestionTab() {
           </Button>
         </Group>
         {result && (
-          <Paper withBorder radius="md" p="sm" mt="md" bg={tokens.background}>
+          <Paper withBorder radius="md" p="sm" mt="md" bg={tokens.surface}>
             <Group gap="lg">
               <Text size="sm" c={tokens.success}>Created: {result.created}</Text>
               <Text size="sm" c={tokens.chartBlue}>Updated: {result.updated}</Text>
@@ -731,7 +731,7 @@ function ParametersTab() {
               {testResult.results.length} results from {testResult.totalDocuments} documents
             </Text>
             {testResult.results.map((r, i) => (
-              <Paper key={i} withBorder radius="sm" p="sm" bg={tokens.background}>
+              <Paper key={i} withBorder radius="sm" p="sm" bg={tokens.surface}>
                 <Group gap="xs" mb={4}>
                   <Badge variant="light" color="blue" size="xs">{r.category}</Badge>
                   <Text size="xs" fw={600} c={tokens.textPrimary}>{r.title}</Text>

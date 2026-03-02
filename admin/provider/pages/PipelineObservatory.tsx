@@ -334,7 +334,7 @@ function AgentMetricsTab() {
                 </Group>
 
                 {/* Latency percentiles */}
-                <Paper withBorder radius="sm" p="xs" bg={tokens.background}>
+                <Paper withBorder radius="sm" p="xs" bg={tokens.surface}>
                   <Text size="xs" c="dimmed" mb={4}>Latency Percentiles</Text>
                   <Group gap="md">
                     <div>

@@ -273,7 +273,7 @@ export function ContactMessagesPage() {
 
       {/* Table */}
       {loading ? (
-        <LoadingState label="Loading contact messages..." />
+        <LoadingState text="Loading contact messages..." />
       ) : messages.length === 0 ? (
         <Paper p="xl" withBorder>
           <Text ta="center" c="dimmed">No contact messages found.</Text>
@@ -355,7 +355,7 @@ export function ContactMessagesPage() {
             </Group>
 
             {/* Tenant context */}
-            <Paper p="sm" withBorder style={{ background: tokens.surfaceSecondary }}>
+            <Paper p="sm" withBorder style={{ background: tokens.surface }}>
               <Stack gap={4}>
                 <Group gap="xs">
                   <Text size="xs" fw={600} w={100}>Tenant</Text>
