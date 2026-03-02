@@ -48,13 +48,14 @@ from src.multi_tenant.tier_upgrade import router as tier_upgrade_router
 from src.multi_tenant.addon_checkout import router as addon_checkout_router
 from src.multi_tenant.memory_dashboard import router as memory_dashboard_router
 from src.multi_tenant.admin_contact_api import router as admin_contact_router
+from src.multi_tenant.superadmin_contact_api import router as superadmin_contact_router
 from src.multi_tenant.admin_ingestion_api import router as admin_ingestion_router
 from src.multi_tenant.admin_fine_tuning_api import router as admin_fine_tuning_router
 from src.multi_tenant.widget_otp_verification import router as widget_otp_router
 
 
 def register_routers(app: FastAPI) -> None:
-    """Register all 38 API routers on the FastAPI application.
+    """Register all 39 API routers on the FastAPI application.
 
     This mirrors the router registration block from main.py lines 186-209.
     """
@@ -96,5 +97,6 @@ def register_routers(app: FastAPI) -> None:
     app.include_router(addon_checkout_router)
     app.include_router(memory_dashboard_router)
     app.include_router(admin_contact_router)
+    app.include_router(superadmin_contact_router)
     app.include_router(admin_fine_tuning_router)
     app.include_router(widget_otp_router)

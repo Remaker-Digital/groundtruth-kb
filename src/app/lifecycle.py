@@ -876,6 +876,31 @@ async def _startup_superadmin_services() -> None:
         )
 
 
+async def _startup_contact_messages() -> None:
+    """Initialize the Contact Messages persistence layer (SPEC-1588).
+
+    Wires a TenantScopedRepository for contact_messages into the
+    admin contact API so submissions are persisted to Cosmos DB.
+    Non-fatal: contact form still delivers email if persistence fails.
+    """
+    from src.multi_tenant.admin_contact_api import configure_contact_repo
+    from src.multi_tenant.superadmin_contact_api import configure_superadmin_contact_services
+
+    try:
+        from src.multi_tenant.cosmos_schema import COLLECTION_CONTACT_MESSAGES
+        from src.multi_tenant.repositories.base import TenantScopedRepository
+
+        repo = TenantScopedRepository(COLLECTION_CONTACT_MESSAGES)
+        configure_contact_repo(repo=repo)
+        configure_superadmin_contact_services(contact_repo=repo)
+        logger.info("Contact messages persistence initialized (contact_messages container)")
+    except Exception:
+        logger.warning(
+            "Contact messages persistence initialization failed — "
+            "contact form will still deliver email but messages will not be persisted."
+        )
+
+
 async def _startup_status_api() -> None:
     """Initialize the public status API with incident repository.
 
@@ -1356,6 +1381,7 @@ def register_startup_handlers(app: FastAPI) -> None:
     app.on_event("startup")(_startup_admin_profile_services)
     app.on_event("startup")(_startup_admin_apikey_services)
     app.on_event("startup")(_startup_superadmin_services)
+    app.on_event("startup")(_startup_contact_messages)
     app.on_event("startup")(_startup_status_api)
     app.on_event("startup")(_startup_alert_engine)
     app.on_event("startup")(_startup_mfa_service)

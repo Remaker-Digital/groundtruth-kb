@@ -83,6 +83,7 @@ const NAV_GROUPS: NavGroup[] = [
       { label: 'Diagnostics', path: '/diagnostics', icon: 'diagnostics', description: 'Support diagnostics' },
       { label: 'Co-Pilot Knowledge', path: '/copilot-knowledge', icon: 'copilot', description: 'Knowledge management' },
       { label: 'Pipeline Observatory', path: '/pipeline', icon: 'queue', description: 'Agent pipeline metrics' },
+      { label: 'Contact Messages', path: '/contact-messages', icon: 'contact', description: 'Customer messages' },
     ],
   },
   {

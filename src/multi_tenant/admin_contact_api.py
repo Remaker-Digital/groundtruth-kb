@@ -2,12 +2,13 @@
 
 Provides a single endpoint for authenticated admin users to send messages
 directly to the service provider (support requests, feature requests,
-information requests). Messages are delivered via SMTP (primary) or
-Azure Communication Services (fallback).
+information requests). Messages are persisted to Cosmos DB (SPEC-1588)
+AND delivered via SMTP (primary) or Azure Communication Services (fallback).
 
 Dependencies:
     - middleware.py: get_tenant_context, TenantContext
     - alert_delivery.py: send_acs_email (ACS fallback)
+    - cosmos_schema.py: ContactMessageDocument
 
 © 2026 Remaker Digital, a DBA of VanDusen & Palmeter, LLC. All rights reserved.
 """
@@ -17,7 +18,9 @@ from __future__ import annotations
 import html
 import logging
 import os
+import uuid
 from datetime import datetime, timezone
+from typing import Any
 
 from fastapi import APIRouter, Depends, HTTPException
 from pydantic import BaseModel, Field
@@ -26,6 +29,18 @@ from src.multi_tenant.auth import TenantContext
 from src.multi_tenant.middleware import get_tenant_context
 
 logger = logging.getLogger(__name__)
+
+# ---------------------------------------------------------------------------
+# Contact message persistence (SPEC-1588)
+# ---------------------------------------------------------------------------
+
+_contact_repo: Any = None
+
+
+def configure_contact_repo(repo: Any) -> None:
+    """Wire the contact_messages repository at startup."""
+    global _contact_repo
+    _contact_repo = repo
 
 router = APIRouter(prefix="/api/admin", tags=["admin-contact"])
 
@@ -232,8 +247,54 @@ async def send_contact_message(
         )
 
     topic_label = TOPIC_LABELS.get(body.topic, body.topic)
+    member_role = ctx.team_member_role.value if ctx.team_member_role else None
+    tier = ctx.tier.value if ctx.tier else None
 
-    # Build email
+    # ── Persist to Cosmos BEFORE email (SPEC-1588) ──────────────
+    now = datetime.now(timezone.utc).isoformat()
+    message_id = str(uuid.uuid4())
+
+    if _contact_repo is not None:
+        from src.multi_tenant.cosmos_schema import ContactMessageDocument
+
+        doc = ContactMessageDocument(
+            id=message_id,
+            tenant_id=ctx.tenant_id,
+            topic=body.topic,
+            subject=body.subject,
+            message=body.message,
+            member_email=ctx.team_member_email,
+            member_role=member_role,
+            member_id=ctx.team_member_id,
+            tier=tier,
+            status="new",
+            notes="",
+            created_at=now,
+            updated_at=now,
+        )
+        try:
+            await _contact_repo.create(ctx.tenant_id, doc)
+            logger.info(
+                "Contact message %s persisted for tenant=%s topic=%s",
+                message_id,
+                ctx.tenant_id,
+                body.topic,
+            )
+        except Exception:
+            logger.exception(
+                "Failed to persist contact message %s for tenant=%s — "
+                "proceeding with email delivery",
+                message_id,
+                ctx.tenant_id,
+            )
+    else:
+        logger.warning(
+            "contact_messages repo not configured — skipping persistence "
+            "(message %s will still be delivered via email)",
+            message_id,
+        )
+
+    # ── Build and send email ────────────────────────────────────
     email_subject = f"[Agent Red] {topic_label}: {body.subject}"
     html_body = _build_html_body(
         topic=body.topic,
@@ -241,22 +302,21 @@ async def send_contact_message(
         message=body.message,
         tenant_id=ctx.tenant_id,
         member_email=ctx.team_member_email,
-        member_role=ctx.team_member_role.value if ctx.team_member_role else None,
+        member_role=member_role,
         member_id=ctx.team_member_id,
-        tier=ctx.tier.value if ctx.tier else None,
+        tier=tier,
     )
 
-    # Send
     success = await _send_contact_email(SUPPORT_EMAIL, email_subject, html_body)
 
     if success:
         return ContactResponse(ok=True, detail="Message sent successfully.")
 
-    # ACS not configured or send failed — log but return success to avoid
-    # confusing the user (the message is also logged server-side).
+    # Email failed — message is still persisted in Cosmos for manual review.
     logger.warning(
-        "Contact message from tenant=%s topic=%s could not be delivered via email. "
-        "Logged for manual review.",
+        "Contact message %s from tenant=%s topic=%s could not be delivered "
+        "via email. Persisted for manual review.",
+        message_id,
         ctx.tenant_id,
         body.topic,
     )

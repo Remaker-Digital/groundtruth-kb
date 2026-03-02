@@ -35,7 +35,7 @@ from __future__ import annotations
 import logging
 from datetime import datetime, timezone
 from enum import Enum
-from typing import Any
+from typing import Any, ClassVar
 
 from pydantic import BaseModel, ConfigDict, Field
 
@@ -67,6 +67,7 @@ COLLECTION_ALERT_HISTORY = "alert_history"
 COLLECTION_INGESTION_JOBS = "ingestion_jobs"
 COLLECTION_PII_TOKEN_MAPPINGS = "pii_token_mappings"
 COLLECTION_ADMIN_DOCUMENTATION = "admin_documentation_vectors"
+COLLECTION_CONTACT_MESSAGES = "contact_messages"
 
 ALL_COLLECTIONS = [
     COLLECTION_TENANTS,
@@ -87,6 +88,7 @@ ALL_COLLECTIONS = [
     COLLECTION_INGESTION_JOBS,
     COLLECTION_PII_TOKEN_MAPPINGS,
     COLLECTION_ADMIN_DOCUMENTATION,
+    COLLECTION_CONTACT_MESSAGES,
 ]
 
 # Cosmos DB Serverless — no provisioned throughput (pay per RU consumed)
@@ -1711,6 +1713,49 @@ class CopilotConfigDocument(BaseModel):
     )
 
 
+class ContactMessageDocument(BaseModel):
+    """Persisted Contact Us form submission (SPEC-1588).
+
+    Each submission from the merchant admin Contact Us modal is stored
+    here in addition to being dispatched via email. Partitioned by
+    tenant_id for efficient per-tenant queries; cross-partition queries
+    used for superadmin dashboards. Status lifecycle: new → read →
+    resolved → archived (SPEC-1592).
+    """
+
+    id: str = Field(description="UUID for this message")
+    tenant_id: str = Field(description="Partition key — originating tenant")
+    topic: str = Field(
+        description="Message category: support, feature_request, billing, bug_report, general",
+    )
+    subject: str = Field(description="Subject line (max 200 chars)")
+    message: str = Field(description="Full message body (max 5000 chars)")
+    member_email: str | None = Field(
+        default=None, description="Team member email who sent the message",
+    )
+    member_role: str | None = Field(
+        default=None, description="Team member role (admin, viewer, etc.)",
+    )
+    member_id: str | None = Field(
+        default=None, description="Team member ID",
+    )
+    tier: str | None = Field(
+        default=None, description="Tenant tier at time of submission",
+    )
+    status: str = Field(
+        default="new",
+        description="Lifecycle status: new, read, resolved, archived",
+    )
+    notes: str = Field(
+        default="",
+        description="Operator annotations / internal notes",
+    )
+    created_at: str = Field(description="When submitted (ISO 8601 UTC)")
+    updated_at: str = Field(description="When last modified (ISO 8601 UTC)")
+
+    VALID_STATUSES: ClassVar[list[str]] = ["new", "read", "resolved", "archived"]
+
+
 # ---------------------------------------------------------------------------
 # Collection configuration
 # ---------------------------------------------------------------------------
@@ -1728,7 +1773,7 @@ class CollectionConfig(BaseModel):
 
 
 def get_collection_configs() -> list[CollectionConfig]:
-    """Return collection configurations for all 17 containers.
+    """Return collection configurations for all 19 containers.
 
     These configs are used by the database initialization utility
     to create containers idempotently.
@@ -2165,6 +2210,31 @@ def get_collection_configs() -> list[CollectionConfig]:
                         "path": "/embedding",
                         "type": "diskANN",
                     },
+                ],
+            },
+        ),
+        # 19. contact_messages (SPEC-1588: persisted Contact Us submissions)
+        CollectionConfig(
+            name=COLLECTION_CONTACT_MESSAGES,
+            partition_key="/tenant_id",
+            indexing_policy={
+                "automatic": True,
+                "indexingMode": "consistent",
+                "includedPaths": [{"path": "/*"}],
+                "excludedPaths": [
+                    {"path": "/message/?"},
+                    {"path": "/notes/?"},
+                    {"path": '/"_etag"/?'},
+                ],
+                "compositeIndexes": [
+                    [
+                        {"path": "/status", "order": "ascending"},
+                        {"path": "/created_at", "order": "descending"},
+                    ],
+                    [
+                        {"path": "/topic", "order": "ascending"},
+                        {"path": "/created_at", "order": "descending"},
+                    ],
                 ],
             },
         ),
