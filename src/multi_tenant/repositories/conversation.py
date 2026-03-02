@@ -179,7 +179,8 @@ class ConversationRepository(TenantScopedRepository):
             offset: Pagination offset.
             limit: Page size.
         """
-        conditions: list[str] = []
+        # SPEC-1607: always exclude zero-message conversations from inbox
+        conditions: list[str] = ["c.message_count > 0"]
         params: list[dict[str, Any]] = []
 
         if status is not None:
@@ -208,7 +209,7 @@ class ConversationRepository(TenantScopedRepository):
         elif not include_archived:
             conditions.append("(NOT IS_DEFINED(c.archived_at) OR c.archived_at = null)")
 
-        where_clause = " AND ".join(conditions) if conditions else "1=1"
+        where_clause = " AND ".join(conditions)
         params.append({"name": "@offset", "value": offset})
         params.append({"name": "@limit", "value": limit})
 
@@ -233,7 +234,8 @@ class ConversationRepository(TenantScopedRepository):
         archived_only: bool = False,
     ) -> int:
         """Count conversations matching filters (for pagination metadata)."""
-        conditions: list[str] = []
+        # SPEC-1607: always exclude zero-message conversations from inbox
+        conditions: list[str] = ["c.message_count > 0"]
         params: list[dict[str, Any]] = []
 
         if status is not None:
@@ -262,7 +264,7 @@ class ConversationRepository(TenantScopedRepository):
         elif not include_archived:
             conditions.append("(NOT IS_DEFINED(c.archived_at) OR c.archived_at = null)")
 
-        where_clause = " AND ".join(conditions) if conditions else "1=1"
+        where_clause = " AND ".join(conditions)
         query_text = f"SELECT VALUE COUNT(1) FROM c WHERE {where_clause}"
 
         return await self.query_count(tenant_id, query_text, params)

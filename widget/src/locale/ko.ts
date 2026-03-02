@@ -13,6 +13,7 @@ export const ko: Locale = {
   offlineMessage: '현재 팀이 오프라인입니다. AI 어시스턴트가 도움을 드릴 수 있습니다.',
   typingIndicator: '입력 중',
   connectionLost: '연결이 끊겼습니다. 재연결 중...',
+  connectionFailed: '연결할 수 없습니다. 다시 시도해 주세요.',
   connectionRestored: '연결됨',
   poweredBy: 'Powered by Agent Red',
   closeWidget: '채팅 닫기',

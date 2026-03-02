@@ -13,6 +13,7 @@ export const ja: Locale = {
   offlineMessage: '現在チームはオフラインです。AIアシスタントがお手伝いいたします。',
   typingIndicator: '入力中',
   connectionLost: '接続が切れました。再接続中...',
+  connectionFailed: '接続できませんでした。もう一度お試しください。',
   connectionRestored: '接続済み',
   poweredBy: 'Powered by Agent Red',
   closeWidget: 'チャットを閉じる',

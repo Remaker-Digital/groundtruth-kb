@@ -17,6 +17,7 @@ export interface Locale {
   offlineMessage: string;
   typingIndicator: string;
   connectionLost: string;
+  connectionFailed: string;
   connectionRestored: string;
   poweredBy: string;
   closeWidget: string;
@@ -69,6 +70,7 @@ export const en: Locale = {
   offlineMessage: 'Our team is currently offline. Our AI assistant is available to help you now.',
   typingIndicator: 'is typing',
   connectionLost: 'Connection lost. Reconnecting...',
+  connectionFailed: 'Unable to connect. Please try again.',
   connectionRestored: 'Connected',
   poweredBy: 'Powered by Agent Red',
   closeWidget: 'Close chat',

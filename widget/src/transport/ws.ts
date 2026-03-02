@@ -33,6 +33,8 @@ interface WSOptions {
   adminApiKey?: string;
   onConnectionLost?: () => void;
   onConnectionRestored?: () => void;
+  /** Called when all reconnect attempts are exhausted (WI-0931). */
+  onMaxReconnectsExhausted?: () => void;
 }
 
 interface WSMessage {
@@ -233,7 +235,15 @@ export class WSConnection {
   }
 
   private scheduleReconnect(): void {
-    if (this.closed || this.reconnectAttempts >= this.maxReconnectAttempts) return;
+    if (this.closed) return;
+
+    if (this.reconnectAttempts >= this.maxReconnectAttempts) {
+      // WI-0931: Max attempts exhausted — stop reconnecting and notify.
+      if (this.options.onMaxReconnectsExhausted) {
+        this.options.onMaxReconnectsExhausted();
+      }
+      return;
+    }
 
     const delay = Math.min(
       this.reconnectBaseDelay * Math.pow(2, this.reconnectAttempts),

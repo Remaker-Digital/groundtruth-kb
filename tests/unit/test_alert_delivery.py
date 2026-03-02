@@ -731,3 +731,110 @@ class TestConvenienceFunctions:
             assert result is not None
         finally:
             configure_alert_service(None)
+
+
+# ---------------------------------------------------------------------------
+# SPEC-1610: Team invite email must contain admin console link (WI-0932)
+# ---------------------------------------------------------------------------
+
+
+class TestTeamInviteEmailLink:
+    """Verify send_team_invite_alert always includes an admin console URL (SPEC-1610)."""
+
+    @pytest.mark.asyncio
+    async def test_cascading_url_fallback_pattern(self):
+        """APP_BASE_URL takes priority in cascading URL resolution."""
+        captured: list[Alert] = []
+        original_create = create_alert
+
+        def _intercept(**kwargs):
+            alert = original_create(**kwargs)
+            captured.append(alert)
+            return alert
+
+        service = AlertDeliveryService()
+        configure_alert_service(service)
+        try:
+            with patch("src.multi_tenant.alert_delivery.create_alert", side_effect=_intercept):
+                with patch.dict(os.environ, {"APP_BASE_URL": "https://custom.example.com"}, clear=False):
+                    await send_team_invite_alert("t", "a@b.com", "Admin", "agent")
+            assert len(captured) == 1
+            admin_url = captured[0].metadata.get("admin_url", "")
+            assert admin_url == "https://custom.example.com/admin/standalone/"
+        finally:
+            configure_alert_service(None)
+
+    @pytest.mark.asyncio
+    async def test_fqdn_fallback_always_present(self):
+        """When no env vars are set, FQDN fallback provides the URL."""
+        captured: list[Alert] = []
+        original_create = create_alert
+
+        def _intercept(**kwargs):
+            alert = original_create(**kwargs)
+            captured.append(alert)
+            return alert
+
+        service = AlertDeliveryService()
+        configure_alert_service(service)
+        try:
+            with patch("src.multi_tenant.alert_delivery.create_alert", side_effect=_intercept):
+                # Remove all URL-related env vars
+                for k in ("APP_BASE_URL", "STANDALONE_ADMIN_URL", "PROD_URL"):
+                    os.environ.pop(k, None)
+                await send_team_invite_alert("t", "a@b.com", "Admin", "agent")
+            assert len(captured) == 1
+            admin_url = captured[0].metadata.get("admin_url", "")
+            assert "agent-red-api-gateway.orangeglacier" in admin_url
+        finally:
+            configure_alert_service(None)
+
+    @pytest.mark.asyncio
+    async def test_admin_url_never_empty(self):
+        """admin_url in alert metadata is never empty string."""
+        captured: list[Alert] = []
+        original_create = create_alert
+
+        def _intercept(**kwargs):
+            alert = original_create(**kwargs)
+            captured.append(alert)
+            return alert
+
+        service = AlertDeliveryService()
+        configure_alert_service(service)
+        try:
+            with patch("src.multi_tenant.alert_delivery.create_alert", side_effect=_intercept):
+                for k in ("APP_BASE_URL", "STANDALONE_ADMIN_URL", "PROD_URL"):
+                    os.environ.pop(k, None)
+                await send_team_invite_alert("t", "a@b.com", "Admin", "agent")
+            assert len(captured) == 1
+            admin_url = captured[0].metadata.get("admin_url", "")
+            assert admin_url, "admin_url must never be empty"
+            assert admin_url.startswith("https://"), f"admin_url must be HTTPS: {admin_url}"
+            assert "/admin/standalone/" in admin_url
+        finally:
+            configure_alert_service(None)
+
+    @pytest.mark.asyncio
+    async def test_message_always_contains_url(self):
+        """The alert message body always includes the admin URL."""
+        captured: list[Alert] = []
+        original_create = create_alert
+
+        def _intercept(**kwargs):
+            alert = original_create(**kwargs)
+            captured.append(alert)
+            return alert
+
+        service = AlertDeliveryService()
+        configure_alert_service(service)
+        try:
+            with patch("src.multi_tenant.alert_delivery.create_alert", side_effect=_intercept):
+                for k in ("APP_BASE_URL", "STANDALONE_ADMIN_URL", "PROD_URL"):
+                    os.environ.pop(k, None)
+                await send_team_invite_alert("t", "a@b.com", "Admin", "agent")
+            assert len(captured) == 1
+            msg = captured[0].message
+            assert "/admin/standalone/" in msg, f"Message must contain admin URL: {msg}"
+        finally:
+            configure_alert_service(None)

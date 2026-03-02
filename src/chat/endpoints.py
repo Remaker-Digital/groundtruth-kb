@@ -841,6 +841,25 @@ async def report_issue(
             conversation_id,
         )
 
+    # SPEC-1611: Issue reports are handled as escalation requests.
+    # Fire-and-forget — delivery failure must not block the response.
+    try:
+        import asyncio
+        from src.multi_tenant.alert_delivery import send_escalation_alert
+
+        _issue_label = request.issue_type.replace("_", " ").title()
+        asyncio.ensure_future(
+            send_escalation_alert(
+                tenant_id=ctx.tenant_id,
+                conversation_id=conversation_id,
+                reason=f"Customer issue report: {_issue_label}",
+                urgency="medium",
+                context_summary=request.details[:500] if request.details else "",
+            )
+        )
+    except Exception:
+        logger.debug("Issue-report escalation alert skipped (alert service not configured)")
+
     return IssueReportResponse(
         conversation_id=conversation_id,
         issue_id=issue_id,

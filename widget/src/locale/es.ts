@@ -13,6 +13,7 @@ export const es: Locale = {
   offlineMessage: 'Nuestro equipo no está disponible. Nuestro asistente de IA puede ayudarte ahora.',
   typingIndicator: 'está escribiendo',
   connectionLost: 'Conexión perdida. Reconectando...',
+  connectionFailed: 'No se pudo conectar. Por favor, inténtalo de nuevo.',
   connectionRestored: 'Conectado',
   poweredBy: 'Impulsado por Agent Red',
   closeWidget: 'Cerrar chat',

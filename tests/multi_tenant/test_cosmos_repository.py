@@ -359,7 +359,7 @@ class TestDocumentModelValidation:
             started_at=_NOW,
             last_activity_at=_NOW,
         )
-        assert doc.is_billable is True  # default
+        assert doc.is_billable is False  # SPEC-1606: default non-billable
         assert doc.message_count == 0  # default
         assert doc.turn_count == 0  # default
         assert doc.agents_invoked == []  # default

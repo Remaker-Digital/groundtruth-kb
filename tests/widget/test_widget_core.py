@@ -1103,3 +1103,91 @@ class TestEngagementTriggers:
         """closeWidget sets userManuallyClosedWidget = true."""
         src = self._read_index()
         assert "userManuallyClosedWidget = true" in src
+
+
+# ---------------------------------------------------------------------------
+# WI-0931: Max reconnect exhaustion — stuck "Connection lost" banner fix
+# ---------------------------------------------------------------------------
+
+
+class TestSSEMaxReconnectExhaustion:
+    """TEST-2916: SSE transport notifies when max reconnect attempts exhausted."""
+
+    def test_sse_options_has_max_reconnects_exhausted_callback(self) -> None:
+        """SSEOptions interface includes onMaxReconnectsExhausted callback."""
+        source = (WIDGET_SRC / "transport" / "sse.ts").read_text()
+        assert "onMaxReconnectsExhausted" in source, \
+            "SSEOptions must include onMaxReconnectsExhausted callback"
+
+    def test_sse_schedule_reconnect_calls_exhausted_callback(self) -> None:
+        """scheduleReconnect invokes onMaxReconnectsExhausted when max reached."""
+        source = (WIDGET_SRC / "transport" / "sse.ts").read_text()
+        # Verify the callback is invoked inside scheduleReconnect
+        assert "this.options.onMaxReconnectsExhausted" in source, \
+            "scheduleReconnect must call this.options.onMaxReconnectsExhausted"
+
+    def test_sse_exhaustion_check_before_scheduling(self) -> None:
+        """Max attempts check occurs before scheduling another attempt."""
+        source = (WIDGET_SRC / "transport" / "sse.ts").read_text()
+        # The exhaustion guard must appear in scheduleReconnect
+        assert "this.reconnectAttempts >= this.maxReconnectAttempts" in source, \
+            "scheduleReconnect must guard against exceeding max attempts"
+
+
+class TestWSMaxReconnectExhaustion:
+    """TEST-2917: WebSocket transport notifies when max reconnect attempts exhausted."""
+
+    def test_ws_options_has_max_reconnects_exhausted_callback(self) -> None:
+        """WSOptions interface includes onMaxReconnectsExhausted callback."""
+        source = (WIDGET_SRC / "transport" / "ws.ts").read_text()
+        assert "onMaxReconnectsExhausted" in source, \
+            "WSOptions must include onMaxReconnectsExhausted callback"
+
+    def test_ws_schedule_reconnect_calls_exhausted_callback(self) -> None:
+        """scheduleReconnect invokes onMaxReconnectsExhausted when max reached."""
+        source = (WIDGET_SRC / "transport" / "ws.ts").read_text()
+        assert "this.options.onMaxReconnectsExhausted" in source, \
+            "scheduleReconnect must call this.options.onMaxReconnectsExhausted"
+
+
+class TestPanelMaxReconnectHandling:
+    """TEST-2918: Panel wires onMaxReconnectsExhausted to clear isReconnecting."""
+
+    def test_panel_wires_max_reconnect_exhausted(self) -> None:
+        """Panel.tsx passes onMaxReconnectsExhausted to SSEConnection."""
+        source = (WIDGET_SRC / "components" / "Panel.tsx").read_text()
+        assert "onMaxReconnectsExhausted" in source, \
+            "Panel must wire onMaxReconnectsExhausted callback to SSEConnection"
+
+    def test_panel_clears_is_reconnecting_on_exhaustion(self) -> None:
+        """Panel sets isReconnecting: false when max reconnects exhausted."""
+        source = (WIDGET_SRC / "components" / "Panel.tsx").read_text()
+        # Verify the callback sets isReconnecting to false
+        assert "isReconnecting: false" in source, \
+            "Panel must clear isReconnecting when max reconnects exhausted"
+
+    def test_panel_shows_connection_failed_error(self) -> None:
+        """Panel shows connectionFailed locale string on exhaustion."""
+        source = (WIDGET_SRC / "components" / "Panel.tsx").read_text()
+        assert "connectionFailed" in source, \
+            "Panel must reference connectionFailed locale key for error display"
+
+
+class TestConnectionFailedLocale:
+    """TEST-2919: connectionFailed locale key exists in all 8 language files."""
+
+    LOCALE_FILES = ["en", "de", "fr", "es", "ja", "ko", "zh", "pt"]
+
+    def test_connection_failed_locale_all_languages(self) -> None:
+        """All 8 locale files contain connectionFailed key with a non-empty value."""
+        locale_dir = WIDGET_SRC / "locale"
+        for lang in self.LOCALE_FILES:
+            source = (locale_dir / f"{lang}.ts").read_text(encoding="utf-8")
+            assert "connectionFailed" in source, \
+                f"Locale {lang}.ts must contain connectionFailed key"
+
+    def test_connection_failed_in_locale_interface(self) -> None:
+        """Locale interface type declares connectionFailed field."""
+        source = (WIDGET_SRC / "locale" / "en.ts").read_text()
+        assert "connectionFailed: string" in source, \
+            "Locale interface must declare connectionFailed: string"

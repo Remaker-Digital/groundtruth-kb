@@ -13,6 +13,7 @@ export const zh: Locale = {
   offlineMessage: '我们的团队目前不在线。AI助手可以为您提供帮助。',
   typingIndicator: '正在输入',
   connectionLost: '连接断开，正在重新连接...',
+  connectionFailed: '无法连接，请重试。',
   connectionRestored: '已连接',
   poweredBy: '由 Agent Red 提供支持',
   closeWidget: '关闭聊天',

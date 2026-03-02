@@ -353,7 +353,7 @@ class ConversationDocument(BaseModel):
     )
 
     # Billing (Decision #24 — billable conversation definition)
-    is_billable: bool = Field(default=True, description="Whether this conversation counts for billing")
+    is_billable: bool = Field(default=False, description="Whether this conversation counts for billing")
     message_count: int = Field(default=0, description="Total messages in conversation")
     turn_count: int = Field(default=0, description="Customer-AI turn pairs")
 

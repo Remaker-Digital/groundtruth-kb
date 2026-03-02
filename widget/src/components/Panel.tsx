@@ -126,8 +126,14 @@ export const Panel: FunctionComponent<PanelProps> = ({
   // WI-0819: Reactive locale — prefer store value (updated by setLocale SDK method)
   const activeLocale: Locale = state.locale;
 
-  // WI-0819: Merge runtime token overrides from store (set by setTheme SDK method)
-  const baseTokens = resolveTokens(config);
+  // WI-0934: Use store config (updated by setConfigPartial) for reactive preview.
+  // The `config` prop is frozen at iframe creation; `state.config` is updated
+  // when the admin UI (or SDK) calls setConfigPartial(). Prefer the store value
+  // so that draft-mode changes and post-activation refreshes take effect
+  // without requiring a full page reload.
+  const activeConfig = state.config || config;
+
+  const baseTokens = resolveTokens(activeConfig);
   const tokens = state.tokenOverrides
     ? { ...baseTokens, ...state.tokenOverrides }
     : baseTokens;
@@ -135,15 +141,15 @@ export const Panel: FunctionComponent<PanelProps> = ({
   // SSE connection ref (lives for the lifetime of the conversation)
   const sseRef = useRef<SSEConnection | null>(null);
 
-  // Derived state
-  const agentName = config.widget_agent_display_name || 'AI Assistant';
-  const agentTitle = config.widget_agent_title || '';
-  const agentAvatarUrl = config.widget_agent_avatar_url || null;
-  const logoUrl = config.widget_logo_url || null;
-  const greetingMessage = config.widget_greeting_message || null;
-  const showBranding = config.widget_show_branding !== false;
-  const fileUploadEnabled = config.widget_file_upload_enabled === true;
-  const quickActions = config.widget_quick_actions || [];
+  // Derived state — use activeConfig for reactive preview
+  const agentName = activeConfig.widget_agent_display_name || 'AI Assistant';
+  const agentTitle = activeConfig.widget_agent_title || '';
+  const agentAvatarUrl = activeConfig.widget_agent_avatar_url || null;
+  const logoUrl = activeConfig.widget_logo_url || null;
+  const greetingMessage = activeConfig.widget_greeting_message || null;
+  const showBranding = activeConfig.widget_show_branding !== false;
+  const fileUploadEnabled = activeConfig.widget_file_upload_enabled === true;
+  const quickActions = activeConfig.widget_quick_actions || [];
 
   // ---- Conversation lifecycle ---------------------------------------------
 
@@ -192,6 +198,12 @@ export const Panel: FunctionComponent<PanelProps> = ({
       adminApiKey: transportCfg.adminApiKey,
       onConnectionLost: () => store.setState({ isReconnecting: true }),
       onConnectionRestored: () => store.setState({ isReconnecting: false, error: null }),
+      // WI-0931: When all reconnect attempts fail, clear the reconnecting
+      // banner and show a final error instead of leaving it stuck forever.
+      onMaxReconnectsExhausted: () => store.setState({
+        isReconnecting: false,
+        error: activeLocale.connectionFailed,
+      }),
     });
 
     sseRef.current.connect();
@@ -307,7 +319,7 @@ export const Panel: FunctionComponent<PanelProps> = ({
   /** Handle pre-chat form submission — route through OTP if verification enabled. */
   const handlePreChatSubmit = useCallback(async (data: Record<string, string>) => {
     const store = getStore();
-    const verificationMode = (config as Record<string, unknown>).customer_email_verification as string ?? 'required';
+    const verificationMode = (activeConfig as Record<string, unknown>).customer_email_verification as string ?? 'required';
     const email = data.email || '';
 
     // If verification is disabled or no email provided, go straight to conversation
@@ -329,7 +341,7 @@ export const Panel: FunctionComponent<PanelProps> = ({
 
     // Transition to OTP screen
     store.setState({ view: 'otp', isLoading: false });
-  }, [beginConversation, config]);
+  }, [beginConversation, activeConfig]);
 
   /** Skip pre-chat form — continue as anonymous guest. */
   const handlePreChatSkip = useCallback(() => {
@@ -482,11 +494,11 @@ export const Panel: FunctionComponent<PanelProps> = ({
   useEffect(() => {
     const currentState = getStore().getState();
     if (currentState.view === 'conversation' && !currentState.conversationId) {
-      if (!config.widget_prechat_form && !currentState.shopifyCustomer) {
+      if (!activeConfig.widget_prechat_form && !currentState.shopifyCustomer) {
         // No auto-start needed — user sends first message to begin
       }
     }
-  }, [config.widget_prechat_form]);
+  }, [activeConfig.widget_prechat_form]);
 
   // ---- Render -------------------------------------------------------------
 
@@ -516,9 +528,9 @@ export const Panel: FunctionComponent<PanelProps> = ({
         agentTitle={agentTitle}
         agentAvatarUrl={agentAvatarUrl}
         logoUrl={logoUrl}
-        headerText={config.widget_header_text || null}
-        headerSubtitle={config.widget_header_subtitle || null}
-        gradientEnd={config.widget_header_gradient_enabled !== false && config.widget_header_gradient_end ? config.widget_header_gradient_end : null}
+        headerText={activeConfig.widget_header_text || null}
+        headerSubtitle={activeConfig.widget_header_subtitle || null}
+        gradientEnd={activeConfig.widget_header_gradient_enabled !== false && activeConfig.widget_header_gradient_end ? activeConfig.widget_header_gradient_end : null}
         onClose={handleCloseWidget}
         onDragStart={handleDragStart}
       />
@@ -533,7 +545,7 @@ export const Panel: FunctionComponent<PanelProps> = ({
 
       {/* Consent banner (WI #87) — shown when consent collection is enabled */}
       {state.view === 'conversation'
-        && (config as Record<string, unknown>).consent_collection_enabled === true
+        && (activeConfig as Record<string, unknown>).consent_collection_enabled === true
         && !state.consentCollected
         && state.conversationId && (
         <ConsentBanner
@@ -613,18 +625,18 @@ export const Panel: FunctionComponent<PanelProps> = ({
             disabled={false}
             fileUploadEnabled={fileUploadEnabled}
             showBranding={showBranding}
-            inputPlaceholder={config.widget_input_placeholder || null}
+            inputPlaceholder={activeConfig.widget_input_placeholder || null}
           />
         </div>
       )}
 
       {/* Pre-chat form */}
-      {state.view === 'prechat' && config.widget_prechat_form && (
+      {state.view === 'prechat' && activeConfig.widget_prechat_form && (
         <div style={{ display: 'contents', animation: 'ar-fade-in 0.2s ease-out' }}>
           <PreChatForm
             tokens={tokens}
             locale={activeLocale}
-            formConfig={config.widget_prechat_form as { fields: { name: string; label: string; type: 'text' | 'email' | 'textarea'; required: boolean; placeholder?: string }[] }}
+            formConfig={activeConfig.widget_prechat_form as { fields: { name: string; label: string; type: 'text' | 'email' | 'textarea'; required: boolean; placeholder?: string }[] }}
             onSubmit={handlePreChatSubmit}
             onSkip={handlePreChatSkip}
             isLoading={state.isLoading}
@@ -641,7 +653,7 @@ export const Panel: FunctionComponent<PanelProps> = ({
             email={state.customerEmail}
             onVerify={handleOtpVerify}
             onSkip={
-              ((config as Record<string, unknown>).customer_email_verification as string) === 'optional'
+              ((activeConfig as Record<string, unknown>).customer_email_verification as string) === 'optional'
                 ? handleOtpSkip
                 : undefined
             }
@@ -684,7 +696,7 @@ export const Panel: FunctionComponent<PanelProps> = ({
           <OfflineForm
             tokens={tokens}
             locale={activeLocale}
-            offlineMessage={config.widget_offline_message || null}
+            offlineMessage={activeConfig.widget_offline_message || null}
             onSubmit={handleOfflineSubmit}
             isLoading={state.isLoading}
           />

@@ -13,6 +13,7 @@ export const fr: Locale = {
   offlineMessage: 'Notre équipe est actuellement hors ligne. Notre assistant IA est disponible pour vous aider.',
   typingIndicator: 'est en train d\'écrire',
   connectionLost: 'Connexion perdue. Reconnexion...',
+  connectionFailed: 'Impossible de se connecter. Veuillez réessayer.',
   connectionRestored: 'Connecté',
   poweredBy: 'Propulsé par Agent Red',
   closeWidget: 'Fermer le chat',

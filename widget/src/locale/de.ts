@@ -13,6 +13,7 @@ export const de: Locale = {
   offlineMessage: 'Unser Team ist derzeit offline. Unser KI-Assistent steht Ihnen zur Verfügung.',
   typingIndicator: 'schreibt',
   connectionLost: 'Verbindung verloren. Verbindung wird wiederhergestellt...',
+  connectionFailed: 'Verbindung fehlgeschlagen. Bitte versuchen Sie es erneut.',
   connectionRestored: 'Verbunden',
   poweredBy: 'Bereitgestellt von Agent Red',
   closeWidget: 'Chat schließen',

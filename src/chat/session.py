@@ -214,8 +214,8 @@ class ConversationSession:
             request.metadata and request.metadata.get("customer_verified")
         )
 
-        # Determine billability from conversation_id prefix
-        is_billable = not conversation_id.startswith(NON_BILLABLE_PREFIXES)
+        # SPEC-1606: conversations start non-billable; promoted on first AI response
+        is_billable = False
 
         # Build initial messages list
         messages: list[dict[str, Any]] = []
@@ -407,6 +407,12 @@ class ConversationSession:
         if critic_passed is not None:
             operations.append(
                 {"op": "set", "path": "/critic_passed", "value": critic_passed}
+            )
+
+        # SPEC-1606: promote to billable on first AI response (eligible IDs only)
+        if not conversation_id.startswith(NON_BILLABLE_PREFIXES):
+            operations.append(
+                {"op": "set", "path": "/is_billable", "value": True}
             )
 
         await self._repo.patch(
