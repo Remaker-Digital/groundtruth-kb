@@ -1,7 +1,7 @@
 ---
 sidebar_position: 2
 title: How It Works
-description: Deep dive into the Agent Red six-agent pipeline, communication protocols, message format, PII protection, and content safety validation.
+description: Deep dive into the Agent Red agent pipeline, communication protocols, message format, PII protection, and content safety validation.
 ---
 
 # How It Works
@@ -208,11 +208,17 @@ The `conversation_id` persists across an entire customer conversation, allowing 
 
 ## PII protection
 
-Agent Red provides PII protection at two levels:
+Agent Red provides PII protection at three levels:
 
-### Storage-layer PII scrubbing (available now)
+### Pipeline PII tokenization
 
-When PII scrubbing is enabled in the Memory & Privacy settings, Agent Red automatically redacts email addresses and phone numbers from conversation transcripts before storing them. This protects customer data at rest while leaving the live conversation experience unchanged.
+Before any customer message reaches the AI models, Agent Red's PII tokenizer scans the text and replaces detected email addresses and phone numbers with reversible UUID tokens. The AI processes the tokenized text, and after the Critic validates the response, detected tokens are replaced with the original values before delivery to the customer. This means the AI models never see raw PII during processing.
+
+Token mappings are stored in an isolated Cosmos DB container with a 7-day TTL, and are automatically purged when a customer exercises their GDPR right to erasure.
+
+### Storage-layer PII scrubbing
+
+When PII scrubbing is enabled in the [Memory & Privacy](/docs/admin-guide/customer-memory) settings, Agent Red automatically redacts email addresses and phone numbers from conversation transcripts before storing them. This protects customer data at rest while leaving the live conversation experience unchanged.
 
 ### Azure security perimeter
 
@@ -298,9 +304,16 @@ flowchart TB
         L3B --> L3E[Recurring\nPatterns]
     end
 
+    subgraph Layer 4 — Dedicated Model Training
+        direction LR
+        L4A[1,000+\nInteractions] --> L4B[Fine-Tuning\nPipeline]
+        L4B --> L4C[Per-Customer\nModel]
+    end
+
     L1B --> RG[Response Generator]
     L2D --> RG
     L3C & L3D & L3E --> RG
+    L4C --> RG
 ```
 
 ### How each layer works
@@ -332,6 +345,8 @@ sequenceDiagram
 
 **Layer 3: Cross-Session Learning (Professional and Enterprise)** — A memory framework analyzes accumulated conversations to extract durable patterns: preferred communication style, recurring issues, escalation triggers, and product preferences. These learned insights are injected alongside the customer profile, enabling the AI to adapt its tone and proactively address known issues.
 
+**Layer 4: Dedicated Model Training (Enterprise add-on)** — After a customer accumulates 1,000+ interactions, Agent Red can create a fine-tuned AI model specifically for that customer. The fine-tuning pipeline trains on the customer's historical data via Azure OpenAI, producing a per-customer model that delivers maximum personalization. Models are periodically re-trained as new interactions accumulate.
+
 ### Memory by tier
 
 | Layer | Starter | Professional | Enterprise |
@@ -339,6 +354,7 @@ sequenceDiagram
 | Customer Context (L1) | Included | Included | Included |
 | Conversation Memory (L2) | Included | Included | Included |
 | Cross-Session Learning (L3) | — | Included | Included |
+| Dedicated Model Training (L4) | — | — | Add-on |
 
 ### Privacy and data handling
 

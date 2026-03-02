@@ -534,3 +534,29 @@ class TestSpec1289MfaMethods:
         assert "mfa_methods" in body
         assert "totp" in body["mfa_methods"]
         assert "backup" in body["mfa_methods"]
+
+
+# ---------------------------------------------------------------------------
+# S130: Pending 2FA JWT constant verification (TEST-2907..2908)
+# ---------------------------------------------------------------------------
+
+
+class TestPending2faJwt:
+    """SPEC-1252: pending 2FA JWT lifetime and algorithm constants."""
+
+    def test_pending_2fa_lifetime_is_10_minutes(self) -> None:
+        """TEST-2907: _PENDING_TOKEN_LIFETIME_MINUTES == 10."""
+        from src.multi_tenant.admin_mfa_auth import _PENDING_TOKEN_LIFETIME_MINUTES
+        assert _PENDING_TOKEN_LIFETIME_MINUTES == 10
+
+    def test_pending_2fa_uses_hs256(self) -> None:
+        """TEST-2908: create_pending_2fa_token encodes with HS256."""
+        token, _ = create_pending_2fa_token(
+            tenant_id="t-test",
+            email="test@example.com",
+            member_id="m-test",
+            role="admin",
+        )
+        # Decode without verification to inspect the header
+        header = jwt.get_unverified_header(token)
+        assert header["alg"] == "HS256"

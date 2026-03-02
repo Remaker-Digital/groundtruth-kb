@@ -54,7 +54,6 @@ Configuration changes use a two-phase commit model. When you save a setting, it 
 | [Analytics](./analytics.md) | Conversation volume, intent breakdown, resolution rates, first-contact resolution |
 | [Data retention](./data-retention.md) | Retention periods, PII scrubbing, consent, automatic deletion |
 | [MFA & security](./mfa-security.md) | Two-factor authentication, magic link login, backup codes |
-| [Provider console](./provider-console.md) | Platform-level dashboard for multi-tenant monitoring and operations |
 
 ## Settings that affect AI prompts
 

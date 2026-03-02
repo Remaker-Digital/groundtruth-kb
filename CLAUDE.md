@@ -94,7 +94,7 @@ A specification is a **requirement** — a business decision that affects custom
 
 Specifications should be **as stable as the business need.** Specs function as a **decision log** (what was agreed and why), not a build specification (how to construct the system).
 
-### Governance Principles (GOV-01 through GOV-08 in KB)
+### Governance Principles (GOV-01 through GOV-13 in KB)
 
 1. **Specs are the negotiation artifact.** Claude's first priority on any change request is creating/updating a specification.
 2. **Specs are immutable without owner consent.** Claude proposes; the owner decides.
@@ -107,22 +107,28 @@ Specifications should be **as stable as the business need.** Specs function as a
 9. **Owner input classification.** Specification language triggers spec-first workflow (GOV-09, below).
 10. **Tests must exercise exposed production interfaces.** Source inspection tests are regression supplements, not Test artifacts. Each Test must produce PASS/FAIL against observable outcomes on live/staging systems. Tests are written and linked to specs **before** implementation (GOV-10).
 11. **Design decision checkpoint discipline.** At each WI/phase completion boundary, Claude must review implementation decisions for spec coverage before proceeding. Batched checkpoint, not real-time pause (GOV-11).
+12. **Work item creation triggers test creation.** Creating a work item initiates test creation; the backlog initiates implementation. Tests may be logical assertions, user story descriptions, or abstract descriptions (GOV-12).
+13. **Test plan phase assignment upon creation.** Every Test artifact must be assigned to at least one test plan phase (PLAN-001) at creation time. The Master Test Plan must cover every Test artifact — no orphan tests. This closes the hierarchy: specs produce tests (GOV-12), tests must be in procedures (GOV-13), all procedures compose the Master Test Plan (GOV-13).
 
 ### Owner Input Classification Rule (GOV-09)
 
 When the owner describes what the system **must do**, **should do**, **must include**, or states numbered criteria, classify the input as **specification language**. Before writing any code: (1) record or verify specifications in KB, (2) identify work items for any gaps, (3) add work items to the backlog, (4) present the backlog for prioritization. Only proceed to implementation after explicit prioritization approval. A `UserPromptSubmit` hook (`.claude/hooks/spec-classifier.py`) mechanically enforces this — but Claude must also self-enforce when the hook does not trigger.
 
-### Workflow: Specification → Test → Implementation
+### Workflow: Specification → Work Item → Test → Backlog → Implementation
 
 1. Owner requests change or Claude proposes → record as specification(s)
-2. Derive tests from specifications → record as test artifacts in KB
-3. Implement the capability → code changes
-4. Execute tests → PASS or FAIL
-5. FAIL → create work item (verify spec → verify test → fix implementation)
+2. Identify implementation gaps → create work items (origin: regression, defect, or new)
+3. Work item creation triggers test creation → record test artifacts in KB
+4. Add work items to backlog → backlog ordering determines implementation priority
+5. Backlog prioritization triggers implementation → code changes
+6. Execute tests → PASS or FAIL
+7. FAIL → create new work item (verify spec → verify test → fix implementation)
+
+**Test forms:** A test may be a logical assertion (exists/doesn't exist, comparisons, if-then), a user story (a verifiable process), or an abstract description (measurements, pseudocode, or other information describing the desired implementation).
 
 ### Work Item Taxonomy (SPEC-1496)
 
-**By origin:** Regression (previously PASSing test now FAILs), Defect (test FAILs against implementation), New (specification exists but no implementation yet).
+**By origin:** Regression (previously PASSing test now FAILs), Defect (test FAILs against implementation), New (specification exists but no implementation yet), Hygiene (process improvement, tooling, drift reduction — improves the project management system, not the product).
 
 **By component:** test_plan, test_procedure, operational_procedure, tenant_administration, provider_administration, agent_implementation, infrastructure_automation, database, test_harness, maintenance_tool, customer_interface, external_integration, development_environment.
 
@@ -188,20 +194,6 @@ Provide brief inline coaching notes (prefixed with "💡 **Feedback:**") when ob
 3. Test integration patterns independently
 4. Never commit AGNTCY source code into this repo
 5. Read AGNTCY from public repo: https://github.com/Remaker-Digital/AGNTCY-muti-agent-deployment-customer-service
-
----
-
-## Roadmap & Remaining Tasks
-
-All 19 cycles deployed. Details in KB documents.
-
-### Owner/Designer Tasks (blocking Shopify submission)
-1. Screenshots (3-6 at 1600×900) — designer
-2. Submission screencast — owner
-3. Remove storefront password on blanco-9939 — owner
-4. Configure pricing in Shopify Partners Dashboard — owner
-5. Deploy GDPR webhook URLs — owner
-6. Stripe test→live mode flip
 
 ---
 

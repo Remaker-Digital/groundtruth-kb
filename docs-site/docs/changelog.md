@@ -9,15 +9,15 @@ All notable changes to Agent Red Customer Experience are documented here.
 
 ---
 
-## v1.62.0 — AGNTCY Platform, PII Tokenization, and Observability (2026-02-28)
+## v1.62.0 — Co-Pilot Agent, PII Tokenization, and AGNTCY Platform (2026-03-01)
 
-### AGNTCY SDK integration
+### Admin Co-Pilot Agent
 
-Agent Red now uses the AGNTCY SDK as its mandatory foundation for all agent-to-agent communication.
+A new AI-powered assistant is available directly inside the admin console, helping merchant administrators manage their Agent Red configuration.
 
-- **Containerized agent deployment:** All six specialized AI agents (Intent Classifier, Knowledge Retriever, Response Generator, Critic Supervisor, Escalation Handler, Analytics Collector) can run as independent containers with A2A transport.
-- **Transport-first routing:** Agent dispatch uses a three-tier approach — AGNTCY transport (preferred), HTTP fallback, in-process fallback — ensuring zero downtime during infrastructure transitions.
-- **Streaming over transport:** Response generation supports SSE streaming through the A2A transport layer for real-time customer-facing responses.
+- **Admin assistance intent:** A new `admin_assistance` intent category enables the Co-Pilot to answer questions about Agent Red features, configuration, and best practices using a dedicated admin documentation knowledge base.
+- **Widget admin mode:** The chat widget can operate in admin mode (using the `data-admin-key` attribute), providing administrators with a Co-Pilot conversation interface embedded directly in the admin console. Admin mode conversations are non-billable and bypass the Critic Supervisor for faster responses.
+- **Three-tier dispatch:** The Co-Pilot Agent uses the same AGNTCY transport infrastructure as the customer-facing pipeline, with in-process fallback for zero-downtime operation.
 
 ### PII tokenization
 
@@ -26,6 +26,14 @@ A new reversible PII tokenization layer protects customer data during AI process
 - **Tokenize before AI:** Customer PII (emails, phone numbers, order numbers) is replaced with reversible UUID tokens before being sent to external AI models. The AI never sees raw PII.
 - **Detokenize after validation:** After the Critic Supervisor validates the response, original values are restored before delivering to the customer.
 - **GDPR lifecycle integration:** PII token mappings are included in data export and deletion workflows. Token mappings have a 7-day TTL and are automatically cleaned up.
+
+### AGNTCY SDK integration
+
+Agent Red now uses the AGNTCY SDK as its mandatory foundation for all agent-to-agent communication.
+
+- **Containerized agent deployment:** All seven specialized AI agents (Intent Classifier, Knowledge Retriever, Response Generator, Critic Supervisor, Escalation Handler, Analytics Collector, and Co-Pilot) can run as independent containers with A2A transport.
+- **Transport-first routing:** Agent dispatch uses a three-tier approach — AGNTCY transport (preferred), HTTP fallback, in-process fallback — ensuring zero downtime during infrastructure transitions.
+- **Streaming over transport:** Response generation supports SSE streaming through the A2A transport layer for real-time customer-facing responses.
 
 ### Observability and cost attribution
 
@@ -58,7 +66,7 @@ A new reversible PII tokenization layer protects customer data during AI process
 - **Performance claims:** Replaced unverified metrics (3,071 rps, 98% accuracy, 100% precision/recall) with honest design targets. Removed aspirational numbers that lacked code or test evidence.
 - **NATS retention:** Corrected 7-day retention claim to actual 5-minute retention (`MESSAGE_MAX_AGE_SECONDS = 300`).
 - **PII protection:** Clarified that PII protection consists of storage-layer scrubbing and the Azure security perimeter.
-- **Customer Memory:** Removed undocumented Layer 4 (Dedicated Model Training) from documentation. The production system provides three memory layers.
+- **Customer Memory:** Corrected documentation to reflect that Layer 4 (Dedicated Model Training) was not yet implemented. Layer 4 was subsequently implemented in v1.62.0 as an Enterprise add-on.
 - **Admin UI screenshots:** Added 6 production screenshots to documentation pages (dashboard, agent configuration, widget configuration, memory & privacy, team management, knowledge base).
 
 ---
@@ -154,7 +162,6 @@ All nine email modules have been restructured to use Titan SMTP as the primary d
 ### Email improvements
 
 - **Thread pool offload:** All email send operations moved to background thread pool execution across eight modules, preventing I/O blocking on the main event loop.
-- **Expired tenant filter:** The Provider Console tenant directory now includes an "Expired" status filter option with a complete set of static filter labels for all tenant lifecycle states.
 
 ---
 
@@ -180,16 +187,6 @@ The avatar upload size limit has been increased from 500 characters (intended fo
 
 ---
 
-## v1.57.5 — Provider Console hardening (2026-02-24)
-
-### Bug fixes
-
-- **Provider Console data validation:** Seven Provider Console components corrected to pass both partition key and document ID to repository read operations. Previously, the systemic single-argument pattern caused silent data lookup failures.
-- **NATS health reporting:** Three code paths in the Provider Console incorrectly reported NATS as "deployed" based on manager object existence rather than actual connection status. Fixed to check connection state.
-- **SPA static file serving:** Logo and favicon files in the Provider and Shopify SPA build outputs are now served correctly instead of falling through to the SPA catch-all route.
-
----
-
 ## v1.57.4 — Beta verification and quality hardening (2026-02-23)
 
 ### Beta readiness (v1.57.0)
@@ -199,7 +196,7 @@ Four features required for beta customer onboarding have been completed:
 - **Conversation vectorization scanner:** A background task scans ended conversations every 5 minutes and vectorizes them for persistent memory retrieval. Each cycle processes up to 20 conversations per tenant. Vectorized conversations are marked with a timestamp to prevent re-processing.
 - **Widget consent collection:** A consent banner appears in the chat widget when the tenant has enabled consent collection. Customer consent status (granted, denied, withdrawn) is stored on their profile and controls whether conversation memory is retained.
 - **Cost analytics:** A new superadmin endpoint provides estimated per-tenant cost breakdowns including Azure OpenAI token costs, Cosmos DB request unit consumption, and container compute amortization.
-- **Abuse detection:** Rate anomaly and error rate heuristics calculate a risk score (0-100) for each tenant. Operators can flag tenants from the Provider Console.
+- **Abuse detection:** Rate anomaly and error rate heuristics calculate a risk score (0-100) for each tenant, with automated flagging for investigation.
 
 ### Assessment fixes (v1.57.1)
 
@@ -210,7 +207,7 @@ An independent assessment review identified four items, all resolved:
 
 ### Critical path verification (v1.57.4)
 
-The full 21-test critical path (CP.1–CP.21) has been verified against production, covering SPA provisioning, setup wizard, activation, all admin pages, live chat pipeline, dashboard, inbox, and configuration persistence. All 21 tests pass.
+The full 21-test critical path (CP.1–CP.21) has been verified against production, covering tenant provisioning, setup wizard, activation, all admin pages, live chat pipeline, dashboard, inbox, and configuration persistence. All 21 tests pass.
 
 ### Tests
 
@@ -229,22 +226,13 @@ A new centralized identity preprocessing stage has been added to the chat pipeli
 - **System prompt identity injection:** A new Layer 6 in the system prompt builder injects the customer's verified identity directly into the AI's context. The AI knows the customer's name, email, and verification level, enabling personalized responses from the first message.
 - **Widget identity forwarding:** The widget now forwards pre-chat form data (name, email) and OTP verification tokens to the backend on every message, not just the first one. This ensures identity is available even if the session is resumed.
 
-### SPA tenant provisioning
-
-Service providers can now create tenants directly from the Provider Console without requiring Stripe or Shopify billing flows.
-
-- **Create Tenant modal:** A new "Create Tenant" button in the Tenant Directory opens a modal form with fields for company name, tenant ID (auto-generated or custom), tier, billing channel, and contact email.
-- **Manual billing channel:** A new `manual` billing channel type distinguishes tenants created by the service provider from those provisioned through Stripe, Shopify, or trial flows.
-- **Auto-activation:** Manually provisioned tenants are automatically activated on creation — no separate activation step required.
-- **Superadmin key generation:** When a contact email is provided, a superadmin team member and API key are automatically created and displayed in the success confirmation.
-
 ### Developer experience
 
 - **Thermal-safe test harness:** A new `scripts/run-tests-thermal-safe.ps1` script distributes the test suite across 5 batches with configurable xdist parallelism and cooling pauses between batches. This prevents sustained CPU heat buildup that caused system instability during extended test runs.
 
 ### Tests
 
-- 57 new tests across 5 test files — identity preprocessor (14), pipeline wiring (5), system prompt identity (12), SPA provisioning (12), superadmin tenant creation (8), plus 6 test drift fixes for new schema values
+- 57 new tests across 5 test files — identity preprocessor (14), pipeline wiring (5), system prompt identity (12), tenant provisioning (12), superadmin creation (8), plus 6 test drift fixes for new schema values
 
 ---
 
@@ -347,11 +335,9 @@ Service providers can now create tenants directly from the Provider Console with
 
 ### UI improvements
 - **Contact Us feature:** New Contact Us page accessible from the admin navigation, providing support contact information and feedback form.
-- **Provider Console camelCase fix:** Six Provider Console pages corrected to use camelCase field names matching API response format.
-- **Data-binding verification (9th dimension):** Added data-binding correctness as a new test dimension across all 16 Provider Console pages.
 
 ### Test expansion
-- 917 total UI tests (up from 810) — 802 standalone + 115 provider.
+- 917 total UI tests (up from 810).
 - 793 PASS, 4 SOFT-PASS, 62 SKIP, 0 FAIL (verified S60).
 
 ---
@@ -361,7 +347,7 @@ Service providers can now create tenants directly from the Provider Console with
 ### Design system centralization
 - **CSS custom properties:** New `tokens.css` file defines 30+ design tokens (colors, spacing, borders) as CSS custom properties, replacing hardcoded hex values.
 - **TypeScript token constants:** New `styles.ts` module exports typed token references for use in Mantine `sx` props and inline styles.
-- **57 files refactored:** Over 200 hardcoded dark-mode hex color values replaced with design token references across all three admin distributions (Shopify, Standalone, Provider).
+- **57 files refactored:** Over 200 hardcoded dark-mode hex color values replaced with design token references across all admin distributions.
 - **Stone neutral palette:** New warm-gray palette (Chrome #0c0a09, Page #1c1917, Surface #292524, Border #44403c) replaces generic dark grays.
 - **Zero regressions:** Full 810-test E2E verification confirmed no visual or functional regressions.
 
@@ -373,7 +359,7 @@ Service providers can now create tenants directly from the Provider Console with
 - **Avatar upload UI:** File upload zone for agent avatar with circular preview and remove button, integrated into the Widget Appearance page.
 - **Tier override endpoint:** Superadmin API endpoint for changing tenant tier without Stripe webhooks.
 - **Simulated customer tenant:** Automated 8-phase creation script (`create_test_tenant.py`) for test-customer-001 with 9 team members, 12 quick actions, 7 KB docs, 19 conversations.
-- **Provider Console null-safety:** Added `?? {}` null coalescing to 8 Provider Console pages to prevent crashes when backend returns null aggregate fields.
+- **Admin null-safety:** Added `?? {}` null coalescing to admin pages to prevent crashes when backend returns null aggregate fields.
 - **UI test results:** 770 PASS, 3 SOFT-PASS, 37 SKIP, 0 FAIL (improved from 649/2/159/0).
 
 ---
@@ -412,10 +398,9 @@ Service providers can now create tenants directly from the Provider Console with
 
 ## v1.46.0 — 2026-02-18
 
-### Provider admin — Phase 3 & 4
-- **Support diagnostics (HV-1):** Provider console page showing per-tenant diagnostic data — recent errors, configuration health, and resolution suggestions.
-- **Cost analytics (HV-2):** Unit economics dashboard with per-tenant cost breakdown, resource consumption trends, and cost-per-conversation metrics.
-- **Abuse detection (HV-4):** Automated detection of abnormal usage patterns (spike detection, rate abuse, content policy violations) with tenant-level risk scoring.
+### Platform monitoring
+- **Cost analytics:** Unit economics dashboard with per-tenant cost breakdown, resource consumption trends, and cost-per-conversation metrics.
+- **Abuse detection:** Automated detection of abnormal usage patterns (spike detection, rate abuse, content policy violations) with tenant-level risk scoring.
 
 ### CDN static hosting (R9b)
 - Architecture document for splitting widget JavaScript and admin static assets to a CDN origin, reducing API Gateway load and improving global load times.
@@ -450,26 +435,23 @@ Service providers can now create tenants directly from the Provider Console with
 - **Accessibility foundation:** `eslint-plugin-jsx-a11y` enforced in CI; `aria-label` attributes added to all interactive elements.
 
 ### Login migration
-- **ApiKeyLogin** and **McpConfigPanel** migrated from custom styling to Mantine component library for visual consistency with the Provider console.
+- **ApiKeyLogin** and **McpConfigPanel** migrated from custom styling to Mantine component library for visual consistency.
 
 ### Design system
-- **Dual-surface design system document:** Codified the visual language for Shopify Polaris (tenant admin) and Mantine (provider admin) surfaces, including color tokens, spacing scale, and component mapping.
+- **Design system document:** Codified the visual language including color tokens, spacing scale, and component mapping.
 - **HelpTooltip coverage:** Extended tooltip help text to all remaining configuration inputs.
 
 ---
 
 ## v1.43.0 — 2026-02-17
 
-### Provider admin — Phase 2
-- **4 new SPA pages:** Status Page, Alert Configuration, Compliance Dashboard, Secret Posture — completing the Provider console's operational monitoring suite.
-- **Grouped sidebar navigation:** 4 navigation groups (Overview, Operations, Compliance & Security, Account) with collapsible sections.
-- **Incident management (HV-5):** Full incident lifecycle — create, acknowledge, update, resolve. Public status page at `/api/status` (no authentication required) shows overall system health and active incidents.
-- **Alerting engine (RB-4):** Background alert evaluation loop (5-minute interval) with 6 metric collectors, configurable threshold rules, cooldown enforcement, and severity auto-derivation.
-- **MFA/TOTP (RB-5):** Two-factor authentication for the Provider console — TOTP setup with QR code, 10 backup codes (SHA-256 hashed, single-use), and JWT session tokens with 8-hour lifetime.
+### Platform capabilities
+- **Incident management:** Full incident lifecycle — create, acknowledge, update, resolve. Public status page at `/api/status` (no authentication required) shows overall system health and active incidents.
+- **Alerting engine:** Background alert evaluation loop (5-minute interval) with 6 metric collectors, configurable threshold rules, cooldown enforcement, and severity auto-derivation.
 
 ### UI quality
 - **Shopify route fix:** Resolved Shopify admin route conflicts with the standalone admin.
-- **Shared theme:** Extracted `agentRedTheme` for consistent Mantine theming across provider and standalone surfaces.
+- **Shared theme:** Extracted `agentRedTheme` for consistent Mantine theming across admin surfaces.
 - **SVG icons:** Replaced emoji-based navigation icons with proper SVG components.
 
 ### Tests
@@ -489,20 +471,9 @@ Service providers can now create tenants directly from the Provider Console with
 - **Azure Communication Services:** Email infrastructure provisioned for transactional notifications.
 - **Email verification:** Domain verification endpoints with SPF/DKIM/DMARC compliance.
 
-### Provider SPA console — Phase 1
-- **Provider admin scaffold:** Vite + Mantine + Recharts single-page application (818KB / 240KB gzip) mounted at `/admin/provider/`.
-- **API key login:** Provider authentication using API key credentials.
-- **5 data pages:** Health Dashboard, Tenant Directory, Deployment History, Queue Health, Integration Health.
-
 ### Refactoring
 - **R10 pipeline decomposition:** Monolithic `pipeline.py` split into 7-file mixin package for maintainability.
 - **R3 config YAML migration:** 78 configuration fields migrated from hardcoded defaults to structured YAML configuration.
-
-### Provider backend endpoints
-- **Queue depth monitoring (C-1):** Real-time queue depth metrics for all background processing queues.
-- **Compliance dashboard (C-3):** Configuration compliance scoring and remediation tracking.
-- **Secret posture (C-4):** Key Vault secret rotation status and expiry monitoring.
-- **Integration reliability (HV-3):** Health check metrics for all external service integrations.
 
 ### Tests
 - 2,941 unit tests passed, 0 failures (up from 2,646)
@@ -759,7 +730,7 @@ Configuration changes now use a two-phase commit model. Saving a setting writes 
 - Escalation keywords now ship with 9 sensible defaults for new tenants
 
 ### Deployment safeguards
-- Upgrade script: SPA dist freshness check, ACR tag validation, source integrity verification
+- Upgrade script: admin dist freshness check, ACR tag validation, source integrity verification
 - Rollback script: verifies image tag exists in ACR before deploying
 
 ### Observability

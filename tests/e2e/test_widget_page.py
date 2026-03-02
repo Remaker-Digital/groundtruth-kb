@@ -69,8 +69,13 @@ class TestWidgetPageStructure:
         expect(header.first).to_be_visible()
 
     def test_live_preview_visible(self, admin_widget_page: Page) -> None:
-        """Live preview panel is visible in the right column."""
-        preview_label = admin_widget_page.get_by_text("Live preview", exact=True)
+        """Live preview panel is visible in the right column.
+
+        The preview section may be below the fold on narrow viewports.
+        Scroll to ensure visibility before asserting.
+        """
+        preview_label = admin_widget_page.get_by_text("Live preview", exact=True).first
+        preview_label.scroll_into_view_if_needed()
         expect(preview_label).to_be_visible()
 
 
@@ -241,19 +246,33 @@ class TestWidgetAppearance:
         expect(label.first).to_be_visible()
 
     def test_position_options(self, admin_widget_page: Page) -> None:
-        """Position control offers 'Bottom right' and 'Bottom left'."""
-        expect(admin_widget_page.get_by_text("Bottom right")).to_be_visible()
-        expect(admin_widget_page.get_by_text("Bottom left")).to_be_visible()
+        """Position control offers 'Bottom right' and 'Bottom left'.
+
+        Mobile offset controls may duplicate position text — use .first
+        to avoid Playwright strict-mode violations.
+        """
+        expect(admin_widget_page.get_by_text("Bottom right").first).to_be_visible()
+        expect(admin_widget_page.get_by_text("Bottom left").first).to_be_visible()
 
     def test_horizontal_offset_label(self, admin_widget_page: Page) -> None:
-        """Horizontal offset input is present."""
-        label = admin_widget_page.get_by_text("Horizontal offset")
-        expect(label).to_be_visible()
+        """Horizontal offset input is present.
+
+        S127 added mobile offset controls — 'Mobile horizontal offset (px)'
+        contains 'Horizontal offset' as a substring, creating duplicates.
+        Use exact match to target the desktop control only.
+        """
+        label = admin_widget_page.get_by_text("Horizontal offset", exact=True)
+        expect(label.first).to_be_visible()
 
     def test_vertical_offset_label(self, admin_widget_page: Page) -> None:
-        """Vertical offset input is present."""
-        label = admin_widget_page.get_by_text("Vertical offset")
-        expect(label).to_be_visible()
+        """Vertical offset input is present.
+
+        S127 added mobile offset controls — 'Mobile vertical offset (px)'
+        contains 'Vertical offset' as a substring, creating duplicates.
+        Use exact match to target the desktop control only.
+        """
+        label = admin_widget_page.get_by_text("Vertical offset", exact=True)
+        expect(label.first).to_be_visible()
 
     def test_color_mode_label(self, admin_widget_page: Page) -> None:
         """Color mode control label is visible."""

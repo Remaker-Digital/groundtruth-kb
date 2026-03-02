@@ -246,10 +246,20 @@ class TestEscalationCategories:
             "Escalation agent row should have category buttons"
 
     def test_category_chips_hidden_for_viewer(self, admin_team_page: Page) -> None:
-        """Viewer row does not show category chips."""
+        """Viewer row does not show category chips.
+
+        The viewer row has action buttons (Remove member, Active/Disabled
+        toggle) but should NOT have escalation category chip buttons.
+        Exclude all action buttons by aria-label to isolate category chips.
+        """
         viewer_row = admin_team_page.locator("tr", has_text="viewer@testco.com")
-        # Should not have any category buttons (only Remove member action)
-        category_buttons = viewer_row.locator('button:not([aria-label="Remove member"])')
+        # Exclude known action buttons: Remove member + Active/Disable toggle
+        category_buttons = viewer_row.locator(
+            'button'
+            ':not([aria-label="Remove member"])'
+            ':not([aria-label="Disable member"])'
+            ':not([aria-label="Enable member"])'
+        )
         expect(category_buttons).to_have_count(0)
 
     def test_category_toggle_sends_put(self, admin_team_page: Page) -> None:

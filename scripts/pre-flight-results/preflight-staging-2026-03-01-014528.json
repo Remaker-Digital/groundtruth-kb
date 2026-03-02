@@ -1,0 +1,124 @@
+{
+  "run_at": "2026-03-01T01:45:28.335482",
+  "environment": "staging",
+  "new_version": "1.62.0",
+  "verdict": "DEPLOYMENT LIVE BUT DEFECTIVE \u2014 Phase D tenant provisioning failures",
+  "phases": {
+    "D": [
+      {
+        "id": "D.1",
+        "description": "Create smoke tenant",
+        "status": "FAIL",
+        "detail": "HTTP 403: {'detail': 'Tenant provisioning is restricted to the service provider.'}"
+      },
+      {
+        "id": "D.2",
+        "description": "(skipped \u2014 D.1 failed)",
+        "status": "SKIP",
+        "detail": "No tenant"
+      },
+      {
+        "id": "D.3",
+        "description": "(skipped \u2014 D.1 failed)",
+        "status": "SKIP",
+        "detail": "No tenant"
+      },
+      {
+        "id": "D.4",
+        "description": "(skipped \u2014 D.1 failed)",
+        "status": "SKIP",
+        "detail": "No tenant"
+      },
+      {
+        "id": "D.5",
+        "description": "(skipped \u2014 D.1 failed)",
+        "status": "SKIP",
+        "detail": "No tenant"
+      },
+      {
+        "id": "D.6",
+        "description": "(skipped \u2014 D.1 failed)",
+        "status": "SKIP",
+        "detail": "No tenant"
+      },
+      {
+        "id": "D.7",
+        "description": "(skipped \u2014 D.1 failed)",
+        "status": "SKIP",
+        "detail": "No tenant"
+      },
+      {
+        "id": "D.8",
+        "description": "(skipped \u2014 D.1 failed)",
+        "status": "SKIP",
+        "detail": "No tenant"
+      },
+      {
+        "id": "D.9",
+        "description": "(skipped \u2014 D.1 failed)",
+        "status": "SKIP",
+        "detail": "No tenant"
+      },
+      {
+        "id": "D.10",
+        "description": "(skipped \u2014 D.1 failed)",
+        "status": "SKIP",
+        "detail": "No tenant"
+      },
+      {
+        "id": "D.11",
+        "description": "(skipped \u2014 D.1 failed)",
+        "status": "SKIP",
+        "detail": "No tenant"
+      },
+      {
+        "id": "D.12",
+        "description": "(skipped \u2014 D.1 failed)",
+        "status": "SKIP",
+        "detail": "No tenant"
+      },
+      {
+        "id": "D.13",
+        "description": "(skipped \u2014 D.1 failed)",
+        "status": "SKIP",
+        "detail": "No tenant"
+      },
+      {
+        "id": "D.14",
+        "description": "(skipped \u2014 D.1 failed)",
+        "status": "SKIP",
+        "detail": "No tenant"
+      },
+      {
+        "id": "D.15",
+        "description": "(skipped \u2014 D.1 failed)",
+        "status": "SKIP",
+        "detail": "No tenant"
+      },
+      {
+        "id": "D.16",
+        "description": "(skipped \u2014 D.1 failed)",
+        "status": "SKIP",
+        "detail": "No tenant"
+      },
+      {
+        "id": "D.17",
+        "description": "(skipped \u2014 D.1 failed)",
+        "status": "SKIP",
+        "detail": "No tenant"
+      },
+      {
+        "id": "D.18",
+        "description": "(skipped \u2014 D.1 failed)",
+        "status": "SKIP",
+        "detail": "No tenant"
+      }
+    ]
+  },
+  "summary": {
+    "D": {
+      "FAIL": 1,
+      "SKIP": 17
+    }
+  }
+}

@@ -251,3 +251,38 @@ class TestGetTenantContextRbac:
         with pytest.raises(HTTPException) as exc_info:
             await get_tenant_context(mock_request)
         assert exc_info.value.status_code == 401
+
+
+# ---------------------------------------------------------------------------
+# S130: Additional RBAC coverage (TEST-2902..2904)
+# ---------------------------------------------------------------------------
+
+
+class TestRbacEnforcementS130:
+    """SPEC-0363 / SPEC-0426: RBAC negative and positive path coverage."""
+
+    def test_enforce_rbac_rejects_viewer_on_admin_path(self) -> None:
+        """TEST-2902: Viewer on /api/config gets 403."""
+        ctx = TenantContext(
+            tenant_id="t-test",
+            team_member_role=TeamMemberRole.VIEWER.value,
+        )
+        with pytest.raises(HTTPException) as exc_info:
+            enforce_rbac("/api/config", ctx)
+        assert exc_info.value.status_code == 403
+
+    def test_enforce_rbac_allows_viewer_on_inbox_path(self) -> None:
+        """TEST-2903: Viewer on /api/admin/conversations does not raise."""
+        ctx = TenantContext(
+            tenant_id="t-test",
+            team_member_role=TeamMemberRole.VIEWER.value,
+        )
+        # Should not raise — conversations is in _ALL_ROLES_PREFIXES
+        enforce_rbac("/api/admin/conversations", ctx)
+
+    def test_admin_only_prefixes_count(self) -> None:
+        """TEST-2904: Drift detection — _ADMIN_ONLY_PREFIXES has 17 entries."""
+        assert len(_ADMIN_ONLY_PREFIXES) == 17, (
+            f"Expected 17 admin-only prefixes, got {len(_ADMIN_ONLY_PREFIXES)}. "
+            f"If a prefix was intentionally added/removed, update SPEC-0363 and this test."
+        )

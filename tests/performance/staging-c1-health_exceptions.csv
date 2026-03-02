@@ -1,0 +1,9 @@
+Count,Message,Traceback,Nodes
+212,No tasks defined on AdminUser. Use the @task decorator or set the 'tasks' attribute of the User (or mark it as abstract = True if you only intend to subclass it),"  File ""C:\Users\micha\AppData\Roaming\Python\Python314\site-packages\locust\user\task.py"", line 357, in run
+    self.schedule_task(self.get_next_task())
+                       ~~~~~~~~~~~~~~~~~~^^
+  File ""C:\Users\micha\AppData\Roaming\Python\Python314\site-packages\locust\user\task.py"", line 501, in get_next_task
+    raise Exception(
+        f""No tasks defined on {self.user.__class__.__name__}{extra_message} Use the @task decorator or set the 'tasks' attribute of the User (or mark it as abstract = True if you only intend to subclass it)""
+    )
+",local

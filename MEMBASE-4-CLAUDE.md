@@ -2,7 +2,7 @@
 
 **A pattern for giving Claude Code persistent, version-controlled, self-auditing project memory using an append-only SQLite database.**
 
-> This pattern was developed across 115+ sessions on a commercial SaaS project (Agent Red Customer Experience). It evolved from markdown-only memory into a structured database with 8 managed artifact types after discovering that markdown backlogs drift, context windows forget, and session boundaries lose state. The approach below is extractable to any project.
+> This pattern was developed across 128 sessions on a commercial SaaS project (Agent Red Customer Experience). It evolved from markdown-only memory into a structured database with 8 managed artifact types after discovering that markdown backlogs drift, context windows forget, and session boundaries lose state. The approach below is extractable to any project.
 
 ---
 
@@ -111,7 +111,7 @@ INNER JOIN (
 | Type | Purpose |
 |------|---------|
 | `requirement` | Business requirement — "would a different choice affect the customer or the business?" |
-| `governance` | Process rules — GOV-01 through GOV-08 (how the human-AI team works) |
+| `governance` | Process rules — GOV-01 through GOV-12 (how the human-AI team works) |
 | `protected_behavior` | Machine-verifiable assertions that must always pass |
 
 #### Tests Table (Spec-Linked)
@@ -184,8 +184,9 @@ CREATE TABLE work_items (
     version INTEGER NOT NULL,
     title TEXT NOT NULL,
     description TEXT,
-    origin TEXT NOT NULL,          -- regression | defect | new
+    origin TEXT NOT NULL,          -- regression | defect | new | hygiene
     component TEXT NOT NULL,       -- e.g. infrastructure, database, customer_interface
+    stage TEXT NOT NULL DEFAULT 'created', -- created | tested | backlogged | implementing | resolved
     source_spec_id TEXT,           -- what spec is this about?
     source_test_id TEXT,           -- what test revealed it?
     failure_description TEXT,
@@ -401,7 +402,7 @@ Without assertions, Claude "believes" specs are implemented based on session mem
 
 ## Step 3: Governance Principles
 
-These governance principles evolved over 115+ sessions. They are not mandatory — adopt the ones that fit your project.
+These governance principles evolved over 128 sessions. They are not mandatory — adopt the ones that fit your project.
 
 ### GOV-01: Specs Are the Negotiation Artifact
 
@@ -434,6 +435,22 @@ Record defects as work items during test phases; fix them in separate sessions. 
 ### GOV-08: Knowledge Database Is the Single Source of Truth
 
 All project knowledge lives in the KB. Markdown files store rules (CLAUDE.md) and operational state (MEMORY.md), but specifications, tests, procedures, and documents belong in the database.
+
+### GOV-09: Owner Input Classification
+
+When the owner describes what the system **must do**, **should do**, **must include**, or states numbered criteria, classify the input as **specification language**. Before writing any code: (1) record or verify specifications, (2) identify work items for gaps, (3) add work items to the backlog, (4) present the backlog for prioritization. A `UserPromptSubmit` hook mechanically enforces this, but Claude must also self-enforce.
+
+### GOV-10: Tests Must Exercise Exposed Production Interfaces
+
+Source inspection tests (reading TypeScript files, checking for string literals) are useful as regression supplements but are not Test artifacts. Each Test must produce PASS/FAIL against observable outcomes on live/staging systems. Tests are written and linked to specifications **before** implementation.
+
+### GOV-11: Design Decision Checkpoint Discipline
+
+At each work item or phase completion boundary, Claude must review implementation decisions for specification coverage before proceeding. This is a batched checkpoint, not a real-time pause — review decisions at natural boundaries rather than after every line of code.
+
+### GOV-12: Work Item Creation Triggers Test Creation
+
+Creating a work item initiates test creation; the backlog initiates implementation. This ensures no work proceeds without a testable definition of "done." Tests may be logical assertions, user story descriptions, or abstract descriptions.
 
 ### The Specification Litmus Test
 
@@ -674,7 +691,7 @@ before new work.
 
 ---
 
-## Lessons Learned (115+ Sessions)
+## Lessons Learned (128 Sessions)
 
 1. **The assertion runner is the single most valuable piece.** It turns "Claude remembers" into "Claude proves." Regressions caught at session start save hours of debugging.
 
@@ -706,6 +723,117 @@ before new work.
 
 15. **Migrate topic files to the database.** Markdown topic files inevitably drift from reality. Migrating project knowledge into documents under change control catches contradictions and enables search across all knowledge.
 
+16. **Detect specification language mechanically.** When the owner says "must include" or "should do," that is a specification, not an implementation instruction. A `UserPromptSubmit` hook can detect these patterns and inject a reminder to follow the spec-first workflow before Claude starts writing code.
+
+17. **Work item stages prevent premature implementation.** Adding a `stage` column (created → tested → backlogged → implementing → resolved) with transition enforcement prevents work items from reaching implementation without first having tests and backlog placement. The database enforces the workflow, not human vigilance.
+
+18. **Route interception in E2E tests has blast radius.** Browser-level request interception (e.g., Playwright `page.route()`) can inadvertently capture requests beyond the intended scope. Glob patterns like `**/api/team/*` match more URLs than expected, including safe GET endpoints. Design tests to avoid overlapping route handlers rather than relying on method-based filtering.
+
+19. **Governance principles compound.** Each governance principle builds on the others. GOV-12 (work item → test) only works because GOV-10 (tests must exercise production interfaces) defines what a valid test is, which only works because GOV-03 (test unambiguity) defines the quality bar. Adopt them incrementally, but expect later principles to reference earlier ones.
+
+20. **The glossary is the pattern, not the code.** The most important thing Membase establishes is shared vocabulary. When the human says "backlog" and Claude says "backlog," both must refer to the same real, versioned, queryable artifact. Without this agreement, every other benefit (assertions, versioning, governance) is undermined.
+
+---
+
+## Glossary
+
+These terms have specific meanings in the Membase pattern. Each corresponds to a real database table or a documented process — there are no abstract concepts without backing implementation.
+
+### Artifact Types
+
+| Term | Table | Definition |
+|------|-------|-----------|
+| **Specification** | `specifications` | A requirement — a business decision that affects customers or the business. Litmus test: "Would a different choice affect the customer or the business?" If yes, it is a specification. If no, it is an implementation detail. Functions as a decision log (what was agreed and why), not a build specification (how to construct). Status lifecycle: `specified` → `implemented` → `verified` → `retired`. |
+| **Test** | `tests` | An individual testable assertion derived from a specification. Three valid forms: (1) logical assertion — exists/doesn't exist, comparisons, if-then; (2) user story — a verifiable process a user performs; (3) abstract description — measurements, pseudocode, or information describing the desired behavior. Must produce an unambiguous PASS/FAIL. |
+| **Test Plan** | `test_plans` | An orchestrating artifact: ordered test phases with gate criteria. References test IDs without duplicating content. Each phase defines what must pass before proceeding to the next. |
+| **Work Item** | `work_items` | A unit of work classified by origin (`regression`, `defect`, `new`, `hygiene`) and component. Stage lifecycle: `created` → `tested` → `backlogged` → `implementing` → `resolved`. Links to a source specification and optionally to a test that revealed it. |
+| **Backlog Snapshot** | `backlog_snapshots` | A point-in-time snapshot of active work items. Not a living document — a frozen record of what was open at a specific moment. Ordering within the snapshot determines implementation priority. |
+| **Operational Procedure** | `operational_procedures` | A step-by-step repeatable process: deployment, verification, audit, recovery. Versioned like all artifacts. |
+| **Document** | `documents` | General-purpose project knowledge under change control. Replaces drifting markdown topic files. Anything that is "project knowledge" but not a specification, test, or procedure belongs here. |
+| **Environment Config** | `environment_config` | Environment-specific values (URLs, connection strings, thresholds) under change control. Tracks what each environment is configured to use. |
+
+### Supporting Records
+
+| Term | Table | Definition |
+|------|-------|-----------|
+| **Assertion Run** | `assertion_runs` | A historical record of a machine-verifiable assertion execution. Records which spec was checked, whether it passed, the detailed results, and what triggered the run. |
+| **Session Prompt** | `session_prompts` | A structured handoff message stored by one session for the next. Contains what was done, what's next, and key context. Marked as consumed after the receiving session reads it. |
+
+### Concepts (Not Tables)
+
+| Term | Definition |
+|------|-----------|
+| **Assertion** | A machine-verifiable check attached to a specification. Three types: `grep` (pattern must exist in file), `grep_absent` (pattern must NOT exist in file), `glob` (file path must exist). Stored as JSON in the specification's `assertions` column. Runs automatically at session start via the SessionStart hook. |
+| **Phantom Artifact** | A concept referenced as if it were a tracked entity, but with no backing storage, change control, or queryable history. Example: saying "the backlog contains WI-42" when no backlog table exists. The anti-pattern this entire system was designed to eliminate. |
+| **Orchestrating Artifact** | An artifact that composes other artifacts by reference (ID only), never by content duplication. Test plans reference test IDs; backlog snapshots reference work item IDs. Each referenced artifact is independently managed and versioned. Prevents content duplication and the drift that accompanies it. |
+| **Governance Principle** | A process rule (GOV-\*) governing how the human-AI team works together. Discovered through real project failures, not designed upfront. Currently 14 principles: 12 numbered rules (GOV-01 through GOV-12) plus 2 architectural principles (SPEC-1493: Artifact Inventory, SPEC-1499: Orchestrating Artifact). |
+| **Protected Behavior** | A specification with `type = 'protected_behavior'` carrying machine-verifiable assertions that must always pass. Checked in build gates before every deployment. |
+| **Append-Only Change Control** | The versioning discipline: no UPDATE in place, no DELETE. Every mutation creates a new versioned row with mandatory `changed_by`, `changed_at`, and `change_reason`. Current state = latest version per ID (via SQL views). Full audit trail preserved indefinitely. |
+| **Session Handoff** | The mechanism by which one session stores context for the next. The previous session calls `db.insert_session_prompt()` with a structured prompt; the SessionStart hook retrieves and displays it, then marks it consumed. Eliminates the human needing to craft "Continue work on X..." prompts. |
+| **Specify on Contact** | Governance principle (GOV-06): when Claude touches unspecified code, it becomes controlled. Any existing behavior that is modified should first be recorded as a specification before changes are made. |
+| **Audit Session** | Every Nth session (default: 5) is automatically flagged for a fresh-context integrity review. The audit covers KB assertions, MEMORY.md accuracy, procedure correctness, and design debt. Compensates for drift that accumulates incrementally across sessions. |
+
+---
+
+## Benefits & Milestones
+
+Membase was not designed upfront — it evolved through real project needs. Each capability below was added in response to a specific problem encountered during production use.
+
+### Evolution Timeline
+
+| Session | Problem Encountered | Capability Added |
+|---------|-------------------|-----------------|
+| S1–S95 | Markdown backlogs drift; concepts referenced but not tracked | — (markdown-only era) |
+| S96 | No machine-verifiable truth about what is implemented | **Knowledge Database** — append-only SQLite, 161 initial specs, assertions, web UI |
+| S104–S106 | Requirements scattered across 90 session transcripts | **Specification Discipline** — 871 specs extracted, governance principles crystallized, specification litmus test defined |
+| S109 | No way to measure which specs have tests | **Test Coverage** — `test_coverage` table, 1,230 test-to-spec mappings, 26% initial coverage |
+| S110 | Topic files contradict each other and the database | **GOV-08** — 30 topic files migrated to KB documents under change control |
+| S112 | Low spec coverage despite many tests | **Test Coverage Sprint** — 1,053 new tests, coverage 26% → 59% |
+| S113–S114 | "Backlog" and "test plan" referenced but not actually tracked | **Artifact System Redesign** — 5 new tables, phantom artifacts eliminated, orchestrating artifact principle |
+| S116–S117 | Claude implements before recording specs from owner requirements | **GOV-09 + GOV-10** — spec-language detection hook (S116), tests must exercise production interfaces (S117) |
+| S128 | Work items created without tests; no lifecycle tracking | **GOV-12** — work item creation triggers test creation; `stage` column with transition enforcement |
+
+### Current State (Session 128)
+
+| Category | Metric | Count |
+|----------|--------|-------|
+| **Specifications** | Total | 1,803 |
+| | Verified | 309 |
+| | Implemented | 795 |
+| | Specified (not yet implemented) | 695 |
+| **Tests** | Test artifacts (spec-linked) | 2,797 |
+| | Test-to-spec coverage mappings | 1,988 |
+| | Automated tests passing | 5,962 |
+| **Work Items** | Total | 917 |
+| | Resolved | 854 |
+| | Open | 27 |
+| **Assertions** | Machine-verifiable assertions | 180 |
+| | Currently passing | 127 |
+| | Expected failures (specified, not implemented) | 53 |
+| | Total assertion run records | 19,092 |
+| **Knowledge** | Documents under change control | 138 |
+| | Operational procedures | 13 |
+| | Governance principles | 14 |
+| **Database** | Versioned artifact rows | 8,443 |
+| | Database size | 14.6 MB |
+| | Data loss incidents | 0 |
+
+### What the System Catches
+
+The following failure modes are detected automatically, without human intervention:
+
+- **Regressions at session start** — assertions run before work begins, flagging any spec whose implementation has drifted since the last session
+- **Phantom artifact references** — the database enforces that every referenced concept has backing storage and change control
+- **Specification drift** — append-only versioning preserves the full decision history; nothing is silently overwritten
+- **Cold-start amnesia** — session handoff prompts give each new session the context it needs without human re-explanation
+- **Accumulated process drift** — every 5th session is an audit, catching errors that compound across sessions
+- **Untested specifications** — `get_untested_specs()` identifies coverage gaps on demand
+- **Premature implementation** — GOV-09 hook detects spec language and enforces spec-first workflow; GOV-12 stage gates prevent implementation without tests
+
+### What the System Does Not Measure
+
+Honesty about limitations: Membase does not track session duration, so there are no "time saved" claims. There is no control group (a parallel project without Membase), so there are no comparative productivity metrics. The benefits above are factual — what exists, what was built, what is caught — not extrapolations.
+
 ---
 
 ## Quick Start Checklist
@@ -725,6 +853,6 @@ before new work.
 
 ---
 
-*This pattern was developed on the Agent Red Customer Experience project by Remaker Digital. The implementation approach is freely reusable under the MIT license. Adapt the schema to your project's needs — the core principles (append-only, machine-verifiable assertions, governance discipline, session handoff, audit cadence) are universal.*
+*This pattern was developed across 128 sessions on the Agent Red Customer Experience project by Remaker Digital. The implementation approach is freely reusable under the MIT license. Adapt the schema to your project's needs — the core principles (append-only, machine-verifiable assertions, governance discipline, session handoff, audit cadence) are universal.*
 
 *© 2026 Remaker Digital, a DBA of VanDusen & Palmeter, LLC. All rights reserved.*

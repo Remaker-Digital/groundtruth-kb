@@ -124,8 +124,13 @@ class TestPanelHeader:
         expect(widget_panel.get_by_text("Agent Red", exact=True)).to_be_visible()
 
     def test_agent_title_visible(self, widget_panel: FrameLocator) -> None:
-        """Agent title appears after the agent name (separated by ·)."""
-        expect(widget_panel.locator("text=AI Assistant")).to_be_visible()
+        """Header title row shows locale default 'Chat with us'.
+
+        The header uses headerText (from config) or locale.headerTitle.
+        When neither is set in mock config, the English locale default
+        'Chat with us' is displayed.
+        """
+        expect(widget_panel.get_by_text("Chat with us")).to_be_visible()
 
     def test_close_button_exists(self, widget_panel: FrameLocator) -> None:
         """Close button with correct aria-label is present."""
@@ -138,12 +143,13 @@ class TestPanelHeader:
         expect(svg).to_be_attached()
 
     def test_online_status_dot(self, widget_panel: FrameLocator) -> None:
-        """A green status dot (6×6px circle) is visible in the header."""
-        # Verify the header subtitle line contains the agent name and title
-        # The status dot is inline — we can't query it directly, but we verify
-        # the surrounding text renders correctly.
+        """A green status dot (6×6px circle) with 'Online' text is visible.
+
+        The header's third row renders a green dot + 'Online' span.
+        We verify the 'Online' text is present as a proxy for the status dot.
+        """
         expect(
-            widget_panel.get_by_text("Agent Red · AI Assistant")
+            widget_panel.get_by_text("Online", exact=True)
         ).to_be_visible()
 
 

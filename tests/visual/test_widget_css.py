@@ -243,7 +243,7 @@ class TestDarkMode:
     """Verify dark mode token derivation produces correct colors."""
 
     def test_dark_mode_background(self, page: Page, vite_server) -> None:
-        """Dark mode panel background should be #1A1A1A."""
+        """Dark mode panel background should be #1c1917 (Tailwind stone-950)."""
         config = {
             **_base_config(),
             "widget_color_mode": "dark",
@@ -277,9 +277,9 @@ class TestDarkMode:
         """)
 
         assert bg is not None, "Could not read dark mode background"
-        # #1A1A1A = rgb(26, 26, 26)
-        assert bg == "rgb(26, 26, 26)", (
-            f"Dark mode background should be rgb(26, 26, 26), got: {bg}"
+        # #1c1917 (Tailwind stone-950) = rgb(28, 25, 23)
+        assert bg == "rgb(28, 25, 23)", (
+            f"Dark mode background should be rgb(28, 25, 23), got: {bg}"
         )
 
 

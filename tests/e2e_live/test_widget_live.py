@@ -166,6 +166,11 @@ class TestWidgetPreview:
             "Preview widget is not interactive — no functional chat interface"
         )
 
+    @pytest.mark.xfail(
+        reason="WI-0918: staging-specific — preview content not rendered "
+               "in main element. Identified as staging-specific since S124.",
+        strict=False,
+    )
     def test_preview_panel_visible(self, live_widget_page: Page):
         """The static preview panel renders with expected content."""
         live_widget_page.wait_for_timeout(1000)

@@ -1,0 +1,1236 @@
+[
+  {
+    "id": "122",
+    "title": "Trial conversation cap (50)",
+    "status": "verified",
+    "section": "3. Trial/Demo Environment",
+    "type": "requirement",
+    "test_count": 1,
+    "assertion_count": 0,
+    "reasons": [
+      "numbered list"
+    ]
+  },
+  {
+    "id": "SPEC-0037",
+    "title": "The KB page toolbar layout MUST have Search input on top row (left-justified), and Category, Status, Scan for conflicts, Export CSV, Import, and + Add article all on one row below (bottom-justified)",
+    "status": "implemented",
+    "section": "ADMIN_UI",
+    "type": "requirement",
+    "test_count": 1,
+    "assertion_count": 0,
+    "reasons": [
+      "compound (and x2)"
+    ]
+  },
+  {
+    "id": "SPEC-0129",
+    "title": "Configurations MUST be nameable and it MUST be possible to select and apply a named saved configuration from a list of previously saved configurations",
+    "status": "implemented",
+    "section": "CONFIG",
+    "type": "requirement",
+    "test_count": 5,
+    "assertion_count": 0,
+    "reasons": [
+      "compound (and x2)"
+    ]
+  },
+  {
+    "id": "SPEC-0179",
+    "title": "The strategic direction shall prioritize conversation quality over cost reduction, with four priorities in order: (1) quality of individual conversations, (2) consistency across conversations, (3) operational visibility, (4) cost efficiency.",
+    "status": "implemented",
+    "section": "GENERAL",
+    "type": "requirement",
+    "test_count": 4,
+    "assertion_count": 0,
+    "reasons": [
+      "multi-value list (5 parts)",
+      "numbered list"
+    ]
+  },
+  {
+    "id": "SPEC-0203",
+    "title": "The widget shall implement an in-conversation authentication flow with 5 steps: (1) detect auth-required intent, (2) present auth prompt, (3) verify credentials, (4) resume conversation with authenticated context, (5) persist auth state.",
+    "status": "implemented",
+    "section": "AUTH",
+    "type": "requirement",
+    "test_count": 1,
+    "assertion_count": 0,
+    "reasons": [
+      "multi-value list (5 parts)",
+      "numbered list"
+    ]
+  },
+  {
+    "id": "SPEC-0207",
+    "title": "Agent Red shall retain its own widget, admin console, and configuration layer (not replaced by AGNTCY equivalents).",
+    "status": "implemented",
+    "section": "GENERAL",
+    "type": "requirement",
+    "test_count": 1,
+    "assertion_count": 0,
+    "reasons": [
+      "multi-component"
+    ]
+  },
+  {
+    "id": "SPEC-0266",
+    "title": "Session wrap-up shall include updating knowledge base, cleaning artifacts, committing to GitHub, updating the GitHub project and wiki, and providing a next-session initialization prompt.",
+    "status": "implemented",
+    "section": "OPS",
+    "type": "requirement",
+    "test_count": 1,
+    "assertion_count": 0,
+    "reasons": [
+      "compound (and x2)"
+    ]
+  },
+  {
+    "id": "SPEC-0287",
+    "title": "Per-tenant rate limits shall be tiered by plan: Starter 10/min, Professional 50/min, Enterprise 200/min.",
+    "status": "implemented",
+    "section": "API",
+    "type": "requirement",
+    "test_count": 10,
+    "assertion_count": 0,
+    "reasons": [
+      "multi-value list (3 parts)",
+      "per-tier/role"
+    ]
+  },
+  {
+    "id": "SPEC-0299",
+    "title": "A work item shall be created to investigate: (A) customer satisfaction impact of reducing P50 response latency below 1,500ms, and (B) cost of options to reduce P50 to minimum including custom AI models and fine-tuning, producing a cost/benefit chart.",
+    "status": "implemented",
+    "section": "GENERAL",
+    "type": "requirement",
+    "test_count": 6,
+    "assertion_count": 0,
+    "reasons": [
+      "multi-value list (4 parts)",
+      "compound (and x2)"
+    ]
+  },
+  {
+    "id": "SPEC-0300",
+    "title": "The PCM customer profile shall include: (1) historical purchase information (product ID, date, rating/review), (2) historical product questions from previous chats, (3) geographic region codes for geography-aware RAG, (4) marketing segmentation codes for campaign-aware RAG, (5) jurisdiction codes for terms/conditions applicability, (6) historical shopping cart contents (purchased or not).",
+    "status": "implemented",
+    "section": "CONVERSATIONS",
+    "type": "requirement",
+    "test_count": 1,
+    "assertion_count": 0,
+    "reasons": [
+      "multi-value list (8 parts)",
+      "numbered list"
+    ]
+  },
+  {
+    "id": "SPEC-0304",
+    "title": "Publishable widget key authentication (WI-170) shall be implemented with pk_live_ prefix format, SHA-256 hashing, scoped to /api/chat/* and /ws/chat/* paths only.",
+    "status": "verified",
+    "section": "AUTH",
+    "type": "requirement",
+    "test_count": 10,
+    "assertion_count": 0,
+    "reasons": [
+      "multi-value list (3 parts)"
+    ]
+  },
+  {
+    "id": "SPEC-0305",
+    "title": "The Trial tier MUST provide professional-grade entitlements for 14 days: 5,000 conversations, 60 rpm rate limit, 10 max concurrent sessions, 365-day history retention, PCM Layers 1-3, $0.00 overage rate (hard cap), 20 max quick actions, 50 max quick action assignments. After expiry the merchant chooses Starter, Professional, or Enterprise.",
+    "status": "verified",
+    "section": "PROVISIONING",
+    "type": "requirement",
+    "test_count": 12,
+    "assertion_count": 0,
+    "reasons": [
+      "multi-value list (11 parts)",
+      "per-tier/role",
+      "matrix/table"
+    ]
+  },
+  {
+    "id": "SPEC-0308",
+    "title": "The Conversation Inbox API (WI-171) shall provide 5 endpoints on /api/admin/conversations: list, detail, messages, assign agent, and add internal note.",
+    "status": "verified",
+    "section": "API",
+    "type": "requirement",
+    "test_count": 4,
+    "assertion_count": 0,
+    "reasons": [
+      "multi-component"
+    ]
+  },
+  {
+    "id": "SPEC-0309",
+    "title": "The Knowledge Base CRUD API (WI-175) shall provide 5 endpoints on /api/admin/knowledge: list, detail, create, update, and soft-delete.",
+    "status": "verified",
+    "section": "API",
+    "type": "requirement",
+    "test_count": 2,
+    "assertion_count": 0,
+    "reasons": [
+      "multi-component"
+    ]
+  },
+  {
+    "id": "SPEC-0312",
+    "title": "The GDPR REST API (WI-180) shall provide 5 endpoints on /api/gdpr: export (tenant/customer scope), delete (with grace period and force override), read consent, update tenant consent, and update customer consent.",
+    "status": "verified",
+    "section": "API",
+    "type": "requirement",
+    "test_count": 15,
+    "assertion_count": 0,
+    "reasons": [
+      "multi-component",
+      "compound (and x2)"
+    ]
+  },
+  {
+    "id": "SPEC-0363",
+    "title": "The viewer role MUST have read-only access to all admin pages",
+    "status": "implemented",
+    "section": "AUTH",
+    "type": "requirement",
+    "test_count": 2,
+    "assertion_count": 0,
+    "reasons": [
+      "multi-component"
+    ]
+  },
+  {
+    "id": "SPEC-0371",
+    "title": "Every tooltip MUST contain brief descriptive text AND a link to the corresponding documentation page with an anchor to the relevant section",
+    "status": "implemented",
+    "section": "ADMIN_UI",
+    "type": "requirement",
+    "test_count": 1,
+    "assertion_count": 0,
+    "reasons": [
+      "multi-component"
+    ]
+  },
+  {
+    "id": "SPEC-0425",
+    "title": "Administrators MUST have all of the same access as the superadmin, with the exception that the superadmin account is not visible to any other user and cannot be disabled.",
+    "status": "verified",
+    "section": "AUTH",
+    "type": "requirement",
+    "test_count": 2,
+    "assertion_count": 0,
+    "reasons": [
+      "multi-component"
+    ]
+  },
+  {
+    "id": "SPEC-0426",
+    "title": "All non-administrators MUST only have permission to interact with the inbox.",
+    "status": "implemented",
+    "section": "AUTH",
+    "type": "requirement",
+    "test_count": 1,
+    "assertion_count": 0,
+    "reasons": [
+      "multi-component"
+    ]
+  },
+  {
+    "id": "SPEC-0452",
+    "title": "Session wrap-up MUST include: knowledge base updates, cleanup of unnecessary artifacts, commit and push to GitHub, GitHub project/wiki updates, and a next-session initialization prompt.",
+    "status": "implemented",
+    "section": "OPS",
+    "type": "requirement",
+    "test_count": 1,
+    "assertion_count": 0,
+    "reasons": [
+      "MUST include list",
+      "compound (and x2)"
+    ]
+  },
+  {
+    "id": "SPEC-0490",
+    "title": "If a merchant administrator interacts with the activation control while in 'Expired' state, a pop-up MUST offer the option to purchase a Starter, Professional or Enterprise license",
+    "status": "implemented",
+    "section": "BILLING",
+    "type": "requirement",
+    "test_count": 1,
+    "assertion_count": 0,
+    "reasons": [
+      "per-tier/role"
+    ]
+  },
+  {
+    "id": "SPEC-0512",
+    "title": "Session wrap-up MUST include: detailed knowledge base updates, repeatable procedure confirmation, artifact cleanup, agentredcx.com updates, git commit/push, GitHub project/wiki updates, production deployment (unless advised against), and next-session prompt",
+    "status": "implemented",
+    "section": "OPS",
+    "type": "requirement",
+    "test_count": 1,
+    "assertion_count": 0,
+    "reasons": [
+      "MUST include list"
+    ]
+  },
+  {
+    "id": "SPEC-0515",
+    "title": "Plan-gated elements MUST be tested per entitlement tier \u2014 a full set of tests may be needed for each plan (Trial, Starter, Professional, Enterprise)",
+    "status": "verified",
+    "section": "TESTING",
+    "type": "requirement",
+    "test_count": 3,
+    "assertion_count": 0,
+    "reasons": [
+      "per-tier/role"
+    ]
+  },
+  {
+    "id": "SPEC-0517",
+    "title": "A master list of all required tooltips and their documentation URLs MUST be maintained and addressed as a single work item",
+    "status": "implemented",
+    "section": "ADMIN_UI",
+    "type": "requirement",
+    "test_count": 1,
+    "assertion_count": 0,
+    "reasons": [
+      "compound (and x2)"
+    ]
+  },
+  {
+    "id": "SPEC-0565",
+    "title": "Integration logo containers MUST use 180px x 180px dimensions with border-radius 8px, dark background (#141414), and 1px solid border (#272727)",
+    "status": "implemented",
+    "section": "ADMIN_UI",
+    "type": "requirement",
+    "test_count": 1,
+    "assertion_count": 0,
+    "reasons": [
+      "multi-value list (3 parts)"
+    ]
+  },
+  {
+    "id": "SPEC-0575",
+    "title": "Knowledge Base MUST allow adding a test entry, and the entry MUST appear in the list and be editable and deletable",
+    "status": "implemented",
+    "section": "KNOWLEDGE_BASE",
+    "type": "requirement",
+    "test_count": 2,
+    "assertion_count": 0,
+    "reasons": [
+      "compound (and x3)"
+    ]
+  },
+  {
+    "id": "SPEC-0634",
+    "title": "When entering Test Mode configuration, all pre-existing values and settings MUST be kept as defaults; only the changeable values and settings define the scope of the test.",
+    "status": "verified",
+    "section": "CONFIG",
+    "type": "requirement",
+    "test_count": 2,
+    "assertion_count": 0,
+    "reasons": [
+      "compound (and x2)"
+    ]
+  },
+  {
+    "id": "SPEC-0638",
+    "title": "The option to disable the escalation/report-issue message MUST be available for Professional and Enterprise tiers but MUST remain mandatory for the Starter (entry-level) tier.",
+    "status": "implemented",
+    "section": "CONFIG",
+    "type": "requirement",
+    "test_count": 4,
+    "assertion_count": 0,
+    "reasons": [
+      "per-tier/role"
+    ]
+  },
+  {
+    "id": "SPEC-0656",
+    "title": "The end-to-end test procedure MUST start with creation of a fresh tenant, initialization, then move through all tests covering Starter, Professional, and Enterprise tiers.",
+    "status": "implemented",
+    "section": "TESTING",
+    "type": "requirement",
+    "test_count": 1,
+    "assertion_count": 0,
+    "reasons": [
+      "per-tier/role"
+    ]
+  },
+  {
+    "id": "SPEC-0657",
+    "title": "Session wrap-up MUST include storing a structured prompt in the Knowledge Database that the next session can retrieve for initialization.",
+    "status": "verified",
+    "section": "OPS",
+    "type": "requirement",
+    "test_count": 1,
+    "assertion_count": 0,
+    "reasons": [
+      "MUST include list"
+    ]
+  },
+  {
+    "id": "SPEC-0661",
+    "title": "Pricing MUST include usage-based overage charges with defined thresholds for AI model use per tier.",
+    "status": "verified",
+    "section": "BILLING",
+    "type": "requirement",
+    "test_count": 1,
+    "assertion_count": 0,
+    "reasons": [
+      "MUST include list",
+      "per-tier/role"
+    ]
+  },
+  {
+    "id": "SPEC-0678",
+    "title": "The admin suite MUST include a Knowledge Base conflict/duplication scanner tool that identifies conflicts or duplications and provides instructions for resolution.",
+    "status": "implemented",
+    "section": "KNOWLEDGE_BASE",
+    "type": "requirement",
+    "test_count": 1,
+    "assertion_count": 0,
+    "reasons": [
+      "MUST include list"
+    ]
+  },
+  {
+    "id": "SPEC-0690",
+    "title": "The email template MUST include text below the WIDGET KEY: 'Your chat widget key and API URL are available from your admin console.'",
+    "status": "verified",
+    "section": "EMAIL",
+    "type": "requirement",
+    "test_count": 7,
+    "assertion_count": 0,
+    "reasons": [
+      "MUST include list"
+    ]
+  },
+  {
+    "id": "SPEC-0698",
+    "title": "The grouped configuration items box MUST include a control displaying the state of those grouped items and allowing 'Activate' changes, 'Roll-back' changes, or 'Discard' changes to restore all inputs to their currently Active state.",
+    "status": "implemented",
+    "section": "ADMIN_UI",
+    "type": "requirement",
+    "test_count": 1,
+    "assertion_count": 0,
+    "reasons": [
+      "MUST include list"
+    ]
+  },
+  {
+    "id": "SPEC-0713",
+    "title": "The 'Escalation agent' role MUST ensure correct routing of escalations to Team members based on escalation category, for both manual and AI-initiated escalations.",
+    "status": "verified",
+    "section": "CONVERSATIONS",
+    "type": "requirement",
+    "test_count": 5,
+    "assertion_count": 0,
+    "reasons": [
+      "multi-role RBAC"
+    ]
+  },
+  {
+    "id": "SPEC-0728",
+    "title": "Testing Repeatable Procedures MUST include tests that verify: (1) test PII injected into a conversation is correctly scrubbed, (2) consent prompt appears, (3) a GDPR deletion request successfully deletes all system information for the identified customer.",
+    "status": "verified",
+    "section": "TESTING",
+    "type": "requirement",
+    "test_count": 2,
+    "assertion_count": 0,
+    "reasons": [
+      "MUST include list",
+      "multi-value list (3 parts)",
+      "numbered list"
+    ]
+  },
+  {
+    "id": "SPEC-0736",
+    "title": "The system MUST implement a four-layer personalization stack: (1) Session context, (2) Cross-session customer memory, (3) Vectorized interaction history for customer-specific RAG, (4) Periodic retraining on accumulated cleansed data.",
+    "status": "implemented",
+    "section": "CONVERSATIONS",
+    "type": "requirement",
+    "test_count": 1,
+    "assertion_count": 0,
+    "reasons": [
+      "multi-value list (4 parts)",
+      "numbered list"
+    ]
+  },
+  {
+    "id": "SPEC-0743",
+    "title": "The Shopify storefront MUST be configured with up-to-date product descriptions, polished pages, and template matching Agent Red brand colors and visual style before designer engagement.",
+    "status": "implemented",
+    "section": "GENERAL",
+    "type": "requirement",
+    "test_count": 1,
+    "assertion_count": 0,
+    "reasons": [
+      "compound (and x2)"
+    ]
+  },
+  {
+    "id": "SPEC-0765",
+    "title": "SPA tenant provisioning inputs MUST include: Merchant Name, merchant URL, merchant superadmin email, and entitlement type (Trial, Starter, Professional, or Enterprise)",
+    "status": "implemented",
+    "section": "PROVISIONING",
+    "type": "requirement",
+    "test_count": 6,
+    "assertion_count": 0,
+    "reasons": [
+      "MUST include list",
+      "per-tier/role"
+    ]
+  },
+  {
+    "id": "SPEC-0768",
+    "title": "The customer identity flow MUST follow this sequence: (1) AI greeting and Quick Actions presented when chat opens, (2) customer inputs message or selects Quick Action, (3) AI checks Shopify auth and whether email is known \u2014 if NOT, AI requests it, (4) customer chooses anonymous or provides email, (5) if email provided, OTP sent, customer enters code, authenticated",
+    "status": "verified",
+    "section": "AUTH",
+    "type": "requirement",
+    "test_count": 6,
+    "assertion_count": 0,
+    "reasons": [
+      "multi-value list (9 parts)",
+      "compound (and x2)",
+      "numbered list"
+    ]
+  },
+  {
+    "id": "SPEC-0806",
+    "title": "Periodic audit sessions MUST occur with a clean context for self-care and inventory/inspection of assets and plans",
+    "status": "verified",
+    "section": "OPS",
+    "type": "requirement",
+    "test_count": 1,
+    "assertion_count": 0,
+    "reasons": [
+      "compound (and x2)"
+    ]
+  },
+  {
+    "id": "SPEC-0807",
+    "title": "Every 5th session (S100, S105, ...) MUST be automatically flagged as an audit session using handoff-embedded cadence (Option A)",
+    "status": "verified",
+    "section": "OPS",
+    "type": "requirement",
+    "test_count": 1,
+    "assertion_count": 0,
+    "reasons": [
+      "multi-value list (3 parts)"
+    ]
+  },
+  {
+    "id": "SPEC-0811",
+    "title": "The pipeline budget MUST reflect a P50 of 7,000ms and a timeout at 8,000ms",
+    "status": "verified",
+    "section": "API",
+    "type": "requirement",
+    "test_count": 1,
+    "assertion_count": 0,
+    "reasons": [
+      "multi-value list (3 parts)"
+    ]
+  },
+  {
+    "id": "SPEC-0862",
+    "title": "The Stripe product catalog MUST include subscription tiers (Starter, Professional, Enterprise) with monthly and annual pricing plus metered overage using Stripe Billing Meters",
+    "status": "verified",
+    "section": "BILLING",
+    "type": "requirement",
+    "test_count": 12,
+    "assertion_count": 0,
+    "reasons": [
+      "MUST include list",
+      "per-tier/role"
+    ]
+  },
+  {
+    "id": "SPEC-0863",
+    "title": "The Stripe product catalog MUST include conversation packs (1K, 5K, 20K) and add-on modules (Multi-Language, Advanced Analytics, Priority Support)",
+    "status": "implemented",
+    "section": "BILLING",
+    "type": "requirement",
+    "test_count": 2,
+    "assertion_count": 0,
+    "reasons": [
+      "MUST include list",
+      "multi-value list (5 parts)"
+    ]
+  },
+  {
+    "id": "SPEC-0864",
+    "title": "Shopify and Stripe partner program approval criteria and enhanced relationship benefits MUST be documented",
+    "status": "implemented",
+    "section": "GENERAL",
+    "type": "requirement",
+    "test_count": 2,
+    "assertion_count": 0,
+    "reasons": [
+      "compound (and x2)"
+    ]
+  },
+  {
+    "id": "SPEC-0867",
+    "title": "The widget_greeting_message field MUST NOT be set to empty string during deactivation \u2014 empty string overrides platform defaults, while None allows defaults to apply",
+    "status": "implemented",
+    "section": "CONFIG",
+    "type": "requirement",
+    "test_count": 4,
+    "assertion_count": 0,
+    "reasons": [
+      "default value (multi-location)"
+    ]
+  },
+  {
+    "id": "SPEC-0873",
+    "title": "Analytics SegmentedControl offers options: 7d, 7d, 14d, 14d, 30d, 30d",
+    "status": "implemented",
+    "section": "ADMIN_UI",
+    "type": "requirement",
+    "test_count": 1,
+    "assertion_count": 0,
+    "reasons": [
+      "multi-value list (6 parts)"
+    ]
+  },
+  {
+    "id": "SPEC-0896",
+    "title": "Dashboard SegmentedControl offers options: 7d, 7d, 14d, 14d, 30d, 30d",
+    "status": "implemented",
+    "section": "ADMIN_UI",
+    "type": "requirement",
+    "test_count": 1,
+    "assertion_count": 0,
+    "reasons": [
+      "multi-value list (6 parts)"
+    ]
+  },
+  {
+    "id": "SPEC-1137",
+    "title": "Define message types: customer, agent, and system with streaming and retracted flags",
+    "status": "implemented",
+    "section": "WIDGET_UI",
+    "type": "requirement",
+    "test_count": 1,
+    "assertion_count": 0,
+    "reasons": [
+      "compound (and x2)"
+    ]
+  },
+  {
+    "id": "SPEC-1149",
+    "title": "Support three panel width presets: compact 320px, standard 380px, wide 440px",
+    "status": "verified",
+    "section": "WIDGET_UI",
+    "type": "requirement",
+    "test_count": 3,
+    "assertion_count": 0,
+    "reasons": [
+      "multi-value list (3 parts)"
+    ]
+  },
+  {
+    "id": "SPEC-1151",
+    "title": "Support three launcher shapes: circle, rounded-square (16px radius), pill (28px radius)",
+    "status": "implemented",
+    "section": "WIDGET_UI",
+    "type": "requirement",
+    "test_count": 1,
+    "assertion_count": 0,
+    "reasons": [
+      "multi-value list (3 parts)"
+    ]
+  },
+  {
+    "id": "SPEC-1152",
+    "title": "Set z-index values starting at 2147483640 for launcher, 2147483641 for panel, 2147483642 for overlay",
+    "status": "implemented",
+    "section": "WIDGET_UI",
+    "type": "requirement",
+    "test_count": 1,
+    "assertion_count": 0,
+    "reasons": [
+      "multi-value list (3 parts)"
+    ]
+  },
+  {
+    "id": "SPEC-1237",
+    "title": "Allow /api/admin/team/whoami path for all roles regardless of RBAC restrictions",
+    "status": "implemented",
+    "section": "AUTH",
+    "type": "requirement",
+    "test_count": 2,
+    "assertion_count": 0,
+    "reasons": [
+      "multi-component"
+    ]
+  },
+  {
+    "id": "SPEC-1238",
+    "title": "Implement per-tenant sliding window rate limiting: Starter 10rpm, Professional 50rpm, Enterprise 200rpm",
+    "status": "verified",
+    "section": "AUTH",
+    "type": "requirement",
+    "test_count": 12,
+    "assertion_count": 0,
+    "reasons": [
+      "multi-value list (3 parts)",
+      "per-tier/role"
+    ]
+  },
+  {
+    "id": "SPEC-1240",
+    "title": "Return X-RateLimit-Limit, X-RateLimit-Remaining, X-RateLimit-Reset headers on every response",
+    "status": "implemented",
+    "section": "AUTH",
+    "type": "requirement",
+    "test_count": 5,
+    "assertion_count": 0,
+    "reasons": [
+      "multiple headers"
+    ]
+  },
+  {
+    "id": "SPEC-1252",
+    "title": "Issue pending_2fa JWT with 10-minute lifetime, HS256 algorithm, and type pending_2fa_session",
+    "status": "implemented",
+    "section": "AUTH",
+    "type": "requirement",
+    "test_count": 1,
+    "assertion_count": 0,
+    "reasons": [
+      "multi-value list (3 parts)"
+    ]
+  },
+  {
+    "id": "SPEC-1254",
+    "title": "Require 2FA only for admin and superadmin roles, skip for viewer and escalation_agent",
+    "status": "verified",
+    "section": "AUTH",
+    "type": "requirement",
+    "test_count": 2,
+    "assertion_count": 0,
+    "reasons": [
+      "compound (and x2)"
+    ]
+  },
+  {
+    "id": "SPEC-1255",
+    "title": "Allow mfa_opt_out bypass for admins granted opt-out by superadmin",
+    "status": "verified",
+    "section": "AUTH",
+    "type": "requirement",
+    "test_count": 1,
+    "assertion_count": 0,
+    "reasons": [
+      "multi-component"
+    ]
+  },
+  {
+    "id": "SPEC-1256",
+    "title": "Skip 2FA challenge for admins with no MFA enrolled (bootstrap case)",
+    "status": "verified",
+    "section": "AUTH",
+    "type": "requirement",
+    "test_count": 1,
+    "assertion_count": 0,
+    "reasons": [
+      "multi-component"
+    ]
+  },
+  {
+    "id": "SPEC-1272",
+    "title": "Verify TOTP codes with 6 digits, 30-second interval, and +/- 1 window tolerance",
+    "status": "implemented",
+    "section": "AUTH",
+    "type": "requirement",
+    "test_count": 1,
+    "assertion_count": 0,
+    "reasons": [
+      "multi-value list (3 parts)"
+    ]
+  },
+  {
+    "id": "SPEC-1281",
+    "title": "Rate-limit magic link requests to 3 per 5 minutes per IP address",
+    "status": "implemented",
+    "section": "AUTH",
+    "type": "requirement",
+    "test_count": 1,
+    "assertion_count": 0,
+    "reasons": [
+      "matrix/table"
+    ]
+  },
+  {
+    "id": "SPEC-1288",
+    "title": "Route to pending 2FA challenge when magic link verifies an admin with MFA enabled",
+    "status": "verified",
+    "section": "AUTH",
+    "type": "requirement",
+    "test_count": 2,
+    "assertion_count": 0,
+    "reasons": [
+      "multi-component"
+    ]
+  },
+  {
+    "id": "SPEC-1290",
+    "title": "Rate-limit email verification requests to 3 per 5 minutes per IP address",
+    "status": "implemented",
+    "section": "EMAIL",
+    "type": "requirement",
+    "test_count": 4,
+    "assertion_count": 0,
+    "reasons": [
+      "matrix/table"
+    ]
+  },
+  {
+    "id": "SPEC-1293",
+    "title": "Generate verification token using secrets.token_urlsafe(32)",
+    "status": "implemented",
+    "section": "EMAIL",
+    "type": "requirement",
+    "test_count": 1,
+    "assertion_count": 0,
+    "reasons": [
+      "numbered list"
+    ]
+  },
+  {
+    "id": "SPEC-1312",
+    "title": "Send trial expiry warning emails at 7-day, 3-day, and 1-day intervals before trial end",
+    "status": "implemented",
+    "section": "EMAIL",
+    "type": "requirement",
+    "test_count": 1,
+    "assertion_count": 0,
+    "reasons": [
+      "multi-value list (3 parts)"
+    ]
+  },
+  {
+    "id": "SPEC-1313",
+    "title": "Apply urgency-specific styling per warning tier: blue (7d), amber (3d), red (1d) badges",
+    "status": "implemented",
+    "section": "EMAIL",
+    "type": "requirement",
+    "test_count": 1,
+    "assertion_count": 0,
+    "reasons": [
+      "multi-value list (3 parts)"
+    ]
+  },
+  {
+    "id": "SPEC-1314",
+    "title": "Use escalating subject lines: ends in 7 days, ends in 3 days, ends tomorrow",
+    "status": "implemented",
+    "section": "EMAIL",
+    "type": "requirement",
+    "test_count": 1,
+    "assertion_count": 0,
+    "reasons": [
+      "multi-value list (3 parts)"
+    ]
+  },
+  {
+    "id": "SPEC-1316",
+    "title": "Send access expiry warning emails at 7-day, 3-day, and 1-day intervals before access end",
+    "status": "implemented",
+    "section": "EMAIL",
+    "type": "requirement",
+    "test_count": 1,
+    "assertion_count": 0,
+    "reasons": [
+      "multi-value list (3 parts)"
+    ]
+  },
+  {
+    "id": "SPEC-1318",
+    "title": "Apply same urgency badge styling to access expiry as trial expiry: blue (7d), amber (3d), red (1d)",
+    "status": "implemented",
+    "section": "EMAIL",
+    "type": "requirement",
+    "test_count": 1,
+    "assertion_count": 0,
+    "reasons": [
+      "multi-value list (3 parts)"
+    ]
+  },
+  {
+    "id": "SPEC-1489",
+    "title": "The intent classification system MUST recognize 17 customer intent categories: general_inquiry, product_question, order_status, return_request, exchange_request, refund_request, shipping_inquiry, pricing_question, availability_check, complaint, feedback, account_issue, payment_issue, subscription_question, technical_support, greeting, escalation. Unrecognized intents MUST default to general_inquiry.",
+    "status": "implemented",
+    "section": "AGENTS",
+    "type": "requirement",
+    "test_count": 7,
+    "assertion_count": 0,
+    "reasons": [
+      "default value (multi-location)"
+    ]
+  },
+  {
+    "id": "SPEC-1490",
+    "title": "The Starter tier MUST include: 1,000 conversations/month, 60 rpm rate limit, 5 max concurrent sessions, 90-day history retention, PCM Layers 1-2 only, $0.04/conversation overage rate, 5 max quick actions, 10 max quick action assignments.",
+    "status": "implemented",
+    "section": "BILLING",
+    "type": "requirement",
+    "test_count": 8,
+    "assertion_count": 0,
+    "reasons": [
+      "MUST include list",
+      "multi-value list (9 parts)"
+    ]
+  },
+  {
+    "id": "SPEC-1491",
+    "title": "The Professional tier MUST include: 5,000 conversations/month, 60 rpm rate limit, 10 max concurrent sessions, 365-day history retention, PCM Layers 1-3, $0.025/conversation overage rate, 20 max quick actions, 50 max quick action assignments.",
+    "status": "implemented",
+    "section": "BILLING",
+    "type": "requirement",
+    "test_count": 7,
+    "assertion_count": 0,
+    "reasons": [
+      "MUST include list",
+      "multi-value list (9 parts)"
+    ]
+  },
+  {
+    "id": "SPEC-1492",
+    "title": "The Enterprise tier MUST include: 20,000 conversations/month, 240 rpm rate limit, 30 max concurrent sessions, unlimited history retention, PCM Layers 1-4 (including dedicated model training), $0.015/conversation overage rate, 50 max quick actions, 200 max quick action assignments.",
+    "status": "implemented",
+    "section": "BILLING",
+    "type": "requirement",
+    "test_count": 8,
+    "assertion_count": 0,
+    "reasons": [
+      "MUST include list",
+      "multi-value list (9 parts)"
+    ]
+  },
+  {
+    "id": "SPEC-1493",
+    "title": "Artifact Inventory: 8 managed artifact types, 2 supporting record types, 0 phantom references",
+    "status": "implemented",
+    "section": "Artifact System",
+    "type": "governance",
+    "test_count": 1,
+    "assertion_count": 0,
+    "reasons": [
+      "multi-value list (3 parts)"
+    ]
+  },
+  {
+    "id": "SPEC-1506",
+    "title": "Standalone admin Widget page must include page visibility rules UI",
+    "status": "implemented",
+    "section": "ADMIN_UI",
+    "type": "requirement",
+    "test_count": 3,
+    "assertion_count": 3,
+    "reasons": [
+      "MUST include list"
+    ]
+  },
+  {
+    "id": "VR-agentconfig-s0-topleft",
+    "title": "Agent configuration page: top-left content quadrant (240,56)-(640,351)",
+    "status": "verified",
+    "section": "VISUAL_REGION",
+    "type": "requirement",
+    "test_count": 1,
+    "assertion_count": 7,
+    "reasons": [
+      "multi-value list (3 parts)"
+    ]
+  },
+  {
+    "id": "VR-billing-s0-topleft",
+    "title": "Billing & usage page: top-left content quadrant (240,56)-(640,351)",
+    "status": "verified",
+    "section": "VISUAL_REGION",
+    "type": "requirement",
+    "test_count": 1,
+    "assertion_count": 7,
+    "reasons": [
+      "multi-value list (3 parts)"
+    ]
+  },
+  {
+    "id": "VR-dashboard-s0-topleft",
+    "title": "Dashboard page: top-left content quadrant (240,56)-(640,351)",
+    "status": "verified",
+    "section": "VISUAL_REGION",
+    "type": "requirement",
+    "test_count": 1,
+    "assertion_count": 7,
+    "reasons": [
+      "multi-value list (3 parts)"
+    ]
+  },
+  {
+    "id": "VR-inbox-s0-topleft",
+    "title": "Inbox page: top-left content quadrant (240,56)-(640,351)",
+    "status": "verified",
+    "section": "VISUAL_REGION",
+    "type": "requirement",
+    "test_count": 1,
+    "assertion_count": 6,
+    "reasons": [
+      "multi-value list (3 parts)"
+    ]
+  },
+  {
+    "id": "VR-integrations-s0-topleft",
+    "title": "Integrations page: top-left content quadrant (240,56)-(640,351)",
+    "status": "verified",
+    "section": "VISUAL_REGION",
+    "type": "requirement",
+    "test_count": 1,
+    "assertion_count": 7,
+    "reasons": [
+      "multi-value list (3 parts)"
+    ]
+  },
+  {
+    "id": "VR-knowledgebase-s0-topleft",
+    "title": "Knowledge base page: top-left content quadrant (240,56)-(640,351)",
+    "status": "verified",
+    "section": "VISUAL_REGION",
+    "type": "requirement",
+    "test_count": 1,
+    "assertion_count": 7,
+    "reasons": [
+      "multi-value list (3 parts)"
+    ]
+  },
+  {
+    "id": "VR-memoryprivacy-s0-topleft",
+    "title": "Memory & privacy page: top-left content quadrant (240,56)-(640,351)",
+    "status": "verified",
+    "section": "VISUAL_REGION",
+    "type": "requirement",
+    "test_count": 1,
+    "assertion_count": 7,
+    "reasons": [
+      "multi-value list (3 parts)"
+    ]
+  },
+  {
+    "id": "VR-quickactions-s0-topleft",
+    "title": "Quick actions page: top-left content quadrant (240,56)-(640,351)",
+    "status": "verified",
+    "section": "VISUAL_REGION",
+    "type": "requirement",
+    "test_count": 1,
+    "assertion_count": 6,
+    "reasons": [
+      "multi-value list (3 parts)"
+    ]
+  },
+  {
+    "id": "VR-shared-style",
+    "title": "Shared admin UI style: applies to all standalone admin pages",
+    "status": "verified",
+    "section": "VISUAL_REGION",
+    "type": "requirement",
+    "test_count": 1,
+    "assertion_count": 9,
+    "reasons": [
+      "multi-component"
+    ]
+  },
+  {
+    "id": "VR-team-s0-topleft",
+    "title": "Team members page: top-left content quadrant (240,56)-(640,351)",
+    "status": "verified",
+    "section": "VISUAL_REGION",
+    "type": "requirement",
+    "test_count": 1,
+    "assertion_count": 7,
+    "reasons": [
+      "multi-value list (3 parts)"
+    ]
+  },
+  {
+    "id": "VR-widget-s0-appearance-start",
+    "title": "Widget page: appearance section start (240,600)-(830,702)",
+    "status": "verified",
+    "section": "VISUAL_REGION",
+    "type": "requirement",
+    "test_count": 1,
+    "assertion_count": 3,
+    "reasons": [
+      "multi-value list (3 parts)"
+    ]
+  },
+  {
+    "id": "VR-widget-s0-embed-code",
+    "title": "Widget page: embed code region (240,400)-(540,600)",
+    "status": "verified",
+    "section": "VISUAL_REGION",
+    "type": "requirement",
+    "test_count": 1,
+    "assertion_count": 3,
+    "reasons": [
+      "multi-value list (3 parts)"
+    ]
+  },
+  {
+    "id": "VR-widget-s0-header-center",
+    "title": "Widget page: header center region (240,0)-(640,56)",
+    "status": "verified",
+    "section": "VISUAL_REGION",
+    "type": "requirement",
+    "test_count": 1,
+    "assertion_count": 2,
+    "reasons": [
+      "multi-value list (3 parts)"
+    ]
+  },
+  {
+    "id": "VR-widget-s0-header-left",
+    "title": "Widget page: header left region (0,0)-(240,56)",
+    "status": "verified",
+    "section": "VISUAL_REGION",
+    "type": "requirement",
+    "test_count": 1,
+    "assertion_count": 5,
+    "reasons": [
+      "multi-value list (3 parts)"
+    ]
+  },
+  {
+    "id": "VR-widget-s0-header-right",
+    "title": "Widget page: header right region (850,0)-(1280,56)",
+    "status": "verified",
+    "section": "VISUAL_REGION",
+    "type": "requirement",
+    "test_count": 1,
+    "assertion_count": 5,
+    "reasons": [
+      "multi-value list (3 parts)"
+    ]
+  },
+  {
+    "id": "VR-widget-s0-install-body",
+    "title": "Widget page: installation card body (240,200)-(540,400)",
+    "status": "verified",
+    "section": "VISUAL_REGION",
+    "type": "requirement",
+    "test_count": 1,
+    "assertion_count": 5,
+    "reasons": [
+      "multi-value list (3 parts)"
+    ]
+  },
+  {
+    "id": "VR-widget-s0-install-right",
+    "title": "Widget page: installation card right side (540,200)-(830,400)",
+    "status": "verified",
+    "section": "VISUAL_REGION",
+    "type": "requirement",
+    "test_count": 1,
+    "assertion_count": 4,
+    "reasons": [
+      "multi-value list (3 parts)"
+    ]
+  },
+  {
+    "id": "VR-widget-s0-nav-bottom",
+    "title": "Widget page: navbar bottom region (0,490)-(240,702)",
+    "status": "verified",
+    "section": "VISUAL_REGION",
+    "type": "requirement",
+    "test_count": 1,
+    "assertion_count": 4,
+    "reasons": [
+      "multi-value list (3 parts)"
+    ]
+  },
+  {
+    "id": "VR-widget-s0-nav-mid",
+    "title": "Widget page: navbar middle region (0,256)-(240,490)",
+    "status": "verified",
+    "section": "VISUAL_REGION",
+    "type": "requirement",
+    "test_count": 1,
+    "assertion_count": 4,
+    "reasons": [
+      "multi-value list (3 parts)"
+    ]
+  },
+  {
+    "id": "VR-widget-s0-nav-top",
+    "title": "Widget page: navbar top region (0,56)-(240,256)",
+    "status": "verified",
+    "section": "VISUAL_REGION",
+    "type": "requirement",
+    "test_count": 1,
+    "assertion_count": 6,
+    "reasons": [
+      "multi-value list (3 parts)"
+    ]
+  },
+  {
+    "id": "VR-widget-s0-preview-chat",
+    "title": "Widget page: live preview chat area (830,256)-(1130,456)",
+    "status": "verified",
+    "section": "VISUAL_REGION",
+    "type": "requirement",
+    "test_count": 1,
+    "assertion_count": 4,
+    "reasons": [
+      "multi-value list (3 parts)"
+    ]
+  },
+  {
+    "id": "VR-widget-s0-preview-fab",
+    "title": "Widget page: preview FAB/launcher (1130,620)-(1280,702)",
+    "status": "verified",
+    "section": "VISUAL_REGION",
+    "type": "requirement",
+    "test_count": 1,
+    "assertion_count": 3,
+    "reasons": [
+      "multi-value list (3 parts)"
+    ]
+  },
+  {
+    "id": "VR-widget-s0-preview-header",
+    "title": "Widget page: live preview panel header (830,56)-(1130,256)",
+    "status": "verified",
+    "section": "VISUAL_REGION",
+    "type": "requirement",
+    "test_count": 1,
+    "assertion_count": 4,
+    "reasons": [
+      "multi-value list (3 parts)"
+    ]
+  },
+  {
+    "id": "VR-widget-s0-preview-input",
+    "title": "Widget page: live preview input area (830,456)-(1130,656)",
+    "status": "verified",
+    "section": "VISUAL_REGION",
+    "type": "requirement",
+    "test_count": 1,
+    "assertion_count": 4,
+    "reasons": [
+      "multi-value list (3 parts)"
+    ]
+  },
+  {
+    "id": "VR-widget-s0-title",
+    "title": "Widget page: page title region (240,56)-(540,200)",
+    "status": "verified",
+    "section": "VISUAL_REGION",
+    "type": "requirement",
+    "test_count": 1,
+    "assertion_count": 5,
+    "reasons": [
+      "multi-value list (3 parts)"
+    ]
+  }
+]

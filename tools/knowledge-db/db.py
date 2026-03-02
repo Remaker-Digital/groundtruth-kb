@@ -203,6 +203,7 @@ CREATE TABLE IF NOT EXISTS work_items (
     failure_description TEXT,
     resolution_status TEXT NOT NULL,
     priority TEXT,
+    stage TEXT NOT NULL DEFAULT 'created',
     changed_by TEXT NOT NULL,
     changed_at TEXT NOT NULL,
     change_reason TEXT NOT NULL,
@@ -1306,6 +1307,60 @@ class KnowledgeDB:
         ).fetchone()
         return (row[0] or 0) + 1
 
+    # Valid stage transitions: created → tested → backlogged → implementing → resolved
+    _VALID_STAGE_TRANSITIONS: dict[str, set[str]] = {
+        "created": {"tested", "resolved"},
+        "tested": {"backlogged", "resolved"},
+        "backlogged": {"implementing", "resolved"},
+        "implementing": {"resolved"},
+        "resolved": {"resolved"},  # idempotent
+    }
+
+    def _validate_stage_transition(
+        self, wi_id: str, current_stage: str, new_stage: str
+    ) -> None:
+        """Enforce valid work item stage transitions per SPEC-1602."""
+        if new_stage == current_stage:
+            return  # no-op
+        valid = self._VALID_STAGE_TRANSITIONS.get(current_stage, set())
+        if new_stage not in valid:
+            raise ValueError(
+                f"Invalid stage transition for {wi_id}: "
+                f"'{current_stage}' → '{new_stage}'. "
+                f"Valid transitions from '{current_stage}': {sorted(valid)}"
+            )
+        # Structural guards: tested requires linked test, implementing requires backlog
+        if new_stage == "tested":
+            if not self._wi_has_linked_test(wi_id):
+                raise ValueError(
+                    f"Cannot advance {wi_id} to 'tested': no linked test found. "
+                    f"Create a test linked to this WI's source_spec_id first (GOV-12)."
+                )
+        if new_stage == "implementing":
+            if not self._wi_in_backlog(wi_id):
+                raise ValueError(
+                    f"Cannot advance {wi_id} to 'implementing': not found in any "
+                    f"backlog snapshot. Add to backlog first."
+                )
+
+    def _wi_has_linked_test(self, wi_id: str) -> bool:
+        """Check if a work item has a linked test via its source_spec_id."""
+        wi = self.get_work_item(wi_id)
+        if not wi or not wi.get("source_spec_id"):
+            return False
+        tests = self.get_tests_for_spec(wi["source_spec_id"])
+        return len(tests) > 0
+
+    def _wi_in_backlog(self, wi_id: str) -> bool:
+        """Check if a work item ID appears in any backlog snapshot description."""
+        rows = self._get_conn().execute(
+            "SELECT description FROM current_backlog_snapshots"
+        ).fetchall()
+        for row in rows:
+            if row[0] and wi_id in row[0]:
+                return True
+        return False
+
     def insert_work_item(
         self,
         id: str,
@@ -1321,13 +1376,16 @@ class KnowledgeDB:
         source_test_id: str | None = None,
         failure_description: str | None = None,
         priority: str | None = None,
+        stage: str = "created",
     ) -> dict[str, Any]:
         """Insert a new version of a work item.
 
         Args:
-            origin: 'regression', 'defect', or 'new'.
+            origin: 'regression', 'defect', 'new', or 'hygiene'.
             component: From the component taxonomy (e.g., 'agent_implementation', 'customer_interface').
             resolution_status: 'open', 'in_progress', 'resolved', or 'verified'.
+            stage: Lifecycle stage — 'created', 'tested', 'backlogged', 'implementing', or 'resolved'.
+                   Defaults to 'created'. For resolved WIs, pass stage='resolved'.
             source_spec_id: The specification this work item relates to (required for all origins).
             source_test_id: The test that revealed the failure (required for regression/defect).
             failure_description: What failed and why (required for regression/defect).
@@ -1338,12 +1396,12 @@ class KnowledgeDB:
             """INSERT INTO work_items
                (id, version, title, description, origin, component,
                 source_spec_id, source_test_id, failure_description,
-                resolution_status, priority,
+                resolution_status, priority, stage,
                 changed_by, changed_at, change_reason)
-               VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)""",
+               VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)""",
             (id, version, title, description, origin, component,
              source_spec_id, source_test_id, failure_description,
-             resolution_status, priority,
+             resolution_status, priority, stage,
              changed_by, _now(), change_reason),
         )
         conn.commit()
@@ -1356,7 +1414,12 @@ class KnowledgeDB:
         change_reason: str,
         **fields: Any,
     ) -> dict[str, Any]:
-        """Create a new version of a work item, carrying forward unchanged fields."""
+        """Create a new version of a work item, carrying forward unchanged fields.
+
+        Stage transitions are enforced per SPEC-1602:
+        created → tested → backlogged → implementing → resolved.
+        Any stage can transition to 'resolved' (early closure).
+        """
         current = self.get_work_item(id)
         if not current:
             raise ValueError(f"Work item {id} not found")
@@ -1370,17 +1433,21 @@ class KnowledgeDB:
         failure_description = fields.get("failure_description", current["failure_description"])
         resolution_status = fields.get("resolution_status", current["resolution_status"])
         priority = fields.get("priority", current["priority"])
+        current_stage = current.get("stage", "created")
+        new_stage = fields.get("stage", current_stage)
+        # Enforce stage transitions
+        self._validate_stage_transition(id, current_stage, new_stage)
         conn = self._get_conn()
         conn.execute(
             """INSERT INTO work_items
                (id, version, title, description, origin, component,
                 source_spec_id, source_test_id, failure_description,
-                resolution_status, priority,
+                resolution_status, priority, stage,
                 changed_by, changed_at, change_reason)
-               VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)""",
+               VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)""",
             (id, version, title, description, origin, component,
              source_spec_id, source_test_id, failure_description,
-             resolution_status, priority,
+             resolution_status, priority, new_stage,
              changed_by, _now(), change_reason),
         )
         conn.commit()
