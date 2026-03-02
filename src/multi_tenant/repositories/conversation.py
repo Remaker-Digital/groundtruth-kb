@@ -309,6 +309,7 @@ class ConversationRepository(TenantScopedRepository):
         since: str,
         until: str | None = None,
         is_test_mode: bool | None = None,
+        billable_only: bool = False,
     ) -> list[dict[str, Any]]:
         """Count conversations grouped by status in a date range.
 
@@ -318,6 +319,8 @@ class ConversationRepository(TenantScopedRepository):
             until: End timestamp (ISO 8601, exclusive).
             is_test_mode: Filter by test mode flag (None = all,
                 True = test only, False = production only).
+            billable_only: If True, only count billable conversations
+                (SPEC-1593..1600 — dashboard excludes non-billable).
 
         Returns list of {status, count} dicts.
         """
@@ -336,6 +339,9 @@ class ConversationRepository(TenantScopedRepository):
         elif is_test_mode is False:
             query_text += " AND (NOT IS_DEFINED(c.is_test_mode) OR c.is_test_mode = false)"
 
+        if billable_only:
+            query_text += " AND c.is_billable = true"
+
         query_text += " GROUP BY c.status"
 
         return await self.query(tenant_id, query_text, params)
@@ -346,6 +352,7 @@ class ConversationRepository(TenantScopedRepository):
         since: str,
         until: str | None = None,
         is_test_mode: bool | None = None,
+        billable_only: bool = False,
     ) -> dict[str, Any]:
         """Compute aggregate conversation metrics for a date range.
 
@@ -355,6 +362,8 @@ class ConversationRepository(TenantScopedRepository):
             until: End timestamp (ISO 8601, exclusive).
             is_test_mode: Filter by test mode flag (None = all,
                 True = test only, False = production only).
+            billable_only: If True, only aggregate billable conversations
+                (SPEC-1593..1600 — dashboard excludes non-billable).
 
         Returns a dict with total, billable, avg_turns, avg_messages,
         escalated, critic_passed, critic_failed counts.
@@ -381,6 +390,9 @@ class ConversationRepository(TenantScopedRepository):
         elif is_test_mode is False:
             query_text += " AND (NOT IS_DEFINED(c.is_test_mode) OR c.is_test_mode = false)"
 
+        if billable_only:
+            query_text += " AND c.is_billable = true"
+
         results = await self.query(tenant_id, query_text, params)
         if results:
             return results[0]
@@ -397,6 +409,7 @@ class ConversationRepository(TenantScopedRepository):
         since: str,
         until: str | None = None,
         is_test_mode: bool | None = None,
+        billable_only: bool = False,
     ) -> list[dict[str, Any]]:
         """List all conversations with their agents_invoked for intent analysis.
 
@@ -406,6 +419,8 @@ class ConversationRepository(TenantScopedRepository):
             until: End timestamp (ISO 8601, exclusive).
             is_test_mode: Filter by test mode flag (None = all,
                 True = test only, False = production only).
+            billable_only: If True, only list billable conversations
+                (SPEC-1598 — top topics excludes non-billable).
 
         Returns conversation docs with only the fields needed for
         agent/intent frequency analysis: conversation_id, agents_invoked,
@@ -427,6 +442,9 @@ class ConversationRepository(TenantScopedRepository):
         elif is_test_mode is False:
             query_text += " AND (NOT IS_DEFINED(c.is_test_mode) OR c.is_test_mode = false)"
 
+        if billable_only:
+            query_text += " AND c.is_billable = true"
+
         return await self.query(tenant_id, query_text, params)
 
     async def list_gap_conversations(
@@ -436,6 +454,7 @@ class ConversationRepository(TenantScopedRepository):
         until: str | None = None,
         limit: int = 50,
         is_test_mode: bool | None = None,
+        billable_only: bool = False,
     ) -> list[dict[str, Any]]:
         """List conversations that represent potential knowledge gaps.
 
@@ -446,6 +465,8 @@ class ConversationRepository(TenantScopedRepository):
             limit: Maximum number of results.
             is_test_mode: Filter by test mode flag (None = all,
                 True = test only, False = production only).
+            billable_only: If True, only list billable gap conversations
+                (SPEC-1597 — escalation rate excludes non-billable).
 
         Returns conversations with escalated or error status — these
         indicate the AI couldn't resolve the customer's issue.
@@ -468,6 +489,9 @@ class ConversationRepository(TenantScopedRepository):
             query_text += " AND c.is_test_mode = true"
         elif is_test_mode is False:
             query_text += " AND (NOT IS_DEFINED(c.is_test_mode) OR c.is_test_mode = false)"
+
+        if billable_only:
+            query_text += " AND c.is_billable = true"
 
         query_text += " ORDER BY c.started_at DESC"
         params.append({"name": "@limit", "value": limit})
@@ -551,6 +575,7 @@ class ConversationRepository(TenantScopedRepository):
         since: str,
         until: str | None = None,
         is_test_mode: bool | None = None,
+        billable_only: bool = False,
     ) -> dict[str, Any]:
         """Count First Contact Resolution conversations.
 
@@ -569,6 +594,8 @@ class ConversationRepository(TenantScopedRepository):
             until: End timestamp (ISO 8601, exclusive). None = now.
             is_test_mode: Filter by test mode flag (None = all,
                 True = test only, False = production only).
+            billable_only: If True, only count billable resolved conversations
+                (SPEC-1593 — resolution rate excludes non-billable).
 
         Returns:
             Dict with resolved_count, fcr_count, fcr_rate.
@@ -592,6 +619,9 @@ class ConversationRepository(TenantScopedRepository):
             resolved_query += " AND c.is_test_mode = true"
         elif is_test_mode is False:
             resolved_query += " AND (NOT IS_DEFINED(c.is_test_mode) OR c.is_test_mode = false)"
+
+        if billable_only:
+            resolved_query += " AND c.is_billable = true"
 
         resolved_conversations = await self.query(
             tenant_id, resolved_query, resolved_params,

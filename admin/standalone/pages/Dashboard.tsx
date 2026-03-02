@@ -201,7 +201,10 @@ export function DashboardPage() {
   const intentBarBg = isDark ? 'rgba(255,255,255,0.06)' : '#f1f3f5';
   const cardBorder = isDark ? tokens.border : 'var(--mantine-color-gray-2)';
 
-  const recentConversations = (conversations.data?.conversations ?? []).slice(0, 5);
+  // SPEC-1599: Recent conversations must exclude non-billable
+  const recentConversations = (conversations.data?.conversations ?? [])
+    .filter((c) => c.isBillable !== false)
+    .slice(0, 5);
   const intentList = intents.data?.intents ?? [];
   const rawChartData = dailyVolume.data?.days ?? [];
   const gapList = gaps.data?.gaps ?? [];
@@ -282,9 +285,8 @@ export function DashboardPage() {
       {/* Stat cards — 5 cards with detail sub-labels + help tooltips (WI #259) */}
       <SimpleGrid cols={{ base: 1, xs: 2, md: 3 }} spacing="md">
         <StatCard
-          label={<>Total conversations <HelpTooltip text="All conversations started in the selected period, including billable and non-billable." docLink={`${DOCS_BASE}/analytics#total-conversations`} /></>}
+          label={<>Total conversations <HelpTooltip text="Billable customer conversations in the selected period. Internal and admin conversations are excluded." docLink={`${DOCS_BASE}/analytics#total-conversations`} /></>}
           value={(s?.totalConversations ?? 0).toLocaleString()}
-          detail={s ? `Billable: ${(s.billableConversations ?? 0).toLocaleString()}` : undefined}
           loading={summaryLoading}
         />
         <StatCard
@@ -322,7 +324,7 @@ export function DashboardPage() {
       {/* Conversation volume chart */}
       <Paper p="lg" radius="md" withBorder>
         <Group justify="space-between" mb="md">
-          <Text fw={600}>Conversation volume <HelpTooltip text="Daily breakdown of total and billable conversations over the selected time period." docLink={`${DOCS_BASE}/analytics#conversation-volume-chart`} /></Text>
+          <Text fw={600}>Conversation volume <HelpTooltip text="Daily billable conversation volume over the selected time period." docLink={`${DOCS_BASE}/analytics#conversation-volume-chart`} /></Text>
           <Text size="xs" c="dimmed">
             {period === '7d'
               ? 'Last 7 days'
@@ -346,10 +348,6 @@ export function DashboardPage() {
                   <linearGradient id="gradTotal" x1="0" y1="0" x2="0" y2="1">
                     <stop offset="5%" stopColor={BRAND_RED} stopOpacity={0.15} />
                     <stop offset="95%" stopColor={BRAND_RED} stopOpacity={0} />
-                  </linearGradient>
-                  <linearGradient id="gradBillable" x1="0" y1="0" x2="0" y2="1">
-                    <stop offset="5%" stopColor={tokens.actionHover} stopOpacity={0.12} />
-                    <stop offset="95%" stopColor={tokens.actionHover} stopOpacity={0} />
                   </linearGradient>
                 </defs>
                 <CartesianGrid strokeDasharray="3 3" stroke={gridStroke} />
@@ -381,23 +379,14 @@ export function DashboardPage() {
                   stroke={BRAND_RED}
                   strokeWidth={2}
                   fill="url(#gradTotal)"
-                  name="Total"
-                />
-                <Area
-                  type="monotone"
-                  dataKey="billable"
-                  stroke={tokens.actionHover}
-                  strokeWidth={1.5}
-                  fill="url(#gradBillable)"
-                  name="Billable"
+                  name="Conversations"
                 />
               </AreaChart>
             </ResponsiveContainer>
             {/* Legend */}
             <Group gap="lg" mt="xs" justify="center">
               {[
-                { color: BRAND_RED, label: 'Total' },
-                { color: tokens.actionHover, label: 'Billable' },
+                { color: BRAND_RED, label: 'Conversations' },
               ].map((item) => (
                 <Group gap={6} key={item.label}>
                   <Box

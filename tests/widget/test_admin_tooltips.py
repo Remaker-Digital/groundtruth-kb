@@ -123,7 +123,7 @@ class TestDashboardTooltips:
         source = _read(self.DASHBOARD)
         assert "Total conversations" in source
         # Verify it has HelpTooltip nearby with meaningful text
-        assert "All conversations started in the selected period" in source
+        assert "Billable customer conversations in the selected period" in source
 
     def test_avg_response_time_tooltip(self) -> None:
         """Average response time stat card has a tooltip."""
@@ -153,7 +153,7 @@ class TestDashboardTooltips:
         """Conversation volume chart has a section tooltip."""
         source = _read(self.DASHBOARD)
         assert "Conversation volume" in source
-        assert "Daily breakdown" in source
+        assert "Daily billable conversation volume" in source
 
     def test_recent_conversations_tooltip(self) -> None:
         """Recent conversations section has a tooltip."""

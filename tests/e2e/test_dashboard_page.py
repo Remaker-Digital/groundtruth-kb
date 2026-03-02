@@ -115,11 +115,12 @@ class TestDashboardStatCards:
         value = admin_page.get_by_text("142")
         expect(value.first).to_be_visible()
 
-    def test_total_conversations_billable_detail(self, admin_page: Page):
-        """Billable detail line shows under total conversations."""
+    def test_total_conversations_shows_billable_only(self, admin_page: Page):
+        """Total conversations shows billable-only count (SPEC-1595)."""
         _wait_for_dashboard_data(admin_page)
-        detail = admin_page.get_by_text("Billable: 128")
-        expect(detail.first).to_be_visible()
+        # With billable-only filtering, total = billable (no sub-label)
+        value = admin_page.get_by_text("142")
+        expect(value.first).to_be_visible()
 
     def test_avg_response_time_label(self, admin_page: Page):
         """Avg response time stat card label is visible."""
@@ -318,18 +319,12 @@ class TestDashboardConversationChart:
         label = admin_page.get_by_text("Last 30 days")
         expect(label.first).to_be_visible()
 
-    def test_chart_legend_total(self, admin_page: Page):
-        """Chart legend includes 'Total' label."""
+    def test_chart_legend_conversations(self, admin_page: Page):
+        """Chart legend includes 'Conversations' label (SPEC-1594 — billable only)."""
         _wait_for_dashboard_data(admin_page)
         # Legend item labels are inside small Text elements
-        total_legend = admin_page.locator("text=Total").last
-        expect(total_legend).to_be_visible()
-
-    def test_chart_legend_billable(self, admin_page: Page):
-        """Chart legend includes 'Billable' label."""
-        _wait_for_dashboard_data(admin_page)
-        billable_legend = admin_page.locator("text=Billable").last
-        expect(billable_legend).to_be_visible()
+        conv_legend = admin_page.locator("text=Conversations").last
+        expect(conv_legend).to_be_visible()
 
     def test_chart_container_renders(self, admin_page: Page):
         """Recharts SVG container is rendered (not skeleton)."""

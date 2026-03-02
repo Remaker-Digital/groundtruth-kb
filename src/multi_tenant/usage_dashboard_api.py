@@ -334,14 +334,14 @@ async def get_daily_volume(
     # Aggregate by day
     day_totals: dict[str, dict[str, int]] = {}  # date -> {total, billable}
 
-    # First pass: count all conversations by day
-    # list_billable only returns billable ones, so we also query all
-    # conversations for total count
+    # SPEC-1594: Conversation volume chart must exclude non-billable.
+    # Query only billable conversations for accurate volume display.
     all_conversations = await repo.query(
         tenant_id=ctx.tenant_id,
         query_text=(
             "SELECT c.tenant_id, c.started_at, c.is_billable FROM c "
-            "WHERE c.started_at >= @since AND c.started_at < @until "
+            "WHERE c.is_billable = true "
+            "AND c.started_at >= @since AND c.started_at < @until "
             "ORDER BY c.started_at ASC"
         ),
         parameters=[
@@ -357,9 +357,9 @@ async def get_daily_volume(
         day = started[:10]  # YYYY-MM-DD
         if day not in day_totals:
             day_totals[day] = {"total": 0, "billable": 0}
+        # With billable-only query, total = billable
         day_totals[day]["total"] += 1
-        if conv.get("is_billable", False):
-            day_totals[day]["billable"] += 1
+        day_totals[day]["billable"] += 1
 
     # Build sorted response
     days = [

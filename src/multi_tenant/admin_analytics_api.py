@@ -250,12 +250,15 @@ async def get_analytics_summary(
     effective_since = since or _default_since()
     effective_until = until or _default_until()
 
+    # All dashboard metrics exclude non-billable conversations
+    # (SPEC-1593..1600 — owner requirement: dashboard = billable only).
     # Parallel queries: aggregate metrics + status breakdown + FCR
     metrics = await repo.aggregate_metrics(
         tenant_id=ctx.tenant_id,
         since=effective_since,
         until=effective_until,
         is_test_mode=is_test_mode,
+        billable_only=True,
     )
 
     status_counts = await repo.count_by_status(
@@ -263,6 +266,7 @@ async def get_analytics_summary(
         since=effective_since,
         until=effective_until,
         is_test_mode=is_test_mode,
+        billable_only=True,
     )
 
     fcr_data = await repo.count_fcr(
@@ -270,6 +274,7 @@ async def get_analytics_summary(
         since=effective_since,
         until=effective_until,
         is_test_mode=is_test_mode,
+        billable_only=True,
     )
 
     total = metrics.get("total", 0) or 0
@@ -278,7 +283,7 @@ async def get_analytics_summary(
     critic_passed = metrics.get("critic_passed", 0) or 0
     critic_failed = metrics.get("critic_failed", 0) or 0
 
-    # Compute rates (avoid division by zero)
+    # Compute rates against billable total (= total when billable_only=True)
     escalation_rate = (escalated / total) if total > 0 else 0.0
     critic_total = critic_passed + critic_failed
     critic_pass_rate = (critic_passed / critic_total) if critic_total > 0 else 0.0
@@ -364,11 +369,13 @@ async def get_intent_distribution(
     effective_since = since or _default_since()
     effective_until = until or _default_until()
 
+    # Top topics / topic breakdown: billable only (SPEC-1598, SPEC-1600)
     conversations = await repo.list_agents_invoked(
         tenant_id=ctx.tenant_id,
         since=effective_since,
         until=effective_until,
         is_test_mode=is_test_mode,
+        billable_only=True,
     )
 
     total = len(conversations)
@@ -444,12 +451,14 @@ async def get_knowledge_gaps(
     effective_since = since or _default_since()
     effective_until = until or _default_until()
 
+    # Knowledge gaps: billable only (SPEC-1597 — escalation rate)
     gap_conversations = await repo.list_gap_conversations(
         tenant_id=ctx.tenant_id,
         since=effective_since,
         until=effective_until,
         limit=limit,
         is_test_mode=is_test_mode,
+        billable_only=True,
     )
 
     escalated_count = sum(
