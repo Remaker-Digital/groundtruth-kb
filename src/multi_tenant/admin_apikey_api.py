@@ -642,10 +642,16 @@ async def reset_api_key_via_email(
     )
 
     # Build self-service re-reset URL for the security notification in the email.
-    # If the admin didn't request this, they can click through to request a new key.
+    # SPEC-1617: include ?tenant= slug so the link is globally unique.
+    from src.multi_tenant.welcome_email import _build_admin_login_url, tenant_url_slug
+
+    shop_domain = tenant.get("shopify_shop_domain")
+    slug = tenant_url_slug(shop_domain, tenant_name, tenant_id)
     scheme = request.headers.get("x-forwarded-proto", request.url.scheme)
     host = request.headers.get("host", request.url.hostname or "localhost")
     admin_login_url = f"{scheme}://{host}/admin/standalone/"
+    if slug:
+        admin_login_url += f"?tenant={slug}"
 
     # Send the new key via email
     email_sent = await _send_api_key_email(email, raw_key, tenant_name, admin_login_url)

@@ -1,9 +1,14 @@
-"""Cleanup orphaned conversations — patch is_billable=false for conversations
-with 0 messages that are incorrectly marked as billable.
+"""WI-0930 — Staging data cleanup: patch orphaned conversations to non-billable.
 
-Targets staging environment only. Run after deploying SPEC-1606 (billable
-classification deferral) to correct historical data pollution from Locust
-load tests and verification scripts.
+One-time cleanup script to fix historical data pollution from Locust load tests
+and verification scripts. Uses DIRECT Cosmos DB access because the admin API
+(SPEC-1607) filters out zero-message conversations — making orphans invisible
+through the API layer.
+
+Targets:
+  1. is_billable=True AND message_count=0 (abandoned/rate-limited connections)
+  2. is_billable=True AND conversation_id starts with non-billable prefix
+  3. is_billable=True AND conversation_type='admin_assistance'
 
 Usage:
     python scripts/cleanup_orphaned_conversations.py --env staging --dry-run
@@ -15,143 +20,225 @@ Usage:
 from __future__ import annotations
 
 import argparse
-import asyncio
 import io
 import os
 import sys
+from pathlib import Path
 
 # Windows cp1252 safety
 sys.stdout = io.TextIOWrapper(sys.stdout.buffer, encoding="utf-8", errors="replace")
 
+PROJECT_ROOT = Path(__file__).resolve().parent.parent
+if str(PROJECT_ROOT) not in sys.path:
+    sys.path.insert(0, str(PROJECT_ROOT))
+
+from scripts._env import load_env_local
+load_env_local()
+
+from azure.cosmos import CosmosClient  # noqa: E402
+
+
 # ---------------------------------------------------------------------------
-# Environment configuration (same pattern as upgrade_verification.py)
+# Config
 # ---------------------------------------------------------------------------
 
-ENVIRONMENTS = {
-    "staging": {
-        "base_url": "https://agent-red-staging.orangeglacier-f566a4e7.eastus.azurecontainerapps.io",
-        "tenants": {
-            "staging-001": {
-                "api_key": "ar_user_stag_qejkqo2vSBoS-QceOJ8eg4wS0Gy82G5H",
-            },
-            "staging-002": {
-                "api_key": "ar_user_stag_nn3mMFfxve98raVOJI0zzFQ7qH_PSJn9",
-            },
-        },
-    },
-}
+STAGING_TENANTS = ["staging-001", "staging-002"]
+# Staging uses a separate Cosmos database (agentred-staging) from production
+# (agentred). This script only targets staging data — use the staging database.
+STAGING_DATABASE = "agentred-staging"
+CONTAINER_NAME = "conversations"
+
+# Non-billable conversation ID prefixes (per SPEC-1606)
+NON_BILLABLE_PREFIXES = ("test_", "admin_", "health_", "system_")
 
 
-async def cleanup_tenant(
-    base_url: str,
-    api_key: str,
-    tenant_name: str,
-    dry_run: bool = True,
-) -> dict[str, int]:
-    """Find and patch orphaned conversations for a single tenant.
+def get_cosmos_client() -> CosmosClient:
+    """Create Cosmos client from environment variables."""
+    endpoint = os.environ["COSMOS_DB_ENDPOINT"]
+    key = os.environ["COSMOS_DB_KEY"]
+    return CosmosClient(endpoint, credential=key)
 
-    Returns counts: {'found': N, 'patched': N, 'errors': N}
+
+def find_orphaned_conversations(container, tenant_id: str) -> list[dict]:
+    """Find conversations that are billable but shouldn't be.
+
+    Uses direct Cosmos query because the admin API (SPEC-1607) filters
+    out zero-message conversations, making them invisible through the
+    API layer. Direct access is required for data cleanup.
     """
-    import httpx
-
-    headers = {"X-API-Key": api_key, "Content-Type": "application/json"}
-    stats = {"found": 0, "patched": 0, "errors": 0}
-
-    async with httpx.AsyncClient(base_url=base_url, headers=headers, timeout=30) as client:
-        # Fetch all conversations (paginated)
-        offset = 0
-        limit = 50
-        orphaned = []
-
-        while True:
-            resp = await client.get(
-                "/api/admin/conversations",
-                params={"offset": offset, "limit": limit, "archived": "include"},
-            )
-            if resp.status_code != 200:
-                print(f"  [{tenant_name}] Error fetching conversations: {resp.status_code}")
-                stats["errors"] += 1
-                break
-
-            data = resp.json()
-            conversations = data.get("conversations", [])
-            if not conversations:
-                break
-
-            for conv in conversations:
-                if conv.get("messageCount", 0) == 0 and conv.get("isBillable", False):
-                    orphaned.append(conv["conversationId"])
-
-            total = data.get("totalCount", 0)
-            offset += limit
-            if offset >= total:
-                break
-
-        stats["found"] = len(orphaned)
-        print(f"  [{tenant_name}] Found {len(orphaned)} orphaned conversations (0 messages, billable)")
-
-        if dry_run:
-            for conv_id in orphaned[:5]:
-                print(f"    Would patch: {conv_id}")
-            if len(orphaned) > 5:
-                print(f"    ... and {len(orphaned) - 5} more")
-            return stats
-
-        # Patch each orphaned conversation
-        for conv_id in orphaned:
-            try:
-                # Use the resolve endpoint to end the conversation
-                # and let the finalization logic correct is_billable
-                resp = await client.post(
-                    f"/api/admin/conversations/{conv_id}/resolve",
-                )
-                if resp.status_code in (200, 204):
-                    stats["patched"] += 1
-                else:
-                    print(f"    Error resolving {conv_id}: {resp.status_code}")
-                    stats["errors"] += 1
-            except Exception as e:
-                print(f"    Exception patching {conv_id}: {e}")
-                stats["errors"] += 1
-
-            # Rate limiting: 10 rpm for starter tier
-            await asyncio.sleep(0.5)
-
-        print(f"  [{tenant_name}] Patched {stats['patched']}, errors {stats['errors']}")
-
-    return stats
+    query = """
+    SELECT c.id, c.conversation_id, c.tenant_id, c.is_billable,
+           c.message_count, c.status, c.conversation_type, c.started_at
+    FROM c
+    WHERE c.is_billable = true
+      AND c.tenant_id = @tenant_id
+      AND (
+          c.message_count = 0
+          OR STARTSWITH(c.conversation_id, 'test_')
+          OR STARTSWITH(c.conversation_id, 'admin_')
+          OR STARTSWITH(c.conversation_id, 'health_')
+          OR STARTSWITH(c.conversation_id, 'system_')
+          OR c.conversation_type = 'admin_assistance'
+      )
+    """
+    params = [{"name": "@tenant_id", "value": tenant_id}]
+    items = list(container.query_items(
+        query=query,
+        parameters=params,
+        partition_key=tenant_id,
+    ))
+    return items
 
 
-async def main() -> None:
-    parser = argparse.ArgumentParser(description="Cleanup orphaned conversations")
-    parser.add_argument("--env", choices=list(ENVIRONMENTS), required=True)
-    parser.add_argument("--dry-run", action="store_true", default=False)
+def count_all_conversations(container, tenant_id: str) -> dict[str, int]:
+    """Get conversation counts for reporting."""
+    query = """
+    SELECT
+        COUNT(1) AS total,
+        SUM(c.is_billable ? 1 : 0) AS billable,
+        SUM(c.message_count = 0 ? 1 : 0) AS zero_messages,
+        SUM(c.is_billable = true AND c.message_count = 0 ? 1 : 0) AS billable_zero_msg
+    FROM c
+    WHERE c.tenant_id = @tenant_id
+    """
+    params = [{"name": "@tenant_id", "value": tenant_id}]
+    results = list(container.query_items(
+        query=query,
+        parameters=params,
+        partition_key=tenant_id,
+    ))
+    if results:
+        return results[0]
+    return {"total": 0, "billable": 0, "zero_messages": 0, "billable_zero_msg": 0}
+
+
+def patch_to_non_billable(container, item: dict, dry_run: bool = True) -> bool:
+    """Patch a single conversation to is_billable=False."""
+    if dry_run:
+        return True
+
+    try:
+        container.patch_item(
+            item=item["id"],
+            partition_key=item["tenant_id"],
+            patch_operations=[
+                {"op": "set", "path": "/is_billable", "value": False},
+            ],
+        )
+        return True
+    except Exception as e:
+        print(f"  x Failed to patch {item['conversation_id']}: {e}")
+        return False
+
+
+def main():
+    parser = argparse.ArgumentParser(description="WI-0930: Cleanup orphaned conversations")
+    parser.add_argument("--env", choices=["staging"], required=True,
+                        help="Target environment (staging only)")
+    parser.add_argument("--tenant", help="Specific tenant ID (default: all staging tenants)")
+    parser.add_argument("--dry-run", action="store_true", default=False,
+                        help="Report only, do not patch")
     args = parser.parse_args()
 
-    env = ENVIRONMENTS[args.env]
-    base_url = env["base_url"]
-    mode = "DRY RUN" if args.dry_run else "LIVE"
+    tenants = [args.tenant] if args.tenant else STAGING_TENANTS
 
-    print(f"\n{'='*60}")
-    print(f"Orphaned Conversation Cleanup — {args.env} ({mode})")
+    print(f"\nWI-0930: Staging Data Cleanup")
+    print(f"{'='*60}")
+    print(f"  Environment: {args.env}")
+    print(f"  Tenants:     {', '.join(tenants)}")
+    print(f"  Mode:        {'DRY RUN' if args.dry_run else 'LIVE PATCH'}")
     print(f"{'='*60}\n")
 
-    total_stats = {"found": 0, "patched": 0, "errors": 0}
+    client = get_cosmos_client()
+    database = client.get_database_client(STAGING_DATABASE)
+    container = database.get_container_client(CONTAINER_NAME)
 
-    for tenant_name, tenant_cfg in env["tenants"].items():
-        stats = await cleanup_tenant(
-            base_url=base_url,
-            api_key=tenant_cfg["api_key"],
-            tenant_name=tenant_name,
-            dry_run=args.dry_run,
-        )
-        for k in total_stats:
-            total_stats[k] += stats[k]
+    total_found = 0
+    total_patched = 0
+    total_errors = 0
 
-    print(f"\n{'='*60}")
-    print(f"Total: {total_stats['found']} found, {total_stats['patched']} patched, {total_stats['errors']} errors")
-    print(f"{'='*60}\n")
+    for tenant_id in tenants:
+        print(f"--- {tenant_id} ---")
+
+        # Pre-cleanup counts
+        counts = count_all_conversations(container, tenant_id)
+        print(f"  Before cleanup:")
+        print(f"    Total conversations:     {counts.get('total', 0)}")
+        print(f"    Billable:                {counts.get('billable', 0)}")
+        print(f"    Zero-message:            {counts.get('zero_messages', 0)}")
+        print(f"    Billable + zero-message: {counts.get('billable_zero_msg', 0)}")
+        print()
+
+        # Find orphans
+        orphans = find_orphaned_conversations(container, tenant_id)
+        print(f"  Orphaned billable conversations: {len(orphans)}")
+
+        if not orphans:
+            print(f"  No cleanup needed.\n")
+            continue
+
+        # Categorize
+        zero_msg = [o for o in orphans if o.get("message_count", 0) == 0]
+        prefixed = [o for o in orphans
+                     if any(o.get("conversation_id", "").startswith(p) for p in NON_BILLABLE_PREFIXES)
+                     and o.get("message_count", 0) > 0]
+        admin_asst = [o for o in orphans
+                      if o.get("conversation_type") == "admin_assistance"
+                      and o.get("message_count", 0) > 0
+                      and not any(o.get("conversation_id", "").startswith(p) for p in NON_BILLABLE_PREFIXES)]
+
+        print(f"    Zero-message (abandoned):     {len(zero_msg)}")
+        print(f"    Non-billable prefix:          {len(prefixed)}")
+        print(f"    Admin assistance:             {len(admin_asst)}")
+        print()
+
+        # Patch each orphan
+        patched = 0
+        errors = 0
+        for o in orphans:
+            reason = "zero_msg" if o.get("message_count", 0) == 0 else (
+                "prefix" if any(o.get("conversation_id", "").startswith(p) for p in NON_BILLABLE_PREFIXES) else
+                "admin_assistance"
+            )
+            status = o.get("status", "?")
+            msg_count = o.get("message_count", 0)
+            conv_id = o.get("conversation_id", "?")[:50]
+
+            success = patch_to_non_billable(container, o, dry_run=args.dry_run)
+            if success:
+                patched += 1
+            else:
+                errors += 1
+
+            action = "would patch" if args.dry_run else ("patched" if success else "FAILED")
+            print(f"    {action}: {conv_id}  (reason={reason}, status={status}, msgs={msg_count})")
+
+        total_found += len(orphans)
+        total_patched += patched
+        total_errors += errors
+
+        # Post-cleanup counts (only if not dry run)
+        if not args.dry_run:
+            print()
+            counts_after = count_all_conversations(container, tenant_id)
+            print(f"  After cleanup:")
+            print(f"    Total conversations:     {counts_after.get('total', 0)}")
+            print(f"    Billable:                {counts_after.get('billable', 0)}")
+            print(f"    Zero-message:            {counts_after.get('zero_messages', 0)}")
+            print(f"    Billable + zero-message: {counts_after.get('billable_zero_msg', 0)}")
+
+        print()
+
+    print(f"{'='*60}")
+    print(f"Summary")
+    print(f"{'='*60}")
+    print(f"  Total found:   {total_found}")
+    print(f"  Total {'would patch' if args.dry_run else 'patched'}:  {total_patched}")
+    print(f"  Total errors:  {total_errors}")
+    if args.dry_run:
+        print(f"\n  Re-run without --dry-run to apply patches.")
+    print()
 
 
 if __name__ == "__main__":
-    asyncio.run(main())
+    main()

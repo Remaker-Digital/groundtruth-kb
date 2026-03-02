@@ -19,10 +19,18 @@ Usage:
 from __future__ import annotations
 
 import argparse
+import io
 import re
 import sys
 from pathlib import Path
 from typing import Any
+
+# Windows cp1252 stdout encoding fix — only when running as main script
+if __name__ == "__main__":
+    if sys.stdout and hasattr(sys.stdout, "buffer"):
+        sys.stdout = io.TextIOWrapper(sys.stdout.buffer, encoding="utf-8", errors="replace")
+    if sys.stderr and hasattr(sys.stderr, "buffer"):
+        sys.stderr = io.TextIOWrapper(sys.stderr.buffer, encoding="utf-8", errors="replace")
 
 # Project root: 3 levels up from tools/knowledge-db/assertions.py
 PROJECT_ROOT = Path(__file__).resolve().parent.parent.parent
@@ -46,9 +54,9 @@ def _read_file_safe(file_path: Path) -> str | None:
 
 _VALID_ASSERTION_TYPES = {"grep", "glob", "grep_absent"}
 _REQUIRED_FIELDS = {
-    "grep": ("type", "pattern", "file", "description"),
-    "glob": ("type", "pattern", "description"),
-    "grep_absent": ("type", "pattern", "file", "description"),
+    "grep": ("type", "pattern"),
+    "glob": ("type", "pattern"),
+    "grep_absent": ("type", "pattern"),
 }
 
 
@@ -59,15 +67,18 @@ def run_single_assertion(assertion: dict[str, Any]) -> dict[str, Any]:
       - type: "grep", "glob", or "grep_absent"
       - pattern: regex pattern (grep/grep_absent) or glob pattern (glob)
       - file: relative file path from project root (grep/grep_absent)
+        (also accepts file_pattern as alias for file)
       - min_count: minimum match count (grep only, default 1)
       - description: human-readable explanation
+      - contains: (glob only) optional string that must appear in matched files
 
     Returns:
       - type, description, passed (bool), detail (str)
     """
     a_type = assertion.get("type", "")
-    pattern = assertion.get("pattern", "")
-    description = assertion.get("description", "")
+    # Normalize field aliases: query → pattern, target/path/expected → file
+    pattern = assertion.get("pattern") or assertion.get("query", "")
+    description = assertion.get("description", "") or f"{a_type}: {pattern}"
 
     # Validate assertion definition
     if a_type not in _VALID_ASSERTION_TYPES:
@@ -75,12 +86,11 @@ def run_single_assertion(assertion: dict[str, Any]) -> dict[str, Any]:
             "type": a_type, "description": description, "passed": False,
             "detail": f"Invalid assertion type: {a_type!r}. Valid: {_VALID_ASSERTION_TYPES}",
         }
-    for field in _REQUIRED_FIELDS.get(a_type, ()):
-        if not assertion.get(field):
-            return {
-                "type": a_type, "description": description, "passed": False,
-                "detail": f"Missing required field '{field}' for assertion type '{a_type}'",
-            }
+    if not pattern:
+        return {
+            "type": a_type, "description": description, "passed": False,
+            "detail": f"Missing 'pattern' (or 'query') for assertion type '{a_type}'",
+        }
     result: dict[str, Any] = {
         "type": a_type,
         "description": description,
@@ -89,37 +99,86 @@ def run_single_assertion(assertion: dict[str, Any]) -> dict[str, Any]:
     }
 
     if a_type == "grep":
-        file_rel = assertion.get("file", "")
+        file_rel = (assertion.get("file") or assertion.get("file_pattern")
+                    or assertion.get("target") or assertion.get("path")
+                    or assertion.get("expected") or "")
         min_count = assertion.get("min_count", 1)
-        file_path = PROJECT_ROOT / file_rel
-        content = _read_file_safe(file_path)
-        if content is None:
-            result["detail"] = f"File not found: {file_rel}"
+        if not file_rel:
+            result["detail"] = "Missing 'file' (or 'file_pattern') field"
             return result
-        matches = re.findall(pattern, content)
-        count = len(matches)
-        result["passed"] = count >= min_count
-        result["detail"] = f"Found {count} match(es), need >= {min_count}"
+        # file_pattern may be a glob (e.g., "**/cosmos_schema.py") — resolve
+        if "*" in file_rel:
+            matched_files = list(PROJECT_ROOT.glob(file_rel))
+            if not matched_files:
+                result["detail"] = f"No files matching glob: {file_rel}"
+                return result
+            # Search in all matched files
+            total_count = 0
+            for mf in matched_files:
+                content = _read_file_safe(mf)
+                if content:
+                    total_count += len(re.findall(pattern, content))
+            result["passed"] = total_count >= min_count
+            result["detail"] = f"Found {total_count} match(es) across {len(matched_files)} file(s), need >= {min_count}"
+        else:
+            file_path = PROJECT_ROOT / file_rel
+            content = _read_file_safe(file_path)
+            if content is None:
+                result["detail"] = f"File not found: {file_rel}"
+                return result
+            matches = re.findall(pattern, content)
+            count = len(matches)
+            result["passed"] = count >= min_count
+            result["detail"] = f"Found {count} match(es), need >= {min_count}"
 
     elif a_type == "glob":
         matches = list(PROJECT_ROOT.glob(pattern))
-        count = len(matches)
-        result["passed"] = count >= 1
-        result["detail"] = f"Found {count} file(s) matching '{pattern}'"
+        contains = assertion.get("contains", "")
+        if contains:
+            # Filter to files that contain the required string
+            matches = [
+                m for m in matches
+                if m.is_file() and contains in (_read_file_safe(m) or "")
+            ]
+            count = len(matches)
+            result["passed"] = count >= 1
+            result["detail"] = f"Found {count} file(s) matching '{pattern}' containing '{contains}'"
+        else:
+            count = len(matches)
+            result["passed"] = count >= 1
+            result["detail"] = f"Found {count} file(s) matching '{pattern}'"
 
     elif a_type == "grep_absent":
-        file_rel = assertion.get("file", "")
-        file_path = PROJECT_ROOT / file_rel
-        content = _read_file_safe(file_path)
-        if content is None:
-            # File not existing means the pattern is absent — pass
-            result["passed"] = True
-            result["detail"] = f"File not found (pattern trivially absent): {file_rel}"
+        file_rel = (assertion.get("file") or assertion.get("file_pattern")
+                    or assertion.get("target") or assertion.get("path")
+                    or assertion.get("expected") or "")
+        if not file_rel:
+            result["detail"] = "Missing 'file' (or 'file_pattern') field"
             return result
-        matches = re.findall(pattern, content)
-        count = len(matches)
-        result["passed"] = count == 0
-        result["detail"] = f"Found {count} match(es), need 0"
+        if "*" in file_rel:
+            matched_files = list(PROJECT_ROOT.glob(file_rel))
+            if not matched_files:
+                result["passed"] = True
+                result["detail"] = f"No files matching glob (pattern trivially absent): {file_rel}"
+                return result
+            total_count = 0
+            for mf in matched_files:
+                content = _read_file_safe(mf)
+                if content:
+                    total_count += len(re.findall(pattern, content))
+            result["passed"] = total_count == 0
+            result["detail"] = f"Found {total_count} match(es) across {len(matched_files)} file(s), need 0"
+        else:
+            file_path = PROJECT_ROOT / file_rel
+            content = _read_file_safe(file_path)
+            if content is None:
+                result["passed"] = True
+                result["detail"] = f"File not found (pattern trivially absent): {file_rel}"
+                return result
+            matches = re.findall(pattern, content)
+            count = len(matches)
+            result["passed"] = count == 0
+            result["detail"] = f"Found {count} match(es), need 0"
 
     else:
         result["detail"] = f"Unknown assertion type: {a_type}"

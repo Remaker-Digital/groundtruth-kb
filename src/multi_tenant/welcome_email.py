@@ -95,22 +95,59 @@ _WELCOME_EMAIL_BODY = """
 # ---------------------------------------------------------------------------
 
 
-def _build_admin_login_url(explicit_url: str | None = None) -> str:
+def tenant_url_slug(
+    shop_domain: str | None = None,
+    brand_name: str | None = None,
+    tenant_id: str | None = None,
+) -> str:
+    """Derive a URL-safe tenant slug for the ``?tenant=`` query parameter.
+
+    Priority: shop domain (stripped of .myshopify.com) > slugified brand
+    name > raw tenant_id.  Returns empty string if no identifier available.
+
+    SPEC-1617: Globally unique tenant admin URLs.
+    """
+    import re as _re
+
+    if shop_domain:
+        slug = shop_domain.replace(".myshopify.com", "").strip()
+        if slug:
+            return slug
+    if brand_name:
+        slug = _re.sub(r"[^a-z0-9]+", "-", brand_name.lower()).strip("-")
+        if slug:
+            return slug
+    return tenant_id or ""
+
+
+def _build_admin_login_url(
+    explicit_url: str | None = None,
+    *,
+    tenant_slug: str | None = None,
+) -> str:
     """Build the admin console login URL.
 
     Priority: explicit_url > STANDALONE_ADMIN_URL env > PROD_URL env > fallback.
+    If *tenant_slug* is provided, appends ``?tenant=<slug>`` (SPEC-1617).
     """
     if explicit_url:
-        return explicit_url
-    standalone = os.environ.get("STANDALONE_ADMIN_URL", "")
-    if standalone:
-        return standalone
-    prod = os.environ.get("PROD_URL", "")
-    if prod:
-        return f"{prod.rstrip('/')}/admin/standalone/"
-    # Fallback: production API gateway admin console.
-    # The FQDN is stable (Azure Container Apps environment-scoped).
-    return "https://agent-red-api-gateway.orangeglacier-f566a4e7.eastus.azurecontainerapps.io/admin/standalone/"
+        base = explicit_url
+    else:
+        standalone = os.environ.get("STANDALONE_ADMIN_URL", "")
+        if standalone:
+            base = standalone
+        else:
+            prod = os.environ.get("PROD_URL", "")
+            if prod:
+                base = f"{prod.rstrip('/')}/admin/standalone/"
+            else:
+                # Fallback: production API gateway admin console.
+                # The FQDN is stable (Azure Container Apps environment-scoped).
+                base = "https://agent-red-api-gateway.orangeglacier-f566a4e7.eastus.azurecontainerapps.io/admin/standalone/"
+    if tenant_slug:
+        sep = "&" if "?" in base else "?"
+        return f"{base}{sep}tenant={tenant_slug}"
+    return base
 
 
 async def send_welcome_email(
@@ -120,6 +157,9 @@ async def send_welcome_email(
     widget_key: str | None = None,
     tier: str | None = None,
     admin_login_url: str | None = None,
+    *,
+    shop_domain: str | None = None,
+    brand_name: str | None = None,
 ) -> bool:
     """Send a welcome email to the newly provisioned merchant.
 
@@ -145,7 +185,8 @@ async def send_welcome_email(
 
     from src.multi_tenant.alert_delivery import _EMAIL_WRAPPER
 
-    resolved_url = _build_admin_login_url(admin_login_url)
+    slug = tenant_url_slug(shop_domain, brand_name, tenant_id)
+    resolved_url = _build_admin_login_url(admin_login_url, tenant_slug=slug)
 
     html_body = _WELCOME_EMAIL_BODY.format(
         superadmin_key=superadmin_key or "(not generated)",

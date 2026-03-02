@@ -113,8 +113,11 @@ class AgentDispatchMixin:
                 except Exception as exc:
                     logger.warning("Transport IC call failed, falling back: %s", exc)
             if USE_AGENT_CONTAINERS:
-                span.set_attribute("dispatch.mode", "http")
-                return await self._call_intent_classifier_http(message, system_prompt)
+                try:
+                    span.set_attribute("dispatch.mode", "http")
+                    return await self._call_intent_classifier_http(message, system_prompt)
+                except Exception as exc:
+                    logger.warning("HTTP IC call failed, falling back to in-process: %s", exc)
             span.set_attribute("dispatch.mode", "in-process")
             result = await self._call_intent_classifier_direct(message, system_prompt)
             # Record token usage if available (SPEC-1540)
@@ -198,8 +201,11 @@ class AgentDispatchMixin:
                 except Exception as exc:
                     logger.warning("Transport KR call failed, falling back: %s", exc)
             if USE_AGENT_CONTAINERS:
-                span.set_attribute("dispatch.mode", "http")
-                return await self._call_knowledge_retrieval_http(message, intent, system_prompt)
+                try:
+                    span.set_attribute("dispatch.mode", "http")
+                    return await self._call_knowledge_retrieval_http(message, intent, system_prompt)
+                except Exception as exc:
+                    logger.warning("HTTP KR call failed, falling back to in-process: %s", exc)
             span.set_attribute("dispatch.mode", "in-process")
             return await self._call_knowledge_retrieval_direct(message, intent, system_prompt)
         except Exception:
@@ -324,19 +330,23 @@ class AgentDispatchMixin:
 
         # Priority 2: HTTP container
         if USE_AGENT_CONTAINERS:
-            async for chunk in self._call_response_generator_stream_http(
-                customer_message, intent, knowledge_context,
-                system_prompt, budget, model,
-            ):
-                yield chunk
-        else:
-            # Priority 3: In-process agent (fallback)
-            async for chunk in self._call_response_generator_stream_direct(
-                customer_message, intent, knowledge_context,
-                system_prompt, budget, model,
-                conversation_history=conversation_history,
-            ):
-                yield chunk
+            try:
+                async for chunk in self._call_response_generator_stream_http(
+                    customer_message, intent, knowledge_context,
+                    system_prompt, budget, model,
+                ):
+                    yield chunk
+                return
+            except Exception as exc:
+                logger.warning("HTTP RG stream failed, falling back to in-process: %s", exc)
+
+        # Priority 3: In-process agent (fallback)
+        async for chunk in self._call_response_generator_stream_direct(
+            customer_message, intent, knowledge_context,
+            system_prompt, budget, model,
+            conversation_history=conversation_history,
+        ):
+            yield chunk
 
     async def _call_response_generator_stream_transport(
         self,

@@ -96,10 +96,11 @@ def configure_chat_pipeline(
 
     Called during app startup (main.py) after all services are initialized.
 
-    When openai_client is not provided and USE_AGENT_CONTAINERS is False,
-    a default AsyncAzureOpenAI client is created from environment variables.
+    When openai_client is not provided, a default AsyncAzureOpenAI client
+    is created from environment variables. The client is needed for both
+    direct mode and as a fallback when HTTP container calls fail.
     """
-    if openai_client is None and not USE_AGENT_CONTAINERS:
+    if openai_client is None:
         openai_client = _create_openai_client()
 
     global _pipeline

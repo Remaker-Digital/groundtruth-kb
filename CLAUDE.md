@@ -109,6 +109,9 @@ Specifications should be **as stable as the business need.** Specs function as a
 11. **Design decision checkpoint discipline.** At each WI/phase completion boundary, Claude must review implementation decisions for spec coverage before proceeding. Batched checkpoint, not real-time pause (GOV-11).
 12. **Work item creation triggers test creation.** Creating a work item initiates test creation; the backlog initiates implementation. Tests may be logical assertions, user story descriptions, or abstract descriptions (GOV-12).
 13. **Test plan phase assignment upon creation.** Every Test artifact must be assigned to at least one test plan phase (PLAN-001) at creation time. The Master Test Plan must cover every Test artifact — no orphan tests. This closes the hierarchy: specs produce tests (GOV-12), tests must be in procedures (GOV-13), all procedures compose the Master Test Plan (GOV-13).
+14. **UI element test maintenance.** When a UI element is added to or removed from any admin UI, the tests validating that element must be added or retired accordingly. Applies to all dynamic data bindings and all static data (labels, tooltips, placeholders, headings, button text). Display-value test suites must stay synchronized with the rendered UI (GOV-14).
+15. **Test fix approval gate.** Claude MUST NOT initiate implementation of fixes for failed tests without explicit owner approval immediately prior to initiation. Report failures with diagnostics, propose a fix, and wait for approval (GOV-15).
+16. **Deployment approval gate.** Claude MUST NOT initiate a deployment (ACR build, container app update, or equivalent) without explicit owner approval immediately prior to initiation. Present the deployment plan (version, environment, changes) and wait for approval (GOV-16).
 
 ### Owner Input Classification Rule (GOV-09)
 

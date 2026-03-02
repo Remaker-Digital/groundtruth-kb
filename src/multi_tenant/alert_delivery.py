@@ -1247,24 +1247,12 @@ async def send_team_invite_alert(
     if service is None:
         return None
 
-    # Resolve admin console URL using the same cascading fallback as
-    # welcome_email._build_admin_login_url():
-    #   APP_BASE_URL env → STANDALONE_ADMIN_URL env → PROD_URL env → FQDN fallback
-    admin_url = ""
-    base_url = os.environ.get("APP_BASE_URL", "").rstrip("/")
-    if base_url:
-        admin_url = f"{base_url}/admin/standalone/"
-    else:
-        standalone = os.environ.get("STANDALONE_ADMIN_URL", "")
-        if standalone:
-            admin_url = standalone
-        else:
-            prod = os.environ.get("PROD_URL", "")
-            if prod:
-                admin_url = f"{prod.rstrip('/')}/admin/standalone/"
-            else:
-                # Stable FQDN — Azure Container Apps environment-scoped.
-                admin_url = "https://agent-red-api-gateway.orangeglacier-f566a4e7.eastus.azurecontainerapps.io/admin/standalone/"
+    # Resolve admin console URL using the canonical builder from welcome_email.
+    # SPEC-1617: include ?tenant= slug so the link is globally unique.
+    from src.multi_tenant.welcome_email import _build_admin_login_url, tenant_url_slug
+
+    slug = tenant_url_slug(tenant_id=tenant_id)
+    admin_url = _build_admin_login_url(tenant_slug=slug)
 
     message_parts = [
         f"{inviter_name} has invited you to join their Agent Red team "

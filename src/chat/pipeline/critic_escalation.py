@@ -79,7 +79,9 @@ class CriticEscalationMixin:
             )
 
         # Option 2: Direct Azure OpenAI validation (WI #207)
-        if self._openai_client and not USE_AGENT_CONTAINERS:
+        # Always fall through to direct validation when CriticPolicy (Option 1)
+        # is unavailable, regardless of USE_AGENT_CONTAINERS setting.
+        if self._openai_client:
             return await self._validate_with_critic_direct(
                 tenant_id, conversation_id, response_text,
                 customer_message, budget,
@@ -314,7 +316,10 @@ class CriticEscalationMixin:
             except Exception as exc:
                 logger.warning("Transport ESC call failed, falling back: %s", exc)
         if USE_AGENT_CONTAINERS:
-            return await self._call_escalation_handler_http(message, system_prompt)
+            try:
+                return await self._call_escalation_handler_http(message, system_prompt)
+            except Exception as exc:
+                logger.warning("HTTP ESC call failed, falling back to in-process: %s", exc)
         return await self._call_escalation_handler_direct(message, system_prompt)
 
     async def _call_escalation_handler_direct(

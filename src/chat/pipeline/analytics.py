@@ -82,16 +82,20 @@ class AnalyticsMixin:
 
             # Priority 2: HTTP container
             if USE_AGENT_CONTAINERS:
-                url = self._agent_urls.get("analytics-collector", "")
-                client = await self._get_http_client()
-                await client.post(
-                    f"{url.rstrip('/')}{AGENT_ANALYTICS_PATH}",
-                    json=analytics_data,
-                    timeout=httpx.Timeout(connect=1.0, read=2.0, write=1.0, pool=1.0),
-                )
-            else:
-                # Priority 3: In-process agent (fallback)
-                await self._an_agent.process(analytics_data, {})
+                try:
+                    url = self._agent_urls.get("analytics-collector", "")
+                    client = await self._get_http_client()
+                    await client.post(
+                        f"{url.rstrip('/')}{AGENT_ANALYTICS_PATH}",
+                        json=analytics_data,
+                        timeout=httpx.Timeout(connect=1.0, read=2.0, write=1.0, pool=1.0),
+                    )
+                    return
+                except Exception:
+                    logger.debug("HTTP analytics dispatch failed — falling back to in-process")
+
+            # Priority 3: In-process agent (fallback)
+            await self._an_agent.process(analytics_data, {})
         except Exception:
             # Analytics is fire-and-forget — never block the pipeline
             logger.debug(

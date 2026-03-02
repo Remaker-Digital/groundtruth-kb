@@ -36,6 +36,7 @@ if sys.platform == "win32":
 # Project root and imports from sibling scripts
 # ---------------------------------------------------------------------------
 PROJECT_ROOT = Path(__file__).resolve().parent.parent
+sys.path.insert(0, str(PROJECT_ROOT))
 sys.path.insert(0, str(PROJECT_ROOT / "scripts"))
 
 from upgrade_verification import api_call, widget_call, ENVIRONMENTS  # noqa: E402
@@ -98,11 +99,14 @@ def phase_a(new_version: str) -> list[AssertionResult]:
 
     # A.1 — Version bump confirmed
     try:
-        r = subprocess.run(
+        from scripts._subprocess_stream import stream_subprocess as _stream
+        r_s = _stream(
             [sys.executable, "-c",
              "from src.multi_tenant.api_versioning import PRODUCT_VERSION; print(PRODUCT_VERSION)"],
-            capture_output=True, text=True, cwd=str(PROJECT_ROOT), timeout=15,
+            cwd=PROJECT_ROOT, timeout=15, prefix="  [A.1] ",
         )
+        r = subprocess.CompletedProcess(args="", returncode=r_s.returncode,
+                                        stdout=r_s.stdout, stderr="")
         actual = r.stdout.strip()
         if actual == new_version:
             results.append(_pass("A.1", "Version bump confirmed", f"PRODUCT_VERSION={actual}"))
@@ -139,10 +143,12 @@ def phase_a(new_version: str) -> list[AssertionResult]:
 
     # A.3 — No uncommitted changes
     try:
-        r = subprocess.run(
+        r_s = _stream(
             ["git", "diff", "--stat", "src/", "admin/", "widget/"],
-            capture_output=True, text=True, cwd=str(PROJECT_ROOT), timeout=15,
+            cwd=PROJECT_ROOT, timeout=15, prefix="  [A.3] ",
         )
+        r = subprocess.CompletedProcess(args="", returncode=r_s.returncode,
+                                        stdout=r_s.stdout, stderr="")
         if r.stdout.strip() == "":
             results.append(_pass("A.3", "No uncommitted changes", "Clean working tree"))
         else:
@@ -262,13 +268,16 @@ def phase_c(fqdn: str, api_key: str, widget_key: str, new_version: str) -> list[
 
     if snapshot_path.exists():
         try:
-            r = subprocess.run(
+            from scripts._subprocess_stream import stream_subprocess as _stream
+            r_s = _stream(
                 [sys.executable, str(PROJECT_ROOT / "scripts" / "upgrade_verification.py"),
                  "phase-c", "--env", env_name,
                  "--snapshot", str(snapshot_path),
                  "--new-version", new_version],
-                capture_output=True, text=True, cwd=str(PROJECT_ROOT), timeout=600,
+                cwd=PROJECT_ROOT, timeout=600, prefix="  [C.10] ",
             )
+            r = subprocess.CompletedProcess(args="", returncode=r_s.returncode,
+                                            stdout=r_s.stdout, stderr="")
             # Parse actual PASS/FAIL counts from output (e.g., "35 PASS, 0 FAIL")
             import re as _re
             m = _re.search(r"(\d+)\s+PASS,\s+(\d+)\s+FAIL", r.stdout)
@@ -330,13 +339,15 @@ def _run_regression_tier(fqdn: str, api_key: str, widget_key: str,
     # Ensure Python can find project modules
     env["PYTHONPATH"] = str(PROJECT_ROOT) + os.pathsep + env.get("PYTHONPATH", "")
     try:
-        r = subprocess.run(
+        from scripts._subprocess_stream import stream_subprocess as _stream
+        r_s = _stream(
             [sys.executable, "-m", "pytest",
              "tests/regression/test_upgrade_regression.py",
              "-x", "-q", "-m", tier, "--tb=short", "--no-header"],
-            capture_output=True, text=True, cwd=str(PROJECT_ROOT),
-            env=env, timeout=120,
+            cwd=PROJECT_ROOT, env=env, timeout=120, prefix=f"  [{aid}] ",
         )
+        r = subprocess.CompletedProcess(args="", returncode=r_s.returncode,
+                                        stdout=r_s.stdout, stderr="")
         # Parse pytest output using regex (handles "18 passed," with trailing comma)
         output = r.stdout + "\n" + r.stderr
         passed = 0
@@ -824,6 +835,28 @@ def main():
     print(f"  {icon} VERDICT: {verdict}")
     print(f"  Results: {report_path}")
     print(f"{'#' * 60}\n")
+
+    # DEFECT auto-creation (SPEC-1617): one per failed phase
+    if "VERIFIED" not in verdict:
+        from scripts._defect_reporter import create_defect
+        for phase_name, phase_results in all_results.items():
+            fails = [r for r in phase_results if r.status == "FAIL"]
+            if fails:
+                detail = "; ".join(f"{r.id}: {r.detail[:80]}" for r in fails[:5])
+                wi = create_defect(
+                    title=f"Pre-flight Phase {phase_name} failure: {args.env} {args.new_version}",
+                    description=(
+                        f"Pre-flight checklist Phase {phase_name} failed.\n\n"
+                        f"Environment: {args.env}\n"
+                        f"Version: {args.new_version}\n"
+                        f"Failures: {detail}"
+                    ),
+                    source_spec_id="SPEC-1617",
+                    component="infrastructure_automation",
+                    changed_by="pre-flight-checklist",
+                )
+                if wi:
+                    print(f"  Created DEFECT: {wi} (Phase {phase_name})")
 
     # Exit code: 0 for verified, 1 for failures
     sys.exit(0 if "VERIFIED" in verdict else 1)

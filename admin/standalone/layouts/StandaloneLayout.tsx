@@ -282,6 +282,22 @@ export const StandaloneLayout: React.FC<StandaloneLayoutProps> = ({
             shopDomain: data.shopify_shop_domain || undefined,
             brandName: data.brand_name || undefined,
           });
+
+          // SPEC-1617: Inject globally unique tenant identifier into URL.
+          // Prefer shop domain (already unique, e.g. "blanco-9939"); fall
+          // back to brand name slugified; last resort use tenant_id.
+          const slug =
+            (data.shopify_shop_domain || '').replace(/\.myshopify\.com$/i, '') ||
+            (data.brand_name || '').toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '') ||
+            data.tenant_id || '';
+          if (slug) {
+            const url = new URL(window.location.href);
+            if (url.searchParams.get('tenant') !== slug) {
+              url.searchParams.set('tenant', slug);
+              window.history.replaceState(null, '', url.toString());
+            }
+          }
+
           setLoading(false);
         }
       } catch (err) {

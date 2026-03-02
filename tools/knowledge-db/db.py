@@ -1967,6 +1967,12 @@ def _row_to_dict(row: sqlite3.Row) -> dict[str, Any]:
         if key in d and d[key] and isinstance(d[key], str):
             try:
                 parsed = json.loads(d[key])
+                # Defensive: handle double-encoded JSON (string instead of list/dict)
+                if isinstance(parsed, str):
+                    try:
+                        parsed = json.loads(parsed)
+                    except (json.JSONDecodeError, TypeError):
+                        pass
                 d[f"{key}_parsed"] = parsed
                 d[f"_{key}_parsed"] = parsed  # backward compat
             except (json.JSONDecodeError, TypeError):

@@ -114,9 +114,13 @@ async def send_trial_expiry_warning(
         return False
 
     from src.multi_tenant.alert_delivery import _EMAIL_WRAPPER
-    from src.multi_tenant.welcome_email import _build_admin_login_url
+    from src.multi_tenant.welcome_email import (
+        _build_admin_login_url,
+        tenant_url_slug,
+    )
 
     days_label = {"7d": "7 days", "3d": "3 days", "1d": "1 day"}[warning_tier]
+    slug = tenant_url_slug(tenant_id=tenant_id)
 
     html_body = _EXPIRY_WARNING_BODY.format(
         urgency_intro=config["urgency_intro"],
@@ -126,7 +130,7 @@ async def send_trial_expiry_warning(
         badge_border=config["badge_border"],
         badge_color=config["badge_color"],
         tenant_id=tenant_id,
-        admin_login_url=_build_admin_login_url(),
+        admin_login_url=_build_admin_login_url(tenant_slug=slug),
     )
     full_html = _EMAIL_WRAPPER.format(body=html_body)
     subject = config["subject"]

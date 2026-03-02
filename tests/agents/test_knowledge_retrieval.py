@@ -27,6 +27,10 @@ from src.agents.knowledge_retrieval import (
     _STOP,
 )
 
+# Module-level imports trigger sentence_transformers lazy init; mocks on
+# global state are not safe under xdist parallel workers (S132 fix).
+pytestmark = pytest.mark.xdist_group("knowledge_retrieval")
+
 
 # ---------------------------------------------------------------------------
 # Fixtures
