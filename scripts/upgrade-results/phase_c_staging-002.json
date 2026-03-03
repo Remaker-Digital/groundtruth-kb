@@ -81,7 +81,7 @@
     "id": "C.14",
     "description": "Superadmin API functional",
     "status": "PASS",
-    "detail": "HTTP 200, total=2"
+    "detail": "HTTP 200, total=3"
   },
   {
     "id": "C.15",
