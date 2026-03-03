@@ -1,14 +1,20 @@
 #!/usr/bin/env python3
-"""Automated Build/Deploy Pipeline — SPEC-1615.
+"""Automated Build/Deploy Pipeline — SPEC-1615 (Two-Track).
 
 Single-invocation pipeline that builds, deploys, and verifies a release
 without any human or Claude interaction during execution.
 
+Two tracks:
+  Staging (comprehensive):  15 phases — build, deploy, version verify,
+    upgrade verification, config pipeline, seed test tenant, verify
+    Initialized state.
+  Production (safe):  12 phases — build, deploy, version verify,
+    upgrade verification + lightweight smoke. No tenant mutations.
+
 Usage:
-    python scripts/deploy_pipeline.py --env staging --version v1.65.0
+    python scripts/deploy_pipeline.py --env staging --version v1.66.0
     python scripts/deploy_pipeline.py --env production --version v1.66.0
-    python scripts/deploy_pipeline.py --env staging --version v1.65.0 --dry-run
-    python scripts/deploy_pipeline.py --env staging --version v1.65.0 --skip-verification
+    python scripts/deploy_pipeline.py --env staging --version v1.66.0 --dry-run
 
 Exit codes:
     0 = SUCCESS (all phases passed)
@@ -556,45 +562,51 @@ def phase_8_deploy(args: argparse.Namespace) -> PhaseResult:
     return PhaseResult(9, "Deploy to Target", "PASS", dt)
 
 
-def phase_9_wait_for_startup(args: argparse.Namespace) -> PhaseResult:
-    """Wait for the new revision to become healthy."""
+def phase_10_startup_and_version(args: argparse.Namespace) -> PhaseResult:
+    """Wait for healthy startup AND verify product_version matches deployed version."""
     t0 = time.time()
     env_config = ENVIRONMENTS[args.env]
     fqdn = env_config["fqdn"]
+    expected_version = args.version.lstrip("v")
 
     if args.dry_run:
-        log("INFO", f"  [DRY RUN] Would wait for https://{fqdn}/health")
-        return PhaseResult(10, "Wait for Startup", "PASS", time.time() - t0, "dry-run")
+        log("INFO", f"  [DRY RUN] Would wait for https://{fqdn}/health (version={expected_version})")
+        return PhaseResult(10, "Startup + Version Verify", "PASS", time.time() - t0, "dry-run")
 
-    log("INFO", f"  Waiting up to {HEALTH_WAIT_SECONDS}s for https://{fqdn}/health...")
+    log("INFO", f"  Waiting up to {HEALTH_WAIT_SECONDS}s for /health (version={expected_version})...")
     elapsed = 0
-    healthy = False
+    last_status = 0
+    last_version = "?"
 
     while elapsed < HEALTH_WAIT_SECONDS:
         time.sleep(HEALTH_POLL_INTERVAL)
         elapsed += HEALTH_POLL_INTERVAL
-
         status, body, _ = api_call(fqdn, "/health", timeout=10)
-        if status == 200:
-            version_str = body.get("product_version", "?") if isinstance(body, dict) else "?"
-            log("PASS", f"  /health 200 after {elapsed}s (product_version={version_str})")
-            healthy = True
-            break
+        last_status = status
+        if status == 200 and isinstance(body, dict):
+            actual_version = body.get("product_version", "?")
+            last_version = actual_version
+            if actual_version == expected_version:
+                log("PASS", f"  /health 200, product_version={actual_version} (matched after {elapsed}s)")
+                return PhaseResult(10, "Startup + Version Verify", "PASS", time.time() - t0)
+            else:
+                log("INFO", f"  Waiting... [{elapsed}s] (200 but version={actual_version}, want {expected_version})")
         else:
             log("INFO", f"  Waiting... [{elapsed}s / {HEALTH_WAIT_SECONDS}s] (status={status})")
 
-    dt = time.time() - t0
-    if not healthy:
-        # One last try
-        status, body, _ = api_call(fqdn, "/health", timeout=10)
-        if status == 200:
-            log("PASS", f"  /health 200 on final check")
-            return PhaseResult(10, "Wait for Startup", "PASS", dt)
-        detail = f"Not healthy after {HEALTH_WAIT_SECONDS}s (last status={status})"
-        log("FAIL", f"  {detail}")
-        return PhaseResult(10, "Wait for Startup", "FAIL", dt, detail)
+    # Final attempt
+    status, body, _ = api_call(fqdn, "/health", timeout=10)
+    if status == 200 and isinstance(body, dict):
+        actual_version = body.get("product_version", "?")
+        if actual_version == expected_version:
+            return PhaseResult(10, "Startup + Version Verify", "PASS", time.time() - t0)
+        detail = (f"Health 200 but product_version={actual_version}, expected={expected_version} "
+                  f"-- old revision still active")
+    else:
+        detail = f"Not healthy after {HEALTH_WAIT_SECONDS}s (last status={last_status})"
 
-    return PhaseResult(10, "Wait for Startup", "PASS", dt)
+    log("FAIL", f"  {detail}")
+    return PhaseResult(10, "Startup + Version Verify", "FAIL", time.time() - t0, detail)
 
 
 def phase_10a_pre_deploy_snapshot(args: argparse.Namespace) -> PhaseResult:
@@ -606,9 +618,6 @@ def phase_10a_pre_deploy_snapshot(args: argparse.Namespace) -> PhaseResult:
     if args.dry_run:
         log("INFO", "  [DRY RUN] Would capture pre-deploy snapshots")
         return PhaseResult(8, "Pre-Deploy Snapshot", "PASS", time.time() - t0, "dry-run")
-    if args.skip_verification:
-        log("INFO", "  Skipping pre-deploy snapshot (--skip-verification)")
-        return PhaseResult(8, "Pre-Deploy Snapshot", "SKIP", time.time() - t0)
 
     script = PROJECT_ROOT / "scripts" / "upgrade_verification.py"
     env = args.env
@@ -659,9 +668,6 @@ def phase_13_upgrade_verification(args: argparse.Namespace) -> PhaseResult:
     if args.dry_run:
         log("INFO", "  [DRY RUN] Would run upgrade verification")
         return PhaseResult(11, "Upgrade Verification", "PASS", time.time() - t0, "dry-run")
-    if args.skip_verification:
-        log("INFO", "  Skipping upgrade verification (--skip-verification)")
-        return PhaseResult(11, "Upgrade Verification", "SKIP", time.time() - t0)
 
     script = PROJECT_ROOT / "scripts" / "upgrade_verification.py"
     env = args.env
@@ -720,9 +726,6 @@ def phase_14_config_pipeline(args: argparse.Namespace) -> PhaseResult:
     if args.dry_run:
         log("INFO", "  [DRY RUN] Would run config pipeline tests")
         return PhaseResult(12, "Config Pipeline", "PASS", time.time() - t0, "dry-run")
-    if args.skip_verification:
-        log("INFO", "  Skipping config pipeline (--skip-verification)")
-        return PhaseResult(12, "Config Pipeline", "SKIP", time.time() - t0)
 
     test_file = PROJECT_ROOT / "tests" / "security" / "test_config_pipeline_live.py"
     if not test_file.exists():
@@ -760,6 +763,299 @@ def phase_14_config_pipeline(args: argparse.Namespace) -> PhaseResult:
 
     log("PASS", f"  Config pipeline: {p} passed")
     return PhaseResult(12, "Config Pipeline", "PASS", dt, extra=extra)
+
+
+# ---------------------------------------------------------------------------
+# Helpers for two-track pipeline
+# ---------------------------------------------------------------------------
+_seed_credentials: dict[str, str] = {}
+
+
+def _parse_seed_credentials(output: str) -> None:
+    """Extract credentials from seed_tenant.py stdout."""
+    # Widget key: "  Widget Key:        pk_live_..."
+    m = re.search(r"Widget Key:\s+(pk_live_\S+)", output)
+    if m:
+        _seed_credentials["widget_key"] = m.group(1)
+    # User API key: appears after "User API Keys:" block
+    m = re.search(r"(ar_user_\S+)", output)
+    if m:
+        _seed_credentials["user_api_key"] = m.group(1)
+
+
+def _parse_upgrade_output(output: str) -> tuple[int, int]:
+    """Parse PASS/FAIL counts from upgrade_verification.py output.
+
+    Returns (total_pass, total_fail).
+    """
+    total_pass = 0
+    total_fail = 0
+    # Multi-tenant summary: "  staging-001              PASS  (35 pass, 0 fail)"
+    for m in re.finditer(r"\((\d+)\s+pass,\s*(\d+)\s+fail\)", output):
+        total_pass += int(m.group(1))
+        total_fail += int(m.group(2))
+    # Fallback: uppercase format from individual assertions
+    if total_pass == 0 and total_fail == 0:
+        pass_matches = re.findall(r"(\d+)\s+PASS", output)
+        fail_matches = re.findall(r"(\d+)\s+FAIL", output)
+        if pass_matches:
+            total_pass = sum(int(x) for x in pass_matches)
+        if fail_matches:
+            total_fail = sum(int(x) for x in fail_matches)
+    return total_pass, total_fail
+
+
+# ---------------------------------------------------------------------------
+# Staging-only phases
+# ---------------------------------------------------------------------------
+def phase_13_seed_test_tenant(args: argparse.Namespace) -> PhaseResult:
+    """Reset/create remaker-digital-001 on staging via seed_tenant.py."""
+    t0 = time.time()
+    if args.env != "staging":
+        return PhaseResult(13, "Seed Test Tenant", "SKIP", time.time() - t0, "staging-only")
+    if args.dry_run:
+        log("INFO", "  [DRY RUN] Would run seed_tenant.py --execute against staging")
+        return PhaseResult(13, "Seed Test Tenant", "PASS", time.time() - t0, "dry-run")
+
+    env_config = ENVIRONMENTS["staging"]
+    seed_env = os.environ.copy()
+    seed_env["SEED_TENANT_ID"] = "remaker-digital-001"
+    seed_env["SEED_SHOP_DOMAIN"] = "blanco-9939.myshopify.com"
+    seed_env["SEED_CUSTOMER_EMAIL"] = "mike@remakerdigital.com"
+    seed_env["SEED_TIER"] = "professional"
+    seed_env["SEED_BILLING_CHANNEL"] = "shopify"
+    seed_env["SEED_FQDN"] = env_config["fqdn"]
+
+    script = PROJECT_ROOT / "scripts" / "seed_tenant.py"
+    log("INFO", "  Running seed_tenant.py --execute (creates/resets remaker-digital-001)...")
+
+    r = _stream(
+        [sys.executable, str(script), "--execute"],
+        cwd=PROJECT_ROOT, timeout=300, env=seed_env,
+        prefix="  [seed] ",
+    )
+
+    dt = time.time() - t0
+    if r.returncode != 0:
+        detail = f"seed_tenant.py exited {r.returncode}"
+        log("FAIL", f"  {detail}")
+        return PhaseResult(13, "Seed Test Tenant", "FAIL", dt, detail)
+
+    # Parse credentials from seed output for Phase 14
+    _parse_seed_credentials(r.stdout)
+    if "user_api_key" not in _seed_credentials:
+        detail = "No API key found in seed output -- credential parsing failed"
+        log("FAIL", f"  {detail}")
+        return PhaseResult(13, "Seed Test Tenant", "FAIL", dt, detail)
+
+    log("PASS", f"  remaker-digital-001 seeded on staging (key={_seed_credentials['user_api_key'][:20]}...)")
+    return PhaseResult(13, "Seed Test Tenant", "PASS", dt)
+
+
+def phase_14_verify_initialized_state(args: argparse.Namespace) -> PhaseResult:
+    """Verify remaker-digital-001 is in Initialized (draft) state after seed."""
+    t0 = time.time()
+    if args.env != "staging":
+        return PhaseResult(14, "Verify Initialized State", "SKIP", time.time() - t0, "staging-only")
+    if args.dry_run:
+        log("INFO", "  [DRY RUN] Would verify 6 Initialized-state assertions")
+        return PhaseResult(14, "Verify Initialized State", "PASS", time.time() - t0, "dry-run")
+
+    fqdn = ENVIRONMENTS["staging"]["fqdn"]
+    api_key = _seed_credentials.get("user_api_key")
+    if not api_key:
+        detail = "No API key from seed output -- cannot verify"
+        log("FAIL", f"  {detail}")
+        return PhaseResult(14, "Verify Initialized State", "FAIL", time.time() - t0, detail)
+
+    # Brief delay for Cosmos consistency
+    log("INFO", "  Waiting 5s for Cosmos consistency...")
+    time.sleep(5)
+
+    failures = []
+    passed = 0
+    total = 6
+
+    # I.1 -- Tenant lookup
+    status, body, _ = api_call(fqdn, "/api/tenants/lookup", api_key)
+    if status == 200 and isinstance(body, dict) and body.get("found"):
+        log("PASS", "  I.1 Tenant lookup: found=true")
+        passed += 1
+    else:
+        msg = f"I.1: lookup HTTP {status}"
+        failures.append(msg)
+        log("FAIL", f"  {msg}")
+
+    # I.2 + I.3 -- Config state is draft, brand name empty
+    status, body, _ = api_call(fqdn, "/api/admin/preferences", api_key)
+    if status == 200 and isinstance(body, dict):
+        state = body.get("configState", body.get("config_state", "?"))
+        if state == "draft":
+            log("PASS", "  I.2 Config state: draft")
+            passed += 1
+        else:
+            msg = f"I.2: config_state={state}, expected draft"
+            failures.append(msg)
+            log("FAIL", f"  {msg}")
+        brand = body.get("brandName", body.get("brand_name", "?"))
+        if brand in ("", None):
+            log("PASS", "  I.3 Brand name: empty")
+            passed += 1
+        else:
+            msg = f"I.3: brandName='{brand}', expected empty"
+            failures.append(msg)
+            log("FAIL", f"  {msg}")
+    else:
+        failures.append(f"I.2: GET /api/admin/preferences HTTP {status}")
+        failures.append("I.3: skipped (I.2 failed)")
+        log("FAIL", f"  I.2: GET /api/admin/preferences HTTP {status}")
+
+    # I.4 -- Not activated
+    status, body, _ = api_call(fqdn, "/api/config/activation-status", api_key)
+    if status == 200 and isinstance(body, dict):
+        is_active = body.get("isActive", body.get("is_active"))
+        if not is_active:
+            log("PASS", "  I.4 Not activated: isActive=false")
+            passed += 1
+        else:
+            msg = f"I.4: isActive={is_active}, expected false"
+            failures.append(msg)
+            log("FAIL", f"  {msg}")
+    else:
+        msg = f"I.4: activation-status HTTP {status}"
+        failures.append(msg)
+        log("FAIL", f"  {msg}")
+
+    # I.5 -- Exactly 1 superadmin
+    status, body, _ = api_call(fqdn, "/api/admin/team", api_key)
+    if status == 200:
+        members = body if isinstance(body, list) else (body.get("members", []) if isinstance(body, dict) else [])
+        superadmins = [m for m in members if m.get("role") == "superadmin"]
+        if len(members) == 1 and len(superadmins) == 1:
+            log("PASS", "  I.5 Team: 1 superadmin")
+            passed += 1
+        else:
+            msg = f"I.5: {len(members)} members, {len(superadmins)} superadmins"
+            failures.append(msg)
+            log("FAIL", f"  {msg}")
+    else:
+        msg = f"I.5: GET /api/admin/team HTTP {status}"
+        failures.append(msg)
+        log("FAIL", f"  {msg}")
+
+    # I.6 -- Zero conversations
+    status, body, _ = api_call(fqdn, "/api/admin/conversations?limit=1", api_key)
+    if status == 200 and isinstance(body, dict):
+        total_count = body.get("totalCount", body.get("total_count", -1))
+        if total_count == 0:
+            log("PASS", "  I.6 Conversations: 0")
+            passed += 1
+        else:
+            msg = f"I.6: totalCount={total_count}, expected 0"
+            failures.append(msg)
+            log("FAIL", f"  {msg}")
+    else:
+        msg = f"I.6: GET /api/admin/conversations HTTP {status}"
+        failures.append(msg)
+        log("FAIL", f"  {msg}")
+
+    dt = time.time() - t0
+    extra = f"[{passed}/{total}]"
+    if failures:
+        detail = "; ".join(failures)
+        log("FAIL", f"  Initialized state: {len(failures)} failure(s)")
+        return PhaseResult(14, "Verify Initialized State", "FAIL", dt, detail, extra)
+
+    log("PASS", f"  All {total} Initialized state assertions passed")
+    return PhaseResult(14, "Verify Initialized State", "PASS", dt, extra=extra)
+
+
+# ---------------------------------------------------------------------------
+# Production-only phases
+# ---------------------------------------------------------------------------
+def phase_11_production_verification(args: argparse.Namespace) -> PhaseResult:
+    """Production: upgrade verification + lightweight smoke (no mutations)."""
+    t0 = time.time()
+    if args.dry_run:
+        log("INFO", "  [DRY RUN] Would run production verification (phase-c + smoke)")
+        return PhaseResult(11, "Production Verification", "PASS", time.time() - t0, "dry-run")
+
+    env_config = ENVIRONMENTS["production"]
+    fqdn = env_config["fqdn"]
+    api_key = env_config["api_key"]
+    expected_version = args.version.lstrip("v")
+    failures = []
+
+    # Part 1: Upgrade verification (phase-c, 35 assertions)
+    script = PROJECT_ROOT / "scripts" / "upgrade_verification.py"
+    log("INFO", "  Running phase-c upgrade verification...")
+    try:
+        r = _stream(
+            [sys.executable, str(script), "phase-c",
+             "--env", "production", "--new-version", expected_version],
+            cwd=PROJECT_ROOT, timeout=600, prefix="  [phase-c] ",
+        )
+    except Exception as e:
+        failures.append(f"phase-c exception: {e}")
+        r = None
+
+    total_pass, total_fail = (0, 0)
+    if r is not None:
+        total_pass, total_fail = _parse_upgrade_output(r.stdout)
+        if r.returncode != 0 or total_fail > 0:
+            failures.append(f"phase-c: {total_pass} PASS, {total_fail} FAIL")
+
+    # 65s rate limit cooldown
+    log("INFO", "  ... 65s rate limit cooldown before smoke test ...")
+    time.sleep(65)
+
+    # Part 2: Lightweight smoke (read-only, NO mutations)
+    log("INFO", "  Running lightweight smoke test...")
+
+    # Smoke 1: /health + correct version
+    status, body, hdrs = api_call(fqdn, "/health", timeout=10)
+    pv = body.get("product_version", "?") if isinstance(body, dict) else "?"
+    if status == 200 and pv == expected_version:
+        log("PASS", f"  Smoke: /health 200, product_version={pv}")
+    else:
+        msg = f"smoke-health: HTTP {status}, product_version={pv}"
+        failures.append(msg)
+        log("FAIL", f"  {msg}")
+
+    # Smoke 2: X-Product-Version header
+    xpv = hdrs.get("x-product-version", "?") if isinstance(hdrs, dict) else "?"
+    if xpv == expected_version:
+        log("PASS", f"  Smoke: X-Product-Version header={xpv}")
+    else:
+        msg = f"smoke-header: X-Product-Version={xpv}, expected {expected_version}"
+        failures.append(msg)
+        log("FAIL", f"  {msg}")
+
+    # Smoke 3: Tenant lookup (read-only)
+    status, body, _ = api_call(fqdn, "/api/tenants/lookup", api_key)
+    if status == 200 and isinstance(body, dict) and body.get("found"):
+        log("PASS", "  Smoke: /api/tenants/lookup found=true")
+    else:
+        msg = f"smoke-lookup: HTTP {status}"
+        failures.append(msg)
+        log("FAIL", f"  {msg}")
+
+    dt = time.time() - t0
+    if failures:
+        detail = "; ".join(failures)
+        log("FAIL", f"  Production verification failed: {detail}")
+        # Include rollback instructions
+        log("WARN", "")
+        log("WARN", "  PRODUCTION DEPLOYMENT VERIFICATION FAILED -- Manual action may be required:")
+        log("WARN", f"  1. Check if failure is transient (rate limiting, cold start)")
+        log("WARN", f"  2. If persistent, rollback:")
+        log("WARN", f"     az containerapp update --name {env_config.get('container_app', '?')} "
+                     f"--resource-group {RESOURCE_GROUP} --image <previous-image-tag>")
+        log("WARN", "")
+        return PhaseResult(11, "Production Verification", "FAIL", dt, detail, f"[{total_pass}/35]")
+
+    log("PASS", f"  Production verification: {total_pass}/35 upgrade + 3/3 smoke")
+    return PhaseResult(11, "Production Verification", "PASS", dt, extra=f"[{total_pass}/35]")
 
 
 # ---------------------------------------------------------------------------
@@ -850,16 +1146,14 @@ def _print_summary(results: list[PhaseResult], args: argparse.Namespace,
 # ---------------------------------------------------------------------------
 def main() -> int:
     parser = argparse.ArgumentParser(
-        description="Automated Build/Deploy Pipeline (SPEC-1615)",
+        description="Automated Build/Deploy Pipeline (SPEC-1615) — Two-Track",
     )
     parser.add_argument("--env", required=True, choices=["staging", "production"],
-                        help="Target environment")
+                        help="Target environment (staging=comprehensive, production=safe)")
     parser.add_argument("--version", required=True,
-                        help="Image version tag (e.g., v1.65.0)")
+                        help="Image version tag (e.g., v1.66.0)")
     parser.add_argument("--dry-run", action="store_true",
                         help="Validate without executing destructive actions")
-    parser.add_argument("--skip-verification", action="store_true",
-                        help="Skip upgrade verification and config pipeline phases")
     args = parser.parse_args()
 
     # Validate version format
@@ -871,51 +1165,49 @@ def main() -> int:
     results: list[PhaseResult] = []
     build_context = ""
 
-    log("INFO", f"Deploy Pipeline starting: {args.env} {args.version}")
+    track = "STAGING (comprehensive)" if args.env == "staging" else "PRODUCTION (safe)"
+    log("INFO", f"Deploy Pipeline starting: {args.env} {args.version} [{track}]")
     if args.dry_run:
-        log("INFO", "*** DRY RUN MODE — no destructive actions ***")
+        log("INFO", "*** DRY RUN MODE -- no destructive actions ***")
 
-    # Execute phases sequentially — stop on first failure
-    phases = [
-        (phase_0_validate_environment, False),
-        (phase_1_protected_behaviors, False),
-        (phase_2_clear_vite_api_url, False),
-        (phase_3_build_artifacts, False),
-        (phase_4_freshness_gate, False),
-        (phase_5_restore_env_local, False),
-        # Phase 6 is special (returns build context path)
-        # Phase 7 needs build context
-        # Phases 8-11 are post-build
+    # -----------------------------------------------------------------------
+    # Shared build phases (0-7) — identical for both tracks, stop on failure
+    # -----------------------------------------------------------------------
+    build_phases = [
+        phase_0_validate_environment,
+        phase_1_protected_behaviors,
+        phase_2_clear_vite_api_url,
+        phase_3_build_artifacts,
+        phase_4_freshness_gate,
+        phase_5_restore_env_local,
     ]
 
-    for phase_fn, _ in phases:
+    for phase_fn in build_phases:
         result = phase_fn(args)
         results.append(result)
         if not result.passed and result.status != "SKIP":
             break
 
-    # Continue with phases 6-14 only if all prior phases passed
     all_ok = all(r.passed for r in results)
 
     if all_ok:
-        # Phase 6: Build context
         result, build_context = phase_6_create_build_context(args)
         results.append(result)
         all_ok = result.passed
 
     if all_ok:
-        # Phase 7: ACR build
         result = phase_7_acr_build(args, build_context)
         results.append(result)
         all_ok = result.passed
-
-        # Cleanup build context
         if build_context and not args.dry_run:
             shutil.rmtree(build_context, ignore_errors=True)
             log("INFO", "  Build context cleaned up")
 
+    # -----------------------------------------------------------------------
+    # Deploy phases (8-10) — identical for both tracks, stop on failure
+    # -----------------------------------------------------------------------
     if all_ok:
-        # Phase 8: Pre-deploy snapshot (captures current state BEFORE deploy)
+        # Phase 8: Pre-deploy snapshot
         result = phase_10a_pre_deploy_snapshot(args)
         results.append(result)
         all_ok = result.passed or result.status == "SKIP"
@@ -927,23 +1219,58 @@ def main() -> int:
         all_ok = result.passed
 
     if all_ok:
-        # Phase 10: Wait for startup
-        result = phase_9_wait_for_startup(args)
+        # Phase 10: Startup + version verification (MUST match deployed version)
+        result = phase_10_startup_and_version(args)
         results.append(result)
         all_ok = result.passed
 
-    if all_ok:
-        # Phase 11: Post-deploy upgrade verification (compares to Phase 8 snapshots)
+    # -----------------------------------------------------------------------
+    # Post-deploy verification — DIVERGES by environment
+    # -----------------------------------------------------------------------
+    if all_ok and args.env == "staging":
+        # STAGING TRACK: comprehensive verification
+        # Phases 11-12 stop on failure; phases 13-14 continue to gather data
+
+        # Phase 11: Upgrade verification (multi-c for staging-001, staging-002)
         result = phase_13_upgrade_verification(args)
         results.append(result)
         all_ok = result.passed or result.status == "SKIP"
 
-    if all_ok:
-        # Phase 12: Config pipeline
-        result = phase_14_config_pipeline(args)
+        if all_ok:
+            # Phase 12: Config pipeline tests
+            result = phase_14_config_pipeline(args)
+            results.append(result)
+            # Continue even if config pipeline fails — gather seed data
+
+        # 65s rate limit cooldown before seeding
+        if not args.dry_run:
+            log("INFO", "  ... 65s rate limit cooldown before seed ...")
+            time.sleep(65)
+
+        # Phase 13: Seed test tenant (remaker-digital-001)
+        result = phase_13_seed_test_tenant(args)
+        results.append(result)
+        seed_ok = result.passed
+
+        # Phase 14: Verify Initialized state
+        if seed_ok:
+            result = phase_14_verify_initialized_state(args)
+            results.append(result)
+        else:
+            # Seed failed — skip initialized verification
+            results.append(PhaseResult(14, "Verify Initialized State", "SKIP",
+                                       0, "seed failed"))
+
+    elif all_ok and args.env == "production":
+        # PRODUCTION TRACK: safe verification (no mutations)
+
+        # Phase 11: Combined upgrade verification + lightweight smoke
+        result = phase_11_production_verification(args)
         results.append(result)
 
+    # -----------------------------------------------------------------------
     # Create DEFECT work item if any phase failed
+    # -----------------------------------------------------------------------
     defect_wi = None
     any_failed = any(r.status == "FAIL" for r in results)
     if any_failed:
