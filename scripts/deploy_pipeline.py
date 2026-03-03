@@ -825,6 +825,9 @@ def phase_13_seed_test_tenant(args: argparse.Namespace) -> PhaseResult:
     seed_env["SEED_TIER"] = "professional"
     seed_env["SEED_BILLING_CHANNEL"] = "shopify"
     seed_env["SEED_FQDN"] = env_config["fqdn"]
+    # Critical: staging uses a separate Cosmos database (agentred-staging)
+    if "cosmos_db_database" in env_config:
+        seed_env["COSMOS_DB_DATABASE"] = env_config["cosmos_db_database"]
 
     script = PROJECT_ROOT / "scripts" / "seed_tenant.py"
     log("INFO", "  Running seed_tenant.py --execute (creates/resets remaker-digital-001)...")
@@ -886,33 +889,32 @@ def phase_14_verify_initialized_state(args: argparse.Namespace) -> PhaseResult:
         failures.append(msg)
         log("FAIL", f"  {msg}")
 
-    # I.2 + I.3 -- Config state is draft, brand name empty
-    status, body, _ = api_call(fqdn, "/api/admin/preferences", api_key)
-    if status == 200 and isinstance(body, dict):
-        state = body.get("configState", body.get("config_state", "?"))
-        if state == "draft":
-            log("PASS", "  I.2 Config state: draft")
-            passed += 1
-        else:
-            msg = f"I.2: config_state={state}, expected draft"
-            failures.append(msg)
-            log("FAIL", f"  {msg}")
-        brand = body.get("brandName", body.get("brand_name", "?"))
-        if brand in ("", None):
-            log("PASS", "  I.3 Brand name: empty")
-            passed += 1
-        else:
-            msg = f"I.3: brandName='{brand}', expected empty"
-            failures.append(msg)
-            log("FAIL", f"  {msg}")
-    else:
-        failures.append(f"I.2: GET /api/admin/preferences HTTP {status}")
-        failures.append("I.3: skipped (I.2 failed)")
-        log("FAIL", f"  I.2: GET /api/admin/preferences HTTP {status}")
-
-    # I.4 -- Not activated
+    # I.2 + I.3 + I.4 -- Activation status (single API call)
+    # Replaces separate /api/admin/preferences (which doesn't exist) with
+    # the activation-status endpoint that fully describes Initialized state.
     status, body, _ = api_call(fqdn, "/api/config/activation-status", api_key)
     if status == 200 and isinstance(body, dict):
+        # I.2: Not yet configured (mandatory fields incomplete)
+        is_configured = body.get("isConfigured", body.get("is_configured"))
+        if not is_configured:
+            log("PASS", "  I.2 Not configured: isConfigured=false")
+            passed += 1
+        else:
+            msg = f"I.2: isConfigured={is_configured}, expected false"
+            failures.append(msg)
+            log("FAIL", f"  {msg}")
+
+        # I.3: Never activated (active_version == 0)
+        active_ver = body.get("activeVersion", body.get("active_version", -1))
+        if active_ver == 0:
+            log("PASS", "  I.3 Never activated: activeVersion=0")
+            passed += 1
+        else:
+            msg = f"I.3: activeVersion={active_ver}, expected 0"
+            failures.append(msg)
+            log("FAIL", f"  {msg}")
+
+        # I.4: Not active
         is_active = body.get("isActive", body.get("is_active"))
         if not is_active:
             log("PASS", "  I.4 Not activated: isActive=false")
@@ -922,9 +924,10 @@ def phase_14_verify_initialized_state(args: argparse.Namespace) -> PhaseResult:
             failures.append(msg)
             log("FAIL", f"  {msg}")
     else:
-        msg = f"I.4: activation-status HTTP {status}"
-        failures.append(msg)
-        log("FAIL", f"  {msg}")
+        failures.append(f"I.2: activation-status HTTP {status}")
+        failures.append("I.3: skipped (I.2 failed)")
+        failures.append("I.4: skipped (I.2 failed)")
+        log("FAIL", f"  I.2/I.3/I.4: activation-status HTTP {status}")
 
     # I.5 -- Exactly 1 superadmin
     status, body, _ = api_call(fqdn, "/api/admin/team", api_key)

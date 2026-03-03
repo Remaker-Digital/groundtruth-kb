@@ -31,6 +31,7 @@ ENVIRONMENTS = {
         "api_key": "ar_user_stag_qejkqo2vSBoS-QceOJ8eg4wS0Gy82G5H",
         "widget_key": "pk_live_18e9ec8657ac_007a17bf49c2a07f0dc3bf66675a17ee",
         "resource_group": "Agent-Red",
+        "cosmos_db_database": "agentred-staging",
     },
     "production": {
         "fqdn": "agent-red-api-gateway.orangeglacier-f566a4e7.eastus.azurecontainerapps.io",
@@ -39,6 +40,7 @@ ENVIRONMENTS = {
         "api_key": "ar_user_rema_QU5f2jBq0Z4SXYoyFd9zOmTEjQ7gj4j7",
         "widget_key": "pk_live_c79a2bd0b3d4_ab04f5d5d4cbe783db863c16aba9eb94",
         "resource_group": "Agent-Red",
+        "cosmos_db_database": "agentred",
     },
 }
 
