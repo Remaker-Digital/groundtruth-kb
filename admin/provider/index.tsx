@@ -46,6 +46,7 @@ import { AbuseDetectionPage } from './pages/AbuseDetection';
 import { CopilotKnowledgePage } from './pages/CopilotKnowledge';
 import { PipelineObservatoryPage } from './pages/PipelineObservatory';
 import { ContactMessagesPage } from './pages/ContactMessages';
+import { ServiceMessagesPage } from './pages/ServiceMessages';
 
 // ---------------------------------------------------------------------------
 // Auth state (sessionStorage — SUPERADMIN key + MFA token)
@@ -157,6 +158,7 @@ const App: React.FC = () => {
             <Route path="/copilot-knowledge" element={<CopilotKnowledgePage />} />
             <Route path="/pipeline" element={<PipelineObservatoryPage />} />
             <Route path="/contact-messages" element={<ContactMessagesPage />} />
+            <Route path="/service-messages" element={<ServiceMessagesPage />} />
             {/* Compliance & Security */}
             <Route path="/compliance" element={<ComplianceDashboardPage />} />
             <Route path="/secrets" element={<SecretPosturePage />} />

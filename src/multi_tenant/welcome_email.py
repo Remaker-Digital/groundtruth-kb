@@ -100,23 +100,16 @@ def tenant_url_slug(
     brand_name: str | None = None,
     tenant_id: str | None = None,
 ) -> str:
-    """Derive a URL-safe tenant slug for the ``?tenant=`` query parameter.
+    """Return the tenant ID as the URL slug for the ``?tenant=`` parameter.
 
-    Priority: shop domain (stripped of .myshopify.com) > slugified brand
-    name > raw tenant_id.  Returns empty string if no identifier available.
+    SPEC-1644: The URL must uniquely identify the tenant.  Tenant IDs
+    (UUIDs) are globally unique by design.  Previous implementation
+    derived slugs from shop_domain or brand_name, which caused collision
+    issues when multiple tenants shared a brand name (WI-0993/WI-0994).
 
-    SPEC-1617: Globally unique tenant admin URLs.
+    The *shop_domain* and *brand_name* parameters are retained for
+    call-site compatibility but are no longer used in slug generation.
     """
-    import re as _re
-
-    if shop_domain:
-        slug = shop_domain.replace(".myshopify.com", "").strip()
-        if slug:
-            return slug
-    if brand_name:
-        slug = _re.sub(r"[^a-z0-9]+", "-", brand_name.lower()).strip("-")
-        if slug:
-            return slug
     return tenant_id or ""
 
 

@@ -141,13 +141,17 @@ export const ApiKeyLogin: React.FC<ApiKeyLoginProps> = ({
       setError(null);
 
       try {
-        // SPEC-1619: Include tenant slug from URL so the magic link
-        // returns the user to the same tenant-scoped page.
-        const tenantSlug = new URLSearchParams(window.location.search).get('tenant');
+        // SPEC-1644: The URL must identify the tenant. The ?tenant= parameter
+        // is required for magic link requests (tenant-scoped authentication).
+        const tenantId = new URLSearchParams(window.location.search).get('tenant');
+        if (!tenantId) {
+          setError('Sign-in link requires a tenant URL. Use the link from your welcome email.');
+          return;
+        }
         const resp = await fetch(`${API_BASE_URL}/api/auth/magic-link/request`, {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ email: trimmed, ...(tenantSlug && { tenant: tenantSlug }) }),
+          body: JSON.stringify({ email: trimmed, tenant: tenantId }),
         });
 
         if (resp.status === 429) {

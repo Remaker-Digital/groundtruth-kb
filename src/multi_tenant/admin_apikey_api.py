@@ -187,115 +187,110 @@ async def _send_api_key_email(
     tenant_name: str | None = None,
     admin_login_url: str | None = None,
 ) -> bool:
-    """Send the new API key to the merchant via SMTP.
+    """Send the new API key to the merchant via SMTP primary, ACS fallback.
 
-    Uses the same SMTP configuration as alert_delivery.py (SendGrid, etc.).
-    Returns True if sent successfully, False otherwise.
+    Uses the shared ``_EMAIL_WRAPPER`` from alert_delivery.py for visual
+    consistency across all Agent Red transactional emails (WI-0988).
+    Returns True if sent successfully via either provider, False otherwise.
     """
-    import smtplib
-    from email.mime.multipart import MIMEMultipart
-    from email.mime.text import MIMEText
-
-    smtp_host = os.environ.get("SMTP_HOST", "")
-    smtp_port = int(os.environ.get("SMTP_PORT", "587"))
-    smtp_user = os.environ.get("SMTP_USERNAME", "")
-    smtp_pass = os.environ.get("SMTP_PASSWORD", "")
-    smtp_from = os.environ.get("SMTP_FROM", smtp_user) or "noreply@agentred.com"
-
-    if not smtp_host:
-        logger.warning("SMTP_HOST not configured — cannot send API key reset email")
-        return False
+    from src.multi_tenant.alert_delivery import _EMAIL_WRAPPER
 
     name_display = f" ({tenant_name})" if tenant_name else ""
     subject = "Your Agent Red API Key Has Been Reset"
 
-    html_body = f"""\
-<!DOCTYPE html>
-<html>
-<head><meta charset="utf-8"/></head>
-<body style="margin:0;padding:0;background:#0a0a0a;font-family:Inter,system-ui,sans-serif;">
-<div style="max-width:560px;margin:40px auto;padding:40px;background:#1f1f1f;border-radius:12px;border:1px solid #272727;">
-  <div style="text-align:center;margin-bottom:24px;">
-    <h1 style="margin:0;font-size:20px;color:#F5F5F5;">Agent Red</h1>
-    <p style="margin:4px 0 0;font-size:14px;color:#A0A0A0;">Customer Experience</p>
-  </div>
-  <h2 style="margin:0 0 16px;font-size:16px;color:#F5F5F5;">API Key Reset</h2>
-  <p style="margin:0 0 12px;font-size:14px;color:#E0E0E0;line-height:1.6;">
-    A new API key was generated for your account{name_display}. Your previous key has been
-    invalidated and will no longer work.
-  </p>
-  <div style="background:#141414;border:1px solid #272727;border-radius:8px;padding:16px;margin:16px 0;">
-    <p style="margin:0 0 6px;font-size:12px;color:#A0A0A0;text-transform:uppercase;letter-spacing:0.5px;">Your New API Key</p>
-    <p style="margin:0;font-family:'JetBrains Mono',monospace;font-size:13px;color:#ff3621;word-break:break-all;">{raw_key}</p>
-  </div>
-  <p style="margin:16px 0 0;font-size:13px;color:#A0A0A0;line-height:1.5;">
-    Copy this key and use it to sign in to your admin dashboard. This key will not
-    be shown again.
-  </p>
-  <hr style="border:none;border-top:1px solid #272727;margin:24px 0;" />
-  <div style="background:#2a1a1a;border:1px solid #4a2020;border-radius:8px;padding:16px;">
-    <p style="margin:0 0 8px;font-size:13px;color:#ff6b6b;font-weight:600;">
-      Did not request this?
-    </p>
-    <p style="margin:0 0 12px;font-size:13px;color:#A0A0A0;line-height:1.5;">
-      If you did not request a key reset, someone may have access to your email.
-      Request a new API key immediately to invalidate this one and secure your account.
-    </p>
-    <a href="{admin_login_url or 'mailto:support@agentred.com'}" style="display:inline-block;padding:10px 24px;background:#ff3621;color:#ffffff;font-size:13px;font-weight:600;text-decoration:none;border-radius:6px;">
-      Request a New API Key
-    </a>
-  </div>
-  <hr style="border:none;border-top:1px solid #272727;margin:24px 0;" />
-  <p style="margin:0;font-size:11px;color:#787878;text-align:center;">
-    Agent Red Customer Experience &mdash; A product of Remaker Digital
+    body_html = f"""\
+<h2 style="margin:0 0 16px;color:#111827;font-size:20px">API Key Reset</h2>
+<p style="color:#374151;font-size:14px;line-height:1.6;margin:0 0 24px">
+  A new API key was generated for your account{name_display}. Your previous key
+  has been invalidated and will no longer work.
+</p>
+
+<div style="background:#f3f4f6;border:1px solid #d1d5db;padding:16px;margin:16px 0">
+  <p style="margin:0 0 8px;color:#6b7280;font-size:12px;font-weight:600;
+       text-transform:uppercase;letter-spacing:0.05em">Your New API Key</p>
+  <code style="word-break:break-all;color:#111827;font-size:14px;
+       font-family:'JetBrains Mono',SFMono-Regular,ui-monospace,monospace">{raw_key}</code>
+  <p style="margin:8px 0 0;color:#6b7280;font-size:12px;line-height:1.4">
+    Copy this key and use it to sign in to your admin dashboard.
+    This key will not be shown again.
   </p>
 </div>
-</body>
-</html>"""
 
-    plain_body = (
-        f"Agent Red API Key Reset\n\n"
-        f"A new API key was generated for your account{name_display}.\n"
-        f"Your previous key has been invalidated.\n\n"
-        f"Your New API Key:\n{raw_key}\n\n"
-        f"Copy this key and use it to sign in. This key will not be shown again.\n\n"
-        f"If you did not request this reset, request a new API key immediately to\n"
-        f"invalidate this one and secure your account:\n"
-        f"{admin_login_url or 'Contact support@agentred.com'}\n"
-    )
+<div style="background:#fef3c7;border:1px solid #fcd34d;padding:16px;margin:16px 0">
+  <strong style="color:#92400e">Did not request this?</strong>
+  <p style="color:#92400e;margin:8px 0 0;font-size:13px">
+    If you did not request a key reset, someone may have access to your email.
+    <a href="{admin_login_url or 'mailto:support@agentred.com'}"
+       style="color:#ff3621;font-weight:600">Request a new API key</a>
+    immediately to invalidate this one and secure your account.
+  </p>
+</div>"""
 
-    try:
-        import asyncio
+    full_html = _EMAIL_WRAPPER.format(body=body_html)
 
-        msg = MIMEMultipart("alternative")
-        msg["From"] = f"Agent Red <{smtp_from}>"
-        msg["To"] = to_email
-        msg["Subject"] = subject
-        msg.attach(MIMEText(plain_body, "plain"))
-        msg.attach(MIMEText(html_body, "html"))
+    # --- Provider 1: SMTP (Titan or other SMTP provider) ---
+    smtp_host = os.environ.get("SMTP_HOST", "")
+    if smtp_host:
+        import smtplib
+        from email.mime.multipart import MIMEMultipart
+        from email.mime.text import MIMEText
 
-        def _smtp_send() -> None:
-            if smtp_port == 465:
-                with smtplib.SMTP_SSL(smtp_host, smtp_port, timeout=10.0) as server:
-                    if smtp_user and smtp_pass:
-                        server.login(smtp_user, smtp_pass)
-                    server.send_message(msg)
+        smtp_port = int(os.environ.get("SMTP_PORT", "587"))
+        smtp_user = os.environ.get("SMTP_USERNAME", "")
+        smtp_pass = os.environ.get("SMTP_PASSWORD", "")
+        smtp_from = os.environ.get("SMTP_FROM", smtp_user) or "noreply@agentred.com"
+
+        try:
+            import asyncio
+
+            msg = MIMEMultipart("alternative")
+            msg["From"] = f"Agent Red <{smtp_from}>"
+            msg["To"] = to_email
+            msg["Subject"] = subject
+            msg.attach(MIMEText(full_html, "html"))
+
+            def _smtp_send() -> None:
+                if smtp_port == 465:
+                    with smtplib.SMTP_SSL(smtp_host, smtp_port, timeout=15) as server:
+                        if smtp_user and smtp_pass:
+                            server.login(smtp_user, smtp_pass)
+                        server.send_message(msg)
+                else:
+                    with smtplib.SMTP(smtp_host, smtp_port, timeout=15) as server:
+                        server.ehlo()
+                        if smtp_port != 25:
+                            server.starttls()
+                        if smtp_user and smtp_pass:
+                            server.login(smtp_user, smtp_pass)
+                        server.send_message(msg)
+
+            await asyncio.to_thread(_smtp_send)  # SPEC-1622: non-blocking SMTP
+            logger.info("API key reset email sent via SMTP to %s", to_email)
+            return True
+
+        except Exception:
+            logger.exception("SMTP API key reset email failed — trying ACS fallback")
+            # Fall through to ACS provider
+
+    # --- Provider 2: Azure Communication Services (fallback) ---
+    conn_str = os.environ.get("AZURE_COMM_CONNECTION_STRING", "")
+    if conn_str:
+        try:
+            from src.multi_tenant.alert_delivery import send_acs_email
+
+            status = await send_acs_email(conn_str, to_email, subject, full_html)
+            sent = status == "Succeeded"
+            if sent:
+                logger.info("API key reset email sent via ACS to %s", to_email)
             else:
-                with smtplib.SMTP(smtp_host, smtp_port, timeout=10.0) as server:
-                    server.ehlo()
-                    if smtp_port != 25:
-                        server.starttls()
-                    if smtp_user and smtp_pass:
-                        server.login(smtp_user, smtp_pass)
-                    server.send_message(msg)
+                logger.warning("ACS API key reset email status=%s for %s", status, to_email)
+            return sent
+        except Exception:
+            logger.exception("ACS API key reset email failed for %s", to_email)
+            return False
 
-        await asyncio.to_thread(_smtp_send)  # SPEC-1622: non-blocking SMTP
-        logger.info("API key reset email sent to %s", to_email)
-        return True
-
-    except Exception:
-        logger.exception("Failed to send API key reset email to %s", to_email)
-        return False
+    logger.warning("No email provider configured — cannot send API key reset email")
+    return False
 
 
 # ---------------------------------------------------------------------------

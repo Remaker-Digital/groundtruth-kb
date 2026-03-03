@@ -4370,3 +4370,228 @@ async def get_database_metrics(
 ) -> DatabaseMetricsResponse:
     """Return Cosmos DB operational metrics (SPEC-1583)."""
     return DatabaseMetricsResponse()
+
+
+# ---------------------------------------------------------------------------
+# Service Messages (SPEC-1646, SPEC-1647, SPEC-1648)
+# ---------------------------------------------------------------------------
+
+
+class ServiceMessageRequest(CamelCaseModel):
+    """Request body for sending a service message."""
+
+    subject: str = Field(
+        ..., min_length=1, max_length=200,
+        description="Email subject line",
+    )
+    body: str = Field(
+        ..., min_length=1, max_length=10000,
+        description="HTML body content for the service message",
+    )
+    filter_status: list[str] | None = Field(
+        default=None,
+        description="Filter recipients by tenant status (e.g. ['active', 'initialized'])",
+    )
+    filter_tier: list[str] | None = Field(
+        default=None,
+        description="Filter recipients by subscription tier (e.g. ['professional', 'enterprise'])",
+    )
+
+
+class ServiceMessageRecipient(CamelCaseModel):
+    """A resolved recipient for preview purposes."""
+
+    tenant_id: str
+    email: str
+    tier: str | None = None
+    status: str | None = None
+
+
+class ServiceMessagePreviewResponse(CamelCaseModel):
+    """Preview of recipients before sending."""
+
+    recipients: list[ServiceMessageRecipient]
+    total_count: int
+
+
+class ServiceMessageSendResponse(CamelCaseModel):
+    """Result of sending a service message."""
+
+    total_recipients: int
+    sent_count: int
+    failed_count: int
+    errors: list[str] = Field(default_factory=list)
+    success: bool
+
+
+@router.post(
+    "/service-messages/preview",
+    response_model=ServiceMessagePreviewResponse,
+    summary="Preview service message recipients",
+    description=(
+        "Resolves the list of superadmin email addresses that would receive "
+        "a service message with the given filters. Does not send anything."
+    ),
+    status_code=200,
+)
+async def preview_service_message_recipients(
+    filter_status: list[str] | None = Query(None, description="Filter by tenant status"),
+    filter_tier: list[str] | None = Query(None, description="Filter by subscription tier"),
+    ctx: TenantContext = Depends(require_role(TeamMemberRole.SUPERADMIN)),
+) -> ServiceMessagePreviewResponse:
+    """Resolve and return the recipient list for a service message."""
+    if not _tenant_repo:
+        raise HTTPException(status_code=503, detail="Service not initialized")
+
+    recipients = await _resolve_service_message_recipients(
+        filter_status=filter_status,
+        filter_tier=filter_tier,
+    )
+    return ServiceMessagePreviewResponse(
+        recipients=recipients,
+        total_count=len(recipients),
+    )
+
+
+@router.post(
+    "/service-messages/send",
+    response_model=ServiceMessageSendResponse,
+    summary="Send a service message to tenant superadmins",
+    description=(
+        "Sends a bulk service message via BCC email to all tenant superadmins "
+        "matching the specified filters. The sender is 'Agent Red Service "
+        "Administrator'. Recipient email addresses are not disclosed to each "
+        "other (SPEC-1648)."
+    ),
+    status_code=200,
+    responses={
+        422: {"description": "No recipients match the filters"},
+        503: {"description": "Service not initialized"},
+    },
+)
+async def send_service_message_endpoint(
+    request: ServiceMessageRequest,
+    ctx: TenantContext = Depends(require_role(TeamMemberRole.SUPERADMIN)),
+) -> ServiceMessageSendResponse:
+    """Send a service message to filtered tenant superadmins."""
+    if not _tenant_repo:
+        raise HTTPException(status_code=503, detail="Service not initialized")
+
+    # Only the SPA tenant can send service messages
+    _SPA_TENANT_ID = "remaker-digital-001"
+    if ctx.tenant_id != _SPA_TENANT_ID:
+        raise HTTPException(
+            status_code=403,
+            detail="Only the service provider tenant can send service messages",
+        )
+
+    # Resolve recipients
+    recipients = await _resolve_service_message_recipients(
+        filter_status=request.filter_status,
+        filter_tier=request.filter_tier,
+    )
+    if not recipients:
+        raise HTTPException(
+            status_code=422,
+            detail="No recipients match the specified filters",
+        )
+
+    # De-duplicate emails (a superadmin could be on multiple tenants)
+    unique_emails = list(dict.fromkeys(r.email for r in recipients))
+
+    # Render and send
+    from src.multi_tenant.service_message_delivery import (
+        render_service_message_body,
+        send_service_message,
+    )
+
+    body_html = render_service_message_body(request.body)
+    result = await send_service_message(
+        subject=request.subject,
+        body_html=body_html,
+        recipient_emails=unique_emails,
+    )
+
+    # Audit log the send
+    if _audit_repo:
+        try:
+            await _audit_repo.create({
+                "id": f"svc-msg-{datetime.now(timezone.utc).strftime('%Y%m%d%H%M%S')}",
+                "tenant_id": ctx.tenant_id,
+                "event_type": "service_message_sent",
+                "actor": ctx.user_email or "superadmin",
+                "details": {
+                    "subject": request.subject[:100],
+                    "total_recipients": result.total_recipients,
+                    "sent_count": result.sent_count,
+                    "failed_count": result.failed_count,
+                    "filter_status": request.filter_status,
+                    "filter_tier": request.filter_tier,
+                },
+                "created_at": datetime.now(timezone.utc).isoformat(),
+            })
+        except Exception:
+            logger.exception("Failed to audit log service message send")
+
+    return ServiceMessageSendResponse(
+        total_recipients=result.total_recipients,
+        sent_count=result.sent_count,
+        failed_count=result.failed_count,
+        errors=result.errors,
+        success=result.success,
+    )
+
+
+async def _resolve_service_message_recipients(
+    *,
+    filter_status: list[str] | None = None,
+    filter_tier: list[str] | None = None,
+) -> list[ServiceMessageRecipient]:
+    """Resolve superadmin emails from filtered tenant list.
+
+    Queries the tenant directory with optional status/tier filters and
+    returns a list of recipients with valid email addresses.
+    """
+    if not _tenant_repo:
+        return []
+
+    # Build cross-partition query for tenants with email addresses
+    conditions = ["c.customer_email != null", "c.customer_email != ''"]
+    params: list[dict[str, Any]] = []
+
+    if filter_status:
+        # IN clause for multiple status values
+        placeholders = ", ".join(f"@status{i}" for i in range(len(filter_status)))
+        conditions.append(f"c.status IN ({placeholders})")
+        for i, s in enumerate(filter_status):
+            params.append({"name": f"@status{i}", "value": s})
+
+    if filter_tier:
+        placeholders = ", ".join(f"@tier{i}" for i in range(len(filter_tier)))
+        conditions.append(f"c.tier IN ({placeholders})")
+        for i, t in enumerate(filter_tier):
+            params.append({"name": f"@tier{i}", "value": t})
+
+    where_clause = " AND ".join(conditions)
+    query = (
+        f"SELECT c.tenant_id, c.customer_email, c.tier, c.status "
+        f"FROM c WHERE {where_clause} "
+        f"ORDER BY c.created_at DESC"
+    )
+
+    recipients: list[ServiceMessageRecipient] = []
+    async for item in _tenant_repo._container.query_items(
+        query=query,
+        parameters=params if params else None,
+        max_item_count=500,
+    ):
+        email = item.get("customer_email", "")
+        if email and "@" in email:
+            recipients.append(ServiceMessageRecipient(
+                tenant_id=item.get("tenant_id", ""),
+                email=email,
+                tier=item.get("tier"),
+                status=item.get("status"),
+            ))
+
+    return recipients

@@ -63,6 +63,11 @@ LIVE_API_KEY = (
     or ""
 )
 
+# SPEC-1645: Tenant ID for the test tenancy.
+# On staging, remaker-digital-001 is the canonical test tenant.
+# On production, this is the remaker-digital-001 tenant as well.
+LIVE_TENANT_ID = os.environ.get("LIVE_TENANT_ID", "remaker-digital-001")
+
 # Mutations that MUST NOT reach production during test runs.
 # Each entry: (HTTP method, URL substring to match).
 #
@@ -126,6 +131,27 @@ def _check_production_reachable() -> bool:
             return resp.status_code == 200
     except Exception:
         return False
+
+
+def _dismiss_onboarding_modal(page: Page) -> None:
+    """Dismiss the OnboardingWizard modal if it is visible.
+
+    Freshly-seeded tenants (active_version=0) show a 3-step onboarding
+    wizard that blocks sidebar navigation.  Step 1 has a "Skip for now"
+    button.  The modal uses ``closeOnClickOutside={false}`` so backdrop
+    clicks don't work — we must click the button.
+
+    On activated tenants the modal doesn't appear, so this is a no-op.
+    """
+    try:
+        skip_btn = page.get_by_text("Skip for now", exact=True)
+        skip_btn.wait_for(state="visible", timeout=3_000)
+        skip_btn.click()
+        # Wait for the modal to close and Dashboard to become interactive
+        page.wait_for_timeout(500)
+    except Exception:
+        # Modal not present — tenant is already activated.  No action needed.
+        pass
 
 
 def _navigate_admin_to(page: Page, nav_text: str, wait_for_text: str | None = None) -> Page:
@@ -321,14 +347,17 @@ def live_admin_page(
         sessionStorage.setItem('agentred_api_key', '{live_api_key}');
     """)
 
-    # Navigate to the admin SPA
+    # Navigate to the admin SPA with tenant identification (SPEC-1644/SPEC-1645)
     page.goto(
-        f"http://localhost:{ADMIN_VITE_PORT}/admin/standalone/",
+        f"http://localhost:{ADMIN_VITE_PORT}/admin/standalone/?tenant={LIVE_TENANT_ID}",
         wait_until="networkidle",
     )
 
     # Wait for the Dashboard to load with real data
     page.wait_for_selector("text=Dashboard", timeout=20_000)
+
+    # Dismiss the OnboardingWizard if it appears (freshly-seeded tenants)
+    _dismiss_onboarding_modal(page)
 
     return page
 

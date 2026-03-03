@@ -861,7 +861,7 @@ def phase_14_verify_initialized_state(args: argparse.Namespace) -> PhaseResult:
     if args.env != "staging":
         return PhaseResult(14, "Verify Initialized State", "SKIP", time.time() - t0, "staging-only")
     if args.dry_run:
-        log("INFO", "  [DRY RUN] Would verify 6 Initialized-state assertions")
+        log("INFO", "  [DRY RUN] Would verify 10 Initialized-state assertions")
         return PhaseResult(14, "Verify Initialized State", "PASS", time.time() - t0, "dry-run")
 
     fqdn = ENVIRONMENTS["staging"]["fqdn"]
@@ -877,7 +877,7 @@ def phase_14_verify_initialized_state(args: argparse.Namespace) -> PhaseResult:
 
     failures = []
     passed = 0
-    total = 6
+    total = 10
 
     # I.1 -- Tenant lookup
     status, body, _ = api_call(fqdn, "/api/tenants/lookup", api_key)
@@ -959,6 +959,71 @@ def phase_14_verify_initialized_state(args: argparse.Namespace) -> PhaseResult:
             log("FAIL", f"  {msg}")
     else:
         msg = f"I.6: GET /api/admin/conversations HTTP {status}"
+        failures.append(msg)
+        log("FAIL", f"  {msg}")
+
+    # I.7 -- Tenant tier is professional
+    status, body, _ = api_call(fqdn, "/api/tenants/lookup", api_key)
+    if status == 200 and isinstance(body, dict):
+        tier = body.get("tier", body.get("subscription_tier"))
+        if tier and tier.lower() == "professional":
+            log("PASS", "  I.7 Tier: professional")
+            passed += 1
+        else:
+            msg = f"I.7: tier={tier!r}, expected 'professional'"
+            failures.append(msg)
+            log("FAIL", f"  {msg}")
+    else:
+        msg = f"I.7: lookup HTTP {status}"
+        failures.append(msg)
+        log("FAIL", f"  {msg}")
+
+    # I.8 -- Widget key exists and matches seed output
+    widget_key_from_seed = _seed_credentials.get("widget_key", "")
+    status, body, _ = api_call(fqdn, "/api/admin/widget", api_key)
+    if status == 200 and isinstance(body, dict):
+        widget_key = body.get("widgetKey", body.get("widget_key", ""))
+        if widget_key and widget_key.startswith("pk_live_"):
+            if widget_key_from_seed and widget_key != widget_key_from_seed:
+                msg = f"I.8: widget key mismatch: API={widget_key[:20]}... seed={widget_key_from_seed[:20]}..."
+                failures.append(msg)
+                log("FAIL", f"  {msg}")
+            else:
+                log("PASS", f"  I.8 Widget key: {widget_key[:20]}...")
+                passed += 1
+        else:
+            msg = f"I.8: no widget key in response (got {widget_key!r})"
+            failures.append(msg)
+            log("FAIL", f"  {msg}")
+    else:
+        msg = f"I.8: GET /api/admin/widget HTTP {status}"
+        failures.append(msg)
+        log("FAIL", f"  {msg}")
+
+    # I.9 -- Draft config accessible (ConfigEditor depends on this endpoint)
+    status, body, _ = api_call(fqdn, "/api/config?state=draft", api_key)
+    if status == 200:
+        log("PASS", "  I.9 Draft config: accessible")
+        passed += 1
+    else:
+        msg = f"I.9: GET /api/config?state=draft HTTP {status}"
+        failures.append(msg)
+        log("FAIL", f"  {msg}")
+
+    # I.10 -- Admin SPA serves HTML (static files built correctly)
+    try:
+        import httpx
+        with httpx.Client(timeout=10.0) as client:
+            r = client.get(f"https://{fqdn}/admin/standalone/")
+            if r.status_code == 200 and "<!doctype html" in r.text.lower()[:200]:
+                log("PASS", "  I.10 Admin SPA: serves HTML")
+                passed += 1
+            else:
+                msg = f"I.10: SPA returned HTTP {r.status_code}, content_type={r.headers.get('content-type')}"
+                failures.append(msg)
+                log("FAIL", f"  {msg}")
+    except Exception as exc:
+        msg = f"I.10: SPA fetch error: {exc}"
         failures.append(msg)
         log("FAIL", f"  {msg}")
 

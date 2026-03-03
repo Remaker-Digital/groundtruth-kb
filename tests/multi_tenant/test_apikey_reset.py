@@ -475,8 +475,14 @@ class TestEmailSending:
             assert "Agent Red" in html_part
 
     @pytest.mark.asyncio
-    async def test_akr17_email_plaintext_contains_key(self):
-        """AKR-17: Plain-text email body contains the raw API key."""
+    async def test_akr17_email_uses_shared_wrapper(self):
+        """AKR-17: Email uses the shared _EMAIL_WRAPPER for visual consistency.
+
+        WI-0988: The API key reset email was migrated from a standalone
+        dark-themed HTML template to the shared _EMAIL_WRAPPER.  The email
+        is now HTML-only (no text/plain part), consistent with all other
+        Agent Red transactional emails.
+        """
         with patch.dict(
             "os.environ",
             {"SMTP_HOST": "mail.example.com", "SMTP_PORT": "587"},
@@ -491,13 +497,18 @@ class TestEmailSending:
                 )
 
             msg = mock_smtp.send_message.call_args[0][0]
-            plain_part = None
+            html_part = None
             for part in msg.walk():
-                if part.get_content_type() == "text/plain":
-                    plain_part = part.get_payload(decode=True).decode()
+                if part.get_content_type() == "text/html":
+                    html_part = part.get_payload(decode=True).decode()
                     break
-            assert plain_part is not None
-            assert "ar_live_test_MYKEY123" in plain_part
+            assert html_part is not None
+            # Shared wrapper has the Agent Red logo and branding
+            assert "Agent Red" in html_part
+            assert "ar_live_test_MYKEY123" in html_part
+            # Verify shared wrapper structure (logo image, footer link)
+            assert "email-logo-light" in html_part
+            assert "remakerdigital.com" in html_part
 
 
 # ---------------------------------------------------------------------------

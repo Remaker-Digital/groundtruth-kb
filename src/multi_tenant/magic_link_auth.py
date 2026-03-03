@@ -99,11 +99,10 @@ class MagicLinkRequest(BaseModel):
     """Request body for magic link."""
 
     email: str = Field(description="Email address associated with the tenant account")
-    tenant: str | None = Field(
-        default=None,
-        description="Optional tenant slug from the origin URL (SPEC-1619). "
-        "When provided, the magic link verify URL will include ?tenant=<slug> "
-        "so the user returns to the same tenant-scoped page.",
+    tenant: str = Field(
+        description="Tenant ID from the origin URL query parameter (SPEC-1644). "
+        "Required — the URL must identify the tenant.  The magic link verify "
+        "URL will include ?tenant=<id> for tenant-scoped authentication.",
     )
 
 
@@ -317,13 +316,14 @@ async def request_magic_link(
 ) -> MagicLinkRequestResponse:
     """Send a magic link to the specified email address.
 
-    Resolution order:
-      1. Search team_members across all tenants for matching email.
-      2. Fall back to tenants.customer_email (tenant owner).
-      3. If no match anywhere, silently return 200 (no enumeration).
+    Resolution order (tenant-scoped per SPEC-1644):
+      1. Search team_members within the specified tenant for matching email.
+      2. Fall back to tenant owner (customer_email) on the tenant document.
+      3. If no match, silently return 200 (no enumeration).
 
     SPEC-1618: Each email references only the specific merchant account.
-    SPEC-1619: Magic link URL preserves the origin tenant slug.
+    SPEC-1619: Magic link URL preserves the origin tenant ID.
+    SPEC-1644: No cross-partition queries — tenant ID from URL scopes all lookups.
     """
     client_ip = request.client.host if request.client else "unknown"
 
@@ -343,17 +343,18 @@ async def request_magic_link(
         token_repo = VerificationTokenRepository()
 
         email = body.email.strip().lower()
-        origin_tenant = body.tenant  # SPEC-1619: preserve origin URL context
+        origin_tenant = body.tenant  # SPEC-1644: tenant ID from URL
 
         scheme = request.headers.get("x-forwarded-proto", request.url.scheme)
         host = request.headers.get("host", request.url.hostname or "localhost")
 
-        # ---- Step 1: Search team members across all tenants ----
-        members = await team_repo.find_all_by_email(email)
+        # ---- Step 1: Search team member within the specified tenant ----
+        # SPEC-1644: Tenant-scoped lookup only — no cross-partition queries.
+        member = await team_repo.find_by_email(origin_tenant, email)
 
-        if members:
+        if member:
             await _send_member_magic_links(
-                members=members,
+                members=[member],
                 email=email,
                 scheme=scheme,
                 host=host,
@@ -364,9 +365,10 @@ async def request_magic_link(
             return MagicLinkRequestResponse()
 
         # ---- Step 2: Fall back to tenant owner (customer_email) ----
-        tenant = await tenant_repo.find_by_customer_email(email)
-        if not tenant:
-            logger.info("Magic link request for unknown email: %s", email)
+        # SPEC-1644: Read tenant document directly (no cross-partition).
+        tenant = await tenant_repo.read(origin_tenant, origin_tenant)
+        if not tenant or tenant.get("customer_email", "").lower() != email:
+            logger.info("Magic link: no match in tenant=%s email=%s", origin_tenant, email)
             return MagicLinkRequestResponse()
 
         tenant_id = tenant["id"]

@@ -226,13 +226,17 @@ class TestRequestEndpoint:
     @pytest.mark.asyncio
     async def test_ml14_unknown_email_returns_200(self, mock_request, mock_tenant_repo, mock_token_repo):
         mock_team = AsyncMock()
-        mock_team.find_all_by_email = AsyncMock(return_value=[])
+        mock_team.find_by_email = AsyncMock(return_value=None)
+        mock_tenant_repo.read.return_value = None
         with (
             patch("src.multi_tenant.repositories.TeamMemberRepository", return_value=mock_team),
             patch("src.multi_tenant.repositories.TenantRepository", return_value=mock_tenant_repo),
             patch("src.multi_tenant.repositories.VerificationTokenRepository", return_value=mock_token_repo),
         ):
-            result = await request_magic_link(MagicLinkRequest(email="unknown@test.com"), mock_request)
+            result = await request_magic_link(
+                MagicLinkRequest(email="unknown@test.com", tenant="tenant-abc-123"),
+                mock_request,
+            )
         assert isinstance(result, MagicLinkRequestResponse)
         mock_token_repo.create_token.assert_not_called()
 
@@ -241,8 +245,9 @@ class TestRequestEndpoint:
         self, mock_request, mock_tenant_repo, mock_token_repo, sample_tenant,
     ):
         mock_team = AsyncMock()
-        mock_team.find_all_by_email = AsyncMock(return_value=[])
-        mock_tenant_repo.find_by_customer_email.return_value = sample_tenant
+        mock_team.find_by_email = AsyncMock(return_value=None)
+        # SPEC-1644: tenant-scoped read, email checked against customer_email
+        mock_tenant_repo.read.return_value = sample_tenant
         with (
             patch("src.multi_tenant.repositories.TeamMemberRepository", return_value=mock_team),
             patch("src.multi_tenant.repositories.TenantRepository", return_value=mock_tenant_repo),
@@ -250,7 +255,8 @@ class TestRequestEndpoint:
             patch("src.multi_tenant.magic_link_auth._send_magic_link_email", new_callable=AsyncMock, return_value=True),
         ):
             result = await request_magic_link(
-                MagicLinkRequest(email="merchant@example.com"), mock_request,
+                MagicLinkRequest(email="merchant@example.com", tenant="tenant-abc-123"),
+                mock_request,
             )
         assert isinstance(result, MagicLinkRequestResponse)
         mock_token_repo.create_token.assert_called_once()
@@ -264,24 +270,30 @@ class TestRequestEndpoint:
         # Exhaust rate limit
         for _ in range(_RATE_MAX):
             _is_rate_limited(mock_request.client.host)
-        result = await request_magic_link(MagicLinkRequest(email="any@test.com"), mock_request)
+        result = await request_magic_link(
+            MagicLinkRequest(email="any@test.com", tenant="any-tenant"),
+            mock_request,
+        )
         assert isinstance(result, MagicLinkRequestResponse)
 
     @pytest.mark.asyncio
     async def test_ml17_email_case_normalized(self, mock_request, mock_tenant_repo, mock_token_repo):
         mock_team = AsyncMock()
-        mock_team.find_all_by_email = AsyncMock(return_value=[])
-        mock_tenant_repo.find_by_customer_email.return_value = None
+        mock_team.find_by_email = AsyncMock(return_value=None)
+        mock_tenant_repo.read.return_value = None
         with (
             patch("src.multi_tenant.repositories.TeamMemberRepository", return_value=mock_team),
             patch("src.multi_tenant.repositories.TenantRepository", return_value=mock_tenant_repo),
             patch("src.multi_tenant.repositories.VerificationTokenRepository", return_value=mock_token_repo),
         ):
-            await request_magic_link(MagicLinkRequest(email="  Test@Example.Com  "), mock_request)
-        # Team member search happens first with normalized email
-        mock_team.find_all_by_email.assert_called_once_with("test@example.com")
-        # Then falls through to tenant owner lookup
-        mock_tenant_repo.find_by_customer_email.assert_called_once_with("test@example.com")
+            await request_magic_link(
+                MagicLinkRequest(email="  Test@Example.Com  ", tenant="tenant-abc-123"),
+                mock_request,
+            )
+        # SPEC-1644: Tenant-scoped lookup with normalized email
+        mock_team.find_by_email.assert_called_once_with("tenant-abc-123", "test@example.com")
+        # Then falls through to tenant owner lookup (direct read, not cross-partition)
+        mock_tenant_repo.read.assert_called_once_with("tenant-abc-123", "tenant-abc-123")
 
 
 # ---------------------------------------------------------------------------
@@ -366,7 +378,7 @@ class TestVerifyEndpoint:
 def mock_team_repo():
     """Mock TeamMemberRepository."""
     repo = AsyncMock()
-    repo.find_all_by_email = AsyncMock(return_value=[])
+    repo.find_by_email = AsyncMock(return_value=None)
     repo.read = AsyncMock(return_value=None)
     return repo
 
@@ -431,7 +443,8 @@ class TestTeamMemberMagicLinkRequest:
         sample_team_member, sample_tenant,
     ):
         """Team member email → creates token with member_id."""
-        mock_team_repo.find_all_by_email.return_value = [sample_team_member]
+        # SPEC-1644: tenant-scoped lookup returns single member
+        mock_team_repo.find_by_email.return_value = sample_team_member
         mock_tenant_repo.read.return_value = sample_tenant
 
         with (
@@ -441,7 +454,8 @@ class TestTeamMemberMagicLinkRequest:
             patch("src.multi_tenant.magic_link_auth._send_magic_link_email", new_callable=AsyncMock, return_value=True),
         ):
             result = await request_magic_link(
-                MagicLinkRequest(email="agent@example.com"), mock_request,
+                MagicLinkRequest(email="agent@example.com", tenant="tenant-abc-123"),
+                mock_request,
             )
 
         assert isinstance(result, MagicLinkRequestResponse)
@@ -451,27 +465,22 @@ class TestTeamMemberMagicLinkRequest:
         assert call_kwargs.kwargs.get("member_id") == "member-001"
 
     @pytest.mark.asyncio
-    async def test_ml26_multi_tenant_sends_separate_emails(
+    async def test_ml26_tenant_scoped_lookup_only_searches_specified_tenant(
         self, mock_request, mock_team_repo, mock_tenant_repo, mock_token_repo,
     ):
-        """SPEC-1618: Email in two tenants → TWO separate emails, one per tenant.
+        """SPEC-1644: Magic link only searches within the specified tenant.
 
-        Each email must reference ONLY the specific merchant account.
-        Sending an email containing links to multiple tenancies is a defect.
+        Cross-partition queries are prohibited. Even if the same email
+        exists in multiple tenants, only the specified tenant is searched.
         """
-        member_a = {
+        member = {
             "id": "m-a", "tenant_id": "t-a", "email": "shared@example.com",
             "role": "admin", "is_active": True,
         }
-        member_b = {
-            "id": "m-b", "tenant_id": "t-b", "email": "shared@example.com",
-            "role": "escalation_agent", "is_active": True,
+        mock_team_repo.find_by_email.return_value = member
+        mock_tenant_repo.read.return_value = {
+            "id": "t-a", "shop_domain": "store-a.myshopify.com",
         }
-        mock_team_repo.find_all_by_email.return_value = [member_a, member_b]
-        mock_tenant_repo.read.side_effect = [
-            {"id": "t-a", "shop_domain": "store-a.myshopify.com"},
-            {"id": "t-b", "business_name": "Brand B"},
-        ]
 
         send_mock = AsyncMock(return_value=True)
         with (
@@ -481,23 +490,16 @@ class TestTeamMemberMagicLinkRequest:
             patch("src.multi_tenant.magic_link_auth._send_magic_link_email", send_mock),
         ):
             await request_magic_link(
-                MagicLinkRequest(email="shared@example.com"), mock_request,
+                MagicLinkRequest(email="shared@example.com", tenant="t-a"),
+                mock_request,
             )
 
-        # Two tokens created (one per tenant)
-        assert mock_token_repo.create_token.call_count == 2
-        # SPEC-1618: Two SEPARATE emails sent (not one combined email)
-        assert send_mock.call_count == 2
+        # SPEC-1644: Only ONE token and ONE email (tenant-scoped, not cross-partition)
+        assert mock_token_repo.create_token.call_count == 1
+        assert send_mock.call_count == 1
 
-        # First email references only tenant A
-        email_a_html = send_mock.call_args_list[0][0][1]
-        assert "store-a.myshopify.com" in email_a_html
-        assert "Brand B" not in email_a_html  # must NOT contain other tenant
-
-        # Second email references only tenant B
-        email_b_html = send_mock.call_args_list[1][0][1]
-        assert "Brand B" in email_b_html
-        assert "store-a.myshopify.com" not in email_b_html  # must NOT contain other tenant
+        # Lookup was tenant-scoped (find_by_email with tenant_id, not find_all_by_email)
+        mock_team_repo.find_by_email.assert_called_once_with("t-a", "shared@example.com")
 
     @pytest.mark.asyncio
     async def test_ml27_owner_fallback_when_no_team_member(
@@ -505,8 +507,9 @@ class TestTeamMemberMagicLinkRequest:
         mock_token_repo, sample_tenant,
     ):
         """Email not in team_members but is tenant owner → standard flow."""
-        mock_team_repo.find_all_by_email.return_value = []
-        mock_tenant_repo.find_by_customer_email.return_value = sample_tenant
+        mock_team_repo.find_by_email.return_value = None
+        # SPEC-1644: direct tenant read (not cross-partition find_by_customer_email)
+        mock_tenant_repo.read.return_value = sample_tenant
 
         with (
             patch("src.multi_tenant.repositories.TeamMemberRepository", return_value=mock_team_repo),
@@ -515,7 +518,8 @@ class TestTeamMemberMagicLinkRequest:
             patch("src.multi_tenant.magic_link_auth._send_magic_link_email", new_callable=AsyncMock, return_value=True),
         ):
             result = await request_magic_link(
-                MagicLinkRequest(email="merchant@example.com"), mock_request,
+                MagicLinkRequest(email="merchant@example.com", tenant="tenant-abc-123"),
+                mock_request,
             )
 
         assert isinstance(result, MagicLinkRequestResponse)
@@ -641,8 +645,8 @@ class TestSpec1282UniformResponse:
     async def test_spec1282_unknown_email_returns_200(self, mock_request, mock_tenant_repo, mock_token_repo):
         """SPEC-1282: Unknown email returns 200 (no enumeration leak)."""
         mock_team = AsyncMock()
-        mock_team.find_all_by_email = AsyncMock(return_value=[])
-        mock_tenant_repo.find_by_customer_email.return_value = None
+        mock_team.find_by_email = AsyncMock(return_value=None)
+        mock_tenant_repo.read.return_value = None
 
         with (
             patch("src.multi_tenant.repositories.TeamMemberRepository", return_value=mock_team),
@@ -650,7 +654,8 @@ class TestSpec1282UniformResponse:
             patch("src.multi_tenant.repositories.VerificationTokenRepository", return_value=mock_token_repo),
         ):
             result = await request_magic_link(
-                MagicLinkRequest(email="nonexistent@nowhere.com"), mock_request,
+                MagicLinkRequest(email="nonexistent@nowhere.com", tenant="any-tenant"),
+                mock_request,
             )
         assert isinstance(result, MagicLinkRequestResponse)
         # No token created
@@ -662,8 +667,8 @@ class TestSpec1282UniformResponse:
     ):
         """SPEC-1282: Known email also returns 200 (same shape)."""
         mock_team = AsyncMock()
-        mock_team.find_all_by_email = AsyncMock(return_value=[])
-        mock_tenant_repo.find_by_customer_email.return_value = sample_tenant
+        mock_team.find_by_email = AsyncMock(return_value=None)
+        mock_tenant_repo.read.return_value = sample_tenant
 
         with (
             patch("src.multi_tenant.repositories.TeamMemberRepository", return_value=mock_team),
@@ -672,7 +677,8 @@ class TestSpec1282UniformResponse:
             patch("src.multi_tenant.magic_link_auth._send_magic_link_email", new_callable=AsyncMock, return_value=True),
         ):
             result = await request_magic_link(
-                MagicLinkRequest(email="merchant@example.com"), mock_request,
+                MagicLinkRequest(email="merchant@example.com", tenant="tenant-abc-123"),
+                mock_request,
             )
         assert isinstance(result, MagicLinkRequestResponse)
 
@@ -682,7 +688,8 @@ class TestSpec1282UniformResponse:
         for _ in range(_RATE_MAX):
             _is_rate_limited(mock_request.client.host)
         result = await request_magic_link(
-            MagicLinkRequest(email="any@test.com"), mock_request,
+            MagicLinkRequest(email="any@test.com", tenant="any-tenant"),
+            mock_request,
         )
         assert isinstance(result, MagicLinkRequestResponse)
 
@@ -772,14 +779,15 @@ class TestSpec1619OriginUrlPreservation:
         assert url.startswith("https://staging.example.com/admin/standalone/verify-magic-link")
 
     def test_request_model_accepts_tenant_field(self):
-        """MagicLinkRequest model accepts optional 'tenant' field."""
+        """MagicLinkRequest model accepts 'tenant' field."""
         req = MagicLinkRequest(email="user@test.com", tenant="staging-001")
         assert req.tenant == "staging-001"
 
-    def test_request_model_tenant_defaults_to_none(self):
-        """MagicLinkRequest model defaults tenant to None."""
-        req = MagicLinkRequest(email="user@test.com")
-        assert req.tenant is None
+    def test_request_model_tenant_is_required(self):
+        """SPEC-1644: MagicLinkRequest requires tenant (URL must identify tenant)."""
+        from pydantic import ValidationError
+        with pytest.raises(ValidationError):
+            MagicLinkRequest(email="user@test.com")  # missing required 'tenant'
 
     @pytest.mark.asyncio
     async def test_owner_path_includes_origin_tenant(
@@ -788,8 +796,8 @@ class TestSpec1619OriginUrlPreservation:
     ):
         """Owner path: origin tenant from request body is included in URL."""
         mock_team_repo = AsyncMock()
-        mock_team_repo.find_all_by_email = AsyncMock(return_value=[])
-        mock_tenant_repo.find_by_customer_email.return_value = sample_tenant
+        mock_team_repo.find_by_email = AsyncMock(return_value=None)
+        mock_tenant_repo.read.return_value = sample_tenant
 
         send_mock = AsyncMock(return_value=True)
         with (
@@ -817,7 +825,8 @@ class TestSpec1619OriginUrlPreservation:
             "id": "m-1", "tenant_id": "t-1", "email": "user@test.com",
             "role": "admin", "is_active": True,
         }
-        mock_team_repo.find_all_by_email.return_value = [member]
+        # SPEC-1644: tenant-scoped lookup returns single member
+        mock_team_repo.find_by_email.return_value = member
         mock_tenant_repo.read.return_value = {
             "id": "t-1", "business_name": "Test Co",
         }
