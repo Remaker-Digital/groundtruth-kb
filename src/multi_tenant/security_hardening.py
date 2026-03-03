@@ -214,6 +214,112 @@ FAILED_AUTH_WINDOW_SECONDS = 300  # 5 minutes
 AUTH_BLOCK_DURATION_SECONDS = 900  # 15 minutes
 
 
+# ---------------------------------------------------------------------------
+# Distributed rate limiting abstraction (SPEC-1626)
+# ---------------------------------------------------------------------------
+
+
+class RateLimitBackend:
+    """Protocol for pluggable rate limit storage backends.
+
+    The sliding-window-counter pattern is duplicated across 5+ modules
+    (email_verification, magic_link_auth, widget_otp_verification,
+    admin_apikey_api, standalone_auth). This abstraction allows all of
+    them to share the same interface while supporting different storage
+    backends:
+
+        - ``InMemoryRateLimitBackend``: Current behavior — single-process,
+          no external dependencies. Suitable for development and
+          single-replica deployments.
+        - Future: ``RedisRateLimitBackend``, ``CosmosRateLimitBackend``
+          for multi-replica horizontal scaling.
+
+    Usage::
+
+        backend = get_rate_limit_backend()
+        if backend.is_limited("ip:192.168.1.1", max_requests=3, window_seconds=300):
+            return  # Rate limited
+    """
+
+    def is_limited(self, key: str, *, max_requests: int, window_seconds: float) -> bool:
+        """Check and record a request. Returns True if rate limited."""
+        raise NotImplementedError
+
+    def reset(self, key: str) -> None:
+        """Clear rate limit state for a key (e.g., on successful auth)."""
+        raise NotImplementedError
+
+    def cleanup(self) -> int:
+        """Remove expired entries. Returns count of removed entries."""
+        raise NotImplementedError
+
+
+class InMemoryRateLimitBackend(RateLimitBackend):
+    """In-memory sliding window rate limiter — single-process only.
+
+    Thread-safe for asyncio (cooperative multitasking). For horizontal
+    scaling across multiple replicas, swap to a Redis or Cosmos backend.
+    """
+
+    def __init__(self) -> None:
+        self._windows: dict[str, list[float]] = {}
+
+    def is_limited(self, key: str, *, max_requests: int, window_seconds: float) -> bool:
+        now = time.time()
+        window_start = now - window_seconds
+        if key in self._windows:
+            self._windows[key] = [
+                ts for ts in self._windows[key] if ts > window_start
+            ]
+        requests = self._windows.get(key, [])
+        if len(requests) >= max_requests:
+            return True
+        self._windows.setdefault(key, []).append(now)
+        return False
+
+    def reset(self, key: str) -> None:
+        self._windows.pop(key, None)
+
+    def cleanup(self) -> int:
+        now = time.time()
+        removed = 0
+        empty_keys = []
+        for key, timestamps in self._windows.items():
+            before = len(timestamps)
+            self._windows[key] = [ts for ts in timestamps if ts > now - 600]
+            removed += before - len(self._windows[key])
+            if not self._windows[key]:
+                empty_keys.append(key)
+        for key in empty_keys:
+            del self._windows[key]
+            removed += 1
+        return removed
+
+
+# -- Singleton accessor for the rate limit backend -------------------------
+
+_rate_limit_backend: RateLimitBackend | None = None
+
+
+def get_rate_limit_backend() -> RateLimitBackend:
+    """Return the shared rate limit backend (creates InMemory if none set)."""
+    global _rate_limit_backend
+    if _rate_limit_backend is None:
+        _rate_limit_backend = InMemoryRateLimitBackend()
+    return _rate_limit_backend
+
+
+def set_rate_limit_backend(backend: RateLimitBackend) -> None:
+    """Swap the rate limit backend (e.g., to Redis for production)."""
+    global _rate_limit_backend
+    _rate_limit_backend = backend
+
+
+# ---------------------------------------------------------------------------
+# Pre-auth rate limiting (original implementation)
+# ---------------------------------------------------------------------------
+
+
 @dataclass
 class _AuthAttemptTracker:
     """Tracks failed authentication attempts per IP address."""
@@ -360,6 +466,49 @@ def get_pre_auth_limiter() -> PreAuthRateLimiter:
     if _pre_auth_limiter is None:
         _pre_auth_limiter = PreAuthRateLimiter()
     return _pre_auth_limiter
+
+
+# Background cleanup task (SPEC-1623)
+_cleanup_task: Any = None
+_CLEANUP_INTERVAL_SECONDS = 300  # 5 minutes
+
+
+async def _pre_auth_cleanup_loop() -> None:
+    """Periodically remove expired entries from the pre-auth rate limiter."""
+    import asyncio
+
+    while True:
+        await asyncio.sleep(_CLEANUP_INTERVAL_SECONDS)
+        try:
+            removed = get_pre_auth_limiter().cleanup()
+            if removed > 0:
+                logger.info("Pre-auth cleanup: removed %d expired tracker entries", removed)
+        except Exception:
+            logger.debug("Pre-auth cleanup cycle failed", exc_info=True)
+
+
+async def start_pre_auth_cleanup() -> None:
+    """Start the pre-auth cleanup background task (SPEC-1623)."""
+    import asyncio
+
+    global _cleanup_task  # noqa: PLW0603
+    _cleanup_task = asyncio.create_task(_pre_auth_cleanup_loop())
+    logger.info("Pre-auth cleanup task started (%ds interval)", _CLEANUP_INTERVAL_SECONDS)
+
+
+async def stop_pre_auth_cleanup() -> None:
+    """Stop the pre-auth cleanup background task."""
+    import asyncio
+
+    global _cleanup_task  # noqa: PLW0603
+    if _cleanup_task and not _cleanup_task.done():
+        _cleanup_task.cancel()
+        try:
+            await _cleanup_task
+        except asyncio.CancelledError:
+            pass
+        logger.info("Pre-auth cleanup task stopped")
+    _cleanup_task = None
 
 
 class PreAuthRateLimitMiddleware:

@@ -347,40 +347,42 @@ class TestMagicLinkAuthSpecs:
         source = inspect.getsource(_send_magic_link_email)
         assert "[Agent Red] Sign In Link" in source
 
-    def test_spec_1320_multi_tenant_magic_link_has_separate_buttons(self):
-        """SPEC-1320: Multi-tenant magic link with separate sign-in buttons per tenant."""
-        from src.multi_tenant.magic_link_auth import (
-            _MULTI_TENANT_EMAIL_BODY,
-            _TENANT_BUTTON_TEMPLATE,
+    def test_spec_1618_multi_tenant_templates_removed(self):
+        """SPEC-1618: Multi-tenant combined email templates must not exist.
+
+        Sending an email containing links to multiple tenancies is always
+        a defect. The _MULTI_TENANT_EMAIL_BODY and _TENANT_BUTTON_TEMPLATE
+        templates have been removed. Each tenant match now sends a separate
+        email using the standard _MAGIC_LINK_EMAIL_BODY template.
+        """
+        import inspect
+        import src.multi_tenant.magic_link_auth as mlm
+
+        source = inspect.getsource(mlm)
+        assert "_MULTI_TENANT_EMAIL_BODY" not in source
+        assert "_TENANT_BUTTON_TEMPLATE" not in source
+
+    def test_spec_1618_single_email_template_supports_tenant_context(self):
+        """SPEC-1618: The standard email template includes a {tenant_context}
+        placeholder so multi-account users see which account the email is for.
+        """
+        from src.multi_tenant.magic_link_auth import _MAGIC_LINK_EMAIL_BODY
+
+        assert "{tenant_context}" in _MAGIC_LINK_EMAIL_BODY
+        assert "{magic_link_url}" in _MAGIC_LINK_EMAIL_BODY
+
+        # Renders cleanly with empty tenant context (single-tenant case)
+        html = _MAGIC_LINK_EMAIL_BODY.format(
+            magic_link_url="https://example.com/verify?token=tok",
+            tenant_context="",
         )
+        assert "Sign In" in html
+        assert "https://example.com/verify?token=tok" in html
 
-        # Multi-tenant template mentions multiple accounts
-        assert "multiple accounts" in _MULTI_TENANT_EMAIL_BODY
-
-        # Template has {tenant_buttons} placeholder
-        assert "{tenant_buttons}" in _MULTI_TENANT_EMAIL_BODY
-
-        # Button template has per-tenant label
-        assert "{tenant_label}" in _TENANT_BUTTON_TEMPLATE
-        assert "Sign In" in _TENANT_BUTTON_TEMPLATE
-
-    def test_spec_1320_multi_tenant_renders_multiple_buttons(self):
-        """SPEC-1320: Rendering multi-tenant email produces one button per tenant."""
-        from src.multi_tenant.magic_link_auth import (
-            _MULTI_TENANT_EMAIL_BODY,
-            _TENANT_BUTTON_TEMPLATE,
+        # Renders cleanly with tenant context (multi-account case)
+        html = _MAGIC_LINK_EMAIL_BODY.format(
+            magic_link_url="https://example.com/verify?token=tok",
+            tenant_context='<p>Account: <strong>Shop A</strong></p>',
         )
-
-        buttons = "".join(
-            _TENANT_BUTTON_TEMPLATE.format(
-                magic_link_url=f"https://example.com/verify?token=tok_{i}",
-                tenant_label=label,
-            )
-            for i, label in enumerate(["Shop A", "Shop B", "Shop C"])
-        )
-        html = _MULTI_TENANT_EMAIL_BODY.format(tenant_buttons=buttons)
-
         assert "Shop A" in html
-        assert "Shop B" in html
-        assert "Shop C" in html
-        assert html.count("Sign In") >= 3
+        assert "Sign In" in html

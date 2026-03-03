@@ -155,10 +155,17 @@ class TenantAuthMiddleware(BaseHTTPMiddleware):
         if is_auth_exempt(request.url.path):
             return await call_next(request)
 
+        # Extract client IP for pre-auth rate limiting (SPEC-1621)
+        client = request.scope.get("client")
+        client_ip = client[0] if client else "unknown"
+
         try:
             tenant_context = await self._authenticate(request)
             request.state.tenant_context = tenant_context
         except AuthenticationError as exc:
+            # Record failure for brute-force protection (SPEC-1621)
+            from src.multi_tenant.security_hardening import get_pre_auth_limiter
+            get_pre_auth_limiter().record_failure(client_ip)
             logger.warning(
                 "Auth failed: path=%s method=%s error=%s",
                 request.url.path, request.method, exc.message,
@@ -168,6 +175,9 @@ class TenantAuthMiddleware(BaseHTTPMiddleware):
                 content={"error": exc.message},
             )
         except Exception as exc:
+            # Record failure for brute-force protection (SPEC-1621)
+            from src.multi_tenant.security_hardening import get_pre_auth_limiter
+            get_pre_auth_limiter().record_failure(client_ip)
             logger.exception(
                 "Unexpected error during authentication: path=%s method=%s",
                 request.url.path, request.method,
@@ -176,6 +186,10 @@ class TenantAuthMiddleware(BaseHTTPMiddleware):
                 status_code=500,
                 content={"error": "Internal authentication error."},
             )
+
+        # Record success to reset failure counter (SPEC-1621)
+        from src.multi_tenant.security_hardening import get_pre_auth_limiter
+        get_pre_auth_limiter().record_success(client_ip)
 
         return await call_next(request)
 

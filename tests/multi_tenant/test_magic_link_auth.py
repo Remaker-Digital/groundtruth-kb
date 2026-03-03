@@ -451,10 +451,14 @@ class TestTeamMemberMagicLinkRequest:
         assert call_kwargs.kwargs.get("member_id") == "member-001"
 
     @pytest.mark.asyncio
-    async def test_ml26_multi_tenant_sends_multi_button_email(
+    async def test_ml26_multi_tenant_sends_separate_emails(
         self, mock_request, mock_team_repo, mock_tenant_repo, mock_token_repo,
     ):
-        """Email in two tenants → single email with two sign-in buttons."""
+        """SPEC-1618: Email in two tenants → TWO separate emails, one per tenant.
+
+        Each email must reference ONLY the specific merchant account.
+        Sending an email containing links to multiple tenancies is a defect.
+        """
         member_a = {
             "id": "m-a", "tenant_id": "t-a", "email": "shared@example.com",
             "role": "admin", "is_active": True,
@@ -482,12 +486,18 @@ class TestTeamMemberMagicLinkRequest:
 
         # Two tokens created (one per tenant)
         assert mock_token_repo.create_token.call_count == 2
-        # Single email sent
-        send_mock.assert_called_once()
-        # Email body contains both tenant labels
-        email_html = send_mock.call_args[0][1]
-        assert "store-a.myshopify.com" in email_html
-        assert "Brand B" in email_html
+        # SPEC-1618: Two SEPARATE emails sent (not one combined email)
+        assert send_mock.call_count == 2
+
+        # First email references only tenant A
+        email_a_html = send_mock.call_args_list[0][0][1]
+        assert "store-a.myshopify.com" in email_a_html
+        assert "Brand B" not in email_a_html  # must NOT contain other tenant
+
+        # Second email references only tenant B
+        email_b_html = send_mock.call_args_list[1][0][1]
+        assert "Brand B" in email_b_html
+        assert "store-a.myshopify.com" not in email_b_html  # must NOT contain other tenant
 
     @pytest.mark.asyncio
     async def test_ml27_owner_fallback_when_no_team_member(
@@ -729,3 +739,101 @@ class TestSpec1286SingleUseTokens:
             token_id="any",
             token_type="magic_link",
         )
+
+
+class TestSpec1619OriginUrlPreservation:
+    """SPEC-1619: Magic link URL must match origin URL.
+
+    When a user clicks 'Sign in with email' on a tenant-scoped page
+    (?tenant=<slug>), the magic link they receive must include that
+    tenant slug so they return to the same context.
+    """
+
+    def test_build_magic_link_url_without_tenant(self):
+        """No origin tenant → plain verify URL."""
+        from src.multi_tenant.magic_link_auth import _build_magic_link_url
+
+        url = _build_magic_link_url(
+            scheme="https", host="example.com", token_id="tok123",
+        )
+        assert url == "https://example.com/admin/standalone/verify-magic-link?token=tok123"
+        assert "tenant=" not in url
+
+    def test_build_magic_link_url_with_tenant(self):
+        """Origin tenant slug → included in verify URL."""
+        from src.multi_tenant.magic_link_auth import _build_magic_link_url
+
+        url = _build_magic_link_url(
+            scheme="https", host="staging.example.com",
+            token_id="tok456", origin_tenant="my-shop",
+        )
+        assert "token=tok456" in url
+        assert "tenant=my-shop" in url
+        assert url.startswith("https://staging.example.com/admin/standalone/verify-magic-link")
+
+    def test_request_model_accepts_tenant_field(self):
+        """MagicLinkRequest model accepts optional 'tenant' field."""
+        req = MagicLinkRequest(email="user@test.com", tenant="staging-001")
+        assert req.tenant == "staging-001"
+
+    def test_request_model_tenant_defaults_to_none(self):
+        """MagicLinkRequest model defaults tenant to None."""
+        req = MagicLinkRequest(email="user@test.com")
+        assert req.tenant is None
+
+    @pytest.mark.asyncio
+    async def test_owner_path_includes_origin_tenant(
+        self, mock_request, mock_team_repo, mock_tenant_repo,
+        mock_token_repo, sample_tenant,
+    ):
+        """Owner path: origin tenant from request body is included in URL."""
+        mock_team_repo = AsyncMock()
+        mock_team_repo.find_all_by_email = AsyncMock(return_value=[])
+        mock_tenant_repo.find_by_customer_email.return_value = sample_tenant
+
+        send_mock = AsyncMock(return_value=True)
+        with (
+            patch("src.multi_tenant.repositories.TeamMemberRepository", return_value=mock_team_repo),
+            patch("src.multi_tenant.repositories.TenantRepository", return_value=mock_tenant_repo),
+            patch("src.multi_tenant.repositories.VerificationTokenRepository", return_value=mock_token_repo),
+            patch("src.multi_tenant.magic_link_auth._send_magic_link_email", send_mock),
+        ):
+            await request_magic_link(
+                MagicLinkRequest(email="merchant@example.com", tenant="staging-001"),
+                mock_request,
+            )
+
+        send_mock.assert_called_once()
+        email_html = send_mock.call_args[0][1]
+        assert "tenant=staging-001" in email_html
+
+    @pytest.mark.asyncio
+    async def test_member_path_includes_origin_tenant(
+        self, mock_request, mock_team_repo, mock_tenant_repo,
+        mock_token_repo,
+    ):
+        """Member path: origin tenant from request body is included in URL."""
+        member = {
+            "id": "m-1", "tenant_id": "t-1", "email": "user@test.com",
+            "role": "admin", "is_active": True,
+        }
+        mock_team_repo.find_all_by_email.return_value = [member]
+        mock_tenant_repo.read.return_value = {
+            "id": "t-1", "business_name": "Test Co",
+        }
+
+        send_mock = AsyncMock(return_value=True)
+        with (
+            patch("src.multi_tenant.repositories.TeamMemberRepository", return_value=mock_team_repo),
+            patch("src.multi_tenant.repositories.TenantRepository", return_value=mock_tenant_repo),
+            patch("src.multi_tenant.repositories.VerificationTokenRepository", return_value=mock_token_repo),
+            patch("src.multi_tenant.magic_link_auth._send_magic_link_email", send_mock),
+        ):
+            await request_magic_link(
+                MagicLinkRequest(email="user@test.com", tenant="my-shop"),
+                mock_request,
+            )
+
+        send_mock.assert_called_once()
+        email_html = send_mock.call_args[0][1]
+        assert "tenant=my-shop" in email_html

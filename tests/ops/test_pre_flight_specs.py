@@ -114,22 +114,22 @@ class TestPhaseDSSE:
 class TestPhaseAPreBuild:
     """SPEC-1467: Phase A is Pre-Build Verification."""
 
-    @patch("pre_flight_checklist.subprocess.run")
-    def test_phase_a_checks_version_bump(self, mock_run):
+    @patch("scripts._subprocess_stream.stream_subprocess")
+    def test_phase_a_checks_version_bump(self, mock_stream):
         """A.1 verifies PRODUCT_VERSION matches expected version."""
-        mock_run.return_value = MagicMock(
-            stdout="1.60.0", stderr="", returncode=0
+        mock_stream.return_value = MagicMock(
+            returncode=0, stdout="1.60.0", duration=0.1, timed_out=False,
         )
         results = phase_a("1.60.0")
         a1 = [r for r in results if r.id == "A.1"]
         assert len(a1) == 1
         assert a1[0].status == "PASS"
 
-    @patch("pre_flight_checklist.subprocess.run")
-    def test_phase_a_checks_version_mismatch(self, mock_run):
+    @patch("scripts._subprocess_stream.stream_subprocess")
+    def test_phase_a_checks_version_mismatch(self, mock_stream):
         """A.1 FAILS when version doesn't match."""
-        mock_run.return_value = MagicMock(
-            stdout="1.59.0", stderr="", returncode=0
+        mock_stream.return_value = MagicMock(
+            returncode=0, stdout="1.59.0", duration=0.1, timed_out=False,
         )
         results = phase_a("1.60.0")
         a1 = [r for r in results if r.id == "A.1"]
@@ -184,10 +184,10 @@ class TestPhaseASnapshotCheck:
         )
         snapshot_existed = snapshot_path.exists()
 
-        # Use a mock subprocess for tier regression tests
-        with patch("pre_flight_checklist.subprocess.run") as mock_run:
-            mock_run.return_value = MagicMock(
-                stdout="0 passed", stderr="", returncode=0
+        # Use a mock for stream_subprocess (tier regression + upgrade verification)
+        with patch("scripts._subprocess_stream.stream_subprocess") as mock_stream:
+            mock_stream.return_value = MagicMock(
+                returncode=0, stdout="0 passed", duration=0.1, timed_out=False,
             )
             # Temporarily rename snapshot if it exists
             temp_path = snapshot_path.with_suffix(".tmp_test_backup")
@@ -216,9 +216,9 @@ class TestPhaseCApiCallCount:
     """SPEC-1471: Phase C.1-C.10 consume 15+ API calls."""
 
     @patch("pre_flight_checklist.time.sleep")
-    @patch("pre_flight_checklist.subprocess.run")
+    @patch("scripts._subprocess_stream.stream_subprocess")
     @patch("upgrade_verification.urlopen")
-    def test_phase_c_makes_at_least_15_calls(self, mock_urlopen, mock_run,
+    def test_phase_c_makes_at_least_15_calls(self, mock_urlopen, mock_stream,
                                               mock_sleep):
         mock_resp = MagicMock()
         mock_resp.status = 200
@@ -235,8 +235,9 @@ class TestPhaseCApiCallCount:
         mock_resp.__exit__ = MagicMock(return_value=False)
         mock_urlopen.return_value = mock_resp
 
-        mock_run.return_value = MagicMock(
-            stdout="17 passed", stderr="", returncode=0
+        mock_stream.return_value = MagicMock(
+            returncode=0, stdout="35 PASS, 0 FAIL\n17 passed",
+            duration=1.0, timed_out=False,
         )
 
         results = phase_c(

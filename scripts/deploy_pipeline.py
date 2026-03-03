@@ -128,7 +128,10 @@ def log(level: str, msg: str) -> None:
     ts = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
     line = f"[{ts}] [{level:5s}] {msg}"
     _log_lines.append(line)
-    print(line, flush=True)
+    try:
+        print(line, flush=True)
+    except (OSError, ValueError):
+        pass  # stdout closed (background task) — still captured in _log_lines
 
 
 def _write_log_file(env: str) -> Path:
@@ -798,6 +801,14 @@ def _create_defect_work_item(results: list[PhaseResult], args: argparse.Namespac
 # ---------------------------------------------------------------------------
 # Summary report
 # ---------------------------------------------------------------------------
+def _safe_print(*args_p, **kwargs_p) -> None:
+    """Print that silently ignores closed stdout (background tasks)."""
+    try:
+        print(*args_p, **kwargs_p)
+    except (OSError, ValueError):
+        pass
+
+
 def _print_summary(results: list[PhaseResult], args: argparse.Namespace,
                    start_time: float, log_path: Path | None, defect_wi: str | None) -> None:
     """Print final summary report."""
@@ -807,31 +818,31 @@ def _print_summary(results: list[PhaseResult], args: argparse.Namespace,
     all_passed = all(r.passed or r.status == "SKIP" for r in results)
     verdict = "SUCCESS" if all_passed else "FAILURE"
 
-    print()
-    print("=" * 55)
-    print(f"  DEPLOY PIPELINE — {args.env} {args.version}")
-    print(f"  Started: {datetime.fromtimestamp(start_time).strftime('%Y-%m-%d %H:%M:%S')}")
-    print("=" * 55)
-    print()
+    _safe_print()
+    _safe_print("=" * 55)
+    _safe_print(f"  DEPLOY PIPELINE — {args.env} {args.version}")
+    _safe_print(f"  Started: {datetime.fromtimestamp(start_time).strftime('%Y-%m-%d %H:%M:%S')}")
+    _safe_print("=" * 55)
+    _safe_print()
 
     for r in results:
         dots = "." * (35 - len(r.name))
         extra = f"  {r.extra}" if r.extra else ""
-        print(f"Phase {r.phase:2d}: {r.name} {dots} {r.status} ({r.duration:.1f}s){extra}")
+        _safe_print(f"Phase {r.phase:2d}: {r.name} {dots} {r.status} ({r.duration:.1f}s){extra}")
 
-    print()
-    print("=" * 55)
-    print(f"  RESULT: {verdict}")
-    print(f"  Duration: {minutes}m {seconds}s")
-    print(f"  Image: {ACR_LOGIN_SERVER}/{IMAGE_REPO}:{args.version}")
+    _safe_print()
+    _safe_print("=" * 55)
+    _safe_print(f"  RESULT: {verdict}")
+    _safe_print(f"  Duration: {minutes}m {seconds}s")
+    _safe_print(f"  Image: {ACR_LOGIN_SERVER}/{IMAGE_REPO}:{args.version}")
     env_config = ENVIRONMENTS.get(args.env, {})
-    print(f"  Environment: {args.env} ({env_config.get('container_app', '?')})")
+    _safe_print(f"  Environment: {args.env} ({env_config.get('container_app', '?')})")
     if defect_wi:
-        print(f"  Defect: {defect_wi}")
+        _safe_print(f"  Defect: {defect_wi}")
     if log_path:
-        print(f"  Log: {log_path}")
-    print("=" * 55)
-    print()
+        _safe_print(f"  Log: {log_path}")
+    _safe_print("=" * 55)
+    _safe_print()
 
 
 # ---------------------------------------------------------------------------

@@ -743,7 +743,12 @@ class TestTeamInviteEmailLink:
 
     @pytest.mark.asyncio
     async def test_cascading_url_fallback_pattern(self):
-        """APP_BASE_URL takes priority in cascading URL resolution."""
+        """STANDALONE_ADMIN_URL takes priority in cascading URL resolution.
+
+        Updated S132: send_team_invite_alert now uses _build_admin_login_url()
+        which reads STANDALONE_ADMIN_URL (not APP_BASE_URL) and appends
+        ?tenant=<slug> per SPEC-1617.
+        """
         captured: list[Alert] = []
         original_create = create_alert
 
@@ -756,11 +761,12 @@ class TestTeamInviteEmailLink:
         configure_alert_service(service)
         try:
             with patch("src.multi_tenant.alert_delivery.create_alert", side_effect=_intercept):
-                with patch.dict(os.environ, {"APP_BASE_URL": "https://custom.example.com"}, clear=False):
+                with patch.dict(os.environ, {"STANDALONE_ADMIN_URL": "https://custom.example.com/admin/standalone/"}, clear=False):
                     await send_team_invite_alert("t", "a@b.com", "Admin", "agent")
             assert len(captured) == 1
             admin_url = captured[0].metadata.get("admin_url", "")
-            assert admin_url == "https://custom.example.com/admin/standalone/"
+            # SPEC-1617: URL includes ?tenant=<slug> (slug = raw tenant_id when no shop_domain/brand_name)
+            assert admin_url == "https://custom.example.com/admin/standalone/?tenant=t"
         finally:
             configure_alert_service(None)
 

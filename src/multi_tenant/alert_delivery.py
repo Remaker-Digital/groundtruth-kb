@@ -788,6 +788,8 @@ class EmailAlertChannel(AlertChannel):
         smtp_from = os.environ.get("SMTP_FROM", smtp_user) or self.SENDER_ADDRESS
 
         try:
+            import asyncio
+
             msg = MIMEMultipart("alternative")
             msg["From"] = f"Agent Red <{smtp_from}>"
             msg["To"] = to_email
@@ -797,21 +799,24 @@ class EmailAlertChannel(AlertChannel):
             msg.attach(MIMEText(alert.message, "plain"))
             msg.attach(MIMEText(html_body, "html"))
 
-            if smtp_port == 465:
-                # Implicit SSL/TLS (e.g., Titan Email, some providers)
-                with smtplib.SMTP_SSL(smtp_host, smtp_port, timeout=self.TIMEOUT_SECONDS) as server:
-                    if smtp_user and smtp_pass:
-                        server.login(smtp_user, smtp_pass)
-                    server.send_message(msg)
-            else:
-                # STARTTLS on port 587 or plain on port 25
-                with smtplib.SMTP(smtp_host, smtp_port, timeout=self.TIMEOUT_SECONDS) as server:
-                    server.ehlo()
-                    if smtp_port != 25:
-                        server.starttls()
-                    if smtp_user and smtp_pass:
-                        server.login(smtp_user, smtp_pass)
-                    server.send_message(msg)
+            timeout = self.TIMEOUT_SECONDS
+
+            def _smtp_send() -> None:
+                if smtp_port == 465:
+                    with smtplib.SMTP_SSL(smtp_host, smtp_port, timeout=timeout) as server:
+                        if smtp_user and smtp_pass:
+                            server.login(smtp_user, smtp_pass)
+                        server.send_message(msg)
+                else:
+                    with smtplib.SMTP(smtp_host, smtp_port, timeout=timeout) as server:
+                        server.ehlo()
+                        if smtp_port != 25:
+                            server.starttls()
+                        if smtp_user and smtp_pass:
+                            server.login(smtp_user, smtp_pass)
+                        server.send_message(msg)
+
+            await asyncio.to_thread(_smtp_send)  # SPEC-1622: non-blocking SMTP
 
             logger.info(
                 "Email sent via SMTP: alert_id=%s to=%s host=%s",

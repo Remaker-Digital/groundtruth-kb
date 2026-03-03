@@ -425,13 +425,19 @@ async def handle_checkout_completed(event: dict) -> dict:
     if customer_email:
         from src.multi_tenant.welcome_email import send_welcome_email
 
-        await send_welcome_email(
-            to_email=customer_email,
-            tenant_id=tenant.tenant_id,
-            superadmin_key=superadmin_key,
-            widget_key=widget_key,
-            tier=provisioning_payload.get("tier"),
-        )
+        try:
+            await send_welcome_email(
+                to_email=customer_email,
+                tenant_id=tenant.tenant_id,
+                superadmin_key=superadmin_key,
+                widget_key=widget_key,
+                tier=provisioning_payload.get("tier"),
+            )
+        except Exception:
+            logger.exception(
+                "Welcome email failed for tenant=%s — provisioning continues",
+                tenant.tenant_id[:8],
+            )
 
     return provisioning_payload
 

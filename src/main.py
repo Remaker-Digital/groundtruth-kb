@@ -25,6 +25,7 @@ from src.app.lifecycle import (
     register_middleware,
     register_startup_handlers,
     register_shutdown_handlers,
+    build_app_lifespan,
 )
 from src.app.background import register_idle_scanner, register_sla_snapshots, register_alert_evaluation, register_ingestion_processor, register_archival_sweep, register_trial_scanner, register_trial_warning, register_expiry_scanner, register_expiry_warning, register_vectorization_scanner, register_website_refresh
 from src.app.health import register_health_endpoints
@@ -33,24 +34,31 @@ from src.app.health import register_health_endpoints
 # Application composition
 # ---------------------------------------------------------------------------
 
-app = create_app()
+# Step 1: Collect all startup/shutdown handlers into registries (SPEC-1623).
+# This must happen BEFORE app creation because the lifespan context manager
+# is passed to FastAPI() and cannot be changed after construction.
+register_startup_handlers()
+register_shutdown_handlers()
+register_idle_scanner()
+register_sla_snapshots()
+register_alert_evaluation()
+register_ingestion_processor()
+register_archival_sweep()
+register_trial_scanner()
+register_trial_warning()
+register_expiry_scanner()
+register_expiry_warning()
+register_vectorization_scanner()
+register_website_refresh()
+
+# Step 2: Build the lifespan and create the app.
+app = create_app(lifespan=build_app_lifespan())
+
+# Step 3: Register middleware, routers, static mounts, and health endpoints.
 register_middleware(app)
 register_routers(app)
 mount_static_apps(app)
 mount_standalone_admin(app)
-register_startup_handlers(app)
-register_shutdown_handlers(app)
-register_idle_scanner(app)
-register_sla_snapshots(app)
-register_alert_evaluation(app)
-register_ingestion_processor(app)
-register_archival_sweep(app)
-register_trial_scanner(app)
-register_trial_warning(app)
-register_expiry_scanner(app)
-register_expiry_warning(app)
-register_vectorization_scanner(app)
-register_website_refresh(app)
 register_health_endpoints(app)
 
 # ---------------------------------------------------------------------------

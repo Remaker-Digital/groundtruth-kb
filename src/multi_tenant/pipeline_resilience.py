@@ -152,6 +152,7 @@ class _TenantGate:
         self._queue_depth = queue_depth
         self._waiting = 0
         self._active = 0
+        self._queue_lock = asyncio.Lock()  # SPEC-1625: guard check-and-increment
 
     @property
     def active(self) -> int:
@@ -171,16 +172,21 @@ class _TenantGate:
 
         Returns True if acquired (caller must release). Returns False
         if the gate is full (caller should reject the request).
-        """
-        # Check if the queue is full before waiting
-        if self._semaphore.locked() and self._waiting >= self._queue_depth:
-            return False
 
-        self._waiting += 1
+        Uses an asyncio.Lock around the queue check-and-increment to
+        prevent oversubscription under contention (SPEC-1625).
+        """
+        async with self._queue_lock:
+            # Check if the queue is full before waiting
+            if self._semaphore.locked() and self._waiting >= self._queue_depth:
+                return False
+            self._waiting += 1
+
         try:
             await self._semaphore.acquire()
         finally:
-            self._waiting -= 1
+            async with self._queue_lock:
+                self._waiting -= 1
 
         self._active += 1
         return True

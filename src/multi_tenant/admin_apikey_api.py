@@ -265,6 +265,8 @@ async def _send_api_key_email(
     )
 
     try:
+        import asyncio
+
         msg = MIMEMultipart("alternative")
         msg["From"] = f"Agent Red <{smtp_from}>"
         msg["To"] = to_email
@@ -272,22 +274,22 @@ async def _send_api_key_email(
         msg.attach(MIMEText(plain_body, "plain"))
         msg.attach(MIMEText(html_body, "html"))
 
-        if smtp_port == 465:
-            # Implicit SSL/TLS (e.g., Titan Email, some providers)
-            with smtplib.SMTP_SSL(smtp_host, smtp_port, timeout=10.0) as server:
-                if smtp_user and smtp_pass:
-                    server.login(smtp_user, smtp_pass)
-                server.send_message(msg)
-        else:
-            # STARTTLS on port 587 or plain on port 25
-            with smtplib.SMTP(smtp_host, smtp_port, timeout=10.0) as server:
-                server.ehlo()
-                if smtp_port != 25:
-                    server.starttls()
-                if smtp_user and smtp_pass:
-                    server.login(smtp_user, smtp_pass)
-                server.send_message(msg)
+        def _smtp_send() -> None:
+            if smtp_port == 465:
+                with smtplib.SMTP_SSL(smtp_host, smtp_port, timeout=10.0) as server:
+                    if smtp_user and smtp_pass:
+                        server.login(smtp_user, smtp_pass)
+                    server.send_message(msg)
+            else:
+                with smtplib.SMTP(smtp_host, smtp_port, timeout=10.0) as server:
+                    server.ehlo()
+                    if smtp_port != 25:
+                        server.starttls()
+                    if smtp_user and smtp_pass:
+                        server.login(smtp_user, smtp_pass)
+                    server.send_message(msg)
 
+        await asyncio.to_thread(_smtp_send)  # SPEC-1622: non-blocking SMTP
         logger.info("API key reset email sent to %s", to_email)
         return True
 

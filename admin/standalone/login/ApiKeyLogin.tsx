@@ -141,10 +141,13 @@ export const ApiKeyLogin: React.FC<ApiKeyLoginProps> = ({
       setError(null);
 
       try {
+        // SPEC-1619: Include tenant slug from URL so the magic link
+        // returns the user to the same tenant-scoped page.
+        const tenantSlug = new URLSearchParams(window.location.search).get('tenant');
         const resp = await fetch(`${API_BASE_URL}/api/auth/magic-link/request`, {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ email: trimmed }),
+          body: JSON.stringify({ email: trimmed, ...(tenantSlug && { tenant: tenantSlug }) }),
         });
 
         if (resp.status === 429) {

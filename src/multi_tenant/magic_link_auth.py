@@ -99,6 +99,12 @@ class MagicLinkRequest(BaseModel):
     """Request body for magic link."""
 
     email: str = Field(description="Email address associated with the tenant account")
+    tenant: str | None = Field(
+        default=None,
+        description="Optional tenant slug from the origin URL (SPEC-1619). "
+        "When provided, the magic link verify URL will include ?tenant=<slug> "
+        "so the user returns to the same tenant-scoped page.",
+    )
 
 
 class MagicLinkRequestResponse(BaseModel):
@@ -127,6 +133,7 @@ class MagicLinkVerifyResponse(BaseModel):
 
 _MAGIC_LINK_EMAIL_BODY = """
 <h2 style="margin:0 0 16px;color:#111827;font-size:20px">Sign In to Agent Red</h2>
+{tenant_context}
 <p style="color:#374151;font-size:14px;line-height:1.6;margin:0 0 24px">
   Click the button below to sign in to your Agent Red admin dashboard.
   This link will expire in 15 minutes.
@@ -141,29 +148,6 @@ _MAGIC_LINK_EMAIL_BODY = """
   If you did not request this link, you can safely ignore this email.
   Someone may have entered your email address by mistake.
 </p>
-"""
-
-_MULTI_TENANT_EMAIL_BODY = """
-<h2 style="margin:0 0 16px;color:#111827;font-size:20px">Sign In to Agent Red</h2>
-<p style="color:#374151;font-size:14px;line-height:1.6;margin:0 0 24px">
-  Your email address is associated with multiple accounts.
-  Click the button for the account you want to access.
-  These links will expire in 15 minutes.
-</p>
-{tenant_buttons}
-<p style="color:#9ca3af;font-size:12px;line-height:1.5;margin:16px 0 0">
-  If you did not request this link, you can safely ignore this email.
-  Someone may have entered your email address by mistake.
-</p>
-"""
-
-_TENANT_BUTTON_TEMPLATE = """
-<div style="text-align:center;margin:16px 0">
-  <a href="{magic_link_url}" style="display:inline-block;padding:12px 32px;background:#ff3621;
-     color:#ffffff;font-size:14px;font-weight:600;text-decoration:none;border-radius:6px">
-    Sign In — {tenant_label}
-  </a>
-</div>
 """
 
 # ---------------------------------------------------------------------------
@@ -235,6 +219,7 @@ async def _send_magic_link_email(to_email: str, html_body: str) -> bool:
     # --- Provider 1: SMTP (Titan or other SMTP provider) ---
     smtp_host = os.environ.get("SMTP_HOST", "")
     if smtp_host:
+        import asyncio
         import smtplib
         from email.mime.multipart import MIMEMultipart
         from email.mime.text import MIMEText
@@ -244,7 +229,7 @@ async def _send_magic_link_email(to_email: str, html_body: str) -> bool:
         smtp_pass = os.environ.get("SMTP_PASSWORD", "")
         smtp_from = os.environ.get("SMTP_FROM", smtp_user)
 
-        try:
+        def _smtp_send() -> None:
             msg = MIMEMultipart("alternative")
             msg["From"] = f"Agent Red <{smtp_from}>"
             msg["To"] = to_email
@@ -264,6 +249,9 @@ async def _send_magic_link_email(to_email: str, html_body: str) -> bool:
                     if smtp_user:
                         server.login(smtp_user, smtp_pass)
                     server.send_message(msg)
+
+        try:
+            await asyncio.to_thread(_smtp_send)  # SPEC-1622: non-blocking SMTP
             return True
         except Exception:
             logger.exception("SMTP email send failed for magic link — trying ACS fallback")
@@ -283,6 +271,31 @@ async def _send_magic_link_email(to_email: str, html_body: str) -> bool:
 
     logger.warning("No email provider configured for magic link delivery")
     return False
+
+
+# ---------------------------------------------------------------------------
+# URL builder (SPEC-1619)
+# ---------------------------------------------------------------------------
+
+
+def _build_magic_link_url(
+    *,
+    scheme: str,
+    host: str,
+    token_id: str,
+    origin_tenant: str | None = None,
+) -> str:
+    """Build the magic link verify URL, preserving origin tenant context.
+
+    SPEC-1619: When the user clicked "Sign in with email" on a
+    tenant-scoped page (?tenant=<slug>), the verify URL must include
+    the same tenant parameter so the frontend can restore the correct
+    tenant context after verification.
+    """
+    url = f"{scheme}://{host}/admin/standalone/verify-magic-link?token={token_id}"
+    if origin_tenant:
+        url += f"&tenant={origin_tenant}"
+    return url
 
 
 # ---------------------------------------------------------------------------
@@ -309,8 +322,8 @@ async def request_magic_link(
       2. Fall back to tenants.customer_email (tenant owner).
       3. If no match anywhere, silently return 200 (no enumeration).
 
-    Multi-tenant: If the email matches team members in multiple tenants,
-    a single email is sent with one sign-in button per tenant.
+    SPEC-1618: Each email references only the specific merchant account.
+    SPEC-1619: Magic link URL preserves the origin tenant slug.
     """
     client_ip = request.client.host if request.client else "unknown"
 
@@ -330,6 +343,7 @@ async def request_magic_link(
         token_repo = VerificationTokenRepository()
 
         email = body.email.strip().lower()
+        origin_tenant = body.tenant  # SPEC-1619: preserve origin URL context
 
         scheme = request.headers.get("x-forwarded-proto", request.url.scheme)
         host = request.headers.get("host", request.url.hostname or "localhost")
@@ -343,6 +357,7 @@ async def request_magic_link(
                 email=email,
                 scheme=scheme,
                 host=host,
+                origin_tenant=origin_tenant,
                 token_repo=token_repo,
                 tenant_repo=tenant_repo,
             )
@@ -364,11 +379,13 @@ async def request_magic_link(
             ttl=_TOKEN_TTL_SECONDS,
         )
 
-        magic_link_url = (
-            f"{scheme}://{host}/admin/standalone/verify-magic-link"
-            f"?token={token_id}"
+        magic_link_url = _build_magic_link_url(
+            scheme=scheme, host=host, token_id=token_id,
+            origin_tenant=origin_tenant,
         )
-        html_body = _MAGIC_LINK_EMAIL_BODY.format(magic_link_url=magic_link_url)
+        html_body = _MAGIC_LINK_EMAIL_BODY.format(
+            magic_link_url=magic_link_url, tenant_context="",
+        )
         full_html = _EMAIL_WRAPPER.format(body=html_body)
         await _send_magic_link_email(email, full_html)
 
@@ -387,22 +404,25 @@ async def _send_member_magic_links(
     email: str,
     scheme: str,
     host: str,
+    origin_tenant: str | None = None,
     token_repo: Any,
     tenant_repo: Any,
 ) -> None:
-    """Create tokens and send magic link email for team member matches.
+    """Create tokens and send one magic link email PER tenant match.
 
-    If the email matches a single tenant, sends the standard single-button
-    email. If it matches multiple tenants, sends a multi-button email with
-    one sign-in button per tenant.
+    SPEC-1618: Each email must reference ONLY the specific merchant account
+    that triggered it. Sending an email containing links to multiple
+    tenancies is always a defect. When an email address matches team members
+    in multiple tenants, we send separate emails — one per tenant.
+
+    SPEC-1619: origin_tenant is forwarded to _build_magic_link_url so the
+    verify URL preserves the tenant slug from the page the user was on.
     """
-    # Build (tenant_id, member_id, display_label) tuples
-    tenant_entries: list[tuple[str, str, str]] = []
     for member in members:
         tid = member["tenant_id"]
         mid = member["id"]
 
-        # Try to get a human-readable label for the tenant
+        # Resolve a human-readable label for the tenant
         try:
             tenant_doc = await tenant_repo.read(tid, tid)
             label = (
@@ -413,11 +433,7 @@ async def _send_member_magic_links(
         except Exception:
             label = tid[:8]
 
-        tenant_entries.append((tid, mid, label))
-
-    # Create verification tokens for each tenant match
-    token_urls: list[tuple[str, str]] = []  # (magic_link_url, label)
-    for tid, mid, label in tenant_entries:
+        # Create a unique verification token for this tenant
         token_id = secrets.token_urlsafe(32)
         await token_repo.create_token(
             token_id=token_id,
@@ -427,36 +443,32 @@ async def _send_member_magic_links(
             ttl=_TOKEN_TTL_SECONDS,
             member_id=mid,
         )
-        magic_link_url = (
-            f"{scheme}://{host}/admin/standalone/verify-magic-link"
-            f"?token={token_id}"
-        )
-        token_urls.append((magic_link_url, label))
 
-    # Render email
-    if len(token_urls) == 1:
-        # Single tenant — standard email
-        html_body = _MAGIC_LINK_EMAIL_BODY.format(
-            magic_link_url=token_urls[0][0],
+        magic_link_url = _build_magic_link_url(
+            scheme=scheme, host=host, token_id=token_id,
+            origin_tenant=origin_tenant,
         )
-    else:
-        # Multi-tenant — one button per tenant
-        buttons = "".join(
-            _TENANT_BUTTON_TEMPLATE.format(
-                magic_link_url=url, tenant_label=label,
+
+        # Tenant context line — shown only when the user has multiple accounts
+        if len(members) > 1:
+            tenant_context = (
+                f'<p style="color:#6b7280;font-size:13px;margin:0 0 8px">'
+                f"Account: <strong>{label}</strong></p>"
             )
-            for url, label in token_urls
+        else:
+            tenant_context = ""
+
+        html_body = _MAGIC_LINK_EMAIL_BODY.format(
+            magic_link_url=magic_link_url,
+            tenant_context=tenant_context,
         )
-        html_body = _MULTI_TENANT_EMAIL_BODY.format(tenant_buttons=buttons)
+        full_html = _EMAIL_WRAPPER.format(body=html_body)
+        await _send_magic_link_email(email, full_html)
 
-    full_html = _EMAIL_WRAPPER.format(body=html_body)
-    await _send_magic_link_email(email, full_html)
-
-    tenant_ids = [t[0] for t in tenant_entries]
-    logger.info(
-        "Magic link sent (member): tenants=%s email=%s",
-        tenant_ids, email,
-    )
+        logger.info(
+            "Magic link sent (member): tenant=%s email=%s",
+            tid, email,
+        )
 
 
 @router.get(

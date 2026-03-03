@@ -25,6 +25,11 @@ from fastapi import FastAPI
 
 logger = logging.getLogger(__name__)
 
+# -- Handler registries (SPEC-1623: lifespan migration) -------------------
+# Populated by each register_*() function, consumed by build_app_lifespan().
+_bg_startup_handlers: list = []
+_bg_shutdown_handlers: list = []
+
 _idle_scanner_task: asyncio.Task[None] | None = None
 _sla_snapshot_task: asyncio.Task[None] | None = None
 _alert_eval_task: asyncio.Task[None] | None = None
@@ -90,10 +95,10 @@ async def _shutdown_idle_scanner() -> None:
     _idle_scanner_task = None
 
 
-def register_idle_scanner(app: FastAPI) -> None:
-    """Register idle scanner startup/shutdown handlers on the FastAPI app."""
-    app.on_event("startup")(_startup_idle_scanner)
-    app.on_event("shutdown")(_shutdown_idle_scanner)
+def register_idle_scanner(app: FastAPI | None = None) -> None:
+    """Collect idle scanner startup/shutdown handlers (SPEC-1623)."""
+    _bg_startup_handlers.append(_startup_idle_scanner)
+    _bg_shutdown_handlers.append(_shutdown_idle_scanner)
 
 
 # ---------------------------------------------------------------------------
@@ -237,10 +242,10 @@ async def _shutdown_sla_snapshots() -> None:
     _sla_snapshot_task = None
 
 
-def register_sla_snapshots(app: FastAPI) -> None:
-    """Register SLA snapshot startup/shutdown handlers on the FastAPI app."""
-    app.on_event("startup")(_startup_sla_snapshots)
-    app.on_event("shutdown")(_shutdown_sla_snapshots)
+def register_sla_snapshots(app: FastAPI | None = None) -> None:
+    """Collect SLA snapshot startup/shutdown handlers (SPEC-1623)."""
+    _bg_startup_handlers.append(_startup_sla_snapshots)
+    _bg_shutdown_handlers.append(_shutdown_sla_snapshots)
 
 
 # ---------------------------------------------------------------------------
@@ -312,10 +317,10 @@ async def _shutdown_alert_evaluation() -> None:
     _alert_eval_task = None
 
 
-def register_alert_evaluation(app: FastAPI) -> None:
-    """Register alert evaluation startup/shutdown handlers on the FastAPI app."""
-    app.on_event("startup")(_startup_alert_evaluation)
-    app.on_event("shutdown")(_shutdown_alert_evaluation)
+def register_alert_evaluation(app: FastAPI | None = None) -> None:
+    """Collect alert evaluation startup/shutdown handlers (SPEC-1623)."""
+    _bg_startup_handlers.append(_startup_alert_evaluation)
+    _bg_shutdown_handlers.append(_shutdown_alert_evaluation)
 
 
 # ---------------------------------------------------------------------------
@@ -469,10 +474,10 @@ async def _shutdown_ingestion_processor() -> None:
     _ingestion_processor_task = None
 
 
-def register_ingestion_processor(app: FastAPI) -> None:
-    """Register ingestion processor startup/shutdown handlers on the FastAPI app."""
-    app.on_event("startup")(_startup_ingestion_processor)
-    app.on_event("shutdown")(_shutdown_ingestion_processor)
+def register_ingestion_processor(app: FastAPI | None = None) -> None:
+    """Collect ingestion processor startup/shutdown handlers (SPEC-1623)."""
+    _bg_startup_handlers.append(_startup_ingestion_processor)
+    _bg_shutdown_handlers.append(_shutdown_ingestion_processor)
 
 
 # ---------------------------------------------------------------------------
@@ -590,10 +595,10 @@ async def _shutdown_archival_sweep() -> None:
     _archival_sweep_task = None
 
 
-def register_archival_sweep(app: FastAPI) -> None:
-    """Register conversation archival sweep startup/shutdown handlers on the FastAPI app."""
-    app.on_event("startup")(_startup_archival_sweep)
-    app.on_event("shutdown")(_shutdown_archival_sweep)
+def register_archival_sweep(app: FastAPI | None = None) -> None:
+    """Collect conversation archival sweep startup/shutdown handlers (SPEC-1623)."""
+    _bg_startup_handlers.append(_startup_archival_sweep)
+    _bg_shutdown_handlers.append(_shutdown_archival_sweep)
 
 
 # ---------------------------------------------------------------------------
@@ -689,10 +694,10 @@ async def _shutdown_trial_scanner() -> None:
     _trial_scanner_task = None
 
 
-def register_trial_scanner(app: FastAPI) -> None:
-    """Register trial expiry scanner startup/shutdown handlers on the FastAPI app."""
-    app.on_event("startup")(_startup_trial_scanner)
-    app.on_event("shutdown")(_shutdown_trial_scanner)
+def register_trial_scanner(app: FastAPI | None = None) -> None:
+    """Collect trial expiry scanner startup/shutdown handlers (SPEC-1623)."""
+    _bg_startup_handlers.append(_startup_trial_scanner)
+    _bg_shutdown_handlers.append(_shutdown_trial_scanner)
 
 
 # ---------------------------------------------------------------------------
@@ -827,10 +832,10 @@ async def _shutdown_trial_warning() -> None:
     _trial_warning_task = None
 
 
-def register_trial_warning(app: FastAPI) -> None:
-    """Register trial expiry warning startup/shutdown handlers on the FastAPI app."""
-    app.on_event("startup")(_startup_trial_warning)
-    app.on_event("shutdown")(_shutdown_trial_warning)
+def register_trial_warning(app: FastAPI | None = None) -> None:
+    """Collect trial expiry warning startup/shutdown handlers (SPEC-1623)."""
+    _bg_startup_handlers.append(_startup_trial_warning)
+    _bg_shutdown_handlers.append(_shutdown_trial_warning)
 
 
 # ---------------------------------------------------------------------------
@@ -927,10 +932,10 @@ async def _shutdown_expiry_scanner() -> None:
     _expiry_scanner_task = None
 
 
-def register_expiry_scanner(app: FastAPI) -> None:
-    """Register access expiry scanner startup/shutdown handlers on the FastAPI app."""
-    app.on_event("startup")(_startup_expiry_scanner)
-    app.on_event("shutdown")(_shutdown_expiry_scanner)
+def register_expiry_scanner(app: FastAPI | None = None) -> None:
+    """Collect access expiry scanner startup/shutdown handlers (SPEC-1623)."""
+    _bg_startup_handlers.append(_startup_expiry_scanner)
+    _bg_shutdown_handlers.append(_shutdown_expiry_scanner)
 
 
 # ---------------------------------------------------------------------------
@@ -1064,10 +1069,10 @@ async def _shutdown_expiry_warning() -> None:
     _expiry_warning_task = None
 
 
-def register_expiry_warning(app: FastAPI) -> None:
-    """Register access expiry warning startup/shutdown handlers on the FastAPI app."""
-    app.on_event("startup")(_startup_expiry_warning)
-    app.on_event("shutdown")(_shutdown_expiry_warning)
+def register_expiry_warning(app: FastAPI | None = None) -> None:
+    """Collect access expiry warning startup/shutdown handlers (SPEC-1623)."""
+    _bg_startup_handlers.append(_startup_expiry_warning)
+    _bg_shutdown_handlers.append(_shutdown_expiry_warning)
 
 
 # ---------------------------------------------------------------------------
@@ -1238,10 +1243,10 @@ async def _shutdown_vectorization_scanner() -> None:
     _vectorization_scanner_task = None
 
 
-def register_vectorization_scanner(app: FastAPI) -> None:
-    """Register vectorization scanner startup/shutdown handlers on the FastAPI app."""
-    app.on_event("startup")(_startup_vectorization_scanner)
-    app.on_event("shutdown")(_shutdown_vectorization_scanner)
+def register_vectorization_scanner(app: FastAPI | None = None) -> None:
+    """Collect vectorization scanner startup/shutdown handlers (SPEC-1623)."""
+    _bg_startup_handlers.append(_startup_vectorization_scanner)
+    _bg_shutdown_handlers.append(_shutdown_vectorization_scanner)
 
 
 # ---------------------------------------------------------------------------
@@ -1328,7 +1333,7 @@ async def _shutdown_website_refresh() -> None:
     _website_refresh_task = None
 
 
-def register_website_refresh(app: FastAPI) -> None:
-    """Register website refresh scanner startup/shutdown handlers on the FastAPI app."""
-    app.on_event("startup")(_startup_website_refresh)
-    app.on_event("shutdown")(_shutdown_website_refresh)
+def register_website_refresh(app: FastAPI | None = None) -> None:
+    """Collect website refresh scanner startup/shutdown handlers (SPEC-1623)."""
+    _bg_startup_handlers.append(_startup_website_refresh)
+    _bg_shutdown_handlers.append(_shutdown_website_refresh)

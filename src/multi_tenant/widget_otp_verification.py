@@ -436,6 +436,7 @@ async def _send_otp_email(
     # --- Provider 1: SMTP (Titan or other SMTP provider) ---
     smtp_host = os.environ.get("SMTP_HOST", "")
     if smtp_host:
+        import asyncio
         import smtplib
         from email.mime.multipart import MIMEMultipart
         from email.mime.text import MIMEText
@@ -445,13 +446,12 @@ async def _send_otp_email(
         smtp_pass = os.environ.get("SMTP_PASSWORD", "")
         smtp_from = os.environ.get("SMTP_FROM", smtp_user)
 
-        try:
+        def _smtp_send() -> None:
             msg = MIMEMultipart("alternative")
             msg["From"] = f"Agent Red <{smtp_from}>"
             msg["To"] = to_email
             msg["Subject"] = subject
             msg.attach(MIMEText(full_html, "html"))
-
             if smtp_port == 465:
                 with smtplib.SMTP_SSL(smtp_host, smtp_port, timeout=10) as server:
                     if smtp_user and smtp_pass:
@@ -465,6 +465,9 @@ async def _send_otp_email(
                     if smtp_user and smtp_pass:
                         server.login(smtp_user, smtp_pass)
                     server.send_message(msg)
+
+        try:
+            await asyncio.to_thread(_smtp_send)  # SPEC-1622: non-blocking SMTP
             return True
         except Exception:
             logger.exception("SMTP email send failed for widget OTP — trying ACS fallback")

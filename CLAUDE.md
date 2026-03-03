@@ -45,17 +45,15 @@ All new work in this repository must include:
 
 **Owner role:** Provides direction (actions to take) and decisions (specifications to create, approve, or modify). The owner supplies the *what* and *why*.
 
-**Claude role:** Creates, manages, and maintains all artifacts. Proposes specifications, implements changes, runs tests, and keeps the system internally consistent. Claude is responsible for the *how* — and for ensuring that the artifact system faithfully represents the shared understanding at all times.
+**Claude role:** Creates, manages, and maintains all artifacts. Proposes specifications, implements changes, runs tests, and keeps the system internally consistent. Claude is responsible for the *how*.
 
-**The artifact system exists to serve communication.** When the owner says "backlog" and Claude says "backlog," both must be referring to the same real, verifiable, historically traceable thing.
-
-**Standard:** If Claude references something, it must exist. If it exists, it must be under change control. If it's under change control, its history must be retrievable.
+**The artifact system exists to serve communication.** When the owner and Claude say each say "Specification", "Test", "Test Plan", "Work Item", "Backlog", "Operational Procedure", "Document", or "Environment Config" both must be referring to the same real, verifiable, historically traceable thing.
 
 ---
 
 ## Artifacts and Change Control
 
-The project maintains exactly **8 managed artifact types** and **2 supporting record types**, all stored in the Knowledge Database (`tools/knowledge-db/knowledge.db`). No phantom artifacts are permitted — every entity referenced as "managed" must correspond to a real, versioned, queryable database record.
+The project maintains exactly **9 managed artifact types** and **2 supporting record types**, all stored in the Knowledge Database (`tools/knowledge-db/knowledge.db`).
 
 ### Artifact Inventory (SPEC-1493)
 
@@ -90,8 +88,6 @@ Specifications are the protocol for recording agreement between owner and Claude
 
 A specification is a **requirement** — a business decision that affects customers or the business.
 
-**The litmus test:** "Would a different choice affect the customer or the business?" If yes, it's a specification. If no, it's an implementation detail.
-
 Specifications should be **as stable as the business need.** Specs function as a **decision log** (what was agreed and why), not a build specification (how to construct the system).
 
 ### Governance Principles (GOV-01 through GOV-13 in KB)
@@ -104,14 +100,17 @@ Specifications should be **as stable as the business need.** Specs function as a
 6. **Specify on contact.** Unspecified elements become controlled when touched.
 7. **No bug fixes during testing.** Record defects as work items; fix in separate sessions.
 8. **Knowledge Database is the single source of truth.** All project knowledge lives in the KB.
-9. **Owner input classification.** Specification language triggers spec-first workflow (GOV-09, below).
+9. **Owner input classification.** Specification language triggers spec-first workflow.
 10. **Tests must exercise exposed production interfaces.** Source inspection tests are regression supplements, not Test artifacts. Each Test must produce PASS/FAIL against observable outcomes on live/staging systems. Tests are written and linked to specs **before** implementation (GOV-10).
 11. **Design decision checkpoint discipline.** At each WI/phase completion boundary, Claude must review implementation decisions for spec coverage before proceeding. Batched checkpoint, not real-time pause (GOV-11).
 12. **Work item creation triggers test creation.** Creating a work item initiates test creation; the backlog initiates implementation. Tests may be logical assertions, user story descriptions, or abstract descriptions (GOV-12).
-13. **Test plan phase assignment upon creation.** Every Test artifact must be assigned to at least one test plan phase (PLAN-001) at creation time. The Master Test Plan must cover every Test artifact — no orphan tests. This closes the hierarchy: specs produce tests (GOV-12), tests must be in procedures (GOV-13), all procedures compose the Master Test Plan (GOV-13).
+13. **Test plan phase assignment upon creation.** Every Test artifact must be assigned to at least one test plan phase (PLAN-001) at creation time.
+13.1 **No orphan tests.** The Master Test Plan must cover every Test artifact — no orphan tests. 
+13.2 **Hierarchy.** Specs produce tests (GOV-12), tests must be in procedures (GOV-13), all procedures compose the Master Test Plan (GOV-13).
 14. **UI element test maintenance.** When a UI element is added to or removed from any admin UI, the tests validating that element must be added or retired accordingly. Applies to all dynamic data bindings and all static data (labels, tooltips, placeholders, headings, button text). Display-value test suites must stay synchronized with the rendered UI (GOV-14).
 15. **Test fix approval gate.** Claude MUST NOT initiate implementation of fixes for failed tests without explicit owner approval immediately prior to initiation. Report failures with diagnostics, propose a fix, and wait for approval (GOV-15).
 16. **Deployment approval gate.** Claude MUST NOT initiate a deployment (ACR build, container app update, or equivalent) without explicit owner approval immediately prior to initiation. Present the deployment plan (version, environment, changes) and wait for approval (GOV-16).
+17. **Prioritize quality** Always prioritize quality over effort and strive for software engineering excellence.
 
 ### Owner Input Classification Rule (GOV-09)
 
@@ -148,14 +147,6 @@ Key files: CLAUDE.md, memory/MEMORY.md
 Next: [describe task].
 ```
 
-### Preferred Way of Working
-
-For planning, prioritization, and multi-step decision-making, use an **iterative review process**: present one item at a time, pause for owner input, incorporate feedback, adjust subsequent items. Do not batch multiple decisions.
-
-### Option Evaluation Criteria
-
-Prioritize: (1) Implementation quality, (2) Desirability, (3) Downstream confidence. **Avoid vague generalizations** — state specifically what is gained or lost.
-
 ### Protected Behaviors & Removal Rule
 
 **Never remove code, tests, features, or procedure entries without explicit owner approval.** If something looks wrong — ASK rather than act. Protected behaviors are specifications with `type = 'protected_behavior'` (PB-* IDs) carrying machine-verifiable assertions. The Build & Deploy Phase 0 regression gate checks these before every build.
@@ -172,7 +163,7 @@ Prioritize: (1) Implementation quality, (2) Desirability, (3) Downstream confide
 
 **Anti-drift rules:**
 - **All project knowledge lives in the KB.** Specifications, tests, work items, procedures, documents → use the appropriate `db.insert_*()` method.
-- **DO NOT create new markdown files** to store project knowledge. Ask: "Should this be a KB record instead?" The answer is almost always yes.
+- **DO NOT create new markdown files** to store project knowledge. Ask: "Should this be a KB record instead?" The answer is always yes.
 - **Permitted markdown:** CLAUDE.md (rules), MEMORY.md + `memory/*.md` topic files (session state, operational patterns), external-facing published docs (wiki, website, legal).
 - **Topic files are NOT canonical** — they are Claude's operational memory. The KB is the source of truth.
 

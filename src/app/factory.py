@@ -20,7 +20,7 @@ from fastapi.responses import JSONResponse, Response
 from src.multi_tenant.structured_logging import configure_structured_logging
 
 
-def create_app() -> FastAPI:
+def create_app(lifespan=None) -> FastAPI:
     """Create and return a fully configured FastAPI application.
 
     This factory:
@@ -29,6 +29,11 @@ def create_app() -> FastAPI:
     3. Adds CORS middleware
     4. Configures structured logging
 
+    Args:
+        lifespan: Optional async context manager for startup/shutdown
+            lifecycle management (SPEC-1623).  Replaces the deprecated
+            ``on_event()`` pattern.
+
     Returns:
         A configured FastAPI application instance ready for router registration.
     """
@@ -36,6 +41,7 @@ def create_app() -> FastAPI:
     # --- FastAPI app creation (main.py lines 27-76) ---
 
     app = FastAPI(
+        lifespan=lifespan,
         title="Agent Red Customer Experience",
         description=(
             "AI-powered customer experience platform API.\n\n"

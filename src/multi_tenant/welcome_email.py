@@ -201,6 +201,7 @@ async def send_welcome_email(
     # --- Provider 1: SMTP (Titan or other SMTP provider) ---
     smtp_host = os.environ.get("SMTP_HOST", "")
     if smtp_host:
+        import asyncio
         import smtplib
         from email.mime.multipart import MIMEMultipart
         from email.mime.text import MIMEText
@@ -210,13 +211,12 @@ async def send_welcome_email(
         smtp_pass = os.environ.get("SMTP_PASSWORD", "")
         smtp_from = os.environ.get("SMTP_FROM", smtp_user)
 
-        try:
+        def _smtp_send() -> None:
             msg = MIMEMultipart("alternative")
             msg["From"] = f"Agent Red <{smtp_from}>"
             msg["To"] = to_email
             msg["Subject"] = subject
             msg.attach(MIMEText(full_html, "html"))
-
             if smtp_port == 465:
                 with smtplib.SMTP_SSL(smtp_host, smtp_port, timeout=15) as server:
                     if smtp_user and smtp_pass:
@@ -231,6 +231,8 @@ async def send_welcome_email(
                         server.login(smtp_user, smtp_pass)
                     server.send_message(msg)
 
+        try:
+            await asyncio.to_thread(_smtp_send)  # SPEC-1622: non-blocking SMTP
             logger.info("Welcome email sent via SMTP: tenant=%s email=%s host=%s", tenant_id[:8], to_email, smtp_host)
             return True
         except Exception:

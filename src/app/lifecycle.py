@@ -901,6 +901,49 @@ async def _startup_contact_messages() -> None:
         )
 
 
+async def _startup_copilot_knowledge() -> None:
+    """Initialize Co-Pilot Knowledge management (SPEC-1570..1577).
+
+    Wires the admin_documentation_vectors Cosmos repository into the
+    superadmin Co-Pilot Knowledge endpoints (document CRUD, ingestion,
+    embedding, search).
+    Non-fatal: Co-Pilot Knowledge pages will show 503 if unavailable.
+    """
+    from src.multi_tenant.superadmin_api import configure_copilot_knowledge_service
+
+    try:
+        from src.multi_tenant.cosmos_schema import COLLECTION_ADMIN_DOCUMENTATION
+        from src.multi_tenant.repositories.base import TenantScopedRepository
+
+        repo = TenantScopedRepository(COLLECTION_ADMIN_DOCUMENTATION)
+        configure_copilot_knowledge_service(admin_doc_repo=repo)
+        logger.info("Co-Pilot Knowledge services initialized (admin_documentation_vectors container)")
+    except Exception:
+        logger.warning(
+            "Co-Pilot Knowledge initialization failed — "
+            "knowledge management endpoints will return 503."
+        )
+
+
+async def _startup_pipeline_observatory() -> None:
+    """Enable Pipeline Observatory endpoints (SPEC-1579..1583).
+
+    Marks the pipeline observatory as configured so topology, tenant
+    comparison, and database metrics endpoints return data.
+    Non-fatal: observatory pages will show empty/error states.
+    """
+    from src.multi_tenant.superadmin_api import configure_pipeline_observatory
+
+    try:
+        configure_pipeline_observatory(enabled=True)
+        logger.info("Pipeline Observatory enabled")
+    except Exception:
+        logger.warning(
+            "Pipeline Observatory initialization failed — "
+            "observatory endpoints will return empty results."
+        )
+
+
 async def _startup_status_api() -> None:
     """Initialize the public status API with incident repository.
 
@@ -1346,64 +1389,140 @@ async def _shutdown_chat_pipeline() -> None:
         pass
 
 
+async def _startup_pre_auth_cleanup() -> None:
+    """Start the pre-auth rate limiter cleanup background task (SPEC-1623)."""
+    try:
+        from src.multi_tenant.security_hardening import start_pre_auth_cleanup
+        await start_pre_auth_cleanup()
+    except Exception:
+        logger.warning("Pre-auth cleanup task failed to start", exc_info=True)
+
+
+async def _shutdown_pre_auth_cleanup() -> None:
+    """Stop the pre-auth rate limiter cleanup background task."""
+    try:
+        from src.multi_tenant.security_hardening import stop_pre_auth_cleanup
+        await stop_pre_auth_cleanup()
+    except Exception:
+        pass
+
+
 # =========================================================================
 # Registration functions — called from main.py
 # =========================================================================
 
-def register_startup_handlers(app: FastAPI) -> None:
-    """Register all startup event handlers on *app*.
+# -- Handler registries (SPEC-1623: lifespan migration) -------------------
+# Populated by register_startup_handlers() / register_shutdown_handlers()
+# and consumed by build_app_lifespan().
+
+_lifecycle_startup_handlers: list = []
+_lifecycle_shutdown_handlers: list = []
+
+
+def register_startup_handlers(app: FastAPI | None = None) -> None:
+    """Collect all core lifecycle startup handlers.
 
     Handler functions are defined at module level (above) so they are
-    individually importable by test code.  This function simply wires
-    them into FastAPI's on_event("startup") mechanism.
+    individually importable by test code.  The ``app`` parameter is
+    accepted for backwards compatibility but is no longer used —
+    handlers are collected into ``_lifecycle_startup_handlers`` and
+    executed by the lifespan context manager (SPEC-1623).
     """
-    app.on_event("startup")(_startup_cosmos_db)
-    app.on_event("startup")(_startup_tenant_resolution)
-    app.on_event("startup")(_startup_config_processor)
-    app.on_event("startup")(_startup_conversation_meter)
-    app.on_event("startup")(_startup_dashboard_services)
-    app.on_event("startup")(_startup_tracing)
-    app.on_event("startup")(_startup_circuit_breakers)
-    app.on_event("startup")(_startup_nats)
-    app.on_event("startup")(_startup_agntcy_sdk)
-    app.on_event("startup")(_startup_secret_service)
-    app.on_event("startup")(_startup_chat_services)
-    app.on_event("startup")(_startup_admin_inbox_services)
-    app.on_event("startup")(_startup_knowledge_vectorizer)
-    app.on_event("startup")(_startup_conversation_vectorizer)
-    app.on_event("startup")(_startup_admin_knowledge_services)
-    app.on_event("startup")(_startup_embed_unembedded_kb)
-    app.on_event("startup")(_startup_admin_analytics_services)
-    app.on_event("startup")(_startup_admin_team_services)
-    app.on_event("startup")(_startup_admin_gdpr_services)
-    app.on_event("startup")(_startup_admin_audit_services)
-    app.on_event("startup")(_startup_admin_quick_action_services)
-    app.on_event("startup")(_startup_admin_profile_services)
-    app.on_event("startup")(_startup_admin_apikey_services)
-    app.on_event("startup")(_startup_superadmin_services)
-    app.on_event("startup")(_startup_contact_messages)
-    app.on_event("startup")(_startup_status_api)
-    app.on_event("startup")(_startup_alert_engine)
-    app.on_event("startup")(_startup_mfa_service)
-    app.on_event("startup")(_startup_pattern_service)
-    app.on_event("startup")(_startup_fine_tuning_service)
-    app.on_event("startup")(_startup_key_rotation)
-    app.on_event("startup")(_startup_trial_service)
-    app.on_event("startup")(_startup_data_retention)
-    app.on_event("startup")(_startup_archival_pipeline)
-    app.on_event("startup")(_startup_alert_delivery)
-    app.on_event("startup")(_startup_activation_service)
-    app.on_event("startup")(_startup_migration_check)
+    _lifecycle_startup_handlers.clear()
+    _lifecycle_startup_handlers.extend([
+        _startup_cosmos_db,
+        _startup_tenant_resolution,
+        _startup_config_processor,
+        _startup_conversation_meter,
+        _startup_dashboard_services,
+        _startup_tracing,
+        _startup_circuit_breakers,
+        _startup_nats,
+        _startup_agntcy_sdk,
+        _startup_secret_service,
+        _startup_chat_services,
+        _startup_admin_inbox_services,
+        _startup_knowledge_vectorizer,
+        _startup_conversation_vectorizer,
+        _startup_admin_knowledge_services,
+        _startup_embed_unembedded_kb,
+        _startup_admin_analytics_services,
+        _startup_admin_team_services,
+        _startup_admin_gdpr_services,
+        _startup_admin_audit_services,
+        _startup_admin_quick_action_services,
+        _startup_admin_profile_services,
+        _startup_admin_apikey_services,
+        _startup_superadmin_services,
+        _startup_contact_messages,
+        _startup_copilot_knowledge,
+        _startup_pipeline_observatory,
+        _startup_status_api,
+        _startup_alert_engine,
+        _startup_mfa_service,
+        _startup_pattern_service,
+        _startup_fine_tuning_service,
+        _startup_key_rotation,
+        _startup_trial_service,
+        _startup_data_retention,
+        _startup_archival_pipeline,
+        _startup_alert_delivery,
+        _startup_activation_service,
+        _startup_migration_check,
+        _startup_pre_auth_cleanup,
+    ])
 
 
-def register_shutdown_handlers(app: FastAPI) -> None:
-    """Register all shutdown event handlers on *app*.
+def register_shutdown_handlers(app: FastAPI | None = None) -> None:
+    """Collect all core lifecycle shutdown handlers.
 
-    Handler functions are defined at module level (above) so they are
-    individually importable by test code.
+    The ``app`` parameter is accepted for backwards compatibility but
+    is no longer used (SPEC-1623).
     """
-    app.on_event("shutdown")(_shutdown_nats)
-    app.on_event("shutdown")(_shutdown_agntcy_sdk)
-    app.on_event("shutdown")(_shutdown_cosmos_db)
-    app.on_event("shutdown")(_shutdown_secret_service)
-    app.on_event("shutdown")(_shutdown_chat_pipeline)
+    _lifecycle_shutdown_handlers.clear()
+    _lifecycle_shutdown_handlers.extend([
+        _shutdown_nats,
+        _shutdown_agntcy_sdk,
+        _shutdown_cosmos_db,
+        _shutdown_secret_service,
+        _shutdown_chat_pipeline,
+        _shutdown_pre_auth_cleanup,
+    ])
+
+
+def build_app_lifespan():
+    """Build and return the FastAPI lifespan async context manager.
+
+    Replaces the deprecated ``on_event("startup")``/``on_event("shutdown")``
+    registration pattern (SPEC-1623).  Must be called AFTER all
+    ``register_*`` functions have populated the handler registries.
+
+    The lifespan executes handlers in this order:
+      1. Core lifecycle startup handlers (Cosmos, NATS, tracing, …)
+      2. Background task startup handlers (idle scanner, SLA, alerts, …)
+      3.   — app serves requests —
+      4. Background task shutdown handlers (cancel loops)
+      5. Core lifecycle shutdown handlers (close Cosmos, NATS, …)
+    """
+    from contextlib import asynccontextmanager
+    from collections.abc import AsyncIterator
+
+    from src.app.background import _bg_startup_handlers, _bg_shutdown_handlers
+
+    @asynccontextmanager
+    async def _lifespan(app: FastAPI) -> AsyncIterator[None]:
+        # ── Startup ───────────────────────────────────────────────
+        for handler in _lifecycle_startup_handlers:
+            await handler()
+        for handler in _bg_startup_handlers:
+            await handler()
+        try:
+            yield
+        finally:
+            # ── Shutdown ──────────────────────────────────────────
+            for handler in _bg_shutdown_handlers:
+                await handler()
+            for handler in _lifecycle_shutdown_handlers:
+                await handler()
+
+    return _lifespan

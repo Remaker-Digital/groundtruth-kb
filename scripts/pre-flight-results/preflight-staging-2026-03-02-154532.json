@@ -1,0 +1,136 @@
+{
+  "run_at": "2026-03-02T15:45:32.445347",
+  "environment": "staging",
+  "new_version": "1.66.0",
+  "verdict": "DEPLOYMENT BLOCKED \u2014 Phase A pre-build failures",
+  "phases": {
+    "A": [
+      {
+        "id": "A.1",
+        "description": "Version bump confirmed",
+        "status": "PASS",
+        "detail": "PRODUCT_VERSION=1.66.0"
+      },
+      {
+        "id": "A.2",
+        "description": "Protected Behaviors",
+        "status": "PASS",
+        "detail": "11/11 assertions"
+      },
+      {
+        "id": "A.3",
+        "description": "No uncommitted changes",
+        "status": "FAIL",
+        "detail": "Modified files: admin/standalone/dist/index.html   | 2 +-\n src/multi_tenant/api_versioning.py | 2 +-\n 2 files changed, 2 insertions(+), 2 deletions(-)"
+      },
+      {
+        "id": "A.4",
+        "description": "Unit/integration tests",
+        "status": "SKIP",
+        "detail": "Run manually: .\\scripts\\run-tests-thermal-safe.ps1 -SkipLive"
+      },
+      {
+        "id": "A.5",
+        "description": "TypeScript lint",
+        "status": "SKIP",
+        "detail": "Run manually: cd admin && npx eslint --ext .tsx,.ts shared/ standalone/ provider/ shopify/ --max-warnings 50"
+      }
+    ],
+    "C": [
+      {
+        "id": "C.1",
+        "description": "Version header matches",
+        "status": "PASS",
+        "detail": "X-Product-Version: 1.66.0"
+      },
+      {
+        "id": "C.2",
+        "description": "Health endpoint healthy",
+        "status": "PASS",
+        "detail": "product_version=1.66.0"
+      },
+      {
+        "id": "C.3",
+        "description": "Ready endpoint",
+        "status": "WARN",
+        "detail": "status=ready but nats.connected=false (lazy init)"
+      },
+      {
+        "id": "C.4",
+        "description": "Standalone SPA",
+        "status": "PASS",
+        "detail": "HTTP 200, text/html"
+      },
+      {
+        "id": "C.5",
+        "description": "Shopify SPA",
+        "status": "PASS",
+        "detail": "HTTP 200, text/html"
+      },
+      {
+        "id": "C.6",
+        "description": "Provider SPA",
+        "status": "PASS",
+        "detail": "HTTP 200, text/html"
+      },
+      {
+        "id": "C.7",
+        "description": "Widget.js accessible",
+        "status": "PASS",
+        "detail": "99697 bytes"
+      },
+      {
+        "id": "C.8",
+        "description": "OpenAPI spec",
+        "status": "PASS",
+        "detail": "HTTP 200"
+      },
+      {
+        "id": "C.9",
+        "description": "Security headers",
+        "status": "PASS",
+        "detail": "nosniff + X-Frame-Options present"
+      },
+      {
+        "id": "C.10",
+        "description": "Upgrade verification (35 assertions)",
+        "status": "PASS",
+        "detail": "phase-c 35 PASS, 0 FAIL"
+      },
+      {
+        "id": "C.11",
+        "description": "Tier 0 regression (17 tests)",
+        "status": "PASS",
+        "detail": "18 passed, 0 failed"
+      },
+      {
+        "id": "C.12",
+        "description": "Tier 1 regression (20 tests)",
+        "status": "PASS",
+        "detail": "28 passed, 0 failed"
+      }
+    ],
+    "D": [
+      {
+        "id": "D.0",
+        "description": "SPA key required",
+        "status": "FAIL",
+        "detail": "Set SUPERADMIN_PREVIEW_API_KEY env var"
+      }
+    ]
+  },
+  "summary": {
+    "A": {
+      "PASS": 2,
+      "FAIL": 1,
+      "SKIP": 2
+    },
+    "C": {
+      "PASS": 11,
+      "WARN": 1
+    },
+    "D": {
+      "FAIL": 1
+    }
+  }
+}

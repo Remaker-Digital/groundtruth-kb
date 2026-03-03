@@ -553,7 +553,8 @@ def mount_standalone_admin(app: FastAPI) -> None:
                 host = request.headers.get("host", request.url.netloc)
                 reset_url = f"{scheme}://{host}/admin/standalone/_reset-password?token={reset_token}"
 
-                _send_admin_reset_email(email, reset_url)
+                import asyncio
+                await asyncio.to_thread(_send_admin_reset_email, email, reset_url)  # SPEC-1622: non-blocking SMTP
 
             # Always return success page (prevents email enumeration)
             return HTMLResponse(content=_STANDALONE_FORGOT_PW_SENT_HTML)
@@ -625,7 +626,8 @@ def mount_standalone_admin(app: FastAPI) -> None:
                 scheme = request.headers.get("x-forwarded-proto", request.url.scheme)
                 host = request.headers.get("host", request.url.hostname or "localhost")
                 forgot_url = f"{scheme}://{host}/admin/standalone/_forgot-password"
-                _send_admin_password_changed_email(_ADMIN_RESET_EMAIL, forgot_url)
+                import asyncio
+                await asyncio.to_thread(_send_admin_password_changed_email, _ADMIN_RESET_EMAIL, forgot_url)  # SPEC-1622: non-blocking SMTP
 
             # Auto-login: set the session cookie and redirect to admin dashboard.
             response = StarletteResponse(

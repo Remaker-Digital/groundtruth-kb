@@ -1317,7 +1317,8 @@ class KnowledgeDB:
     }
 
     def _validate_stage_transition(
-        self, wi_id: str, current_stage: str, new_stage: str
+        self, wi_id: str, current_stage: str, new_stage: str,
+        *, owner_approved: bool = False,
     ) -> None:
         """Enforce valid work item stage transitions per SPEC-1602."""
         if new_stage == current_stage:
@@ -1342,6 +1343,17 @@ class KnowledgeDB:
                     f"Cannot advance {wi_id} to 'implementing': not found in any "
                     f"backlog snapshot. Add to backlog first."
                 )
+        # GOV-15 gate: defect/regression WIs require explicit owner approval to resolve
+        if new_stage == "resolved":
+            wi = self.get_work_item(wi_id)
+            if wi and wi.get("origin") in ("defect", "regression"):
+                if not owner_approved:
+                    raise ValueError(
+                        f"Cannot resolve {wi_id} (origin={wi['origin']}): "
+                        f"owner_approved=True required (GOV-15). "
+                        f"Report diagnostics and proposed fix to the owner, "
+                        f"then pass owner_approved=True after explicit approval."
+                    )
 
     def _wi_has_linked_test(self, wi_id: str) -> bool:
         """Check if a work item has a linked test via its source_spec_id."""
@@ -1412,6 +1424,8 @@ class KnowledgeDB:
         id: str,
         changed_by: str,
         change_reason: str,
+        *,
+        owner_approved: bool = False,
         **fields: Any,
     ) -> dict[str, Any]:
         """Create a new version of a work item, carrying forward unchanged fields.
@@ -1419,6 +1433,11 @@ class KnowledgeDB:
         Stage transitions are enforced per SPEC-1602:
         created → tested → backlogged → implementing → resolved.
         Any stage can transition to 'resolved' (early closure).
+
+        Args:
+            owner_approved: Required ``True`` for resolving defect/regression
+                WIs (GOV-15 enforcement).  The caller must have received
+                explicit owner approval in the conversation before setting this.
         """
         current = self.get_work_item(id)
         if not current:
@@ -1435,8 +1454,10 @@ class KnowledgeDB:
         priority = fields.get("priority", current["priority"])
         current_stage = current.get("stage", "created")
         new_stage = fields.get("stage", current_stage)
-        # Enforce stage transitions
-        self._validate_stage_transition(id, current_stage, new_stage)
+        # Enforce stage transitions (includes GOV-15 owner approval gate)
+        self._validate_stage_transition(
+            id, current_stage, new_stage, owner_approved=owner_approved,
+        )
         conn = self._get_conn()
         conn.execute(
             """INSERT INTO work_items

@@ -19,13 +19,18 @@ R2 refactoring — session 34.
 © 2026 Remaker Digital, a DBA of VanDusen & Palmeter, LLC. All rights reserved.
 """
 
-# Re-export everything from the repositories package
+# Re-export everything from the repositories package.
+# SYNC NOTICE (SPEC-1627): This list MUST mirror repositories/__init__.py __all__.
+# When adding a new repository class, add it to BOTH files.
 from src.multi_tenant.repositories import (  # noqa: F401
+    AlertHistoryRepository,
+    AlertRuleRepository,
     AuditLogRepository,
     ConversationRepository,
     CustomerProfileRepository,
     DocumentConflictError,
     DocumentNotFoundError,
+    IncidentRepository,
     KnowledgeBaseRepository,
     MemoryVectorRepository,
     PlatformConfigRepository,
@@ -41,11 +46,14 @@ from src.multi_tenant.repositories import (  # noqa: F401
 )
 
 __all__ = [
+    # Exceptions
     "TenantIsolationError",
     "DocumentNotFoundError",
     "DocumentConflictError",
+    # Base classes
     "TenantScopedRepository",
     "PlatformScopedRepository",
+    # Tenant-scoped repositories
     "TenantRepository",
     "ConversationRepository",
     "UsageRepository",
@@ -54,8 +62,12 @@ __all__ = [
     "MemoryVectorRepository",
     "PreferencesRepository",
     "TeamMemberRepository",
+    # Platform-scoped repositories
     "PlatformConfigRepository",
     "AuditLogRepository",
     "SLASnapshotRepository",
     "VerificationTokenRepository",
+    "IncidentRepository",
+    "AlertRuleRepository",
+    "AlertHistoryRepository",
 ]

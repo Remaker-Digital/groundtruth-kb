@@ -129,10 +129,14 @@ def stream_subprocess(
             lines.append(line)
             try:
                 print(f"{prefix}{line}", flush=True, file=_safe_stdout)
-            except (UnicodeEncodeError, OSError):
-                # Last resort: ASCII-safe output so the thread never dies
-                safe = line.encode("ascii", errors="replace").decode()
-                print(f"{prefix}{safe}", flush=True)
+            except (UnicodeEncodeError, OSError, ValueError):
+                # Last resort: ASCII-safe output so the thread never dies.
+                # ValueError = "I/O operation on closed file" (background tasks).
+                try:
+                    safe = line.encode("ascii", errors="replace").decode()
+                    print(f"{prefix}{safe}", flush=True)
+                except (OSError, ValueError):
+                    pass  # stdout completely gone — still captured in lines[]
         proc.stdout.close()
 
     reader_thread = threading.Thread(target=_reader, daemon=True)
@@ -155,6 +159,14 @@ def stream_subprocess(
     finally:
         timer.cancel()
         reader_thread.join(timeout=5)
+
+    # Detach the temporary TextIOWrapper so its __del__ does not close the
+    # underlying sys.stdout.buffer when the local variable goes out of scope.
+    if _safe_stdout is not sys.stdout and hasattr(_safe_stdout, "detach"):
+        try:
+            _safe_stdout.detach()
+        except Exception:
+            pass
 
     duration = time.time() - t0
     stdout = "\n".join(lines)

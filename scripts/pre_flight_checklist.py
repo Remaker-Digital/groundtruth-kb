@@ -32,6 +32,14 @@ if sys.platform == "win32":
     sys.stdout = io.TextIOWrapper(sys.stdout.buffer, encoding="utf-8", errors="replace")
     sys.stderr = io.TextIOWrapper(sys.stderr.buffer, encoding="utf-8", errors="replace")
 
+
+def _safe_print(*args, **kwargs) -> None:
+    """Print that silently ignores closed stdout (background tasks)."""
+    try:
+        print(*args, **kwargs)
+    except (OSError, ValueError):
+        pass
+
 # ---------------------------------------------------------------------------
 # Project root and imports from sibling scripts
 # ---------------------------------------------------------------------------
@@ -256,7 +264,7 @@ def phase_c(fqdn: str, api_key: str, widget_key: str, new_version: str) -> list[
 
     # Rate limit cooldown — C.1-C.9 consume ~10 API calls.
     # The upgrade verification subprocess needs its own rate budget.
-    print("    ... waiting 65s for rate limit cooldown before upgrade verification ...")
+    _safe_print("    ... waiting 65s for rate limit cooldown before upgrade verification ...")
     time.sleep(65)
 
     # C.10 — Existing tenant data (upgrade verification Phase C)
@@ -307,7 +315,7 @@ def phase_c(fqdn: str, api_key: str, widget_key: str, new_version: str) -> list[
 
     # Rate limit cooldown — Phases C.1–C.10 consume 15+ API calls.
     # Starter tier allows 10 rpm; wait for budget to replenish before regression tests.
-    print("    ... waiting 65s for rate limit cooldown before regression tests ...")
+    _safe_print("    ... waiting 65s for rate limit cooldown before regression tests ...")
     time.sleep(65)
 
     # C.11 — Tier 0 regression (17 tests)
@@ -316,7 +324,7 @@ def phase_c(fqdn: str, api_key: str, widget_key: str, new_version: str) -> list[
 
     # Cooldown between tier0 and tier1 — tier0 makes 18+ API calls
     if tier0_result.status != "SKIP":
-        print("    ... waiting 65s for rate limit cooldown between tier0 and tier1 ...")
+        _safe_print("    ... waiting 65s for rate limit cooldown between tier0 and tier1 ...")
         time.sleep(65)
 
     # C.12 — Tier 1 regression (20 tests)
@@ -706,20 +714,20 @@ def compute_verdict(all_results: dict[str, list[AssertionResult]]) -> str:
 # ---------------------------------------------------------------------------
 def print_results(phase_name: str, phase_label: str, results: list[AssertionResult]) -> None:
     """Print a formatted results table for one phase."""
-    print(f"\n{'=' * 60}")
-    print(f"  Phase {phase_name} — {phase_label}")
-    print(f"{'=' * 60}")
+    _safe_print(f"\n{'=' * 60}")
+    _safe_print(f"  Phase {phase_name} — {phase_label}")
+    _safe_print(f"{'=' * 60}")
     for r in results:
         icon = {"PASS": "+", "FAIL": "X", "SKIP": "-", "WARN": "!"}[r.status]
-        print(f"  [{icon}] {r.id:5s} {r.status:4s}  {r.description}")
+        _safe_print(f"  [{icon}] {r.id:5s} {r.status:4s}  {r.description}")
         if r.detail:
-            print(f"               {r.detail[:120]}")
+            _safe_print(f"               {r.detail[:120]}")
     counts = {}
     for r in results:
         counts[r.status] = counts.get(r.status, 0) + 1
     summary_parts = [f"{v} {k}" for k, v in sorted(counts.items())]
-    print(f"  {'—' * 50}")
-    print(f"  Total: {', '.join(summary_parts)}")
+    _safe_print(f"  {'—' * 50}")
+    _safe_print(f"  Total: {', '.join(summary_parts)}")
 
 
 def save_report(results: dict[str, list[AssertionResult]], env_name: str,
@@ -778,14 +786,14 @@ def main():
     # SPA superadmin key for Phase D — from environment
     spa_api_key = os.environ.get("SUPERADMIN_PREVIEW_API_KEY", "")
 
-    print(f"\n{'#' * 60}")
-    print(f"  Pre-Flight Deployment Checklist")
-    print(f"  Environment: {args.env}")
-    print(f"  Target FQDN: {fqdn}")
-    print(f"  Expected Version: {args.new_version}")
-    print(f"  Phase: {args.phase or 'ALL'}")
-    print(f"  Timestamp: {datetime.datetime.now().isoformat()}")
-    print(f"{'#' * 60}")
+    _safe_print(f"\n{'#' * 60}")
+    _safe_print(f"  Pre-Flight Deployment Checklist")
+    _safe_print(f"  Environment: {args.env}")
+    _safe_print(f"  Target FQDN: {fqdn}")
+    _safe_print(f"  Expected Version: {args.new_version}")
+    _safe_print(f"  Phase: {args.phase or 'ALL'}")
+    _safe_print(f"  Timestamp: {datetime.datetime.now().isoformat()}")
+    _safe_print(f"{'#' * 60}")
 
     all_results: dict[str, list[AssertionResult]] = {}
     phases_to_run = [args.phase] if args.phase else ["A", "C", "D"]
@@ -798,13 +806,13 @@ def main():
 
     # Phase B is manual — print reminder
     if "B" in phases_to_run or (args.phase is None):
-        print(f"\n{'=' * 60}")
-        print("  Phase B — Build & Deploy (MANUAL)")
-        print(f"{'=' * 60}")
-        print("  Phase B steps are executed manually or via upgrade.ps1.")
-        print("  See: docs/operations/pre-flight-deployment-checklist.md")
-        print("  Before deploying, capture Phase A snapshot:")
-        print(f"    python scripts/upgrade_verification.py phase-a --env {args.env}")
+        _safe_print(f"\n{'=' * 60}")
+        _safe_print("  Phase B — Build & Deploy (MANUAL)")
+        _safe_print(f"{'=' * 60}")
+        _safe_print("  Phase B steps are executed manually or via upgrade.ps1.")
+        _safe_print("  See: docs/operations/pre-flight-deployment-checklist.md")
+        _safe_print("  Before deploying, capture Phase A snapshot:")
+        _safe_print(f"    python scripts/upgrade_verification.py phase-a --env {args.env}")
 
     # Phase C
     if "C" in phases_to_run:
@@ -815,9 +823,9 @@ def main():
     # Phase D
     if "D" in phases_to_run:
         if not spa_api_key:
-            print(f"\n  WARNING: SUPERADMIN_PREVIEW_API_KEY not set.")
-            print(f"  Phase D requires the SPA superadmin key to provision tenants.")
-            print(f"  Set it: export SUPERADMIN_PREVIEW_API_KEY=ar_user_rema_...")
+            _safe_print(f"\n  WARNING: SUPERADMIN_PREVIEW_API_KEY not set.")
+            _safe_print(f"  Phase D requires the SPA superadmin key to provision tenants.")
+            _safe_print(f"  Set it: export SUPERADMIN_PREVIEW_API_KEY=ar_user_rema_...")
             all_results["D"] = [
                 _fail("D.0", "SPA key required",
                       "Set SUPERADMIN_PREVIEW_API_KEY env var")]
@@ -830,11 +838,11 @@ def main():
     verdict = compute_verdict(all_results)
     report_path = save_report(all_results, args.env, args.new_version, verdict)
 
-    print(f"\n{'#' * 60}")
+    _safe_print(f"\n{'#' * 60}")
     icon = "OK" if "VERIFIED" in verdict else "XX"
-    print(f"  {icon} VERDICT: {verdict}")
-    print(f"  Results: {report_path}")
-    print(f"{'#' * 60}\n")
+    _safe_print(f"  {icon} VERDICT: {verdict}")
+    _safe_print(f"  Results: {report_path}")
+    _safe_print(f"{'#' * 60}\n")
 
     # DEFECT auto-creation (SPEC-1617): one per failed phase
     if "VERIFIED" not in verdict:
@@ -856,7 +864,7 @@ def main():
                     changed_by="pre-flight-checklist",
                 )
                 if wi:
-                    print(f"  Created DEFECT: {wi} (Phase {phase_name})")
+                    _safe_print(f"  Created DEFECT: {wi} (Phase {phase_name})")
 
     # Exit code: 0 for verified, 1 for failures
     sys.exit(0 if "VERIFIED" in verdict else 1)

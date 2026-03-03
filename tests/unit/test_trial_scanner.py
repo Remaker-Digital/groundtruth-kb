@@ -24,6 +24,8 @@ from src.app.background import (
     _TRIAL_SCAN_INTERVAL,
     _TRIAL_SCAN_STARTUP_DELAY,
     _trial_scanner_loop,
+    _startup_trial_scanner,
+    _shutdown_trial_scanner,
     register_trial_scanner,
 )
 
@@ -237,17 +239,22 @@ class TestTrialScannerConfig:
 
 
 class TestTrialScannerRegistration:
-    """Verify register_trial_scanner wires startup/shutdown."""
+    """Verify register_trial_scanner collects startup/shutdown handlers."""
 
     def test_registers_startup_and_shutdown(self):
-        mock_app = MagicMock()
-        register_trial_scanner(mock_app)
+        from src.app.background import _bg_startup_handlers, _bg_shutdown_handlers
 
-        # Should register both startup and shutdown
-        assert mock_app.on_event.call_count == 2
-        event_types = [call.args[0] for call in mock_app.on_event.call_args_list]
-        assert "startup" in event_types
-        assert "shutdown" in event_types
+        # Clear registries to isolate test
+        startup_before = len(_bg_startup_handlers)
+        shutdown_before = len(_bg_shutdown_handlers)
+
+        register_trial_scanner()
+
+        # Should append both startup and shutdown handlers
+        assert len(_bg_startup_handlers) == startup_before + 1
+        assert len(_bg_shutdown_handlers) == shutdown_before + 1
+        assert _bg_startup_handlers[-1] is _startup_trial_scanner
+        assert _bg_shutdown_handlers[-1] is _shutdown_trial_scanner
 
 
 # ---------------------------------------------------------------------------
