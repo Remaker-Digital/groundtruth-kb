@@ -35,11 +35,13 @@ export default defineConfig({
     port: 3300,
     proxy: {
       '/api': {
-        // Dev proxy target: set VITE_API_URL in .env.local for production FQDN.
-        // Default per REPEATABLE-PROCEDURES.md §7.4 — .env.local takes precedence.
-        target: process.env.VITE_API_URL || 'http://localhost:8000',
+        // Dev proxy target: API_PROXY_TARGET (server-side only, not exposed to
+        // browser) or VITE_API_URL from .env.local.  API_PROXY_TARGET is preferred
+        // by the E2E test conftest so the SPA uses relative URLs through the proxy
+        // (avoids cross-origin CORS issues with X-API-Key headers).
+        target: process.env.API_PROXY_TARGET || process.env.VITE_API_URL || 'http://localhost:8000',
         changeOrigin: true,
-        secure: !!process.env.VITE_API_URL,
+        secure: !!(process.env.API_PROXY_TARGET || process.env.VITE_API_URL),
       },
       // Widget served from public/widget.js in dev mode (see StandaloneLayout.tsx)
       // '/widget.js': {

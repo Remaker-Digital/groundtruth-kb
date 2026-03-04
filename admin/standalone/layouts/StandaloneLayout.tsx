@@ -16,7 +16,8 @@
  */
 
 import React, { createContext, useCallback, useContext, useEffect, useState } from 'react';
-import { useNavigate, useLocation } from 'react-router-dom';
+import { useLocation } from 'react-router-dom';
+import { useQueryPreservingNavigate } from '../hooks/useQueryPreservingNavigate';
 import {
   AppShell,
   NavLink,
@@ -189,7 +190,7 @@ export const StandaloneLayout: React.FC<StandaloneLayoutProps> = ({
   // Resolve auth credential — prefer `auth` prop, fall back to legacy `apiKey`
   const resolvedAuth: AuthCredential = auth ?? { type: 'api_key', value: legacyApiKey ?? '' };
   const location = useLocation();
-  const navigate = useNavigate();
+  const navigate = useQueryPreservingNavigate();
   const [opened, { toggle }] = useDisclosure();
   const { setColorScheme } = useMantineColorScheme();
   const computedColorScheme = useComputedColorScheme('dark');

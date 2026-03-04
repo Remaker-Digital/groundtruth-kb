@@ -41,12 +41,14 @@ PROD_URL = os.environ.get(
 # Tenant A: Professional tier (50 rpm)
 TENANT_A_API_KEY = os.environ.get("SUPERADMIN_PREVIEW_API_KEY", "")
 
-# Tenant B: Starter tier (10 rpm)
-_creds_path = Path(__file__).resolve().parent.parent.parent / "logs" / "test_tenant_credentials.json"
-_tenant_b_creds: dict = {}
-if _creds_path.exists():
-    _tenant_b_creds = json.loads(_creds_path.read_text())
-TENANT_B_API_KEY = _tenant_b_creds.get("superadmin_key", "")
+# S134: Tenant B (Starter tier, 10 rpm) — prefer env vars from pipeline.
+TENANT_B_API_KEY = os.environ.get("TENANT_B_API_KEY", "")
+if not TENANT_B_API_KEY:
+    _creds_path = Path(__file__).resolve().parent.parent.parent / "logs" / "test_tenant_credentials.json"
+    _tenant_b_creds: dict = {}
+    if _creds_path.exists():
+        _tenant_b_creds = json.loads(_creds_path.read_text())
+    TENANT_B_API_KEY = _tenant_b_creds.get("superadmin_key", "")
 
 # Rate limit thresholds (with ±20% tolerance for timing sensitivity)
 STARTER_RPM = 10

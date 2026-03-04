@@ -226,6 +226,24 @@ CREATE TABLE IF NOT EXISTS backlog_snapshots (
     UNIQUE(id, version)
 );
 
+CREATE TABLE IF NOT EXISTS testable_elements (
+    rowid INTEGER PRIMARY KEY AUTOINCREMENT,
+    id TEXT NOT NULL,
+    version INTEGER NOT NULL,
+    subsystem TEXT NOT NULL,
+    page_or_module TEXT NOT NULL,
+    name TEXT NOT NULL,
+    element_type TEXT NOT NULL,
+    expected_behavior TEXT NOT NULL,
+    spec_id TEXT,
+    applicable_dimensions TEXT NOT NULL,
+    status TEXT NOT NULL DEFAULT 'active',
+    changed_by TEXT NOT NULL,
+    changed_at TEXT NOT NULL,
+    change_reason TEXT NOT NULL,
+    UNIQUE(id, version)
+);
+
 -- Indexes for query performance (append-only tables grow monotonically)
 CREATE INDEX IF NOT EXISTS idx_specs_id_version ON specifications(id, version);
 CREATE INDEX IF NOT EXISTS idx_specs_status ON specifications(status);
@@ -249,6 +267,9 @@ CREATE INDEX IF NOT EXISTS idx_work_items_id_version ON work_items(id, version);
 CREATE INDEX IF NOT EXISTS idx_work_items_status ON work_items(resolution_status);
 CREATE INDEX IF NOT EXISTS idx_work_items_origin ON work_items(origin);
 CREATE INDEX IF NOT EXISTS idx_backlog_id_version ON backlog_snapshots(id, version);
+CREATE INDEX IF NOT EXISTS idx_te_id_version ON testable_elements(id, version);
+CREATE INDEX IF NOT EXISTS idx_te_subsystem ON testable_elements(subsystem);
+CREATE INDEX IF NOT EXISTS idx_te_status ON testable_elements(status);
 
 -- Views: current state = latest version per ID
 CREATE VIEW IF NOT EXISTS current_specifications AS
@@ -300,6 +321,11 @@ CREATE VIEW IF NOT EXISTS current_backlog_snapshots AS
 SELECT b.* FROM backlog_snapshots b
 INNER JOIN (SELECT id, MAX(version) AS max_v FROM backlog_snapshots GROUP BY id) m
 ON b.id = m.id AND b.version = m.max_v;
+
+CREATE VIEW IF NOT EXISTS current_testable_elements AS
+SELECT t.* FROM testable_elements t
+INNER JOIN (SELECT id, MAX(version) AS max_v FROM testable_elements GROUP BY id) m
+ON t.id = m.id AND t.version = m.max_v;
 """
 
 
@@ -1901,6 +1927,113 @@ class KnowledgeDB:
     # Summary stats
     # ------------------------------------------------------------------
 
+    # ------------------------------------------------------------------
+    # Testable Elements (SPEC-1652/1653)
+    # ------------------------------------------------------------------
+
+    def _next_te_version(self, te_id: str) -> int:
+        row = self._get_conn().execute(
+            "SELECT MAX(version) FROM testable_elements WHERE id = ?", (te_id,)
+        ).fetchone()
+        return (row[0] or 0) + 1
+
+    def insert_testable_element(
+        self,
+        id: str,
+        subsystem: str,
+        page_or_module: str,
+        name: str,
+        element_type: str,
+        expected_behavior: str,
+        applicable_dimensions: list[str],
+        changed_by: str,
+        change_reason: str,
+        *,
+        spec_id: str | None = None,
+        status: str = "active",
+    ) -> dict[str, Any]:
+        """Insert a new version of a testable element.
+
+        Args:
+            id: Unique identifier (e.g., "EL-dashboard-001").
+            subsystem: Categorical (dashboard, team, config, inbox, api, auth, etc.).
+            page_or_module: Where this element lives (page name or module path).
+            name: Human-readable element name.
+            element_type: button, text, input, chart, link, endpoint, config_field, etc.
+            expected_behavior: What correct behavior looks like.
+            applicable_dimensions: Which test dimensions apply (exists, correct_value, etc.).
+            spec_id: Linked specification ID (nullable).
+            status: 'active' or 'deprecated'.
+        """
+        version = self._next_te_version(id)
+        dims_json = json.dumps(applicable_dimensions)
+        conn = self._get_conn()
+        conn.execute(
+            """INSERT INTO testable_elements
+               (id, version, subsystem, page_or_module, name, element_type,
+                expected_behavior, spec_id, applicable_dimensions, status,
+                changed_by, changed_at, change_reason)
+               VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)""",
+            (id, version, subsystem, page_or_module, name, element_type,
+             expected_behavior, spec_id, dims_json, status,
+             changed_by, _now(), change_reason),
+        )
+        conn.commit()
+        return self.get_testable_element(id)
+
+    def get_testable_element(self, te_id: str) -> dict[str, Any] | None:
+        """Get the current (latest) version of a testable element."""
+        row = self._get_conn().execute(
+            "SELECT * FROM current_testable_elements WHERE id = ?", (te_id,)
+        ).fetchone()
+        return _row_to_dict(row) if row else None
+
+    def list_testable_elements(
+        self,
+        *,
+        subsystem: str | None = None,
+        page_or_module: str | None = None,
+        element_type: str | None = None,
+        status: str | None = None,
+    ) -> list[dict[str, Any]]:
+        """List current testable elements with optional filters."""
+        query = "SELECT * FROM current_testable_elements WHERE 1=1"
+        params: list[Any] = []
+        if subsystem:
+            query += " AND subsystem = ?"
+            params.append(subsystem)
+        if page_or_module:
+            query += " AND page_or_module = ?"
+            params.append(page_or_module)
+        if element_type:
+            query += " AND element_type = ?"
+            params.append(element_type)
+        if status:
+            query += " AND status = ?"
+            params.append(status)
+        query += " ORDER BY id"
+        rows = self._get_conn().execute(query, params).fetchall()
+        return [_row_to_dict(r) for r in rows]
+
+    def get_element_coverage_summary(self) -> dict[str, Any]:
+        """Get coverage statistics per subsystem for quality dashboard."""
+        conn = self._get_conn()
+        # Count elements per subsystem
+        subsystem_counts = conn.execute(
+            """SELECT subsystem, COUNT(*) as total,
+                      SUM(CASE WHEN status = 'active' THEN 1 ELSE 0 END) as active
+               FROM current_testable_elements
+               GROUP BY subsystem ORDER BY subsystem"""
+        ).fetchall()
+        return {
+            "subsystems": [
+                {"subsystem": r["subsystem"], "total": r["total"], "active": r["active"]}
+                for r in subsystem_counts
+            ],
+            "total_elements": sum(r["total"] for r in subsystem_counts),
+            "total_active": sum(r["active"] for r in subsystem_counts),
+        }
+
     def get_summary(self) -> dict[str, Any]:
         conn = self._get_conn()
         specs = conn.execute(
@@ -1957,6 +2090,8 @@ class KnowledgeDB:
 
         backlog_count = conn.execute("SELECT COUNT(*) FROM current_backlog_snapshots").fetchone()[0]
 
+        te_count = conn.execute("SELECT COUNT(*) FROM current_testable_elements").fetchone()[0]
+
         return {
             "spec_counts": spec_counts,
             "spec_total": sum(spec_counts.values()),
@@ -1976,6 +2111,7 @@ class KnowledgeDB:
             "work_item_counts": work_item_counts,
             "work_item_total": sum(work_item_counts.values()),
             "backlog_snapshot_count": backlog_count,
+            "testable_element_count": te_count,
         }
 
 
@@ -1984,7 +2120,7 @@ def _row_to_dict(row: sqlite3.Row) -> dict[str, Any]:
     # Parse JSON fields — expose as both "field_parsed" (clean) and "_field_parsed" (legacy)
     for key in ("assertions", "results", "variables", "steps", "known_failure_modes",
                  "tags", "context", "test_ids", "work_item_ids",
-                 "summary_by_origin", "summary_by_component"):
+                 "summary_by_origin", "summary_by_component", "applicable_dimensions"):
         if key in d and d[key] and isinstance(d[key], str):
             try:
                 parsed = json.loads(d[key])

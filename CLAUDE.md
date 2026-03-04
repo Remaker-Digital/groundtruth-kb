@@ -53,30 +53,9 @@ All new work in this repository must include:
 
 ## Artifacts and Change Control
 
-The project maintains exactly **9 managed artifact types** and **2 supporting record types**, all stored in the Knowledge Database (`tools/knowledge-db/knowledge.db`).
+**9 managed artifact types + 2 supporting records** in KB (`tools/knowledge-db/knowledge.db`). See `CLAUDE-ARCHITECTURE.md` § Artifact Inventory for full table/schema details.
 
-### Artifact Inventory (SPEC-1493)
-
-| # | Artifact | Table | Purpose |
-|---|----------|-------|---------|
-| 1 | **Specification** | `specifications` | Testable description of system behavior or content |
-| 2 | **Test** | `tests` | Individual testable assertion derived from a specification |
-| 3 | **Test Plan** | `test_plans` + `test_plan_phases` | Ordered test phases with gate criteria |
-| 4 | **Work Item** | `work_items` | Unit of work: regression, defect, or new capability |
-| 5 | **Backlog** | `backlog_snapshots` | Point-in-time snapshot of active work items |
-| 6 | **Operational Procedure** | `operational_procedures` | Step-by-step repeatable process |
-| 7 | **Document** | `documents` | General-purpose project knowledge |
-| 8 | **Environment Config** | `environment_config` | Environment-specific values under change control |
-
-Supporting records: **Assertion Runs** (`assertion_runs`) and **Session Prompts** (`session_prompts`).
-
-### Orchestrating Artifact Principle (SPEC-1499)
-
-An orchestrating artifact (test plan, backlog) contains ordering, criteria, and execution context. It references other artifacts by ID without duplicating their content. Each referenced artifact is independently managed and versioned.
-
-### Append-Only Change Control
-
-All artifact tables use append-only versioning: `UNIQUE(id, version)`. Every mutation creates a new version row with mandatory `changed_by`, `changed_at`, `change_reason`. No UPDATE in place, no DELETE. `current_*` views surface the latest version per ID.
+**Key principles:** Append-only versioning (`UNIQUE(id, version)`), no UPDATE/DELETE. Orchestrating artifacts (test plan, backlog) reference other artifacts by ID without duplicating content (SPEC-1499).
 
 ---
 
@@ -90,27 +69,29 @@ A specification is a **requirement** — a business decision that affects custom
 
 Specifications should be **as stable as the business need.** Specs function as a **decision log** (what was agreed and why), not a build specification (how to construct the system).
 
-### Governance Principles (GOV-01 through GOV-13 in KB)
+### Governance Index
 
-1. **Specs are the negotiation artifact.** Claude's first priority on any change request is creating/updating a specification.
-2. **Specs are immutable without owner consent.** Claude proposes; the owner decides.
-3. **Spec granularity is driven by test unambiguity.** Every test must produce an unambiguous PASS/FAIL.
-4. **Specs mature through use.** Iterative refinement is normal maturation, not a defect.
-5. **Fix the spec first, not the code.** Correct the specification before changing implementation.
-6. **Specify on contact.** Unspecified elements become controlled when touched.
-7. **No bug fixes during testing.** Record defects as work items; fix in separate sessions.
-8. **Knowledge Database is the single source of truth.** All project knowledge lives in the KB.
-9. **Owner input classification.** Specification language triggers spec-first workflow.
-10. **Tests must exercise exposed production interfaces.** Source inspection tests are regression supplements, not Test artifacts. Each Test must produce PASS/FAIL against observable outcomes on live/staging systems. Tests are written and linked to specs **before** implementation (GOV-10).
-11. **Design decision checkpoint discipline.** At each WI/phase completion boundary, Claude must review implementation decisions for spec coverage before proceeding. Batched checkpoint, not real-time pause (GOV-11).
-12. **Work item creation triggers test creation.** Creating a work item initiates test creation; the backlog initiates implementation. Tests may be logical assertions, user story descriptions, or abstract descriptions (GOV-12).
-13. **Test plan phase assignment upon creation.** Every Test artifact must be assigned to at least one test plan phase (PLAN-001) at creation time.
-13.1 **No orphan tests.** The Master Test Plan must cover every Test artifact — no orphan tests. 
-13.2 **Hierarchy.** Specs produce tests (GOV-12), tests must be in procedures (GOV-13), all procedures compose the Master Test Plan (GOV-13).
-14. **UI element test maintenance.** When a UI element is added to or removed from any admin UI, the tests validating that element must be added or retired accordingly. Applies to all dynamic data bindings and all static data (labels, tooltips, placeholders, headings, button text). Display-value test suites must stay synchronized with the rendered UI (GOV-14).
-15. **Test fix approval gate.** Claude MUST NOT initiate implementation of fixes for failed tests without explicit owner approval immediately prior to initiation. Report failures with diagnostics, propose a fix, and wait for approval (GOV-15).
-16. **Deployment approval gate.** Claude MUST NOT initiate a deployment (ACR build, container app update, or equivalent) without explicit owner approval immediately prior to initiation. Present the deployment plan (version, environment, changes) and wait for approval (GOV-16).
-17. **Prioritize quality** Always prioritize quality over effort and strive for software engineering excellence.
+All GOV specs are stored in KB with `type = 'governance'`. Quick reference:
+
+| GOV | Short Name | Core Rule |
+|-----|-----------|-----------|
+| 01 | Spec-first | First priority: create/update spec before any code |
+| 02 | Owner consent | Specs immutable without owner approval |
+| 03 | Test clarity | Every test must produce unambiguous PASS/FAIL |
+| 04 | Maturation | Iterative spec refinement is normal, not a defect |
+| 05 | Fix spec first | Correct specification before changing implementation |
+| 06 | Specify on contact | Unspecified elements become controlled when touched |
+| 07 | No fixes during testing | Record defects as WIs; fix in separate sessions |
+| 08 | KB is truth | All project knowledge lives in the Knowledge Database |
+| 09 | Input classification | Specification language triggers spec-first workflow |
+| 10 | Live interfaces only | Tests must exercise production interfaces, not source code |
+| 11 | Checkpoint discipline | Review spec coverage at WI/phase boundaries |
+| 12 | WI triggers tests | Work item creation initiates test creation |
+| 13 | Phase assignment | Every Test assigned to PLAN-001 phase at creation; no orphans |
+| 14 | UI test sync | UI element changes require matching test updates |
+| 15 | Test fix gate | No fixing failed tests without owner approval |
+| 16 | Deploy gate | No deployment without owner approval |
+| 17 | Quality first | Prioritize quality over effort; software engineering excellence |
 
 ### Owner Input Classification Rule (GOV-09)
 
@@ -128,11 +109,9 @@ When the owner describes what the system **must do**, **should do**, **must incl
 
 **Test forms:** A test may be a logical assertion (exists/doesn't exist, comparisons, if-then), a user story (a verifiable process), or an abstract description (measurements, pseudocode, or other information describing the desired implementation).
 
-### Work Item Taxonomy (SPEC-1496)
+### Work Item Taxonomy
 
-**By origin:** Regression (previously PASSing test now FAILs), Defect (test FAILs against implementation), New (specification exists but no implementation yet), Hygiene (process improvement, tooling, drift reduction — improves the project management system, not the product).
-
-**By component:** test_plan, test_procedure, operational_procedure, tenant_administration, provider_administration, agent_implementation, infrastructure_automation, database, test_harness, maintenance_tool, customer_interface, external_integration, development_environment.
+See `CLAUDE-ARCHITECTURE.md` § Work Item Taxonomy for full origin/component lists (SPEC-1496).
 
 ---
 
@@ -192,5 +171,5 @@ Provide brief inline coaching notes (prefixed with "💡 **Feedback:**") when ob
 ---
 
 *© 2026 Remaker Digital, a DBA of VanDusen & Palmeter, LLC. All rights reserved.*
-*Last Updated: 2026-02-28*
-*Version: 62.0.0*
+*Last Updated: 2026-03-03*
+*Version: 63.0.0*

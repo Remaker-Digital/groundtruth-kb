@@ -16,10 +16,9 @@
  */
 
 import React from 'react';
-import { Navigate } from 'react-router-dom';
-
 import type { TeamRole } from '../../shared/types';
 import { useAppContext } from '../layouts/StandaloneLayout';
+import { NavigateWithQuery } from './NavigateWithQuery';
 
 interface ProtectedRouteProps {
   /** Roles permitted to view this route. */
@@ -40,7 +39,7 @@ export const ProtectedRoute: React.FC<ProtectedRouteProps> = ({
 
   // Role doesn't match — redirect to inbox (accessible to all roles)
   if (!allowedRoles.includes(userRole)) {
-    return <Navigate to="/inbox" replace />;
+    return <NavigateWithQuery to="/inbox" replace />;
   }
 
   return <>{children}</>;

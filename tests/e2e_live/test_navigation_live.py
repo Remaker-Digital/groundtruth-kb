@@ -121,7 +121,8 @@ class TestLayoutElements:
         live_admin_page.on("pageerror", lambda exc: errors.append(str(exc)))
 
         # Re-navigate to trigger any load-time errors
-        live_admin_page.reload(wait_until="networkidle")
+        # S134: Use "load" — live SPAs prevent networkidle from resolving.
+        live_admin_page.reload(wait_until="load")
         live_admin_page.wait_for_selector("text=Dashboard", timeout=15_000)
 
         assert len(errors) == 0, f"Uncaught JS errors: {errors}"

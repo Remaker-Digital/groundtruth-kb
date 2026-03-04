@@ -18,7 +18,8 @@
 
 import React from 'react';
 import { createRoot } from 'react-dom/client';
-import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom';
+import { BrowserRouter, Routes, Route } from 'react-router-dom';
+import { NavigateWithQuery } from './components/NavigateWithQuery';
 import { MantineProvider } from '@mantine/core';
 import { Notifications } from '@mantine/notifications';
 
@@ -138,6 +139,10 @@ const App: React.FC = () => {
           const data = await resp.json();
 
           // Two-stage auth: 2FA required for admin roles
+          // Preserve ?tenant= while cleaning magic link params
+          const _tenant = new URLSearchParams(window.location.search).get('tenant');
+          const _cleanUrl = '/admin/standalone/' + (_tenant ? `?tenant=${_tenant}` : '');
+
           if (data.requires_2fa && data.pending_2fa_token) {
             setPending2fa({
               pendingToken: data.pending_2fa_token,
@@ -145,14 +150,14 @@ const App: React.FC = () => {
               email: data.email,
               mfaMethods: data.mfa_methods || ['totp'],
             });
-            window.history.replaceState({}, '', '/admin/standalone/');
+            window.history.replaceState({}, '', _cleanUrl);
             return;
           }
 
           storeSessionToken(data.session_token);
           setAuth({ type: 'session_token', value: data.session_token });
-          // Clean URL
-          window.history.replaceState({}, '', '/admin/standalone/');
+          // Clean URL (preserve tenant param for SPEC-1654)
+          window.history.replaceState({}, '', _cleanUrl);
         } else {
           const body = await resp.json().catch(() => ({}));
           setVerifyError(body.message || 'This sign-in link is invalid or has expired.');
@@ -240,7 +245,7 @@ const App: React.FC = () => {
             <Route path="/" element={<DashboardPage />} />
             <Route path="/inbox" element={<InboxPage />} />
             <Route path="/team" element={<TeamPage />} />
-            <Route path="/analytics" element={<Navigate to="/" replace />} />
+            <Route path="/analytics" element={<NavigateWithQuery to="/" replace />} />
 
             {/* Admin-only routes (WI #295 Phase 4) */}
             <Route path="/configuration" element={
@@ -278,7 +283,7 @@ const App: React.FC = () => {
                 <MemoryPrivacyPage />
               </ProtectedRoute>
             } />
-            <Route path="*" element={<Navigate to="/" replace />} />
+            <Route path="*" element={<NavigateWithQuery to="/" replace />} />
           </Routes>
         </StandaloneLayout>
       </BrowserRouter>

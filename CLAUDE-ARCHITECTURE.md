@@ -183,5 +183,40 @@ E:\Claude-Playground\CLAUDE-PROJECTS\Agent Red Customer Engagement\
 
 ---
 
+## Artifact Inventory (SPEC-1493)
+
+The project maintains exactly **9 managed artifact types** and **2 supporting record types**, all stored in the Knowledge Database (`tools/knowledge-db/knowledge.db`).
+
+| # | Artifact | Table | Purpose |
+|---|----------|-------|---------|
+| 1 | **Specification** | `specifications` | Testable description of system behavior or content |
+| 2 | **Test** | `tests` | Individual testable assertion derived from a specification |
+| 3 | **Test Plan** | `test_plans` + `test_plan_phases` | Ordered test phases with gate criteria |
+| 4 | **Work Item** | `work_items` | Unit of work: regression, defect, or new capability |
+| 5 | **Backlog** | `backlog_snapshots` | Point-in-time snapshot of active work items |
+| 6 | **Operational Procedure** | `operational_procedures` | Step-by-step repeatable process |
+| 7 | **Document** | `documents` | General-purpose project knowledge |
+| 8 | **Environment Config** | `environment_config` | Environment-specific values under change control |
+
+Supporting records: **Assertion Runs** (`assertion_runs`) and **Session Prompts** (`session_prompts`).
+
+### Orchestrating Artifact Principle (SPEC-1499)
+
+An orchestrating artifact (test plan, backlog) contains ordering, criteria, and execution context. It references other artifacts by ID without duplicating their content. Each referenced artifact is independently managed and versioned.
+
+### Append-Only Change Control
+
+All artifact tables use append-only versioning: `UNIQUE(id, version)`. Every mutation creates a new version row with mandatory `changed_by`, `changed_at`, `change_reason`. No UPDATE in place, no DELETE. `current_*` views surface the latest version per ID.
+
+---
+
+## Work Item Taxonomy (SPEC-1496)
+
+**By origin:** Regression (previously PASSing test now FAILs), Defect (test FAILs against implementation), New (specification exists but no implementation yet), Hygiene (process improvement, tooling, drift reduction — improves the project management system, not the product).
+
+**By component:** test_plan, test_procedure, operational_procedure, tenant_administration, provider_administration, agent_implementation, infrastructure_automation, database, test_harness, maintenance_tool, customer_interface, external_integration, development_environment.
+
+---
+
 *© 2026 Remaker Digital, a DBA of VanDusen & Palmeter, LLC. All rights reserved.*
-*Last Updated: 2026-02-17*
+*Last Updated: 2026-03-03*

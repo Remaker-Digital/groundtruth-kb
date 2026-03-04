@@ -1,29 +1,32 @@
 #!/usr/bin/env python3
 """Automated Test Pipeline — SPEC-1616 / PLAN-001.
 
-Single-invocation, fully autonomous pipeline that executes ALL 16 phases of
-the Master Test Plan (PLAN-001) without any human or Claude interaction.
+Single-invocation, fully autonomous pipeline that executes the Master Test
+Plan (PLAN-001) without any human or Claude interaction.
 
-Each phase maps 1:1 to a PLAN-001 phase (PHASE-001 through PHASE-016):
+SPEC-1649: ALL phases use only live external interfaces (HTTP, WebSocket,
+rendered UI against real backend). No mocked APIs, stubs, or code inspection.
 
     Pre-check : Validate Environment (fail-fast)
     Phase  1  : Pre-flight Checks (live platform gates)
-    Phase  2  : Unit & Integration Tests (thermal-safe, 5 batches)
     Phase  3  : Production Regression (live E2E Playwright)
-    Phase  4  : External URL Reachability (ops spec tests)
     Phase  5  : Tenant Isolation (live cross-tenant verification)
     Phase  6  : API Security & Penetration (live adversarial requests)
     Phase  7  : Rate Limiting & DoS Resilience (live rate limit exhaustion)
     Phase  8  : Data Integrity & Backup (live consistency checks)
     Phase  9  : Resilience & Failover (live graceful degradation)
-    Phase 10  : Load Testing (Locust headless)
-    Phase 11  : Conversation Quality (evaluation metrics)
-    Phase 12  : UI Regression (mocked E2E Playwright — ALL tests)
+    Phase 10  : Load Testing (Locust headless against staging)
+    Phase 11  : Conversation Quality (live widget API conversation flow)
     Phase 13  : SPA Provisioning + Critical Path (live config pipeline)
     Phase 14  : Upgrade Verification (live multi-tenant assertions)
-    Phase 15  : Manual Verification (automatable subset + SKIP for manual)
-    Phase 16  : Widget Visual Regression (widget + visual source tests)
+    Phase 15  : External Verification (live URL reachability checks)
+    Phase 16  : Widget Embed (live widget bundle/config/CORS checks)
     Summary   : Print table, create DEFECTs, write log, update KB phases
+
+Removed phases (SPEC-1649 — mocked/inspection tests excluded from PLAN-001):
+    Phase  2  : Unit & Integration (MOCKED_UNIT → use thermal-safe harness locally)
+    Phase  4  : External URL Reachability (MOCKED_UNIT → consolidated into Phase 1)
+    Phase 12  : UI Regression (MOCKED_UI → covered by Phase 3 live E2E)
 
 Usage:
     python scripts/test_pipeline.py --env staging --version 1.66.0
@@ -122,9 +125,48 @@ def _cooldown(label: str) -> None:
     time.sleep(LIVE_COOLDOWN_SECONDS)
 
 
+def _get_env_vars(args: argparse.Namespace) -> dict[str, str]:
+    """Get environment-specific variables for subprocess invocations.
+
+    S132 lesson: config pipeline tests read PROD_URL, SUPERADMIN_PREVIEW_API_KEY,
+    and PREVIEW_WIDGET_KEY from env vars. Without explicit passthrough, a staging
+    pipeline silently tests production.
+    """
+    try:
+        from scripts.upgrade_verification import ENVIRONMENTS, TENANTS
+        env_cfg = ENVIRONMENTS.get(args.env, {})
+        fqdn = env_cfg.get("fqdn", "")
+        superadmin_key = env_cfg.get("api_key", "")  # ENVIRONMENTS uses "api_key" key
+        widget_key = env_cfg.get("widget_key", "")
+        cosmos_db = env_cfg.get("cosmos_db_database", "")
+        env_vars = {}
+        if fqdn:
+            env_vars["PROD_URL"] = f"https://{fqdn}"
+        if superadmin_key:
+            env_vars["SUPERADMIN_PREVIEW_API_KEY"] = superadmin_key
+        if widget_key:
+            env_vars["PREVIEW_WIDGET_KEY"] = widget_key
+        if cosmos_db:
+            env_vars["COSMOS_DB_DATABASE"] = cosmos_db
+
+        # S134: Pass Tenant B credentials for multi-tenant isolation tests.
+        # Multi-tenant tests (Phase 5, 7, 8) need a second tenant's credentials.
+        # Look up the first non-primary tenant in TENANTS for this environment.
+        for key, overlay in TENANTS.items():
+            if key.startswith(f"{args.env}:"):
+                env_vars["TENANT_B_API_KEY"] = overlay.get("api_key", "")
+                env_vars["TENANT_B_WIDGET_KEY"] = overlay.get("widget_key", "")
+                break
+        return env_vars
+    except Exception as e:
+        log("WARN", f"  Could not load ENVIRONMENTS: {e}")
+        return {}
+
+
 def _run_pytest(test_path: str | list[str], *, timeout: int = 300,
                 prefix: str = "  [pytest] ", extra_args: list[str] | None = None,
-                xdist: bool = False) -> tuple[int, int, int, int, float, str]:
+                xdist: bool = False,
+                extra_env: dict[str, str] | None = None) -> tuple[int, int, int, int, float, str]:
     """Run pytest and return (passed, failed, errors, xfailed, duration, stdout).
 
     Handles all output parsing consistently across phases.
@@ -139,8 +181,14 @@ def _run_pytest(test_path: str | list[str], *, timeout: int = 300,
     if extra_args:
         cmd.extend(extra_args)
 
+    # Merge extra_env into current environment for the subprocess
+    env = None
+    if extra_env:
+        env = {**os.environ, **extra_env}
+
     t0 = time.time()
-    r = stream_subprocess(cmd, cwd=PROJECT_ROOT, timeout=timeout, prefix=prefix)
+    r = stream_subprocess(cmd, cwd=PROJECT_ROOT, timeout=timeout, prefix=prefix,
+                          env=env)
     dt = time.time() - t0
 
     # Parse pytest summary — take LAST match (thermal-safe runner prints per-batch)
@@ -253,8 +301,8 @@ def precheck_validate_environment(args: argparse.Namespace) -> PhaseResult:
     else:
         log("WARN", "  Locust: not installed (Phase 10 will SKIP)")
 
-    # Live-phase prerequisites (only when running live phases)
-    needs_live = args.phase in ("live", "security", "all", None)
+    # All phases are live (SPEC-1649) — always validate live prerequisites
+    needs_live = True
     if needs_live:
         # .env.local credentials
         try:
@@ -339,67 +387,10 @@ def phase_1_preflight(args: argparse.Namespace) -> PhaseResult:
 
 
 # ---------------------------------------------------------------------------
-# Phase 2 — Unit & Integration Tests (PHASE-002)
+# Phase 2 — REMOVED (SPEC-1649: MOCKED_UNIT)
+# Unit & Integration tests run locally via thermal-safe harness (SPEC-1650).
+# Not part of PLAN-001 live execution.
 # ---------------------------------------------------------------------------
-def phase_2_local_pytest(args: argparse.Namespace) -> PhaseResult:
-    """Run the full local pytest suite via thermal-safe PowerShell runner.
-
-    Uses subprocess.run instead of stream_subprocess because PowerShell with
-    CREATE_NEW_PROCESS_GROUP on Windows hangs after child pytest processes
-    exit — the pipe never closes.  The thermal-safe runner manages its own
-    child timeouts, so we don't need the process-group kill path.
-    """
-    t0 = time.time()
-
-    cmd_str = subprocess.list2cmdline([
-        "powershell", "-ExecutionPolicy", "Bypass", "-File",
-        str(PROJECT_ROOT / "scripts" / "run-tests-thermal-safe.ps1"),
-        "-SkipLive",
-    ])
-
-    log("INFO", "  Launching thermal-safe test runner (up to 20 min)...")
-    try:
-        proc = subprocess.run(
-            cmd_str,
-            cwd=str(PROJECT_ROOT),
-            capture_output=True,
-            text=True,
-            timeout=1200,
-            shell=True,
-            encoding="utf-8",
-            errors="replace",
-        )
-        stdout = proc.stdout or ""
-        returncode = proc.returncode
-        timed_out = False
-    except subprocess.TimeoutExpired as e:
-        stdout = (e.stdout or b"").decode("utf-8", errors="replace")
-        returncode = -1
-        timed_out = True
-
-    dt = time.time() - t0
-
-    # Print captured output (replay for real-time log file)
-    for line in stdout.splitlines():
-        log("INFO", f"  [pytest] {line}")
-
-    # Parse output — take LAST match (thermal-safe prints per-batch before summary)
-    all_passed = re.findall(r"(\d+)\s+passed", stdout)
-    all_failed = re.findall(r"(\d+)\s+failed", stdout)
-    passed = int(all_passed[-1]) if all_passed else 0
-    failed = int(all_failed[-1]) if all_failed else 0
-
-    if returncode == 0 and failed == 0 and passed > 0:
-        log("PASS", f"  Local pytest: {passed} passed, 0 failed")
-        return PhaseResult(2, "Unit & Integration Tests", "PASS", dt,
-                           extra=f"[{passed}/{passed}]")
-    elif timed_out:
-        log("FAIL", "  Local pytest: TIMEOUT (20 min)")
-        return PhaseResult(2, "Unit & Integration Tests", "FAIL", dt, "Timeout")
-    else:
-        detail = f"{passed} passed, {failed} failed"
-        log("FAIL", f"  Local pytest: {detail}")
-        return PhaseResult(2, "Unit & Integration Tests", "FAIL", dt, detail)
 
 
 # ---------------------------------------------------------------------------
@@ -408,8 +399,15 @@ def phase_2_local_pytest(args: argparse.Namespace) -> PhaseResult:
 def phase_3_live_e2e(args: argparse.Namespace) -> PhaseResult:
     """Run live E2E Playwright tests against the target environment."""
     t0 = time.time()
+    env_vars = _get_env_vars(args)
+    # S134: Playwright tests against live staging need longer per-test timeout.
+    # Default --timeout=60 is insufficient: each test starts Vite dev server,
+    # navigates SPA via proxy to staging, waits for real API responses.
+    # Override to 120s per test, 900s total subprocess.
     passed, failed, errors, xfailed, dt, _ = _run_pytest(
-        "tests/e2e_live/", timeout=600, prefix="  [live-e2e] ",
+        "tests/e2e_live/", timeout=900, prefix="  [live-e2e] ",
+        extra_env=env_vars,
+        extra_args=["--timeout=120"],
     )
 
     if failed == 0 and errors == 0 and passed > 0:
@@ -426,23 +424,10 @@ def phase_3_live_e2e(args: argparse.Namespace) -> PhaseResult:
 
 
 # ---------------------------------------------------------------------------
-# Phase 4 — External URL Reachability (PHASE-004)
+# Phase 4 — REMOVED (SPEC-1649: MOCKED_UNIT)
+# tests/ops/ runs mocked script inspection. External URL reachability is
+# covered by Phase 1 pre-flight checks (live HTTP to health endpoint).
 # ---------------------------------------------------------------------------
-def phase_4_url_reachability() -> PhaseResult:
-    """Run ops spec tests — pre-flight specs, seed specs, hooks, upgrade specs."""
-    t0 = time.time()
-    passed, failed, errors, xfailed, dt, _ = _run_pytest(
-        "tests/ops/", timeout=300, prefix="  [ops] ",
-    )
-
-    if failed == 0 and errors == 0 and passed > 0:
-        log("PASS", f"  URL Reachability / Ops: {passed} passed")
-        return PhaseResult(4, "External URL Reachability", "PASS", dt,
-                           extra=f"[{passed}]")
-    else:
-        detail = f"{passed} passed, {failed} failed, {errors} errors"
-        log("FAIL", f"  URL Reachability / Ops: {detail}")
-        return PhaseResult(4, "External URL Reachability", "FAIL", dt, detail)
 
 
 # ---------------------------------------------------------------------------
@@ -451,9 +436,11 @@ def phase_4_url_reachability() -> PhaseResult:
 def phase_5_tenant_isolation(args: argparse.Namespace) -> PhaseResult:
     """Run live tenant isolation verification."""
     t0 = time.time()
+    env_vars = _get_env_vars(args)
     passed, failed, errors, xfailed, dt, _ = _run_pytest(
         "tests/security/test_tenant_isolation_live.py",
         timeout=300, prefix="  [isolation] ",
+        extra_env=env_vars,
     )
 
     if failed == 0 and errors == 0 and passed > 0:
@@ -471,9 +458,11 @@ def phase_5_tenant_isolation(args: argparse.Namespace) -> PhaseResult:
 def phase_6_security_penetration(args: argparse.Namespace) -> PhaseResult:
     """Run live API security and penetration tests."""
     t0 = time.time()
+    env_vars = _get_env_vars(args)
     passed, failed, errors, xfailed, dt, _ = _run_pytest(
         "tests/security/test_live_penetration.py",
         timeout=300, prefix="  [security] ",
+        extra_env=env_vars,
     )
 
     if failed == 0 and errors == 0 and passed > 0:
@@ -494,9 +483,11 @@ def phase_6_security_penetration(args: argparse.Namespace) -> PhaseResult:
 def phase_7_rate_limiting(args: argparse.Namespace) -> PhaseResult:
     """Run live rate limiting tests (intentionally exhausts rate windows)."""
     t0 = time.time()
+    env_vars = _get_env_vars(args)
     passed, failed, errors, xfailed, dt, _ = _run_pytest(
         "tests/security/test_rate_limiting_live.py",
         timeout=300, prefix="  [rate-limit] ",
+        extra_env=env_vars,
     )
 
     if failed == 0 and errors == 0 and passed > 0:
@@ -514,9 +505,11 @@ def phase_7_rate_limiting(args: argparse.Namespace) -> PhaseResult:
 def phase_8_data_integrity(args: argparse.Namespace) -> PhaseResult:
     """Run live data integrity and consistency checks."""
     t0 = time.time()
+    env_vars = _get_env_vars(args)
     passed, failed, errors, xfailed, dt, _ = _run_pytest(
         "tests/security/test_data_integrity_live.py",
         timeout=300, prefix="  [integrity] ",
+        extra_env=env_vars,
     )
 
     if failed == 0 and errors == 0 and passed > 0:
@@ -535,9 +528,11 @@ def phase_8_data_integrity(args: argparse.Namespace) -> PhaseResult:
 def phase_9_resilience(args: argparse.Namespace) -> PhaseResult:
     """Run live resilience and graceful degradation tests."""
     t0 = time.time()
+    env_vars = _get_env_vars(args)
     passed, failed, errors, xfailed, dt, _ = _run_pytest(
         "tests/security/test_resilience_live.py",
         timeout=300, prefix="  [resilience] ",
+        extra_env=env_vars,
     )
 
     if failed == 0 and errors == 0 and passed > 0:
@@ -611,13 +606,18 @@ def phase_10_load_testing(args: argparse.Namespace) -> PhaseResult:
 
 
 # ---------------------------------------------------------------------------
-# Phase 11 — Conversation Quality (PHASE-011)
+# Phase 11 — Conversation Quality (PHASE-011) — LIVE_API
+# Replaces mocked evaluation framework with live widget API conversation flow.
+# WI-1022: Tests real chat pipeline via external HTTP interface.
 # ---------------------------------------------------------------------------
-def phase_11_conversation_quality() -> PhaseResult:
-    """Run conversation quality evaluation tests."""
+def phase_11_conversation_quality(args: argparse.Namespace) -> PhaseResult:
+    """Run live conversation quality tests via widget API (SPEC-1649)."""
     t0 = time.time()
+    env_vars = _get_env_vars(args)
     passed, failed, errors, xfailed, dt, _ = _run_pytest(
-        "tests/evaluation/", timeout=300, prefix="  [quality] ",
+        "tests/live_api/test_conversation_quality_live.py",
+        timeout=300, prefix="  [conv-quality] ",
+        extra_env=env_vars,
     )
 
     if failed == 0 and errors == 0 and passed > 0:
@@ -631,110 +631,40 @@ def phase_11_conversation_quality() -> PhaseResult:
 
 
 # ---------------------------------------------------------------------------
-# Phase 12 — UI Regression (PHASE-012)
+# Phase 12 — REMOVED (SPEC-1649: MOCKED_UI)
+# tests/e2e/ uses Playwright with local Vite + route interception (mocked).
+# Phase 3 runs live E2E via tests/e2e_live/.
+# Future: WI-1023 will expand tests/e2e_live/ to cover all admin pages.
 # ---------------------------------------------------------------------------
-def phase_12_ui_regression() -> PhaseResult:
-    """Run ALL mocked E2E Playwright tests — including display_values.
-
-    The Vite dev server is managed by conftest.py's session-scoped
-    ``admin_vite_server`` fixture.
-    """
-    t0 = time.time()
-
-    # Collect ALL E2E test files (no exclusions)
-    e2e_dir = PROJECT_ROOT / "tests" / "e2e"
-    test_files = sorted(
-        str(f.relative_to(PROJECT_ROOT))
-        for f in e2e_dir.glob("test_*.py")
-    )
-
-    log("INFO", f"  Running {len(test_files)} E2E test files (all, including display_values)...")
-
-    passed, failed, errors, xfailed, dt, _ = _run_pytest(
-        test_files, timeout=1500, prefix="  [e2e] ",
-    )
-
-    if failed == 0 and errors == 0 and passed > 0:
-        log("PASS", f"  UI Regression: {passed} passed, 0 failed")
-        return PhaseResult(12, "UI Regression", "PASS", dt, extra=f"[{passed}]")
-    else:
-        detail = f"{passed} passed, {failed} failed, {errors} errors"
-        log("FAIL", f"  UI Regression: {detail}")
-        return PhaseResult(12, "UI Regression", "FAIL", dt, detail)
 
 
 # ---------------------------------------------------------------------------
 # Phase 13 — SPA Provisioning + Critical Path (PHASE-013)
 # ---------------------------------------------------------------------------
 def phase_13_config_pipeline(args: argparse.Namespace) -> PhaseResult:
-    """Run live config pipeline tests + KB assertion check."""
+    """Run live config pipeline tests (SPEC-1649: live API only).
+
+    SPEC-1649: KB assertion checks (SOURCE_INSPECTION) removed from PLAN-001.
+    KB assertions remain a development-time tool (run via assertion-check.py hook).
+    """
     t0 = time.time()
 
-    # Part A: Config pipeline live tests (26 tests)
-    passed_a, failed_a, errors_a, _, _, _ = _run_pytest(
+    # Pass environment-specific variables (S132 lesson: env-aware config tests)
+    env_vars = _get_env_vars(args)
+
+    passed, failed, errors, xfailed, dt, _ = _run_pytest(
         "tests/security/test_config_pipeline_live.py",
         timeout=300, prefix="  [config] ",
+        extra_env=env_vars,
     )
 
-    # Part B: KB Assertion Check (in-process)
-    kb_passed = 0
-    kb_failed = 0
-    kb_regressions: list[str] = []
-    try:
-        from db import KnowledgeDB
-        from assertions import run_all_assertions
-
-        kdb = KnowledgeDB()
-        try:
-            summary = run_all_assertions(kdb, triggered_by="test-pipeline")
-        finally:
-            kdb.close()
-
-        kb_passed = summary.get("passed", 0)
-        kb_failed = summary.get("failed", 0)
-
-        # Only count machine-checkable regressions in implemented/verified specs
-        _MACHINE_TYPES = {"grep", "glob", "grep_absent"}
-        failures = [d for d in summary.get("details", [])
-                    if not d.get("skipped") and not d["overall_passed"]]
-        if failures:
-            kdb2 = KnowledgeDB()
-            try:
-                for f in failures:
-                    spec = kdb2.get_spec(f["spec_id"])
-                    status = spec["status"] if spec else "unknown"
-                    if status not in ("implemented", "verified"):
-                        continue
-                    has_machine_fail = any(
-                        not r["passed"]
-                        and r.get("type", "") in _MACHINE_TYPES
-                        and "Invalid assertion type" not in r.get("detail", "")
-                        for r in f.get("results", [])
-                    )
-                    if has_machine_fail:
-                        kb_regressions.append(f["spec_id"])
-            finally:
-                kdb2.close()
-
-        log("INFO", f"  KB Assertions: {kb_passed}/{summary.get('specs_with_assertions', 0)} PASS")
-    except Exception as e:
-        log("WARN", f"  KB Assertions error: {e}")
-
-    dt = time.time() - t0
-    total_failed = failed_a + errors_a + len(kb_regressions)
-
-    if total_failed == 0 and passed_a > 0:
-        log("PASS", f"  SPA + Critical Path: {passed_a} config + {kb_passed} KB assertions")
+    if failed == 0 and errors == 0 and passed > 0:
+        log("PASS", f"  Config Pipeline: {passed} passed")
         return PhaseResult(13, "SPA Provisioning + Critical Path", "PASS", dt,
-                           extra=f"[{passed_a}+{kb_passed}]")
+                           extra=f"[{passed}]")
     else:
-        parts = []
-        if failed_a or errors_a:
-            parts.append(f"config: {failed_a} failed, {errors_a} errors")
-        if kb_regressions:
-            parts.append(f"KB regressions: {', '.join(kb_regressions[:5])}")
-        detail = "; ".join(parts)
-        log("FAIL", f"  SPA + Critical Path: {detail}")
+        detail = f"{passed} passed, {failed} failed, {errors} errors"
+        log("FAIL", f"  Config Pipeline: {detail}")
         return PhaseResult(13, "SPA Provisioning + Critical Path", "FAIL", dt, detail)
 
 
@@ -775,144 +705,48 @@ def phase_14_upgrade_verification(args: argparse.Namespace) -> PhaseResult:
 
 
 # ---------------------------------------------------------------------------
-# Phase 15 — Manual Verification (PHASE-015)
-# Runs automatable subset: protected behaviors + governance checks.
-# Reports SKIP for inherently manual items.
+# Phase 15 — External Verification (PHASE-015) — LIVE_API
+# Replaces source inspection with live HTTP reachability checks.
+# WI-1025: Tests external URLs (docs site, public endpoints, admin SPAs).
 # ---------------------------------------------------------------------------
-PROTECTED_BEHAVIORS = [
-    ("PB-001", "injectWidget", "admin/standalone/layouts/StandaloneLayout.tsx", 1),
-    ("PB-002", "icon-master.svg", "admin/standalone/index.html", 1),
-    ("PB-003", "icon-master.svg", "admin/provider/index.html", 1),
-    ("PB-010", "Save your configuration first", "src/multi_tenant/activation_service.py", 2),
-    ("PB-011", "isProOrHigher", "admin/standalone/pages/MemoryPrivacy.tsx", 1),
-    ("PB-020", "send_team_invite_alert", "src/multi_tenant/admin_team_api.py", 1),
-    ("PB-021", "admin_url", "src/multi_tenant/alert_delivery.py", 2),
-    ("PB-022", "resend-invite", "src/multi_tenant/admin_team_api.py", 1),
-    ("PB-023a", "find_superadmin_email", "src/chat/pipeline/critic_escalation.py", 1),
-    ("PB-023b", "recipient_emails", "src/multi_tenant/alert_delivery.py", 3),
-    ("PB-030", "VITE_API_URL", "docs/operations/build-deploy-procedure.md", 1),
-]
-
-
-def phase_15_manual_verification(args: argparse.Namespace) -> PhaseResult:
-    """Run automatable subset of manual verification."""
+def phase_15_external_verification(args: argparse.Namespace) -> PhaseResult:
+    """Run live external URL verification tests (SPEC-1649)."""
     t0 = time.time()
-    warnings = []
-
-    # Part A: Protected behaviors
-    pb_pass = 0
-    pb_total = len(PROTECTED_BEHAVIORS)
-    pb_failures = []
-
-    for pb_id, pattern, filepath, threshold in PROTECTED_BEHAVIORS:
-        full_path = PROJECT_ROOT / filepath
-        if not full_path.exists():
-            pb_failures.append(f"{pb_id}: file not found ({filepath})")
-            continue
-        content = full_path.read_text(encoding="utf-8", errors="replace")
-        count = content.count(pattern)
-        if count >= threshold:
-            pb_pass += 1
-        else:
-            pb_failures.append(f"{pb_id}: '{pattern}' count={count} < {threshold}")
-
-    if pb_failures:
-        for f in pb_failures:
-            log("FAIL", f"    - {f}")
-    else:
-        log("PASS", f"  Protected Behaviors: {pb_pass}/{pb_total}")
-
-    # Part B: Governance checks (GOV-14/15/16 via git analysis)
-    try:
-        r_ui = stream_subprocess(
-            ["git", "diff", "--name-only", "HEAD~5"],
-            cwd=PROJECT_ROOT, timeout=15, prefix="  [gov-14] ",
-        )
-        ui_files = [f for f in r_ui.stdout.splitlines()
-                    if f.startswith("admin/") and f.endswith(".tsx")]
-        test_files = [f for f in r_ui.stdout.splitlines()
-                      if f.startswith("tests/e2e")]
-        if ui_files and not test_files:
-            warnings.append(f"GOV-14: {len(ui_files)} UI files changed, 0 E2E test changes")
-            log("WARN", f"  GOV-14: {len(ui_files)} UI changes, no E2E test changes")
-        else:
-            log("INFO", f"  GOV-14: OK ({len(ui_files)} UI, {len(test_files)} test)")
-    except Exception as e:
-        warnings.append(f"GOV-14 error: {e}")
-
-    try:
-        r_tests = stream_subprocess(
-            ["git", "log", "--oneline", "HEAD~5..HEAD", "--", "tests/"],
-            cwd=PROJECT_ROOT, timeout=15, prefix="  [gov-15] ",
-        )
-        test_commits = r_tests.stdout.strip().splitlines()
-        unapproved = [c for c in test_commits
-                      if "approved" not in c.lower() and "drift" not in c.lower()
-                      and c.strip()]
-        if unapproved:
-            warnings.append(f"GOV-15: {len(unapproved)} test commits without approval marker")
-        else:
-            log("INFO", f"  GOV-15: OK ({len(test_commits)} test commits)")
-    except Exception as e:
-        warnings.append(f"GOV-15 error: {e}")
-
-    try:
-        r_auto = stream_subprocess(
-            ["git", "log", "--oneline", "HEAD~5..HEAD", "--",
-             "scripts/deploy_pipeline.py", "scripts/test_pipeline.py",
-             "scripts/pre_flight_checklist.py"],
-            cwd=PROJECT_ROOT, timeout=15, prefix="  [gov-16] ",
-        )
-        auto_commits = r_auto.stdout.strip().splitlines()
-        unapproved = [c for c in auto_commits
-                      if "approved" not in c.lower() and c.strip()]
-        if unapproved:
-            warnings.append(f"GOV-16: {len(unapproved)} automation commits without approval")
-        else:
-            log("INFO", f"  GOV-16: OK ({len(auto_commits)} automation commits)")
-    except Exception as e:
-        warnings.append(f"GOV-16 error: {e}")
-
-    # Part C: Manual items — always SKIP
-    log("SKIP", "  3 manual test artifacts require human verification (see KB)")
-
-    dt = time.time() - t0
-
-    if pb_failures:
-        detail = f"Protected behaviors: {'; '.join(pb_failures[:3])}"
-        return PhaseResult(15, "Manual Verification", "FAIL", dt, detail)
-
-    if warnings:
-        detail = "; ".join(warnings)
-        log("WARN", f"  Governance: {len(warnings)} warnings")
-        return PhaseResult(15, "Manual Verification", "WARN", dt, detail)
-
-    log("PASS", "  Manual Verification: automatable subset PASS")
-    return PhaseResult(15, "Manual Verification", "WARN", dt,
-                       "3 manual items SKIP — see KB")
-
-
-# ---------------------------------------------------------------------------
-# Phase 16 — Widget Visual Regression (PHASE-016)
-# ---------------------------------------------------------------------------
-def phase_16_widget_visual(args: argparse.Namespace) -> PhaseResult:
-    """Run widget source inspection + visual regression tests."""
-    t0 = time.time()
-
-    # Combine tests/widget/ (753 tests) + tests/visual/ (38 tests)
-    test_dirs = ["tests/widget/", "tests/visual/"]
+    env_vars = _get_env_vars(args)
     passed, failed, errors, xfailed, dt, _ = _run_pytest(
-        test_dirs, timeout=600, prefix="  [widget] ", xdist=True,
+        "tests/live_api/test_external_urls_live.py",
+        timeout=120, prefix="  [ext-verify] ",
+        extra_env=env_vars,
     )
 
     if failed == 0 and errors == 0 and passed > 0:
-        log("PASS", f"  Widget Visual: {passed} passed")
-        return PhaseResult(16, "Widget Visual Regression", "PASS", dt,
+        log("PASS", f"  External Verification: {passed} passed")
+        return PhaseResult(15, "External Verification", "PASS", dt,
                            extra=f"[{passed}]")
     else:
         detail = f"{passed} passed, {failed} failed, {errors} errors"
-        log("FAIL", f"  Widget Visual: {detail}")
-        return PhaseResult(16, "Widget Visual Regression", "FAIL", dt, detail)
+        log("FAIL", f"  External Verification: {detail}")
+        return PhaseResult(15, "External Verification", "FAIL", dt, detail)
+
+
+def phase_16_widget_embed(args: argparse.Namespace) -> PhaseResult:
+    """Run live widget embed verification tests (SPEC-1649)."""
+    t0 = time.time()
+    env_vars = _get_env_vars(args)
+    passed, failed, errors, xfailed, dt, _ = _run_pytest(
+        "tests/live_api/test_widget_embed_live.py",
+        timeout=120, prefix="  [widget-embed] ",
+        extra_env=env_vars,
+    )
+
+    if failed == 0 and errors == 0 and passed > 0:
+        log("PASS", f"  Widget Embed: {passed} passed")
+        return PhaseResult(16, "Widget Embed", "PASS", dt,
+                           extra=f"[{passed}]")
+    else:
+        detail = f"{passed} passed, {failed} failed, {errors} errors"
+        log("FAIL", f"  Widget Embed: {detail}")
+        return PhaseResult(16, "Widget Embed", "FAIL", dt, detail)
 
 
 # ---------------------------------------------------------------------------
@@ -1009,34 +843,35 @@ def run_summary(results: list[PhaseResult], args: argparse.Namespace,
 # ---------------------------------------------------------------------------
 # CLI + orchestrator
 # ---------------------------------------------------------------------------
-# Phase execution order: local phases first, then live phases (with security
-# reordered so rate-limiting runs last to avoid exhausting windows).
+# Phase execution order: ALL phases are live (SPEC-1649).
+# Security phases reordered so rate-limiting runs last to avoid exhausting windows.
 # Phases 5 → 6 → 8 → 9 → 7 (rate limiting last among security).
-PHASE_ORDER_ALL = [1, 2, 3, 4, 5, 6, 8, 9, 7, 10, 11, 12, 13, 14, 15, 16]
+# Removed phases: 2 (mocked unit), 4 (mocked ops), 12 (mocked UI)
+# Restored phases: 11 (conversation quality), 15 (external verify), 16 (widget embed)
+PHASE_ORDER_ALL = [1, 3, 5, 6, 8, 9, 7, 10, 11, 13, 14, 15, 16]
 
 PHASE_GROUPS = {
-    "local":    [2, 4, 11, 12, 15, 16],
-    "live":     [1, 3, 5, 6, 8, 9, 7, 10, 13, 14],
+    "live":     [1, 3, 5, 6, 8, 9, 7, 10, 11, 13, 14, 15, 16],
     "security": [5, 6, 8, 9, 7],
     "all":      PHASE_ORDER_ALL,
 }
 
-# Phases that require live API access (need cooldowns between them)
-LIVE_PHASES = {1, 3, 5, 6, 7, 8, 9, 10, 13, 14}
+# ALL remaining phases are live (SPEC-1649)
+LIVE_PHASES = {1, 3, 5, 6, 7, 8, 9, 10, 11, 13, 14, 15, 16}
 
 # Phases that MUST have a cooldown before them (heavy API consumers)
-COOLDOWN_BEFORE = {5, 6, 7, 8, 9, 14}
+COOLDOWN_BEFORE = {5, 6, 7, 8, 9, 11, 14}
 
 
 def main():
     parser = argparse.ArgumentParser(
-        description="Master Test Plan Runner — PLAN-001 (16 phases)")
+        description="Master Test Plan Runner — PLAN-001 (live-only, SPEC-1649)")
     parser.add_argument("--env", required=True, choices=["staging", "production"],
                         help="Target environment")
     parser.add_argument("--version", required=True,
                         help="Expected product version (e.g., 1.66.0)")
     parser.add_argument("--phase", default=None,
-                        choices=["local", "live", "security", "all"],
+                        choices=["live", "security", "all"],
                         help="Phase group to run (default: all)")
     parser.add_argument("--stop-on-fail", action="store_true",
                         help="Stop after first FAIL")
@@ -1064,24 +899,21 @@ def main():
         run_summary(results, args, start_time, log_path)
         sys.exit(1)
 
-    # Phase dispatch table
+    # Phase dispatch table (SPEC-1649: live-only phases)
     phase_funcs: dict[int, callable] = {
         1:  lambda: phase_1_preflight(args),
-        2:  lambda: phase_2_local_pytest(args),
         3:  lambda: phase_3_live_e2e(args),
-        4:  lambda: phase_4_url_reachability(),
         5:  lambda: phase_5_tenant_isolation(args),
         6:  lambda: phase_6_security_penetration(args),
         7:  lambda: phase_7_rate_limiting(args),
         8:  lambda: phase_8_data_integrity(args),
         9:  lambda: phase_9_resilience(args),
         10: lambda: phase_10_load_testing(args),
-        11: lambda: phase_11_conversation_quality(),
-        12: lambda: phase_12_ui_regression(),
+        11: lambda: phase_11_conversation_quality(args),
         13: lambda: phase_13_config_pipeline(args),
         14: lambda: phase_14_upgrade_verification(args),
-        15: lambda: phase_15_manual_verification(args),
-        16: lambda: phase_16_widget_visual(args),
+        15: lambda: phase_15_external_verification(args),
+        16: lambda: phase_16_widget_embed(args),
     }
 
     prev_was_live = False

@@ -49,16 +49,32 @@ load_env_local()
 ADMIN_VITE_PORT = 3300
 ADMIN_DIR = Path(__file__).resolve().parent.parent.parent / "admin" / "standalone"
 
+# The ACTUAL API target — pipeline sets this for staging; defaults to production.
 PROD_URL = os.environ.get(
     "PROD_URL",
     "https://agent-red-api-gateway.orangeglacier-f566a4e7.eastus.azurecontainerapps.io",
 )
 
-# API key for the production tenant — used to authenticate the admin SPA.
-# .env.local uses SAP_CONSOLE_API_KEY; some scripts use SUPERADMIN_PREVIEW_API_KEY.
+# The URL the SPA reads from import.meta.env.VITE_API_URL.
+# This is what the browser actually requests — we intercept THIS URL in Playwright.
+#
+# The Vite subprocess gets VITE_API_URL=PROD_URL (see admin_vite_server fixture),
+# and process env takes precedence over admin/standalone/.env.local in dotenv.
+# So SPA_API_URL must always match PROD_URL — reading admin/.env.local would give
+# a stale production URL when the pipeline targets staging, causing the interceptor
+# to miss cross-origin requests (CORS blocks X-API-Key on the wrong URL).
+SPA_API_URL = PROD_URL
+
+# API key for the target tenant — used to authenticate the admin SPA.
+# Priority: pipeline-provided override > staging remaker-digital > .env.local fallback.
+# S134 bug fix: SUPERADMIN_PREVIEW_API_KEY (pipeline-provided via _get_env_vars)
+# must take precedence over SPA_CONSOLE_API_KEY (.env.local).  Without this,
+# a staging pipeline run always uses the production key from .env.local,
+# which is wrong (and may be stale/invalid).
 LIVE_API_KEY = (
-    os.environ.get("SAP_CONSOLE_API_KEY")
-    or os.environ.get("SUPERADMIN_PREVIEW_API_KEY")
+    os.environ.get("SUPERADMIN_PREVIEW_API_KEY")
+    or os.environ.get("STAGING_REMAKER_DIGITAL_001_SUPERADMIN_KEY")
+    or os.environ.get("SPA_CONSOLE_API_KEY")
     or os.environ.get("AGENTRED_API_KEY")
     or ""
 )
@@ -169,6 +185,71 @@ def _navigate_admin_to(page: Page, nav_text: str, wait_for_text: str | None = No
     return page
 
 
+def _attach_api_proxy_rewrite(page: Page) -> None:
+    """Rewrite cross-origin API calls to go through the local Vite proxy.
+
+    When VITE_API_URL is set (via admin/.env.local), the React SPA makes
+    direct cross-origin requests to the gateway URL stored there.  This
+    causes CORS preflight failures for custom headers like X-API-Key.
+
+    This handler intercepts those cross-origin requests at the Playwright
+    network level (before CORS checks) and proxies them through the
+    localhost Vite dev server instead — making them same-origin.
+
+    Key distinction: SPA_API_URL is what the browser requests (from
+    admin/.env.local); PROD_URL is the actual API target (may differ for
+    staging pipeline runs).  The Vite proxy (API_PROXY_TARGET) routes
+    /api/* to PROD_URL, so the full chain is:
+
+        SPA → SPA_API_URL → Playwright intercepts → localhost:3300
+                → Vite proxy → API_PROXY_TARGET (=PROD_URL)
+
+    Uses httpx to manually fetch from localhost because Playwright's
+    route.continue_() does not allow protocol changes (https → http).
+
+    MUST be registered BEFORE safety guards so guards take priority via
+    Playwright's LIFO route matching + fallback() chain.
+    """
+    if not SPA_API_URL:
+        return
+
+    import httpx
+
+    def _proxy_via_localhost(route: Route) -> None:
+        local_url = route.request.url.replace(
+            SPA_API_URL, f"http://localhost:{ADMIN_VITE_PORT}"
+        )
+        # Forward the request headers, stripping host (will be set by httpx)
+        headers = {
+            k: v
+            for k, v in route.request.headers.items()
+            if k.lower() not in ("host", "content-length")
+        }
+        try:
+            with httpx.Client(timeout=30.0) as client:
+                resp = client.request(
+                    method=route.request.method,
+                    url=local_url,
+                    headers=headers,
+                    content=route.request.post_data_buffer,
+                    follow_redirects=True,
+                )
+            # Convert httpx headers to dict (Playwright needs simple dict)
+            resp_headers = {k: v for k, v in resp.headers.items()}
+            # Remove transfer-encoding since we're passing the full body
+            resp_headers.pop("transfer-encoding", None)
+            route.fulfill(
+                status=resp.status_code,
+                headers=resp_headers,
+                body=resp.content,
+            )
+        except Exception:
+            # If local proxy fails, let the original request through
+            route.fallback()
+
+    page.route(f"{SPA_API_URL}/**", _proxy_via_localhost)
+
+
 def _attach_safety_guards(page: Page) -> None:
     """Block dangerous mutations from reaching production.
 
@@ -216,7 +297,7 @@ def live_api_key() -> str:
     if not LIVE_API_KEY:
         pytest.skip(
             "No API key found in .env.local "
-            "(set SUPERADMIN_PREVIEW_API_KEY or AGENTRED_API_KEY) — "
+            "(set SUPERADMIN_PREVIEW_API_KEY or SPA_CONSOLE_API_KEY) — "
             "skipping live E2E tests"
         )
     return LIVE_API_KEY
@@ -258,8 +339,11 @@ def admin_vite_server(production_reachable) -> subprocess.Popen | None:
     if sys.platform == "win32":
         creation_flags = subprocess.CREATE_NEW_PROCESS_GROUP
 
-    # Point the Vite proxy to production
-    env = {**os.environ, "VITE_API_URL": PROD_URL}
+    # Point the Vite proxy to the target environment.
+    # API_PROXY_TARGET is a server-only env var (not exposed to browser via
+    # import.meta.env) that vite.config.ts reads for the proxy target.
+    # VITE_API_URL is also set so the proxy works even without the config change.
+    env = {**os.environ, "API_PROXY_TARGET": PROD_URL, "VITE_API_URL": PROD_URL}
     proc = subprocess.Popen(
         "npm run dev",
         cwd=str(ADMIN_DIR),
@@ -339,6 +423,10 @@ def live_admin_page(
     loads, so the app authenticates against the production backend.
     Safety guards block dangerous mutations.
     """
+    # Rewrite cross-origin API calls to go through local Vite proxy.
+    # Registered FIRST so safety guards (registered next) take LIFO priority.
+    _attach_api_proxy_rewrite(page)
+
     # Attach safety guards BEFORE navigation
     _attach_safety_guards(page)
 
@@ -348,9 +436,12 @@ def live_admin_page(
     """)
 
     # Navigate to the admin SPA with tenant identification (SPEC-1644/SPEC-1645)
+    # S134: Use "load" instead of "networkidle" — live SPAs have persistent
+    # API connections (SSE, polling) that prevent networkidle from resolving.
+    # The explicit wait_for_selector("Dashboard") below ensures content is ready.
     page.goto(
         f"http://localhost:{ADMIN_VITE_PORT}/admin/standalone/?tenant={LIVE_TENANT_ID}",
-        wait_until="networkidle",
+        wait_until="load",
     )
 
     # Wait for the Dashboard to load with real data

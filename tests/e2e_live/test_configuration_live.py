@@ -180,7 +180,8 @@ class TestDraftSaveRoundTrip:
             live_config_page.wait_for_timeout(2000)
 
             # Reload and verify
-            live_config_page.reload(wait_until="networkidle")
+            # S134: Use "load" — live SPAs prevent networkidle.
+            live_config_page.reload(wait_until="load")
             live_config_page.wait_for_selector(
                 "text=Configuration", timeout=15_000
             )

@@ -49,7 +49,8 @@ def _wait_for_team_data(page: Page) -> str:
         if attempt < 3:
             # Progressive backoff: 5s, 10s, 15s — lets rate limit window reset
             page.wait_for_timeout((attempt + 1) * 5000)
-            page.reload(wait_until="networkidle")
+            # S134: Use "load" — live SPAs prevent networkidle.
+            page.reload(wait_until="load")
     return page.text_content("main") or ""
 
 
