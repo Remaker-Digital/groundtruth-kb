@@ -26,7 +26,7 @@ def _wait_for_team_data(page: Page) -> str:
     """Wait for team member data to load, return page text.
 
     Retries with reload if the team API returns an error (typically
-    rate limiting at 50 rpm). Each retry adds a pause to let the
+    rate limiting at 500 rpm). Each retry adds a pause to let the
     rate limit window reset.
     """
     for attempt in range(4):

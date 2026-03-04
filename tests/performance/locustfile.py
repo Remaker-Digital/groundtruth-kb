@@ -2,7 +2,7 @@
 
 Validates SLA commitments under realistic concurrent load:
     - P50 < 1,500ms, P95 < 2,000ms, P99 < 5,000ms
-    - Per-tenant rate limits enforced (Starter 10rpm, Professional 50rpm)
+    - Per-tenant rate limits enforced (all tiers 500rpm)
     - Multi-tenant isolation (noisy neighbor prevention)
     - SSE streaming stability under concurrent connections
     - Pipeline timeout budget (8s hard deadline)

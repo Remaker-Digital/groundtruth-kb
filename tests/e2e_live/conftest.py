@@ -18,8 +18,8 @@ Safety:
   named configs).  Blocked requests return 200 + empty JSON.
 
 Rate limiting:
-  Professional tier = 50 rpm.  A 2 s cooldown between test classes keeps
-  the suite within budget (~120 API calls total).
+  All tiers = 500 rpm.  A 2 s cooldown between test classes prevents
+  burst clustering.
 
 © 2026 Remaker Digital, a DBA of VanDusen & Palmeter, LLC. All rights reserved.
 """
@@ -46,31 +46,25 @@ load_env_local()
 # Constants
 # ---------------------------------------------------------------------------
 
-ADMIN_VITE_PORT = 3300
-ADMIN_DIR = Path(__file__).resolve().parent.parent.parent / "admin" / "standalone"
+# S137: All live E2E tests target the DEPLOYED staging environment directly.
+# The SPA and API share the same origin — no Vite dev server, no CORS proxy.
+# Override via env vars if targeting a different environment.
+STAGING_FQDN = "https://agent-red-staging.orangeglacier-f566a4e7.eastus.azurecontainerapps.io"
 
-# The ACTUAL API target — pipeline sets this for staging; defaults to production.
-PROD_URL = os.environ.get(
-    "PROD_URL",
-    "https://agent-red-api-gateway.orangeglacier-f566a4e7.eastus.azurecontainerapps.io",
+LIVE_SPA_BASE_URL = os.environ.get(
+    "LIVE_SPA_BASE_URL",
+    f"{STAGING_FQDN}/admin/standalone",
 )
 
-# The URL the SPA reads from import.meta.env.VITE_API_URL.
-# This is what the browser actually requests — we intercept THIS URL in Playwright.
-#
-# The Vite subprocess gets VITE_API_URL=PROD_URL (see admin_vite_server fixture),
-# and process env takes precedence over admin/standalone/.env.local in dotenv.
-# So SPA_API_URL must always match PROD_URL — reading admin/.env.local would give
-# a stale production URL when the pipeline targets staging, causing the interceptor
-# to miss cross-origin requests (CORS blocks X-API-Key on the wrong URL).
+# The ACTUAL API target — used for reachability checks and direct API calls.
+PROD_URL = os.environ.get("PROD_URL", STAGING_FQDN)
+
+# Legacy: SPA_API_URL used by the Vite proxy rewrite.  Still needed if
+# someone opts into local Vite mode by clearing LIVE_SPA_BASE_URL.
 SPA_API_URL = PROD_URL
 
 # API key for the target tenant — used to authenticate the admin SPA.
-# Priority: pipeline-provided override > staging remaker-digital > .env.local fallback.
-# S134 bug fix: SUPERADMIN_PREVIEW_API_KEY (pipeline-provided via _get_env_vars)
-# must take precedence over SPA_CONSOLE_API_KEY (.env.local).  Without this,
-# a staging pipeline run always uses the production key from .env.local,
-# which is wrong (and may be stale/invalid).
+# Priority: env override > .env.local keys.
 LIVE_API_KEY = (
     os.environ.get("SUPERADMIN_PREVIEW_API_KEY")
     or os.environ.get("STAGING_REMAKER_DIGITAL_001_SUPERADMIN_KEY")
@@ -79,10 +73,12 @@ LIVE_API_KEY = (
     or ""
 )
 
-# SPEC-1645: Tenant ID for the test tenancy.
-# On staging, remaker-digital-001 is the canonical test tenant.
-# On production, this is the remaker-digital-001 tenant as well.
-LIVE_TENANT_ID = os.environ.get("LIVE_TENANT_ID", "remaker-digital-001")
+# Tenant slug for URL ?tenant= parameter.
+LIVE_TENANT_ID = os.environ.get("LIVE_TENANT_ID", "blanco-9939")
+
+# Legacy Vite support — only used when LIVE_SPA_BASE_URL is empty.
+ADMIN_VITE_PORT = 3300
+ADMIN_DIR = Path(__file__).resolve().parent.parent.parent / "admin" / "standalone"
 
 # Mutations that MUST NOT reach production during test runs.
 # Each entry: (HTTP method, URL substring to match).
@@ -322,7 +318,14 @@ def admin_vite_server(production_reachable) -> subprocess.Popen | None:
 
     Sets VITE_API_URL so the Vite proxy in vite.config.ts forwards
     /api/* to the real production backend.
+
+    When LIVE_SPA_BASE_URL is set (deployed SPA mode), the Vite server
+    is not needed — the SPA is served directly from the deployed container.
     """
+    if LIVE_SPA_BASE_URL:
+        yield None
+        return
+
     node_modules = ADMIN_DIR / "node_modules"
     if not node_modules.exists():
         pytest.skip(
@@ -398,13 +401,13 @@ def admin_vite_server(production_reachable) -> subprocess.Popen | None:
 
 @pytest.fixture(autouse=True, scope="class")
 def _rate_limit_cooldown():
-    """Insert a 3 s cooldown between test classes to stay within 50 rpm.
+    """Insert a 2 s cooldown between test classes.
 
-    Each page navigation triggers 1-3 API calls.  With ~20 test classes
-    and 3 s between each, the suite averages ~40 rpm, well within budget.
+    With class-scoped page fixtures (one page load per class), API usage
+    is modest (~3-5 calls per class).  A 2 s gap prevents burst clustering.
     """
     yield
-    time.sleep(3)
+    time.sleep(2)
 
 
 # ---------------------------------------------------------------------------
@@ -419,30 +422,48 @@ def live_admin_page(
 ) -> Page:
     """Navigate to the admin SPA with real API key and safety guards.
 
-    Injects the real API key into sessionStorage before the React app
-    loads, so the app authenticates against the production backend.
-    Safety guards block dangerous mutations.
+    Two modes:
+      1. **Local Vite** (default): starts a Vite dev server on localhost:3300,
+         rewrites cross-origin API calls through the Vite proxy.
+      2. **Deployed SPA** (LIVE_SPA_BASE_URL set): navigates directly to the
+         deployed admin SPA.  No Vite, no proxy rewriting.  SPA and API share
+         the same origin, so no CORS issues.
+
+    In both modes, injects the real API key into sessionStorage before the
+    React app loads and attaches safety guards to block dangerous mutations.
     """
-    # Rewrite cross-origin API calls to go through local Vite proxy.
-    # Registered FIRST so safety guards (registered next) take LIFO priority.
-    _attach_api_proxy_rewrite(page)
+    if LIVE_SPA_BASE_URL:
+        # --- Deployed SPA mode ---
+        _attach_safety_guards(page)
+        page.add_init_script(f"""
+            sessionStorage.setItem('agentred_api_key', '{live_api_key}');
+        """)
+        page.goto(
+            f"{LIVE_SPA_BASE_URL}/?tenant={LIVE_TENANT_ID}",
+            wait_until="load",
+        )
+    else:
+        # --- Local Vite mode ---
+        # Rewrite cross-origin API calls to go through local Vite proxy.
+        # Registered FIRST so safety guards (registered next) take LIFO priority.
+        _attach_api_proxy_rewrite(page)
 
-    # Attach safety guards BEFORE navigation
-    _attach_safety_guards(page)
+        # Attach safety guards BEFORE navigation
+        _attach_safety_guards(page)
 
-    # Inject real auth key into sessionStorage before any page JS runs
-    page.add_init_script(f"""
-        sessionStorage.setItem('agentred_api_key', '{live_api_key}');
-    """)
+        # Inject real auth key into sessionStorage before any page JS runs
+        page.add_init_script(f"""
+            sessionStorage.setItem('agentred_api_key', '{live_api_key}');
+        """)
 
-    # Navigate to the admin SPA with tenant identification (SPEC-1644/SPEC-1645)
-    # S134: Use "load" instead of "networkidle" — live SPAs have persistent
-    # API connections (SSE, polling) that prevent networkidle from resolving.
-    # The explicit wait_for_selector("Dashboard") below ensures content is ready.
-    page.goto(
-        f"http://localhost:{ADMIN_VITE_PORT}/admin/standalone/?tenant={LIVE_TENANT_ID}",
-        wait_until="load",
-    )
+        # Navigate to the admin SPA with tenant identification (SPEC-1644/SPEC-1645)
+        # S134: Use "load" instead of "networkidle" — live SPAs have persistent
+        # API connections (SSE, polling) that prevent networkidle from resolving.
+        # The explicit wait_for_selector("Dashboard") below ensures content is ready.
+        page.goto(
+            f"http://localhost:{ADMIN_VITE_PORT}/admin/standalone/?tenant={LIVE_TENANT_ID}",
+            wait_until="load",
+        )
 
     # Wait for the Dashboard to load with real data
     page.wait_for_selector("text=Dashboard", timeout=20_000)
@@ -479,8 +500,30 @@ def live_widget_page(live_admin_page: Page) -> Page:
 
 @pytest.fixture()
 def live_inbox_page(live_admin_page: Page) -> Page:
-    """Navigate to the Inbox page with real data."""
-    return _navigate_admin_to(live_admin_page, "Inbox", "Inbox")
+    """Navigate to the Inbox page with real data.
+
+    After clicking Inbox in the sidebar, waits for conversation data to
+    load from the API — either conversation items (containing 'messages')
+    or the 'No conversations' empty state.
+    """
+    _navigate_admin_to(live_admin_page, "Inbox", "Inbox")
+
+    # Wait for conversation data to load: either "N messages" text from
+    # conversation items, or "No conversations" empty state, or filter
+    # tab counts like "All (N)".
+    try:
+        live_admin_page.wait_for_selector(
+            "text=/messages|No conversations|All \\(\\d/i",
+            timeout=15_000,
+        )
+    except Exception:
+        # If neither appears within 15 s, proceed anyway — individual
+        # tests will assert and fail with a clear error message.
+        pass
+
+    # Extra settle time for remaining React renders
+    live_admin_page.wait_for_timeout(1000)
+    return live_admin_page
 
 
 @pytest.fixture()

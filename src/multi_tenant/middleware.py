@@ -817,9 +817,10 @@ class RateLimitMiddleware(BaseHTTPMiddleware):
     """Per-tenant rate limiting based on subscription tier.
 
     Rate limits (requests per minute):
-        Starter:      10 rpm
-        Professional: 50 rpm
-        Enterprise:  200 rpm
+        All tiers:   500 rpm (uniform)
+
+    Per-tenant overrides via TenantDocument.rate_limit_rpm take
+    precedence over tier defaults.
 
     Uses a sliding window counter per tenant. When the limit is
     exceeded, returns HTTP 429 with Retry-After header.

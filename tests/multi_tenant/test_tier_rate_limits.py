@@ -48,21 +48,21 @@ PROJECT_ROOT = Path(__file__).resolve().parents[2]
 class TestTierRateLimitDefaults:
     """SPEC-0287: verify TIER_DEFAULTS rate_limit_rpm for each tier."""
 
-    def test_starter_rpm_is_60(self) -> None:
-        """TEST-2860: Starter rate_limit_rpm == 60."""
-        assert TIER_DEFAULTS["starter"]["rate_limit_rpm"] == 60
+    def test_starter_rpm_is_500(self) -> None:
+        """TEST-2860: Starter rate_limit_rpm == 500."""
+        assert TIER_DEFAULTS["starter"]["rate_limit_rpm"] == 500
 
-    def test_professional_rpm_is_60(self) -> None:
-        """TEST-2861: Professional rate_limit_rpm == 60."""
-        assert TIER_DEFAULTS["professional"]["rate_limit_rpm"] == 60
+    def test_professional_rpm_is_500(self) -> None:
+        """TEST-2861: Professional rate_limit_rpm == 500."""
+        assert TIER_DEFAULTS["professional"]["rate_limit_rpm"] == 500
 
-    def test_enterprise_rpm_is_240(self) -> None:
-        """TEST-2862: Enterprise rate_limit_rpm == 240."""
-        assert TIER_DEFAULTS["enterprise"]["rate_limit_rpm"] == 240
+    def test_enterprise_rpm_is_500(self) -> None:
+        """TEST-2862: Enterprise rate_limit_rpm == 500."""
+        assert TIER_DEFAULTS["enterprise"]["rate_limit_rpm"] == 500
 
     def test_admin_rpm_base_constant(self) -> None:
-        """_ADMIN_RPM base constant is 60."""
-        assert _ADMIN_RPM == 60
+        """_ADMIN_RPM base constant is 500."""
+        assert _ADMIN_RPM == 500
 
 
 class TestTierRateLimitDocumentation:
@@ -71,25 +71,23 @@ class TestTierRateLimitDocumentation:
     def test_middleware_docstring_matches_tier_defaults(self) -> None:
         """TEST-2863: Middleware docstring must NOT contain stale 10/50/200."""
         docstring = RateLimitMiddleware.__doc__ or ""
-        # The stale values are 10, 50, 200 — these should NOT appear
-        # Note: current docstring IS stale (tracked by WI-0926). This test
-        # records the expectation. When WI-0926 is fixed, this will PASS.
+        # Stale values that must NOT appear
         stale_pattern = re.compile(r"Starter:\s+10\s+rpm")
-        has_stale = bool(stale_pattern.search(docstring))
-        # We EXPECT this to be stale right now — mark as known defect
-        if has_stale:
-            pytest.xfail("WI-0926: Middleware docstring still contains stale 10/50/200 rpm values")
+        assert not stale_pattern.search(docstring), (
+            "Middleware docstring still contains stale 10/50/200 rpm values"
+        )
+        # Must mention 500 rpm
+        assert "500 rpm" in docstring, "Middleware docstring missing '500 rpm'"
 
     def test_overview_md_rpm_values_match_tier_defaults(self) -> None:
-        """TEST-2864: overview.md tier table must contain 60/60/240 rpm."""
+        """TEST-2864: overview.md tier table must contain 500 rpm."""
         overview = PROJECT_ROOT / "docs-site" / "docs" / "getting-started" / "overview.md"
         if not overview.exists():
             pytest.skip("overview.md not found")
         content = overview.read_text(encoding="utf-8")
-        # The doc should mention 60 rpm for Starter/Professional and 240 for Enterprise
-        # If it still says 10/50/200, that's a defect (WI-0926)
+        # If it still says 10/50/200, that's stale
         if "10 rpm" in content and "50 rpm" in content:
-            pytest.xfail("WI-0926: overview.md still contains stale 10/50/200 rpm values")
+            pytest.xfail("WI-0926: overview.md still contains stale rpm values")
 
 
 # ===================================================================
@@ -203,9 +201,9 @@ class TestTrialEntitlements:
         """TEST-2883."""
         assert TIER_DEFAULTS["trial"]["included_conversations"] == 5000
 
-    def test_trial_rpm_is_60(self) -> None:
+    def test_trial_rpm_is_500(self) -> None:
         """TEST-2884."""
-        assert TIER_DEFAULTS["trial"]["rate_limit_rpm"] == 60
+        assert TIER_DEFAULTS["trial"]["rate_limit_rpm"] == 500
 
     def test_trial_max_concurrent(self) -> None:
         """TEST-2885."""
@@ -275,7 +273,7 @@ class TestRateLimitHeaders:
 
         response = await mw.dispatch(request, call_next)
         assert "X-RateLimit-Limit" in response.headers
-        assert int(response.headers["X-RateLimit-Limit"]) == 60
+        assert int(response.headers["X-RateLimit-Limit"]) == 500
 
     @pytest.mark.asyncio
     async def test_response_has_ratelimit_remaining_header(self) -> None:
@@ -293,7 +291,7 @@ class TestRateLimitHeaders:
         response = await mw.dispatch(request, call_next)
         assert "X-RateLimit-Remaining" in response.headers
         remaining = int(response.headers["X-RateLimit-Remaining"])
-        assert remaining == 59  # First request: 60 - 0 - 1
+        assert remaining == 499  # First request: 500 - 0 - 1
 
     @pytest.mark.asyncio
     async def test_response_has_ratelimit_reset_header(self) -> None:
@@ -425,8 +423,8 @@ class TestRateLimitEnforcement:
     """SPEC-1238: Enterprise tier rate limit is 240 rpm (4x base)."""
 
     @pytest.mark.asyncio
-    async def test_enterprise_within_240_rpm_not_limited(self) -> None:
-        """TEST-2901: Enterprise tenant is not rate-limited at 240 rpm."""
+    async def test_enterprise_within_500_rpm_not_limited(self) -> None:
+        """TEST-2901: Enterprise tenant rate limit is 500 rpm (same as all tiers)."""
         mw = RateLimitMiddleware(app=MagicMock())
 
         @dataclass
@@ -437,7 +435,7 @@ class TestRateLimitEnforcement:
 
         ctx = Ctx()
         limit = mw._get_limit(ctx)
-        assert limit == 240, f"Enterprise rate limit should be 240, got {limit}"
+        assert limit == 500, f"Enterprise rate limit should be 500, got {limit}"
 
 
 # ===================================================================

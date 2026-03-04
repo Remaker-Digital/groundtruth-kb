@@ -1,7 +1,7 @@
 """Live rate limiting & DoS resilience testing — validates per-tenant rate limits.
 
-Tests use both production tenants (professional 50rpm, starter 10rpm)
-to verify tier-specific rate limit enforcement and cross-tenant isolation.
+Tests use both production tenants to verify rate limit enforcement and
+cross-tenant isolation.  All tiers share a uniform 500 rpm limit.
 
 Procedure: docs/operations/rate-limit-test-procedure.md
 Prerequisites: Both tenants seeded, production healthy.
@@ -38,10 +38,10 @@ PROD_URL = os.environ.get(
     "https://agent-red-api-gateway.orangeglacier-f566a4e7.eastus.azurecontainerapps.io",
 )
 
-# Tenant A: Professional tier (50 rpm)
+# Tenant A: Professional tier (500 rpm)
 TENANT_A_API_KEY = os.environ.get("SUPERADMIN_PREVIEW_API_KEY", "")
 
-# S134: Tenant B (Starter tier, 10 rpm) — prefer env vars from pipeline.
+# S134: Tenant B (Starter tier, 500 rpm) — prefer env vars from pipeline.
 TENANT_B_API_KEY = os.environ.get("TENANT_B_API_KEY", "")
 if not TENANT_B_API_KEY:
     _creds_path = Path(__file__).resolve().parent.parent.parent / "logs" / "test_tenant_credentials.json"
@@ -51,8 +51,9 @@ if not TENANT_B_API_KEY:
     TENANT_B_API_KEY = _tenant_b_creds.get("superadmin_key", "")
 
 # Rate limit thresholds (with ±20% tolerance for timing sensitivity)
-STARTER_RPM = 10
-PROFESSIONAL_RPM = 50
+# All tiers now share a uniform 500 rpm limit.
+STARTER_RPM = 500
+PROFESSIONAL_RPM = 500
 TOLERANCE = 0.20  # 20% tolerance
 
 
@@ -125,7 +126,7 @@ class TestRateLimitEnforcement:
     """Verify rate limits are enforced at correct thresholds per tier."""
 
     def test_rl01_starter_within_limit(self, headers_b):
-        """RL-01: Starter tenant (10 rpm) — 8 requests succeed."""
+        """RL-01: Starter tenant (500 rpm) — requests within limit succeed."""
         # Use fewer than limit to stay within tolerance
         count = int(STARTER_RPM * (1 - TOLERANCE))  # 8
         results = _rapid_requests(TENANT_B_API_KEY, count)
@@ -148,8 +149,8 @@ class TestRateLimitEnforcement:
             pytest.skip("Rate limiter did not trigger (timing sensitivity)")
 
     def test_rl03_professional_within_limit(self, headers_a):
-        """RL-03: Professional tenant (50 rpm) — 10 requests succeed."""
-        count = 10  # Well within 50 rpm limit
+        """RL-03: Professional tenant (500 rpm) — 10 requests succeed."""
+        count = 10  # Well within 500 rpm limit
         results = _rapid_requests(TENANT_A_API_KEY, count)
         ok_count = sum(1 for s in results if s == 200)
         assert ok_count >= count * 0.8, (
@@ -254,7 +255,7 @@ class TestCrossTenantIsolation:
         )
 
     def test_rl11_exhaust_tenant_a(self, headers_a):
-        """RL-11: Exhaust Tenant A's rate limit (50 rpm)."""
+        """RL-11: Exhaust Tenant A's rate limit (500 rpm)."""
         results = _rapid_requests(TENANT_A_API_KEY, PROFESSIONAL_RPM + 10)
         ok_count = sum(1 for s in results if s == 200)
         assert ok_count >= 10, f"Expected some successes, got {ok_count}"

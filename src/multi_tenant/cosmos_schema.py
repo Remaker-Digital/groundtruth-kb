@@ -2245,10 +2245,10 @@ def get_collection_configs() -> list[CollectionConfig]:
 # Tier defaults (Decision #5 — rate limits, Decision #14 — concurrency)
 # ---------------------------------------------------------------------------
 
-# Admin RPM: All tiers share the same rate limit to support aggressive
-# concurrent multi-user admin usage. Per-tenant overrides via TenantDocument
-# rate_limit_rpm field take precedence (resolved in middleware._get_limit).
-_ADMIN_RPM = 60
+# Admin RPM: All tiers share the same rate limit (500 rpm).
+# Per-tenant overrides via TenantDocument rate_limit_rpm field take
+# precedence (resolved in middleware._get_limit).
+_ADMIN_RPM = 500
 
 TIER_DEFAULTS: dict[str, dict[str, Any]] = {
     # Trial: Full professional-grade entitlements for 14 days.
@@ -2289,7 +2289,7 @@ TIER_DEFAULTS: dict[str, dict[str, Any]] = {
     },
     TenantTier.ENTERPRISE.value: {
         "included_conversations": 20_000,
-        "rate_limit_rpm": _ADMIN_RPM * 4, # 240 RPM for enterprise
+        "rate_limit_rpm": _ADMIN_RPM,     # Same 500 RPM for all tiers
         "max_concurrent": 30,
         "queue_depth": 50,
         "history_depth_days": None,     # Unlimited
