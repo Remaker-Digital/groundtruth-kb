@@ -1,21 +1,21 @@
 """
-Live E2E test fixtures for the standalone admin SPA against production.
+Live E2E test fixtures for the standalone admin SPA against staging.
 
 Unlike tests/e2e/ (which mocks all API calls), these tests run the real React
-app with real API responses from the production backend, proxied through Vite.
+app with real API responses from the deployed staging environment.
 
 Architecture:
   - admin_vite_server (session): starts ``npm run dev`` with VITE_API_URL
-    pointing to production so the Vite proxy forwards /api/* to the real backend.
+    pointing to staging so the Vite proxy forwards /api/* to the real backend.
   - live_api_key (session): loads from .env.local — the real admin API key.
-  - live_admin_page (per-test): injects real auth, navigates to the admin SPA,
-    attaches safety guards to block dangerous mutations.
+  - live_admin_page (per-test): injects real auth, navigates to the admin SPA.
   - Page fixtures: live_dashboard_page, live_team_page, etc.
 
-Safety:
-  page.route() blocks any POST/DELETE that could mutate production state
-  (activate config, rotate widget key, invite/remove team members, delete
-  named configs).  Blocked requests return 200 + empty JSON.
+Mutation policy (SPEC-1655):
+  Staging is NOT a safe environment.  ALL data-mutating operations (POST,
+  PUT, DELETE) MUST be executed — destructive testing is a required part of
+  the test plan.  Tests that create data must clean up after themselves
+  (disposable member pattern).
 
 Rate limiting:
   All tiers = 500 rpm.  A 2 s cooldown between test classes prevents
@@ -80,23 +80,10 @@ LIVE_TENANT_ID = os.environ.get("LIVE_TENANT_ID", "blanco-9939")
 ADMIN_VITE_PORT = 3300
 ADMIN_DIR = Path(__file__).resolve().parent.parent.parent / "admin" / "standalone"
 
-# Mutations that MUST NOT reach production during test runs.
-# Each entry: (HTTP method, URL substring to match).
-#
-# IMPORTANT: Only list patterns whose URL path is UNIQUE to the dangerous
-# mutation.  If the same URL serves both a safe GET and a dangerous POST
-# (e.g. GET /api/admin/team → list members  vs  POST /api/admin/team → invite),
-# the route interception will also catch the GET and break the Vite proxy.
-# For those cases, rely on test design (tests never submit invite forms).
-BLOCKED_MUTATIONS: list[tuple[str, str]] = [
-    ("POST", "/api/config/activate"),
-    ("POST", "/api/admin/widget/rotate"),
-    # DELETE /api/admin/team/:id intentionally omitted.
-    # The glob pattern **/api/admin/team/* also matches GET /api/admin/team
-    # (the trailing * can match zero chars), breaking the team page.
-    # Tests don't invoke the delete flow, so the safety risk is minimal.
-    ("DELETE", "/api/config/named/"),
-]
+# SPEC-1655: No mutations are blocked.  Staging is a testing environment
+# where ALL operations (POST, PUT, DELETE) must be exercised.
+# Legacy BLOCKED_MUTATIONS list removed per owner directive S139.
+# Tests that create/modify data must clean up after themselves.
 
 # Navigation items and their expected page headings
 NAV_ITEMS: dict[str, str | None] = {
@@ -148,22 +135,32 @@ def _check_production_reachable() -> bool:
 def _dismiss_onboarding_modal(page: Page) -> None:
     """Dismiss the OnboardingWizard modal if it is visible.
 
-    Freshly-seeded tenants (active_version=0) show a 3-step onboarding
-    wizard that blocks sidebar navigation.  Step 1 has a "Skip for now"
-    button.  The modal uses ``closeOnClickOutside={false}`` so backdrop
-    clicks don't work — we must click the button.
+    The OnboardingWizard auto-opens on every fresh page load when
+    ``sessionStorage`` lacks ``agentred-onboarding-dismissed``.  Since each
+    test gets a fresh browser context, the wizard always appears.
 
-    On activated tenants the modal doesn't appear, so this is a no-op.
+    - Freshly-seeded tenants (active_version=0): Step 1 shows a "Skip for
+      now" button.  Click it.
+    - Activated tenants (active_version >= 1): The wizard shows template
+      selection with NO "Skip for now" button.  Press Escape to dismiss.
+
+    The modal uses ``closeOnClickOutside={false}`` so backdrop clicks don't
+    work, but Escape triggers the ``onClose`` callback.
     """
     try:
         skip_btn = page.get_by_text("Skip for now", exact=True)
         skip_btn.wait_for(state="visible", timeout=3_000)
         skip_btn.click()
-        # Wait for the modal to close and Dashboard to become interactive
         page.wait_for_timeout(500)
     except Exception:
-        # Modal not present — tenant is already activated.  No action needed.
-        pass
+        # No "Skip for now" — try Escape to dismiss any open modal overlay
+        try:
+            dialog = page.locator("[role='dialog']")
+            if dialog.count() > 0:
+                page.keyboard.press("Escape")
+                page.wait_for_timeout(500)
+        except Exception:
+            pass
 
 
 def _navigate_admin_to(page: Page, nav_text: str, wait_for_text: str | None = None) -> Page:
@@ -244,40 +241,6 @@ def _attach_api_proxy_rewrite(page: Page) -> None:
             route.fallback()
 
     page.route(f"{SPA_API_URL}/**", _proxy_via_localhost)
-
-
-def _attach_safety_guards(page: Page) -> None:
-    """Block dangerous mutations from reaching production.
-
-    Registers targeted route handlers for each blocked mutation pattern.
-    Unlike intercepting all /api/** traffic (which can interfere with the
-    Vite proxy's request forwarding), this only intercepts the specific
-    dangerous endpoints, leaving all other API calls untouched.
-    """
-    blocked_log: list[str] = []
-
-    def _make_blocker(method: str, pattern: str):
-        def _block(route: Route) -> None:
-            if route.request.method == method:
-                blocked_log.append(f"BLOCKED: {method} {route.request.url}")
-                route.fulfill(
-                    status=200,
-                    content_type="application/json",
-                    body="{}",
-                )
-            else:
-                # Use fallback() instead of continue_() — fallback passes
-                # to the next handler without consuming the route, avoiding
-                # interference with Vite proxy request forwarding.
-                route.fallback()
-        return _block
-
-    # Register a targeted route handler for each blocked mutation
-    for blocked_method, blocked_pattern in BLOCKED_MUTATIONS:
-        page.route(f"**{blocked_pattern}*", _make_blocker(blocked_method, blocked_pattern))
-
-    # Attach log for test assertions
-    page._safety_blocked = blocked_log  # type: ignore[attr-defined]
 
 
 # ---------------------------------------------------------------------------
@@ -420,7 +383,7 @@ def live_admin_page(
     admin_vite_server,
     live_api_key: str,
 ) -> Page:
-    """Navigate to the admin SPA with real API key and safety guards.
+    """Navigate to the admin SPA with real API key — all mutations allowed.
 
     Two modes:
       1. **Local Vite** (default): starts a Vite dev server on localhost:3300,
@@ -429,14 +392,14 @@ def live_admin_page(
          deployed admin SPA.  No Vite, no proxy rewriting.  SPA and API share
          the same origin, so no CORS issues.
 
-    In both modes, injects the real API key into sessionStorage before the
-    React app loads and attaches safety guards to block dangerous mutations.
+    SPEC-1655: No mutation guards — staging is a testing environment where
+    ALL operations (POST, PUT, DELETE) must be exercised.
     """
     if LIVE_SPA_BASE_URL:
         # --- Deployed SPA mode ---
-        _attach_safety_guards(page)
         page.add_init_script(f"""
             sessionStorage.setItem('agentred_api_key', '{live_api_key}');
+            sessionStorage.setItem('agentred-onboarding-dismissed', 'true');
         """)
         page.goto(
             f"{LIVE_SPA_BASE_URL}/?tenant={LIVE_TENANT_ID}",
@@ -445,15 +408,17 @@ def live_admin_page(
     else:
         # --- Local Vite mode ---
         # Rewrite cross-origin API calls to go through local Vite proxy.
-        # Registered FIRST so safety guards (registered next) take LIFO priority.
         _attach_api_proxy_rewrite(page)
 
-        # Attach safety guards BEFORE navigation
-        _attach_safety_guards(page)
-
-        # Inject real auth key into sessionStorage before any page JS runs
+        # Inject real auth key + suppress auto-opening OnboardingWizard
+        # into sessionStorage before any page JS runs.
+        # The wizard checks this flag in a useEffect; setting it via
+        # addInitScript ensures it's present BEFORE React hydrates,
+        # eliminating the race condition where the wizard opens after
+        # _dismiss_onboarding_modal() has already run.
         page.add_init_script(f"""
             sessionStorage.setItem('agentred_api_key', '{live_api_key}');
+            sessionStorage.setItem('agentred-onboarding-dismissed', 'true');
         """)
 
         # Navigate to the admin SPA with tenant identification (SPEC-1644/SPEC-1645)

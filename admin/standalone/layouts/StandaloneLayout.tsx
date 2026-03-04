@@ -120,27 +120,13 @@ const TIER_BADGE_COLORS: Record<string, string> = {
   enterprise: 'grape',
 };
 
-/** Tier ordering for feature-gating comparison. Higher index = higher tier.
- *  Trial has professional-grade entitlements, so it maps to professional's index. */
-const TIER_ORDER: Record<TenantTier, number> = {
-  starter: 0,
-  professional: 1,
-  trial: 1,         // Trial = professional entitlements
-  enterprise: 2,
-};
-
-/** Short labels for nav tier badges. */
+/** Short labels for nav tier badges (used in top-bar plan display). */
 const TIER_BADGE_LABELS: Record<TenantTier, string> = {
   trial: 'Trial',
   starter: 'Starter',
   professional: 'Professional',
   enterprise: 'Enterprise',
 };
-
-/** Returns true if the tenant tier meets or exceeds the required minimum. */
-function tierMeetsMin(current: TenantTier, minTier: TenantTier): boolean {
-  return (TIER_ORDER[current] ?? 0) >= (TIER_ORDER[minTier] ?? 0);
-}
 
 // Icons imported from shared icon library (admin/shared/icons/)
 
@@ -151,8 +137,6 @@ type NavPage = {
   badge?: number;
   /** Roles that can see this nav item. Omit = all roles. */
   roles?: TeamRole[];
-  /** Minimum tier to use this page (e.g. 'professional'). Shows a small badge in the nav. */
-  minTier?: TenantTier;
 };
 
 /** Nav items rendered BEFORE the configuration group. */
@@ -173,7 +157,7 @@ const configGroupItems: NavPage[] = [
 /** Nav items rendered AFTER the configuration group. */
 const navItemsAfter: NavPage[] = [
   { path: '/integrations', label: 'Integrations', icon: 'integrations', roles: ['superadmin', 'admin'] },
-  { path: '/memory-privacy', label: 'Memory & privacy', icon: 'memory', roles: ['superadmin', 'admin'], minTier: 'professional' },
+  { path: '/memory-privacy', label: 'Memory & privacy', icon: 'memory', roles: ['superadmin', 'admin'] },
   { path: '/billing', label: 'Billing', icon: 'billing', roles: ['superadmin', 'admin'] },
 ];
 
@@ -1026,8 +1010,6 @@ export const StandaloneLayout: React.FC<StandaloneLayoutProps> = ({
                 const IconComponent = Icons[item.icon];
                 const isActive = location.pathname === item.path
                   || (item.path !== '/' && location.pathname.startsWith(item.path));
-                const currentTier = tenantContext?.tier ?? 'starter';
-                const showTierBadge = item.minTier && !tierMeetsMin(currentTier, item.minTier);
                 return (
                   <NavLink
                     key={item.path}
@@ -1045,10 +1027,6 @@ export const StandaloneLayout: React.FC<StandaloneLayoutProps> = ({
                     rightSection={
                       item.badge ? (
                         <Badge size="xs" variant="filled" color="brand.5" circle>{item.badge}</Badge>
-                      ) : showTierBadge ? (
-                        <Badge size="xs" variant="light" color={TIER_BADGE_COLORS[item.minTier!] ?? 'gray'}>
-                          {TIER_BADGE_LABELS[item.minTier!]}
-                        </Badge>
                       ) : undefined
                     }
                     active={isActive}
