@@ -23,9 +23,9 @@ POSTCONDITIONS:
   [ ] All prior tenant data deleted from 9 containers (clean slate)
   [ ] 10 Cosmos DB containers created/verified
   [ ] Tenant document with API key + widget key
-  [ ] Preferences document (config_state=draft, all merchant-configurable fields empty)
+  [ ] Preferences document (config_state=draft, all fields empty, zero quick actions)
   [ ] 1 team member (superadmin) with per-user API key
-  [ ] 54 KB articles seeded
+  [ ] Zero KB articles (tests create via CRUD)
   [ ] 4 tier_defaults platform config documents
   [ ] Credentials printed to stdout (SAVE THESE)
   [ ] Key Vault ADMIN-PREVIEW-API-KEY updated with new superadmin key  (MANDATORY — see POST-SEED STEPS)
@@ -452,7 +452,7 @@ async def phase_2_tenant(dry_run: bool) -> None:
         consent_status=ConsentStatus.GRANTED,
         api_key_hash=hash_api_key(api_key),
         widget_key_hash=hash_widget_key(widget_key),
-        rate_limit_rpm=50,
+        rate_limit_rpm=None,  # Fall through to TIER_DEFAULTS (S139/S140 fix)
         max_concurrent=10,
         created_at=now,
         updated_at=now,
@@ -502,13 +502,9 @@ async def phase_3_preferences(dry_run: bool) -> None:
 
     now = datetime.now(timezone.utc).isoformat()
 
-    # Add timestamps to quick actions
-    qa_with_timestamps = []
-    for qa in QUICK_ACTIONS:
-        qa_copy = dict(qa)
-        qa_copy["created_at"] = now
-        qa_copy["updated_at"] = now
-        qa_with_timestamps.append(qa_copy)
+    # Quick actions are NOT seeded — tests exercise full CRUD on these.
+    # A fresh tenant starts with zero quick actions.
+    qa_with_timestamps: list[dict] = []
 
     # Retrieve the widget key generated in Phase 2 (required for activation)
     widget_key = generated_credentials.get("widget_key")
@@ -586,7 +582,7 @@ async def phase_3_preferences(dry_run: bool) -> None:
         widget_page_rules=[],
         # Quick actions (embedded directly)
         quick_actions=qa_with_timestamps,
-        quick_action_assignments=QUICK_ACTION_ASSIGNMENTS,
+        quick_action_assignments=[],  # Tests create assignments via CRUD
         widget_quick_actions_enabled=True,
         # Metadata
         created_at=now,
