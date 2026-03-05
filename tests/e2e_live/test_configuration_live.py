@@ -124,6 +124,67 @@ def _unique_config_name() -> str:
     return f"e2e-test-{uuid.uuid4().hex[:8]}"
 
 
+def _wait_for_form_inputs(page: Page) -> None:
+    """Wait for Mantine form inputs to render after config data loads."""
+    try:
+        page.wait_for_selector(
+            "input[type='text'], textarea", timeout=10_000,
+        )
+    except Exception:
+        pass  # inputs may legitimately not exist (error overlay)
+
+
+def _expand_first_category(page: Page) -> bool:
+    """Expand the first escalation category to reveal keyword/email inputs.
+
+    Categories are collapsed by default (Mantine Collapse). The clickable
+    area is the Group wrapping category name + switch in the header row.
+    Returns True if expansion happened.
+    """
+    for cat_name in ESCALATION_CATEGORIES:
+        header = page.locator(f"text={cat_name}").first
+        if header.count() == 0 or not header.is_visible():
+            continue
+        # Click the category name to toggle expand
+        header.click()
+        page.wait_for_timeout(800)
+        # Verify expanded: look for keyword input inside Collapse
+        kw_input = page.locator("input[placeholder*='keyword' i]")
+        if kw_input.count() > 0 and kw_input.first.is_visible():
+            return True
+    return False
+
+
+def _click_save_current_as(page: Page) -> bool:
+    """Click 'Save current as…' button. Returns True if clicked."""
+    from playwright.sync_api import expect
+    btn = page.get_by_role("button", name=re.compile(r"Save current", re.I))
+    if btn.count() == 0:
+        # fallback — Unicode ellipsis vs ASCII
+        btn = page.locator(
+            "button:has-text('Save current'), button:has-text('Save as')"
+        )
+    if btn.count() == 0:
+        return False
+    expect(btn.first).to_be_visible(timeout=5_000)
+    btn.first.click()
+    page.wait_for_timeout(1000)
+    return True
+
+
+def _fill_and_dirty(locator, value: str) -> None:
+    """Fill a Mantine controlled input and trigger dirty-state detection.
+
+    Mantine's useForm tracks dirty state via React onChange events.
+    Playwright fill() dispatches input+change events but sometimes Mantine
+    misses them. The type() method sends individual keystrokes which
+    reliably trigger React event handlers.
+    """
+    locator.click()
+    locator.press("Control+a")
+    locator.type(value)
+
+
 # ═══════════════════════════════════════════════════════════════════════════
 # Section A: Page Header — EL-config-001..002
 # ═══════════════════════════════════════════════════════════════════════════
@@ -166,12 +227,12 @@ class TestSavedConfigurations:
 
     def test_save_current_as_button(self, live_config_page: Page):
         """[EL-config-004/A] 'Save current as' button exists."""
+        from playwright.sync_api import expect
         _wait_for_config_data(live_config_page)
-        btn = live_config_page.locator(
-            "button:has-text('Save current'), button:has-text('Save as')"
+        btn = live_config_page.get_by_role(
+            "button", name=re.compile(r"Save current", re.I)
         )
-        if btn.count() == 0:
-            pytest.skip("Save current as button not visible — may require changes first")
+        expect(btn.first).to_be_visible(timeout=5_000)
 
     def test_saved_configs_table_or_list(self, live_config_page: Page):
         """[EL-config-005/A] Saved configs rendered as table, list, or empty-state message."""
@@ -217,9 +278,16 @@ class TestSavedConfigurations:
     def test_field_count_badge(self, live_config_page: Page):
         """[EL-config-008/A,B] Config entry shows field count badge."""
         text = _wait_for_config_data(live_config_page)
-        has_count = bool(re.search(r"\d+\s*(field|change|value)", text, re.I))
+        # The keyword count badge in each escalation category header shows just
+        # a number (e.g. "6").  Also check for "N fields" in saved config rows.
+        has_count = bool(re.search(r"\d+\s*(field|change|value|keyword|tag)", text, re.I))
         if not has_count:
-            pytest.skip("Field count badge not visible — may depend on config state")
+            # Mantine Badge in category headers shows bare number next to name
+            badges = live_config_page.locator(
+                ".mantine-Badge-root, [class*='Badge']"
+            )
+            has_count = badges.count() >= 1
+        assert has_count, "No count badge found (keyword count or field count)"
 
 
 # ═══════════════════════════════════════════════════════════════════════════
@@ -231,79 +299,58 @@ class TestSavedConfigCrud:
 
     def test_save_config_opens_modal(self, live_config_page: Page):
         """[EL-config-004/E, EL-config-033/A] Clicking 'Save current as' opens name modal."""
+        from playwright.sync_api import expect
         _wait_for_config_data(live_config_page)
         if _is_rate_limited(live_config_page):
             pytest.skip("Rate-limited")
 
-        btn = live_config_page.locator(
-            "button:has-text('Save current'), button:has-text('Save as')"
+        assert _click_save_current_as(live_config_page), (
+            "'Save current as…' button not found"
         )
-        if btn.count() == 0:
-            pytest.skip("Save button not found")
-        btn.first.click()
-        live_config_page.wait_for_timeout(1000)
 
-        text = _text(live_config_page).lower()
-        has_modal = (
-            "name" in text
-            or live_config_page.locator(
-                "input[placeholder*='name' i], input[placeholder*='config' i]"
-            ).count() > 0
-            or live_config_page.locator("[role='dialog']").count() > 0
-        )
+        # Modal should show dialog with name input
+        dialog = live_config_page.locator("[role='dialog']")
+        expect(dialog.first).to_be_visible(timeout=3_000)
 
         # Cancel/close the modal
-        cancel = live_config_page.locator("button:has-text('Cancel')")
+        cancel = live_config_page.get_by_role("button", name="Cancel")
         if cancel.count() > 0:
             cancel.first.click()
             live_config_page.wait_for_timeout(500)
-
-        assert has_modal, "Save config modal did not appear"
 
     def test_save_config_modal_has_name_input(self, live_config_page: Page):
         """[EL-config-034/A] Modal contains a config name input field."""
+        from playwright.sync_api import expect
         _wait_for_config_data(live_config_page)
         if _is_rate_limited(live_config_page):
             pytest.skip("Rate-limited")
 
-        btn = live_config_page.locator(
-            "button:has-text('Save current'), button:has-text('Save as')"
+        assert _click_save_current_as(live_config_page), (
+            "'Save current as…' button not found"
         )
-        if btn.count() == 0:
-            pytest.skip("Save button not found")
-        btn.first.click()
-        live_config_page.wait_for_timeout(1000)
 
-        name_input = live_config_page.locator(
-            "[role='dialog'] input, input[placeholder*='name' i], "
-            "input[placeholder*='config' i]"
-        )
-        found = name_input.count() > 0
+        # Modal input: label="Configuration name"
+        name_input = live_config_page.get_by_label("Configuration name")
+        expect(name_input).to_be_visible(timeout=3_000)
 
-        cancel = live_config_page.locator("button:has-text('Cancel')")
+        cancel = live_config_page.get_by_role("button", name="Cancel")
         if cancel.count() > 0:
             cancel.first.click()
             live_config_page.wait_for_timeout(500)
 
-        assert found, "Config name input not found in save modal"
-
     def test_save_modal_cancel_closes(self, live_config_page: Page):
         """[EL-config-036/E] Cancel button closes the save modal."""
+        from playwright.sync_api import expect
         _wait_for_config_data(live_config_page)
         if _is_rate_limited(live_config_page):
             pytest.skip("Rate-limited")
 
-        btn = live_config_page.locator(
-            "button:has-text('Save current'), button:has-text('Save as')"
+        assert _click_save_current_as(live_config_page), (
+            "'Save current as…' button not found"
         )
-        if btn.count() == 0:
-            pytest.skip("Save button not found")
-        btn.first.click()
-        live_config_page.wait_for_timeout(1000)
 
-        cancel = live_config_page.locator("button:has-text('Cancel')")
-        if cancel.count() == 0:
-            pytest.skip("Cancel button not found in modal")
+        cancel = live_config_page.get_by_role("button", name="Cancel")
+        expect(cancel.first).to_be_visible(timeout=3_000)
         cancel.first.click()
         live_config_page.wait_for_timeout(500)
 
@@ -315,6 +362,7 @@ class TestSavedConfigCrud:
 
     def test_save_and_delete_named_config(self, live_config_page: Page):
         """[EL-config-009/E, EL-config-010/E, EL-config-037/E] Full save→delete lifecycle."""
+        from playwright.sync_api import expect
         _wait_for_config_data(live_config_page)
         if _is_rate_limited(live_config_page):
             pytest.skip("Rate-limited")
@@ -322,43 +370,27 @@ class TestSavedConfigCrud:
         config_name = _unique_config_name()
 
         # Open save modal
-        btn = live_config_page.locator(
-            "button:has-text('Save current'), button:has-text('Save as')"
+        assert _click_save_current_as(live_config_page), (
+            "'Save current as…' button not found"
         )
-        if btn.count() == 0:
-            pytest.skip("Save button not found")
-        btn.first.click()
-        live_config_page.wait_for_timeout(1000)
 
-        # Fill name
-        name_input = live_config_page.locator(
-            "[role='dialog'] input, input[placeholder*='name' i]"
-        )
-        if name_input.count() == 0:
-            pytest.skip("Name input not found in modal")
-        name_input.first.fill(config_name)
-        # Trigger React state update by pressing End after fill
-        name_input.first.press("End")
+        # Fill name using type() for reliable Mantine dirty-state detection
+        name_input = live_config_page.get_by_label("Configuration name")
+        expect(name_input).to_be_visible(timeout=3_000)
+        _fill_and_dirty(name_input, config_name)
         live_config_page.wait_for_timeout(500)
 
-        # Submit
+        # Submit — "Save configuration" button inside dialog
         submit = live_config_page.locator(
-            "[role='dialog'] button:has-text('Save'), "
-            "button:has-text('Create'), button:has-text('Submit')"
+            "[role='dialog'] button:has-text('Save configuration'), "
+            "[role='dialog'] button:has-text('Save'):not(:has-text('Cancel'))"
         )
-        if submit.count() > 0:
-            if submit.first.is_disabled():
-                # Dialog submit may require non-empty name — Mantine may not have
-                # detected the fill().  Try typing a char to trigger dirty state.
-                name_input.first.press("End")
-                name_input.first.type("x")
-                live_config_page.wait_for_timeout(300)
-            if submit.first.is_disabled():
-                # Close modal and skip
-                cancel = live_config_page.locator("button:has-text('Cancel')")
-                if cancel.count() > 0:
-                    cancel.first.click()
-                pytest.skip("Dialog submit button disabled — Mantine form state not detected")
+        assert submit.count() > 0, "Save configuration button not found in modal"
+        # Wait for button to become enabled (Mantine enables when name is non-empty)
+        for _ in range(5):
+            if not submit.first.is_disabled():
+                break
+            live_config_page.wait_for_timeout(300)
             submit.first.click()
             live_config_page.wait_for_timeout(3000)
 
@@ -569,14 +601,14 @@ class TestEscalationCategories:
         assert switches.count() >= 1, "No category toggle switches found"
 
     def test_keyword_count_badge(self, live_config_page: Page):
-        """[EL-config-024/A,B] At least one category shows keyword count."""
-        text = _wait_for_config_data(live_config_page)
-        has_count = bool(re.search(r"\d+\s*(keyword|tag)", text, re.I))
-        if not has_count:
-            # Accept any numeric badge near category names
-            has_count = bool(re.search(r"keyword", text, re.I))
-        if not has_count:
-            pytest.skip("Keyword count badge not visible — may need expanded categories")
+        """[EL-config-024/A,B] At least one category shows keyword count badge."""
+        _wait_for_config_data(live_config_page)
+        # Each category header has a Badge showing keyword count (e.g., "6").
+        # Mantine Badge elements near escalation category names.
+        badges = live_config_page.locator(".mantine-Badge-root, [class*='Badge']")
+        assert badges.count() >= 1, (
+            "No keyword count badges found near escalation categories"
+        )
 
     def test_category_email_indicator(self, live_config_page: Page):
         """[EL-config-025/A] Email indicator badge or icon visible."""
@@ -591,45 +623,66 @@ class TestEscalationCategories:
 
     def test_category_notification_email_input(self, live_config_page: Page):
         """[EL-config-026/A] Notification email input exists within categories."""
+        from playwright.sync_api import expect
         _wait_for_config_data(live_config_page)
-        email_inputs = live_config_page.locator(
-            "input[type='email'], input[placeholder*='email' i], "
-            "input[placeholder*='@']"
+        # Expand first category — email input is inside <Collapse>
+        assert _expand_first_category(live_config_page), (
+            "Could not expand any escalation category"
         )
-        if email_inputs.count() == 0:
-            pytest.skip("No email input visible — may need to expand a category")
+        # Mantine TextInput with label="Notification email",
+        # placeholder="{catId}@yourcompany.com"
+        email_input = live_config_page.get_by_label("Notification email").first
+        expect(email_input).to_be_visible(timeout=3_000)
 
     def test_keyword_chips_displayed(self, live_config_page: Page):
-        """[EL-config-027/A,B] Category keyword chips/tags are visible."""
-        text = _wait_for_config_data(live_config_page).lower()
-        has_keywords = (
-            "keyword" in text
-            or live_config_page.locator(
-                "[class*='chip'], [class*='tag'], [class*='badge']"
-            ).count() >= 3
+        """[EL-config-027/A,B] Category keyword chips/tags are visible after expand."""
+        _wait_for_config_data(live_config_page)
+        # Expand first category to reveal keyword Badge chips
+        assert _expand_first_category(live_config_page), (
+            "Could not expand any escalation category"
         )
+        # Keywords are rendered as Mantine Badge components inside the
+        # expanded Collapse area (e.g., "pricing", "discount", "cost")
+        text = _text(live_config_page).lower()
+        has_keywords = "keyword" in text or "add keyword" in text
         if not has_keywords:
-            pytest.skip("Keyword chips not visible — may need expanded categories")
+            # Check for Badge elements in the expanded area
+            badges = live_config_page.locator(
+                ".mantine-Badge-root, [class*='Badge']"
+            )
+            has_keywords = badges.count() >= 3
+        assert has_keywords, "Keyword chips not visible after expanding category"
 
     def test_reset_keywords_button(self, live_config_page: Page):
-        """[EL-config-028/A] Reset keywords button exists."""
+        """[EL-config-028/A] Reset keywords ActionIcon exists after expand."""
         _wait_for_config_data(live_config_page)
-        reset = live_config_page.locator(
-            "button:has-text('Reset'), button:has-text('Default'), "
-            "button[title*='reset' i]"
+        # Expand first category to reveal the reset ActionIcon
+        assert _expand_first_category(live_config_page), (
+            "Could not expand any escalation category"
         )
-        if reset.count() == 0:
-            pytest.skip("Reset keywords button not visible")
+        # Reset is a Tooltip-wrapped ActionIcon with label="Reset to default keywords"
+        # It renders as a <button> with an SVG icon, no visible text.
+        reset = live_config_page.locator(
+            "button[aria-label*='Reset' i], "
+            "[class*='ActionIcon']:has(svg)"
+        )
+        assert reset.count() >= 1, (
+            "Reset keywords ActionIcon not found after expanding category"
+        )
 
     def test_add_keyword_input(self, live_config_page: Page):
-        """[EL-config-029/A] Add keyword input exists."""
+        """[EL-config-029/A] Add keyword input exists after expand."""
+        from playwright.sync_api import expect
         _wait_for_config_data(live_config_page)
-        kw_input = live_config_page.locator(
-            "input[placeholder*='keyword' i], input[placeholder*='add' i], "
-            "input[placeholder*='tag' i]"
+        # Expand first category to reveal keyword input
+        assert _expand_first_category(live_config_page), (
+            "Could not expand any escalation category"
         )
-        if kw_input.count() == 0:
-            pytest.skip("Add keyword input not visible — may need expanded category")
+        # TextInput with placeholder="Add keyword and press Enter..."
+        kw_input = live_config_page.locator(
+            "input[placeholder*='keyword' i], input[placeholder*='Add' i]"
+        )
+        expect(kw_input.first).to_be_visible(timeout=3_000)
 
 
 # ═══════════════════════════════════════════════════════════════════════════
@@ -654,8 +707,9 @@ class TestEscalationMutations:
         if switch_tracks.count() == 0:
             # Fallback: try the input with force=True
             switches = live_config_page.locator("input[role='switch']")
-            if switches.count() == 0:
-                pytest.skip("No toggle switches found")
+            assert switches.count() > 0, (
+                "No escalation category toggle switches found on config page"
+            )
             sw = switches.first
             initial_checked = sw.is_checked()
             sw.click(force=True)
@@ -678,11 +732,14 @@ class TestEscalationMutations:
         if _is_rate_limited(live_config_page):
             pytest.skip("Rate-limited")
 
-        kw_input = live_config_page.locator(
-            "input[placeholder*='keyword' i], input[placeholder*='add' i]"
+        # Expand first category to reveal keyword input
+        assert _expand_first_category(live_config_page), (
+            "Could not expand any escalation category"
         )
-        if kw_input.count() == 0:
-            pytest.skip("Keyword input not visible")
+        kw_input = live_config_page.locator(
+            "input[placeholder*='keyword' i], input[placeholder*='Add' i]"
+        )
+        assert kw_input.count() > 0, "Keyword input not visible after expanding category"
 
         test_keyword = f"e2e-{uuid.uuid4().hex[:6]}"
         kw_input.first.fill(test_keyword)
@@ -746,18 +803,34 @@ class TestAiSuggestions:
     def test_ai_suggestion_badges_exist(self, live_config_page: Page):
         """[EL-config-038..041/A] AI suggestion badges visible near at least one field."""
         _wait_for_config_data(live_config_page)
+        _wait_for_form_inputs(live_config_page)
         text = _text(live_config_page).lower()
+        # SuggestionBadge renders "Suggested" (Mantine Badge, violet) next to
+        # empty fields.  Only appears when: (a) suggestion available AND
+        # (b) field value is empty/blank.  On a seeded tenant fields have
+        # values so badges may not render — that is correct behavior.
         has_suggestion = (
-            "ai suggest" in text
-            or "suggestion" in text
-            or "auto" in text
+            "suggested" in text  # Badge text "Suggested"
+            or "suggest" in text  # Nearby label text
             or live_config_page.locator(
-                "[class*='suggestion'], [class*='ai-badge'], "
-                "button:has-text('AI'), button:has-text('Suggest')"
+                ".mantine-Badge-root:has-text('Suggested'), "
+                "[class*='Badge']:has-text('Suggested')"
             ).count() > 0
         )
         if not has_suggestion:
-            pytest.skip("AI suggestion badges not visible — may depend on config state")
+            # Suggestion badges only appear for empty fields — if all fields
+            # have values, this is expected.  Try clearing brand name to trigger.
+            brand_input = _find_field_by_label(live_config_page, "Brand name")
+            if brand_input:
+                brand_input.fill("")
+                live_config_page.wait_for_timeout(2000)
+                has_suggestion = live_config_page.locator(
+                    ".mantine-Badge-root:has-text('Suggested'), "
+                    "[class*='Badge']:has-text('Suggested')"
+                ).count() > 0
+        assert has_suggestion, (
+            "AI suggestion badges not visible — even after clearing brand name field"
+        )
 
 
 # ═══════════════════════════════════════════════════════════════════════════
@@ -788,19 +861,26 @@ class TestLoadingAndStatus:
         assert has_content, f"Config content not loaded. Text: {text[:200]}"
 
     def test_draft_auto_save_indicator(self, live_config_page: Page):
-        """[EL-config-045/A] Draft auto-save indicator or unsaved changes badge."""
+        """[EL-config-045/A] Draft auto-save indicator or save button visible."""
         _wait_for_config_data(live_config_page)
         text = _text(live_config_page).lower()
-        # If there are unsaved changes, badge appears. If not, page shows "saved" state.
+        # The "Save draft inputs" button text always indicates save state management.
+        # When changes exist: button enabled + "unsaved" indicator.
+        # When clean: button disabled or hidden.
         has_indicator = (
             "unsaved" in text
             or "draft" in text
             or "saved" in text
-            or "auto" in text
+            or "save draft" in text
+            or "save changes" in text
             or "changes" in text
+            or live_config_page.locator(
+                "button:has-text('Save draft'), button:has-text('Save changes')"
+            ).count() > 0
         )
-        if not has_indicator:
-            pytest.skip("Auto-save indicator not visible — config may be fully saved")
+        assert has_indicator, (
+            "No save-state indicator found (Save button, unsaved badge, or draft text)"
+        )
 
 
 # ═══════════════════════════════════════════════════════════════════════════
@@ -813,40 +893,34 @@ class TestDraftSaveRoundTrip:
     def test_edit_draft_and_save(self, live_config_page: Page):
         """[EL-config-012/E] Change a draft field, save, reload, verify persistence."""
         _wait_for_config_data(live_config_page)
+        _wait_for_form_inputs(live_config_page)
         if _is_rate_limited(live_config_page):
             pytest.skip("Rate-limited")
 
-        target_input = None
-
-        # Try textareas first
-        textareas = live_config_page.locator("textarea")
-        for i in range(min(textareas.count(), 10)):
-            val = textareas.nth(i).input_value()
-            if val and len(val.strip()) > 3:
-                target_input = textareas.nth(i)
-                break
-
-        # Fall back to text inputs
+        # Target the brand name or brand voice field — always present
+        target_input = _find_field_by_label(live_config_page, "Brand name")
         if target_input is None:
-            inputs = live_config_page.locator("input[type='text']")
-            for i in range(min(inputs.count(), 20)):
-                val = inputs.nth(i).input_value()
-                if val and len(val.strip()) > 3 and not val.strip().replace(" ", "").replace("days", "").isdigit():
-                    target_input = inputs.nth(i)
+            target_input = _find_field_by_label(live_config_page, "Brand voice")
+        if target_input is None:
+            # Fallback to first visible textarea
+            textareas = live_config_page.locator("textarea")
+            for i in range(min(textareas.count(), 5)):
+                if textareas.nth(i).is_visible():
+                    target_input = textareas.nth(i)
                     break
-
-        if target_input is None:
-            pytest.skip("No suitable text field found")
+        assert target_input is not None, (
+            "No editable text field found (Brand name, Brand voice, or textarea)"
+        )
 
         marker = f"[e2e-{uuid.uuid4().hex[:6]}]"
-        target_input.fill(f"draft-test {marker}")
-        # Force keystroke to trigger Mantine dirty state detection
-        target_input.press("End")
+        # Use _fill_and_dirty for reliable Mantine dirty-state detection
+        _fill_and_dirty(target_input, f"draft-test {marker}")
         live_config_page.wait_for_timeout(500)
 
         saved = _save_and_wait(live_config_page)
-        if not saved:
-            pytest.skip("Save button disabled — Mantine form state not detected after fill()")
+        assert saved, (
+            "Save button disabled after _fill_and_dirty() — form dirty state not triggered"
+        )
 
         # Reload and verify
         live_config_page.reload(wait_until="load")
@@ -859,6 +933,7 @@ class TestDraftSaveRoundTrip:
     def test_save_button_triggers_api_call(self, live_config_page: Page):
         """[EL-config-044/E] Save button sends PUT /api/config."""
         _wait_for_config_data(live_config_page)
+        _wait_for_form_inputs(live_config_page)
         if _is_rate_limited(live_config_page):
             pytest.skip("Rate-limited")
 
@@ -872,20 +947,19 @@ class TestDraftSaveRoundTrip:
 
         live_config_page.route("**/api/config**", _capture_api)
 
-        inputs = live_config_page.locator("input[type='text']")
-        if inputs.count() > 0:
-            inputs.first.fill("api-call-test")
-            inputs.first.press("End")
-            live_config_page.wait_for_timeout(500)
+        # Use brand name field with _fill_and_dirty for reliable Mantine state
+        target = _find_field_by_label(live_config_page, "Brand name")
+        if target is None:
+            target = live_config_page.locator("input[type='text']").first
+        assert target is not None, "No text input found for API call test"
 
-            saved = _save_and_wait(live_config_page)
-            if not saved:
-                live_config_page.unroute("**/api/config**")
-                pytest.skip("Save button disabled — form dirty state not detected")
+        _fill_and_dirty(target, "api-call-test")
+        live_config_page.wait_for_timeout(500)
 
-            assert len(api_calls) >= 1, "Save did not trigger PUT /api/config"
-
+        saved = _save_and_wait(live_config_page)
         live_config_page.unroute("**/api/config**")
+        assert saved, "Save button disabled after _fill_and_dirty()"
+        assert len(api_calls) >= 1, "Save did not trigger PUT /api/config"
 
 
 # ═══════════════════════════════════════════════════════════════════════════
@@ -900,15 +974,16 @@ class TestNegativeConfigInputs:
     def test_xss_in_brand_name_sanitized(self, live_config_page: Page):
         """XSS payload in brand name should not execute."""
         _wait_for_config_data(live_config_page)
+        _wait_for_form_inputs(live_config_page)
         if _is_rate_limited(live_config_page):
             pytest.skip("Rate-limited")
 
-        inputs = live_config_page.locator("input[type='text']")
-        if inputs.count() == 0:
-            pytest.skip("No text inputs found")
+        target = _find_field_by_label(live_config_page, "Brand name")
+        if target is None:
+            target = live_config_page.locator("input[type='text']").first
+        assert target is not None, "No text input found for XSS test"
 
-        inputs.first.fill('<script>alert("xss")</script>')
-        inputs.first.press("End")
+        _fill_and_dirty(target, '<script>alert("xss")</script>')
         saved = _save_and_wait(live_config_page)
 
         if saved:
@@ -925,12 +1000,12 @@ class TestNegativeConfigInputs:
     def test_xss_in_textarea_sanitized(self, live_config_page: Page):
         """XSS payload in textarea (brand voice, instructions) should not execute."""
         _wait_for_config_data(live_config_page)
+        _wait_for_form_inputs(live_config_page)
         if _is_rate_limited(live_config_page):
             pytest.skip("Rate-limited")
 
         textareas = live_config_page.locator("textarea")
-        if textareas.count() == 0:
-            pytest.skip("No textareas found")
+        assert textareas.count() > 0, "No textareas found on config page"
 
         textareas.first.fill('<img onerror="alert(1)" src="x">')
         _save_and_wait(live_config_page)
@@ -942,15 +1017,16 @@ class TestNegativeConfigInputs:
     def test_sql_injection_in_brand_name(self, live_config_page: Page):
         """SQL injection payload in brand name should be handled safely."""
         _wait_for_config_data(live_config_page)
+        _wait_for_form_inputs(live_config_page)
         if _is_rate_limited(live_config_page):
             pytest.skip("Rate-limited")
 
-        inputs = live_config_page.locator("input[type='text']")
-        if inputs.count() == 0:
-            pytest.skip("No text inputs")
+        target = _find_field_by_label(live_config_page, "Brand name")
+        if target is None:
+            target = live_config_page.locator("input[type='text']").first
+        assert target is not None, "No text input found for SQL injection test"
 
-        inputs.first.fill("'; DROP TABLE configurations; --")
-        inputs.first.press("End")
+        _fill_and_dirty(target, "'; DROP TABLE configurations; --")
         saved = _save_and_wait(live_config_page)
 
         if saved:
@@ -966,15 +1042,16 @@ class TestNegativeConfigInputs:
     def test_overlong_brand_name_handled(self, live_config_page: Page):
         """Very long brand name (500+ chars) should not crash the page."""
         _wait_for_config_data(live_config_page)
+        _wait_for_form_inputs(live_config_page)
         if _is_rate_limited(live_config_page):
             pytest.skip("Rate-limited")
 
-        inputs = live_config_page.locator("input[type='text']")
-        if inputs.count() == 0:
-            pytest.skip("No text inputs")
+        target = _find_field_by_label(live_config_page, "Brand name")
+        if target is None:
+            target = live_config_page.locator("input[type='text']").first
+        assert target is not None, "No text input found for overlong test"
 
-        inputs.first.fill("X" * 500)
-        inputs.first.press("End")
+        _fill_and_dirty(target, "X" * 500)
         _save_and_wait(live_config_page)  # OK if save was blocked
 
         text = _text(live_config_page).lower()
@@ -983,12 +1060,12 @@ class TestNegativeConfigInputs:
     def test_overlong_textarea_handled(self, live_config_page: Page):
         """Very long textarea content (5000+ chars) should not crash."""
         _wait_for_config_data(live_config_page)
+        _wait_for_form_inputs(live_config_page)
         if _is_rate_limited(live_config_page):
             pytest.skip("Rate-limited")
 
         textareas = live_config_page.locator("textarea")
-        if textareas.count() == 0:
-            pytest.skip("No textareas")
+        assert textareas.count() > 0, "No textareas found on config page"
 
         textareas.first.fill("Y" * 5000)
         _save_and_wait(live_config_page)
@@ -999,15 +1076,18 @@ class TestNegativeConfigInputs:
     def test_empty_brand_name_accepted_or_validated(self, live_config_page: Page):
         """Emptying brand name should either show validation error or save empty draft."""
         _wait_for_config_data(live_config_page)
+        _wait_for_form_inputs(live_config_page)
         if _is_rate_limited(live_config_page):
             pytest.skip("Rate-limited")
 
-        inputs = live_config_page.locator("input[type='text']")
-        if inputs.count() == 0:
-            pytest.skip("No text inputs")
+        target = _find_field_by_label(live_config_page, "Brand name")
+        if target is None:
+            target = live_config_page.locator("input[type='text']").first
+        assert target is not None, "No text input found for empty brand test"
 
-        inputs.first.fill("")
-        inputs.first.press("End")
+        target.click()
+        target.press("Control+a")
+        target.press("Backspace")
         _save_and_wait(live_config_page)  # OK if save blocked (empty required field)
 
         text = _text(live_config_page).lower()
@@ -1016,15 +1096,16 @@ class TestNegativeConfigInputs:
     def test_special_characters_in_fields(self, live_config_page: Page):
         """Special characters (emoji, unicode, quotes) should not break the page."""
         _wait_for_config_data(live_config_page)
+        _wait_for_form_inputs(live_config_page)
         if _is_rate_limited(live_config_page):
             pytest.skip("Rate-limited")
 
-        inputs = live_config_page.locator("input[type='text']")
-        if inputs.count() == 0:
-            pytest.skip("No text inputs")
+        target = _find_field_by_label(live_config_page, "Brand name")
+        if target is None:
+            target = live_config_page.locator("input[type='text']").first
+        assert target is not None, "No text input found for special chars test"
 
-        inputs.first.fill("Test \"Brand\" with <special> & chars + emoji")
-        inputs.first.press("End")
+        _fill_and_dirty(target, "Test \"Brand\" with <special> & chars + emoji")
         _save_and_wait(live_config_page)  # OK if save was blocked
 
         text = _text(live_config_page).lower()
@@ -1035,24 +1116,26 @@ class TestNegativeConfigInputs:
     def test_rapid_save_cycle_stability(self, live_config_page: Page):
         """Rapidly saving 3 times should not corrupt config state."""
         _wait_for_config_data(live_config_page)
+        _wait_for_form_inputs(live_config_page)
         if _is_rate_limited(live_config_page):
             pytest.skip("Rate-limited")
 
-        inputs = live_config_page.locator("input[type='text']")
-        if inputs.count() == 0:
-            pytest.skip("No text inputs")
+        target = _find_field_by_label(live_config_page, "Brand name")
+        if target is None:
+            target = live_config_page.locator("input[type='text']").first
+        assert target is not None, "No text input found for rapid save test"
 
         # Rapid save cycle — fill and attempt save 3 times
         any_saved = False
         for i in range(3):
-            inputs.first.fill(f"rapid-cycle-{i}")
-            inputs.first.press("End")
+            _fill_and_dirty(target, f"rapid-cycle-{i}")
             live_config_page.wait_for_timeout(300)
             if _save_and_wait(live_config_page):
                 any_saved = True
 
-        if not any_saved:
-            pytest.skip("Save button disabled — form dirty state not detected")
+        assert any_saved, (
+            "Save button disabled across 3 rapid cycles — form dirty state not triggered"
+        )
 
         live_config_page.wait_for_timeout(3000)
         live_config_page.reload(wait_until="load")
@@ -1061,23 +1144,17 @@ class TestNegativeConfigInputs:
 
     def test_save_config_with_empty_name(self, live_config_page: Page):
         """Saving a named config with empty name should be blocked or handled."""
+        from playwright.sync_api import expect
         _wait_for_config_data(live_config_page)
         if _is_rate_limited(live_config_page):
             pytest.skip("Rate-limited")
 
-        btn = live_config_page.locator(
-            "button:has-text('Save current'), button:has-text('Save as')"
+        assert _click_save_current_as(live_config_page), (
+            "'Save current as…' button not found"
         )
-        if btn.count() == 0:
-            pytest.skip("Save button not found")
-        btn.first.click()
-        live_config_page.wait_for_timeout(1000)
 
-        name_input = live_config_page.locator(
-            "[role='dialog'] input, input[placeholder*='name' i]"
-        )
-        if name_input.count() == 0:
-            pytest.skip("Name input not found")
+        name_input = live_config_page.get_by_label("Configuration name")
+        expect(name_input).to_be_visible(timeout=3_000)
         name_input.first.fill("")
 
         submit = live_config_page.locator(
@@ -1110,26 +1187,17 @@ class TestNegativeConfigInputs:
 
     def test_save_config_with_xss_name(self, live_config_page: Page):
         """Saving a named config with XSS payload in name should be safe."""
+        from playwright.sync_api import expect
         _wait_for_config_data(live_config_page)
         if _is_rate_limited(live_config_page):
             pytest.skip("Rate-limited")
 
-        btn = live_config_page.locator(
-            "button:has-text('Save current'), button:has-text('Save as')"
+        assert _click_save_current_as(live_config_page), (
+            "'Save current as…' button not found"
         )
-        if btn.count() == 0:
-            pytest.skip("Save button not found")
-        btn.first.click()
-        live_config_page.wait_for_timeout(1000)
 
-        name_input = live_config_page.locator(
-            "[role='dialog'] input, input[placeholder*='name' i]"
-        )
-        if name_input.count() == 0:
-            cancel = live_config_page.locator("button:has-text('Cancel')")
-            if cancel.count() > 0:
-                cancel.first.click()
-            pytest.skip("Name input not found")
+        name_input = live_config_page.get_by_label("Configuration name")
+        expect(name_input).to_be_visible(timeout=3_000)
 
         xss_name = f'<script>alert(1)</script>-{uuid.uuid4().hex[:4]}'
         name_input.first.fill(xss_name)

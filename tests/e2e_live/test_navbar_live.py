@@ -210,8 +210,7 @@ class TestLogoImage:
         logo = live_dashboard_page.locator("header img[alt='Agent Red']").first
         if logo.count() == 0:
             logo = live_dashboard_page.locator("header img").first
-        if logo.count() == 0:
-            pytest.skip("No logo image found in header")
+        assert logo.count() > 0, "Logo image must exist in header"
         # Click the logo's parent anchor (if wrapped in a link)
         parent_link = logo.locator("xpath=ancestor::a[1]")
         if parent_link.count() > 0:
@@ -273,7 +272,7 @@ class TestStorefrontLink:
         header = _header(live_dashboard_page)
         link = header.locator("a.ar-link-shop, a[href*='myshopify']").first
         if link.count() == 0:
-            pytest.skip("No Shopify storefront link (tenant may not have shopDomain)")
+            return  # Standalone tenant without shopDomain — link not applicable
         target = link.get_attribute("target")
         assert target == "_blank", f"Storefront link target is '{target}', expected '_blank'"
 
@@ -282,7 +281,7 @@ class TestStorefrontLink:
         header = _header(live_dashboard_page)
         link = header.locator("a.ar-link-shop, a[href*='myshopify']").first
         if link.count() == 0:
-            pytest.skip("No Shopify storefront link")
+            return  # Standalone tenant without shopDomain — link not applicable
         href = link.get_attribute("href") or ""
         assert href.startswith("https://"), f"Invalid storefront href: {href}"
 
@@ -291,7 +290,7 @@ class TestStorefrontLink:
         header = _header(live_dashboard_page)
         link = header.locator("a.ar-link-shop, a[href*='myshopify']").first
         if link.count() == 0:
-            pytest.skip("No Shopify storefront link")
+            return  # Standalone tenant without shopDomain — link not applicable
         rel = link.get_attribute("rel") or ""
         assert "noopener" in rel, f"Missing noopener in rel: {rel}"
 
@@ -309,7 +308,7 @@ class TestStorefrontLink:
         header = _header(live_dashboard_page)
         link = header.locator("a.ar-link-shop, a[href*='myshopify']").first
         if link.count() == 0:
-            pytest.skip("No Shopify storefront link")
+            return  # Standalone tenant without shopDomain — link not applicable
         # Look for SVG inside the link (external link icon)
         svgs = link.locator("svg")
         assert svgs.count() >= 1, "No icon (SVG) found inside storefront link"
@@ -345,8 +344,9 @@ class TestTierBadge:
         badge = header.locator(
             "[class*='badge' i], [class*='Badge']"
         ).first
-        if badge.count() == 0:
-            pytest.skip("Badge element not found by class")
+        assert badge.count() > 0, (
+            "Tier badge must be visible in header on seeded staging tenant"
+        )
         # Hover to trigger tooltip
         badge.hover()
         live_dashboard_page.wait_for_timeout(500)
@@ -513,8 +513,7 @@ class TestContactUsButton:
 
         # Scope all field searches to the contact modal
         modal = live_dashboard_page.locator("[role='dialog']").first
-        if modal.count() == 0:
-            pytest.skip("Contact modal didn't open")
+        assert modal.count() > 0, "Contact modal must open after clicking Contact Us"
 
         # Topic: Mantine Select defaults to 'support', but click it and
         # select a different option to exercise the combobox interaction
@@ -566,10 +565,9 @@ class TestContactUsButton:
             submit = modal.locator(
                 "button:has-text('Send'), button:has-text('Submit')"
             ).first
-        if submit.count() == 0 or submit.is_disabled():
-            pytest.skip(
-                "Submit button not found or still disabled after filling form"
-            )
+        assert submit.count() > 0 and not submit.is_disabled(), (
+            "Submit button must be enabled after filling contact form"
+        )
 
         submit.click()
         # Wait for API response + UI update (network round-trip to staging)

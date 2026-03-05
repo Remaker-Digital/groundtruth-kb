@@ -452,8 +452,9 @@ class TestMemberRowElements:
     def test_superadmin_badge(self, live_team_page: Page):
         """[EL-team-018/A] Superadmin member shows 'Superadmin' label."""
         text = _wait_for_team_data(live_team_page).lower()
-        if "superadmin" not in text:
-            pytest.skip("No superadmin row visible — staging may only show invited members")
+        assert "superadmin" in text, (
+            "Superadmin label must be visible on seeded staging tenant"
+        )
 
     def test_role_selector_for_non_superadmin(self, live_team_page: Page):
         """[EL-team-019/A] Non-superadmin rows have role <select> dropdowns."""
@@ -466,7 +467,7 @@ class TestMemberRowElements:
         if has_non_sa:
             assert selects.count() > 0, "Non-superadmin rows lack role <select>"
         else:
-            pytest.skip("No non-superadmin members visible")
+            return  # Only superadmin present — role selector verified by TestRoleChange
 
     def test_joined_date_format(self, live_team_page: Page):
         """[EL-team-020/A,B] Joined column shows formatted date."""
@@ -517,13 +518,10 @@ class TestRoleChange:
         _wait_for_team_data(live_team_page)
 
         row = _find_row_by_email(live_team_page, email)
-        if not row:
-            pytest.skip(f"Invited member {email} not found")
+        assert row is not None, f"Invited member {email} must be visible after invite"
 
         sel = row.locator("select")
-        if sel.count() == 0:
-            _delete_member(live_team_page, email)
-            pytest.skip("No role selector in test member row")
+        assert sel.count() > 0, "Non-superadmin row must have role <select> dropdown"
 
         # Change viewer → admin
         sel.first.select_option("admin")
@@ -552,13 +550,10 @@ class TestRoleChange:
         _wait_for_team_data(live_team_page)
 
         row = _find_row_by_email(live_team_page, email)
-        if not row:
-            pytest.skip(f"Invited member {email} not found")
+        assert row is not None, f"Invited member {email} must be visible after invite"
 
         sel = row.locator("select")
-        if sel.count() == 0:
-            _delete_member(live_team_page, email)
-            pytest.skip("No role selector")
+        assert sel.count() > 0, "Non-superadmin row must have role <select> dropdown"
 
         # Change viewer → escalation_agent
         sel.first.select_option("escalation_agent")
@@ -609,7 +604,7 @@ class TestEscalationCategories:
                 )
                 return
         if not has_ea_row:
-            pytest.skip("No escalation agent members in table — cannot verify chips")
+            return  # No escalation agent present — chips verified by TestEscalationCategories.test_toggle
 
     def test_toggle_category_chip(self, live_team_page: Page):
         """[EL-team-023/E1] Clicking a category chip toggles its selection — real PUT."""
@@ -623,8 +618,7 @@ class TestEscalationCategories:
         _wait_for_team_data(live_team_page)
 
         row = _find_row_by_email(live_team_page, email)
-        if not row:
-            pytest.skip(f"Escalation agent {email} not found")
+        assert row is not None, f"Escalation agent {email} must be visible after invite"
 
         # Find a clickable category chip in the row
         # Categories render as small pill buttons or clickable spans
@@ -639,23 +633,24 @@ class TestEscalationCategories:
 
         _delete_member(live_team_page, email)
 
-        if not chip_clicked:
-            pytest.skip("No category chips found to click")
+        assert chip_clicked, "Escalation agent row must have clickable category chips"
 
     def test_role_header_info_icon(self, live_team_page: Page):
         """[EL-team-024/A] Role column header has an info icon or tooltip trigger."""
         _wait_for_team_data(live_team_page)
         headers = live_team_page.locator("table thead th, table th")
+        found_role_header = False
         for i in range(headers.count()):
             h = headers.nth(i)
             if "role" in (h.inner_text() or "").lower():
-                # Look for SVG icon or question mark (rendered as "ROLE?")
+                found_role_header = True
                 icons = h.locator("svg, button, [title*='info' i]")
                 header_text = h.inner_text() or ""
-                if icons.count() > 0 or "?" in header_text:
-                    return
-                pytest.skip("No info icon in Role header")
-        pytest.skip("Role header not found")
+                assert icons.count() > 0 or "?" in header_text, (
+                    "Role column header must have info icon or '?' indicator"
+                )
+                return
+        assert found_role_header, "Role column header must exist in team table"
 
     def test_role_tooltip_shows_descriptions(self, live_team_page: Page):
         """[EL-team-024/E1] Hovering the role info icon shows role descriptions."""
@@ -664,20 +659,22 @@ class TestEscalationCategories:
             pytest.skip("Rate-limited")
 
         headers = live_team_page.locator("table thead th, table th")
+        found_role_header = False
         for i in range(headers.count()):
             h = headers.nth(i)
             if "role" in (h.inner_text() or "").lower():
+                found_role_header = True
                 icon = h.locator("svg, button, [title*='info' i]").first
-                if icon.is_visible():
-                    icon.hover()
-                    live_team_page.wait_for_timeout(500)
-                    text = _text(live_team_page).lower()
-                    has_desc = "full access" in text or "configuration" in text or "read-only" in text
-                    if has_desc:
-                        return
-                    pytest.skip("Tooltip appeared but no role descriptions found")
-                pytest.skip("Info icon not visible")
-        pytest.skip("Role header not found")
+                assert icon.is_visible(), "Role info icon must be visible for hover"
+                icon.hover()
+                live_team_page.wait_for_timeout(500)
+                text = _text(live_team_page).lower()
+                has_desc = "full access" in text or "configuration" in text or "read-only" in text
+                assert has_desc, (
+                    "Role tooltip must show descriptions (full access/configuration/read-only)"
+                )
+                return
+        assert found_role_header, "Role column header must exist in team table"
 
 
 # ═══════════════════════════════════════════════════════════════════════════
@@ -692,7 +689,7 @@ class TestActiveDisabledToggle:
         _wait_for_team_data(live_team_page)
         row = _find_non_superadmin_row(live_team_page)
         if not row:
-            pytest.skip("No non-superadmin member available")
+            return  # Only superadmin present — toggle verified by mutation tests
         toggles = row.locator(
             "button:has-text('Active'), button:has-text('Disabled')"
         )
@@ -709,15 +706,12 @@ class TestActiveDisabledToggle:
         _wait_for_team_data(live_team_page)
 
         row = _find_row_by_email(live_team_page, email)
-        if not row:
-            pytest.skip(f"Test member {email} not found")
+        assert row is not None, f"Test member {email} must be visible after invite"
 
         toggle = row.locator(
             "button:has-text('Active'), button:has-text('Disabled')"
         )
-        if toggle.count() == 0:
-            _delete_member(live_team_page, email)
-            pytest.skip("No toggle button")
+        assert toggle.count() > 0, "Non-superadmin row must have Active/Disabled toggle button"
 
         initial = toggle.first.inner_text().strip()
 
@@ -749,15 +743,12 @@ class TestActiveDisabledToggle:
         _wait_for_team_data(live_team_page)
 
         row = _find_row_by_email(live_team_page, email)
-        if not row:
-            pytest.skip(f"Test member {email} not found")
+        assert row is not None, f"Test member {email} must be visible after invite"
 
         toggle = row.locator(
             "button:has-text('Active'), button:has-text('Disabled')"
         )
-        if toggle.count() == 0:
-            _delete_member(live_team_page, email)
-            pytest.skip("No toggle button")
+        assert toggle.count() > 0, "Non-superadmin row must have Active/Disabled toggle button"
 
         # Disable the member
         if toggle.first.inner_text().strip() == "Active":
@@ -788,7 +779,7 @@ class TestDeleteMember:
         _wait_for_team_data(live_team_page)
         row = _find_non_superadmin_row(live_team_page)
         if not row:
-            pytest.skip("No non-superadmin member")
+            return  # Only superadmin present — delete button verified by TestDeleteMember
         del_btn = row.locator(
             "button[title='Remove member'], button:has(svg)"
         )
@@ -805,17 +796,13 @@ class TestDeleteMember:
         _wait_for_team_data(live_team_page)
 
         row = _find_row_by_email(live_team_page, email)
-        if not row:
-            pytest.skip(f"Test member {email} not found")
+        assert row is not None, f"Test member {email} must be visible after invite"
 
         del_btn = row.locator("button[title='Remove member']")
         if del_btn.count() == 0:
             buttons = row.locator("button")
-            if buttons.count() >= 2:
-                buttons.last.click()
-            else:
-                _delete_member(live_team_page, email)
-                pytest.skip("No delete button")
+            assert buttons.count() >= 2, "Non-superadmin row must have action buttons"
+            buttons.last.click()
         else:
             del_btn.first.click()
 
@@ -847,9 +834,7 @@ class TestDeleteMember:
         _wait_for_team_data(live_team_page)
 
         row = _find_row_by_email(live_team_page, email)
-        if not row:
-            _delete_member(live_team_page, email)
-            pytest.skip(f"Test member {email} not found")
+        assert row is not None, f"Test member {email} must be visible after invite"
 
         del_btn = row.locator("button[title='Remove member']")
         if del_btn.count() > 0:
@@ -886,8 +871,7 @@ class TestDeleteMember:
         _wait_for_team_data(live_team_page)
 
         row = _find_row_by_email(live_team_page, email)
-        if not row:
-            pytest.skip(f"Test member {email} not found")
+        assert row is not None, f"Test member {email} must be visible after invite"
 
         # Open delete dialog
         del_btn = row.locator("button[title='Remove member']")
@@ -921,14 +905,12 @@ class TestDeleteMember:
         _wait_for_team_data(live_team_page)
 
         row = _find_row_by_email(live_team_page, email)
-        if not row:
-            pytest.skip(f"Test member {email} not found")
+        assert row is not None, f"Test member {email} must be visible after invite"
 
         rows_before = live_team_page.locator("table tbody tr").count()
 
         deleted = _delete_member(live_team_page, email)
-        if not deleted:
-            pytest.skip("Could not execute delete via UI")
+        assert deleted, "Delete via UI must succeed on disposable test member"
 
         # Give the API time to propagate, then retry reload up to 3 times
         removed = False
@@ -959,8 +941,9 @@ class TestSuperadminProtection:
     def test_no_role_dropdown(self, live_team_page: Page):
         """Superadmin row has no role <select> dropdown."""
         text = _wait_for_team_data(live_team_page)
-        if "superadmin" not in text.lower():
-            pytest.skip("No superadmin visible")
+        assert "superadmin" in text.lower(), (
+            "Superadmin must be visible on seeded staging tenant"
+        )
 
         rows = live_team_page.locator("table tbody tr")
         for i in range(rows.count()):
@@ -970,13 +953,14 @@ class TestSuperadminProtection:
                     "Superadmin row must not have a role selector"
                 )
                 return
-        pytest.skip("Could not identify superadmin row")
+        pytest.fail("Could not identify superadmin row in table")
 
     def test_no_toggle_or_delete(self, live_team_page: Page):
         """Superadmin row has no Active/Disabled toggle or Delete button."""
         text = _wait_for_team_data(live_team_page)
-        if "superadmin" not in text.lower():
-            pytest.skip("No superadmin visible")
+        assert "superadmin" in text.lower(), (
+            "Superadmin must be visible on seeded staging tenant"
+        )
 
         rows = live_team_page.locator("table tbody tr")
         for i in range(rows.count()):
@@ -992,7 +976,7 @@ class TestSuperadminProtection:
                     f"Superadmin row has action buttons: {btn_texts}"
                 )
                 return
-        pytest.skip("Could not identify superadmin row")
+        pytest.fail("Could not identify superadmin row in table")
 
 
 # ═══════════════════════════════════════════════════════════════════════════
@@ -1143,8 +1127,7 @@ class TestNegativeInviteForm:
         name_input = live_team_page.locator(
             "input[placeholder*='Jane'], input[placeholder*='name' i]"
         )
-        if name_input.count() == 0:
-            pytest.skip("No name input field")
+        assert name_input.count() > 0, "Invite form must have a name input field"
         name_input.first.fill("X" * 500)
 
         submit = live_team_page.locator(
@@ -1180,8 +1163,7 @@ class TestNegativeInviteForm:
         name_input = live_team_page.locator(
             "input[placeholder*='Jane'], input[placeholder*='name' i]"
         )
-        if name_input.count() == 0:
-            pytest.skip("No name input field")
+        assert name_input.count() > 0, "Invite form must have a name input field"
         name_input.first.fill('<script>alert("xss")</script>')
 
         # Select role
@@ -1248,8 +1230,9 @@ class TestNegativeInviteForm:
 
         # Verify first invite exists
         text = _text(live_team_page)
-        if email.lower() not in text.lower():
-            pytest.skip("First invite didn't take effect")
+        assert email.lower() in text.lower(), (
+            f"First invite for {email} must be visible on seeded staging tenant"
+        )
 
         # Try to invite same email again
         _open_invite_form(live_team_page)
@@ -1364,13 +1347,10 @@ class TestNegativeInviteForm:
         _wait_for_team_data(live_team_page)
 
         row = _find_row_by_email(live_team_page, email)
-        if not row:
-            pytest.skip(f"Test member {email} not found")
+        assert row is not None, f"Test member {email} must be visible after invite"
 
         sel = row.locator("select")
-        if sel.count() == 0:
-            _delete_member(live_team_page, email)
-            pytest.skip("No role selector")
+        assert sel.count() > 0, "Non-superadmin row must have role <select> dropdown"
 
         # Rapid toggles: viewer -> admin -> escalation_agent -> viewer
         for role in ["admin", "escalation_agent", "viewer"]:
@@ -1407,15 +1387,12 @@ class TestNegativeInviteForm:
         _wait_for_team_data(live_team_page)
 
         row = _find_row_by_email(live_team_page, email)
-        if not row:
-            pytest.skip(f"Test member {email} not found")
+        assert row is not None, f"Test member {email} must be visible after invite"
 
         toggle = row.locator(
             "button:has-text('Active'), button:has-text('Disabled')"
         )
-        if toggle.count() == 0:
-            _delete_member(live_team_page, email)
-            pytest.skip("No toggle button")
+        assert toggle.count() > 0, "Non-superadmin row must have Active/Disabled toggle button"
 
         # Record initial state
         initial = toggle.first.inner_text().strip()

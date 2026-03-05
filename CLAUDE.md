@@ -59,13 +59,11 @@ All new work in this repository must include:
 
 ---
 
-## Specification Discipline
+## Three interdependent artifacts
 
-Specifications are the protocol for recording agreement between owner and Claude. The owner does not read code or write tests; Claude does not set business requirements. The specification is the mutual understanding.
+**Specifications** are requirements which explain what needs to be implemented in order to satisfy customers and enable the business they function as a protocol for agreement between the owner and Claude. **Tests** are created by Claude to verify that the implementation will meet the specifications. **Implementation** code and related artifacts are the system described by the specifications, and verified by the tests.
 
 ### What Is a Specification?
-
-A specification is a **requirement** — a business decision that affects customers or the business.
 
 Specifications should be **as stable as the business need.** Specs function as a **decision log** (what was agreed and why), not a build specification (how to construct the system).
 
