@@ -165,6 +165,9 @@ logs/
 # Test fixture binary files (uploaded documents for RAG testing)
 tests/rag-documents-upload/
 
+# JUnit XML test results (transient CI artifacts)
+tests/results/
+
 # =============================================================================
 # CLI Tools (downloaded binaries)
 # =============================================================================
