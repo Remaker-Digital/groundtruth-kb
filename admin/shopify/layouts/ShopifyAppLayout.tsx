@@ -91,14 +91,36 @@ export const ShopifyAppLayout: React.FC<ShopifyAppLayoutProps> = ({
   const getSessionToken = useCallback(async (): Promise<string> => {
     // In Shopify embedded apps, shopify.idToken() provides the session token.
     // This is the App Bridge 4.x pattern (replaces getSessionToken from 3.x).
+    //
+    // IMPORTANT: idToken() uses postMessage to communicate with the parent
+    // Shopify admin frame.  If App Bridge is not fully initialized or the
+    // postMessage handshake stalls, the Promise can hang FOREVER (never
+    // resolves, never rejects).  We guard against this with a timeout and
+    // fall back to the id_token URL parameter that Shopify includes in
+    // the initial iframe URL.
     try {
       const shopify = (window as unknown as { shopify?: { idToken: () => Promise<string> } }).shopify;
       if (shopify?.idToken) {
-        return await shopify.idToken();
+        const token = await Promise.race([
+          shopify.idToken(),
+          new Promise<never>((_, reject) =>
+            setTimeout(() => reject(new Error('idToken() timed out after 5 s')), 5_000),
+          ),
+        ]);
+        return token;
       }
     } catch (e) {
-      console.error('[AgentRed] App Bridge idToken() failed:', e);
+      console.warn('[AgentRed] App Bridge idToken() failed or timed out:', e);
     }
+
+    // Fallback: extract the id_token from the initial iframe URL params.
+    // Shopify always passes this when loading the embedded app.
+    const urlToken = new URLSearchParams(window.location.search).get('id_token');
+    if (urlToken) {
+      console.info('[AgentRed] Using id_token from URL params (App Bridge unavailable).');
+      return urlToken;
+    }
+
     throw new Error('Shopify App Bridge not available — this app must be opened from the Shopify admin.');
   }, []);
 
@@ -114,6 +136,7 @@ export const ShopifyAppLayout: React.FC<ShopifyAppLayoutProps> = ({
       return fetch(`${API_BASE_URL}${path}`, {
         ...init,
         headers,
+        cache: 'no-store',
       });
     },
     [getSessionToken, shopifyConfig.shop],
@@ -149,7 +172,7 @@ export const ShopifyAppLayout: React.FC<ShopifyAppLayoutProps> = ({
         } catch {
           // App Bridge may not be available (e.g. during initial load) —
           // tenant lookup is auth-exempt, so try without auth
-          resp = await fetch(`${API_BASE_URL}/api/tenants/lookup?shop=${encodeURIComponent(shop)}`);
+          resp = await fetch(`${API_BASE_URL}/api/tenants/lookup?shop=${encodeURIComponent(shop)}`, { cache: 'no-store' });
         }
 
         if (!resp.ok) throw new Error(`Tenant lookup failed: ${resp.status}`);

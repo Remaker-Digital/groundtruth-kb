@@ -105,7 +105,31 @@ def _setup_shopify_mocks(page: Page) -> None:
 
     This must be called BEFORE page.goto() because add_init_script runs
     before any page JS executes, and route() intercepts network requests.
+
+    Critical: The Shopify App Bridge CDN script (app-bridge.js) performs
+    "frame-busting" — it detects non-iframe context via
+    ``window.top !== window.self`` and redirects to admin.shopify.com
+    BEFORE React renders.  We intercept this CDN script and replace it
+    with a no-op so our ``window.shopify`` mock survives.
     """
+    # 0. Intercept App Bridge CDN script — replace with no-op to prevent
+    #    frame-busting redirect.  Our add_init_script mock below provides
+    #    the window.shopify object that React/App Bridge hooks expect.
+    def handle_app_bridge(route: Route) -> None:
+        route.fulfill(
+            status=200,
+            content_type="application/javascript",
+            body="/* App Bridge mock — frame-busting disabled for E2E */",
+        )
+
+    page.route("**/cdn.shopify.com/**/app-bridge*", handle_app_bridge)
+
+    # Also block any redirect attempts to admin.shopify.com
+    def block_shopify_redirect(route: Route) -> None:
+        route.abort("blockedbyclient")
+
+    page.route("https://admin.shopify.com/**", block_shopify_redirect)
+
     # 1. Mock window.shopify (App Bridge 4.x) — must exist before React renders
     page.add_init_script("""
         window.shopify = {
@@ -220,10 +244,30 @@ def live_shopify_page(page: Page, staging_reachable) -> Page:
 def live_shopify_error_page(page: Page, staging_reachable) -> Page:
     """Navigate to the Shopify admin WITHOUT shop param — triggers error state.
 
-    No mocks applied.  The layout detects missing shop domain and shows
-    a Polaris Banner with error instructions.
+    App Bridge CDN is still intercepted (no-op) to prevent frame-busting
+    redirect, but tenant lookup and activation status are NOT mocked.
+    The layout detects missing shop domain and shows a Polaris Banner
+    with error instructions.
     """
+    # Block App Bridge CDN to prevent redirect
+    def handle_app_bridge(route: Route) -> None:
+        route.fulfill(
+            status=200,
+            content_type="application/javascript",
+            body="/* App Bridge mock — frame-busting disabled for E2E */",
+        )
+
+    page.route("**/cdn.shopify.com/**/app-bridge*", handle_app_bridge)
+    page.route("https://admin.shopify.com/**", lambda r: r.abort("blockedbyclient"))
+
     page.add_init_script("""
+        window.shopify = {
+            idToken: () => Promise.resolve('test-e2e-session-token'),
+            navigation: { dispatch: function() {} },
+            redirect: function() {},
+            saveBar: { show: function() {}, hide: function() {},
+                leaveConfirmation: { enable: function() {}, disable: function() {} } }
+        };
         try { sessionStorage.setItem('agentred-onboarding-dismissed', '1'); } catch {}
     """)
     page.goto(f"{SHOPIFY_BASE_URL}/", wait_until="load")

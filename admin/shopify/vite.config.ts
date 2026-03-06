@@ -18,6 +18,11 @@ export default defineConfig({
     alias: {
       '@shared': resolve(__dirname, '../shared'),
     },
+    // Ensure imports from admin/shared/ resolve deps from this project's node_modules.
+    // Without this, shared components import @mantine/core from admin/node_modules/
+    // while index.tsx imports from admin/shopify/node_modules/, creating duplicate
+    // React contexts and breaking MantineProvider detection.
+    dedupe: ['@mantine/core', '@mantine/hooks', '@mantine/notifications', 'react', 'react-dom'],
   },
   build: {
     outDir: 'dist',

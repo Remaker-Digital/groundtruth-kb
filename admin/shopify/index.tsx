@@ -19,8 +19,11 @@ import { tokens } from '../shared/theme/styles';
 import { createRoot } from 'react-dom/client';
 import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom';
 import { AppProvider } from '@shopify/polaris';
+import { MantineProvider } from '@mantine/core';
 import '@shopify/polaris/build/esm/styles.css';
+import '@mantine/core/styles.css';
 import enTranslations from '@shopify/polaris/locales/en.json';
+import { agentRedTheme } from '../shared/theme/agentRedTheme';
 
 import { ShopifyAppLayout } from './layouts/ShopifyAppLayout';
 import { DashboardPage } from './pages/Dashboard';
@@ -150,5 +153,9 @@ const App: React.FC = () => {
 
 const root = document.getElementById('app');
 if (root) {
-  createRoot(root).render(<App />);
+  createRoot(root).render(
+    <MantineProvider theme={agentRedTheme} defaultColorScheme="light">
+      <App />
+    </MantineProvider>,
+  );
 }

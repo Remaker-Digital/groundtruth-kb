@@ -61,7 +61,7 @@ All new work in this repository must include:
 
 ## Three interdependent artifacts
 
-**Specifications** are requirements which explain what needs to be implemented in order to satisfy customers and enable the business they function as a protocol for agreement between the owner and Claude. **Tests** are created by Claude to verify that the implementation will meet the specifications. **Implementation** code and related artifacts are the system described by the specifications, and verified by the tests.
+**Specifications** are requirements which explain what needs to be implemented in order to satisfy customers and enable the business, functioning as a protocol for agreement between the owner and Claude. **Tests** are created by Claude to verify that the implementation will meet the specifications. **Implementation** code and related artifacts are the system described by the specifications, and verified by the tests.
 
 ### What Is a Specification?
 

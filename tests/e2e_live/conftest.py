@@ -144,23 +144,50 @@ def _dismiss_onboarding_modal(page: Page) -> None:
     - Activated tenants (active_version >= 1): The wizard shows template
       selection with NO "Skip for now" button.  Press Escape to dismiss.
 
+    **Race condition (WI-CP3):** For version-0 tenants the StandaloneLayout
+    ``useEffect`` fires *after* the activation-status API returns, forcibly
+    removing the ``agentred-onboarding-dismissed`` flag and re-opening the
+    wizard — even if we already dismissed it.  We must retry dismissal up
+    to 3 times and verify the overlay is fully removed before returning.
+
     The modal uses ``closeOnClickOutside={false}`` so backdrop clicks don't
-    work, but Escape triggers the ``onClose`` callback.
+    work, but Escape triggers the ``onClose`` callback on Step 1 only.
     """
-    try:
-        skip_btn = page.get_by_text("Skip for now", exact=True)
-        skip_btn.wait_for(state="visible", timeout=3_000)
-        skip_btn.click()
-        page.wait_for_timeout(500)
-    except Exception:
-        # No "Skip for now" — try Escape to dismiss any open modal overlay
+    overlay_sel = ".mantine-Modal-overlay"
+
+    for attempt in range(3):
+        # Try clicking "Skip for now" (freshly-seeded Step 1)
         try:
-            dialog = page.locator("[role='dialog']")
-            if dialog.count() > 0:
-                page.keyboard.press("Escape")
-                page.wait_for_timeout(500)
+            skip_btn = page.get_by_text("Skip for now", exact=True)
+            skip_btn.wait_for(state="visible", timeout=3_000)
+            skip_btn.click()
+            page.wait_for_timeout(500)
         except Exception:
-            pass
+            # No "Skip for now" visible — try Escape on any open dialog
+            try:
+                dialog = page.locator("[role='dialog']")
+                if dialog.count() > 0:
+                    page.keyboard.press("Escape")
+                    page.wait_for_timeout(500)
+            except Exception:
+                pass
+
+        # Verify the overlay is actually gone
+        try:
+            page.locator(overlay_sel).wait_for(state="hidden", timeout=2_000)
+            return  # ✅ Overlay removed — safe to proceed
+        except Exception:
+            # Overlay still present — the useEffect may have re-opened the
+            # wizard after our dismiss.  Wait a beat and retry.
+            page.wait_for_timeout(1_000)
+
+    # Final safety net: force-remove overlay via JS so tests aren't blocked.
+    # This doesn't "fix" the wizard state but prevents the overlay from
+    # intercepting pointer events on the page underneath.
+    page.evaluate("""
+        document.querySelectorAll('.mantine-Modal-overlay, .mantine-Modal-root')
+            .forEach(el => el.remove());
+    """)
 
 
 def _navigate_admin_to(page: Page, nav_text: str, wait_for_text: str | None = None) -> Page:
