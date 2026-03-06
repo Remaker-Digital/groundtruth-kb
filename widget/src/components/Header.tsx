@@ -57,8 +57,8 @@ export const Header: FunctionComponent<HeaderProps> = ({
 }) => {
   const displayTitle = headerText || locale.headerTitle;
   const displaySubtitle = headerSubtitle || 'We typically reply within minutes';
-  // Avatar initials: first 2 chars of title (e.g. "SU" from "Support")
-  const avatarInitials = displayTitle.replace(/[^a-zA-Z]/g, '').slice(0, 2).toUpperCase() || 'AR';
+  // Avatar initials: first 2 chars of agent name (WI-0872 consistency fix)
+  const avatarInitials = agentName.slice(0, 2).toUpperCase() || 'AR';
 
   // Header background: gradient when a second color is configured, flat otherwise
   const headerBg = gradientEnd

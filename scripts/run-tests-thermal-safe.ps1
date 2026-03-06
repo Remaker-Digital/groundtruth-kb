@@ -243,6 +243,10 @@ foreach ($name in $batchesToRun) {
     $args += "-q"
     $args += "--tb=short"
     $args += "--no-header"
+    # JUnit XML for test traceability (SPEC-1661)
+    $xmlDir = Join-Path $ProjectRoot "logs"
+    if (-not (Test-Path $xmlDir)) { New-Item -ItemType Directory -Path $xmlDir -Force | Out-Null }
+    $args += "--junitxml=$(Join-Path $xmlDir "test-results-$name.xml")"
 
     if ($Coverage) {
         $args += "--cov=src"

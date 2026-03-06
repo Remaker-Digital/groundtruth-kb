@@ -174,8 +174,13 @@ def _run_pytest(test_path: str | list[str], *, timeout: int = 300,
     if isinstance(test_path, str):
         test_path = [test_path]
 
+    # JUnit XML for test traceability (SPEC-1661)
+    xml_dir = os.path.join(PROJECT_ROOT, "logs")
+    os.makedirs(xml_dir, exist_ok=True)
+    junit_xml = os.path.join(xml_dir, "test-results-pipeline.xml")
     cmd = [sys.executable, "-m", "pytest", *test_path,
-           "-v", "--timeout=60", "--tb=short", "--no-header"]
+           "-v", "--timeout=60", "--tb=short", "--no-header",
+           f"--junitxml={junit_xml}"]
     if xdist:
         cmd.extend(["-n", "4"])
     if extra_args:

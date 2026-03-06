@@ -570,12 +570,12 @@ class TestTierDefaults:
 
     @pytest.mark.unit
     def test_tier_defaults_rate_limits(self):
-        """CR-18: Rate limits — uniform admin RPM across tiers, enterprise 4x."""
+        """CR-18: Rate limits — uniform 500 RPM across all tiers (S137)."""
         from src.multi_tenant.cosmos_schema import _ADMIN_RPM
         assert TIER_DEFAULTS["trial"]["rate_limit_rpm"] == _ADMIN_RPM
         assert TIER_DEFAULTS["starter"]["rate_limit_rpm"] == _ADMIN_RPM
         assert TIER_DEFAULTS["professional"]["rate_limit_rpm"] == _ADMIN_RPM
-        assert TIER_DEFAULTS["enterprise"]["rate_limit_rpm"] == _ADMIN_RPM * 4
+        assert TIER_DEFAULTS["enterprise"]["rate_limit_rpm"] == _ADMIN_RPM
 
     @pytest.mark.unit
     def test_tier_defaults_concurrency(self):

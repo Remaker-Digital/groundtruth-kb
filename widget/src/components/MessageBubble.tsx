@@ -206,7 +206,7 @@ export const MessageBubble: FunctionComponent<MessageBubbleProps> = ({
                   }}
                 />
               ) : (
-                agentName.charAt(0).toUpperCase()
+                agentName.slice(0, 2).toUpperCase()
               )}
             </div>
           )}
@@ -380,7 +380,7 @@ export const TypingIndicator: FunctionComponent<{
           style={{ width: '100%', height: '100%', objectFit: 'cover' }}
         />
       ) : (
-        agentName.charAt(0).toUpperCase()
+        agentName.slice(0, 2).toUpperCase()
       )}
     </div>
 
