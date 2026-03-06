@@ -110,6 +110,9 @@ class ChatPipeline(AgentDispatchMixin, CriticEscalationMixin, AnalyticsMixin):
         self._meter = meter
         self._agent_urls = agent_urls or AGENT_URLS
         self._http_client: httpx.AsyncClient | None = None
+        self._http_lock = asyncio.Lock()
+        # Background task references — prevents GC of fire-and-forget tasks
+        self._background_tasks: set[asyncio.Task] = set()
         # Azure OpenAI direct client (WI #207)
         self._openai_client = openai_client
         # Knowledge base repository for direct retrieval
@@ -139,21 +142,48 @@ class ChatPipeline(AgentDispatchMixin, CriticEscalationMixin, AnalyticsMixin):
         self._init_agents()
 
     async def _get_http_client(self) -> httpx.AsyncClient:
-        """Lazy-initialize the shared HTTP client with connection pooling."""
-        if self._http_client is None or self._http_client.is_closed:
-            self._http_client = httpx.AsyncClient(
-                timeout=httpx.Timeout(connect=1.0, read=5.0, write=1.0, pool=1.0),
-                limits=httpx.Limits(
-                    max_connections=100,
-                    max_keepalive_connections=20,
-                ),
-            )
-        return self._http_client
+        """Lazy-initialize the shared HTTP client with connection pooling.
+
+        Uses asyncio.Lock to prevent race conditions where concurrent
+        coroutines could each create a separate client, leaking connections.
+        """
+        async with self._http_lock:
+            if self._http_client is None or self._http_client.is_closed:
+                self._http_client = httpx.AsyncClient(
+                    timeout=httpx.Timeout(connect=1.0, read=5.0, write=1.0, pool=1.0),
+                    limits=httpx.Limits(
+                        max_connections=100,
+                        max_keepalive_connections=20,
+                    ),
+                )
+            return self._http_client
 
     async def close(self) -> None:
         """Close the HTTP client. Called during app shutdown."""
         if self._http_client and not self._http_client.is_closed:
             await self._http_client.aclose()
+
+    def _create_background_task(self, coro, *, name: str | None = None) -> asyncio.Task:
+        """Create a fire-and-forget task with proper lifecycle management.
+
+        Stores a reference to prevent garbage collection and attaches a
+        done callback that logs unhandled exceptions and auto-discards
+        the reference on completion.
+        """
+        task = asyncio.create_task(coro, name=name)
+        self._background_tasks.add(task)
+
+        def _on_done(t: asyncio.Task) -> None:
+            self._background_tasks.discard(t)
+            if not t.cancelled() and t.exception() is not None:
+                logger.warning(
+                    "Background task %s failed: %s",
+                    t.get_name(),
+                    t.exception(),
+                )
+
+        task.add_done_callback(_on_done)
+        return task
 
     def _init_agents(self) -> None:
         """Initialize in-process A2A agent instances (SPEC-1538).
@@ -214,7 +244,7 @@ class ChatPipeline(AgentDispatchMixin, CriticEscalationMixin, AnalyticsMixin):
             self._profile_cache[cache_key] = profile
             logger.debug("Warmed up profile for %s:%s", tenant_id, customer_id)
         except Exception:
-            logger.debug("Warm-up profile fetch failed for %s -- will retry in execute()", customer_id)
+            logger.debug("Warm-up profile fetch failed for %s -- will retry in execute()", customer_id, exc_info=True)
 
     def invalidate_profile_cache(self, tenant_id: str, customer_id: str) -> None:
         """Invalidate a cached profile (e.g. after mid-conversation verification)."""
@@ -305,7 +335,11 @@ class ChatPipeline(AgentDispatchMixin, CriticEscalationMixin, AnalyticsMixin):
                         tenant_id, customer_id, customer_message,
                     )
                 except Exception:
-                    pass  # Non-fatal -- best-effort identity extraction
+                    logger.debug(
+                        "Identity extraction failed for %s -- non-fatal",
+                        customer_id,
+                        exc_info=True,
+                    )
 
             # Build system prompts for all agents
             # P0-AUTH-FIX: A customer is "anonymous" only if they have no
@@ -670,10 +704,11 @@ class ChatPipeline(AgentDispatchMixin, CriticEscalationMixin, AnalyticsMixin):
             # ---------------------------------------------------------------
             # Phase 5: Analytics (fire-and-forget)
             # ---------------------------------------------------------------
-            asyncio.create_task(
+            self._create_background_task(
                 self._fire_analytics(
                     tenant_id, conversation_id, intent, budget, trace,
-                )
+                ),
+                name=f"analytics-{conversation_id}",
             )
 
             # Build and store decision trace
@@ -860,11 +895,12 @@ class ChatPipeline(AgentDispatchMixin, CriticEscalationMixin, AnalyticsMixin):
             )
 
             # Fire analytics for admin conversation tracking (SPEC-1561)
-            asyncio.create_task(
+            self._create_background_task(
                 self._fire_analytics(
                     tenant_id, conversation_id, "admin_assistance",
                     budget, trace,
-                )
+                ),
+                name=f"analytics-copilot-{conversation_id}",
             )
 
             yield done_event(trace_id=trace_id)
@@ -917,7 +953,7 @@ class ChatPipeline(AgentDispatchMixin, CriticEscalationMixin, AnalyticsMixin):
                 profile = await self._profile_service.get_profile(tenant_id, customer_id)
                 self._profile_cache[cache_key] = profile
             except Exception:
-                logger.debug("Profile lookup failed for %s -- continuing without", customer_id)
+                logger.debug("Profile lookup failed for %s -- continuing without", customer_id, exc_info=True)
                 self._profile_cache[cache_key] = None
                 return None
 
@@ -948,6 +984,7 @@ class ChatPipeline(AgentDispatchMixin, CriticEscalationMixin, AnalyticsMixin):
                     logger.debug(
                         "Layer 2 search failed for %s -- continuing without history",
                         customer_id,
+                        exc_info=True,
                     )
 
         return profile

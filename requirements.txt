@@ -26,6 +26,9 @@ httpx>=0.27.0
 # NATS client
 nats-py>=2.10.0
 
+# Redis (distributed rate limiting — SPEC-1626)
+redis[hiredis]>=5.0.0
+
 # OpenAI / Azure OpenAI
 openai>=1.55.0
 

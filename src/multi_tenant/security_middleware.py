@@ -1,6 +1,12 @@
-"""Security middleware — request body limits, JSON depth, security headers (WI #157-159).
+"""Security middleware — trusted proxy, request body limits, JSON depth, security headers.
 
-Provides three middleware components for defense-in-depth:
+Provides four middleware components for defense-in-depth:
+
+0. TrustedProxyMiddleware (SPEC-1663):
+   Extracts real client IP from trusted reverse proxy headers
+   (Cloudflare, Azure Front Door, generic X-Forwarded-For) and
+   rewrites scope["client"] so all downstream middleware and endpoints
+   see the correct client IP without any code changes.
 
 1. RequestBodyLimitMiddleware (WI #157):
    Rejects request bodies exceeding 1 MB (configurable). Prevents
@@ -32,6 +38,8 @@ from __future__ import annotations
 
 import json
 import logging
+import os
+import re
 from typing import Any
 
 from starlette.middleware.base import BaseHTTPMiddleware, RequestResponseEndpoint
@@ -51,6 +59,144 @@ MAX_BODY_SIZE_BYTES = 1_048_576  # 1 MB
 
 # Maximum JSON nesting depth
 MAX_JSON_DEPTH = 50
+
+# Trusted proxy modes (set via TRUSTED_PROXY env var)
+TRUSTED_PROXY_CLOUDFLARE = "cloudflare"
+TRUSTED_PROXY_FORWARDED_FOR = "x-forwarded-for"
+
+# IPv4/IPv6 validation — loose check, not full RFC validation.
+# Accepts: 192.168.1.1, ::1, 2001:db8::1, 10.0.0.1
+_IP_PATTERN = re.compile(
+    r"^(?:[0-9]{1,3}\.){3}[0-9]{1,3}$"  # IPv4
+    r"|^[0-9a-fA-F:]+$"                  # IPv6 (simplified)
+)
+
+
+# ---------------------------------------------------------------------------
+# 0. TrustedProxyMiddleware (SPEC-1663)
+# ---------------------------------------------------------------------------
+
+
+class TrustedProxyMiddleware:
+    """ASGI middleware that extracts real client IP from reverse proxy headers.
+
+    When running behind Cloudflare, Azure Front Door, or other reverse
+    proxies, the ASGI ``scope["client"]`` contains the proxy's internal IP
+    (e.g., ``10.x.x.x``), not the actual client IP. This middleware extracts
+    the real IP from trusted headers and rewrites ``scope["client"]`` so
+    **all downstream middleware and endpoints** see the correct client IP
+    without any code changes.
+
+    This is critical for:
+    - Pre-auth rate limiting (``PreAuthRateLimitMiddleware``)
+    - Per-tenant rate limiting (``RateLimitMiddleware``)
+    - Magic link / OTP / email verification rate limits
+    - Stripe webhook IP allowlist
+    - Abuse logging and SLA monitoring
+
+    Modes (configured via ``TRUSTED_PROXY`` env var):
+
+    - ``"cloudflare"``: Trust ``CF-Connecting-IP`` header (set and
+      overwritten by Cloudflare on every request — cannot be spoofed by
+      clients). Also reads ``CF-IPCountry`` and ``CF-Ray`` into scope state.
+    - ``"x-forwarded-for"``: Trust first IP in ``X-Forwarded-For`` header
+      (generic reverse proxy mode — suitable when the outermost proxy
+      strips/overwrites the header).
+    - Unset/empty: Disabled — use direct ``scope["client"]`` IP.
+
+    Security notes:
+    - ``CF-Connecting-IP`` is safe to trust because Cloudflare always
+      overwrites it with the actual connecting IP. Clients cannot spoof it.
+    - ``X-Forwarded-For`` can be spoofed if intermediary proxies don't
+      strip client-supplied values. Only use this mode when the outermost
+      proxy (e.g., Azure Front Door) overwrites the header.
+    - The middleware validates that extracted IPs look like valid IPv4/IPv6
+      addresses before applying them. Invalid values are logged and ignored.
+
+    Must be registered as the **outermost** middleware (first registered =
+    outermost in Starlette's reverse-order model) so that it runs before
+    all other middleware.
+    """
+
+    def __init__(self, app: ASGIApp, *, mode: str | None = None) -> None:
+        self.app = app
+        self.mode = (mode or os.environ.get("TRUSTED_PROXY", "")).strip().lower()
+        if self.mode and self.mode not in (
+            TRUSTED_PROXY_CLOUDFLARE,
+            TRUSTED_PROXY_FORWARDED_FOR,
+        ):
+            logger.warning(
+                "Unknown TRUSTED_PROXY mode %r — proxy header extraction disabled. "
+                "Valid modes: 'cloudflare', 'x-forwarded-for'",
+                self.mode,
+            )
+            self.mode = ""
+
+        if self.mode:
+            logger.info("TrustedProxyMiddleware enabled: mode=%s", self.mode)
+
+    async def __call__(self, scope: Scope, receive: Receive, send: Send) -> None:
+        if scope["type"] != "http" or not self.mode:
+            await self.app(scope, receive, send)
+            return
+
+        headers = dict(scope.get("headers", []))
+        real_ip: str | None = None
+        original_ip = scope.get("client", ("unknown", 0))
+
+        if self.mode == TRUSTED_PROXY_CLOUDFLARE:
+            # CF-Connecting-IP is a single IP, always set by Cloudflare
+            cf_ip = headers.get(b"cf-connecting-ip", b"").decode("latin-1").strip()
+            if cf_ip and _is_valid_ip(cf_ip):
+                real_ip = cf_ip
+            elif cf_ip:
+                logger.warning(
+                    "Invalid CF-Connecting-IP header value: %r (ignored)", cf_ip,
+                )
+
+            # Store Cloudflare metadata in scope state for logging/analytics
+            state = scope.setdefault("state", {})
+            cf_country = headers.get(b"cf-ipcountry", b"").decode("latin-1").strip()
+            cf_ray = headers.get(b"cf-ray", b"").decode("latin-1").strip()
+            if cf_country:
+                state["cf_ipcountry"] = cf_country
+            if cf_ray:
+                state["cf_ray"] = cf_ray
+
+        elif self.mode == TRUSTED_PROXY_FORWARDED_FOR:
+            # X-Forwarded-For: client, proxy1, proxy2 — first IP is the client
+            xff = headers.get(b"x-forwarded-for", b"").decode("latin-1").strip()
+            if xff:
+                first_ip = xff.split(",")[0].strip()
+                if _is_valid_ip(first_ip):
+                    real_ip = first_ip
+                else:
+                    logger.warning(
+                        "Invalid first IP in X-Forwarded-For: %r (ignored)", first_ip,
+                    )
+
+        if real_ip:
+            # Preserve the original port (or 0 if not available)
+            original_port = original_ip[1] if len(original_ip) > 1 else 0
+            scope["client"] = (real_ip, original_port)
+            logger.debug(
+                "Real client IP extracted: %s (was %s, mode=%s)",
+                real_ip, original_ip[0], self.mode,
+            )
+
+        await self.app(scope, receive, send)
+
+
+def _is_valid_ip(value: str) -> bool:
+    """Loosely validate that a string looks like an IPv4 or IPv6 address.
+
+    This is a format sanity check, not full RFC compliance. The goal is to
+    reject obvious non-IP values (injection attempts, hostnames) while
+    accepting all reasonable IP address formats.
+    """
+    if not value or len(value) > 45:  # Max IPv6 length
+        return False
+    return bool(_IP_PATTERN.match(value))
 
 # Paths exempt from body size limit (streaming endpoints may need larger)
 BODY_LIMIT_EXEMPT_PREFIXES = (

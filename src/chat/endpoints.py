@@ -72,6 +72,9 @@ from src.multi_tenant.repository import PreferencesRepository
 
 logger = logging.getLogger(__name__)
 
+# Module-level set to prevent GC of fire-and-forget tasks
+_background_tasks: set[asyncio.Task] = set()
+
 
 # ---------------------------------------------------------------------------
 # Router
@@ -322,11 +325,14 @@ async def start_conversation(
     if customer_id_for_warmup:
         try:
             pipeline = _get_pipeline()
-            asyncio.create_task(
+            task = asyncio.create_task(
                 pipeline.warm_up(ctx.tenant_id, customer_id_for_warmup, ctx.tier),
+                name=f"warmup-{ctx.tenant_id[:8]}",
             )
+            _background_tasks.add(task)
+            task.add_done_callback(_background_tasks.discard)
         except Exception:
-            pass  # Non-fatal — pipeline may not be initialized in tests
+            logger.debug("Profile warm-up skipped — pipeline not initialized", exc_info=True)
 
     return response
 

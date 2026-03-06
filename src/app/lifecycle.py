@@ -57,21 +57,22 @@ def register_middleware(app: FastAPI) -> None:
 
     Starlette processes middleware in REVERSE registration order.
     Registration order (first registered = outermost = runs last):
-      1. SecurityHeadersMiddleware    — security response headers (outermost)
-      2. ApiVersionMiddleware         — X-API-Version on every response
-      3. RequestBodyLimitMiddleware   — reject oversized payloads early
-      4. CorrelationMiddleware        — sets CorrelationContext (needs TenantContext)
-      5. JsonDepthValidationMiddleware — reject deeply nested JSON (needs body)
-      6. TenantConcurrencyMiddleware  — enforces per-tenant concurrency limits
-      7. RateLimitMiddleware          — enforces per-tenant rate limits + headers
-      8. TenantAuthMiddleware         — authenticates and injects TenantContext
-      9. PreAuthRateLimitMiddleware   — blocks IPs with excessive failed auth (WI #163)
+      1. TrustedProxyMiddleware       — extract real client IP from proxy headers (outermost)
+      2. SecurityHeadersMiddleware    — security response headers
+      3. ApiVersionMiddleware         — X-API-Version on every response
+      4. RequestBodyLimitMiddleware   — reject oversized payloads early
+      5. CorrelationMiddleware        — sets CorrelationContext (needs TenantContext)
+      6. JsonDepthValidationMiddleware — reject deeply nested JSON (needs body)
+      7. TenantConcurrencyMiddleware  — enforces per-tenant concurrency limits
+      8. RateLimitMiddleware          — enforces per-tenant rate limits + headers
+      9. TenantAuthMiddleware         — authenticates and injects TenantContext
+     10. PreAuthRateLimitMiddleware   — blocks IPs with excessive failed auth (WI #163)
 
     Execution order (innermost registered = runs first):
       PreAuthRateLimitMiddleware → TenantAuthMiddleware →
       RateLimitMiddleware → TenantConcurrencyMiddleware →
       JsonDepthValidation → CorrelationMiddleware →
-      RequestBodyLimit → ApiVersion → SecurityHeaders → handler
+      RequestBodyLimit → ApiVersion → SecurityHeaders → TrustedProxy → handler
     """
     from src.multi_tenant.middleware import (
         RateLimitMiddleware,
@@ -84,6 +85,7 @@ def register_middleware(app: FastAPI) -> None:
         JsonDepthValidationMiddleware,
         RequestBodyLimitMiddleware,
         SecurityHeadersMiddleware,
+        TrustedProxyMiddleware,
     )
     from src.multi_tenant.api_versioning import ApiVersionMiddleware
     from src.multi_tenant.security_hardening import PreAuthRateLimitMiddleware
@@ -91,6 +93,7 @@ def register_middleware(app: FastAPI) -> None:
         CorrelationMiddleware,
     )
 
+    app.add_middleware(TrustedProxyMiddleware)
     app.add_middleware(SecurityHeadersMiddleware)
     app.add_middleware(ApiVersionMiddleware)
     app.add_middleware(RequestBodyLimitMiddleware)
@@ -1415,6 +1418,44 @@ async def _shutdown_pre_auth_cleanup() -> None:
         pass
 
 
+async def _startup_redis_rate_limiter() -> None:
+    """Initialize Redis-backed rate limiter if REDIS_URL is configured (SPEC-1626).
+
+    When REDIS_URL is set, swaps the in-memory rate limit backend to Redis
+    for distributed rate limiting across multiple replicas. Falls back to
+    in-memory silently if Redis is unavailable or not configured.
+    """
+    redis_url = os.environ.get("REDIS_URL")
+    if not redis_url:
+        logger.info("REDIS_URL not set — using in-memory rate limiter")
+        return
+
+    try:
+        import redis as redis_lib
+
+        client = redis_lib.Redis.from_url(
+            redis_url,
+            decode_responses=True,
+            socket_connect_timeout=5,
+            socket_timeout=2,
+            retry_on_timeout=True,
+        )
+        # Verify connectivity
+        client.ping()
+
+        from src.multi_tenant.security_hardening import (
+            RedisRateLimitBackend,
+            set_rate_limit_backend,
+        )
+        backend = RedisRateLimitBackend(client, key_prefix="agentred:rl:")
+        set_rate_limit_backend(backend)
+        logger.info("Redis rate limiter connected: %s", redis_url.split("@")[-1])
+    except ImportError:
+        logger.warning("redis package not installed — using in-memory rate limiter")
+    except Exception:
+        logger.warning("Redis connection failed — falling back to in-memory rate limiter", exc_info=True)
+
+
 # =========================================================================
 # Registration functions — called from main.py
 # =========================================================================
@@ -1478,6 +1519,7 @@ def register_startup_handlers(app: FastAPI | None = None) -> None:
         _startup_activation_service,
         _startup_migration_check,
         _startup_pre_auth_cleanup,
+        _startup_redis_rate_limiter,
     ])
 
 

@@ -59,3 +59,42 @@ exclude_lines = [
     "pass",
     "\\.\\.\\.\\s*$",
 ]
+
+# ---------------------------------------------------------------------------
+# ruff — fast Python linter + formatter (replaces flake8, isort, pyupgrade)
+# ---------------------------------------------------------------------------
+
+[tool.ruff]
+target-version = "py312"
+line-length = 120
+
+[tool.ruff.lint]
+# Start permissive — tighten iteratively. E/F are pycodestyle + pyflakes
+# (equivalent to flake8 defaults). I = isort. UP = pyupgrade.
+select = ["E", "F", "I", "UP", "B", "SIM"]
+ignore = [
+    "E501",    # line too long — handled by formatter
+    "E741",    # ambiguous variable name (l, O, I) — common in math/data code
+    "B008",    # function-call-in-default-argument — FastAPI Depends() pattern
+    "B905",    # zip-without-explicit-strict — too noisy for existing code
+    "SIM108",  # use-ternary-operator — sometimes if/else is clearer
+    "UP007",   # non-pep604-annotation — X | Y vs Optional[X] preference
+]
+
+[tool.ruff.lint.per-file-ignores]
+"tests/**" = [
+    "E501",    # long test names and assertions are fine
+    "B011",    # assert False is valid in tests
+    "SIM300",  # yoda conditions in assertions are fine
+]
+"scripts/**" = [
+    "E501",    # scripts can have long lines
+]
+
+[tool.ruff.lint.isort]
+known-first-party = ["src"]
+
+[tool.ruff.format]
+quote-style = "double"
+indent-style = "space"
+skip-magic-trailing-comma = false

@@ -29,8 +29,14 @@ services:
       - LOG_LEVEL=DEBUG
       - USE_AZURE_OPENAI=false
       - USE_REAL_APIS=false
+      - REDIS_URL=redis://redis:6379/0
+      # TRUSTED_PROXY: set to 'cloudflare' or 'x-forwarded-for' when behind
+      # a reverse proxy. Disabled for local dev (SPEC-1663).
+      # - TRUSTED_PROXY=cloudflare
     depends_on:
       nats:
+        condition: service_healthy
+      redis:
         condition: service_healthy
     networks:
       - agent-red-net
@@ -57,6 +63,31 @@ services:
       test: ["CMD", "wget", "--spider", "-q", "http://localhost:8222/healthz"]
       interval: 10s
       timeout: 5s
+      retries: 3
+      start_period: 5s
+    networks:
+      - agent-red-net
+    restart: unless-stopped
+
+  # ---------------------------------------------------------------------------
+  # Redis (Distributed Rate Limiting — SPEC-1626)
+  # Provides shared rate limiting state across multiple API replicas
+  # ---------------------------------------------------------------------------
+  redis:
+    image: redis:7-alpine
+    container_name: agent-red-redis
+    ports:
+      - "6379:6379"
+    command: >
+      redis-server
+      --maxmemory 64mb
+      --maxmemory-policy allkeys-lru
+      --save ""
+      --appendonly no
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 10s
+      timeout: 3s
       retries: 3
       start_period: 5s
     networks:
