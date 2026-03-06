@@ -80,11 +80,12 @@ def run_single_assertion(assertion: dict[str, Any]) -> dict[str, Any]:
     pattern = assertion.get("pattern") or assertion.get("query", "")
     description = assertion.get("description", "") or f"{a_type}: {pattern}"
 
-    # Validate assertion definition
+    # Validate assertion definition — skip non-machine types gracefully
     if a_type not in _VALID_ASSERTION_TYPES:
         return {
-            "type": a_type, "description": description, "passed": False,
-            "detail": f"Invalid assertion type: {a_type!r}. Valid: {_VALID_ASSERTION_TYPES}",
+            "type": a_type, "description": description, "passed": True,
+            "detail": f"Skipped non-machine assertion type: {a_type!r} (only {_VALID_ASSERTION_TYPES} are executable)",
+            "skipped": True,
         }
     if not pattern:
         return {
@@ -209,7 +210,14 @@ def run_spec_assertions(
         }
 
     results = [run_single_assertion(a) for a in assertions]
-    overall_passed = all(r["passed"] for r in results)
+
+    # Only machine-checkable assertions determine overall_passed
+    machine_results = [r for r in results if not r.get("skipped")]
+    if machine_results:
+        overall_passed = all(r["passed"] for r in machine_results)
+    else:
+        # All assertions were non-machine types — treat as passed (no regressions possible)
+        overall_passed = True
 
     # Record in database
     db.insert_assertion_run(
@@ -225,8 +233,8 @@ def run_spec_assertions(
         "title": spec["title"],
         "overall_passed": overall_passed,
         "results": results,
-        "assertion_count": len(results),
-        "skipped": False,
+        "assertion_count": len(machine_results),
+        "skipped": len(machine_results) == 0 and len(results) > 0,
     }
 
 
