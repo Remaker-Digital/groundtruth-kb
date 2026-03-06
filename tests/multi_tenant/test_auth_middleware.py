@@ -692,14 +692,14 @@ class TestMagicLinkSessionMemberIdentity:
         }
         session_token = _jwt.encode(payload, _JWT_SECRET, algorithm="HS256")
 
-        # Mock tenant lookup
-        mock_tenant_repo = AsyncMock()
-        mock_tenant_repo.read.return_value = {
+        # Mock tenant lookup via pooled resolver
+        tenant_doc = {
             "id": "t-001",
             "tenant_id": "t-001",
             "status": "active",
             "tier": "professional",
         }
+        mock_resolve_tenant = AsyncMock(return_value=tenant_doc)
 
         # Mock team member lookup for escalation categories
         mock_team_repo = AsyncMock()
@@ -715,12 +715,10 @@ class TestMagicLinkSessionMemberIdentity:
         configure_tenant_resolution(
             resolve_by_shop_domain=AsyncMock(),
             resolve_by_api_key_hash=AsyncMock(),
+            resolve_by_tenant_id=mock_resolve_tenant,
         )
 
-        with (
-            patch("src.multi_tenant.repositories.TenantRepository", return_value=mock_tenant_repo),
-            patch("src.multi_tenant.repositories.TeamMemberRepository", return_value=mock_team_repo),
-        ):
+        with patch("src.multi_tenant.repositories.TeamMemberRepository", return_value=mock_team_repo):
             ctx = await middleware._auth_magic_link_session(session_token)
 
         assert ctx.tenant_id == "t-001"
@@ -747,22 +745,22 @@ class TestMagicLinkSessionMemberIdentity:
         }
         session_token = _jwt.encode(payload, _JWT_SECRET, algorithm="HS256")
 
-        mock_tenant_repo = AsyncMock()
-        mock_tenant_repo.read.return_value = {
+        tenant_doc = {
             "id": "t-001",
             "tenant_id": "t-001",
             "status": "active",
             "tier": "professional",
         }
+        mock_resolve_tenant = AsyncMock(return_value=tenant_doc)
 
         middleware = TenantAuthMiddleware(MagicMock())
         configure_tenant_resolution(
             resolve_by_shop_domain=AsyncMock(),
             resolve_by_api_key_hash=AsyncMock(),
+            resolve_by_tenant_id=mock_resolve_tenant,
         )
 
-        with patch("src.multi_tenant.repositories.TenantRepository", return_value=mock_tenant_repo):
-            ctx = await middleware._auth_magic_link_session(session_token)
+        ctx = await middleware._auth_magic_link_session(session_token)
 
         assert ctx.tenant_id == "t-001"
         assert ctx.auth_method == "magic_link_session"

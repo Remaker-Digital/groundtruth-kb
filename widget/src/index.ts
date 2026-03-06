@@ -443,6 +443,11 @@ async function init(
       document.addEventListener('mousemove', onDragMove);
       document.addEventListener('mouseup', onDragEnd);
     }
+
+    // WI-0868: Live config preview from admin WidgetConfigurator
+    if (ev.data.type === 'ar:config-preview' && ev.data.payload) {
+      store.setState({ config: { ...store.getState().config, ...ev.data.payload } });
+    }
   });
 
   // Mobile fullscreen flag — computed once for panel lifecycle (SPEC-1509)

@@ -86,9 +86,10 @@ interface WidgetConfig {
   // Engagement triggers (WI-0816)
   widget_exit_intent_enabled: boolean;
   widget_scroll_depth_trigger: number | null;
-  // Content / Targeting (4)
+  // Content / Targeting (5)
   widget_greeting_message: string;
   widget_header_text: string;
+  widget_header_subtitle: string;
   widget_input_placeholder: string;
   widget_page_rules: string[];
 }
@@ -131,6 +132,7 @@ const DEFAULT_CONFIG: WidgetConfig = {
   widget_scroll_depth_trigger: null,
   widget_greeting_message: '',
   widget_header_text: '',
+  widget_header_subtitle: '',
   widget_input_placeholder: '',
   widget_page_rules: [],
 };
@@ -160,23 +162,8 @@ function makeStyles(dark: boolean) {
   return {
     container: {
       fontFamily: "'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif",
-      display: 'flex',
-      gap: 24,
-      maxWidth: 1200,
+      maxWidth: 900,
       margin: '0 auto',
-    } as React.CSSProperties,
-
-    formPanel: {
-      flex: 1,
-      minWidth: 0,
-    } as React.CSSProperties,
-
-    previewPanel: {
-      width: 340,
-      flexShrink: 0,
-      position: 'sticky' as const,
-      top: 16,
-      alignSelf: 'flex-start' as const,
     } as React.CSSProperties,
 
     card: {
@@ -460,24 +447,6 @@ function makeStyles(dark: boolean) {
       fontWeight: 600,
       cursor: 'pointer',
     } as React.CSSProperties,
-
-    // Preview styles
-    previewTitle: {
-      fontSize: 14,
-      fontWeight: 600,
-      color: text,
-      margin: '0 0 12px 0',
-    } as React.CSSProperties,
-
-    previewFrame: (widgetDarkMode: boolean): React.CSSProperties => ({
-      background: widgetDarkMode ? '#1F2937' : '#F3F4F6',
-      borderRadius: 12,
-      padding: 24,
-      minHeight: 480,
-      position: 'relative' as const,
-      overflow: 'hidden',
-      border: `1px solid ${borderLight}`,
-    }),
 
     emptyPageRules: {
       padding: 16,
@@ -987,367 +956,7 @@ const ToggleField: React.FC<ToggleFieldProps> = ({ label, description, value, on
 );
 
 // ---------------------------------------------------------------------------
-// Sub-component: Live Preview
-// ---------------------------------------------------------------------------
-
-interface QuickActionPreview {
-  id: string;
-  label: string;
-  icon: string | null;
-}
-
-interface PreviewProps {
-  config: WidgetConfig;
-  st: Styles;
-  quickActions?: QuickActionPreview[];
-}
-
-const WidgetPreview: React.FC<PreviewProps> = ({ config, st, quickActions }) => {
-  const isDark = config.widget_dark_mode;
-  // Contrast check: compute luminance for text readability
-  const hexToLum = (hex: string): number => {
-    const c = hex.replace('#', '');
-    if (c.length !== 6) return 0.5;
-    const r = parseInt(c.substring(0, 2), 16) / 255;
-    const g = parseInt(c.substring(2, 4), 16) / 255;
-    const b = parseInt(c.substring(4, 6), 16) / 255;
-    return 0.2126 * r + 0.7152 * g + 0.0722 * b;
-  };
-
-  const primaryColor = config.widget_primary_color || tokens.brand;
-  const bgColor = isDark ? '#1A1A2E' : (config.widget_background_color || '#FFFFFF');
-  const textColor = isDark ? '#E5E7EB' : '#111827';
-  const subtextColor = isDark ? '#9CA3AF' : '#6B7280';
-  const agentBubbleBg = config.widget_agent_bubble_color || (isDark ? '#374151' : '#F3F4F6');
-  const agentBubbleText = config.widget_agent_bubble_text_color || textColor;
-  const customerBubbleBg = config.widget_customer_bubble_color || primaryColor;
-  const customerBubbleTextAuto = hexToLum(customerBubbleBg) > 0.5 ? '#111827' : '#FFFFFF';
-  const customerBubbleText = config.widget_customer_bubble_text_color || customerBubbleTextAuto;
-  const launcherShape = config.widget_launcher_shape || 'circle';
-  const launcherBorderRadius = launcherShape === 'rounded-square' ? 12 : launcherShape === 'pill' ? 24 : '50%';
-  const launcherIcon = config.widget_launcher_icon || 'chat';
-  const headerText = config.widget_header_text || 'Chat with us';
-  const agentName = config.widget_agent_display_name || 'Support';
-  const agentTitle = config.widget_agent_title || 'AI Assistant';
-  const placeholder = config.widget_input_placeholder || 'Type a message...';
-  const position = config.widget_position || 'bottom-right';
-
-  const headerTextColor = hexToLum(primaryColor) > 0.5 ? '#111827' : '#FFFFFF';
-
-  return (
-    <div>
-      <p style={st.previewTitle}>Live preview</p>
-      <div style={st.previewFrame(isDark)}>
-        {/* Mini widget panel */}
-        <div style={{
-          width: '100%',
-          borderRadius: 12,
-          overflow: 'hidden',
-          boxShadow: '0 4px 24px rgba(0,0,0,0.12)',
-          background: bgColor,
-          display: 'flex',
-          flexDirection: 'column',
-          height: 400,
-        }}>
-          {/* Header */}
-          <div style={{
-            background: primaryColor,
-            padding: '16px',
-            display: 'flex',
-            alignItems: 'center',
-            gap: 10,
-          }}>
-            {/* Avatar */}
-            <div style={{
-              width: 36,
-              height: 36,
-              borderRadius: '50%',
-              background: 'rgba(255,255,255,0.2)',
-              display: 'flex',
-              alignItems: 'center',
-              justifyContent: 'center',
-              fontSize: 14,
-              color: headerTextColor,
-              fontWeight: 600,
-              overflow: 'hidden',
-              flexShrink: 0,
-            }}>
-              {config.widget_agent_avatar_url ? (
-                <img
-                  src={config.widget_agent_avatar_url}
-                  alt=""
-                  style={{ width: '100%', height: '100%', objectFit: 'cover' }}
-                />
-              ) : (
-                agentName.charAt(0).toUpperCase()
-              )}
-            </div>
-            <div style={{ flex: 1, minWidth: 0 }}>
-              <div style={{
-                fontSize: 14,
-                fontWeight: 600,
-                color: headerTextColor,
-                whiteSpace: 'nowrap',
-                overflow: 'hidden',
-                textOverflow: 'ellipsis',
-              }}>
-                {headerText}
-              </div>
-              <div style={{
-                fontSize: 11,
-                color: headerTextColor,
-                opacity: 0.8,
-              }}>
-                {agentName} &middot; {agentTitle}
-              </div>
-            </div>
-            {/* Close icon */}
-            <div style={{
-              width: 28,
-              height: 28,
-              display: 'flex',
-              alignItems: 'center',
-              justifyContent: 'center',
-              color: headerTextColor,
-              opacity: 0.7,
-              fontSize: 18,
-              cursor: 'default',
-            }}>
-              &#10005;
-            </div>
-          </div>
-
-          {/* Message area */}
-          <div style={{
-            flex: 1,
-            padding: 12,
-            overflowY: 'auto',
-            display: 'flex',
-            flexDirection: 'column',
-            gap: 8,
-          }}>
-            {/* Agent greeting */}
-            <div style={{ display: 'flex', gap: 8, alignItems: 'flex-end' }}>
-              <div style={{
-                width: 24,
-                height: 24,
-                borderRadius: '50%',
-                background: primaryColor,
-                flexShrink: 0,
-                display: 'flex',
-                alignItems: 'center',
-                justifyContent: 'center',
-                fontSize: 10,
-                color: headerTextColor,
-                fontWeight: 600,
-              }}>
-                {agentName.charAt(0).toUpperCase()}
-              </div>
-              <div style={{
-                background: agentBubbleBg,
-                borderRadius: '12px 12px 12px 4px',
-                padding: '8px 12px',
-                fontSize: 13,
-                color: agentBubbleText,
-                maxWidth: '75%',
-                lineHeight: 1.4,
-              }}>
-                {config.widget_greeting_message || 'Hi there! How can I help you today?'}
-              </div>
-            </div>
-
-            {/* Quick action pills (WI #245) */}
-            {quickActions && quickActions.length > 0 && (
-              <div style={{
-                display: 'flex',
-                flexDirection: 'column',
-                alignItems: 'center',
-                gap: 6,
-                marginTop: 4,
-                marginBottom: 4,
-              }}>
-                {quickActions.slice(0, 2).map((qa) => (
-                  <div
-                    key={qa.id}
-                    style={{
-                      display: 'inline-flex',
-                      alignItems: 'center',
-                      gap: 4,
-                      padding: '5px 12px',
-                      borderRadius: 16,
-                      border: `1px solid ${isDark ? '#374151' : '#E5E7EB'}`,
-                      background: isDark ? '#2A2A2A' : '#F7F7F8',
-                      fontSize: 12,
-                      color: textColor,
-                      cursor: 'default',
-                    }}
-                  >
-                    {qa.icon && <span>{qa.icon}</span>}
-                    <span>{qa.label}</span>
-                  </div>
-                ))}
-              </div>
-            )}
-
-            {/* Customer message */}
-            <div style={{
-              display: 'flex',
-              justifyContent: 'flex-end',
-            }}>
-              <div style={{
-                background: customerBubbleBg,
-                borderRadius: '12px 12px 4px 12px',
-                padding: '8px 12px',
-                fontSize: 13,
-                color: customerBubbleText,
-                maxWidth: '75%',
-                lineHeight: 1.4,
-              }}>
-                I have a question about my order
-              </div>
-            </div>
-
-            {/* Agent reply */}
-            <div style={{ display: 'flex', gap: 8, alignItems: 'flex-end' }}>
-              <div style={{
-                width: 24,
-                height: 24,
-                borderRadius: '50%',
-                background: primaryColor,
-                flexShrink: 0,
-                display: 'flex',
-                alignItems: 'center',
-                justifyContent: 'center',
-                fontSize: 10,
-                color: headerTextColor,
-                fontWeight: 600,
-              }}>
-                {agentName.charAt(0).toUpperCase()}
-              </div>
-              <div style={{
-                background: agentBubbleBg,
-                borderRadius: '12px 12px 12px 4px',
-                padding: '8px 12px',
-                fontSize: 13,
-                color: agentBubbleText,
-                maxWidth: '75%',
-                lineHeight: 1.4,
-              }}>
-                Of course! I'd be happy to help. Could you share your order number?
-              </div>
-            </div>
-          </div>
-
-          {/* Input bar */}
-          <div style={{
-            padding: '8px 12px',
-            borderTop: `1px solid ${isDark ? '#374151' : '#E5E7EB'}`,
-            display: 'flex',
-            alignItems: 'center',
-            gap: 8,
-          }}>
-            {config.widget_file_upload_enabled && (
-              <div style={{
-                width: 28,
-                height: 28,
-                display: 'flex',
-                alignItems: 'center',
-                justifyContent: 'center',
-                color: subtextColor,
-                fontSize: 16,
-                cursor: 'default',
-              }}>
-                &#128206;
-              </div>
-            )}
-            <div style={{
-              flex: 1,
-              padding: '8px 12px',
-              borderRadius: 20,
-              background: isDark ? '#374151' : '#F3F4F6',
-              fontSize: 13,
-              color: subtextColor,
-            }}>
-              {placeholder}
-            </div>
-            <div style={{
-              width: 32,
-              height: 32,
-              borderRadius: '50%',
-              background: primaryColor,
-              display: 'flex',
-              alignItems: 'center',
-              justifyContent: 'center',
-              color: headerTextColor,
-              fontSize: 14,
-              cursor: 'default',
-            }}>
-              &#9654;
-            </div>
-          </div>
-
-          {/* Branding */}
-          {config.widget_show_branding && (
-            <div style={{
-              textAlign: 'center',
-              padding: '4px 0 6px 0',
-              fontSize: 10,
-              color: subtextColor,
-            }}>
-              Powered by Agent Red
-            </div>
-          )}
-        </div>
-
-        {/* Launcher button preview */}
-        <div style={{
-          marginTop: 16,
-          display: 'flex',
-          justifyContent: position === 'bottom-right' ? 'flex-end' : 'flex-start',
-        }}>
-          <div style={{
-            width: 52,
-            height: 52,
-            borderRadius: launcherBorderRadius,
-            background: primaryColor,
-            display: 'flex',
-            alignItems: 'center',
-            justifyContent: 'center',
-            boxShadow: '0 4px 12px rgba(0,0,0,0.2)',
-            cursor: 'default',
-          }}>
-            <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke={headerTextColor} strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-              {launcherIcon === 'headset' ? (
-                <>
-                  <path d="M3 18v-6a9 9 0 0 1 18 0v6" />
-                  <path d="M21 19a2 2 0 0 1-2 2h-1a2 2 0 0 1-2-2v-3a2 2 0 0 1 2-2h3zM3 19a2 2 0 0 0 2 2h1a2 2 0 0 0 2-2v-3a2 2 0 0 0-2-2H3z" />
-                </>
-              ) : launcherIcon === 'help' ? (
-                <>
-                  <circle cx="12" cy="12" r="10" />
-                  <path d="M9.09 9a3 3 0 0 1 5.83 1c0 2-3 3-3 3" />
-                  <line x1="12" y1="17" x2="12.01" y2="17" />
-                </>
-              ) : (
-                <path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z" />
-              )}
-            </svg>
-          </div>
-        </div>
-
-        {/* Position indicator */}
-        <div style={{
-          marginTop: 8,
-          textAlign: 'center',
-          fontSize: 11,
-          color: isDark ? '#9CA3AF' : '#6B7280',
-        }}>
-          Position: {position} &middot; Shape: {launcherShape} &middot; Offset: {config.widget_offset_x}px / {config.widget_offset_y}px
-        </div>
-      </div>
-    </div>
-  );
-};
+// (Preview component removed — WI-0870: live preview now via ar:config-preview postMessage)
 
 // ---------------------------------------------------------------------------
 // Helpers
@@ -1411,8 +1020,6 @@ export const WidgetConfigurator: React.FC<BaseComponentProps> = ({
   const [jsonErrors, setJsonErrors] = useState<Record<string, string>>({});
 
   // Quick actions for preview (WI #245)
-  const [previewQuickActions, setPreviewQuickActions] = useState<QuickActionPreview[]>([]);
-
   // Detect dark mode from Mantine color scheme attribute
   const isDarkMode = typeof document !== 'undefined'
     && document.documentElement.getAttribute('data-mantine-color-scheme') === 'dark';
@@ -1456,27 +1063,6 @@ export const WidgetConfigurator: React.FC<BaseComponentProps> = ({
     }
   }, [config.data]);
 
-  // Fetch quick actions for preview (WI #245)
-  useEffect(() => {
-    (async () => {
-      try {
-        const resp = await apiFetch('/api/admin/quick-actions');
-        if (resp.ok) {
-          const data = await resp.json();
-          const actions = (data.actions || [])
-            .filter((a: { isActive?: boolean; is_active?: boolean }) => a.isActive || a.is_active)
-            .slice(0, 2)
-            .map((a: { id: string; label: string; icon?: string | null }) => ({
-              id: a.id,
-              label: a.label,
-              icon: a.icon || null,
-            }));
-          setPreviewQuickActions(actions);
-        }
-      } catch { /* preview is non-critical */ }
-    })();
-  }, [apiFetch]);
-
   // Change tracking
   const pendingChanges = useMemo(
     () => diffConfig(savedConfig, localConfig),
@@ -1492,6 +1078,17 @@ export const WidgetConfigurator: React.FC<BaseComponentProps> = ({
   ) => {
     setLocalConfig((prev) => ({ ...prev, [key]: value }));
   }, []);
+
+  // WI-0869: Dispatch live config preview to widget iframe
+  useEffect(() => {
+    const iframe = document.querySelector<HTMLIFrameElement>('iframe[data-agent-red-widget]');
+    if (iframe?.contentWindow) {
+      iframe.contentWindow.postMessage(
+        { type: 'ar:config-preview', payload: localConfig },
+        '*',
+      );
+    }
+  }, [localConfig]);
 
   // Save handler
   const handleSave = useCallback(async () => {
@@ -1655,7 +1252,7 @@ export const WidgetConfigurator: React.FC<BaseComponentProps> = ({
   return (
     <div style={s.container}>
       {/* Form panel */}
-      <div style={s.formPanel}>
+      <div>
         {/* Unsaved changes indicator */}
         {hasChanges && (
           <div style={s.saveBar}>
@@ -2276,6 +1873,20 @@ export const WidgetConfigurator: React.FC<BaseComponentProps> = ({
             </Field>
             <Field
               st={s}
+              label="Header subtitle"
+              description="Secondary text below the agent name. Default: 'We typically reply within minutes'."
+            >
+              <input
+                type="text"
+                style={s.input}
+                value={localConfig.widget_header_subtitle}
+                placeholder="We typically reply within minutes"
+                maxLength={150}
+                onChange={(e) => updateField('widget_header_subtitle', e.target.value)}
+              />
+            </Field>
+            <Field
+              st={s}
               label="Input placeholder"
               description="Grey hint text in the message input box."
             >
@@ -2336,10 +1947,6 @@ export const WidgetConfigurator: React.FC<BaseComponentProps> = ({
         </div>
       </div>
 
-      {/* Preview panel */}
-      <div style={s.previewPanel}>
-        <WidgetPreview config={localConfig} st={s} quickActions={previewQuickActions} />
-      </div>
     </div>
   );
 };

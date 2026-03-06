@@ -419,7 +419,7 @@ class TestSaveDraftNewDraft:
 
     @pytest.mark.asyncio
     async def test_draft_id_format(self):
-        """Draft document ID follows tenant_id:version format."""
+        """Draft document ID follows tenant_id:version:uid format."""
         active = _make_active_doc(version=3)
         service, prefs_repo, _, _, _ = _make_service(active=active)
 
@@ -429,7 +429,10 @@ class TestSaveDraftNewDraft:
             )
 
         created_doc = prefs_repo.upsert.call_args[0][1]
-        assert created_doc.id == f"{STARTER_TENANT_ID}:4"
+        # Format: {tenant_id}:{version}:{8-char-uuid}
+        assert created_doc.id.startswith(f"{STARTER_TENANT_ID}:4:")
+        uid_suffix = created_doc.id.split(":")[-1]
+        assert len(uid_suffix) == 8
 
     @pytest.mark.asyncio
     async def test_draft_sets_metadata(self):

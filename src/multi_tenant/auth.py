@@ -283,12 +283,11 @@ def _validate_shopify_domains(payload: dict[str, Any]) -> None:
     # iss: https://shop.myshopify.com/admin -> host: shop.myshopify.com
     # dest: https://shop.myshopify.com -> host: shop.myshopify.com
     if iss_host != dest_host:
-        # Allow custom domain on dest (App Bridge may use custom domain)
-        # In this case, we trust the iss hostname (which is always .myshopify.com)
-        logger.info(
-            "Shopify session token iss/dest hostname mismatch: iss=%s dest=%s "
-            "(may be custom domain — accepting iss as authoritative)",
-            iss_host, dest_host,
+        # Shopify spec requires dest to match iss shop domain.
+        # Mismatches could indicate token-substitution attempts.
+        raise AuthenticationError(
+            f"Shopify session token iss/dest hostname mismatch: "
+            f"iss={iss_host} dest={dest_host}"
         )
 
     # Scheme must be HTTPS

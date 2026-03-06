@@ -869,7 +869,12 @@ class ChatPipeline(AgentDispatchMixin, CriticEscalationMixin, AnalyticsMixin):
 
             yield done_event(trace_id=trace_id)
 
-        except (PipelineTimeoutError, Exception) as exc:
+        except PipelineTimeoutError:
+            # Re-raise so the outer execute() handler emits a proper
+            # error_event with code=pipeline_timeout.
+            raise
+
+        except Exception as exc:
             logger.warning(
                 "Co-pilot failed: conv=%s error=%s",
                 conversation_id, exc,

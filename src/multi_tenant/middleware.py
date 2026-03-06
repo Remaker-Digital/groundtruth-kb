@@ -33,6 +33,7 @@ Usage in route handlers:
 
 from __future__ import annotations
 
+import asyncio
 import logging
 import time
 from collections import defaultdict
@@ -84,6 +85,7 @@ _resolve_by_shop_domain: Callable | None = None
 _resolve_by_api_key_hash: Callable | None = None
 _resolve_by_widget_key_hash: Callable | None = None
 _resolve_by_user_api_key_hash: Callable | None = None
+_resolve_by_tenant_id: Callable | None = None
 
 
 def configure_tenant_resolution(
@@ -91,6 +93,7 @@ def configure_tenant_resolution(
     resolve_by_api_key_hash: Callable,
     resolve_by_widget_key_hash: Callable | None = None,
     resolve_by_user_api_key_hash: Callable | None = None,
+    resolve_by_tenant_id: Callable | None = None,
 ) -> None:
     """Configure the tenant resolution functions.
 
@@ -108,13 +111,18 @@ def configure_tenant_resolution(
         resolve_by_user_api_key_hash: Async function that accepts a user
             API key hash and returns {team_member, tenant} or None.
             Optional — per-user auth is disabled if not provided.
+        resolve_by_tenant_id: Async function that accepts a tenant ID
+            string and returns a tenant dict or None. Used by magic-link
+            auth to reuse the connection-pooled repository.
     """
     global _resolve_by_shop_domain, _resolve_by_api_key_hash
     global _resolve_by_widget_key_hash, _resolve_by_user_api_key_hash
+    global _resolve_by_tenant_id
     _resolve_by_shop_domain = resolve_by_shop_domain
     _resolve_by_api_key_hash = resolve_by_api_key_hash
     _resolve_by_widget_key_hash = resolve_by_widget_key_hash
     _resolve_by_user_api_key_hash = resolve_by_user_api_key_hash
+    _resolve_by_tenant_id = resolve_by_tenant_id
     logger.info("Tenant resolution functions configured")
 
 
@@ -503,17 +511,13 @@ class TenantAuthMiddleware(BaseHTTPMiddleware):
         if not tenant_id:
             raise AuthenticationError("Session token missing tenant ID.")
 
-        # Resolve tenant to get status/tier
-        if _resolve_by_shop_domain is None and _resolve_by_api_key_hash is None:
+        # Resolve tenant to get status/tier using pooled resolver
+        if _resolve_by_tenant_id is None:
             raise AuthenticationError(
                 "Tenant resolution not configured.", status_code=500,
             )
 
-        # Look up tenant by ID — reuse the existing tenant resolution
-        from src.multi_tenant.repositories import TenantRepository
-
-        tenant_repo = TenantRepository()
-        tenant = await tenant_repo.read(tenant_id, tenant_id)
+        tenant = await _resolve_by_tenant_id(tenant_id)
         if tenant is None:
             raise AuthenticationError(
                 f"No tenant found for session token: {tenant_id}",
@@ -619,9 +623,10 @@ def require_tier(minimum_tier: TenantTier) -> Callable:
         ):
             ...
 
-    Tier ordering: STARTER < PROFESSIONAL < ENTERPRISE
+    Tier ordering: TRIAL = STARTER < PROFESSIONAL < ENTERPRISE
     """
     _tier_order = {
+        TenantTier.TRIAL: 0,
         TenantTier.STARTER: 0,
         TenantTier.PROFESSIONAL: 1,
         TenantTier.ENTERPRISE: 2,
@@ -835,6 +840,7 @@ class RateLimitMiddleware(BaseHTTPMiddleware):
         # {tenant_id: [(timestamp, count), ...]}
         self._windows: dict[str, list[tuple[float, int]]] = defaultdict(list)
         self._window_size = 60.0  # 1 minute sliding window
+        self._lock = asyncio.Lock()
 
     async def dispatch(
         self, request: Request, call_next: RequestResponseEndpoint,
@@ -849,45 +855,49 @@ class RateLimitMiddleware(BaseHTTPMiddleware):
         if limit is None:
             return await call_next(request)
 
-        # Check and update rate counter
+        # Atomic check-and-increment under lock to prevent
+        # concurrent requests from both passing the limit check.
         now = time.monotonic()
         tenant_id = ctx.tenant_id
 
-        # Clean expired entries
-        window = self._windows[tenant_id]
-        cutoff = now - self._window_size
-        self._windows[tenant_id] = [
-            (ts, count) for ts, count in window if ts > cutoff
-        ]
+        async with self._lock:
+            # Clean expired entries
+            cutoff = now - self._window_size
+            self._windows[tenant_id] = [
+                (ts, count) for ts, count in self._windows[tenant_id]
+                if ts > cutoff
+            ]
 
-        # Count requests in window
-        current_count = sum(count for _, count in self._windows[tenant_id])
-
-        if current_count >= limit:
-            retry_after = int(self._window_size)
-            logger.warning(
-                "Rate limit exceeded: tenant=%s tier=%s limit=%d/min current=%d",
-                tenant_id, ctx.tier, limit, current_count,
-            )
-            return JSONResponse(
-                status_code=429,
-                content={
-                    "error": "Rate limit exceeded.",
-                    "limit": limit,
-                    "window": "60s",
-                    "retry_after": retry_after,
-                },
-                headers={
-                    "Retry-After": str(retry_after),
-                    "X-RateLimit-Limit": str(limit),
-                    "X-RateLimit-Remaining": "0",
-                    "X-RateLimit-Reset": str(retry_after),
-                },
+            # Count requests in window
+            current_count = sum(
+                count for _, count in self._windows[tenant_id]
             )
 
-        # Record this request
-        self._windows[tenant_id].append((now, 1))
-        remaining = max(0, limit - current_count - 1)
+            if current_count >= limit:
+                retry_after = int(self._window_size)
+                logger.warning(
+                    "Rate limit exceeded: tenant=%s tier=%s limit=%d/min current=%d",
+                    tenant_id, ctx.tier, limit, current_count,
+                )
+                return JSONResponse(
+                    status_code=429,
+                    content={
+                        "error": "Rate limit exceeded.",
+                        "limit": limit,
+                        "window": "60s",
+                        "retry_after": retry_after,
+                    },
+                    headers={
+                        "Retry-After": str(retry_after),
+                        "X-RateLimit-Limit": str(limit),
+                        "X-RateLimit-Remaining": "0",
+                        "X-RateLimit-Reset": str(retry_after),
+                    },
+                )
+
+            # Record this request atomically with the check
+            self._windows[tenant_id].append((now, 1))
+            remaining = max(0, limit - current_count - 1)
 
         response = await call_next(request)
 

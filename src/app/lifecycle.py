@@ -161,11 +161,19 @@ async def _startup_tenant_resolution() -> None:
                 return None
             return {"team_member": member, "tenant": tenant}
 
+        async def resolve_by_tenant_id(tid: str) -> dict | None:
+            """Resolve tenant by ID using pooled repository."""
+            try:
+                return await tenant_repo.read(tid, tid)
+            except Exception:
+                return None
+
         configure_tenant_resolution(
             resolve_by_shop_domain=tenant_repo.find_by_shopify_domain,
             resolve_by_api_key_hash=tenant_repo.find_by_api_key_hash,
             resolve_by_widget_key_hash=tenant_repo.find_by_widget_key_hash,
             resolve_by_user_api_key_hash=resolve_user_api_key,
+            resolve_by_tenant_id=resolve_by_tenant_id,
         )
         # Wire Cosmos DB as the primary persistence layer for provisioning
         from src.integrations.provisioning import configure_provisioning_repo

@@ -35,6 +35,7 @@ from __future__ import annotations
 
 import asyncio
 import logging
+import uuid
 from dataclasses import dataclass, field
 from datetime import datetime, timezone
 from typing import Any
@@ -296,12 +297,14 @@ class ActivationService:
                     for key, value in changes.items():
                         base_config[key] = value
 
-                    # Create draft document
+                    # Create draft document with UUID suffix to avoid
+                    # collision with discarded drafts at the same version.
                     draft_version = active_version + 1
+                    draft_uid = uuid.uuid4().hex[:8]
                     now = datetime.now(timezone.utc).isoformat()
 
                     base_config.update({
-                        "id": f"{tenant_id}:{draft_version}",
+                        "id": f"{tenant_id}:{draft_version}:{draft_uid}",
                         "tenant_id": tenant_id,
                         "version": draft_version,
                         "is_current": False,
@@ -626,17 +629,18 @@ class ActivationService:
                 errors=[{"field": "_system", "message": "Service not configured"}],
             )
 
-        # Validate
-        validation = await self.validate_for_activation(tenant_id, tier)
-        if not validation.can_activate:
-            return ActivationResult(
-                success=False,
-                errors=validation.hard_errors,
-                warnings=validation.warnings,
-            )
-
         try:
             async with self._lock:
+                # Validate inside the lock so no concurrent save_draft()
+                # can modify the draft between validation and promotion.
+                validation = await self.validate_for_activation(tenant_id, tier)
+                if not validation.can_activate:
+                    return ActivationResult(
+                        success=False,
+                        errors=validation.hard_errors,
+                        warnings=validation.warnings,
+                    )
+
                 draft = await self._prefs_repo.get_draft(tenant_id)
 
                 # Re-activation path: no draft, but active config is
