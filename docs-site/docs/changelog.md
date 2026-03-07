@@ -9,6 +9,43 @@ All notable changes to Agent Red Customer Experience are documented here.
 
 ---
 
+## v1.76.0 — CORS Fix, Widget Resilience, and UX Improvements (Staging, 2026-03-07)
+
+:::note Staging Release
+This release is currently deployed to the staging environment for validation. It has not yet been promoted to production.
+:::
+
+### Widget resilience
+
+The chat widget now automatically retries transient HTTP errors to improve reliability on high-traffic storefronts.
+
+- **Exponential backoff:** Failed requests to the API (429 Too Many Requests, 502, 503, 504) are retried automatically with increasing delays. Configuration fetches retry up to 3 times with a 1.5-second base delay; conversation start retries up to 2 times.
+- **Retry-After header support:** When the server sends a `Retry-After` header, the widget respects the requested delay (capped at 30 seconds) before retrying.
+
+### CORS middleware fix
+
+A critical fix ensures that CORS headers are present on all HTTP responses, including rate-limited (429) responses.
+
+- **Root cause:** The CORS middleware was positioned as the innermost middleware layer, meaning rate limit rejections were sent to the browser before CORS headers could be added. Modern browsers block responses missing CORS headers, causing silent failures.
+- **Fix:** CORS middleware is now the outermost middleware layer, ensuring every response includes the correct cross-origin headers regardless of which middleware generated the response.
+
+### Issue report improvements
+
+- **Done button:** After submitting an issue report, the confirmation screen now shows a "Done" button instead of "Cancel." The previous label incorrectly suggested the submission could be undone. This change applies across all 8 supported languages (English, German, French, Spanish, Japanese, Korean, Chinese, Portuguese).
+
+### Shopify CDN deployment
+
+- **Permanent widget URLs:** Widget bundles are now deployed using `shopify app deploy` which creates permanent, versioned CDN paths. Previously, development-mode paths could expire, causing the widget script to return 404 on the storefront.
+
+### Infrastructure
+
+- **Async safety:** Background tasks are now properly tracked to prevent fire-and-forget coroutines from being garbage collected.
+- **Redis rate limiting:** A new Redis-backed rate limiting backend using sorted sets is available for production scaling. Automatically configures from `REDIS_URL` environment variable with in-memory fallback.
+- **Cloudflare proxy support:** A new trusted proxy middleware correctly extracts visitor IP addresses from Cloudflare headers (`CF-Connecting-IP`, `X-Forwarded-For`) for accurate rate limiting behind CDN proxies.
+- **GitHub Actions CI:** Automated linting and unit test execution on every push.
+
+---
+
 ## v1.62.0 — Co-Pilot Agent, PII Tokenization, and AGNTCY Platform (2026-03-01)
 
 ### Admin Co-Pilot Agent
