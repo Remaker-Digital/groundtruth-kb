@@ -11,6 +11,7 @@
  */
 
 import React, { createContext, useCallback, useContext, useEffect, useState } from 'react';
+import { useTenantDirectory, type TenantDisplayInfo } from '../hooks/useTenantDirectory';
 import { useLocation, useNavigate } from 'react-router-dom';
 import {
   AppShell,
@@ -38,6 +39,8 @@ interface ProviderContextValue {
   apiFetch: (path: string, init?: RequestInit) => Promise<Response>;
   onNotify: (message: string, type: 'success' | 'error' | 'warning' | 'info') => void;
   productVersion: string | null;
+  /** WI-0883: Human-readable tenant lookup (email → domain → UUID) */
+  getTenantDisplay: (tenantId: string) => TenantDisplayInfo;
 }
 
 const ProviderContext = createContext<ProviderContextValue | null>(null);
@@ -162,7 +165,10 @@ export function ProviderLayout({ apiKey, onLogout, children }: ProviderLayoutPro
     return () => { cancelled = true; };
   }, [apiFetch]);
 
-  const ctx: ProviderContextValue = { apiFetch, onNotify, productVersion };
+  // WI-0883: Human-readable tenant directory lookup
+  const { getTenantDisplay } = useTenantDirectory(apiFetch);
+
+  const ctx: ProviderContextValue = { apiFetch, onNotify, productVersion, getTenantDisplay };
 
   return (
     <ProviderContext.Provider value={ctx}>

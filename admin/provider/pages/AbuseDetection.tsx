@@ -27,6 +27,7 @@ import {
 } from '@mantine/core';
 import { useProviderContext } from '../layouts/ProviderLayout';
 import { LoadingState } from '../../shared/LoadingState';
+import { TenantName } from '../components/TenantName';
 import { tokens } from '../../shared/theme/styles';
 
 // ---------------------------------------------------------------------------
@@ -90,7 +91,7 @@ function riskColor(score: number): string {
 // ---------------------------------------------------------------------------
 
 export function AbuseDetectionPage() {
-  const { apiFetch, onNotify } = useProviderContext();
+  const { apiFetch, onNotify, getTenantDisplay } = useProviderContext();
   const [data, setData] = useState<AbuseOverview | null>(null);
   const [loading, setLoading] = useState(true);
 
@@ -224,7 +225,7 @@ export function AbuseDetectionPage() {
               data.highRiskTenants.map((t) => (
                 <Table.Tr key={t.tenantId}>
                   <Table.Td>
-                    <Text size="xs" ff="monospace" c={tokens.textSecondary}>{t.tenantId}</Text>
+                    <TenantName tenantId={t.tenantId} info={getTenantDisplay(t.tenantId)} />
                   </Table.Td>
                   <Table.Td>
                     <Group gap="xs">

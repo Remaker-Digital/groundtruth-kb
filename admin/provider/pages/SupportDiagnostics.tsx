@@ -27,6 +27,7 @@ import {
 } from '@mantine/core';
 import { useProviderContext } from '../layouts/ProviderLayout';
 import { LoadingState } from '../../shared/LoadingState';
+import { TenantName } from '../components/TenantName';
 import { tokens } from '../../shared/theme/styles';
 
 // ---------------------------------------------------------------------------
@@ -130,7 +131,7 @@ function BoolBadge({ value, trueLabel, falseLabel }: {
 // ---------------------------------------------------------------------------
 
 export function SupportDiagnosticsPage() {
-  const { apiFetch, onNotify } = useProviderContext();
+  const { apiFetch, onNotify, getTenantDisplay } = useProviderContext();
   const [tenantId, setTenantId] = useState('');
   const [data, setData] = useState<DiagnosticSnapshot | null>(null);
   const [errors, setErrors] = useState<ErrorsResponse | null>(null);

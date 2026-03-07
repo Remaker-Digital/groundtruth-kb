@@ -32,6 +32,7 @@ import {
 } from '@mantine/core';
 import { useProviderContext } from '../layouts/ProviderLayout';
 import { LoadingState } from '../../shared/LoadingState';
+import { TenantName } from '../components/TenantName';
 import { tokens } from '../../shared/theme/styles';
 
 // ---------------------------------------------------------------------------
@@ -133,7 +134,7 @@ function truncate(text: string, maxLen: number): string {
 // ---------------------------------------------------------------------------
 
 export function ContactMessagesPage() {
-  const { apiFetch, onNotify } = useProviderContext();
+  const { apiFetch, onNotify, getTenantDisplay } = useProviderContext();
   const [messages, setMessages] = useState<ContactMessage[]>([]);
   const [total, setTotal] = useState(0);
   const [page, setPage] = useState(1);
@@ -302,7 +303,7 @@ export function ContactMessagesPage() {
                     <Text size="xs">{formatDate(msg.createdAt)}</Text>
                   </Table.Td>
                   <Table.Td>
-                    <Text size="xs" ff="monospace">{truncate(msg.tenantId, 12)}</Text>
+                    <TenantName tenantId={msg.tenantId} info={getTenantDisplay(msg.tenantId)} />
                   </Table.Td>
                   <Table.Td>
                     <Badge size="xs" color={TOPIC_COLORS[msg.topic] || 'gray'}>
@@ -359,7 +360,7 @@ export function ContactMessagesPage() {
               <Stack gap={4}>
                 <Group gap="xs">
                   <Text size="xs" fw={600} w={100}>Tenant</Text>
-                  <Text size="xs" ff="monospace">{selected.tenantId}</Text>
+                  <TenantName tenantId={selected.tenantId} info={getTenantDisplay(selected.tenantId)} />
                 </Group>
                 <Group gap="xs">
                   <Text size="xs" fw={600} w={100}>Tier</Text>

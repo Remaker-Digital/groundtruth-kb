@@ -23,6 +23,7 @@ import {
 } from '@mantine/core';
 import { useProviderContext } from '../layouts/ProviderLayout';
 import { LoadingState } from '../../shared/LoadingState';
+import { TenantName } from '../components/TenantName';
 import { tokens } from '../../shared/theme/styles';
 
 // ---------------------------------------------------------------------------
@@ -80,7 +81,7 @@ function formatServiceName(service: string): string {
 // ---------------------------------------------------------------------------
 
 export function IntegrationHealthPage() {
-  const { apiFetch, onNotify } = useProviderContext();
+  const { apiFetch, onNotify, getTenantDisplay } = useProviderContext();
   const [data, setData] = useState<IntegrationHealthResponse | null>(null);
   const [loading, setLoading] = useState(true);
 
@@ -259,7 +260,7 @@ export function IntegrationHealthPage() {
           <Stack gap="xs">
             {data.errors.map((err, i) => (
               <Group key={i} gap="xs">
-                <Text size="xs" ff="monospace" c={tokens.warning}>{err.tenantId}</Text>
+                <TenantName tenantId={err.tenantId} info={getTenantDisplay(err.tenantId)} />
                 <Text size="xs" c={tokens.textMuted}>{err.message}</Text>
               </Group>
             ))}

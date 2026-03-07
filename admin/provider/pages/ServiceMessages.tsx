@@ -30,6 +30,7 @@ import {
   Pagination,
 } from '@mantine/core';
 import { useProviderContext } from '../layouts/ProviderLayout';
+import { TenantName } from '../components/TenantName';
 import { tokens } from '../../shared/theme/styles';
 
 /* ------------------------------------------------------------------ */
@@ -75,7 +76,7 @@ const TIER_OPTIONS = [
 /* ------------------------------------------------------------------ */
 
 export function ServiceMessagesPage() {
-  const { apiFetch, onNotify } = useProviderContext();
+  const { apiFetch, onNotify, getTenantDisplay } = useProviderContext();
 
   // Form state
   const [subject, setSubject] = useState('');
@@ -302,11 +303,7 @@ export function ServiceMessagesPage() {
               {pagedRecipients.map((r, i) => (
                 <Table.Tr key={`${r.tenantId}-${i}`}>
                   <Table.Td>
-                    <Text size="xs" ff="monospace">
-                      {r.tenantId.length > 20
-                        ? `${r.tenantId.slice(0, 20)}...`
-                        : r.tenantId}
-                    </Text>
+                    <TenantName tenantId={r.tenantId} info={getTenantDisplay(r.tenantId)} />
                   </Table.Td>
                   <Table.Td>{r.email}</Table.Td>
                   <Table.Td>

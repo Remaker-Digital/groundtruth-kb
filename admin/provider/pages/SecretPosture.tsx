@@ -20,11 +20,11 @@ import {
   Table,
   Text,
   Title,
-  Tooltip,
 } from '@mantine/core';
 import { useProviderContext } from '../layouts/ProviderLayout';
 import { LoadingState } from '../../shared/LoadingState';
 import { HelpTooltip } from '../../shared/HelpTooltip';
+import { TenantName } from '../components/TenantName';
 import { tokens } from '../../shared/theme/styles';
 
 // ---------------------------------------------------------------------------
@@ -80,7 +80,7 @@ function typeBadgeColor(type: string): string {
 // ---------------------------------------------------------------------------
 
 export function SecretPosturePage() {
-  const { apiFetch, onNotify } = useProviderContext();
+  const { apiFetch, onNotify, getTenantDisplay } = useProviderContext();
   const [data, setData] = useState<SecretPostureResponse | null>(null);
   const [loading, setLoading] = useState(true);
 
@@ -184,22 +184,10 @@ export function SecretPosturePage() {
               </Table.Tr>
             ) : (
               data.tenants.map((t) => {
-                const displayName = t.customerEmail || t.shopifyShopDomain || t.tenantId;
-                const isUuid = displayName === t.tenantId;
                 return (
                 <Table.Tr key={t.tenantId}>
                   <Table.Td>
-                    <Tooltip label={t.tenantId} position="right" withArrow>
-                      <Text
-                        size="xs"
-                        fw={500}
-                        ff={isUuid ? 'monospace' : undefined}
-                        c={tokens.textSecondary}
-                        style={{ cursor: 'help' }}
-                      >
-                        {displayName}
-                      </Text>
-                    </Tooltip>
+                    <TenantName tenantId={t.tenantId} info={getTenantDisplay(t.tenantId)} />
                   </Table.Td>
                   <Table.Td>
                     <Text size="xs" c={tokens.textMuted}>{t.tier ?? '\u2014'}</Text>
@@ -261,7 +249,7 @@ export function SecretPosturePage() {
           <Stack gap="xs">
             {data.errors.map((err, i) => (
               <Group key={i} gap="xs">
-                <Text size="xs" ff="monospace" c={tokens.warning}>{err.tenantId}</Text>
+                <TenantName tenantId={err.tenantId} info={getTenantDisplay(err.tenantId)} />
                 <Text size="xs" c={tokens.textMuted}>{err.message}</Text>
               </Group>
             ))}

@@ -24,6 +24,7 @@ import {
 } from '@mantine/core';
 import { useProviderContext } from '../layouts/ProviderLayout';
 import { LoadingState } from '../../shared/LoadingState';
+import { TenantName } from '../components/TenantName';
 import { tokens } from '../../shared/theme/styles';
 
 // ---------------------------------------------------------------------------
@@ -69,7 +70,7 @@ const RECONCILIATION_LABELS: Record<string, string> = {
 // ---------------------------------------------------------------------------
 
 export function BillingHealthPage() {
-  const { apiFetch, onNotify } = useProviderContext();
+  const { apiFetch, onNotify, getTenantDisplay } = useProviderContext();
   const [data, setData] = useState<BillingHealthResponse | null>(null);
   const [loading, setLoading] = useState(true);
 
@@ -177,7 +178,7 @@ export function BillingHealthPage() {
               data.tenants.map((t) => (
                 <Table.Tr key={t.tenantId}>
                   <Table.Td>
-                    <Text size="xs" ff="monospace" style={{ color: tokens.textPrimary }}>{t.tenantId}</Text>
+                    <TenantName tenantId={t.tenantId} info={getTenantDisplay(t.tenantId)} />
                   </Table.Td>
                   <Table.Td>
                     <Text size="xs" c={tokens.textMuted}>{t.tier ?? '—'}</Text>

@@ -38,6 +38,7 @@ import {
 import { useProviderContext } from '../layouts/ProviderLayout';
 import { LoadingState } from '../../shared/LoadingState';
 import { tokens } from '../../shared/theme/styles';
+import { TenantName } from '../components/TenantName';
 
 // ---------------------------------------------------------------------------
 // Types
@@ -461,7 +462,12 @@ export function TenantDirectoryPage() {
                   return (
                     <Table.Tr key={t.tenantId}>
                       <Table.Td>
-                        <Text size="xs" ff="monospace" style={{ color: tokens.textPrimary }}>{t.tenantId}</Text>
+                        <TenantName tenantId={t.tenantId} info={{
+                          displayName: t.customerEmail || t.shopifyShopDomain || t.tenantId,
+                          isUuid: !t.customerEmail && !t.shopifyShopDomain,
+                          customerEmail: t.customerEmail ?? null,
+                          shopifyShopDomain: t.shopifyShopDomain ?? null,
+                        }} />
                       </Table.Td>
                       <Table.Td>
                         <Badge
