@@ -137,7 +137,7 @@ export const IssueReport: FunctionComponent<IssueReportProps> = ({
             cursor: 'pointer',
           }}
         >
-          {locale.issueCancel}
+          {locale.issueDone}
         </button>
       </div>
     );

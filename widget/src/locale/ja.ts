@@ -49,6 +49,7 @@ export const ja: Locale = {
   issueSubmitting: '送信中...',
   issueSubmitSuccess: 'ありがとうございます！レポートが送信されました。',
   issueCancel: 'キャンセル',
+  issueDone: '完了',
   otpPrompt: 'メールに送信されたコードを入力してください。',
   otpVerify: '確認',
   otpResend: 'コードを再送',

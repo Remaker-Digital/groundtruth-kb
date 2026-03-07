@@ -53,6 +53,7 @@ export interface Locale {
   issueSubmitting: string;
   issueSubmitSuccess: string;
   issueCancel: string;
+  issueDone: string;
   otpPrompt: string;
   otpVerify: string;
   otpResend: string;
@@ -106,6 +107,7 @@ export const en: Locale = {
   issueSubmitting: 'Submitting...',
   issueSubmitSuccess: 'Thank you! Your report has been submitted.',
   issueCancel: 'Cancel',
+  issueDone: 'Done',
   otpPrompt: 'Enter the code we sent to your email.',
   otpVerify: 'Verify',
   otpResend: 'Resend code',

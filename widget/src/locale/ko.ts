@@ -49,6 +49,7 @@ export const ko: Locale = {
   issueSubmitting: '제출 중...',
   issueSubmitSuccess: '감사합니다! 신고가 제출되었습니다.',
   issueCancel: '취소',
+  issueDone: '완료',
   otpPrompt: '이메일로 전송된 코드를 입력해 주세요.',
   otpVerify: '확인',
   otpResend: '코드 재전송',

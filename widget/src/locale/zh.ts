@@ -49,6 +49,7 @@ export const zh: Locale = {
   issueSubmitting: '提交中...',
   issueSubmitSuccess: '谢谢！您的报告已提交。',
   issueCancel: '取消',
+  issueDone: '完成',
   otpPrompt: '请输入我们发送到您邮箱的验证码。',
   otpVerify: '验证',
   otpResend: '重新发送验证码',

@@ -49,6 +49,7 @@ export const fr: Locale = {
   issueSubmitting: 'Envoi...',
   issueSubmitSuccess: 'Merci ! Votre signalement a été envoyé.',
   issueCancel: 'Annuler',
+  issueDone: 'Terminé',
   otpPrompt: 'Entrez le code que nous avons envoyé à votre e-mail.',
   otpVerify: 'Vérifier',
   otpResend: 'Renvoyer le code',
