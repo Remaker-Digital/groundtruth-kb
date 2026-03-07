@@ -62,9 +62,10 @@ def _reset_registry():
 class TestRegistryLoading:
     """Test that YAML fields load correctly."""
 
-    def test_registry_loads_92_fields(self):
+    def test_registry_loads_91_fields(self):
+        """91 fields after test_mode_enabled removal (S157)."""
         registry = get_field_registry()
-        assert len(registry) == 92
+        assert len(registry) == 91
 
     def test_all_fields_have_required_attributes(self):
         registry = get_field_registry()

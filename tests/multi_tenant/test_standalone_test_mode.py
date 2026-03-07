@@ -367,10 +367,15 @@ class TestTestModeConversationSchema:
 
 
 class TestTestModeFieldsSchema:
-    """Verify test_mode_enabled is defined in the fields.yaml schema."""
+    """Verify test_mode_enabled was REMOVED from fields.yaml (S157).
 
-    def test_test_mode_field_exists_in_schema(self) -> None:
-        """test_mode_enabled field is present in fields.yaml."""
+    Test mode was a phantom specification — no billing enforcement existed.
+    The field was removed from the UI and schema. Backend is_test_mode on
+    conversations is retained for backward compatibility.
+    """
+
+    def test_test_mode_field_removed_from_schema(self) -> None:
+        """test_mode_enabled field is NOT present in fields.yaml (S157)."""
         from pathlib import Path
         import yaml
 
@@ -378,43 +383,5 @@ class TestTestModeFieldsSchema:
         with open(fields_path) as f:
             data = yaml.safe_load(f)
 
-        # fields.yaml uses a flat list under "fields:" key
         all_fields = [f["field_name"] for f in data.get("fields", [])]
-        assert "test_mode_enabled" in all_fields
-
-    def test_test_mode_field_is_boolean(self) -> None:
-        """test_mode_enabled field is type boolean."""
-        from pathlib import Path
-        import yaml
-
-        fields_path = Path(__file__).parent.parent.parent / "src" / "multi_tenant" / "schema" / "fields.yaml"
-        with open(fields_path) as f:
-            data = yaml.safe_load(f)
-
-        test_mode_field = None
-        for field in data.get("fields", []):
-            if field["field_name"] == "test_mode_enabled":
-                test_mode_field = field
-                break
-
-        assert test_mode_field is not None
-        assert test_mode_field["field_type"] == "boolean"
-        assert test_mode_field["platform_default"] is False
-
-    def test_test_mode_available_to_all_tiers(self) -> None:
-        """test_mode_enabled is tier_gate=all (available to Starter+)."""
-        from pathlib import Path
-        import yaml
-
-        fields_path = Path(__file__).parent.parent.parent / "src" / "multi_tenant" / "schema" / "fields.yaml"
-        with open(fields_path) as f:
-            data = yaml.safe_load(f)
-
-        test_mode_field = None
-        for field in data.get("fields", []):
-            if field["field_name"] == "test_mode_enabled":
-                test_mode_field = field
-                break
-
-        assert test_mode_field is not None
-        assert test_mode_field["tier_gate"] == "all"
+        assert "test_mode_enabled" not in all_fields

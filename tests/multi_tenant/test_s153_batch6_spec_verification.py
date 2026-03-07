@@ -542,13 +542,13 @@ class TestSpec0091LightDarkToggleRetainsDark:
 
 
 class TestSpec0152TestModeIndicator:
-    """SPEC-0152: When test mode activates, the mode indicator MUST display 'Test mode'."""
+    """SPEC-0152: Test mode indicator REMOVED (S157 — phantom spec)."""
 
-    def test_test_mode_banner(self):
+    def test_test_mode_banner_removed(self):
+        """Test mode banner/indicator removed from StandaloneLayout (S157)."""
         src = (STANDALONE / "layouts" / "StandaloneLayout.tsx").read_text(encoding="utf-8")
-        assert "Test Mode Active" in src or "test_mode" in src, \
-            "Must show test mode indicator"
-        assert "testModeEnabled" in src, "Must track test mode state"
+        assert "testModeEnabled" not in src, \
+            "testModeEnabled should be removed from layout (S157)"
 
 
 class TestSpec0353StorefrontNameInNavbar:

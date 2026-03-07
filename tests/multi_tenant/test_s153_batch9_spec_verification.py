@@ -88,12 +88,13 @@ class TestSpec0087MantineV7Used:
 
 
 class TestSpec0108TestModeOnNavbar:
-    """SPEC-0108: 'Test mode' toggle appears on nav bar at top."""
+    """SPEC-0108: Test mode toggle REMOVED from navbar (S157 — phantom spec)."""
 
-    def test_test_mode_in_header(self):
+    def test_test_mode_removed_from_header(self):
+        """Test mode toggle/indicator removed from layout header (S157)."""
         src = (STANDALONE / "layouts" / "StandaloneLayout.tsx").read_text(encoding="utf-8")
-        assert "Test Mode" in src or "testMode" in src or "test_mode" in src, \
-            "Test mode indicator must appear in layout"
+        assert "testModeEnabled" not in src, \
+            "testModeEnabled should be removed from layout (S157)"
 
 
 class TestSpec0121KBToolbarTooltips:

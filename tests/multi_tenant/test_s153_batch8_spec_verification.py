@@ -322,11 +322,13 @@ class TestSpec1569ProviderHumanReadableTenant:
 # ═══════════════════════════════════════════════════════════════════════
 
 class TestSpec0109TestModeFirstStep:
-    """SPEC-0109: 'Test mode' toggle must be first step in wizard flow."""
+    """SPEC-0109: Test mode REMOVED from wizard step one (S157 — phantom spec)."""
 
-    def test_test_mode_in_step_one(self):
+    def test_test_mode_removed_from_wizard(self):
+        """Test mode toggle removed from wizard (S157)."""
         src = (SHARED / "components" / "OnboardingWizard.tsx").read_text(encoding="utf-8")
-        assert "Test mode" in src or "testMode" in src, "Must have test mode in wizard"
+        assert "test_mode_enabled" not in src, \
+            "test_mode_enabled should be removed from wizard (S157)"
 
 
 class TestSpec0497ActivationStateMatchesReport:

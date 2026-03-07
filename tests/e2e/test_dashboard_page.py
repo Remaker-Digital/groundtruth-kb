@@ -256,50 +256,22 @@ class TestDashboardSetupChecklist:
 
 
 # ===========================================================================
-# TestDashboardTestModeAlert — conditional when test_mode_enabled
+# TestDashboardTestModeAlert — REMOVED (S157: phantom specification)
 # ===========================================================================
 
 class TestDashboardTestModeAlert:
-    """Test mode alert visibility depends on config.test_mode_enabled."""
+    """Test mode alert was removed in S157 — phantom specification.
 
-    def test_alert_hidden_by_default(self, admin_page: Page):
-        """Test mode alert NOT visible when test_mode_enabled is not set."""
+    test_mode_enabled never had billing enforcement. The UI toggle, banner,
+    and analytics filter have all been removed. Backend is_test_mode on
+    conversations retained for backward compatibility.
+    """
+
+    def test_test_mode_alert_not_present(self, admin_page: Page):
+        """Test mode alert does not exist in Dashboard (removed S157)."""
         _wait_for_dashboard_data(admin_page)
         alert = admin_page.get_by_text("Test mode is active")
         expect(alert).to_have_count(0)
-
-    def test_alert_visible_when_test_mode_enabled(self, page: Page, admin_vite_server, api_mocker: AdminApiMocker):
-        """Test mode alert renders when test_mode_enabled is true.
-
-        Override uses 'state=draft' to match the Dashboard's useConfig call
-        and 'page_type=all' for the layout's test-mode fetch, without
-        inadvertently matching /api/config/activation-status.
-        """
-        config_with_test_mode = {
-            "config": {**MOCK_CONFIG["config"], "test_mode_enabled": True},
-            "draft": None,
-            "activationStatus": MOCK_CONFIG.get("activationStatus"),
-        }
-        api_mocker.override("state=draft", config_with_test_mode)
-        api_mocker.override("page_type=all", config_with_test_mode)
-        setup_admin_page(page, api_mocker)
-        page.wait_for_timeout(500)
-        alert = page.get_by_text("Test mode is active")
-        expect(alert.first).to_be_visible()
-
-    def test_test_mode_alert_mentions_billing(self, page: Page, admin_vite_server, api_mocker: AdminApiMocker):
-        """Test mode alert mentions conversations are excluded from billing."""
-        config_with_test_mode = {
-            "config": {**MOCK_CONFIG["config"], "test_mode_enabled": True},
-            "draft": None,
-            "activationStatus": MOCK_CONFIG.get("activationStatus"),
-        }
-        api_mocker.override("state=draft", config_with_test_mode)
-        api_mocker.override("page_type=all", config_with_test_mode)
-        setup_admin_page(page, api_mocker)
-        page.wait_for_timeout(500)
-        billing_text = page.get_by_text("excluded from billing")
-        expect(billing_text.first).to_be_visible()
 
 
 # ===========================================================================

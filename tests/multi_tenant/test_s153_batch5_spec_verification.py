@@ -175,16 +175,14 @@ class TestSpec0494WizardSessionDismissal:
 
 
 class TestSpec0629TestModeFirstStep:
-    """SPEC-0629: Test Mode/Production selection in wizard first step."""
+    """SPEC-0629: Test Mode REMOVED from wizard (S157 — phantom spec)."""
 
-    def test_test_mode_in_step_one(self):
+    def test_test_mode_removed_from_wizard(self):
+        """Test mode toggle removed from wizard step one (S157)."""
         wizard = SHARED / "components" / "OnboardingWizard.tsx"
         src = wizard.read_text(encoding="utf-8")
-        # Test mode toggle should be in the first step content
-        assert "Test mode" in src or "test mode" in src, \
-            "Wizard must include test mode option"
-        assert "test" in src.lower() and "mode" in src.lower(), \
-            "Test mode must be available in wizard"
+        assert "test_mode_enabled" not in src, \
+            "test_mode_enabled should be removed from wizard (S157)"
 
 
 class TestSpec0708ActivationEnablesWidget:

@@ -276,14 +276,12 @@ class TestSetupChecklist:
 # ===========================================================================
 
 class TestTestModeAlert:
-    """EL-dashboard-013..014: Test mode alert (visible when test_mode=true)."""
+    """EL-dashboard-013..014: Test mode alert REMOVED (S157 — phantom spec)."""
 
-    # B6: Conditional display
-    def test_test_mode_conditional(self, live_dashboard_page: Page):
-        """[EL-013/B6] Test mode alert present when test_mode_enabled=true."""
+    def test_test_mode_alert_not_present(self, live_dashboard_page: Page):
+        """[EL-013] Test mode alert removed from Dashboard (S157)."""
         text = _main_text(live_dashboard_page)
-        if "test mode" in text.lower():
-            assert "active" in text.lower() or "enabled" in text.lower()
+        assert "test mode" not in text.lower(), "Test mode alert should not appear (removed S157)"
 
 
 # ===========================================================================

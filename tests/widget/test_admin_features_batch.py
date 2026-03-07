@@ -457,19 +457,13 @@ class TestChatScrollControls:
 # ===========================================================================
 
 class TestWizardTestModeToggle:
-    """WI-0821: Wizard has test mode toggle in step 3."""
+    """WI-0821: Wizard test mode REMOVED (S157 — phantom specification)."""
 
-    def test_test_mode_state(self) -> None:
+    def test_test_mode_removed(self) -> None:
+        """Test mode state and field removed from OnboardingWizard (S157)."""
         source = _read(ADMIN_SHARED / "components" / "OnboardingWizard.tsx")
-        assert "testMode" in source
-
-    def test_test_mode_switch(self) -> None:
-        source = _read(ADMIN_SHARED / "components" / "OnboardingWizard.tsx")
-        assert "Test mode" in source
-
-    def test_test_mode_enables_flag(self) -> None:
-        source = _read(ADMIN_SHARED / "components" / "OnboardingWizard.tsx")
-        assert "test_mode_enabled" in source
+        assert "test_mode_enabled" not in source
+        assert "testMode" not in source
 
 
 # ===========================================================================

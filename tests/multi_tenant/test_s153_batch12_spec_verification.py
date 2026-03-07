@@ -143,13 +143,14 @@ class TestSpec0539EnvLocalHasURLsAndKeys:
 
 
 class TestSpec0141WizardTwoPurposes:
-    """SPEC-0141: Wizard MUST have two purposes: (1) configuring Test mode
-    and (2) ensuring merchants complete configuration for initial activation."""
+    """SPEC-0141: Wizard ensures merchants complete configuration for
+    initial activation. Test mode removed S157 (phantom specification)."""
 
-    def test_wizard_has_test_mode_toggle(self):
+    def test_wizard_test_mode_removed(self):
+        """Test mode toggle removed from wizard (S157)."""
         wiz = (SHARED / "components" / "OnboardingWizard.tsx").read_text(encoding="utf-8")
-        assert "test" in wiz.lower() and ("mode" in wiz.lower() or "Mode" in wiz), \
-            "Wizard must have test mode functionality"
+        assert "test_mode_enabled" not in wiz, \
+            "test_mode_enabled should be removed from wizard (S157)"
 
     def test_wizard_has_activation(self):
         wiz = (SHARED / "components" / "OnboardingWizard.tsx").read_text(encoding="utf-8")
