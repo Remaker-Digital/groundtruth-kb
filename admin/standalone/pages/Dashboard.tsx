@@ -266,22 +266,6 @@ export function DashboardPage() {
       {/* Go-Live: Initial setup checklist (WI #288) */}
       <SetupChecklist config={configResult.data?.config} activationStatus={activationStatus.data ?? undefined} />
 
-      {/* Go-Live: Test mode diff checklist (WI #289) */}
-      {Boolean(configResult.data?.config?.test_mode_enabled) && (
-        <Alert variant="light" color="yellow" title="Test mode is active">
-          <Text size="sm" mb="xs">While in test mode:</Text>
-          <List size="sm" spacing={4}>
-            <List.Item><Text size="sm">Conversations are tagged as <strong>test</strong> and excluded from billing.</Text></List.Item>
-            <List.Item><Text size="sm">A yellow test mode banner appears at the top of the admin.</Text></List.Item>
-            <List.Item><Text size="sm">Analytics include test conversations (filter by tag to separate).</Text></List.Item>
-            <List.Item><Text size="sm">Widget behavior is identical to standard mode for realistic testing.</Text></List.Item>
-          </List>
-          <Text size="sm" mt="xs" c="dimmed">
-            When ready, switch to standard mode on the Agent Configuration page.
-          </Text>
-        </Alert>
-      )}
-
       {/* Stat cards — 5 cards with detail sub-labels + help tooltips (WI #259) */}
       <SimpleGrid cols={{ base: 1, xs: 2, md: 3 }} spacing="md">
         <StatCard

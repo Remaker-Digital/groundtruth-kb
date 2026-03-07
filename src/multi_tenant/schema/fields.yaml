@@ -1634,17 +1634,5 @@ fields:
     pii_classification: none
     injected_in_prompt: true
 
-  - field_name: test_mode_enabled
-    display_name: Test mode
-    field_type: boolean
-    validation: {}
-    platform_default: false
-    tier_gate: all
-    onboarding_step: 10
-    step_order: 1
-    tooltip: Enable test mode — conversations are not billed.
-    description: "When test mode is active, conversations are prefixed with 'test_' and excluded from billing. Use this to verify your configuration before going live. Test conversations still flow through the full pipeline including the Critic."
-    doc_link: "https://docs.agentred.ai/configuration/advanced#test-mode"
-    affects_agents: []
-    pii_classification: none
-    injected_in_prompt: false
+  # test_mode_enabled REMOVED (S157) — phantom specification, never enforced.
+  # Backend is_test_mode field on conversations retained for backward compatibility.

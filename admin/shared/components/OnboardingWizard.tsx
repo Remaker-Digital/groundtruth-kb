@@ -120,7 +120,6 @@ export const OnboardingWizard: React.FC<Props> = ({
   const [suggestionsLoading, setSuggestionsLoading] = useState(false);
   const [activating, setActivating] = useState(false);
   const [activateError, setActivateError] = useState<string | null>(null);
-  const [testMode, setTestMode] = useState(false);
   const [customInstructions, setCustomInstructions] = useState('');
   const pollRef = useRef<ReturnType<typeof setInterval> | null>(null);
 
@@ -347,10 +346,7 @@ export const OnboardingWizard: React.FC<Props> = ({
         fields[s.fieldName] = s.value;
       }
 
-      // Include test mode and custom instructions from wizard
-      if (testMode) {
-        fields.test_mode_enabled = true;
-      }
+      // Include custom instructions from wizard
       if (customInstructions.trim()) {
         fields.custom_instructions = customInstructions.trim();
       }
@@ -398,7 +394,7 @@ export const OnboardingWizard: React.FC<Props> = ({
     } finally {
       setActivating(false);
     }
-  }, [suggestions, apiFetch, onNavigate, shopDomain, selectedTemplate, testMode, customInstructions]);
+  }, [suggestions, apiFetch, onNavigate, shopDomain, selectedTemplate, customInstructions]);
 
   // Navigate to config page (fallback for manual review)
   const handleGoToConfig = useCallback(() => {
@@ -418,7 +414,6 @@ export const OnboardingWizard: React.FC<Props> = ({
     setSuggestions(null);
     setActivating(false);
     setActivateError(null);
-    setTestMode(false);
     setCustomInstructions('');
     if (pollRef.current) {
       clearInterval(pollRef.current);
@@ -528,17 +523,6 @@ export const OnboardingWizard: React.FC<Props> = ({
               size="sm"
             />
           )}
-
-          {/* Test mode selector — lets merchants try the AI without billing */}
-          <Divider />
-          <Switch
-            label="Test mode"
-            description="Start in test mode — conversations are tagged as test and excluded from billing. You can switch to standard mode later."
-            checked={testMode}
-            onChange={(e) => setTestMode(e.currentTarget.checked)}
-            size="sm"
-            color="yellow"
-          />
 
           <Group justify="space-between" mt="xs">
             <Button variant="subtle" color="dimmed" onClick={handleClose} size="sm">
@@ -670,14 +654,8 @@ export const OnboardingWizard: React.FC<Props> = ({
               <Group justify="space-between" align="flex-start">
                 <Text size="sm" c="dimmed" style={{ flex: 1 }}>
                   Optionally add custom instructions to shape how your AI assistant
-                  responds. Then click <strong>Activate now</strong> to go live
-                  {testMode ? ' in test mode' : ''}.
+                  responds. Then click <strong>Activate now</strong> to go live.
                 </Text>
-                {testMode && (
-                  <Badge color="yellow" variant="light" size="sm">
-                    Test mode
-                  </Badge>
-                )}
               </Group>
 
               <Textarea

@@ -115,16 +115,11 @@ function formatLastSeen(dateStr: string): string {
 export const AnalyticsPage: React.FC = () => {
   const { apiFetch } = useAppContext();
   const [period, setPeriod] = useState('30d');
-  const [modeFilter, setModeFilter] = useState<'all' | 'production' | 'test'>('all');
-
-  // Convert UI filter to API parameter
-  const isTestMode = modeFilter === 'test' ? true : modeFilter === 'production' ? false : undefined;
-
-  // API hooks — pass test mode filter
-  const summary = useAnalyticsSummary(apiFetch, isTestMode);
+  // API hooks
+  const summary = useAnalyticsSummary(apiFetch);
   const dailyVolume = useDailyVolume(apiFetch);
-  const intents = useIntentBreakdown(apiFetch, isTestMode);
-  const gaps = useKnowledgeGaps(apiFetch, isTestMode);
+  const intents = useIntentBreakdown(apiFetch);
+  const gaps = useKnowledgeGaps(apiFetch);
 
   // Dark mode chart colors — Mazel design revision (2026-02-03 mockup)
   const computedColorScheme = useComputedColorScheme('dark');
@@ -158,16 +153,6 @@ export const AnalyticsPage: React.FC = () => {
         </div>
         <Group gap="md">
           <SegmentedControl
-            value={modeFilter}
-            onChange={(val) => setModeFilter(val as 'all' | 'production' | 'test')}
-            data={[
-              { label: 'All', value: 'all' },
-              { label: 'Production', value: 'production' },
-              { label: 'Test', value: 'test' },
-            ]}
-            size="sm"
-          />
-          <SegmentedControl
             value={period}
             onChange={setPeriod}
             data={[
@@ -181,26 +166,6 @@ export const AnalyticsPage: React.FC = () => {
         </Group>
       </Group>
 
-      {/* Test mode filter indicator */}
-      {modeFilter !== 'all' && (
-        <Paper p="xs" radius="md" withBorder style={{
-          borderColor: modeFilter === 'test' ? 'rgba(255, 152, 0, 0.3)' : undefined,
-          background: modeFilter === 'test'
-            ? 'linear-gradient(135deg, rgba(255, 152, 0, 0.08) 0%, rgba(255, 87, 34, 0.04) 100%)'
-            : undefined,
-        }}>
-          <Group gap="xs" justify="center">
-            <Badge size="sm" variant="light" color={modeFilter === 'test' ? 'orange' : 'blue'}>
-              {modeFilter === 'test' ? 'Test mode' : 'Production'}
-            </Badge>
-            <Text size="xs" c="dimmed">
-              {modeFilter === 'test'
-                ? 'Showing metrics from test configuration sessions only'
-                : 'Showing metrics from production sessions only'}
-            </Text>
-          </Group>
-        </Paper>
-      )}
 
       {/* Loading indicator */}
       {isLoading && (

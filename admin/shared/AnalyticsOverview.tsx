@@ -464,28 +464,27 @@ const PERIOD_OPTIONS: { value: AnalyticsPeriod; label: string }[] = [
   { value: '90d', label: '90 days' },
 ];
 
-export const AnalyticsOverview: React.FC<BaseComponentProps & { isTestMode?: boolean }> = ({
+export const AnalyticsOverview: React.FC<BaseComponentProps> = ({
   tenantContext,
   apiFetch,
   onNotify,
-  isTestMode,
 }) => {
   const [period, setPeriod] = useState<AnalyticsPeriod>('30d');
 
-  // Data hooks — pass test mode filter and period
+  // Data hooks — period filter only (test mode removed S157)
   const {
     data: summary,
     loading: summaryLoading,
     error: summaryError,
     refetch: refetchSummary,
-  } = useAnalyticsSummary(apiFetch, isTestMode, period);
+  } = useAnalyticsSummary(apiFetch, undefined, period);
 
   const {
     data: intentData,
     loading: intentsLoading,
     error: intentsError,
     refetch: refetchIntents,
-  } = useIntentBreakdown(apiFetch, isTestMode, period);
+  } = useIntentBreakdown(apiFetch, undefined, period);
   const intents = intentData?.intents ?? [];
 
   const {
@@ -493,7 +492,7 @@ export const AnalyticsOverview: React.FC<BaseComponentProps & { isTestMode?: boo
     loading: gapsLoading,
     error: gapsError,
     refetch: refetchGaps,
-  } = useKnowledgeGaps(apiFetch, isTestMode, period);
+  } = useKnowledgeGaps(apiFetch, undefined, period);
   const gaps = gapsData?.gaps ?? [];
 
   // Determine overall loading state for the initial load
