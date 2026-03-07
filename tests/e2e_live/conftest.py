@@ -35,6 +35,16 @@ from pathlib import Path
 import pytest
 from playwright.sync_api import Page, Route
 
+
+def pytest_collection_modifyitems(items):
+    """Override the global 30 s pytest-timeout for all live E2E tests.
+
+    Remote staging page loads + API waits regularly exceed 30 s.
+    """
+    for item in items:
+        if "e2e_live" in str(item.fspath):
+            item.add_marker(pytest.mark.timeout(120))
+
 # ---------------------------------------------------------------------------
 # Auto-load .env.local (transient credentials — R7 refactoring)
 # ---------------------------------------------------------------------------
@@ -500,12 +510,12 @@ def live_inbox_page(live_admin_page: Page) -> Page:
     """
     _navigate_admin_to(live_admin_page, "Inbox", "Inbox")
 
-    # Wait for conversation data to load: either "N messages" text from
-    # conversation items, or "No conversations" empty state, or filter
-    # tab counts like "All (N)".
+    # Wait for conversation data to load: either "N msg" / "N messages"
+    # from conversation items, or "No conversations" empty state, or
+    # filter tab counts like "All (N)".
     try:
         live_admin_page.wait_for_selector(
-            "text=/messages|No conversations|All \\(\\d/i",
+            "text=/\\d+\\s*(msg|messages?)|No conversations|All \\(\\d/i",
             timeout=15_000,
         )
     except Exception:

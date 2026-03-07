@@ -1,0 +1,89 @@
+# Python Lint Pipeline
+#
+# Runs ruff (linting + formatting check) on every PR and push to main.
+# Ruff replaces flake8 + isort + pyupgrade in a single fast tool.
+#
+# © 2026 Remaker Digital, a DBA of VanDusen & Palmeter, LLC. All rights reserved.
+
+name: Lint
+
+on:
+  pull_request:
+    paths:
+      - 'src/**'
+      - 'tests/**'
+      - 'scripts/**'
+      - 'pyproject.toml'
+      - '.github/workflows/lint.yml'
+  push:
+    branches: [main]
+    paths:
+      - 'src/**'
+      - 'tests/**'
+  workflow_dispatch:
+
+concurrency:
+  group: lint-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  ruff:
+    name: Ruff Lint + Format Check
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+
+      - name: Install ruff
+        run: pip install ruff
+
+      - name: Ruff check (lint)
+        # Non-blocking for now — existing codebase has ~600 style issues.
+        # Change to blocking after incremental cleanup reaches zero.
+        continue-on-error: true
+        run: ruff check src/ tests/ --output-format=github --statistics
+
+      - name: Ruff format check
+        continue-on-error: true
+        run: ruff format --check src/ tests/ --diff
+
+  syntax:
+    name: Python Syntax Validation
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+
+      - name: Compile all Python files
+        run: |
+          python -c "
+          import py_compile, sys, os
+
+          errors = []
+          for root, dirs, files in os.walk('src'):
+              dirs[:] = [d for d in dirs if d != '__pycache__']
+              for f in files:
+                  if f.endswith('.py'):
+                      path = os.path.join(root, f)
+                      try:
+                          py_compile.compile(path, doraise=True)
+                      except py_compile.PyCompileError as e:
+                          errors.append(str(e))
+
+          if errors:
+              print(f'FAIL: {len(errors)} syntax errors:')
+              for e in errors:
+                  print(f'  {e}')
+              sys.exit(1)
+          else:
+              count = sum(1 for r, _, fs in os.walk('src') for f in fs if f.endswith('.py'))
+              print(f'OK: {count} Python files compiled successfully')
+          "

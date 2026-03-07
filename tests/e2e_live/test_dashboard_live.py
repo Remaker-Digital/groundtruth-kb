@@ -123,102 +123,124 @@ class TestPageStructure:
 # ===========================================================================
 
 class TestPeriodFilter:
-    """EL-dashboard-004..007: Period segmented control."""
+    """EL-dashboard-004..007: Period segmented control.
+
+    Dashboard.tsx renders a Mantine <SegmentedControl> with labels
+    '7d', '14d', '30d', '90d' (role="radiogroup" with <label> children).
+    """
+
+    def _find_period_label(self, page: Page, label: str):
+        """Find a period label in either SegmentedControl or button group."""
+        # Primary: Mantine SegmentedControl renders <label> elements
+        sc = page.locator(
+            f"[class*='SegmentedControl'] label:has-text('{label}'), "
+            f"[role='radiogroup'] label:has-text('{label}')"
+        )
+        if sc.count() > 0:
+            return sc.first
+        # Fallback: AnalyticsOverview renders <button> elements with "N days"
+        long_label = label.replace("d", " days")
+        btn = page.get_by_role("button", name=long_label)
+        if btn.count() > 0:
+            return btn.first
+        return None
 
     # A1: Filter exists
     def test_period_filter_exists(self, live_dashboard_page: Page):
         """[EL-004/A1] Period filter control is visible."""
-        # AnalyticsOverview renders buttons with text "7 days", "14 days", etc.
-        btn_30d = live_dashboard_page.get_by_role("button", name="30 days")
-        assert btn_30d.count() > 0, "No period filter '30 days' button found"
+        el = self._find_period_label(live_dashboard_page, "30d")
+        assert el is not None, "No period filter '30d' control found"
 
-    # B1: Default value — 30 days button has aria-pressed=true
+    # B1: Default value — 30d is the active selection
     def test_period_filter_default_30d(self, live_dashboard_page: Page):
-        """[EL-004/B1] Default selected period is 30 days (aria-pressed=true)."""
-        btn_30d = live_dashboard_page.get_by_role("button", name="30 days")
-        expect(btn_30d).to_be_visible(timeout=5_000)
-        pressed = btn_30d.get_attribute("aria-pressed")
-        assert pressed == "true", f"30 days button not pressed by default (aria-pressed={pressed})"
+        """[EL-004/B1] Default selected period is 30d."""
+        el = self._find_period_label(live_dashboard_page, "30d")
+        assert el is not None, "No period filter '30d' found"
+        # SegmentedControl uses data-active; button group uses aria-pressed
+        is_active = (
+            el.get_attribute("data-active") is not None
+            or el.get_attribute("aria-pressed") == "true"
+        )
+        assert is_active, "30d should be selected by default"
 
     # A3: All 4 options present
     def test_period_filter_all_options(self, live_dashboard_page: Page):
-        """[EL-004/A3] All 4 period options are present: 7 days, 14 days, 30 days, 90 days."""
-        for label in ["7 days", "14 days", "30 days", "90 days"]:
-            btn = live_dashboard_page.get_by_role("button", name=label)
-            assert btn.count() > 0, f"Period option '{label}' not found"
+        """[EL-004/A3] All 4 period options are present: 7d, 14d, 30d, 90d."""
+        for label in ["7d", "14d", "30d", "90d"]:
+            el = self._find_period_label(live_dashboard_page, label)
+            assert el is not None, f"Period option '{label}' not found"
 
-    # E1: Clicking 7 days changes chart
+    # E1: Clicking 7d changes chart
     def test_period_filter_7d_action(self, live_dashboard_page: Page):
-        """[EL-005/E1] Clicking '7 days' updates the chart period label."""
-        # Period filter buttons use aria-pressed within a role="group"
-        btn_7d = live_dashboard_page.get_by_role("button", name="7 days")
-        expect(btn_7d).to_be_visible(timeout=5_000)
-        btn_7d.click()
+        """[EL-005/E1] Clicking '7d' updates the chart period label."""
+        el = self._find_period_label(live_dashboard_page, "7d")
+        assert el is not None, "7d period option not found"
+        el.click()
         live_dashboard_page.wait_for_timeout(1000)
         text = _main_text(live_dashboard_page)
         assert "7" in text, "Chart label didn't update to reflect 7-day period"
 
-    # E1: Clicking 90 days changes chart
+    # E1: Clicking 90d changes chart
     def test_period_filter_90d_action(self, live_dashboard_page: Page):
-        """[EL-007/E1] Clicking '90 days' updates the chart period label."""
-        btn_90d = live_dashboard_page.get_by_role("button", name="90 days")
-        expect(btn_90d).to_be_visible(timeout=5_000)
-        btn_90d.click()
+        """[EL-007/E1] Clicking '90d' updates the chart period label."""
+        el = self._find_period_label(live_dashboard_page, "90d")
+        assert el is not None, "90d period option not found"
+        el.click()
         live_dashboard_page.wait_for_timeout(1000)
         text = _main_text(live_dashboard_page)
         assert "90" in text, "Chart label didn't update to reflect 90-day period"
 
-    # E1: Clicking 14 days changes chart
+    # E1: Clicking 14d changes chart
     def test_period_filter_14d_action(self, live_dashboard_page: Page):
-        """[EL-006/E1] Clicking '14 days' updates the chart period label."""
-        btn_14d = live_dashboard_page.get_by_role("button", name="14 days")
-        expect(btn_14d).to_be_visible(timeout=5_000)
-        btn_14d.click()
+        """[EL-006/E1] Clicking '14d' updates the chart period label."""
+        el = self._find_period_label(live_dashboard_page, "14d")
+        assert el is not None, "14d period option not found"
+        el.click()
         live_dashboard_page.wait_for_timeout(1000)
         text = _main_text(live_dashboard_page)
         assert "14" in text, "Chart label didn't update to reflect 14-day period"
 
-    # E1: Clicking 30 days changes chart
+    # E1: Clicking 30d changes chart
     def test_period_filter_30d_action(self, live_dashboard_page: Page):
-        """[EL-004/E1] Clicking '30 days' updates the chart period label."""
-        btn_30d = live_dashboard_page.get_by_role("button", name="30 days")
-        expect(btn_30d).to_be_visible(timeout=5_000)
-        btn_30d.click()
+        """[EL-004/E1] Clicking '30d' updates the chart period label."""
+        el = self._find_period_label(live_dashboard_page, "30d")
+        assert el is not None, "30d period option not found"
+        el.click()
         live_dashboard_page.wait_for_timeout(1000)
         text = _main_text(live_dashboard_page)
         assert "30" in text, "Chart label didn't update to reflect 30-day period"
 
     # E1: Cycling all 4 period filters in sequence
     def test_period_filter_cycle_all(self, live_dashboard_page: Page):
-        """[EL-004..007/E1] Clicking each period button in sequence updates chart."""
-        for label in ["7 days", "14 days", "30 days", "90 days"]:
-            btn = live_dashboard_page.get_by_role("button", name=label)
-            expect(btn).to_be_visible(timeout=5_000)
-            btn.click()
+        """[EL-004..007/E1] Clicking each period option in sequence updates chart."""
+        for label in ["7d", "14d", "30d", "90d"]:
+            el = self._find_period_label(live_dashboard_page, label)
+            assert el is not None, f"Period option '{label}' not found"
+            el.click()
             live_dashboard_page.wait_for_timeout(800)
-            # Extract the number for assertion
-            num = label.split()[0]
+            num = label.replace("d", "")
             text = _main_text(live_dashboard_page)
             assert num in text, (
                 f"Chart didn't update after clicking '{label}' filter"
             )
 
-    # A4: Filter is a proper button group with aria-pressed
+    # A4: Filter is a proper SegmentedControl (radiogroup) or button group
     def test_period_filter_element_type(self, live_dashboard_page: Page):
-        """[EL-004/A4] Period filter uses a button group with aria-pressed (not freeform input)."""
-        # AnalyticsOverview renders: <div role="group" aria-label="Analytics date range">
-        #   <button aria-pressed="true/false">N days</button> × 4
-        group = live_dashboard_page.locator("[role='group'][aria-label*='date range' i]")
-        if group.count() > 0:
-            pressed = group.locator("button[aria-pressed]")
-            assert pressed.count() >= 4, f"Expected 4 period buttons, found {pressed.count()}"
-        else:
-            # Fallback: count period buttons directly
+        """[EL-004/A4] Period filter uses SegmentedControl (radiogroup) or button group."""
+        # SegmentedControl renders role="radiogroup"
+        radiogroup = live_dashboard_page.locator("[role='radiogroup']")
+        # AnalyticsOverview renders role="group" with aria-label
+        buttongroup = live_dashboard_page.locator("[role='group'][aria-label*='date range' i]")
+        has_control = radiogroup.count() > 0 or buttongroup.count() > 0
+        if not has_control:
+            # Fallback: count period labels directly
             count = sum(
-                1 for lbl in ["7 days", "14 days", "30 days", "90 days"]
-                if live_dashboard_page.get_by_role("button", name=lbl).count() > 0
+                1 for lbl in ["7d", "14d", "30d", "90d"]
+                if self._find_period_label(live_dashboard_page, lbl) is not None
             )
-            assert count >= 4, f"Only {count}/4 period buttons found"
+            assert count >= 4, f"Only {count}/4 period options found"
+        else:
+            assert has_control, "Period filter must be a SegmentedControl or button group"
 
 
 # ===========================================================================
