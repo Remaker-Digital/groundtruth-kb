@@ -6,7 +6,7 @@
 
 name = "Agent Red Customer Experience"
 client_id = "4c6cf726cd1f9f5389caf48f78af9735"
-application_url = "https://agent-red-staging.orangeglacier-f566a4e7.eastus.azurecontainerapps.io/admin/shopify"
+application_url = "https://agent-red-api-gateway.orangeglacier-f566a4e7.eastus.azurecontainerapps.io/admin/shopify"
 embedded = true
 
 [build]
@@ -14,7 +14,7 @@ automatically_update_urls_on_dev = true
 
 [auth]
 redirect_urls = [
-  "https://agent-red-staging.orangeglacier-f566a4e7.eastus.azurecontainerapps.io/api/shopify/billing/confirm"
+  "https://agent-red-api-gateway.orangeglacier-f566a4e7.eastus.azurecontainerapps.io/api/shopify/billing/confirm"
 ]
 
 [access_scopes]
@@ -24,6 +24,6 @@ scopes = "read_orders,read_products,read_customers,read_inventory"
 api_version = "2026-01"
 
 [webhooks.privacy_compliance]
-customer_data_request_url = "https://agent-red-staging.orangeglacier-f566a4e7.eastus.azurecontainerapps.io/api/shopify/gdpr/customers-data-request"
-customer_deletion_url = "https://agent-red-staging.orangeglacier-f566a4e7.eastus.azurecontainerapps.io/api/shopify/gdpr/customers-redact"
-shop_deletion_url = "https://agent-red-staging.orangeglacier-f566a4e7.eastus.azurecontainerapps.io/api/shopify/gdpr/shop-redact"
+customer_data_request_url = "https://agent-red-api-gateway.orangeglacier-f566a4e7.eastus.azurecontainerapps.io/api/shopify/gdpr/customers-data-request"
+customer_deletion_url = "https://agent-red-api-gateway.orangeglacier-f566a4e7.eastus.azurecontainerapps.io/api/shopify/gdpr/customers-redact"
+shop_deletion_url = "https://agent-red-api-gateway.orangeglacier-f566a4e7.eastus.azurecontainerapps.io/api/shopify/gdpr/shop-redact"
