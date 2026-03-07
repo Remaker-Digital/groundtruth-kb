@@ -9,6 +9,7 @@ rendered UI against real backend). No mocked APIs, stubs, or code inspection.
 
     Pre-check : Validate Environment (fail-fast)
     Phase  1  : Pre-flight Checks (live platform gates)
+    Phase  2  : Data Seeding (populate staging with realistic test data)
     Phase  3  : Production Regression (live E2E Playwright)
     Phase  5  : Tenant Isolation (live cross-tenant verification)
     Phase  6  : API Security & Penetration (live adversarial requests)
@@ -24,9 +25,11 @@ rendered UI against real backend). No mocked APIs, stubs, or code inspection.
     Summary   : Print table, create DEFECTs, write log, update KB phases
 
 Removed phases (SPEC-1649 — mocked/inspection tests excluded from PLAN-001):
-    Phase  2  : Unit & Integration (MOCKED_UNIT → use thermal-safe harness locally)
     Phase  4  : External URL Reachability (MOCKED_UNIT → consolidated into Phase 1)
     Phase 12  : UI Regression (MOCKED_UI → covered by Phase 3 live E2E)
+
+Restored phases:
+    Phase  2  : Data Seeding (was MOCKED_UNIT; now seeds realistic test data via REST API)
 
 Usage:
     python scripts/test_pipeline.py --env staging --version 1.66.0
@@ -392,10 +395,57 @@ def phase_1_preflight(args: argparse.Namespace) -> PhaseResult:
 
 
 # ---------------------------------------------------------------------------
-# Phase 2 — REMOVED (SPEC-1649: MOCKED_UNIT)
-# Unit & Integration tests run locally via thermal-safe harness (SPEC-1650).
-# Not part of PLAN-001 live execution.
+# Phase 2 — Data Seeding (populate staging with realistic test data)
 # ---------------------------------------------------------------------------
+def phase_2_data_seeding(args: argparse.Namespace) -> PhaseResult:
+    """Populate tenant with realistic data via REST API (seed_midflight.py).
+
+    Runs immediately before live E2E tests (Phase 3) to ensure the tenant has
+    the data that a real customer would have after weeks of active use:
+    - Team members (admin, escalation agents, viewer)
+    - Knowledge base articles (FAQ, policy, product, article)
+    - Quick actions (5 widget buttons)
+    - Conversations (5 widget-initiated via chat API)
+    - Active configuration (brand, widget, escalation settings)
+
+    Without this data, CRUD display tests (inbox, KB list, team table,
+    dashboard stats) fail due to empty state.
+
+    For staging: runs both cleanup (idempotent) and full seed.
+    For production: SKIPPED — never mutate production data automatically.
+
+    The initialization seed (seed_tenant.py) is a separate concern — it resets
+    the tenant to first-use state via direct Cosmos writes and should be run
+    manually after deployment when a full tenant reset is needed.
+    """
+    t0 = time.time()
+
+    if args.env == "production":
+        log("SKIP", "  Data seeding skipped — production environment")
+        return PhaseResult(2, "Data Seeding", "SKIP", time.time() - t0,
+                           "Skipped for production safety")
+
+    try:
+        from scripts.seed_midflight import run_seed
+        ok = run_seed(
+            env=args.env,
+            skip_conversations=False,
+            skip_cleanup=False,
+        )
+        dt = time.time() - t0
+
+        if ok:
+            log("PASS", "  Data seeding completed")
+            return PhaseResult(2, "Data Seeding", "PASS", dt)
+        else:
+            log("WARN", "  Data seeding completed with warnings")
+            return PhaseResult(2, "Data Seeding", "WARN", dt,
+                               "Some seed operations failed")
+    except Exception as e:
+        dt = time.time() - t0
+        detail = str(e)[:200]
+        log("WARN", f"  Data seeding error: {detail}")
+        return PhaseResult(2, "Data Seeding", "WARN", dt, detail)
 
 
 # ---------------------------------------------------------------------------
@@ -849,23 +899,24 @@ def run_summary(results: list[PhaseResult], args: argparse.Namespace,
 # CLI + orchestrator
 # ---------------------------------------------------------------------------
 # Phase execution order: ALL phases are live (SPEC-1649).
+# Phase 2 restored as data seeding (replaced removed mocked-unit phase).
 # Security phases reordered so rate-limiting runs last to avoid exhausting windows.
 # Phases 5 → 6 → 8 → 9 → 7 (rate limiting last among security).
-# Removed phases: 2 (mocked unit), 4 (mocked ops), 12 (mocked UI)
-# Restored phases: 11 (conversation quality), 15 (external verify), 16 (widget embed)
-PHASE_ORDER_ALL = [1, 3, 5, 6, 8, 9, 7, 10, 11, 13, 14, 15, 16]
+# Removed phases: 4 (mocked ops), 12 (mocked UI)
+# Restored phases: 2 (data seeding), 11 (conversation quality), 15 (external verify), 16 (widget embed)
+PHASE_ORDER_ALL = [1, 2, 3, 5, 6, 8, 9, 7, 10, 11, 13, 14, 15, 16]
 
 PHASE_GROUPS = {
-    "live":     [1, 3, 5, 6, 8, 9, 7, 10, 11, 13, 14, 15, 16],
+    "live":     [1, 2, 3, 5, 6, 8, 9, 7, 10, 11, 13, 14, 15, 16],
     "security": [5, 6, 8, 9, 7],
     "all":      PHASE_ORDER_ALL,
 }
 
 # ALL remaining phases are live (SPEC-1649)
-LIVE_PHASES = {1, 3, 5, 6, 7, 8, 9, 10, 11, 13, 14, 15, 16}
+LIVE_PHASES = {1, 2, 3, 5, 6, 7, 8, 9, 10, 11, 13, 14, 15, 16}
 
 # Phases that MUST have a cooldown before them (heavy API consumers)
-COOLDOWN_BEFORE = {5, 6, 7, 8, 9, 11, 14}
+COOLDOWN_BEFORE = {3, 5, 6, 7, 8, 9, 11, 14}
 
 
 def main():
@@ -907,6 +958,7 @@ def main():
     # Phase dispatch table (SPEC-1649: live-only phases)
     phase_funcs: dict[int, callable] = {
         1:  lambda: phase_1_preflight(args),
+        2:  lambda: phase_2_data_seeding(args),
         3:  lambda: phase_3_live_e2e(args),
         5:  lambda: phase_5_tenant_isolation(args),
         6:  lambda: phase_6_security_penetration(args),
