@@ -55,25 +55,43 @@ logger = logging.getLogger(__name__)
 def register_middleware(app: FastAPI) -> None:
     """Register all middleware on *app* in the correct order.
 
-    Starlette processes middleware in REVERSE registration order.
-    Registration order (first registered = outermost = runs last):
-      1. TrustedProxyMiddleware       — extract real client IP from proxy headers (outermost)
-      2. SecurityHeadersMiddleware    — security response headers
-      3. ApiVersionMiddleware         — X-API-Version on every response
-      4. RequestBodyLimitMiddleware   — reject oversized payloads early
-      5. CorrelationMiddleware        — sets CorrelationContext (needs TenantContext)
-      6. JsonDepthValidationMiddleware — reject deeply nested JSON (needs body)
-      7. TenantConcurrencyMiddleware  — enforces per-tenant concurrency limits
-      8. RateLimitMiddleware          — enforces per-tenant rate limits + headers
-      9. TenantAuthMiddleware         — authenticates and injects TenantContext
-     10. PreAuthRateLimitMiddleware   — blocks IPs with excessive failed auth (WI #163)
+    In Starlette/FastAPI, the **last** middleware added via
+    ``app.add_middleware()`` becomes the **outermost** — it processes
+    requests first and responses last.
 
-    Execution order (innermost registered = runs first):
-      PreAuthRateLimitMiddleware → TenantAuthMiddleware →
+    Registration order (last added = outermost = processes requests first):
+
+      Inner (closest to route handler):
+        1. TrustedProxyMiddleware       — extract real client IP
+        2. SecurityHeadersMiddleware    — security response headers
+        3. ApiVersionMiddleware         — X-API-Version on every response
+        4. RequestBodyLimitMiddleware   — reject oversized payloads early
+        5. CorrelationMiddleware        — sets CorrelationContext
+        6. JsonDepthValidationMiddleware — reject deeply nested JSON
+        7. TenantConcurrencyMiddleware  — per-tenant concurrency limits
+        8. RateLimitMiddleware          — per-tenant rate limits + headers
+        9. TenantAuthMiddleware         — authenticates, injects TenantContext
+       10. PreAuthRateLimitMiddleware   — blocks IPs with excessive auth fails
+      Outer (processes requests first, responses last):
+       11. CORSMiddleware               — CORS headers on ALL responses
+
+    Execution order (request → handler):
+      CORSMiddleware → PreAuthRateLimitMiddleware → TenantAuthMiddleware →
       RateLimitMiddleware → TenantConcurrencyMiddleware →
       JsonDepthValidation → CorrelationMiddleware →
       RequestBodyLimit → ApiVersion → SecurityHeaders → TrustedProxy → handler
+
+    CRITICAL: CORSMiddleware MUST be outermost so that CORS headers
+    appear on every response — including 429 (rate limit), 401 (auth
+    failure), and 503 (service unavailable).  When CORS was inner to
+    the rate limiter, 429 responses lacked CORS headers and browsers
+    blocked them entirely as CORS violations, causing the storefront
+    chat widget to fail silently.
     """
+    import os
+
+    from fastapi.middleware.cors import CORSMiddleware
+
     from src.multi_tenant.middleware import (
         RateLimitMiddleware,
         TenantAuthMiddleware,
@@ -93,6 +111,7 @@ def register_middleware(app: FastAPI) -> None:
         CorrelationMiddleware,
     )
 
+    # --- Inner middleware (closest to route handler) ---
     app.add_middleware(TrustedProxyMiddleware)
     app.add_middleware(SecurityHeadersMiddleware)
     app.add_middleware(ApiVersionMiddleware)
@@ -103,6 +122,23 @@ def register_middleware(app: FastAPI) -> None:
     app.add_middleware(RateLimitMiddleware)
     app.add_middleware(TenantAuthMiddleware)
     app.add_middleware(PreAuthRateLimitMiddleware)
+
+    # --- CORS: outermost middleware ---
+    # Must be added LAST so it wraps ALL other middleware.
+    # This ensures CORS headers appear on 429, 401, 403, 503 responses
+    # from rate limiting, auth, and other middleware — not just 200s.
+    _cors_origins = os.environ.get("APP_CORS_ORIGINS", "*").split(",")
+    _cors_origin_regex = os.environ.get("APP_CORS_ORIGIN_REGEX", None)
+
+    app.add_middleware(
+        CORSMiddleware,
+        allow_origins=_cors_origins,
+        allow_origin_regex=_cors_origin_regex,
+        allow_credentials=True,
+        allow_methods=["*"],
+        allow_headers=["*"],
+        expose_headers=["X-API-Version", "X-Product-Version", "X-API-Deprecation-Notice"],
+    )
 
 
 # =========================================================================

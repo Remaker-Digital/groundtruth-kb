@@ -1,7 +1,10 @@
 """FastAPI application factory for Agent Red Customer Experience.
 
 Creates and configures the FastAPI application instance with exception
-handling, CORS middleware, and structured logging.
+handling and structured logging.  CORS middleware is registered in
+lifecycle.register_middleware() as the outermost middleware so that
+CORS headers appear on ALL responses, including 429 (rate limit) and
+401 (auth failure) — see lifecycle.py docstring for middleware ordering.
 
 R1 refactoring — session 31.
 © 2026 Remaker Digital, a DBA of VanDusen & Palmeter, LLC. All rights reserved.
@@ -14,8 +17,7 @@ import os
 import traceback
 
 from fastapi import FastAPI, Request
-from fastapi.middleware.cors import CORSMiddleware
-from fastapi.responses import JSONResponse, Response
+from fastapi.responses import JSONResponse
 
 from src.multi_tenant.structured_logging import configure_structured_logging
 
@@ -26,8 +28,12 @@ def create_app(lifespan=None) -> FastAPI:
     This factory:
     1. Creates the FastAPI instance with all metadata (tags, responses, docs_url, etc.)
     2. Registers the global exception handler
-    3. Adds CORS middleware
-    4. Configures structured logging
+    3. Configures structured logging
+
+    Note: CORS middleware is NOT registered here — it is added as the
+    outermost middleware in ``lifecycle.register_middleware()`` so that
+    CORS headers appear on ALL responses (including 429 rate-limit and
+    401 auth-failure responses from outer middleware layers).
 
     Args:
         lifespan: Optional async context manager for startup/shutdown
@@ -132,24 +138,6 @@ def create_app(lifespan=None) -> FastAPI:
             content={"error": "Internal server error."},
             headers=_version_headers,
         )
-
-    # --- CORS middleware (main.py lines 128-146) ---
-
-    # CORS — restrict in production via APP_CORS_ORIGINS env var
-    # APP_CORS_ORIGINS: comma-separated explicit origins (e.g., "https://admin.shopify.com,https://example.com")
-    # APP_CORS_ORIGIN_REGEX: regex for wildcard subdomains (e.g., "https://.*\\.myshopify\\.com")
-    _cors_origins = os.environ.get("APP_CORS_ORIGINS", "*").split(",")
-    _cors_origin_regex = os.environ.get("APP_CORS_ORIGIN_REGEX", None)
-
-    app.add_middleware(
-        CORSMiddleware,
-        allow_origins=_cors_origins,
-        allow_origin_regex=_cors_origin_regex,
-        allow_credentials=True,
-        allow_methods=["*"],
-        allow_headers=["*"],
-        expose_headers=["X-API-Version", "X-Product-Version", "X-API-Deprecation-Notice"],
-    )
 
     # --- Structured logging (main.py lines 152-155) ---
 

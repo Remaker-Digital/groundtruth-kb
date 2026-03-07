@@ -55,13 +55,35 @@ interface ApiResponse<T> {
   error: string | null;
 }
 
+/** Status codes that are transient and worth retrying. */
+const RETRYABLE_STATUSES = new Set([429, 502, 503, 504]);
+
+/** Default retry configuration. */
+const DEFAULT_MAX_RETRIES = 0;  // No retries by default (opt-in per call)
+
+interface RequestOptions {
+  /** Number of retry attempts for transient failures (429/5xx/network).
+   *  Default: 0 (no retries). Config fetch uses 3. */
+  maxRetries?: number;
+  /** Initial delay in ms before the first retry. Doubles each attempt. */
+  retryBaseDelayMs?: number;
+}
+
+/** Sleep helper for retry backoff. */
+function sleep(ms: number): Promise<void> {
+  return new Promise((resolve) => setTimeout(resolve, ms));
+}
+
 async function request<T>(
   method: string,
   path: string,
   body?: unknown,
+  options?: RequestOptions,
 ): Promise<ApiResponse<T>> {
   const { apiBaseUrl, widgetKey, adminApiKey } = getTransportConfig();
   const url = `${apiBaseUrl}${path}`;
+  const maxRetries = options?.maxRetries ?? DEFAULT_MAX_RETRIES;
+  const retryBaseDelay = options?.retryBaseDelayMs ?? 1000;
 
   // SPEC-1562: When an admin API key is available (Co-pilot mode),
   // authenticate as a team member. Falls back to widget key.
@@ -74,28 +96,59 @@ async function request<T>(
     headers['X-Widget-Key'] = widgetKey;
   }
 
-  try {
-    const res = await fetch(url, {
-      method,
-      headers,
-      body: body ? JSON.stringify(body) : undefined,
-    });
+  let lastError: ApiResponse<T> | null = null;
 
-    if (!res.ok) {
-      const errorText = await res.text().catch(() => 'Unknown error');
-      return { ok: false, status: res.status, data: null, error: errorText };
+  for (let attempt = 0; attempt <= maxRetries; attempt++) {
+    // Exponential backoff: 1s, 2s, 4s (for retries, not the first attempt)
+    if (attempt > 0) {
+      const delay = retryBaseDelay * Math.pow(2, attempt - 1);
+      await sleep(delay);
     }
 
-    const data = await res.json() as T;
-    return { ok: true, status: res.status, data, error: null };
-  } catch (err) {
-    return {
-      ok: false,
-      status: 0,
-      data: null,
-      error: err instanceof Error ? err.message : 'Network error',
-    };
+    try {
+      const res = await fetch(url, {
+        method,
+        headers,
+        body: body ? JSON.stringify(body) : undefined,
+      });
+
+      if (!res.ok) {
+        const errorText = await res.text().catch(() => 'Unknown error');
+        lastError = { ok: false, status: res.status, data: null, error: errorText };
+
+        // Retry on transient errors, break on permanent ones (4xx except 429)
+        if (RETRYABLE_STATUSES.has(res.status) && attempt < maxRetries) {
+          // Respect Retry-After header if present
+          const retryAfter = res.headers.get('Retry-After');
+          if (retryAfter) {
+            const retryMs = parseInt(retryAfter, 10) * 1000;
+            if (!isNaN(retryMs) && retryMs > 0 && retryMs <= 30000) {
+              await sleep(retryMs);
+              // Skip the normal backoff delay on next iteration
+              continue;
+            }
+          }
+          continue;
+        }
+
+        return lastError;
+      }
+
+      const data = await res.json() as T;
+      return { ok: true, status: res.status, data, error: null };
+    } catch (err) {
+      lastError = {
+        ok: false,
+        status: 0,
+        data: null,
+        error: err instanceof Error ? err.message : 'Network error',
+      };
+      // Network errors are retryable (CORS blocked, server unreachable, etc.)
+      if (attempt < maxRetries) continue;
+    }
   }
+
+  return lastError!;
 }
 
 // ---------------------------------------------------------------------------
@@ -118,10 +171,14 @@ export async function fetchWidgetConfig(
   if (pageHandle) params.push(`page_handle=${encodeURIComponent(pageHandle)}`);
   if (params.length > 0) path += `?${params.join('&')}`;
 
+  // Config fetch is critical — retry up to 3 times with exponential backoff.
+  // Handles transient 429 (rate limit), 503 (cold start), and network errors
+  // (CORS failures, server unreachable). Without config, the widget cannot
+  // initialize at all.
   const resp = await request<{
     config: WidgetConfig;
     quick_actions?: Array<{ id: string; label: string; prompt_template: string; icon?: string | null }>;
-  }>('GET', path);
+  }>('GET', path, undefined, { maxRetries: 3, retryBaseDelayMs: 1500 });
 
   if (!resp.ok || !resp.data) return null;
 
@@ -179,10 +236,13 @@ export async function startConversation(
     body.customer_token = customerToken;
   }
 
+  // Conversation start is critical — retry up to 2 times with backoff.
+  // Handles transient 429 (rate limit) and 503 (cold start).
   const resp = await request<{ conversation_id: string }>(
     'POST',
     '/api/chat/conversations',
     body,
+    { maxRetries: 2, retryBaseDelayMs: 1000 },
   );
   return resp.ok && resp.data ? resp.data.conversation_id : null;
 }
