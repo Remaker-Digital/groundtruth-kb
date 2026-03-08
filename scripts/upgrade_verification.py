@@ -27,9 +27,9 @@ ENVIRONMENTS = {
     "staging": {
         "fqdn": "agent-red-staging.orangeglacier-f566a4e7.eastus.azurecontainerapps.io",
         "container_app": "agent-red-staging",
-        "tenant_id": "staging-001",
-        "api_key": "ar_user_stag_PrSjVAo368DK58OYpFPmieVgyKL-G15l",
-        "widget_key": "pk_live_18e9ec8657ac_ffaf9f7845b21015014faae7663171f4",
+        "tenant_id": "remaker-digital-001",
+        "api_key": "ar_user_rema_TwjRWmhZhjo3sX1sROYKcTHGVKfks9cu",
+        "widget_key": "pk_live_c79a2bd0b3d4_96f287f39e6a217f10dc76709297c169",
         "resource_group": "Agent-Red",
         "cosmos_db_database": "agentred-staging",
     },
@@ -47,6 +47,11 @@ ENVIRONMENTS = {
 # Additional tenants for multi-tenant upgrade verification.
 # Keyed by "{env}:{tenant_id}".
 TENANTS = {
+    "staging:staging-001": {
+        "tenant_id": "staging-001",
+        "api_key": "ar_user_stag_PrSjVAo368DK58OYpFPmieVgyKL-G15l",
+        "widget_key": "pk_live_18e9ec8657ac_ffaf9f7845b21015014faae7663171f4",
+    },
     "staging:staging-002": {
         "tenant_id": "staging-002",
         "api_key": "ar_user_stag_5HsOLIUC49ROPdgKpczXQuguX6JHmRaI",

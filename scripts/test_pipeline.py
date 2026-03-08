@@ -426,6 +426,13 @@ def phase_2_data_seeding(args: argparse.Namespace) -> PhaseResult:
                            "Skipped for production safety")
 
     try:
+        # S158 fix: seed_midflight reads env vars directly (not subprocess).
+        # Override os.environ so it picks up the correct staging credentials
+        # instead of .env.local's production keys.
+        env_vars = _get_env_vars(args)
+        for k, v in env_vars.items():
+            os.environ[k] = v
+
         from scripts.seed_midflight import run_seed
         ok = run_seed(
             env=args.env,

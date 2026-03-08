@@ -3,7 +3,7 @@
     "id": "C.1",
     "description": "Version updated",
     "status": "PASS",
-    "detail": "expected=1.68.0, got=1.68.0"
+    "detail": "expected=1.79.2, got=1.79.2"
   },
   {
     "id": "C.2",
@@ -14,8 +14,8 @@
   {
     "id": "C.3",
     "description": "Configuration state unchanged",
-    "status": "PASS",
-    "detail": "active=True, configured=True"
+    "status": "FAIL",
+    "detail": "active=False, configured=False"
   },
   {
     "id": "C.4",
@@ -62,8 +62,8 @@
   {
     "id": "C.11",
     "description": "Widget key still valid",
-    "status": "PASS",
-    "detail": "HTTP 201"
+    "status": "FAIL",
+    "detail": "HTTP 403"
   },
   {
     "id": "C.12",
@@ -80,8 +80,8 @@
   {
     "id": "C.14",
     "description": "Superadmin API functional",
-    "status": "PASS",
-    "detail": "HTTP 200, total=3"
+    "status": "FAIL",
+    "detail": "HTTP 403, total=0"
   },
   {
     "id": "C.15",
@@ -98,20 +98,20 @@
   {
     "id": "C.17",
     "description": "Incidents endpoint",
-    "status": "PASS",
-    "detail": "HTTP 200"
+    "status": "FAIL",
+    "detail": "HTTP 403"
   },
   {
     "id": "C.18",
     "description": "Alert rules endpoint",
-    "status": "PASS",
-    "detail": "HTTP 200"
+    "status": "FAIL",
+    "detail": "HTTP 403"
   },
   {
     "id": "C.19",
     "description": "MFA endpoint",
-    "status": "PASS",
-    "detail": "HTTP 200"
+    "status": "FAIL",
+    "detail": "HTTP 403"
   },
   {
     "id": "C.20",
@@ -134,20 +134,20 @@
   {
     "id": "C.23",
     "description": "Support diagnostics",
-    "status": "PASS",
-    "detail": "HTTP 200"
+    "status": "FAIL",
+    "detail": "HTTP 403"
   },
   {
     "id": "C.24",
     "description": "Cost analytics",
-    "status": "PASS",
-    "detail": "HTTP 200"
+    "status": "FAIL",
+    "detail": "HTTP 403"
   },
   {
     "id": "C.25",
     "description": "Abuse detection",
-    "status": "PASS",
-    "detail": "HTTP 200"
+    "status": "FAIL",
+    "detail": "HTTP 403"
   },
   {
     "id": "C.26",
