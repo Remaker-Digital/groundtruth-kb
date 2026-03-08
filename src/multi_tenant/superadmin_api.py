@@ -2529,6 +2529,11 @@ async def _get_team_member(ctx: TenantContext) -> dict[str, Any]:
     MFA endpoints need the full document (mfa_enabled, backup code hashes, etc.)
     but TenantContext only carries scalar identity fields.
     """
+    if ctx.is_platform_admin:
+        raise HTTPException(
+            status_code=501,
+            detail="MFA not yet supported for platform admins",
+        )
     if not ctx.team_member_id:
         raise HTTPException(status_code=401, detail="No authenticated team member")
     from src.multi_tenant.repositories.team import TeamMemberRepository
@@ -2550,6 +2555,13 @@ async def mfa_status(
     ctx: TenantContext = Depends(get_tenant_context),
 ) -> MfaStatusResponse:
     """Get MFA enrollment status for the current authenticated user."""
+    # Platform admins don't have MFA yet — return unenrolled status
+    if ctx.is_platform_admin:
+        return MfaStatusResponse(
+            mfa_enabled=False,
+            enrolled_at=None,
+            backup_codes_remaining=0,
+        )
     member = await _get_team_member(ctx)
 
     try:
