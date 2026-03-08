@@ -947,6 +947,11 @@ class RateLimitMiddleware(BaseHTTPMiddleware):
         if ctx is None:
             return await call_next(request)
 
+        # Platform admins operate outside all tenancies — no per-tenant
+        # rate limiting applies (SPEC-1667 design: SPA skips tenant checks).
+        if getattr(ctx, "is_platform_admin", False):
+            return await call_next(request)
+
         # Determine rate limit for this tenant's tier
         limit = self._get_limit(ctx)
         if limit is None:

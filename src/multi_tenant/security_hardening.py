@@ -624,6 +624,14 @@ class PreAuthRateLimitMiddleware:
             await self.app(scope, receive, send)
             return
 
+        # Platform admin (superadmin) paths are exempt from IP-based
+        # failed-auth blocking.  The SPA key is a 44-character secret
+        # making brute-force infeasible, and the platform admin needs
+        # uninterrupted access for operational duties (SPEC-1667).
+        if path.startswith("/api/superadmin"):
+            await self.app(scope, receive, send)
+            return
+
         # Extract client IP
         client = scope.get("client")
         client_ip = client[0] if client else "unknown"
