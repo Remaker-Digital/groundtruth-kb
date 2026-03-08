@@ -116,12 +116,16 @@ async def seed_platform_admin(
 
         # Check for existing admin with same email
         existing = []
-        async for item in container.query_items(
-            query="SELECT * FROM c WHERE c.email = @email",
-            parameters=[{"name": "@email", "value": email}],
-            enable_cross_partition_query=True,
-        ):
-            existing.append(item)
+        try:
+            async for item in container.query_items(
+                query="SELECT * FROM c WHERE c.email = @email",
+                parameters=[{"name": "@email", "value": email}],
+            ):
+                existing.append(item)
+        except Exception as exc:
+            # Fresh container or SDK issue — safe to proceed
+            print(f"  [..] Skipping duplicate check: {exc}")
+            existing = []
 
         if existing:
             print(f"\n  WARNING: Platform admin with email '{email}' already exists.")

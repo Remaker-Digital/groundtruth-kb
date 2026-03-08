@@ -52,7 +52,7 @@ class PlatformAdminRepository(PlatformScopedRepository):
                 "AND c.is_active = true"
             ),
             parameters=[{"name": "@key_hash", "value": key_hash}],
-            enable_cross_partition_query=True,
+            # cross-partition auto-detected in azure-cosmos >=4.9
         ):
             items.append(item)
             if len(items) >= 1:
@@ -67,7 +67,7 @@ class PlatformAdminRepository(PlatformScopedRepository):
         async for item in self._container.query_items(
             query="SELECT * FROM c WHERE c.email = @email",
             parameters=[{"name": "@email", "value": email}],
-            enable_cross_partition_query=True,
+            # cross-partition auto-detected in azure-cosmos >=4.9
         ):
             items.append(item)
             if len(items) >= 1:
@@ -93,7 +93,7 @@ class PlatformAdminRepository(PlatformScopedRepository):
         items: list[dict[str, Any]] = []
         async for item in self._container.query_items(
             query="SELECT * FROM c WHERE c.is_active = true",
-            enable_cross_partition_query=True,
+            # cross-partition auto-detected in azure-cosmos >=4.9
         ):
             items.append(item)
         return items
