@@ -1,0 +1,36 @@
+[
+  {
+    "name": "health-10u",
+    "users": 10,
+    "total_requests": 6,
+    "total_failures": 0,
+    "error_rate_pct": 0.0,
+    "avg_response_time": 695.2579999827625,
+    "p50": 93.0,
+    "p75": 180.0,
+    "p90": 3600.0,
+    "p95": 3600.0,
+    "p99": 3600.0,
+    "max_response_time": 3637.829099956434,
+    "rps": 0.10957901599506466,
+    "status_429_count": 0,
+    "status_5xx_count": 0
+  },
+  {
+    "name": "mixed-10u",
+    "users": 10,
+    "total_requests": 141,
+    "total_failures": 0,
+    "error_rate_pct": 0.0,
+    "avg_response_time": 203.33288865434733,
+    "p50": 150.0,
+    "p75": 170.0,
+    "p90": 380.0,
+    "p95": 540.0,
+    "p99": 760.0,
+    "max_response_time": 852.0790999755263,
+    "rps": 2.4080043662228583,
+    "status_429_count": 0,
+    "status_5xx_count": 0
+  }
+]
