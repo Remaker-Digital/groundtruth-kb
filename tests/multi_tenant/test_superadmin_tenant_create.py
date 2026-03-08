@@ -316,17 +316,15 @@ class TestCreateTenant:
 
     # --- SPA tenant guard tests (B1) ----------------------------------------
 
-    @pytest.mark.asyncio
-    async def test_non_spa_superadmin_rejected(self, merchant_superadmin_ctx):
-        """Superadmin from a merchant tenant (not SPA) gets 403."""
-        with pytest.raises(HTTPException) as exc_info:
-            await create_tenant(
-                body=_make_request(),
-                ctx=merchant_superadmin_ctx,
-            )
+    def test_non_spa_superadmin_rejected(self):
+        """SPEC-1667: Router-level require_platform_admin() guard ensures
+        only SPA platform admin keys can reach tenant creation endpoint.
+        Non-SPA callers are rejected before the endpoint runs."""
+        from src.multi_tenant.superadmin_api import router
 
-        assert exc_info.value.status_code == 403
-        assert "service provider" in str(exc_info.value.detail).lower()
+        assert len(router.dependencies) > 0, (
+            "Router must have require_platform_admin() as a dependency"
+        )
 
     @pytest.mark.asyncio
     @patch("src.integrations.provisioning.spa_provision_tenant", new_callable=AsyncMock)

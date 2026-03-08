@@ -52,16 +52,19 @@ from src.multi_tenant.auth import (
     extract_bearer_token,
     extract_shop_domain,
     is_auth_exempt,
+    is_spa_api_key,
     is_user_api_key,
     is_widget_key_allowed_path,
     validate_tenant_status,
     verify_api_key,
     verify_shopify_session_token,
+    verify_spa_api_key,
     verify_user_api_key,
     verify_widget_key,
 )
 from src.multi_tenant.magic_link_auth import verify_magic_link_session_token
 from src.multi_tenant.cosmos_schema import (
+    PLATFORM_ADMIN_TENANT_ID,
     TIER_DEFAULTS,
     TeamMemberRole,
     TenantStatus,
@@ -86,6 +89,7 @@ _resolve_by_api_key_hash: Callable | None = None
 _resolve_by_widget_key_hash: Callable | None = None
 _resolve_by_user_api_key_hash: Callable | None = None
 _resolve_by_tenant_id: Callable | None = None
+_resolve_by_spa_key_hash: Callable | None = None
 
 
 def configure_tenant_resolution(
@@ -94,6 +98,7 @@ def configure_tenant_resolution(
     resolve_by_widget_key_hash: Callable | None = None,
     resolve_by_user_api_key_hash: Callable | None = None,
     resolve_by_tenant_id: Callable | None = None,
+    resolve_by_spa_key_hash: Callable | None = None,
 ) -> None:
     """Configure the tenant resolution functions.
 
@@ -114,15 +119,19 @@ def configure_tenant_resolution(
         resolve_by_tenant_id: Async function that accepts a tenant ID
             string and returns a tenant dict or None. Used by magic-link
             auth to reuse the connection-pooled repository.
+        resolve_by_spa_key_hash: Async function that accepts an SPA API
+            key hash and returns a platform admin document or None.
+            Optional — SPA auth is disabled if not provided. (SPEC-1667)
     """
     global _resolve_by_shop_domain, _resolve_by_api_key_hash
     global _resolve_by_widget_key_hash, _resolve_by_user_api_key_hash
-    global _resolve_by_tenant_id
+    global _resolve_by_tenant_id, _resolve_by_spa_key_hash
     _resolve_by_shop_domain = resolve_by_shop_domain
     _resolve_by_api_key_hash = resolve_by_api_key_hash
     _resolve_by_widget_key_hash = resolve_by_widget_key_hash
     _resolve_by_user_api_key_hash = resolve_by_user_api_key_hash
     _resolve_by_tenant_id = resolve_by_tenant_id
+    _resolve_by_spa_key_hash = resolve_by_spa_key_hash
     logger.info("Tenant resolution functions configured")
 
 
@@ -377,12 +386,18 @@ class TenantAuthMiddleware(BaseHTTPMiddleware):
         )
 
     async def _auth_api_key(self, api_key: str) -> TenantContext:
-        """Authenticate via API key (tenant key or per-user key).
+        """Authenticate via API key (SPA, per-user, or tenant key).
 
         Detects the key type by prefix:
+        - ar_spa_* → SPA platform admin key → resolves from platform_admins
         - ar_user_* → per-user API key → resolves to team member + tenant
         - ar_live_* or other → tenant API key → resolves to tenant only
         """
+        # Route SPA platform admin keys through isolated auth (SPEC-1667)
+        if is_spa_api_key(api_key) and _resolve_by_spa_key_hash is not None:
+            logger.debug("Auth routing: SPA platform admin key detected")
+            return await self._auth_spa_api_key(api_key)
+
         # Route per-user keys through the user auth flow
         if is_user_api_key(api_key) and _resolve_by_user_api_key_hash is not None:
             logger.debug("Auth routing: per-user API key detected (prefix=%s...)", api_key[:12])
@@ -455,6 +470,40 @@ class TenantAuthMiddleware(BaseHTTPMiddleware):
             team_member_email=member.get("email"),
             team_member_role=role,
             escalation_categories=tuple(member.get("escalation_categories", [])),
+        )
+
+    async def _auth_spa_api_key(self, api_key: str) -> TenantContext:
+        """Authenticate via SPA platform admin API key (SPEC-1667).
+
+        Resolves credentials from the platform_admins collection —
+        completely isolated from all tenant team_members collections.
+        The SPA has zero permissions within any tenancy and does not
+        exist as a user for any tenancy.
+
+        Skips tenant status validation, trial/expiry checks, and
+        rate-limit-rpm resolution because these are tenant-specific
+        concerns that do not apply to the platform admin.
+        """
+        if _resolve_by_spa_key_hash is None:
+            raise AuthenticationError(
+                "Platform admin authentication not configured.", status_code=500,
+            )
+
+        admin = await verify_spa_api_key(api_key, _resolve_by_spa_key_hash)
+
+        logger.info(
+            "SPA platform admin authenticated: email=%s admin_id=%s",
+            admin.get("email", "unknown"),
+            admin.get("admin_id", admin.get("id", "unknown")),
+        )
+
+        return TenantContext(
+            tenant_id=PLATFORM_ADMIN_TENANT_ID,
+            is_platform_admin=True,
+            auth_method="spa_api_key",
+            status=TenantStatus.ACTIVE,
+            # No tier, no trial, no rate_limit_rpm, no team member fields.
+            # Platform admins operate outside all tenancies.
         )
 
     async def _auth_widget_key(
@@ -609,6 +658,18 @@ async def get_tenant_context(request: Request) -> TenantContext:
             status_code=401,
             detail="Not authenticated. TenantContext not found in request.",
         )
+
+    # SPEC-1667: Platform admin keys MUST NOT access tenant-scoped endpoints.
+    # The SPA has zero permissions within any tenancy. Only /api/superadmin/*
+    # paths are accessible to platform admins.
+    if getattr(ctx, "is_platform_admin", False):
+        if not request.url.path.startswith("/api/superadmin"):
+            raise HTTPException(
+                status_code=403,
+                detail="Platform admin credentials cannot access tenant endpoints. "
+                       "Use tenant-specific credentials for tenant operations.",
+            )
+
     enforce_rbac(request.url.path, ctx)
     return ctx
 
@@ -728,6 +789,40 @@ def require_admin_or_above() -> Callable:
     named for clarity when protecting read-only endpoints.
     """
     return require_role(TeamMemberRole.SUPERADMIN, TeamMemberRole.ADMIN)
+
+
+def require_platform_admin() -> Callable:
+    """FastAPI dependency: require SPA platform admin credentials (SPEC-1667).
+
+    Only requests authenticated with an ar_spa_* key (resolving from
+    the platform_admins collection) can pass this guard. Tenant team
+    member keys (ar_user_*), tenant API keys (ar_live_*), and widget
+    keys (pk_live_*) are all rejected with 403.
+
+    Usage:
+        router = APIRouter(
+            prefix="/api/superadmin",
+            dependencies=[Depends(require_platform_admin())],
+        )
+    """
+    async def dependency(request: Request) -> TenantContext:
+        ctx = getattr(request.state, "tenant_context", None)
+        if ctx is None:
+            raise HTTPException(
+                status_code=401,
+                detail="Not authenticated. TenantContext not found in request.",
+            )
+
+        if not getattr(ctx, "is_platform_admin", False):
+            raise HTTPException(
+                status_code=403,
+                detail="This endpoint requires platform administrator credentials. "
+                       "Tenant API keys cannot access the service provider console.",
+            )
+
+        return ctx
+
+    return dependency
 
 
 # ---------------------------------------------------------------------------

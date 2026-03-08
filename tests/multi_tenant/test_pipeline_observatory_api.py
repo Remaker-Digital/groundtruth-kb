@@ -68,7 +68,7 @@ class TestPipelineTopology:
     @pytest.mark.asyncio
     async def test_topology_returns_all_agents(self, superadmin_ctx):
         """GET /pipeline/topology returns 7 agent nodes (TEST-2754)."""
-        result = await get_pipeline_topology(period="24h", _ctx=superadmin_ctx)
+        result = await get_pipeline_topology(period="24h")
         assert isinstance(result, PipelineTopologyResponse)
         assert len(result.nodes) == 7
         agent_names = {n.agent for n in result.nodes}
@@ -77,7 +77,7 @@ class TestPipelineTopology:
     @pytest.mark.asyncio
     async def test_topology_returns_edges(self, superadmin_ctx):
         """GET /pipeline/topology returns pipeline edges (TEST-2755)."""
-        result = await get_pipeline_topology(period="24h", _ctx=superadmin_ctx)
+        result = await get_pipeline_topology(period="24h")
         assert len(result.edges) == len(PIPELINE_EDGES)
         for edge in result.edges:
             assert edge.source in PIPELINE_AGENTS
@@ -86,13 +86,13 @@ class TestPipelineTopology:
     @pytest.mark.asyncio
     async def test_topology_period_parameter(self, superadmin_ctx):
         """Period parameter is reflected in response (TEST-2756)."""
-        result = await get_pipeline_topology(period="7d", _ctx=superadmin_ctx)
+        result = await get_pipeline_topology(period="7d")
         assert result.period == "7d"
 
     @pytest.mark.asyncio
     async def test_node_metrics_structure(self, superadmin_ctx):
         """Each node has required metric fields (TEST-2757)."""
-        result = await get_pipeline_topology(period="24h", _ctx=superadmin_ctx)
+        result = await get_pipeline_topology(period="24h")
         node = result.nodes[0]
         assert hasattr(node, "invocation_count")
         assert hasattr(node, "avg_latency_ms")
@@ -114,7 +114,7 @@ class TestAgentMetrics:
     async def test_valid_agent_returns_metrics(self, superadmin_ctx):
         """GET /pipeline/agents/{agent}/metrics returns details (TEST-2758)."""
         result = await get_agent_metrics(
-            agent="intent-classifier", period="24h", _ctx=superadmin_ctx
+            agent="intent-classifier", period="24h"
         )
         assert isinstance(result, AgentDetailMetrics)
         assert result.agent == "intent-classifier"
@@ -126,7 +126,7 @@ class TestAgentMetrics:
 
         with pytest.raises(HTTPException) as exc_info:
             await get_agent_metrics(
-                agent="nonexistent-agent", period="24h", _ctx=superadmin_ctx
+                agent="nonexistent-agent", period="24h"
             )
         assert exc_info.value.status_code == 404
 
@@ -134,7 +134,7 @@ class TestAgentMetrics:
     async def test_agent_metrics_fields(self, superadmin_ctx):
         """Agent detail includes trend arrays (TEST-2760)."""
         result = await get_agent_metrics(
-            agent="response-generator", period="24h", _ctx=superadmin_ctx
+            agent="response-generator", period="24h"
         )
         assert hasattr(result, "latency_trend")
         assert hasattr(result, "token_usage_trend")
@@ -152,7 +152,7 @@ class TestTenantComparison:
     @pytest.mark.asyncio
     async def test_returns_all_tenants(self, superadmin_ctx):
         """GET /pipeline/tenants returns tenant summaries (TEST-2761)."""
-        result = await get_tenant_comparison(_ctx=superadmin_ctx)
+        result = await get_tenant_comparison()
         assert isinstance(result, TenantComparisonResponse)
         assert result.total == 2
         assert len(result.tenants) == 2
@@ -161,7 +161,7 @@ class TestTenantComparison:
     async def test_sort_parameters(self, superadmin_ctx):
         """Sort parameters are reflected in response (TEST-2762)."""
         result = await get_tenant_comparison(
-            sort_by="avg_latency_ms", sort_order="asc", _ctx=superadmin_ctx
+            sort_by="avg_latency_ms", sort_order="asc"
         )
         assert result.sort_by == "avg_latency_ms"
         assert result.sort_order == "asc"
@@ -169,7 +169,7 @@ class TestTenantComparison:
     @pytest.mark.asyncio
     async def test_tenant_summary_fields(self, superadmin_ctx):
         """Each tenant has required metric fields (TEST-2763)."""
-        result = await get_tenant_comparison(_ctx=superadmin_ctx)
+        result = await get_tenant_comparison()
         tenant = result.tenants[0]
         assert hasattr(tenant, "total_conversations")
         assert hasattr(tenant, "billable_conversations")
@@ -190,7 +190,7 @@ class TestTenantDetail:
     async def test_returns_tenant_metrics(self, superadmin_ctx):
         """GET /pipeline/tenants/{id}/metrics returns detail (TEST-2764)."""
         result = await get_tenant_pipeline_metrics(
-            tenant_id="tenant-001", period="24h", _ctx=superadmin_ctx
+            tenant_id="tenant-001", period="24h"
         )
         assert isinstance(result, TenantDetailMetrics)
         assert result.tenant_id == "tenant-001"
@@ -199,7 +199,7 @@ class TestTenantDetail:
     async def test_detail_includes_trends(self, superadmin_ctx):
         """Detail includes trend and breakdown arrays (TEST-2765)."""
         result = await get_tenant_pipeline_metrics(
-            tenant_id="tenant-001", period="24h", _ctx=superadmin_ctx
+            tenant_id="tenant-001", period="24h"
         )
         assert hasattr(result, "volume_trend")
         assert hasattr(result, "cost_trend")
@@ -218,7 +218,7 @@ class TestDatabaseMetrics:
     @pytest.mark.asyncio
     async def test_returns_database_metrics(self, superadmin_ctx):
         """GET /pipeline/database returns metrics (TEST-2766)."""
-        result = await get_database_metrics(_ctx=superadmin_ctx)
+        result = await get_database_metrics()
         assert isinstance(result, DatabaseMetricsResponse)
         assert hasattr(result, "collections")
         assert hasattr(result, "total_documents")

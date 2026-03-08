@@ -209,7 +209,7 @@ class TestDiagnosticSnapshot:
             patch("src.multi_tenant.repositories.ConversationRepository", return_value=mock_conv_repo),
         ):
             result = await get_tenant_diagnostic(
-                tenant_id="tenant-diag-001", _ctx=superadmin_ctx,
+                tenant_id="tenant-diag-001",
             )
 
         assert isinstance(result, TenantDiagnosticSnapshot)
@@ -234,7 +234,7 @@ class TestDiagnosticSnapshot:
             patch("src.multi_tenant.repositories.ConversationRepository", return_value=mock_conv_repo),
         ):
             result = await get_tenant_diagnostic(
-                tenant_id="tenant-diag-001", _ctx=superadmin_ctx,
+                tenant_id="tenant-diag-001",
             )
 
         assert result.config_state.is_active is True
@@ -260,7 +260,7 @@ class TestDiagnosticSnapshot:
             patch("src.multi_tenant.repositories.ConversationRepository", return_value=mock_conv_repo),
         ):
             result = await get_tenant_diagnostic(
-                tenant_id="tenant-diag-001", _ctx=superadmin_ctx,
+                tenant_id="tenant-diag-001",
             )
 
         # KB stats
@@ -290,7 +290,7 @@ class TestDiagnosticSnapshot:
             patch("src.multi_tenant.superadmin_api._nats_mgr", None),
         ):
             result = await get_tenant_diagnostic(
-                tenant_id="tenant-diag-001", _ctx=superadmin_ctx,
+                tenant_id="tenant-diag-001",
             )
 
         # Conversation stats
@@ -334,7 +334,7 @@ class TestDiagnosticMissingTenant:
         ):
             with pytest.raises(Exception) as exc_info:
                 await get_tenant_diagnostic(
-                    tenant_id="nonexistent-tenant", _ctx=superadmin_ctx,
+                    tenant_id="nonexistent-tenant",
                 )
             assert exc_info.value.status_code == 404
             assert "Tenant not found" in str(exc_info.value.detail)
@@ -365,7 +365,7 @@ class TestGracefulDegradation:
             patch("src.multi_tenant.repositories.ConversationRepository", return_value=mock_conv_repo),
         ):
             result = await get_tenant_diagnostic(
-                tenant_id="tenant-diag-001", _ctx=superadmin_ctx,
+                tenant_id="tenant-diag-001",
             )
 
         # Should still return basic info
@@ -396,7 +396,7 @@ class TestGracefulDegradation:
             patch("src.multi_tenant.repositories.ConversationRepository", return_value=mock_conv_repo),
         ):
             result = await get_tenant_diagnostic(
-                tenant_id="tenant-diag-001", _ctx=superadmin_ctx,
+                tenant_id="tenant-diag-001",
             )
 
         assert result.knowledge_base.total_articles == 0  # default
@@ -420,7 +420,7 @@ class TestGracefulDegradation:
             patch("src.multi_tenant.repositories.ConversationRepository", return_value=mock_conv_repo),
         ):
             result = await get_tenant_diagnostic(
-                tenant_id="tenant-diag-001", _ctx=superadmin_ctx,
+                tenant_id="tenant-diag-001",
             )
 
         assert result.team.member_count == 0  # default
@@ -444,7 +444,7 @@ class TestGracefulDegradation:
             patch("src.multi_tenant.repositories.ConversationRepository", return_value=broken_conv),
         ):
             result = await get_tenant_diagnostic(
-                tenant_id="tenant-diag-001", _ctx=superadmin_ctx,
+                tenant_id="tenant-diag-001",
             )
 
         assert result.conversations.last_24h_count == 0
@@ -475,7 +475,7 @@ class TestGracefulDegradation:
             patch("src.multi_tenant.repositories.ConversationRepository", return_value=broken_conv),
         ):
             result = await get_tenant_diagnostic(
-                tenant_id="tenant-diag-001", _ctx=superadmin_ctx,
+                tenant_id="tenant-diag-001",
             )
 
         # Basic info still present
@@ -508,7 +508,7 @@ class TestErrorsEndpoint:
             patch("src.multi_tenant.repositories.AuditLogRepository", return_value=mock_audit_repo),
         ):
             result = await get_tenant_errors(
-                tenant_id="tenant-diag-001", _ctx=superadmin_ctx,
+                tenant_id="tenant-diag-001",
             )
 
         assert isinstance(result, TenantErrorsResponse)
@@ -530,7 +530,7 @@ class TestErrorsEndpoint:
             patch("src.multi_tenant.repositories.AuditLogRepository", return_value=mock_audit_repo),
         ):
             result = await get_tenant_errors(
-                tenant_id="tenant-diag-001", _ctx=superadmin_ctx,
+                tenant_id="tenant-diag-001",
             )
 
         entry = result.entries[0]
@@ -551,7 +551,7 @@ class TestErrorsEndpoint:
         ):
             with pytest.raises(Exception) as exc_info:
                 await get_tenant_errors(
-                    tenant_id="nonexistent", _ctx=superadmin_ctx,
+                    tenant_id="nonexistent",
                 )
             assert exc_info.value.status_code == 404
 
@@ -565,7 +565,7 @@ class TestErrorsEndpoint:
             patch("src.multi_tenant.repositories.AuditLogRepository", return_value=mock_audit_repo_empty),
         ):
             result = await get_tenant_errors(
-                tenant_id="tenant-diag-001", _ctx=superadmin_ctx,
+                tenant_id="tenant-diag-001",
             )
 
         assert result.total == 0

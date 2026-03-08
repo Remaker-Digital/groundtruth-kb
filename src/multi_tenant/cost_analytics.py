@@ -34,15 +34,15 @@ from fastapi import APIRouter, Depends, HTTPException, Query
 from pydantic import Field
 
 from src.multi_tenant.api_models import CamelCaseModel
-from src.multi_tenant.cosmos_schema import TeamMemberRole, TenantTier
-from src.multi_tenant.middleware import require_role
+from src.multi_tenant.cosmos_schema import TenantTier
+from src.multi_tenant.middleware import require_platform_admin
 
 logger = logging.getLogger(__name__)
 
 router = APIRouter(
     prefix="/api/superadmin/costs",
     tags=["Cost Analytics"],
-    dependencies=[Depends(require_role(TeamMemberRole.SUPERADMIN))],
+    dependencies=[Depends(require_platform_admin())],
 )
 
 

@@ -94,7 +94,7 @@ class TestSecretPostureHappyPath:
             secret_service=mock_secret_service,
         )
         from src.multi_tenant.superadmin_api import secret_posture
-        result = await secret_posture(_ctx=superadmin_ctx)
+        result = await secret_posture()
 
         assert isinstance(result, SecretPostureResponse)
         assert result.total_tenants == 2
@@ -114,7 +114,7 @@ class TestSecretPostureHappyPath:
             secret_service=mock_secret_service,
         )
         from src.multi_tenant.superadmin_api import secret_posture
-        result = await secret_posture(_ctx=superadmin_ctx)
+        result = await secret_posture()
 
         assert result.total_secrets == 5  # 4 + 1
 
@@ -131,7 +131,7 @@ class TestSecretPostureHappyPath:
             secret_service=mock_secret_service,
         )
         from src.multi_tenant.superadmin_api import secret_posture
-        result = await secret_posture(_ctx=superadmin_ctx)
+        result = await secret_posture()
 
         assert result.secrets_by_type_global["shopify_access_token"] == 2
         assert result.secrets_by_type_global["stripe_secret_key"] == 1
@@ -150,7 +150,7 @@ class TestSecretPostureHappyPath:
             secret_service=mock_secret_service,
         )
         from src.multi_tenant.superadmin_api import secret_posture
-        result = await secret_posture(_ctx=superadmin_ctx)
+        result = await secret_posture()
 
         assert result.total_tenants == 0
         assert result.total_secrets == 0
@@ -178,7 +178,7 @@ class TestSecretClassification:
             secret_service=mock_secret_service,
         )
         from src.multi_tenant.superadmin_api import secret_posture
-        result = await secret_posture(_ctx=superadmin_ctx)
+        result = await secret_posture()
 
         assert result.tenants[0].has_shopify is True
         assert result.tenants_with_shopify == 1
@@ -197,7 +197,7 @@ class TestSecretClassification:
             secret_service=mock_secret_service,
         )
         from src.multi_tenant.superadmin_api import secret_posture
-        result = await secret_posture(_ctx=superadmin_ctx)
+        result = await secret_posture()
 
         assert result.tenants[0].has_stripe is True
         assert result.tenants_with_stripe == 1
@@ -216,7 +216,7 @@ class TestSecretClassification:
             secret_service=mock_secret_service,
         )
         from src.multi_tenant.superadmin_api import secret_posture
-        result = await secret_posture(_ctx=superadmin_ctx)
+        result = await secret_posture()
 
         assert result.tenants[0].has_api_key is True
         assert result.tenants_with_api_key == 1
@@ -237,7 +237,7 @@ class TestSecretClassification:
             secret_service=mock_secret_service,
         )
         from src.multi_tenant.superadmin_api import secret_posture
-        result = await secret_posture(_ctx=superadmin_ctx)
+        result = await secret_posture()
 
         assert result.tenants[0].has_shopify is False
         assert result.tenants[0].has_stripe is False
@@ -265,7 +265,7 @@ class TestSecretMetadata:
             secret_service=mock_secret_service,
         )
         from src.multi_tenant.superadmin_api import secret_posture
-        result = await secret_posture(_ctx=superadmin_ctx)
+        result = await secret_posture()
 
         assert result.tenants[0].disabled_secrets == 1  # openai_api_key
 
@@ -283,7 +283,7 @@ class TestSecretMetadata:
             secret_service=mock_secret_service,
         )
         from src.multi_tenant.superadmin_api import secret_posture
-        result = await secret_posture(_ctx=superadmin_ctx)
+        result = await secret_posture()
 
         assert result.tenants[0].oldest_secret == "2026-01-05T00:00:00Z"
         assert result.tenants[0].newest_secret == "2026-01-20T00:00:00Z"
@@ -302,7 +302,7 @@ class TestSecretMetadata:
             secret_service=mock_secret_service,
         )
         from src.multi_tenant.superadmin_api import secret_posture
-        result = await secret_posture(_ctx=superadmin_ctx)
+        result = await secret_posture()
 
         assert result.tenants[0].secret_count == 0
         assert result.tenants[0].oldest_secret is None
@@ -329,7 +329,7 @@ class TestSecretPostureErrors:
         from src.multi_tenant.superadmin_api import secret_posture
 
         with pytest.raises(HTTPException) as exc_info:
-            await secret_posture(_ctx=superadmin_ctx)
+            await secret_posture()
         assert exc_info.value.status_code == 503
 
     @pytest.mark.asyncio
@@ -344,7 +344,7 @@ class TestSecretPostureErrors:
         from src.multi_tenant.superadmin_api import secret_posture
 
         with pytest.raises(HTTPException) as exc_info:
-            await secret_posture(_ctx=superadmin_ctx)
+            await secret_posture()
         assert exc_info.value.status_code == 503
 
     @pytest.mark.asyncio
@@ -363,7 +363,7 @@ class TestSecretPostureErrors:
             secret_service=mock_secret_service,
         )
         from src.multi_tenant.superadmin_api import secret_posture
-        result = await secret_posture(_ctx=superadmin_ctx)
+        result = await secret_posture()
 
         assert result.total_tenants == 1
         assert len(result.errors) == 1
@@ -382,7 +382,7 @@ class TestSecretPostureErrors:
             secret_service=mock_secret_service,
         )
         from src.multi_tenant.superadmin_api import secret_posture
-        result = await secret_posture(_ctx=superadmin_ctx)
+        result = await secret_posture()
 
         assert result.total_tenants == 0
         assert len(result.errors) == 2

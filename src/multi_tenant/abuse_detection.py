@@ -25,9 +25,7 @@ from fastapi import APIRouter, Body, Depends, HTTPException
 from pydantic import Field
 
 from src.multi_tenant.api_models import CamelCaseModel
-from src.multi_tenant.auth import TenantContext
-from src.multi_tenant.cosmos_schema import TeamMemberRole
-from src.multi_tenant.middleware import require_role
+from src.multi_tenant.middleware import require_platform_admin
 
 logger = logging.getLogger(__name__)
 
@@ -432,7 +430,11 @@ async def _scan_tenant(
 # Router
 # ---------------------------------------------------------------------------
 
-router = APIRouter(prefix="/api/superadmin/abuse", tags=["Abuse Detection"])
+router = APIRouter(
+    prefix="/api/superadmin/abuse",
+    tags=["Abuse Detection"],
+    dependencies=[Depends(require_platform_admin())],
+)
 
 
 @router.get(
@@ -446,7 +448,7 @@ router = APIRouter(prefix="/api/superadmin/abuse", tags=["Abuse Detection"])
     status_code=200,
 )
 async def scan_abuse_signals(
-    _ctx: TenantContext = Depends(require_role(TeamMemberRole.SUPERADMIN)),
+
 ) -> AbuseOverview:
     """Scan all tenants for abuse signals."""
     if not _tenant_repo:
@@ -508,7 +510,7 @@ async def scan_abuse_signals(
 )
 async def get_tenant_abuse_profile(
     tenant_id: str,
-    _ctx: TenantContext = Depends(require_role(TeamMemberRole.SUPERADMIN)),
+
 ) -> TenantAbuseProfile:
     """Get abuse profile for a single tenant."""
     if not _tenant_repo:
@@ -547,7 +549,7 @@ async def get_tenant_abuse_profile(
 async def flag_tenant(
     tenant_id: str,
     body: FlagRequest = Body(...),
-    _ctx: TenantContext = Depends(require_role(TeamMemberRole.SUPERADMIN)),
+
 ) -> FlagResponse:
     """Flag or unflag a tenant for abuse."""
     if not _tenant_repo:
@@ -560,7 +562,7 @@ async def flag_tenant(
         raise HTTPException(status_code=404, detail=f"Tenant not found: {tenant_id}")
 
     now = datetime.now(timezone.utc).isoformat()
-    actor = getattr(_ctx, "team_member_email", None) or getattr(_ctx, "tenant_id", "unknown")
+    actor = "spa-console"
 
     if body.flagged:
         operations = [

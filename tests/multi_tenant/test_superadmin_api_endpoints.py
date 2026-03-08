@@ -122,7 +122,7 @@ class TestListAllTenants:
         tenant_repo._container.query_items = _query_items
         _configure_services(tenant_repo=tenant_repo)
 
-        result = await list_all_tenants(_ctx=_ctx(), skip=0, limit=50)
+        result = await list_all_tenants(skip=0, limit=50)
         assert result.skip == 0
         assert result.limit == 50
 
@@ -145,7 +145,7 @@ class TestTenantSummary:
         ])
         _configure_services(tenant_repo=tenant_repo)
 
-        result = await tenant_summary(_ctx=_ctx())
+        result = await tenant_summary()
         assert result.total_tenants == 1
         assert "active" in result.by_status
 
@@ -170,7 +170,6 @@ class TestOverrideTenantTier:
         result = await override_tenant_tier(
             tenant_id="test-tenant-001",
             tier="professional",
-            _ctx=_ctx(),
         )
         assert result.new_tier == "professional"
         assert result.previous_tier == "starter"
@@ -319,7 +318,7 @@ class TestDeploymentHistory:
             "1.60.0",
             create=True,
         ):
-            result = await deployment_history(_ctx=_ctx(), limit=20)
+            result = await deployment_history(limit=20)
 
         assert result.total == 0
         assert result.events == []
@@ -343,7 +342,7 @@ class TestProviderDashboard:
         audit_repo._container = _mock_container([])
         _configure_services(tenant_repo=tenant_repo, audit_repo=audit_repo)
 
-        result = await provider_dashboard(_ctx=_ctx())
+        result = await provider_dashboard()
         assert result.timestamp is not None
         assert isinstance(result.system_health, dict)
 
@@ -364,7 +363,7 @@ class TestBillingHealth:
         tenant_repo._container = _mock_container([])
         _configure_services(tenant_repo=tenant_repo)
 
-        result = await billing_health(_ctx=_ctx())
+        result = await billing_health()
         assert result.total_tenants == 0
         assert result.tenants == []
 
@@ -386,7 +385,7 @@ class TestSLATrends:
         _configure_services()
 
         with pytest.raises(HTTPException) as exc_info:
-            await sla_trends(_ctx=_ctx(), range_days=7, period_days=30)
+            await sla_trends(range_days=7, period_days=30)
         assert exc_info.value.status_code == 503
 
 
@@ -404,7 +403,7 @@ class TestQueueDepth:
 
         _configure_services(nats_mgr=None)
 
-        result = await queue_depth(_ctx=_ctx())
+        result = await queue_depth()
         assert result.nats_deployed is False
         assert result.total_messages == 0
 
@@ -425,7 +424,7 @@ class TestComplianceSummary:
         tenant_repo.list_active_tenant_ids = AsyncMock(return_value=[])
         _configure_services(tenant_repo=tenant_repo)
 
-        result = await compliance_summary(_ctx=_ctx())
+        result = await compliance_summary()
         assert result.total_tenants == 0
 
 
@@ -449,7 +448,7 @@ class TestSecretPosture:
             secret_service=secret_service,
         )
 
-        result = await secret_posture(_ctx=_ctx())
+        result = await secret_posture()
         assert result.total_tenants == 0
         assert result.total_secrets == 0
 
@@ -468,7 +467,7 @@ class TestIntegrationHealth:
 
         _configure_services(nats_mgr=None)
 
-        result = await integration_health(_ctx=_ctx())
+        result = await integration_health()
         assert result.nats_deployed is False
         assert result.overall_healthy is True
 
@@ -489,7 +488,7 @@ class TestListIncidents:
         incident_repo.list_all = AsyncMock(return_value=[])
         _configure_services(incident_repo=incident_repo)
 
-        result = await list_incidents(_ctx=_ctx(), limit=50)
+        result = await list_incidents(limit=50)
         assert result.total == 0
         assert result.incidents == []
 
@@ -545,7 +544,7 @@ class TestGetIncident:
         })
         _configure_services(incident_repo=incident_repo)
 
-        result = await get_incident(incident_id="INC-001", _ctx=_ctx())
+        result = await get_incident(incident_id="INC-001")
         assert result.incident_id == "INC-001"
 
 
@@ -631,7 +630,7 @@ class TestListAlertRules:
         alert_rule_repo.list_all = AsyncMock(return_value=[])
         _configure_services(alert_rule_repo=alert_rule_repo)
 
-        result = await list_alert_rules(_ctx=_ctx())
+        result = await list_alert_rules()
         assert result.total == 0
         assert result.rules == []
 
@@ -664,7 +663,7 @@ class TestCreateAlertRule:
             rule_type="error_rate",
             condition=AlertConditionModel(metric="error_rate", operator="gt", threshold=5.0),
         )
-        result = await create_alert_rule(body=body, _ctx=_ctx())
+        result = await create_alert_rule(body=body)
         assert result.rule_id == "RULE-001"
         assert result.name == "High Error Rate"
 
@@ -701,7 +700,7 @@ class TestUpdateAlertRule:
 
         body = UpdateAlertRuleRequest(name="Updated Name")
         result = await update_alert_rule(
-            rule_id="RULE-001", body=body, _ctx=_ctx(),
+            rule_id="RULE-001", body=body,
         )
         assert result.name == "Updated Name"
 
@@ -721,7 +720,7 @@ class TestDeleteAlertRule:
         alert_rule_repo.delete_rule = AsyncMock(return_value=True)
         _configure_services(alert_rule_repo=alert_rule_repo)
 
-        result = await delete_alert_rule(rule_id="RULE-001", _ctx=_ctx())
+        result = await delete_alert_rule(rule_id="RULE-001")
         assert result["deleted"] is True
 
 
@@ -741,7 +740,7 @@ class TestAlertHistory:
         alert_history_repo.list_recent = AsyncMock(return_value=[])
         _configure_services(alert_history_repo=alert_history_repo)
 
-        result = await alert_history(_ctx=_ctx(), days=7, limit=100)
+        result = await alert_history(days=7, limit=100)
         assert result.total == 0
         assert result.alerts == []
 
@@ -781,7 +780,7 @@ class TestEvaluateAlerts:
 
         _configure_services()
 
-        result = await evaluate_alerts(_ctx=_ctx())
+        result = await evaluate_alerts()
         # Should return a dict with evaluated=False or True depending on engine availability
         assert "evaluated" in result
 

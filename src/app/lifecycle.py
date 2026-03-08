@@ -207,12 +207,23 @@ async def _startup_tenant_resolution() -> None:
             except Exception:
                 return None
 
+        # SPA platform admin key resolution (SPEC-1667):
+        # Resolves ar_spa_* keys from the platform_admins collection,
+        # completely isolated from all tenant team_members collections.
+        from src.multi_tenant.repositories.platform_admin import PlatformAdminRepository
+        platform_admin_repo = PlatformAdminRepository()
+
+        async def resolve_spa_api_key(key_hash: str) -> dict | None:
+            """Resolve an SPA API key hash to a platform admin document."""
+            return await platform_admin_repo.find_by_api_key_hash(key_hash)
+
         configure_tenant_resolution(
             resolve_by_shop_domain=tenant_repo.find_by_shopify_domain,
             resolve_by_api_key_hash=tenant_repo.find_by_api_key_hash,
             resolve_by_widget_key_hash=tenant_repo.find_by_widget_key_hash,
             resolve_by_user_api_key_hash=resolve_user_api_key,
             resolve_by_tenant_id=resolve_by_tenant_id,
+            resolve_by_spa_key_hash=resolve_spa_api_key,
         )
         # Wire Cosmos DB as the primary persistence layer for provisioning
         from src.integrations.provisioning import configure_provisioning_repo

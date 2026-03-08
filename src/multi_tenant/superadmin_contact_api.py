@@ -30,16 +30,15 @@ from src.multi_tenant.api_models import CamelCaseModel
 from src.multi_tenant.cosmos_schema import (
     COLLECTION_CONTACT_MESSAGES,
     ContactMessageDocument,
-    TeamMemberRole,
 )
-from src.multi_tenant.middleware import require_role
+from src.multi_tenant.middleware import require_platform_admin
 
 logger = logging.getLogger(__name__)
 
 router = APIRouter(
     prefix="/api/superadmin/contact-messages",
     tags=["Superadmin Contact Messages"],
-    dependencies=[Depends(require_role(TeamMemberRole.SUPERADMIN))],
+    dependencies=[Depends(require_platform_admin())],
 )
 
 # ---------------------------------------------------------------------------

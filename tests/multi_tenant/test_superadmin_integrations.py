@@ -116,7 +116,7 @@ class TestIntegrationHealthHappyPath:
             prefs_repo=mock_prefs_repo,
         )
         from src.multi_tenant.superadmin_api import integration_health
-        result = await integration_health(_ctx=superadmin_ctx)
+        result = await integration_health()
 
         assert isinstance(result, IntegrationHealthResponse)
         assert result.overall_healthy is True
@@ -139,7 +139,7 @@ class TestIntegrationHealthHappyPath:
             prefs_repo=mock_prefs_repo,
         )
         from src.multi_tenant.superadmin_api import integration_health
-        result = await integration_health(_ctx=superadmin_ctx)
+        result = await integration_health()
 
         assert len(result.circuit_breakers) == 5
 
@@ -158,7 +158,7 @@ class TestIntegrationHealthHappyPath:
             prefs_repo=mock_prefs_repo,
         )
         from src.multi_tenant.superadmin_api import integration_health
-        result = await integration_health(_ctx=superadmin_ctx)
+        result = await integration_health()
 
         cosmos = [b for b in result.circuit_breakers if b.service == "cosmos-db"]
         assert len(cosmos) == 1
@@ -189,7 +189,7 @@ class TestCircuitBreakerStates:
             prefs_repo=mock_prefs_repo,
         )
         from src.multi_tenant.superadmin_api import integration_health
-        result = await integration_health(_ctx=superadmin_ctx)
+        result = await integration_health()
 
         assert result.any_breaker_open is True
         assert result.overall_healthy is False
@@ -209,7 +209,7 @@ class TestCircuitBreakerStates:
             prefs_repo=mock_prefs_repo,
         )
         from src.multi_tenant.superadmin_api import integration_health
-        result = await integration_health(_ctx=superadmin_ctx)
+        result = await integration_health()
 
         nats_breaker = [b for b in result.circuit_breakers if b.service == "nats"]
         assert len(nats_breaker) == 1
@@ -230,7 +230,7 @@ class TestCircuitBreakerStates:
             prefs_repo=mock_prefs_repo,
         )
         from src.multi_tenant.superadmin_api import integration_health
-        result = await integration_health(_ctx=superadmin_ctx)
+        result = await integration_health()
 
         assert len(result.circuit_breakers) == 0
         assert any("circuit_breakers" in e.get("subsystem", "") for e in result.errors)
@@ -258,7 +258,7 @@ class TestNATSConnectivity:
             prefs_repo=mock_prefs_repo,
         )
         from src.multi_tenant.superadmin_api import integration_health
-        result = await integration_health(_ctx=superadmin_ctx)
+        result = await integration_health()
 
         assert result.nats_connected is True
 
@@ -278,7 +278,7 @@ class TestNATSConnectivity:
             prefs_repo=mock_prefs_repo,
         )
         from src.multi_tenant.superadmin_api import integration_health
-        result = await integration_health(_ctx=superadmin_ctx)
+        result = await integration_health()
 
         assert result.nats_connected is False
         assert result.nats_deployed is False
@@ -299,7 +299,7 @@ class TestNATSConnectivity:
             prefs_repo=mock_prefs_repo,
         )
         from src.multi_tenant.superadmin_api import integration_health
-        result = await integration_health(_ctx=superadmin_ctx)
+        result = await integration_health()
 
         assert result.nats_connected is False
 
@@ -339,7 +339,7 @@ class TestMCPIntegrationStatus:
             prefs_repo=mock_prefs_repo,
         )
         from src.multi_tenant.superadmin_api import integration_health
-        result = await integration_health(_ctx=superadmin_ctx)
+        result = await integration_health()
 
         sf = [m for m in result.mcp_integrations if m.server_name == "shopify-storefront"]
         assert len(sf) == 1
@@ -367,7 +367,7 @@ class TestMCPIntegrationStatus:
             prefs_repo=mock_prefs_repo,
         )
         from src.multi_tenant.superadmin_api import integration_health
-        result = await integration_health(_ctx=superadmin_ctx)
+        result = await integration_health()
 
         for mcp in result.mcp_integrations:
             assert mcp.tenants_enabled == 0
@@ -388,7 +388,7 @@ class TestMCPIntegrationStatus:
             prefs_repo=None,
         )
         from src.multi_tenant.superadmin_api import integration_health
-        result = await integration_health(_ctx=superadmin_ctx)
+        result = await integration_health()
 
         assert result.mcp_integrations == []
 
@@ -411,7 +411,7 @@ class TestMCPIntegrationStatus:
             prefs_repo=mock_prefs_repo,
         )
         from src.multi_tenant.superadmin_api import integration_health
-        result = await integration_health(_ctx=superadmin_ctx)
+        result = await integration_health()
 
         sf = [m for m in result.mcp_integrations if m.server_name == "shopify-storefront"]
         assert sf[0].tenants_enabled == 1  # only t-001 counted

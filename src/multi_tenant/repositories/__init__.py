@@ -35,6 +35,7 @@ from src.multi_tenant.repositories.platform import (
     PlatformConfigRepository,
     PlatformScopedRepository,
 )
+from src.multi_tenant.repositories.platform_admin import PlatformAdminRepository
 from src.multi_tenant.repositories.sla_snapshots import SLASnapshotRepository
 from src.multi_tenant.repositories.verification import VerificationTokenRepository
 from src.multi_tenant.repositories.incidents import IncidentRepository
@@ -65,4 +66,5 @@ __all__ = [
     "IncidentRepository",
     "AlertRuleRepository",
     "AlertHistoryRepository",
+    "PlatformAdminRepository",
 ]

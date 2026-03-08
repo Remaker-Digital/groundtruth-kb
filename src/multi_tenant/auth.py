@@ -78,6 +78,12 @@ API_KEY_HEADER = "X-API-Key"
 # Per-user API key prefix (distinguishes user keys from tenant keys)
 USER_API_KEY_PREFIX = "ar_user_"
 
+# Service Provider Administrator (SPA) API key prefix (SPEC-1667).
+# SPA keys authenticate the platform admin console. They are completely
+# isolated from all tenant credentials — the SPA has zero permissions within
+# any tenancy and does not exist as a user for any tenancy.
+SPA_API_KEY_PREFIX = "ar_spa_"
+
 # Publishable widget key (Decision UI-6)
 WIDGET_KEY_HEADER = "X-Widget-Key"
 WIDGET_KEY_PREFIX = "pk_live_"
@@ -153,6 +159,11 @@ class TenantContext:
 
     # Widget key auth (Decision UI-6) — scoped to /api/chat/* only
     is_widget_auth: bool = False
+
+    # Platform admin auth (SPEC-1667) — SPA console only.
+    # When True, tenant_id is PLATFORM_ADMIN_TENANT_ID ("__platform__")
+    # and the request can ONLY access /api/superadmin/* endpoints.
+    is_platform_admin: bool = False
 
     # Trial tier (WI #119) — ISO 8601 expiry timestamp
     trial_expires_at: str | None = None
@@ -441,6 +452,82 @@ async def verify_user_api_key(
         raise AuthenticationError("Account is disabled. Contact your administrator.")
 
     return result
+
+
+# ---------------------------------------------------------------------------
+# SPA platform admin key generation and verification (SPEC-1667)
+# ---------------------------------------------------------------------------
+
+
+def generate_spa_api_key() -> str:
+    """Generate a new SPA platform admin API key.
+
+    Format: ar_spa_plat_{random}
+    Example: ar_spa_plat_yZR6wMzdVDlVJhbdRPW1Vh01TkytKcQ3
+
+    Unlike tenant user keys (ar_user_{tenant_prefix}_{random}), SPA keys
+    have NO tenant prefix because the SPA has no tenant affiliation.
+    The "plat" segment is a fixed identifier for platform-level keys.
+
+    Returns:
+        The raw API key string (must be saved immediately, never stored raw).
+    """
+    import secrets
+
+    random_part = secrets.token_urlsafe(24)
+    return f"{SPA_API_KEY_PREFIX}plat_{random_part}"
+
+
+def is_spa_api_key(api_key: str) -> bool:
+    """Check if an API key is an SPA platform admin key.
+
+    SPA keys start with 'ar_spa_', tenant user keys with 'ar_user_'.
+    These are dispatched to completely separate credential stores.
+    """
+    return api_key.startswith(SPA_API_KEY_PREFIX)
+
+
+async def verify_spa_api_key(
+    api_key: str,
+    lookup_fn: Any,
+) -> dict[str, Any]:
+    """Verify an SPA platform admin API key (SPEC-1667).
+
+    Resolves credentials from the platform_admins collection — completely
+    isolated from all tenant team_members collections.
+
+    Args:
+        api_key: The raw SPA API key (ar_spa_...).
+        lookup_fn: Async function that accepts an API key hash and returns
+            a platform admin document or None.
+            Signature: async (key_hash: str) -> dict | None
+
+    Returns:
+        The platform admin document.
+
+    Raises:
+        AuthenticationError: If the key is invalid, admin is inactive,
+            or no matching platform admin found.
+    """
+    if not api_key:
+        raise AuthenticationError("API key is required.")
+
+    key_hash = hash_api_key(api_key)
+    admin = await lookup_fn(key_hash)
+
+    if admin is None:
+        logger.warning("SPA API key authentication failed: no matching platform admin")
+        raise AuthenticationError("Invalid API key.")
+
+    # Verify platform admin is active
+    if not admin.get("is_active", False):
+        logger.warning(
+            "SPA API key auth failed: admin %s is inactive",
+            admin.get("email", "unknown"),
+        )
+        raise AuthenticationError("Platform admin account is disabled.")
+
+    return admin
 
 
 # ---------------------------------------------------------------------------

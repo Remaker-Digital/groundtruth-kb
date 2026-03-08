@@ -76,7 +76,7 @@ class TestTierOverride:
         mock_tenant_repo.patch.return_value = {}
 
         result = await override_tenant_tier(
-            tenant_id="test-001", tier="professional", _ctx=superadmin_ctx,
+            tenant_id="test-001", tier="professional",
         )
 
         assert isinstance(result, TierOverrideResponse)
@@ -101,7 +101,7 @@ class TestTierOverride:
         mock_tenant_repo.patch.return_value = {}
 
         result = await override_tenant_tier(
-            tenant_id="test-001", tier="trial", _ctx=superadmin_ctx,
+            tenant_id="test-001", tier="trial",
         )
 
         assert result.previous_tier == "professional"
@@ -118,7 +118,7 @@ class TestTierOverride:
         mock_tenant_repo.patch.return_value = {}
 
         result = await override_tenant_tier(
-            tenant_id="test-001", tier="enterprise", _ctx=superadmin_ctx,
+            tenant_id="test-001", tier="enterprise",
         )
 
         assert result.new_tier == "enterprise"
@@ -134,7 +134,7 @@ class TestTierOverride:
         mock_tenant_repo.patch.return_value = {}
 
         result = await override_tenant_tier(
-            tenant_id="test-001", tier="starter", _ctx=superadmin_ctx,
+            tenant_id="test-001", tier="starter",
         )
 
         assert result.previous_tier is None
@@ -149,7 +149,7 @@ class TestTierOverride:
 
         with pytest.raises(HTTPException) as exc_info:
             await override_tenant_tier(
-                tenant_id="test-001", tier="platinum", _ctx=superadmin_ctx,
+                tenant_id="test-001", tier="platinum",
             )
 
         assert exc_info.value.status_code == 400
@@ -167,7 +167,7 @@ class TestTierOverride:
 
         with pytest.raises(HTTPException) as exc_info:
             await override_tenant_tier(
-                tenant_id="nonexistent-tenant", tier="starter", _ctx=superadmin_ctx,
+                tenant_id="nonexistent-tenant", tier="starter",
             )
 
         assert exc_info.value.status_code == 404
@@ -186,7 +186,7 @@ class TestTierOverride:
         try:
             with pytest.raises(HTTPException) as exc_info:
                 await override_tenant_tier(
-                    tenant_id="test-001", tier="starter", _ctx=superadmin_ctx,
+                    tenant_id="test-001", tier="starter",
                 )
             assert exc_info.value.status_code == 503
         finally:
@@ -203,7 +203,7 @@ class TestTierOverride:
         mock_tenant_repo.patch.return_value = {}
 
         await override_tenant_tier(
-            tenant_id="test-001", tier="starter", _ctx=superadmin_ctx,
+            tenant_id="test-001", tier="starter",
         )
 
         call_args = mock_tenant_repo.patch.call_args

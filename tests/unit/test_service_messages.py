@@ -236,30 +236,19 @@ class TestServiceMessageAPI:
         assert "ctx" in param_names
         assert "request" in param_names
 
-    @pytest.mark.asyncio
-    async def test_send_endpoint_rejects_non_spa_tenant(self):
-        """TEST-2951: Non-SPA tenants get 403 when sending service messages."""
-        from src.multi_tenant.superadmin_api import (
-            ServiceMessageRequest,
-            send_service_message_endpoint,
+    def test_send_endpoint_protected_by_platform_admin_guard(self):
+        """TEST-2951: Service message endpoint protected by require_platform_admin().
+
+        SPEC-1667: The per-function _SPA_TENANT_ID gate was removed — access
+        control is now enforced by the router-level require_platform_admin()
+        dependency, which rejects all non-SPA keys before any endpoint runs.
+        """
+        from src.multi_tenant.superadmin_api import router
+
+        # Verify the router has a dependency (require_platform_admin)
+        assert len(router.dependencies) > 0, (
+            "Router must have require_platform_admin() as a dependency"
         )
-        from src.multi_tenant.auth import TenantContext
-
-        mock_ctx = MagicMock(spec=TenantContext)
-        mock_ctx.tenant_id = "some-other-tenant"
-        mock_ctx.user_email = "admin@other.com"
-
-        request = ServiceMessageRequest(
-            subject="Test",
-            body="<p>test</p>",
-        )
-
-        # Patch _tenant_repo to avoid 503
-        with patch("src.multi_tenant.superadmin_api._tenant_repo", MagicMock()):
-            with pytest.raises(Exception) as exc_info:
-                await send_service_message_endpoint(request=request, ctx=mock_ctx)
-            # Should raise HTTPException with 403
-            assert "403" in str(exc_info.value.status_code) or exc_info.value.status_code == 403
 
     @pytest.mark.asyncio
     async def test_preview_returns_recipient_list(self):

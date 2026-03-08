@@ -29,9 +29,7 @@ from fastapi import APIRouter, Depends, HTTPException, Query
 from pydantic import Field
 
 from src.multi_tenant.api_models import CamelCaseModel
-from src.multi_tenant.auth import TenantContext
-from src.multi_tenant.cosmos_schema import TeamMemberRole
-from src.multi_tenant.middleware import require_role
+from src.multi_tenant.middleware import require_platform_admin
 
 logger = logging.getLogger(__name__)
 
@@ -160,7 +158,7 @@ class TenantErrorsResponse(CamelCaseModel):
 router = APIRouter(
     prefix="/api/superadmin/diagnostics",
     tags=["Support Diagnostics"],
-    dependencies=[Depends(require_role(TeamMemberRole.SUPERADMIN))],
+    dependencies=[Depends(require_platform_admin())],
 )
 
 
@@ -353,7 +351,7 @@ async def _collect_last_activity(tenant_id: str) -> str | None:
 )
 async def get_tenant_diagnostic(
     tenant_id: str,
-    _ctx: TenantContext = Depends(require_role(TeamMemberRole.SUPERADMIN)),
+
 ) -> TenantDiagnosticSnapshot:
     """Collect a comprehensive diagnostic snapshot for a single tenant."""
     from src.multi_tenant.repositories import TenantRepository
@@ -454,7 +452,7 @@ async def get_tenant_diagnostic(
 )
 async def get_tenant_errors(
     tenant_id: str,
-    _ctx: TenantContext = Depends(require_role(TeamMemberRole.SUPERADMIN)),
+
     limit: int = Query(50, ge=1, le=100, description="Max entries to return"),
 ) -> TenantErrorsResponse:
     """Return recent error-level audit entries for a tenant."""

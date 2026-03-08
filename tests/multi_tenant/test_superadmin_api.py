@@ -157,7 +157,7 @@ class TestTenantDirectory:
         from src.multi_tenant.superadmin_api import list_all_tenants
 
         result = await list_all_tenants(
-            _ctx=superadmin_ctx, skip=0, limit=50,
+            skip=0, limit=50,
         )
 
         assert isinstance(result, TenantDirectoryResponse)
@@ -198,7 +198,6 @@ class TestTenantDirectory:
         from src.multi_tenant.superadmin_api import list_all_tenants
 
         result = await list_all_tenants(
-            _ctx=superadmin_ctx,
             status="active",
             skip=0,
             limit=50,
@@ -236,7 +235,6 @@ class TestTenantDirectory:
         from src.multi_tenant.superadmin_api import list_all_tenants
 
         result = await list_all_tenants(
-            _ctx=superadmin_ctx,
             tier="starter",
             skip=0,
             limit=50,
@@ -274,7 +272,6 @@ class TestTenantDirectory:
         from src.multi_tenant.superadmin_api import list_all_tenants
 
         result = await list_all_tenants(
-            _ctx=superadmin_ctx,
             skip=10,
             limit=5,
         )
@@ -294,7 +291,7 @@ class TestTenantDirectory:
         from src.multi_tenant.superadmin_api import list_all_tenants
 
         with pytest.raises(Exception) as exc_info:
-            await list_all_tenants(_ctx=superadmin_ctx)
+            await list_all_tenants()
 
         assert exc_info.value.status_code == 503  # type: ignore[union-attr]
 
@@ -316,7 +313,7 @@ class TestTenantSummary:
 
         from src.multi_tenant.superadmin_api import tenant_summary
 
-        result = await tenant_summary(_ctx=superadmin_ctx)
+        result = await tenant_summary()
 
         assert isinstance(result, TenantDistributionSummary)
         assert result.total_tenants == 3
@@ -338,7 +335,7 @@ class TestTenantSummary:
 
         from src.multi_tenant.superadmin_api import tenant_summary
 
-        result = await tenant_summary(_ctx=superadmin_ctx)
+        result = await tenant_summary()
 
         assert result.total_tenants == 0
         assert result.by_status == {}
@@ -381,7 +378,7 @@ class TestDeploymentHistory:
 
         from src.multi_tenant.superadmin_api import deployment_history
 
-        result = await deployment_history(_ctx=superadmin_ctx, limit=20)
+        result = await deployment_history(limit=20)
 
         assert isinstance(result, DeploymentHistoryResponse)
         assert len(result.events) == 2
@@ -403,7 +400,7 @@ class TestDeploymentHistory:
 
         from src.multi_tenant.superadmin_api import deployment_history
 
-        result = await deployment_history(_ctx=superadmin_ctx)
+        result = await deployment_history()
 
         assert result.total == 0
         assert result.events == []
@@ -432,7 +429,7 @@ class TestDeploymentHistory:
 
         from src.multi_tenant.superadmin_api import deployment_history
 
-        result = await deployment_history(_ctx=superadmin_ctx, limit=3)
+        result = await deployment_history(limit=3)
 
         assert len(result.events) <= 3
 
@@ -483,7 +480,7 @@ class TestProviderDashboard:
             "src.multi_tenant.tenant_secret_service.get_secret_service",
             side_effect=ImportError("not available"),
         ):
-            result = await provider_dashboard(_ctx=superadmin_ctx)
+            result = await provider_dashboard()
 
         assert isinstance(result, DashboardHealthResponse)
         assert result.timestamp is not None
@@ -541,7 +538,7 @@ class TestProviderDashboard:
             "src.multi_tenant.tenant_secret_service.get_secret_service",
             side_effect=ImportError("not available"),
         ):
-            result = await provider_dashboard(_ctx=superadmin_ctx)
+            result = await provider_dashboard()
 
         assert result.sla_summary["overall_compliant"] is True
         assert result.sla_summary["uptime_pct"] == 99.95
@@ -583,7 +580,7 @@ class TestProviderDashboard:
             "src.multi_tenant.tenant_secret_service.get_secret_service",
             side_effect=Exception("unavailable"),
         ):
-            result = await provider_dashboard(_ctx=superadmin_ctx)
+            result = await provider_dashboard()
 
         # Should still return, just with error fields
         assert isinstance(result, DashboardHealthResponse)
@@ -638,7 +635,7 @@ class TestBillingHealth:
 
         from src.multi_tenant.superadmin_api import billing_health
 
-        result = await billing_health(_ctx=superadmin_ctx)
+        result = await billing_health()
 
         assert isinstance(result, BillingHealthResponse)
         assert result.total_tenants == 2
@@ -675,7 +672,7 @@ class TestBillingHealth:
 
         from src.multi_tenant.superadmin_api import billing_health
 
-        result = await billing_health(_ctx=superadmin_ctx)
+        result = await billing_health()
 
         assert result.tenants_needing_review == 1
         assert result.tenants[0].needs_review is True
@@ -698,7 +695,7 @@ class TestBillingHealth:
 
         from src.multi_tenant.superadmin_api import billing_health
 
-        result = await billing_health(_ctx=superadmin_ctx)
+        result = await billing_health()
 
         assert result.total_tenants == 0
         assert result.tenants == []
@@ -714,7 +711,7 @@ class TestBillingHealth:
         from src.multi_tenant.superadmin_api import billing_health
 
         with pytest.raises(Exception) as exc_info:
-            await billing_health(_ctx=superadmin_ctx)
+            await billing_health()
 
         assert exc_info.value.status_code == 503  # type: ignore[union-attr]
 
@@ -735,23 +732,12 @@ class TestSuperadminAuth:
         """Router is tagged 'superadmin'."""
         assert "superadmin" in router.tags
 
-    def test_all_endpoints_have_superadmin_dependency(self):
-        """Every route in the router requires SUPERADMIN role.
+    def test_router_has_platform_admin_dependency(self):
+        """SPEC-1667: Router has require_platform_admin() as a router-level dependency.
 
-        This is a structural check — verifies that all endpoint functions
-        have a parameter with a dependency that calls require_role.
+        Auth is enforced via router-level dependencies=[Depends(require_platform_admin())]
+        rather than per-endpoint _ctx parameters.
         """
-        import inspect
-
-        for route in router.routes:
-            if not hasattr(route, "endpoint"):
-                continue
-            sig = inspect.signature(route.endpoint)
-            has_ctx_param = False
-            for param_name, param in sig.parameters.items():
-                if param_name == "_ctx" or param_name.endswith("ctx"):
-                    has_ctx_param = True
-            assert has_ctx_param, (
-                f"Endpoint {route.endpoint.__name__} is missing "
-                f"a _ctx parameter (SUPERADMIN dependency)"
-            )
+        assert len(router.dependencies) > 0, (
+            "Router must have require_platform_admin() as a dependency"
+        )

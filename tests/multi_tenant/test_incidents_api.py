@@ -189,7 +189,7 @@ class TestListIncidents:
 
         from src.multi_tenant.superadmin_api import list_incidents
 
-        result = await list_incidents(_ctx=superadmin_ctx)
+        result = await list_incidents()
 
         assert isinstance(result, IncidentListResponse)
         assert result.total == 0
@@ -202,7 +202,7 @@ class TestListIncidents:
 
         from src.multi_tenant.superadmin_api import list_incidents
 
-        result = await list_incidents(_ctx=superadmin_ctx)
+        result = await list_incidents()
 
         assert result.total == 2
         assert len(result.incidents) == 2
@@ -216,7 +216,7 @@ class TestListIncidents:
 
         from src.multi_tenant.superadmin_api import list_incidents
 
-        await list_incidents(_ctx=superadmin_ctx, limit=10)
+        await list_incidents(limit=10)
 
         mock_incident_repo.list_all.assert_awaited_once_with(limit=10)
 
@@ -232,7 +232,7 @@ class TestListIncidents:
         from src.multi_tenant.superadmin_api import list_incidents
 
         with pytest.raises(HTTPException) as exc_info:
-            await list_incidents(_ctx=superadmin_ctx)
+            await list_incidents()
         assert exc_info.value.status_code == 503
 
 
@@ -341,7 +341,7 @@ class TestGetIncident:
 
         from src.multi_tenant.superadmin_api import get_incident
 
-        result = await get_incident(incident_id="inc-aaa111", _ctx=superadmin_ctx)
+        result = await get_incident(incident_id="inc-aaa111")
 
         assert isinstance(result, IncidentModel)
         assert result.incident_id == "inc-aaa111"
@@ -355,7 +355,7 @@ class TestGetIncident:
         from src.multi_tenant.superadmin_api import get_incident
 
         with pytest.raises(HTTPException) as exc_info:
-            await get_incident(incident_id="inc-nonexistent", _ctx=superadmin_ctx)
+            await get_incident(incident_id="inc-nonexistent")
         assert exc_info.value.status_code == 404
 
     @pytest.mark.asyncio
@@ -365,7 +365,7 @@ class TestGetIncident:
 
         from src.multi_tenant.superadmin_api import get_incident
 
-        result = await get_incident(incident_id="inc-bbb222", _ctx=superadmin_ctx)
+        result = await get_incident(incident_id="inc-bbb222")
 
         assert len(result.updates) == 2
         assert result.updates[0].status == "investigating"
@@ -736,17 +736,13 @@ class TestIncidentSerialization:
 class TestIncidentAuth:
     """Auth dependency verification."""
 
-    @pytest.mark.asyncio
-    async def test_list_requires_superadmin(self):
-        """list_incidents depends on require_role(SUPERADMIN)."""
-        import inspect
+    def test_list_requires_platform_admin(self):
+        """SPEC-1667: list_incidents protected by router-level require_platform_admin()."""
+        from src.multi_tenant.superadmin_api import router
 
-        from src.multi_tenant.superadmin_api import list_incidents
-
-        sig = inspect.signature(list_incidents)
-        ctx_param = sig.parameters.get("_ctx")
-        assert ctx_param is not None
-        assert ctx_param.default is not inspect.Parameter.empty
+        assert len(router.dependencies) > 0, (
+            "Router must have require_platform_admin() as a dependency"
+        )
 
     @pytest.mark.asyncio
     async def test_create_requires_superadmin(self):

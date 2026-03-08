@@ -551,7 +551,7 @@ class TestSLATrendsEndpoint:
             return_value=mock_repo,
         ):
             ctx = MagicMock()
-            result = await sla_trends(_ctx=ctx, range_days=1, period_days=30)
+            result = await sla_trends(range_days=1, period_days=30)
             assert isinstance(result, SLATrendsResponse)
             assert result.range_days == 1
             assert len(result.trend_points) == 24
@@ -569,5 +569,5 @@ class TestSLATrendsEndpoint:
         ):
             ctx = MagicMock()
             with pytest.raises(HTTPException) as exc_info:
-                await sla_trends(_ctx=ctx, range_days=7, period_days=30)
+                await sla_trends(range_days=7, period_days=30)
             assert exc_info.value.status_code == 503

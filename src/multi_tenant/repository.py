@@ -33,6 +33,7 @@ from src.multi_tenant.repositories import (  # noqa: F401
     IncidentRepository,
     KnowledgeBaseRepository,
     MemoryVectorRepository,
+    PlatformAdminRepository,
     PlatformConfigRepository,
     PlatformScopedRepository,
     PreferencesRepository,
@@ -70,4 +71,5 @@ __all__ = [
     "IncidentRepository",
     "AlertRuleRepository",
     "AlertHistoryRepository",
+    "PlatformAdminRepository",
 ]

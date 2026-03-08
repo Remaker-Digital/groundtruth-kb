@@ -131,13 +131,10 @@ class TestSecretPostureAggregation:
         )
 
         with patch(
-            "src.multi_tenant.superadmin_api.require_role",
-            return_value=lambda: superadmin_ctx,
-        ), patch(
             "src.multi_tenant.cosmos_client.get_cosmos_manager",
             side_effect=ImportError("No cosmos in test"),
         ):
-            result = await secret_posture(_ctx=superadmin_ctx)
+            result = await secret_posture()
 
         assert isinstance(result, SecretPostureResponse)
         assert len(result.tenants) == 1
@@ -163,7 +160,7 @@ class TestSecretPostureAggregation:
             "src.multi_tenant.cosmos_client.get_cosmos_manager",
             side_effect=ImportError("No cosmos in test"),
         ):
-            result = await secret_posture(_ctx=superadmin_ctx)
+            result = await secret_posture()
 
         assert result.tenants[0].has_api_key is True
 
@@ -184,7 +181,7 @@ class TestSecretPostureAggregation:
             "src.multi_tenant.cosmos_client.get_cosmos_manager",
             side_effect=ImportError("No cosmos in test"),
         ):
-            result = await secret_posture(_ctx=superadmin_ctx)
+            result = await secret_posture()
 
         assert result.tenants[0].has_shopify is True
         assert result.tenants_with_shopify == 1
@@ -206,7 +203,7 @@ class TestSecretPostureAggregation:
             "src.multi_tenant.cosmos_client.get_cosmos_manager",
             side_effect=ImportError("No cosmos in test"),
         ):
-            result = await secret_posture(_ctx=superadmin_ctx)
+            result = await secret_posture()
 
         assert result.tenants[0].has_stripe is True
         assert result.tenants_with_stripe == 1
@@ -246,7 +243,7 @@ class TestSecretPostureAggregation:
             "src.multi_tenant.cosmos_client.get_cosmos_manager",
             return_value=mock_manager,
         ):
-            result = await secret_posture(_ctx=superadmin_ctx)
+            result = await secret_posture()
 
         assert result.tenants[0].totp_count == 1
 
@@ -265,7 +262,7 @@ class TestSecretPostureAggregation:
             "src.multi_tenant.cosmos_client.get_cosmos_manager",
             side_effect=ImportError("No cosmos in test"),
         ):
-            result = await secret_posture(_ctx=superadmin_ctx)
+            result = await secret_posture()
 
         t = result.tenants[0]
         # KV secrets: 2026-01-20 and 2026-02-01
@@ -292,7 +289,7 @@ class TestSecretPostureAggregation:
             "src.multi_tenant.cosmos_client.get_cosmos_manager",
             side_effect=ImportError("No cosmos in test"),
         ):
-            result = await secret_posture(_ctx=superadmin_ctx)
+            result = await secret_posture()
 
         t = result.tenants[0]
         # 2 KV secrets + 2 Cosmos hashes (api_key + widget_key) + 0 TOTP = 4
@@ -313,7 +310,7 @@ class TestSecretPostureAggregation:
             "src.multi_tenant.cosmos_client.get_cosmos_manager",
             side_effect=ImportError("No cosmos in test"),
         ):
-            result = await secret_posture(_ctx=superadmin_ctx)
+            result = await secret_posture()
 
         by_type = result.tenants[0].secrets_by_type
         assert "api_key_hash" in by_type
@@ -344,7 +341,7 @@ class TestTenantIdentification:
             "src.multi_tenant.cosmos_client.get_cosmos_manager",
             side_effect=ImportError("No cosmos in test"),
         ):
-            result = await secret_posture(_ctx=superadmin_ctx)
+            result = await secret_posture()
 
         assert result.tenants[0].customer_email == "admin@example.com"
 
@@ -363,7 +360,7 @@ class TestTenantIdentification:
             "src.multi_tenant.cosmos_client.get_cosmos_manager",
             side_effect=ImportError("No cosmos in test"),
         ):
-            result = await secret_posture(_ctx=superadmin_ctx)
+            result = await secret_posture()
 
         assert result.tenants[0].shopify_shop_domain == "example-shop.myshopify.com"
 
@@ -385,7 +382,7 @@ class TestTenantIdentification:
             "src.multi_tenant.cosmos_client.get_cosmos_manager",
             side_effect=ImportError("No cosmos in test"),
         ):
-            result = await secret_posture(_ctx=superadmin_ctx)
+            result = await secret_posture()
 
         assert result.tenants[0].customer_email is None
         assert result.tenants[0].shopify_shop_domain is None

@@ -48,6 +48,13 @@ logger = logging.getLogger(__name__)
 
 DATABASE_NAME = "agentred"
 
+# Sentinel tenant_id for platform admin authentication (SPEC-1667).
+# SPA console auth produces a TenantContext with this value instead of a real
+# tenant UUID. It is deliberately invalid as a UUID and will be rejected by
+# TenantScopedRepository._validate_tenant_id() if any code path accidentally
+# tries to use it for tenant-scoped operations.
+PLATFORM_ADMIN_TENANT_ID = "__platform__"
+
 # Collection names — used as container IDs in Cosmos DB
 COLLECTION_TENANTS = "tenants"
 COLLECTION_CONVERSATIONS = "conversations"
@@ -68,6 +75,7 @@ COLLECTION_INGESTION_JOBS = "ingestion_jobs"
 COLLECTION_PII_TOKEN_MAPPINGS = "pii_token_mappings"
 COLLECTION_ADMIN_DOCUMENTATION = "admin_documentation_vectors"
 COLLECTION_CONTACT_MESSAGES = "contact_messages"
+COLLECTION_PLATFORM_ADMINS = "platform_admins"
 
 ALL_COLLECTIONS = [
     COLLECTION_TENANTS,
@@ -89,6 +97,7 @@ ALL_COLLECTIONS = [
     COLLECTION_PII_TOKEN_MAPPINGS,
     COLLECTION_ADMIN_DOCUMENTATION,
     COLLECTION_CONTACT_MESSAGES,
+    COLLECTION_PLATFORM_ADMINS,
 ]
 
 # Cosmos DB Serverless — no provisioned throughput (pay per RU consumed)
@@ -2236,6 +2245,20 @@ def get_collection_configs() -> list[CollectionConfig]:
                         {"path": "/created_at", "order": "descending"},
                     ],
                 ],
+            },
+        ),
+        # 20. platform_admins (SPEC-1667: SPA authentication isolation)
+        # Stores Service Provider Administrator credentials, completely
+        # isolated from all tenant team_members collections.
+        CollectionConfig(
+            name=COLLECTION_PLATFORM_ADMINS,
+            partition_key="/admin_id",
+            unique_keys=[["/email"]],
+            indexing_policy={
+                "automatic": True,
+                "indexingMode": "consistent",
+                "includedPaths": [{"path": "/*"}],
+                "excludedPaths": [{"path": '/"_etag"/?'}],
             },
         ),
     ]

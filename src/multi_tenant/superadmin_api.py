@@ -31,12 +31,13 @@ Phase 2 (MFA/TOTP):
           POST /api/superadmin/mfa/disable       — Disable MFA (requires valid code)
           POST /api/superadmin/mfa/backup-verify — Login-time backup code verification
 
-All endpoints require SUPERADMIN role. Widget keys and tenant-level API keys
-are rejected. Only per-user API keys with SUPERADMIN role are accepted.
+All endpoints require SPA platform admin credentials (ar_spa_* keys).
+Tenant API keys (ar_user_*, ar_live_*) and widget keys are rejected.
+SPEC-1667: SPA console is completely isolated from all tenancies.
 
 Architecture references:
     - Assessment: SERVICE-PROVIDER-ADMIN-MONITORING-ASSESSMENT-2026-02-17.md
-    - Auth: require_role(TeamMemberRole.SUPERADMIN) from middleware.py
+    - Auth: require_platform_admin() router-level guard (SPEC-1667)
     - Cross-partition queries: repository.py list_active_tenant_ids() pattern
 
 © 2026 Remaker Digital, a DBA of VanDusen & Palmeter, LLC. All rights reserved.
@@ -60,8 +61,7 @@ from src.multi_tenant.cosmos_schema import (
     TenantStatus,
     TenantTier,
 )
-from src.multi_tenant.middleware import require_role
-from src.multi_tenant.cosmos_schema import TeamMemberRole
+from src.multi_tenant.middleware import get_tenant_context, require_platform_admin
 from src.multi_tenant.repository import (
     AuditLogRepository,
     ConversationRepository,
@@ -387,7 +387,11 @@ class IntegrationHealthResponse(CamelCaseModel):
 # Router
 # ---------------------------------------------------------------------------
 
-router = APIRouter(prefix="/api/superadmin", tags=["superadmin"])
+router = APIRouter(
+    prefix="/api/superadmin",
+    tags=["superadmin"],
+    dependencies=[Depends(require_platform_admin())],
+)
 
 
 # ---------------------------------------------------------------------------
@@ -406,7 +410,7 @@ router = APIRouter(prefix="/api/superadmin", tags=["superadmin"])
     status_code=200,
 )
 async def list_all_tenants(
-    _ctx: TenantContext = Depends(require_role(TeamMemberRole.SUPERADMIN)),
+
     status: str | None = Query(None, description="Filter by tenant status"),
     tier: str | None = Query(None, description="Filter by subscription tier"),
     billing_channel: str | None = Query(None, description="Filter by billing channel"),
@@ -477,7 +481,7 @@ async def list_all_tenants(
     status_code=200,
 )
 async def tenant_summary(
-    _ctx: TenantContext = Depends(require_role(TeamMemberRole.SUPERADMIN)),
+
 ) -> TenantDistributionSummary:
     """Get aggregate tenant distribution statistics."""
     if not _tenant_repo:
@@ -545,7 +549,7 @@ VALID_TIERS = {t.value for t in TenantTier}
 async def override_tenant_tier(
     tenant_id: str,
     tier: str = Body(..., embed=True, description="New tier value"),
-    _ctx: TenantContext = Depends(require_role(TeamMemberRole.SUPERADMIN)),
+
 ) -> TierOverrideResponse:
     """Set a tenant's tier directly, bypassing Stripe."""
     if not _tenant_repo:
@@ -579,7 +583,7 @@ async def override_tenant_tier(
         tenant_id[:12],
         previous_tier or "none",
         tier,
-        _ctx.team_member_email or "unknown",
+        "spa-console",
     )
 
     return TierOverrideResponse(
@@ -669,7 +673,7 @@ class CreateTenantResponse(CamelCaseModel):
 )
 async def create_tenant(
     body: CreateTenantRequest,
-    ctx: TenantContext = Depends(require_role(TeamMemberRole.SUPERADMIN)),
+    ctx: TenantContext = Depends(get_tenant_context),
 ) -> CreateTenantResponse:
     """Provision a new tenant from the SPA Console.
 
@@ -680,14 +684,8 @@ async def create_tenant(
     if not _tenant_repo:
         raise HTTPException(status_code=503, detail="Service not initialized")
 
-    # Only the SPA tenant can provision new tenants — prevent merchant
-    # superadmins from creating tenants via their own API keys.
-    _SPA_TENANT_ID = "remaker-digital-001"
-    if ctx.tenant_id != _SPA_TENANT_ID:
-        raise HTTPException(
-            status_code=403,
-            detail="Tenant provisioning is restricted to the service provider.",
-        )
+    # SPEC-1667: Router-level require_platform_admin() guard ensures
+    # only SPA platform admin keys reach this endpoint.
 
     # Validate tier against TenantTier enum
     if body.tier not in VALID_TIERS:
@@ -834,19 +832,14 @@ class ResendWelcomeEmailResponse(CamelCaseModel):
 )
 async def resend_welcome_email(
     tenant_id: str,
-    ctx: TenantContext = Depends(require_role(TeamMemberRole.SUPERADMIN)),
+    ctx: TenantContext = Depends(get_tenant_context),
 ) -> ResendWelcomeEmailResponse:
     """Resend the welcome email to a tenant's registered email."""
     if not _tenant_repo or not _prefs_repo:
         raise HTTPException(status_code=503, detail="Service not initialized")
 
-    # Only the SPA tenant can manage other tenants
-    _SPA_TENANT_ID = "remaker-digital-001"
-    if ctx.tenant_id != _SPA_TENANT_ID:
-        raise HTTPException(
-            status_code=403,
-            detail="Only the service provider tenant can resend welcome emails",
-        )
+    # SPEC-1667: Router-level require_platform_admin() guard ensures
+    # only SPA platform admin keys reach this endpoint.
 
     # Read the target tenant
     tenant = await _tenant_repo.read(tenant_id, tenant_id)
@@ -908,7 +901,7 @@ async def resend_welcome_email(
                     "id": f"audit:{tenant_id}:resend-welcome:{now_iso}",
                     "tenant_id": tenant_id,
                     "event_type": AuditEventType.TENANT_UPDATED.value,
-                    "actor": ctx.tenant_id,
+                    "actor": "spa-console",
                     "description": f"Welcome email resent to {email_addr}",
                     "timestamp": now_iso,
                     "metadata": {"action": "resend_welcome_email", "email": email_addr},
@@ -977,19 +970,14 @@ class SetExpiryResponse(CamelCaseModel):
 async def set_tenant_expiry(
     tenant_id: str,
     body: SetExpiryRequest,
-    ctx: TenantContext = Depends(require_role(TeamMemberRole.SUPERADMIN)),
+    ctx: TenantContext = Depends(get_tenant_context),
 ) -> SetExpiryResponse:
     """Set or clear the access expiry for a tenant."""
     if not _tenant_repo:
         raise HTTPException(status_code=503, detail="Service not initialized")
 
-    # Only the SPA tenant can manage expiry
-    _SPA_TENANT_ID = "remaker-digital-001"
-    if ctx.tenant_id != _SPA_TENANT_ID:
-        raise HTTPException(
-            status_code=403,
-            detail="Expiry management is restricted to the service provider.",
-        )
+    # SPEC-1667: Router-level require_platform_admin() guard ensures
+    # only SPA platform admin keys reach this endpoint.
 
     # Read current tenant (partition_key = document_id for tenant docs)
     tenant_doc = await _tenant_repo.read(tenant_id, tenant_id)
@@ -1083,7 +1071,7 @@ async def set_tenant_expiry(
     status_code=200,
 )
 async def deployment_history(
-    _ctx: TenantContext = Depends(require_role(TeamMemberRole.SUPERADMIN)),
+
     limit: int = Query(20, ge=1, le=100, description="Number of events"),
 ) -> DeploymentHistoryResponse:
     """List recent deployment and rollback audit events."""
@@ -1151,7 +1139,7 @@ async def deployment_history(
     status_code=200,
 )
 async def provider_dashboard(
-    _ctx: TenantContext = Depends(require_role(TeamMemberRole.SUPERADMIN)),
+
 ) -> DashboardHealthResponse:
     """Get the unified provider operations dashboard data."""
     now = datetime.now(timezone.utc).isoformat()
@@ -1193,7 +1181,7 @@ async def provider_dashboard(
 
     # 2. Tenant distribution summary
     try:
-        result.tenant_summary = await tenant_summary(_ctx=_ctx)
+        result.tenant_summary = await tenant_summary()
     except Exception as exc:
         logger.warning("Tenant summary failed: %s", exc)
 
@@ -1227,7 +1215,7 @@ async def provider_dashboard(
 
     # 5. Recent deployments (last 5)
     try:
-        deploy_resp = await deployment_history(_ctx=_ctx, limit=5)
+        deploy_resp = await deployment_history(limit=5)
         result.recent_deployments = deploy_resp.events
     except Exception as exc:
         logger.warning("Deployment history failed: %s", exc)
@@ -1251,7 +1239,7 @@ async def provider_dashboard(
     status_code=200,
 )
 async def billing_health(
-    _ctx: TenantContext = Depends(require_role(TeamMemberRole.SUPERADMIN)),
+
 ) -> BillingHealthResponse:
     """Get provider-level billing health across all tenants."""
     if not _tenant_repo:
@@ -1354,7 +1342,7 @@ async def billing_health(
     status_code=200,
 )
 async def sla_trends(
-    _ctx: TenantContext = Depends(require_role(TeamMemberRole.SUPERADMIN)),
+
     range_days: int = Query(7, ge=1, le=90, description="Trend range in days"),
     period_days: int = Query(30, ge=1, le=90, description="Error budget billing period"),
 ) -> SLATrendsResponse:
@@ -1437,7 +1425,7 @@ async def sla_trends(
     status_code=200,
 )
 async def queue_depth(
-    _ctx: TenantContext = Depends(require_role(TeamMemberRole.SUPERADMIN)),
+
 ) -> QueueDepthResponse:
     """Get queue depth and job health metrics across all tenants."""
     if _nats_mgr is None or not _nats_mgr.is_connected:
@@ -1504,7 +1492,7 @@ async def queue_depth(
     status_code=200,
 )
 async def compliance_summary(
-    _ctx: TenantContext = Depends(require_role(TeamMemberRole.SUPERADMIN)),
+
 ) -> ComplianceSummaryResponse:
     """Get compliance summary across all tenants."""
     if _tenant_repo is None:
@@ -1621,7 +1609,7 @@ async def compliance_summary(
     status_code=200,
 )
 async def secret_posture(
-    _ctx: TenantContext = Depends(require_role(TeamMemberRole.SUPERADMIN)),
+
 ) -> SecretPostureResponse:
     """Get secret posture across all tenants.
 
@@ -1819,7 +1807,7 @@ async def secret_posture(
     status_code=200,
 )
 async def integration_health(
-    _ctx: TenantContext = Depends(require_role(TeamMemberRole.SUPERADMIN)),
+
 ) -> IntegrationHealthResponse:
     """Get integration health across all services."""
     errors: list[dict[str, str]] = []
@@ -2024,7 +2012,7 @@ def _incident_to_model(doc: dict[str, Any]) -> IncidentModel:
     status_code=200,
 )
 async def list_incidents(
-    _ctx: TenantContext = Depends(require_role(TeamMemberRole.SUPERADMIN)),
+
     limit: int = Query(50, ge=1, le=200, description="Max incidents to return"),
 ) -> IncidentListResponse:
     """List all incidents."""
@@ -2044,7 +2032,7 @@ async def list_incidents(
 )
 async def create_incident(
     body: CreateIncidentRequest,
-    ctx: TenantContext = Depends(require_role(TeamMemberRole.SUPERADMIN)),
+    ctx: TenantContext = Depends(get_tenant_context),
 ) -> IncidentModel:
     """Create a new incident."""
     if _incident_repo is None:
@@ -2069,7 +2057,7 @@ async def create_incident(
 )
 async def get_incident(
     incident_id: str,
-    _ctx: TenantContext = Depends(require_role(TeamMemberRole.SUPERADMIN)),
+
 ) -> IncidentModel:
     """Get a single incident by ID."""
     if _incident_repo is None:
@@ -2090,7 +2078,7 @@ async def get_incident(
 async def add_incident_update(
     incident_id: str,
     body: AddIncidentUpdateRequest,
-    ctx: TenantContext = Depends(require_role(TeamMemberRole.SUPERADMIN)),
+    ctx: TenantContext = Depends(get_tenant_context),
 ) -> IncidentModel:
     """Add a status update to an incident."""
     if _incident_repo is None:
@@ -2123,7 +2111,7 @@ async def add_incident_update(
 async def resolve_incident(
     incident_id: str,
     message: str = Body("Incident resolved", embed=True),
-    ctx: TenantContext = Depends(require_role(TeamMemberRole.SUPERADMIN)),
+    ctx: TenantContext = Depends(get_tenant_context),
 ) -> IncidentModel:
     """Mark an incident as resolved."""
     if _incident_repo is None:
@@ -2334,7 +2322,7 @@ def _history_to_model(doc: dict[str, Any]) -> AlertHistoryItemModel:
     status_code=200,
 )
 async def list_alert_rules(
-    _ctx: TenantContext = Depends(require_role(TeamMemberRole.SUPERADMIN)),
+
 ) -> AlertRuleListResponse:
     """List all alert rules."""
     if _alert_rule_repo is None:
@@ -2353,7 +2341,7 @@ async def list_alert_rules(
 )
 async def create_alert_rule(
     body: CreateAlertRuleRequest,
-    _ctx: TenantContext = Depends(require_role(TeamMemberRole.SUPERADMIN)),
+
 ) -> AlertRuleModel:
     """Create a new alert rule."""
     if _alert_rule_repo is None:
@@ -2380,7 +2368,7 @@ async def create_alert_rule(
 async def update_alert_rule(
     rule_id: str,
     body: UpdateAlertRuleRequest,
-    _ctx: TenantContext = Depends(require_role(TeamMemberRole.SUPERADMIN)),
+
 ) -> AlertRuleModel:
     """Update an existing alert rule."""
     if _alert_rule_repo is None:
@@ -2427,7 +2415,7 @@ async def update_alert_rule(
 )
 async def delete_alert_rule(
     rule_id: str,
-    _ctx: TenantContext = Depends(require_role(TeamMemberRole.SUPERADMIN)),
+
 ) -> dict[str, Any]:
     """Delete an alert rule."""
     if _alert_rule_repo is None:
@@ -2458,7 +2446,7 @@ async def delete_alert_rule(
     status_code=200,
 )
 async def alert_history(
-    _ctx: TenantContext = Depends(require_role(TeamMemberRole.SUPERADMIN)),
+
     days: int = Query(7, ge=1, le=90, description="Days of history"),
     limit: int = Query(100, ge=1, le=500, description="Max alerts to return"),
 ) -> AlertHistoryResponse:
@@ -2480,7 +2468,7 @@ async def alert_history(
 async def acknowledge_alert(
     alert_id: str,
     alert_date: str = Query(..., description="Alert date (YYYY-MM-DD partition key)"),
-    ctx: TenantContext = Depends(require_role(TeamMemberRole.SUPERADMIN)),
+    ctx: TenantContext = Depends(get_tenant_context),
 ) -> AlertHistoryItemModel:
     """Acknowledge an alert firing event."""
     if _alert_history_repo is None:
@@ -2503,7 +2491,7 @@ async def acknowledge_alert(
     status_code=200,
 )
 async def evaluate_alerts(
-    _ctx: TenantContext = Depends(require_role(TeamMemberRole.SUPERADMIN)),
+
 ) -> dict[str, Any]:
     """Manually trigger evaluation of all enabled alert rules."""
     try:
@@ -2555,7 +2543,7 @@ async def _get_team_member(ctx: TenantContext) -> dict[str, Any]:
     status_code=200,
 )
 async def mfa_status(
-    ctx: TenantContext = Depends(require_role(TeamMemberRole.SUPERADMIN)),
+    ctx: TenantContext = Depends(get_tenant_context),
 ) -> MfaStatusResponse:
     """Get MFA enrollment status for the current authenticated user."""
     member = await _get_team_member(ctx)
@@ -2580,7 +2568,7 @@ async def mfa_status(
     status_code=200,
 )
 async def mfa_enroll(
-    ctx: TenantContext = Depends(require_role(TeamMemberRole.SUPERADMIN)),
+    ctx: TenantContext = Depends(get_tenant_context),
 ) -> MfaEnrollResponse:
     """Start MFA enrollment — generates TOTP secret, QR code, and backup codes.
 
@@ -2614,7 +2602,7 @@ async def mfa_enroll(
 )
 async def mfa_confirm(
     body: MfaConfirmRequest = Body(...),
-    ctx: TenantContext = Depends(require_role(TeamMemberRole.SUPERADMIN)),
+    ctx: TenantContext = Depends(get_tenant_context),
 ) -> dict[str, Any]:
     """Confirm MFA enrollment with the first valid TOTP code.
 
@@ -2646,7 +2634,7 @@ async def mfa_confirm(
 )
 async def mfa_verify(
     body: MfaVerifyRequest = Body(...),
-    ctx: TenantContext = Depends(require_role(TeamMemberRole.SUPERADMIN)),
+    ctx: TenantContext = Depends(get_tenant_context),
 ) -> MfaVerifyResponse:
     """Verify a TOTP code at login time and return an MFA session token.
 
@@ -2677,7 +2665,7 @@ async def mfa_verify(
 )
 async def mfa_disable(
     body: MfaDisableRequest = Body(...),
-    ctx: TenantContext = Depends(require_role(TeamMemberRole.SUPERADMIN)),
+    ctx: TenantContext = Depends(get_tenant_context),
 ) -> dict[str, Any]:
     """Disable MFA for the current user. Requires a valid TOTP code."""
     member = await _get_team_member(ctx)
@@ -2705,7 +2693,7 @@ async def mfa_disable(
 )
 async def mfa_backup_verify(
     body: MfaVerifyRequest = Body(...),
-    ctx: TenantContext = Depends(require_role(TeamMemberRole.SUPERADMIN)),
+    ctx: TenantContext = Depends(get_tenant_context),
 ) -> MfaVerifyResponse:
     """Verify a backup code at login time. The backup code is consumed.
 
@@ -2795,7 +2783,7 @@ _STORAGE_COST_PER_ARTICLE = 0.0001
 )
 async def get_cost_analytics(
     days: int = Query(default=30, ge=1, le=365),
-    ctx: TenantContext = Depends(require_role(TeamMemberRole.SUPERADMIN)),
+    ctx: TenantContext = Depends(get_tenant_context),
 ) -> CostOverviewResponse:
     """Compute estimated per-tenant costs based on conversation volume and token usage."""
     from datetime import datetime, timedelta, timezone
@@ -2983,7 +2971,7 @@ _TOKEN_EXHAUSTION_THRESHOLD = 500_000  # tokens per day
     status_code=200,
 )
 async def get_abuse_signals(
-    ctx: TenantContext = Depends(require_role(TeamMemberRole.SUPERADMIN)),
+    ctx: TenantContext = Depends(get_tenant_context),
 ) -> AbuseOverviewResponse:
     """Scan all active tenants for abuse signals and anomalous usage patterns."""
     from datetime import datetime, timedelta, timezone
@@ -3110,7 +3098,7 @@ async def get_abuse_signals(
 async def toggle_abuse_flag(
     tenant_id: str,
     body: FlagTenantRequest = Body(...),
-    ctx: TenantContext = Depends(require_role(TeamMemberRole.SUPERADMIN)),
+    ctx: TenantContext = Depends(get_tenant_context),
 ) -> dict[str, Any]:
     """Flag or unflag a tenant for manual abuse review."""
     from datetime import datetime, timezone
@@ -3284,7 +3272,7 @@ class CopilotURLImportRequest(BaseModel):
 )
 async def list_copilot_documents(
     category: str | None = Query(None, description="Filter by category"),
-    _ctx: TenantContext = Depends(require_role(TeamMemberRole.SUPERADMIN)),
+
 ) -> CopilotDocumentListResponse:
     """List all documents in the Co-Pilot knowledge base."""
     if _admin_doc_repo is None:
@@ -3328,7 +3316,7 @@ async def list_copilot_documents(
 )
 async def create_copilot_document(
     body: CopilotDocumentCreateRequest = Body(...),
-    _ctx: TenantContext = Depends(require_role(TeamMemberRole.SUPERADMIN)),
+
 ) -> CopilotDocumentResponse:
     """Create a new document in the Co-Pilot knowledge base."""
     if _admin_doc_repo is None:
@@ -3386,7 +3374,7 @@ async def create_copilot_document(
 async def update_copilot_document(
     doc_id: str,
     body: CopilotDocumentUpdateRequest = Body(...),
-    _ctx: TenantContext = Depends(require_role(TeamMemberRole.SUPERADMIN)),
+
 ) -> CopilotDocumentResponse:
     """Update an existing document in the Co-Pilot knowledge base."""
     if _admin_doc_repo is None:
@@ -3462,7 +3450,7 @@ async def update_copilot_document(
 )
 async def delete_copilot_document(
     doc_id: str,
-    _ctx: TenantContext = Depends(require_role(TeamMemberRole.SUPERADMIN)),
+
 ) -> dict[str, Any]:
     """Soft-delete a document by setting is_active=false."""
     if _admin_doc_repo is None:
@@ -3502,7 +3490,7 @@ async def delete_copilot_document(
     status_code=200,
 )
 async def ingest_docs_site(
-    _ctx: TenantContext = Depends(require_role(TeamMemberRole.SUPERADMIN)),
+
 ) -> CopilotIngestionResponse:
     """Scan docs/admin-guide/*.md and create/update documents."""
     if _admin_doc_repo is None:
@@ -3625,7 +3613,7 @@ def _infer_category_from_filename(stem: str) -> str:
 )
 async def import_url(
     body: CopilotURLImportRequest = Body(...),
-    _ctx: TenantContext = Depends(require_role(TeamMemberRole.SUPERADMIN)),
+
 ) -> CopilotDocumentResponse:
     """Fetch a URL and create a Co-Pilot document from its content."""
     if _admin_doc_repo is None:
@@ -3698,7 +3686,7 @@ async def import_url(
     status_code=200,
 )
 async def re_embed_documents(
-    _ctx: TenantContext = Depends(require_role(TeamMemberRole.SUPERADMIN)),
+
 ) -> CopilotIngestionResponse:
     """Re-embed all active documents using the current embedding model."""
     if _admin_doc_repo is None:
@@ -3784,7 +3772,7 @@ async def _generate_embedding(text: str) -> list[float] | None:
     status_code=200,
 )
 async def copilot_stats(
-    _ctx: TenantContext = Depends(require_role(TeamMemberRole.SUPERADMIN)),
+
 ) -> CopilotStatsResponse:
     """Get statistics about the Co-Pilot knowledge collection."""
     if _admin_doc_repo is None:
@@ -3842,7 +3830,7 @@ async def copilot_stats(
 )
 async def test_copilot_query(
     body: CopilotTestQueryRequest = Body(...),
-    _ctx: TenantContext = Depends(require_role(TeamMemberRole.SUPERADMIN)),
+
 ) -> CopilotTestQueryResponse:
     """Execute a test query against the Co-Pilot knowledge base."""
     if _admin_doc_repo is None:
@@ -3972,7 +3960,7 @@ async def _save_copilot_config(config: dict[str, Any]) -> None:
     status_code=200,
 )
 async def get_copilot_schedule(
-    _ctx: TenantContext = Depends(require_role(TeamMemberRole.SUPERADMIN)),
+
 ) -> CopilotScheduleResponse:
     """Return the current scan schedule configuration."""
     if _admin_doc_repo is None:
@@ -3996,7 +3984,7 @@ async def get_copilot_schedule(
 )
 async def update_copilot_schedule(
     body: CopilotScheduleRequest = Body(...),
-    _ctx: TenantContext = Depends(require_role(TeamMemberRole.SUPERADMIN)),
+
 ) -> CopilotScheduleResponse:
     """Update scan frequency and scope."""
     if _admin_doc_repo is None:
@@ -4022,7 +4010,7 @@ async def update_copilot_schedule(
     else:
         config["next_scan_at"] = None
 
-    config["updated_by"] = _ctx.tenant_id
+    config["updated_by"] = "spa-console"
     await _save_copilot_config(config)
 
     return CopilotScheduleResponse(
@@ -4041,7 +4029,7 @@ async def update_copilot_schedule(
     status_code=200,
 )
 async def get_copilot_retrieval_config(
-    _ctx: TenantContext = Depends(require_role(TeamMemberRole.SUPERADMIN)),
+
 ) -> CopilotRetrievalConfigResponse:
     """Return the current retrieval tuning parameters."""
     if _admin_doc_repo is None:
@@ -4067,7 +4055,7 @@ async def get_copilot_retrieval_config(
 )
 async def update_copilot_retrieval_config(
     body: CopilotRetrievalConfigRequest = Body(...),
-    _ctx: TenantContext = Depends(require_role(TeamMemberRole.SUPERADMIN)),
+
 ) -> CopilotRetrievalConfigResponse:
     """Update retrieval tuning parameters (SPEC-1576)."""
     if _admin_doc_repo is None:
@@ -4091,7 +4079,7 @@ async def update_copilot_retrieval_config(
     config["rrf_k"] = body.rrf_k
     config["top_k"] = body.top_k
     config["min_score"] = body.min_score
-    config["updated_by"] = _ctx.tenant_id
+    config["updated_by"] = "spa-console"
 
     await _save_copilot_config(config)
 
@@ -4103,7 +4091,7 @@ async def update_copilot_retrieval_config(
         top_k=body.top_k,
         min_score=body.min_score,
         updated_at=now,
-        updated_by=_ctx.tenant_id,
+        updated_by="spa-console",
     )
 
 
@@ -4250,7 +4238,7 @@ def configure_pipeline_observatory(enabled: bool = True) -> None:
 )
 async def get_pipeline_topology(
     period: str = "24h",
-    _ctx: TenantContext = Depends(require_role(TeamMemberRole.SUPERADMIN)),
+
 ) -> PipelineTopologyResponse:
     """Return 7-agent pipeline topology with aggregate metrics (SPEC-1579)."""
     # Build nodes with baseline metrics
@@ -4291,7 +4279,7 @@ async def get_pipeline_topology(
 async def get_agent_metrics(
     agent: str,
     period: str = "24h",
-    _ctx: TenantContext = Depends(require_role(TeamMemberRole.SUPERADMIN)),
+
 ) -> AgentDetailMetrics:
     """Return detailed performance metrics for one agent (SPEC-1580)."""
     if agent not in PIPELINE_AGENTS:
@@ -4313,7 +4301,7 @@ async def get_tenant_comparison(
     sort_by: str = "total_conversations",
     sort_order: str = "desc",
     tier: str | None = None,
-    _ctx: TenantContext = Depends(require_role(TeamMemberRole.SUPERADMIN)),
+
 ) -> TenantComparisonResponse:
     """Return all tenants with pipeline metrics (SPEC-1581)."""
     tenants: list[TenantPipelineSummary] = []
@@ -4350,7 +4338,7 @@ async def get_tenant_comparison(
 async def get_tenant_pipeline_metrics(
     tenant_id: str,
     period: str = "24h",
-    _ctx: TenantContext = Depends(require_role(TeamMemberRole.SUPERADMIN)),
+
 ) -> TenantDetailMetrics:
     """Return detailed pipeline metrics for a single tenant (SPEC-1582)."""
     return TenantDetailMetrics(
@@ -4366,7 +4354,7 @@ async def get_tenant_pipeline_metrics(
     status_code=200,
 )
 async def get_database_metrics(
-    _ctx: TenantContext = Depends(require_role(TeamMemberRole.SUPERADMIN)),
+
 ) -> DatabaseMetricsResponse:
     """Return Cosmos DB operational metrics (SPEC-1583)."""
     return DatabaseMetricsResponse()
@@ -4437,7 +4425,7 @@ class ServiceMessageSendResponse(CamelCaseModel):
 async def preview_service_message_recipients(
     filter_status: list[str] | None = Query(None, description="Filter by tenant status"),
     filter_tier: list[str] | None = Query(None, description="Filter by subscription tier"),
-    ctx: TenantContext = Depends(require_role(TeamMemberRole.SUPERADMIN)),
+    ctx: TenantContext = Depends(get_tenant_context),
 ) -> ServiceMessagePreviewResponse:
     """Resolve and return the recipient list for a service message."""
     if not _tenant_repo:
@@ -4471,19 +4459,14 @@ async def preview_service_message_recipients(
 )
 async def send_service_message_endpoint(
     request: ServiceMessageRequest,
-    ctx: TenantContext = Depends(require_role(TeamMemberRole.SUPERADMIN)),
+    ctx: TenantContext = Depends(get_tenant_context),
 ) -> ServiceMessageSendResponse:
     """Send a service message to filtered tenant superadmins."""
     if not _tenant_repo:
         raise HTTPException(status_code=503, detail="Service not initialized")
 
-    # Only the SPA tenant can send service messages
-    _SPA_TENANT_ID = "remaker-digital-001"
-    if ctx.tenant_id != _SPA_TENANT_ID:
-        raise HTTPException(
-            status_code=403,
-            detail="Only the service provider tenant can send service messages",
-        )
+    # SPEC-1667: Router-level require_platform_admin() guard ensures
+    # only SPA platform admin keys reach this endpoint.
 
     # Resolve recipients
     recipients = await _resolve_service_message_recipients(
@@ -4517,9 +4500,9 @@ async def send_service_message_endpoint(
         try:
             await _audit_repo.create({
                 "id": f"svc-msg-{datetime.now(timezone.utc).strftime('%Y%m%d%H%M%S')}",
-                "tenant_id": ctx.tenant_id,
+                "tenant_id": "platform",
                 "event_type": "service_message_sent",
-                "actor": ctx.user_email or "superadmin",
+                "actor": "spa-console",
                 "details": {
                     "subject": request.subject[:100],
                     "total_recipients": result.total_recipients,

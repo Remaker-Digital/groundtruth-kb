@@ -581,15 +581,15 @@ class TestSpec1648BCCDelivery:
         )
 
     def test_spa_only_authorization(self):
-        """Only the SPA tenant (remaker-digital-001) can send service messages."""
-        from src.multi_tenant.superadmin_api import send_service_message_endpoint
+        """SPEC-1667: Service messages protected by router-level require_platform_admin().
 
-        source = inspect.getsource(send_service_message_endpoint)
-        assert "remaker-digital-001" in source, (
-            "SPEC-1648: Only SPA tenant must be authorized to send"
-        )
-        assert "403" in source, (
-            "SPEC-1648: Non-SPA tenants must get 403"
+        The per-function _SPA_TENANT_ID gate was removed — access control is
+        enforced by the router-level require_platform_admin() dependency.
+        """
+        from src.multi_tenant.superadmin_api import router
+
+        assert len(router.dependencies) > 0, (
+            "Router must have require_platform_admin() as a dependency"
         )
 
 

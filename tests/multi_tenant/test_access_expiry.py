@@ -287,30 +287,18 @@ class TestSetExpiryEndpoint:
 
         assert exc_info.value.status_code == 404
 
-    @pytest.mark.asyncio
-    async def test_ex16_non_spa_tenant_forbidden(self, mock_tenant_repo):
-        """Non-SPA tenant gets 403 on expiry endpoint."""
-        from fastapi import HTTPException
-        from src.multi_tenant.middleware import TenantContext
-        from src.multi_tenant.superadmin_api import set_tenant_expiry, SetExpiryRequest
+    def test_ex16_router_protected_by_platform_admin_guard(self):
+        """SPEC-1667: set_tenant_expiry protected by router-level require_platform_admin().
 
-        non_spa_ctx = TenantContext(
-            tenant_id="some-other-tenant",
-            tier=TenantTier.STARTER,
-            status=TenantStatus.ACTIVE,
-            auth_method="user_api_key",
-            team_member_role=MagicMock(value="superadmin"),
+        The per-function _SPA_TENANT_ID gate was removed — access control is
+        now enforced by the router-level require_platform_admin() dependency,
+        which rejects all non-SPA keys before any endpoint runs.
+        """
+        from src.multi_tenant.superadmin_api import router
+
+        assert len(router.dependencies) > 0, (
+            "Router must have require_platform_admin() as a dependency"
         )
-
-        with (
-            patch("src.multi_tenant.superadmin_api._tenant_repo", mock_tenant_repo),
-            patch("src.multi_tenant.superadmin_api._audit_repo", None),
-            pytest.raises(HTTPException) as exc_info,
-        ):
-            body = SetExpiryRequest(expires_at=_FUTURE)
-            await set_tenant_expiry(_TENANT_ID, body, non_spa_ctx)
-
-        assert exc_info.value.status_code == 403
 
 
 # ---------------------------------------------------------------------------

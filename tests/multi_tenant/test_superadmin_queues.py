@@ -111,7 +111,7 @@ class TestQueueDepthHappyPath:
             nats_mgr=mock_nats_mgr,
         )
         from src.multi_tenant.superadmin_api import queue_depth
-        result = await queue_depth(_ctx=superadmin_ctx)
+        result = await queue_depth()
 
         assert isinstance(result, QueueDepthResponse)
         assert result.total_tenants == 3
@@ -130,7 +130,7 @@ class TestQueueDepthHappyPath:
             nats_mgr=mock_nats_mgr,
         )
         from src.multi_tenant.superadmin_api import queue_depth
-        result = await queue_depth(_ctx=superadmin_ctx)
+        result = await queue_depth()
 
         assert result.total_messages == 42 + 100 + 0
         assert result.total_bytes == 8192 + 20480 + 0
@@ -147,7 +147,7 @@ class TestQueueDepthHappyPath:
             nats_mgr=mock_nats_mgr,
         )
         from src.multi_tenant.superadmin_api import queue_depth
-        result = await queue_depth(_ctx=superadmin_ctx)
+        result = await queue_depth()
 
         t1 = result.tenants[0]
         assert t1.tenant_id == "t-001"
@@ -167,7 +167,7 @@ class TestQueueDepthHappyPath:
             nats_mgr=mock_nats_mgr,
         )
         from src.multi_tenant.superadmin_api import queue_depth
-        result = await queue_depth(_ctx=superadmin_ctx)
+        result = await queue_depth()
 
         assert result.total_messages == 0
         assert result.total_bytes == 0
@@ -183,7 +183,7 @@ class TestQueueDepthHappyPath:
             nats_mgr=mock_nats_mgr,
         )
         from src.multi_tenant.superadmin_api import queue_depth
-        result = await queue_depth(_ctx=superadmin_ctx)
+        result = await queue_depth()
 
         assert result.total_tenants == 0
         assert result.tenants == []
@@ -200,7 +200,7 @@ class TestQueueDepthHappyPath:
             nats_mgr=mock_nats_mgr,
         )
         from src.multi_tenant.superadmin_api import queue_depth
-        result = await queue_depth(_ctx=superadmin_ctx)
+        result = await queue_depth()
 
         assert result.total_tenants == 1
         assert len(result.tenants) == 1
@@ -226,7 +226,7 @@ class TestQueueDepthErrors:
         )
         from src.multi_tenant.superadmin_api import queue_depth
 
-        result = await queue_depth(_ctx=superadmin_ctx)
+        result = await queue_depth()
         assert result.nats_deployed is False
         assert result.total_tenants == 0
         assert result.tenants == []
@@ -241,7 +241,7 @@ class TestQueueDepthErrors:
         )
         from src.multi_tenant.superadmin_api import queue_depth
 
-        result = await queue_depth(_ctx=superadmin_ctx)
+        result = await queue_depth()
         assert result.nats_deployed is False
         assert result.total_tenants == 0
         assert result.total_messages == 0
@@ -259,7 +259,7 @@ class TestQueueDepthErrors:
         from src.multi_tenant.superadmin_api import queue_depth
 
         with pytest.raises(HTTPException) as exc_info:
-            await queue_depth(_ctx=superadmin_ctx)
+            await queue_depth()
         assert exc_info.value.status_code == 503
 
     @pytest.mark.asyncio
@@ -276,7 +276,7 @@ class TestQueueDepthErrors:
             nats_mgr=mock_nats_mgr,
         )
         from src.multi_tenant.superadmin_api import queue_depth
-        result = await queue_depth(_ctx=superadmin_ctx)
+        result = await queue_depth()
 
         assert result.total_tenants == 2
         assert len(result.errors) == 1
@@ -293,7 +293,7 @@ class TestQueueDepthErrors:
             nats_mgr=mock_nats_mgr,
         )
         from src.multi_tenant.superadmin_api import queue_depth
-        result = await queue_depth(_ctx=superadmin_ctx)
+        result = await queue_depth()
 
         assert result.total_tenants == 0
         assert len(result.errors) == 3
@@ -357,16 +357,13 @@ class TestQueueDepthSerialization:
 class TestQueueDepthAuth:
     """Authentication enforcement tests."""
 
-    @pytest.mark.asyncio
-    async def test_requires_superadmin_role(self, mock_nats_mgr, mock_tenant_repo):
-        """Endpoint requires SUPERADMIN role via dependency."""
-        from src.multi_tenant.superadmin_api import queue_depth
-        import inspect
+    def test_requires_platform_admin(self):
+        """SPEC-1667: Endpoint protected by router-level require_platform_admin()."""
+        from src.multi_tenant.superadmin_api import router
 
-        sig = inspect.signature(queue_depth)
-        ctx_param = sig.parameters.get("_ctx")
-        assert ctx_param is not None
-        assert ctx_param.default is not inspect.Parameter.empty
+        assert len(router.dependencies) > 0, (
+            "Router must have require_platform_admin() as a dependency"
+        )
 
     def test_router_prefix(self):
         """Endpoint is mounted under /api/superadmin."""

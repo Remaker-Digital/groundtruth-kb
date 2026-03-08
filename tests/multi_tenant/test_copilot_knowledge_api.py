@@ -101,7 +101,7 @@ class TestCopilotDocumentCRUD:
     @pytest.mark.asyncio
     async def test_list_documents(self, mock_admin_doc_repo, superadmin_ctx):
         """GET /copilot/documents returns document list (TEST-2736)."""
-        result = await list_copilot_documents(category=None, _ctx=superadmin_ctx)
+        result = await list_copilot_documents(category=None)
         assert isinstance(result, CopilotDocumentListResponse)
         assert result.total == 1
         assert result.documents[0].title == "Quick Start Guide"
@@ -111,7 +111,7 @@ class TestCopilotDocumentCRUD:
     async def test_list_documents_by_category(self, mock_admin_doc_repo, superadmin_ctx):
         """GET /copilot/documents?category=... filters by category."""
         result = await list_copilot_documents(
-            category="getting_started", _ctx=superadmin_ctx
+            category="getting_started"
         )
         assert result.total == 1
         mock_admin_doc_repo.list_by_category.assert_awaited_once_with("getting_started")
@@ -125,7 +125,7 @@ class TestCopilotDocumentCRUD:
             content="The dashboard shows key metrics.",
             tags=["dashboard"],
         )
-        result = await create_copilot_document(body=body, _ctx=superadmin_ctx)
+        result = await create_copilot_document(body=body)
         assert isinstance(result, CopilotDocumentResponse)
         assert result.title == "Dashboard Overview"
         assert result.document_category == "dashboard"
@@ -143,7 +143,6 @@ class TestCopilotDocumentCRUD:
         result = await update_copilot_document(
             doc_id="getting_started:quickstart",
             body=body,
-            _ctx=superadmin_ctx,
         )
         assert isinstance(result, CopilotDocumentResponse)
         assert result.title == "Updated Quick Start"
@@ -155,7 +154,6 @@ class TestCopilotDocumentCRUD:
         """DELETE /copilot/documents/{id} soft-deletes (TEST-2739)."""
         result = await delete_copilot_document(
             doc_id="getting_started:quickstart",
-            _ctx=superadmin_ctx,
         )
         assert result["is_active"] is False
         assert result["id"] == "getting_started:quickstart"
@@ -173,7 +171,6 @@ class TestCopilotDocumentCRUD:
             await update_copilot_document(
                 doc_id="missing:doc",
                 body=CopilotDocumentUpdateRequest(title="New"),
-                _ctx=superadmin_ctx,
             )
         assert exc_info.value.status_code == 404
 
@@ -216,7 +213,7 @@ class TestBatchIngestion:
             return real_path(p)
 
         with patch("pathlib.Path", side_effect=fake_path):
-            result = await ingest_docs_site(_ctx=superadmin_ctx)
+            result = await ingest_docs_site()
 
         assert isinstance(result, CopilotIngestionResponse)
         assert result.skipped == 1
@@ -234,7 +231,7 @@ class TestBatchIngestion:
 
         with patch("pathlib.Path", return_value=mock_dir):
             with pytest.raises(HTTPException) as exc_info:
-                await ingest_docs_site(_ctx=superadmin_ctx)
+                await ingest_docs_site()
         assert exc_info.value.status_code == 404
 
 
@@ -255,7 +252,7 @@ class TestURLImport:
             document_category="getting_started",
         )
         with pytest.raises(HTTPException) as exc_info:
-            await import_url(body=body, _ctx=superadmin_ctx)
+            await import_url(body=body)
         assert exc_info.value.status_code == 400
         assert "HTTPS" in exc_info.value.detail
 
@@ -282,7 +279,7 @@ class TestURLImport:
             mock_client_inst.__aexit__ = AsyncMock(return_value=False)
             MockClient.return_value = mock_client_inst
 
-            result = await import_url(body=body, _ctx=superadmin_ctx)
+            result = await import_url(body=body)
 
         assert isinstance(result, CopilotDocumentResponse)
         assert result.title == "Setup Guide"
@@ -309,7 +306,7 @@ class TestReEmbedding:
             new_callable=AsyncMock,
             return_value=fake_embedding,
         ):
-            result = await re_embed_documents(_ctx=superadmin_ctx)
+            result = await re_embed_documents()
 
         assert isinstance(result, CopilotIngestionResponse)
         assert result.updated == 1
@@ -334,7 +331,7 @@ class TestReEmbedding:
             new_callable=AsyncMock,
             return_value=fake_embedding,
         ):
-            await re_embed_documents(_ctx=superadmin_ctx)
+            await re_embed_documents()
 
         assert len(upserted_docs) == 1
         doc = upserted_docs[0]
@@ -352,7 +349,7 @@ class TestCollectionStats:
     @pytest.mark.asyncio
     async def test_stats_endpoint(self, mock_admin_doc_repo, superadmin_ctx):
         """GET /copilot/stats returns statistics (TEST-2747)."""
-        result = await copilot_stats(_ctx=superadmin_ctx)
+        result = await copilot_stats()
         assert isinstance(result, CopilotStatsResponse)
         assert result.total_documents == 1
         assert result.active_documents == 1
@@ -369,7 +366,7 @@ class TestCollectionStats:
         }
         mock_admin_doc_repo.list_all_active = AsyncMock(return_value=[stale_doc])
 
-        result = await copilot_stats(_ctx=superadmin_ctx)
+        result = await copilot_stats()
         assert result.stale_count == 1
 
 
@@ -392,7 +389,7 @@ class TestQueryEndpoint:
             new_callable=AsyncMock,
             return_value=[0.5] * 3072,
         ):
-            result = await _test_copilot_query(body=body, _ctx=superadmin_ctx)
+            result = await _test_copilot_query(body=body)
 
         assert isinstance(result, CopilotTestQueryResponse)
         assert result.query == "how to set up"
@@ -408,5 +405,5 @@ class TestQueryEndpoint:
         configure_copilot_knowledge_service(admin_doc_repo=None)
 
         with pytest.raises(HTTPException) as exc_info:
-            await list_copilot_documents(category=None, _ctx=superadmin_ctx)
+            await list_copilot_documents(category=None)
         assert exc_info.value.status_code == 503

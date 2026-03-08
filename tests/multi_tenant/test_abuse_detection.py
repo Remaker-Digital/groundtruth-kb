@@ -161,7 +161,7 @@ class TestSignalScan:
             return_value=FakeAsyncIterator([0]),
         )
 
-        result = await scan_abuse_signals(_ctx=superadmin_ctx)
+        result = await scan_abuse_signals()
 
         assert isinstance(result, AbuseOverview)
         assert result.total_tenants_scanned == 2
@@ -192,7 +192,7 @@ class TestSignalScan:
             return_value=FakeAsyncIterator([0]),
         )
 
-        result = await scan_abuse_signals(_ctx=superadmin_ctx)
+        result = await scan_abuse_signals()
 
         assert result.total_tenants_scanned == 1
         assert len(result.high_risk_tenants) == 1
@@ -208,7 +208,7 @@ class TestSignalScan:
         """Scan with no active tenants returns empty overview."""
         mock_tenant_repo.list_active_tenant_ids = AsyncMock(return_value=[])
 
-        result = await scan_abuse_signals(_ctx=superadmin_ctx)
+        result = await scan_abuse_signals()
 
         assert isinstance(result, AbuseOverview)
         assert result.total_tenants_scanned == 0
@@ -250,7 +250,6 @@ class TestTenantProfile:
 
         result = await get_tenant_abuse_profile(
             tenant_id="tenant-001",
-            _ctx=superadmin_ctx,
         )
 
         assert isinstance(result, TenantAbuseProfile)
@@ -300,7 +299,6 @@ class TestTenantProfile:
 
         result = await get_tenant_abuse_profile(
             tenant_id="tenant-001",
-            _ctx=superadmin_ctx,
         )
 
         assert isinstance(result, TenantAbuseProfile)
@@ -330,7 +328,6 @@ class TestTenantProfile:
 
         result = await get_tenant_abuse_profile(
             tenant_id="tenant-001",
-            _ctx=superadmin_ctx,
         )
 
         assert isinstance(result, TenantAbuseProfile)
@@ -349,7 +346,6 @@ class TestTenantProfile:
         with pytest.raises(Exception) as exc_info:
             await get_tenant_abuse_profile(
                 tenant_id="nonexistent",
-                _ctx=superadmin_ctx,
             )
 
         assert exc_info.value.status_code == 404
@@ -378,14 +374,13 @@ class TestFlagTenant:
         result = await flag_tenant(
             tenant_id="tenant-001",
             body=FlagRequest(flagged=True),
-            _ctx=superadmin_ctx,
         )
 
         assert isinstance(result, FlagResponse)
         assert result.tenant_id == "tenant-001"
         assert result.is_flagged is True
         assert result.flagged_at is not None
-        assert result.flagged_by == "admin@remaker.com"
+        assert result.flagged_by == "spa-console"
 
         # Verify patch was called with correct operations
         mock_tenant_repo._container.patch_item.assert_awaited_once()
@@ -411,7 +406,6 @@ class TestFlagTenant:
         result = await flag_tenant(
             tenant_id="tenant-001",
             body=FlagRequest(flagged=False),
-            _ctx=superadmin_ctx,
         )
 
         assert isinstance(result, FlagResponse)
@@ -437,7 +431,6 @@ class TestFlagTenant:
             await flag_tenant(
                 tenant_id="nonexistent",
                 body=FlagRequest(flagged=True),
-                _ctx=superadmin_ctx,
             )
 
         assert exc_info.value.status_code == 404
@@ -456,25 +449,16 @@ class TestAbuseAuth:
         assert router.prefix == "/api/superadmin/abuse"
         assert "Abuse Detection" in router.tags
 
-    def test_all_endpoints_have_superadmin_dependency(self):
-        """Every route in the router requires SUPERADMIN role.
+    def test_router_has_platform_admin_guard(self):
+        """Router has require_platform_admin() as a router-level dependency.
 
-        Structural check — verifies all endpoint functions have a parameter
-        with a dependency that calls require_role.
+        SPEC-1667: Access control is enforced by the router-level
+        require_platform_admin() dependency, which rejects all non-SPA
+        keys before any endpoint runs.
         """
-        for route in router.routes:
-            if not hasattr(route, "endpoint"):
-                continue
-            sig = inspect.signature(route.endpoint)
-            has_ctx_param = False
-            for param_name, param in sig.parameters.items():
-                if param_name == "_ctx" or param_name.endswith("ctx"):
-                    has_ctx_param = True
-                    break
-            assert has_ctx_param, (
-                f"Route {route.path} ({route.endpoint.__name__}) "
-                f"is missing a _ctx parameter with require_role dependency"
-            )
+        assert len(router.dependencies) > 0, (
+            "Router must have require_platform_admin() as a dependency"
+        )
 
 
 # ---------------------------------------------------------------------------

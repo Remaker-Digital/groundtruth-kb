@@ -66,7 +66,7 @@ class TestScanSchedule:
     @pytest.mark.asyncio
     async def test_get_default_schedule(self, superadmin_ctx):
         """GET /copilot/config/schedule returns defaults (TEST-2749)."""
-        result = await get_copilot_schedule(_ctx=superadmin_ctx)
+        result = await get_copilot_schedule()
         assert isinstance(result, CopilotScheduleResponse)
         assert result.scan_frequency == "manual"
         assert result.scan_scope == "docs-site"
@@ -82,7 +82,7 @@ class TestScanSchedule:
             scan_frequency="daily",
             scan_scope="both",
         )
-        result = await update_copilot_schedule(body=body, _ctx=superadmin_ctx)
+        result = await update_copilot_schedule(body=body)
         assert isinstance(result, CopilotScheduleResponse)
         assert result.scan_frequency == "daily"
         assert result.scan_scope == "both"
@@ -98,7 +98,7 @@ class TestScanSchedule:
             scan_frequency="manual",
             scan_scope="docs-site",
         )
-        result = await update_copilot_schedule(body=body, _ctx=superadmin_ctx)
+        result = await update_copilot_schedule(body=body)
         assert result.next_scan_at is None
 
     @pytest.mark.asyncio
@@ -111,7 +111,7 @@ class TestScanSchedule:
             scan_scope="docs-site",
         )
         with pytest.raises(HTTPException) as exc_info:
-            await update_copilot_schedule(body=body, _ctx=superadmin_ctx)
+            await update_copilot_schedule(body=body)
         assert exc_info.value.status_code == 400
 
     @pytest.mark.asyncio
@@ -130,7 +130,7 @@ class TestScanSchedule:
             scan_frequency="weekly",
             scan_scope="both",
         )
-        result = await update_copilot_schedule(body=body, _ctx=superadmin_ctx)
+        result = await update_copilot_schedule(body=body)
         assert result.scan_frequency == "weekly"
         assert len(result.scan_history) == 1
 
@@ -145,7 +145,7 @@ class TestRetrievalConfig:
     @pytest.mark.asyncio
     async def test_get_default_config(self, superadmin_ctx):
         """GET /copilot/config/retrieval returns defaults (TEST-2751)."""
-        result = await get_copilot_retrieval_config(_ctx=superadmin_ctx)
+        result = await get_copilot_retrieval_config()
         assert isinstance(result, CopilotRetrievalConfigResponse)
         assert result.vector_weight == 0.7
         assert result.bm25_weight == 0.3
@@ -169,7 +169,7 @@ class TestRetrievalConfig:
             "src.agents.co_pilot.configure_copilot_retrieval"
         ):
             result = await update_copilot_retrieval_config(
-                body=body, _ctx=superadmin_ctx
+                body=body
             )
         assert isinstance(result, CopilotRetrievalConfigResponse)
         assert result.vector_weight == 0.8
@@ -188,7 +188,7 @@ class TestRetrievalConfig:
         body = CopilotRetrievalConfigRequest(vector_weight=1.5)
         with pytest.raises(HTTPException) as exc_info:
             await update_copilot_retrieval_config(
-                body=body, _ctx=superadmin_ctx
+                body=body
             )
         assert exc_info.value.status_code == 400
 
@@ -200,7 +200,7 @@ class TestRetrievalConfig:
         body = CopilotRetrievalConfigRequest(top_k=0)
         with pytest.raises(HTTPException) as exc_info:
             await update_copilot_retrieval_config(
-                body=body, _ctx=superadmin_ctx
+                body=body
             )
         assert exc_info.value.status_code == 400
 
@@ -217,7 +217,7 @@ class TestRetrievalConfig:
             "src.agents.co_pilot.configure_copilot_retrieval"
         ):
             await update_copilot_retrieval_config(
-                body=body, _ctx=superadmin_ctx
+                body=body
             )
             mock_admin_doc_repo.upsert_document.assert_awaited_once()
 
@@ -228,7 +228,7 @@ class TestRetrievalConfig:
 
         configure_copilot_knowledge_service(admin_doc_repo=None)
         with pytest.raises(HTTPException) as exc_info:
-            await get_copilot_retrieval_config(_ctx=superadmin_ctx)
+            await get_copilot_retrieval_config()
         assert exc_info.value.status_code == 503
 
 

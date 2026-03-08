@@ -126,7 +126,7 @@ class TestComplianceSummaryHappyPath:
             prefs_repo=mock_prefs_repo,
         )
         from src.multi_tenant.superadmin_api import compliance_summary
-        result = await compliance_summary(_ctx=superadmin_ctx)
+        result = await compliance_summary()
 
         assert isinstance(result, ComplianceSummaryResponse)
         assert result.total_tenants == 2
@@ -154,7 +154,7 @@ class TestComplianceSummaryHappyPath:
             prefs_repo=mock_prefs_repo,
         )
         from src.multi_tenant.superadmin_api import compliance_summary
-        result = await compliance_summary(_ctx=superadmin_ctx)
+        result = await compliance_summary()
 
         assert result.tenants_with_pii_scrubbing == 2
 
@@ -179,7 +179,7 @@ class TestComplianceSummaryHappyPath:
             prefs_repo=mock_prefs_repo,
         )
         from src.multi_tenant.superadmin_api import compliance_summary
-        result = await compliance_summary(_ctx=superadmin_ctx)
+        result = await compliance_summary()
 
         assert result.tenants_with_pii_scrubbing == 0
 
@@ -211,7 +211,7 @@ class TestComplianceGracePeriod:
             prefs_repo=mock_prefs_repo,
         )
         from src.multi_tenant.superadmin_api import compliance_summary
-        result = await compliance_summary(_ctx=superadmin_ctx)
+        result = await compliance_summary()
 
         assert result.tenants_in_grace_period == 1
         active_tenant = [t for t in result.tenants if t.grace_period_active]
@@ -238,7 +238,7 @@ class TestComplianceGracePeriod:
             prefs_repo=mock_prefs_repo,
         )
         from src.multi_tenant.superadmin_api import compliance_summary
-        result = await compliance_summary(_ctx=superadmin_ctx)
+        result = await compliance_summary()
 
         assert result.tenants_in_grace_period == 0
 
@@ -258,7 +258,7 @@ class TestComplianceGracePeriod:
             prefs_repo=mock_prefs_repo,
         )
         from src.multi_tenant.superadmin_api import compliance_summary
-        result = await compliance_summary(_ctx=superadmin_ctx)
+        result = await compliance_summary()
 
         assert result.tenants_in_grace_period == 0
 
@@ -301,7 +301,7 @@ class TestComplianceDSAR:
             prefs_repo=mock_prefs_repo,
         )
         from src.multi_tenant.superadmin_api import compliance_summary
-        result = await compliance_summary(_ctx=superadmin_ctx)
+        result = await compliance_summary()
 
         assert result.total_dsar_requests == 3
         assert result.tenants[0].dsar_request_count == 2
@@ -325,7 +325,7 @@ class TestComplianceDSAR:
             prefs_repo=mock_prefs_repo,
         )
         from src.multi_tenant.superadmin_api import compliance_summary
-        result = await compliance_summary(_ctx=superadmin_ctx)
+        result = await compliance_summary()
 
         assert result.total_dsar_requests == 0
         assert result.tenants[0].dsar_request_count == 0
@@ -350,7 +350,7 @@ class TestComplianceSummaryErrors:
         from src.multi_tenant.superadmin_api import compliance_summary
 
         with pytest.raises(HTTPException) as exc_info:
-            await compliance_summary(_ctx=superadmin_ctx)
+            await compliance_summary()
         assert exc_info.value.status_code == 503
 
     @pytest.mark.asyncio
@@ -375,7 +375,7 @@ class TestComplianceSummaryErrors:
             prefs_repo=mock_prefs_repo,
         )
         from src.multi_tenant.superadmin_api import compliance_summary
-        result = await compliance_summary(_ctx=superadmin_ctx)
+        result = await compliance_summary()
 
         # Both tenants appear — sub-query failures are caught individually
         assert result.total_tenants == 2
@@ -401,7 +401,7 @@ class TestComplianceSummaryErrors:
             prefs_repo=None,
         )
         from src.multi_tenant.superadmin_api import compliance_summary
-        result = await compliance_summary(_ctx=superadmin_ctx)
+        result = await compliance_summary()
 
         assert result.tenants_with_pii_scrubbing == 0
         assert result.total_tenants == 2
@@ -419,7 +419,7 @@ class TestComplianceSummaryErrors:
             prefs_repo=mock_prefs_repo,
         )
         from src.multi_tenant.superadmin_api import compliance_summary
-        result = await compliance_summary(_ctx=superadmin_ctx)
+        result = await compliance_summary()
 
         assert result.total_dsar_requests == 0
         assert result.total_tenants == 2
@@ -435,7 +435,7 @@ class TestComplianceSummaryErrors:
             audit_repo=mock_audit_repo,
         )
         from src.multi_tenant.superadmin_api import compliance_summary
-        result = await compliance_summary(_ctx=superadmin_ctx)
+        result = await compliance_summary()
 
         assert result.total_tenants == 0
         assert result.tenants == []
