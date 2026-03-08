@@ -88,6 +88,44 @@ class PlatformAdminRepository(PlatformScopedRepository):
         """
         return await self._container.create_item(body=document)
 
+    async def update_api_key_hash(
+        self, admin_id: str, new_key_hash: str, updated_at: str,
+    ) -> dict[str, Any]:
+        """Replace the API key hash for a platform admin (SPEC-1669).
+
+        Reads the current document, updates the api_key_hash and
+        updated_at fields, then replaces the document in Cosmos DB.
+        The previous key is immediately invalidated because the hash
+        no longer matches.
+
+        Args:
+            admin_id: Platform admin document ID (also partition key).
+            new_key_hash: SHA-256 hex digest of the new SPA API key.
+            updated_at: ISO 8601 timestamp of the key regeneration.
+
+        Returns:
+            Updated document (with new _etag).
+
+        Raises:
+            CosmosResourceNotFoundError: If no admin with this ID exists.
+        """
+        # Read current document
+        doc = await self._container.read_item(
+            item=admin_id,
+            partition_key=admin_id,
+        )
+
+        # Replace the key hash — the old key is immediately invalid
+        doc["api_key_hash"] = new_key_hash
+        doc["updated_at"] = updated_at
+        doc["key_regenerated_at"] = updated_at
+
+        return await self._container.replace_item(
+            item=admin_id,
+            body=doc,
+            partition_key=admin_id,
+        )
+
     async def list_admins(self) -> list[dict[str, Any]]:
         """List all platform admins (cross-partition, small collection)."""
         items: list[dict[str, Any]] = []

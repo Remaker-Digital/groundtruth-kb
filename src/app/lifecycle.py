@@ -914,6 +914,14 @@ async def _startup_superadmin_services() -> None:
         except Exception:
             logger.debug("Incident/alert repositories not available for superadmin API")
 
+        # Platform admin repository for SPEC-1669 key regeneration
+        pa_repo = None
+        try:
+            from src.multi_tenant.repositories.platform_admin import PlatformAdminRepository
+            pa_repo = PlatformAdminRepository()
+        except Exception:
+            logger.debug("PlatformAdminRepository not available for superadmin API")
+
         configure_superadmin_services(
             tenant_repo=TenantRepository(),
             audit_repo=AuditLogRepository(),
@@ -925,6 +933,7 @@ async def _startup_superadmin_services() -> None:
             incident_repo=incident_repo,
             alert_rule_repo=alert_rule_repo,
             alert_history_repo=alert_history_repo,
+            platform_admin_repo=pa_repo,
         )
         logger.info("Superadmin provider operations API initialized (18 endpoints)")
     except Exception:

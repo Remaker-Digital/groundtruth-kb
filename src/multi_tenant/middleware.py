@@ -504,6 +504,8 @@ class TenantAuthMiddleware(BaseHTTPMiddleware):
             status=TenantStatus.ACTIVE,
             # No tier, no trial, no rate_limit_rpm, no team member fields.
             # Platform admins operate outside all tenancies.
+            platform_admin_id=admin.get("admin_id", admin.get("id")),
+            platform_admin_email=admin.get("email"),
         )
 
     async def _auth_widget_key(

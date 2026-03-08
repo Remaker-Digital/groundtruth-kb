@@ -87,6 +87,7 @@ _secret_service: Any = None
 _incident_repo: Any = None
 _alert_rule_repo: Any = None
 _alert_history_repo: Any = None
+_platform_admin_repo: Any = None
 
 
 def configure_superadmin_services(
@@ -100,6 +101,7 @@ def configure_superadmin_services(
     incident_repo: Any = None,
     alert_rule_repo: Any = None,
     alert_history_repo: Any = None,
+    platform_admin_repo: Any = None,
 ) -> None:
     """Wire repositories into module-level variables.
 
@@ -108,6 +110,7 @@ def configure_superadmin_services(
     global _tenant_repo, _audit_repo, _conv_repo, _usage_repo, _prefs_repo
     global _nats_mgr, _secret_service
     global _incident_repo, _alert_rule_repo, _alert_history_repo
+    global _platform_admin_repo
     _tenant_repo = tenant_repo
     _audit_repo = audit_repo
     _conv_repo = conv_repo
@@ -118,6 +121,7 @@ def configure_superadmin_services(
     _incident_repo = incident_repo
     _alert_rule_repo = alert_rule_repo
     _alert_history_repo = alert_history_repo
+    _platform_admin_repo = platform_admin_repo
     logger.info("Superadmin API services configured")
 
 
@@ -4578,3 +4582,128 @@ async def _resolve_service_message_recipients(
             ))
 
     return recipients
+
+
+# ---------------------------------------------------------------------------
+# SPEC-1669: SPA Platform Admin Key Regeneration
+# ---------------------------------------------------------------------------
+
+
+class RegenerateKeyResponse(CamelCaseModel):
+    """Response from SPA API key regeneration.
+
+    Contains the new raw API key — displayed ONCE and never stored in
+    plaintext. The caller must save it immediately.
+    """
+
+    admin_id: str
+    email: str
+    new_api_key: str
+    regenerated_at: str
+    message: str = (
+        "New API key generated. Save this key immediately — "
+        "it will not be shown again. The previous key is now invalid."
+    )
+
+
+@router.post(
+    "/platform-admin/regenerate-key",
+    response_model=RegenerateKeyResponse,
+    summary="Regenerate SPA platform admin API key (SPEC-1669)",
+    description=(
+        "Generate a new ar_spa_* API key for the currently authenticated "
+        "platform admin. The previous key is invalidated immediately. "
+        "The new key is returned exactly once and must be saved. "
+        "Key regeneration is auditable (logged with timestamp and admin_id)."
+    ),
+    responses={
+        200: {"description": "New key generated successfully"},
+        503: {"description": "Platform admin repository not initialized"},
+    },
+    status_code=200,
+)
+async def regenerate_platform_admin_key(
+    ctx: TenantContext = Depends(get_tenant_context),
+) -> RegenerateKeyResponse:
+    """Regenerate the SPA platform admin API key (SPEC-1669).
+
+    This endpoint:
+    1. Generates a new ar_spa_* key for the authenticated platform admin.
+    2. Hashes the new key and updates the platform_admins document.
+    3. Returns the raw key exactly once (never stored in plaintext).
+    4. The previous key is immediately invalidated (hash replaced).
+    5. Logs the regeneration for audit trail.
+
+    The caller is already authenticated via their current key (router-level
+    require_platform_admin() guard). After this call, the current key is
+    invalid and the new key must be used for subsequent requests.
+    """
+    if _platform_admin_repo is None:
+        raise HTTPException(
+            status_code=503,
+            detail="Platform admin service not initialized.",
+        )
+
+    admin_id = ctx.platform_admin_id
+    admin_email = ctx.platform_admin_email or "unknown"
+
+    if not admin_id:
+        raise HTTPException(
+            status_code=500,
+            detail="Platform admin identity not available in request context.",
+        )
+
+    # Generate new SPA API key
+    from src.multi_tenant.auth import generate_spa_api_key, hash_api_key
+
+    new_raw_key = generate_spa_api_key()
+    new_key_hash = hash_api_key(new_raw_key)
+    now_iso = datetime.now(timezone.utc).isoformat()
+
+    # Update the platform admin document with the new key hash
+    try:
+        await _platform_admin_repo.update_api_key_hash(
+            admin_id=admin_id,
+            new_key_hash=new_key_hash,
+            updated_at=now_iso,
+        )
+    except Exception as exc:
+        logger.error(
+            "SPA key regeneration failed for admin %s: %s",
+            admin_id, exc,
+        )
+        raise HTTPException(
+            status_code=500,
+            detail=f"Key regeneration failed: {exc}",
+        )
+
+    # Audit log
+    logger.info(
+        "SPA API key regenerated: admin_id=%s email=%s at=%s",
+        admin_id, admin_email, now_iso,
+    )
+
+    if _audit_repo:
+        try:
+            await _audit_repo.log_event(
+                event_type=AuditEventType.SECURITY_EVENT,
+                tenant_id="__platform__",
+                actor=admin_email,
+                actor_type="admin",
+                payload={
+                    "action": "spa_key_regenerated",
+                    "admin_id": admin_id,
+                    "regenerated_at": now_iso,
+                    "key_hash_prefix": new_key_hash[:8],
+                },
+            )
+        except Exception as exc:
+            # Audit failure should not block key regeneration
+            logger.warning("Audit log for key regeneration failed: %s", exc)
+
+    return RegenerateKeyResponse(
+        admin_id=admin_id,
+        email=admin_email,
+        new_api_key=new_raw_key,
+        regenerated_at=now_iso,
+    )

@@ -183,6 +183,10 @@ class TenantContext:
     team_member_role: TeamMemberRole | None = None
     escalation_categories: tuple[str, ...] = ()
 
+    # Platform admin identity (populated for spa_api_key auth, SPEC-1667)
+    platform_admin_id: str | None = None
+    platform_admin_email: str | None = None
+
 
 # ---------------------------------------------------------------------------
 # Exceptions
