@@ -17,6 +17,7 @@ credentials/
 *.pem
 *.key
 *.crt
+scripts/production-keys-*.json
 
 # =============================================================================
 # Python
