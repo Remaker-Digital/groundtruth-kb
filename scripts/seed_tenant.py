@@ -436,8 +436,10 @@ async def phase_2_tenant(dry_run: bool) -> None:
     widget_key = generate_widget_key(TENANT_ID)
     now = datetime.now(timezone.utc).isoformat()
 
-    generated_credentials["tenant_api_key"] = api_key
+    # SPEC-1673: Only the widget_key is retained temporarily (needed by
+    # Phase 3 preferences).  The tenant API key is hashed and discarded.
     generated_credentials["widget_key"] = widget_key
+    generated_credentials["seeded_tenant_api_key"] = True
 
     tenant_doc = TenantDocument(
         id=TENANT_ID,
@@ -485,6 +487,9 @@ async def phase_2_tenant(dry_run: bool) -> None:
         else:
             print(f"  [ERROR] {e}")
             phase_results["2_tenant"] = f"ERROR: {e}"
+
+    # SPEC-1673: Raw tenant API key discarded after hashing — never retained.
+    del api_key
 
 
 # ---------------------------------------------------------------------------
@@ -615,6 +620,10 @@ async def phase_3_preferences(dry_run: bool) -> None:
             print(f"  [ERROR] {e}")
             phase_results["3_preferences"] = f"ERROR: {e}"
 
+    # SPEC-1673: Raw widget key discarded after use — never retained.
+    generated_credentials.pop("widget_key", None)
+    del widget_key
+
 
 # ---------------------------------------------------------------------------
 # Phase 4: Create team members
@@ -648,8 +657,9 @@ async def phase_4_team(dry_run: bool) -> None:
         key_hash = hash_api_key(user_api_key)
         key_prefix = user_api_key[:12] + "..."
 
-        # Store generated keys for summary
-        generated_credentials[f"user_key_{email}"] = user_api_key
+        # SPEC-1673: Track that a key was generated (no raw value stored)
+        generated_credentials[f"user_key_{email}"] = "[generated]"
+        del user_api_key  # Raw key discarded after hashing
 
         doc = TeamMemberDocument(
             id=member_id,
@@ -810,24 +820,23 @@ async def phase_7_demo_data(dry_run: bool, demo: bool) -> None:
 # ---------------------------------------------------------------------------
 
 def phase_8_summary() -> None:
-    """Print all generated credentials and phase results."""
+    """Print seed summary — SPEC-1673: raw keys are NEVER displayed."""
     print()
     print()
     print("=" * 65)
     print("  PHASE 8: SEED SUMMARY")
     print("=" * 65)
 
-    # Credentials
+    # Key generation status (SPEC-1673: no raw keys displayed)
     print()
     print("-" * 65)
-    print("  CREDENTIALS (save these — they cannot be retrieved later)")
+    print("  KEYS GENERATED AND HASHED (SPEC-1673)")
     print("-" * 65)
     print()
 
-    if "tenant_api_key" in generated_credentials:
-        print(f"  Tenant API Key:    {generated_credentials['tenant_api_key']}")
-    if "widget_key" in generated_credentials:
-        print(f"  Widget Key:        {generated_credentials['widget_key']}")
+    if generated_credentials.get("seeded_tenant_api_key"):
+        print("  Tenant API Key:  [GENERATED — hash stored in Cosmos]")
+    print("  Widget Key:      [GENERATED — hash stored in Cosmos]")
 
     print()
     print("  User API Keys:")
@@ -836,8 +845,12 @@ def phase_8_summary() -> None:
         key_name = f"user_key_{email}"
         if key_name in generated_credentials:
             print(f"    {member_cfg['display_name']} <{email}>")
-            print(f"      {generated_credentials[key_name]}")
+            print(f"      [GENERATED — hash stored in Cosmos]")
             print()
+
+    print("  Raw keys are NOT displayed or saved (SPEC-1673).")
+    print("  Tenant superadmins will receive keys via email (WI-1106).")
+    print()
 
     # URLs
     print("-" * 65)
@@ -860,17 +873,6 @@ def phase_8_summary() -> None:
         phase_num = phase_name.split("_")[0]
         label = phase_name.split("_", 1)[1].replace("_", " ").title()
         print(f"  Phase {phase_num}: {label:25s} {result}")
-    print()
-
-    # Next steps
-    print("-" * 65)
-    print("  NEXT STEPS")
-    print("-" * 65)
-    print()
-    print("  1. Update .env.local ADMIN_PREVIEW_API_KEY with the superadmin User API Key")
-    print("  2. Update MEMORY.md with the new widget key")
-    print("  3. Open the Admin UI to verify dashboard data")
-    print("  4. Test the widget on the storefront with the new widget key")
     print()
     print("=" * 65)
     print()

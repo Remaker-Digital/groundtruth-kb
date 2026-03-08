@@ -23,13 +23,22 @@ from urllib.error import HTTPError, URLError
 # ---------------------------------------------------------------------------
 # Environment configs
 # ---------------------------------------------------------------------------
+# ---------------------------------------------------------------------------
+# SPEC-1673: Provider-Tenant Key Isolation
+# Tenant API keys MUST NOT be hardcoded. They are read from environment
+# variables at runtime. Scripts will fail with a clear error if keys are
+# not set — this is correct behavior. The provider should NOT hold these
+# keys. See WI-1107 for the full test infrastructure refactoring.
+# ---------------------------------------------------------------------------
+import os as _os
+
 ENVIRONMENTS = {
     "staging": {
         "fqdn": "agent-red-staging.orangeglacier-f566a4e7.eastus.azurecontainerapps.io",
         "container_app": "agent-red-staging",
         "tenant_id": "remaker-digital-001",
-        "api_key": "ar_user_rema_TwjRWmhZhjo3sX1sROYKcTHGVKfks9cu",
-        "widget_key": "pk_live_c79a2bd0b3d4_96f287f39e6a217f10dc76709297c169",
+        "api_key": _os.environ.get("STAGING_TENANT_API_KEY", ""),
+        "widget_key": _os.environ.get("STAGING_TENANT_WIDGET_KEY", ""),
         "resource_group": "Agent-Red",
         "cosmos_db_database": "agentred-staging",
     },
@@ -37,8 +46,8 @@ ENVIRONMENTS = {
         "fqdn": "agent-red-api-gateway.orangeglacier-f566a4e7.eastus.azurecontainerapps.io",
         "container_app": "agent-red-api-gateway",
         "tenant_id": "remaker-digital-001",
-        "api_key": "ar_user_rema_QU5f2jBq0Z4SXYoyFd9zOmTEjQ7gj4j7",
-        "widget_key": "pk_live_c79a2bd0b3d4_ab04f5d5d4cbe783db863c16aba9eb94",
+        "api_key": _os.environ.get("PRODUCTION_TENANT_API_KEY", ""),
+        "widget_key": _os.environ.get("PRODUCTION_TENANT_WIDGET_KEY", ""),
         "resource_group": "Agent-Red",
         "cosmos_db_database": "agentred",
     },
@@ -49,13 +58,13 @@ ENVIRONMENTS = {
 TENANTS = {
     "staging:staging-001": {
         "tenant_id": "staging-001",
-        "api_key": "ar_user_stag_PrSjVAo368DK58OYpFPmieVgyKL-G15l",
-        "widget_key": "pk_live_18e9ec8657ac_ffaf9f7845b21015014faae7663171f4",
+        "api_key": _os.environ.get("STAGING_001_API_KEY", ""),
+        "widget_key": _os.environ.get("STAGING_001_WIDGET_KEY", ""),
     },
     "staging:staging-002": {
         "tenant_id": "staging-002",
-        "api_key": "ar_user_stag_5HsOLIUC49ROPdgKpczXQuguX6JHmRaI",
-        "widget_key": "pk_live_631dbbde2eaf_6424b262421b4ff46b50ef18ccdf0e52",
+        "api_key": _os.environ.get("STAGING_002_API_KEY", ""),
+        "widget_key": _os.environ.get("STAGING_002_WIDGET_KEY", ""),
     },
 }
 

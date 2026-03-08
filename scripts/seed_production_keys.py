@@ -173,8 +173,14 @@ async def seed_keys(
 ) -> dict[str, dict]:
     """Generate and persist API keys for tenants missing them.
 
+    SPEC-1673: Raw keys are NEVER returned, printed, or saved.
+    Only SHA-256 hashes are persisted in Cosmos DB. The raw keys
+    exist only in memory during generation and are discarded after
+    hashing. Future: deliver raw keys via email (WI-1106).
+
     Returns:
-        dict mapping tenant_id -> {api_key, widget_key, user_keys: {email: key}}
+        dict mapping tenant_id -> {seeded_api_key: bool, seeded_widget_key: bool,
+                                    seeded_user_keys: [email, ...]}
     """
     print()
     mode = "DRY RUN" if dry_run else "EXECUTE"
@@ -203,7 +209,12 @@ async def seed_keys(
             continue
 
         print(f"\n  [SEED] {tid} (status={status}, tier={t.get('tier', '?')})")
-        tenant_keys: dict = {"tenant_id": tid, "user_keys": {}}
+        tenant_result: dict = {
+            "tenant_id": tid,
+            "seeded_api_key": False,
+            "seeded_widget_key": False,
+            "seeded_user_keys": [],
+        }
 
         # --- Tenant-level API key ---
         import secrets
@@ -211,8 +222,9 @@ async def seed_keys(
         if not has_api_key:
             api_key = "ar_" + secrets.token_hex(24)
             api_hash = hash_api_key(api_key)
-            tenant_keys["api_key"] = api_key
-            print(f"    Generated tenant API key: {api_key[:16]}...")
+            # SPEC-1673: Raw key is NOT stored in any dict or variable
+            # beyond this scope. Only the hash is persisted.
+            print(f"    Tenant API key: [generated, hash ready]")
 
             if not dry_run:
                 container = db.get_container_client("tenants")
@@ -220,6 +232,9 @@ async def seed_keys(
                 t["updated_at"] = datetime.now(timezone.utc).isoformat()
                 await container.upsert_item(body=t)
                 print(f"    [WRITTEN] api_key_hash updated in Cosmos")
+                tenant_result["seeded_api_key"] = True
+            # Raw key goes out of scope here — never retained
+            del api_key
         else:
             print(f"    Tenant API key: already present")
 
@@ -227,21 +242,16 @@ async def seed_keys(
         if not has_widget_key:
             widget_key = generate_widget_key(tid)
             widget_hash = hash_widget_key(widget_key)
-            tenant_keys["widget_key"] = widget_key
-            print(f"    Generated widget key:     {widget_key[:20]}...")
+            print(f"    Widget key: [generated, hash ready]")
 
             if not dry_run:
                 container = db.get_container_client("tenants")
-                # Re-read to avoid overwriting the api_key_hash we just set
-                if not has_api_key:
-                    # Already updated `t` above, just add widget hash
-                    t["widget_key_hash"] = widget_hash
-                    t["updated_at"] = datetime.now(timezone.utc).isoformat()
-                else:
-                    t["widget_key_hash"] = widget_hash
-                    t["updated_at"] = datetime.now(timezone.utc).isoformat()
+                t["widget_key_hash"] = widget_hash
+                t["updated_at"] = datetime.now(timezone.utc).isoformat()
                 await container.upsert_item(body=t)
                 print(f"    [WRITTEN] widget_key_hash updated in Cosmos")
+                tenant_result["seeded_widget_key"] = True
+            del widget_key
         else:
             print(f"    Widget key: already present")
 
@@ -255,8 +265,7 @@ async def seed_keys(
             user_key = generate_user_api_key(tid)
             user_hash = hash_api_key(user_key)
             key_prefix = user_key[:12] + "..."
-            tenant_keys["user_keys"][email] = user_key
-            print(f"    Generated user key for {email}: {user_key[:16]}...")
+            print(f"    User key for {email}: [generated, hash ready]")
 
             if not dry_run:
                 member_container = db.get_container_client("team_members")
@@ -265,9 +274,11 @@ async def seed_keys(
                 m["updated_at"] = datetime.now(timezone.utc).isoformat()
                 await member_container.upsert_item(body=m)
                 print(f"    [WRITTEN] user_api_key_hash for {email}")
+                tenant_result["seeded_user_keys"].append(email)
+            del user_key
 
-        if tenant_keys.get("api_key") or tenant_keys.get("widget_key") or tenant_keys["user_keys"]:
-            generated[tid] = tenant_keys
+        if tenant_result["seeded_api_key"] or tenant_result["seeded_widget_key"] or tenant_result["seeded_user_keys"]:
+            generated[tid] = tenant_result
 
     return generated
 
@@ -317,33 +328,26 @@ async def main() -> None:
                 active_only=not args.include_inactive,
             )
 
+            # SPEC-1673: Provider MUST NOT see raw tenant API keys.
+            # Keys are generated and hashed in-memory. The raw keys are
+            # discarded after hashing. Future: deliver via email (WI-1106).
             if generated:
                 print()
                 print("=" * 70)
-                print("  GENERATED CREDENTIALS (save immediately!)")
+                print("  KEYS GENERATED AND HASHED (SPEC-1673)")
                 print("=" * 70)
                 for tid, keys in generated.items():
                     print(f"\n  Tenant: {tid}")
                     if "api_key" in keys:
-                        print(f"    API Key:    {keys['api_key']}")
+                        print(f"    API Key:    [GENERATED — hash stored in Cosmos]")
                     if "widget_key" in keys:
-                        print(f"    Widget Key: {keys['widget_key']}")
-                    for email, ukey in keys.get("user_keys", {}).items():
-                        print(f"    User Key ({email}): {ukey}")
-
-                # Save to file for safety
-                ts = datetime.now().strftime("%Y%m%d-%H%M%S")
-                out_path = os.path.join(
-                    os.path.dirname(__file__),
-                    f"production-keys-{args.env}-{ts}.json",
-                )
-                with open(out_path, "w") as f:
-                    json.dump(generated, f, indent=2)
-                print(f"\n  Keys saved to: {out_path}")
-                print(
-                    "  WARNING: This file contains raw credentials. "
-                    "Delete after transferring to Key Vault / secure storage."
-                )
+                        print(f"    Widget Key: [GENERATED — hash stored in Cosmos]")
+                    for email in keys.get("user_keys", {}):
+                        print(f"    User Key ({email}): [GENERATED — hash stored in Cosmos]")
+                print()
+                print("  Raw keys are NOT displayed or saved (SPEC-1673).")
+                print("  Tenant superadmins will receive keys via email (WI-1106).")
+                print("  Until WI-1106 is implemented, tenants use magic link email auth.")
             else:
                 print("\n  No keys needed — all tenants have keys.")
 
