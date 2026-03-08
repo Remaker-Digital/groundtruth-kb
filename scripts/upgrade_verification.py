@@ -28,8 +28,8 @@ ENVIRONMENTS = {
         "fqdn": "agent-red-staging.orangeglacier-f566a4e7.eastus.azurecontainerapps.io",
         "container_app": "agent-red-staging",
         "tenant_id": "staging-001",
-        "api_key": "ar_user_stag_qejkqo2vSBoS-QceOJ8eg4wS0Gy82G5H",
-        "widget_key": "pk_live_18e9ec8657ac_007a17bf49c2a07f0dc3bf66675a17ee",
+        "api_key": "ar_user_stag_PrSjVAo368DK58OYpFPmieVgyKL-G15l",
+        "widget_key": "pk_live_18e9ec8657ac_ffaf9f7845b21015014faae7663171f4",
         "resource_group": "Agent-Red",
         "cosmos_db_database": "agentred-staging",
     },
@@ -49,8 +49,8 @@ ENVIRONMENTS = {
 TENANTS = {
     "staging:staging-002": {
         "tenant_id": "staging-002",
-        "api_key": "ar_user_stag_nn3mMFfxve98raVOJI0zzFQ7qH_PSJn9",
-        "widget_key": "pk_live_631dbbde2eaf_65dcc8518044653629deb33add5afedc",
+        "api_key": "ar_user_stag_5HsOLIUC49ROPdgKpczXQuguX6JHmRaI",
+        "widget_key": "pk_live_631dbbde2eaf_6424b262421b4ff46b50ef18ccdf0e52",
     },
 }
 
