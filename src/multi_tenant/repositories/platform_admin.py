@@ -120,11 +120,7 @@ class PlatformAdminRepository(PlatformScopedRepository):
         doc["updated_at"] = updated_at
         doc["key_regenerated_at"] = updated_at
 
-        return await self._container.replace_item(
-            item=admin_id,
-            body=doc,
-            partition_key=admin_id,
-        )
+        return await self._container.upsert_item(body=doc)
 
     async def list_admins(self) -> list[dict[str, Any]]:
         """List all platform admins (cross-partition, small collection)."""

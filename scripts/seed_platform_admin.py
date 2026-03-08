@@ -132,17 +132,18 @@ async def seed_platform_admin(
             print(f"  Existing admin_id: {existing[0].get('admin_id')}")
             print(f"  Deactivating existing record and creating new one...\n")
 
-            # Deactivate the old record
+            # Delete the old record and recreate
             old_doc = existing[0]
-            old_doc["is_active"] = False
-            old_doc["deactivated_at"] = now_iso
-            old_doc["deactivated_reason"] = "Replaced by new seed"
-            await container.replace_item(
-                item=old_doc["id"],
-                body=old_doc,
-                partition_key=old_doc["admin_id"],
-            )
-            print(f"  [OK] Deactivated previous admin: {old_doc['admin_id']}")
+            old_admin_id = old_doc["admin_id"]
+            try:
+                await container.delete_item(
+                    item=old_doc["id"],
+                    partition_key=old_admin_id,
+                )
+                print(f"  [OK] Deleted previous admin: {old_admin_id}")
+            except Exception as del_exc:
+                print(f"  [WARN] Could not delete old admin: {del_exc}")
+                print(f"  Proceeding with new admin creation...")
 
         # Create the new admin document
         await container.create_item(body=document)
