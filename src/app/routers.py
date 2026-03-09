@@ -55,10 +55,12 @@ from src.multi_tenant.widget_otp_verification import router as widget_otp_router
 from src.multi_tenant.spa_recovery import router as spa_recovery_router
 from src.multi_tenant.tenant_recovery import router as tenant_recovery_router
 from src.multi_tenant.tenant_recovery import recovery_verify_router
+from src.multi_tenant.communication_capture import router as capture_router
+from src.multi_tenant.email_change import router as email_change_router
 
 
 def register_routers(app: FastAPI) -> None:
-    """Register all 41 API routers on the FastAPI application.
+    """Register all 43 API routers on the FastAPI application.
 
     This mirrors the router registration block from main.py lines 186-209.
     """
@@ -106,3 +108,5 @@ def register_routers(app: FastAPI) -> None:
     app.include_router(spa_recovery_router)  # SPEC-1678: unauthenticated
     app.include_router(tenant_recovery_router)  # SPEC-1677: SPA-facing
     app.include_router(recovery_verify_router)  # SPEC-1677: unauthenticated
+    app.include_router(capture_router)  # SPEC-1687: communication capture
+    app.include_router(email_change_router)  # SPEC-1682/1683: email change

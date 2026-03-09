@@ -304,10 +304,10 @@ export function DashboardPage() {
         />
       </SimpleGrid>
 
-      {/* Conversation volume chart */}
+      {/* Daily usage chart (SPEC-1685) */}
       <Paper p="lg" radius="md" withBorder>
         <Group justify="space-between" mb="md">
-          <Text fw={600}>Conversation volume <HelpTooltip text="Daily billable conversation volume over the selected time period." docLink={`${DOCS_BASE}/analytics#conversation-volume-chart`} /></Text>
+          <Text fw={600}>Daily usage <HelpTooltip text="Daily conversation volume (total vs. billable) over the selected time period. Helps identify usage trends and peak periods." docLink={`${DOCS_BASE}/analytics#daily-usage-chart`} /></Text>
           <Text size="xs" c="dimmed">
             {period === '7d'
               ? 'Last 7 days'
@@ -331,6 +331,10 @@ export function DashboardPage() {
                   <linearGradient id="gradTotal" x1="0" y1="0" x2="0" y2="1">
                     <stop offset="5%" stopColor={BRAND_RED} stopOpacity={0.15} />
                     <stop offset="95%" stopColor={BRAND_RED} stopOpacity={0} />
+                  </linearGradient>
+                  <linearGradient id="gradBillable" x1="0" y1="0" x2="0" y2="1">
+                    <stop offset="5%" stopColor={tokens.actionHover} stopOpacity={0.12} />
+                    <stop offset="95%" stopColor={tokens.actionHover} stopOpacity={0} />
                   </linearGradient>
                 </defs>
                 <CartesianGrid strokeDasharray="3 3" stroke={gridStroke} />
@@ -362,14 +366,23 @@ export function DashboardPage() {
                   stroke={BRAND_RED}
                   strokeWidth={2}
                   fill="url(#gradTotal)"
-                  name="Conversations"
+                  name="Total"
+                />
+                <Area
+                  type="monotone"
+                  dataKey="billable"
+                  stroke={tokens.actionHover}
+                  strokeWidth={1.5}
+                  fill="url(#gradBillable)"
+                  name="Billable"
                 />
               </AreaChart>
             </ResponsiveContainer>
             {/* Legend */}
             <Group gap="lg" mt="xs" justify="center">
               {[
-                { color: BRAND_RED, label: 'Conversations' },
+                { color: BRAND_RED, label: 'Total' },
+                { color: tokens.actionHover, label: 'Billable' },
               ].map((item) => (
                 <Group gap={6} key={item.label}>
                   <Box

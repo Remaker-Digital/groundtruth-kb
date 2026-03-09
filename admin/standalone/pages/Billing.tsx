@@ -1,7 +1,7 @@
 // © 2026 Remaker Digital, a DBA of VanDusen & Palmeter, LLC. All rights reserved.
 
 /**
- * Billing & usage page — Standalone admin.
+ * Account and billing page — Standalone admin.
  *
  * Adapted from the prototype BillingPage with API hooks replacing mock data.
  * Uses flat UsageDashboard + DailyVolume API types from shared hooks.
@@ -11,7 +11,7 @@
  *   chrome #0c0a09 -> page #1c1917 -> surface #292524 -> border #44403c
  */
 
-import React, { useCallback } from 'react';
+import React, { useCallback, useState } from 'react';
 import {
   Paper,
   Group,
@@ -23,22 +23,13 @@ import {
   Progress,
   RingProgress,
   SimpleGrid,
-  Box,
-  Loader,
   Alert,
-  useComputedColorScheme,
+  TextInput,
+  Divider,
 } from '@mantine/core';
-import {
-  AreaChart,
-  Area,
-  XAxis,
-  YAxis,
-  Tooltip,
-  CartesianGrid,
-  ResponsiveContainer,
-} from 'recharts';
+
 import { useAppContext } from '../layouts/StandaloneLayout';
-import { useUsageDashboard, useDailyVolume } from '../../shared/hooks/index';
+import { useUsageDashboard } from '../../shared/hooks/index';
 import { HelpTooltip } from '../../shared/HelpTooltip';
 import { LoadingState } from '../../shared/LoadingState';
 import { tokens } from '../../shared/theme/styles';
@@ -74,11 +65,6 @@ const ADDON_MODULES = [
 // ---------------------------------------------------------------------------
 // Helpers
 // ---------------------------------------------------------------------------
-
-function formatChartDate(dateStr: string): string {
-  const d = new Date(dateStr);
-  return `${d.getMonth() + 1}/${d.getDate()}`;
-}
 
 function formatCurrency(amount: number | null | undefined): string {
   if (amount == null) return '$0.00';
@@ -198,21 +184,20 @@ function PackCard({ conversations, price, effectiveRate, onPurchase, purchasing 
 // ---------------------------------------------------------------------------
 
 export const BillingPage: React.FC = () => {
-  const { apiFetch, tenantContext, onNotify } = useAppContext();
+  const { apiFetch, tenantContext, onNotify, userRole, userEmail } = useAppContext();
   const usage = useUsageDashboard(apiFetch);
-  const dailyVolume = useDailyVolume(apiFetch);
+
   const [purchasingPack, setPurchasingPack] = React.useState<number | null>(null);
 
-  const computedColorScheme = useComputedColorScheme('dark');
-  const isDark = computedColorScheme === 'dark';
+  // Contact preferences state (SPEC-1681)
+  const [newEmail, setNewEmail] = useState('');
+  const [emailChangePending, setEmailChangePending] = useState(false);
+  const [recoveryEmail, setRecoveryEmail] = useState('');
+  const [phone, setPhone] = useState('');
 
-  // Dark-mode-aware chart colors — Mazel design revision (2026-02-03 mockup)
-  const gridStroke = isDark ? 'rgba(255,255,255,0.06)' : '#e9ecef';
-  const axisTickFill = isDark ? tokens.textTertiary : '#868e96';
-  const axisLineStroke = isDark ? tokens.border : '#dee2e6';
-  const tooltipBg = isDark ? tokens.surface : '#fff';
-  const tooltipBorder = isDark ? tokens.border : '#dee2e6';
-  const tooltipColor = isDark ? tokens.textSecondary : undefined;
+
+
+
 
   // Extract usage fields with null safety
   const totalConversations = usage.data?.totalConversations ?? 0;
@@ -228,8 +213,7 @@ export const BillingPage: React.FC = () => {
   const tierLabel = TIER_LABELS[tier] || tier;
   const tierBadgeColor = TIER_BADGE_COLORS[tier] || 'gray';
 
-  // Chart data from daily volume hook
-  const chartData = dailyVolume.data?.days ?? [];
+
 
   // --- Callbacks ---
 
@@ -249,6 +233,39 @@ export const BillingPage: React.FC = () => {
   // Alias for backwards-compatible references in the template
   const handleManageSubscription = handleOpenPortal;
   const handleManageBilling = handleOpenPortal;
+
+  // --- Email change handler (SPEC-1682) ---
+
+  const handleRequestEmailChange = useCallback(async () => {
+    const trimmed = newEmail.trim().toLowerCase();
+    if (!trimmed || !trimmed.includes('@')) {
+      onNotify('Please enter a valid email address.', 'error');
+      return;
+    }
+    if (trimmed === (userEmail || '').toLowerCase()) {
+      onNotify('New email must be different from your current email.', 'warning');
+      return;
+    }
+    setEmailChangePending(true);
+    try {
+      const resp = await apiFetch('/api/admin/email/request', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ new_email: trimmed }),
+      });
+      const data = await resp.json();
+      if (resp.ok && data.ok) {
+        onNotify('Confirmation email sent to your new address. Check your inbox.', 'success');
+        setNewEmail('');
+      } else {
+        onNotify(data.message || 'Failed to request email change.', 'error');
+      }
+    } catch {
+      onNotify('Failed to request email change. Please try again.', 'error');
+    } finally {
+      setEmailChangePending(false);
+    }
+  }, [newEmail, userEmail, apiFetch, onNotify]);
 
   const PACK_ID_MAP: Record<number, string> = { 1000: 'pack_1k', 5000: 'pack_5k', 20000: 'pack_20k' };
 
@@ -284,8 +301,8 @@ export const BillingPage: React.FC = () => {
     return (
       <Stack gap="lg">
         <div>
-          <Title order={2}>Billing & usage</Title>
-          <Text c="dimmed" size="sm">Manage your subscription and monitor usage</Text>
+          <Title order={2}>Account and billing</Title>
+          <Text c="dimmed" size="sm">Manage your account, contact preferences, and subscription</Text>
         </div>
         <LoadingState text="Loading billing data" />
       </Stack>
@@ -298,9 +315,9 @@ export const BillingPage: React.FC = () => {
     <Stack gap="lg">
       {/* Page header */}
       <div>
-        <Title order={2}>Billing & usage</Title>
+        <Title order={2}>Account and billing</Title>
         <Text c="dimmed" size="sm">
-          Manage your subscription and monitor usage
+          Manage your account, contact preferences, and subscription
         </Text>
       </div>
 
@@ -309,6 +326,76 @@ export const BillingPage: React.FC = () => {
         <Alert color="red" variant="light" title="Usage data unavailable">
           {usage.error}
         </Alert>
+      )}
+
+      {/* Contact and security preferences — superadmin only (SPEC-1681) */}
+      {userRole === 'superadmin' && (
+        <Paper p="lg" radius="md" withBorder>
+          <Text fw={600} mb="md">
+            Contact and security preferences
+            <HelpTooltip
+              text="Manage your account email, recovery options, and security settings. Only visible to superadmins."
+              docLink="https://agentredcx.com/docs/admin-guide/account#contact-preferences"
+            />
+          </Text>
+
+          <SimpleGrid cols={{ base: 1, md: 2 }} spacing="md">
+            {/* Current email (read-only) */}
+            <TextInput
+              label="Account email"
+              value={userEmail || ''}
+              readOnly
+              variant="filled"
+              description="Your current login email address"
+              styles={{ input: { cursor: 'default' } }}
+            />
+
+            {/* Change email (SPEC-1682) */}
+            <div>
+              <TextInput
+                label="New email address"
+                placeholder="Enter new email"
+                value={newEmail}
+                onChange={(e) => setNewEmail(e.currentTarget.value)}
+                description="A confirmation link will be sent to the new address"
+              />
+              <Button
+                mt="xs"
+                size="xs"
+                color="action"
+                onClick={handleRequestEmailChange}
+                loading={emailChangePending}
+                disabled={emailChangePending || !newEmail.trim()}
+              >
+                Request email change
+              </Button>
+            </div>
+
+            {/* Recovery email */}
+            <TextInput
+              label="Recovery email"
+              placeholder="backup@example.com"
+              value={recoveryEmail}
+              onChange={(e) => setRecoveryEmail(e.currentTarget.value)}
+              description="Used for account recovery if you lose access"
+              disabled
+              rightSection={<Badge size="xs" variant="light" color="gray">Coming soon</Badge>}
+              rightSectionWidth={95}
+            />
+
+            {/* Phone number (SPEC-1686) */}
+            <TextInput
+              label="Phone number"
+              placeholder="+1 (555) 123-4567"
+              value={phone}
+              onChange={(e) => setPhone(e.currentTarget.value)}
+              description="For SMS verification and security alerts"
+              disabled
+              rightSection={<Badge size="xs" variant="light" color="gray">Coming soon</Badge>}
+              rightSectionWidth={95}
+            />
+          </SimpleGrid>
+        </Paper>
       )}
 
       {/* Plan Card */}
@@ -393,102 +480,6 @@ export const BillingPage: React.FC = () => {
           </Stack>
         </Alert>
       )}
-
-      {/* Usage Chart */}
-      <Paper p="lg" radius="md" withBorder>
-        <Text fw={600} mb="md">
-          Daily usage (30 days)<HelpTooltip text="Number of billable conversations per day over the last 30 days. Helps identify usage trends and peak periods." docLink="https://agentredcx.com/docs/billing/overview#usage-dashboard" />
-        </Text>
-        {dailyVolume.loading && !chartData.length ? (
-          <Group justify="center" py="xl">
-            <Loader size="sm" />
-          </Group>
-        ) : chartData.length === 0 ? (
-          <Text size="sm" c="dimmed" ta="center" py="xl">
-            No usage data available yet
-          </Text>
-        ) : (
-          <>
-            <ResponsiveContainer width="100%" height={280}>
-              <AreaChart
-                data={chartData}
-                margin={{ top: 8, right: 8, left: -10, bottom: 0 }}
-              >
-                <defs>
-                  <linearGradient id="gradBillingTotal" x1="0" y1="0" x2="0" y2="1">
-                    <stop offset="5%" stopColor={BRAND_RED} stopOpacity={0.15} />
-                    <stop offset="95%" stopColor={BRAND_RED} stopOpacity={0} />
-                  </linearGradient>
-                  <linearGradient id="gradBillingBillable" x1="0" y1="0" x2="0" y2="1">
-                    <stop offset="5%" stopColor={tokens.actionHover} stopOpacity={0.12} />
-                    <stop offset="95%" stopColor={tokens.actionHover} stopOpacity={0} />
-                  </linearGradient>
-                </defs>
-                <CartesianGrid strokeDasharray="3 3" stroke={gridStroke} />
-                <XAxis
-                  dataKey="date"
-                  tickFormatter={formatChartDate}
-                  tick={{ fontSize: 11, fill: axisTickFill }}
-                  axisLine={{ stroke: axisLineStroke }}
-                  tickLine={false}
-                />
-                <YAxis
-                  tick={{ fontSize: 11, fill: axisTickFill }}
-                  axisLine={{ stroke: axisLineStroke }}
-                  tickLine={false}
-                />
-                <Tooltip
-                  contentStyle={{
-                    borderRadius: 8,
-                    border: `1px solid ${tooltipBorder}`,
-                    fontSize: 12,
-                    background: tooltipBg,
-                    color: tooltipColor,
-                  }}
-                  labelFormatter={(label) => `Date: ${label}`}
-                />
-                <Area
-                  type="monotone"
-                  dataKey="total"
-                  stroke={BRAND_RED}
-                  strokeWidth={2}
-                  fill="url(#gradBillingTotal)"
-                  name="Total"
-                />
-                <Area
-                  type="monotone"
-                  dataKey="billable"
-                  stroke={tokens.actionHover}
-                  strokeWidth={1.5}
-                  fill="url(#gradBillingBillable)"
-                  name="Billable"
-                />
-              </AreaChart>
-            </ResponsiveContainer>
-            {/* Legend */}
-            <Group gap="lg" mt="xs" justify="center">
-              {[
-                { color: BRAND_RED, label: 'Total' },
-                { color: tokens.actionHover, label: 'Billable' },
-              ].map((item) => (
-                <Group gap={6} key={item.label}>
-                  <Box
-                    style={{
-                      width: 10,
-                      height: 10,
-                      borderRadius: 2,
-                      backgroundColor: item.color,
-                    }}
-                  />
-                  <Text size="xs" c="dimmed">
-                    {item.label}
-                  </Text>
-                </Group>
-              ))}
-            </Group>
-          </>
-        )}
-      </Paper>
 
       {/* Conversation Packs */}
       <div>

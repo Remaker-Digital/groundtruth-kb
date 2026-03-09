@@ -120,6 +120,8 @@ AUTH_EXEMPT_PREFIXES = (
     "/api/auth/account-recovery",  # SPEC-1677: tenant account recovery verification
     "/api/status",
     "/admin/",
+    "/api/test/email-capture",  # SPEC-1687: communication capture
+    "/api/admin/email/confirm",  # SPEC-1683: email change confirmation (token-based)
 )
 
 

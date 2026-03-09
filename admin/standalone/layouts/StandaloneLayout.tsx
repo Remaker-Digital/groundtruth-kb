@@ -82,6 +82,8 @@ interface AppContextValue {
   tenantContext: TenantContext | null;
   /** Caller's role from /api/admin/team/whoami. Null until resolved. */
   userRole: TeamRole | null;
+  /** Caller's email from /api/admin/team/whoami. Null until resolved. */
+  userEmail: string | null;
   /** Product version from API X-Product-Version header. Null until first API call completes. */
   productVersion: string | null;
   apiFetch: (path: string, init?: RequestInit) => Promise<Response>;
@@ -160,7 +162,7 @@ const configGroupItems: NavPage[] = [
 const navItemsAfter: NavPage[] = [
   { path: '/integrations', label: 'Integrations', icon: 'integrations', roles: ['superadmin', 'admin'] },
   { path: '/memory-privacy', label: 'Memory & privacy', icon: 'memory', roles: ['superadmin', 'admin'] },
-  { path: '/billing', label: 'Billing', icon: 'billing', roles: ['superadmin', 'admin'] },
+  { path: '/billing', label: 'Account & billing', icon: 'billing', roles: ['superadmin', 'admin'] },
 ];
 
 // ---------------------------------------------------------------------------
@@ -334,6 +336,7 @@ export const StandaloneLayout: React.FC<StandaloneLayoutProps> = ({
   // ---- Caller role resolution (whoami) ------------------------------------
 
   const [userRole, setUserRole] = useState<TeamRole | null>(null);
+  const [userEmail, setUserEmail] = useState<string | null>(null);
 
   useEffect(() => {
     if (!tenantContext) return;
@@ -346,6 +349,7 @@ export const StandaloneLayout: React.FC<StandaloneLayoutProps> = ({
         }
         const data = await resp.json();
         setUserRole((data.role as TeamRole) || 'admin');
+        setUserEmail(data.email || null);
       })
       .catch(() => {
         setUserRole('admin'); // Graceful fallback
@@ -616,6 +620,7 @@ export const StandaloneLayout: React.FC<StandaloneLayoutProps> = ({
   const contextValue: AppContextValue = {
     tenantContext,
     userRole,
+    userEmail,
     productVersion,
     apiFetch,
     onNotify,
