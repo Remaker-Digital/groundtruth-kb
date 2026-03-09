@@ -70,6 +70,7 @@ _PREFS_DIRECT_FIELDS: set[str] = {
     "widget_customer_bubble_color",
     "widget_customer_bubble_text_color",
     "widget_launcher_shape",
+    "widget_launcher_color",
     "widget_shadow_intensity",
     "widget_panel_width",
     "widget_panel_height",

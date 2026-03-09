@@ -471,8 +471,14 @@ export const StandaloneLayout: React.FC<StandaloneLayoutProps> = ({
       return;
     }
 
-    // --- Already injected — nothing to do ---
-    if (document.getElementById('agent-red-admin-widget')) return;
+    // --- Force re-inject on config changes (e.g. activation) ---
+    const existing = document.getElementById('agent-red-admin-widget');
+    if (existing) {
+      existing.remove();
+      const oldSdk = (window as unknown as Record<string, unknown>).AgentRed as
+        { destroy?: () => void } | undefined;
+      if (oldSdk?.destroy) oldSdk.destroy();
+    }
 
     // Resolve API base URL — same origin as admin or explicit VITE_API_URL
     const apiUrl = API_BASE_URL || window.location.origin;
@@ -547,7 +553,7 @@ export const StandaloneLayout: React.FC<StandaloneLayoutProps> = ({
         { destroy?: () => void } | undefined;
       if (sdk?.destroy) sdk.destroy();
     };
-  }, [tenantContext, apiFetch, activationStatus?.is_active]);
+  }, [tenantContext, apiFetch, activationStatus?.is_active, configRefreshKey]);
 
   // ---- Draft config preview on Agent Configuration page -------------------
   // When the admin is on /configuration, swap the widget to show draft config
@@ -1071,6 +1077,7 @@ export const StandaloneLayout: React.FC<StandaloneLayoutProps> = ({
           onSuccess={() => {
             setShowActivationDialog(false);
             setActivationRefreshKey((k) => k + 1);
+            setConfigRefreshKey((k) => k + 1);
           }}
         />
       )}

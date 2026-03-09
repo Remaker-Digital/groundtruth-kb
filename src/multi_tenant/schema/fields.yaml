@@ -1125,6 +1125,7 @@ fields:
     pii_classification: none
     injected_in_prompt: false
 
+
   - field_name: widget_shadow_intensity
     display_name: Panel shadow
     field_type: enum

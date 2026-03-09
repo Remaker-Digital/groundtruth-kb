@@ -43,6 +43,8 @@ export interface DesignTokens {
   colorSuccess: string;
   colorOverlay: string;
   colorInputBarBg: string;
+  colorLauncher: string;
+  colorLauncherHover: string;
 
   // Typography (Zapier reference: clean, readable, consistent)
   fontFamily: string;
@@ -138,6 +140,7 @@ export interface WidgetConfig {
   widget_customer_bubble_color?: string | null;
   widget_customer_bubble_text_color?: string | null;
   widget_launcher_shape?: 'circle' | 'rounded-square' | 'pill' | null;
+  widget_launcher_color?: string | null;
   widget_offline_message?: string | null;
   widget_auto_open?: boolean | null;
   widget_auto_open_delay?: number | null;
@@ -276,6 +279,7 @@ export function resolveTokens(config: WidgetConfig): DesignTokens {
     | 'colorCustomerBubble' | 'colorCustomerBubbleText'
     | 'colorError' | 'colorSuccess' | 'colorOverlay'
     | 'colorInputBarBg'
+    | 'colorLauncher' | 'colorLauncherHover'
   > = {
     // Typography — Inter (brand), JetBrains Mono (code)
     fontFamily: customFont || "'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif",
@@ -365,6 +369,8 @@ export function resolveTokens(config: WidgetConfig): DesignTokens {
       colorSuccess: '#22C55E',
       colorOverlay: 'rgba(0, 0, 0, 0.6)',
       colorInputBarBg: '#0c0a09',
+      colorLauncher: config.widget_launcher_color || primary,
+      colorLauncherHover: darken(config.widget_launcher_color || primary, -0.1),
     };
   }
 
@@ -389,5 +395,7 @@ export function resolveTokens(config: WidgetConfig): DesignTokens {
     colorSuccess: '#16A34A',
     colorOverlay: 'rgba(0, 0, 0, 0.4)',
     colorInputBarBg: '#fff',
+    colorLauncher: config.widget_launcher_color || primary,
+    colorLauncherHover: darken(config.widget_launcher_color || primary, 0.08),
   };
 }

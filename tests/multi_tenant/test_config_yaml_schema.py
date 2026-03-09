@@ -370,7 +370,8 @@ class TestFieldPipelineCompleteness:
         "widget_customer_bubble_color",       # In mapping, YAML definition pending
         "widget_customer_bubble_text_color",  # In mapping, YAML definition pending
         "widget_key",                         # Internal field, not user-configurable
-        "widget_launcher_shape",              # In mapping, YAML definition pending
+"widget_launcher_shape",              # In mapping, YAML definition pending
+        "widget_launcher_color",              # In mapping, YAML definition pending
     }
     _YAML_ONLY_NOT_IN_COSMOS = {
         "widget_greeting_mode",     # S99: added to YAML, not in Cosmos schema

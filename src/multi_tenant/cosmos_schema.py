@@ -1011,6 +1011,7 @@ class PreferencesDocument(BaseModel):
     widget_customer_bubble_color: str | None = Field(default=None, description="Hex color for customer message bubble background (#RRGGBB)")
     widget_customer_bubble_text_color: str | None = Field(default=None, description="Hex color for customer message bubble text (#RRGGBB)")
     widget_launcher_shape: str | None = Field(default=None, description="circle | rounded-square | pill")
+    widget_launcher_color: str | None = Field(default=None, description="Hex color for launcher button background (#RRGGBB). Falls back to widget_primary_color.")
     widget_shadow_intensity: str | None = Field(default=None, description="none | subtle | standard | heavy")
     widget_panel_width: str | None = Field(default=None, description="compact | standard | wide")
     widget_panel_height: str | None = Field(default=None, description="short | standard | tall")

@@ -65,7 +65,7 @@ export const Launcher: FunctionComponent<LauncherProps> = ({
         width: tokens.launcherSize,
         height: tokens.launcherSize,
         borderRadius: tokens.launcherBorderRadius,
-        backgroundColor: tokens.colorPrimary,
+        backgroundColor: tokens.colorLauncher,
         color: tokens.colorPrimaryText,
         border: 'none',
         cursor: 'pointer',
@@ -79,10 +79,10 @@ export const Launcher: FunctionComponent<LauncherProps> = ({
         padding: 0,
       }}
       onMouseEnter={(e) => {
-        (e.currentTarget as HTMLElement).style.backgroundColor = tokens.colorPrimaryHover;
+        (e.currentTarget as HTMLElement).style.backgroundColor = tokens.colorLauncherHover;
       }}
       onMouseLeave={(e) => {
-        (e.currentTarget as HTMLElement).style.backgroundColor = tokens.colorPrimary;
+        (e.currentTarget as HTMLElement).style.backgroundColor = tokens.colorLauncher;
       }}
     >
       {/* Launcher icon (open state shows close) */}

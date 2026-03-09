@@ -80,6 +80,7 @@ function renderGreetingPreview(msg: string): string {
 
 interface WidgetConfig {
   primaryColor: string;
+  launcherColor: string;
   headerGradientEnd: string;
   headerGradientEnabled: boolean;
   fontFamily: string;
@@ -119,6 +120,7 @@ interface WidgetConfig {
 
 const DEFAULT_WIDGET_CONFIG: WidgetConfig = {
   primaryColor: BRAND_RED,
+  launcherColor: '',
   headerGradientEnd: '#8B1520',
   headerGradientEnabled: false,
   fontFamily: 'Inter, system-ui, sans-serif',
@@ -165,6 +167,7 @@ function configToWidgetConfig(cfg: Record<string, unknown>): Partial<WidgetConfi
   const partial: Partial<WidgetConfig> = {};
 
   if (cfg.widget_primary_color != null) partial.primaryColor = String(cfg.widget_primary_color);
+  if (cfg.widget_launcher_color != null) partial.launcherColor = String(cfg.widget_launcher_color);
   if (cfg.widget_header_gradient_end != null) partial.headerGradientEnd = String(cfg.widget_header_gradient_end);
   if (cfg.widget_header_gradient_enabled != null) partial.headerGradientEnabled = Boolean(cfg.widget_header_gradient_enabled);
   if (cfg.widget_font_family != null) partial.fontFamily = String(cfg.widget_font_family);
@@ -208,6 +211,7 @@ function configToWidgetConfig(cfg: Record<string, unknown>): Partial<WidgetConfi
 function widgetConfigToApiFields(wc: WidgetConfig): Record<string, unknown> {
   return {
     widget_primary_color: wc.primaryColor,
+    widget_launcher_color: wc.launcherColor || null,
     widget_header_gradient_end: wc.headerGradientEnd,
     widget_header_gradient_enabled: wc.headerGradientEnabled,
     widget_font_family: wc.fontFamily,
@@ -562,7 +566,7 @@ function WidgetPreview({ config, adminIsDark, quickActions }: { config: WidgetCo
                   width: 28,
                   height: 28,
                   borderRadius: '50%',
-                  background: config.primaryColor,
+                  background: config.launcherColor || config.primaryColor,
                   display: 'flex',
                   alignItems: 'center',
                   justifyContent: 'center',
@@ -1130,6 +1134,12 @@ export function WidgetPage() {
                     ]}
                   />
                 </div>
+                <ColorField
+                  label="Launcher color"
+                  value={config.launcherColor || config.primaryColor}
+                  onChange={(val) => update('launcherColor', val)}
+                  swatches={[BRAND_RED, '#2563EB', '#059669', '#7C3AED', '#D97706', '#DB2777', '#000000', '#FFFFFF']}
+                />
                 <Select
                   label="Launcher icon"
                   data={ICON_OPTIONS}
