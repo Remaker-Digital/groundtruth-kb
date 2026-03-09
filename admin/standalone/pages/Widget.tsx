@@ -1134,74 +1134,84 @@ export function WidgetPage() {
                     ]}
                   />
                 </div>
-                <ColorField
-                  label="Launcher color"
-                  value={config.launcherColor || config.primaryColor}
-                  onChange={(val) => update('launcherColor', val)}
-                  swatches={[BRAND_RED, '#2563EB', '#059669', '#7C3AED', '#D97706', '#DB2777', '#000000', '#FFFFFF']}
-                />
-                <Select
-                  label="Launcher icon"
-                  data={ICON_OPTIONS}
-                  value={config.launcherIcon}
-                  onChange={(val) => update('launcherIcon', (val as WidgetConfig['launcherIcon']) || 'chat')}
-                  mt={8}
-                />
-                <div>
-                  <Text size="sm" fw={500} mb={6}>
-                    Position
-                  </Text>
-                  <SegmentedControl
-                    fullWidth
-                    value={config.position}
-                    onChange={(val) => update('position', val as WidgetConfig['position'])}
-                    data={[
-                      { label: 'Bottom right', value: 'bottom-right' },
-                      { label: 'Bottom left', value: 'bottom-left' },
-                    ]}
-                    color="action"
-                  />
-                  <Group grow mt={8}>
-                    <NumberInput
-                      label="Horizontal offset"
-                      description="Distance from edge (px)"
-                      size="xs"
-                      min={0}
-                      max={200}
-                      step={4}
-                      suffix=" px"
-                      value={config.positionOffsetX}
-                      onChange={(val) => update('positionOffsetX', typeof val === 'number' ? val : 20)}
+
+                {/* Launcher configuration — two-column layout */}
+                <Group grow align="flex-start" gap="md" mt={8}>
+                  {/* Left column: Launcher color picker */}
+                  <div style={{ flex: '1 1 50%' }}>
+                    <ColorField
+                      label="Launcher color"
+                      value={config.launcherColor || config.primaryColor}
+                      onChange={(val) => update('launcherColor', val)}
+                      swatches={[BRAND_RED, '#2563EB', '#059669', '#7C3AED', '#D97706', '#DB2777', '#000000', '#FFFFFF']}
                     />
-                    <NumberInput
-                      label="Vertical offset"
-                      description="Distance from bottom (px)"
-                      size="xs"
-                      min={0}
-                      max={200}
-                      step={4}
-                      suffix=" px"
-                      value={config.positionOffsetY}
-                      onChange={(val) => update('positionOffsetY', typeof val === 'number' ? val : 20)}
+                  </div>
+
+                  {/* Right column: Launcher controls stack */}
+                  <Stack gap="sm" style={{ flex: '1 1 50%' }}>
+                    <Select
+                      label="Launcher icon"
+                      data={ICON_OPTIONS}
+                      value={config.launcherIcon}
+                      onChange={(val) => update('launcherIcon', (val as WidgetConfig['launcherIcon']) || 'chat')}
                     />
-                  </Group>
-                </div>
-                <div>
-                  <Text size="sm" fw={500} mb={6}>
-                    Color mode
-                  </Text>
-                  <SegmentedControl
-                    fullWidth
-                    value={config.colorMode}
-                    onChange={(val) => update('colorMode', val as WidgetConfig['colorMode'])}
-                    data={[
-                      { label: 'Light', value: 'light' },
-                      { label: 'Dark', value: 'dark' },
-                      { label: 'Auto', value: 'auto' },
-                    ]}
-                    color="action"
-                  />
-                </div>
+                    <div>
+                      <Text size="sm" fw={500} mb={6}>
+                        Position
+                      </Text>
+                      <SegmentedControl
+                        fullWidth
+                        value={config.position}
+                        onChange={(val) => update('position', val as WidgetConfig['position'])}
+                        data={[
+                          { label: 'Bottom right', value: 'bottom-right' },
+                          { label: 'Bottom left', value: 'bottom-left' },
+                        ]}
+                        color="action"
+                      />
+                    </div>
+                    <Group grow>
+                      <NumberInput
+                        label="Horizontal offset"
+                        description="Distance from edge (px)"
+                        size="xs"
+                        min={0}
+                        max={200}
+                        step={4}
+                        suffix=" px"
+                        value={config.positionOffsetX}
+                        onChange={(val) => update('positionOffsetX', typeof val === 'number' ? val : 20)}
+                      />
+                      <NumberInput
+                        label="Vertical offset"
+                        description="Distance from bottom (px)"
+                        size="xs"
+                        min={0}
+                        max={200}
+                        step={4}
+                        suffix=" px"
+                        value={config.positionOffsetY}
+                        onChange={(val) => update('positionOffsetY', typeof val === 'number' ? val : 20)}
+                      />
+                    </Group>
+                    <div>
+                      <Text size="sm" fw={500} mb={6}>
+                        Color mode
+                      </Text>
+                      <SegmentedControl
+                        fullWidth
+                        value={config.colorMode}
+                        onChange={(val) => update('colorMode', val as WidgetConfig['colorMode'])}
+                        data={[
+                          { label: 'Light', value: 'light' },
+                          { label: 'Dark', value: 'dark' },
+                          { label: 'Auto', value: 'auto' },
+                        ]}
+                        color="action"
+                      />
+                    </div>
+                  </Stack>
+                </Group>
                 <div>
                   <Text size="sm" fw={500} mb={6}>
                     Panel width <HelpTooltip text="Set the chat panel width. Compact (320px) works well on smaller screens; Wide (440px) shows more content." docLink="https://agentredcx.com/docs/admin-guide/widget-appearance" />
