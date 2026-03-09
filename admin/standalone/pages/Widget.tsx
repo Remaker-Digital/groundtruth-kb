@@ -1097,7 +1097,7 @@ export function WidgetPage() {
                   value={config.fontFamily}
                   onChange={(val) => update('fontFamily', val || DEFAULT_WIDGET_CONFIG.fontFamily)}
                 />
-                <div>
+                <div style={{ marginBottom: 20 }}>
                   <Text size="sm" fw={500} mb={4}>
                     Border radius ({config.borderRadius}px)
                   </Text>
