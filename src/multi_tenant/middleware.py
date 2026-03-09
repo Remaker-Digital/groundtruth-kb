@@ -211,6 +211,31 @@ class TenantAuthMiddleware(BaseHTTPMiddleware):
         from src.multi_tenant.security_hardening import get_pre_auth_limiter
         get_pre_auth_limiter().record_success(client_ip)
 
+        # WI-1045 / SPEC-1657: Validate ?tenant= URL param against resolved tenant.
+        # If the URL claims a specific tenant but the API key resolves to a
+        # different one, reject the request rather than silently using the
+        # key's tenant. This prevents confusion attacks where a crafted URL
+        # shows tenant A's admin while the backend scopes queries to tenant B.
+        url_tenant = request.query_params.get("tenant")
+        if (
+            url_tenant
+            and not getattr(tenant_context, "is_platform_admin", False)
+            and not getattr(tenant_context, "is_widget_auth", False)
+            and tenant_context.tenant_id != url_tenant
+        ):
+            logger.warning(
+                "Tenant mismatch: URL tenant=%s, auth tenant=%s, path=%s",
+                url_tenant,
+                tenant_context.tenant_id[:12],
+                request.url.path,
+            )
+            return JSONResponse(
+                status_code=403,
+                content={
+                    "error": "Tenant parameter does not match authenticated tenant.",
+                },
+            )
+
         # SPEC-1676: Fire non-blocking login notification for SPA auth
         if getattr(tenant_context, "is_platform_admin", False):
             try:

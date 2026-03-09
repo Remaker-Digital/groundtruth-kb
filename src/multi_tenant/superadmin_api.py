@@ -649,14 +649,18 @@ class CreateTenantRequest(CamelCaseModel):
 
 
 class CreateTenantResponse(CamelCaseModel):
-    """Response from SPA tenant creation — includes one-time credentials."""
+    """Response from SPA tenant creation.
+
+    SPEC-1673: Raw tenant API keys are NEVER returned in API responses.
+    Keys are delivered directly to the tenant superadmin via email only.
+    The provider operator sees delivery status, not raw credentials.
+    """
 
     tenant_id: str
     status: str
     tier: str
     superadmin_email: str
-    superadmin_api_key: str | None = None
-    widget_key: str | None = None
+    keys_delivered_via_email: bool = False
     warnings: list[str] = Field(default_factory=list)
 
 
@@ -792,13 +796,18 @@ async def create_tenant(
         ctx.team_member_email or "unknown",
     )
 
+    # SPEC-1673: Raw keys are NEVER returned in the API response.
+    # Keys were already emailed to the tenant superadmin in Step 5 of
+    # spa_provision_tenant(). The provider operator only sees whether
+    # email delivery succeeded.
+    email_succeeded = not any("email failed" in e.lower() for e in result.errors)
+
     return CreateTenantResponse(
         tenant_id=result.tenant_id,
         status=result.status,
         tier=result.tier,
         superadmin_email=result.superadmin_email,
-        superadmin_api_key=result.superadmin_api_key,
-        widget_key=result.widget_key,
+        keys_delivered_via_email=email_succeeded,
         warnings=result.errors,
     )
 

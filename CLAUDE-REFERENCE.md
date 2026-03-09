@@ -83,20 +83,20 @@ If AGNTCY Docker containers are running on this machine, Agent Red must behave a
 
 ## Production Infrastructure (Summary)
 
-> **Detailed tables:** `CLAUDE_ARCHIVE.md` § "Production Infrastructure Ownership". Operational patterns: `memory/deployment.md`.
+> **Canonical source:** `MEMORY.md` § Quick Reference for current values (versions, keys, FQDNs).
 
 | Resource | Name | Key Detail |
 |----------|------|------------|
-| Resource Group | agentred-prod-rg | East US 2, 17 resources |
-| Azure OpenAI | aoai-agentred-eastus2 | S0, 3 deployments (gpt-4o, gpt-4o-mini, text-embedding-3-large) |
-| Cosmos DB | cosmos-agentred-eastus2 | Serverless, NoSQL Vector Search, DiskANN, 10 containers |
-| Key Vault | kv-agentred-eastus2 | RBAC-enabled |
-| Container Registry | acragentredeastus2 | 9 repositories |
-| Container App Env | agent-red-cae | Domain: `lemonriver-f59f94b7.eastus2.azurecontainerapps.io` |
-| API Gateway | agent-red-api-gateway | FQDN: `agent-red-api-gateway.lemonriver-f59f94b7.eastus2.azurecontainerapps.io` |
-| NATS | agent-red-nats | Internal: `agent-red-nats.internal.lemonriver-f59f94b7.eastus2.azurecontainerapps.io:4222` |
+| Resource Group | Agent-Red | East US |
+| Azure OpenAI | aoai-agentred-eastus | S0, 3 deployments (gpt-4o, gpt-4o-mini, text-embedding-3-large) |
+| Cosmos DB | cosmos-agentred-eastus | Serverless, NoSQL Vector Search, DiskANN, 20 containers (incl. platform_admins) |
+| Key Vault | kv-agentred-eastus | RBAC-enabled |
+| Container Registry | acragentredeastus | ACR repository: api-gateway |
+| Container App Env | agent-red-cae | Domain: `orangeglacier-f566a4e7.eastus.azurecontainerapps.io` |
+| API Gateway | agent-red-api-gateway | FQDN: `agent-red-api-gateway.orangeglacier-f566a4e7.eastus.azurecontainerapps.io` |
+| NATS | agent-red-nats | Internal: `agent-red-nats.internal.orangeglacier-f566a4e7.eastus.azurecontainerapps.io:4222` |
 
-9 Container Apps deployed. 27 RBAC assignments. Terraform state clean. NATS connected=false (lazy init).
+Staging: `agent-red-staging.orangeglacier-f566a4e7.eastus.azurecontainerapps.io` (3 tenants, scales to zero).
 
 **Third-Party Service Accounts:** Azure OpenAI (pay-per-token), Shopify Partner (developer), Zendesk (sandbox), Mailchimp (free tier), Google Analytics (GA4).
 
@@ -259,4 +259,4 @@ No competitor has confirmed implementing per-customer vector RAG over historical
 ---
 
 *© 2026 Remaker Digital, a DBA of VanDusen & Palmeter, LLC. All rights reserved.*
-*Last Updated: 2026-02-13*
+*Last Updated: 2026-03-08*

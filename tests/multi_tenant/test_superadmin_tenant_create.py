@@ -163,8 +163,10 @@ class TestCreateTenant:
         assert result.status == "active"
         assert result.tier == "starter"
         assert result.superadmin_email == "admin@test.com"
-        assert result.superadmin_api_key == "ar_user_test_abc123"
-        assert result.widget_key == "pk_live_abc_def"
+        # SPEC-1673: Raw keys are NEVER returned in API response
+        assert not hasattr(result, "superadmin_api_key") or result.__fields__.get("superadmin_api_key") is None
+        assert not hasattr(result, "widget_key") or result.__fields__.get("widget_key") is None
+        assert result.keys_delivered_via_email is True
         assert result.warnings == []
 
     def test_missing_merchant_name_rejected(self):
@@ -218,7 +220,9 @@ class TestCreateTenant:
         )
 
         assert result.tenant_id == "spa-test-001"
-        assert result.widget_key is None
+        # SPEC-1673: keys_delivered_via_email should still be True because
+        # the widget key failure isn't an email failure
+        assert result.keys_delivered_via_email is True
         assert len(result.warnings) >= 1
         assert "Widget" in result.warnings[0] or "widget" in result.warnings[0].lower()
 
@@ -239,7 +243,8 @@ class TestCreateTenant:
         )
 
         assert result.tenant_id == "spa-test-001"
-        assert result.superadmin_api_key is None
+        # SPEC-1673: no raw keys in response regardless
+        assert result.keys_delivered_via_email is True  # no "email failed" in errors
         assert len(result.warnings) >= 1
 
     @pytest.mark.asyncio
@@ -313,6 +318,45 @@ class TestCreateTenant:
             superadmin_email="admin@test.com",
             tier="starter",
         )
+
+    # --- SPEC-1673: Key delivery via email tests ----------------------------
+
+    @pytest.mark.asyncio
+    @patch("src.integrations.provisioning.spa_provision_tenant", new_callable=AsyncMock)
+    async def test_keys_not_in_response_spec_1673(
+        self, mock_provision, superadmin_ctx,
+    ):
+        """SPEC-1673: Raw tenant API keys MUST NOT appear in API response."""
+        mock_provision.return_value = _make_provision_result()
+
+        result = await create_tenant(
+            body=_make_request(),
+            ctx=superadmin_ctx,
+        )
+
+        # Response model must not contain raw key fields
+        response_fields = set(type(result).model_fields.keys())
+        assert "superadmin_api_key" not in response_fields
+        assert "widget_key" not in response_fields
+        assert "keys_delivered_via_email" in response_fields
+
+    @pytest.mark.asyncio
+    @patch("src.integrations.provisioning.spa_provision_tenant", new_callable=AsyncMock)
+    async def test_email_failure_sets_delivery_false(
+        self, mock_provision, superadmin_ctx,
+    ):
+        """When welcome email fails, keys_delivered_via_email is False."""
+        mock_provision.return_value = _make_provision_result(
+            errors=["Welcome email failed: SMTP timeout"],
+        )
+
+        result = await create_tenant(
+            body=_make_request(),
+            ctx=superadmin_ctx,
+        )
+
+        assert result.keys_delivered_via_email is False
+        assert any("email failed" in w.lower() for w in result.warnings)
 
     # --- SPA tenant guard tests (B1) ----------------------------------------
 

@@ -28,7 +28,7 @@ E:\Claude-Playground\CLAUDE-PROJECTS\Agent Red Customer Engagement\
 │
 ├── src/                            # Commercial source code
 │   ├── __init__.py
-│   ├── main.py                     # FastAPI app entrypoint (21 routers, 79 routes, 9 middleware, ~1,000 lines)
+│   ├── main.py                     # FastAPI app entrypoint (44 routers, ~140+ routes, 9 middleware, ~1,000 lines)
 │   ├── integrations/               # Billing & platform integrations
 │   │   ├── __init__.py
 │   │   ├── provisioning.py         # Channel-agnostic tenant provisioning service
@@ -41,9 +41,9 @@ E:\Claude-Playground\CLAUDE-PROJECTS\Agent Red Customer Engagement\
 │   │   ├── shopify_client.py       # Async Shopify GraphQL API client (httpx)
 │   │   ├── shopify_billing.py      # Shopify Billing API (subscriptions + usage charges)
 │   │   └── shopify_gdpr_webhooks.py # Shopify GDPR mandatory webhooks (3 endpoints, HMAC verification)
-│   ├── multi_tenant/               # Multi-tenant infrastructure (51 modules, ~39,500 lines)
+│   ├── multi_tenant/               # Multi-tenant infrastructure (89 modules + 16 repositories, ~55,000+ lines)
 │   │   ├── __init__.py             # Package init with import hints
-│   │   ├── cosmos_schema.py        # 9 collections, 12 document models, 8 enums, tier defaults (incl. trial)
+│   │   ├── cosmos_schema.py        # 20 collections, 12+ document models, 8 enums, tier defaults (incl. trial)
 │   │   ├── cosmos_client.py        # CosmosManager singleton (lazy init, Managed Identity, health)
 │   │   ├── repository.py           # TenantScopedRepository + 10 collection repositories
 │   │   ├── auth.py                 # Triple auth: Shopify JWT + API key + publishable widget key
@@ -91,11 +91,32 @@ E:\Claude-Playground\CLAUDE-PROJECTS\Agent Red Customer Engagement\
 │   │   ├── staleness_service.py   # KB entry staleness detection + scoring (~540 lines)
 │   │   ├── semantic_cache.py      # 3-tier semantic cache: embedding, search, response (~530 lines)
 │   │   ├── kb_conflict_scanner.py # KB conflict/duplication scanner: 4-phase detection (~705 lines)
-│   │   ├── superadmin_api.py      # SPA provider ops API: tenant directory, dashboard, billing, deploys (~583 lines)
-│   │   ├── mcp_client.py          # MCP client: AgentRedMcpClient, config models, shop_domain guard, policy gate, PII scrub (~650 lines, session 36+37)
-│   │   ├── mcp_credential_cache.py # In-memory credential cache: 5-min TTL, double-check locking, Key Vault backend (~270 lines, session 37)
-│   │   ├── mutation_policy.py     # MutationPolicy, MutationRequest, MutationResult, evaluate_request (~230 lines, session 37)
-│   │   └── mutation_executor.py   # Critic-gated 6-stage mutation executor: policy→idempotency→Critic→confirm→execute→log (~310 lines, session 37)
+│   │   ├── superadmin_api.py      # SPA provider ops API: tenant directory, dashboard, billing, deploys, user management (~700+ lines)
+│   │   ├── mcp_client.py          # MCP client: AgentRedMcpClient, config models, shop_domain guard, policy gate, PII scrub (~650 lines)
+│   │   ├── mcp_credential_cache.py # In-memory credential cache: 5-min TTL, double-check locking, Key Vault backend (~270 lines)
+│   │   ├── mutation_policy.py     # MutationPolicy, MutationRequest, MutationResult, evaluate_request (~230 lines)
+│   │   ├── mutation_executor.py   # Critic-gated 6-stage mutation executor: policy→idempotency→Critic→confirm→execute→log (~310 lines)
+│   │   ├── login_notification.py  # Non-blocking SPA login notification emails (SPEC-1676)
+│   │   ├── spa_recovery.py        # SPA emergency key recovery via backup codes (SPEC-1678)
+│   │   ├── tenant_recovery.py     # Tenant account recovery: recovery address + one-time auth links (SPEC-1677)
+│   │   ├── tenant_name.py         # TenantName value object: human-readable slug generation from email domain
+│   │   └── repositories/          # Collection-specific repository classes (16 modules)
+│   │       ├── __init__.py
+│   │       ├── base.py            # TenantScopedRepository base class
+│   │       ├── platform_admin.py  # PlatformAdminRepository (platform_admins collection, SPEC-1667)
+│   │       ├── platform.py        # PlatformScopedRepository
+│   │       ├── tenant.py          # TenantRepository
+│   │       ├── team.py            # TeamRepository
+│   │       ├── conversation.py    # ConversationRepository
+│   │       ├── knowledge.py       # KnowledgeRepository
+│   │       ├── customer.py        # CustomerRepository
+│   │       ├── memory.py          # MemoryRepository
+│   │       ├── preferences.py     # PreferencesRepository
+│   │       ├── usage.py           # UsageRepository
+│   │       ├── alerts.py          # AlertsRepository
+│   │       ├── incidents.py       # IncidentsRepository
+│   │       ├── sla_snapshots.py   # SlaSnapshotsRepository
+│   │       └── verification.py    # VerificationRepository
 │   ├── chat/                       # Chat API
 │   │   ├── __init__.py
 │   │   ├── models.py              # Request/response Pydantic models + StreamEvent SSE format (~200 lines)
@@ -129,7 +150,7 @@ E:\Claude-Playground\CLAUDE-PROJECTS\Agent Red Customer Engagement\
 │   ├── ai-features/                # Advanced AI (Phase 2.5)
 │   └── white-label/                # Customization (future)
 │
-├── tests/                          # Test suites (2,646 unit tests, 0 failures)
+├── tests/                          # Test suites (5,984 offline tests, 936 live E2E, 0 failures)
 │   ├── conftest.py                 # Shared fixtures: TestClient, MockCosmos, MockNATS, MockKV, auth helpers
 │   ├── test_conftest_smoke.py      # Fixture smoke tests
 │   ├── test_health.py              # Health/ready endpoint tests
@@ -139,17 +160,19 @@ E:\Claude-Playground\CLAUDE-PROJECTS\Agent Red Customer Engagement\
 │   ├── security/                   # Adversarial/security tests
 │   ├── performance/                # Performance/load tests + Locust config
 │   ├── chat/                       # SSE/streaming tests
-│   ├── agents/                    # AGNTCY agent module tests (121 tests across 10 files)
+│   ├── agents/                    # AGNTCY agent module tests
 │   ├── regression/                 # 73 regression tests (3-tier upgrade validation)
+│   ├── e2e_live/                    # Live E2E Playwright tests (936 tests: standalone 576, provider 264, shopify 96)
 │   └── integration/                # Azure service integration tests
 │
 ├── widget/                         # Chat widget frontend (Preact + TypeScript, ~17KB gzip)
 ├── prototype/                      # Admin dashboard prototype (Mantine + Polaris, owner-approved)
 ├── extensions/                     # Shopify Theme App Extension
 ├── admin/                          # Admin dashboard frontends
-│   ├── shared/                     # 12 shared components + hooks + types (~6,500 lines; +McpConfigPanel session 37)
-│   ├── shopify/                    # Shopify embedded admin (Polaris + App Bridge, ~2,700 lines)
-│   └── standalone/                 # Standalone admin (API key login, ~2,800 lines)
+│   ├── shared/                     # Shared components + hooks + types
+│   ├── shopify/                    # Shopify embedded admin (Polaris + App Bridge)
+│   ├── standalone/                 # Standalone admin (API key login)
+│   └── provider/                   # Provider Console SPA (20 pages, Mantine + Recharts)
 │
 ├── infrastructure/terraform/       # IaC for Azure
 ├── website/content/                # Marketing website content
@@ -219,4 +242,4 @@ All artifact tables use append-only versioning: `UNIQUE(id, version)`. Every mut
 ---
 
 *© 2026 Remaker Digital, a DBA of VanDusen & Palmeter, LLC. All rights reserved.*
-*Last Updated: 2026-03-03*
+*Last Updated: 2026-03-08*
