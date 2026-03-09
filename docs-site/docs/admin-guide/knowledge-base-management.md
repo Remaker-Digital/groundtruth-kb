@@ -267,6 +267,24 @@ Outdated knowledge base articles are worse than no articles at all. An outdated 
 - **When policies change:** Update the relevant knowledge base article and Business Policy field the same day.
 - **Seasonally:** Archive or update seasonal content (holiday shipping cutoffs, seasonal promotions).
 
+### Optimization workflow
+
+Follow this process to systematically improve your knowledge base over time:
+
+1. **Start with your top 20 questions.** Check your email inbox, help desk, or social media for the 20 most common customer questions. Create one article for each.
+
+2. **Run a conflict scan.** From the Knowledge Base page, click the **Conflict scan** button. The scan checks for duplicate, overlapping, or contradictory entries and reports issues grouped by severity (High, Medium, Low). Each issue shows similarity percentages and a suggested resolution. Fix all High-severity conflicts immediately.
+
+3. **Review the analytics.** After your first week, check the Dashboard for knowledge gaps — questions the AI could not answer confidently. Create articles to cover those gaps.
+
+4. **Test article quality.** Open the chat widget and ask the exact questions your articles should answer. If the AI gives a vague or incomplete response, the article likely needs clearer language, a better title, or both.
+
+5. **Use the staleness indicators.** Articles with orange or red freshness badges need review. Click **Mark as verified** if the content is still accurate, or edit the article if information has changed.
+
+6. **Split long articles.** If an article covers more than one distinct topic (e.g., returns AND exchanges AND warranties), split it into separate articles. Focused articles produce better retrieval scores.
+
+7. **Iterate monthly.** Review escalated conversations for patterns. If customers are frequently escalated for the same topic, the knowledge base is missing coverage. Add or improve articles for that topic.
+
 ---
 
 *© 2026 Remaker Digital, a DBA of VanDusen & Palmeter, LLC. All rights reserved.*

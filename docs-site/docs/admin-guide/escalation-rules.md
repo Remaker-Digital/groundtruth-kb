@@ -142,4 +142,52 @@ Forces escalation after the conversation reaches this many back-and-forth exchan
 
 ---
 
+## Testing your escalation rules
+
+Before going live, verify that escalation triggers work as expected. Follow this testing workflow:
+
+### Step 1 — Test keyword triggers
+
+1. Open the chat widget on your website (or the widget preview).
+2. Type a message containing one of your escalation keywords (e.g., "I want to speak to a person").
+3. Verify that the AI responds with an escalation handoff message.
+4. Check the Inbox — the conversation should appear with an **Escalated** status badge.
+5. Verify that the escalation agent assigned to the matching category received an email notification.
+
+Repeat for each keyword in your list. If a keyword does not trigger escalation, check that it matches exactly (escalation keywords are case-insensitive but must match as a substring).
+
+### Step 2 — Test threshold behavior
+
+1. Start a new conversation with a question outside your knowledge base coverage (something the AI should not be confident about).
+2. Continue the conversation for several turns, asking progressively more specific questions that the AI cannot answer.
+3. The AI should escalate when its confidence drops below your threshold setting.
+4. If the AI does not escalate when it should, lower the threshold by 0.05–0.1.
+
+### Step 3 — Test turn limits
+
+1. Start a new conversation.
+2. Continue chatting until you reach the maximum turn count (default: 10 turns).
+3. After reaching the limit, the AI should escalate the conversation automatically.
+4. Verify the escalation appears in the Inbox.
+
+### Step 4 — Test notification routing
+
+1. Ensure you have at least one escalation agent configured in [Team management](./team-management.md) with assigned categories.
+2. Trigger an escalation (using any of the methods above).
+3. Check that the correct agent receives the email notification based on the escalation category.
+4. Click the link in the notification email and verify it opens the correct conversation in the Inbox.
+
+### Tuning after launch
+
+After your first 1–2 weeks of live traffic:
+
+| Metric to check | Where to find it | Action |
+|---|---|---|
+| Escalation rate | Dashboard | If above 20%, your threshold may be too high or your knowledge base may have gaps |
+| False escalations | Inbox (Escalated filter) | Review escalated conversations that the AI could have handled. Lower the threshold by 0.05 |
+| Missed escalations | Inbox (Resolved filter) | Look for resolved conversations where the customer expressed frustration but was not escalated. Add the phrases they used as keywords |
+| Notification gaps | Team page (Escalations column) | If an agent has zero escalations and conversations are going unhandled, check their category assignments |
+
+---
+
 *© 2026 Remaker Digital, a DBA of VanDusen & Palmeter, LLC. All rights reserved.*

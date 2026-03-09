@@ -14,17 +14,18 @@ Agent Red is in early access. If you need onboarding assistance, [contact us](ht
 
 ## Setup overview
 
-The complete setup path has five stages. Most customers complete the process in under an hour.
+The complete setup path has six stages. Most customers complete the process in under an hour.
 
 ```mermaid
 flowchart LR
     A[1. Account\nProvisioning] --> B[2. API Key\nConfiguration]
     B --> C[3. Connect\nData Sources]
     C --> D[4. Knowledge\nBase Setup]
-    D --> E[5. Go Live]
+    D --> E[5. AI Config\nWizard]
+    E --> F[6. Go Live]
 
     style A fill:#DC2626,color:#fff
-    style E fill:#16A34A,color:#fff
+    style F fill:#16A34A,color:#fff
 ```
 
 ## 1. Account provisioning
@@ -165,7 +166,67 @@ FAQ entries are question-and-answer pairs that you create in the dashboard. They
 
 Policy documents are longer-form content (return policies, warranty terms, shipping rules) that the AI references when answering policy-related questions. Upload these as text in the dashboard. The system chunks and indexes them automatically.
 
-## 5. Go live
+## 5. AI Configuration wizard
+
+When you first log in to the admin console and have not yet activated a configuration, Agent Red presents a three-step setup wizard. The wizard guides you through the essential configuration in order.
+
+```mermaid
+flowchart LR
+    A[Step 1\nConnect Store] --> B[Step 2\nReview Knowledge Base]
+    B --> C[Step 3\nConfigure Agent]
+    C --> D[Activate]
+
+    style A fill:#DC2626,color:#fff
+    style D fill:#16A34A,color:#fff
+```
+
+### Step 1 — Connect your store
+
+Link your Shopify storefront so Agent Red can automatically import product catalog, policies, and page content.
+
+1. Click **Connect Shopify** in the wizard.
+2. Authorize the required permissions (read_products, read_orders, read_customers, read_inventory).
+3. Wait for the initial sync to complete (typically 5–15 minutes depending on catalog size).
+4. The wizard shows a summary of imported content — product count, policy pages found, and custom pages.
+
+If you are using Agent Red without Shopify (standalone mode), click **Skip** to proceed to Step 2 and add knowledge base content manually.
+
+### Step 2 — Review your knowledge base
+
+Browse the articles that were imported from your storefront and optionally apply an industry template.
+
+1. Review imported articles — they appear as **drafts**. Edit titles and content for clarity.
+2. Optionally click **Apply template** to add industry-specific FAQ articles (11 categories available — Electronics, Apparel, Beauty, Food, Health, Home, Jewelry, Pet, Sports, Toys, General).
+3. **Publish** the articles you want the AI to use. Only published articles are searchable.
+4. Add any additional FAQ entries or policy documents that were not covered by the import.
+
+:::tip
+Spend 10–15 minutes reviewing imported articles. Auto-imported content may need editing for tone, accuracy, or completeness. This step has the single biggest impact on response quality.
+:::
+
+### Step 3 — Configure your agent
+
+Review AI-generated configuration suggestions and customize your agent's personality and behavior.
+
+1. **Brand name** — pre-filled from your store name. Edit if needed.
+2. **Brand voice** — AI analyzes your content and suggests a personality description. Accept or write your own.
+3. **Formality** — choose Casual, Professional, or Formal.
+4. **Response length** — choose Concise, Moderate, or Detailed.
+5. **Policies** — review the return window (days), refund policy, and shipping policy. AI suggestions appear as badges — click to preview and apply.
+6. **Escalation threshold** — a slider from 0.0 (aggressive AI) to 1.0 (conservative). Start with your tier's default.
+7. **Custom instructions** — optional free-form instructions for the AI (e.g., "Always mention our free shipping over $50").
+
+Configuration inputs with AI suggestions show a colored badge. Click the badge to preview the suggestion, then click **Apply** to accept it.
+
+### Activate
+
+After completing all three steps, click **Activate** to publish your configuration and go live. The chat widget becomes active on your storefront.
+
+:::info
+The onboarding wizard only appears before your first activation. After that, you manage all settings through the standard admin pages (Configuration, Knowledge Base, Widget, etc.).
+:::
+
+## 6. Go live
 
 Before enabling Agent Red for live customer traffic, review these configuration options.
 

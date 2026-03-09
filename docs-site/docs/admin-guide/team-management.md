@@ -93,7 +93,56 @@ If a team member loses their key, an admin can regenerate it from the Team page.
 
 ### Delete a team member
 
-Admins can delete any team member except the superadmin. Deleting a member invalidates their API key.
+Admins can delete any team member except the superadmin. Deleting a member invalidates their API key. A confirmation dialog appears before the deletion is finalized.
+
+---
+
+## Day-to-day team management
+
+### Adding your first escalation agent
+
+When you start receiving escalated conversations, you need at least one team member with the Escalation agent role to handle them.
+
+1. Go to **Team** in the sidebar.
+2. Click **Invite member**.
+3. Enter the team member's email address and optionally their name.
+4. Select **Escalation agent** as the role.
+5. Select one or more **escalation categories** — choose the categories that match this person's expertise:
+   - **Service** — general customer service questions
+   - **Support** — technical support and troubleshooting
+   - **Sales** — product recommendations, pricing, upselling
+   - **Account** — account management, billing inquiries
+   - **Technical Assistance** — complex technical issues
+   - **General Inquiry** — catch-all for unclassified escalations
+6. Click **Send invite**.
+7. The team member receives an email with their API key for logging in.
+
+### Monitoring team workload
+
+The Team page displays an **Escalations** column for each escalation agent, showing the number of currently unresolved escalations assigned to them. Use this to:
+
+- Identify agents who may be overloaded.
+- Rebalance category assignments if one category generates significantly more escalations.
+- Add more escalation agents to high-volume categories.
+
+### Changing a team member's role
+
+1. Find the team member in the table.
+2. Click the **role dropdown** in their row.
+3. Select the new role.
+4. The change takes effect immediately — no save button required.
+
+If changing from Escalation agent to another role, any pending escalation assignments for that member will need to be reassigned.
+
+### Suspending access temporarily
+
+Use the **Active/Disabled** toggle to suspend a team member's access without deleting them:
+
+1. Toggle the switch in the Status column to **Disabled**.
+2. The member's API key is immediately invalidated — they cannot log in.
+3. Toggle back to **Active** to restore access. The same API key works again.
+
+This is useful for temporary absences (vacation, leave) where you want to preserve the member's record and role.
 
 ---
 

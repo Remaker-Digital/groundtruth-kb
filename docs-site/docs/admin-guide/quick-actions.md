@@ -65,13 +65,51 @@ If you haven't created any quick actions yet, use the **Load starter prompts** b
 
 Starter prompts give you a working baseline that you can customize or replace. They are only loaded once — pressing the button again has no effect if prompts already exist.
 
+## Page assignments
+
+After creating quick action prompts, assign them to page types to control where they appear.
+
+1. Go to **Quick Actions** and click the **Page assignments** tab.
+2. Each row represents a page type (All pages, Home, Product, Collection, Cart, Search, Blog, Page, Other).
+3. Assign up to **2 quick actions per page type** using the dropdown selectors (Slot 1 and Slot 2).
+4. Optionally enable **Auto-open** per page type — the chat widget opens automatically after a configurable delay (1–60 seconds).
+
+**Priority rule:** Page-specific assignments take precedence over the "All pages" fallback. If a product page has its own assignments, those are shown instead of the "All pages" defaults.
+
+## Tuning and testing quick actions
+
+### Testing your prompts
+
+1. **Preview in the widget.** Visit your website (or use the widget preview in the admin console) and verify that the correct prompts appear on each page type.
+2. **Click each button.** Confirm the AI produces a relevant, accurate response. If the response is poor, the issue is likely in your knowledge base — add or improve articles covering that topic.
+3. **Test template variables.** On a product page, verify that `\{\{product_name\}\}` resolves to the actual product title. On a collection page, verify `\{\{collection_name\}\}` resolves correctly.
+4. **Test on mobile.** Open your website on a phone or use browser developer tools to simulate a mobile viewport. Confirm buttons do not wrap awkwardly or overflow the greeting area.
+
+### Tuning prompt effectiveness
+
+After your first week of live traffic, review quick action performance:
+
+1. **Check click rates.** In the Dashboard, review which quick actions customers are clicking. Low click rates indicate the prompt label is not resonating — try rewording it.
+2. **Review conversation outcomes.** Filter Inbox conversations that started from a quick action click. If they frequently escalate, the prompt may be triggering questions your knowledge base cannot answer well.
+3. **Iterate on prompt text.** The button label is what customers see; the prompt text is what gets sent. You can use a friendly label ("Need help with sizing?") with a more specific prompt text ("What size should I order? I need help with your sizing guide.").
+4. **Rotate seasonal prompts.** Create holiday-specific or sale-specific quick actions and toggle them active/inactive as needed. Inactive prompts are preserved but not shown to customers.
+
+### Common tuning patterns
+
+| Symptom | Fix |
+|---|---|
+| Button is never clicked | Shorten the label, make it more specific, or replace with a more relevant topic |
+| AI gives a vague response after click | Add or improve the knowledge base article for that topic |
+| Template variable shows as raw text | Verify the page type assignment matches — `\{\{product_name\}\}` only works on product pages |
+| Too many buttons crowd the greeting | Reduce to 2 prompts per page type. Use "All pages" for universal prompts only |
+
 ## Best practices
 
 - **Keep labels short.** Buttons with more than 5-6 words wrap awkwardly on mobile.
-- **Limit to 3-4 prompts per page type.** More than that overwhelms the greeting area and pushes the input field down.
+- **Limit to 2 prompts per page type.** The page assignment system supports two slots per page type — this prevents overcrowding.
 - **Use template variables on product pages.** A generic "Tell me about this product" is less engaging than "Tell me about \{\{product_name\}\}".
 - **Test on mobile.** The greeting area has limited vertical space. Verify that your prompts display correctly on small screens.
-- **Review analytics.** If a prompt is rarely clicked, replace it with something more relevant to what customers actually ask about.
+- **Review analytics regularly.** If a prompt is rarely clicked, replace it with something more relevant to what customers actually ask about.
 
 ---
 

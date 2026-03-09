@@ -77,6 +77,40 @@ Templates provide a starting point. Always review and customize the generated co
 
 ---
 
+## URL import
+
+You can import content from any public web page directly into your knowledge base. This is useful for importing FAQ pages, help centers, or policy pages from your existing website — even if it is not on Shopify.
+
+### How to import from a URL
+
+1. Navigate to **Knowledge Base** in the admin console.
+2. Click **Import** in the toolbar.
+3. Select the **Import URL** tab.
+4. Enter the full URL of the page you want to import (e.g., `https://example.com/faq`).
+5. Click **Import**.
+6. Agent Red fetches the page, extracts the text content, and creates knowledge base articles from it.
+7. Imported articles appear as **drafts** — review, edit, and publish them.
+
+### Supported page types
+
+| Page type | How it is processed |
+|---|---|
+| FAQ pages | Questions and answers are detected and split into individual articles |
+| Policy pages | Full text extracted and chunked into articles of approximately 300 words each |
+| Help center articles | Headings used as article titles, body text as content |
+| Product pages | Product description, specifications, and pricing extracted |
+| Blog posts | Article text extracted, metadata (author, date) stripped |
+
+### Best practices for URL import
+
+- **Import one URL at a time.** Each URL creates a set of draft articles. Review them before importing the next URL to avoid duplication.
+- **Use direct page URLs**, not site-level URLs. Import `https://example.com/shipping-policy`, not `https://example.com/` — the importer processes a single page, not an entire site.
+- **Review auto-generated titles.** The importer creates titles from page headings, which may need editing for clarity.
+- **Check for duplicates.** If you have already created articles covering the same topic, the import may create duplicates. Run a conflict scan after importing.
+- **Publish after review.** Imported articles default to draft status. Only published articles are searchable by the AI.
+
+---
+
 ## Configuration suggestions
 
 After your knowledge base has content (from storefront ingestion, templates, or manual entry), Agent Red analyzes it to suggest optimal configuration values.
