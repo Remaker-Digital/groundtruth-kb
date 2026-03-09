@@ -1116,25 +1116,6 @@ export function WidgetPage() {
                     ]}
                   />
                 </div>
-                <div style={{ marginTop: 8 }}>
-                  <Text size="sm" fw={500} mb={4}>
-                    Launcher size ({config.launcherSize}px)
-                  </Text>
-                  <Slider
-                    min={48}
-                    max={72}
-                    step={1}
-                    value={config.launcherSize}
-                    onChange={(val) => update('launcherSize', val)}
-                    color="action"
-                    marks={[
-                      { value: 48, label: '48' },
-                      { value: 60, label: '60' },
-                      { value: 72, label: '72' },
-                    ]}
-                  />
-                </div>
-
                 {/* Launcher configuration — two-column layout */}
                 <Group grow align="flex-start" gap="md" mt={8}>
                   {/* Left column: Launcher color picker */}
@@ -1155,6 +1136,24 @@ export function WidgetPage() {
                       value={config.launcherIcon}
                       onChange={(val) => update('launcherIcon', (val as WidgetConfig['launcherIcon']) || 'chat')}
                     />
+                    <div>
+                      <Text size="sm" fw={500} mb={4}>
+                        Launcher size ({config.launcherSize}px)
+                      </Text>
+                      <Slider
+                        min={48}
+                        max={72}
+                        step={1}
+                        value={config.launcherSize}
+                        onChange={(val) => update('launcherSize', val)}
+                        color="action"
+                        marks={[
+                          { value: 48, label: '48' },
+                          { value: 60, label: '60' },
+                          { value: 72, label: '72' },
+                        ]}
+                      />
+                    </div>
                     <div>
                       <Text size="sm" fw={500} mb={6}>
                         Position

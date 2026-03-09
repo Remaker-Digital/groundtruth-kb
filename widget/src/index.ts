@@ -265,19 +265,24 @@ async function init(
 
   function renderLauncher() {
     const state = store.getState();
+    // Re-resolve tokens from current store config on each render so that
+    // setConfigPartial() changes (e.g. launcher color) are reflected in
+    // real-time without requiring widget re-initialization.
+    const currentConfig = state.config;
+    const liveTokens = resolveTokens(currentConfig);
     render(
       h(Launcher, {
-        tokens,
-        position: (isMobileDevice && config.widget_mobile_position) || config.widget_position || 'bottom-right',
+        tokens: liveTokens,
+        position: (isMobileDevice && currentConfig.widget_mobile_position) || currentConfig.widget_position || 'bottom-right',
         offsetX: isMobileDevice
-          ? (config.widget_mobile_offset_x ?? config.widget_position_offset_x ?? config.widget_offset_x ?? 20)
-          : (config.widget_position_offset_x ?? config.widget_offset_x ?? 20),
+          ? (currentConfig.widget_mobile_offset_x ?? currentConfig.widget_position_offset_x ?? currentConfig.widget_offset_x ?? 20)
+          : (currentConfig.widget_position_offset_x ?? currentConfig.widget_offset_x ?? 20),
         offsetY: isMobileDevice
-          ? (config.widget_mobile_offset_y ?? config.widget_position_offset_y ?? config.widget_offset_y ?? 20)
-          : (config.widget_position_offset_y ?? config.widget_offset_y ?? 20),
+          ? (currentConfig.widget_mobile_offset_y ?? currentConfig.widget_position_offset_y ?? currentConfig.widget_offset_y ?? 20)
+          : (currentConfig.widget_position_offset_y ?? currentConfig.widget_offset_y ?? 20),
         isOpen: state.view !== 'closed',
         unreadCount: state.unreadCount,
-        launcherIcon: (config.widget_launcher_icon as 'chat' | 'headset' | 'help') || 'chat',
+        launcherIcon: (currentConfig.widget_launcher_icon as 'chat' | 'headset' | 'help') || 'chat',
         onClick: toggleWidget,
       }),
       shadowRoot,
