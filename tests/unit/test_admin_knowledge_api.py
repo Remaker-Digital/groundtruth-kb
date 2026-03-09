@@ -169,16 +169,23 @@ class TestBuildEntryResponse:
         assert resp.staleness_category == "aging"
         mock_classify.assert_called_once_with(0.4)
 
+    @patch("src.multi_tenant.staleness_service.compute_staleness_score")
     @patch("src.multi_tenant.staleness_service.classify_staleness")
-    def test_builds_response_without_staleness(self, mock_classify):
+    def test_builds_response_without_staleness(self, mock_classify, mock_compute):
+        """When staleness_score is not persisted, compute on-the-fly."""
+        mock_compute.return_value = 0.15
+        mock_classify.return_value = "fresh"
         entry = _make_entry(staleness_score=None)
         resp = _build_entry_response(entry, "tenant-001")
-        assert resp.staleness_score is None
-        assert resp.staleness_category is None
-        mock_classify.assert_not_called()
+        # Score is now computed on-the-fly instead of being None
+        assert resp.staleness_score == 0.15
+        assert resp.staleness_category == "fresh"
+        mock_compute.assert_called_once_with(entry)
+        mock_classify.assert_called_once_with(0.15)
 
-    @patch("src.multi_tenant.staleness_service.classify_staleness")
-    def test_defaults_for_missing_fields(self, mock_classify):
+    @patch("src.multi_tenant.staleness_service.compute_staleness_score", return_value=0.5)
+    @patch("src.multi_tenant.staleness_service.classify_staleness", return_value="aging")
+    def test_defaults_for_missing_fields(self, mock_classify, mock_compute):
         """Minimal dict still produces a valid response."""
         resp = _build_entry_response({"id": "x", "created_at": _NOW, "updated_at": _NOW}, "t")
         assert resp.id == "x"

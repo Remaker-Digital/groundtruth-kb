@@ -121,6 +121,7 @@ export const OnboardingWizard: React.FC<Props> = ({
   const [activating, setActivating] = useState(false);
   const [activateError, setActivateError] = useState<string | null>(null);
   const [customInstructions, setCustomInstructions] = useState('');
+  const [existingArticleCount, setExistingArticleCount] = useState(0);
   const pollRef = useRef<ReturnType<typeof setInterval> | null>(null);
 
   // The effective ingestion URL for non-Shopify merchants
@@ -137,6 +138,18 @@ export const OnboardingWizard: React.FC<Props> = ({
       .then((data) => setTemplates(data.templates || data || []))
       .catch(() => setTemplates([]))
       .finally(() => setTemplatesLoading(false));
+  }, [opened, apiFetch]);
+
+  // Check for existing KB articles when wizard opens (duplicate warning)
+  useEffect(() => {
+    if (!opened) return;
+    apiFetch('/api/admin/knowledge?limit=1')
+      .then((r) => r.json())
+      .then((data) => {
+        const total = data.total ?? data.entries?.length ?? 0;
+        setExistingArticleCount(total);
+      })
+      .catch(() => setExistingArticleCount(0));
   }, [opened, apiFetch]);
 
   // Clean up polling on unmount
@@ -459,6 +472,21 @@ export const OnboardingWizard: React.FC<Props> = ({
             What type of products or services does your store sell? We'll create
             starter knowledge base articles tailored to your industry.
           </Text>
+
+          {existingArticleCount > 0 && (
+            <Alert variant="light" color="yellow" radius="sm" title="Existing articles detected">
+              <Text size="sm">
+                Your knowledge base already contains <strong>{existingArticleCount}</strong> article{existingArticleCount === 1 ? '' : 's'}.
+                Running the wizard again will <strong>add new articles</strong> alongside existing ones.
+                Previously added articles will not be removed automatically — you should
+                review and remove duplicates from the{' '}
+                <Anchor size="sm" onClick={() => { onClose(); onNavigate?.('/knowledge-base'); }}>
+                  Knowledge Base
+                </Anchor>{' '}
+                page after setup.
+              </Text>
+            </Alert>
+          )}
 
           {templatesLoading ? (
             <Group justify="center" py="xl">

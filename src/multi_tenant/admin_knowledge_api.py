@@ -386,10 +386,15 @@ router = APIRouter(prefix="/api/admin/knowledge", tags=["admin-knowledge"])
 
 def _build_entry_response(entry: dict[str, Any], tenant_id: str) -> KnowledgeEntryResponse:
     """Build a KnowledgeEntryResponse from a raw entry dict."""
-    from src.multi_tenant.staleness_service import classify_staleness
+    from src.multi_tenant.staleness_service import classify_staleness, compute_staleness_score
 
     score = entry.get("staleness_score")
-    staleness_cat = classify_staleness(score) if score is not None else None
+    if score is None:
+        # Compute on-the-fly when staleness_score has not been persisted yet.
+        # This handles articles created by the Setup Wizard or manual entry
+        # that haven't had a staleness scan run against them.
+        score = compute_staleness_score(entry)
+    staleness_cat = classify_staleness(score)
 
     return KnowledgeEntryResponse(
         id=entry.get("id", ""),
