@@ -936,6 +936,30 @@ async def _startup_superadmin_services() -> None:
             platform_admin_repo=pa_repo,
         )
         logger.info("Superadmin provider operations API initialized (18 endpoints)")
+
+        # SPEC-1678: Wire SPA recovery module with same repos
+        try:
+            from src.multi_tenant.spa_recovery import configure_spa_recovery
+            configure_spa_recovery(
+                platform_admin_repo=pa_repo,
+                audit_repo=AuditLogRepository(),
+            )
+            logger.info("SPA recovery module initialized (SPEC-1678)")
+        except Exception:
+            logger.debug("SPA recovery initialization failed — recovery endpoint unavailable")
+
+        # SPEC-1677: Wire tenant account recovery module
+        try:
+            from src.multi_tenant.tenant_recovery import configure_tenant_recovery
+            from src.multi_tenant.repositories.verification import VerificationTokenRepository
+            configure_tenant_recovery(
+                tenant_repo=TenantRepository(),
+                verification_repo=VerificationTokenRepository(),
+                audit_repo=AuditLogRepository(),
+            )
+            logger.info("Tenant recovery module initialized (SPEC-1677)")
+        except Exception:
+            logger.debug("Tenant recovery initialization failed — recovery endpoint unavailable")
     except Exception:
         logger.warning(
             "Superadmin API initialization failed — provider endpoints "

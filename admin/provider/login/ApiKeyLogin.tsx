@@ -15,13 +15,17 @@
 
 import React, { useState, useCallback } from 'react';
 import {
+  Alert,
+  Anchor,
   Box,
   Button,
   Center,
+  Collapse,
   Paper,
   PasswordInput,
   Stack,
   Text,
+  TextInput,
 } from '@mantine/core';
 import { tokens } from '../../shared/theme/styles';
 
@@ -40,6 +44,13 @@ export const ApiKeyLogin: React.FC<ApiKeyLoginProps> = ({ onLogin }) => {
   const [apiKey, setApiKey] = useState('');
   const [error, setError] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
+
+  // SPEC-1678: Recovery state
+  const [showRecovery, setShowRecovery] = useState(false);
+  const [recoveryEmail, setRecoveryEmail] = useState('');
+  const [recoveryCode, setRecoveryCode] = useState('');
+  const [recoveryLoading, setRecoveryLoading] = useState(false);
+  const [recoveryMessage, setRecoveryMessage] = useState<string | null>(null);
 
   const handleLogin = useCallback(
     async (e: React.FormEvent) => {
@@ -89,6 +100,43 @@ export const ApiKeyLogin: React.FC<ApiKeyLoginProps> = ({ onLogin }) => {
       }
     },
     [apiKey, onLogin],
+  );
+
+  // SPEC-1678: Recovery form handler
+  const handleRecovery = useCallback(
+    async (e: React.FormEvent) => {
+      e.preventDefault();
+      if (!recoveryEmail.trim() || !recoveryCode.trim()) {
+        setRecoveryMessage(null);
+        return;
+      }
+
+      setRecoveryLoading(true);
+      setRecoveryMessage(null);
+
+      try {
+        await fetch(`${API_BASE_URL}/api/auth/spa-recovery/recover`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            email: recoveryEmail.trim(),
+            backup_code: recoveryCode.trim(),
+          }),
+        });
+        // Always show success message (endpoint returns 200 regardless)
+        setRecoveryMessage(
+          'If the email and backup code are valid, a new API key has been sent to your email.',
+        );
+        setRecoveryCode('');
+      } catch {
+        setRecoveryMessage(
+          'Unable to connect. Please check your network and try again.',
+        );
+      } finally {
+        setRecoveryLoading(false);
+      }
+    },
+    [recoveryEmail, recoveryCode],
   );
 
   return (
@@ -143,6 +191,76 @@ export const ApiKeyLogin: React.FC<ApiKeyLoginProps> = ({ onLogin }) => {
             Sign in
           </Button>
         </form>
+
+        {/* SPEC-1678: Recovery section */}
+        <Box ta="center" mt="md">
+          <Anchor
+            size="xs"
+            c="dimmed"
+            onClick={() => {
+              setShowRecovery((v) => !v);
+              setRecoveryMessage(null);
+            }}
+            aria-label="Lost access? Use a backup code"
+          >
+            Lost access? Use a backup code
+          </Anchor>
+        </Box>
+
+        <Collapse in={showRecovery}>
+          <form onSubmit={handleRecovery}>
+            <Stack gap="xs" mt="sm">
+              <TextInput
+                label="Email"
+                placeholder="Your admin email"
+                value={recoveryEmail}
+                onChange={(e) => setRecoveryEmail(e.currentTarget.value)}
+                size="xs"
+                aria-label="Recovery email"
+                styles={{
+                  input: {
+                    backgroundColor: tokens.page,
+                    borderColor: tokens.border,
+                    color: tokens.textSecondary,
+                  },
+                  label: { color: tokens.textSecondary, fontWeight: 500 },
+                }}
+              />
+              <TextInput
+                label="Backup code"
+                placeholder="Enter 8-character backup code"
+                value={recoveryCode}
+                onChange={(e) => setRecoveryCode(e.currentTarget.value)}
+                size="xs"
+                aria-label="Backup code"
+                styles={{
+                  input: {
+                    backgroundColor: tokens.page,
+                    borderColor: tokens.border,
+                    color: tokens.textSecondary,
+                  },
+                  label: { color: tokens.textSecondary, fontWeight: 500 },
+                }}
+              />
+              <Button
+                type="submit"
+                fullWidth
+                size="xs"
+                loading={recoveryLoading}
+                color="gray"
+                variant="outline"
+                aria-label="Recover access"
+              >
+                Recover access
+              </Button>
+              {recoveryMessage && (
+                <Alert color="blue" variant="light" p="xs">
+                  <Text size="xs">{recoveryMessage}</Text>
+                </Alert>
+              )}
+            </Stack>
+          </form>
+        </Collapse>
 
         <Text size="xs" c="dimmed" ta="center" mt="lg" lh={1.5}>
           Service provider access only.

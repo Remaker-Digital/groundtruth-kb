@@ -340,3 +340,43 @@ class TenantRepository(TenantScopedRepository):
             operations.append({"op": "set", "path": "/deactivated_at", "value": now})
 
         return await self.patch(tenant_id, tenant_id, operations)
+
+    # ------------------------------------------------------------------
+    # SPEC-1677: Tenant account recovery address
+    # ------------------------------------------------------------------
+
+    async def update_recovery_address(
+        self,
+        tenant_id: str,
+        recovery_email: str | None,
+        enabled: bool,
+        activated_by: str,
+        activated_at: str,
+    ) -> dict[str, Any]:
+        """Set or clear the tenant's recovery address (SPEC-1677)."""
+        operations = [
+            {"op": "set", "path": "/recovery_address", "value": recovery_email},
+            {"op": "set", "path": "/recovery_address_enabled", "value": enabled},
+            {"op": "set", "path": "/recovery_address_activated_by", "value": activated_by},
+            {"op": "set", "path": "/recovery_address_activated_at", "value": activated_at},
+            {"op": "set", "path": "/updated_at", "value": activated_at},
+        ]
+        return await self.patch(tenant_id, tenant_id, operations)
+
+    async def get_recovery_address(
+        self, tenant_id: str,
+    ) -> dict[str, Any] | None:
+        """Read the tenant's recovery address fields (SPEC-1677).
+
+        Returns dict with recovery fields, or None if tenant not found.
+        """
+        try:
+            doc = await self.read(tenant_id, tenant_id)
+            return {
+                "recovery_address": doc.get("recovery_address"),
+                "recovery_address_enabled": doc.get("recovery_address_enabled", False),
+                "recovery_address_activated_by": doc.get("recovery_address_activated_by"),
+                "recovery_address_activated_at": doc.get("recovery_address_activated_at"),
+            }
+        except Exception:
+            return None

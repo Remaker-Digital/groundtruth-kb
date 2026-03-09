@@ -116,6 +116,8 @@ AUTH_EXEMPT_PREFIXES = (
     "/api/admin/api-keys/reset",
     "/api/auth/magic-link",
     "/api/auth/2fa",
+    "/api/auth/spa-recovery",  # SPEC-1678: unauthenticated backup code recovery
+    "/api/auth/account-recovery",  # SPEC-1677: tenant account recovery verification
     "/api/status",
     "/admin/",
 )
@@ -186,6 +188,8 @@ class TenantContext:
     # Platform admin identity (populated for spa_api_key auth, SPEC-1667)
     platform_admin_id: str | None = None
     platform_admin_email: str | None = None
+    platform_admin_role: str | None = None  # "superadmin" or "operator" (SPEC-1675)
+    platform_admin_notification_email: str | None = None  # SPEC-1676 override
 
 
 # ---------------------------------------------------------------------------

@@ -131,3 +131,81 @@ class PlatformAdminRepository(PlatformScopedRepository):
         ):
             items.append(item)
         return items
+
+    # ----- SPEC-1675: User hierarchy methods -----
+
+    async def find_by_admin_id(
+        self, admin_id: str,
+    ) -> dict[str, Any] | None:
+        """Read a platform admin by document ID (partition key)."""
+        try:
+            return await self._container.read_item(
+                item=admin_id,
+                partition_key=admin_id,
+            )
+        except Exception:
+            return None
+
+    async def deactivate_admin(
+        self, admin_id: str, updated_at: str,
+    ) -> dict[str, Any]:
+        """Deactivate a platform admin (set is_active=false)."""
+        doc = await self._container.read_item(
+            item=admin_id,
+            partition_key=admin_id,
+        )
+        doc["is_active"] = False
+        doc["updated_at"] = updated_at
+        doc["deactivated_at"] = updated_at
+        return await self._container.upsert_item(body=doc)
+
+    async def update_notification_email(
+        self, admin_id: str, email: str | None, updated_at: str,
+    ) -> dict[str, Any]:
+        """Set or clear the notification email address (SPEC-1676)."""
+        doc = await self._container.read_item(
+            item=admin_id,
+            partition_key=admin_id,
+        )
+        doc["notification_email_address"] = email
+        doc["updated_at"] = updated_at
+        return await self._container.upsert_item(body=doc)
+
+    async def update_backup_code_hashes(
+        self, admin_id: str,
+        hashes: list[str], count: int, updated_at: str,
+    ) -> dict[str, Any]:
+        """Replace all backup recovery code hashes (SPEC-1678)."""
+        doc = await self._container.read_item(
+            item=admin_id,
+            partition_key=admin_id,
+        )
+        doc["backup_recovery_code_hashes"] = hashes
+        doc["backup_codes_remaining"] = count
+        doc["updated_at"] = updated_at
+        return await self._container.upsert_item(body=doc)
+
+    async def consume_backup_code(
+        self, admin_id: str,
+        remaining_hashes: list[str], new_count: int, updated_at: str,
+    ) -> dict[str, Any]:
+        """Remove a used backup code hash and decrement the counter."""
+        doc = await self._container.read_item(
+            item=admin_id,
+            partition_key=admin_id,
+        )
+        doc["backup_recovery_code_hashes"] = remaining_hashes
+        doc["backup_codes_remaining"] = new_count
+        doc["updated_at"] = updated_at
+        return await self._container.upsert_item(body=doc)
+
+    async def update_last_login(
+        self, admin_id: str, timestamp: str,
+    ) -> dict[str, Any]:
+        """Record last login time for an admin."""
+        doc = await self._container.read_item(
+            item=admin_id,
+            partition_key=admin_id,
+        )
+        doc["last_login_at"] = timestamp
+        return await self._container.upsert_item(body=doc)

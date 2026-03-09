@@ -75,6 +75,9 @@ from datetime import datetime, timezone
 
 logger = logging.getLogger(__name__)
 
+# S155/SPEC-1676: Task set to prevent GC of fire-and-forget notification tasks
+_spa_notification_tasks: set[asyncio.Task] = set()
+
 
 # ---------------------------------------------------------------------------
 # Tenant resolution functions
@@ -207,6 +210,25 @@ class TenantAuthMiddleware(BaseHTTPMiddleware):
         # Record success to reset failure counter (SPEC-1621)
         from src.multi_tenant.security_hardening import get_pre_auth_limiter
         get_pre_auth_limiter().record_success(client_ip)
+
+        # SPEC-1676: Fire non-blocking login notification for SPA auth
+        if getattr(tenant_context, "is_platform_admin", False):
+            try:
+                from src.multi_tenant.login_notification import send_login_notification
+                user_agent = request.headers.get("user-agent", "")
+                task = asyncio.create_task(
+                    send_login_notification(
+                        admin_email=tenant_context.platform_admin_email or "",
+                        notification_email=tenant_context.platform_admin_notification_email,
+                        client_ip=client_ip,
+                        user_agent=user_agent,
+                    )
+                )
+                # S155 async safety: prevent GC of fire-and-forget tasks
+                _spa_notification_tasks.add(task)
+                task.add_done_callback(_spa_notification_tasks.discard)
+            except Exception as exc:
+                logger.warning("Login notification setup failed: %s", exc)
 
         return await call_next(request)
 
@@ -506,6 +528,8 @@ class TenantAuthMiddleware(BaseHTTPMiddleware):
             # Platform admins operate outside all tenancies.
             platform_admin_id=admin.get("admin_id", admin.get("id")),
             platform_admin_email=admin.get("email"),
+            platform_admin_role=admin.get("role", "superadmin"),  # SPEC-1675
+            platform_admin_notification_email=admin.get("notification_email_address"),  # SPEC-1676
         )
 
     async def _auth_widget_key(
@@ -820,6 +844,41 @@ def require_platform_admin() -> Callable:
                 status_code=403,
                 detail="This endpoint requires platform administrator credentials. "
                        "Tenant API keys cannot access the service provider console.",
+            )
+
+        return ctx
+
+    return dependency
+
+
+def require_spa_superadmin() -> Callable:
+    """FastAPI dependency: require SPA *superadmin* credentials (SPEC-1675).
+
+    Stricter than require_platform_admin() — rejects operator-role admins.
+    Use for destructive actions like creating/deleting other SPA users.
+
+    Usage:
+        @router.post("/users", dependencies=[Depends(require_spa_superadmin())])
+    """
+    async def dependency(request: Request) -> TenantContext:
+        ctx = getattr(request.state, "tenant_context", None)
+        if ctx is None:
+            raise HTTPException(
+                status_code=401,
+                detail="Not authenticated. TenantContext not found in request.",
+            )
+
+        if not getattr(ctx, "is_platform_admin", False):
+            raise HTTPException(
+                status_code=403,
+                detail="This endpoint requires platform administrator credentials.",
+            )
+
+        if getattr(ctx, "platform_admin_role", None) != "superadmin":
+            raise HTTPException(
+                status_code=403,
+                detail="This action requires SPA superadmin privileges. "
+                       "Operator accounts cannot perform this action.",
             )
 
         return ctx

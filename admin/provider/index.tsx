@@ -40,6 +40,7 @@ import { IntegrationHealthPage } from './pages/IntegrationHealth';
 import { StatusPageManagement } from './pages/StatusPage';
 import { AlertConfigPage } from './pages/AlertConfig';
 import { MfaSettingsPage } from './pages/MfaSettings';
+import { UserManagementPage } from './pages/UserManagement';
 import { SupportDiagnosticsPage } from './pages/SupportDiagnostics';
 import { CostAnalyticsPage } from './pages/CostAnalytics';
 import { AbuseDetectionPage } from './pages/AbuseDetection';
@@ -167,6 +168,7 @@ const App: React.FC = () => {
             <Route path="/sla" element={<SLATrendsPage />} />
             <Route path="/abuse" element={<AbuseDetectionPage />} />
             {/* Account */}
+            <Route path="/users" element={<UserManagementPage />} />
             <Route path="/mfa" element={<MfaSettingsPage />} />
             <Route path="*" element={<Navigate to="/" replace />} />
           </Routes>

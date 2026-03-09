@@ -81,9 +81,15 @@ async def seed_platform_admin(
         "email": email,
         "display_name": display_name,
         "api_key_hash": key_hash,
+        "role": "superadmin",  # SPEC-1675: seed-created admin is always superadmin
         "is_active": True,
         "created_at": now_iso,
         "updated_at": now_iso,
+        "created_by": None,  # SPEC-1675: null = seed-created
+        "notification_email_address": None,  # SPEC-1676
+        "backup_recovery_code_hashes": [],  # SPEC-1678
+        "backup_codes_remaining": 0,
+        "last_login_at": None,
     }
 
     print(f"\n{'='*60}")

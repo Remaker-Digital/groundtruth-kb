@@ -4719,3 +4719,358 @@ async def regenerate_platform_admin_key(
         new_api_key=new_raw_key,
         regenerated_at=now_iso,
     )
+
+
+# ---------------------------------------------------------------------------
+# SPEC-1675: SPA User Hierarchy and Lifecycle
+# ---------------------------------------------------------------------------
+
+
+class PlatformAdminUserResponse(CamelCaseModel):
+    """Public representation of a platform admin user."""
+
+    admin_id: str
+    email: str
+    display_name: str
+    role: str  # "superadmin" or "operator"
+    is_active: bool
+    created_at: str | None = None
+    last_login_at: str | None = None
+    notification_email_address: str | None = None
+    backup_codes_remaining: int = 0
+    created_by: str | None = None
+
+
+class CreateOperatorRequest(CamelCaseModel):
+    """Request to create a new SPA operator."""
+
+    email: str = Field(description="Email address for the new operator")
+    display_name: str = Field(description="Display name for the operator")
+
+
+class CreateOperatorResponse(CamelCaseModel):
+    """Response from operator creation — contains raw API key (shown once)."""
+
+    admin_id: str
+    email: str
+    display_name: str
+    role: str = "operator"
+    api_key: str = Field(description="Raw API key — save immediately, shown once")
+    message: str = "Operator created. Save the API key immediately — it cannot be retrieved later."
+
+
+class BackupCodesResponse(CamelCaseModel):
+    """Backup recovery codes — shown once, must be saved securely."""
+
+    admin_id: str
+    codes: list[str] = Field(description="8 backup codes — save securely, shown once")
+    count: int = 8
+    message: str = (
+        "Save these backup codes in a secure location. "
+        "They cannot be retrieved later. Each code can only be used once."
+    )
+
+
+class UpdateNotificationEmailRequest(CamelCaseModel):
+    """Request to set or clear the notification email address."""
+
+    email: str | None = Field(
+        default=None,
+        description="Notification email address, or null to clear",
+    )
+
+
+@router.get(
+    "/platform-admin/users",
+    response_model=list[PlatformAdminUserResponse],
+    summary="List all SPA platform admin users (SPEC-1675)",
+)
+async def list_platform_admin_users(
+    ctx: TenantContext = Depends(get_tenant_context),
+) -> list[PlatformAdminUserResponse]:
+    """List all active platform admin users."""
+    if _platform_admin_repo is None:
+        raise HTTPException(status_code=503, detail="Platform admin service not initialized.")
+
+    admins = await _platform_admin_repo.list_admins()
+    return [
+        PlatformAdminUserResponse(
+            admin_id=a.get("admin_id", a.get("id", "")),
+            email=a.get("email", ""),
+            display_name=a.get("display_name", ""),
+            role=a.get("role", "superadmin"),
+            is_active=a.get("is_active", True),
+            created_at=a.get("created_at"),
+            last_login_at=a.get("last_login_at"),
+            notification_email_address=a.get("notification_email_address"),
+            backup_codes_remaining=a.get("backup_codes_remaining", 0),
+            created_by=a.get("created_by"),
+        )
+        for a in admins
+    ]
+
+
+@router.post(
+    "/platform-admin/users",
+    response_model=CreateOperatorResponse,
+    summary="Create a new SPA operator (SPEC-1675)",
+    status_code=201,
+)
+async def create_platform_admin_operator(
+    body: CreateOperatorRequest,
+    ctx: TenantContext = Depends(get_tenant_context),
+) -> CreateOperatorResponse:
+    """Create a new operator-level platform admin.
+
+    Only the SPA superadmin can create operators. The raw API key is
+    returned exactly once and must be saved immediately.
+    """
+    if _platform_admin_repo is None:
+        raise HTTPException(status_code=503, detail="Platform admin service not initialized.")
+
+    # Superadmin guard
+    if ctx.platform_admin_role != "superadmin":
+        raise HTTPException(
+            status_code=403,
+            detail="Only the SPA superadmin can create operators.",
+        )
+
+    # Check for existing admin with same email
+    existing = await _platform_admin_repo.find_by_email(body.email)
+    if existing:
+        raise HTTPException(
+            status_code=409,
+            detail=f"A platform admin with email '{body.email}' already exists.",
+        )
+
+    import secrets
+    import uuid
+
+    from src.multi_tenant.auth import generate_spa_api_key, hash_api_key
+
+    admin_id = str(uuid.uuid4())
+    raw_key = generate_spa_api_key()
+    key_hash = hash_api_key(raw_key)
+    now_iso = datetime.now(timezone.utc).isoformat()
+
+    document = {
+        "id": admin_id,
+        "admin_id": admin_id,
+        "email": body.email,
+        "display_name": body.display_name,
+        "api_key_hash": key_hash,
+        "role": "operator",
+        "is_active": True,
+        "created_at": now_iso,
+        "updated_at": now_iso,
+        "created_by": ctx.platform_admin_id,
+        "notification_email_address": None,
+        "backup_recovery_code_hashes": [],
+        "backup_codes_remaining": 0,
+        "last_login_at": None,
+    }
+
+    await _platform_admin_repo.create_admin(document)
+
+    # Audit log
+    if _audit_repo:
+        try:
+            await _audit_repo.log_event(
+                event_type=AuditEventType.SECURITY_EVENT,
+                tenant_id="__platform__",
+                actor=ctx.platform_admin_email or "unknown",
+                actor_type="admin",
+                payload={
+                    "action": "spa_operator_created",
+                    "new_admin_id": admin_id,
+                    "new_email": body.email,
+                    "created_by": ctx.platform_admin_id,
+                },
+            )
+        except Exception as exc:
+            logger.warning("Audit log for operator creation failed: %s", exc)
+
+    logger.info(
+        "SPA operator created: admin_id=%s email=%s by=%s",
+        admin_id, body.email, ctx.platform_admin_id,
+    )
+
+    return CreateOperatorResponse(
+        admin_id=admin_id,
+        email=body.email,
+        display_name=body.display_name,
+        api_key=raw_key,
+    )
+
+
+@router.delete(
+    "/platform-admin/users/{admin_id}",
+    summary="Deactivate an SPA operator (SPEC-1675)",
+)
+async def deactivate_platform_admin_user(
+    admin_id: str,
+    ctx: TenantContext = Depends(get_tenant_context),
+) -> dict[str, str]:
+    """Deactivate a platform admin operator.
+
+    Only the superadmin can deactivate operators. The superadmin
+    cannot be deactivated, and an admin cannot deactivate themselves.
+    """
+    if _platform_admin_repo is None:
+        raise HTTPException(status_code=503, detail="Platform admin service not initialized.")
+
+    # Superadmin guard
+    if ctx.platform_admin_role != "superadmin":
+        raise HTTPException(
+            status_code=403,
+            detail="Only the SPA superadmin can deactivate operators.",
+        )
+
+    # Cannot deactivate self
+    if admin_id == ctx.platform_admin_id:
+        raise HTTPException(
+            status_code=400,
+            detail="Cannot deactivate your own account.",
+        )
+
+    # Look up the target admin
+    target = await _platform_admin_repo.find_by_admin_id(admin_id)
+    if not target:
+        raise HTTPException(status_code=404, detail="Platform admin not found.")
+
+    # Cannot deactivate the superadmin
+    if target.get("role") == "superadmin":
+        raise HTTPException(
+            status_code=403,
+            detail="The SPA superadmin account cannot be deactivated.",
+        )
+
+    now_iso = datetime.now(timezone.utc).isoformat()
+    await _platform_admin_repo.deactivate_admin(admin_id, now_iso)
+
+    # Audit log
+    if _audit_repo:
+        try:
+            await _audit_repo.log_event(
+                event_type=AuditEventType.SECURITY_EVENT,
+                tenant_id="__platform__",
+                actor=ctx.platform_admin_email or "unknown",
+                actor_type="admin",
+                payload={
+                    "action": "spa_operator_deactivated",
+                    "deactivated_admin_id": admin_id,
+                    "deactivated_email": target.get("email"),
+                    "deactivated_by": ctx.platform_admin_id,
+                },
+            )
+        except Exception as exc:
+            logger.warning("Audit log for operator deactivation failed: %s", exc)
+
+    logger.info(
+        "SPA operator deactivated: admin_id=%s by=%s",
+        admin_id, ctx.platform_admin_id,
+    )
+
+    return {"message": f"Operator {target.get('email')} has been deactivated."}
+
+
+@router.post(
+    "/platform-admin/users/backup-codes",
+    response_model=BackupCodesResponse,
+    summary="Generate backup recovery codes for self (SPEC-1675/1678)",
+)
+async def generate_backup_codes(
+    ctx: TenantContext = Depends(get_tenant_context),
+) -> BackupCodesResponse:
+    """Generate 8 backup recovery codes for the authenticated admin.
+
+    Replaces any existing backup codes. Codes are returned in plaintext
+    exactly once — they must be saved securely. Only SHA-256 hashes are
+    stored in the database.
+    """
+    if _platform_admin_repo is None:
+        raise HTTPException(status_code=503, detail="Platform admin service not initialized.")
+
+    import secrets
+
+    from src.multi_tenant.auth import hash_api_key
+
+    admin_id = ctx.platform_admin_id
+    if not admin_id:
+        raise HTTPException(status_code=500, detail="Platform admin identity not available.")
+
+    # Generate 8 random codes (8-char hex each)
+    codes = [secrets.token_hex(4) for _ in range(8)]
+    code_hashes = [hash_api_key(code) for code in codes]
+
+    now_iso = datetime.now(timezone.utc).isoformat()
+    await _platform_admin_repo.update_backup_code_hashes(
+        admin_id=admin_id,
+        hashes=code_hashes,
+        count=len(codes),
+        updated_at=now_iso,
+    )
+
+    # Audit log
+    if _audit_repo:
+        try:
+            await _audit_repo.log_event(
+                event_type=AuditEventType.SECURITY_EVENT,
+                tenant_id="__platform__",
+                actor=ctx.platform_admin_email or "unknown",
+                actor_type="admin",
+                payload={
+                    "action": "backup_codes_generated",
+                    "admin_id": admin_id,
+                    "count": len(codes),
+                },
+            )
+        except Exception as exc:
+            logger.warning("Audit log for backup code generation failed: %s", exc)
+
+    logger.info(
+        "Backup codes generated: admin_id=%s count=%d",
+        admin_id, len(codes),
+    )
+
+    return BackupCodesResponse(
+        admin_id=admin_id,
+        codes=codes,
+        count=len(codes),
+    )
+
+
+@router.put(
+    "/platform-admin/users/notification-email",
+    summary="Set notification email for self (SPEC-1675/1676)",
+)
+async def update_notification_email(
+    body: UpdateNotificationEmailRequest,
+    ctx: TenantContext = Depends(get_tenant_context),
+) -> dict[str, str]:
+    """Set or clear the notification email for login alerts.
+
+    When set, login notifications (SPEC-1676) are sent to this address
+    instead of the admin's primary email.
+    """
+    if _platform_admin_repo is None:
+        raise HTTPException(status_code=503, detail="Platform admin service not initialized.")
+
+    admin_id = ctx.platform_admin_id
+    if not admin_id:
+        raise HTTPException(status_code=500, detail="Platform admin identity not available.")
+
+    now_iso = datetime.now(timezone.utc).isoformat()
+    await _platform_admin_repo.update_notification_email(
+        admin_id=admin_id,
+        email=body.email,
+        updated_at=now_iso,
+    )
+
+    action = "set" if body.email else "cleared"
+    logger.info(
+        "Notification email %s: admin_id=%s email=%s",
+        action, admin_id, body.email,
+    )
+
+    return {"message": f"Notification email {action} successfully."}

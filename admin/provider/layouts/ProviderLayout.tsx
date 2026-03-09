@@ -104,6 +104,7 @@ const NAV_GROUPS: NavGroup[] = [
   {
     group: 'Account',
     items: [
+      { label: 'User Management', path: '/users', icon: 'team', description: 'SPA admin users' },
       { label: 'MFA Settings', path: '/mfa', icon: 'mfa', description: 'Two-factor auth' },
     ],
   },

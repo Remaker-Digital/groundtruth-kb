@@ -52,10 +52,13 @@ from src.multi_tenant.superadmin_contact_api import router as superadmin_contact
 from src.multi_tenant.admin_ingestion_api import router as admin_ingestion_router
 from src.multi_tenant.admin_fine_tuning_api import router as admin_fine_tuning_router
 from src.multi_tenant.widget_otp_verification import router as widget_otp_router
+from src.multi_tenant.spa_recovery import router as spa_recovery_router
+from src.multi_tenant.tenant_recovery import router as tenant_recovery_router
+from src.multi_tenant.tenant_recovery import recovery_verify_router
 
 
 def register_routers(app: FastAPI) -> None:
-    """Register all 39 API routers on the FastAPI application.
+    """Register all 41 API routers on the FastAPI application.
 
     This mirrors the router registration block from main.py lines 186-209.
     """
@@ -100,3 +103,6 @@ def register_routers(app: FastAPI) -> None:
     app.include_router(superadmin_contact_router)
     app.include_router(admin_fine_tuning_router)
     app.include_router(widget_otp_router)
+    app.include_router(spa_recovery_router)  # SPEC-1678: unauthenticated
+    app.include_router(tenant_recovery_router)  # SPEC-1677: SPA-facing
+    app.include_router(recovery_verify_router)  # SPEC-1677: unauthenticated
