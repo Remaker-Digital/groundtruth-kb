@@ -40,6 +40,9 @@ opentelemetry-instrumentation-fastapi>=0.49b0
 # Stripe (billing & subscriptions)
 stripe>=8.0.0
 
+# Password hashing (standalone admin auth hardening -- SPEC-1688)
+argon2-cffi>=25.1.0
+
 # JWT (Shopify session token verification + MFA session tokens)
 PyJWT>=2.9.0
 

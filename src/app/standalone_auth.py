@@ -20,6 +20,8 @@ import pathlib
 import secrets as _secrets
 import time as _time
 
+import argon2
+
 from fastapi import FastAPI, Request
 from fastapi.responses import FileResponse, HTMLResponse, JSONResponse
 from starlette.responses import Response as StarletteResponse
@@ -37,31 +39,95 @@ _admin_standalone_dist = (
 _ADMIN_INITIAL_PASSWORD = os.environ.get("ADMIN_PREVIEW_PASSWORD", "")
 _ADMIN_RESET_EMAIL = os.environ.get("ADMIN_RESET_EMAIL", "").strip().lower()
 _ADMIN_COOKIE_NAME = "agentred_admin"
-# Mutable password hash — allows runtime password changes.  Falls back to env var.
-# Deterministic token derived from the password so all gateway replicas agree.
+_CSRF_COOKIE_NAME = "agentred_csrf"
+_MIN_PASSWORD_LENGTH = 12
+
+# Argon2id password hashing (SPEC-1688)
+_ph = argon2.PasswordHasher(type=argon2.Type.ID)
+
+
+def _hash_password(password: str) -> str:
+    """Hash a password using Argon2id."""
+    return _ph.hash(password)
+
+
+def _verify_password(password: str) -> bool:
+    """Verify a password against the stored Argon2id hash."""
+    if not _admin_password_hash:
+        return False
+    try:
+        return _ph.verify(_admin_password_hash, password)
+    except argon2.exceptions.VerifyMismatchError:
+        return False
+
+
 _admin_password_hash: str = (
+    _hash_password(_ADMIN_INITIAL_PASSWORD) if _ADMIN_INITIAL_PASSWORD else ""
+)
+# Immutable HMAC key for reset tokens -- derived deterministically from the env var
+# password so all replicas agree.  Uses SHA-256 (not Argon2) because this needs
+# to be deterministic and fast (signing key, not password storage).
+_ADMIN_HMAC_KEY: str = (
     hashlib.sha256(f"agentred-admin:{_ADMIN_INITIAL_PASSWORD}".encode()).hexdigest()
     if _ADMIN_INITIAL_PASSWORD
     else ""
 )
-# Immutable HMAC key for reset tokens — derived from the env var password and NEVER
-# changes at runtime.  This ensures all replicas always agree on the signing key,
-# even after an in-memory password change on a single replica.
-_ADMIN_HMAC_KEY: str = _admin_password_hash
 
-def _compute_cookie_value(password: str) -> str:
-    """Derive a deterministic cookie token from a password."""
-    return hashlib.sha256(f"agentred-admin:{password}".encode()).hexdigest()[:32]
-
-_admin_cookie_value: str = (
-    _compute_cookie_value(_ADMIN_INITIAL_PASSWORD) if _ADMIN_INITIAL_PASSWORD else ""
+# Session secret for signing session tokens (SPEC-1689).
+# If ADMIN_SESSION_SECRET env var is set, use it (consistent across replicas).
+# Otherwise derive deterministically from the password so multi-replica deployments
+# all agree on the signing key.
+_SESSION_SECRET: str = os.environ.get("ADMIN_SESSION_SECRET", "") or (
+    _hmac.new(b"agentred-session", _ADMIN_INITIAL_PASSWORD.encode(), "sha256").hexdigest()
+    if _ADMIN_INITIAL_PASSWORD
+    else _secrets.token_hex(32)
 )
-# Store the current active password for comparison during password change
-_admin_current_password: str = _ADMIN_INITIAL_PASSWORD
 
-# Password reset tokens — HMAC-signed so any replica can validate without shared state.
+
+def _generate_session_token(ttl: int = 86400 * 7) -> str:
+    """Create an HMAC-signed session token valid for *ttl* seconds (default 7 days)."""
+    nonce = _secrets.token_urlsafe(24)
+    expiry = str(int(_time.time() + ttl))
+    payload = f"{nonce}.{expiry}"
+    sig = _hmac.new(_SESSION_SECRET.encode(), payload.encode(), "sha256").hexdigest()
+    return f"{payload}.{sig}"
+
+
+def _validate_session_token(token: str) -> bool:
+    """Validate an HMAC-signed session token (signature + expiry)."""
+    if not token:
+        return False
+    parts = token.split(".")
+    if len(parts) != 3:
+        return False
+    nonce, expiry_str, sig = parts
+    payload = f"{nonce}.{expiry_str}"
+    expected = _hmac.new(_SESSION_SECRET.encode(), payload.encode(), "sha256").hexdigest()
+    if not _hmac.compare_digest(sig, expected):
+        return False
+    try:
+        if _time.time() > float(expiry_str):
+            return False
+    except ValueError:
+        return False
+    return True
+
+
+def _generate_csrf_token() -> str:
+    """Generate a cryptographically random CSRF token (double-submit cookie pattern)."""
+    return _secrets.token_urlsafe(32)
+
+
+def _validate_csrf_token(form_token: str, cookie_token: str) -> bool:
+    """Validate CSRF token: compare form field with cookie value."""
+    if not form_token or not cookie_token:
+        return False
+    return _hmac.compare_digest(form_token, cookie_token)
+
+
+# Password reset tokens -- HMAC-signed so any replica can validate without shared state.
 # Token format: "<nonce>.<expiry_ts>.<hmac_hex>"
-# Signed with _admin_password_hash (deterministic across replicas from env var).
+# Signed with _ADMIN_HMAC_KEY (deterministic across replicas from env var).
 
 _admin_used_reset_nonces: set[str] = set()  # best-effort single-use per replica
 _admin_reset_rate_limit: dict[str, list[float]] = {}
@@ -113,6 +179,7 @@ _STANDALONE_LOGIN_HTML = f"""<!DOCTYPE html>
   <p class="subtitle">Customer Experience Admin</p>
   <div class="error" id="err">Incorrect password. Please try again.</div>
   <form method="POST" action="/admin/standalone/_auth">
+    <input type="hidden" name="csrf_token" value="{{{{csrf_token}}}}"/>
     <label for="pw">Password</label>
     <input id="pw" type="password" name="password" placeholder="Enter your password" autofocus required/>
     <button type="submit">Sign In</button>
@@ -137,6 +204,7 @@ _STANDALONE_FORGOT_PW_HTML = f"""<!DOCTYPE html>
   <p class="subtitle">Enter your email address and we'll send you a link to reset your password.</p>
   <div class="error" id="err">Please enter a valid email address.</div>
   <form method="POST" action="/admin/standalone/_forgot-password">
+    <input type="hidden" name="csrf_token" value="{{{{csrf_token}}}}"/>
     <label for="email">Email address</label>
     <input id="email" type="email" name="email" placeholder="you@company.com" autofocus required/>
     <button type="submit">Send reset link</button>
@@ -185,10 +253,11 @@ _STANDALONE_RESET_PW_HTML = f"""<!DOCTYPE html>
   <div class="success" id="ok">Password changed successfully!</div>
   <form method="POST" action="/admin/standalone/_reset-password">
     <input type="hidden" name="token" value="{{{{token}}}}"/>
+    <input type="hidden" name="csrf_token" value="{{{{csrf_token}}}}"/>
     <label for="new">New password</label>
-    <input id="new" type="password" name="new_password" placeholder="New password" autofocus required minlength="6"/>
+    <input id="new" type="password" name="new_password" placeholder="New password" autofocus required minlength="12"/>
     <label for="confirm">Confirm new password</label>
-    <input id="confirm" type="password" name="confirm_password" placeholder="Confirm new password" required minlength="6"/>
+    <input id="confirm" type="password" name="confirm_password" placeholder="Confirm new password" required minlength="12"/>
     <button type="submit">Set password</button>
   </form>
   <a href="/admin/standalone/" class="link">Back to sign in</a>
@@ -213,6 +282,53 @@ _STANDALONE_RESET_INVALID_HTML = f"""<!DOCTYPE html>
 </div>
 </body>
 </html>"""
+
+
+
+def _render_login_html(csrf_token: str | None = None, error: str | None = None) -> str:
+    """Render the login page HTML with a fresh CSRF token (SPEC-1690)."""
+    if csrf_token is None:
+        csrf_token = _generate_csrf_token()
+    html = _STANDALONE_LOGIN_HTML.replace("{{csrf_token}}", csrf_token)
+    if error:
+        html = html.replace(
+            'Incorrect password. Please try again.', error,
+        ).replace(
+            'class="error" id="err"', 'class="error" id="err" style="display:block"',
+        )
+    return html
+
+
+def _render_forgot_pw_html(csrf_token: str | None = None, error: str | None = None) -> str:
+    """Render the forgot-password page HTML with a fresh CSRF token."""
+    if csrf_token is None:
+        csrf_token = _generate_csrf_token()
+    html = _STANDALONE_FORGOT_PW_HTML.replace("{{csrf_token}}", csrf_token)
+    if error:
+        html = html.replace(
+            'Please enter a valid email address.', error,
+        ).replace(
+            'class="error" id="err"', 'class="error" id="err" style="display:block"',
+        )
+    return html
+
+
+def _render_reset_pw_html(
+    token: str, csrf_token: str | None = None, error: str | None = None,
+) -> str:
+    """Render the reset-password page HTML with CSRF token and reset token."""
+    if csrf_token is None:
+        csrf_token = _generate_csrf_token()
+    html = _STANDALONE_RESET_PW_HTML.replace("{{token}}", token).replace(
+        "{{csrf_token}}", csrf_token,
+    )
+    if error:
+        html = html.replace(
+            'Passwords do not match.', error,
+        ).replace(
+            'class="error" id="err"', 'class="error" id="err" style="display:block"',
+        )
+    return html
 
 
 def _generate_reset_token(ttl: int = 900) -> str:
@@ -463,61 +579,90 @@ def mount_standalone_admin(app: FastAPI) -> None:
     including login, forgot-password, reset-password flows, and static
     file serving from the Vite build output.
     """
-    global _admin_current_password, _admin_cookie_value
-
     if _admin_standalone_dist.is_dir():
 
         def _check_admin_cookie(request: Request) -> bool:
             """Return True if the request has a valid admin session cookie."""
-            global _admin_current_password, _admin_cookie_value
-            if not _admin_current_password:
+            if not _admin_password_hash:
                 # No password configured — allow all access
                 return True
             cookie = request.cookies.get(_ADMIN_COOKIE_NAME, "")
-            return cookie == _admin_cookie_value
+            return _validate_session_token(cookie)
 
         @app.post("/admin/standalone/_auth", include_in_schema=False)
         async def _admin_standalone_auth(request: Request) -> StarletteResponse:
-            """Validate the admin password and set a session cookie."""
-            global _admin_current_password, _admin_cookie_value
+            """Validate the admin password and set a session cookie (SPEC-1688/1689/1690)."""
             form = await request.form()
             password = str(form.get("password", ""))
+            form_csrf = str(form.get("csrf_token", ""))
+            cookie_csrf = request.cookies.get(_CSRF_COOKIE_NAME, "")
 
-            if password == _admin_current_password and _admin_current_password:
+            # CSRF validation (SPEC-1690)
+            if not _validate_csrf_token(form_csrf, cookie_csrf):
+                csrf = _generate_csrf_token()
+                response = HTMLResponse(
+                    content=_render_login_html(csrf_token=csrf, error="Invalid request. Please try again."),
+                    status_code=403, headers=_NO_CACHE_HEADERS,
+                )
+                response.set_cookie(_CSRF_COOKIE_NAME, csrf, httponly=True, secure=True, samesite="lax", max_age=3600)
+                return response
+
+            # Argon2id password verification (SPEC-1688)
+            if _verify_password(password):
+                token = _generate_session_token()
                 response = StarletteResponse(
                     status_code=303,
                     headers={"location": "/admin/standalone/"},
                 )
                 response.set_cookie(
                     _ADMIN_COOKIE_NAME,
-                    _admin_cookie_value,
+                    token,
                     httponly=True,
                     secure=True,
                     samesite="lax",
                     max_age=86400 * 7,  # 7 days
                 )
+                response.delete_cookie(_CSRF_COOKIE_NAME)
                 return response
 
-            # Wrong password — re-render login with error
-            error_html = _STANDALONE_LOGIN_HTML.replace(
-                'class="error" id="err"', 'class="error" id="err" style="display:block"',
+            # Wrong password — re-render login with fresh CSRF token
+            csrf = _generate_csrf_token()
+            response = HTMLResponse(
+                content=_render_login_html(csrf_token=csrf),
+                status_code=403, headers=_NO_CACHE_HEADERS,
             )
-            return HTMLResponse(content=error_html, status_code=403)
+            response.set_cookie(_CSRF_COOKIE_NAME, csrf, httponly=True, secure=True, samesite="lax", max_age=3600)
+            return response
 
         # ---- Forgot password flow (email-based reset) --------------------------
 
         @app.get("/admin/standalone/_forgot-password", include_in_schema=False)
-        async def _admin_forgot_password_form(request: Request) -> HTMLResponse:
-            """Show the forgot password form (enter email)."""
-            return HTMLResponse(content=_STANDALONE_FORGOT_PW_HTML)
+        async def _admin_forgot_password_form(request: Request) -> StarletteResponse:
+            """Show the forgot password form (enter email) with CSRF token."""
+            csrf = _generate_csrf_token()
+            response = HTMLResponse(content=_render_forgot_pw_html(csrf_token=csrf))
+            response.set_cookie(_CSRF_COOKIE_NAME, csrf, httponly=True, secure=True, samesite="lax", max_age=3600)
+            return response
 
         @app.post("/admin/standalone/_forgot-password", include_in_schema=False)
-        async def _admin_forgot_password(request: Request) -> HTMLResponse:
-            """Process forgot-password: validate email, send reset link."""
+        async def _admin_forgot_password(request: Request) -> StarletteResponse:
+            """Process forgot-password: validate CSRF + email, send reset link."""
             global _admin_reset_rate_limit
 
             form = await request.form()
             email = str(form.get("email", "")).strip().lower()
+            form_csrf = str(form.get("csrf_token", ""))
+            cookie_csrf = request.cookies.get(_CSRF_COOKIE_NAME, "")
+
+            # CSRF validation (SPEC-1690)
+            if not _validate_csrf_token(form_csrf, cookie_csrf):
+                csrf = _generate_csrf_token()
+                response = HTMLResponse(
+                    content=_render_forgot_pw_html(csrf_token=csrf, error="Invalid request. Please try again."),
+                    status_code=403,
+                )
+                response.set_cookie(_CSRF_COOKIE_NAME, csrf, httponly=True, secure=True, samesite="lax", max_age=3600)
+                return response
 
             # Rate limit: 3 requests per 5 min per IP
             client_ip = request.client.host if request.client else "unknown"
@@ -526,22 +671,28 @@ def mount_standalone_admin(app: FastAPI) -> None:
             hits = _admin_reset_rate_limit.get(client_ip, [])
             hits = [t for t in hits if now - t < window]
             if len(hits) >= 3:
-                rate_html = _STANDALONE_FORGOT_PW_HTML.replace(
-                    'Please enter a valid email address.',
-                    'Too many requests. Please wait a few minutes and try again.',
-                ).replace(
-                    'class="error" id="err"', 'class="error" id="err" style="display:block"',
+                csrf = _generate_csrf_token()
+                response = HTMLResponse(
+                    content=_render_forgot_pw_html(
+                        csrf_token=csrf,
+                        error="Too many requests. Please wait a few minutes and try again.",
+                    ),
+                    status_code=429,
                 )
-                return HTMLResponse(content=rate_html, status_code=429)
+                response.set_cookie(_CSRF_COOKIE_NAME, csrf, httponly=True, secure=True, samesite="lax", max_age=3600)
+                return response
             hits.append(now)
             _admin_reset_rate_limit[client_ip] = hits
 
             # Validate email format
             if not email or "@" not in email:
-                error_html = _STANDALONE_FORGOT_PW_HTML.replace(
-                    'class="error" id="err"', 'class="error" id="err" style="display:block"',
+                csrf = _generate_csrf_token()
+                response = HTMLResponse(
+                    content=_render_forgot_pw_html(csrf_token=csrf),
+                    status_code=400,
                 )
-                return HTMLResponse(content=error_html, status_code=400)
+                response.set_cookie(_CSRF_COOKIE_NAME, csrf, httponly=True, secure=True, samesite="lax", max_age=3600)
+                return response
 
             # Check if email matches the configured reset email
             if _ADMIN_RESET_EMAIL and email == _ADMIN_RESET_EMAIL:
@@ -560,23 +711,30 @@ def mount_standalone_admin(app: FastAPI) -> None:
             return HTMLResponse(content=_STANDALONE_FORGOT_PW_SENT_HTML)
 
         @app.get("/admin/standalone/_reset-password", include_in_schema=False)
-        async def _admin_reset_password_form(request: Request) -> HTMLResponse:
-            """Show the set-new-password form if the token is valid."""
+        async def _admin_reset_password_form(request: Request) -> StarletteResponse:
+            """Show the set-new-password form if the token is valid (with CSRF)."""
             token = request.query_params.get("token", "")
             if not _validate_reset_token(token):
                 return HTMLResponse(content=_STANDALONE_RESET_INVALID_HTML, status_code=400)
-            # Inject token into the hidden field
-            form_html = _STANDALONE_RESET_PW_HTML.replace("{{token}}", token)
-            return HTMLResponse(content=form_html)
+            csrf = _generate_csrf_token()
+            response = HTMLResponse(content=_render_reset_pw_html(token=token, csrf_token=csrf))
+            response.set_cookie(_CSRF_COOKIE_NAME, csrf, httponly=True, secure=True, samesite="lax", max_age=3600)
+            return response
 
         @app.post("/admin/standalone/_reset-password", include_in_schema=False)
         async def _admin_reset_password(request: Request) -> StarletteResponse:
-            """Process password reset: validate token, auto-login user."""
+            """Process password reset: validate CSRF + token, auto-login (SPEC-1690/1691)."""
 
             form = await request.form()
             token = str(form.get("token", ""))
             new_pw = str(form.get("new_password", ""))
             confirm = str(form.get("confirm_password", ""))
+            form_csrf = str(form.get("csrf_token", ""))
+            cookie_csrf = request.cookies.get(_CSRF_COOKIE_NAME, "")
+
+            # CSRF validation (SPEC-1690)
+            if not _validate_csrf_token(form_csrf, cookie_csrf):
+                return HTMLResponse(content=_STANDALONE_RESET_INVALID_HTML, status_code=400)
 
             # Validate token
             if not _validate_reset_token(token):
@@ -584,30 +742,35 @@ def mount_standalone_admin(app: FastAPI) -> None:
 
             # Validate passwords match
             if new_pw != confirm:
-                form_html = _STANDALONE_RESET_PW_HTML.replace("{{token}}", token).replace(
-                    'class="error" id="err"', 'class="error" id="err" style="display:block"',
+                csrf = _generate_csrf_token()
+                response = HTMLResponse(
+                    content=_render_reset_pw_html(token=token, csrf_token=csrf),
+                    status_code=400,
                 )
-                return HTMLResponse(content=form_html, status_code=400)
+                response.set_cookie(_CSRF_COOKIE_NAME, csrf, httponly=True, secure=True, samesite="lax", max_age=3600)
+                return response
 
-            # Validate minimum length
-            if len(new_pw) < 6:
-                form_html = _STANDALONE_RESET_PW_HTML.replace("{{token}}", token).replace(
-                    'Passwords do not match.',
-                    'Password must be at least 6 characters.',
-                ).replace(
-                    'class="error" id="err"', 'class="error" id="err" style="display:block"',
+            # Validate minimum length (SPEC-1691)
+            if len(new_pw) < _MIN_PASSWORD_LENGTH:
+                csrf = _generate_csrf_token()
+                response = HTMLResponse(
+                    content=_render_reset_pw_html(
+                        token=token, csrf_token=csrf,
+                        error=f"Password must be at least {_MIN_PASSWORD_LENGTH} characters.",
+                    ),
+                    status_code=400,
                 )
-                return HTMLResponse(content=form_html, status_code=400)
+                response.set_cookie(_CSRF_COOKIE_NAME, csrf, httponly=True, secure=True, samesite="lax", max_age=3600)
+                return response
 
             # Multi-replica safety: Do NOT change the password in-memory.
             # With minReplicas > 1, an in-memory password change only affects
             # THIS replica — the other replica(s) keep the env var password,
             # causing 50% login failures and cookie mismatches.
             #
-            # Instead: auto-login the user by setting the session cookie (derived
-            # from the env var password, identical on all replicas) and redirect
-            # to the admin dashboard.  The user gets a 7-day authenticated session
-            # without needing to know the password.
+            # Instead: auto-login the user by setting an opaque session token
+            # (HMAC-signed, validated on any replica) and redirect to the admin
+            # dashboard.  The user gets a 7-day authenticated session.
             #
             # To change the actual admin password, update the ADMIN_PREVIEW_PASSWORD
             # env var on the Container App (triggers rolling restart of all replicas).
@@ -617,7 +780,7 @@ def mount_standalone_admin(app: FastAPI) -> None:
             if nonce:
                 _admin_used_reset_nonces.add(nonce)
 
-            logger.info("Admin password reset: auto-login via session cookie")
+            logger.info("Admin password reset: auto-login via session token")
 
             # Send password-changed confirmation email (non-blocking best-effort).
             # Includes a "Reset Password" recovery link in case the admin did not
@@ -629,19 +792,21 @@ def mount_standalone_admin(app: FastAPI) -> None:
                 import asyncio
                 await asyncio.to_thread(_send_admin_password_changed_email, _ADMIN_RESET_EMAIL, forgot_url)  # SPEC-1622: non-blocking SMTP
 
-            # Auto-login: set the session cookie and redirect to admin dashboard.
+            # Auto-login: set opaque session token and redirect to admin dashboard.
+            session_token = _generate_session_token()
             response = StarletteResponse(
                 status_code=303,
                 headers={"location": "/admin/standalone/"},
             )
             response.set_cookie(
                 _ADMIN_COOKIE_NAME,
-                _admin_cookie_value,
+                session_token,
                 httponly=True,
                 secure=True,
                 samesite="lax",
                 max_age=86400 * 7,  # 7 days
             )
+            response.delete_cookie(_CSRF_COOKIE_NAME)
             return response
 
         # IMPORTANT: Register explicit root routes BEFORE the StaticFiles mount.
@@ -659,14 +824,20 @@ def mount_standalone_admin(app: FastAPI) -> None:
         async def _admin_standalone_index_slash(request: Request) -> StarletteResponse:
             """Serve the standalone admin SPA root with trailing slash (password-gated)."""
             if not _check_admin_cookie(request):
-                return HTMLResponse(content=_STANDALONE_LOGIN_HTML, headers=_NO_CACHE_HEADERS)
+                csrf = _generate_csrf_token()
+                response = HTMLResponse(content=_render_login_html(csrf_token=csrf), headers=_NO_CACHE_HEADERS)
+                response.set_cookie(_CSRF_COOKIE_NAME, csrf, httponly=True, secure=True, samesite="lax", max_age=3600)
+                return response
             return FileResponse(str(_admin_standalone_dist / "index.html"), headers=_NO_CACHE_HEADERS)
 
         @app.get("/admin/standalone", include_in_schema=False)
         async def _admin_standalone_index(request: Request) -> StarletteResponse:
             """Serve the standalone admin SPA root (password-gated)."""
             if not _check_admin_cookie(request):
-                return HTMLResponse(content=_STANDALONE_LOGIN_HTML, headers=_NO_CACHE_HEADERS)
+                csrf = _generate_csrf_token()
+                response = HTMLResponse(content=_render_login_html(csrf_token=csrf), headers=_NO_CACHE_HEADERS)
+                response.set_cookie(_CSRF_COOKIE_NAME, csrf, httponly=True, secure=True, samesite="lax", max_age=3600)
+                return response
             return FileResponse(str(_admin_standalone_dist / "index.html"), headers=_NO_CACHE_HEADERS)
 
         # Serve static assets (JS, CSS, sourcemaps) from the Vite build output
@@ -685,7 +856,10 @@ def mount_standalone_admin(app: FastAPI) -> None:
             for SPA client-side routing.
             """
             if not _check_admin_cookie(request):
-                return HTMLResponse(content=_STANDALONE_LOGIN_HTML, headers=_NO_CACHE_HEADERS)
+                csrf = _generate_csrf_token()
+                response = HTMLResponse(content=_render_login_html(csrf_token=csrf), headers=_NO_CACHE_HEADERS)
+                response.set_cookie(_CSRF_COOKIE_NAME, csrf, httponly=True, secure=True, samesite="lax", max_age=3600)
+                return response
             # Serve real static files (SVG, PNG, etc.) from dist root
             candidate = _admin_standalone_dist / full_path
             if candidate.is_file() and ".." not in full_path:
@@ -694,7 +868,7 @@ def mount_standalone_admin(app: FastAPI) -> None:
 
         logger.info(
             "Standalone admin SPA mounted at /admin/standalone%s",
-            " (password-gated)" if _admin_current_password else " (NO PASSWORD — open access)",
+            " (password-gated)" if _admin_password_hash else " (NO PASSWORD — open access)",
         )
     else:
         logger.warning(

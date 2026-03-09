@@ -135,10 +135,8 @@ def standalone_client():
         b"agentred-admin:testpassword",
     ).hexdigest()
     auth_mod._ADMIN_INITIAL_PASSWORD = "testpassword"
-    auth_mod._admin_password_hash = test_hash
+    auth_mod._admin_password_hash = auth_mod._hash_password("testpassword")
     auth_mod._ADMIN_HMAC_KEY = test_hash
-    auth_mod._admin_current_password = "testpassword"
-    auth_mod._admin_cookie_value = auth_mod._compute_cookie_value("testpassword")
     auth_mod._ADMIN_RESET_EMAIL = "admin@test.com"
 
     from fastapi.testclient import TestClient
@@ -154,6 +152,12 @@ def standalone_client():
     auth_mod._admin_reset_rate_limit.clear()
 
 
+def _get_csrf(client, url):
+    """GET a page to obtain CSRF cookie."""
+    resp = client.get(url)
+    return resp.cookies.get("agentred_csrf", "")
+
+
 class TestForgotPasswordEndpoints:
     """Integration tests for the forgot/reset password flow."""
 
@@ -165,10 +169,12 @@ class TestForgotPasswordEndpoints:
 
     def test_post_forgot_password_valid_email(self, standalone_client):
         """POST with matching email returns success page (no email enumeration)."""
+        csrf = _get_csrf(standalone_client, "/admin/standalone/_forgot-password")
         with patch("src.app.standalone_auth._send_admin_reset_email", return_value=True) as mock_send:
             resp = standalone_client.post(
                 "/admin/standalone/_forgot-password",
-                data={"email": "admin@test.com"},
+                data={"email": "admin@test.com", "csrf_token": csrf},
+                cookies={"agentred_csrf": csrf},
             )
         assert resp.status_code == 200
         assert mock_send.called
@@ -180,19 +186,23 @@ class TestForgotPasswordEndpoints:
 
     def test_post_forgot_password_wrong_email(self, standalone_client):
         """POST with non-matching email still returns success (anti-enumeration)."""
+        csrf = _get_csrf(standalone_client, "/admin/standalone/_forgot-password")
         with patch("src.app.standalone_auth._send_admin_reset_email") as mock_send:
             resp = standalone_client.post(
                 "/admin/standalone/_forgot-password",
-                data={"email": "wrong@example.com"},
+                data={"email": "wrong@example.com", "csrf_token": csrf},
+                cookies={"agentred_csrf": csrf},
             )
         assert resp.status_code == 200
         assert not mock_send.called
 
     def test_post_forgot_password_invalid_email(self, standalone_client):
         """POST with invalid email returns error."""
+        csrf = _get_csrf(standalone_client, "/admin/standalone/_forgot-password")
         resp = standalone_client.post(
             "/admin/standalone/_forgot-password",
-            data={"email": "not-an-email"},
+            data={"email": "not-an-email", "csrf_token": csrf},
+            cookies={"agentred_csrf": csrf},
         )
         assert resp.status_code == 400
 
@@ -203,16 +213,20 @@ class TestForgotPasswordEndpoints:
 
         with patch("src.app.standalone_auth._send_admin_reset_email", return_value=True):
             for _ in range(3):
+                csrf = _get_csrf(standalone_client, "/admin/standalone/_forgot-password")
                 resp = standalone_client.post(
                     "/admin/standalone/_forgot-password",
-                    data={"email": "admin@test.com"},
+                    data={"email": "admin@test.com", "csrf_token": csrf},
+                    cookies={"agentred_csrf": csrf},
                 )
                 assert resp.status_code == 200
 
             # Fourth should be rate-limited
+            csrf = _get_csrf(standalone_client, "/admin/standalone/_forgot-password")
             resp = standalone_client.post(
                 "/admin/standalone/_forgot-password",
-                data={"email": "admin@test.com"},
+                data={"email": "admin@test.com", "csrf_token": csrf},
+                cookies={"agentred_csrf": csrf},
             )
             assert resp.status_code == 429
 
@@ -221,17 +235,19 @@ class TestForgotPasswordEndpoints:
         from src.main import _generate_reset_token
         token = _generate_reset_token(ttl=60)
 
-        # GET the reset form
+        # GET the reset form (also sets CSRF cookie)
         resp = standalone_client.get(
             f"/admin/standalone/_reset-password?token={token}",
         )
         assert resp.status_code == 200
         assert token in resp.text or "new_password" in resp.text.lower()
+        csrf = resp.cookies.get("agentred_csrf", "")
 
         # POST the new password -> auto-login redirect with cookie
         resp = standalone_client.post(
             "/admin/standalone/_reset-password",
-            data={"token": token, "new_password": "newpass123", "confirm_password": "newpass123"},
+            data={"token": token, "new_password": "newpassword123", "confirm_password": "newpassword123", "csrf_token": csrf},
+            cookies={"agentred_csrf": csrf},
             follow_redirects=False,
         )
         assert resp.status_code == 303
@@ -250,20 +266,24 @@ class TestForgotPasswordEndpoints:
         from src.main import _generate_reset_token
         token = _generate_reset_token(ttl=60)
 
+        csrf = _get_csrf(standalone_client, f"/admin/standalone/_reset-password?token={token}")
         resp = standalone_client.post(
             "/admin/standalone/_reset-password",
-            data={"token": token, "new_password": "newpass1", "confirm_password": "newpass2"},
+            data={"token": token, "new_password": "newpassword123", "confirm_password": "newpassword456", "csrf_token": csrf},
+            cookies={"agentred_csrf": csrf},
         )
         assert resp.status_code == 400
 
     def test_reset_password_too_short(self, standalone_client):
-        """Password under 6 chars returns 400."""
+        """Password under 12 chars returns 400 (SPEC-1691)."""
         from src.main import _generate_reset_token
         token = _generate_reset_token(ttl=60)
 
+        csrf = _get_csrf(standalone_client, f"/admin/standalone/_reset-password?token={token}")
         resp = standalone_client.post(
             "/admin/standalone/_reset-password",
-            data={"token": token, "new_password": "abc", "confirm_password": "abc"},
+            data={"token": token, "new_password": "short12345", "confirm_password": "short12345", "csrf_token": csrf},
+            cookies={"agentred_csrf": csrf},
         )
         assert resp.status_code == 400
 
@@ -273,9 +293,11 @@ class TestForgotPasswordEndpoints:
         token = _generate_reset_token(ttl=60)
 
         # First use succeeds (303 redirect = auto-login)
+        csrf = _get_csrf(standalone_client, f"/admin/standalone/_reset-password?token={token}")
         resp = standalone_client.post(
             "/admin/standalone/_reset-password",
-            data={"token": token, "new_password": "newpass123", "confirm_password": "newpass123"},
+            data={"token": token, "new_password": "newpassword123", "confirm_password": "newpassword123", "csrf_token": csrf},
+            cookies={"agentred_csrf": csrf},
             follow_redirects=False,
         )
         assert resp.status_code == 303
@@ -283,6 +305,7 @@ class TestForgotPasswordEndpoints:
         # Second use fails (nonce tracked)
         resp = standalone_client.post(
             "/admin/standalone/_reset-password",
-            data={"token": token, "new_password": "another123", "confirm_password": "another123"},
+            data={"token": token, "new_password": "anotherpass123", "confirm_password": "anotherpass123", "csrf_token": csrf},
+            cookies={"agentred_csrf": csrf},
         )
         assert resp.status_code == 400
