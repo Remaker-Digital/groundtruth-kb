@@ -817,10 +817,9 @@ class TestValidateForActivation:
         assert any(e["field"] == "brand_name" for e in result.hard_errors)
 
     @pytest.mark.asyncio
-    async def test_hard_block_no_widget_key(self):
-        """Missing widget_key blocks activation."""
+    async def test_missing_widget_key_is_warning(self):
+        """Missing widget_key produces a warning (auto-provisioned during activation)."""
         draft = _make_draft_doc(widget_key="")
-        # Override to truly remove widget_key
         draft["widget_key"] = ""
         service, _, _, _, _ = _make_service(draft=draft, kb_count=5)
 
@@ -828,12 +827,13 @@ class TestValidateForActivation:
             STARTER_TENANT_ID, TenantTier.STARTER,
         )
 
-        assert result.can_activate is False
-        assert any(e["field"] == "widget_key" for e in result.hard_errors)
+        # widget_key is no longer a hard block — it's auto-provisioned during activation
+        assert result.can_activate is True
+        assert any(w["field"] == "widget_key" for w in result.warnings)
 
     @pytest.mark.asyncio
-    async def test_hard_block_none_widget_key(self):
-        """None widget_key blocks activation."""
+    async def test_none_widget_key_is_warning(self):
+        """None widget_key produces a warning (auto-provisioned during activation)."""
         draft = _make_draft_doc()
         draft["widget_key"] = None
         service, _, _, _, _ = _make_service(draft=draft, kb_count=5)
@@ -842,12 +842,12 @@ class TestValidateForActivation:
             STARTER_TENANT_ID, TenantTier.STARTER,
         )
 
-        assert result.can_activate is False
-        assert any(e["field"] == "widget_key" for e in result.hard_errors)
+        assert result.can_activate is True
+        assert any(w["field"] == "widget_key" for w in result.warnings)
 
     @pytest.mark.asyncio
-    async def test_multiple_hard_blocks(self):
-        """Both brand_name and widget_key can fail simultaneously."""
+    async def test_multiple_blocks_brand_name_hard_widget_key_warning(self):
+        """brand_name is a hard error, widget_key is a warning."""
         draft = _make_draft_doc(brand_name="", widget_key="")
         draft["widget_key"] = ""
         service, _, _, _, _ = _make_service(draft=draft, kb_count=5)
@@ -856,10 +856,12 @@ class TestValidateForActivation:
             STARTER_TENANT_ID, TenantTier.STARTER,
         )
 
-        assert result.can_activate is False
+        assert result.can_activate is False  # brand_name still blocks
         error_fields = [e["field"] for e in result.hard_errors]
         assert "brand_name" in error_fields
-        assert "widget_key" in error_fields
+        assert "widget_key" not in error_fields  # widget_key is now a warning
+        warning_fields = [w["field"] for w in result.warnings]
+        assert "widget_key" in warning_fields
 
     @pytest.mark.asyncio
     async def test_hard_error_no_brand_voice(self):

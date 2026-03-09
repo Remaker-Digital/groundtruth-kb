@@ -55,7 +55,9 @@ export function useUpdateConfig(apiFetch: ApiFetch) {
       } catch (err: unknown) {
         const msg = err instanceof Error ? err.message : 'Update failed';
         setError(msg);
-        return null;
+        // Return error detail so callers can read it synchronously
+        // (React state won't update until next render cycle).
+        return { success: false, error: msg } as unknown as ConfigUpdateResult;
       } finally {
         setLoading(false);
       }
@@ -148,7 +150,9 @@ export function useSaveNamedConfig(apiFetch: ApiFetch) {
       } catch (err: unknown) {
         const msg = err instanceof Error ? err.message : 'Save failed';
         setError(msg);
-        return null;
+        // Return error detail so callers can read it synchronously
+        // (React state won't update until next render cycle).
+        return { success: false, error: msg } as unknown as ConfigUpdateResult;
       } finally {
         setLoading(false);
       }
@@ -181,7 +185,9 @@ export function useActivateNamedConfig(apiFetch: ApiFetch) {
       } catch (err: unknown) {
         const msg = err instanceof Error ? err.message : 'Activate failed';
         setError(msg);
-        return null;
+        // Return error detail so callers can read it synchronously
+        // (React state won't update until next render cycle).
+        return { success: false, error: msg } as unknown as ConfigUpdateResult;
       } finally {
         setLoading(false);
       }

@@ -38,7 +38,7 @@ import {
   useIntentBreakdown,
   useKnowledgeGaps,
 } from '../../shared/hooks/index';
-import { useConfig, useActivationStatus } from '../../shared/hooks/useConfig';
+import { useConfig } from '../../shared/hooks/useConfig';
 import { HelpTooltip } from '../../shared/HelpTooltip';
 import { agentDisplayLabel } from '../../shared/AnalyticsOverview';
 import { tokens } from '../../shared/theme/styles';
@@ -174,7 +174,7 @@ function SetupChecklist({ config, activationStatus }: {
 const DOCS_BASE = 'https://agentredcx.com/docs/admin-guide';
 
 export function DashboardPage() {
-  const { apiFetch, tenantContext } = useAppContext();
+  const { apiFetch, tenantContext, activationStatus: activationStatusFromCtx } = useAppContext();
 
   // Analytics filters
   const [period, setPeriod] = useState('30d');
@@ -186,7 +186,6 @@ export function DashboardPage() {
   const intents = useIntentBreakdown(apiFetch);
   const gaps = useKnowledgeGaps(apiFetch);
   const configResult = useConfig(apiFetch);
-  const activationStatus = useActivationStatus(apiFetch);
 
   const computedColorScheme = useComputedColorScheme('dark');
   const isDark = computedColorScheme === 'dark';
@@ -264,7 +263,7 @@ export function DashboardPage() {
       </Group>
 
       {/* Go-Live: Initial setup checklist (WI #288) */}
-      <SetupChecklist config={configResult.data?.config} activationStatus={activationStatus.data ?? undefined} />
+      <SetupChecklist config={configResult.data?.config} activationStatus={activationStatusFromCtx ?? undefined} />
 
       {/* Stat cards — 5 cards with detail sub-labels + help tooltips (WI #259) */}
       <SimpleGrid cols={{ base: 1, xs: 2, md: 3 }} spacing="md">

@@ -876,7 +876,7 @@ export const ConfigEditor: React.FC<BaseComponentProps> = ({
         refetchConfig();
         refetchVersions();
       } else {
-        onNotify(result?.message ?? 'Failed to save configuration.', 'error');
+        onNotify((result as any)?.error || result?.message || 'Failed to save configuration.', 'error');
       }
     } catch {
       onNotify('An unexpected error occurred while saving.', 'error');

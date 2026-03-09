@@ -512,6 +512,71 @@ class ActivationService:
         return draft is not None
 
     # ------------------------------------------------------------------
+    # Auto-provision Widget Key
+    # ------------------------------------------------------------------
+
+    async def _ensure_widget_key(self, tenant_id: str) -> None:
+        """Generate and persist a widget key if missing from draft/active config.
+
+        Fixes the circular dependency where activation requires a widget_key
+        but the key is only set during provisioning. If provisioning failed
+        to write it to the preferences document (CP.6 class bug), this method
+        heals the gap by generating a new key and writing it to both the
+        preferences document and the tenant document (hash).
+        """
+        # Check draft first, then active
+        draft = await self._prefs_repo.get_draft(tenant_id)
+        target = draft
+        if target is None:
+            target = await self._prefs_repo.get_active(tenant_id)
+        if target is None:
+            return  # No config doc at all — validation will catch this
+
+        if target.get("widget_key"):
+            return  # Already has a widget key
+
+        logger.info(
+            "Auto-provisioning widget key for tenant=%s (missing from %s config)",
+            tenant_id[:8], target.get("config_state", "unknown"),
+        )
+
+        from src.multi_tenant.auth import generate_widget_key, hash_widget_key
+
+        raw_key = generate_widget_key(tenant_id)
+        key_hash = hash_widget_key(raw_key)
+        now_iso = datetime.now(timezone.utc).isoformat()
+
+        # Write raw key to preferences doc (for admin UI + activation gate)
+        await self._prefs_repo.patch(
+            tenant_id=tenant_id,
+            document_id=target["id"],
+            operations=[
+                {"op": "set", "path": "/widget_key", "value": raw_key},
+                {"op": "set", "path": "/updated_at", "value": now_iso},
+            ],
+        )
+
+        # Write hash to tenant doc (for auth middleware lookup)
+        if self._tenant_repo:
+            try:
+                await self._tenant_repo.patch(
+                    tenant_id,
+                    tenant_id,
+                    operations=[
+                        {"op": "set", "path": "/widget_key_hash", "value": key_hash},
+                        {"op": "set", "path": "/updated_at", "value": now_iso},
+                    ],
+                )
+            except Exception:
+                # Tenant doc may already have a hash — non-critical
+                logger.debug("Widget key hash update on tenant doc failed", exc_info=True)
+
+        logger.info(
+            "Widget key auto-provisioned for tenant=%s",
+            tenant_id[:8],
+        )
+
+    # ------------------------------------------------------------------
     # Validate for Activation
     # ------------------------------------------------------------------
 
@@ -554,12 +619,12 @@ class ActivationService:
                 "page": "agent-configuration",
             })
 
-        # Hard block: widget_key
+        # Widget key: auto-provisioned during activation if missing
         widget_key = draft.get("widget_key")
         if not widget_key:
-            hard_errors.append({
+            warnings.append({
                 "field": "widget_key",
-                "message": "Widget key is missing (set during provisioning)",
+                "message": "Widget key will be generated automatically during activation",
                 "page": "system",
             })
 
@@ -631,6 +696,12 @@ class ActivationService:
 
         try:
             async with self._lock:
+                # Auto-provision widget key if missing from draft/active.
+                # Fixes circular dependency: activation requires widget_key,
+                # but widget_key is set during provisioning which may have
+                # failed to write it to the preferences document.
+                await self._ensure_widget_key(tenant_id)
+
                 # Validate inside the lock so no concurrent save_draft()
                 # can modify the draft between validation and promotion.
                 validation = await self.validate_for_activation(tenant_id, tier)

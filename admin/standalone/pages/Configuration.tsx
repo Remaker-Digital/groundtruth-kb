@@ -476,7 +476,7 @@ export const ConfigurationPage: React.FC = () => {
     if (Object.keys(changes).length === 0) return;
 
     const result = await saveConfig(changes);
-    if (result) {
+    if (result?.success) {
       onNotify('Draft configuration saved successfully.', 'success');
       // Update server snapshot so discard reflects new saved state
       serverFormRef.current = { ...form };
@@ -484,7 +484,8 @@ export const ConfigurationPage: React.FC = () => {
       configResult.refetch();
       refreshActivationStatus();
     } else {
-      onNotify(saveError || 'Failed to save configuration.', 'error');
+      const detail = (result as any)?.error || saveError || 'Failed to save configuration.';
+      onNotify(`Failed to save: ${detail}`, 'error');
     }
   };
 

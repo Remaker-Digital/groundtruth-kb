@@ -91,6 +91,8 @@ interface AppContextValue {
   refreshActivationStatus: () => void;
   /** Increments after a discard so child pages can re-fetch their config data. */
   configRefreshKey: number;
+  /** Shared activation status from layout polling — use instead of per-page hooks. */
+  activationStatus: ActivationStatus | null;
 }
 
 // ---------------------------------------------------------------------------
@@ -614,6 +616,7 @@ export const StandaloneLayout: React.FC<StandaloneLayoutProps> = ({
     loading,
     refreshActivationStatus: fetchActivationStatus,
     configRefreshKey,
+    activationStatus,
   };
 
   // ---- Render ------------------------------------------------------------

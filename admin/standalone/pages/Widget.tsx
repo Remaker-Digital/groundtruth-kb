@@ -917,10 +917,9 @@ export function WidgetPage() {
     if (result?.success) {
       onNotify('Draft widget settings saved successfully.', 'success');
       refreshActivationStatus();
-    } else if (saveError) {
-      onNotify(`Failed to save: ${saveError}`, 'error');
     } else {
-      onNotify('Failed to save widget settings', 'error');
+      const detail = (result as any)?.error || saveError || 'Failed to save widget settings';
+      onNotify(`Failed to save: ${detail}`, 'error');
     }
   }
 
