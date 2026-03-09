@@ -1029,14 +1029,14 @@ class PreferencesDocument(BaseModel):
     widget_greeting_enabled: bool | None = Field(default=None, description="Show greeting message on open")
     widget_greeting_message: str | None = Field(default=None, description="Greeting message text")
     widget_pre_chat_form_enabled: bool | None = Field(default=None, description="Show pre-chat form before conversation")
-    widget_pre_chat_fields: list[str] = Field(default_factory=list, description="Pre-chat form field names (name, email, phone, etc.)")
+    widget_pre_chat_fields: list[str] | None = Field(default=None, description="Pre-chat form field names (name, email, phone, etc.)")
     widget_offline_form_enabled: bool | None = Field(default=None, description="Show offline contact form")
 
     # Content and targeting
     widget_key: str | None = Field(default=None, description="Publishable widget key (pk_live_...) for widget authentication")
     widget_header_text: str | None = Field(default=None, description="Custom widget header/title text")
     widget_input_placeholder: str | None = Field(default=None, description="Message input placeholder text")
-    widget_page_rules: list[str] = Field(default_factory=list, description="URL patterns for page visibility rules")
+    widget_page_rules: list[str] | None = Field(default=None, description="URL patterns for page visibility rules")
     widget_exit_intent_enabled: bool = Field(default=False, description="Auto-open widget on exit intent (desktop mouseleave)")
     widget_scroll_depth_trigger: int | None = Field(default=None, description="Auto-open widget at scroll depth percentage (1-100)")
 
