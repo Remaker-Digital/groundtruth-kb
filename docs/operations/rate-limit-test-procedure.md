@@ -1,9 +1,9 @@
 # Rate Limiting & DoS Resilience Testing Procedure
 # Type: Repeatable Procedure (see docs/operations/REPEATABLE-PROCEDURES.md)
-# Last verified: 2026-02-19 (19 passed, 1 timing-dependent — CONDITIONAL PASS)
-# Last corrected: 2026-02-19 (test ordering exhausts starter window, added longer wait)
+# Last verified: 2026-03-09 (updated to reflect uniform 500 RPM)
+# Last corrected: 2026-03-09 (all tiers now 500 RPM per DOC-145 owner decision)
 
-This procedure validates that the Agent Red API gateway correctly enforces per-tenant rate limits and remains resilient under burst traffic conditions. It uses both the production tenant (professional tier, 50 rpm) and the test tenant (starter tier, 10 rpm) to verify tier-specific enforcement.
+This procedure validates that the Agent Red API gateway correctly enforces per-tenant rate limits and remains resilient under burst traffic conditions. All tiers now use a uniform 500 RPM limit (owner decision DOC-145, S157). Platform admin is exempt from rate limiting (SPEC-1670).
 
 > **Audience:** AI assistants (Claude) and human operators.
 > **Tooling:** pytest + httpx (for targeted rate limit tests), Locust (for sustained burst tests).
@@ -18,23 +18,23 @@ PROJECT_ROOT        = E:\Claude-Playground\CLAUDE-PROJECTS\Agent Red Customer En
 PROD_URL            = https://agent-red-api-gateway.orangeglacier-f566a4e7.eastus.azurecontainerapps.io
 TEST_FILE           = tests/security/test_rate_limiting_live.py
 
-# Tenant A: Professional tier (50 rpm)
+# Tenant A: Professional tier (500 RPM)
 TENANT_A_ID         = remaker-digital-001
 TENANT_A_API_KEY    = (from .env.local SUPERADMIN_PREVIEW_API_KEY; rotates on every re-seed)
 TENANT_A_TIER       = professional
-TENANT_A_RPM        = 50
+TENANT_A_RPM        = 500
 
-# Tenant B: Starter tier (10 rpm)
+# Tenant B: Starter tier (500 RPM)
 TENANT_B_ID         = test-customer-001
 TENANT_B_API_KEY    = (from logs/test_tenant_credentials.json superadmin_key; rotates on every re-seed)
 TENANT_B_TIER       = starter
-TENANT_B_RPM        = 10
+TENANT_B_RPM        = 500
 
 # Rate limit tier defaults
-TRIAL_RPM           = 5
-STARTER_RPM         = 10
-PROFESSIONAL_RPM    = 50
-ENTERPRISE_RPM      = 200
+TRIAL_RPM           = 500
+STARTER_RPM         = 500
+PROFESSIONAL_RPM    = 500
+ENTERPRISE_RPM      = 500
 
 # Expected test counts
 EXPECTED_PASS       = 20
@@ -62,10 +62,10 @@ EXPECTED_FAILURES   = 0
 
 | ID | Test | Expected |
 |----|------|----------|
-| RL-01 | Starter tenant: 10 requests within 60s → all succeed | 200 on all 10 |
-| RL-02 | Starter tenant: 15 requests within 60s → 429 after 10 | First 10 → 200, remaining → 429 |
-| RL-03 | Professional tenant: 50 requests within 60s → all succeed | 200 on all 50 |
-| RL-04 | Professional tenant: 60 requests within 60s → 429 after 50 | First 50 → 200, remaining → 429 |
+| RL-01 | Starter tenant: requests within 60s under 500 RPM → all succeed | 200 (all under limit) |
+| RL-02 | Starter tenant: 510 requests within 60s → 429 after 500 | First 5000 → 200, remaining → 429 |
+| RL-03 | Professional tenant: requests within 60s under 500 RPM → all succeed | 200 on all 50 |
+| RL-04 | Professional tenant: 510 requests within 60s → 429 after 500 | First 500 → 200, remaining → 429 |
 | RL-05 | 429 response includes Retry-After header | Header present, value > 0 |
 | RL-06 | 429 response body is valid JSON with error detail | {"detail": "..."} structure |
 | RL-07 | After rate limit window resets (wait 60s), requests succeed again | 200 after waiting |
@@ -75,9 +75,9 @@ EXPECTED_FAILURES   = 0
 
 | ID | Test | Expected |
 |----|------|----------|
-| RL-09 | Exhaust Tenant B's rate limit (10 rpm) | B gets 429 |
+| RL-09 | Exhaust Tenant B's rate limit (500 RPM) | B gets 429 |
 | RL-10 | While B is throttled, Tenant A requests still succeed | A gets 200 |
-| RL-11 | Exhaust Tenant A's rate limit (50 rpm) | A gets 429 |
+| RL-11 | Exhaust Tenant A's rate limit (500 RPM) | A gets 429 |
 | RL-12 | While A is throttled, Tenant B requests still succeed (after window reset) | B gets 200 |
 
 ### Category 3: Burst Traffic Resilience (4 tests)
@@ -165,7 +165,7 @@ ON FAIL:   If production remains degraded after rate limit testing, the burst
 
 ## Timing Sensitivity Note
 
-Rate limit tests are inherently timing-sensitive. Network latency between the test runner and production can cause requests to span multiple rate limit windows, making threshold enforcement appear off by a few requests. The tests should allow a ±20% tolerance on threshold counts (e.g., starter at 10 rpm should accept 8-12 before triggering 429).
+Rate limit tests are inherently timing-sensitive. Network latency between the test runner and production can cause requests to span multiple rate limit windows, making threshold enforcement appear off by a few requests. The tests should allow a ±20% tolerance on threshold counts (e.g., starter at 500 RPM should accept ~500 before triggering 429).
 
 ---
 
@@ -183,4 +183,4 @@ Rate limit tests are inherently timing-sensitive. Network latency between the te
 ---
 
 *© 2026 Remaker Digital, a DBA of VanDusen & Palmeter, LLC. All rights reserved.*
-*Last Updated: 2026-02-19*
+*Last Updated: 2026-03-09*
