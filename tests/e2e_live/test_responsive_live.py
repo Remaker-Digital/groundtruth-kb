@@ -56,37 +56,37 @@ class TestDesktopLayout:
     """Layout at desktop viewport (1440×900)."""
 
     @pytest.fixture(autouse=True)
-    def _set_viewport(self, live_admin_page: Page):
+    def _set_viewport(self, shared_admin_page: Page):
         """Set viewport to desktop size."""
-        live_admin_page.set_viewport_size({"width": 1440, "height": 900})
-        live_admin_page.wait_for_timeout(500)
+        shared_admin_page.set_viewport_size({"width": 1440, "height": 900})
+        shared_admin_page.wait_for_timeout(500)
 
-    def test_sidebar_visible(self, live_admin_page: Page):
+    def test_sidebar_visible(self, shared_admin_page: Page):
         """Sidebar navigation is fully visible at desktop width."""
-        nav_box = _get_bounding_box(live_admin_page, "nav")
+        nav_box = _get_bounding_box(shared_admin_page, "nav")
         assert nav_box is not None, "Nav element not found"
         assert nav_box["width"] > 100, f"Sidebar too narrow: {nav_box['width']}px"
 
-    def test_two_column_widget_page(self, live_admin_page: Page):
+    def test_two_column_widget_page(self, shared_admin_page: Page):
         """Widget page shows form + preview side-by-side at desktop."""
-        _navigate_admin_to(live_admin_page, "Widget configuration", "Widget")
-        live_admin_page.wait_for_timeout(500)
+        _navigate_admin_to(shared_admin_page, "Widget configuration", "Widget")
+        shared_admin_page.wait_for_timeout(500)
 
         # Check if preview element is positioned to the right
         viewport_width = 1440
-        main_box = _get_bounding_box(live_admin_page, "main")
+        main_box = _get_bounding_box(shared_admin_page, "main")
         if main_box:
             assert main_box["width"] > 800, (
                 f"Main content area too narrow for two columns: {main_box['width']}px"
             )
 
-    def test_stat_cards_horizontal(self, live_admin_page: Page):
+    def test_stat_cards_horizontal(self, shared_admin_page: Page):
         """Dashboard stat cards are laid out horizontally at desktop width."""
-        _navigate_admin_to(live_admin_page, "Dashboard", "Dashboard")
-        live_admin_page.wait_for_timeout(500)
+        _navigate_admin_to(shared_admin_page, "Dashboard", "Dashboard")
+        shared_admin_page.wait_for_timeout(500)
 
         # Get positions of card elements
-        card_positions = live_admin_page.evaluate("""
+        card_positions = shared_admin_page.evaluate("""
             (() => {
                 const cards = document.querySelectorAll('[class*="card"], [class*="Card"]');
                 const positions = [];
@@ -109,10 +109,10 @@ class TestDesktopLayout:
                 f"(all at x≈{x_values[0]})"
             )
 
-    def test_content_area_width(self, live_admin_page: Page):
+    def test_content_area_width(self, shared_admin_page: Page):
         """Main content area uses the available width minus sidebar."""
-        main_box = _get_bounding_box(live_admin_page, "main")
-        nav_box = _get_bounding_box(live_admin_page, "nav")
+        main_box = _get_bounding_box(shared_admin_page, "main")
+        nav_box = _get_bounding_box(shared_admin_page, "nav")
         if main_box and nav_box:
             expected_min = 1440 - nav_box["width"] - 100  # allow margins
             assert main_box["width"] >= expected_min * 0.7, (
@@ -129,19 +129,19 @@ class TestTabletLayout:
     """Layout at tablet viewport (768×1024)."""
 
     @pytest.fixture(autouse=True)
-    def _set_viewport(self, live_admin_page: Page):
+    def _set_viewport(self, shared_admin_page: Page):
         """Set viewport to tablet size."""
-        live_admin_page.set_viewport_size({"width": 768, "height": 1024})
-        live_admin_page.wait_for_timeout(500)
+        shared_admin_page.set_viewport_size({"width": 768, "height": 1024})
+        shared_admin_page.wait_for_timeout(500)
 
-    def test_sidebar_collapses_to_burger(self, live_admin_page: Page):
+    def test_sidebar_collapses_to_burger(self, shared_admin_page: Page):
         """At tablet width, sidebar collapses and a burger menu icon appears."""
         # Check for burger menu icon
-        burger = live_admin_page.locator(
+        burger = shared_admin_page.locator(
             "[class*='burger'], [class*='Burger'], "
             "button[aria-label*='menu'], button[aria-label*='Menu']"
         )
-        sidebar_visible = _is_element_visible(live_admin_page, "nav")
+        sidebar_visible = _is_element_visible(shared_admin_page, "nav")
 
         # Either the burger is shown OR the sidebar collapses
         # (exact behavior depends on the Mantine responsive breakpoint)
@@ -149,15 +149,15 @@ class TestTabletLayout:
         # At 768px, the sidebar may still be visible but narrower
         # Accept either collapsed or narrow sidebar
         if sidebar_visible:
-            nav_box = _get_bounding_box(live_admin_page, "nav")
+            nav_box = _get_bounding_box(shared_admin_page, "nav")
             if nav_box:
                 assert nav_box["width"] < 300, (
                     f"Sidebar still full-width at tablet: {nav_box['width']}px"
                 )
 
-    def test_content_fills_width(self, live_admin_page: Page):
+    def test_content_fills_width(self, shared_admin_page: Page):
         """Main content uses most of the viewport width."""
-        main_box = _get_bounding_box(live_admin_page, "main")
+        main_box = _get_bounding_box(shared_admin_page, "main")
         if main_box:
             # Content should fill at least 60% of viewport at tablet
             fill_ratio = main_box["width"] / 768
@@ -165,9 +165,9 @@ class TestTabletLayout:
                 f"Content only fills {fill_ratio:.0%} of viewport at tablet"
             )
 
-    def test_stat_cards_responsive(self, live_admin_page: Page):
+    def test_stat_cards_responsive(self, shared_admin_page: Page):
         """Stat cards wrap or resize at tablet width."""
-        card_positions = live_admin_page.evaluate("""
+        card_positions = shared_admin_page.evaluate("""
             (() => {
                 const cards = document.querySelectorAll('[class*="card"], [class*="Card"]');
                 const positions = [];
@@ -189,14 +189,14 @@ class TestTabletLayout:
                 f"Stat cards not responsive at tablet — avg width {avg_width}px"
             )
 
-    def test_widget_preview_stacks_below(self, live_admin_page: Page):
+    def test_widget_preview_stacks_below(self, shared_admin_page: Page):
         """At tablet width, widget preview stacks below the form."""
-        _navigate_admin_to(live_admin_page, "Widget configuration", "Widget")
-        live_admin_page.wait_for_timeout(500)
+        _navigate_admin_to(shared_admin_page, "Widget configuration", "Widget")
+        shared_admin_page.wait_for_timeout(500)
 
         # At 768px, two-column layout should collapse to single column
         # (preview below form instead of beside it)
-        main_box = _get_bounding_box(live_admin_page, "main")
+        main_box = _get_bounding_box(shared_admin_page, "main")
         if main_box:
             # Accept any valid layout — the key check is no horizontal overflow
             assert main_box["width"] <= 768, (

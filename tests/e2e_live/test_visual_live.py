@@ -47,16 +47,16 @@ def _parse_px(value: str) -> float:
 class TestSidebarCSS:
     """Sidebar navigation CSS properties match design system."""
 
-    def test_sidebar_width(self, live_admin_page: Page):
+    def test_sidebar_width(self, shared_admin_page: Page):
         """Sidebar (nav) has a computed width around 260px."""
-        width = _get_computed_style(live_admin_page, "nav", "width")
+        width = _get_computed_style(shared_admin_page, "nav", "width")
         px = _parse_px(width)
         # Allow some tolerance (250-280px)
         assert 200 <= px <= 320, f"Sidebar width {width} outside expected range"
 
-    def test_sidebar_background_color(self, live_admin_page: Page):
+    def test_sidebar_background_color(self, shared_admin_page: Page):
         """Sidebar has a dark background color."""
-        bg = _get_computed_style(live_admin_page, "nav", "background-color")
+        bg = _get_computed_style(shared_admin_page, "nav", "background-color")
         # Dark theme — RGB values should be low (dark)
         match = re.search(r"rgb\((\d+),\s*(\d+),\s*(\d+)\)", bg)
         if match:
@@ -67,10 +67,10 @@ class TestSidebarCSS:
             # Accept any non-empty value — the nav element exists
             assert bg, "No background-color computed for nav element"
 
-    def test_nav_item_font_size(self, live_admin_page: Page):
+    def test_nav_item_font_size(self, shared_admin_page: Page):
         """Navigation item text uses an appropriate font size."""
         # Get font-size from a nav link element
-        fs = live_admin_page.evaluate("""
+        fs = shared_admin_page.evaluate("""
             (() => {
                 const navLinks = document.querySelectorAll('nav a, nav [role="button"]');
                 for (const el of navLinks) {
@@ -88,15 +88,15 @@ class TestSidebarCSS:
 class TestHeaderCSS:
     """Header bar CSS properties."""
 
-    def test_header_height(self, live_admin_page: Page):
+    def test_header_height(self, shared_admin_page: Page):
         """Header has a height around 56px (StandaloneLayout design)."""
-        height = _get_computed_style(live_admin_page, "header", "height")
+        height = _get_computed_style(shared_admin_page, "header", "height")
         px = _parse_px(height)
         assert 40 <= px <= 80, f"Header height {height} outside expected range"
 
-    def test_header_background_color(self, live_admin_page: Page):
+    def test_header_background_color(self, shared_admin_page: Page):
         """Header has a dark background color."""
-        bg = _get_computed_style(live_admin_page, "header", "background-color")
+        bg = _get_computed_style(shared_admin_page, "header", "background-color")
         match = re.search(r"rgb\((\d+),\s*(\d+),\s*(\d+)\)", bg)
         if match:
             r, g, b = int(match.group(1)), int(match.group(2)), int(match.group(3))
@@ -105,10 +105,10 @@ class TestHeaderCSS:
         else:
             assert bg, "No background-color computed for header"
 
-    def test_tier_badge_color(self, live_admin_page: Page):
+    def test_tier_badge_color(self, shared_admin_page: Page):
         """The tier badge has a visible background or text color."""
         # Find the badge element containing tier text
-        badge = live_admin_page.evaluate("""
+        badge = shared_admin_page.evaluate("""
             (() => {
                 const badges = document.querySelectorAll('[class*="badge"], [class*="Badge"]');
                 for (const el of badges) {
@@ -130,14 +130,14 @@ class TestHeaderCSS:
 class TestContentCSS:
     """Content area CSS properties for cards and inputs."""
 
-    def test_stat_card_border_radius(self, live_admin_page: Page):
+    def test_stat_card_border_radius(self, shared_admin_page: Page):
         """Dashboard content elements have a border-radius (rounded corners).
 
         The admin SPA uses inline styles (borderRadius: 6) and Mantine Paper
         components with hashed CSS class names. We scan all elements in main
         for any with non-zero border-radius.
         """
-        br = live_admin_page.evaluate("""
+        br = shared_admin_page.evaluate("""
             (() => {
                 // Search broadly: inline-styled cards, Mantine Paper, or any
                 // element inside main with border-radius set
@@ -159,13 +159,13 @@ class TestContentCSS:
         """) or ""
         assert br and br != "0px", f"No rounded content elements found (border-radius: {br or 'none'})"
 
-    def test_stat_card_padding(self, live_admin_page: Page):
+    def test_stat_card_padding(self, shared_admin_page: Page):
         """Dashboard content elements have consistent padding.
 
         Summary cards use inline padding (16px 20px). We look for any
         bordered/backgrounded element inside main with non-zero padding.
         """
-        padding = live_admin_page.evaluate("""
+        padding = shared_admin_page.evaluate("""
             (() => {
                 const candidates = document.querySelectorAll(
                     'main div, main section, main article'
@@ -188,9 +188,9 @@ class TestContentCSS:
         """) or ""
         assert padding and padding != "0px", "No padded content elements found"
 
-    def test_input_field_styling(self, live_admin_page: Page):
+    def test_input_field_styling(self, shared_admin_page: Page):
         """Text inputs have proper styling (border, padding)."""
-        style = live_admin_page.evaluate("""
+        style = shared_admin_page.evaluate("""
             (() => {
                 const input = document.querySelector('input[type="text"]');
                 if (!input) return null;
@@ -210,13 +210,13 @@ class TestContentCSS:
 class TestWidgetPageCSS:
     """Widget configuration page CSS properties."""
 
-    def test_preview_panel_styling(self, live_widget_page: Page):
+    def test_preview_panel_styling(self, shared_widget_page: Page):
         """The widget preview section has visible styling (border, shadow, or bg).
 
         The preview panel uses inline styles (border: 1px solid, borderRadius: 12).
         Mantine class names are hashed so we scan by structural position.
         """
-        has_style = live_widget_page.evaluate("""
+        has_style = shared_widget_page.evaluate("""
             (() => {
                 // Search all elements in main for preview-like panels:
                 // elements with border-radius >= 8 AND either border or box-shadow
@@ -241,9 +241,9 @@ class TestWidgetPageCSS:
         """)
         assert has_style is not None, "No styled preview panel found (border-radius >= 8 + border/shadow)"
 
-    def test_color_picker_swatch_renders(self, live_widget_page: Page):
+    def test_color_picker_swatch_renders(self, shared_widget_page: Page):
         """A color swatch element has a background-color set."""
-        bg = live_widget_page.evaluate("""
+        bg = shared_widget_page.evaluate("""
             (() => {
                 const swatches = document.querySelectorAll(
                     '[class*="swatch"], [class*="Swatch"], [class*="color"], input[type="color"]'
@@ -257,13 +257,13 @@ class TestWidgetPageCSS:
         """) or ""
         assert bg, "No color swatch with a visible background-color found"
 
-    def test_embed_code_monospace_font(self, live_widget_page: Page):
+    def test_embed_code_monospace_font(self, shared_widget_page: Page):
         """The embed code or snippet area uses a monospace font family.
 
         The admin SPA uses JetBrains Mono for code blocks via Mantine Code
         component or inline style fontFamily.
         """
-        font = live_widget_page.evaluate("""
+        font = shared_widget_page.evaluate("""
             (() => {
                 // Check Mantine Code components, <code>, <pre>, and any element
                 // with monospace font set via inline styles
@@ -291,9 +291,9 @@ class TestWidgetPageCSS:
 class TestBrandColors:
     """Brand color (#ff3621) is applied correctly throughout the UI."""
 
-    def test_brand_primary_color_used(self, live_admin_page: Page):
+    def test_brand_primary_color_used(self, shared_admin_page: Page):
         """The brand primary color #ff3621 (rgb(255, 54, 33)) appears in styles."""
-        found = live_admin_page.evaluate("""
+        found = shared_admin_page.evaluate("""
             (() => {
                 const all = document.querySelectorAll('*');
                 for (const el of Array.from(all).slice(0, 500)) {
@@ -310,13 +310,13 @@ class TestBrandColors:
         """)
         assert found, "Brand color rgb(255, 54, 33) not found in any element"
 
-    def test_active_nav_item_highlight(self, live_admin_page: Page):
+    def test_active_nav_item_highlight(self, shared_admin_page: Page):
         """The active navigation item has a distinguishing style.
 
         Nav items may use background-color, font-weight, opacity,
         border-left, or text color to indicate the active state.
         """
-        highlight = live_admin_page.evaluate("""
+        highlight = shared_admin_page.evaluate("""
             (() => {
                 const navItems = document.querySelectorAll('nav a, nav [role="button"], nav div');
                 const results = [];
@@ -350,9 +350,9 @@ class TestBrandColors:
         """)
         assert highlight is not None, "No style differentiation found among nav items"
 
-    def test_button_primary_color(self, live_admin_page: Page):
+    def test_button_primary_color(self, shared_admin_page: Page):
         """Primary buttons use the brand color or a related accent."""
-        btn_bg = live_admin_page.evaluate("""
+        btn_bg = shared_admin_page.evaluate("""
             (() => {
                 const buttons = document.querySelectorAll('button');
                 for (const el of buttons) {

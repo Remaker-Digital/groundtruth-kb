@@ -301,14 +301,14 @@ def _cleanup_stale_actions(page: Page) -> None:
 class TestPageHeader:
     """Verify page title and subtitle (EL-quickactions-001, 002)."""
 
-    def test_page_title_visible(self, live_quick_actions_page: Page):
+    def test_page_title_visible(self, shared_quick_actions_page: Page):
         """EL-001: 'Quick actions' heading is visible."""
-        heading = live_quick_actions_page.locator("h2:has-text('Quick actions')").first
+        heading = shared_quick_actions_page.locator("h2:has-text('Quick actions')").first
         assert heading.is_visible(), "Quick actions heading not visible"
 
-    def test_page_subtitle_visible(self, live_quick_actions_page: Page):
+    def test_page_subtitle_visible(self, shared_quick_actions_page: Page):
         """EL-002: Subtitle describes quick action purpose."""
-        page = live_quick_actions_page
+        page = shared_quick_actions_page
         if _is_rate_limited(page):
             # Retry once after cooldown
             page.wait_for_timeout(3000)
@@ -329,9 +329,9 @@ class TestPageHeader:
 class TestTabs:
     """Verify tab structure and switching (EL-quickactions-003, 004)."""
 
-    def test_prompt_library_tab_visible(self, live_quick_actions_page: Page):
+    def test_prompt_library_tab_visible(self, shared_quick_actions_page: Page):
         """EL-003: 'Prompt library' tab exists with action count."""
-        page = live_quick_actions_page
+        page = shared_quick_actions_page
         if _is_rate_limited(page):
             page.wait_for_timeout(3000)
             page.reload(wait_until="load")
@@ -343,9 +343,9 @@ class TestTabs:
             tab = page.locator("[role='tablist'] button").filter(has_text="Prompt").first
         assert tab.is_visible(), "Prompt library tab not visible"
 
-    def test_page_assignments_tab_visible(self, live_quick_actions_page: Page):
+    def test_page_assignments_tab_visible(self, shared_quick_actions_page: Page):
         """EL-004: 'Page assignments' tab exists."""
-        page = live_quick_actions_page
+        page = shared_quick_actions_page
         if _is_rate_limited(page):
             pytest.skip("Rate limited — tabs not rendered")
         tab = page.locator("[role='tab']").filter(has_text="Page assignments").first
@@ -353,9 +353,9 @@ class TestTabs:
             tab = page.locator("[role='tab']").filter(has_text="assignment").first
         assert tab.is_visible(), "Page assignments tab not visible"
 
-    def test_tab_switching_works(self, live_quick_actions_page: Page):
+    def test_tab_switching_works(self, shared_quick_actions_page: Page):
         """EL-003/004: Clicking tabs switches displayed content."""
-        page = live_quick_actions_page
+        page = shared_quick_actions_page
 
         # Switch to Page assignments
         _switch_to_tab(page, "Page assignments")
@@ -375,12 +375,12 @@ class TestTabs:
 class TestEmptyState:
     """Verify empty state display for a fresh tenant (EL-031, 032)."""
 
-    def test_empty_state_message(self, live_quick_actions_page: Page):
+    def test_empty_state_message(self, shared_quick_actions_page: Page):
         """EL-031: Empty state shows 'No quick actions yet' message."""
-        if _is_rate_limited(live_quick_actions_page):
+        if _is_rate_limited(shared_quick_actions_page):
             pytest.skip("Rate limited")
-        text = _get_main_text(live_quick_actions_page)
-        row_count = _count_table_rows(live_quick_actions_page)
+        text = _get_main_text(shared_quick_actions_page)
+        row_count = _count_table_rows(shared_quick_actions_page)
         if row_count > 0 and "no quick actions" not in text.lower():
             return  # Actions exist from prior tests — empty state not applicable
         # Fresh tenant: shows "No quick actions yet"
@@ -388,11 +388,11 @@ class TestEmptyState:
             f"Expected empty state. Text: {text[:300]}"
         )
 
-    def test_starter_example_buttons(self, live_quick_actions_page: Page):
+    def test_starter_example_buttons(self, shared_quick_actions_page: Page):
         """EL-032: Starter example buttons are shown in empty state."""
-        if _is_rate_limited(live_quick_actions_page):
+        if _is_rate_limited(shared_quick_actions_page):
             pytest.skip("Rate limited")
-        page = live_quick_actions_page
+        page = shared_quick_actions_page
         text = _get_main_text(page)
         if "no quick actions" not in text.lower():
             return  # Actions exist — empty state not applicable
@@ -410,9 +410,9 @@ class TestEmptyState:
 class TestCreateButton:
     """Verify the Create quick action button (EL-005)."""
 
-    def test_create_button_visible(self, live_quick_actions_page: Page):
+    def test_create_button_visible(self, shared_quick_actions_page: Page):
         """EL-005: 'Create quick action' button is visible."""
-        page = live_quick_actions_page
+        page = shared_quick_actions_page
         if _is_rate_limited(page):
             page.wait_for_timeout(3000)
             page.reload(wait_until="load")
@@ -424,9 +424,9 @@ class TestCreateButton:
             f"Create button text not found in page: {text[:200]}"
         )
 
-    def test_create_button_opens_modal(self, live_quick_actions_page: Page):
+    def test_create_button_opens_modal(self, shared_quick_actions_page: Page):
         """EL-005: Clicking Create opens the create/edit modal."""
-        page = live_quick_actions_page
+        page = shared_quick_actions_page
         if _is_rate_limited(page):
             pytest.skip("Rate limited")
         _open_create_modal(page)
@@ -446,9 +446,9 @@ class TestCreateButton:
 class TestCreateEditModal:
     """Verify modal form fields and interactions (EL-013..022)."""
 
-    def test_modal_has_label_input(self, live_quick_actions_page: Page):
+    def test_modal_has_label_input(self, shared_quick_actions_page: Page):
         """EL-014: Modal contains 'Button label' input."""
-        page = live_quick_actions_page
+        page = shared_quick_actions_page
         if _is_rate_limited(page):
             pytest.skip("Rate limited")
         _open_create_modal(page)
@@ -457,9 +457,9 @@ class TestCreateEditModal:
         assert "button label" in dialog_text.lower(), "Button label field not found"
         _close_modal(page)
 
-    def test_modal_has_prompt_textarea(self, live_quick_actions_page: Page):
+    def test_modal_has_prompt_textarea(self, shared_quick_actions_page: Page):
         """EL-015: Modal contains 'Prompt template' textarea."""
-        page = live_quick_actions_page
+        page = shared_quick_actions_page
         if _is_rate_limited(page):
             pytest.skip("Rate limited")
         _open_create_modal(page)
@@ -467,9 +467,9 @@ class TestCreateEditModal:
         assert ta.count() > 0, "Prompt template textarea not found"
         _close_modal(page)
 
-    def test_modal_has_template_variables(self, live_quick_actions_page: Page):
+    def test_modal_has_template_variables(self, shared_quick_actions_page: Page):
         """EL-016: Template variable buttons are shown."""
-        page = live_quick_actions_page
+        page = shared_quick_actions_page
         if _is_rate_limited(page):
             pytest.skip("Rate limited")
         _open_create_modal(page)
@@ -478,9 +478,9 @@ class TestCreateEditModal:
             assert var in dialog_text, f"Template variable '{var}' not in modal"
         _close_modal(page)
 
-    def test_modal_has_icon_input(self, live_quick_actions_page: Page):
+    def test_modal_has_icon_input(self, shared_quick_actions_page: Page):
         """EL-017: Icon input field is present."""
-        page = live_quick_actions_page
+        page = shared_quick_actions_page
         if _is_rate_limited(page):
             pytest.skip("Rate limited")
         _open_create_modal(page)
@@ -488,9 +488,9 @@ class TestCreateEditModal:
         assert "icon" in dialog_text.lower(), "Icon field not found in modal"
         _close_modal(page)
 
-    def test_modal_has_emoji_grid(self, live_quick_actions_page: Page):
+    def test_modal_has_emoji_grid(self, shared_quick_actions_page: Page):
         """EL-018: Emoji quick-select grid with preset emojis."""
-        page = live_quick_actions_page
+        page = shared_quick_actions_page
         if _is_rate_limited(page):
             pytest.skip("Rate limited")
         _open_create_modal(page)
@@ -499,9 +499,9 @@ class TestCreateEditModal:
         assert emoji_count >= 3, f"Only {emoji_count} emojis found in grid"
         _close_modal(page)
 
-    def test_modal_has_active_toggle(self, live_quick_actions_page: Page):
+    def test_modal_has_active_toggle(self, shared_quick_actions_page: Page):
         """EL-019: Active toggle switch is present."""
-        page = live_quick_actions_page
+        page = shared_quick_actions_page
         if _is_rate_limited(page):
             pytest.skip("Rate limited")
         _open_create_modal(page)
@@ -509,9 +509,9 @@ class TestCreateEditModal:
         assert "active" in dialog_text, "Active toggle not found"
         _close_modal(page)
 
-    def test_modal_has_cancel_and_submit(self, live_quick_actions_page: Page):
+    def test_modal_has_cancel_and_submit(self, shared_quick_actions_page: Page):
         """EL-021/022: Cancel and Create buttons present."""
-        page = live_quick_actions_page
+        page = shared_quick_actions_page
         if _is_rate_limited(page):
             pytest.skip("Rate limited")
         _open_create_modal(page)
@@ -521,9 +521,9 @@ class TestCreateEditModal:
         assert create.count() > 0, "Create button not found"
         _close_modal(page)
 
-    def test_submit_disabled_without_required_fields(self, live_quick_actions_page: Page):
+    def test_submit_disabled_without_required_fields(self, shared_quick_actions_page: Page):
         """EL-022: Submit button is disabled when label/prompt empty."""
-        page = live_quick_actions_page
+        page = shared_quick_actions_page
         if _is_rate_limited(page):
             pytest.skip("Rate limited")
         _open_create_modal(page)
@@ -606,9 +606,9 @@ class TestCreateAction:
 class TestTableStructure:
     """Verify table columns and row rendering after creating an action."""
 
-    def test_table_headers(self, live_quick_actions_page: Page):
+    def test_table_headers(self, shared_quick_actions_page: Page):
         """EL-006: Table has correct column headers."""
-        page = live_quick_actions_page
+        page = shared_quick_actions_page
         thead = page.locator("thead").first
         if thead.count() == 0:
             return  # Empty state — no table to inspect, element verified structurally
@@ -616,11 +616,11 @@ class TestTableStructure:
         for col in ["icon", "label", "prompt template", "status", "actions"]:
             assert col in header_text, f"Missing column header: {col}"
 
-    def test_action_row_with_data(self, live_quick_actions_page: Page):
+    def test_action_row_with_data(self, shared_quick_actions_page: Page):
         """EL-007..010: Row shows icon, label, prompt, and status badge."""
-        if _is_rate_limited(live_quick_actions_page):
+        if _is_rate_limited(shared_quick_actions_page):
             pytest.skip("Rate limited")
-        page = live_quick_actions_page
+        page = shared_quick_actions_page
         label = _create_action(page, icon="🏷️", prompt="Row structure test prompt")
 
         page.reload(wait_until="load")
@@ -780,9 +780,9 @@ class TestDeleteAction:
 class TestTemplateVariables:
     """Verify template variable buttons insert tokens into prompt textarea."""
 
-    def test_variable_buttons_insert_token(self, live_quick_actions_page: Page):
+    def test_variable_buttons_insert_token(self, shared_quick_actions_page: Page):
         """EL-016: Clicking a variable button inserts it into the textarea."""
-        page = live_quick_actions_page
+        page = shared_quick_actions_page
         if _is_rate_limited(page):
             pytest.skip("Rate limited")
         _open_create_modal(page)
@@ -813,9 +813,9 @@ class TestTemplateVariables:
 class TestEmojiGrid:
     """Verify emoji quick-select grid fills the icon input."""
 
-    def test_emoji_click_fills_icon(self, live_quick_actions_page: Page):
+    def test_emoji_click_fills_icon(self, shared_quick_actions_page: Page):
         """EL-018: Clicking an emoji in the grid fills the icon field."""
-        page = live_quick_actions_page
+        page = shared_quick_actions_page
         if _is_rate_limited(page):
             pytest.skip("Rate limited")
         _open_create_modal(page)
@@ -845,18 +845,18 @@ class TestEmojiGrid:
 class TestPageAssignmentsTab:
     """Verify the Page assignments tab rendering and interactions."""
 
-    def test_info_banner_visible(self, live_quick_actions_page: Page):
+    def test_info_banner_visible(self, shared_quick_actions_page: Page):
         """EL-025: 'How page assignments work' info banner."""
-        page = live_quick_actions_page
+        page = shared_quick_actions_page
         _switch_to_tab(page, "Page assignments")
         text = _get_main_text(page)
         assert "page assignments work" in text.lower() or "slot" in text.lower(), (
             f"Info banner not found. Text: {text[:300]}"
         )
 
-    def test_assignments_table_has_page_types(self, live_quick_actions_page: Page):
+    def test_assignments_table_has_page_types(self, shared_quick_actions_page: Page):
         """EL-026/027: Assignments table shows all 9 page types."""
-        page = live_quick_actions_page
+        page = shared_quick_actions_page
         _switch_to_tab(page, "Page assignments")
         text = _get_main_text(page)
         for page_type in ["All pages", "Home", "Product", "Collection", "Cart"]:
@@ -864,9 +864,9 @@ class TestPageAssignmentsTab:
                 f"Page type '{page_type}' not in assignments table"
             )
 
-    def test_slot_dropdowns_exist(self, live_quick_actions_page: Page):
+    def test_slot_dropdowns_exist(self, shared_quick_actions_page: Page):
         """EL-028: Slot 1 and Slot 2 dropdowns exist per row."""
-        page = live_quick_actions_page
+        page = shared_quick_actions_page
         _switch_to_tab(page, "Page assignments")
         # Each row has 2 select dropdowns (Slot 1, Slot 2)
         # Mantine Select renders as input[role='searchbox'] or input within combobox
@@ -878,18 +878,18 @@ class TestPageAssignmentsTab:
         # At minimum, some slot dropdowns should be visible
         assert count >= 4, f"Expected slot dropdowns, found {count}"
 
-    def test_auto_open_toggles_exist(self, live_quick_actions_page: Page):
+    def test_auto_open_toggles_exist(self, shared_quick_actions_page: Page):
         """EL-029: Auto-open toggle switches per page type row."""
-        page = live_quick_actions_page
+        page = shared_quick_actions_page
         _switch_to_tab(page, "Page assignments")
         text = _get_main_text(page)
         assert "auto-open" in text.lower() or "auto" in text.lower(), (
             "Auto-open column not found"
         )
 
-    def test_delay_inputs_exist(self, live_quick_actions_page: Page):
+    def test_delay_inputs_exist(self, shared_quick_actions_page: Page):
         """EL-030: Delay (s) number inputs per page type row."""
-        page = live_quick_actions_page
+        page = shared_quick_actions_page
         _switch_to_tab(page, "Page assignments")
         text = _get_main_text(page)
         # Look for delay column header or number inputs in the panel
@@ -909,11 +909,11 @@ class TestPageAssignmentsTab:
 class TestPageAssignmentMutations:
     """Verify assignment slot changes, auto-open toggle, and delay input."""
 
-    def test_assign_action_to_slot(self, live_quick_actions_page: Page):
+    def test_assign_action_to_slot(self, shared_quick_actions_page: Page):
         """EL-028: Assign a quick action to a slot dropdown."""
-        if _is_rate_limited(live_quick_actions_page):
+        if _is_rate_limited(shared_quick_actions_page):
             pytest.skip("Rate limited")
-        page = live_quick_actions_page
+        page = shared_quick_actions_page
 
         # First, create an action to assign
         label = _create_action(page)
@@ -953,11 +953,11 @@ class TestPageAssignmentMutations:
         page.wait_for_timeout(500)
         _delete_action_by_label(page, label)
 
-    def test_auto_open_toggle_mutation(self, live_quick_actions_page: Page):
+    def test_auto_open_toggle_mutation(self, shared_quick_actions_page: Page):
         """EL-029: Toggle auto-open switch and verify it persists."""
-        if _is_rate_limited(live_quick_actions_page):
+        if _is_rate_limited(shared_quick_actions_page):
             pytest.skip("Rate limited")
-        page = live_quick_actions_page
+        page = shared_quick_actions_page
         _switch_to_tab(page, "Page assignments")
         page.wait_for_timeout(500)
 
@@ -986,11 +986,11 @@ class TestPageAssignmentMutations:
 class TestActiveToggle:
     """Verify toggling action active/inactive status."""
 
-    def test_create_inactive_action(self, live_quick_actions_page: Page):
+    def test_create_inactive_action(self, shared_quick_actions_page: Page):
         """EL-019: Create an action with Active toggle OFF."""
-        if _is_rate_limited(live_quick_actions_page):
+        if _is_rate_limited(shared_quick_actions_page):
             pytest.skip("Rate limited")
-        page = live_quick_actions_page
+        page = shared_quick_actions_page
 
         label = _unique_label()
         _open_create_modal(page)

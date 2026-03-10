@@ -219,13 +219,137 @@ def staging_reachable() -> None:
 
 @pytest.fixture(autouse=True, scope="class")
 def _rate_limit_cooldown():
-    """2 s cooldown between test classes to avoid burst clustering."""
+    """0.5 s cooldown between test classes.  (S164: reduced from 2 s.)"""
     yield
-    time.sleep(2)
+    time.sleep(0.5)
 
 
 # ---------------------------------------------------------------------------
-# Per-test page fixtures — mocked App Bridge context
+# Class-scoped shared fixtures (S164 -- page reuse across read-only tests)
+# ---------------------------------------------------------------------------
+
+@pytest.fixture(scope="class")
+def shared_browser_context(browser):
+    """Class-scoped BrowserContext for Shopify admin tests."""
+    ctx = browser.new_context()
+    yield ctx
+    ctx.close()
+
+
+def _setup_shared_shopify_page(context, page, path="/"):
+    """Set up mocks on a class-scoped BrowserContext and navigate."""
+    # Intercept App Bridge CDN
+    def handle_app_bridge(route):
+        route.fulfill(status=200, content_type="application/javascript",
+                      body="/* App Bridge mock */")
+    page.route("**/cdn.shopify.com/**/app-bridge*", handle_app_bridge)
+    page.route("https://admin.shopify.com/**", lambda r: r.abort("blockedbyclient"))
+
+    # Mock window.shopify via context-level init script
+    context.add_init_script("""
+        window.shopify = {
+            idToken: () => Promise.resolve('test-e2e-session-token'),
+            navigation: { dispatch: function() {} },
+            redirect: function() {},
+            saveBar: { show: function() {}, hide: function() {},
+                leaveConfirmation: { enable: function() {}, disable: function() {} } }
+        };
+        try { sessionStorage.setItem('agentred-onboarding-dismissed', '1'); } catch {}
+    """)
+
+    # Intercept tenant lookup + activation status
+    import json as _json
+    def handle_tenant_lookup(route):
+        route.fulfill(status=200, content_type="application/json",
+                      body=_json.dumps({"found": True, "tenant_id": "staging-001",
+                                        "tier": "starter", "status": "active"}))
+    page.route("**/api/tenants/lookup*", handle_tenant_lookup)
+
+    def handle_activation_status(route):
+        route.fulfill(status=200, content_type="application/json",
+                      body=_json.dumps({"is_configured": True,
+                                        "active_activated_at": "2026-01-01T00:00:00Z"}))
+    page.route("**/api/config/activation-status*", handle_activation_status)
+
+    page.goto(f"{SHOPIFY_BASE_URL}{path}?shop={TEST_SHOP_DOMAIN}", wait_until="load")
+    page.wait_for_timeout(3_000)
+    return page
+
+
+@pytest.fixture(scope="class")
+def shared_shopify_page(shared_browser_context, staging_reachable) -> Page:
+    """Class-scoped Shopify admin shell with mocked App Bridge."""
+    page = shared_browser_context.new_page()
+    _setup_shared_shopify_page(shared_browser_context, page, "/")
+    yield page
+    page.close()
+
+
+@pytest.fixture(scope="class")
+def shared_shopify_dashboard(shared_browser_context, staging_reachable) -> Page:
+    """Class-scoped Shopify Dashboard."""
+    page = shared_browser_context.new_page()
+    _setup_shared_shopify_page(shared_browser_context, page, "/")
+    yield page
+    page.close()
+
+
+@pytest.fixture(scope="class")
+def shared_shopify_inbox(shared_browser_context, staging_reachable) -> Page:
+    """Class-scoped Shopify Inbox."""
+    page = shared_browser_context.new_page()
+    _setup_shared_shopify_page(shared_browser_context, page, "/inbox")
+    yield page
+    page.close()
+
+
+@pytest.fixture(scope="class")
+def shared_shopify_configuration(shared_browser_context, staging_reachable) -> Page:
+    """Class-scoped Shopify Configuration."""
+    page = shared_browser_context.new_page()
+    _setup_shared_shopify_page(shared_browser_context, page, "/configuration")
+    yield page
+    page.close()
+
+
+@pytest.fixture(scope="class")
+def shared_shopify_knowledge_base(shared_browser_context, staging_reachable) -> Page:
+    """Class-scoped Shopify Knowledge Base."""
+    page = shared_browser_context.new_page()
+    _setup_shared_shopify_page(shared_browser_context, page, "/knowledge-base")
+    yield page
+    page.close()
+
+
+@pytest.fixture(scope="class")
+def shared_shopify_widget(shared_browser_context, staging_reachable) -> Page:
+    """Class-scoped Shopify Widget Configuration."""
+    page = shared_browser_context.new_page()
+    _setup_shared_shopify_page(shared_browser_context, page, "/widget")
+    yield page
+    page.close()
+
+
+@pytest.fixture(scope="class")
+def shared_shopify_billing(shared_browser_context, staging_reachable) -> Page:
+    """Class-scoped Shopify Billing."""
+    page = shared_browser_context.new_page()
+    _setup_shared_shopify_page(shared_browser_context, page, "/billing")
+    yield page
+    page.close()
+
+
+@pytest.fixture(scope="class")
+def shared_shopify_settings(shared_browser_context, staging_reachable) -> Page:
+    """Class-scoped Shopify Settings."""
+    page = shared_browser_context.new_page()
+    _setup_shared_shopify_page(shared_browser_context, page, "/settings")
+    yield page
+    page.close()
+
+
+# ---------------------------------------------------------------------------
+# Per-test page fixtures (for mutation test classes)
 # ---------------------------------------------------------------------------
 
 @pytest.fixture()

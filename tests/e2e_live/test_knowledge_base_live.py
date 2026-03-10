@@ -218,37 +218,37 @@ def _archive_test_article(page: Page, title: str) -> None:
 class TestPageHeader:
     """Page title, subtitle, and action bar elements."""
 
-    def test_page_title(self, live_kb_page: Page):
+    def test_page_title(self, shared_kb_page: Page):
         """[EL-kb-001/A,B] 'Knowledge base' heading is visible."""
-        text = _wait_for_kb_data(live_kb_page)
+        text = _wait_for_kb_data(shared_kb_page)
         assert "knowledge base" in text.lower(), "Page title 'Knowledge base' not found"
 
-    def test_page_subtitle(self, live_kb_page: Page):
+    def test_page_subtitle(self, shared_kb_page: Page):
         """[EL-kb-002/A,B] Subtitle describes AI article management."""
-        text = _wait_for_kb_data(live_kb_page)
-        if _is_rate_limited(live_kb_page):
+        text = _wait_for_kb_data(shared_kb_page)
+        if _is_rate_limited(shared_kb_page):
             pytest.skip("Rate limited")
         assert (
             "manage articles" in text.lower() or "ai uses" in text.lower()
         ), "Page subtitle not found"
 
-    def test_search_input_visible(self, live_kb_page: Page):
+    def test_search_input_visible(self, shared_kb_page: Page):
         """[EL-kb-003/A,B] Search input with placeholder is visible."""
-        _wait_for_kb_data(live_kb_page)
-        if _is_rate_limited(live_kb_page):
+        _wait_for_kb_data(shared_kb_page)
+        if _is_rate_limited(shared_kb_page):
             pytest.skip("Rate limited")
-        search = live_kb_page.locator(
+        search = shared_kb_page.locator(
             "input[placeholder*='earch'], input[type='search']"
         ).first
         assert search.is_visible(), "Search articles input not found"
 
-    def test_category_filter_visible(self, live_kb_page: Page):
+    def test_category_filter_visible(self, shared_kb_page: Page):
         """[EL-kb-004/A,B] Category filter dropdown is visible."""
-        _wait_for_kb_data(live_kb_page)
-        if _is_rate_limited(live_kb_page):
+        _wait_for_kb_data(shared_kb_page)
+        if _is_rate_limited(shared_kb_page):
             pytest.skip("Rate limited")
         # Mantine Select renders as div with input, look for Category placeholder
-        selects = live_kb_page.locator(".mantine-Select-root input")
+        selects = shared_kb_page.locator(".mantine-Select-root input")
         found_category = False
         for i in range(selects.count()):
             val = selects.nth(i).input_value()
@@ -259,18 +259,18 @@ class TestPageHeader:
                 break
         # Fallback: check text
         if not found_category:
-            text = _text(live_kb_page).lower()
+            text = _text(shared_kb_page).lower()
             found_category = "all" in text and any(
                 c.lower() in text for c in CATEGORIES[:3]
             )
         assert found_category, "Category filter dropdown not found"
 
-    def test_status_filter_visible(self, live_kb_page: Page):
+    def test_status_filter_visible(self, shared_kb_page: Page):
         """[EL-kb-005/A,B] Status filter dropdown is visible."""
-        _wait_for_kb_data(live_kb_page)
-        if _is_rate_limited(live_kb_page):
+        _wait_for_kb_data(shared_kb_page)
+        if _is_rate_limited(shared_kb_page):
             pytest.skip("Rate limited")
-        selects = live_kb_page.locator(".mantine-Select-root input")
+        selects = shared_kb_page.locator(".mantine-Select-root input")
         found_status = False
         for i in range(selects.count()):
             val = selects.nth(i).input_value()
@@ -280,40 +280,40 @@ class TestPageHeader:
                 found_status = True
                 break
         if not found_status:
-            text = _text(live_kb_page).lower()
+            text = _text(shared_kb_page).lower()
             found_status = "published" in text or "draft" in text
         assert found_status, "Status filter dropdown not found"
 
-    def test_scan_button_visible(self, live_kb_page: Page):
+    def test_scan_button_visible(self, shared_kb_page: Page):
         """[EL-kb-006/A,B] 'Scan for conflicts' button is visible."""
-        _wait_for_kb_data(live_kb_page)
-        if _is_rate_limited(live_kb_page):
+        _wait_for_kb_data(shared_kb_page)
+        if _is_rate_limited(shared_kb_page):
             pytest.skip("Rate limited")
-        btn = live_kb_page.locator("button:has-text('Scan for conflicts')").first
+        btn = shared_kb_page.locator("button:has-text('Scan for conflicts')").first
         assert btn.is_visible(), "'Scan for conflicts' button not found"
 
-    def test_export_csv_button_visible(self, live_kb_page: Page):
+    def test_export_csv_button_visible(self, shared_kb_page: Page):
         """[EL-kb-007/A,B] 'Export CSV' button is visible."""
-        _wait_for_kb_data(live_kb_page)
-        if _is_rate_limited(live_kb_page):
+        _wait_for_kb_data(shared_kb_page)
+        if _is_rate_limited(shared_kb_page):
             pytest.skip("Rate limited")
-        btn = live_kb_page.locator("button:has-text('Export CSV')").first
+        btn = shared_kb_page.locator("button:has-text('Export CSV')").first
         assert btn.is_visible(), "'Export CSV' button not found"
 
-    def test_import_button_visible(self, live_kb_page: Page):
+    def test_import_button_visible(self, shared_kb_page: Page):
         """[EL-kb-008/A,B] 'Import' button is visible."""
-        _wait_for_kb_data(live_kb_page)
-        if _is_rate_limited(live_kb_page):
+        _wait_for_kb_data(shared_kb_page)
+        if _is_rate_limited(shared_kb_page):
             pytest.skip("Rate limited")
-        btn = live_kb_page.locator("button:has-text('Import')").first
+        btn = shared_kb_page.locator("button:has-text('Import')").first
         assert btn.is_visible(), "'Import' button not found"
 
-    def test_add_article_button_visible(self, live_kb_page: Page):
+    def test_add_article_button_visible(self, shared_kb_page: Page):
         """[EL-kb-009/A,B,C] 'Add article' button is blue with + icon."""
-        _wait_for_kb_data(live_kb_page)
-        if _is_rate_limited(live_kb_page):
+        _wait_for_kb_data(shared_kb_page)
+        if _is_rate_limited(shared_kb_page):
             pytest.skip("Rate limited")
-        btn = live_kb_page.locator("button:has-text('Add article')").first
+        btn = shared_kb_page.locator("button:has-text('Add article')").first
         assert btn.is_visible(), "'Add article' button not found"
 
 
@@ -325,10 +325,10 @@ class TestPageHeader:
 class TestStatCards:
     """Summary statistics cards above the articles table."""
 
-    def test_total_articles_card(self, live_kb_page: Page):
+    def test_total_articles_card(self, shared_kb_page: Page):
         """[EL-kb-010/A,B] Total articles stat card shows a number."""
-        text = _wait_for_kb_data(live_kb_page)
-        if _is_rate_limited(live_kb_page):
+        text = _wait_for_kb_data(shared_kb_page)
+        if _is_rate_limited(shared_kb_page):
             pytest.skip("Rate limited")
         assert "total articles" in text.lower(), "'Total articles' stat card not found"
         # Should have a numeric value
@@ -336,40 +336,40 @@ class TestStatCards:
         if match:
             assert int(match.group(1)) >= 0
 
-    def test_published_card(self, live_kb_page: Page):
+    def test_published_card(self, shared_kb_page: Page):
         """[EL-kb-011/A,B] Published count card is visible."""
-        text = _wait_for_kb_data(live_kb_page)
-        if _is_rate_limited(live_kb_page):
+        text = _wait_for_kb_data(shared_kb_page)
+        if _is_rate_limited(shared_kb_page):
             pytest.skip("Rate limited")
         assert "published" in text.lower(), "'Published' stat card not found"
 
-    def test_draft_card(self, live_kb_page: Page):
+    def test_draft_card(self, shared_kb_page: Page):
         """[EL-kb-012/A,B] Draft count card is visible."""
-        text = _wait_for_kb_data(live_kb_page)
-        if _is_rate_limited(live_kb_page):
+        text = _wait_for_kb_data(shared_kb_page)
+        if _is_rate_limited(shared_kb_page):
             pytest.skip("Rate limited")
         assert "draft" in text.lower(), "'Draft' stat card not found"
 
-    def test_archived_card(self, live_kb_page: Page):
+    def test_archived_card(self, shared_kb_page: Page):
         """[EL-kb-013/A,B] Archived count card is visible."""
-        text = _wait_for_kb_data(live_kb_page)
-        if _is_rate_limited(live_kb_page):
+        text = _wait_for_kb_data(shared_kb_page)
+        if _is_rate_limited(shared_kb_page):
             pytest.skip("Rate limited")
         assert "archived" in text.lower(), "'Archived' stat card not found"
 
-    def test_needs_attention_card(self, live_kb_page: Page):
+    def test_needs_attention_card(self, shared_kb_page: Page):
         """[EL-kb-014/A,B] Needs attention stat card is visible."""
-        text = _wait_for_kb_data(live_kb_page)
-        if _is_rate_limited(live_kb_page):
+        text = _wait_for_kb_data(shared_kb_page)
+        if _is_rate_limited(shared_kb_page):
             pytest.skip("Rate limited")
         assert (
             "needs attention" in text.lower() or "attention" in text.lower()
         ), "'Needs attention' stat card not found"
 
-    def test_stat_values_are_numeric(self, live_kb_page: Page):
+    def test_stat_values_are_numeric(self, shared_kb_page: Page):
         """[EL-kb-010..014/B] All stat cards contain numeric values."""
-        text = _wait_for_kb_data(live_kb_page)
-        if _is_rate_limited(live_kb_page):
+        text = _wait_for_kb_data(shared_kb_page)
+        if _is_rate_limited(shared_kb_page):
             pytest.skip("Rate limited")
         # Find all numbers in the stat cards area — at least 5 expected
         numbers = re.findall(r"\b\d+\b", text)
@@ -377,10 +377,10 @@ class TestStatCards:
             f"Expected at least 4 numeric values in stat cards, found {len(numbers)}"
         )
 
-    def test_stat_sum_consistency(self, live_kb_page: Page):
+    def test_stat_sum_consistency(self, shared_kb_page: Page):
         """[EL-kb-010..013/B] Published + Draft + Archived = Total (or close)."""
-        text = _wait_for_kb_data(live_kb_page)
-        if _is_rate_limited(live_kb_page):
+        text = _wait_for_kb_data(shared_kb_page)
+        if _is_rate_limited(shared_kb_page):
             pytest.skip("Rate limited")
         # Try to extract stat values — look for label + number patterns
         total_m = re.search(r"total articles\s*\n?\s*(\d+)", text.lower())
@@ -407,37 +407,37 @@ class TestStatCards:
 class TestKnowledgeAutomation:
     """Knowledge Automation collapsible section."""
 
-    def test_automation_section_visible(self, live_kb_page: Page):
+    def test_automation_section_visible(self, shared_kb_page: Page):
         """[EL-kb-015/A,B] 'Knowledge automation' section with Beta badge."""
-        text = _wait_for_kb_data(live_kb_page)
-        if _is_rate_limited(live_kb_page):
+        text = _wait_for_kb_data(shared_kb_page)
+        if _is_rate_limited(shared_kb_page):
             pytest.skip("Rate limited")
         assert "knowledge automation" in text.lower(), (
             "'Knowledge automation' section not found"
         )
 
-    def test_beta_badge(self, live_kb_page: Page):
+    def test_beta_badge(self, shared_kb_page: Page):
         """[EL-kb-015/B,C] Beta badge is visible."""
-        _wait_for_kb_data(live_kb_page)
-        if _is_rate_limited(live_kb_page):
+        _wait_for_kb_data(shared_kb_page)
+        if _is_rate_limited(shared_kb_page):
             pytest.skip("Rate limited")
-        text = _text(live_kb_page).lower()
+        text = _text(shared_kb_page).lower()
         assert "beta" in text, "'Beta' badge not found on Knowledge automation section"
 
-    def test_show_hide_toggle(self, live_kb_page: Page):
+    def test_show_hide_toggle(self, shared_kb_page: Page):
         """[EL-kb-015/E1] Show/Hide toggle expands and collapses the section."""
-        _wait_for_kb_data(live_kb_page)
-        if _is_rate_limited(live_kb_page):
+        _wait_for_kb_data(shared_kb_page)
+        if _is_rate_limited(shared_kb_page):
             pytest.skip("Rate limited")
-        toggle = live_kb_page.locator(
+        toggle = shared_kb_page.locator(
             "button:has-text('Show'), button:has-text('Hide')"
         ).first
         assert toggle.is_visible(), "Show/Hide toggle must be visible on Knowledge automation section"
 
         initial_text = toggle.inner_text().lower()
         toggle.click()
-        live_kb_page.wait_for_timeout(500)
-        toggled_text = live_kb_page.locator(
+        shared_kb_page.wait_for_timeout(500)
+        toggled_text = shared_kb_page.locator(
             "button:has-text('Show'), button:has-text('Hide')"
         ).first.inner_text().lower()
 
@@ -446,59 +446,59 @@ class TestKnowledgeAutomation:
             f"Show/Hide toggle did not change: '{initial_text}' → '{toggled_text}'"
         )
 
-    def test_scan_storefront_button(self, live_kb_page: Page):
+    def test_scan_storefront_button(self, shared_kb_page: Page):
         """[EL-kb-016/A,B] 'Scan storefront' button visible when expanded."""
-        _wait_for_kb_data(live_kb_page)
-        if _is_rate_limited(live_kb_page):
+        _wait_for_kb_data(shared_kb_page)
+        if _is_rate_limited(shared_kb_page):
             pytest.skip("Rate limited")
         # Ensure section is expanded
-        show_btn = live_kb_page.locator("button:has-text('Show')").first
+        show_btn = shared_kb_page.locator("button:has-text('Show')").first
         if show_btn.is_visible():
             show_btn.click()
-            live_kb_page.wait_for_timeout(500)
+            shared_kb_page.wait_for_timeout(500)
 
-        btn = live_kb_page.locator("button:has-text('Scan storefront')").first
+        btn = shared_kb_page.locator("button:has-text('Scan storefront')").first
         assert btn.is_visible(), "'Scan storefront' button must be visible when section expanded"
 
-    def test_refresh_status_button(self, live_kb_page: Page):
+    def test_refresh_status_button(self, shared_kb_page: Page):
         """[EL-kb-017/A,B] 'Refresh status' button visible when expanded."""
-        _wait_for_kb_data(live_kb_page)
-        if _is_rate_limited(live_kb_page):
+        _wait_for_kb_data(shared_kb_page)
+        if _is_rate_limited(shared_kb_page):
             pytest.skip("Rate limited")
-        show_btn = live_kb_page.locator("button:has-text('Show')").first
+        show_btn = shared_kb_page.locator("button:has-text('Show')").first
         if show_btn.is_visible():
             show_btn.click()
-            live_kb_page.wait_for_timeout(500)
+            shared_kb_page.wait_for_timeout(500)
 
-        btn = live_kb_page.locator("button:has-text('Refresh status')").first
+        btn = shared_kb_page.locator("button:has-text('Refresh status')").first
         assert btn.is_visible(), "'Refresh status' button must be visible when section expanded"
 
-    def test_storefront_import_label(self, live_kb_page: Page):
+    def test_storefront_import_label(self, shared_kb_page: Page):
         """[EL-kb-018/A] 'Storefront import' label visible when expanded."""
-        _wait_for_kb_data(live_kb_page)
-        if _is_rate_limited(live_kb_page):
+        _wait_for_kb_data(shared_kb_page)
+        if _is_rate_limited(shared_kb_page):
             pytest.skip("Rate limited")
-        show_btn = live_kb_page.locator("button:has-text('Show')").first
+        show_btn = shared_kb_page.locator("button:has-text('Show')").first
         if show_btn.is_visible():
             show_btn.click()
-            live_kb_page.wait_for_timeout(500)
+            shared_kb_page.wait_for_timeout(500)
 
-        text = _text(live_kb_page).lower()
+        text = _text(shared_kb_page).lower()
         assert "storefront import" in text, (
             "'Storefront import' label must be visible when section expanded"
         )
 
-    def test_industry_templates_label(self, live_kb_page: Page):
+    def test_industry_templates_label(self, shared_kb_page: Page):
         """[EL-kb-019/A] 'Industry templates' label visible when expanded."""
-        _wait_for_kb_data(live_kb_page)
-        if _is_rate_limited(live_kb_page):
+        _wait_for_kb_data(shared_kb_page)
+        if _is_rate_limited(shared_kb_page):
             pytest.skip("Rate limited")
-        show_btn = live_kb_page.locator("button:has-text('Show')").first
+        show_btn = shared_kb_page.locator("button:has-text('Show')").first
         if show_btn.is_visible():
             show_btn.click()
-            live_kb_page.wait_for_timeout(500)
+            shared_kb_page.wait_for_timeout(500)
 
-        text = _text(live_kb_page).lower()
+        text = _text(shared_kb_page).lower()
         assert "template" in text, (
             "'Industry templates' label must be visible when section expanded"
         )
@@ -512,20 +512,20 @@ class TestKnowledgeAutomation:
 class TestArticlesTable:
     """Articles table structure and content."""
 
-    def test_table_exists(self, live_kb_page: Page):
+    def test_table_exists(self, shared_kb_page: Page):
         """[EL-kb-020/A] Articles table is rendered."""
-        _wait_for_kb_data(live_kb_page)
-        if _is_rate_limited(live_kb_page):
+        _wait_for_kb_data(shared_kb_page)
+        if _is_rate_limited(shared_kb_page):
             pytest.skip("Rate limited")
-        table = live_kb_page.locator("table").first
+        table = shared_kb_page.locator("table").first
         assert table.is_visible(), "Articles table not found"
 
-    def test_table_headers(self, live_kb_page: Page):
+    def test_table_headers(self, shared_kb_page: Page):
         """[EL-kb-020/A,B] Table has expected column headers."""
-        _wait_for_kb_data(live_kb_page)
-        if _is_rate_limited(live_kb_page):
+        _wait_for_kb_data(shared_kb_page)
+        if _is_rate_limited(shared_kb_page):
             pytest.skip("Rate limited")
-        headers = live_kb_page.locator("table thead th")
+        headers = shared_kb_page.locator("table thead th")
         header_texts = []
         for i in range(headers.count()):
             header_texts.append(headers.nth(i).inner_text().strip().lower())
@@ -534,12 +534,12 @@ class TestArticlesTable:
                 expected in h for h in header_texts
             ), f"Table header '{expected}' not found in {header_texts}"
 
-    def test_article_titles_present(self, live_kb_page: Page):
+    def test_article_titles_present(self, shared_kb_page: Page):
         """[EL-kb-021/A,B] Article titles are displayed in table rows."""
-        _wait_for_kb_data(live_kb_page)
-        if _is_rate_limited(live_kb_page):
+        _wait_for_kb_data(shared_kb_page)
+        if _is_rate_limited(shared_kb_page):
             pytest.skip("Rate limited")
-        rows = live_kb_page.locator("table tbody tr")
+        rows = shared_kb_page.locator("table tbody tr")
         if rows.count() == 0:
             return  # Empty table state — element verified, no article data to inspect
         first_row = rows.first
@@ -549,96 +549,96 @@ class TestArticlesTable:
         title_text = cells.first.inner_text().strip()
         assert len(title_text) > 0, "First article title is empty"
 
-    def test_category_badges(self, live_kb_page: Page):
+    def test_category_badges(self, shared_kb_page: Page):
         """[EL-kb-022/A,B,C] Category badges are color-coded."""
-        _wait_for_kb_data(live_kb_page)
-        if _is_rate_limited(live_kb_page):
+        _wait_for_kb_data(shared_kb_page)
+        if _is_rate_limited(shared_kb_page):
             pytest.skip("Rate limited")
-        rows = live_kb_page.locator("table tbody tr")
+        rows = shared_kb_page.locator("table tbody tr")
         if rows.count() == 0:
             return  # Empty table state — element verified, no article data to inspect
         # Look for Mantine Badge elements in category column
-        badges = live_kb_page.locator("table tbody .mantine-Badge-root")
+        badges = shared_kb_page.locator("table tbody .mantine-Badge-root")
         if badges.count() == 0:
             # Fallback: check for known category text
-            text = _text(live_kb_page).lower()
+            text = _text(shared_kb_page).lower()
             has_cat = any(c.lower() in text for c in CATEGORIES)
             assert has_cat, "Category badges or text must be visible in articles table"
 
-    def test_status_badges(self, live_kb_page: Page):
+    def test_status_badges(self, shared_kb_page: Page):
         """[EL-kb-023/A,B,C] Status badges show Published/Draft/Archived."""
-        _wait_for_kb_data(live_kb_page)
-        if _is_rate_limited(live_kb_page):
+        _wait_for_kb_data(shared_kb_page)
+        if _is_rate_limited(shared_kb_page):
             pytest.skip("Rate limited")
-        rows = live_kb_page.locator("table tbody tr")
+        rows = shared_kb_page.locator("table tbody tr")
         if rows.count() == 0:
             return  # Empty table state — element verified, no article data to inspect
-        text = _text(live_kb_page).lower()
+        text = _text(shared_kb_page).lower()
         has_status = any(s in text for s in STATUS_BADGES)
         assert has_status, f"No status badges found — expected one of {STATUS_BADGES}"
 
-    def test_freshness_badges(self, live_kb_page: Page):
+    def test_freshness_badges(self, shared_kb_page: Page):
         """[EL-kb-024/A,B,C] Freshness badges present (Fresh/Aging/Stale/Very stale)."""
-        _wait_for_kb_data(live_kb_page)
-        if _is_rate_limited(live_kb_page):
+        _wait_for_kb_data(shared_kb_page)
+        if _is_rate_limited(shared_kb_page):
             pytest.skip("Rate limited")
-        rows = live_kb_page.locator("table tbody tr")
+        rows = shared_kb_page.locator("table tbody tr")
         if rows.count() == 0:
             return  # Empty table state — element verified, no article data to inspect
-        text = _text(live_kb_page).lower()
+        text = _text(shared_kb_page).lower()
         has_freshness = any(f.lower() in text for f in STALENESS_LABELS)
         # May show "--" if no staleness data
         assert has_freshness or "--" in text, (
             "Freshness column must show staleness labels or '--' placeholders"
         )
 
-    def test_last_updated_dates(self, live_kb_page: Page):
+    def test_last_updated_dates(self, shared_kb_page: Page):
         """[EL-kb-025/A,B] Last updated column has date-formatted values."""
-        _wait_for_kb_data(live_kb_page)
-        if _is_rate_limited(live_kb_page):
+        _wait_for_kb_data(shared_kb_page)
+        if _is_rate_limited(shared_kb_page):
             pytest.skip("Rate limited")
-        rows = live_kb_page.locator("table tbody tr")
+        rows = shared_kb_page.locator("table tbody tr")
         if rows.count() == 0:
             return  # Empty table state — element verified, no article data to inspect
-        text = _text(live_kb_page)
+        text = _text(shared_kb_page)
         # Look for date patterns like "Jan 15, 2026" or "2026" or "--"
         has_date = bool(
             re.search(r"\b\d{4}\b", text) or "--" in text
         )
         assert has_date, "No date values found in table"
 
-    def test_action_buttons_in_rows(self, live_kb_page: Page):
+    def test_action_buttons_in_rows(self, shared_kb_page: Page):
         """[EL-kb-026..028/A] Edit and archive/restore buttons in each row."""
-        _wait_for_kb_data(live_kb_page)
-        if _is_rate_limited(live_kb_page):
+        _wait_for_kb_data(shared_kb_page)
+        if _is_rate_limited(shared_kb_page):
             pytest.skip("Rate limited")
-        rows = live_kb_page.locator("table tbody tr")
+        rows = shared_kb_page.locator("table tbody tr")
         if rows.count() == 0:
             return  # Empty table state — element verified, no article data to inspect
         first_row = rows.first
         buttons = first_row.locator("button")
         assert buttons.count() >= 1, "No action buttons in first table row"
 
-    def test_empty_state_message(self, live_kb_page: Page):
+    def test_empty_state_message(self, shared_kb_page: Page):
         """[EL-kb-029/A,B] Empty state shown when filters produce no results."""
-        _wait_for_kb_data(live_kb_page)
-        if _is_rate_limited(live_kb_page):
+        _wait_for_kb_data(shared_kb_page)
+        if _is_rate_limited(shared_kb_page):
             pytest.skip("Rate limited")
 
         # Apply a filter that's unlikely to match anything
-        search_input = live_kb_page.locator(
+        search_input = shared_kb_page.locator(
             "input[placeholder*='earch']"
         ).first
         assert search_input.is_visible(), "Search input must be visible on KB page"
 
-        text_before = _text(live_kb_page)
+        text_before = _text(shared_kb_page)
         search_input.fill("zzz_nonexistent_query_xyz")
-        live_kb_page.wait_for_timeout(1000)
-        text_after = _text(live_kb_page)
+        shared_kb_page.wait_for_timeout(1000)
+        text_after = _text(shared_kb_page)
 
         # Either "No articles match" appears OR the result set is smaller
         has_empty = "no articles" in text_after.lower()
-        rows_after = live_kb_page.locator("table tbody tr").count()
+        rows_after = shared_kb_page.locator("table tbody tr").count()
         # If rows_after dropped or empty message shown, test passes
         assert has_empty or rows_after == 0 or rows_after == 1, (
             "Filtering did not produce empty state or reduced results"
@@ -646,7 +646,7 @@ class TestArticlesTable:
 
         # Clear the search
         search_input.fill("")
-        live_kb_page.wait_for_timeout(500)
+        shared_kb_page.wait_for_timeout(500)
 
 
 # ═══════════════════════════════════════════════════════════════════════
@@ -660,47 +660,47 @@ _MODAL_SKIP = "Modal did not open — staging API may be rate-limiting modal dat
 class TestArticleModal:
     """Add/Edit article modal structure and form elements."""
 
-    def test_add_modal_opens(self, live_kb_page: Page):
+    def test_add_modal_opens(self, shared_kb_page: Page):
         """[EL-kb-030/A,E1] Clicking 'Add article' opens modal with correct title."""
-        _wait_for_kb_data(live_kb_page)
-        if _is_rate_limited(live_kb_page):
+        _wait_for_kb_data(shared_kb_page)
+        if _is_rate_limited(shared_kb_page):
             pytest.skip("Rate limited")
-        if not _open_add_article_modal(live_kb_page):
+        if not _open_add_article_modal(shared_kb_page):
             pytest.skip(_MODAL_SKIP)
-        modal = live_kb_page.locator("[role='dialog'], .mantine-Modal-root").first
+        modal = shared_kb_page.locator("[role='dialog'], .mantine-Modal-root").first
         assert modal.is_visible(), "Article modal did not open"
         modal_text = modal.inner_text().lower()
         assert "add article" in modal_text or "create" in modal_text, (
             "Modal title should say 'Add article'"
         )
-        _close_modal(live_kb_page)
+        _close_modal(shared_kb_page)
 
-    def test_title_input_in_modal(self, live_kb_page: Page):
+    def test_title_input_in_modal(self, shared_kb_page: Page):
         """[EL-kb-031/A,D] Title input is present and accepts text."""
-        _wait_for_kb_data(live_kb_page)
-        if _is_rate_limited(live_kb_page):
+        _wait_for_kb_data(shared_kb_page)
+        if _is_rate_limited(shared_kb_page):
             pytest.skip("Rate limited")
-        if not _open_add_article_modal(live_kb_page):
+        if not _open_add_article_modal(shared_kb_page):
             pytest.skip(_MODAL_SKIP)
 
-        title_input = live_kb_page.locator(
+        title_input = shared_kb_page.locator(
             "[role='dialog'] input[type='text'], "
             ".mantine-Modal-root input[type='text']"
         ).first
         assert title_input.is_visible(), "Title input not found in modal"
         title_input.fill("Test Title Input")
         assert title_input.input_value() == "Test Title Input"
-        _close_modal(live_kb_page)
+        _close_modal(shared_kb_page)
 
-    def test_category_dropdown_in_modal(self, live_kb_page: Page):
+    def test_category_dropdown_in_modal(self, shared_kb_page: Page):
         """[EL-kb-032/A,D] Category dropdown in modal has options."""
-        _wait_for_kb_data(live_kb_page)
-        if _is_rate_limited(live_kb_page):
+        _wait_for_kb_data(shared_kb_page)
+        if _is_rate_limited(shared_kb_page):
             pytest.skip("Rate limited")
-        if not _open_add_article_modal(live_kb_page):
+        if not _open_add_article_modal(shared_kb_page):
             pytest.skip(_MODAL_SKIP)
 
-        selects = live_kb_page.locator(
+        selects = shared_kb_page.locator(
             "[role='dialog'] .mantine-Select-root, "
             ".mantine-Modal-root .mantine-Select-root"
         )
@@ -708,39 +708,39 @@ class TestArticleModal:
         # Click category select to show options
         cat_input = selects.first.locator("input").first
         cat_input.click()
-        live_kb_page.wait_for_timeout(300)
+        shared_kb_page.wait_for_timeout(300)
 
-        options = live_kb_page.locator("[role='option']")
+        options = shared_kb_page.locator("[role='option']")
         assert options.count() >= 3, (
             f"Expected 3+ category options, found {options.count()}"
         )
-        _close_modal(live_kb_page)
+        _close_modal(shared_kb_page)
 
-    def test_content_textarea_in_modal(self, live_kb_page: Page):
+    def test_content_textarea_in_modal(self, shared_kb_page: Page):
         """[EL-kb-033/A,D] Content textarea is present and accepts text."""
-        _wait_for_kb_data(live_kb_page)
-        if _is_rate_limited(live_kb_page):
+        _wait_for_kb_data(shared_kb_page)
+        if _is_rate_limited(shared_kb_page):
             pytest.skip("Rate limited")
-        if not _open_add_article_modal(live_kb_page):
+        if not _open_add_article_modal(shared_kb_page):
             pytest.skip(_MODAL_SKIP)
 
-        textarea = live_kb_page.locator(
+        textarea = shared_kb_page.locator(
             "[role='dialog'] textarea, .mantine-Modal-root textarea"
         ).first
         assert textarea.is_visible(), "Content textarea not found in modal"
         textarea.fill("Test content paragraph.")
         assert "Test content" in textarea.input_value()
-        _close_modal(live_kb_page)
+        _close_modal(shared_kb_page)
 
-    def test_status_dropdown_in_modal(self, live_kb_page: Page):
+    def test_status_dropdown_in_modal(self, shared_kb_page: Page):
         """[EL-kb-034/A,D] Status dropdown offers Published/Draft/Archived."""
-        _wait_for_kb_data(live_kb_page)
-        if _is_rate_limited(live_kb_page):
+        _wait_for_kb_data(shared_kb_page)
+        if _is_rate_limited(shared_kb_page):
             pytest.skip("Rate limited")
-        if not _open_add_article_modal(live_kb_page):
+        if not _open_add_article_modal(shared_kb_page):
             pytest.skip(_MODAL_SKIP)
 
-        selects = live_kb_page.locator(
+        selects = shared_kb_page.locator(
             "[role='dialog'] .mantine-Select-root, "
             ".mantine-Modal-root .mantine-Select-root"
         )
@@ -750,55 +750,55 @@ class TestArticleModal:
 
         status_input = selects.nth(1).locator("input").first
         status_input.click()
-        live_kb_page.wait_for_timeout(300)
+        shared_kb_page.wait_for_timeout(300)
 
         options_text = []
-        options = live_kb_page.locator("[role='option']")
+        options = shared_kb_page.locator("[role='option']")
         for i in range(options.count()):
             options_text.append(options.nth(i).inner_text().lower())
 
         assert any("draft" in o for o in options_text), (
             f"'Draft' option not found in status dropdown: {options_text}"
         )
-        _close_modal(live_kb_page)
+        _close_modal(shared_kb_page)
 
-    def test_cancel_button_closes_modal(self, live_kb_page: Page):
+    def test_cancel_button_closes_modal(self, shared_kb_page: Page):
         """[EL-kb-035/A,E1] Cancel button closes the modal."""
-        _wait_for_kb_data(live_kb_page)
-        if _is_rate_limited(live_kb_page):
+        _wait_for_kb_data(shared_kb_page)
+        if _is_rate_limited(shared_kb_page):
             pytest.skip("Rate limited")
-        if not _open_add_article_modal(live_kb_page):
+        if not _open_add_article_modal(shared_kb_page):
             pytest.skip(_MODAL_SKIP)
 
-        cancel_btn = live_kb_page.locator(
+        cancel_btn = shared_kb_page.locator(
             "[role='dialog'] button:has-text('Cancel'), "
             ".mantine-Modal-root button:has-text('Cancel')"
         ).first
         assert cancel_btn.is_visible(), "Cancel button not found"
         cancel_btn.click()
-        live_kb_page.wait_for_timeout(500)
+        shared_kb_page.wait_for_timeout(500)
 
-        modals = live_kb_page.locator("[role='dialog'], .mantine-Modal-root")
+        modals = shared_kb_page.locator("[role='dialog'], .mantine-Modal-root")
         assert modals.count() == 0 or not modals.first.is_visible(), (
             "Modal still visible after clicking Cancel"
         )
 
-    def test_submit_button_disabled_empty_form(self, live_kb_page: Page):
+    def test_submit_button_disabled_empty_form(self, shared_kb_page: Page):
         """[EL-kb-036/A,C,E1] Submit button disabled when title/content empty."""
-        _wait_for_kb_data(live_kb_page)
-        if _is_rate_limited(live_kb_page):
+        _wait_for_kb_data(shared_kb_page)
+        if _is_rate_limited(shared_kb_page):
             pytest.skip("Rate limited")
-        if not _open_add_article_modal(live_kb_page):
+        if not _open_add_article_modal(shared_kb_page):
             pytest.skip(_MODAL_SKIP)
 
-        submit_btn = live_kb_page.locator(
+        submit_btn = shared_kb_page.locator(
             "[role='dialog'] button:has-text('Create'), "
             ".mantine-Modal-root button:has-text('Create')"
         ).first
         if submit_btn.is_visible():
             is_disabled = submit_btn.is_disabled()
             assert is_disabled, "Submit button should be disabled when form is empty"
-        _close_modal(live_kb_page)
+        _close_modal(shared_kb_page)
 
 
 # ═══════════════════════════════════════════════════════════════════════
@@ -826,77 +826,77 @@ class TestImportModal:
         except Exception:
             return False
 
-    def test_import_modal_opens(self, live_kb_page: Page):
+    def test_import_modal_opens(self, shared_kb_page: Page):
         """[EL-kb-038/A,E1] Clicking Import opens modal."""
-        _wait_for_kb_data(live_kb_page)
-        if _is_rate_limited(live_kb_page):
+        _wait_for_kb_data(shared_kb_page)
+        if _is_rate_limited(shared_kb_page):
             pytest.skip("Rate limited")
-        if not self._open_import(live_kb_page):
+        if not self._open_import(shared_kb_page):
             pytest.skip(_MODAL_SKIP)
-        modal = live_kb_page.locator("[role='dialog'], .mantine-Modal-root").first
+        modal = shared_kb_page.locator("[role='dialog'], .mantine-Modal-root").first
         assert modal.is_visible(), "Import modal did not open"
-        _close_modal(live_kb_page)
+        _close_modal(shared_kb_page)
 
-    def test_upload_file_tab(self, live_kb_page: Page):
+    def test_upload_file_tab(self, shared_kb_page: Page):
         """[EL-kb-039/A,B] 'Upload file' tab is present."""
-        _wait_for_kb_data(live_kb_page)
-        if _is_rate_limited(live_kb_page):
+        _wait_for_kb_data(shared_kb_page)
+        if _is_rate_limited(shared_kb_page):
             pytest.skip("Rate limited")
-        if not self._open_import(live_kb_page):
+        if not self._open_import(shared_kb_page):
             pytest.skip(_MODAL_SKIP)
-        modal_text = live_kb_page.locator(
+        modal_text = shared_kb_page.locator(
             "[role='dialog'], .mantine-Modal-root"
         ).first.inner_text().lower()
         assert "upload file" in modal_text, "'Upload file' tab not found in import modal"
-        _close_modal(live_kb_page)
+        _close_modal(shared_kb_page)
 
-    def test_import_url_tab(self, live_kb_page: Page):
+    def test_import_url_tab(self, shared_kb_page: Page):
         """[EL-kb-040/A,B] 'Import URL' tab is present."""
-        _wait_for_kb_data(live_kb_page)
-        if _is_rate_limited(live_kb_page):
+        _wait_for_kb_data(shared_kb_page)
+        if _is_rate_limited(shared_kb_page):
             pytest.skip("Rate limited")
-        if not self._open_import(live_kb_page):
+        if not self._open_import(shared_kb_page):
             pytest.skip(_MODAL_SKIP)
-        modal_text = live_kb_page.locator(
+        modal_text = shared_kb_page.locator(
             "[role='dialog'], .mantine-Modal-root"
         ).first.inner_text().lower()
         assert "import url" in modal_text, "'Import URL' tab not found in import modal"
-        _close_modal(live_kb_page)
+        _close_modal(shared_kb_page)
 
-    def test_file_drop_zone_visible(self, live_kb_page: Page):
+    def test_file_drop_zone_visible(self, shared_kb_page: Page):
         """[EL-kb-041/A,C] File drop zone with dashed border is present."""
-        _wait_for_kb_data(live_kb_page)
-        if _is_rate_limited(live_kb_page):
+        _wait_for_kb_data(shared_kb_page)
+        if _is_rate_limited(shared_kb_page):
             pytest.skip("Rate limited")
-        if not self._open_import(live_kb_page):
+        if not self._open_import(shared_kb_page):
             pytest.skip(_MODAL_SKIP)
 
         # Upload file tab should be the default — look for drop zone text
-        modal_text = live_kb_page.locator(
+        modal_text = shared_kb_page.locator(
             "[role='dialog'], .mantine-Modal-root"
         ).first.inner_text().lower()
         has_drop = "drop" in modal_text or "browse" in modal_text or "click" in modal_text
         assert has_drop, "File drop zone instructions not found"
-        _close_modal(live_kb_page)
+        _close_modal(shared_kb_page)
 
-    def test_url_input_on_import_url_tab(self, live_kb_page: Page):
+    def test_url_input_on_import_url_tab(self, shared_kb_page: Page):
         """[EL-kb-043/A,D] URL input visible on Import URL tab."""
-        _wait_for_kb_data(live_kb_page)
-        if _is_rate_limited(live_kb_page):
+        _wait_for_kb_data(shared_kb_page)
+        if _is_rate_limited(shared_kb_page):
             pytest.skip("Rate limited")
-        if not self._open_import(live_kb_page):
+        if not self._open_import(shared_kb_page):
             pytest.skip(_MODAL_SKIP)
 
         # Switch to Import URL tab
-        url_tab = live_kb_page.locator(
+        url_tab = shared_kb_page.locator(
             "[role='dialog'] [role='tab']:has-text('Import URL'), "
             ".mantine-Modal-root [role='tab']:has-text('Import URL')"
         ).first
         if url_tab.is_visible():
             url_tab.click()
-            live_kb_page.wait_for_timeout(300)
+            shared_kb_page.wait_for_timeout(300)
 
-        url_input = live_kb_page.locator(
+        url_input = shared_kb_page.locator(
             "[role='dialog'] input[placeholder*='http'], "
             ".mantine-Modal-root input[placeholder*='http'], "
             "[role='dialog'] input[type='url'], "
@@ -906,7 +906,7 @@ class TestImportModal:
         ).first
         if not url_input.is_visible():
             # Broader fallback
-            inputs = live_kb_page.locator(
+            inputs = shared_kb_page.locator(
                 "[role='dialog'] input, .mantine-Modal-root input"
             )
             for i in range(inputs.count()):
@@ -916,7 +916,7 @@ class TestImportModal:
                     break
 
         assert url_input.is_visible(), "URL input not found on Import URL tab"
-        _close_modal(live_kb_page)
+        _close_modal(shared_kb_page)
 
 
 # ═══════════════════════════════════════════════════════════════════════
@@ -927,29 +927,29 @@ class TestImportModal:
 class TestSearchFilter:
     """Search input and filter dropdown interactions."""
 
-    def test_search_filters_articles(self, live_kb_page: Page):
+    def test_search_filters_articles(self, shared_kb_page: Page):
         """[EL-kb-003/E1] Typing in search input filters the article list."""
-        _wait_for_kb_data(live_kb_page)
-        if _is_rate_limited(live_kb_page):
+        _wait_for_kb_data(shared_kb_page)
+        if _is_rate_limited(shared_kb_page):
             pytest.skip("Rate limited")
 
-        rows_before = live_kb_page.locator("table tbody tr").count()
+        rows_before = shared_kb_page.locator("table tbody tr").count()
         if rows_before <= 1:
             return  # Too few articles to verify filtering — table verified
 
-        search = live_kb_page.locator("input[placeholder*='earch']").first
+        search = shared_kb_page.locator("input[placeholder*='earch']").first
         assert search.is_visible(), "Search input must be visible on KB page"
 
         # Get the title of the first article and search for it
-        first_title = live_kb_page.locator(
+        first_title = shared_kb_page.locator(
             "table tbody tr:first-child td:first-child"
         ).first.inner_text().strip()
         if len(first_title) < 3:
             return  # Article title too short to test search filtering
 
         search.fill(first_title[:10])
-        live_kb_page.wait_for_timeout(800)
-        rows_after = live_kb_page.locator("table tbody tr").count()
+        shared_kb_page.wait_for_timeout(800)
+        rows_after = shared_kb_page.locator("table tbody tr").count()
 
         # Should have same or fewer rows
         assert rows_after <= rows_before, (
@@ -957,79 +957,79 @@ class TestSearchFilter:
         )
         # Clean up
         search.fill("")
-        live_kb_page.wait_for_timeout(500)
+        shared_kb_page.wait_for_timeout(500)
 
-    def test_category_filter_reduces_results(self, live_kb_page: Page):
+    def test_category_filter_reduces_results(self, shared_kb_page: Page):
         """[EL-kb-004/E1] Selecting a specific category filters articles."""
-        _wait_for_kb_data(live_kb_page)
-        if _is_rate_limited(live_kb_page):
+        _wait_for_kb_data(shared_kb_page)
+        if _is_rate_limited(shared_kb_page):
             pytest.skip("Rate limited")
 
-        rows_before = live_kb_page.locator("table tbody tr").count()
+        rows_before = shared_kb_page.locator("table tbody tr").count()
         if rows_before <= 1:
             return  # Too few articles to verify category filtering — table verified
 
         # Find the category Select (first Mantine Select on page, not in modal)
-        selects = live_kb_page.locator(
+        selects = shared_kb_page.locator(
             "main .mantine-Select-root input"
         )
         assert selects.count() >= 1, "Category select dropdown must be visible on KB page"
 
         cat_input = selects.first
         cat_input.click()
-        live_kb_page.wait_for_timeout(300)
+        shared_kb_page.wait_for_timeout(300)
 
         # Pick a specific category (not 'All')
-        option = live_kb_page.locator("[role='option']:has-text('FAQ')").first
+        option = shared_kb_page.locator("[role='option']:has-text('FAQ')").first
         if option.is_visible():
             option.click()
-            live_kb_page.wait_for_timeout(800)
-            rows_after = live_kb_page.locator("table tbody tr").count()
+            shared_kb_page.wait_for_timeout(800)
+            rows_after = shared_kb_page.locator("table tbody tr").count()
             # Results should be <= before (unless all are FAQ)
             assert rows_after <= rows_before
 
             # Reset to All
             cat_input.click()
-            live_kb_page.wait_for_timeout(300)
-            all_option = live_kb_page.locator("[role='option']:has-text('All')").first
+            shared_kb_page.wait_for_timeout(300)
+            all_option = shared_kb_page.locator("[role='option']:has-text('All')").first
             if all_option.is_visible():
                 all_option.click()
-                live_kb_page.wait_for_timeout(500)
+                shared_kb_page.wait_for_timeout(500)
         else:
             return  # FAQ option not in dropdown — category filter element verified
 
-    def test_status_filter_reduces_results(self, live_kb_page: Page):
+    def test_status_filter_reduces_results(self, shared_kb_page: Page):
         """[EL-kb-005/E1] Selecting a specific status filters articles."""
-        _wait_for_kb_data(live_kb_page)
-        if _is_rate_limited(live_kb_page):
+        _wait_for_kb_data(shared_kb_page)
+        if _is_rate_limited(shared_kb_page):
             pytest.skip("Rate limited")
 
-        rows_before = live_kb_page.locator("table tbody tr").count()
+        rows_before = shared_kb_page.locator("table tbody tr").count()
         if rows_before <= 1:
             return  # Too few articles to verify status filtering — table verified
 
         # Status Select is the second Select on the page
-        selects = live_kb_page.locator("main .mantine-Select-root input")
+        selects = shared_kb_page.locator("main .mantine-Select-root input")
         assert selects.count() >= 2, "Status select dropdown must be visible on KB page"
 
         status_input = selects.nth(1)
         status_input.click()
-        live_kb_page.wait_for_timeout(300)
+        shared_kb_page.wait_for_timeout(300)
 
-        option = live_kb_page.locator("[role='option']:has-text('Draft')").first
+        option = shared_kb_page.locator("[role='option']:has-text('Draft')").first
         if option.is_visible():
             option.click()
-            live_kb_page.wait_for_timeout(800)
-            rows_after = live_kb_page.locator("table tbody tr").count()
+            shared_kb_page.wait_for_timeout(800)
+            rows_after = shared_kb_page.locator("table tbody tr").count()
             assert rows_after <= rows_before
 
             # Reset to All
             status_input.click()
-            live_kb_page.wait_for_timeout(300)
-            all_option = live_kb_page.locator("[role='option']:has-text('All')").first
+            shared_kb_page.wait_for_timeout(300)
+            all_option = shared_kb_page.locator("[role='option']:has-text('All')").first
             if all_option.is_visible():
                 all_option.click()
-                live_kb_page.wait_for_timeout(500)
+                shared_kb_page.wait_for_timeout(500)
         else:
             return  # Draft option not in dropdown — status filter element verified
 
@@ -1178,21 +1178,21 @@ class TestArticleCRUD:
 class TestConflictScanModal:
     """Conflict scan results modal structure (triggered by scan action)."""
 
-    def test_scan_modal_has_summary_cards(self, live_kb_page: Page):
+    def test_scan_modal_has_summary_cards(self, shared_kb_page: Page):
         """[EL-kb-045..046/A,B] Scan modal shows summary stat cards."""
-        _wait_for_kb_data(live_kb_page)
-        if _is_rate_limited(live_kb_page):
+        _wait_for_kb_data(shared_kb_page)
+        if _is_rate_limited(shared_kb_page):
             pytest.skip("Rate limited")
 
-        btn = live_kb_page.locator("button:has-text('Scan for conflicts')").first
+        btn = shared_kb_page.locator("button:has-text('Scan for conflicts')").first
         assert btn.is_visible() and not btn.is_disabled(), (
             "'Scan for conflicts' button must be visible and enabled"
         )
 
         btn.click()
-        live_kb_page.wait_for_timeout(5000)
+        shared_kb_page.wait_for_timeout(5000)
 
-        modal = live_kb_page.locator("[role='dialog'], .mantine-Modal-root").first
+        modal = shared_kb_page.locator("[role='dialog'], .mantine-Modal-root").first
         if not modal.is_visible():
             return  # Scan returned no data — no modal to inspect, scan action verified
 
@@ -1207,7 +1207,7 @@ class TestConflictScanModal:
         assert has_summary, (
             "Scan modal should show summary stats (entries scanned, scan time, etc.)"
         )
-        _close_modal(live_kb_page)
+        _close_modal(shared_kb_page)
 
 
 # ═══════════════════════════════════════════════════════════════════════
@@ -1218,142 +1218,142 @@ class TestConflictScanModal:
 class TestNegativeDestructive:
     """SPEC-1655: Invalid inputs, boundary values, XSS, and malformed data."""
 
-    def test_xss_in_article_title(self, live_kb_page: Page):
+    def test_xss_in_article_title(self, shared_kb_page: Page):
         """[SPEC-1655/E1] XSS payload in title is escaped, not executed."""
-        _wait_for_kb_data(live_kb_page)
-        if _is_rate_limited(live_kb_page):
+        _wait_for_kb_data(shared_kb_page)
+        if _is_rate_limited(shared_kb_page):
             pytest.skip("Rate limited")
 
         xss_title = f"XSS-Test-<script>alert(1)</script>-{uuid.uuid4().hex[:6]}"
-        if not _open_add_article_modal(live_kb_page):
+        if not _open_add_article_modal(shared_kb_page):
             pytest.skip(_MODAL_SKIP)
 
-        title_input = live_kb_page.locator(
+        title_input = shared_kb_page.locator(
             "[role='dialog'] input[type='text']"
         ).first
         title_input.fill(xss_title)
 
         # Fill content too
-        textarea = live_kb_page.locator("[role='dialog'] textarea").first
+        textarea = shared_kb_page.locator("[role='dialog'] textarea").first
         textarea.fill("Content with <img onerror=alert(1) src=x> tag")
 
         # Submit
-        submit_btn = live_kb_page.locator(
+        submit_btn = shared_kb_page.locator(
             "[role='dialog'] button:has-text('Create')"
         ).first
         if submit_btn.is_visible() and not submit_btn.is_disabled():
             submit_btn.click()
-            live_kb_page.wait_for_timeout(2000)
+            shared_kb_page.wait_for_timeout(2000)
 
         # Check no alert dialog appeared (would be caught by Playwright)
         # If article was created, verify title is displayed as text not HTML
-        live_kb_page.reload(wait_until="load")
-        _wait_for_kb_data(live_kb_page)
-        text = _text(live_kb_page)
+        shared_kb_page.reload(wait_until="load")
+        _wait_for_kb_data(shared_kb_page)
+        text = _text(shared_kb_page)
         if "xss-test" in text.lower():
             # Title should appear as escaped text
             assert "<script>" not in text.lower() or "xss-test-&lt;script&gt;" in text.lower() or "xss-test-<script>" in text, (
                 "XSS payload should be escaped"
             )
-            _archive_test_article(live_kb_page, xss_title)
+            _archive_test_article(shared_kb_page, xss_title)
 
-    def test_empty_title_rejected(self, live_kb_page: Page):
+    def test_empty_title_rejected(self, shared_kb_page: Page):
         """[SPEC-1655/E1] Cannot create article with empty title."""
-        _wait_for_kb_data(live_kb_page)
-        if _is_rate_limited(live_kb_page):
+        _wait_for_kb_data(shared_kb_page)
+        if _is_rate_limited(shared_kb_page):
             pytest.skip("Rate limited")
 
-        if not _open_add_article_modal(live_kb_page):
+        if not _open_add_article_modal(shared_kb_page):
             pytest.skip(_MODAL_SKIP)
 
         # Leave title empty, fill content
-        textarea = live_kb_page.locator("[role='dialog'] textarea").first
+        textarea = shared_kb_page.locator("[role='dialog'] textarea").first
         textarea.fill("Content without a title")
 
-        submit_btn = live_kb_page.locator(
+        submit_btn = shared_kb_page.locator(
             "[role='dialog'] button:has-text('Create')"
         ).first
         if submit_btn.is_visible():
             is_disabled = submit_btn.is_disabled()
             assert is_disabled, "Submit should be disabled with empty title"
 
-        _close_modal(live_kb_page)
+        _close_modal(shared_kb_page)
 
-    def test_empty_content_rejected(self, live_kb_page: Page):
+    def test_empty_content_rejected(self, shared_kb_page: Page):
         """[SPEC-1655/E1] Cannot create article with empty content."""
-        _wait_for_kb_data(live_kb_page)
-        if _is_rate_limited(live_kb_page):
+        _wait_for_kb_data(shared_kb_page)
+        if _is_rate_limited(shared_kb_page):
             pytest.skip("Rate limited")
 
-        if not _open_add_article_modal(live_kb_page):
+        if not _open_add_article_modal(shared_kb_page):
             pytest.skip(_MODAL_SKIP)
 
         # Fill title, leave content empty
-        title_input = live_kb_page.locator(
+        title_input = shared_kb_page.locator(
             "[role='dialog'] input[type='text']"
         ).first
         title_input.fill("Title Without Content")
 
-        submit_btn = live_kb_page.locator(
+        submit_btn = shared_kb_page.locator(
             "[role='dialog'] button:has-text('Create')"
         ).first
         if submit_btn.is_visible():
             is_disabled = submit_btn.is_disabled()
             assert is_disabled, "Submit should be disabled with empty content"
 
-        _close_modal(live_kb_page)
+        _close_modal(shared_kb_page)
 
-    def test_overlong_title(self, live_kb_page: Page):
+    def test_overlong_title(self, shared_kb_page: Page):
         """[SPEC-1655/E1] Very long title is accepted or truncated gracefully."""
-        _wait_for_kb_data(live_kb_page)
-        if _is_rate_limited(live_kb_page):
+        _wait_for_kb_data(shared_kb_page)
+        if _is_rate_limited(shared_kb_page):
             pytest.skip("Rate limited")
 
         long_title = f"LONG-{uuid.uuid4().hex[:6]}-{'A' * 500}"
         title = _create_test_article(
-            live_kb_page,
+            shared_kb_page,
             title=long_title,
             content="Testing overlong title handling.",
         )
         if title is None:
             pytest.skip(_MODAL_SKIP)
 
-        live_kb_page.wait_for_timeout(1500)
-        live_kb_page.reload(wait_until="load")
-        _wait_for_kb_data(live_kb_page)
+        shared_kb_page.wait_for_timeout(1500)
+        shared_kb_page.reload(wait_until="load")
+        _wait_for_kb_data(shared_kb_page)
 
-        text = _text(live_kb_page).lower()
+        text = _text(shared_kb_page).lower()
         # Article should appear (possibly truncated)
         if "long-" in text:
-            _archive_test_article(live_kb_page, title)
+            _archive_test_article(shared_kb_page, title)
         # If not visible, the API may have rejected it — that's also acceptable
 
-    def test_rapid_create_articles(self, live_kb_page: Page):
+    def test_rapid_create_articles(self, shared_kb_page: Page):
         """[SPEC-1655/E1] Rapidly creating articles doesn't cause crashes."""
-        _wait_for_kb_data(live_kb_page)
-        if _is_rate_limited(live_kb_page):
+        _wait_for_kb_data(shared_kb_page)
+        if _is_rate_limited(shared_kb_page):
             pytest.skip("Rate limited")
 
         titles = []
         for i in range(2):
             title = _create_test_article(
-                live_kb_page,
+                shared_kb_page,
                 content=f"Rapid create test #{i}",
             )
             if title is None:
                 pytest.skip(_MODAL_SKIP)
             titles.append(title)
-            live_kb_page.wait_for_timeout(1000)
+            shared_kb_page.wait_for_timeout(1000)
 
         # Page should still be functional
-        live_kb_page.reload(wait_until="load")
-        _wait_for_kb_data(live_kb_page)
-        text = _text(live_kb_page).lower()
+        shared_kb_page.reload(wait_until="load")
+        _wait_for_kb_data(shared_kb_page)
+        text = _text(shared_kb_page).lower()
         assert "knowledge" in text, "Page broke after rapid article creation"
 
         # Cleanup
         for t in titles:
-            _archive_test_article(live_kb_page, t)
+            _archive_test_article(shared_kb_page, t)
 
 
 # ═══════════════════════════════════════════════════════════════════════
@@ -1364,37 +1364,37 @@ class TestNegativeDestructive:
 class TestKBLayout:
     """Page-level layout and structure validation."""
 
-    def test_page_loads_without_errors(self, live_kb_page: Page):
+    def test_page_loads_without_errors(self, shared_kb_page: Page):
         """[EL-kb-001..048/A] KB page loads without JS errors or blank state."""
-        text = _wait_for_kb_data(live_kb_page)
+        text = _wait_for_kb_data(shared_kb_page)
         assert len(text) > 50, "KB page appears blank or barely loaded"
 
-    def test_main_sections_present(self, live_kb_page: Page):
+    def test_main_sections_present(self, shared_kb_page: Page):
         """[EL-kb-001..020/A] All major sections are present on the page."""
-        text = _wait_for_kb_data(live_kb_page).lower()
-        if _is_rate_limited(live_kb_page):
+        text = _wait_for_kb_data(shared_kb_page).lower()
+        if _is_rate_limited(shared_kb_page):
             pytest.skip("Rate limited")
         # Must have: heading, stat cards, articles table
         assert "knowledge" in text, "Knowledge heading missing"
         assert "total" in text or "articles" in text, "Stat cards missing"
-        table = live_kb_page.locator("table").first
+        table = shared_kb_page.locator("table").first
         assert table.is_visible(), "Articles table missing"
 
-    def test_no_console_errors(self, live_kb_page: Page):
+    def test_no_console_errors(self, shared_kb_page: Page):
         """[EL-kb-001/A] No critical JS errors on page load."""
         # This test validates that the page rendered without critical errors
         # by checking that core UI elements are present
-        text = _wait_for_kb_data(live_kb_page)
+        text = _wait_for_kb_data(shared_kb_page)
         assert "knowledge" in text.lower(), (
             "Page did not render — possible JS error"
         )
 
-    def test_stat_cards_above_table(self, live_kb_page: Page):
+    def test_stat_cards_above_table(self, shared_kb_page: Page):
         """[EL-kb-010..014/C] Stat cards render above the articles table."""
-        _wait_for_kb_data(live_kb_page)
+        _wait_for_kb_data(shared_kb_page)
         # Stat cards should have "Total articles" text above the table
-        stat_label = live_kb_page.locator("text=Total articles").first
-        table = live_kb_page.locator("table").first
+        stat_label = shared_kb_page.locator("text=Total articles").first
+        table = shared_kb_page.locator("table").first
         if stat_label.is_visible() and table.is_visible():
             stat_box = stat_label.bounding_box()
             table_box = table.bounding_box()

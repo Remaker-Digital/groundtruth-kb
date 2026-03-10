@@ -163,13 +163,163 @@ def staging_reachable() -> None:
 
 @pytest.fixture(autouse=True, scope="class")
 def _rate_limit_cooldown():
-    """2 s cooldown between test classes to avoid burst clustering."""
+    """0.5 s cooldown between test classes.  (S164: reduced from 2 s.)"""
     yield
-    time.sleep(2)
+    time.sleep(0.5)
 
 
 # ---------------------------------------------------------------------------
-# Per-test page fixture
+# Class-scoped shared fixtures (S164 -- page reuse across read-only tests)
+# ---------------------------------------------------------------------------
+
+@pytest.fixture(scope="class")
+def shared_browser_context(browser):
+    """Class-scoped BrowserContext for provider console tests."""
+    ctx = browser.new_context()
+    yield ctx
+    ctx.close()
+
+
+@pytest.fixture(scope="class")
+def shared_provider_page(
+    shared_browser_context,
+    staging_reachable,
+    provider_api_key: str,
+) -> Page:
+    """Class-scoped provider page -- ONE SPA load per class."""
+    page = shared_browser_context.new_page()
+    shared_browser_context.add_init_script(f"""
+        sessionStorage.setItem("agentred_provider_key", "{provider_api_key}");
+    """)
+    page.goto(f"{PROVIDER_BASE_URL}/", wait_until="load")
+    try:
+        page.wait_for_selector(
+            "text=/Platform Dashboard|Service Provider Console|Dashboard/i",
+            timeout=20_000,
+        )
+    except Exception:
+        pass
+    page.wait_for_timeout(1000)
+    yield page
+    page.close()
+
+
+@pytest.fixture(scope="class")
+def shared_health_dashboard_page(shared_provider_page: Page) -> Page:
+    """Class-scoped Health Dashboard (landing page)."""
+    return shared_provider_page
+
+
+@pytest.fixture(scope="class")
+def shared_tenant_directory_page(shared_provider_page: Page) -> Page:
+    """Class-scoped Tenant Directory."""
+    return _navigate_provider_to(shared_provider_page, "Tenants", "Tenant")
+
+
+@pytest.fixture(scope="class")
+def shared_deployment_history_page(shared_provider_page: Page) -> Page:
+    """Class-scoped Deployment History."""
+    return _navigate_provider_to(shared_provider_page, "Deployments", "Deployment")
+
+
+@pytest.fixture(scope="class")
+def shared_queue_health_page(shared_provider_page: Page) -> Page:
+    """Class-scoped Queue Health."""
+    return _navigate_provider_to(shared_provider_page, "Queue Health", "Queue")
+
+
+@pytest.fixture(scope="class")
+def shared_integration_health_page(shared_provider_page: Page) -> Page:
+    """Class-scoped Integration Health."""
+    return _navigate_provider_to(shared_provider_page, "Integrations", "Integration")
+
+
+@pytest.fixture(scope="class")
+def shared_status_page_page(shared_provider_page: Page) -> Page:
+    """Class-scoped Status Page Management."""
+    return _navigate_provider_to(shared_provider_page, "Status Page", "Status")
+
+
+@pytest.fixture(scope="class")
+def shared_alert_config_page(shared_provider_page: Page) -> Page:
+    """Class-scoped Alert Configuration."""
+    return _navigate_provider_to(shared_provider_page, "Alerts", "Alert")
+
+
+@pytest.fixture(scope="class")
+def shared_diagnostics_page(shared_provider_page: Page) -> Page:
+    """Class-scoped Support Diagnostics."""
+    return _navigate_provider_to(shared_provider_page, "Diagnostics", "Diagnostic")
+
+
+@pytest.fixture(scope="class")
+def shared_copilot_knowledge_page(shared_provider_page: Page) -> Page:
+    """Class-scoped Co-Pilot Knowledge."""
+    return _navigate_provider_to(shared_provider_page, "Co-Pilot Knowledge", "Knowledge")
+
+
+@pytest.fixture(scope="class")
+def shared_pipeline_page(shared_provider_page: Page) -> Page:
+    """Class-scoped Pipeline Observatory."""
+    return _navigate_provider_to(shared_provider_page, "Pipeline Observatory", "Pipeline")
+
+
+@pytest.fixture(scope="class")
+def shared_contact_messages_page(shared_provider_page: Page) -> Page:
+    """Class-scoped Contact Messages."""
+    return _navigate_provider_to(shared_provider_page, "Contact Messages", "Contact")
+
+
+@pytest.fixture(scope="class")
+def shared_service_messages_page(shared_provider_page: Page) -> Page:
+    """Class-scoped Service Messages."""
+    return _navigate_provider_to(shared_provider_page, "Service Messages", "Service")
+
+
+@pytest.fixture(scope="class")
+def shared_compliance_page(shared_provider_page: Page) -> Page:
+    """Class-scoped Compliance Dashboard."""
+    return _navigate_provider_to(shared_provider_page, "Compliance", "Compliance")
+
+
+@pytest.fixture(scope="class")
+def shared_secrets_page(shared_provider_page: Page) -> Page:
+    """Class-scoped Secret Posture."""
+    return _navigate_provider_to(shared_provider_page, "Secrets", "Secret")
+
+
+@pytest.fixture(scope="class")
+def shared_billing_health_page(shared_provider_page: Page) -> Page:
+    """Class-scoped Billing Health."""
+    return _navigate_provider_to(shared_provider_page, "Billing", "Billing")
+
+
+@pytest.fixture(scope="class")
+def shared_cost_analytics_page(shared_provider_page: Page) -> Page:
+    """Class-scoped Cost Analytics."""
+    return _navigate_provider_to(shared_provider_page, "Cost Analytics", "Cost")
+
+
+@pytest.fixture(scope="class")
+def shared_sla_trends_page(shared_provider_page: Page) -> Page:
+    """Class-scoped SLA Trends."""
+    return _navigate_provider_to(shared_provider_page, "SLA Trends", "SLA")
+
+
+@pytest.fixture(scope="class")
+def shared_abuse_detection_page(shared_provider_page: Page) -> Page:
+    """Class-scoped Abuse Detection."""
+    return _navigate_provider_to(shared_provider_page, "Abuse Detection", "Abuse")
+
+
+@pytest.fixture(scope="class")
+def shared_mfa_settings_page(shared_provider_page: Page) -> Page:
+    """Class-scoped MFA Settings."""
+    return _navigate_provider_to(shared_provider_page, "MFA Settings", "MFA")
+
+
+# ---------------------------------------------------------------------------
+# Per-test page fixture (for mutation test classes)
 # ---------------------------------------------------------------------------
 
 @pytest.fixture()

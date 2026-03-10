@@ -405,17 +405,149 @@ def admin_vite_server(production_reachable) -> subprocess.Popen | None:
 
 @pytest.fixture(autouse=True, scope="class")
 def _rate_limit_cooldown():
-    """Insert a 2 s cooldown between test classes.
+    """Insert a 0.5 s cooldown between test classes.
 
     With class-scoped page fixtures (one page load per class), API usage
-    is modest (~3-5 calls per class).  A 2 s gap prevents burst clustering.
+    is modest (~3-5 calls per class).  0.5 s is sufficient to prevent burst
+    clustering given the 500 RPM rate limit.  (S164: reduced from 2 s.)
     """
     yield
-    time.sleep(2)
+    time.sleep(0.5)
 
 
 # ---------------------------------------------------------------------------
-# Per-test fixtures
+# Class-scoped shared fixtures (S164 -- page reuse across read-only tests)
+# ---------------------------------------------------------------------------
+
+@pytest.fixture(scope="class")
+def shared_browser_context(browser):
+    """A BrowserContext shared across all tests in a class.
+
+    add_init_script is registered on the BrowserContext, so auth
+    injection fires on every goto() within the context -- auth persists
+    across navigations without re-setup.
+    """
+    ctx = browser.new_context()
+    yield ctx
+    ctx.close()
+
+
+@pytest.fixture(scope="class")
+def shared_admin_page(
+    shared_browser_context,
+    admin_vite_server,
+    live_api_key: str,
+) -> Page:
+    """Class-scoped admin page -- ONE SPA load shared by all tests in a class.
+
+    Identical setup to live_admin_page but scoped to the class, so the
+    ~5-10 s browser launch + SPA load + onboarding dismiss happens once
+    per class instead of once per test.  Only use for read-only test classes.
+    """
+    page = shared_browser_context.new_page()
+
+    if LIVE_SPA_BASE_URL:
+        shared_browser_context.add_init_script(f"""
+            sessionStorage.setItem("agentred_api_key", "{live_api_key}");
+            sessionStorage.setItem("agentred-onboarding-dismissed", "true");
+        """)
+        page.goto(
+            f"{LIVE_SPA_BASE_URL}/?tenant={LIVE_TENANT_ID}",
+            wait_until="load",
+        )
+    else:
+        _attach_api_proxy_rewrite(page)
+        shared_browser_context.add_init_script(f"""
+            sessionStorage.setItem("agentred_api_key", "{live_api_key}");
+            sessionStorage.setItem("agentred-onboarding-dismissed", "true");
+        """)
+        page.goto(
+            f"http://localhost:{ADMIN_VITE_PORT}/admin/standalone/?tenant={LIVE_TENANT_ID}",
+            wait_until="load",
+        )
+
+    page.wait_for_selector("text=Dashboard", timeout=20_000)
+    _dismiss_onboarding_modal(page)
+    yield page
+    page.close()
+
+
+@pytest.fixture(scope="class")
+def shared_dashboard_page(shared_admin_page: Page) -> Page:
+    """Class-scoped Dashboard page."""
+    return shared_admin_page
+
+
+@pytest.fixture(scope="class")
+def shared_team_page(shared_admin_page: Page) -> Page:
+    """Class-scoped Team members page."""
+    return _navigate_admin_to(shared_admin_page, "Team members", "Team members")
+
+
+@pytest.fixture(scope="class")
+def shared_config_page(shared_admin_page: Page) -> Page:
+    """Class-scoped Agent configuration page."""
+    return _navigate_admin_to(shared_admin_page, "Agent configuration", "Configuration")
+
+
+@pytest.fixture(scope="class")
+def shared_widget_page(shared_admin_page: Page) -> Page:
+    """Class-scoped Widget configuration page."""
+    return _navigate_admin_to(shared_admin_page, "Widget configuration", "Widget")
+
+
+@pytest.fixture(scope="class")
+def shared_inbox_page(shared_admin_page: Page) -> Page:
+    """Class-scoped Inbox page."""
+    _navigate_admin_to(shared_admin_page, "Inbox", "Inbox")
+    try:
+        shared_admin_page.wait_for_selector(
+            r"text=/\d+\s*(msg|messages?)|No conversations|All \(\d/i",
+            timeout=15_000,
+        )
+    except Exception:
+        pass
+    shared_admin_page.wait_for_timeout(1000)
+    return shared_admin_page
+
+
+@pytest.fixture(scope="class")
+def shared_kb_page(shared_admin_page: Page) -> Page:
+    """Class-scoped Knowledge base page."""
+    return _navigate_admin_to(shared_admin_page, "Knowledge base", "Knowledge")
+
+
+@pytest.fixture(scope="class")
+def shared_billing_page(shared_admin_page: Page) -> Page:
+    """Class-scoped Billing page."""
+    return _navigate_admin_to(shared_admin_page, "Account & billing", "Account")
+
+
+@pytest.fixture(scope="class")
+def shared_integrations_page(shared_admin_page: Page) -> Page:
+    """Class-scoped Integrations page."""
+    return _navigate_admin_to(shared_admin_page, "Integrations", None)
+
+
+@pytest.fixture(scope="class")
+def shared_memory_page(shared_admin_page: Page) -> Page:
+    """Class-scoped Memory and privacy page."""
+    _navigate_admin_to(shared_admin_page, "Memory & privacy", None)
+    try:
+        shared_admin_page.wait_for_selector("text=Memory", timeout=5_000)
+    except Exception:
+        pytest.skip("Memory & privacy page not available (tier restriction)")
+    return shared_admin_page
+
+
+@pytest.fixture(scope="class")
+def shared_quick_actions_page(shared_admin_page: Page) -> Page:
+    """Class-scoped Quick actions page."""
+    return _navigate_admin_to(shared_admin_page, "Quick actions", "Quick actions")
+
+
+# ---------------------------------------------------------------------------
+# Per-test fixtures (for mutation test classes that need fresh page state)
 # ---------------------------------------------------------------------------
 
 @pytest.fixture()

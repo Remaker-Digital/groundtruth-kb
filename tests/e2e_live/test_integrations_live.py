@@ -75,18 +75,18 @@ def _scroll_to_text(page: Page, text: str) -> None:
 class TestPageHeader:
     """Page title and subtitle."""
 
-    def test_page_title_visible(self, live_integrations_page: Page):
+    def test_page_title_visible(self, shared_integrations_page: Page):
         """EL-integrations-001: Page title 'Integrations' is visible."""
-        page = live_integrations_page
+        page = shared_integrations_page
         if _is_rate_limited(page):
             pytest.skip("Rate limited")
         _wait_for_integrations_page(page)
         title = page.locator("h2:has-text('Integrations')").first
         expect(title).to_be_visible()
 
-    def test_page_subtitle_visible(self, live_integrations_page: Page):
+    def test_page_subtitle_visible(self, shared_integrations_page: Page):
         """EL-integrations-001: Subtitle about connecting services is visible."""
-        page = live_integrations_page
+        page = shared_integrations_page
         if _is_rate_limited(page):
             pytest.skip("Rate limited")
         _wait_for_integrations_page(page)
@@ -101,9 +101,9 @@ class TestPageHeader:
 class TestIntegrationCards:
     """Integration card rendering."""
 
-    def test_at_least_4_cards(self, live_integrations_page: Page):
+    def test_at_least_4_cards(self, shared_integrations_page: Page):
         """EL-integrations-002: At least 4 integration cards rendered."""
-        page = live_integrations_page
+        page = shared_integrations_page
         if _is_rate_limited(page):
             pytest.skip("Rate limited")
         _wait_for_integrations_page(page)
@@ -111,9 +111,9 @@ class TestIntegrationCards:
         found = sum(1 for name in known if page.locator(f"text={name}").count() > 0)
         assert found >= 4, f"Expected at least 4 integration cards, found {found}"
 
-    def test_card_has_logo_or_icon(self, live_integrations_page: Page):
+    def test_card_has_logo_or_icon(self, shared_integrations_page: Page):
         """EL-integrations-003: Integration cards have logo images or SVG icons."""
-        page = live_integrations_page
+        page = shared_integrations_page
         if _is_rate_limited(page):
             pytest.skip("Rate limited")
         _wait_for_integrations_page(page)
@@ -123,9 +123,9 @@ class TestIntegrationCards:
         total = imgs.count() + svgs.count()
         assert total >= 4, f"Expected at least 4 logos/icons, found {total}"
 
-    def test_card_has_name_and_description(self, live_integrations_page: Page):
+    def test_card_has_name_and_description(self, shared_integrations_page: Page):
         """EL-integrations-004/005: Each card shows name and description."""
-        page = live_integrations_page
+        page = shared_integrations_page
         if _is_rate_limited(page):
             pytest.skip("Rate limited")
         _wait_for_integrations_page(page)
@@ -137,9 +137,9 @@ class TestIntegrationCards:
         assert "commerce" in body or "product" in body or "order" in body or "store" in body, \
             "No Shopify integration description found"
 
-    def test_help_tooltips_on_cards(self, live_integrations_page: Page):
+    def test_help_tooltips_on_cards(self, shared_integrations_page: Page):
         """EL-integrations-004: Integration names have help tooltips."""
-        page = live_integrations_page
+        page = shared_integrations_page
         if _is_rate_limited(page):
             pytest.skip("Rate limited")
         _wait_for_integrations_page(page)
@@ -154,9 +154,9 @@ class TestIntegrationCards:
 class TestStatusBadges:
     """Status badges on integration cards."""
 
-    def test_connection_status_badges(self, live_integrations_page: Page):
+    def test_connection_status_badges(self, shared_integrations_page: Page):
         """EL-integrations-006: At least one status badge (Connected/Not Connected)."""
-        page = live_integrations_page
+        page = shared_integrations_page
         if _is_rate_limited(page):
             pytest.skip("Rate limited")
         _wait_for_integrations_page(page)
@@ -172,9 +172,9 @@ class TestStatusBadges:
             return
         pytest.fail("No connection status badge found")
 
-    def test_coming_soon_badge(self, live_integrations_page: Page):
+    def test_coming_soon_badge(self, shared_integrations_page: Page):
         """EL-integrations-007: 'Coming Soon' badge on unavailable integrations."""
-        page = live_integrations_page
+        page = shared_integrations_page
         if _is_rate_limited(page):
             pytest.skip("Rate limited")
         _wait_for_integrations_page(page)
@@ -183,9 +183,9 @@ class TestStatusBadges:
             pytest.skip("No Coming Soon integrations present")
         expect(badge.first).to_be_visible()
 
-    def test_tier_gate_badge(self, live_integrations_page: Page):
+    def test_tier_gate_badge(self, shared_integrations_page: Page):
         """EL-integrations-008: Tier gate badge on restricted integrations."""
-        page = live_integrations_page
+        page = shared_integrations_page
         if _is_rate_limited(page):
             pytest.skip("Rate limited")
         _wait_for_integrations_page(page)
@@ -205,9 +205,9 @@ class TestStatusBadges:
 class TestActionButtons:
     """Activate, Deactivate, and Disconnect buttons."""
 
-    def test_activate_button_exists(self, live_integrations_page: Page):
+    def test_activate_button_exists(self, shared_integrations_page: Page):
         """EL-integrations-009: Activate button shown for disconnected integrations."""
-        page = live_integrations_page
+        page = shared_integrations_page
         if _is_rate_limited(page):
             pytest.skip("Rate limited")
         _wait_for_integrations_page(page)
@@ -217,9 +217,9 @@ class TestActionButtons:
             pytest.skip("No Activate buttons visible")
         expect(btn.first).to_be_visible()
 
-    def test_deactivate_button_or_absent(self, live_integrations_page: Page):
+    def test_deactivate_button_or_absent(self, shared_integrations_page: Page):
         """EL-integrations-010: Deactivate button for connected integrations."""
-        page = live_integrations_page
+        page = shared_integrations_page
         if _is_rate_limited(page):
             pytest.skip("Rate limited")
         _wait_for_integrations_page(page)
@@ -229,9 +229,9 @@ class TestActionButtons:
             pytest.skip("No Deactivate buttons visible — no active integrations")
         expect(btn.first).to_be_visible()
 
-    def test_disconnect_button_or_absent(self, live_integrations_page: Page):
+    def test_disconnect_button_or_absent(self, shared_integrations_page: Page):
         """EL-integrations-011: Disconnect button for connected integrations."""
-        page = live_integrations_page
+        page = shared_integrations_page
         if _is_rate_limited(page):
             pytest.skip("Rate limited")
         _wait_for_integrations_page(page)
@@ -248,45 +248,45 @@ class TestActionButtons:
 class TestSpecificIntegrations:
     """Verify each named integration card exists."""
 
-    def test_shopify_card(self, live_integrations_page: Page):
+    def test_shopify_card(self, shared_integrations_page: Page):
         """EL-integrations-015: Shopify integration card visible."""
-        page = live_integrations_page
+        page = shared_integrations_page
         if _is_rate_limited(page):
             pytest.skip("Rate limited")
         _wait_for_integrations_page(page)
         card = page.locator("text=Shopify").first
         expect(card).to_be_visible()
 
-    def test_zendesk_card(self, live_integrations_page: Page):
+    def test_zendesk_card(self, shared_integrations_page: Page):
         """EL-integrations-016: Zendesk integration card visible."""
-        page = live_integrations_page
+        page = shared_integrations_page
         if _is_rate_limited(page):
             pytest.skip("Rate limited")
         _wait_for_integrations_page(page)
         card = page.locator("text=Zendesk").first
         expect(card).to_be_visible()
 
-    def test_mailchimp_card(self, live_integrations_page: Page):
+    def test_mailchimp_card(self, shared_integrations_page: Page):
         """EL-integrations-017: Mailchimp integration card visible."""
-        page = live_integrations_page
+        page = shared_integrations_page
         if _is_rate_limited(page):
             pytest.skip("Rate limited")
         _wait_for_integrations_page(page)
         card = page.locator("text=Mailchimp").first
         expect(card).to_be_visible()
 
-    def test_google_analytics_card(self, live_integrations_page: Page):
+    def test_google_analytics_card(self, shared_integrations_page: Page):
         """EL-integrations-018: Google Analytics integration card visible."""
-        page = live_integrations_page
+        page = shared_integrations_page
         if _is_rate_limited(page):
             pytest.skip("Rate limited")
         _wait_for_integrations_page(page)
         card = page.locator("text=Google Analytics").first
         expect(card).to_be_visible()
 
-    def test_stripe_card(self, live_integrations_page: Page):
+    def test_stripe_card(self, shared_integrations_page: Page):
         """EL-integrations-019: Stripe integration card visible."""
-        page = live_integrations_page
+        page = shared_integrations_page
         if _is_rate_limited(page):
             pytest.skip("Rate limited")
         _wait_for_integrations_page(page)
@@ -302,9 +302,9 @@ class TestSpecificIntegrations:
 class TestActiveCount:
     """Integration count summary footer."""
 
-    def test_active_count_footer(self, live_integrations_page: Page):
+    def test_active_count_footer(self, shared_integrations_page: Page):
         """EL-integrations-014: 'X of Y integrations active' footer text."""
-        page = live_integrations_page
+        page = shared_integrations_page
         if _is_rate_limited(page):
             pytest.skip("Rate limited")
         _wait_for_integrations_page(page)
@@ -320,9 +320,9 @@ class TestActiveCount:
 class TestMutations:
     """Mutation tests — activate/deactivate integrations."""
 
-    def test_activate_shopify(self, live_integrations_page: Page):
+    def test_activate_shopify(self, shared_integrations_page: Page):
         """Activate Shopify integration via button click."""
-        page = live_integrations_page
+        page = shared_integrations_page
         if _is_rate_limited(page):
             pytest.skip("Rate limited")
         _wait_for_integrations_page(page)
@@ -349,9 +349,9 @@ class TestMutations:
 class TestDisconnectConfirmation:
     """Disconnect confirmation dialog."""
 
-    def test_disconnect_shows_confirmation(self, live_integrations_page: Page):
+    def test_disconnect_shows_confirmation(self, shared_integrations_page: Page):
         """EL-integrations-012: Clicking Disconnect shows confirmation inline."""
-        page = live_integrations_page
+        page = shared_integrations_page
         if _is_rate_limited(page):
             pytest.skip("Rate limited")
         _wait_for_integrations_page(page)
@@ -374,9 +374,9 @@ class TestDisconnectConfirmation:
 class TestLoadStates:
     """Loading and error states."""
 
-    def test_loading_not_stuck(self, live_integrations_page: Page):
+    def test_loading_not_stuck(self, shared_integrations_page: Page):
         """EL-integrations-020: Loading spinner not stuck after page load."""
-        page = live_integrations_page
+        page = shared_integrations_page
         if _is_rate_limited(page):
             pytest.skip("Rate limited")
         _wait_for_integrations_page(page)
@@ -387,9 +387,9 @@ class TestLoadStates:
         assert loading.count() == 0 or not loading.first.is_visible(), \
             "Loading state still visible after page load"
 
-    def test_no_error_on_clean_load(self, live_integrations_page: Page):
+    def test_no_error_on_clean_load(self, shared_integrations_page: Page):
         """No error alert on fresh page load."""
-        page = live_integrations_page
+        page = shared_integrations_page
         if _is_rate_limited(page):
             pytest.skip("Rate limited")
         _wait_for_integrations_page(page)

@@ -554,10 +554,14 @@ def phase_3_live_e2e(args: argparse.Namespace) -> PhaseResult:
     # Each test navigates a real SPA and waits for API responses (1-10s each).
     # 3600s (60min) only completes ~60% before being killed.
     # 10800s (180min) provides margin for the full ~130min expected runtime.
+    # S164: Enable xdist (4 workers) with loadfile distribution to preserve
+    # class-scoped shared fixtures.  Timeout reduced: class-scoped fixtures
+    # + xdist parallelism reduces ~130 min to ~12-18 min.
     passed, failed, errors, xfailed, dt, _ = _run_pytest(
-        "tests/e2e_live/", timeout=10800, prefix="  [live-e2e] ",
+        "tests/e2e_live/", timeout=3600, prefix="  [live-e2e] ",
         extra_env=env_vars,
-        extra_args=["--timeout=120"],
+        extra_args=["--timeout=120", "--dist=loadfile"],
+        xdist=True,
     )
 
     if failed == 0 and errors == 0 and passed > 0:

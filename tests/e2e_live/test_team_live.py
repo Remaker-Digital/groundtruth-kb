@@ -234,31 +234,31 @@ def _delete_member(page: Page, email: str) -> bool:
 class TestPageHeader:
     """[EL-team-001..004] Title, subtitle, member count, invite button."""
 
-    def test_page_title(self, live_team_page: Page):
+    def test_page_title(self, shared_team_page: Page):
         """[EL-team-001/A,B] Page heading shows 'Team members'."""
-        _wait_for_team_data(live_team_page)
-        if _is_rate_limited(live_team_page):
+        _wait_for_team_data(shared_team_page)
+        if _is_rate_limited(shared_team_page):
             pytest.skip("Rate limited")
-        text = _text(live_team_page)
+        text = _text(shared_team_page)
         assert "Team members" in text
 
-    def test_page_subtitle(self, live_team_page: Page):
+    def test_page_subtitle(self, shared_team_page: Page):
         """[EL-team-002/A,B] Subtitle describes team management."""
-        _wait_for_team_data(live_team_page)
-        if _is_rate_limited(live_team_page):
+        _wait_for_team_data(shared_team_page)
+        if _is_rate_limited(shared_team_page):
             pytest.skip("Rate limited")
-        text = _text(live_team_page).lower()
+        text = _text(shared_team_page).lower()
         assert "manage" in text or "assign" in text or "roles" in text, (
             f"Subtitle not found. Text snippet: {text[:300]}"
         )
 
-    def test_member_count_matches_rows(self, live_team_page: Page):
+    def test_member_count_matches_rows(self, shared_team_page: Page):
         """[EL-team-003/A,B] Stated member count matches table row count."""
-        text = _wait_for_team_data(live_team_page)
-        if _is_rate_limited(live_team_page):
+        text = _wait_for_team_data(shared_team_page)
+        if _is_rate_limited(shared_team_page):
             pytest.skip("Rate limited")
         count_match = re.search(r"(\d+)\s*(?:team\s*)?member", text, re.I)
-        rows = live_team_page.locator("table tbody tr")
+        rows = shared_team_page.locator("table tbody tr")
         row_count = rows.count()
         if count_match and row_count > 0:
             stated = int(count_match.group(1))
@@ -270,31 +270,31 @@ class TestPageHeader:
         else:
             assert count_match or row_count > 0
 
-    def test_invite_button_visible(self, live_team_page: Page):
+    def test_invite_button_visible(self, shared_team_page: Page):
         """[EL-team-004/A] '+ Invite member' button is present."""
-        _wait_for_team_data(live_team_page)
-        if _is_rate_limited(live_team_page):
+        _wait_for_team_data(shared_team_page)
+        if _is_rate_limited(shared_team_page):
             pytest.skip("Rate limited")
-        btn = live_team_page.locator("button:has-text('Invite member')")
+        btn = shared_team_page.locator("button:has-text('Invite member')")
         assert btn.count() > 0, "Invite member button not found"
 
-    def test_invite_button_toggles_form(self, live_team_page: Page):
+    def test_invite_button_toggles_form(self, shared_team_page: Page):
         """[EL-team-004/E1] Clicking invite button shows/hides the invite form."""
-        _wait_for_team_data(live_team_page)
-        if _is_rate_limited(live_team_page):
+        _wait_for_team_data(shared_team_page)
+        if _is_rate_limited(shared_team_page):
             pytest.skip("Rate-limited")
 
         # Open form
-        _open_invite_form(live_team_page)
-        email_input = live_team_page.locator(
+        _open_invite_form(shared_team_page)
+        email_input = shared_team_page.locator(
             "input[type='email'], input[placeholder*='colleague']"
         )
         assert email_input.count() > 0, "Invite form email input did not appear"
 
         # Close form (button text flips to "Cancel" when form is open)
-        cancel_btn = live_team_page.locator("button:has-text('Cancel')").first
+        cancel_btn = shared_team_page.locator("button:has-text('Cancel')").first
         cancel_btn.click()
-        live_team_page.wait_for_timeout(500)
+        shared_team_page.wait_for_timeout(500)
 
 
 # ═══════════════════════════════════════════════════════════════════════════
@@ -446,55 +446,55 @@ class TestInviteForm:
 class TestTableStructure:
     """[EL-team-011..017] Table element and six column headers."""
 
-    def test_table_exists(self, live_team_page: Page):
+    def test_table_exists(self, shared_team_page: Page):
         """[EL-team-011/A] Team members <table> is present."""
-        _wait_for_team_data(live_team_page)
-        if _is_rate_limited(live_team_page):
+        _wait_for_team_data(shared_team_page)
+        if _is_rate_limited(shared_team_page):
             pytest.skip("Rate limited")
-        assert live_team_page.locator("table").count() > 0
+        assert shared_team_page.locator("table").count() > 0
 
-    def test_header_team_member(self, live_team_page: Page):
+    def test_header_team_member(self, shared_team_page: Page):
         """[EL-team-012/A,B] 'Team member' column header (CSS text-transform: uppercase)."""
-        _wait_for_team_data(live_team_page)
-        if _is_rate_limited(live_team_page):
+        _wait_for_team_data(shared_team_page)
+        if _is_rate_limited(shared_team_page):
             pytest.skip("Rate limited")
-        assert "team member" in _text(live_team_page).lower()
+        assert "team member" in _text(shared_team_page).lower()
 
-    def test_header_role(self, live_team_page: Page):
+    def test_header_role(self, shared_team_page: Page):
         """[EL-team-013/A,B] 'Role' column header (CSS text-transform: uppercase)."""
-        _wait_for_team_data(live_team_page)
-        if _is_rate_limited(live_team_page):
+        _wait_for_team_data(shared_team_page)
+        if _is_rate_limited(shared_team_page):
             pytest.skip("Rate limited")
-        text = _text(live_team_page).lower()
+        text = _text(shared_team_page).lower()
         assert "role" in text, "'Role' column header not found"
 
-    def test_header_joined(self, live_team_page: Page):
+    def test_header_joined(self, shared_team_page: Page):
         """[EL-team-014/A,B] 'Joined' column header (CSS text-transform: uppercase)."""
-        _wait_for_team_data(live_team_page)
-        if _is_rate_limited(live_team_page):
+        _wait_for_team_data(shared_team_page)
+        if _is_rate_limited(shared_team_page):
             pytest.skip("Rate limited")
-        assert "joined" in _text(live_team_page).lower()
+        assert "joined" in _text(shared_team_page).lower()
 
-    def test_header_last_active(self, live_team_page: Page):
+    def test_header_last_active(self, shared_team_page: Page):
         """[EL-team-015/A,B] 'Last active' column header (CSS text-transform: uppercase)."""
-        _wait_for_team_data(live_team_page)
-        if _is_rate_limited(live_team_page):
+        _wait_for_team_data(shared_team_page)
+        if _is_rate_limited(shared_team_page):
             pytest.skip("Rate limited")
-        assert "last active" in _text(live_team_page).lower()
+        assert "last active" in _text(shared_team_page).lower()
 
-    def test_header_escalations(self, live_team_page: Page):
+    def test_header_escalations(self, shared_team_page: Page):
         """[EL-team-016/A,B] 'Escalations' column header."""
-        _wait_for_team_data(live_team_page)
-        if _is_rate_limited(live_team_page):
+        _wait_for_team_data(shared_team_page)
+        if _is_rate_limited(shared_team_page):
             pytest.skip("Rate limited")
-        assert "escalation" in _text(live_team_page).lower()
+        assert "escalation" in _text(shared_team_page).lower()
 
-    def test_header_actions(self, live_team_page: Page):
+    def test_header_actions(self, shared_team_page: Page):
         """[EL-team-017/A,B] 'Actions' column header (CSS text-transform: uppercase)."""
-        _wait_for_team_data(live_team_page)
-        if _is_rate_limited(live_team_page):
+        _wait_for_team_data(shared_team_page)
+        if _is_rate_limited(shared_team_page):
             pytest.skip("Rate limited")
-        assert "actions" in _text(live_team_page).lower()
+        assert "actions" in _text(shared_team_page).lower()
 
 
 # ═══════════════════════════════════════════════════════════════════════════
@@ -504,31 +504,31 @@ class TestTableStructure:
 class TestMemberRowElements:
     """[EL-team-018..022] Per-row data: name, email, role, dates, escalations."""
 
-    def test_member_email_displayed(self, live_team_page: Page):
+    def test_member_email_displayed(self, shared_team_page: Page):
         """[EL-team-018/A,B] At least one email address is visible."""
-        text = _wait_for_team_data(live_team_page)
-        if _is_rate_limited(live_team_page):
+        text = _wait_for_team_data(shared_team_page)
+        if _is_rate_limited(shared_team_page):
             pytest.skip("Rate limited")
         emails = re.findall(r"[\w.+-]+@[\w.-]+\.\w+", text)
         assert len(emails) >= 1, "No emails found in team table"
 
-    def test_superadmin_badge(self, live_team_page: Page):
+    def test_superadmin_badge(self, shared_team_page: Page):
         """[EL-team-018/A] Superadmin member shows 'Superadmin' label."""
-        _wait_for_team_data(live_team_page)
-        if _is_rate_limited(live_team_page):
+        _wait_for_team_data(shared_team_page)
+        if _is_rate_limited(shared_team_page):
             pytest.skip("Rate limited")
-        row = _find_superadmin_row(live_team_page)
+        row = _find_superadmin_row(shared_team_page)
         if row is None:
             pytest.skip(
                 "Superadmin row not found — accumulated test members may have "
                 "pushed it beyond pagination reach; staging data cleanup needed"
             )
 
-    def test_role_selector_for_non_superadmin(self, live_team_page: Page):
+    def test_role_selector_for_non_superadmin(self, shared_team_page: Page):
         """[EL-team-019/A] Non-superadmin rows have role <select> dropdowns."""
-        _wait_for_team_data(live_team_page)
-        selects = live_team_page.locator("table tbody select, table select")
-        text = _text(live_team_page).lower()
+        _wait_for_team_data(shared_team_page)
+        selects = shared_team_page.locator("table tbody select, table select")
+        text = _text(shared_team_page).lower()
         has_non_sa = any(
             r in text for r in ("admin", "escalation agent", "viewer")
         )
@@ -537,19 +537,19 @@ class TestMemberRowElements:
         else:
             return  # Only superadmin present — role selector verified by TestRoleChange
 
-    def test_joined_date_format(self, live_team_page: Page):
+    def test_joined_date_format(self, shared_team_page: Page):
         """[EL-team-020/A,B] Joined column shows formatted date."""
-        text = _wait_for_team_data(live_team_page)
-        if _is_rate_limited(live_team_page):
+        text = _wait_for_team_data(shared_team_page)
+        if _is_rate_limited(shared_team_page):
             pytest.skip("Rate-limited — cannot verify date format")
         months = r"Jan|Feb|Mar|Apr|May|Jun|Jul|Aug|Sep|Oct|Nov|Dec"
         assert re.search(rf"({months})\s+\d{{1,2}},?\s*\d{{4}}", text), (
             f"No formatted date found. Text: {text[:300]}"
         )
 
-    def test_last_active_display(self, live_team_page: Page):
+    def test_last_active_display(self, shared_team_page: Page):
         """[EL-team-021/A,B] Last active shows relative time or 'Never'."""
-        text = _wait_for_team_data(live_team_page)
+        text = _wait_for_team_data(shared_team_page)
         has_time = bool(re.search(
             r"\d+\s*[mhd]\s*ago|just now|never|today|yesterday",
             text, re.I,
@@ -560,9 +560,9 @@ class TestMemberRowElements:
         ))
         assert has_time or has_date, f"No activity time found. Text: {text[:300]}"
 
-    def test_escalation_count_column(self, live_team_page: Page):
+    def test_escalation_count_column(self, shared_team_page: Page):
         """[EL-team-022/A] Escalation column shows count or '--'."""
-        text = _wait_for_team_data(live_team_page)
+        text = _wait_for_team_data(shared_team_page)
         # Agents show a number, others show "--" (dashes)
         assert "--" in text or re.search(r"\b\d+\b", text)
 

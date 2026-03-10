@@ -55,46 +55,46 @@ def _bounding_box(page: Page, selector: str) -> dict:
 class TestNavbarContainer:
     """EL-navbar-001: Sticky top navbar container properties."""
 
-    def test_header_exists(self, live_dashboard_page: Page):
+    def test_header_exists(self, shared_dashboard_page: Page):
         """Navbar header element is present on the page."""
-        header = _header(live_dashboard_page)
+        header = _header(shared_dashboard_page)
         expect(header).to_be_visible()
 
-    def test_header_height(self, live_dashboard_page: Page):
+    def test_header_height(self, shared_dashboard_page: Page):
         """Navbar height is 56px (Mantine AppShell.Header spec)."""
-        box = _bounding_box(live_dashboard_page, "header")
+        box = _bounding_box(shared_dashboard_page, "header")
         assert box, "Could not get header bounding box"
         # Allow small tolerance for border
         assert 54 <= box["height"] <= 60, (
             f"Navbar height {box['height']}px — expected ~56px"
         )
 
-    def test_header_full_width(self, live_dashboard_page: Page):
+    def test_header_full_width(self, shared_dashboard_page: Page):
         """Navbar spans the full viewport width."""
-        box = _bounding_box(live_dashboard_page, "header")
-        viewport = live_dashboard_page.viewport_size
+        box = _bounding_box(shared_dashboard_page, "header")
+        viewport = shared_dashboard_page.viewport_size
         assert box and viewport, "Could not get dimensions"
         assert box["width"] >= viewport["width"] * 0.95, (
             f"Navbar width {box['width']}px vs viewport {viewport['width']}px"
         )
 
-    def test_header_background_color(self, live_dashboard_page: Page):
+    def test_header_background_color(self, shared_dashboard_page: Page):
         """Navbar background is dark (#0c0a09 in dark mode, or white-ish in light)."""
-        bg = _computed_style(live_dashboard_page, "header", "background-color")
+        bg = _computed_style(shared_dashboard_page, "header", "background-color")
         assert bg, "Could not read header background-color"
         # Should be a valid CSS color value (rgb, rgba, or hex)
         assert re.match(r"(rgb|rgba|#)", bg), f"Unexpected bg format: {bg}"
 
-    def test_header_border_bottom(self, live_dashboard_page: Page):
+    def test_header_border_bottom(self, shared_dashboard_page: Page):
         """Navbar has a bottom border (1px solid)."""
         border_width = _computed_style(
-            live_dashboard_page, "header", "border-bottom-width"
+            shared_dashboard_page, "header", "border-bottom-width"
         )
         border_style = _computed_style(
-            live_dashboard_page, "header", "border-bottom-style"
+            shared_dashboard_page, "header", "border-bottom-style"
         )
         border_color = _computed_style(
-            live_dashboard_page, "header", "border-bottom-color"
+            shared_dashboard_page, "header", "border-bottom-color"
         )
         # Border should exist (width > 0)
         assert border_width and border_width != "0px", (
@@ -105,35 +105,35 @@ class TestNavbarContainer:
         )
         assert border_color, "No border color set"
 
-    def test_header_sticky_position(self, live_dashboard_page: Page):
+    def test_header_sticky_position(self, shared_dashboard_page: Page):
         """Navbar is sticky/fixed at the top of the viewport."""
-        position = _computed_style(live_dashboard_page, "header", "position")
+        position = _computed_style(shared_dashboard_page, "header", "position")
         # Mantine AppShell.Header uses sticky or fixed
         assert position in ("sticky", "fixed"), (
             f"Navbar position is '{position}' — expected sticky or fixed"
         )
 
-    def test_header_top_zero(self, live_dashboard_page: Page):
+    def test_header_top_zero(self, shared_dashboard_page: Page):
         """Navbar top offset is 0 (stuck to top of viewport)."""
-        box = _bounding_box(live_dashboard_page, "header")
+        box = _bounding_box(shared_dashboard_page, "header")
         assert box, "Could not get header bounding box"
         assert box["y"] <= 2, f"Navbar top offset is {box['y']}px — expected 0"
 
-    def test_header_margin(self, live_dashboard_page: Page):
+    def test_header_margin(self, shared_dashboard_page: Page):
         """Navbar has 0 margin (no unexpected spacing)."""
-        margin = _computed_style(live_dashboard_page, "header", "margin")
+        margin = _computed_style(shared_dashboard_page, "header", "margin")
         # Should be "0px" or "0px 0px 0px 0px"
         assert "0" in margin, f"Unexpected navbar margin: {margin}"
 
-    def test_header_padding(self, live_dashboard_page: Page):
+    def test_header_padding(self, shared_dashboard_page: Page):
         """Navbar header or its inner container has horizontal padding."""
         # Mantine's AppShell.Header may delegate padding to inner children
         # rather than the <header> element itself. Check both levels.
         padding_left = _computed_style(
-            live_dashboard_page, "header", "padding-left"
+            shared_dashboard_page, "header", "padding-left"
         )
         padding_right = _computed_style(
-            live_dashboard_page, "header", "padding-right"
+            shared_dashboard_page, "header", "padding-right"
         )
         has_padding = (
             (padding_left and padding_left != "0px")
@@ -142,10 +142,10 @@ class TestNavbarContainer:
         if not has_padding:
             # Check first child (inner container)
             inner_pl = _computed_style(
-                live_dashboard_page, "header > *:first-child", "padding-left"
+                shared_dashboard_page, "header > *:first-child", "padding-left"
             )
             inner_pr = _computed_style(
-                live_dashboard_page, "header > *:first-child", "padding-right"
+                shared_dashboard_page, "header > *:first-child", "padding-right"
             )
             has_padding = (
                 (inner_pl and inner_pl != "0px")
@@ -164,12 +164,12 @@ class TestNavbarContainer:
 class TestHamburgerMenu:
     """EL-navbar-002: Mobile hamburger menu button."""
 
-    def test_hamburger_hidden_on_desktop(self, live_dashboard_page: Page):
+    def test_hamburger_hidden_on_desktop(self, shared_dashboard_page: Page):
         """Hamburger button is NOT visible on desktop viewport."""
-        viewport = live_dashboard_page.viewport_size
+        viewport = shared_dashboard_page.viewport_size
         if viewport and viewport["width"] >= 768:
             # On desktop, the burger should be hidden
-            burger = live_dashboard_page.locator(
+            burger = shared_dashboard_page.locator(
                 "header button[class*='burger'], header button[class*='Burger']"
             )
             if burger.count() > 0:
@@ -184,32 +184,32 @@ class TestHamburgerMenu:
 class TestLogoImage:
     """EL-navbar-003: Logo SVG image in the navbar."""
 
-    def test_logo_exists(self, live_dashboard_page: Page):
+    def test_logo_exists(self, shared_dashboard_page: Page):
         """Logo image is visible in the header."""
-        logo = live_dashboard_page.locator("header img[alt='Agent Red']")
+        logo = shared_dashboard_page.locator("header img[alt='Agent Red']")
         if logo.count() == 0:
             # Try broader selector
-            logo = live_dashboard_page.locator("header img").first
+            logo = shared_dashboard_page.locator("header img").first
         expect(logo.first).to_be_visible()
 
-    def test_logo_alt_text(self, live_dashboard_page: Page):
+    def test_logo_alt_text(self, shared_dashboard_page: Page):
         """Logo has alt text 'Agent Red'."""
-        logo = live_dashboard_page.locator("header img[alt='Agent Red']")
+        logo = shared_dashboard_page.locator("header img[alt='Agent Red']")
         assert logo.count() >= 1, "No img with alt='Agent Red' in header"
 
-    def test_logo_source(self, live_dashboard_page: Page):
+    def test_logo_source(self, shared_dashboard_page: Page):
         """Logo src points to the correct SVG asset."""
-        logo = live_dashboard_page.locator("header img[alt='Agent Red']").first
+        logo = shared_dashboard_page.locator("header img[alt='Agent Red']").first
         src = logo.get_attribute("src") or ""
         assert "logo" in src.lower() or "svg" in src.lower(), (
             f"Logo src doesn't look like a logo path: {src}"
         )
 
-    def test_logo_click_navigates_home(self, live_dashboard_page: Page):
+    def test_logo_click_navigates_home(self, shared_dashboard_page: Page):
         """[EL-navbar-003/E1] Clicking the logo navigates to admin home."""
-        logo = live_dashboard_page.locator("header img[alt='Agent Red']").first
+        logo = shared_dashboard_page.locator("header img[alt='Agent Red']").first
         if logo.count() == 0:
-            logo = live_dashboard_page.locator("header img").first
+            logo = shared_dashboard_page.locator("header img").first
         assert logo.count() > 0, "Logo image must exist in header"
         # Click the logo's parent anchor (if wrapped in a link)
         parent_link = logo.locator("xpath=ancestor::a[1]")
@@ -217,9 +217,9 @@ class TestLogoImage:
             parent_link.first.click()
         else:
             logo.click()
-        live_dashboard_page.wait_for_timeout(1000)
-        url = live_dashboard_page.url.lower()
-        body_text = live_dashboard_page.inner_text("body") or ""
+        shared_dashboard_page.wait_for_timeout(1000)
+        url = shared_dashboard_page.url.lower()
+        body_text = shared_dashboard_page.inner_text("body") or ""
         # Should still be on admin SPA (either dashboard or root)
         on_admin = (
             "admin" in url or "standalone" in url
@@ -235,16 +235,16 @@ class TestLogoImage:
 class TestBrandText:
     """EL-navbar-004: 'Customer Experience' brand text."""
 
-    def test_brand_text_exists(self, live_dashboard_page: Page):
+    def test_brand_text_exists(self, shared_dashboard_page: Page):
         """'Customer Experience' text is visible in the header."""
-        text = _header_text(live_dashboard_page)
+        text = _header_text(shared_dashboard_page)
         assert "Customer Experience" in text, (
             f"'Customer Experience' not found in header: {text[:100]}"
         )
 
-    def test_brand_text_value(self, live_dashboard_page: Page):
+    def test_brand_text_value(self, shared_dashboard_page: Page):
         """Brand text is exactly 'Customer Experience' (not truncated)."""
-        header = _header(live_dashboard_page)
+        header = _header(shared_dashboard_page)
         brand = header.locator("text=Customer Experience").first
         expect(brand).to_be_visible()
 
@@ -256,10 +256,10 @@ class TestBrandText:
 class TestStorefrontLink:
     """EL-navbar-006: Shopify storefront link."""
 
-    def test_storefront_link_or_brand_name_exists(self, live_dashboard_page: Page):
+    def test_storefront_link_or_brand_name_exists(self, shared_dashboard_page: Page):
         """Either a storefront link or brand name is visible in the header."""
-        text = _header_text(live_dashboard_page)
-        header = _header(live_dashboard_page)
+        text = _header_text(shared_dashboard_page)
+        header = _header(shared_dashboard_page)
         # Look for any of: Shopify domain text, brand name, or a link
         has_link = header.locator("a.ar-link-shop, a[target='_blank']").count() > 0
         has_brand_text = len(text) > len("Customer Experience") + 10
@@ -267,45 +267,45 @@ class TestStorefrontLink:
             "No storefront link or brand name found in header"
         )
 
-    def test_storefront_link_opens_new_tab(self, live_dashboard_page: Page):
+    def test_storefront_link_opens_new_tab(self, shared_dashboard_page: Page):
         """Storefront link has target='_blank' (opens in new tab)."""
-        header = _header(live_dashboard_page)
+        header = _header(shared_dashboard_page)
         link = header.locator("a.ar-link-shop, a[href*='myshopify']").first
         if link.count() == 0:
             return  # Standalone tenant without shopDomain — link not applicable
         target = link.get_attribute("target")
         assert target == "_blank", f"Storefront link target is '{target}', expected '_blank'"
 
-    def test_storefront_link_has_valid_href(self, live_dashboard_page: Page):
+    def test_storefront_link_has_valid_href(self, shared_dashboard_page: Page):
         """Storefront link href is a valid https URL."""
-        header = _header(live_dashboard_page)
+        header = _header(shared_dashboard_page)
         link = header.locator("a.ar-link-shop, a[href*='myshopify']").first
         if link.count() == 0:
             return  # Standalone tenant without shopDomain — link not applicable
         href = link.get_attribute("href") or ""
         assert href.startswith("https://"), f"Invalid storefront href: {href}"
 
-    def test_storefront_link_has_security_attrs(self, live_dashboard_page: Page):
+    def test_storefront_link_has_security_attrs(self, shared_dashboard_page: Page):
         """Storefront link has rel='noopener noreferrer'."""
-        header = _header(live_dashboard_page)
+        header = _header(shared_dashboard_page)
         link = header.locator("a.ar-link-shop, a[href*='myshopify']").first
         if link.count() == 0:
             return  # Standalone tenant without shopDomain — link not applicable
         rel = link.get_attribute("rel") or ""
         assert "noopener" in rel, f"Missing noopener in rel: {rel}"
 
-    def test_storefront_domain_stripped(self, live_dashboard_page: Page):
+    def test_storefront_domain_stripped(self, shared_dashboard_page: Page):
         """Shopify domain shows without '.myshopify.com' suffix."""
-        text = _header_text(live_dashboard_page)
+        text = _header_text(shared_dashboard_page)
         # The domain should appear stripped (e.g., "blanco-9939" not "blanco-9939.myshopify.com")
         if ".myshopify.com" in text:
             pytest.fail(
                 "Full .myshopify.com domain shown — should be stripped"
             )
 
-    def test_storefront_has_external_link_icon(self, live_dashboard_page: Page):
+    def test_storefront_has_external_link_icon(self, shared_dashboard_page: Page):
         """Storefront link includes an external link icon."""
-        header = _header(live_dashboard_page)
+        header = _header(shared_dashboard_page)
         link = header.locator("a.ar-link-shop, a[href*='myshopify']").first
         if link.count() == 0:
             return  # Standalone tenant without shopDomain — link not applicable
@@ -323,23 +323,23 @@ class TestTierBadge:
 
     VALID_TIERS = {"Trial", "Starter", "Professional", "Enterprise"}
 
-    def test_tier_badge_exists(self, live_dashboard_page: Page):
+    def test_tier_badge_exists(self, shared_dashboard_page: Page):
         """A tier badge is visible in the header."""
-        text = _header_text(live_dashboard_page)
+        text = _header_text(shared_dashboard_page)
         found = [t for t in self.VALID_TIERS if t in text]
         assert found, f"No tier badge text found in header: {text[:200]}"
 
-    def test_tier_badge_valid_value(self, live_dashboard_page: Page):
+    def test_tier_badge_valid_value(self, shared_dashboard_page: Page):
         """Tier badge shows one of the valid tier names."""
-        text = _header_text(live_dashboard_page)
+        text = _header_text(shared_dashboard_page)
         found = [t for t in self.VALID_TIERS if t in text]
         assert len(found) == 1, (
             f"Expected exactly 1 tier badge, found {len(found)}: {found}"
         )
 
-    def test_tier_badge_has_tooltip(self, live_dashboard_page: Page):
+    def test_tier_badge_has_tooltip(self, shared_dashboard_page: Page):
         """[EL-navbar-008/E4] Tier badge shows pricing info on hover."""
-        header = _header(live_dashboard_page)
+        header = _header(shared_dashboard_page)
         # Find the badge element (Mantine Badge has role or data attribute)
         badge = header.locator(
             "[class*='badge' i], [class*='Badge']"
@@ -349,9 +349,9 @@ class TestTierBadge:
         )
         # Hover to trigger tooltip
         badge.hover()
-        live_dashboard_page.wait_for_timeout(500)
+        shared_dashboard_page.wait_for_timeout(500)
         # Assert tooltip appears (not a silent pass)
-        tooltip = live_dashboard_page.locator("[role='tooltip']")
+        tooltip = shared_dashboard_page.locator("[role='tooltip']")
         assert tooltip.count() > 0, (
             "No tooltip appeared after hovering tier badge"
         )
@@ -368,37 +368,37 @@ class TestTierBadge:
 class TestDocumentationButton:
     """EL-navbar-009: Documentation link button."""
 
-    def test_docs_button_exists(self, live_dashboard_page: Page):
+    def test_docs_button_exists(self, shared_dashboard_page: Page):
         """Documentation button is visible (by aria-label)."""
-        btn = live_dashboard_page.locator(
+        btn = shared_dashboard_page.locator(
             "header [aria-label='Open documentation']"
         )
         expect(btn.first).to_be_visible()
 
-    def test_docs_button_links_to_docs(self, live_dashboard_page: Page):
+    def test_docs_button_links_to_docs(self, shared_dashboard_page: Page):
         """Documentation button href points to agentredcx.com."""
-        btn = live_dashboard_page.locator(
+        btn = shared_dashboard_page.locator(
             "header [aria-label='Open documentation']"
         ).first
         href = btn.get_attribute("href") or ""
         assert "agentredcx.com" in href, f"Docs href is '{href}', expected agentredcx.com"
 
-    def test_docs_button_opens_new_tab(self, live_dashboard_page: Page):
+    def test_docs_button_opens_new_tab(self, shared_dashboard_page: Page):
         """Documentation button has target='_blank'."""
-        btn = live_dashboard_page.locator(
+        btn = shared_dashboard_page.locator(
             "header [aria-label='Open documentation']"
         ).first
         target = btn.get_attribute("target") or ""
         assert target == "_blank", f"Docs target is '{target}'"
 
-    def test_docs_button_click_opens_documentation(self, live_dashboard_page: Page):
+    def test_docs_button_click_opens_documentation(self, shared_dashboard_page: Page):
         """[EL-navbar-009/E1] Clicking docs button opens agentredcx.com in new tab."""
-        btn = live_dashboard_page.locator(
+        btn = shared_dashboard_page.locator(
             "header [aria-label='Open documentation']"
         ).first
         # Listen for new page (tab) event triggered by target="_blank" click
         try:
-            with live_dashboard_page.context.expect_page(timeout=5000) as new_page_info:
+            with shared_dashboard_page.context.expect_page(timeout=5000) as new_page_info:
                 btn.click()
             new_page = new_page_info.value
             new_url = new_page.url
@@ -606,36 +606,36 @@ class TestContactUsButton:
 class TestDarkModeToggle:
     """EL-navbar-011: Dark/light mode toggle button."""
 
-    def test_dark_mode_button_exists(self, live_dashboard_page: Page):
+    def test_dark_mode_button_exists(self, shared_dashboard_page: Page):
         """Dark mode toggle button is visible (by aria-label)."""
-        btn = live_dashboard_page.locator(
+        btn = shared_dashboard_page.locator(
             "header [aria-label='Toggle dark mode']"
         )
         expect(btn.first).to_be_visible()
 
-    def test_dark_mode_button_has_icon(self, live_dashboard_page: Page):
+    def test_dark_mode_button_has_icon(self, shared_dashboard_page: Page):
         """Dark mode button contains a sun or moon SVG icon."""
-        btn = live_dashboard_page.locator(
+        btn = shared_dashboard_page.locator(
             "header [aria-label='Toggle dark mode']"
         ).first
         svgs = btn.locator("svg")
         assert svgs.count() >= 1, "No icon in dark mode toggle button"
 
-    def test_dark_mode_toggle_changes_theme(self, live_dashboard_page: Page):
+    def test_dark_mode_toggle_changes_theme(self, shared_dashboard_page: Page):
         """Clicking the toggle changes the page color scheme."""
         # Capture initial background color of body
-        initial_bg = live_dashboard_page.evaluate(
+        initial_bg = shared_dashboard_page.evaluate(
             "() => window.getComputedStyle(document.body).backgroundColor"
         )
 
-        btn = live_dashboard_page.locator(
+        btn = shared_dashboard_page.locator(
             "header [aria-label='Toggle dark mode']"
         ).first
         btn.click()
-        live_dashboard_page.wait_for_timeout(500)
+        shared_dashboard_page.wait_for_timeout(500)
 
         # Background should change
-        new_bg = live_dashboard_page.evaluate(
+        new_bg = shared_dashboard_page.evaluate(
             "() => window.getComputedStyle(document.body).backgroundColor"
         )
         assert initial_bg != new_bg, (
@@ -652,37 +652,37 @@ class TestDarkModeToggle:
 class TestSignOutButton:
     """EL-navbar-012: Sign out button — existence, icon, and click action."""
 
-    def test_sign_out_button_exists(self, live_dashboard_page: Page):
+    def test_sign_out_button_exists(self, shared_dashboard_page: Page):
         """Sign out button is visible (by aria-label)."""
-        btn = live_dashboard_page.locator(
+        btn = shared_dashboard_page.locator(
             "header [aria-label='Sign out']"
         )
         expect(btn.first).to_be_visible()
 
-    def test_sign_out_button_has_icon(self, live_dashboard_page: Page):
+    def test_sign_out_button_has_icon(self, shared_dashboard_page: Page):
         """Sign out button contains an SVG icon."""
-        btn = live_dashboard_page.locator(
+        btn = shared_dashboard_page.locator(
             "header [aria-label='Sign out']"
         ).first
         svgs = btn.locator("svg")
         assert svgs.count() >= 1, "No icon in sign out button"
 
-    def test_sign_out_click_clears_session(self, live_dashboard_page: Page):
+    def test_sign_out_click_clears_session(self, shared_dashboard_page: Page):
         """[EL-navbar-012/E1] Clicking sign out navigates to login page.
 
         Each test gets a function-scoped page fixture, so signing out
         here does not affect other tests.
         """
-        btn = live_dashboard_page.locator(
+        btn = shared_dashboard_page.locator(
             "header [aria-label='Sign out']"
         ).first
         btn.click()
-        live_dashboard_page.wait_for_timeout(2000)
+        shared_dashboard_page.wait_for_timeout(2000)
 
         # After sign out, the app should redirect to the magic link
         # login page or show authentication-related content.
-        url = live_dashboard_page.url.lower()
-        body_text = (live_dashboard_page.inner_text("body") or "")[:1000]
+        url = shared_dashboard_page.url.lower()
+        body_text = (shared_dashboard_page.inner_text("body") or "")[:1000]
 
         signed_out = (
             "magic" in url
@@ -704,7 +704,7 @@ class TestSignOutButton:
 class TestNavbarIntegrity:
     """Cross-cutting navbar integrity checks."""
 
-    def test_all_icon_buttons_present(self, live_dashboard_page: Page):
+    def test_all_icon_buttons_present(self, shared_dashboard_page: Page):
         """All 4 icon buttons are present in the header (docs, contact, theme, logout)."""
         expected_labels = [
             "Open documentation",
@@ -712,7 +712,7 @@ class TestNavbarIntegrity:
             "Toggle dark mode",
             "Sign out",
         ]
-        header = _header(live_dashboard_page)
+        header = _header(shared_dashboard_page)
         found = []
         for label in expected_labels:
             btn = header.locator(f"[aria-label='{label}']")
@@ -723,9 +723,9 @@ class TestNavbarIntegrity:
             f"Missing: {set(expected_labels) - set(found)}"
         )
 
-    def test_no_broken_images(self, live_dashboard_page: Page):
+    def test_no_broken_images(self, shared_dashboard_page: Page):
         """No broken images in the navbar (all img elements loaded)."""
-        header = _header(live_dashboard_page)
+        header = _header(shared_dashboard_page)
         images = header.locator("img")
         for i in range(images.count()):
             img = images.nth(i)
@@ -734,17 +734,17 @@ class TestNavbarIntegrity:
                 f"Broken image in navbar: {img.get_attribute('src')}"
             )
 
-    def test_navbar_no_overflow(self, live_dashboard_page: Page):
+    def test_navbar_no_overflow(self, shared_dashboard_page: Page):
         """Navbar content doesn't overflow its container."""
-        header_box = _bounding_box(live_dashboard_page, "header")
+        header_box = _bounding_box(shared_dashboard_page, "header")
         assert header_box, "Could not get header box"
         # Content should not push the header taller than expected
         assert header_box["height"] <= 70, (
             f"Navbar height {header_box['height']}px — possible overflow"
         )
 
-    def test_header_z_index(self, live_dashboard_page: Page):
+    def test_header_z_index(self, shared_dashboard_page: Page):
         """Navbar has sufficient z-index to stay above content."""
-        z = _computed_style(live_dashboard_page, "header", "z-index")
+        z = _computed_style(shared_dashboard_page, "header", "z-index")
         if z and z != "auto":
             assert int(z) >= 1, f"Navbar z-index is {z} — too low"

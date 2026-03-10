@@ -31,16 +31,16 @@ from .conftest import _main_text, _is_rate_limited
 class TestTenantDirectoryHeader:
     """Page header: title and Create Tenant button."""
 
-    def test_page_title(self, live_tenant_directory_page: Page):
+    def test_page_title(self, shared_tenant_directory_page: Page):
         """Page shows 'Tenant Directory' title."""
-        text = _main_text(live_tenant_directory_page)
+        text = _main_text(shared_tenant_directory_page)
         assert "tenant directory" in text.lower(), (
             "Page must show 'Tenant Directory' title"
         )
 
-    def test_create_tenant_button(self, live_tenant_directory_page: Page):
+    def test_create_tenant_button(self, shared_tenant_directory_page: Page):
         """'Create Tenant' button is visible."""
-        btn = live_tenant_directory_page.get_by_text("Create Tenant", exact=True)
+        btn = shared_tenant_directory_page.get_by_text("Create Tenant", exact=True)
         assert btn.count() > 0 and btn.first.is_visible(), (
             "'Create Tenant' button must be visible"
         )
@@ -54,18 +54,18 @@ class TestTenantDirectoryHeader:
 class TestTenantSummaryCards:
     """Summary cards: total tenants, by-status counts."""
 
-    def test_total_tenants_label(self, live_tenant_directory_page: Page):
+    def test_total_tenants_label(self, shared_tenant_directory_page: Page):
         """Summary card shows 'Total Tenants' label."""
-        if _is_rate_limited(live_tenant_directory_page):
+        if _is_rate_limited(shared_tenant_directory_page):
             pytest.skip("Rate limited — cannot verify summary cards")
-        text = _main_text(live_tenant_directory_page).lower()
+        text = _main_text(shared_tenant_directory_page).lower()
         assert "total tenants" in text, "Must show 'Total Tenants' summary card"
 
-    def test_total_tenants_numeric(self, live_tenant_directory_page: Page):
+    def test_total_tenants_numeric(self, shared_tenant_directory_page: Page):
         """Total tenants shows a numeric value >= 1."""
-        if _is_rate_limited(live_tenant_directory_page):
+        if _is_rate_limited(shared_tenant_directory_page):
             pytest.skip("Rate limited — cannot verify tenant count")
-        text = _main_text(live_tenant_directory_page)
+        text = _main_text(shared_tenant_directory_page)
         idx = text.lower().find("total tenants")
         if idx < 0:
             return  # Summary not loaded — data-dependent
@@ -75,11 +75,11 @@ class TestTenantSummaryCards:
             "Total tenants must show a positive number"
         )
 
-    def test_status_summary_cards(self, live_tenant_directory_page: Page):
+    def test_status_summary_cards(self, shared_tenant_directory_page: Page):
         """At least one status summary card is rendered (e.g., 'active')."""
-        if _is_rate_limited(live_tenant_directory_page):
+        if _is_rate_limited(shared_tenant_directory_page):
             pytest.skip("Rate limited — cannot verify status summary")
-        text = _main_text(live_tenant_directory_page).lower()
+        text = _main_text(shared_tenant_directory_page).lower()
         statuses = ["active", "provisioning", "trial", "deactivated"]
         found = any(s in text for s in statuses)
         assert found, "At least one status summary card must be present"
@@ -93,40 +93,40 @@ class TestTenantSummaryCards:
 class TestTenantFilterBar:
     """Filter section: Status, Tier, and Billing channel selects + count."""
 
-    def test_status_filter_present(self, live_tenant_directory_page: Page):
+    def test_status_filter_present(self, shared_tenant_directory_page: Page):
         """Status filter dropdown is present."""
-        if _is_rate_limited(live_tenant_directory_page):
+        if _is_rate_limited(shared_tenant_directory_page):
             pytest.skip("Rate limited — cannot verify filters")
-        label = live_tenant_directory_page.get_by_text("Status", exact=True)
+        label = shared_tenant_directory_page.get_by_text("Status", exact=True)
         assert label.count() > 0, "Status filter label must be present"
 
-    def test_tier_filter_present(self, live_tenant_directory_page: Page):
+    def test_tier_filter_present(self, shared_tenant_directory_page: Page):
         """Tier filter dropdown is present."""
-        if _is_rate_limited(live_tenant_directory_page):
+        if _is_rate_limited(shared_tenant_directory_page):
             pytest.skip("Rate limited — cannot verify filters")
-        label = live_tenant_directory_page.get_by_text("Tier", exact=True)
+        label = shared_tenant_directory_page.get_by_text("Tier", exact=True)
         assert label.count() > 0, "Tier filter label must be present"
 
-    def test_billing_channel_filter_present(self, live_tenant_directory_page: Page):
+    def test_billing_channel_filter_present(self, shared_tenant_directory_page: Page):
         """Billing channel filter dropdown is present."""
-        if _is_rate_limited(live_tenant_directory_page):
+        if _is_rate_limited(shared_tenant_directory_page):
             pytest.skip("Rate limited — cannot verify filters")
-        label = live_tenant_directory_page.get_by_text("Billing channel", exact=True)
+        label = shared_tenant_directory_page.get_by_text("Billing channel", exact=True)
         assert label.count() > 0, "Billing channel filter label must be present"
 
-    def test_results_count_text(self, live_tenant_directory_page: Page):
+    def test_results_count_text(self, shared_tenant_directory_page: Page):
         """Results count shows 'N tenant(s) found' text."""
-        if _is_rate_limited(live_tenant_directory_page):
+        if _is_rate_limited(shared_tenant_directory_page):
             pytest.skip("Rate limited — cannot verify count")
-        text = _main_text(live_tenant_directory_page).lower()
+        text = _main_text(shared_tenant_directory_page).lower()
         has_count = bool(re.search(r'\d+\s+tenants?\s+found', text))
         assert has_count, "Must show 'N tenant(s) found' results count"
 
-    def test_filter_dropdowns_are_selects(self, live_tenant_directory_page: Page):
+    def test_filter_dropdowns_are_selects(self, shared_tenant_directory_page: Page):
         """Filter dropdowns are Mantine Select inputs (with combobox role)."""
-        if _is_rate_limited(live_tenant_directory_page):
+        if _is_rate_limited(shared_tenant_directory_page):
             pytest.skip("Rate limited — cannot verify selects")
-        selects = live_tenant_directory_page.locator(
+        selects = shared_tenant_directory_page.locator(
             "main input[role='searchbox'], main input[type='search'], "
             "main [class*='Select' i] input"
         )
@@ -134,11 +134,11 @@ class TestTenantFilterBar:
             f"Expected at least 3 filter selects, found {selects.count()}"
         )
 
-    def test_filters_in_paper_container(self, live_tenant_directory_page: Page):
+    def test_filters_in_paper_container(self, shared_tenant_directory_page: Page):
         """Filters are wrapped in a Paper component with border."""
-        if _is_rate_limited(live_tenant_directory_page):
+        if _is_rate_limited(shared_tenant_directory_page):
             pytest.skip("Rate limited — cannot verify filter container")
-        papers = live_tenant_directory_page.locator(
+        papers = shared_tenant_directory_page.locator(
             "main [class*='paper' i], main [class*='Paper']"
         )
         assert papers.count() >= 1, "Filters should be in a Paper container"
@@ -152,18 +152,18 @@ class TestTenantFilterBar:
 class TestTenantTable:
     """Tenant table: column headers, row structure."""
 
-    def test_table_present(self, live_tenant_directory_page: Page):
+    def test_table_present(self, shared_tenant_directory_page: Page):
         """Tenant table element exists."""
-        if _is_rate_limited(live_tenant_directory_page):
+        if _is_rate_limited(shared_tenant_directory_page):
             pytest.skip("Rate limited — cannot verify table")
-        table = live_tenant_directory_page.locator("main table")
+        table = shared_tenant_directory_page.locator("main table")
         assert table.count() > 0, "Tenant table must exist"
 
-    def test_column_headers(self, live_tenant_directory_page: Page):
+    def test_column_headers(self, shared_tenant_directory_page: Page):
         """Table has expected column headers."""
-        if _is_rate_limited(live_tenant_directory_page):
+        if _is_rate_limited(shared_tenant_directory_page):
             pytest.skip("Rate limited — cannot verify columns")
-        thead = live_tenant_directory_page.locator("main table thead")
+        thead = shared_tenant_directory_page.locator("main table thead")
         if thead.count() == 0:
             return  # Table not rendered — data-dependent
         text = thead.first.inner_text(timeout=5_000).lower()
@@ -171,11 +171,11 @@ class TestTenantTable:
         for col in expected:
             assert col in text, f"Column '{col}' not found in table header"
 
-    def test_table_striped(self, live_tenant_directory_page: Page):
+    def test_table_striped(self, shared_tenant_directory_page: Page):
         """Table uses striped rows (data attribute or class)."""
-        if _is_rate_limited(live_tenant_directory_page):
+        if _is_rate_limited(shared_tenant_directory_page):
             pytest.skip("Rate limited — cannot verify striping")
-        table = live_tenant_directory_page.locator("main table")
+        table = shared_tenant_directory_page.locator("main table")
         if table.count() == 0:
             return
         # Mantine Table striped adds data-striped or class
@@ -183,11 +183,11 @@ class TestTenantTable:
         has_striped = "striped" in html.lower() or "data-striped" in html
         assert has_striped, "Table should use striped rows"
 
-    def test_table_has_rows(self, live_tenant_directory_page: Page):
+    def test_table_has_rows(self, shared_tenant_directory_page: Page):
         """Table has at least one data row (or shows empty state)."""
-        if _is_rate_limited(live_tenant_directory_page):
+        if _is_rate_limited(shared_tenant_directory_page):
             pytest.skip("Rate limited — cannot verify table rows")
-        rows = live_tenant_directory_page.locator("main table tbody tr")
+        rows = shared_tenant_directory_page.locator("main table tbody tr")
         assert rows.count() >= 1, "Table must have at least one row (data or empty state)"
 
 
@@ -199,11 +199,11 @@ class TestTenantTable:
 class TestTenantTableRows:
     """Individual row elements: tenant ID, status badge, tier badge, etc."""
 
-    def test_tenant_id_monospace(self, live_tenant_directory_page: Page):
+    def test_tenant_id_monospace(self, shared_tenant_directory_page: Page):
         """Tenant ID cells use monospace font."""
-        if _is_rate_limited(live_tenant_directory_page):
+        if _is_rate_limited(shared_tenant_directory_page):
             pytest.skip("Rate limited — cannot verify tenant ID")
-        rows = live_tenant_directory_page.locator("main table tbody tr")
+        rows = shared_tenant_directory_page.locator("main table tbody tr")
         if rows.count() == 0:
             return
         first_cell = rows.first.locator("td").first
@@ -216,46 +216,46 @@ class TestTenantTableRows:
             "Tenant ID should be displayed in monospace font"
         )
 
-    def test_status_badges(self, live_tenant_directory_page: Page):
+    def test_status_badges(self, shared_tenant_directory_page: Page):
         """Status column shows colored badges."""
-        if _is_rate_limited(live_tenant_directory_page):
+        if _is_rate_limited(shared_tenant_directory_page):
             pytest.skip("Rate limited — cannot verify status badges")
-        text = _main_text(live_tenant_directory_page).lower()
+        text = _main_text(shared_tenant_directory_page).lower()
         if "no tenants" in text:
             return  # No data
-        badges = live_tenant_directory_page.locator(
+        badges = shared_tenant_directory_page.locator(
             "main table tbody [class*='badge' i]"
         )
         assert badges.count() > 0, "Table rows should contain status badges"
 
-    def test_action_menu_buttons(self, live_tenant_directory_page: Page):
+    def test_action_menu_buttons(self, shared_tenant_directory_page: Page):
         """Each row has a ⋮ action menu button."""
-        if _is_rate_limited(live_tenant_directory_page):
+        if _is_rate_limited(shared_tenant_directory_page):
             pytest.skip("Rate limited — cannot verify action menus")
-        text = _main_text(live_tenant_directory_page).lower()
+        text = _main_text(shared_tenant_directory_page).lower()
         if "no tenants" in text:
             return  # No data
-        menus = live_tenant_directory_page.locator("main table tbody button, main table tbody [role='button']")
+        menus = shared_tenant_directory_page.locator("main table tbody button, main table tbody [role='button']")
         assert menus.count() > 0, "Table rows should have action menu buttons"
 
-    def test_created_date_format(self, live_tenant_directory_page: Page):
+    def test_created_date_format(self, shared_tenant_directory_page: Page):
         """Created column shows date in localized format."""
-        if _is_rate_limited(live_tenant_directory_page):
+        if _is_rate_limited(shared_tenant_directory_page):
             pytest.skip("Rate limited — cannot verify dates")
-        text = _main_text(live_tenant_directory_page)
+        text = _main_text(shared_tenant_directory_page)
         if "no tenants" in text.lower():
             return  # No data
         # Look for date patterns in the table area
         has_date = bool(re.search(r'\d{1,2}/\d{1,2}/\d{2,4}', text))
         assert has_date, "Created column should show dates"
 
-    def test_empty_state_text(self, live_tenant_directory_page: Page):
+    def test_empty_state_text(self, shared_tenant_directory_page: Page):
         """When no tenants match filters, shows 'No tenants found'."""
-        if _is_rate_limited(live_tenant_directory_page):
+        if _is_rate_limited(shared_tenant_directory_page):
             pytest.skip("Rate limited — cannot verify empty state")
-        text = _main_text(live_tenant_directory_page).lower()
+        text = _main_text(shared_tenant_directory_page).lower()
         # Only check if actually empty
-        rows = live_tenant_directory_page.locator("main table tbody tr")
+        rows = shared_tenant_directory_page.locator("main table tbody tr")
         if rows.count() == 1:
             row_text = rows.first.inner_text(timeout=3_000).lower()
             if "no tenants" in row_text:
@@ -270,11 +270,11 @@ class TestTenantTableRows:
 class TestTenantActionMenu:
     """Row action menu (⋮): Resend Welcome, Set Expiry, Extend, Remove."""
 
-    def test_open_action_menu(self, live_tenant_directory_page: Page):
+    def test_open_action_menu(self, shared_tenant_directory_page: Page):
         """Clicking ⋮ opens a dropdown menu."""
-        if _is_rate_limited(live_tenant_directory_page):
+        if _is_rate_limited(shared_tenant_directory_page):
             pytest.skip("Rate limited — cannot test action menu")
-        page = live_tenant_directory_page
+        page = shared_tenant_directory_page
         text = _main_text(page).lower()
         if "no tenants" in text:
             return  # No data rows
@@ -291,11 +291,11 @@ class TestTenantActionMenu:
         page.keyboard.press("Escape")
         assert has_menu, "Clicking ⋮ should open a dropdown menu"
 
-    def test_menu_has_resend_welcome(self, live_tenant_directory_page: Page):
+    def test_menu_has_resend_welcome(self, shared_tenant_directory_page: Page):
         """Action menu contains 'Resend Welcome Email' option."""
-        if _is_rate_limited(live_tenant_directory_page):
+        if _is_rate_limited(shared_tenant_directory_page):
             pytest.skip("Rate limited — cannot test menu items")
-        page = live_tenant_directory_page
+        page = shared_tenant_directory_page
         text = _main_text(page).lower()
         if "no tenants" in text:
             return
@@ -310,11 +310,11 @@ class TestTenantActionMenu:
             "Action menu must contain 'Resend Welcome Email'"
         )
 
-    def test_menu_has_set_expiry(self, live_tenant_directory_page: Page):
+    def test_menu_has_set_expiry(self, shared_tenant_directory_page: Page):
         """Action menu contains 'Set Expiry…' option."""
-        if _is_rate_limited(live_tenant_directory_page):
+        if _is_rate_limited(shared_tenant_directory_page):
             pytest.skip("Rate limited — cannot test menu items")
-        page = live_tenant_directory_page
+        page = shared_tenant_directory_page
         text = _main_text(page).lower()
         if "no tenants" in text:
             return
@@ -329,11 +329,11 @@ class TestTenantActionMenu:
             "Action menu must contain 'Set Expiry…'"
         )
 
-    def test_menu_has_extend_30_days(self, live_tenant_directory_page: Page):
+    def test_menu_has_extend_30_days(self, shared_tenant_directory_page: Page):
         """Action menu contains 'Extend 30 Days' option."""
-        if _is_rate_limited(live_tenant_directory_page):
+        if _is_rate_limited(shared_tenant_directory_page):
             pytest.skip("Rate limited — cannot test menu items")
-        page = live_tenant_directory_page
+        page = shared_tenant_directory_page
         text = _main_text(page).lower()
         if "no tenants" in text:
             return
@@ -357,11 +357,11 @@ class TestTenantActionMenu:
 class TestCreateTenantModal:
     """Create Tenant modal: form fields, validation, cancel behavior."""
 
-    def test_modal_opens(self, live_tenant_directory_page: Page):
+    def test_modal_opens(self, shared_tenant_directory_page: Page):
         """Clicking 'Create Tenant' opens modal."""
-        if _is_rate_limited(live_tenant_directory_page):
+        if _is_rate_limited(shared_tenant_directory_page):
             pytest.skip("Rate limited — cannot test modal")
-        page = live_tenant_directory_page
+        page = shared_tenant_directory_page
         btn = page.get_by_text("Create Tenant", exact=True).first
         btn.click()
         page.wait_for_timeout(500)
@@ -370,11 +370,11 @@ class TestCreateTenantModal:
         page.keyboard.press("Escape")
         assert has_modal, "Clicking 'Create Tenant' must open a modal dialog"
 
-    def test_modal_title(self, live_tenant_directory_page: Page):
+    def test_modal_title(self, shared_tenant_directory_page: Page):
         """Modal title shows 'Create New Tenant'."""
-        if _is_rate_limited(live_tenant_directory_page):
+        if _is_rate_limited(shared_tenant_directory_page):
             pytest.skip("Rate limited — cannot test modal")
-        page = live_tenant_directory_page
+        page = shared_tenant_directory_page
         page.get_by_text("Create Tenant", exact=True).first.click()
         page.wait_for_timeout(500)
         body_text = page.locator("body").inner_text(timeout=3_000).lower()
@@ -383,11 +383,11 @@ class TestCreateTenantModal:
             "Modal title must be 'Create New Tenant'"
         )
 
-    def test_merchant_name_field(self, live_tenant_directory_page: Page):
+    def test_merchant_name_field(self, shared_tenant_directory_page: Page):
         """Modal has 'Merchant Name' input (required)."""
-        if _is_rate_limited(live_tenant_directory_page):
+        if _is_rate_limited(shared_tenant_directory_page):
             pytest.skip("Rate limited — cannot test modal fields")
-        page = live_tenant_directory_page
+        page = shared_tenant_directory_page
         page.get_by_text("Create Tenant", exact=True).first.click()
         page.wait_for_timeout(500)
         # Mantine required labels render as "Merchant Name *" — use exact=False
@@ -396,11 +396,11 @@ class TestCreateTenantModal:
         page.keyboard.press("Escape")
         assert has_field, "Modal must have 'Merchant Name' field"
 
-    def test_merchant_url_field(self, live_tenant_directory_page: Page):
+    def test_merchant_url_field(self, shared_tenant_directory_page: Page):
         """Modal has 'Merchant URL' input."""
-        if _is_rate_limited(live_tenant_directory_page):
+        if _is_rate_limited(shared_tenant_directory_page):
             pytest.skip("Rate limited — cannot test modal fields")
-        page = live_tenant_directory_page
+        page = shared_tenant_directory_page
         page.get_by_text("Create Tenant", exact=True).first.click()
         page.wait_for_timeout(500)
         field = page.get_by_text("Merchant URL", exact=False)
@@ -408,11 +408,11 @@ class TestCreateTenantModal:
         page.keyboard.press("Escape")
         assert has_field, "Modal must have 'Merchant URL' field"
 
-    def test_superadmin_email_field(self, live_tenant_directory_page: Page):
+    def test_superadmin_email_field(self, shared_tenant_directory_page: Page):
         """Modal has 'Superadmin Email' input (required)."""
-        if _is_rate_limited(live_tenant_directory_page):
+        if _is_rate_limited(shared_tenant_directory_page):
             pytest.skip("Rate limited — cannot test modal fields")
-        page = live_tenant_directory_page
+        page = shared_tenant_directory_page
         page.get_by_text("Create Tenant", exact=True).first.click()
         page.wait_for_timeout(500)
         # Mantine required labels render as "Superadmin Email *" — use exact=False
@@ -421,22 +421,22 @@ class TestCreateTenantModal:
         page.keyboard.press("Escape")
         assert has_field, "Modal must have 'Superadmin Email' field"
 
-    def test_tier_select_field(self, live_tenant_directory_page: Page):
+    def test_tier_select_field(self, shared_tenant_directory_page: Page):
         """Modal has 'Tier' select defaulting to starter."""
-        if _is_rate_limited(live_tenant_directory_page):
+        if _is_rate_limited(shared_tenant_directory_page):
             pytest.skip("Rate limited — cannot test modal fields")
-        page = live_tenant_directory_page
+        page = shared_tenant_directory_page
         page.get_by_text("Create Tenant", exact=True).first.click()
         page.wait_for_timeout(500)
         body_text = page.locator("body").inner_text(timeout=3_000).lower()
         page.keyboard.press("Escape")
         assert "tier" in body_text, "Modal must have 'Tier' select field"
 
-    def test_cancel_button(self, live_tenant_directory_page: Page):
+    def test_cancel_button(self, shared_tenant_directory_page: Page):
         """Modal has Cancel button that closes it."""
-        if _is_rate_limited(live_tenant_directory_page):
+        if _is_rate_limited(shared_tenant_directory_page):
             pytest.skip("Rate limited — cannot test cancel")
-        page = live_tenant_directory_page
+        page = shared_tenant_directory_page
         page.get_by_text("Create Tenant", exact=True).first.click()
         page.wait_for_timeout(500)
         cancel = page.locator("[role='dialog'] >> text=Cancel")
@@ -448,11 +448,11 @@ class TestCreateTenantModal:
         else:
             page.keyboard.press("Escape")
 
-    def test_submit_button(self, live_tenant_directory_page: Page):
+    def test_submit_button(self, shared_tenant_directory_page: Page):
         """Modal has 'Create Tenant' submit button."""
-        if _is_rate_limited(live_tenant_directory_page):
+        if _is_rate_limited(shared_tenant_directory_page):
             pytest.skip("Rate limited — cannot test submit")
-        page = live_tenant_directory_page
+        page = shared_tenant_directory_page
         page.get_by_text("Create Tenant", exact=True).first.click()
         page.wait_for_timeout(500)
         # The modal submit button also says "Create Tenant"
@@ -474,11 +474,11 @@ class TestCreateTenantModal:
 class TestSetExpiryModal:
     """Set Expiry modal: opens from row menu, has date input + buttons."""
 
-    def test_expiry_modal_opens_from_menu(self, live_tenant_directory_page: Page):
+    def test_expiry_modal_opens_from_menu(self, shared_tenant_directory_page: Page):
         """Clicking 'Set Expiry…' in action menu opens expiry modal."""
-        if _is_rate_limited(live_tenant_directory_page):
+        if _is_rate_limited(shared_tenant_directory_page):
             pytest.skip("Rate limited — cannot test expiry modal")
-        page = live_tenant_directory_page
+        page = shared_tenant_directory_page
         text = _main_text(page).lower()
         if "no tenants" in text:
             return  # No data
@@ -498,11 +498,11 @@ class TestSetExpiryModal:
         else:
             page.keyboard.press("Escape")
 
-    def test_expiry_modal_title(self, live_tenant_directory_page: Page):
+    def test_expiry_modal_title(self, shared_tenant_directory_page: Page):
         """Expiry modal shows 'Set Access Expiry' title."""
-        if _is_rate_limited(live_tenant_directory_page):
+        if _is_rate_limited(shared_tenant_directory_page):
             pytest.skip("Rate limited — cannot test expiry modal")
-        page = live_tenant_directory_page
+        page = shared_tenant_directory_page
         text = _main_text(page).lower()
         if "no tenants" in text:
             return
@@ -523,11 +523,11 @@ class TestSetExpiryModal:
         else:
             page.keyboard.press("Escape")
 
-    def test_expiry_modal_has_date_input(self, live_tenant_directory_page: Page):
+    def test_expiry_modal_has_date_input(self, shared_tenant_directory_page: Page):
         """Expiry modal has a date input field."""
-        if _is_rate_limited(live_tenant_directory_page):
+        if _is_rate_limited(shared_tenant_directory_page):
             pytest.skip("Rate limited — cannot test expiry modal")
-        page = live_tenant_directory_page
+        page = shared_tenant_directory_page
         text = _main_text(page).lower()
         if "no tenants" in text:
             return
@@ -547,11 +547,11 @@ class TestSetExpiryModal:
         else:
             page.keyboard.press("Escape")
 
-    def test_expiry_modal_shows_tenant_id(self, live_tenant_directory_page: Page):
+    def test_expiry_modal_shows_tenant_id(self, shared_tenant_directory_page: Page):
         """Expiry modal displays the tenant ID."""
-        if _is_rate_limited(live_tenant_directory_page):
+        if _is_rate_limited(shared_tenant_directory_page):
             pytest.skip("Rate limited — cannot test expiry modal")
-        page = live_tenant_directory_page
+        page = shared_tenant_directory_page
         text = _main_text(page).lower()
         if "no tenants" in text:
             return
@@ -581,14 +581,14 @@ class TestSetExpiryModal:
 class TestTenantPagination:
     """Pagination controls (shown when more than 25 tenants)."""
 
-    def test_pagination_or_all_visible(self, live_tenant_directory_page: Page):
+    def test_pagination_or_all_visible(self, shared_tenant_directory_page: Page):
         """If > 25 tenants exist, pagination controls appear."""
-        if _is_rate_limited(live_tenant_directory_page):
+        if _is_rate_limited(shared_tenant_directory_page):
             pytest.skip("Rate limited — cannot verify pagination")
-        text = _main_text(live_tenant_directory_page)
+        text = _main_text(shared_tenant_directory_page)
         count_match = re.search(r'(\d+)\s+tenants?\s+found', text.lower())
         if count_match and int(count_match.group(1)) > 25:
-            pagination = live_tenant_directory_page.locator(
+            pagination = shared_tenant_directory_page.locator(
                 "[class*='pagination' i], nav[aria-label*='pagination' i]"
             )
             assert pagination.count() > 0, (
@@ -605,11 +605,11 @@ class TestTenantPagination:
 class TestTenantDataIntegrity:
     """Cross-checks between summary counts and table data."""
 
-    def test_results_count_matches_summary(self, live_tenant_directory_page: Page):
+    def test_results_count_matches_summary(self, shared_tenant_directory_page: Page):
         """Results count is consistent with summary total."""
-        if _is_rate_limited(live_tenant_directory_page):
+        if _is_rate_limited(shared_tenant_directory_page):
             pytest.skip("Rate limited — cannot verify data integrity")
-        text = _main_text(live_tenant_directory_page)
+        text = _main_text(shared_tenant_directory_page)
         # Extract results count
         count_match = re.search(r'(\d+)\s+tenants?\s+found', text.lower())
         if not count_match:
@@ -637,11 +637,11 @@ class TestTenantDataIntegrity:
 class TestTenantFilterInteractions:
     """Clicking filter dropdowns and verifying UI responds."""
 
-    def test_status_filter_clearable(self, live_tenant_directory_page: Page):
+    def test_status_filter_clearable(self, shared_tenant_directory_page: Page):
         """Status filter has clearable functionality (clear button appears after selection)."""
-        if _is_rate_limited(live_tenant_directory_page):
+        if _is_rate_limited(shared_tenant_directory_page):
             pytest.skip("Rate limited — cannot test filter")
-        page = live_tenant_directory_page
+        page = shared_tenant_directory_page
         # Mantine Select with clearable renders a clear button after selection
         selects = page.locator(
             "main input[role='searchbox'], main [class*='Select'] input"
@@ -652,11 +652,11 @@ class TestTenantFilterInteractions:
         first_select = selects.first
         assert first_select.is_enabled(), "Filter selects must be enabled"
 
-    def test_tier_filter_has_options(self, live_tenant_directory_page: Page):
+    def test_tier_filter_has_options(self, shared_tenant_directory_page: Page):
         """Tier filter dropdown shows tier options when clicked."""
-        if _is_rate_limited(live_tenant_directory_page):
+        if _is_rate_limited(shared_tenant_directory_page):
             pytest.skip("Rate limited — cannot test filter")
-        page = live_tenant_directory_page
+        page = shared_tenant_directory_page
         label = page.get_by_text("Tier", exact=True)
         if label.count() == 0:
             return
@@ -675,20 +675,20 @@ class TestTenantFilterInteractions:
             page.keyboard.press("Escape")
             assert has_options, "Tier filter must show dropdown options"
 
-    def test_billing_channel_filter_label(self, live_tenant_directory_page: Page):
+    def test_billing_channel_filter_label(self, shared_tenant_directory_page: Page):
         """Billing channel filter shows 'Billing channel' label."""
-        if _is_rate_limited(live_tenant_directory_page):
+        if _is_rate_limited(shared_tenant_directory_page):
             pytest.skip("Rate limited — cannot test filter")
-        text = _main_text(live_tenant_directory_page).lower()
+        text = _main_text(shared_tenant_directory_page).lower()
         assert "billing channel" in text or "channel" in text, (
             "Must show 'Billing channel' filter label"
         )
 
-    def test_filter_results_count_changes(self, live_tenant_directory_page: Page):
+    def test_filter_results_count_changes(self, shared_tenant_directory_page: Page):
         """Applying a filter changes the results count text."""
-        if _is_rate_limited(live_tenant_directory_page):
+        if _is_rate_limited(shared_tenant_directory_page):
             pytest.skip("Rate limited — cannot test filter interaction")
-        page = live_tenant_directory_page
+        page = shared_tenant_directory_page
         text_before = _main_text(page)
         count_before = re.search(r'(\d+)\s+tenants?\s+found', text_before.lower())
         if not count_before:
@@ -708,11 +708,11 @@ class TestTenantFilterInteractions:
 class TestCreateTenantFormDetails:
     """Deeper Create Tenant modal tests: all form fields and defaults."""
 
-    def test_expires_date_field(self, live_tenant_directory_page: Page):
+    def test_expires_date_field(self, shared_tenant_directory_page: Page):
         """Modal has 'Expires' date input."""
-        if _is_rate_limited(live_tenant_directory_page):
+        if _is_rate_limited(shared_tenant_directory_page):
             pytest.skip("Rate limited — cannot test modal")
-        page = live_tenant_directory_page
+        page = shared_tenant_directory_page
         page.get_by_text("Create Tenant", exact=True).first.click()
         page.wait_for_timeout(500)
         body_text = page.locator("body").inner_text(timeout=3_000).lower()
@@ -721,11 +721,11 @@ class TestCreateTenantFormDetails:
             "Modal must have 'Expires' date field"
         )
 
-    def test_tier_defaults_to_starter(self, live_tenant_directory_page: Page):
+    def test_tier_defaults_to_starter(self, shared_tenant_directory_page: Page):
         """Tier select defaults to 'Starter'."""
-        if _is_rate_limited(live_tenant_directory_page):
+        if _is_rate_limited(shared_tenant_directory_page):
             pytest.skip("Rate limited — cannot test modal")
-        page = live_tenant_directory_page
+        page = shared_tenant_directory_page
         page.get_by_text("Create Tenant", exact=True).first.click()
         page.wait_for_timeout(500)
         dialog = page.locator("[role='dialog']")
@@ -739,11 +739,11 @@ class TestCreateTenantFormDetails:
         has_tier = "starter" in body_text or "tier" in body_text
         assert has_tier, "Tier field should be present in create tenant form"
 
-    def test_modal_has_required_asterisks(self, live_tenant_directory_page: Page):
+    def test_modal_has_required_asterisks(self, shared_tenant_directory_page: Page):
         """Required fields (Merchant Name, Superadmin Email) show required indicators."""
-        if _is_rate_limited(live_tenant_directory_page):
+        if _is_rate_limited(shared_tenant_directory_page):
             pytest.skip("Rate limited — cannot test modal")
-        page = live_tenant_directory_page
+        page = shared_tenant_directory_page
         page.get_by_text("Create Tenant", exact=True).first.click()
         page.wait_for_timeout(500)
         dialog = page.locator("[role='dialog']")
@@ -758,11 +758,11 @@ class TestCreateTenantFormDetails:
             f"Expected at least 2 required inputs, found {required_inputs.count()}"
         )
 
-    def test_modal_escape_closes(self, live_tenant_directory_page: Page):
+    def test_modal_escape_closes(self, shared_tenant_directory_page: Page):
         """Pressing Escape closes the Create Tenant modal."""
-        if _is_rate_limited(live_tenant_directory_page):
+        if _is_rate_limited(shared_tenant_directory_page):
             pytest.skip("Rate limited — cannot test modal")
-        page = live_tenant_directory_page
+        page = shared_tenant_directory_page
         page.get_by_text("Create Tenant", exact=True).first.click()
         page.wait_for_timeout(500)
         assert page.locator("[role='dialog']").count() > 0, "Modal must open"
@@ -781,11 +781,11 @@ class TestCreateTenantFormDetails:
 class TestTenantActionMenuExpanded:
     """Additional action menu items: Remove Expiry."""
 
-    def test_menu_has_remove_expiry(self, live_tenant_directory_page: Page):
+    def test_menu_has_remove_expiry(self, shared_tenant_directory_page: Page):
         """Action menu contains 'Remove Expiry' option (only if tenant has expiry set)."""
-        if _is_rate_limited(live_tenant_directory_page):
+        if _is_rate_limited(shared_tenant_directory_page):
             pytest.skip("Rate limited — cannot test menu")
-        page = live_tenant_directory_page
+        page = shared_tenant_directory_page
         text = _main_text(page).lower()
         if "no tenants" in text:
             return
@@ -804,11 +804,11 @@ class TestTenantActionMenuExpanded:
             "Action menu must contain 'Remove Expiry' or 'Set Expiry'"
         )
 
-    def test_menu_four_items(self, live_tenant_directory_page: Page):
+    def test_menu_four_items(self, shared_tenant_directory_page: Page):
         """Action menu has 4 items: Resend Welcome, Set Expiry, Extend 30 Days, Remove Expiry."""
-        if _is_rate_limited(live_tenant_directory_page):
+        if _is_rate_limited(shared_tenant_directory_page):
             pytest.skip("Rate limited — cannot test menu")
-        page = live_tenant_directory_page
+        page = shared_tenant_directory_page
         text = _main_text(page).lower()
         if "no tenants" in text:
             return
@@ -836,32 +836,32 @@ class TestTenantActionMenuExpanded:
 class TestTenantTableColumnDetails:
     """Detailed column validation: tier badges, channel display, expires badge."""
 
-    def test_tier_badges_colored(self, live_tenant_directory_page: Page):
+    def test_tier_badges_colored(self, shared_tenant_directory_page: Page):
         """Tier column shows colored badges (gray/blue/violet)."""
-        if _is_rate_limited(live_tenant_directory_page):
+        if _is_rate_limited(shared_tenant_directory_page):
             pytest.skip("Rate limited — cannot verify tier badges")
-        text = _main_text(live_tenant_directory_page).lower()
+        text = _main_text(shared_tenant_directory_page).lower()
         if "no tenants" in text:
             return
         tiers = ["starter", "professional", "enterprise", "trial"]
         found = sum(1 for t in tiers if t in text)
         assert found >= 1, "Table must show at least one tier badge"
 
-    def test_email_column_present(self, live_tenant_directory_page: Page):
+    def test_email_column_present(self, shared_tenant_directory_page: Page):
         """Table has Email column with email addresses."""
-        if _is_rate_limited(live_tenant_directory_page):
+        if _is_rate_limited(shared_tenant_directory_page):
             pytest.skip("Rate limited — cannot verify email column")
-        thead = live_tenant_directory_page.locator("main table thead")
+        thead = shared_tenant_directory_page.locator("main table thead")
         if thead.count() == 0:
             return
         text = thead.first.inner_text(timeout=5_000).lower()
         assert "email" in text, "Table must have 'Email' column"
 
-    def test_expires_column_present(self, live_tenant_directory_page: Page):
+    def test_expires_column_present(self, shared_tenant_directory_page: Page):
         """Table has Expires column for expiry dates."""
-        if _is_rate_limited(live_tenant_directory_page):
+        if _is_rate_limited(shared_tenant_directory_page):
             pytest.skip("Rate limited — cannot verify expires column")
-        thead = live_tenant_directory_page.locator("main table thead")
+        thead = shared_tenant_directory_page.locator("main table thead")
         if thead.count() == 0:
             return
         text = thead.first.inner_text(timeout=5_000).lower()

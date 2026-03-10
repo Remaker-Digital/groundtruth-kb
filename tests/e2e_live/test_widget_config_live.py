@@ -109,18 +109,18 @@ def _ensure_no_overlay(page: Page) -> None:
 class TestPageHeader:
     """Page title and subtitle."""
 
-    def test_page_title_visible(self, live_widget_page: Page):
+    def test_page_title_visible(self, shared_widget_page: Page):
         """EL-widget-001: Page title 'Widget configuration' is visible."""
-        page = live_widget_page
+        page = shared_widget_page
         if _is_rate_limited(page):
             pytest.skip("Rate limited")
         _wait_for_widget_page(page)
         title = page.locator("h2:has-text('Widget configuration')").first
         expect(title).to_be_visible()
 
-    def test_page_subtitle_visible(self, live_widget_page: Page):
+    def test_page_subtitle_visible(self, shared_widget_page: Page):
         """EL-widget-001: Subtitle about customization is visible."""
-        page = live_widget_page
+        page = shared_widget_page
         if _is_rate_limited(page):
             pytest.skip("Rate limited")
         _wait_for_widget_page(page)
@@ -135,18 +135,18 @@ class TestPageHeader:
 class TestInstallation:
     """Installation section: widget key, API URL, embed code, rotation modal."""
 
-    def test_installation_section_visible(self, live_widget_page: Page):
+    def test_installation_section_visible(self, shared_widget_page: Page):
         """EL-widget-039: Installation section header exists."""
-        page = live_widget_page
+        page = shared_widget_page
         if _is_rate_limited(page):
             pytest.skip("Rate limited")
         _wait_for_widget_page(page)
         header = page.locator("text=Installation").first
         expect(header).to_be_visible()
 
-    def test_widget_key_displayed(self, live_widget_page: Page):
+    def test_widget_key_displayed(self, shared_widget_page: Page):
         """EL-widget-039: Widget key is displayed in a readonly input."""
-        page = live_widget_page
+        page = shared_widget_page
         if _is_rate_limited(page):
             pytest.skip("Rate limited")
         _wait_for_widget_page(page)
@@ -154,18 +154,18 @@ class TestInstallation:
         key_label = page.locator("text=Widget key").first
         expect(key_label).to_be_visible()
 
-    def test_api_url_displayed(self, live_widget_page: Page):
+    def test_api_url_displayed(self, shared_widget_page: Page):
         """EL-widget-039: API URL is displayed."""
-        page = live_widget_page
+        page = shared_widget_page
         if _is_rate_limited(page):
             pytest.skip("Rate limited")
         _wait_for_widget_page(page)
         api_label = page.locator("text=API URL").first
         expect(api_label).to_be_visible()
 
-    def test_embed_code_visible(self, live_widget_page: Page):
+    def test_embed_code_visible(self, shared_widget_page: Page):
         """EL-widget-039: Embed code snippet is visible when key exists."""
-        page = live_widget_page
+        page = shared_widget_page
         if _is_rate_limited(page):
             pytest.skip("Rate limited")
         _wait_for_widget_page(page)
@@ -173,9 +173,9 @@ class TestInstallation:
         embed = page.locator("text=Embed code").or_(page.locator("text=No widget key"))
         expect(embed.first).to_be_visible()
 
-    def test_rotate_key_button_exists(self, live_widget_page: Page):
+    def test_rotate_key_button_exists(self, shared_widget_page: Page):
         """EL-widget-040: Rotate key button exists."""
-        page = live_widget_page
+        page = shared_widget_page
         if _is_rate_limited(page):
             pytest.skip("Rate limited")
         _wait_for_widget_page(page)
@@ -190,9 +190,9 @@ class TestInstallation:
             assert False, "Rotate key button must be visible on seeded staging tenant"
         expect(btn.first).to_be_visible()
 
-    def test_rotate_key_opens_modal(self, live_widget_page: Page):
+    def test_rotate_key_opens_modal(self, shared_widget_page: Page):
         """EL-widget-040: Clicking Rotate key opens confirmation modal."""
-        page = live_widget_page
+        page = shared_widget_page
         if _is_rate_limited(page):
             pytest.skip("Rate limited")
         _wait_for_widget_page(page)
@@ -214,9 +214,9 @@ class TestInstallation:
         # Close without rotating
         _ensure_no_overlay(page)
 
-    def test_copy_key_button(self, live_widget_page: Page):
+    def test_copy_key_button(self, shared_widget_page: Page):
         """EL-widget-039: Copy button or action icon exists near widget key."""
-        page = live_widget_page
+        page = shared_widget_page
         if _is_rate_limited(page):
             pytest.skip("Rate limited")
         _wait_for_widget_page(page)
@@ -245,9 +245,9 @@ class TestInstallation:
 class TestAppearanceColors:
     """Color controls in the Appearance section."""
 
-    def test_primary_color_picker_visible(self, live_widget_page: Page):
+    def test_primary_color_picker_visible(self, shared_widget_page: Page):
         """EL-widget-002: Primary color picker is visible."""
-        page = live_widget_page
+        page = shared_widget_page
         if _is_rate_limited(page):
             pytest.skip("Rate limited")
         _wait_for_widget_page(page)
@@ -255,9 +255,9 @@ class TestAppearanceColors:
         label = page.locator("text=Header left color").first
         expect(label).to_be_visible()
 
-    def test_gradient_end_color_picker(self, live_widget_page: Page):
+    def test_gradient_end_color_picker(self, shared_widget_page: Page):
         """EL-widget-003: Gradient end color picker exists."""
-        page = live_widget_page
+        page = shared_widget_page
         if _is_rate_limited(page):
             pytest.skip("Rate limited")
         _wait_for_widget_page(page)
@@ -265,9 +265,9 @@ class TestAppearanceColors:
         label = page.locator("text=Header right color").first
         expect(label).to_be_visible()
 
-    def test_gradient_toggle_exists(self, live_widget_page: Page):
+    def test_gradient_toggle_exists(self, shared_widget_page: Page):
         """EL-widget-004: Header gradient toggle exists."""
-        page = live_widget_page
+        page = shared_widget_page
         if _is_rate_limited(page):
             pytest.skip("Rate limited")
         _wait_for_widget_page(page)
@@ -275,9 +275,9 @@ class TestAppearanceColors:
         toggle = page.locator("text=Enable header gradient").first
         expect(toggle).to_be_visible()
 
-    def test_color_picker_has_swatches(self, live_widget_page: Page):
+    def test_color_picker_has_swatches(self, shared_widget_page: Page):
         """EL-widget-002: Color picker shows swatch palette."""
-        page = live_widget_page
+        page = shared_widget_page
         if _is_rate_limited(page):
             pytest.skip("Rate limited")
         _wait_for_widget_page(page)
@@ -286,9 +286,9 @@ class TestAppearanceColors:
         swatches = page.locator(".mantine-ColorPicker-swatch, [class*='ColorSwatch']")
         assert swatches.count() > 0, "No color swatches found"
 
-    def test_hex_input_exists(self, live_widget_page: Page):
+    def test_hex_input_exists(self, shared_widget_page: Page):
         """EL-widget-002: Hex text input exists with #RRGGBB format."""
-        page = live_widget_page
+        page = shared_widget_page
         if _is_rate_limited(page):
             pytest.skip("Rate limited")
         _wait_for_widget_page(page)
@@ -304,9 +304,9 @@ class TestAppearanceColors:
 class TestAppearanceControls:
     """Font, border radius, launcher, position, color mode, panel, locale, shadow."""
 
-    def test_font_family_selector(self, live_widget_page: Page):
+    def test_font_family_selector(self, shared_widget_page: Page):
         """EL-widget-006: Font family selector exists."""
-        page = live_widget_page
+        page = shared_widget_page
         if _is_rate_limited(page):
             pytest.skip("Rate limited")
         _wait_for_widget_page(page)
@@ -314,9 +314,9 @@ class TestAppearanceControls:
         label = page.locator("text=Font family").first
         expect(label).to_be_visible()
 
-    def test_border_radius_slider(self, live_widget_page: Page):
+    def test_border_radius_slider(self, shared_widget_page: Page):
         """EL-widget-007: Border radius slider exists with marks."""
-        page = live_widget_page
+        page = shared_widget_page
         if _is_rate_limited(page):
             pytest.skip("Rate limited")
         _wait_for_widget_page(page)
@@ -327,9 +327,9 @@ class TestAppearanceControls:
         marks = page.locator(".mantine-Slider-markLabel")
         assert marks.count() >= 2, "Slider should have marks"
 
-    def test_launcher_size_slider(self, live_widget_page: Page):
+    def test_launcher_size_slider(self, shared_widget_page: Page):
         """EL-widget-011: Launcher size slider exists."""
-        page = live_widget_page
+        page = shared_widget_page
         if _is_rate_limited(page):
             pytest.skip("Rate limited")
         _wait_for_widget_page(page)
@@ -337,9 +337,9 @@ class TestAppearanceControls:
         label = page.locator("text=/Launcher size/").first
         expect(label).to_be_visible()
 
-    def test_launcher_icon_selector(self, live_widget_page: Page):
+    def test_launcher_icon_selector(self, shared_widget_page: Page):
         """EL-widget-012: Launcher icon selector exists."""
-        page = live_widget_page
+        page = shared_widget_page
         if _is_rate_limited(page):
             pytest.skip("Rate limited")
         _wait_for_widget_page(page)
@@ -347,9 +347,9 @@ class TestAppearanceControls:
         label = page.locator("text=Launcher icon").first
         expect(label).to_be_visible()
 
-    def test_position_segmented_control(self, live_widget_page: Page):
+    def test_position_segmented_control(self, shared_widget_page: Page):
         """EL-widget-013: Position selector with Bottom right / Bottom left."""
-        page = live_widget_page
+        page = shared_widget_page
         if _is_rate_limited(page):
             pytest.skip("Rate limited")
         _wait_for_widget_page(page)
@@ -360,9 +360,9 @@ class TestAppearanceControls:
         left = page.locator("label:has-text('Bottom left')").first
         expect(left).to_be_visible()
 
-    def test_position_offset_inputs(self, live_widget_page: Page):
+    def test_position_offset_inputs(self, shared_widget_page: Page):
         """EL-widget-014/015: Horizontal and vertical offset inputs exist."""
-        page = live_widget_page
+        page = shared_widget_page
         if _is_rate_limited(page):
             pytest.skip("Rate limited")
         _wait_for_widget_page(page)
@@ -372,9 +372,9 @@ class TestAppearanceControls:
         v_label = page.locator("text=Vertical offset").first
         expect(v_label).to_be_visible()
 
-    def test_color_mode_segmented(self, live_widget_page: Page):
+    def test_color_mode_segmented(self, shared_widget_page: Page):
         """EL-widget-005: Color mode selector (Light/Dark/Auto)."""
-        page = live_widget_page
+        page = shared_widget_page
         if _is_rate_limited(page):
             pytest.skip("Rate limited")
         _wait_for_widget_page(page)
@@ -383,9 +383,9 @@ class TestAppearanceControls:
             loc = page.locator(f"label:has-text('{label}')").first
             expect(loc).to_be_visible()
 
-    def test_panel_width_segmented(self, live_widget_page: Page):
+    def test_panel_width_segmented(self, shared_widget_page: Page):
         """EL-widget-009: Panel width (Compact/Standard/Wide)."""
-        page = live_widget_page
+        page = shared_widget_page
         if _is_rate_limited(page):
             pytest.skip("Rate limited")
         _wait_for_widget_page(page)
@@ -393,9 +393,9 @@ class TestAppearanceControls:
         label = page.locator("text=Panel width").first
         expect(label).to_be_visible()
 
-    def test_panel_height_segmented(self, live_widget_page: Page):
+    def test_panel_height_segmented(self, shared_widget_page: Page):
         """EL-widget-010: Panel height (Short/Standard/Tall)."""
-        page = live_widget_page
+        page = shared_widget_page
         if _is_rate_limited(page):
             pytest.skip("Rate limited")
         _wait_for_widget_page(page)
@@ -403,9 +403,9 @@ class TestAppearanceControls:
         label = page.locator("text=Panel height").first
         expect(label).to_be_visible()
 
-    def test_locale_selector(self, live_widget_page: Page):
+    def test_locale_selector(self, shared_widget_page: Page):
         """EL-widget-016: Locale selector with language options."""
-        page = live_widget_page
+        page = shared_widget_page
         if _is_rate_limited(page):
             pytest.skip("Rate limited")
         _wait_for_widget_page(page)
@@ -413,9 +413,9 @@ class TestAppearanceControls:
         label = page.locator("text=Widget language").first
         expect(label).to_be_visible()
 
-    def test_shadow_intensity_segmented(self, live_widget_page: Page):
+    def test_shadow_intensity_segmented(self, shared_widget_page: Page):
         """EL-widget-008: Shadow intensity (None/Subtle/Standard/Heavy)."""
-        page = live_widget_page
+        page = shared_widget_page
         if _is_rate_limited(page):
             pytest.skip("Rate limited")
         _wait_for_widget_page(page)
@@ -431,9 +431,9 @@ class TestAppearanceControls:
 class TestBehaviorSwitches:
     """Behavior section toggles and controls."""
 
-    def test_greeting_toggle(self, live_widget_page: Page):
+    def test_greeting_toggle(self, shared_widget_page: Page):
         """EL-widget-024: Greeting enabled toggle exists."""
-        page = live_widget_page
+        page = shared_widget_page
         if _is_rate_limited(page):
             pytest.skip("Rate limited")
         _wait_for_widget_page(page)
@@ -441,9 +441,9 @@ class TestBehaviorSwitches:
         toggle = page.locator("label:has-text('Greeting message')").first
         expect(toggle).to_be_visible()
 
-    def test_greeting_mode_selector(self, live_widget_page: Page):
+    def test_greeting_mode_selector(self, shared_widget_page: Page):
         """EL-widget-025: Greeting mode selector (Static/AI-generated)."""
-        page = live_widget_page
+        page = shared_widget_page
         if _is_rate_limited(page):
             pytest.skip("Rate limited")
         _wait_for_widget_page(page)
@@ -456,9 +456,9 @@ class TestBehaviorSwitches:
         )
         assert static.count() > 0 or ai.count() > 0
 
-    def test_greeting_message_textarea(self, live_widget_page: Page):
+    def test_greeting_message_textarea(self, shared_widget_page: Page):
         """EL-widget-026: Greeting message textarea exists."""
-        page = live_widget_page
+        page = shared_widget_page
         if _is_rate_limited(page):
             pytest.skip("Rate limited")
         _wait_for_widget_page(page)
@@ -469,9 +469,9 @@ class TestBehaviorSwitches:
             return  # AI-generated mode active — textarea not shown (valid state)
         expect(textarea).to_be_visible()
 
-    def test_pre_chat_form_toggle(self, live_widget_page: Page):
+    def test_pre_chat_form_toggle(self, shared_widget_page: Page):
         """EL-widget-027: Pre-chat form toggle exists."""
-        page = live_widget_page
+        page = shared_widget_page
         if _is_rate_limited(page):
             pytest.skip("Rate limited")
         _wait_for_widget_page(page)
@@ -479,9 +479,9 @@ class TestBehaviorSwitches:
         toggle = page.locator("label:has-text('Pre-chat form')").first
         expect(toggle).to_be_visible()
 
-    def test_sound_toggle(self, live_widget_page: Page):
+    def test_sound_toggle(self, shared_widget_page: Page):
         """EL-widget-019: Sound notifications toggle exists."""
-        page = live_widget_page
+        page = shared_widget_page
         if _is_rate_limited(page):
             pytest.skip("Rate limited")
         _wait_for_widget_page(page)
@@ -489,9 +489,9 @@ class TestBehaviorSwitches:
         toggle = page.locator("label:has-text('Sound notifications')").first
         expect(toggle).to_be_visible()
 
-    def test_exit_intent_toggle(self, live_widget_page: Page):
+    def test_exit_intent_toggle(self, shared_widget_page: Page):
         """EL-widget-036: Exit-intent toggle exists."""
-        page = live_widget_page
+        page = shared_widget_page
         if _is_rate_limited(page):
             pytest.skip("Rate limited")
         _wait_for_widget_page(page)
@@ -499,9 +499,9 @@ class TestBehaviorSwitches:
         toggle = page.locator("label:has-text('Exit-intent')").first
         expect(toggle).to_be_visible()
 
-    def test_scroll_depth_input(self, live_widget_page: Page):
+    def test_scroll_depth_input(self, shared_widget_page: Page):
         """EL-widget-037: Scroll depth trigger input exists."""
-        page = live_widget_page
+        page = shared_widget_page
         if _is_rate_limited(page):
             pytest.skip("Rate limited")
         _wait_for_widget_page(page)
@@ -509,9 +509,9 @@ class TestBehaviorSwitches:
         label = page.locator("text=Scroll-depth").first
         expect(label).to_be_visible()
 
-    def test_mobile_fullscreen_toggle(self, live_widget_page: Page):
+    def test_mobile_fullscreen_toggle(self, shared_widget_page: Page):
         """EL-widget-020: Mobile fullscreen toggle exists."""
-        page = live_widget_page
+        page = shared_widget_page
         if _is_rate_limited(page):
             pytest.skip("Rate limited")
         _wait_for_widget_page(page)
@@ -519,9 +519,9 @@ class TestBehaviorSwitches:
         toggle = page.locator("label:has-text('Mobile fullscreen')").first
         expect(toggle).to_be_visible()
 
-    def test_mobile_position_selector(self, live_widget_page: Page):
+    def test_mobile_position_selector(self, shared_widget_page: Page):
         """EL-widget-021: Mobile position override selector exists."""
-        page = live_widget_page
+        page = shared_widget_page
         if _is_rate_limited(page):
             pytest.skip("Rate limited")
         _wait_for_widget_page(page)
@@ -529,9 +529,9 @@ class TestBehaviorSwitches:
         label = page.locator("text=Mobile position").first
         expect(label).to_be_visible()
 
-    def test_mobile_offset_inputs(self, live_widget_page: Page):
+    def test_mobile_offset_inputs(self, shared_widget_page: Page):
         """EL-widget-022/023: Mobile offset inputs exist."""
-        page = live_widget_page
+        page = shared_widget_page
         if _is_rate_limited(page):
             pytest.skip("Rate limited")
         _wait_for_widget_page(page)
@@ -541,9 +541,9 @@ class TestBehaviorSwitches:
         v = page.locator("text=Mobile vertical offset").first
         expect(v).to_be_visible()
 
-    def test_offline_form_toggle(self, live_widget_page: Page):
+    def test_offline_form_toggle(self, shared_widget_page: Page):
         """EL-widget-029: Offline form toggle exists."""
-        page = live_widget_page
+        page = shared_widget_page
         if _is_rate_limited(page):
             pytest.skip("Rate limited")
         _wait_for_widget_page(page)
@@ -562,9 +562,9 @@ class TestBehaviorSwitches:
 class TestPageRules:
     """Page visibility rules editor."""
 
-    def test_page_rules_section_visible(self, live_widget_page: Page):
+    def test_page_rules_section_visible(self, shared_widget_page: Page):
         """EL-widget-035: Page visibility rules section exists."""
-        page = live_widget_page
+        page = shared_widget_page
         if _is_rate_limited(page):
             pytest.skip("Rate limited")
         _wait_for_widget_page(page)
@@ -572,9 +572,9 @@ class TestPageRules:
         label = page.locator("text=Page visibility rules").first
         expect(label).to_be_visible()
 
-    def test_add_rule_button_exists(self, live_widget_page: Page):
+    def test_add_rule_button_exists(self, shared_widget_page: Page):
         """EL-widget-035: '+ Add rule' button exists."""
-        page = live_widget_page
+        page = shared_widget_page
         if _is_rate_limited(page):
             pytest.skip("Rate limited")
         _wait_for_widget_page(page)
@@ -582,9 +582,9 @@ class TestPageRules:
         btn = page.locator("button:has-text('Add rule')").first
         expect(btn).to_be_visible()
 
-    def test_add_rule_creates_input(self, live_widget_page: Page):
+    def test_add_rule_creates_input(self, shared_widget_page: Page):
         """EL-widget-035: Clicking Add rule creates a rule input field."""
-        page = live_widget_page
+        page = shared_widget_page
         if _is_rate_limited(page):
             pytest.skip("Rate limited")
         _wait_for_widget_page(page)
@@ -603,9 +603,9 @@ class TestPageRules:
 class TestContentSection:
     """Content section: header title, subtitle, placeholder, agent identity."""
 
-    def test_content_section_visible(self, live_widget_page: Page):
+    def test_content_section_visible(self, shared_widget_page: Page):
         """Content section header exists."""
-        page = live_widget_page
+        page = shared_widget_page
         if _is_rate_limited(page):
             pytest.skip("Rate limited")
         _wait_for_widget_page(page)
@@ -614,9 +614,9 @@ class TestContentSection:
         header = page.locator("text=Content").first
         expect(header).to_be_visible()
 
-    def test_header_title_input(self, live_widget_page: Page):
+    def test_header_title_input(self, shared_widget_page: Page):
         """EL-widget-030: Header title input exists."""
-        page = live_widget_page
+        page = shared_widget_page
         if _is_rate_limited(page):
             pytest.skip("Rate limited")
         _wait_for_widget_page(page)
@@ -626,9 +626,9 @@ class TestContentSection:
         input_el = page.locator("input[placeholder='Support']").first
         expect(input_el).to_be_visible()
 
-    def test_header_subtitle_input(self, live_widget_page: Page):
+    def test_header_subtitle_input(self, shared_widget_page: Page):
         """EL-widget-031: Header subtitle input exists."""
-        page = live_widget_page
+        page = shared_widget_page
         if _is_rate_limited(page):
             pytest.skip("Rate limited")
         _wait_for_widget_page(page)
@@ -636,9 +636,9 @@ class TestContentSection:
         label = page.locator("text=Header subtitle").first
         expect(label).to_be_visible()
 
-    def test_input_placeholder_field(self, live_widget_page: Page):
+    def test_input_placeholder_field(self, shared_widget_page: Page):
         """EL-widget-032: Input placeholder field exists."""
-        page = live_widget_page
+        page = shared_widget_page
         if _is_rate_limited(page):
             pytest.skip("Rate limited")
         _wait_for_widget_page(page)
@@ -646,9 +646,9 @@ class TestContentSection:
         label = page.locator("text=Input placeholder").first
         expect(label).to_be_visible()
 
-    def test_agent_display_name_input(self, live_widget_page: Page):
+    def test_agent_display_name_input(self, shared_widget_page: Page):
         """EL-widget-034: Agent display name input exists."""
-        page = live_widget_page
+        page = shared_widget_page
         if _is_rate_limited(page):
             pytest.skip("Rate limited")
         _wait_for_widget_page(page)
@@ -656,9 +656,9 @@ class TestContentSection:
         label = page.locator("text=Agent display name").first
         expect(label).to_be_visible()
 
-    def test_agent_avatar_section(self, live_widget_page: Page):
+    def test_agent_avatar_section(self, shared_widget_page: Page):
         """EL-widget-033: Agent avatar upload section exists."""
-        page = live_widget_page
+        page = shared_widget_page
         if _is_rate_limited(page):
             pytest.skip("Rate limited")
         _wait_for_widget_page(page)
@@ -682,9 +682,9 @@ class TestContentSection:
 class TestActionButtons:
     """Save and Reset buttons."""
 
-    def test_save_button_visible(self, live_widget_page: Page):
+    def test_save_button_visible(self, shared_widget_page: Page):
         """Save draft button exists."""
-        page = live_widget_page
+        page = shared_widget_page
         if _is_rate_limited(page):
             pytest.skip("Rate limited")
         _wait_for_widget_page(page)
@@ -692,9 +692,9 @@ class TestActionButtons:
         btn = page.locator("button:has-text('Save draft')").first
         expect(btn).to_be_visible()
 
-    def test_reset_button_visible(self, live_widget_page: Page):
+    def test_reset_button_visible(self, shared_widget_page: Page):
         """Reset to defaults button exists."""
-        page = live_widget_page
+        page = shared_widget_page
         if _is_rate_limited(page):
             pytest.skip("Rate limited")
         _wait_for_widget_page(page)
@@ -710,9 +710,9 @@ class TestActionButtons:
 class TestHelpTooltips:
     """Help tooltips with ? badges on configuration controls."""
 
-    def test_help_tooltips_exist(self, live_widget_page: Page):
+    def test_help_tooltips_exist(self, shared_widget_page: Page):
         """EL-widget-043: Multiple help tooltip badges exist on the page."""
-        page = live_widget_page
+        page = shared_widget_page
         if _is_rate_limited(page):
             pytest.skip("Rate limited")
         _wait_for_widget_page(page)
@@ -732,9 +732,9 @@ class TestHelpTooltips:
 class TestLoadStates:
     """Loading overlay and error states."""
 
-    def test_loading_overlay_not_stuck(self, live_widget_page: Page):
+    def test_loading_overlay_not_stuck(self, shared_widget_page: Page):
         """EL-widget-041: LoadingOverlay is NOT visible after page loads."""
-        page = live_widget_page
+        page = shared_widget_page
         if _is_rate_limited(page):
             pytest.skip("Rate limited")
         _wait_for_widget_page(page)
@@ -742,9 +742,9 @@ class TestLoadStates:
         overlay = page.locator(".mantine-LoadingOverlay-root:visible")
         assert overlay.count() == 0, "Loading overlay still visible after page load"
 
-    def test_no_error_alert_on_clean_load(self, live_widget_page: Page):
+    def test_no_error_alert_on_clean_load(self, shared_widget_page: Page):
         """EL-widget-042: No error alert on fresh page load."""
-        page = live_widget_page
+        page = shared_widget_page
         if _is_rate_limited(page):
             pytest.skip("Rate limited")
         _wait_for_widget_page(page)
@@ -760,9 +760,9 @@ class TestLoadStates:
 class TestMutations:
     """Mutation tests: change controls and verify behavior (SPEC-1655)."""
 
-    def test_toggle_gradient(self, live_widget_page: Page):
+    def test_toggle_gradient(self, shared_widget_page: Page):
         """EL-widget-004: Toggle gradient switch changes state."""
-        page = live_widget_page
+        page = shared_widget_page
         if _is_rate_limited(page):
             pytest.skip("Rate limited")
         _wait_for_widget_page(page)
@@ -773,9 +773,9 @@ class TestMutations:
         title = page.locator("h2:has-text('Widget configuration')")
         expect(title).to_be_visible()
 
-    def test_change_color_mode(self, live_widget_page: Page):
+    def test_change_color_mode(self, shared_widget_page: Page):
         """EL-widget-005: Switch color mode to Dark."""
-        page = live_widget_page
+        page = shared_widget_page
         if _is_rate_limited(page):
             pytest.skip("Rate limited")
         _wait_for_widget_page(page)
@@ -785,9 +785,9 @@ class TestMutations:
         title = page.locator("h2:has-text('Widget configuration')")
         expect(title).to_be_visible()
 
-    def test_change_panel_width(self, live_widget_page: Page):
+    def test_change_panel_width(self, shared_widget_page: Page):
         """EL-widget-009: Switch panel width to Wide."""
-        page = live_widget_page
+        page = shared_widget_page
         if _is_rate_limited(page):
             pytest.skip("Rate limited")
         _wait_for_widget_page(page)
@@ -797,9 +797,9 @@ class TestMutations:
         title = page.locator("h2:has-text('Widget configuration')")
         expect(title).to_be_visible()
 
-    def test_change_position(self, live_widget_page: Page):
+    def test_change_position(self, shared_widget_page: Page):
         """EL-widget-013: Switch position to Bottom left."""
-        page = live_widget_page
+        page = shared_widget_page
         if _is_rate_limited(page):
             pytest.skip("Rate limited")
         _wait_for_widget_page(page)
@@ -809,9 +809,9 @@ class TestMutations:
         title = page.locator("h2:has-text('Widget configuration')")
         expect(title).to_be_visible()
 
-    def test_edit_header_title(self, live_widget_page: Page):
+    def test_edit_header_title(self, shared_widget_page: Page):
         """EL-widget-030: Edit header title field."""
-        page = live_widget_page
+        page = shared_widget_page
         if _is_rate_limited(page):
             pytest.skip("Rate limited")
         _wait_for_widget_page(page)
@@ -821,9 +821,9 @@ class TestMutations:
         page.wait_for_timeout(300)
         assert input_el.input_value() == "E2E Test Support"
 
-    def test_edit_header_subtitle(self, live_widget_page: Page):
+    def test_edit_header_subtitle(self, shared_widget_page: Page):
         """EL-widget-031: Edit header subtitle field."""
-        page = live_widget_page
+        page = shared_widget_page
         if _is_rate_limited(page):
             pytest.skip("Rate limited")
         _wait_for_widget_page(page)
@@ -833,9 +833,9 @@ class TestMutations:
         page.wait_for_timeout(300)
         assert input_el.input_value() == "E2E test subtitle"
 
-    def test_toggle_pre_chat_form(self, live_widget_page: Page):
+    def test_toggle_pre_chat_form(self, shared_widget_page: Page):
         """EL-widget-027: Toggle pre-chat form and verify field chips appear."""
-        page = live_widget_page
+        page = shared_widget_page
         if _is_rate_limited(page):
             pytest.skip("Rate limited")
         _wait_for_widget_page(page)
@@ -849,9 +849,9 @@ class TestMutations:
         title = page.locator("h2:has-text('Widget configuration')")
         expect(title).to_be_visible()
 
-    def test_pre_chat_field_chips(self, live_widget_page: Page):
+    def test_pre_chat_field_chips(self, shared_widget_page: Page):
         """EL-widget-028: Pre-chat field checkboxes (Chip.Group) exist when form enabled."""
-        page = live_widget_page
+        page = shared_widget_page
         if _is_rate_limited(page):
             pytest.skip("Rate limited")
         _wait_for_widget_page(page)
@@ -872,9 +872,9 @@ class TestMutations:
             chip = page.locator(f"text={field}").first
             expect(chip).to_be_visible()
 
-    def test_save_draft(self, live_widget_page: Page):
+    def test_save_draft(self, shared_widget_page: Page):
         """Save draft button executes API call."""
-        page = live_widget_page
+        page = shared_widget_page
         if _is_rate_limited(page):
             pytest.skip("Rate limited")
         _wait_for_widget_page(page)

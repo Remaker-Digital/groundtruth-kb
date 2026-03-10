@@ -75,18 +75,18 @@ def _scroll_to_text(page: Page, text: str) -> None:
 class TestPageHeader:
     """Page title and subtitle."""
 
-    def test_page_title_visible(self, live_billing_page: Page):
+    def test_page_title_visible(self, shared_billing_page: Page):
         """EL-billing-001: Page title 'Account and billing' is visible."""
-        page = live_billing_page
+        page = shared_billing_page
         if _is_rate_limited(page):
             pytest.skip("Rate limited")
         _wait_for_billing_page(page)
         title = page.locator("h2:has-text('Account')").first
         expect(title).to_be_visible()
 
-    def test_page_subtitle_visible(self, live_billing_page: Page):
+    def test_page_subtitle_visible(self, shared_billing_page: Page):
         """EL-billing-001: Subtitle about managing subscription is visible."""
-        page = live_billing_page
+        page = shared_billing_page
         if _is_rate_limited(page):
             pytest.skip("Rate limited")
         _wait_for_billing_page(page)
@@ -101,18 +101,18 @@ class TestPageHeader:
 class TestPlanCard:
     """Current plan card with tier, status, and manage button."""
 
-    def test_current_plan_card_visible(self, live_billing_page: Page):
+    def test_current_plan_card_visible(self, shared_billing_page: Page):
         """EL-billing-002: Current plan card is visible."""
-        page = live_billing_page
+        page = shared_billing_page
         if _is_rate_limited(page):
             pytest.skip("Rate limited")
         _wait_for_billing_page(page)
         plan = page.locator("text=Current plan").first
         expect(plan).to_be_visible()
 
-    def test_tier_badge_visible(self, live_billing_page: Page):
+    def test_tier_badge_visible(self, shared_billing_page: Page):
         """EL-billing-004: Tier badge is visible (Trial/Starter/Professional/Enterprise)."""
-        page = live_billing_page
+        page = shared_billing_page
         if _is_rate_limited(page):
             pytest.skip("Rate limited")
         _wait_for_billing_page(page)
@@ -123,9 +123,9 @@ class TestPlanCard:
                 return
         pytest.fail("No tier badge found (Trial/Starter/Professional/Enterprise)")
 
-    def test_subscription_status_badge(self, live_billing_page: Page):
+    def test_subscription_status_badge(self, shared_billing_page: Page):
         """EL-billing-006: Subscription status badge (Active/Suspended/etc.)."""
-        page = live_billing_page
+        page = shared_billing_page
         if _is_rate_limited(page):
             pytest.skip("Rate limited")
         _wait_for_billing_page(page)
@@ -136,36 +136,36 @@ class TestPlanCard:
                 return
         pytest.fail("No status badge found")
 
-    def test_included_conversations_display(self, live_billing_page: Page):
+    def test_included_conversations_display(self, shared_billing_page: Page):
         """EL-billing-002: Included conversations count is shown."""
-        page = live_billing_page
+        page = shared_billing_page
         if _is_rate_limited(page):
             pytest.skip("Rate limited")
         _wait_for_billing_page(page)
         label = page.locator("text=Included conversations").first
         expect(label).to_be_visible()
 
-    def test_used_this_period_display(self, live_billing_page: Page):
+    def test_used_this_period_display(self, shared_billing_page: Page):
         """EL-billing-002: 'Used this period' count shown."""
-        page = live_billing_page
+        page = shared_billing_page
         if _is_rate_limited(page):
             pytest.skip("Rate limited")
         _wait_for_billing_page(page)
         label = page.locator("text=Used this period").first
         expect(label).to_be_visible()
 
-    def test_remaining_display(self, live_billing_page: Page):
+    def test_remaining_display(self, shared_billing_page: Page):
         """EL-billing-002: Remaining conversations shown."""
-        page = live_billing_page
+        page = shared_billing_page
         if _is_rate_limited(page):
             pytest.skip("Rate limited")
         _wait_for_billing_page(page)
         label = page.locator("text=Remaining").first
         expect(label).to_be_visible()
 
-    def test_manage_subscription_button(self, live_billing_page: Page):
+    def test_manage_subscription_button(self, shared_billing_page: Page):
         """EL-billing-008: Manage subscription button (Stripe tenants only)."""
-        page = live_billing_page
+        page = shared_billing_page
         if _is_rate_limited(page):
             pytest.skip("Rate limited")
         _wait_for_billing_page(page)
@@ -182,45 +182,45 @@ class TestPlanCard:
 class TestUsageStats:
     """Four usage stat cards: conversations, pack balance, overage, cost."""
 
-    def test_conversations_used_card(self, live_billing_page: Page):
+    def test_conversations_used_card(self, shared_billing_page: Page):
         """EL-billing-009: Conversations used stat card with progress ring."""
-        page = live_billing_page
+        page = shared_billing_page
         if _is_rate_limited(page):
             pytest.skip("Rate limited")
         _wait_for_billing_page(page)
         label = page.locator("text=Conversations used").first
         expect(label).to_be_visible()
 
-    def test_pack_balance_card(self, live_billing_page: Page):
+    def test_pack_balance_card(self, shared_billing_page: Page):
         """EL-billing-010: Pack balance stat card."""
-        page = live_billing_page
+        page = shared_billing_page
         if _is_rate_limited(page):
             pytest.skip("Rate limited")
         _wait_for_billing_page(page)
         label = page.locator("text=Pack balance").first
         expect(label).to_be_visible()
 
-    def test_current_overage_card(self, live_billing_page: Page):
+    def test_current_overage_card(self, shared_billing_page: Page):
         """EL-billing-011: Current overage stat card."""
-        page = live_billing_page
+        page = shared_billing_page
         if _is_rate_limited(page):
             pytest.skip("Rate limited")
         _wait_for_billing_page(page)
         label = page.locator("text=Current overage").first
         expect(label).to_be_visible()
 
-    def test_estimated_overage_cost_card(self, live_billing_page: Page):
+    def test_estimated_overage_cost_card(self, shared_billing_page: Page):
         """EL-billing-012: Estimated overage cost stat card."""
-        page = live_billing_page
+        page = shared_billing_page
         if _is_rate_limited(page):
             pytest.skip("Rate limited")
         _wait_for_billing_page(page)
         label = page.locator("text=Estimated overage cost").first
         expect(label).to_be_visible()
 
-    def test_usage_percent_shown(self, live_billing_page: Page):
+    def test_usage_percent_shown(self, shared_billing_page: Page):
         """EL-billing-009: Usage percentage shown as subtext."""
-        page = live_billing_page
+        page = shared_billing_page
         if _is_rate_limited(page):
             pytest.skip("Rate limited")
         _wait_for_billing_page(page)
@@ -237,9 +237,9 @@ class TestUsageStats:
 class TestUsageChart:
     """Verify daily usage chart was removed per SPEC-1684 (S160)."""
 
-    def test_chart_section_removed(self, live_billing_page: Page):
+    def test_chart_section_removed(self, shared_billing_page: Page):
         """EL-billing-013: Daily usage chart removed per SPEC-1684 (S160)."""
-        page = live_billing_page
+        page = shared_billing_page
         if _is_rate_limited(page):
             pytest.skip("Rate limited")
         _wait_for_billing_page(page)
@@ -247,9 +247,9 @@ class TestUsageChart:
         chart = page.locator(".recharts-responsive-container, .recharts-wrapper")
         assert chart.count() == 0, "Chart should have been removed per SPEC-1684"
 
-    def test_chart_legend_removed(self, live_billing_page: Page):
+    def test_chart_legend_removed(self, shared_billing_page: Page):
         """EL-billing-014: Chart legend removed per SPEC-1684 (S160)."""
-        page = live_billing_page
+        page = shared_billing_page
         if _is_rate_limited(page):
             pytest.skip("Rate limited")
         _wait_for_billing_page(page)
@@ -265,9 +265,9 @@ class TestUsageChart:
 class TestUsageAlerts:
     """Usage alert banner."""
 
-    def test_alert_banner_or_absence(self, live_billing_page: Page):
+    def test_alert_banner_or_absence(self, shared_billing_page: Page):
         """EL-billing-016: Alert banner shown when usage thresholds met, else absent."""
-        page = live_billing_page
+        page = shared_billing_page
         if _is_rate_limited(page):
             pytest.skip("Rate limited")
         _wait_for_billing_page(page)
@@ -286,9 +286,9 @@ class TestUsageAlerts:
 class TestConversationPacks:
     """Conversation pack purchase cards."""
 
-    def test_packs_section_visible(self, live_billing_page: Page):
+    def test_packs_section_visible(self, shared_billing_page: Page):
         """EL-billing-017: Conversation packs section header visible."""
-        page = live_billing_page
+        page = shared_billing_page
         if _is_rate_limited(page):
             pytest.skip("Rate limited")
         _wait_for_billing_page(page)
@@ -296,9 +296,9 @@ class TestConversationPacks:
         label = page.locator("text=Conversation packs").first
         expect(label).to_be_visible()
 
-    def test_pack_1000_card(self, live_billing_page: Page):
+    def test_pack_1000_card(self, shared_billing_page: Page):
         """EL-billing-018: 1,000 conversation pack card visible."""
-        page = live_billing_page
+        page = shared_billing_page
         if _is_rate_limited(page):
             pytest.skip("Rate limited")
         _wait_for_billing_page(page)
@@ -306,9 +306,9 @@ class TestConversationPacks:
         card = page.locator("text=1,000")
         assert card.count() > 0, "1,000 conversation pack card not found"
 
-    def test_pack_5000_card(self, live_billing_page: Page):
+    def test_pack_5000_card(self, shared_billing_page: Page):
         """EL-billing-019: 5,000 conversation pack card visible."""
-        page = live_billing_page
+        page = shared_billing_page
         if _is_rate_limited(page):
             pytest.skip("Rate limited")
         _wait_for_billing_page(page)
@@ -316,9 +316,9 @@ class TestConversationPacks:
         card = page.locator("text=5,000")
         assert card.count() > 0, "5,000 conversation pack card not found"
 
-    def test_pack_20000_card(self, live_billing_page: Page):
+    def test_pack_20000_card(self, shared_billing_page: Page):
         """EL-billing-020: 20,000 conversation pack card visible."""
-        page = live_billing_page
+        page = shared_billing_page
         if _is_rate_limited(page):
             pytest.skip("Rate limited")
         _wait_for_billing_page(page)
@@ -326,9 +326,9 @@ class TestConversationPacks:
         card = page.locator("text=20,000")
         assert card.count() > 0, "20,000 conversation pack card not found"
 
-    def test_pack_purchase_buttons(self, live_billing_page: Page):
+    def test_pack_purchase_buttons(self, shared_billing_page: Page):
         """EL-billing-021: Each pack card has a 'Purchase' button."""
-        page = live_billing_page
+        page = shared_billing_page
         if _is_rate_limited(page):
             pytest.skip("Rate limited")
         _wait_for_billing_page(page)
@@ -336,9 +336,9 @@ class TestConversationPacks:
         btns = page.locator("button:has-text('Purchase')")
         assert btns.count() >= 3, f"Expected 3 Purchase buttons, found {btns.count()}"
 
-    def test_pack_prices_shown(self, live_billing_page: Page):
+    def test_pack_prices_shown(self, shared_billing_page: Page):
         """EL-billing-018..020: Pack prices ($29, $99, $249) displayed."""
-        page = live_billing_page
+        page = shared_billing_page
         if _is_rate_limited(page):
             pytest.skip("Rate limited")
         _wait_for_billing_page(page)
@@ -355,9 +355,9 @@ class TestConversationPacks:
 class TestAddOnModules:
     """Add-on module cards with tier gating."""
 
-    def test_addons_section_visible(self, live_billing_page: Page):
+    def test_addons_section_visible(self, shared_billing_page: Page):
         """EL-billing-022: Add-on modules section header visible."""
-        page = live_billing_page
+        page = shared_billing_page
         if _is_rate_limited(page):
             pytest.skip("Rate limited")
         _wait_for_billing_page(page)
@@ -365,9 +365,9 @@ class TestAddOnModules:
         label = page.locator("text=Add-on modules").first
         expect(label).to_be_visible()
 
-    def test_addon_cards_rendered(self, live_billing_page: Page):
+    def test_addon_cards_rendered(self, shared_billing_page: Page):
         """EL-billing-023: At least 5 add-on module cards rendered."""
-        page = live_billing_page
+        page = shared_billing_page
         if _is_rate_limited(page):
             pytest.skip("Rate limited")
         _wait_for_billing_page(page)
@@ -382,9 +382,9 @@ class TestAddOnModules:
         found = sum(1 for mod in modules if page.locator(f"text={mod}").count() > 0)
         assert found >= 4, f"Expected at least 4 add-on modules, found {found}"
 
-    def test_addon_tier_badges(self, live_billing_page: Page):
+    def test_addon_tier_badges(self, shared_billing_page: Page):
         """EL-billing-024: Add-on cards show tier requirement badges."""
-        page = live_billing_page
+        page = shared_billing_page
         if _is_rate_limited(page):
             pytest.skip("Rate limited")
         _wait_for_billing_page(page)
@@ -396,9 +396,9 @@ class TestAddOnModules:
                 return
         pytest.fail("No tier requirement badge found on add-on cards")
 
-    def test_addon_subscribe_buttons(self, live_billing_page: Page):
+    def test_addon_subscribe_buttons(self, shared_billing_page: Page):
         """EL-billing-025: Subscribe or 'Requires tier' buttons on add-on cards."""
-        page = live_billing_page
+        page = shared_billing_page
         if _is_rate_limited(page):
             pytest.skip("Rate limited")
         _wait_for_billing_page(page)
@@ -408,9 +408,9 @@ class TestAddOnModules:
         total = subscribe_btns.count() + requires_btns.count()
         assert total >= 3, f"Expected at least 3 add-on action buttons, found {total}"
 
-    def test_addon_prices_shown(self, live_billing_page: Page):
+    def test_addon_prices_shown(self, shared_billing_page: Page):
         """EL-billing-023: Add-on prices with /mo suffix displayed."""
-        page = live_billing_page
+        page = shared_billing_page
         if _is_rate_limited(page):
             pytest.skip("Rate limited")
         _wait_for_billing_page(page)
@@ -426,9 +426,9 @@ class TestAddOnModules:
 class TestTierComparison:
     """Tier comparison section (may not be rendered on all page versions)."""
 
-    def test_tier_section_or_absence(self, live_billing_page: Page):
+    def test_tier_section_or_absence(self, shared_billing_page: Page):
         """EL-billing-026: Tier comparison section exists or page is functional."""
-        page = live_billing_page
+        page = shared_billing_page
         if _is_rate_limited(page):
             pytest.skip("Rate limited")
         _wait_for_billing_page(page)
@@ -446,9 +446,9 @@ class TestTierComparison:
 class TestManageBilling:
     """Manage billing section for Stripe tenants."""
 
-    def test_manage_billing_section(self, live_billing_page: Page):
+    def test_manage_billing_section(self, shared_billing_page: Page):
         """EL-billing-031: Invoices & payment methods section visible."""
-        page = live_billing_page
+        page = shared_billing_page
         if _is_rate_limited(page):
             pytest.skip("Rate limited")
         _wait_for_billing_page(page)
@@ -458,9 +458,9 @@ class TestManageBilling:
             pytest.skip("Manage billing section not shown — not a Stripe tenant")
         expect(section.first).to_be_visible()
 
-    def test_manage_billing_button(self, live_billing_page: Page):
+    def test_manage_billing_button(self, shared_billing_page: Page):
         """EL-billing-032: 'Manage billing' button exists for Stripe tenants."""
-        page = live_billing_page
+        page = shared_billing_page
         if _is_rate_limited(page):
             pytest.skip("Rate limited")
         _wait_for_billing_page(page)
@@ -477,9 +477,9 @@ class TestManageBilling:
 class TestLoadStates:
     """Loading and error states."""
 
-    def test_loading_state_not_stuck(self, live_billing_page: Page):
+    def test_loading_state_not_stuck(self, shared_billing_page: Page):
         """EL-billing-033: Loading spinner not stuck after page load."""
-        page = live_billing_page
+        page = shared_billing_page
         if _is_rate_limited(page):
             pytest.skip("Rate limited")
         _wait_for_billing_page(page)
@@ -490,9 +490,9 @@ class TestLoadStates:
         assert loading.count() == 0 or not loading.first.is_visible(), \
             "Loading state still visible after page load"
 
-    def test_error_state_or_clean_load(self, live_billing_page: Page):
+    def test_error_state_or_clean_load(self, shared_billing_page: Page):
         """EL-billing-034: No error alert on clean load (or API error is shown)."""
-        page = live_billing_page
+        page = shared_billing_page
         if _is_rate_limited(page):
             pytest.skip("Rate limited")
         _wait_for_billing_page(page)
@@ -511,9 +511,9 @@ class TestLoadStates:
 class TestHelpTooltips:
     """Help tooltips on billing controls."""
 
-    def test_help_tooltips_exist(self, live_billing_page: Page):
+    def test_help_tooltips_exist(self, shared_billing_page: Page):
         """Help tooltip '?' badges exist on the billing page."""
-        page = live_billing_page
+        page = shared_billing_page
         if _is_rate_limited(page):
             pytest.skip("Rate limited")
         _wait_for_billing_page(page)

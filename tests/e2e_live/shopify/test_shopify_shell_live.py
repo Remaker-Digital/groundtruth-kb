@@ -35,38 +35,38 @@ from .conftest import (
 class TestPolarisFrame:
     """Verify Polaris Frame and AppProvider render correctly."""
 
-    def test_page_loads(self, live_shopify_page: Page):
+    def test_page_loads(self, shared_shopify_page: Page):
         """Shopify admin HTML loads and renders content."""
-        text = _body_text(live_shopify_page)
+        text = _body_text(shared_shopify_page)
         assert len(text) > 0, "Page must render visible text content"
 
-    def test_polaris_frame_renders(self, live_shopify_page: Page):
+    def test_polaris_frame_renders(self, shared_shopify_page: Page):
         """Polaris Frame component renders its wrapper element."""
-        frame = live_shopify_page.locator(
+        frame = shared_shopify_page.locator(
             "[class*='Polaris-Frame'], [class*='Frame']"
         )
         assert frame.count() > 0, "Polaris Frame must render"
 
-    def test_polaris_styles_loaded(self, live_shopify_page: Page):
+    def test_polaris_styles_loaded(self, shared_shopify_page: Page):
         """Polaris CSS styles are loaded (not unstyled HTML)."""
         # Polaris injects stylesheets — check for any stylesheet link
-        stylesheets = live_shopify_page.locator(
+        stylesheets = shared_shopify_page.locator(
             "link[rel='stylesheet'], style"
         )
         assert stylesheets.count() > 0, "Polaris stylesheets must be loaded"
 
-    def test_no_javascript_errors(self, live_shopify_page: Page):
+    def test_no_javascript_errors(self, shared_shopify_page: Page):
         """Page renders without uncaught JS errors in the shell."""
         # If there were fatal JS errors, the body would be empty or show
         # the raw React root element without rendered content
-        body = live_shopify_page.locator("body")
+        body = shared_shopify_page.locator("body")
         text = body.inner_text(timeout=5_000)
         assert "Cannot read" not in text, "No uncaught JS errors should appear"
         assert "is not defined" not in text, "No ReferenceError should appear"
 
-    def test_app_root_mounted(self, live_shopify_page: Page):
+    def test_app_root_mounted(self, shared_shopify_page: Page):
         """React app mounts into the #app root element."""
-        app_root = live_shopify_page.locator("#app")
+        app_root = shared_shopify_page.locator("#app")
         assert app_root.count() > 0, "App root #app must exist"
         # The root should have children (React has rendered)
         children = app_root.locator("> *")
@@ -81,52 +81,52 @@ class TestPolarisFrame:
 class TestCrossNavLinks:
     """Cross-navigation links in the layout header (Documentation, full admin, wizard)."""
 
-    def test_documentation_link_exists(self, live_shopify_page: Page):
+    def test_documentation_link_exists(self, shared_shopify_page: Page):
         """'Documentation' cross-nav link is present."""
-        link = live_shopify_page.locator("a:has-text('Documentation')")
+        link = shared_shopify_page.locator("a:has-text('Documentation')")
         assert link.count() > 0, "Documentation cross-nav link must exist"
 
-    def test_documentation_link_href(self, live_shopify_page: Page):
+    def test_documentation_link_href(self, shared_shopify_page: Page):
         """Documentation link points to agentredcx.com."""
-        link = live_shopify_page.locator("a:has-text('Documentation')").first
+        link = shared_shopify_page.locator("a:has-text('Documentation')").first
         href = link.get_attribute("href") or ""
         assert "agentredcx.com" in href, (
             f"Documentation link must point to agentredcx.com, got: {href}"
         )
 
-    def test_documentation_link_opens_new_tab(self, live_shopify_page: Page):
+    def test_documentation_link_opens_new_tab(self, shared_shopify_page: Page):
         """Documentation link opens in a new tab (target=_blank)."""
-        link = live_shopify_page.locator("a:has-text('Documentation')").first
+        link = shared_shopify_page.locator("a:has-text('Documentation')").first
         target = link.get_attribute("target")
         assert target == "_blank", "Documentation link must open in new tab"
 
-    def test_open_full_admin_link_exists(self, live_shopify_page: Page):
+    def test_open_full_admin_link_exists(self, shared_shopify_page: Page):
         """'Open full admin' cross-nav link is present."""
-        link = live_shopify_page.locator("a:has-text('Open full admin')")
+        link = shared_shopify_page.locator("a:has-text('Open full admin')")
         assert link.count() > 0, "Open full admin cross-nav link must exist"
 
-    def test_open_full_admin_link_href(self, live_shopify_page: Page):
+    def test_open_full_admin_link_href(self, shared_shopify_page: Page):
         """Open full admin link points to standalone admin URL."""
-        link = live_shopify_page.locator("a:has-text('Open full admin')").first
+        link = shared_shopify_page.locator("a:has-text('Open full admin')").first
         href = link.get_attribute("href") or ""
         assert "/admin/standalone" in href, (
             f"Open full admin link must point to standalone admin, got: {href}"
         )
 
-    def test_open_full_admin_opens_new_tab(self, live_shopify_page: Page):
+    def test_open_full_admin_opens_new_tab(self, shared_shopify_page: Page):
         """Open full admin link opens in a new tab."""
-        link = live_shopify_page.locator("a:has-text('Open full admin')").first
+        link = shared_shopify_page.locator("a:has-text('Open full admin')").first
         target = link.get_attribute("target")
         assert target == "_blank", "Open full admin link must open in new tab"
 
-    def test_setup_wizard_link_exists(self, live_shopify_page: Page):
+    def test_setup_wizard_link_exists(self, shared_shopify_page: Page):
         """'Setup wizard' trigger link is present."""
-        link = live_shopify_page.locator("a:has-text('Setup wizard')")
+        link = shared_shopify_page.locator("a:has-text('Setup wizard')")
         assert link.count() > 0, "Setup wizard trigger link must exist"
 
-    def test_cross_nav_links_right_aligned(self, live_shopify_page: Page):
+    def test_cross_nav_links_right_aligned(self, shared_shopify_page: Page):
         """Cross-nav links container is right-aligned (flex-end)."""
-        container = live_shopify_page.locator(
+        container = shared_shopify_page.locator(
             "a:has-text('Documentation')"
         ).first.locator("xpath=..")
         if container.count() > 0:
@@ -264,21 +264,21 @@ class TestOnboardingWizard:
     """Onboarding wizard can be triggered from the Setup wizard link."""
 
     @pytest.mark.skip(reason="Mantine Portal not rendered in headless Playwright (S143/S163)")
-    def test_setup_wizard_click_opens_modal(self, live_shopify_page: Page):
+    def test_setup_wizard_click_opens_modal(self, shared_shopify_page: Page):
         """Clicking 'Setup wizard' opens the OnboardingWizard modal."""
-        wizard_link = live_shopify_page.locator("a:has-text('Setup wizard')")
+        wizard_link = shared_shopify_page.locator("a:has-text('Setup wizard')")
         if wizard_link.count() == 0:
             return  # Link not found — may be hidden
         wizard_link.first.click()
-        live_shopify_page.wait_for_timeout(500)
+        shared_shopify_page.wait_for_timeout(500)
         # OnboardingWizard renders as a modal dialog
-        dialog = live_shopify_page.locator("[role='dialog']")
+        dialog = shared_shopify_page.locator("[role='dialog']")
         assert dialog.count() > 0, (
             "Setup wizard click must open OnboardingWizard modal"
         )
         # Close the modal
-        live_shopify_page.keyboard.press("Escape")
-        live_shopify_page.wait_for_timeout(300)
+        shared_shopify_page.keyboard.press("Escape")
+        shared_shopify_page.wait_for_timeout(300)
 
 
 # ===========================================================================
@@ -289,7 +289,7 @@ class TestOnboardingWizard:
 class TestNavigationItems:
     """Verify the App Bridge navigation items match expected structure."""
 
-    def test_seven_navigation_items(self, live_shopify_page: Page):
+    def test_seven_navigation_items(self, shared_shopify_page: Page):
         """Layout registers exactly 7 navigation items with App Bridge."""
         # We can't directly test App Bridge dispatch, but we can verify
         # the SHOPIFY_NAV_ITEMS constant matches the source code
@@ -297,7 +297,7 @@ class TestNavigationItems:
             f"Must have 7 navigation items, got {len(SHOPIFY_NAV_ITEMS)}"
         )
 
-    def test_navigation_item_labels(self, live_shopify_page: Page):
+    def test_navigation_item_labels(self, shared_shopify_page: Page):
         """Navigation items have the expected labels."""
         expected_labels = [
             "Dashboard", "Inbox", "Agent configuration",
@@ -309,7 +309,7 @@ class TestNavigationItems:
             f"Nav labels mismatch: expected {expected_labels}, got {actual_labels}"
         )
 
-    def test_navigation_item_destinations(self, live_shopify_page: Page):
+    def test_navigation_item_destinations(self, shared_shopify_page: Page):
         """Navigation items have the expected route destinations."""
         expected_destinations = [
             "/", "/inbox", "/configuration", "/knowledge-base",
@@ -329,11 +329,11 @@ class TestNavigationItems:
 class TestActivationBanner:
     """ActivationBanner component renders in the layout."""
 
-    def test_no_activation_banner_when_activated(self, live_shopify_page: Page):
+    def test_no_activation_banner_when_activated(self, shared_shopify_page: Page):
         """Activated tenant does not show activation banner."""
         # Our mock returns is_configured=True, active_activated_at set
         # So the activation banner should NOT be visible
-        text = _body_text(live_shopify_page).lower()
+        text = _body_text(shared_shopify_page).lower()
         # "activate" in context of the banner would indicate it's showing
         # We check that the main content doesn't have "activate your agent"
         # (The banner shows "Activate your agent" for unconfigured tenants)
