@@ -385,8 +385,16 @@ class TestMiddlewareRegistration:
         ]
         assert TrustedProxyMiddleware in added_classes
 
-        # TrustedProxyMiddleware should be first registered (outermost)
-        assert added_classes[0] is TrustedProxyMiddleware
+        # TrustedProxyMiddleware must be registered AFTER PreAuthRateLimitMiddleware
+        # (higher index = outermost = runs first) so it extracts real client IP
+        # before the rate limiter reads scope["client"].
+        tp_idx = added_classes.index(TrustedProxyMiddleware)
+        from src.multi_tenant.security_hardening import PreAuthRateLimitMiddleware
+        pa_idx = added_classes.index(PreAuthRateLimitMiddleware)
+        assert tp_idx > pa_idx, (
+            f"TrustedProxyMiddleware (idx={tp_idx}) must be registered after "
+            f"PreAuthRateLimitMiddleware (idx={pa_idx}) to run before it"
+        )
 
 
 # Needed for env var test

@@ -62,24 +62,24 @@ def register_middleware(app: FastAPI) -> None:
     Registration order (last added = outermost = processes requests first):
 
       Inner (closest to route handler):
-        1. TrustedProxyMiddleware       — extract real client IP
-        2. SecurityHeadersMiddleware    — security response headers
-        3. ApiVersionMiddleware         — X-API-Version on every response
-        4. RequestBodyLimitMiddleware   — reject oversized payloads early
-        5. CorrelationMiddleware        — sets CorrelationContext
-        6. JsonDepthValidationMiddleware — reject deeply nested JSON
-        7. TenantConcurrencyMiddleware  — per-tenant concurrency limits
-        8. RateLimitMiddleware          — per-tenant rate limits + headers
-        9. TenantAuthMiddleware         — authenticates, injects TenantContext
-       10. PreAuthRateLimitMiddleware   — blocks IPs with excessive auth fails
+        1. SecurityHeadersMiddleware    — security response headers
+        2. ApiVersionMiddleware         — X-API-Version on every response
+        3. RequestBodyLimitMiddleware   — reject oversized payloads early
+        4. CorrelationMiddleware        — sets CorrelationContext
+        5. JsonDepthValidationMiddleware — reject deeply nested JSON
+        6. TenantConcurrencyMiddleware  — per-tenant concurrency limits
+        7. RateLimitMiddleware          — per-tenant rate limits + headers
+        8. TenantAuthMiddleware         — authenticates, injects TenantContext
+        9. PreAuthRateLimitMiddleware   — blocks IPs with excessive auth fails
+       10. TrustedProxyMiddleware       — extract real client IP from headers
       Outer (processes requests first, responses last):
        11. CORSMiddleware               — CORS headers on ALL responses
 
     Execution order (request → handler):
-      CORSMiddleware → PreAuthRateLimitMiddleware → TenantAuthMiddleware →
-      RateLimitMiddleware → TenantConcurrencyMiddleware →
+      CORSMiddleware → TrustedProxy → PreAuthRateLimitMiddleware →
+      TenantAuthMiddleware → RateLimitMiddleware → TenantConcurrencyMiddleware →
       JsonDepthValidation → CorrelationMiddleware →
-      RequestBodyLimit → ApiVersion → SecurityHeaders → TrustedProxy → handler
+      RequestBodyLimit → ApiVersion → SecurityHeaders → handler
 
     CRITICAL: CORSMiddleware MUST be outermost so that CORS headers
     appear on every response — including 429 (rate limit), 401 (auth
@@ -112,7 +112,6 @@ def register_middleware(app: FastAPI) -> None:
     )
 
     # --- Inner middleware (closest to route handler) ---
-    app.add_middleware(TrustedProxyMiddleware)
     app.add_middleware(SecurityHeadersMiddleware)
     app.add_middleware(ApiVersionMiddleware)
     app.add_middleware(RequestBodyLimitMiddleware)
@@ -122,6 +121,12 @@ def register_middleware(app: FastAPI) -> None:
     app.add_middleware(RateLimitMiddleware)
     app.add_middleware(TenantAuthMiddleware)
     app.add_middleware(PreAuthRateLimitMiddleware)
+
+    # --- TrustedProxy: must run BEFORE PreAuthRateLimitMiddleware ---
+    # Registered AFTER so it wraps PreAuth and rewrites scope["client"]
+    # with the real client IP from X-Forwarded-For/CF-Connecting-IP
+    # before the rate limiter reads it.
+    app.add_middleware(TrustedProxyMiddleware)
 
     # --- CORS: outermost middleware ---
     # Must be added LAST so it wraps ALL other middleware.
