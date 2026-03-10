@@ -13,6 +13,9 @@
 .idea
 .claude
 
+# Auto-generated dependency caches
+.codex_pydeps
+
 # Environment files (secrets — never bake into images)
 .env
 .env.*
