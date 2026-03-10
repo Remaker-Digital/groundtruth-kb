@@ -103,6 +103,7 @@ jobs:
       - name: Run tests (${{ matrix.shard }})
         run: |
           python -m pytest ${{ steps.paths.outputs.test_args }} \
+            -n auto \
             --cov=src \
             --cov-report=xml:coverage-${{ matrix.shard }}.xml \
             --cov-report=json:coverage-${{ matrix.shard }}.json \

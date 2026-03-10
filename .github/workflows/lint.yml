@@ -41,15 +41,139 @@ jobs:
       - name: Install ruff
         run: pip install ruff
 
-      - name: Ruff check (lint)
-        # Non-blocking for now — existing codebase has ~600 style issues.
-        # Change to blocking after incremental cleanup reaches zero.
+      - name: Ruff check (blocking — E/F only, SPEC-1697)
+        # E = pycodestyle errors, F = pyflakes (undefined names, unused imports).
+        # These are the highest-signal rules and MUST pass.
+        run: ruff check src/ tests/ --select E,F --output-format=github --statistics
+
+      - name: Ruff check (advisory — all configured rules)
+        # Full rule set including I, UP, B, SIM — advisory until backlog cleared.
         continue-on-error: true
         run: ruff check src/ tests/ --output-format=github --statistics
 
       - name: Ruff format check
         continue-on-error: true
         run: ruff format --check src/ tests/ --diff
+
+  import-cycles:
+    name: Import Cycle Detection (SPEC-1695)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+
+      - name: Detect circular imports in src/
+        run: |
+          python -c "
+          import ast, os, sys
+          from collections import defaultdict
+
+          graph = defaultdict(set)
+          modules = set()
+
+          for root, dirs, files in os.walk('src'):
+              dirs[:] = [d for d in dirs if d \!= '__pycache__']
+              for f in files:
+                  if not f.endswith('.py'):
+                      continue
+                  path = os.path.join(root, f)
+                  mod = path.replace(os.sep, '.').removesuffix('.py')
+                  if mod.endswith('.__init__'):
+                      mod = mod.removesuffix('.__init__')
+                  modules.add(mod)
+
+                  try:
+                      tree = ast.parse(open(path, encoding='utf-8').read(), filename=path)
+                  except SyntaxError:
+                      continue
+
+                  for node in ast.walk(tree):
+                      if isinstance(node, ast.Import):
+                          for alias in node.names:
+                              if alias.name.startswith('src'):
+                                  graph[mod].add(alias.name)
+                      elif isinstance(node, ast.ImportFrom) and node.module:
+                          if node.module.startswith('src'):
+                              graph[mod].add(node.module)
+
+          WHITE, GRAY, BLACK = 0, 1, 2
+          color = {m: WHITE for m in modules}
+          cycles = []
+
+          def dfs(node, path):
+              color[node] = GRAY
+              for dep in graph.get(node, []):
+                  target = dep
+                  while target and target not in modules:
+                      target = target.rsplit('.', 1)[0] if '.' in target else ''
+                  if not target:
+                      continue
+                  if color.get(target) == GRAY:
+                      cycle_start = path.index(target)
+                      cycles.append(path[cycle_start:] + [target])
+                  elif color.get(target) == WHITE:
+                      dfs(target, path + [target])
+              color[node] = BLACK
+
+          for m in sorted(modules):
+              if color[m] == WHITE:
+                  dfs(m, [m])
+
+          if cycles:
+              print(f'FAIL: {len(cycles)} circular import(s) detected:')
+              for c in cycles[:10]:
+                  print(f'  {chr(32).join(['->'.join(c)])}')
+              sys.exit(1)
+          else:
+              print(f'OK: {len(modules)} modules scanned, no circular imports')
+          "
+
+  pip-audit:
+    name: Dependency Vulnerability Scan (SPEC-1696)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+
+      - name: Install pip-audit and dependencies
+        run: |
+          python -m pip install --upgrade pip
+          grep -v '^agntcy-app-sdk' requirements.txt > /tmp/req-filtered.txt
+          pip install -r /tmp/req-filtered.txt
+          pip install pip-audit
+
+      - name: Run pip-audit (blocking)
+        run: pip-audit
+
+  complexity:
+    name: Complexity and Dead Code Analysis (SPEC-1699)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+
+      - name: Install radon and vulture
+        run: pip install radon vulture
+
+      - name: Radon cyclomatic complexity (advisory)
+        continue-on-error: true
+        run: radon cc src/ -a -nc --total-average
+
+      - name: Vulture dead code detection (advisory)
+        continue-on-error: true
+        run: vulture src/ --min-confidence 90 || true
 
   syntax:
     name: Python Syntax Validation
