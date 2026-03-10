@@ -220,3 +220,6 @@ legal/contracts/signed/
 # Knowledge DB exports and backups (local only)
 tools/knowledge-db/knowledge-export-*.json
 tools/knowledge-db/knowledge.db.backup-*
+
+# Codex auto-generated dependencies (local only)
+.codex_pydeps/
