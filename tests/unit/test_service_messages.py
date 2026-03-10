@@ -273,7 +273,7 @@ class TestServiceMessageAPI:
         mock_repo = MagicMock()
         mock_repo._container = mock_container
 
-        with patch("src.multi_tenant.superadmin_api._tenant_repo", mock_repo):
+        with patch("src.multi_tenant.superadmin_api._monolith._tenant_repo", mock_repo):
             recipients = await _resolve_service_message_recipients(
                 filter_status=["active"],
             )

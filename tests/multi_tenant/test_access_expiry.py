@@ -198,8 +198,8 @@ class TestSetExpiryEndpoint:
         from src.multi_tenant.superadmin_api import set_tenant_expiry, SetExpiryRequest
 
         with (
-            patch("src.multi_tenant.superadmin_api._tenant_repo", mock_tenant_repo),
-            patch("src.multi_tenant.superadmin_api._audit_repo", None),
+            patch("src.multi_tenant.superadmin_api._monolith._tenant_repo", mock_tenant_repo),
+            patch("src.multi_tenant.superadmin_api._monolith._audit_repo", None),
         ):
             body = SetExpiryRequest(expires_at=_FUTURE)
             result = await set_tenant_expiry(_TENANT_ID, body, spa_context)
@@ -217,8 +217,8 @@ class TestSetExpiryEndpoint:
         mock_tenant_repo.read.return_value["expires_at"] = _FUTURE
 
         with (
-            patch("src.multi_tenant.superadmin_api._tenant_repo", mock_tenant_repo),
-            patch("src.multi_tenant.superadmin_api._audit_repo", None),
+            patch("src.multi_tenant.superadmin_api._monolith._tenant_repo", mock_tenant_repo),
+            patch("src.multi_tenant.superadmin_api._monolith._audit_repo", None),
         ):
             body = SetExpiryRequest(expires_at=None)
             result = await set_tenant_expiry(_TENANT_ID, body, spa_context)
@@ -235,8 +235,8 @@ class TestSetExpiryEndpoint:
         mock_tenant_repo.read.return_value["expiry_warnings_sent"] = ["7d", "3d"]
 
         with (
-            patch("src.multi_tenant.superadmin_api._tenant_repo", mock_tenant_repo),
-            patch("src.multi_tenant.superadmin_api._audit_repo", None),
+            patch("src.multi_tenant.superadmin_api._monolith._tenant_repo", mock_tenant_repo),
+            patch("src.multi_tenant.superadmin_api._monolith._audit_repo", None),
         ):
             body = SetExpiryRequest(expires_at=_FUTURE)
             await set_tenant_expiry(_TENANT_ID, body, spa_context)
@@ -257,8 +257,8 @@ class TestSetExpiryEndpoint:
         mock_tenant_repo.read.return_value["expires_at"] = _PAST
 
         with (
-            patch("src.multi_tenant.superadmin_api._tenant_repo", mock_tenant_repo),
-            patch("src.multi_tenant.superadmin_api._audit_repo", None),
+            patch("src.multi_tenant.superadmin_api._monolith._tenant_repo", mock_tenant_repo),
+            patch("src.multi_tenant.superadmin_api._monolith._audit_repo", None),
         ):
             body = SetExpiryRequest(expires_at=_FUTURE)
             await set_tenant_expiry(_TENANT_ID, body, spa_context)
@@ -278,8 +278,8 @@ class TestSetExpiryEndpoint:
         mock_tenant_repo.read.return_value = None
 
         with (
-            patch("src.multi_tenant.superadmin_api._tenant_repo", mock_tenant_repo),
-            patch("src.multi_tenant.superadmin_api._audit_repo", None),
+            patch("src.multi_tenant.superadmin_api._monolith._tenant_repo", mock_tenant_repo),
+            patch("src.multi_tenant.superadmin_api._monolith._audit_repo", None),
             pytest.raises(HTTPException) as exc_info,
         ):
             body = SetExpiryRequest(expires_at=_FUTURE)

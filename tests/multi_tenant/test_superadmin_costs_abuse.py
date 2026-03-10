@@ -125,8 +125,8 @@ class TestCostEndpoint:
         mock_ctx.tenant_id = "spa"
 
         with (
-            patch("src.multi_tenant.superadmin_api._tenant_repo", mock_tenant_repo),
-            patch("src.multi_tenant.superadmin_api._conv_repo", mock_conv_repo),
+            patch("src.multi_tenant.superadmin_api._monolith._tenant_repo", mock_tenant_repo),
+            patch("src.multi_tenant.superadmin_api._monolith._conv_repo", mock_conv_repo),
             patch(
                 "src.multi_tenant.repositories.knowledge.KnowledgeBaseRepository",
                 return_value=MagicMock(query=AsyncMock(return_value=[5])),
@@ -150,7 +150,7 @@ class TestCostEndpoint:
         mock_ctx = MagicMock()
 
         with (
-            patch("src.multi_tenant.superadmin_api._tenant_repo", None),
+            patch("src.multi_tenant.superadmin_api._monolith._tenant_repo", None),
             pytest.raises(HTTPException) as exc_info,
         ):
             await get_cost_analytics(days=30, ctx=mock_ctx)
@@ -186,8 +186,8 @@ class TestAbuseEndpoint:
         mock_ctx = MagicMock()
 
         with (
-            patch("src.multi_tenant.superadmin_api._tenant_repo", mock_tenant_repo),
-            patch("src.multi_tenant.superadmin_api._conv_repo", mock_conv_repo),
+            patch("src.multi_tenant.superadmin_api._monolith._tenant_repo", mock_tenant_repo),
+            patch("src.multi_tenant.superadmin_api._monolith._conv_repo", mock_conv_repo),
         ):
             resp = await get_abuse_signals(ctx=mock_ctx)
 
@@ -216,8 +216,8 @@ class TestAbuseEndpoint:
         mock_ctx = MagicMock()
 
         with (
-            patch("src.multi_tenant.superadmin_api._tenant_repo", mock_tenant_repo),
-            patch("src.multi_tenant.superadmin_api._conv_repo", mock_conv_repo),
+            patch("src.multi_tenant.superadmin_api._monolith._tenant_repo", mock_tenant_repo),
+            patch("src.multi_tenant.superadmin_api._monolith._conv_repo", mock_conv_repo),
         ):
             resp = await get_abuse_signals(ctx=mock_ctx)
 
@@ -247,8 +247,8 @@ class TestAbuseFlagEndpoint:
         body = FlagTenantRequest(flagged=True)
 
         with (
-            patch("src.multi_tenant.superadmin_api._tenant_repo", mock_tenant_repo),
-            patch("src.multi_tenant.superadmin_api._audit_repo", mock_audit_repo),
+            patch("src.multi_tenant.superadmin_api._monolith._tenant_repo", mock_tenant_repo),
+            patch("src.multi_tenant.superadmin_api._monolith._audit_repo", mock_audit_repo),
         ):
             resp = await toggle_abuse_flag("t-001", body, mock_ctx)
 
@@ -270,8 +270,8 @@ class TestAbuseFlagEndpoint:
         body = FlagTenantRequest(flagged=False)
 
         with (
-            patch("src.multi_tenant.superadmin_api._tenant_repo", mock_tenant_repo),
-            patch("src.multi_tenant.superadmin_api._audit_repo", None),
+            patch("src.multi_tenant.superadmin_api._monolith._tenant_repo", mock_tenant_repo),
+            patch("src.multi_tenant.superadmin_api._monolith._audit_repo", None),
         ):
             resp = await toggle_abuse_flag("t-001", body, mock_ctx)
 

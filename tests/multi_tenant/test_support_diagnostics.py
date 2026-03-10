@@ -287,7 +287,7 @@ class TestDiagnosticSnapshot:
             patch("src.multi_tenant.repositories.TeamMemberRepository", return_value=mock_team_repo),
             patch("src.multi_tenant.repositories.ConversationRepository", return_value=mock_conv_repo),
             # Explicitly set NATS as not deployed for this test
-            patch("src.multi_tenant.superadmin_api._nats_mgr", None),
+            patch("src.multi_tenant.superadmin_api._monolith._nats_mgr", None),
         ):
             result = await get_tenant_diagnostic(
                 tenant_id="tenant-diag-001",
