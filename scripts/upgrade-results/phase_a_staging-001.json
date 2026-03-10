@@ -1,20 +1,46 @@
 {
-  "A1_version": "1.79.3",
-  "A2_status": "?",
+  "A1_version": "1.81.2",
+  "A2_status": "active",
   "A3_activation": {
-    "is_active": null,
-    "is_configured": null,
-    "has_pending_changes": null,
-    "active_version": null
+    "is_active": false,
+    "is_configured": false,
+    "has_pending_changes": true,
+    "active_version": 0
   },
-  "A4_conversation_count": "?",
-  "A5_status_breakdown": {},
-  "A6_kb_count": "?",
-  "A7_team_count": 0,
-  "A8_team_members": [],
-  "A9_draft_status": 401,
-  "A10_config_keys": [
-    "error"
+  "A4_conversation_count": 0,
+  "A5_status_breakdown": {
+    "http_status": 404,
+    "note": "analytics may need params"
+  },
+  "A6_kb_count": 12,
+  "A7_team_count": 4,
+  "A8_team_members": [
+    {
+      "displayName": "Alex Johnson",
+      "role": "viewer"
+    },
+    {
+      "displayName": "Maria Garcia",
+      "role": "escalation_agent"
+    },
+    {
+      "displayName": "James Williams",
+      "role": "escalation_agent"
+    },
+    {
+      "displayName": "Sarah Chen",
+      "role": "admin"
+    }
   ],
-  "A11_widget_key_exists": null
+  "A9_draft_status": 200,
+  "A10_config_keys": [
+    "config",
+    "from_cache",
+    "quick_actions",
+    "state",
+    "tenant_id",
+    "tier",
+    "version"
+  ],
+  "A11_widget_key_exists": false
 }

@@ -32,6 +32,16 @@ from urllib.error import HTTPError, URLError
 # ---------------------------------------------------------------------------
 import os as _os
 
+# Load .env.local so ENVIRONMENTS dict picks up credentials when run standalone.
+# The dict reads os.environ.get() at definition time — env vars must be set first.
+import sys as _sys
+from pathlib import Path as _Path
+_PROJECT_ROOT = _Path(__file__).resolve().parent.parent
+if str(_PROJECT_ROOT) not in _sys.path:
+    _sys.path.insert(0, str(_PROJECT_ROOT))
+from scripts._env import load_env_local as _load_env  # noqa: E402
+_load_env()
+
 ENVIRONMENTS = {
     "staging": {
         "fqdn": "agent-red-staging.orangeglacier-f566a4e7.eastus.azurecontainerapps.io",
@@ -276,10 +286,11 @@ def phase_c(env: dict, snapshot: dict, new_version: str) -> list[dict]:
     s, d, _ = api_call(fqdn, "/api/config/activation-status", key)
     if isinstance(d, dict):
         a3 = snapshot.get("A3_activation", {})
+        # S164: Removed has_pending_changes from comparison — E2E tests
+        # legitimately modify draft configs between Phase A and Phase C.
         match = all([
             d.get("is_active") == a3.get("is_active"),
             d.get("is_configured") == a3.get("is_configured"),
-            d.get("has_pending_changes") == a3.get("has_pending_changes"),
         ])
         check("C.3", "Configuration state unchanged", match,
               f"active={d.get('is_active')}, configured={d.get('is_configured')}")
@@ -373,9 +384,9 @@ def phase_c(env: dict, snapshot: dict, new_version: str) -> list[dict]:
     s, d, _ = api_call(fqdn, "/api/superadmin/mfa/status", spa_key)
     check("C.19", "MFA endpoint", s == 200, f"HTTP {s}")
 
-    # C.20 Magic link request
+    # C.20 Magic link request (requires tenant field — SPEC-1644)
     s, d, _ = api_call(fqdn, "/api/auth/magic-link/request", method="POST",
-                    body={"email": "test@test.com"})
+                    body={"email": "test@test.com", "tenant": env.get("tenant_id", "remaker-digital-001")})
     check("C.20", "Magic link request", s == 200, f"HTTP {s}")
 
     # C.21 Analytics period filtering

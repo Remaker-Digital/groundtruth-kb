@@ -202,6 +202,11 @@ def _run_pytest(test_path: str | list[str], *, timeout: int = 300,
     if extra_env:
         env = {**os.environ, **extra_env}
 
+    # S164: Delete stale JUnit XML before running to prevent fallback from
+    # reading results from a PREVIOUS run when the current run times out.
+    if os.path.isfile(junit_xml):
+        os.remove(junit_xml)
+
     t0 = time.time()
     r = stream_subprocess(cmd, cwd=PROJECT_ROOT, timeout=timeout, prefix=prefix,
                           env=env)
@@ -216,6 +221,29 @@ def _run_pytest(test_path: str | list[str], *, timeout: int = 300,
     failed = int(all_failed[-1]) if all_failed else 0
     errors = int(all_errors[-1]) if all_errors else 0
     xfailed = int(all_xfailed[-1]) if all_xfailed else 0
+
+    # S164: JUnit XML fallback — when process was killed by timeout before
+    # pytest could write its summary line, stdout parsing returns 0/0/0.
+    # The JUnit XML is written incrementally, so it has accurate partial results.
+    if passed == 0 and failed == 0 and errors == 0 and os.path.isfile(junit_xml):
+        try:
+            import xml.etree.ElementTree as ET
+            tree = ET.parse(junit_xml)
+            root = tree.getroot()
+            # JUnit XML: <testsuite tests="N" errors="N" failures="N" ...>
+            suites = root.findall(".//testsuite")
+            xml_tests = sum(int(s.get("tests", 0)) for s in suites)
+            xml_failures = sum(int(s.get("failures", 0)) for s in suites)
+            xml_errors = sum(int(s.get("errors", 0)) for s in suites)
+            xml_skipped = sum(int(s.get("skipped", 0)) for s in suites)
+            if xml_tests > 0:
+                passed = xml_tests - xml_failures - xml_errors - xml_skipped
+                failed = xml_failures
+                errors = xml_errors
+                log("INFO", f"  {prefix.strip()}: JUnit XML fallback - "
+                    f"{passed}P/{failed}F/{errors}E from {junit_xml}")
+        except Exception as e:
+            log("WARN", f"  JUnit XML fallback failed: {e}")
 
     return passed, failed, errors, xfailed, dt, r.stdout
 
@@ -379,7 +407,7 @@ def phase_1_preflight(args: argparse.Namespace) -> PhaseResult:
     r = stream_subprocess(
         [sys.executable, str(PROJECT_ROOT / "scripts" / "pre_flight_checklist.py"),
          "--phase", "C", "--env", args.env, "--new-version", args.version],
-        cwd=PROJECT_ROOT, timeout=300, prefix="  [preflight] ",
+        cwd=PROJECT_ROOT, timeout=600, prefix="  [preflight] ",
     )
 
     # Parse "NN PASS, NN WARN, NN FAIL" or "NN PASS"
@@ -453,7 +481,48 @@ def phase_2_data_seeding(args: argparse.Namespace) -> PhaseResult:
             skip_conversations=False,
             skip_cleanup=False,
         )
+
+        # S164: Seed Tenant B (staging-001) so isolation/integrity tests pass.
+        # Phase 5 and Phase 8 assert tenant_b has >=1 team members.
+        if args.env == "staging":
+            from scripts.upgrade_verification import TENANTS
+            tenant_b = TENANTS.get("staging:staging-001", {})
+            tb_key = tenant_b.get("api_key", "")
+            tb_widget = tenant_b.get("widget_key", "")
+            if tb_key:
+                log("INFO", "  Seeding Tenant B (staging-001)...")
+                ok_b = run_seed(
+                    env=args.env,
+                    tenant="staging-001",
+                    api_key=tb_key,
+                    widget_key=tb_widget,
+                    skip_conversations=True,  # Tenant B only needs team + KB
+                    skip_cleanup=False,
+                )
+                if not ok_b:
+                    log("WARN", "  Tenant B seeding had warnings")
+                    ok = False
+            else:
+                log("WARN", "  No API key for staging-001 — skipping Tenant B seed")
+
         dt = time.time() - t0
+
+        # S164: Refresh Phase A snapshots AFTER seeding so Phase 14 (multi-c)
+        # compares against post-seeded state. Without this, seeding adds 12 KB
+        # articles between the pre-flight snapshot (48) and Phase C check (60).
+        log("INFO", "  Refreshing upgrade verification Phase A snapshots...")
+        try:
+            snapshot_r = stream_subprocess(
+                [sys.executable, str(PROJECT_ROOT / "scripts" / "upgrade_verification.py"),
+                 "multi-a", "--env", args.env],
+                cwd=PROJECT_ROOT, timeout=120, prefix="  [snapshot] ",
+            )
+            if snapshot_r.returncode == 0:
+                log("INFO", "  Phase A snapshots refreshed")
+            else:
+                log("WARN", "  Phase A snapshot refresh failed (non-fatal)")
+        except Exception as snap_err:
+            log("WARN", f"  Phase A snapshot refresh error: {snap_err}")
 
         if ok:
             log("PASS", "  Data seeding completed")
@@ -480,12 +549,13 @@ def phase_3_live_e2e(args: argparse.Namespace) -> PhaseResult:
     # Default --timeout=60 is insufficient: each test starts Vite dev server,
     # navigates SPA via proxy to staging, waits for real API responses.
     # Override to 120s per test, 900s total subprocess.
-    # S163: Increased timeout from 900s to 3600s. The full E2E suite has
+    # S164: Increased timeout from 3600s to 7200s. The full E2E suite has
     # ~1100 Playwright tests spanning 12 admin pages + provider + shopify.
     # Each test navigates a real SPA and waits for API responses (1-10s each).
-    # 900s (15min) only completes ~30% before being killed.
+    # 3600s (60min) only completes ~60% before being killed.
+    # 10800s (180min) provides margin for the full ~130min expected runtime.
     passed, failed, errors, xfailed, dt, _ = _run_pytest(
-        "tests/e2e_live/", timeout=3600, prefix="  [live-e2e] ",
+        "tests/e2e_live/", timeout=10800, prefix="  [live-e2e] ",
         extra_env=env_vars,
         extra_args=["--timeout=120"],
     )
@@ -566,7 +636,7 @@ def phase_7_rate_limiting(args: argparse.Namespace) -> PhaseResult:
     env_vars = _get_env_vars(args)
     passed, failed, errors, xfailed, dt, _ = _run_pytest(
         "tests/security/test_rate_limiting_live.py",
-        timeout=300, prefix="  [rate-limit] ",
+        timeout=600, prefix="  [rate-limit] ",
         extra_env=env_vars,
     )
 

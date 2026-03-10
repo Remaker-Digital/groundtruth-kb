@@ -147,8 +147,17 @@ def stream_subprocess(
         nonlocal timed_out
         timed_out = True
         try:
-            proc.kill()
-        except OSError:
+            if sys.platform == "win32":
+                # S164: On Windows with shell=True, proc.kill() only kills
+                # the shell (cmd.exe), not child processes (pytest/playwright).
+                # Use taskkill /T to kill the entire process tree.
+                subprocess.run(
+                    ["taskkill", "/F", "/T", "/PID", str(proc.pid)],
+                    capture_output=True, timeout=10,
+                )
+            else:
+                proc.kill()
+        except (OSError, subprocess.TimeoutExpired):
             pass
 
     timer = threading.Timer(timeout, _timeout_kill)

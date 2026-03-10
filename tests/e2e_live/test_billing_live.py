@@ -90,7 +90,7 @@ class TestPageHeader:
         if _is_rate_limited(page):
             pytest.skip("Rate limited")
         _wait_for_billing_page(page)
-        sub = page.locator("text=Manage your subscription").first
+        sub = page.locator("text=Manage your account").first
         expect(sub).to_be_visible()
 
 
@@ -235,44 +235,27 @@ class TestUsageStats:
 # ---------------------------------------------------------------------------
 
 class TestUsageChart:
-    """Daily usage area chart with legend and empty state."""
+    """Verify daily usage chart was removed per SPEC-1684 (S160)."""
 
-    def test_chart_section_visible(self, live_billing_page: Page):
-        """EL-billing-013: Daily usage chart section visible."""
+    def test_chart_section_removed(self, live_billing_page: Page):
+        """EL-billing-013: Daily usage chart removed per SPEC-1684 (S160)."""
         page = live_billing_page
         if _is_rate_limited(page):
             pytest.skip("Rate limited")
         _wait_for_billing_page(page)
-        _scroll_to_text(page, "Daily usage")
-        label = page.locator("text=Daily usage").first
-        expect(label).to_be_visible()
-
-    def test_chart_or_empty_state(self, live_billing_page: Page):
-        """EL-billing-013/015: Either the chart renders or empty state message."""
-        page = live_billing_page
-        if _is_rate_limited(page):
-            pytest.skip("Rate limited")
-        _wait_for_billing_page(page)
-        _scroll_to_text(page, "Daily usage")
+        # Chart was removed in S160 — verify it's gone
         chart = page.locator(".recharts-responsive-container, .recharts-wrapper")
-        empty = page.locator("text=No usage data available")
-        assert chart.count() > 0 or empty.count() > 0, \
-            "Neither chart nor empty state found"
+        assert chart.count() == 0, "Chart should have been removed per SPEC-1684"
 
-    def test_chart_legend(self, live_billing_page: Page):
-        """EL-billing-014: Chart legend with Total and Billable labels."""
+    def test_chart_legend_removed(self, live_billing_page: Page):
+        """EL-billing-014: Chart legend removed per SPEC-1684 (S160)."""
         page = live_billing_page
         if _is_rate_limited(page):
             pytest.skip("Rate limited")
         _wait_for_billing_page(page)
-        _scroll_to_text(page, "Daily usage")
-        total_legend = page.locator("text=Total")
-        billable_legend = page.locator("text=Billable")
-        if total_legend.count() == 0 and billable_legend.count() == 0:
-            empty = page.locator("text=No usage data available")
-            if empty.count() > 0:
-                pytest.skip("No chart data — legend not rendered")
-        assert total_legend.count() > 0 or billable_legend.count() > 0
+        # Chart and legend removed in S160 — verify recharts legend gone
+        legend = page.locator(".recharts-legend-wrapper")
+        assert legend.count() == 0, "Chart legend should be removed per SPEC-1684"
 
 
 # ---------------------------------------------------------------------------

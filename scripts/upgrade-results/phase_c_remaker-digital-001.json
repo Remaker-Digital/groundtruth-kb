@@ -9,37 +9,37 @@
     "id": "C.2",
     "description": "Tenant status unchanged",
     "status": "PASS",
-    "detail": "? vs ?"
+    "detail": "active vs active"
   },
   {
     "id": "C.3",
     "description": "Configuration state unchanged",
-    "status": "PASS",
-    "detail": "active=None, configured=None"
+    "status": "FAIL",
+    "detail": "active=True, configured=True"
   },
   {
     "id": "C.4",
     "description": "Conversation count not decreased",
-    "status": "FAIL",
-    "detail": "-1 vs ? (growth OK)"
+    "status": "PASS",
+    "detail": "24 vs 18 (growth OK)"
   },
   {
     "id": "C.5",
     "description": "Status breakdown unchanged",
     "status": "PASS",
-    "detail": "{}"
+    "detail": "{'http_status': 404, 'note': 'analytics may need params'}"
   },
   {
     "id": "C.6",
     "description": "KB article count unchanged",
-    "status": "FAIL",
-    "detail": "-1 vs ?"
+    "status": "PASS",
+    "detail": "72 vs 72"
   },
   {
     "id": "C.7",
     "description": "Team member count unchanged",
     "status": "PASS",
-    "detail": "0 vs 0"
+    "detail": "20 vs 20"
   },
   {
     "id": "C.8",
@@ -50,20 +50,20 @@
   {
     "id": "C.9",
     "description": "Draft config unchanged",
-    "status": "FAIL",
-    "detail": "HTTP 429 vs 401"
+    "status": "PASS",
+    "detail": "HTTP 200 vs 200"
   },
   {
     "id": "C.10",
     "description": "Active config unchanged",
     "status": "PASS",
-    "detail": "1 keys vs 1"
+    "detail": "7 keys vs 7"
   },
   {
     "id": "C.11",
     "description": "Widget key still valid",
-    "status": "FAIL",
-    "detail": "HTTP 429"
+    "status": "PASS",
+    "detail": "HTTP 201"
   },
   {
     "id": "C.12",
@@ -116,8 +116,8 @@
   {
     "id": "C.20",
     "description": "Magic link request",
-    "status": "FAIL",
-    "detail": "HTTP 422"
+    "status": "PASS",
+    "detail": "HTTP 200"
   },
   {
     "id": "C.21",

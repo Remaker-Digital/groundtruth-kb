@@ -47,6 +47,11 @@ PROJECT_ROOT = Path(__file__).resolve().parent.parent
 sys.path.insert(0, str(PROJECT_ROOT))
 sys.path.insert(0, str(PROJECT_ROOT / "scripts"))
 
+# Load .env.local BEFORE importing ENVIRONMENTS — the dict reads os.environ.get()
+# at module definition time, so env vars must be set before the import.
+from scripts._env import load_env_local  # noqa: E402
+load_env_local()
+
 from upgrade_verification import api_call, widget_call, ENVIRONMENTS  # noqa: E402
 
 # Optional: httpx for Phase D SSE streaming

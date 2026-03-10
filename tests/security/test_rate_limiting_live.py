@@ -127,8 +127,9 @@ class TestRateLimitEnforcement:
 
     def test_rl01_starter_within_limit(self, headers_b):
         """RL-01: Starter tenant (500 rpm) — requests within limit succeed."""
-        # Use fewer than limit to stay within tolerance
-        count = int(STARTER_RPM * (1 - TOLERANCE))  # 8
+        # S164: Fixed — 500*0.8=400 sequential reqs exceeded 60s timeout.
+        # Use a fixed small count well within the 500 RPM limit.
+        count = 20
         results = _rapid_requests(TENANT_B_API_KEY, count)
         ok_count = sum(1 for s in results if s == 200)
         assert ok_count >= count * 0.8, (
@@ -136,10 +137,12 @@ class TestRateLimitEnforcement:
         )
 
     def test_rl02_starter_exceeds_limit(self, headers_b):
-        """RL-02: Starter tenant — 15 requests triggers 429 after limit."""
+        """RL-02: Starter tenant — concurrent burst exceeds 500 rpm limit."""
         time.sleep(5)  # Brief pause to partially reset window
-        count = int(STARTER_RPM * 1.5)  # 15
-        results = _rapid_requests(TENANT_B_API_KEY, count)
+        # S164: Fixed — 500*1.5=750 sequential reqs exceeded 60s timeout.
+        # Use concurrent requests to burst past the limit quickly.
+        count = 600
+        results = _concurrent_requests(TENANT_B_API_KEY, count)
         has_429 = any(s == 429 for s in results)
         has_no_500 = all(s != 500 for s in results)
         assert has_no_500, f"Got 500 errors in rate limit test: {results}"
@@ -166,10 +169,12 @@ class TestRateLimitEnforcement:
     def test_rl05_429_has_retry_after(self, headers_b):
         """RL-05: 429 response includes Retry-After header."""
         time.sleep(5)
-        # Exhaust starter limit
+        # S164: Fixed — range(505) sequential reqs exceeded 60s timeout.
+        # First blast concurrent requests to exhaust the limit, then probe.
+        _concurrent_requests(TENANT_B_API_KEY, 600)
         results_with_headers = []
         with httpx.Client(base_url=PROD_URL, timeout=15, follow_redirects=True) as c:
-            for _ in range(STARTER_RPM + 5):
+            for _ in range(20):
                 r = c.get("/api/config", headers={"X-API-Key": TENANT_B_API_KEY})
                 if r.status_code == 429:
                     results_with_headers.append(r)
@@ -187,8 +192,11 @@ class TestRateLimitEnforcement:
     def test_rl06_429_response_is_json(self, headers_b):
         """RL-06: 429 response body is valid JSON."""
         time.sleep(5)
+        # S164: Fixed — range(505) sequential reqs exceeded 60s timeout.
+        # Blast concurrent to exhaust limit, then probe sequentially.
+        _concurrent_requests(TENANT_B_API_KEY, 600)
         with httpx.Client(base_url=PROD_URL, timeout=15, follow_redirects=True) as c:
-            for _ in range(STARTER_RPM + 5):
+            for _ in range(20):
                 r = c.get("/api/config", headers={"X-API-Key": TENANT_B_API_KEY})
                 if r.status_code == 429:
                     try:
@@ -202,8 +210,9 @@ class TestRateLimitEnforcement:
 
     def test_rl07_rate_limit_window_resets(self, headers_b):
         """RL-07: After waiting, requests succeed again."""
-        # First exhaust the limit
-        _rapid_requests(TENANT_B_API_KEY, STARTER_RPM + 3)
+        # S164: Fixed — 503 sequential reqs exceeded 60s timeout.
+        # Use concurrent to exhaust the limit quickly.
+        _concurrent_requests(TENANT_B_API_KEY, 600)
         # Wait for partial window reset
         time.sleep(15)
         # Try again — should succeed
@@ -240,7 +249,8 @@ class TestCrossTenantIsolation:
     def test_rl09_exhaust_tenant_b(self, headers_b):
         """RL-09: Exhaust Tenant B's rate limit."""
         time.sleep(10)
-        results = _rapid_requests(TENANT_B_API_KEY, STARTER_RPM + 5)
+        # S164: Fixed — 505 sequential reqs exceeded 60s timeout.
+        results = _concurrent_requests(TENANT_B_API_KEY, 600)
         has_429 = any(s == 429 for s in results)
         # At least some requests should succeed
         ok_count = sum(1 for s in results if s == 200)
@@ -256,7 +266,8 @@ class TestCrossTenantIsolation:
 
     def test_rl11_exhaust_tenant_a(self, headers_a):
         """RL-11: Exhaust Tenant A's rate limit (500 rpm)."""
-        results = _rapid_requests(TENANT_A_API_KEY, PROFESSIONAL_RPM + 10)
+        # S164: Fixed — 510 sequential reqs exceeded 60s timeout.
+        results = _concurrent_requests(TENANT_A_API_KEY, 600)
         ok_count = sum(1 for s in results if s == 200)
         assert ok_count >= 10, f"Expected some successes, got {ok_count}"
 

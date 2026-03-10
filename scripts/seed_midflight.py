@@ -890,10 +890,16 @@ def main():
 def run_seed(
     env: str = "staging",
     tenant: str | None = None,
+    api_key: str | None = None,
+    widget_key: str | None = None,
     skip_conversations: bool = False,
     skip_cleanup: bool = False,
 ) -> bool:
     """Programmatic entry point for test pipeline integration.
+
+    Args:
+        api_key: Override env config API key (for seeding non-primary tenants).
+        widget_key: Override env config widget key.
 
     Returns True if seeding succeeded, False otherwise.
     """
@@ -903,15 +909,17 @@ def run_seed(
         return False
 
     tenant_id = tenant or env_config["tenant_id"]
+    effective_api_key = api_key or env_config["api_key"]
+    effective_widget_key = widget_key or env_config.get("widget_key", "")
 
-    if not env_config["api_key"]:
-        print("ERROR: No API key found")
+    if not effective_api_key:
+        print(f"ERROR: No API key found for tenant {tenant_id}")
         return False
 
     client = SeedClient(
         base_url=env_config["base_url"],
-        api_key=env_config["api_key"],
-        widget_key=env_config.get("widget_key", ""),
+        api_key=effective_api_key,
+        widget_key=effective_widget_key,
         tenant_id=tenant_id,
     )
 

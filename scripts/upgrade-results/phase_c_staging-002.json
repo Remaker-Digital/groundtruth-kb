@@ -8,32 +8,32 @@
   {
     "id": "C.2",
     "description": "Tenant status unchanged",
-    "status": "FAIL",
-    "detail": "active vs ?"
+    "status": "PASS",
+    "detail": "active vs active"
   },
   {
     "id": "C.3",
     "description": "Configuration state unchanged",
-    "status": "FAIL",
+    "status": "PASS",
     "detail": "active=False, configured=False"
   },
   {
     "id": "C.4",
     "description": "Conversation count not decreased",
-    "status": "FAIL",
-    "detail": "0 vs ? (growth OK)"
+    "status": "PASS",
+    "detail": "0 vs 0 (growth OK)"
   },
   {
     "id": "C.5",
     "description": "Status breakdown unchanged",
-    "status": "FAIL",
+    "status": "PASS",
     "detail": "{'http_status': 404, 'note': 'analytics may need params'}"
   },
   {
     "id": "C.6",
     "description": "KB article count unchanged",
-    "status": "FAIL",
-    "detail": "0 vs ?"
+    "status": "PASS",
+    "detail": "0 vs 0"
   },
   {
     "id": "C.7",
@@ -50,14 +50,14 @@
   {
     "id": "C.9",
     "description": "Draft config unchanged",
-    "status": "FAIL",
-    "detail": "HTTP 200 vs 429"
+    "status": "PASS",
+    "detail": "HTTP 200 vs 200"
   },
   {
     "id": "C.10",
     "description": "Active config unchanged",
-    "status": "FAIL",
-    "detail": "7 keys vs 1"
+    "status": "PASS",
+    "detail": "7 keys vs 7"
   },
   {
     "id": "C.11",
@@ -116,8 +116,8 @@
   {
     "id": "C.20",
     "description": "Magic link request",
-    "status": "FAIL",
-    "detail": "HTTP 422"
+    "status": "PASS",
+    "detail": "HTTP 200"
   },
   {
     "id": "C.21",
