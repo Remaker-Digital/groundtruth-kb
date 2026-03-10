@@ -585,16 +585,16 @@ class TestConfigActions:
 class TestPostConfigNavExistence:
     """EL-sidebar-015..018: Post-config nav items."""
 
-    @pytest.mark.parametrize("label", ["Integrations", "Memory & privacy", "Billing"])
+    @pytest.mark.parametrize("label", ["Integrations", "Memory & privacy", "Account & billing"])
     def test_post_config_nav_visible(self, live_admin_page: Page, label: str):
         """Post-config nav items are visible in sidebar."""
         link = _nav_link(live_admin_page, label)
         expect(link).to_be_visible(timeout=5_000)
 
     def test_post_config_nav_order(self, live_admin_page: Page):
-        """Post-config items in order: Integrations, Memory & privacy, Billing."""
+        """Post-config items in order: Integrations, Memory & privacy, Account & billing."""
         text = _sidebar_text(live_admin_page)
-        items = ["Integrations", "Memory & privacy", "Billing"]
+        items = ["Integrations", "Memory & privacy", "Account & billing"]
         positions = [text.find(item) for item in items]
         assert all(p >= 0 for p in positions), (
             f"Missing items: {dict(zip(items, positions))}"
@@ -606,7 +606,7 @@ class TestPostConfigNavExistence:
     @pytest.mark.parametrize("label,expected_path", [
         ("Integrations", "/integrations"),
         ("Memory & privacy", "/memory-privacy"),
-        ("Billing", "/billing"),
+        ("Account & billing", "/billing"),
     ])
     def test_post_config_nav_navigates(self, live_admin_page: Page, label: str, expected_path: str):
         """Each post-config nav item navigates to its correct route."""
@@ -711,13 +711,13 @@ class TestFooterStyle:
     def test_footer_at_bottom_of_sidebar(self, live_admin_page: Page):
         """Footer content appears after all nav items (at bottom of sidebar)."""
         text = _sidebar_text(live_admin_page)
-        billing_pos = text.find("Billing")
+        billing_pos = text.find("Account & billing")
         product_pos = text.find("Agent Red Customer Experience")
         assert billing_pos >= 0 and product_pos >= 0, (
-            "Billing or product name not found"
+            "Account & billing or product name not found"
         )
         assert billing_pos < product_pos, (
-            "Footer should appear below the last nav item (Billing)"
+            "Footer should appear below the last nav item (Account & billing)"
         )
 
 
@@ -826,7 +826,7 @@ class TestNavIcons:
         "Dashboard", "Inbox", "Team members",
         "Agent configuration", "Knowledge base", "Quick actions",
         "Widget configuration", "Integrations", "Memory & privacy",
-        "Billing",
+        "Account & billing",
     ]
 
     @pytest.mark.parametrize("label", ALL_NAV_LABELS)
@@ -910,7 +910,7 @@ class TestSidebarIntegrity:
         "Dashboard", "Inbox", "Team members",
         "Agent configuration", "Knowledge base", "Quick actions",
         "Widget configuration", "Setup wizard",
-        "Integrations", "Memory & privacy", "Billing",
+        "Integrations", "Memory & privacy", "Account & billing",
     ]
 
     def test_all_nav_items_present(self, live_admin_page: Page):

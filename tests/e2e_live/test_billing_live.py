@@ -76,12 +76,12 @@ class TestPageHeader:
     """Page title and subtitle."""
 
     def test_page_title_visible(self, live_billing_page: Page):
-        """EL-billing-001: Page title 'Billing & usage' is visible."""
+        """EL-billing-001: Page title 'Account and billing' is visible."""
         page = live_billing_page
         if _is_rate_limited(page):
             pytest.skip("Rate limited")
         _wait_for_billing_page(page)
-        title = page.locator("h2:has-text('Billing')").first
+        title = page.locator("h2:has-text('Account')").first
         expect(title).to_be_visible()
 
     def test_page_subtitle_visible(self, live_billing_page: Page):
