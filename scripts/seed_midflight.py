@@ -51,20 +51,29 @@ load_env_local()
 ENVIRONMENTS = {
     "staging": {
         "base_url": "https://agent-red-staging.orangeglacier-f566a4e7.eastus.azurecontainerapps.io",
-        "api_key": os.environ.get(
-            "SPA_CONSOLE_API_KEY",
-            os.environ.get("STAGING_REMAKER_DIGITAL_001_SUPERADMIN_KEY", ""),
+        # SPEC-1667: SPA keys (ar_spa_plat_*) are blocked from /api/admin/*.
+        # Seed script MUST use tenant user keys (ar_user_*) for admin API calls.
+        "api_key": (
+            os.environ.get("STAGING_REMAKER_USER_KEY", "")
+            or os.environ.get("STAGING_REMAKER_DIGITAL_001_SUPERADMIN_KEY", "")
+            or os.environ.get("SUPERADMIN_PREVIEW_API_KEY", "")
         ),
-        "widget_key": os.environ.get(
-            "STAGING_REMAKER_DIGITAL_001_WIDGET_KEY",
-            os.environ.get("PREVIEW_WIDGET_KEY", ""),
+        "widget_key": (
+            os.environ.get("STAGING_REMAKER_WIDGET_KEY", "")
+            or os.environ.get("PREVIEW_WIDGET_KEY", "")
         ),
         "tenant_id": "remaker-digital-001",
     },
     "production": {
         "base_url": "https://agent-red-api-gateway.orangeglacier-f566a4e7.eastus.azurecontainerapps.io",
-        "api_key": os.environ.get("SUPERADMIN_PREVIEW_API_KEY", ""),
-        "widget_key": os.environ.get("PREVIEW_WIDGET_KEY", ""),
+        "api_key": (
+            os.environ.get("PRODUCTION_REMAKER_USER_KEY", "")
+            or os.environ.get("SUPERADMIN_PREVIEW_API_KEY", "")
+        ),
+        "widget_key": (
+            os.environ.get("PRODUCTION_REMAKER_WIDGET_KEY", "")
+            or os.environ.get("PREVIEW_WIDGET_KEY", "")
+        ),
         "tenant_id": "remaker-digital-001",
     },
 }

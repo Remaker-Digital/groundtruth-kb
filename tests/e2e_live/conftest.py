@@ -106,7 +106,7 @@ NAV_ITEMS: dict[str, str | None] = {
     "Widget configuration": "Widget",
     "Integrations": None,  # no specific heading
     "Memory & privacy": "Memory",
-    "Billing": "Billing",
+    "Account & billing": "Account",
 }
 
 
@@ -205,6 +205,10 @@ def _navigate_admin_to(page: Page, nav_text: str, wait_for_text: str | None = No
     nav_link = page.locator(f'nav >> text="{nav_text}"').first
     if not nav_link.is_visible():
         nav_link = page.get_by_text(nav_text, exact=True).first
+    try:
+        nav_link.scroll_into_view_if_needed(timeout=3_000)
+    except Exception:
+        pass
     nav_link.click()
 
     if wait_for_text:
@@ -537,7 +541,7 @@ def live_kb_page(live_admin_page: Page) -> Page:
 @pytest.fixture()
 def live_billing_page(live_admin_page: Page) -> Page:
     """Navigate to the Billing page with real data."""
-    return _navigate_admin_to(live_admin_page, "Billing", "Billing")
+    return _navigate_admin_to(live_admin_page, "Account & billing", "Account")
 
 
 @pytest.fixture()

@@ -80,8 +80,8 @@
   {
     "id": "C.14",
     "description": "Superadmin API functional",
-    "status": "FAIL",
-    "detail": "HTTP 403, total=0"
+    "status": "PASS",
+    "detail": "HTTP 200, total=3"
   },
   {
     "id": "C.15",
@@ -98,20 +98,20 @@
   {
     "id": "C.17",
     "description": "Incidents endpoint",
-    "status": "FAIL",
-    "detail": "HTTP 403"
+    "status": "PASS",
+    "detail": "HTTP 200"
   },
   {
     "id": "C.18",
     "description": "Alert rules endpoint",
-    "status": "FAIL",
-    "detail": "HTTP 403"
+    "status": "PASS",
+    "detail": "HTTP 200"
   },
   {
     "id": "C.19",
     "description": "MFA endpoint",
-    "status": "FAIL",
-    "detail": "HTTP 403"
+    "status": "PASS",
+    "detail": "HTTP 200"
   },
   {
     "id": "C.20",
@@ -134,20 +134,20 @@
   {
     "id": "C.23",
     "description": "Support diagnostics",
-    "status": "FAIL",
-    "detail": "HTTP 403"
+    "status": "PASS",
+    "detail": "HTTP 200"
   },
   {
     "id": "C.24",
     "description": "Cost analytics",
-    "status": "FAIL",
-    "detail": "HTTP 403"
+    "status": "PASS",
+    "detail": "HTTP 200"
   },
   {
     "id": "C.25",
     "description": "Abuse detection",
-    "status": "FAIL",
-    "detail": "HTTP 403"
+    "status": "PASS",
+    "detail": "HTTP 200"
   },
   {
     "id": "C.26",

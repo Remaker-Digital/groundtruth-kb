@@ -37,8 +37,9 @@ ENVIRONMENTS = {
         "fqdn": "agent-red-staging.orangeglacier-f566a4e7.eastus.azurecontainerapps.io",
         "container_app": "agent-red-staging",
         "tenant_id": "remaker-digital-001",
-        "api_key": _os.environ.get("STAGING_TENANT_API_KEY", ""),
-        "widget_key": _os.environ.get("STAGING_TENANT_WIDGET_KEY", ""),
+        "api_key": _os.environ.get("STAGING_REMAKER_TENANT_KEY", "") or _os.environ.get("STAGING_TENANT_API_KEY", ""),
+        "widget_key": _os.environ.get("STAGING_REMAKER_WIDGET_KEY", "") or _os.environ.get("STAGING_TENANT_WIDGET_KEY", ""),
+        "spa_api_key": _os.environ.get("STAGING_SPA_KEY", "") or _os.environ.get("STAGING_SPA_API_KEY", ""),
         "resource_group": "Agent-Red",
         "cosmos_db_database": "agentred-staging",
     },
@@ -46,8 +47,9 @@ ENVIRONMENTS = {
         "fqdn": "agent-red-api-gateway.orangeglacier-f566a4e7.eastus.azurecontainerapps.io",
         "container_app": "agent-red-api-gateway",
         "tenant_id": "remaker-digital-001",
-        "api_key": _os.environ.get("PRODUCTION_TENANT_API_KEY", ""),
-        "widget_key": _os.environ.get("PRODUCTION_TENANT_WIDGET_KEY", ""),
+        "api_key": _os.environ.get("PRODUCTION_REMAKER_TENANT_KEY", "") or _os.environ.get("PRODUCTION_TENANT_API_KEY", ""),
+        "widget_key": _os.environ.get("PRODUCTION_REMAKER_WIDGET_KEY", "") or _os.environ.get("PRODUCTION_TENANT_WIDGET_KEY", ""),
+        "spa_api_key": _os.environ.get("PRODUCTION_SPA_KEY", "") or _os.environ.get("PRODUCTION_SPA_API_KEY", ""),
         "resource_group": "Agent-Red",
         "cosmos_db_database": "agentred",
     },
@@ -58,12 +60,12 @@ ENVIRONMENTS = {
 TENANTS = {
     "staging:staging-001": {
         "tenant_id": "staging-001",
-        "api_key": _os.environ.get("STAGING_001_API_KEY", ""),
+        "api_key": _os.environ.get("STAGING_001_TENANT_KEY", "") or _os.environ.get("STAGING_001_API_KEY", ""),
         "widget_key": _os.environ.get("STAGING_001_WIDGET_KEY", ""),
     },
     "staging:staging-002": {
         "tenant_id": "staging-002",
-        "api_key": _os.environ.get("STAGING_002_API_KEY", ""),
+        "api_key": _os.environ.get("STAGING_002_TENANT_KEY", "") or _os.environ.get("STAGING_002_API_KEY", ""),
         "widget_key": _os.environ.get("STAGING_002_WIDGET_KEY", ""),
     },
 }
@@ -229,6 +231,7 @@ def phase_c(env: dict, snapshot: dict, new_version: str) -> list[dict]:
     """Run all 35 assertions. Returns list of {id, description, status, detail}."""
     fqdn = env["fqdn"]
     key = env["api_key"]
+    spa_key = env.get("spa_api_key", "") or key  # SPA key for superadmin; fallback to tenant key
     wk = env["widget_key"]
     tid = env["tenant_id"]
 
@@ -344,7 +347,7 @@ def phase_c(env: dict, snapshot: dict, new_version: str) -> list[dict]:
     check("C.13", "Regression tests", True, "SKIP — requires local pytest run")
 
     # C.14 Superadmin API
-    s, d, _ = api_call(fqdn, "/api/superadmin/tenants", key)
+    s, d, _ = api_call(fqdn, "/api/superadmin/tenants", spa_key)
     total = d.get("total", 0) if isinstance(d, dict) else 0
     check("C.14", "Superadmin API functional", s == 200 and total >= 1,
           f"HTTP {s}, total={total}")
@@ -359,15 +362,15 @@ def phase_c(env: dict, snapshot: dict, new_version: str) -> list[dict]:
     check("C.16", "Provider SPA served", s == 200, f"HTTP {s}")
 
     # C.17 Incident endpoints
-    s, d, _ = api_call(fqdn, "/api/superadmin/incidents", key)
+    s, d, _ = api_call(fqdn, "/api/superadmin/incidents", spa_key)
     check("C.17", "Incidents endpoint", s == 200, f"HTTP {s}")
 
     # C.18 Alert rules
-    s, d, _ = api_call(fqdn, "/api/superadmin/alerts/rules", key)
+    s, d, _ = api_call(fqdn, "/api/superadmin/alerts/rules", spa_key)
     check("C.18", "Alert rules endpoint", s == 200, f"HTTP {s}")
 
     # C.19 MFA status
-    s, d, _ = api_call(fqdn, "/api/superadmin/mfa/status", key)
+    s, d, _ = api_call(fqdn, "/api/superadmin/mfa/status", spa_key)
     check("C.19", "MFA endpoint", s == 200, f"HTTP {s}")
 
     # C.20 Magic link request
@@ -384,17 +387,17 @@ def phase_c(env: dict, snapshot: dict, new_version: str) -> list[dict]:
     check("C.22", "Archive endpoint", s in (200, 404), f"HTTP {s}")
 
     # C.23 Support diagnostics
-    s, d, _ = api_call(fqdn, f"/api/superadmin/diagnostics/{tid}", key)
+    s, d, _ = api_call(fqdn, f"/api/superadmin/diagnostics/{tid}", spa_key)
     has_tid = isinstance(d, dict) and "tenantId" in d
     check("C.23", "Support diagnostics", s == 200 and has_tid, f"HTTP {s}")
 
     # C.24 Cost analytics
-    s, d, _ = api_call(fqdn, "/api/superadmin/costs?days=30", key)
+    s, d, _ = api_call(fqdn, "/api/superadmin/costs?days=30", spa_key)
     has_cost = isinstance(d, dict) and "totalPlatformCost" in d
     check("C.24", "Cost analytics", s == 200 and has_cost, f"HTTP {s}")
 
     # C.25 Abuse detection
-    s, d, _ = api_call(fqdn, "/api/superadmin/abuse/signals", key)
+    s, d, _ = api_call(fqdn, "/api/superadmin/abuse/signals", spa_key)
     has_field = isinstance(d, dict) and "totalTenantsScanned" in d
     check("C.25", "Abuse detection", s == 200 and has_field, f"HTTP {s}")
 

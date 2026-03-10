@@ -495,14 +495,14 @@ class TestConversationChart:
 
     # A1: Chart section header
     def test_chart_header_exists(self, live_dashboard_page: Page):
-        """[EL-034/A1] 'Conversation volume' header is visible."""
+        """[EL-034/A1] 'Daily usage' header is visible (S160 SPEC-1685 rename)."""
         text = _main_text(live_dashboard_page)
-        assert "conversation volume" in text.lower() or "volume" in text.lower()
+        assert "daily usage" in text.lower() or "usage" in text.lower()
 
     # B1: Chart header value
     def test_chart_header_value(self, live_dashboard_page: Page):
-        """[EL-034/B1] Chart header text is 'Conversation volume'."""
-        header = live_dashboard_page.locator("text=Conversation volume").first
+        """[EL-034/B1] Chart header text is 'Daily usage' (S160 SPEC-1685 rename)."""
+        header = live_dashboard_page.locator("text=Daily usage").first
         if header.count() > 0:
             expect(header).to_be_visible()
 

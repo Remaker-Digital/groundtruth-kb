@@ -783,8 +783,12 @@ def main():
     api_key = env_cfg["api_key"]
     widget_key = env_cfg["widget_key"]
 
-    # SPA superadmin key for Phase D — from environment
-    spa_api_key = os.environ.get("SUPERADMIN_PREVIEW_API_KEY", "")
+    # SPA superadmin key for Phase D — from ENVIRONMENTS dict (S163 naming)
+    # SPEC-1667: Phase D needs ar_spa_plat_* key, NOT ar_user_* key.
+    spa_api_key = (
+        env_cfg.get("spa_api_key", "")
+        or os.environ.get("SPA_CONSOLE_API_KEY", "")
+    )
 
     _safe_print(f"\n{'#' * 60}")
     _safe_print(f"  Pre-Flight Deployment Checklist")
@@ -828,7 +832,7 @@ def main():
             _safe_print(f"  Set it: export SUPERADMIN_PREVIEW_API_KEY=ar_user_rema_...")
             all_results["D"] = [
                 _fail("D.0", "SPA key required",
-                      "Set SUPERADMIN_PREVIEW_API_KEY env var")]
+                      "Set STAGING_SPA_KEY or SPA_CONSOLE_API_KEY env var")]
         else:
             results_d = phase_d(fqdn, spa_api_key)
             all_results["D"] = results_d

@@ -151,6 +151,11 @@ def _get_env_vars(args: argparse.Namespace) -> dict[str, str]:
             env_vars["PREVIEW_WIDGET_KEY"] = widget_key
         if cosmos_db:
             env_vars["COSMOS_DB_DATABASE"] = cosmos_db
+        # S163: Pass SPA key for provider E2E and superadmin endpoint tests.
+        # SPEC-1667 SPA isolation requires ar_spa_plat_* keys for /api/superadmin/*.
+        spa_key = env_cfg.get("spa_api_key", "")
+        if spa_key:
+            env_vars["SPA_CONSOLE_API_KEY"] = spa_key
 
         # S134: Pass Tenant B credentials for multi-tenant isolation tests.
         # Multi-tenant tests (Phase 5, 7, 8) need a second tenant's credentials.
@@ -180,7 +185,10 @@ def _run_pytest(test_path: str | list[str], *, timeout: int = 300,
     # JUnit XML for test traceability (SPEC-1661)
     xml_dir = os.path.join(PROJECT_ROOT, "logs")
     os.makedirs(xml_dir, exist_ok=True)
-    junit_xml = os.path.join(xml_dir, "test-results-pipeline.xml")
+    # S163: Per-phase XML to prevent phases overwriting each other's results.
+    # Previous shared file caused 0/0/0 results for overwritten phases.
+    phase_tag = prefix.strip().replace(" ", "-").strip("[]")
+    junit_xml = os.path.join(xml_dir, f"test-results-pipeline-{phase_tag}.xml")
     cmd = [sys.executable, "-m", "pytest", *test_path,
            "-v", "--timeout=60", "--tb=short", "--no-header",
            f"--junitxml={junit_xml}"]
@@ -375,12 +383,18 @@ def phase_1_preflight(args: argparse.Namespace) -> PhaseResult:
     )
 
     # Parse "NN PASS, NN WARN, NN FAIL" or "NN PASS"
-    m_pass = re.search(r"(\d+)\s+PASS", r.stdout)
-    m_fail = re.search(r"(\d+)\s+FAIL", r.stdout)
-    m_warn = re.search(r"(\d+)\s+WARN", r.stdout)
-    passed = int(m_pass.group(1)) if m_pass else 0
-    failed = int(m_fail.group(1)) if m_fail else 0
-    warned = int(m_warn.group(1)) if m_warn else 0
+    # S163: Use the SUMMARY line (e.g., "Total: 1 FAIL, 10 PASS, 1 WARN")
+    # not individual assertion lines like "C.1 PASS" which match first.
+    # Look for the summary line first; fall back to last match in full output.
+    summary_match = re.search(r"Total:\s+(.+)", r.stdout)
+    search_text = summary_match.group(1) if summary_match else r.stdout
+    # findall returns all matches - we want the LAST one from the summary
+    all_pass = re.findall(r"(\d+)\s+PASS", search_text)
+    all_fail = re.findall(r"(\d+)\s+FAIL", search_text)
+    all_warn = re.findall(r"(\d+)\s+WARN", search_text)
+    passed = int(all_pass[-1]) if all_pass else 0
+    failed = int(all_fail[-1]) if all_fail else 0
+    warned = int(all_warn[-1]) if all_warn else 0
 
     dt = time.time() - t0
     if failed == 0 and passed > 0:
@@ -466,8 +480,12 @@ def phase_3_live_e2e(args: argparse.Namespace) -> PhaseResult:
     # Default --timeout=60 is insufficient: each test starts Vite dev server,
     # navigates SPA via proxy to staging, waits for real API responses.
     # Override to 120s per test, 900s total subprocess.
+    # S163: Increased timeout from 900s to 3600s. The full E2E suite has
+    # ~1100 Playwright tests spanning 12 admin pages + provider + shopify.
+    # Each test navigates a real SPA and waits for API responses (1-10s each).
+    # 900s (15min) only completes ~30% before being killed.
     passed, failed, errors, xfailed, dt, _ = _run_pytest(
-        "tests/e2e_live/", timeout=900, prefix="  [live-e2e] ",
+        "tests/e2e_live/", timeout=3600, prefix="  [live-e2e] ",
         extra_env=env_vars,
         extra_args=["--timeout=120"],
     )

@@ -47,7 +47,13 @@ def _nav_link(page: Page, label: str):
     """Locate a sidebar nav link by its visible label text."""
     sb = _sidebar(page)
     # Mantine NavLink renders label inside a span; get_by_text on the sidebar scope
-    return sb.get_by_text(label, exact=True).first
+    loc = sb.get_by_text(label, exact=True).first
+    # S163: Scroll below-fold items into view (Integrations, Memory, Account & billing)
+    try:
+        loc.scroll_into_view_if_needed(timeout=3_000)
+    except Exception:
+        pass
+    return loc
 
 
 def _nav_link_ancestor(page: Page, label: str):
