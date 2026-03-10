@@ -21,6 +21,7 @@ from __future__ import annotations
 import hashlib
 import html
 import logging
+import os
 import re
 import secrets
 import time
@@ -433,6 +434,7 @@ class PreAuthRateLimiter:
         max_attempts: int = MAX_FAILED_AUTH_PER_IP,
         window_seconds: int = FAILED_AUTH_WINDOW_SECONDS,
         block_seconds: int = AUTH_BLOCK_DURATION_SECONDS,
+        exempt_ips: frozenset[str] | None = None,
     ) -> None:
         self._max_attempts = max_attempts
         self._window_seconds = window_seconds
@@ -440,6 +442,20 @@ class PreAuthRateLimiter:
         self._trackers: dict[str, _AuthAttemptTracker] = defaultdict(
             _AuthAttemptTracker
         )
+
+        # Parse exempt IPs from env var when not explicitly provided
+        if exempt_ips is not None:
+            self._exempt_ips = exempt_ips
+        else:
+            raw = os.environ.get("PRE_AUTH_RATE_LIMIT_EXEMPT_IPS", "")
+            parsed = frozenset(ip.strip() for ip in raw.split(",") if ip.strip())
+            self._exempt_ips = parsed
+
+        if self._exempt_ips:
+            logger.info(
+                "Pre-auth rate limiter: %d exempt IP(s) configured",
+                len(self._exempt_ips),
+            )
 
     def is_blocked(self, client_ip: str) -> bool:
         """Check if an IP is currently blocked.
@@ -450,6 +466,9 @@ class PreAuthRateLimiter:
         Returns:
             True if the IP is blocked.
         """
+        if client_ip in self._exempt_ips:
+            return False
+
         tracker = self._trackers.get(client_ip)
         if tracker is None:
             return False
@@ -474,6 +493,13 @@ class PreAuthRateLimiter:
         Returns:
             True if the IP is now blocked (threshold exceeded).
         """
+        if client_ip in self._exempt_ips:
+            logger.debug(
+                "Skipping pre-auth failure recording for exempt IP: %s",
+                client_ip,
+            )
+            return False
+
         now = time.monotonic()
         tracker = self._trackers[client_ip]
 
