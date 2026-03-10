@@ -1,0 +1,28 @@
+# Dockerfile.ui — Lightweight UI-only overlay for Agent Red
+# © 2026 Remaker Digital, a DBA of VanDusen & Palmeter, LLC. All rights reserved.
+#
+# Uses the existing production image as a base and overlays ONLY the UI
+# dist directories (3 admin SPAs + widget bundle). This skips the entire
+# Python dependency installation phase, reducing build time from ~5-8 min
+# to ~30-60 seconds.
+#
+# Usage:
+#   docker build -f Dockerfile.ui --build-arg BASE_IMAGE=acragentredeastus.azurecr.io/api-gateway:v1.81.2 -t api-gateway:v1.81.2-ui1 .
+#   (or use scripts/deploy_ui.py which orchestrates this automatically)
+
+ARG BASE_IMAGE
+FROM ${BASE_IMAGE}
+
+# Switch to root to overwrite files, then back to non-root
+USER root
+
+# Overlay admin SPAs (pre-built Vite output)
+COPY admin/shopify/dist/ ./admin/shopify/dist/
+COPY admin/standalone/dist/ ./admin/standalone/dist/
+COPY admin/provider/dist/ ./admin/provider/dist/
+
+# Overlay widget bundle
+COPY widget/dist/ ./widget/dist/
+
+# Restore non-root user
+USER agentred
