@@ -11,11 +11,11 @@ import pytest
 from fastapi import FastAPI
 from fastapi.testclient import TestClient
 
+from src.multi_tenant.security_hardening import get_rate_limit_backend, set_rate_limit_backend, InMemoryRateLimitBackend
 from src.multi_tenant.email_verification import (
     VerifyEmailRequest,
     VerifyEmailResponse,
     _is_rate_limited,
-    _rate_limit,
     _send_verification_email,
     router,
 )
@@ -40,9 +40,11 @@ def client(app):
 
 @pytest.fixture(autouse=True)
 def clear_rate_limit():
-    _rate_limit.clear()
+    """Use a fresh rate-limit backend per test for isolation."""
+    original = get_rate_limit_backend()
+    set_rate_limit_backend(InMemoryRateLimitBackend())
     yield
-    _rate_limit.clear()
+    set_rate_limit_backend(original)
 
 
 # Mock repos for endpoint tests — patch at the import site

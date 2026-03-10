@@ -47,22 +47,13 @@ _OTP_TOKEN_TYPE = "widget_otp"
 _RATE_WINDOW = 300.0  # 5 minutes
 _RATE_MAX = 3  # max 3 OTP requests per window per IP
 
-_rate_limit: dict[str, list[float]] = {}
-
 
 def _is_rate_limited(client_ip: str) -> bool:
-    """Check if IP has exceeded OTP request rate limit."""
-    now = time.time()
-    window_start = now - _RATE_WINDOW
-    if client_ip in _rate_limit:
-        _rate_limit[client_ip] = [
-            ts for ts in _rate_limit[client_ip] if ts > window_start
-        ]
-    requests = _rate_limit.get(client_ip, [])
-    if len(requests) >= _RATE_MAX:
-        return True
-    _rate_limit.setdefault(client_ip, []).append(now)
-    return False
+    """Check if IP has exceeded OTP request rate limit (SPEC-1694)."""
+    from src.multi_tenant.security_hardening import get_rate_limit_backend
+    return get_rate_limit_backend().is_limited(
+        f"widget_otp:{client_ip}", max_requests=_RATE_MAX, window_seconds=_RATE_WINDOW,
+    )
 
 
 def _generate_otp() -> str:

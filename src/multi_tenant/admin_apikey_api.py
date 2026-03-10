@@ -151,7 +151,6 @@ def generate_api_key(tenant_id: str) -> str:
 # In-memory rate limiter for public reset endpoint
 # ---------------------------------------------------------------------------
 
-_reset_rate_limit: dict[str, list[float]] = {}  # IP -> list of timestamps
 RESET_RATE_WINDOW = 300.0  # 5 minutes
 RESET_RATE_MAX = 3  # max 3 requests per window per IP
 
@@ -160,25 +159,11 @@ _EMAIL_RE = re.compile(r"^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}$")
 
 
 def _is_rate_limited(client_ip: str) -> bool:
-    """Check if a client IP has exceeded the reset rate limit."""
-    import time
-
-    now = time.time()
-    window_start = now - RESET_RATE_WINDOW
-
-    # Clean old entries
-    if client_ip in _reset_rate_limit:
-        _reset_rate_limit[client_ip] = [
-            ts for ts in _reset_rate_limit[client_ip] if ts > window_start
-        ]
-
-    requests = _reset_rate_limit.get(client_ip, [])
-    if len(requests) >= RESET_RATE_MAX:
-        return True
-
-    # Record this request
-    _reset_rate_limit.setdefault(client_ip, []).append(now)
-    return False
+    """Check if a client IP has exceeded the reset rate limit (SPEC-1694)."""
+    from src.multi_tenant.security_hardening import get_rate_limit_backend
+    return get_rate_limit_backend().is_limited(
+        f"apikey_reset:{client_ip}", max_requests=RESET_RATE_MAX, window_seconds=RESET_RATE_WINDOW,
+    )
 
 
 async def _send_api_key_email(

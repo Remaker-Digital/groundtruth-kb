@@ -398,12 +398,15 @@ class TestEmailVerificationRateLimit:
 
     def test_is_rate_limited_blocks_after_3_requests(self) -> None:
         """TEST-2900: _is_rate_limited returns True on 4th call within window."""
-        from src.multi_tenant.email_verification import _is_rate_limited, _rate_limit
+        from src.multi_tenant.email_verification import _is_rate_limited
+        from src.multi_tenant.security_hardening import get_rate_limit_backend, set_rate_limit_backend, InMemoryRateLimitBackend
 
         test_ip = f"test-ip-{time.monotonic()}"  # unique key to avoid cross-test pollution
 
         # Clean any pre-existing entries
-        _rate_limit.pop(test_ip, None)
+        # Use fresh backend for test isolation (SPEC-1694)
+        orig = get_rate_limit_backend()
+        set_rate_limit_backend(InMemoryRateLimitBackend())
 
         assert _is_rate_limited(test_ip) is False, "1st request should pass"
         assert _is_rate_limited(test_ip) is False, "2nd request should pass"
@@ -411,7 +414,7 @@ class TestEmailVerificationRateLimit:
         assert _is_rate_limited(test_ip) is True, "4th request should be blocked"
 
         # Clean up
-        _rate_limit.pop(test_ip, None)
+        set_rate_limit_backend(orig)
 
 
 # ===================================================================

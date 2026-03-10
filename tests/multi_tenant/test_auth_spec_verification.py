@@ -485,11 +485,10 @@ class TestSpec1633TenantScopedRequest:
         """Request handler calls find_by_email(tenant_id, email), not cross-partition."""
         from src.multi_tenant.magic_link_auth import (
             MagicLinkRequest,
-            _rate_limit,
             request_magic_link,
         )
-
-        _rate_limit.clear()
+        from src.multi_tenant.security_hardening import set_rate_limit_backend, InMemoryRateLimitBackend
+        set_rate_limit_backend(InMemoryRateLimitBackend())
 
         mock_team = AsyncMock()
         mock_team.find_by_email = AsyncMock(return_value=None)
@@ -537,11 +536,10 @@ class TestSpec1634NoCrossTenantLookups:
         """Magic link request never calls cross-partition find_all_by_email."""
         from src.multi_tenant.magic_link_auth import (
             MagicLinkRequest,
-            _rate_limit,
             request_magic_link,
         )
-
-        _rate_limit.clear()
+        from src.multi_tenant.security_hardening import set_rate_limit_backend, InMemoryRateLimitBackend
+        set_rate_limit_backend(InMemoryRateLimitBackend())
 
         mock_team = AsyncMock()
         mock_team.find_by_email = AsyncMock(return_value=None)

@@ -26,6 +26,7 @@ from unittest.mock import AsyncMock, MagicMock, patch
 import jwt
 import pytest
 
+from src.multi_tenant.security_hardening import get_rate_limit_backend, set_rate_limit_backend, InMemoryRateLimitBackend
 from src.multi_tenant.magic_link_auth import (
     MagicLinkRequest,
     MagicLinkRequestResponse,
@@ -36,7 +37,6 @@ from src.multi_tenant.magic_link_auth import (
     _TOKEN_TTL_SECONDS,
     _TOKEN_TYPE,
     _is_rate_limited,
-    _rate_limit,
     create_magic_link_session_token,
     request_magic_link,
     verify_magic_link,
@@ -51,10 +51,11 @@ from src.multi_tenant.magic_link_auth import (
 
 @pytest.fixture(autouse=True)
 def _clear_rate_limit():
-    """Clear the in-memory rate limit dict before each test."""
-    _rate_limit.clear()
+    """Use a fresh rate-limit backend per test for isolation."""
+    original = get_rate_limit_backend()
+    set_rate_limit_backend(InMemoryRateLimitBackend())
     yield
-    _rate_limit.clear()
+    set_rate_limit_backend(original)
 
 
 @pytest.fixture()
@@ -211,7 +212,7 @@ class TestRateLimiting:
 
     def test_ml13_old_entries_expire(self):
         """Entries older than the rate window should be cleaned up."""
-        _rate_limit["10.0.0.6"] = [time.time() - _RATE_WINDOW - 10] * _RATE_MAX
+        get_rate_limit_backend().reset(f"magic_link:10.0.0.6")
         assert _is_rate_limited("10.0.0.6") is False
 
 
@@ -628,7 +629,7 @@ class TestSpec1281RateLimit:
         """SPEC-1281: Entries older than 5 minutes are cleaned up."""
         ip = "10.0.1.5"
         # Pre-populate with entries beyond the window
-        _rate_limit[ip] = [time.time() - _RATE_WINDOW - 10] * _RATE_MAX
+        get_rate_limit_backend().reset(f"magic_link:{ip}")
         # Should not be limited (old entries expire)
         assert _is_rate_limited(ip) is False
 

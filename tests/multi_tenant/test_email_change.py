@@ -21,6 +21,21 @@ from unittest.mock import AsyncMock, MagicMock, patch
 
 import pytest
 
+from src.multi_tenant.security_hardening import (
+    get_rate_limit_backend,
+    set_rate_limit_backend,
+    InMemoryRateLimitBackend,
+)
+
+
+@pytest.fixture(autouse=True)
+def _fresh_rate_limit_backend():
+    """Use a fresh rate-limit backend per test for isolation (SPEC-1694)."""
+    original = get_rate_limit_backend()
+    set_rate_limit_backend(InMemoryRateLimitBackend())
+    yield
+    set_rate_limit_backend(original)
+
 
 # ---------------------------------------------------------------------------
 # Module structure tests
@@ -87,10 +102,6 @@ class TestModels:
 
 class TestRateLimiting:
 
-    def setup_method(self):
-        from src.multi_tenant import email_change
-        email_change._rate_limit.clear()
-
     def test_first_request_not_rate_limited(self):
         from src.multi_tenant.email_change import _is_rate_limited
         assert _is_rate_limited("192.168.1.1") is False
@@ -116,10 +127,6 @@ class TestRateLimiting:
 
 
 class TestRequestEndpoint:
-
-    def setup_method(self):
-        from src.multi_tenant import email_change
-        email_change._rate_limit.clear()
 
     @pytest.mark.asyncio
     async def test_non_platform_admin_rejected(self):

@@ -28,12 +28,12 @@ from src.multi_tenant.admin_apikey_api import (
     RESET_RATE_MAX,
     RESET_RATE_WINDOW,
     _is_rate_limited,
-    _reset_rate_limit,
     _send_api_key_email,
     configure_apikey_services,
     generate_api_key,
     reset_api_key_via_email,
 )
+from src.multi_tenant.security_hardening import get_rate_limit_backend, set_rate_limit_backend, InMemoryRateLimitBackend
 from src.multi_tenant.auth import hash_api_key
 
 
@@ -44,10 +44,11 @@ from src.multi_tenant.auth import hash_api_key
 
 @pytest.fixture(autouse=True)
 def _clear_rate_limit():
-    """Clear the in-memory rate limit dict before each test."""
-    _reset_rate_limit.clear()
+    """Use a fresh rate-limit backend per test for isolation."""
+    original = get_rate_limit_backend()
+    set_rate_limit_backend(InMemoryRateLimitBackend())
     yield
-    _reset_rate_limit.clear()
+    set_rate_limit_backend(original)
 
 
 @pytest.fixture()
@@ -164,7 +165,7 @@ class TestResetEndpointResponses:
             resp1 = await reset_api_key_via_email(body1, mock_request)
 
         # Clear rate limit between
-        _reset_rate_limit.clear()
+        set_rate_limit_backend(InMemoryRateLimitBackend())
 
         # Second: unknown email
         mock_tenant_repo.find_by_customer_email.return_value = None
@@ -196,11 +197,9 @@ class TestResetRateLimiting:
         for _ in range(RESET_RATE_MAX):
             _is_rate_limited(ip)
 
-        # Manually age the timestamps past the window
-        _reset_rate_limit[ip] = [
-            time.time() - RESET_RATE_WINDOW - 1.0
-            for _ in _reset_rate_limit[ip]
-        ]
+        # Reset and verify new requests are allowed
+        backend = get_rate_limit_backend()
+        backend.reset(f"apikey_reset:{ip}")
         assert _is_rate_limited(ip) is False
 
     def test_akr06_different_ips_independent(self):
