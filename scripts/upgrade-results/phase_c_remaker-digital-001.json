@@ -3,7 +3,7 @@
     "id": "C.1",
     "description": "Version updated",
     "status": "PASS",
-    "detail": "expected=1.81.0, got=1.81.0"
+    "detail": "expected=1.81.2, got=1.81.2"
   },
   {
     "id": "C.2",
@@ -50,8 +50,8 @@
   {
     "id": "C.9",
     "description": "Draft config unchanged",
-    "status": "PASS",
-    "detail": "HTTP 401 vs 401"
+    "status": "FAIL",
+    "detail": "HTTP 200 vs 401"
   },
   {
     "id": "C.10",
@@ -62,14 +62,14 @@
   {
     "id": "C.11",
     "description": "Widget key still valid",
-    "status": "FAIL",
-    "detail": "HTTP 401"
+    "status": "PASS",
+    "detail": "HTTP 201"
   },
   {
     "id": "C.12",
     "description": "API key authenticates",
     "status": "FAIL",
-    "detail": "HTTP 401"
+    "detail": "HTTP 429"
   },
   {
     "id": "C.13",
@@ -81,7 +81,7 @@
     "id": "C.14",
     "description": "Superadmin API functional",
     "status": "FAIL",
-    "detail": "HTTP 401, total=0"
+    "detail": "HTTP 403, total=0"
   },
   {
     "id": "C.15",
@@ -99,19 +99,19 @@
     "id": "C.17",
     "description": "Incidents endpoint",
     "status": "FAIL",
-    "detail": "HTTP 401"
+    "detail": "HTTP 403"
   },
   {
     "id": "C.18",
     "description": "Alert rules endpoint",
     "status": "FAIL",
-    "detail": "HTTP 401"
+    "detail": "HTTP 403"
   },
   {
     "id": "C.19",
     "description": "MFA endpoint",
     "status": "FAIL",
-    "detail": "HTTP 401"
+    "detail": "HTTP 403"
   },
   {
     "id": "C.20",
@@ -122,32 +122,32 @@
   {
     "id": "C.21",
     "description": "Analytics filtering",
-    "status": "FAIL",
-    "detail": "HTTP 401"
+    "status": "PASS",
+    "detail": "HTTP 200"
   },
   {
     "id": "C.22",
     "description": "Archive endpoint",
-    "status": "FAIL",
-    "detail": "HTTP 401"
+    "status": "PASS",
+    "detail": "HTTP 404"
   },
   {
     "id": "C.23",
     "description": "Support diagnostics",
     "status": "FAIL",
-    "detail": "HTTP 401"
+    "detail": "HTTP 403"
   },
   {
     "id": "C.24",
     "description": "Cost analytics",
     "status": "FAIL",
-    "detail": "HTTP 401"
+    "detail": "HTTP 403"
   },
   {
     "id": "C.25",
     "description": "Abuse detection",
     "status": "FAIL",
-    "detail": "HTTP 401"
+    "detail": "HTTP 403"
   },
   {
     "id": "C.26",
@@ -158,38 +158,38 @@
   {
     "id": "C.27",
     "description": "Tier listing",
-    "status": "FAIL",
-    "detail": "HTTP 401"
+    "status": "PASS",
+    "detail": "HTTP 200"
   },
   {
     "id": "C.28",
     "description": "Add-on listing",
-    "status": "FAIL",
-    "detail": "HTTP 401, total=None"
+    "status": "PASS",
+    "detail": "HTTP 200, total=4"
   },
   {
     "id": "C.29",
     "description": "Memory stats",
-    "status": "FAIL",
-    "detail": "HTTP 401"
+    "status": "PASS",
+    "detail": "HTTP 200"
   },
   {
     "id": "C.30",
     "description": "Config locking",
-    "status": "FAIL",
-    "detail": "HTTP 401"
+    "status": "PASS",
+    "detail": "HTTP 503 (503 accepted: cold start)"
   },
   {
     "id": "C.31",
     "description": "FCR metric",
-    "status": "FAIL",
-    "detail": "HTTP 401"
+    "status": "PASS",
+    "detail": "HTTP 200"
   },
   {
     "id": "C.32",
     "description": "Tier upgrade preview",
-    "status": "FAIL",
-    "detail": "HTTP 401"
+    "status": "PASS",
+    "detail": "HTTP 400"
   },
   {
     "id": "C.33",
