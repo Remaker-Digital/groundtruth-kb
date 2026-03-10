@@ -76,7 +76,7 @@ jobs:
           modules = set()
 
           for root, dirs, files in os.walk('src'):
-              dirs[:] = [d for d in dirs if d \!= '__pycache__']
+              dirs[:] = [d for d in dirs if d != '__pycache__']
               for f in files:
                   if not f.endswith('.py'):
                       continue
@@ -126,7 +126,7 @@ jobs:
           if cycles:
               print(f'FAIL: {len(cycles)} circular import(s) detected:')
               for c in cycles[:10]:
-                  print(f'  {chr(32).join(['->'.join(c)])}')
+                  print(f"  {' -> '.join(c)}")
               sys.exit(1)
           else:
               print(f'OK: {len(modules)} modules scanned, no circular imports')

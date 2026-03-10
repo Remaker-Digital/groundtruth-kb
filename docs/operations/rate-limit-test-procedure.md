@@ -63,8 +63,8 @@ EXPECTED_FAILURES   = 0
 | ID | Test | Expected |
 |----|------|----------|
 | RL-01 | Starter tenant: requests within 60s under 500 RPM → all succeed | 200 (all under limit) |
-| RL-02 | Starter tenant: 510 requests within 60s → 429 after 500 | First 5000 → 200, remaining → 429 |
-| RL-03 | Professional tenant: requests within 60s under 500 RPM → all succeed | 200 on all 50 |
+| RL-02 | Starter tenant: 510 requests within 60s → 429 after 500 | First 500 → 200, remaining → 429 |
+| RL-03 | Professional tenant: requests within 60s under 500 RPM → all succeed | 200 on all (under 500 RPM limit) |
 | RL-04 | Professional tenant: 510 requests within 60s → 429 after 500 | First 500 → 200, remaining → 429 |
 | RL-05 | 429 response includes Retry-After header | Header present, value > 0 |
 | RL-06 | 429 response body is valid JSON with error detail | {"detail": "..."} structure |
