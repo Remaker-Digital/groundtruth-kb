@@ -21,7 +21,7 @@
     "id": "C.4",
     "description": "Conversation count not decreased",
     "status": "PASS",
-    "detail": "31 vs 25 (growth OK)"
+    "detail": "52 vs 46 (growth OK)"
   },
   {
     "id": "C.5",
@@ -33,13 +33,13 @@
     "id": "C.6",
     "description": "KB article count unchanged",
     "status": "PASS",
-    "detail": "84 vs 84"
+    "detail": "120 vs 120"
   },
   {
     "id": "C.7",
     "description": "Team member count unchanged",
     "status": "PASS",
-    "detail": "20 vs 20"
+    "detail": "22 vs 22"
   },
   {
     "id": "C.8",

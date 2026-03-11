@@ -5,15 +5,15 @@
     "is_active": true,
     "is_configured": true,
     "has_pending_changes": false,
-    "active_version": 10
+    "active_version": 23
   },
-  "A4_conversation_count": 25,
+  "A4_conversation_count": 46,
   "A5_status_breakdown": {
     "http_status": 404,
     "note": "analytics may need params"
   },
-  "A6_kb_count": 84,
-  "A7_team_count": 20,
+  "A6_kb_count": 120,
+  "A7_team_count": 22,
   "A8_team_members": [
     {
       "displayName": "Alex Johnson",
@@ -29,6 +29,14 @@
     },
     {
       "displayName": "Sarah Chen",
+      "role": "admin"
+    },
+    {
+      "displayName": "E2E e2e-test",
+      "role": "escalation_agent"
+    },
+    {
+      "displayName": "E2E e2e-test",
       "role": "admin"
     },
     {

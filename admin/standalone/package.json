@@ -2,7 +2,7 @@
   "name": "@agent-red/admin-standalone",
   "version": "1.0.0",
   "private": true,
-  "description": "Agent Red Customer Experience — Standalone admin (API key auth, non-Shopify merchants)",
+  "description": "Agent Red Customer Experience \u2014 Standalone admin (API key auth, non-Shopify merchants)",
   "type": "module",
   "scripts": {
     "sync-env": "powershell -ExecutionPolicy Bypass -File ../../scripts/sync-admin-env.ps1",
@@ -11,7 +11,8 @@
     "prebuild": "npm run sync-env",
     "build": "tsc && vite build",
     "preview": "vite preview",
-    "typecheck": "tsc --noEmit"
+    "typecheck": "tsc --noEmit",
+    "dev:mock": "vite --mode mock"
   },
   "dependencies": {
     "@mantine/core": "^7.17.0",
