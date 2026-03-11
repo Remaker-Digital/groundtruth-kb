@@ -5,14 +5,14 @@
     "is_active": true,
     "is_configured": true,
     "has_pending_changes": false,
-    "active_version": 8
+    "active_version": 10
   },
-  "A4_conversation_count": 18,
+  "A4_conversation_count": 25,
   "A5_status_breakdown": {
     "http_status": 404,
     "note": "analytics may need params"
   },
-  "A6_kb_count": 72,
+  "A6_kb_count": 84,
   "A7_team_count": 20,
   "A8_team_members": [
     {

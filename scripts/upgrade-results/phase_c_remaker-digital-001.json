@@ -14,14 +14,14 @@
   {
     "id": "C.3",
     "description": "Configuration state unchanged",
-    "status": "FAIL",
+    "status": "PASS",
     "detail": "active=True, configured=True"
   },
   {
     "id": "C.4",
     "description": "Conversation count not decreased",
     "status": "PASS",
-    "detail": "24 vs 18 (growth OK)"
+    "detail": "31 vs 25 (growth OK)"
   },
   {
     "id": "C.5",
@@ -33,7 +33,7 @@
     "id": "C.6",
     "description": "KB article count unchanged",
     "status": "PASS",
-    "detail": "72 vs 72"
+    "detail": "84 vs 84"
   },
   {
     "id": "C.7",
