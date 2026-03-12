@@ -130,7 +130,6 @@ def _validate_csrf_token(form_token: str, cookie_token: str) -> bool:
 # Signed with _ADMIN_HMAC_KEY (deterministic across replicas from env var).
 
 _admin_used_reset_nonces: set[str] = set()  # best-effort single-use per replica
-_admin_reset_rate_limit: dict[str, list[float]] = {}
 
 _STANDALONE_SHARED_STYLES = """
   * { box-sizing: border-box; margin: 0; padding: 0; }
@@ -647,8 +646,6 @@ def mount_standalone_admin(app: FastAPI) -> None:
         @app.post("/admin/standalone/_forgot-password", include_in_schema=False)
         async def _admin_forgot_password(request: Request) -> StarletteResponse:
             """Process forgot-password: validate CSRF + email, send reset link."""
-            global _admin_reset_rate_limit
-
             form = await request.form()
             email = str(form.get("email", "")).strip().lower()
             form_csrf = str(form.get("csrf_token", ""))
@@ -664,13 +661,15 @@ def mount_standalone_admin(app: FastAPI) -> None:
                 response.set_cookie(_CSRF_COOKIE_NAME, csrf, httponly=True, secure=True, samesite="lax", max_age=3600)
                 return response
 
-            # Rate limit: 3 requests per 5 min per IP
+            # Rate limit: 3 requests per 5 min per IP (SPEC-1691: shared backend)
+            from src.multi_tenant.security_hardening import get_rate_limit_backend
+
             client_ip = request.client.host if request.client else "unknown"
-            now = _time.time()
-            window = 300  # 5 minutes
-            hits = _admin_reset_rate_limit.get(client_ip, [])
-            hits = [t for t in hits if now - t < window]
-            if len(hits) >= 3:
+            if get_rate_limit_backend().is_limited(
+                f"admin_reset:{client_ip}",
+                max_requests=3,
+                window_seconds=300,
+            ):
                 csrf = _generate_csrf_token()
                 response = HTMLResponse(
                     content=_render_forgot_pw_html(
@@ -681,8 +680,6 @@ def mount_standalone_admin(app: FastAPI) -> None:
                 )
                 response.set_cookie(_CSRF_COOKIE_NAME, csrf, httponly=True, secure=True, samesite="lax", max_age=3600)
                 return response
-            hits.append(now)
-            _admin_reset_rate_limit[client_ip] = hits
 
             # Validate email format
             if not email or "@" not in email:

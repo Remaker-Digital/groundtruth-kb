@@ -22,7 +22,6 @@ from __future__ import annotations
 
 import logging
 import os
-import time
 from datetime import datetime, timezone
 
 from fastapi import APIRouter, Request
@@ -41,8 +40,6 @@ router = APIRouter(
 
 _RATE_WINDOW = 900.0  # 15 minutes
 _RATE_MAX = 3
-
-_rate_limit: dict[str, list[float]] = {}
 
 _GENERIC_RESPONSE = (
     "If your email and backup code are valid, a new API key has been "
@@ -69,23 +66,19 @@ def configure_spa_recovery(
 
 
 # ---------------------------------------------------------------------------
-# Rate limiting
+# Rate limiting (SPEC-1691: uses shared RateLimitBackend)
 # ---------------------------------------------------------------------------
 
 
 def _is_rate_limited(client_ip: str) -> bool:
     """Check if IP has exceeded recovery attempt rate limit."""
-    now = time.time()
-    window_start = now - _RATE_WINDOW
-    if client_ip in _rate_limit:
-        _rate_limit[client_ip] = [
-            ts for ts in _rate_limit[client_ip] if ts > window_start
-        ]
-    requests = _rate_limit.get(client_ip, [])
-    if len(requests) >= _RATE_MAX:
-        return True
-    _rate_limit.setdefault(client_ip, []).append(now)
-    return False
+    from src.multi_tenant.security_hardening import get_rate_limit_backend
+
+    return get_rate_limit_backend().is_limited(
+        f"spa_recovery:{client_ip}",
+        max_requests=_RATE_MAX,
+        window_seconds=_RATE_WINDOW,
+    )
 
 
 # ---------------------------------------------------------------------------

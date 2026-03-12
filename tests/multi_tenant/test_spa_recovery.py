@@ -23,11 +23,11 @@ import pytest
 
 from src.multi_tenant.auth import hash_api_key
 from src.multi_tenant.cosmos_schema import AuditEventType
+from src.multi_tenant.security_hardening import get_rate_limit_backend
 from src.multi_tenant.spa_recovery import (
     RecoveryRequest,
     RecoveryResponse,
     _is_rate_limited,
-    _rate_limit,
     configure_spa_recovery,
     recover_spa_key,
 )
@@ -97,10 +97,13 @@ def _wire_repos(mock_pa_repo, mock_audit_repo):
 
 @pytest.fixture(autouse=True)
 def _clear_rate_limit():
-    """Clear rate limit state between tests."""
-    _rate_limit.clear()
+    """Clear rate limit state between tests via shared backend."""
+    backend = get_rate_limit_backend()
+    if hasattr(backend, "_windows"):
+        backend._windows.clear()
     yield
-    _rate_limit.clear()
+    if hasattr(backend, "_windows"):
+        backend._windows.clear()
 
 
 # ---------------------------------------------------------------------------
@@ -243,8 +246,10 @@ class TestRateLimiting:
 
     def test_rate_limit_window_expires(self):
         ip = "10.0.0.60"
-        # Manually add old timestamps
-        _rate_limit[ip] = [time.time() - 1000, time.time() - 1000, time.time() - 1000]
+        # Manually add old timestamps to the shared backend
+        backend = get_rate_limit_backend()
+        key = f"spa_recovery:{ip}"
+        backend._windows[key] = [time.time() - 1000, time.time() - 1000, time.time() - 1000]
         # Should NOT be rate limited (all entries older than 15 min)
         assert not _is_rate_limited(ip)
 

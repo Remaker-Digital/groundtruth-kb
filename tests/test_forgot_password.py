@@ -149,7 +149,11 @@ def standalone_client():
     auth_mod._ADMIN_HMAC_KEY = original_hmac_key
     auth_mod._ADMIN_RESET_EMAIL = original_email
     auth_mod._admin_used_reset_nonces.clear()
-    auth_mod._admin_reset_rate_limit.clear()
+    # Rate limit state now in shared backend (SPEC-1691)
+    from src.multi_tenant.security_hardening import get_rate_limit_backend
+    backend = get_rate_limit_backend()
+    if hasattr(backend, "_windows"):
+        backend._windows.clear()
 
 
 def _get_csrf(client, url):
@@ -208,8 +212,10 @@ class TestForgotPasswordEndpoints:
 
     def test_rate_limit_forgot_password(self, standalone_client):
         """Fourth request within 5 minutes returns 429."""
-        import src.app.standalone_auth as auth_mod
-        auth_mod._admin_reset_rate_limit.clear()
+        from src.multi_tenant.security_hardening import get_rate_limit_backend
+        backend = get_rate_limit_backend()
+        if hasattr(backend, "_windows"):
+            backend._windows.clear()
 
         with patch("src.app.standalone_auth._send_admin_reset_email", return_value=True):
             for _ in range(3):
