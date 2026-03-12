@@ -178,11 +178,11 @@ class TestTierOverride:
         self, superadmin_ctx,
     ):
         """Returns 503 when _tenant_repo is None."""
-        import src.multi_tenant.superadmin_api as mod
+        import src.multi_tenant.superadmin_api._monolith as _mon
         from fastapi import HTTPException
 
-        original = mod._tenant_repo
-        mod._tenant_repo = None
+        original = _mon._tenant_repo
+        _mon._tenant_repo = None
         try:
             with pytest.raises(HTTPException) as exc_info:
                 await override_tenant_tier(
@@ -190,7 +190,7 @@ class TestTierOverride:
                 )
             assert exc_info.value.status_code == 503
         finally:
-            mod._tenant_repo = original
+            _mon._tenant_repo = original
 
     @pytest.mark.asyncio
     async def test_patch_operations_include_updated_at(

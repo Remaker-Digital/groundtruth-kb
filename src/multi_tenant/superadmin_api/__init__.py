@@ -1,18 +1,17 @@
-"""Superadmin Provider Operations API — package init.
+"""Superadmin Provider Operations API -- package init.
 
 Re-exports all public names from sub-modules for backward compatibility.
 All existing imports (from src.multi_tenant.superadmin_api import X) continue to work.
 
 (c) 2026 Remaker Digital, a DBA of VanDusen & Palmeter, LLC. All rights reserved.
 """
-# Re-export everything from the legacy monolith for backward compatibility.
-# Sub-modules are imported below for domain organization.
-from src.multi_tenant.superadmin_api._monolith import *  # noqa: F403
+# Shared state, router, and configuration functions
 from src.multi_tenant.superadmin_api._monolith import (  # noqa: F401
     router,
     configure_superadmin_services,
     configure_copilot_knowledge_service,
     configure_pipeline_observatory,
+    # Private variables (re-exported for test patching via _monolith)
     _tenant_repo,
     _audit_repo,
     _conv_repo,
@@ -26,26 +25,34 @@ from src.multi_tenant.superadmin_api._monolith import (  # noqa: F401
     _platform_admin_repo,
     _admin_doc_repo,
     _pipeline_metrics_configured,
-    _resolve_service_message_recipients,
-    _get_mfa_svc,
-    _get_team_member,
+)
+
+# Domain sub-modules -- import triggers endpoint registration on shared router.
+# Star imports re-export all public names (models, endpoint functions).
+from src.multi_tenant.superadmin_api._tenants import *  # noqa: F401,F403
+from src.multi_tenant.superadmin_api._dashboard import *  # noqa: F401,F403
+from src.multi_tenant.superadmin_api._operations import *  # noqa: F401,F403
+from src.multi_tenant.superadmin_api._copilot import *  # noqa: F401,F403
+from src.multi_tenant.superadmin_api._platform import *  # noqa: F401,F403
+
+# Private helpers re-exported for backward compatibility (test patching)
+from src.multi_tenant.superadmin_api._operations import (  # noqa: F401
     _incident_to_model,
     _rule_to_model,
     _history_to_model,
+    _get_mfa_svc,
+    _get_team_member,
+)
+from src.multi_tenant.superadmin_api._copilot import (  # noqa: F401
     _infer_category_from_filename,
     _generate_embedding,
     _get_copilot_config,
     _save_copilot_config,
 )
-
-# Domain sub-modules (import for registration)
-from src.multi_tenant.superadmin_api import (  # noqa: F401
-    _tenants,
-    _dashboard,
-    _operations,
-    _copilot,
-    _platform,
+from src.multi_tenant.superadmin_api._platform import (  # noqa: F401
+    _resolve_service_message_recipients,
 )
+
 
 __all__ = [
     "router",

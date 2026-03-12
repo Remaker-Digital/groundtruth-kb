@@ -302,7 +302,7 @@ class TestReEmbedding:
         fake_embedding = [0.5] * 3072
 
         with patch(
-            "src.multi_tenant.superadmin_api._monolith._generate_embedding",
+            "src.multi_tenant.superadmin_api._copilot._generate_embedding",
             new_callable=AsyncMock,
             return_value=fake_embedding,
         ):
@@ -327,7 +327,7 @@ class TestReEmbedding:
         mock_admin_doc_repo.upsert_document = AsyncMock(side_effect=capture_upsert)
 
         with patch(
-            "src.multi_tenant.superadmin_api._monolith._generate_embedding",
+            "src.multi_tenant.superadmin_api._copilot._generate_embedding",
             new_callable=AsyncMock,
             return_value=fake_embedding,
         ):
@@ -385,7 +385,7 @@ class TestQueryEndpoint:
         body = CopilotTestQueryRequest(query="how to set up", top_k=5)
 
         with patch(
-            "src.multi_tenant.superadmin_api._monolith._generate_embedding",
+            "src.multi_tenant.superadmin_api._copilot._generate_embedding",
             new_callable=AsyncMock,
             return_value=[0.5] * 3072,
         ):

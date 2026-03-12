@@ -148,24 +148,46 @@ class TestBackwardCompatibility:
 
 
 class TestSubModuleDomains:
-    """Each sub-module should cover a coherent domain."""
+    """Each sub-module should cover a coherent domain with real endpoints."""
 
-    def test_tenants_module_exists(self):
+    def test_tenants_module_has_endpoints(self):
         import src.multi_tenant.superadmin_api._tenants as m
-        assert hasattr(m, 'sub_router')
+        assert hasattr(m, 'list_all_tenants')
+        assert hasattr(m, 'create_tenant')
+        assert hasattr(m, 'set_tenant_expiry')
 
-    def test_dashboard_module_exists(self):
+    def test_dashboard_module_has_endpoints(self):
         import src.multi_tenant.superadmin_api._dashboard as m
-        assert hasattr(m, 'sub_router')
+        assert hasattr(m, 'provider_dashboard')
+        assert hasattr(m, 'billing_health')
+        assert hasattr(m, 'integration_health')
 
-    def test_operations_module_exists(self):
+    def test_operations_module_has_endpoints(self):
         import src.multi_tenant.superadmin_api._operations as m
-        assert hasattr(m, 'sub_router')
+        assert hasattr(m, 'list_incidents')
+        assert hasattr(m, 'list_alert_rules')
+        assert hasattr(m, 'mfa_status')
 
-    def test_copilot_module_exists(self):
+    def test_copilot_module_has_endpoints(self):
         import src.multi_tenant.superadmin_api._copilot as m
-        assert hasattr(m, 'sub_router')
+        assert hasattr(m, 'list_copilot_documents')
+        assert hasattr(m, 'copilot_stats')
+        assert hasattr(m, 'test_copilot_query')
 
-    def test_platform_module_exists(self):
+    def test_platform_module_has_endpoints(self):
         import src.multi_tenant.superadmin_api._platform as m
-        assert hasattr(m, 'sub_router')
+        assert hasattr(m, 'get_pipeline_topology')
+        assert hasattr(m, 'regenerate_platform_admin_key')
+        assert hasattr(m, 'list_platform_admin_users')
+
+    def test_monolith_only_has_state_and_config(self):
+        """After split, _monolith.py should only contain state, router, and configure_*."""
+        import src.multi_tenant.superadmin_api._monolith as m
+        # Should have state + config
+        assert hasattr(m, 'router')
+        assert hasattr(m, 'configure_superadmin_services')
+        assert hasattr(m, '_tenant_repo')
+        # Should NOT have endpoint functions
+        assert not hasattr(m, 'list_all_tenants')
+        assert not hasattr(m, 'provider_dashboard')
+        assert not hasattr(m, 'list_incidents')

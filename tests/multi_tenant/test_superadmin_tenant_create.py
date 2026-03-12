@@ -266,10 +266,10 @@ class TestCreateTenant:
     @pytest.mark.asyncio
     async def test_service_not_initialized_returns_503(self, superadmin_ctx):
         """Returns 503 when _tenant_repo is None."""
-        import src.multi_tenant.superadmin_api as mod
+        import src.multi_tenant.superadmin_api._monolith as _mon
 
-        original = mod._tenant_repo
-        mod._tenant_repo = None
+        original = _mon._tenant_repo
+        _mon._tenant_repo = None
         try:
             with pytest.raises(HTTPException) as exc_info:
                 await create_tenant(
@@ -278,7 +278,7 @@ class TestCreateTenant:
                 )
             assert exc_info.value.status_code == 503
         finally:
-            mod._tenant_repo = original
+            _mon._tenant_repo = original
 
     @pytest.mark.asyncio
     @patch("src.integrations.provisioning.spa_provision_tenant", new_callable=AsyncMock)

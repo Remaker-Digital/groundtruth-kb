@@ -811,11 +811,11 @@ class TestMfaStatus:
 
         with (
             patch(
-                "src.multi_tenant.superadmin_api._monolith._get_mfa_svc",
+                "src.multi_tenant.superadmin_api._operations._get_mfa_svc",
                 return_value=mock_svc,
             ),
             patch(
-                "src.multi_tenant.superadmin_api._monolith._get_team_member",
+                "src.multi_tenant.superadmin_api._operations._get_team_member",
                 new_callable=AsyncMock,
                 return_value=mock_member,
             ),
