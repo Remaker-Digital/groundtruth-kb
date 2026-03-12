@@ -56,6 +56,22 @@ export function registerTeamHandlers() {
     return { status: 200, body: member };
   });
 
+  // Generic member update — the UI sends PUT /api/admin/team/:id with body fields
+  // (role, is_active, escalation_categories, etc.) rather than sub-path endpoints.
+  // Registered AFTER /role and /active so those specific paths still match first.
+  PUT("/api/admin/team/:id", (req) => {
+    const member = s().members.find((m: { id: string }) => m.id === req.params.id);
+    if (!member) return { status: 404, body: { detail: "Member not found" } };
+    const body = req.body as Record<string, unknown>;
+    if (body.role !== undefined) member.role = body.role as string;
+    if (body.is_active !== undefined) member.isActive = body.is_active as boolean;
+    if (body.escalation_categories !== undefined) {
+      member.escalationCategories = body.escalation_categories as string[];
+    }
+    member.updatedAt = new Date().toISOString();
+    return { status: 200, body: member };
+  });
+
   DELETE("/api/admin/team/:id", (req) => {
     const store = s();
     const idx = store.members.findIndex((m: { id: string }) => m.id === req.params.id);

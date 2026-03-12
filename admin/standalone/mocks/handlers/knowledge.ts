@@ -16,6 +16,35 @@ export function registerKnowledgeHandlers(): void {
     return { status: 200, body: { articles, total: articles.length } };
   });
 
+  // Templates (used by OnboardingWizard) — MUST be before /:id to avoid being caught by parameterized route
+  GET('/api/admin/knowledge/templates', (_req: MockRequest): MockResponse => {
+    return { status: 200, body: { templates: [] } };
+  });
+
+  POST('/api/admin/knowledge/templates/:id/apply', (_req: MockRequest): MockResponse => {
+    return { status: 200, body: { articlesCreated: 0, articlesFailed: 0, totalChars: 0 } };
+  });
+
+  // Staleness — MUST be before /:id
+  GET('/api/admin/knowledge/staleness', (_req: MockRequest): MockResponse => {
+    return { status: 200, body: s().staleness };
+  });
+
+  GET('/api/admin/knowledge/stale', (_req: MockRequest): MockResponse => {
+    const stale = s().articles.filter((a: Record<string, unknown>) => a.stalenessCategory === 'aging' || a.stalenessCategory === 'stale');
+    return { status: 200, body: { entries: stale, total: stale.length } };
+  });
+
+  // Export — MUST be before /:id
+  GET('/api/admin/knowledge/export', (_req: MockRequest): MockResponse => {
+    return { status: 200, body: { csv: "id,title,category,status", filename: "knowledge-export.csv" } };
+  });
+
+  // Suggestions (used by OnboardingWizard) — MUST be before /:id
+  GET('/api/admin/knowledge/suggestions', (_req: MockRequest): MockResponse => {
+    return { status: 200, body: { suggestions: [] } };
+  });
+
   GET('/api/admin/knowledge/:id', (req: MockRequest): MockResponse => {
     const article = s().articles.find((a: Record<string, unknown>) => a.id === req.params.id);
     if (!article) return { status: 404, body: { detail: 'Article not found' } };
@@ -75,21 +104,6 @@ export function registerKnowledgeHandlers(): void {
     };
   });
 
-  // Export
-  GET('/api/admin/knowledge/export', (_req: MockRequest): MockResponse => {
-    return { status: 200, body: { csv: "id,title,category,status", filename: "knowledge-export.csv" } };
-  });
-
-  // Staleness
-  GET('/api/admin/knowledge/staleness', (_req: MockRequest): MockResponse => {
-    return { status: 200, body: s().staleness };
-  });
-
-  GET('/api/admin/knowledge/stale', (_req: MockRequest): MockResponse => {
-    const stale = s().articles.filter((a: Record<string, unknown>) => a.stalenessCategory === 'aging' || a.stalenessCategory === 'stale');
-    return { status: 200, body: { entries: stale, total: stale.length } };
-  });
-
   POST('/api/admin/knowledge/:id/verify', (req: MockRequest): MockResponse => {
     const store = getStore();
     const article = store.knowledge.articles.find((a: Record<string, unknown>) => a.id === req.params.id);
@@ -104,5 +118,14 @@ export function registerKnowledgeHandlers(): void {
   // Conflict scan
   POST('/api/admin/knowledge/scan', (_req: MockRequest): MockResponse => {
     return { status: 200, body: { conflicts: [], total: 0 } };
+  });
+
+  // Ingestion (used by OnboardingWizard)
+  POST('/api/admin/knowledge/ingest', (_req: MockRequest): MockResponse => {
+    return { status: 200, body: { job_id: 'mock-job-001', status: 'completed' } };
+  });
+
+  GET('/api/admin/knowledge/ingest/status', (_req: MockRequest): MockResponse => {
+    return { status: 200, body: { job_id: 'mock-job-001', status: 'completed', progress: 100 } };
   });
 }

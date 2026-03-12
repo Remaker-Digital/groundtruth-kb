@@ -109,7 +109,7 @@ export function mockApiPlugin(): Plugin {
           const headers: Record<string, string> = {
             "Content-Type": "application/json",
             "X-Mock": "true",
-            "X-Product-Version": "1.81.2-mock",
+            "X-Product-Version": "1.82.0-mock",
             ...mockRes.headers,
           };
 

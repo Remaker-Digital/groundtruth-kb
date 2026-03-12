@@ -29,7 +29,7 @@ export function registerConfigHandlers(): void {
 
   // Schema
   GET('/api/config/schema', (_req: MockRequest): MockResponse => {
-    return { status: 200, body: { fields: [] } };
+    return { status: 200, body: { fields: s().schema } };
   });
 
   GET('/api/config/schema/:step', (_req: MockRequest): MockResponse => {

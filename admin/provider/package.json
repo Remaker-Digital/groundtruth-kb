@@ -8,6 +8,7 @@
     "sync-env": "powershell -ExecutionPolicy Bypass -File ../../scripts/sync-admin-env.ps1",
     "predev": "npm run sync-env",
     "dev": "vite",
+    "dev:mock": "vite --mode mock",
     "prebuild": "npm run sync-env",
     "build": "tsc && vite build",
     "preview": "vite preview",
