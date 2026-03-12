@@ -339,11 +339,12 @@ def precheck_validate_environment(args: argparse.Namespace) -> PhaseResult:
     else:
         failures.append("admin/standalone/node_modules not found — run npm install")
 
-    # Locust (optional — SKIP not FAIL)
-    if shutil.which("locust"):
-        log("INFO", "  Locust: available")
-    else:
-        log("WARN", "  Locust: not installed (Phase 10 will SKIP)")
+    # Locust (required — Phase 10 load testing)
+    try:
+        import locust as _locust_check  # noqa: F401
+        log("INFO", f"  Locust: available ({_locust_check.__version__})")
+    except ImportError:
+        failures.append("Locust not installed — pip install locust")
 
     # All phases are live (SPEC-1649) — always validate live prerequisites
     needs_live = True
@@ -709,10 +710,12 @@ def phase_10_load_testing(args: argparse.Namespace) -> PhaseResult:
     """Run Locust headless load test against the target environment."""
     t0 = time.time()
 
-    if not shutil.which("locust"):
+    try:
+        import locust as _locust  # noqa: F401
+    except ImportError:
         dt = time.time() - t0
-        log("SKIP", "  Load Testing: locust not installed")
-        return PhaseResult(10, "Load Testing", "SKIP", dt,
+        log("FAIL", "  Load Testing: locust not installed")
+        return PhaseResult(10, "Load Testing", "FAIL", dt,
                            "locust not installed — pip install locust")
 
     conf_file = f"tests/performance/locust-{args.env}.conf"
@@ -726,7 +729,7 @@ def phase_10_load_testing(args: argparse.Namespace) -> PhaseResult:
             return PhaseResult(10, "Load Testing", "SKIP", dt, "No locust config")
 
     r = stream_subprocess(
-        ["locust", "-f", "tests/performance/locustfile.py",
+        [sys.executable, "-m", "locust", "-f", "tests/performance/locustfile.py",
          "--config", conf_file, "--headless"],
         cwd=PROJECT_ROOT, timeout=300, prefix="  [locust] ",
     )
