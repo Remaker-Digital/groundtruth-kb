@@ -45,9 +45,10 @@ class TestContactPreferencesSection:
         src = _read("admin/standalone/layouts/StandaloneLayout.tsx")
         assert "setUserEmail" in src
 
-    def test_recovery_placeholder(self):
+    def test_recovery_field_present(self):
         src = _read("admin/standalone/pages/Billing.tsx")
-        assert "Coming soon" in src
+        # S168 WI-1240 removed "Coming soon" badges — recovery email field is now active
+        assert "recovery" in src.lower() or "Recovery" in src
 
 
 

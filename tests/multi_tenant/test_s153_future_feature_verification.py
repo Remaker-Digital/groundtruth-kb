@@ -185,8 +185,8 @@ class TestSpec0703ProductionRestore:
     """Documented procedure for restoring production after failure."""
 
     def test_deployment_runbook_exists(self):
-        runbook = DOCS / "operations" / "DEPLOYMENT-RUNBOOK.md"
-        assert runbook.exists(), "Deployment runbook must exist"
+        runbook = DOCS / "archive" / "DEPLOYMENT-RUNBOOK.md"
+        assert runbook.exists(), "Deployment runbook must exist (archived in S161)"
 
 
 # ─────────────────────────────────────────────────────────────

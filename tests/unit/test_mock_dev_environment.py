@@ -152,7 +152,7 @@ class TestFixtureValidity:
 
     def test_fixture_files_are_non_trivial(self):
         for ff in FIXTURE_DIR.glob("*.ts"):
-            lc = len(ff.read_text().strip().splitlines())
+            lc = len(ff.read_text(encoding="utf-8", errors="replace").strip().splitlines())
             assert lc > 10, f"{ff.name} only {lc} lines"
 
     def test_no_fixture_imports_production_code(self):

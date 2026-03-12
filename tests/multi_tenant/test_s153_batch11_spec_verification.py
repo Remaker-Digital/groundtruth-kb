@@ -262,11 +262,12 @@ class TestSpec1661TestTraceabilityAutomation:
     """SPEC-1661: Test Traceability Automation — Pytest Results to KB."""
 
     def test_record_test_results_script(self):
-        assert (SCRIPTS / "record_test_results.py").exists(), \
-            "record_test_results.py must exist"
+        archived = SCRIPTS / "archive" / "record_test_results.py"
+        assert archived.exists(), \
+            "record_test_results.py must exist (archived)"
 
     def test_script_parses_junit(self):
-        src = (SCRIPTS / "record_test_results.py").read_text(encoding="utf-8")
+        src = (SCRIPTS / "archive" / "record_test_results.py").read_text(encoding="utf-8")
         assert "junit" in src.lower() or "xml" in src.lower(), \
             "Must parse JUnit XML format"
 
