@@ -194,9 +194,21 @@ def get_api_json(page: Page, mock_base_url: str, path: str) -> dict:
 
 
 def post_api_json(page: Page, mock_base_url: str, path: str, data: dict = None) -> dict:
-    """POST to a mock API endpoint and return parsed JSON."""
+    """POST to a mock API endpoint and return parsed JSON.
+
+    Uses ``data`` for JSON-serialised body so the mock plugin's
+    ``readBody → JSON.parse()`` can parse it correctly.
+    """
     origin = api_origin(mock_base_url)
-    resp = page.request.post(f"{origin}{path}", data=data)
+    if data is not None:
+        import json as _json
+        resp = page.request.post(
+            f"{origin}{path}",
+            data=_json.dumps(data),
+            headers={"Content-Type": "application/json"},
+        )
+    else:
+        resp = page.request.post(f"{origin}{path}")
     return resp.json()
 
 

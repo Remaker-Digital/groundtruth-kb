@@ -21,6 +21,7 @@ import { registerQuickActionHandlers } from "./handlers/quick-actions";
 import { registerWidgetHandlers } from "./handlers/widget";
 import { registerBillingHandlers } from "./handlers/billing";
 import { registerMemoryHandlers } from "./handlers/memory";
+import { registerIntegrationHandlers } from "./handlers/integrations";
 
 let handlersRegistered = false;
 function ensureHandlers(): void {
@@ -35,6 +36,7 @@ function ensureHandlers(): void {
   registerWidgetHandlers();
   registerBillingHandlers();
   registerMemoryHandlers();
+  registerIntegrationHandlers();
   handlersRegistered = true;
 }
 import { matchRoute } from "./router";

@@ -30,7 +30,8 @@ import {
   NumberInput,
 } from '@mantine/core';
 import { useAppContext } from '../layouts/StandaloneLayout';
-import { useConfig, useUpdateConfig } from '../../shared/hooks/index';
+import { useConfig, useUpdateConfig, useAutoSaveDraft } from '../../shared/hooks/index';
+import { AutoSaveIndicator } from '../../shared/components/AutoSaveIndicator';
 import { HelpTooltip } from '../../shared/HelpTooltip';
 import { LoadingState } from '../../shared/LoadingState';
 import { tokens } from '../../shared/theme/styles';
@@ -99,7 +100,7 @@ export const MemoryPrivacyPage: React.FC = () => {
     }
   }, [updateConfig, onNotify]);
 
-  const handleSave = useCallback(async () => {
+  const handleSave = useCallback(async (): Promise<boolean> => {
     // Field names must match backend config field registry.
     // Only include tier-gated fields when the tenant meets the gate.
     const updates: Record<string, unknown> = {
@@ -117,14 +118,15 @@ export const MemoryPrivacyPage: React.FC = () => {
 
     const result = await updateConfig(updates);
     if (result?.success) {
-      onNotify('Draft memory & privacy settings saved.', 'success');
       refreshActivationStatus();
+      return true;
     } else {
       // Surface the actual validation error from the hook, not a generic fallback
       const detail = result?.message
         || error
         || 'Failed to save settings. Please check your plan tier and try again.';
       onNotify(detail, 'error');
+      return false;
     }
   }, [
     memoryEnabled, conversationMemory, crossSessionLearning, retentionDays,
@@ -132,6 +134,8 @@ export const MemoryPrivacyPage: React.FC = () => {
     identificationMode, isProOrHigher, updateConfig, error, onNotify,
     refreshActivationStatus,
   ]);
+
+  const { onBlur: autoSaveOnBlur, saveCount } = useAutoSaveDraft({ save: handleSave });
 
   // Loading state
   if (loading && !fullConfig) {
@@ -151,10 +155,13 @@ export const MemoryPrivacyPage: React.FC = () => {
   }
 
   return (
-    <Stack gap="lg">
+    <Stack gap="lg" onBlur={autoSaveOnBlur}>
       {/* Page header */}
       <div>
-        <Title order={2}>Memory & privacy</Title>
+        <Group justify="space-between" align="center">
+          <Title order={2}>Memory & privacy</Title>
+          <AutoSaveIndicator saveCount={saveCount} />
+        </Group>
         <Text c="dimmed" size="sm">
           Configure how your AI remembers customers and handles their data
         </Text>
@@ -427,16 +434,7 @@ export const MemoryPrivacyPage: React.FC = () => {
         </Accordion.Item>
       </Accordion>
 
-      {/* Save draft inputs — persists field edits to draft state */}
-      <Group justify="flex-end">
-        <Button
-          color={ACTION_BLUE}
-          onClick={handleSave}
-          loading={saving}
-        >
-          Save draft inputs
-        </Button>
-      </Group>
+      {/* Auto-save replaces the manual save button — changes save on focusout */}
     </Stack>
   );
 };

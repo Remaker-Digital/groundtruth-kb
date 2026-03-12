@@ -10,7 +10,8 @@ Fixture values from admin/standalone/mocks/fixtures/inbox.ts:
     escalated), conv-003 (Sophie Chen, resolved), conv-004 (David Park,
     resolved), conv-005 (Aisha Patel, active)
   Messages for conv-001: 4 messages (customer/ai/customer/ai)
-  Messages for conv-002: 4 messages (customer/ai/system/human_agent)
+  Messages for conv-002: 12 messages (customer/ai/system/human_agent + extended)
+  Messages for conv-003: 8 messages, conv-004: 4 messages, conv-005: 3 messages
 
 API endpoints under test:
   GET  /api/admin/conversations           -> { conversations: [...] }
@@ -166,8 +167,8 @@ class TestConversationDetail:
         """Detail panel shows message or turn count information."""
         _select_conversation(self._page, "Emily Watson")
         text = main_text(self._page)
-        # conv-001 has 6 messages, 3 turns
-        assert "6" in text or "message" in text.lower()
+        # conv-001 has 4 messages, 2 turns
+        assert "4" in text or "message" in text.lower()
 
     def test_detail_shows_customer_verification(self):
         """Detail shows verification status for verified customers."""
@@ -442,6 +443,109 @@ class TestConversationActions:
 
 
 # ---------------------------------------------------------------------------
+# Test Class 6b: Conversation Action Store Mutations (WI-1228)
+# ---------------------------------------------------------------------------
+
+class TestConversationActionMutations:
+    """Verify action endpoints actually mutate the mock store (WI-1228).
+
+    Prior to WI-1228 fix, all action handlers returned static success
+    without updating the in-memory store — subsequent GET would still
+    return the original status.  These tests verify the round-trip:
+    POST action → GET detail → field changed.
+    """
+
+    @pytest.fixture(autouse=True)
+    def _setup(self, page: Page, mock_base_url: str):
+        self._page = page
+        self._url = mock_base_url
+        # Reset store to fixture state so tests are independent
+        post_api_json(page, mock_base_url,
+                      "/api/__test__/reset")
+        _inject_auth_and_go(page, mock_base_url, "/inbox")
+
+    def test_resolve_mutates_status(self):
+        """After resolve, GET detail returns status='resolved'."""
+        post_api_json(self._page, self._url,
+                      "/api/admin/conversations/conv-001/resolve")
+        detail = get_api_json(self._page, self._url,
+                              "/api/admin/conversations/conv-001")
+        assert detail["status"] == "resolved"
+
+    def test_resolve_sets_ended_at(self):
+        """After resolve, endedAt is populated."""
+        post_api_json(self._page, self._url,
+                      "/api/admin/conversations/conv-001/resolve")
+        detail = get_api_json(self._page, self._url,
+                              "/api/admin/conversations/conv-001")
+        assert detail["endedAt"] is not None
+
+    def test_escalate_mutates_status(self):
+        """After escalate, GET detail returns status='escalated'."""
+        post_api_json(self._page, self._url,
+                      "/api/admin/conversations/conv-001/escalate",
+                      data={"category": "billing", "assignTo": "member-007"})
+        detail = get_api_json(self._page, self._url,
+                              "/api/admin/conversations/conv-001")
+        assert detail["status"] == "escalated"
+
+    def test_escalate_sets_category_and_assignee(self):
+        """Escalate stores category and assignee on conversation."""
+        post_api_json(self._page, self._url,
+                      "/api/admin/conversations/conv-001/escalate",
+                      data={"category": "billing", "assignTo": "member-007"})
+        detail = get_api_json(self._page, self._url,
+                              "/api/admin/conversations/conv-001")
+        assert detail["escalationCategory"] == "billing"
+        assert detail["assignedTo"] == "member-007"
+
+    def test_archive_sets_archived_at(self):
+        """After archive, archivedAt is populated."""
+        post_api_json(self._page, self._url,
+                      "/api/admin/conversations/conv-001/archive")
+        detail = get_api_json(self._page, self._url,
+                              "/api/admin/conversations/conv-001")
+        assert detail["archivedAt"] is not None
+
+    def test_archive_then_unarchive_clears(self):
+        """Archive then unarchive restores archivedAt to null."""
+        post_api_json(self._page, self._url,
+                      "/api/admin/conversations/conv-001/archive")
+        post_api_json(self._page, self._url,
+                      "/api/admin/conversations/conv-001/unarchive")
+        detail = get_api_json(self._page, self._url,
+                              "/api/admin/conversations/conv-001")
+        assert detail["archivedAt"] is None
+
+    def test_archive_filters_from_default_list(self):
+        """Archived conversation is excluded from default GET (no ?archived)."""
+        post_api_json(self._page, self._url,
+                      "/api/admin/conversations/conv-001/archive")
+        data = get_api_json(self._page, self._url,
+                            "/api/admin/conversations")
+        ids = [c["conversationId"] for c in data["conversations"]]
+        assert "conv-001" not in ids
+
+    def test_archive_appears_in_archived_only(self):
+        """Archived conversation appears in ?archived=only list."""
+        post_api_json(self._page, self._url,
+                      "/api/admin/conversations/conv-001/archive")
+        data = get_api_json(self._page, self._url,
+                            "/api/admin/conversations?archived=only")
+        ids = [c["conversationId"] for c in data["conversations"]]
+        assert "conv-001" in ids
+
+    def test_assign_sets_assigned_to(self):
+        """After assign, assignedTo is set on conversation."""
+        post_api_json(self._page, self._url,
+                      "/api/admin/conversations/conv-001/assign",
+                      data={"assignTo": "member-042"})
+        detail = get_api_json(self._page, self._url,
+                              "/api/admin/conversations/conv-001")
+        assert detail["assignedTo"] == "member-042"
+
+
+# ---------------------------------------------------------------------------
 # Test Class 7: API Contracts
 # ---------------------------------------------------------------------------
 
@@ -469,7 +573,7 @@ class TestApiContracts:
         assert data["conversationId"] == "conv-001"
         assert data["customerName"] == "Emily Watson"
         assert data["status"] == "active"
-        assert data["messageCount"] == 6
+        assert data["messageCount"] == 4
 
     def test_messages_response_shape(self):
         """GET /api/admin/conversations/:id/messages returns {messages: [...]}."""
@@ -530,10 +634,15 @@ class TestStatusFilter:
                             "/api/admin/conversations?archived=include")
         assert len(data["conversations"]) == 5
 
-    def test_messages_for_conv_without_messages(self):
-        """Conversations without messages return empty array."""
-        data = get_api_json(self._page, self._url,
-                            "/api/admin/conversations/conv-003/messages")
-        assert "messages" in data
-        assert isinstance(data["messages"], list)
-        assert len(data["messages"]) == 0
+    def test_messages_for_all_conversations_match_count(self):
+        """Every conversation's messageCount matches its actual message objects (WI-1227)."""
+        convs_data = get_api_json(self._page, self._url,
+                                  "/api/admin/conversations")
+        for conv in convs_data["conversations"]:
+            cid = conv["conversationId"]
+            msgs_data = get_api_json(self._page, self._url,
+                                     f"/api/admin/conversations/{cid}/messages")
+            assert len(msgs_data["messages"]) == conv["messageCount"], (
+                f'{cid} ({conv["customerName"]}): messageCount={conv["messageCount"]} '
+                f'but API returned {len(msgs_data["messages"])} messages'
+            )

@@ -23,10 +23,13 @@ import {
   Alert,
   Accordion,
   Tooltip,
+  NumberInput,
 } from '@mantine/core';
 import { useDisclosure } from '@mantine/hooks';
 import { useAppContext } from '../layouts/StandaloneLayout';
-import { useKnowledgeBase, useSaveKBArticle, useUploadFile, useImportUrl, useExportCSV, useStalenessSummary, useVerifyEntry } from '../../shared/hooks/index';
+import { useKnowledgeBase, useSaveKBArticle, useUploadFile, useImportUrl, useExportCSV, useStalenessSummary, useVerifyEntry, useConfig, useUpdateConfig, useAutoSaveDraft } from '../../shared/hooks/index';
+import { AutoSaveIndicator } from '../../shared/components/AutoSaveIndicator';
+import { HelpTooltip } from '../../shared/HelpTooltip';
 import { useIngestionStatus, useTemplates, useStartIngestion, useCancelIngestion, useApplyTemplate } from '../../shared/hooks/useIngestion';
 import { IngestionPanel } from '../../shared/components/IngestionPanel';
 import { CategoryTemplateSelector } from '../../shared/components/CategoryTemplateSelector';
@@ -247,7 +250,44 @@ function formatDate(iso: string | null | undefined): string {
 // ---------------------------------------------------------------------------
 
 export const KnowledgeBasePage: React.FC = () => {
-  const { apiFetch, onNotify } = useAppContext();
+  const { apiFetch, onNotify, refreshActivationStatus } = useAppContext();
+
+  // Policy overrides — config fields that live on this page
+  const configResult = useConfig(apiFetch);
+  const { updateConfig: saveConfigFields, loading: savingPolicy } = useUpdateConfig(apiFetch);
+  const [returnWindow, setReturnWindow] = useState<number>(30);
+  const [refundPolicy, setRefundPolicy] = useState('');
+  const [shippingPolicy, setShippingPolicy] = useState('');
+  const policyInitRef = useRef(false);
+
+  // Sync policy fields from server config on load
+  React.useEffect(() => {
+    if (configResult.data && !policyInitRef.current) {
+      const cfg = (configResult.data as any).config ?? configResult.data;
+      setReturnWindow(cfg.return_window ?? cfg.returnWindow ?? 30);
+      setRefundPolicy(cfg.return_policy ?? cfg.refundPolicy ?? '');
+      setShippingPolicy(cfg.shipping_info ?? cfg.shippingPolicy ?? '');
+      policyInitRef.current = true;
+    }
+  }, [configResult.data]);
+
+  const savePolicyOverrides = useCallback(async (): Promise<boolean> => {
+    const changes: Record<string, unknown> = {
+      return_window: returnWindow,
+      return_policy: refundPolicy,
+      shipping_info: shippingPolicy,
+    };
+    const result = await saveConfigFields(changes);
+    if (result?.success) {
+      refreshActivationStatus?.();
+      return true;
+    }
+    return false;
+  }, [returnWindow, refundPolicy, shippingPolicy, saveConfigFields, refreshActivationStatus]);
+
+  const { onBlur: policyOnBlur, saveCount: policySaveCount } = useAutoSaveDraft({
+    save: savePolicyOverrides,
+  });
 
   // API hooks
   const kbResult = useKnowledgeBase(apiFetch);
@@ -527,6 +567,43 @@ export const KnowledgeBasePage: React.FC = () => {
           Manage articles your AI uses to answer customers
         </Text>
       </div>
+
+      {/* Policy overrides — config fields authoritative over KB articles */}
+      <Paper p="lg" radius="md" withBorder onBlur={policyOnBlur}>
+        <Group justify="space-between" mb="md">
+          <Text fw={600}>Policy overrides <HelpTooltip text="These policy values take priority over knowledge base articles when the AI responds to customers." docLink="/docs/business-policies" /></Text>
+          <AutoSaveIndicator saveCount={policySaveCount} />
+        </Group>
+        <Stack gap="md">
+          <NumberInput
+            label="Return window"
+            suffix=" days"
+            value={returnWindow}
+            onChange={(val) => setReturnWindow(Number(val) || 30)}
+            min={0}
+            max={365}
+          />
+          <Textarea
+            label="Refund policy"
+            placeholder="Describe your refund policy..."
+            value={refundPolicy}
+            onChange={(e) => setRefundPolicy(e.currentTarget.value)}
+            minRows={3}
+            autosize
+          />
+          <Textarea
+            label="Shipping policy"
+            placeholder="Describe your shipping policy..."
+            value={shippingPolicy}
+            onChange={(e) => setShippingPolicy(e.currentTarget.value)}
+            minRows={3}
+            autosize
+          />
+        </Stack>
+        <Text size="xs" c="dimmed" mt="sm">
+          These values take priority over knowledge base articles. Changes save automatically.
+        </Text>
+      </Paper>
 
       {/* Top bar: Search on row 1, Filters + Action buttons on row 2 */}
       <Paper p="md" radius="md" withBorder>

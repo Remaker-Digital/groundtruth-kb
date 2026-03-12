@@ -140,3 +140,6 @@ export type {
   WebsiteSourceList,
   WebsiteSourceAction,
 } from './useWebsiteSources';
+
+// Auto-save draft (focusout-driven)
+export { useAutoSaveDraft } from './useAutoSaveDraft';

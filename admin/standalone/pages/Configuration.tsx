@@ -43,7 +43,9 @@ import {
   useSaveNamedConfig,
   useActivateNamedConfig,
   useDeleteNamedConfig,
+  useAutoSaveDraft,
 } from '../../shared/hooks/index';
+import { AutoSaveIndicator } from '../../shared/components/AutoSaveIndicator';
 import { HelpTooltip } from '../../shared/HelpTooltip';
 import { LabelWithSuggestion } from '../../shared/components/SuggestionBadge';
 import { LoadingState } from '../../shared/LoadingState';
@@ -471,23 +473,26 @@ export const ConfigurationPage: React.FC = () => {
     setHasChanges(false);
   };
 
-  const handleSave = async () => {
+  const handleSave = async (): Promise<boolean> => {
     const changes = diffForm(serverFormRef.current, form);
-    if (Object.keys(changes).length === 0) return;
+    if (Object.keys(changes).length === 0) return false;
 
     const result = await saveConfig(changes);
     if (result?.success) {
-      onNotify('Draft configuration saved successfully.', 'success');
       // Update server snapshot so discard reflects new saved state
       serverFormRef.current = { ...form };
       setHasChanges(false);
       configResult.refetch();
       refreshActivationStatus();
+      return true;
     } else {
       const detail = (result as any)?.error || saveError || 'Failed to save configuration.';
       onNotify(`Failed to save: ${detail}`, 'error');
+      return false;
     }
   };
+
+  const { onBlur: autoSaveOnBlur, saveCount } = useAutoSaveDraft({ save: handleSave });
 
   // Named configuration handlers (WI #266, #267)
   const handleSaveNamed = async () => {
@@ -566,7 +571,10 @@ export const ConfigurationPage: React.FC = () => {
     <Stack gap="lg">
       {/* Page header with action buttons */}
       <div>
-        <Title order={2}>Agent configuration</Title>
+        <Group justify="space-between" align="center">
+          <Title order={2}>Agent configuration</Title>
+          <AutoSaveIndicator saveCount={saveCount} />
+        </Group>
         <Text c="dimmed" size="sm">
           Fine-tune your AI agent's behavior
         </Text>
@@ -710,118 +718,14 @@ export const ConfigurationPage: React.FC = () => {
         </Stack>
       </Modal>
 
-      {/* Configuration form */}
-      <Stack gap="lg">
-            {/* Brand & Persona */}
-            <Paper p="lg" radius="md" withBorder>
-              <Text fw={600} mb="md">Brand & persona <HelpTooltip text="Set your AI agent's name, greeting, personality tone, and formality level." docLink={`${DOCS_BASE}/brand-and-tone`} /></Text>
-              <Stack gap="md">
-                <TextInput
-                  label={
-                    <LabelWithSuggestion
-                      label="Brand name"
-                      suggestion={suggestions.brand_name}
-                      currentValue={form.brandName}
-                      onApply={(v) => updateField('brandName', String(v))}
-                    />
-                  }
-                  placeholder="Your store or brand name"
-                  value={form.brandName}
-                  onChange={(e) => updateField('brandName', e.currentTarget.value)}
-                  required
-                />
-                <Textarea
-                  label={
-                    <LabelWithSuggestion
-                      label="Brand voice"
-                      suggestion={suggestions.brand_voice}
-                      currentValue={form.brandVoice}
-                      onApply={(v) => updateField('brandVoice', String(v))}
-                    />
-                  }
-                  placeholder="Describe the personality and tone of your AI agent..."
-                  value={form.brandVoice}
-                  onChange={(e) => updateField('brandVoice', e.currentTarget.value)}
-                  minRows={3}
-                  autosize
-                  required
-                />
-                <Group grow>
-                  <Select
-                    label="Formality"
-                    data={[
-                      { value: 'casual', label: 'Casual' },
-                      { value: 'balanced', label: 'Professional' },
-                      { value: 'formal', label: 'Formal' },
-                    ]}
-                    value={form.formality}
-                    onChange={(val) => updateField('formality', val || 'balanced')}
-                  />
-                  <Select
-                    label="Response length"
-                    data={[
-                      { value: 'concise', label: 'Concise' },
-                      { value: 'standard', label: 'Moderate' },
-                      { value: 'detailed', label: 'Detailed' },
-                    ]}
-                    value={form.responseLength}
-                    onChange={(val) => updateField('responseLength', val || 'standard')}
-                  />
-                </Group>
-              </Stack>
-            </Paper>
-
-            {/* Policies */}
-            <Paper p="lg" radius="md" withBorder>
-              <Text fw={600} mb="md">Policies <HelpTooltip text="Control how the AI handles refunds, returns, and other business rules." docLink={`${DOCS_BASE}/business-policies`} /></Text>
-              <Stack gap="md">
-                <NumberInput
-                  label="Return window"
-                  suffix=" days"
-                  value={form.returnWindow}
-                  onChange={(val) => updateField('returnWindow', Number(val) || 30)}
-                  min={0}
-                  max={365}
-                />
-                <Textarea
-                  label={
-                    <LabelWithSuggestion
-                      label="Refund policy"
-                      suggestion={suggestions.return_policy}
-                      currentValue={form.refundPolicy}
-                      onApply={(v) => updateField('refundPolicy', String(v))}
-                    />
-                  }
-                  placeholder="Describe your refund policy..."
-                  value={form.refundPolicy}
-                  onChange={(e) => updateField('refundPolicy', e.currentTarget.value)}
-                  minRows={3}
-                  autosize
-                />
-                <Textarea
-                  label={
-                    <LabelWithSuggestion
-                      label="Shipping policy"
-                      suggestion={suggestions.shipping_info}
-                      currentValue={form.shippingPolicy}
-                      onApply={(v) => updateField('shippingPolicy', String(v))}
-                    />
-                  }
-                  placeholder="Describe your shipping policy..."
-                  value={form.shippingPolicy}
-                  onChange={(e) => updateField('shippingPolicy', e.currentTarget.value)}
-                  minRows={3}
-                  autosize
-                />
-              </Stack>
-            </Paper>
-
+      {/* Configuration form — auto-saves on focusout */}
+      <Stack gap="lg" onBlur={autoSaveOnBlur}>
             {/* Escalation */}
             <Paper p="lg" radius="md" withBorder>
               <Text fw={600} mb="xs">Escalation <HelpTooltip text="Configure when and how conversations are handed off to human team members." docLink={`${DOCS_BASE}/escalation-rules`} /></Text>
               <Text size="xs" c="dimmed" mb="md">
-                Configure escalation categories, notification emails, and trigger keywords.
-                Each category routes to a different team email with its own keyword set.
+                Configure escalation categories, trigger keywords, and optional notification emails.
+                Each category routes to a different team member with its own keyword set.
               </Text>
 
               <Stack gap="md">
@@ -902,9 +806,9 @@ export const ConfigurationPage: React.FC = () => {
                       {/* Expanded detail */}
                       <Collapse in={isExpanded}>
                         <Stack gap="sm" mt="sm">
-                          {/* Notification email */}
+                          {/* Notification email (optional) */}
                           <TextInput
-                            label="Notification email"
+                            label="Notification email (optional)"
                             placeholder={`${cat.id}@yourcompany.com`}
                             size="sm"
                             value={catConfig.email}
@@ -999,21 +903,86 @@ export const ConfigurationPage: React.FC = () => {
               </Stack>
             </Paper>
 
-            {/* Custom Instructions */}
+            {/* Agent identity */}
             <Paper p="lg" radius="md" withBorder>
-              <Text fw={600} mb="md">Custom instructions <HelpTooltip text="Free-form instructions injected into every AI response. Use this for brand-specific rules or response guidelines." docLink={`${DOCS_BASE}/custom-instructions`} /></Text>
-              <Textarea
-                placeholder="Provide advisory instructions for the AI agent..."
-                value={form.customInstructions}
-                onChange={(e) => updateField('customInstructions', e.currentTarget.value)}
-                minRows={5}
-                autosize
-                maxRows={12}
-              />
-              <Text size="xs" c="dimmed" mt={8}>
-                Advisory instructions for the AI agent. Safety rules always take
-                precedence.
-              </Text>
+              <Text fw={600} mb="md">Agent identity <HelpTooltip text="Define who your AI agent is — brand name, personality, tone, and special instructions." docLink={`${DOCS_BASE}/brand-and-tone`} /></Text>
+              <Stack gap="lg">
+                {/* Brand & persona sub-section */}
+                <div>
+                  <Text fw={500} size="sm" mb="sm" c="dimmed">Brand & persona</Text>
+                  <Stack gap="md">
+                    <TextInput
+                      label={
+                        <LabelWithSuggestion
+                          label="Brand name"
+                          suggestion={suggestions.brand_name}
+                          currentValue={form.brandName}
+                          onApply={(v) => updateField('brandName', String(v))}
+                        />
+                      }
+                      placeholder="Your store or brand name"
+                      value={form.brandName}
+                      onChange={(e) => updateField('brandName', e.currentTarget.value)}
+                      required
+                    />
+                    <Textarea
+                      label={
+                        <LabelWithSuggestion
+                          label="Brand voice"
+                          suggestion={suggestions.brand_voice}
+                          currentValue={form.brandVoice}
+                          onApply={(v) => updateField('brandVoice', String(v))}
+                        />
+                      }
+                      placeholder="Describe the personality and tone of your AI agent..."
+                      value={form.brandVoice}
+                      onChange={(e) => updateField('brandVoice', e.currentTarget.value)}
+                      minRows={3}
+                      autosize
+                      required
+                    />
+                    <Group grow>
+                      <Select
+                        label="Formality"
+                        data={[
+                          { value: 'casual', label: 'Casual' },
+                          { value: 'balanced', label: 'Professional' },
+                          { value: 'formal', label: 'Formal' },
+                        ]}
+                        value={form.formality}
+                        onChange={(val) => updateField('formality', val || 'balanced')}
+                      />
+                      <Select
+                        label="Response length"
+                        data={[
+                          { value: 'concise', label: 'Concise' },
+                          { value: 'standard', label: 'Moderate' },
+                          { value: 'detailed', label: 'Detailed' },
+                        ]}
+                        value={form.responseLength}
+                        onChange={(val) => updateField('responseLength', val || 'standard')}
+                      />
+                    </Group>
+                  </Stack>
+                </div>
+
+                {/* Custom instructions sub-section */}
+                <div>
+                  <Text fw={500} size="sm" mb="sm" c="dimmed">Custom instructions</Text>
+                  <Textarea
+                    placeholder="Provide advisory instructions for the AI agent..."
+                    value={form.customInstructions}
+                    onChange={(e) => updateField('customInstructions', e.currentTarget.value)}
+                    minRows={5}
+                    autosize
+                    maxRows={12}
+                  />
+                  <Text size="xs" c="dimmed" mt={8}>
+                    Advisory instructions for the AI agent. Safety rules always take
+                    precedence.
+                  </Text>
+                </div>
+              </Stack>
             </Paper>
 
             {/* Language */}
@@ -1056,18 +1025,7 @@ export const ConfigurationPage: React.FC = () => {
 
           </Stack>
 
-          {/* Save draft inputs — persists field edits to draft state */}
-          <Group justify="flex-end">
-            <Button
-              color={ACTION_BLUE}
-              leftSection={<SaveIcon />}
-              disabled={!hasChanges}
-              loading={saving}
-              onClick={handleSave}
-            >
-              Save draft inputs
-            </Button>
-          </Group>
+          {/* Auto-save replaces the manual save button — changes save on focusout */}
     </Stack>
   );
 };

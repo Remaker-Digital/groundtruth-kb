@@ -33,7 +33,7 @@ const VARIANT_CLASS: Record<string, string> = {
   primary: 'ar-btn-action',
   success: 'ar-btn-activate',
   outline: 'ar-btn-ghost',
-  danger: 'ar-btn-danger-outline',
+  danger: 'ar-btn-danger',
 };
 
 const STATUS_COLORS: Record<string, string> = {

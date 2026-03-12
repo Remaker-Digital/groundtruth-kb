@@ -29,8 +29,9 @@ import {
   Code,
 } from '@mantine/core';
 import { useAppContext } from '../layouts/StandaloneLayout';
-import { useConfig, useUpdateConfig, useRotateWidgetKey } from '../../shared/hooks/index';
+import { useConfig, useUpdateConfig, useRotateWidgetKey, useAutoSaveDraft } from '../../shared/hooks/index';
 import { useAvatarUpload, useDeleteAvatar } from '../../shared/hooks/useAvatar';
+import { AutoSaveIndicator } from '../../shared/components/AutoSaveIndicator';
 import { HelpTooltip } from '../../shared/HelpTooltip';
 import { tokens } from '../../shared/theme/styles';
 
@@ -915,17 +916,20 @@ export function WidgetPage() {
     setConfig({ ...DEFAULT_WIDGET_CONFIG });
   }
 
-  async function handleSave() {
+  async function handleSave(): Promise<boolean> {
     const changes = widgetConfigToApiFields(config);
     const result = await saveConfig(changes);
     if (result?.success) {
-      onNotify('Draft widget settings saved successfully.', 'success');
       refreshActivationStatus();
+      return true;
     } else {
       const detail = (result as any)?.error || saveError || 'Failed to save widget settings';
       onNotify(`Failed to save: ${detail}`, 'error');
+      return false;
     }
   }
+
+  const { onBlur: autoSaveOnBlur, saveCount } = useAutoSaveDraft({ save: handleSave });
 
   async function handleRotateWidgetKey() {
     const result = await rotateWidgetKey();
@@ -944,14 +948,17 @@ export function WidgetPage() {
 
       {/* Page header */}
       <div>
-        <Title order={2}>Widget configuration</Title>
+        <Group justify="space-between" align="center">
+          <Title order={2}>Widget configuration</Title>
+          <AutoSaveIndicator saveCount={saveCount} />
+        </Group>
         <Text c="dimmed" size="sm">
           Customize how your chat widget looks and behaves
         </Text>
       </div>
 
-      {/* Form sections — full width (live widget serves as preview) */}
-      <Stack gap="md">
+      {/* Form sections — auto-saves on focusout */}
+      <Stack gap="md" onBlur={autoSaveOnBlur}>
             {/* Installation Section — widget key + embed code */}
             <Paper p="lg" radius="md" withBorder>
               <SectionHeader
@@ -1061,9 +1068,96 @@ export function WidgetPage() {
               </Stack>
             </Paper>
 
-            {/* Appearance Section */}
+            {/* Launcher Appearance Section (SPEC-1719 / WI-1237) */}
             <Paper p="lg" radius="md" withBorder>
-              <SectionHeader tooltip="Colors, position, size, and visual style of the chat widget on your storefront." docLink={`${DOCS_BASE}/widget-appearance`}>Appearance</SectionHeader>
+              <SectionHeader tooltip="Color, icon, size, and position of the floating launcher button on your storefront." docLink={`${DOCS_BASE}/widget-appearance`}>Launcher appearance</SectionHeader>
+              <Divider mb="md" />
+              <Stack gap="sm">
+                {/* Launcher configuration — two-column layout */}
+                <Group grow align="flex-start" gap="md">
+                  {/* Left column: Launcher color picker */}
+                  <div style={{ flex: '1 1 50%' }}>
+                    <ColorField
+                      label="Launcher color"
+                      value={config.launcherColor || config.primaryColor}
+                      onChange={(val) => update('launcherColor', val)}
+                      swatches={[BRAND_RED, '#2563EB', '#059669', '#7C3AED', '#D97706', '#DB2777', '#000000', '#FFFFFF']}
+                    />
+                  </div>
+
+                  {/* Right column: Launcher controls stack */}
+                  <Stack gap="sm" style={{ flex: '1 1 50%' }}>
+                    <Select
+                      label="Launcher icon"
+                      data={ICON_OPTIONS}
+                      value={config.launcherIcon}
+                      onChange={(val) => update('launcherIcon', (val as WidgetConfig['launcherIcon']) || 'chat')}
+                    />
+                    <div>
+                      <Text size="sm" fw={500} mb={4}>
+                        Launcher size ({config.launcherSize}px)
+                      </Text>
+                      <Slider
+                        min={48}
+                        max={72}
+                        step={1}
+                        value={config.launcherSize}
+                        onChange={(val) => update('launcherSize', val)}
+                        color="action"
+                        marks={[
+                          { value: 48, label: '48' },
+                          { value: 60, label: '60' },
+                          { value: 72, label: '72' },
+                        ]}
+                      />
+                    </div>
+                  </Stack>
+                </Group>
+                <div>
+                  <Text size="sm" fw={500} mb={6}>
+                    Position
+                  </Text>
+                  <SegmentedControl
+                    fullWidth
+                    value={config.position}
+                    onChange={(val) => update('position', val as WidgetConfig['position'])}
+                    data={[
+                      { label: 'Bottom right', value: 'bottom-right' },
+                      { label: 'Bottom left', value: 'bottom-left' },
+                    ]}
+                    color="action"
+                  />
+                </div>
+                <Group grow>
+                  <NumberInput
+                    label="Horizontal offset"
+                    description="Distance from edge (px)"
+                    size="xs"
+                    min={0}
+                    max={200}
+                    step={4}
+                    suffix=" px"
+                    value={config.positionOffsetX}
+                    onChange={(val) => update('positionOffsetX', typeof val === 'number' ? val : 20)}
+                  />
+                  <NumberInput
+                    label="Vertical offset"
+                    description="Distance from bottom (px)"
+                    size="xs"
+                    min={0}
+                    max={200}
+                    step={4}
+                    suffix=" px"
+                    value={config.positionOffsetY}
+                    onChange={(val) => update('positionOffsetY', typeof val === 'number' ? val : 20)}
+                  />
+                </Group>
+              </Stack>
+            </Paper>
+
+            {/* Chat Window Section (SPEC-1719 / WI-1237) */}
+            <Paper p="lg" radius="md" withBorder>
+              <SectionHeader tooltip="Colors, typography, dimensions, and visual style of the chat panel." docLink={`${DOCS_BASE}/widget-appearance`}>Chat window</SectionHeader>
               <Divider mb="md" />
               <Stack gap="sm">
                 {/* Header color pickers — side-by-side (WI #271) */}
@@ -1116,101 +1210,22 @@ export function WidgetPage() {
                     ]}
                   />
                 </div>
-                {/* Launcher configuration — two-column layout */}
-                <Group grow align="flex-start" gap="md" mt={8}>
-                  {/* Left column: Launcher color picker */}
-                  <div style={{ flex: '1 1 50%' }}>
-                    <ColorField
-                      label="Launcher color"
-                      value={config.launcherColor || config.primaryColor}
-                      onChange={(val) => update('launcherColor', val)}
-                      swatches={[BRAND_RED, '#2563EB', '#059669', '#7C3AED', '#D97706', '#DB2777', '#000000', '#FFFFFF']}
-                    />
-                  </div>
-
-                  {/* Right column: Launcher controls stack */}
-                  <Stack gap="sm" style={{ flex: '1 1 50%' }}>
-                    <Select
-                      label="Launcher icon"
-                      data={ICON_OPTIONS}
-                      value={config.launcherIcon}
-                      onChange={(val) => update('launcherIcon', (val as WidgetConfig['launcherIcon']) || 'chat')}
-                    />
-                    <div>
-                      <Text size="sm" fw={500} mb={4}>
-                        Launcher size ({config.launcherSize}px)
-                      </Text>
-                      <Slider
-                        min={48}
-                        max={72}
-                        step={1}
-                        value={config.launcherSize}
-                        onChange={(val) => update('launcherSize', val)}
-                        color="action"
-                        marks={[
-                          { value: 48, label: '48' },
-                          { value: 60, label: '60' },
-                          { value: 72, label: '72' },
-                        ]}
-                      />
-                    </div>
-                    <div>
-                      <Text size="sm" fw={500} mb={6}>
-                        Position
-                      </Text>
-                      <SegmentedControl
-                        fullWidth
-                        value={config.position}
-                        onChange={(val) => update('position', val as WidgetConfig['position'])}
-                        data={[
-                          { label: 'Bottom right', value: 'bottom-right' },
-                          { label: 'Bottom left', value: 'bottom-left' },
-                        ]}
-                        color="action"
-                      />
-                    </div>
-                    <Group grow>
-                      <NumberInput
-                        label="Horizontal offset"
-                        description="Distance from edge (px)"
-                        size="xs"
-                        min={0}
-                        max={200}
-                        step={4}
-                        suffix=" px"
-                        value={config.positionOffsetX}
-                        onChange={(val) => update('positionOffsetX', typeof val === 'number' ? val : 20)}
-                      />
-                      <NumberInput
-                        label="Vertical offset"
-                        description="Distance from bottom (px)"
-                        size="xs"
-                        min={0}
-                        max={200}
-                        step={4}
-                        suffix=" px"
-                        value={config.positionOffsetY}
-                        onChange={(val) => update('positionOffsetY', typeof val === 'number' ? val : 20)}
-                      />
-                    </Group>
-                    <div>
-                      <Text size="sm" fw={500} mb={6}>
-                        Color mode
-                      </Text>
-                      <SegmentedControl
-                        fullWidth
-                        value={config.colorMode}
-                        onChange={(val) => update('colorMode', val as WidgetConfig['colorMode'])}
-                        data={[
-                          { label: 'Light', value: 'light' },
-                          { label: 'Dark', value: 'dark' },
-                          { label: 'Auto', value: 'auto' },
-                        ]}
-                        color="action"
-                      />
-                    </div>
-                  </Stack>
-                </Group>
+                <div>
+                  <Text size="sm" fw={500} mb={6}>
+                    Color mode
+                  </Text>
+                  <SegmentedControl
+                    fullWidth
+                    value={config.colorMode}
+                    onChange={(val) => update('colorMode', val as WidgetConfig['colorMode'])}
+                    data={[
+                      { label: 'Light', value: 'light' },
+                      { label: 'Dark', value: 'dark' },
+                      { label: 'Auto', value: 'auto' },
+                    ]}
+                    color="action"
+                  />
+                </div>
                 <div>
                   <Text size="sm" fw={500} mb={6}>
                     Panel width <HelpTooltip text="Set the chat panel width. Compact (320px) works well on smaller screens; Wide (440px) shows more content." docLink="https://agentredcx.com/docs/admin-guide/widget-appearance" />
@@ -1593,9 +1608,6 @@ export function WidgetPage() {
             <Group justify="flex-end" gap="sm">
               <Button variant="default" onClick={resetDefaults}>
                 Reset to defaults
-              </Button>
-              <Button color="action" onClick={handleSave} loading={saving}>
-                Save draft inputs
               </Button>
             </Group>
       </Stack>

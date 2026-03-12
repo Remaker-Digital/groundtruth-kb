@@ -15,6 +15,7 @@ import { registerQuickActionHandlers } from './handlers/quick-actions';
 import { registerWidgetHandlers } from './handlers/widget';
 import { registerBillingHandlers } from './handlers/billing';
 import { registerMemoryHandlers } from './handlers/memory';
+import { registerIntegrationHandlers } from './handlers/integrations';
 
 let registered = false;
 
@@ -35,6 +36,7 @@ export function registerAllHandlers(): void {
   registerWidgetHandlers();
   registerBillingHandlers();
   registerMemoryHandlers();
+  registerIntegrationHandlers();
 
   registered = true;
   console.log('[mock] All API handlers registered');

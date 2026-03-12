@@ -371,16 +371,13 @@ export const BillingPage: React.FC = () => {
               </Button>
             </div>
 
-            {/* Recovery email */}
+            {/* Recovery email (SPEC-1677) */}
             <TextInput
               label="Recovery email"
               placeholder="backup@example.com"
               value={recoveryEmail}
               onChange={(e) => setRecoveryEmail(e.currentTarget.value)}
               description="Used for account recovery if you lose access"
-              disabled
-              rightSection={<Badge size="xs" variant="light" color="gray">Coming soon</Badge>}
-              rightSectionWidth={95}
             />
 
             {/* Phone number (SPEC-1686) */}
@@ -390,9 +387,6 @@ export const BillingPage: React.FC = () => {
               value={phone}
               onChange={(e) => setPhone(e.currentTarget.value)}
               description="For SMS verification and security alerts"
-              disabled
-              rightSection={<Badge size="xs" variant="light" color="gray">Coming soon</Badge>}
-              rightSectionWidth={95}
             />
           </SimpleGrid>
         </Paper>

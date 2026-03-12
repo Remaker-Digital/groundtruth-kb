@@ -72,28 +72,48 @@ export function registerInboxHandlers() {
     return { status: 200, body: { results } };
   });
 
-  POST("/api/admin/conversations/:id/resolve", () => ({
-    status: 200,
-    body: { success: true, message: "Conversation resolved" },
-  }));
+  POST("/api/admin/conversations/:id/resolve", (req) => {
+    const conv = s().conversations.find((c: { conversationId: string }) => c.conversationId === req.params.id);
+    if (conv) {
+      conv.status = "resolved";
+      conv.endedAt = new Date().toISOString();
+      conv.lastActivityAt = new Date().toISOString();
+    }
+    return { status: 200, body: { success: true, message: "Conversation resolved" } };
+  });
 
-  POST("/api/admin/conversations/:id/escalate", () => ({
-    status: 200,
-    body: { success: true, message: "Conversation escalated" },
-  }));
+  POST("/api/admin/conversations/:id/escalate", (req) => {
+    const conv = s().conversations.find((c: { conversationId: string }) => c.conversationId === req.params.id);
+    if (conv) {
+      conv.status = "escalated";
+      conv.lastActivityAt = new Date().toISOString();
+      conv.escalationCategory = (req.body as Record<string, string>)?.category || "general";
+      conv.assignedTo = (req.body as Record<string, string>)?.assignTo || null;
+    }
+    return { status: 200, body: { success: true, message: "Conversation escalated" } };
+  });
 
-  POST("/api/admin/conversations/:id/archive", () => ({
-    status: 200,
-    body: { success: true, message: "Conversation archived" },
-  }));
+  POST("/api/admin/conversations/:id/archive", (req) => {
+    const conv = s().conversations.find((c: { conversationId: string }) => c.conversationId === req.params.id);
+    if (conv) {
+      conv.archivedAt = new Date().toISOString();
+    }
+    return { status: 200, body: { success: true, message: "Conversation archived" } };
+  });
 
-  POST("/api/admin/conversations/:id/unarchive", () => ({
-    status: 200,
-    body: { success: true, message: "Conversation unarchived" },
-  }));
+  POST("/api/admin/conversations/:id/unarchive", (req) => {
+    const conv = s().conversations.find((c: { conversationId: string }) => c.conversationId === req.params.id);
+    if (conv) {
+      conv.archivedAt = null;
+    }
+    return { status: 200, body: { success: true, message: "Conversation unarchived" } };
+  });
 
-  POST("/api/admin/conversations/:id/assign", () => ({
-    status: 200,
-    body: { success: true },
-  }));
+  POST("/api/admin/conversations/:id/assign", (req) => {
+    const conv = s().conversations.find((c: { conversationId: string }) => c.conversationId === req.params.id);
+    if (conv) {
+      conv.assignedTo = (req.body as Record<string, string>)?.assignTo || null;
+    }
+    return { status: 200, body: { success: true } };
+  });
 }
