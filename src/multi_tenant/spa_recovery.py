@@ -228,9 +228,18 @@ _RECOVERY_EMAIL_BODY = """
   <strong>Save this key immediately.</strong> It will not be shown again.
   One of your backup codes has been consumed.
 </p>
+<div style="text-align:center;margin:24px 0">
+  <a href="{admin_dashboard_url}" style="display:inline-block;padding:10px 24px;
+     background:#ff3621;color:#ffffff;font-size:14px;font-weight:600;
+     text-decoration:none;border-radius:4px">
+    Sign in to Dashboard
+  </a>
+</div>
 <p style="color:#9ca3af;font-size:12px;line-height:1.5;margin:16px 0 0">
   If you did not initiate this recovery, your backup codes may be
-  compromised. Generate new backup codes immediately after signing in.
+  compromised. Sign in to your
+  <a href="{admin_dashboard_url}" style="color:#ff3621">admin dashboard</a>
+  and generate new backup codes immediately.
 </p>
 """
 
@@ -245,7 +254,13 @@ async def _send_recovery_email(to_email: str, new_key: str) -> None:
             logger.warning("ACS_CONNECTION_STRING not set — recovery email not sent")
             return
 
-        body_html = _RECOVERY_EMAIL_BODY.format(new_key=new_key)
+        from src.multi_tenant.welcome_email import _build_admin_login_url
+
+        admin_url = _build_admin_login_url()
+        body_html = _RECOVERY_EMAIL_BODY.format(
+            new_key=new_key,
+            admin_dashboard_url=admin_url,
+        )
         full_html = _EMAIL_WRAPPER.format(body=body_html)
 
         await send_acs_email(

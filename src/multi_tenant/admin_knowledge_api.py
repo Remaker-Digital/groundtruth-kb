@@ -298,6 +298,36 @@ class ScanResultResponse(CamelCaseModel):
     scan_duration_ms: int
 
 
+class ConfigConflictRequest(CamelCaseModel):
+    """Request body for config-vs-KB conflict check (SPEC-1714)."""
+
+    return_policy: str | None = None
+    shipping_info: str | None = None
+    brand_voice: str | None = None
+
+
+class ConfigConflictItem(CamelCaseModel):
+    """A single config-vs-KB conflict."""
+
+    config_field: str
+    config_value: str
+    article_id: str
+    article_title: str
+    conflicting_facts: list[str] = Field(default_factory=list)
+    resolution: str
+
+
+class ConfigConflictResponse(CamelCaseModel):
+    """Result of config-vs-KB conflict check (SPEC-1714)."""
+
+    tenant_id: str
+    scanned_at: str
+    config_fields_checked: int
+    articles_checked: int
+    conflicts: list[ConfigConflictItem]
+    scan_duration_ms: int
+
+
 class ChunkPreviewItem(CamelCaseModel):
     """A single chunk in the chunk preview response (C5)."""
 
@@ -1524,6 +1554,68 @@ async def get_scan_result(
         high_count=result.high_count,
         medium_count=result.medium_count,
         low_count=result.low_count,
+        scan_duration_ms=result.scan_duration_ms,
+    )
+
+
+# ---------------------------------------------------------------------------
+# POST /api/admin/knowledge/scan/config — Config-vs-KB conflict check (SPEC-1714)
+# ---------------------------------------------------------------------------
+
+
+@router.post(
+    "/scan/config",
+    response_model=ConfigConflictResponse,
+    summary="Check config fields against KB articles",
+    description=(
+        "Cross-checks tenant configuration field values (return_policy, shipping_info, "
+        "brand_voice) against knowledge base articles for factual conflicts. "
+        "Lightweight scan intended to run on config save."
+    ),
+    responses={
+        503: {"description": "Conflict scanner not initialized"},
+    },
+)
+async def scan_config_conflicts(
+    body: ConfigConflictRequest,
+    ctx: TenantContext = Depends(get_tenant_context),
+) -> ConfigConflictResponse:
+    """Scan for conflicts between config fields and KB articles (SPEC-1714)."""
+    if _conflict_scanner is None:
+        raise HTTPException(
+            status_code=503,
+            detail="Conflict scanner not initialised",
+        )
+
+    config_fields: dict[str, str] = {}
+    if body.return_policy:
+        config_fields["return_policy"] = body.return_policy
+    if body.shipping_info:
+        config_fields["shipping_info"] = body.shipping_info
+    if body.brand_voice:
+        config_fields["brand_voice"] = body.brand_voice
+
+    result = await _conflict_scanner.scan_config_conflicts(
+        tenant_id=ctx.tenant_id,
+        config_fields=config_fields,
+    )
+
+    return ConfigConflictResponse(
+        tenant_id=result.tenant_id,
+        scanned_at=result.scanned_at,
+        config_fields_checked=result.config_fields_checked,
+        articles_checked=result.articles_checked,
+        conflicts=[
+            ConfigConflictItem(
+                config_field=c.config_field,
+                config_value=c.config_value,
+                article_id=c.article_id,
+                article_title=c.article_title,
+                conflicting_facts=c.conflicting_facts,
+                resolution=c.resolution,
+            )
+            for c in result.conflicts
+        ],
         scan_duration_ms=result.scan_duration_ms,
     )
 

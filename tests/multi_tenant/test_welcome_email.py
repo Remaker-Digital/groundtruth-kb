@@ -30,8 +30,6 @@ from src.multi_tenant.welcome_email import (
 # ---------------------------------------------------------------------------
 
 _TEMPLATE_KWARGS = dict(
-    superadmin_key="ar_user_test_abc123",
-    widget_key="pk_live_abc123_def456",
     tier="Starter",
     tenant_id="t-001",
     admin_login_url="https://example.com/admin/standalone/",
@@ -43,24 +41,22 @@ class TestWelcomeEmailTemplate:
 
     def test_template_contains_all_fields(self):
         rendered = _WELCOME_EMAIL_BODY.format(**_TEMPLATE_KWARGS)
-        assert "ar_user_test_abc123" in rendered
-        assert "pk_live_abc123_def456" in rendered
         assert "Starter" in rendered
         assert "t-001" in rendered
-        assert "Admin API Key" in rendered
-        assert "Widget Key" in rendered
-        assert "Security Notice" in rendered
         assert "Next Steps" in rendered
+        assert "Sign in to Dashboard" in rendered
 
-    def test_template_handles_missing_keys(self):
-        rendered = _WELCOME_EMAIL_BODY.format(
-            superadmin_key="(not generated)",
-            widget_key="(not generated)",
-            tier="Trial",
-            tenant_id="t-002",
-            admin_login_url="https://example.com/admin/standalone/",
-        )
-        assert "(not generated)" in rendered
+    def test_template_does_not_contain_key_blocks(self):
+        """Keys are no longer shown in welcome email (SPEC-1673)."""
+        rendered = _WELCOME_EMAIL_BODY.format(**_TEMPLATE_KWARGS)
+        assert "Admin API Key" not in rendered
+        assert "Widget Key" not in rendered
+        assert "Security Notice" not in rendered
+
+    def test_template_directs_to_admin_console_for_keys(self):
+        """Welcome email tells users to find keys in admin console."""
+        rendered = _WELCOME_EMAIL_BODY.format(**_TEMPLATE_KWARGS)
+        assert "admin dashboard" in rendered.lower()
 
     def test_template_contains_admin_login_url(self):
         """WI-CP2: Admin console URL must appear in the email body."""
@@ -185,8 +181,6 @@ class TestSendWelcomeEmail:
             result = await send_welcome_email(
                 to_email="merchant@example.com",
                 tenant_id="t-acs",
-                superadmin_key="ar_user_test_key",
-                widget_key="pk_live_test_key",
                 tier="starter",
             )
 
@@ -219,7 +213,6 @@ class TestSendWelcomeEmail:
             await send_welcome_email(
                 to_email="merchant@example.com",
                 tenant_id="t-url-test",
-                superadmin_key="ar_user_test_key",
             )
 
         msg = mock_client.begin_send.call_args[0][0]
@@ -332,7 +325,6 @@ class TestSendWelcomeEmail:
             result = await send_welcome_email(
                 to_email="merchant@example.com",
                 tenant_id="t-smtp",
-                superadmin_key="ar_user_test_key",
                 tier="professional",
             )
 

@@ -389,6 +389,14 @@ export const ConfigurationPage: React.FC = () => {
   // Snapshot of the server state (used for discard and diff)
   const serverFormRef = useRef<ConfigFormState>({ ...DEFAULTS });
 
+  // Config-vs-KB conflict warnings (SPEC-1715)
+  const [configConflicts, setConfigConflicts] = useState<Array<{
+    configField: string;
+    configValue: string;
+    articleTitle: string;
+    conflictingFacts: string[];
+  }>>([]);
+
   // Escalation category expand/collapse state
   const [expandedCategories, setExpandedCategories] = useState<Record<string, boolean>>({});
   // Keyword input buffers (one per category)
@@ -484,6 +492,38 @@ export const ConfigurationPage: React.FC = () => {
       setHasChanges(false);
       configResult.refetch();
       refreshActivationStatus();
+
+      // SPEC-1715: Check for config-vs-KB conflicts after save
+      // Fire-and-forget — don't block save on this check
+      const policyFields = {
+        returnPolicy: form.refundPolicy,
+        shippingInfo: form.shippingPolicy,
+        brandVoice: form.brandVoice,
+      };
+      if (Object.values(policyFields).some((v) => v)) {
+        apiFetch('/api/admin/knowledge/scan/config', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(policyFields),
+        })
+          .then((r: Response) => r.ok ? r.json() : null)
+          .then((data: any) => {
+            if (data?.conflicts?.length) {
+              setConfigConflicts(
+                data.conflicts.map((c: any) => ({
+                  configField: c.configField,
+                  configValue: c.configValue,
+                  articleTitle: c.articleTitle,
+                  conflictingFacts: c.conflictingFacts || [],
+                }))
+              );
+            } else {
+              setConfigConflicts([]);
+            }
+          })
+          .catch(() => { /* Non-critical — don't surface scan errors */ });
+      }
+
       return true;
     } else {
       const detail = (result as any)?.error || saveError || 'Failed to save configuration.';
@@ -584,6 +624,28 @@ export const ConfigurationPage: React.FC = () => {
       {saveError && (
         <Alert color="red" variant="light" title="Save failed" withCloseButton onClose={clearSaveError}>
           <Text size="sm">{saveError}</Text>
+        </Alert>
+      )}
+
+      {/* Config-vs-KB conflict warnings (SPEC-1715) */}
+      {configConflicts.length > 0 && (
+        <Alert
+          color="yellow"
+          variant="light"
+          title="Configuration conflicts with knowledge base"
+          withCloseButton
+          onClose={() => setConfigConflicts([])}
+        >
+          <Text size="sm" mb="xs">
+            The following configuration fields conflict with knowledge base articles.
+            Configuration values take priority, but you may want to update the articles.
+          </Text>
+          {configConflicts.map((c, i) => (
+            <Text key={i} size="sm" c="dimmed" mb={2}>
+              <Text span fw={600} c="dark">{c.configField}</Text> conflicts with article "{c.articleTitle}"
+              {c.conflictingFacts.length > 0 && ` — ${c.conflictingFacts[0]}`}
+            </Text>
+          ))}
         </Alert>
       )}
 

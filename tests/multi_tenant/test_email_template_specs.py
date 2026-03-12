@@ -107,12 +107,13 @@ class TestEmailVerificationSpecs:
 class TestWelcomeEmailSpecs:
     """Specs for welcome_email.py template content."""
 
-    def test_spec_1306_security_notice_about_storing_keys(self):
-        """SPEC-1306: Security notice about storing keys securely."""
+    def test_spec_1306_keys_not_in_email(self):
+        """SPEC-1306: Keys are no longer shown in email (SPEC-1673)."""
         from src.multi_tenant.welcome_email import _WELCOME_EMAIL_BODY
 
-        assert "Security Notice" in _WELCOME_EMAIL_BODY
-        assert "Store these keys securely" in _WELCOME_EMAIL_BODY
+        assert "Admin API Key" not in _WELCOME_EMAIL_BODY
+        assert "Widget Key" not in _WELCOME_EMAIL_BODY
+        assert "admin dashboard" in _WELCOME_EMAIL_BODY.lower()
 
     def test_spec_1307_plan_tier_and_tenant_id_in_footer(self):
         """SPEC-1307: Plan tier and tenant ID in email footer."""
@@ -120,8 +121,6 @@ class TestWelcomeEmailSpecs:
 
         # Template has {tier} and {tenant_id} placeholders in footer
         rendered = _WELCOME_EMAIL_BODY.format(
-            superadmin_key="sk_test_123",
-            widget_key="wk_test_456",
             tier="Professional",
             tenant_id="t-pro-test-001",
             admin_login_url="https://example.com/admin",
@@ -156,8 +155,6 @@ class TestWelcomeEmailSpecs:
                 await send_welcome_email(
                     to_email="merchant@test.com",
                     tenant_id="t-test-001",
-                    superadmin_key="sk_key",
-                    widget_key="wk_key",
                     tier="starter",
                 )
 

@@ -271,6 +271,44 @@ export const KnowledgeBasePage: React.FC = () => {
     }
   }, [configResult.data]);
 
+  // Config-vs-KB conflict warnings (SPEC-1715)
+  const [configConflicts, setConfigConflicts] = useState<Array<{
+    configField: string;
+    configValue: string;
+    articleTitle: string;
+    conflictingFacts: string[];
+  }>>([]);
+
+  /** Fire-and-forget config-vs-KB conflict check (SPEC-1715). */
+  const checkConfigConflicts = useCallback(() => {
+    const policyFields = {
+      returnPolicy: refundPolicy,
+      shippingInfo: shippingPolicy,
+    };
+    if (!Object.values(policyFields).some((v) => v)) return;
+    apiFetch('/api/admin/knowledge/scan/config', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(policyFields),
+    })
+      .then((r: Response) => r.ok ? r.json() : null)
+      .then((data: any) => {
+        if (data?.conflicts?.length) {
+          setConfigConflicts(
+            data.conflicts.map((c: any) => ({
+              configField: c.configField,
+              configValue: c.configValue,
+              articleTitle: c.articleTitle,
+              conflictingFacts: c.conflictingFacts || [],
+            }))
+          );
+        } else {
+          setConfigConflicts([]);
+        }
+      })
+      .catch(() => { /* Non-critical */ });
+  }, [apiFetch, refundPolicy, shippingPolicy]);
+
   const savePolicyOverrides = useCallback(async (): Promise<boolean> => {
     const changes: Record<string, unknown> = {
       return_window: returnWindow,
@@ -280,10 +318,11 @@ export const KnowledgeBasePage: React.FC = () => {
     const result = await saveConfigFields(changes);
     if (result?.success) {
       refreshActivationStatus?.();
+      checkConfigConflicts(); // SPEC-1715: fire-and-forget
       return true;
     }
     return false;
-  }, [returnWindow, refundPolicy, shippingPolicy, saveConfigFields, refreshActivationStatus]);
+  }, [returnWindow, refundPolicy, shippingPolicy, saveConfigFields, refreshActivationStatus, checkConfigConflicts]);
 
   const { onBlur: policyOnBlur, saveCount: policySaveCount } = useAutoSaveDraft({
     save: savePolicyOverrides,
@@ -415,6 +454,7 @@ export const KnowledgeBasePage: React.FC = () => {
     if (result) {
       onNotify(editingArticle ? 'Article updated successfully' : 'Article created successfully', 'success');
       kbResult.refetch();
+      checkConfigConflicts(); // SPEC-1715: re-check after article change
       closeModal();
     } else {
       onNotify(saveError || 'Failed to save article', 'error');
@@ -567,6 +607,28 @@ export const KnowledgeBasePage: React.FC = () => {
           Manage articles your AI uses to answer customers
         </Text>
       </div>
+
+      {/* Config-vs-KB conflict warnings (SPEC-1715) */}
+      {configConflicts.length > 0 && (
+        <Alert
+          color="yellow"
+          variant="light"
+          title="Policy conflicts with knowledge base articles"
+          withCloseButton
+          onClose={() => setConfigConflicts([])}
+        >
+          <Text size="sm" mb="xs">
+            Policy override values conflict with knowledge base articles below.
+            Policies take priority, but consider updating the conflicting articles.
+          </Text>
+          {configConflicts.map((c, i) => (
+            <Text key={i} size="sm" c="dimmed" mb={2}>
+              <Text span fw={600} c="dark">{c.configField}</Text> conflicts with article "{c.articleTitle}"
+              {c.conflictingFacts.length > 0 && ` — ${c.conflictingFacts[0]}`}
+            </Text>
+          ))}
+        </Alert>
+      )}
 
       {/* Policy overrides — config fields authoritative over KB articles */}
       <Paper p="lg" radius="md" withBorder onBlur={policyOnBlur}>

@@ -1,8 +1,11 @@
 """Welcome email — sent once when a new tenant is provisioned.
 
-Delivers the merchant's initial credentials (superadmin API key, widget key),
-admin console URL, and onboarding guidance. Follows a dual-provider pattern:
-SMTP primary (Titan), ACS fallback. Returns bool.
+Delivers the admin console URL and onboarding guidance. API keys are
+NOT included in the email — merchants retrieve them from the admin
+console after signing in (SPEC-1673).
+
+Follows a dual-provider pattern: SMTP primary (Titan), ACS fallback.
+Returns bool.
 
 Call sites:
     - stripe_webhooks.handle_checkout_completed()  (Stripe checkout)
@@ -28,7 +31,7 @@ logger = logging.getLogger(__name__)
 _WELCOME_EMAIL_BODY = """
 <h2 style="margin:0 0 16px;color:#111827;font-size:20px">Welcome to Agent Red</h2>
 <p style="color:#374151;font-size:14px;line-height:1.6;margin:0 0 24px">
-  Your account is ready. Here are your credentials to get started.
+  Your account is ready. Sign in to your admin dashboard to get started.
 </p>
 
 <div style="background:#fff7ed;border:1px solid #fed7aa;padding:16px;margin:16px 0;text-align:center">
@@ -45,38 +48,15 @@ _WELCOME_EMAIL_BODY = """
   </p>
 </div>
 
-<div style="background:#f3f4f6;border:1px solid #d1d5db;padding:16px;margin:16px 0">
-  <p style="margin:0 0 8px;color:#6b7280;font-size:12px;font-weight:600;
-       text-transform:uppercase;letter-spacing:0.05em">Admin API Key</p>
-  <code style="word-break:break-all;color:#111827;font-size:14px;
-       font-family:'JetBrains Mono',SFMono-Regular,ui-monospace,monospace">{superadmin_key}</code>
-  <p style="margin:8px 0 0;color:#6b7280;font-size:12px;line-height:1.4">
-    If lost, you can regenerate your API key by requesting a new key at the login prompt.
-  </p>
-</div>
-
-<div style="background:#f3f4f6;border:1px solid #d1d5db;padding:16px;margin:16px 0">
-  <p style="margin:0 0 8px;color:#6b7280;font-size:12px;font-weight:600;
-       text-transform:uppercase;letter-spacing:0.05em">Widget Key</p>
-  <code style="word-break:break-all;color:#111827;font-size:14px;
-       font-family:'JetBrains Mono',SFMono-Regular,ui-monospace,monospace">{widget_key}</code>
-  <p style="margin:8px 0 0;color:#6b7280;font-size:12px;line-height:1.4">
-    Your chat widget key and API URL are available from your admin console.
-  </p>
-</div>
-
-<div style="background:#fef3c7;border:1px solid #fcd34d;padding:16px;margin:16px 0">
-  <strong style="color:#92400e">Security Notice</strong>
-  <p style="color:#92400e;margin:8px 0 0;font-size:13px">
-    Store these keys securely. If lost, you can regenerate your API key
-    by requesting a new key at the login prompt. Your chat widget key
-    and API URL are available from your admin console.
-  </p>
-</div>
+<p style="color:#374151;font-size:14px;line-height:1.6;margin:16px 0">
+  Your API key and widget key are available from your admin dashboard
+  after signing in. Keys are never sent via email for your security.
+</p>
 
 <h3 style="margin:24px 0 12px;color:#111827;font-size:16px">Next Steps</h3>
 <ol style="color:#374151;font-size:14px;line-height:1.8;margin:0;padding-left:20px">
-  <li>Sign in to your <a href="{admin_login_url}" style="color:#ff3621;font-weight:600">Admin Dashboard</a> using your API key</li>
+  <li>Sign in to your <a href="{admin_login_url}" style="color:#ff3621;font-weight:600">Admin Dashboard</a></li>
+  <li>Find your API key and widget key on the Account page</li>
   <li>Configure your brand name, voice, and AI agent personality</li>
   <li>Add your widget key to your website to start chatting with customers</li>
   <li>Invite team members to handle escalated conversations</li>
@@ -160,11 +140,15 @@ async def send_welcome_email(
     False on any failure. Never raises — callers should not block
     provisioning on email delivery.
 
+    Note: ``superadmin_key`` and ``widget_key`` parameters are retained
+    for call-site compatibility but are no longer displayed in the email.
+    Keys are accessible from the admin console after signing in.
+
     Args:
         to_email: Merchant's email address.
         tenant_id: The new tenant ID.
-        superadmin_key: Raw superadmin API key (shown once).
-        widget_key: Raw widget key (shown once).
+        superadmin_key: Deprecated — no longer shown in email.
+        widget_key: Deprecated — no longer shown in email.
         tier: Subscription tier name.
         admin_login_url: Admin dashboard URL. If not provided, built from
             STANDALONE_ADMIN_URL or PROD_URL environment variables.
@@ -182,8 +166,6 @@ async def send_welcome_email(
     resolved_url = _build_admin_login_url(admin_login_url, tenant_slug=slug)
 
     html_body = _WELCOME_EMAIL_BODY.format(
-        superadmin_key=superadmin_key or "(not generated)",
-        widget_key=widget_key or "(not generated)",
         tier=(tier or "trial").capitalize(),
         tenant_id=tenant_id,
         admin_login_url=resolved_url,

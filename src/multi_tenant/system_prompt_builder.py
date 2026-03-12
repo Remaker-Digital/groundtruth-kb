@@ -509,6 +509,29 @@ def _build_tenant_config_section(
         if prefs.shipping_info:
             lines.append(f"- Shipping info: {prefs.shipping_info}")
 
+    # --- Config authority rule (Response Generator only, SPEC-1713) ---
+    # When config fields and KB articles cover the same topic, config is
+    # authoritative.  This prevents the model from blending contradictory
+    # information when a KB article hasn't been updated to match config.
+    if agent == AgentRole.RESPONSE_GENERATOR:
+        _policy_fields = [
+            prefs.return_policy,
+            prefs.shipping_info,
+            prefs.brand_voice,
+        ]
+        if any(_policy_fields):
+            lines.append("")
+            lines.append(
+                "IMPORTANT — CONFIGURATION AUTHORITY RULE:\n"
+                "The values above (return policy, shipping info, brand voice) are "
+                "the merchant's authoritative configuration. If a knowledge base "
+                "article contains different information for the same topic "
+                "(e.g., a different return window or shipping policy), ALWAYS "
+                "follow the MERCHANT CONFIGURATION values above. They represent "
+                "the merchant's current, approved policies. Knowledge base articles "
+                "may be outdated or contain draft/historical information."
+            )
+
     # --- Escalation rules (Escalation Handler + Response Generator) ---
     if agent in (AgentRole.ESCALATION_HANDLER, AgentRole.RESPONSE_GENERATOR):
         lines.append(

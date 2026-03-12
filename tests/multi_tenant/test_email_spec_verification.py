@@ -137,17 +137,21 @@ class TestSpec0760CredentialsInWelcomeEmail:
         )
         assert "widget_key" in sig.parameters
 
-    def test_welcome_email_template_includes_api_key(self):
-        """Welcome email body template includes Admin API Key section."""
+    def test_welcome_email_template_no_key_blocks(self):
+        """Welcome email no longer includes API key or widget key blocks."""
         from src.multi_tenant.welcome_email import _WELCOME_EMAIL_BODY
 
-        assert "superadmin_key" in _WELCOME_EMAIL_BODY or "{superadmin_key}" in _WELCOME_EMAIL_BODY
+        assert "{superadmin_key}" not in _WELCOME_EMAIL_BODY
+        assert "{widget_key}" not in _WELCOME_EMAIL_BODY
+        assert "Admin API Key" not in _WELCOME_EMAIL_BODY
+        assert "Widget Key" not in _WELCOME_EMAIL_BODY
 
-    def test_welcome_email_template_includes_widget_key(self):
-        """Welcome email body template includes widget key section."""
+    def test_welcome_email_template_directs_to_console(self):
+        """Welcome email directs users to admin console for keys."""
         from src.multi_tenant.welcome_email import _WELCOME_EMAIL_BODY
 
-        assert "widget_key" in _WELCOME_EMAIL_BODY or "{widget_key}" in _WELCOME_EMAIL_BODY
+        assert "admin dashboard" in _WELCOME_EMAIL_BODY.lower()
+        assert "Sign in to Dashboard" in _WELCOME_EMAIL_BODY
 
 
 # ---------------------------------------------------------------------------
@@ -221,17 +225,18 @@ class TestSpec0689KeyRegenerationNotice:
     """SPEC-0689: The email template MUST include text below the ADMIN API KEY:
     'If lost, you can regenerate your API key...'"""
 
-    def test_welcome_email_has_regeneration_notice(self):
-        """Welcome email body includes regeneration guidance."""
+    def test_welcome_email_keys_available_in_console(self):
+        """Welcome email directs users to admin console for keys."""
         from src.multi_tenant.welcome_email import _WELCOME_EMAIL_BODY
 
-        assert "regenerate" in _WELCOME_EMAIL_BODY.lower()
+        assert "admin dashboard" in _WELCOME_EMAIL_BODY.lower()
+        assert "never sent via email" in _WELCOME_EMAIL_BODY.lower()
 
-    def test_welcome_email_key_section_has_security_notice(self):
-        """Welcome email has security notice about storing keys."""
+    def test_welcome_email_has_security_messaging(self):
+        """Welcome email explains key security practice."""
         from src.multi_tenant.welcome_email import _WELCOME_EMAIL_BODY
 
-        assert "security" in _WELCOME_EMAIL_BODY.lower() or "store" in _WELCOME_EMAIL_BODY.lower()
+        assert "security" in _WELCOME_EMAIL_BODY.lower() or "never sent" in _WELCOME_EMAIL_BODY.lower()
 
 
 # ---------------------------------------------------------------------------

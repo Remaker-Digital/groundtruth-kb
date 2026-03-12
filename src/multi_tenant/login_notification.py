@@ -57,9 +57,17 @@ _LOGIN_NOTIFICATION_BODY = """
     </td>
   </tr>
 </table>
+<div style="text-align:center;margin:24px 0">
+  <a href="{admin_dashboard_url}" style="display:inline-block;padding:10px 24px;
+     background:#ff3621;color:#ffffff;font-size:14px;font-weight:600;
+     text-decoration:none;border-radius:4px">
+    Sign in to Dashboard
+  </a>
+</div>
 <p style="color:#9ca3af;font-size:12px;line-height:1.5;margin:0">
-  If this was not you, generate new backup codes and rotate your API key
-  immediately.
+  If this was not you, sign in to your
+  <a href="{admin_dashboard_url}" style="color:#ff3621">admin dashboard</a>
+  to generate new backup codes and rotate your API key immediately.
 </p>
 """
 
@@ -94,11 +102,15 @@ async def send_login_notification(
             logger.debug("ACS_CONNECTION_STRING not set — login notification skipped")
             return
 
+        from src.multi_tenant.welcome_email import _build_admin_login_url
+
         timestamp = datetime.now(timezone.utc).strftime("%Y-%m-%d %H:%M:%S UTC")
+        admin_url = _build_admin_login_url()
         body_html = _LOGIN_NOTIFICATION_BODY.format(
             timestamp=timestamp,
             client_ip=client_ip,
             user_agent=user_agent or "Unknown",
+            admin_dashboard_url=admin_url,
         )
         full_html = _EMAIL_WRAPPER.format(body=body_html)
 

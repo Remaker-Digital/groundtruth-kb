@@ -75,6 +75,7 @@ class ConflictType(str, Enum):
     CONFLICTING = "conflicting"
     TOPICAL_OVERLAP = "topical_overlap"
     SIMILAR_TITLES = "similar_titles"
+    CONFIG_VS_KB = "config_vs_kb"
 
 
 class ConflictSeverity(str, Enum):
@@ -121,6 +122,52 @@ class ScanResult:
     medium_count: int = 0
     low_count: int = 0
     scan_duration_ms: int = 0
+
+
+@dataclass
+class ConfigConflict:
+    """A conflict between a tenant config field and a KB article (SPEC-1714)."""
+
+    config_field: str
+    config_value: str
+    article_id: str
+    article_title: str
+    conflicting_facts: list[str] = field(default_factory=list)
+    resolution: str = ""
+
+
+@dataclass
+class ConfigScanResult:
+    """Result of config-vs-KB cross-check scan (SPEC-1714)."""
+
+    tenant_id: str
+    scanned_at: str
+    config_fields_checked: int
+    articles_checked: int
+    conflicts: list[ConfigConflict] = field(default_factory=list)
+    scan_duration_ms: int = 0
+
+
+# ---------------------------------------------------------------------------
+# Config field descriptors for cross-checking
+# ---------------------------------------------------------------------------
+
+# Maps PreferencesDocument field names to human-readable labels and
+# topic keywords used to filter relevant KB articles before comparison.
+_CONFIG_POLICY_FIELDS: dict[str, dict[str, Any]] = {
+    "return_policy": {
+        "label": "Return policy",
+        "keywords": ["return", "refund", "exchange", "money back"],
+    },
+    "shipping_info": {
+        "label": "Shipping info",
+        "keywords": ["shipping", "delivery", "ship", "freight", "postage"],
+    },
+    "brand_voice": {
+        "label": "Brand voice",
+        "keywords": ["tone", "voice", "style", "brand"],
+    },
+}
 
 
 # ---------------------------------------------------------------------------
@@ -204,6 +251,19 @@ def _sentence_jaccard(a: str, b: str) -> float:
     intersection = len(sent_a & sent_b)
     union = len(sent_a | sent_b)
     return intersection / union if union > 0 else 0.0
+
+
+def _filter_articles_by_keywords(
+    entries: list[dict[str, Any]],
+    keywords: list[str],
+) -> list[dict[str, Any]]:
+    """Filter KB articles to those whose title or content mentions any keyword."""
+    relevant: list[dict[str, Any]] = []
+    for entry in entries:
+        text = (entry.get("title", "") + " " + entry.get("content", "")).lower()
+        if any(kw in text for kw in keywords):
+            relevant.append(entry)
+    return relevant
 
 
 def _detect_factual_conflicts(content_a: str, content_b: str) -> list[str]:
@@ -300,6 +360,13 @@ _RESOLUTION_TEMPLATES: dict[ConflictType, str] = {
         "These articles have similar titles, which may confuse the retrieval system "
         "even though their content differs. Consider renaming one to be more specific "
         "about what it covers to improve retrieval accuracy."
+    ),
+    ConflictType.CONFIG_VS_KB: (
+        "A knowledge base article contains information that conflicts with the "
+        "merchant's agent configuration. The configuration values are authoritative "
+        "(SPEC-1713) and the AI will follow them, but the conflicting KB article "
+        "may confuse retrieval results. Update the KB article to match the current "
+        "configuration, or remove the conflicting section from the article."
     ),
 }
 
@@ -449,6 +516,96 @@ class KBConflictScanner:
             high,
             medium,
             low,
+            elapsed_ms,
+        )
+
+        return result
+
+    async def scan_config_conflicts(
+        self,
+        tenant_id: str,
+        config_fields: dict[str, str],
+    ) -> ConfigScanResult:
+        """Cross-check tenant config field values against KB articles (SPEC-1714).
+
+        Compares each non-empty config field (return_policy, shipping_info, etc.)
+        against KB articles whose content matches the field's topic keywords.
+        Uses the same factual conflict regex patterns as article-vs-article scans.
+
+        Args:
+            tenant_id: Tenant partition key.
+            config_fields: Dict of field_name -> field_value from PreferencesDocument.
+                           Only non-empty string values are checked.
+
+        Returns:
+            ConfigScanResult with all detected config-vs-KB conflicts.
+        """
+        self._ensure_configured()
+        start_time = time.monotonic()
+
+        # Filter to non-empty config fields that we know how to check
+        fields_to_check: dict[str, str] = {}
+        for field_name, value in config_fields.items():
+            if value and field_name in _CONFIG_POLICY_FIELDS:
+                fields_to_check[field_name] = value
+
+        if not fields_to_check:
+            return ConfigScanResult(
+                tenant_id=tenant_id,
+                scanned_at=datetime.now(timezone.utc).isoformat(),
+                config_fields_checked=0,
+                articles_checked=0,
+                scan_duration_ms=0,
+            )
+
+        # Fetch all active KB entries
+        entries = await self._kb_repo.list_active(tenant_id=tenant_id)
+        conflicts: list[ConfigConflict] = []
+
+        for field_name, config_value in fields_to_check.items():
+            field_info = _CONFIG_POLICY_FIELDS[field_name]
+            keywords = field_info["keywords"]
+            label = field_info["label"]
+
+            # Filter articles by keyword relevance (title or content)
+            relevant_articles = _filter_articles_by_keywords(entries, keywords)
+
+            for article in relevant_articles:
+                content = article.get("content", "")
+                if not content:
+                    continue
+
+                # Run factual conflict detection: config value vs article content
+                fact_conflicts = _detect_factual_conflicts(config_value, content)
+                if fact_conflicts:
+                    conflicts.append(ConfigConflict(
+                        config_field=field_name,
+                        config_value=config_value,
+                        article_id=article["id"],
+                        article_title=article.get("title", ""),
+                        conflicting_facts=fact_conflicts,
+                        resolution=_generate_resolution(
+                            ConflictType.CONFIG_VS_KB, fact_conflicts
+                        ),
+                    ))
+
+        elapsed_ms = int((time.monotonic() - start_time) * 1000)
+
+        result = ConfigScanResult(
+            tenant_id=tenant_id,
+            scanned_at=datetime.now(timezone.utc).isoformat(),
+            config_fields_checked=len(fields_to_check),
+            articles_checked=len(entries),
+            conflicts=conflicts,
+            scan_duration_ms=elapsed_ms,
+        )
+
+        logger.info(
+            "Config conflict scan: tenant=%s fields=%d articles=%d conflicts=%d duration=%dms",
+            tenant_id[:8],
+            len(fields_to_check),
+            len(entries),
+            len(conflicts),
             elapsed_ms,
         )
 
