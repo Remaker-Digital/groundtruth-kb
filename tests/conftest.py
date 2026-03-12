@@ -172,6 +172,15 @@ TEST_API_KEY_STARTER = "arsk_test_starter_key_001"
 TEST_API_KEY_PROFESSIONAL = "arsk_test_pro_key_002"
 TEST_API_KEY_ENTERPRISE = "arsk_test_ent_key_003"
 
+# SPA platform admin key (ar_spa_ prefix triggers isolated auth path)
+TEST_SPA_KEY = "ar_spa_plat_test_spa_key_001"
+
+# Per-user API key (ar_user_ prefix triggers user auth path)
+TEST_USER_KEY = "ar_user_test_user_key_001"
+
+# Widget key (pk_live_ prefix, must pass validate_widget_key_format)
+TEST_WIDGET_KEY = "pk_live_abcd1234efgh_5678ijkl9012mnop"
+
 
 def hash_test_api_key(api_key: str) -> str:
     """Hash an API key the same way auth.py does."""
@@ -182,11 +191,45 @@ def hash_test_api_key(api_key: str) -> str:
 TEST_API_KEY_HASH_STARTER = hash_test_api_key(TEST_API_KEY_STARTER)
 TEST_API_KEY_HASH_PROFESSIONAL = hash_test_api_key(TEST_API_KEY_PROFESSIONAL)
 TEST_API_KEY_HASH_ENTERPRISE = hash_test_api_key(TEST_API_KEY_ENTERPRISE)
+TEST_SPA_KEY_HASH = hash_test_api_key(TEST_SPA_KEY)
+TEST_USER_KEY_HASH = hash_test_api_key(TEST_USER_KEY)
+TEST_WIDGET_KEY_HASH = hash_test_api_key(TEST_WIDGET_KEY)
+
+# SPA platform admin document shape (returned by resolve_by_spa_key_hash)
+TEST_SPA_ADMIN_DOC = {
+    "id": "spa-admin-001",
+    "admin_id": "spa-admin-001",
+    "email": "admin@platform.test",
+    "api_key_hash": TEST_SPA_KEY_HASH,
+    "is_active": True,
+    "role": "superadmin",
+    "notification_email_address": "admin@platform.test",
+    "partition_key": "__platform__",
+}
+
+# Per-user team member + tenant document shape (returned by resolve_by_user_api_key_hash)
+TEST_USER_MEMBER_DOC = {
+    "team_member": {
+        "id": "member-001",
+        "email": "user@starter.test",
+        "user_api_key_hash": TEST_USER_KEY_HASH,
+        "is_active": True,
+        "role": "superadmin",
+        "escalation_categories": [],
+        "tenant_id": STARTER_TENANT_ID,
+    },
+    "tenant": None,  # Populated dynamically in _build_tenant_lookup_table
+}
 
 
 def auth_headers_api_key(api_key: str = TEST_API_KEY_STARTER) -> dict[str, str]:
     """Build request headers for API key authentication."""
     return {"X-API-Key": api_key}
+
+
+def auth_headers_widget_key(widget_key: str = TEST_WIDGET_KEY) -> dict[str, str]:
+    """Build request headers for widget key authentication."""
+    return {"X-Widget-Key": widget_key}
 
 
 def auth_headers_bearer(token: str) -> dict[str, str]:
@@ -420,11 +463,15 @@ def mock_circuit_breakers() -> MagicMock:
 
 def _build_tenant_lookup_table(
     tenants: list[dict[str, Any]] | None = None,
-) -> tuple[AsyncMock, AsyncMock]:
+) -> dict[str, AsyncMock]:
     """Build mock resolver functions for tenant auth middleware.
 
-    Returns (resolve_by_shop_domain, resolve_by_api_key_hash) functions
-    that search the provided tenant list.
+    Returns a dict of resolver functions covering all 5 auth paths:
+    - resolve_by_shop_domain
+    - resolve_by_api_key_hash
+    - resolve_by_spa_key_hash
+    - resolve_by_widget_key_hash
+    - resolve_by_user_api_key_hash
     """
     if tenants is None:
         tenants = [
@@ -447,6 +494,23 @@ def _build_tenant_lookup_table(
             ),
         ]
 
+    # Widget key hash → tenant mapping (starter tenant)
+    widget_tenants = {
+        TEST_WIDGET_KEY_HASH: tenants[0],  # Starter tenant
+    }
+
+    # SPA key hash → platform admin document
+    spa_admins = {
+        TEST_SPA_KEY_HASH: TEST_SPA_ADMIN_DOC,
+    }
+
+    # User key hash → {team_member, tenant} mapping
+    user_member = dict(TEST_USER_MEMBER_DOC)
+    user_member["tenant"] = tenants[0]  # Link to starter tenant
+    user_members = {
+        TEST_USER_KEY_HASH: user_member,
+    }
+
     async def resolve_by_shop_domain(domain: str) -> dict[str, Any] | None:
         for t in tenants:
             if t.get("shopify_shop_domain") == domain:
@@ -459,7 +523,22 @@ def _build_tenant_lookup_table(
                 return t
         return None
 
-    return AsyncMock(side_effect=resolve_by_shop_domain), AsyncMock(side_effect=resolve_by_api_key_hash)
+    async def resolve_by_spa_key_hash(key_hash: str) -> dict[str, Any] | None:
+        return spa_admins.get(key_hash)
+
+    async def resolve_by_widget_key_hash(key_hash: str) -> dict[str, Any] | None:
+        return widget_tenants.get(key_hash)
+
+    async def resolve_by_user_api_key_hash(key_hash: str) -> dict[str, Any] | None:
+        return user_members.get(key_hash)
+
+    return {
+        "resolve_by_shop_domain": AsyncMock(side_effect=resolve_by_shop_domain),
+        "resolve_by_api_key_hash": AsyncMock(side_effect=resolve_by_api_key_hash),
+        "resolve_by_spa_key_hash": AsyncMock(side_effect=resolve_by_spa_key_hash),
+        "resolve_by_widget_key_hash": AsyncMock(side_effect=resolve_by_widget_key_hash),
+        "resolve_by_user_api_key_hash": AsyncMock(side_effect=resolve_by_user_api_key_hash),
+    }
 
 
 @pytest.fixture
@@ -497,10 +576,13 @@ def app_client(
         with TestClient(_main_mod.app, raise_server_exceptions=False) as client:
             # Wire tenant resolvers *after* TestClient startup so they are
             # not overwritten by the (now-failing) _startup_tenant_resolution.
-            domain_resolver, key_resolver = _build_tenant_lookup_table()
+            resolvers = _build_tenant_lookup_table()
             configure_tenant_resolution(
-                resolve_by_shop_domain=domain_resolver,
-                resolve_by_api_key_hash=key_resolver,
+                resolve_by_shop_domain=resolvers["resolve_by_shop_domain"],
+                resolve_by_api_key_hash=resolvers["resolve_by_api_key_hash"],
+                resolve_by_spa_key_hash=resolvers["resolve_by_spa_key_hash"],
+                resolve_by_widget_key_hash=resolvers["resolve_by_widget_key_hash"],
+                resolve_by_user_api_key_hash=resolvers["resolve_by_user_api_key_hash"],
             )
 
             yield client
@@ -529,6 +611,24 @@ def enterprise_client(app_client: TestClient) -> AuthenticatedClient:
     return AuthenticatedClient(app_client, TEST_API_KEY_ENTERPRISE)
 
 
+@pytest.fixture
+def spa_client(app_client: TestClient) -> AuthenticatedClient:
+    """TestClient pre-authenticated as the SPA platform admin."""
+    return AuthenticatedClient(app_client, TEST_SPA_KEY)
+
+
+@pytest.fixture
+def user_client(app_client: TestClient) -> AuthenticatedClient:
+    """TestClient pre-authenticated as a per-user (superadmin role) team member."""
+    return AuthenticatedClient(app_client, TEST_USER_KEY)
+
+
+@pytest.fixture
+def widget_client(app_client: TestClient) -> "WidgetAuthClient":
+    """TestClient pre-authenticated with a widget key (X-Widget-Key header)."""
+    return WidgetAuthClient(app_client, TEST_WIDGET_KEY)
+
+
 class AuthenticatedClient:
     """Wrapper around TestClient that injects auth headers automatically.
 
@@ -541,6 +641,43 @@ class AuthenticatedClient:
     def __init__(self, client: TestClient, api_key: str) -> None:
         self._client = client
         self._headers = auth_headers_api_key(api_key)
+
+    def get(self, url: str, **kwargs: Any) -> Any:
+        headers = {**self._headers, **kwargs.pop("headers", {})}
+        return self._client.get(url, headers=headers, **kwargs)
+
+    def post(self, url: str, **kwargs: Any) -> Any:
+        headers = {**self._headers, **kwargs.pop("headers", {})}
+        return self._client.post(url, headers=headers, **kwargs)
+
+    def put(self, url: str, **kwargs: Any) -> Any:
+        headers = {**self._headers, **kwargs.pop("headers", {})}
+        return self._client.put(url, headers=headers, **kwargs)
+
+    def patch(self, url: str, **kwargs: Any) -> Any:
+        headers = {**self._headers, **kwargs.pop("headers", {})}
+        return self._client.patch(url, headers=headers, **kwargs)
+
+    def delete(self, url: str, **kwargs: Any) -> Any:
+        headers = {**self._headers, **kwargs.pop("headers", {})}
+        return self._client.delete(url, headers=headers, **kwargs)
+
+    @property
+    def raw(self) -> TestClient:
+        """Access the underlying TestClient for unauthenticated requests."""
+        return self._client
+
+
+class WidgetAuthClient:
+    """Wrapper around TestClient that injects widget key headers automatically.
+
+    Widget keys use X-Widget-Key header (not X-API-Key) and are restricted
+    to /api/chat/*, /ws/chat/*, and /api/config paths only.
+    """
+
+    def __init__(self, client: TestClient, widget_key: str) -> None:
+        self._client = client
+        self._headers = auth_headers_widget_key(widget_key)
 
     def get(self, url: str, **kwargs: Any) -> Any:
         headers = {**self._headers, **kwargs.pop("headers", {})}
