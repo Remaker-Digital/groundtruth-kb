@@ -45,7 +45,7 @@ class TestProductVersionConstant:
         assert PRODUCT_VERSION is not None
 
     def test_product_version_value(self):
-        assert PRODUCT_VERSION == "1.82.1"
+        assert PRODUCT_VERSION == "1.83.0"
 
     def test_product_version_is_string(self):
         assert isinstance(PRODUCT_VERSION, str)
