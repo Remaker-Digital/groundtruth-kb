@@ -1530,6 +1530,7 @@ async def _startup_redis_rate_limiter() -> None:
 
         client = redis_lib.Redis.from_url(
             redis_url,
+            username=None,  # Azure Cache for Redis uses key-only auth (no ACL usernames)
             decode_responses=True,
             socket_connect_timeout=5,
             socket_timeout=2,
