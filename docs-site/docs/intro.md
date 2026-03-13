@@ -5,8 +5,17 @@ title: Welcome
 hide_title: true
 ---
 
+import ThemedImage from '@theme/ThemedImage';
+
 <div style={{textAlign: 'center', marginBottom: '2rem'}}>
-  <img src="/img/agent-red-logo.svg" alt="Agent Red" style={{maxHeight: '240px', marginTop: '100px', marginBottom: '80px'}} />
+  <ThemedImage
+    alt="Agent Red"
+    sources={{
+      light: '/img/primary-logo-no-wordmark_black_text.svg',
+      dark: '/img/agent-red-logo.svg',
+    }}
+    style={{maxHeight: '240px', marginTop: '100px', marginBottom: '80px'}}
+  />
   <h1 style={{fontSize: '2.5rem', marginBottom: '0.25rem'}}>Agent Red Customer Experience</h1>
   <p style={{fontSize: '1.1rem', opacity: 0.7}}>
     A product of <a href="https://remakerdigital.com" target="_blank" rel="noopener noreferrer">Remaker Digital</a>

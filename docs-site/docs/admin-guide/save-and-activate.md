@@ -1,34 +1,34 @@
 ---
 sidebar_position: 2
-title: Save and activate
-description: Understand the two-phase commit model — save configuration changes as a draft, review them, and activate when ready to go live.
+title: How changes go live
+description: Understand how Agent Red auto-saves your edits as a draft and activates them when you are ready to go live.
 ---
 
-# Save and activate
+# How changes go live
 
-Agent Red uses a two-phase commit model for configuration changes. When you edit a setting in the admin console, the change is saved to a **draft** — it does not affect your live AI agent. Your live configuration only changes when you explicitly **activate** the draft.
+Agent Red auto-saves your edits as you work. When you change a field and move to the next one, the change is saved to a **draft** automatically — a brief "✓ Saved" indicator confirms each save. The draft does not affect your live AI agent. Your live configuration only changes when you explicitly **activate** the draft.
 
 This means you can freely experiment with settings, walk away, come back later, and activate only when you are confident the changes are correct.
 
-## Why two phases
+## Why a draft step
 
-Changing your AI agent's behavior affects every customer conversation. The two-phase model gives you a safety net:
+Changing your AI agent's behavior affects every customer conversation. The draft-then-activate model gives you a safety net:
 
-- **No accidental changes** — Saving a field does not change what your customers experience. You must deliberately activate.
+- **No accidental changes** — Editing a field does not change what your customers experience. You must deliberately activate.
 - **Review before going live** — The activation dialog shows exactly which fields changed and whether validation passed, so you know what will happen before it happens.
 - **One-click undo** — If an activation does not perform as expected, you can restore the previous configuration immediately.
 
 ## How it works
 
-### 1. Save changes (draft)
+### 1. Edit (auto-saved draft)
 
-Edit any configuration page — Brand and tone, Response style, Widget appearance, Quick actions, or any other setting. When you click **Save**, the changes are written to your draft. The draft is private to your admin console and has no effect on the live AI agent or widget.
+Edit any configuration page — Agent identity, Response style, Widget appearance, Quick actions, or any other setting. Changes are **auto-saved** when you move focus away from a field (on blur). A brief "✓ Saved" indicator confirms each save. There is no save button — saving happens automatically.
 
-You can save changes across multiple pages. All saved changes accumulate in the draft until you activate or discard them.
+The draft is private to your admin console and has no effect on the live AI agent or widget. You can make changes across multiple pages. All changes accumulate in the draft until you activate or discard them.
 
 ### 2. Review (activation banner)
 
-When you have unsaved draft changes, an **activation banner** appears at the top of the admin console. The banner tells you that changes are pending and offers two actions:
+When you have pending draft changes, an **activation banner** appears at the top of the admin console. The banner tells you that changes are pending and offers two actions:
 
 | Action | What it does |
 |--------|--------------|
@@ -78,7 +78,7 @@ Before a draft can be activated, Agent Red validates that the configuration is v
 | **Brand voice** | Must be set (not empty) | Hard error | The brand voice controls the AI's communication style. Without it, responses fall back to a generic tone that may not represent your brand. |
 | **Widget key** | Must exist for the tenant | Hard error | The widget key connects the chat widget on your storefront to the correct tenant. Without it, the widget cannot load. |
 
-If any validation fails, the **Activate now** button is disabled and the dialog shows the specific error. Fix the issue, save again, and the validation updates automatically.
+If any validation fails, the **Activate now** button is disabled and the dialog shows the specific error. Fix the issue and the validation updates automatically on the next auto-save.
 
 Additional warnings (non-blocking) may appear for optional fields that improve agent quality, such as missing business policies.
 
@@ -108,21 +108,21 @@ When you click **Activate now**, Agent Red promotes all pending changes as a sin
 
 | Domain | Examples | How it activates |
 |--------|----------|-----------------|
-| **Agent configuration** | Brand name, brand voice, response length, escalation rules, custom instructions | Saved to draft, activated atomically |
-| **Quick actions** | Prompt buttons, page assignments, ordering | Saved to draft, activated atomically |
-| **Widget configuration** | Colors, position, launcher style, dark mode, pre-chat form | Saved to draft, activated atomically |
+| **Agent configuration** | Brand name, brand voice, response length, escalation rules, custom instructions | Auto-saved to draft, activated atomically |
+| **Quick actions** | Prompt buttons, page assignments, ordering | Auto-saved to draft, activated atomically |
+| **Widget configuration** | Colors, position, launcher style, dark mode, pre-chat form | Auto-saved to draft, activated atomically |
 | **Knowledge base** | Articles, categories, conflict scan results | Changes trigger Pending badge; validated at activation time |
-| **Quick action assignments** | Page assignments, auto-open, delay | Changes trigger Pending badge; saved to draft |
+| **Quick action assignments** | Page assignments, auto-open, delay | Changes trigger Pending badge; auto-saved to draft |
 
-Knowledge base and quick action changes now trigger the **Pending** badge on the sidebar. When you create, update, or delete a knowledge base article, or change quick action page assignments, the configuration state updates to Pending — reminding you to activate when ready. The activation dialog groups these changes under "Knowledge base" and "Quick actions" respectively.
+Knowledge base and quick action changes trigger the **Pending** badge on the sidebar. When you create, update, or delete a knowledge base article, or change quick action page assignments, the configuration state updates to Pending — reminding you to activate when ready. The activation dialog groups these changes under "Knowledge base" and "Quick actions" respectively.
 
 ## Common scenarios
 
-### I saved changes yesterday but did not activate. Are they lost?
+### I made changes yesterday but did not activate. Are they lost?
 
 No. Draft changes persist until you activate or discard them. You can close the browser, log out, and return days later — the draft will still be there.
 
-### Two team members saved changes at the same time. What happens?
+### Two team members made changes at the same time. What happens?
 
 All draft changes accumulate. If Admin A changes the brand voice and Admin B changes the widget color, both changes appear in the draft. The activation dialog shows all pending changes from all team members.
 
@@ -132,7 +132,7 @@ Click **Restore previous configuration** to immediately revert to the configurat
 
 ### Can I activate only some of my changes?
 
-No. Activation is all-or-nothing across the four domains. If you want to activate only some changes, discard the draft, re-save only the changes you want, and then activate.
+No. Activation is all-or-nothing across the four domains. If you want to activate only some changes, discard the draft, re-make only the changes you want, and then activate.
 
 ### What happens to in-progress conversations when I activate?
 
