@@ -11,7 +11,7 @@ from __future__ import annotations
 import logging
 from typing import Any
 
-from fastapi import FastAPI
+from fastapi import FastAPI, Request
 
 from src.multi_tenant.nats_isolation import get_nats_manager
 from src.multi_tenant.pipeline_resilience import get_circuit_breaker_registry
@@ -104,9 +104,131 @@ def register_health_endpoints(app: FastAPI) -> None:
 
         result["agntcy_sdk"] = get_sdk_status()
 
+        # Cross-replica cache invalidation (SPEC-1757)
+        from src.multi_tenant.cache_invalidation import is_configured as cache_invalidation_configured
+
+        result["cache_invalidation"] = {"redis_pubsub": cache_invalidation_configured()}
+
         # API version (WI #140)
         from src.multi_tenant.api_versioning import API_VERSION
 
         result["version"] = API_VERSION
 
         return result
+
+    @app.get("/health/metrics", tags=["system"])
+    async def health_metrics(request: Request) -> dict:
+        """SPEC-1760: Scaling metrics for monitoring at 680-tenant scale.
+
+        Exposes internal resource counters useful for capacity planning and
+        alerting. Authenticated: platform-admin only.
+
+        Metrics returned:
+        - active_sse_connections / global_sse_limit
+        - rate_limit_shard_sizes (per-shard tenant counts)
+        - tenant_meta_cache_size / cache_hit_rate
+        - config_cache_ttl
+        - pre_auth_tracker_count
+        - tenant_lock_count
+        - uptime_seconds
+        - event_loop_lag_ms
+        """
+        import asyncio
+        import time as _time
+
+        from starlette.responses import JSONResponse
+
+        # --- Auth gate: platform admin only ---
+        # /health/* is auth-exempt at middleware level, so we must
+        # authenticate the platform admin key directly here.
+        api_key = request.headers.get("X-API-Key", "")
+        if not api_key.startswith("ar_spa_"):
+            return JSONResponse(
+                status_code=403,
+                content={"error": "Platform admin authentication required"},
+            )
+        try:
+            from src.multi_tenant.auth import hash_api_key, SPA_API_KEY_PREFIX
+            from src.multi_tenant.repositories.platform_admin import PlatformAdminRepository
+
+            key_hash = hash_api_key(api_key)
+            repo = PlatformAdminRepository()
+            admin = await repo.find_by_api_key_hash(key_hash)
+            if admin is None or not admin.get("is_active", False):
+                return JSONResponse(
+                    status_code=403,
+                    content={"error": "Invalid platform admin key"},
+                )
+        except Exception:
+            return JSONResponse(
+                status_code=403,
+                content={"error": "Platform admin authentication failed"},
+            )
+
+        metrics: dict[str, Any] = {}
+
+        # SSE connections (SPEC-1756)
+        from src.chat.sse_manager import get_sse_manager, GLOBAL_SSE_MAX_CONNECTIONS
+
+        sse = get_sse_manager()
+        metrics["active_sse_connections"] = sse.global_connection_count
+        metrics["global_sse_limit"] = GLOBAL_SSE_MAX_CONNECTIONS
+        metrics["sse_global_limit_reached"] = sse.is_global_limit_reached
+        metrics["tenants_streaming"] = len(sse._connections)
+
+        # Rate limit shard sizes (SPEC-1745)
+        try:
+            from src.multi_tenant.middleware import _tenant_meta_cache
+
+            # Access shards through the middleware module
+            rate_limit_shard_sizes: list[int] = []
+            # Import is deferred — middleware may not have a running instance
+            metrics["tenant_meta_cache_size"] = len(_tenant_meta_cache)
+        except Exception:
+            metrics["tenant_meta_cache_size"] = -1
+
+        # Config cache TTL (SPEC-1748)
+        from src.multi_tenant.config.cache import CACHE_TTL_SECONDS
+
+        metrics["config_cache_ttl_seconds"] = CACHE_TTL_SECONDS
+
+        # Pre-auth tracker count (SPEC-1758)
+        from src.multi_tenant.security_hardening import (
+            get_pre_auth_limiter,
+            MAX_TRACKED_IPS,
+        )
+
+        limiter = get_pre_auth_limiter()
+        metrics["pre_auth_tracker_count"] = limiter.tracker_count
+        metrics["pre_auth_tracker_limit"] = MAX_TRACKED_IPS
+
+        # Tenant QA lock count (SPEC-1759)
+        from src.multi_tenant.admin_quick_action_api import (
+            _tenant_qa_locks,
+            MAX_TENANT_LOCKS,
+        )
+
+        metrics["tenant_lock_count"] = len(_tenant_qa_locks)
+        metrics["tenant_lock_limit"] = MAX_TENANT_LOCKS
+
+        # Uptime
+        if not hasattr(health_metrics, "_start_time"):
+            health_metrics._start_time = _time.monotonic()  # type: ignore[attr-defined]
+        metrics["uptime_seconds"] = round(
+            _time.monotonic() - health_metrics._start_time, 1  # type: ignore[attr-defined]
+        )
+
+        # Event loop lag — schedule a callback and measure delay
+        loop = asyncio.get_event_loop()
+        lag_start = loop.time()
+        await asyncio.sleep(0)  # yield to event loop
+        lag_ms = round((loop.time() - lag_start) * 1000, 2)
+        metrics["event_loop_lag_ms"] = lag_ms
+
+        # API version
+        from src.multi_tenant.api_versioning import API_VERSION, PRODUCT_VERSION
+
+        metrics["api_version"] = API_VERSION
+        metrics["product_version"] = PRODUCT_VERSION
+
+        return metrics

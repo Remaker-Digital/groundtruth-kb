@@ -580,32 +580,35 @@ class TestRateLimitSlidingWindow:
     def test_window_records_requests(self):
         mw = self._make_middleware()
         tenant_id = "t-rate-01"
+        shard = mw._get_shard(tenant_id)
         now = time.monotonic()
-        mw._windows[tenant_id].append((now, 1))
-        assert len(mw._windows[tenant_id]) == 1
+        shard.windows[tenant_id].append((now, 1))
+        assert len(shard.windows[tenant_id]) == 1
 
     def test_expired_entries_cleaned(self):
         mw = self._make_middleware()
         tenant_id = "t-rate-02"
+        shard = mw._get_shard(tenant_id)
         now = time.monotonic()
         # Add an entry 120 seconds ago — outside the 60s window
-        mw._windows[tenant_id].append((now - 120.0, 1))
-        mw._windows[tenant_id].append((now, 1))
+        shard.windows[tenant_id].append((now - 120.0, 1))
+        shard.windows[tenant_id].append((now, 1))
 
         # Simulate the cleanup logic from dispatch
-        cutoff = now - mw._window_size
-        mw._windows[tenant_id] = [
-            (ts, count) for ts, count in mw._windows[tenant_id] if ts > cutoff
+        cutoff = now - shard.window_size
+        shard.windows[tenant_id] = [
+            (ts, count) for ts, count in shard.windows[tenant_id] if ts > cutoff
         ]
-        assert len(mw._windows[tenant_id]) == 1
+        assert len(shard.windows[tenant_id]) == 1
 
     def test_count_accumulates(self):
         mw = self._make_middleware()
         tenant_id = "t-rate-03"
+        shard = mw._get_shard(tenant_id)
         now = time.monotonic()
         for i in range(5):
-            mw._windows[tenant_id].append((now + i * 0.1, 1))
-        current_count = sum(count for _, count in mw._windows[tenant_id])
+            shard.windows[tenant_id].append((now + i * 0.1, 1))
+        current_count = sum(count for _, count in shard.windows[tenant_id])
         assert current_count == 5
 
 

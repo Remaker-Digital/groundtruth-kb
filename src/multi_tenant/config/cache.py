@@ -15,8 +15,11 @@ from typing import Any
 
 from src.multi_tenant.cosmos_schema import TenantTier
 
-# Decision #22: 60-second in-memory cache
-CACHE_TTL_SECONDS = 60
+# Decision #22 + SPEC-1751: 300-second in-memory cache (was 60s).
+# At 680 tenants, 60s TTL causes excessive Cosmos reads. 300s reduces
+# cache-miss rate by ~80%. Explicit invalidation on write keeps
+# admin changes visible immediately.
+CACHE_TTL_SECONDS = 300
 
 
 @dataclass

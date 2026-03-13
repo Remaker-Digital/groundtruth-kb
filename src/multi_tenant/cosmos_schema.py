@@ -2288,6 +2288,10 @@ TIER_DEFAULTS: dict[str, dict[str, Any]] = {
         "trial_duration_days": 14,      # 14-day trial period
         "max_quick_actions": 20,
         "max_quick_action_assignments": 50,
+        "max_kb_articles": 200,               # SPEC-1752
+        "max_website_sources": 20,            # SPEC-1752
+        "max_escalation_categories": 10,      # SPEC-1752
+        "max_team_members": 20,               # SPEC-1752
     },
     TenantTier.STARTER.value: {
         "included_conversations": 1_000,
@@ -2299,6 +2303,10 @@ TIER_DEFAULTS: dict[str, dict[str, Any]] = {
         "overage_rate": 0.04,
         "max_quick_actions": 5,
         "max_quick_action_assignments": 10,
+        "max_kb_articles": 50,                # SPEC-1752
+        "max_website_sources": 5,             # SPEC-1752
+        "max_escalation_categories": 3,       # SPEC-1752
+        "max_team_members": 5,                # SPEC-1752
     },
     TenantTier.PROFESSIONAL.value: {
         "included_conversations": 5_000,
@@ -2310,6 +2318,10 @@ TIER_DEFAULTS: dict[str, dict[str, Any]] = {
         "overage_rate": 0.025,
         "max_quick_actions": 20,
         "max_quick_action_assignments": 50,
+        "max_kb_articles": 200,               # SPEC-1752
+        "max_website_sources": 20,            # SPEC-1752
+        "max_escalation_categories": 10,      # SPEC-1752
+        "max_team_members": 20,               # SPEC-1752
     },
     TenantTier.ENTERPRISE.value: {
         "included_conversations": 20_000,
@@ -2321,6 +2333,10 @@ TIER_DEFAULTS: dict[str, dict[str, Any]] = {
         "overage_rate": 0.015,
         "max_quick_actions": 50,
         "max_quick_action_assignments": 200,
+        "max_kb_articles": 1_000,             # SPEC-1752
+        "max_website_sources": 100,           # SPEC-1752
+        "max_escalation_categories": 25,      # SPEC-1752
+        "max_team_members": 100,              # SPEC-1752
     },
 }
 

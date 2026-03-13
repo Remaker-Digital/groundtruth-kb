@@ -375,7 +375,7 @@ class TestRequireTierFactory:
         with pytest.raises(HTTPException) as exc_info:
             await dep(request)
         assert exc_info.value.status_code == 403
-        assert "not set" in exc_info.value.detail.lower()
+        assert "not configured" in exc_info.value.detail.lower()
 
 
 # ===================================================================

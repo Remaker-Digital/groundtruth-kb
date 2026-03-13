@@ -25,7 +25,7 @@ import os
 import re
 import secrets
 import time
-from collections import defaultdict
+from collections import OrderedDict, defaultdict
 from dataclasses import dataclass, field
 from typing import Any
 
@@ -213,6 +213,11 @@ MAX_FAILED_AUTH_PER_IP = 10
 FAILED_AUTH_WINDOW_SECONDS = 300  # 5 minutes
 # Block duration after exceeding failed auth limit (seconds)
 AUTH_BLOCK_DURATION_SECONDS = 900  # 15 minutes
+
+# SPEC-1758: Maximum tracked IP addresses to prevent unbounded memory growth.
+# At 680 tenants, potentially 50,000+ unique IPs daily. LRU eviction when cap
+# is reached. Configurable via PRE_AUTH_MAX_TRACKED_IPS env var.
+MAX_TRACKED_IPS: int = int(os.environ.get("PRE_AUTH_MAX_TRACKED_IPS", "10000"))
 
 
 # ---------------------------------------------------------------------------
@@ -435,13 +440,15 @@ class PreAuthRateLimiter:
         window_seconds: int = FAILED_AUTH_WINDOW_SECONDS,
         block_seconds: int = AUTH_BLOCK_DURATION_SECONDS,
         exempt_ips: frozenset[str] | None = None,
+        max_tracked_ips: int = MAX_TRACKED_IPS,
     ) -> None:
         self._max_attempts = max_attempts
         self._window_seconds = window_seconds
         self._block_seconds = block_seconds
-        self._trackers: dict[str, _AuthAttemptTracker] = defaultdict(
-            _AuthAttemptTracker
-        )
+        self._max_tracked_ips = max_tracked_ips
+        # SPEC-1758: OrderedDict for LRU eviction — most recently accessed
+        # entries move to the end, oldest entries evicted from the front.
+        self._trackers: OrderedDict[str, _AuthAttemptTracker] = OrderedDict()
 
         # Parse exempt IPs from env var when not explicitly provided
         if exempt_ips is not None:
@@ -473,6 +480,9 @@ class PreAuthRateLimiter:
         if tracker is None:
             return False
 
+        # SPEC-1758: Touch LRU order on access
+        self._trackers.move_to_end(client_ip)
+
         now = time.monotonic()
         if tracker.blocked_until > now:
             return True
@@ -501,7 +511,22 @@ class PreAuthRateLimiter:
             return False
 
         now = time.monotonic()
-        tracker = self._trackers[client_ip]
+
+        # SPEC-1758: Get or create tracker with LRU bookkeeping
+        if client_ip in self._trackers:
+            # Move to end (most recently used)
+            self._trackers.move_to_end(client_ip)
+            tracker = self._trackers[client_ip]
+        else:
+            # New IP — enforce cap with LRU eviction
+            if len(self._trackers) >= self._max_tracked_ips:
+                evicted_ip, _ = self._trackers.popitem(last=False)
+                logger.warning(
+                    "Pre-auth tracker cap reached (%d), evicted oldest IP: %s",
+                    self._max_tracked_ips, evicted_ip,
+                )
+            tracker = _AuthAttemptTracker()
+            self._trackers[client_ip] = tracker
 
         # Prune old attempts outside the window
         cutoff = now - self._window_seconds
@@ -547,6 +572,11 @@ class PreAuthRateLimiter:
         cutoff = now - self._window_seconds
         recent = sum(1 for t in tracker.timestamps if t > cutoff)
         return max(0, self._max_attempts - recent)
+
+    @property
+    def tracker_count(self) -> int:
+        """Number of tracked IP addresses. SPEC-1758 monitoring."""
+        return len(self._trackers)
 
     def cleanup(self) -> int:
         """Remove expired tracker entries.

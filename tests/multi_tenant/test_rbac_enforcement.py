@@ -45,6 +45,7 @@ def _make_ctx(role: TeamMemberRole | None = None, **kwargs) -> TenantContext:
     """Create a minimal TenantContext for RBAC testing."""
     defaults = {
         "tenant_id": "t-001",
+        "tier": "starter",  # SPEC-1750: null tier rejected on /api/admin paths
         "auth_method": "user_api_key" if role else "api_key",
         "team_member_role": role,
     }

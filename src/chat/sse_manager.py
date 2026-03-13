@@ -32,6 +32,7 @@ from __future__ import annotations
 import asyncio
 import json
 import logging
+import os
 import sys
 import time
 import traceback
@@ -49,6 +50,15 @@ logger = logging.getLogger(__name__)
 # ---------------------------------------------------------------------------
 # Constants
 # ---------------------------------------------------------------------------
+
+# SPEC-1756: Global SSE connection limit per replica.
+# At 680 tenants worst case: 680 × 30 (Enterprise) = 20,400 concurrent SSE
+# connections. Default 5000 per replica provides a safety valve well below
+# OS file descriptor limits while allowing headroom for scaling.
+# Configurable via SSE_MAX_CONNECTIONS env var.
+GLOBAL_SSE_MAX_CONNECTIONS: int = int(
+    os.environ.get("SSE_MAX_CONNECTIONS", "5000")
+)
 
 # Keepalive interval (seconds) — must be less than Azure App Gateway
 # idle timeout (60s) and typical proxy timeouts (30-120s).
@@ -155,14 +165,47 @@ class SSEConnectionManager:
     def can_connect(self, tenant_id: str, tier: str = "starter") -> bool:
         """Check if a new SSE connection is allowed for this tenant.
 
+        SPEC-1756: Checks global connection limit FIRST, then per-tenant
+        limit. Returns False (with global_limit_reached flag) when the
+        replica-wide cap is hit, signaling HTTP 503 + Retry-After.
+
         Uses the same concurrency limits as TenantConcurrencyMiddleware
         (from TIER_DEFAULTS.max_concurrent).
         """
+        # SPEC-1756: Global cap check — protect the replica
+        if self.global_connection_count >= GLOBAL_SSE_MAX_CONNECTIONS:
+            logger.warning(
+                "Global SSE connection limit reached: %d/%d (tenant=%s denied)",
+                self.global_connection_count,
+                GLOBAL_SSE_MAX_CONNECTIONS,
+                tenant_id[:8],
+            )
+            return False
+
+        # Per-tenant cap check
         tier_config = TIER_DEFAULTS.get(tier, TIER_DEFAULTS.get("starter", {}))
         max_concurrent = tier_config.get("max_concurrent", 3)
 
         current = len(self._connections.get(tenant_id, set()))
         return current < max_concurrent
+
+    @property
+    def global_connection_count(self) -> int:
+        """Total active SSE connections across all tenants on this replica.
+
+        SPEC-1756: Used by can_connect() for global cap enforcement and
+        by /health/metrics for monitoring.
+        """
+        return sum(len(convs) for convs in self._connections.values())
+
+    @property
+    def is_global_limit_reached(self) -> bool:
+        """Whether the global SSE connection limit has been reached.
+
+        SPEC-1756: Callers should return HTTP 503 with Retry-After header
+        when this returns True.
+        """
+        return self.global_connection_count >= GLOBAL_SSE_MAX_CONNECTIONS
 
     def connect(
         self,
@@ -550,9 +593,7 @@ class SSEConnectionManager:
 
     def health_summary(self) -> dict[str, Any]:
         """Health summary for the /ready endpoint."""
-        total_connections = sum(
-            len(convs) for convs in self._connections.values()
-        )
+        total_connections = self.global_connection_count
         total_tabs = sum(
             len(tabs)
             for tenant_tabs in self._tab_connections.values()
@@ -560,6 +601,8 @@ class SSEConnectionManager:
         )
         return {
             "active_connections": total_connections,
+            "global_connection_limit": GLOBAL_SSE_MAX_CONNECTIONS,
+            "global_limit_reached": self.is_global_limit_reached,
             "active_tabs": total_tabs,
             "tenants_streaming": len(self._connections),
             "event_buffers": len(self._buffers),

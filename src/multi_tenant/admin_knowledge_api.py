@@ -872,6 +872,31 @@ async def create_knowledge_entry(
     """
     repo = _get_repo()
 
+    # SPEC-1752: Enforce per-tier KB article cap.
+    if ctx.tier is not None:
+        from src.multi_tenant.cosmos_schema import TIER_DEFAULTS as _TD
+        _tk = ctx.tier.value if hasattr(ctx.tier, "value") else str(ctx.tier)
+        _tier_cfg = _TD.get(_tk, {})
+        _max_articles = _tier_cfg.get("max_kb_articles")
+        if _max_articles is not None:
+            try:
+                existing = await repo.query(
+                    tenant_id=ctx.tenant_id,
+                    query_text="SELECT VALUE COUNT(1) FROM c WHERE c.is_active = true",
+                    max_items=1,
+                )
+                _count = existing[0] if existing else 0
+                if isinstance(_count, int) and _count >= _max_articles:
+                    raise HTTPException(
+                        status_code=403,
+                        detail=(
+                            f"Knowledge base article limit reached ({_max_articles} "
+                            f"for {_tk} tier). Upgrade to add more."
+                        ),
+                    )
+            except (TypeError, AttributeError):
+                pass  # Repo not fully initialized — skip cap check
+
     # Validate entry_type
     if request.entry_type not in VALID_ENTRY_TYPES:
         raise HTTPException(
@@ -1274,6 +1299,38 @@ async def import_knowledge_from_url(
 
     Maximum page size: 4 MB per page.
     """
+    # SPEC-1749: Enforce tier-based website source limits on import.
+    # Without this check, tenants could bypass crawl source limits
+    # by calling the import endpoint directly.
+    if ctx.tier is not None:
+        from src.multi_tenant.cosmos_schema import TIER_DEFAULTS
+
+        tier_key = ctx.tier.value if hasattr(ctx.tier, "value") else str(ctx.tier)
+        tier_defaults = TIER_DEFAULTS.get(tier_key, {})
+        max_sources = tier_defaults.get("max_website_sources")
+        if max_sources is not None:
+            try:
+                repo_check = _get_repo()
+                existing = await repo_check.query(
+                    tenant_id=ctx.tenant_id,
+                    query_text=(
+                        "SELECT VALUE COUNT(1) FROM c "
+                        "WHERE c.type = 'website_source'"
+                    ),
+                    max_items=1,
+                )
+                current_count = existing[0] if existing else 0
+                if isinstance(current_count, int) and current_count >= max_sources:
+                    raise HTTPException(
+                        status_code=403,
+                        detail=(
+                            f"Website source limit reached ({max_sources} for "
+                            f"{tier_key} tier). Upgrade to import more."
+                        ),
+                    )
+            except (TypeError, AttributeError):
+                pass  # Repo not fully initialized — skip cap check
+
     repo = _get_repo()
 
     if request.entry_type not in VALID_ENTRY_TYPES:

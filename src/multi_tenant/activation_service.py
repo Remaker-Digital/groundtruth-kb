@@ -577,6 +577,67 @@ class ActivationService:
         )
 
     # ------------------------------------------------------------------
+    # Tier Entitlement Validation (SPEC-1748)
+    # ------------------------------------------------------------------
+
+    def _validate_tier_entitlements(
+        self, draft: dict, tier: TenantTier,
+    ) -> list[dict[str, str]]:
+        """Check that draft config doesn't use features above the tenant's tier.
+
+        Returns a list of hard-error dicts (empty = pass).  Called by
+        activate() as a defense-in-depth guard against mid-session
+        downgrades.
+        """
+        from src.multi_tenant.cosmos_schema import TIER_DEFAULTS
+
+        tier_defaults = TIER_DEFAULTS.get(tier.value, {})
+        allowed_layers = set(tier_defaults.get("memory_layers", [1, 2, 3]))
+        max_qa = tier_defaults.get("max_quick_actions")
+        errors: list[dict[str, str]] = []
+
+        # Custom instructions require Professional+ (Starter has no
+        # custom_instructions key in TIER_DEFAULTS — gate on tier level).
+        if tier == TenantTier.STARTER:
+            ci = draft.get("custom_instructions")
+            if ci and str(ci).strip():
+                errors.append({
+                    "field": "custom_instructions",
+                    "message": (
+                        "Custom instructions require Professional tier or higher. "
+                        "Upgrade to activate this feature."
+                    ),
+                })
+
+        # Memory layer 3 requires Professional+.
+        configured_layers = draft.get("memory_layers")
+        if configured_layers and isinstance(configured_layers, list):
+            for layer in configured_layers:
+                if layer not in allowed_layers:
+                    errors.append({
+                        "field": "memory_layers",
+                        "message": (
+                            f"Memory layer {layer} is not available on the "
+                            f"{tier.value} tier. Upgrade to access it."
+                        ),
+                    })
+                    break  # One error is enough
+
+        # Quick action count within tier limit.
+        if max_qa is not None:
+            qa_count = len(draft.get("quick_actions", []))
+            if qa_count > max_qa:
+                errors.append({
+                    "field": "quick_actions",
+                    "message": (
+                        f"Quick action limit exceeded ({qa_count}/{max_qa} "
+                        f"for {tier.value} tier). Remove extras or upgrade."
+                    ),
+                })
+
+        return errors
+
+    # ------------------------------------------------------------------
     # Validate for Activation
     # ------------------------------------------------------------------
 
@@ -701,6 +762,18 @@ class ActivationService:
                 # but widget_key is set during provisioning which may have
                 # failed to write it to the preferences document.
                 await self._ensure_widget_key(tenant_id)
+
+                # SPEC-1748: Re-validate tier entitlements before activation.
+                # A tenant downgraded mid-session could otherwise activate
+                # Professional-only features on a Starter plan.
+                pre_draft = await self._prefs_repo.get_draft(tenant_id)
+                if pre_draft is not None:
+                    tier_errors = self._validate_tier_entitlements(pre_draft, tier)
+                    if tier_errors:
+                        return ActivationResult(
+                            success=False,
+                            errors=tier_errors,
+                        )
 
                 # Validate inside the lock so no concurrent save_draft()
                 # can modify the draft between validation and promotion.

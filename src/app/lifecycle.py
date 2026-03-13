@@ -1503,6 +1503,16 @@ async def _shutdown_pre_auth_cleanup() -> None:
         pass
 
 
+async def _shutdown_cache_invalidation() -> None:
+    """Stop the cross-replica cache invalidation subscriber (SPEC-1757)."""
+    try:
+        from src.multi_tenant.cache_invalidation import shutdown_cache_invalidation
+
+        shutdown_cache_invalidation()
+    except Exception:
+        pass
+
+
 async def _startup_redis_rate_limiter() -> None:
     """Initialize Redis-backed rate limiter if REDIS_URL is configured (SPEC-1626).
 
@@ -1535,6 +1545,11 @@ async def _startup_redis_rate_limiter() -> None:
         backend = RedisRateLimitBackend(client, key_prefix="agentred:rl:")
         set_rate_limit_backend(backend)
         logger.info("Redis rate limiter connected: %s", redis_url.split("@")[-1])
+
+        # SPEC-1757: Start cross-replica cache invalidation subscriber
+        from src.multi_tenant.cache_invalidation import configure_cache_invalidation
+
+        configure_cache_invalidation(client)
     except ImportError:
         logger.warning("redis package not installed — using in-memory rate limiter")
     except Exception:
@@ -1622,6 +1637,7 @@ def register_shutdown_handlers(app: FastAPI | None = None) -> None:
         _shutdown_secret_service,
         _shutdown_chat_pipeline,
         _shutdown_pre_auth_cleanup,
+        _shutdown_cache_invalidation,
     ])
 
 

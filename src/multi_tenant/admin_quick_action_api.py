@@ -42,8 +42,11 @@ Dependencies:
 
 from __future__ import annotations
 
+import asyncio
 import logging
+import os
 import uuid
+from collections import OrderedDict
 from datetime import datetime, timezone
 from typing import Any
 
@@ -238,6 +241,40 @@ def _get_tier_limit(tier: str | None, key: str) -> int:
     return 5  # Fallback default
 
 
+# SPEC-1759: Per-tenant locks with LRU eviction to prevent unbounded growth.
+# At 680 tenants, locks are lightweight (~100 bytes each) but should still
+# be bounded. OrderedDict provides O(1) LRU eviction. Evicted locks are
+# safe to discard — worst case is a brief TOCTOU window for inactive tenants.
+# Configurable via MAX_TENANT_LOCKS env var.
+MAX_TENANT_LOCKS: int = int(os.environ.get("MAX_TENANT_LOCKS", "1000"))
+_tenant_qa_locks: OrderedDict[str, asyncio.Lock] = OrderedDict()
+
+
+def _get_tenant_lock(tenant_id: str) -> asyncio.Lock:
+    """Get or create a per-tenant lock for atomic operations.
+
+    SPEC-1759: Uses OrderedDict for LRU tracking. When the cap is reached,
+    the oldest (least recently used) lock is evicted. This is safe because
+    evicted locks belong to inactive tenants — if they become active again,
+    a new lock is created.
+    """
+    if tenant_id in _tenant_qa_locks:
+        _tenant_qa_locks.move_to_end(tenant_id)
+        return _tenant_qa_locks[tenant_id]
+
+    # New tenant — enforce cap with LRU eviction
+    if len(_tenant_qa_locks) >= MAX_TENANT_LOCKS:
+        evicted_id, _ = _tenant_qa_locks.popitem(last=False)
+        logger.debug(
+            "Tenant lock cap reached (%d), evicted oldest: %s",
+            MAX_TENANT_LOCKS, evicted_id[:8],
+        )
+
+    lock = asyncio.Lock()
+    _tenant_qa_locks[tenant_id] = lock
+    return lock
+
+
 async def _ensure_qa_draft(ctx: "TenantContext") -> None:
     """Ensure a draft document exists before any QA write operation.
 
@@ -374,33 +411,37 @@ async def create_quick_action(
     """Create a new quick action prompt."""
     repo = _get_repo()
 
-    # Check tier limit
-    existing = await repo.get_quick_actions(ctx.tenant_id)
-    max_actions = _get_tier_limit(ctx.tier, "max_quick_actions")
-    if len(existing) >= max_actions:
-        raise HTTPException(
-            status_code=403,
-            detail=f"Quick action limit reached ({max_actions} for {ctx.tier} tier). "
-            f"Upgrade your plan to create more.",
+    # SPEC-1747: Atomic reservation — hold per-tenant lock across
+    # count check + write to prevent TOCTOU race conditions.
+    lock = _get_tenant_lock(ctx.tenant_id)
+    async with lock:
+        # Check tier limit
+        existing = await repo.get_quick_actions(ctx.tenant_id)
+        max_actions = _get_tier_limit(ctx.tier, "max_quick_actions")
+        if len(existing) >= max_actions:
+            raise HTTPException(
+                status_code=403,
+                detail=f"Quick action limit reached ({max_actions} for {ctx.tier} tier). "
+                f"Upgrade your plan to create more.",
+            )
+
+        # Ensure draft exists before QA write (D20 fix)
+        await _ensure_qa_draft(ctx)
+
+        now = datetime.now(timezone.utc).isoformat()
+        action = QuickActionPrompt(
+            id=str(uuid.uuid4()),
+            label=body.label,
+            prompt_template=body.prompt_template,
+            icon=body.icon,
+            is_active=body.is_active,
+            sort_order=body.sort_order,
+            created_at=now,
+            updated_at=now,
         )
 
-    # Ensure draft exists before QA write (D20 fix)
-    await _ensure_qa_draft(ctx)
-
-    now = datetime.now(timezone.utc).isoformat()
-    action = QuickActionPrompt(
-        id=str(uuid.uuid4()),
-        label=body.label,
-        prompt_template=body.prompt_template,
-        icon=body.icon,
-        is_active=body.is_active,
-        sort_order=body.sort_order,
-        created_at=now,
-        updated_at=now,
-    )
-
-    action_dict = action.model_dump()
-    await repo.upsert_quick_action(ctx.tenant_id, action_dict)
+        action_dict = action.model_dump()
+        await repo.upsert_quick_action(ctx.tenant_id, action_dict)
 
     logger.info(
         "Quick action created: tenant=%s id=%s label=%s",
@@ -488,35 +529,38 @@ async def upsert_page_assignment(
             detail=f"Quick action '{body.slot_2_action_id}' not found",
         )
 
-    # Check tier limit for new assignments
-    existing_assignments = await repo.get_page_assignments(ctx.tenant_id)
-    is_new = not any(
-        a.get("page_type") == body.page_type
-        and a.get("page_handle") == body.page_handle
-        for a in existing_assignments
-    )
-    if is_new:
-        max_assignments = _get_tier_limit(ctx.tier, "max_quick_action_assignments")
-        if len(existing_assignments) >= max_assignments:
-            raise HTTPException(
-                status_code=403,
-                detail=f"Assignment limit reached ({max_assignments} for {ctx.tier} tier).",
-            )
+    # SPEC-1747: Atomic reservation for assignment count check + write.
+    lock = _get_tenant_lock(ctx.tenant_id)
+    async with lock:
+        # Check tier limit for new assignments
+        existing_assignments = await repo.get_page_assignments(ctx.tenant_id)
+        is_new = not any(
+            a.get("page_type") == body.page_type
+            and a.get("page_handle") == body.page_handle
+            for a in existing_assignments
+        )
+        if is_new:
+            max_assignments = _get_tier_limit(ctx.tier, "max_quick_action_assignments")
+            if len(existing_assignments) >= max_assignments:
+                raise HTTPException(
+                    status_code=403,
+                    detail=f"Assignment limit reached ({max_assignments} for {ctx.tier} tier).",
+                )
 
-    # Ensure draft exists before QA write (D68 fix)
-    await _ensure_qa_draft(ctx)
+        # Ensure draft exists before QA write (D68 fix)
+        await _ensure_qa_draft(ctx)
 
-    assignment = QuickActionPageAssignment(
-        page_type=body.page_type,
-        page_handle=body.page_handle,
-        slot_1_action_id=body.slot_1_action_id,
-        slot_2_action_id=body.slot_2_action_id,
-        auto_open=body.auto_open,
-        auto_open_delay_ms=body.auto_open_delay_ms,
-    )
+        assignment = QuickActionPageAssignment(
+            page_type=body.page_type,
+            page_handle=body.page_handle,
+            slot_1_action_id=body.slot_1_action_id,
+            slot_2_action_id=body.slot_2_action_id,
+            auto_open=body.auto_open,
+            auto_open_delay_ms=body.auto_open_delay_ms,
+        )
 
-    assignment_dict = assignment.model_dump()
-    await repo.upsert_page_assignment(ctx.tenant_id, assignment_dict)
+        assignment_dict = assignment.model_dump()
+        await repo.upsert_page_assignment(ctx.tenant_id, assignment_dict)
 
     logger.info(
         "Page assignment upserted: tenant=%s page_type=%s page_handle=%s",

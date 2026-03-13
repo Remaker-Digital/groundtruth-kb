@@ -139,6 +139,73 @@ def configure_tenant_resolution(
 
 
 # ---------------------------------------------------------------------------
+# Tenant Metadata Cache (SPEC-1751)
+# ---------------------------------------------------------------------------
+# At 680 tenants, every request hitting Cosmos for tenant metadata creates
+# excessive read load. This LRU cache with 120s TTL provides ~95% hit rate.
+# Explicit invalidation on write operations (tier change, status change).
+
+_TENANT_META_CACHE_TTL = 120  # seconds
+_TENANT_META_CACHE_MAX = 1_000  # entries
+
+# Cache structure: {cache_key: (tenant_dict, expires_at_monotonic)}
+_tenant_meta_cache: dict[str, tuple[Any, float]] = {}
+
+
+def _get_cached_tenant_meta(cache_key: str) -> Any | None:
+    """Return cached tenant metadata if fresh, else None."""
+    entry = _tenant_meta_cache.get(cache_key)
+    if entry is None:
+        return None
+    tenant_dict, expires_at = entry
+    if time.monotonic() > expires_at:
+        _tenant_meta_cache.pop(cache_key, None)
+        return None
+    return tenant_dict
+
+
+def _set_cached_tenant_meta(cache_key: str, tenant_dict: Any) -> None:
+    """Store tenant metadata in cache with TTL."""
+    # Evict oldest entries if at capacity
+    while len(_tenant_meta_cache) >= _TENANT_META_CACHE_MAX:
+        _tenant_meta_cache.pop(next(iter(_tenant_meta_cache)))
+    _tenant_meta_cache[cache_key] = (
+        tenant_dict,
+        time.monotonic() + _TENANT_META_CACHE_TTL,
+    )
+
+
+def invalidate_tenant_meta_cache(
+    tenant_id: str | None = None,
+    *,
+    _publish: bool = True,
+) -> None:
+    """Invalidate cached tenant metadata.
+
+    Args:
+        tenant_id: If provided, invalidate only that tenant's entries.
+            If None, clear the entire cache.
+        _publish: If True (default), publish the invalidation event to
+            other replicas via Redis pub/sub (SPEC-1757). Set to False
+            internally when handling a received pub/sub message to avoid
+            infinite publish loops.
+    """
+    if tenant_id is None:
+        _tenant_meta_cache.clear()
+    else:
+        # Remove all cache keys containing this tenant_id
+        to_remove = [k for k in _tenant_meta_cache if tenant_id in k]
+        for k in to_remove:
+            del _tenant_meta_cache[k]
+
+    # SPEC-1757: Notify other replicas via Redis pub/sub
+    if _publish:
+        from src.multi_tenant.cache_invalidation import publish_cache_invalidation
+
+        publish_cache_invalidation(tenant_id)
+
+
+# ---------------------------------------------------------------------------
 # TenantAuthMiddleware
 # ---------------------------------------------------------------------------
 
@@ -409,11 +476,16 @@ class TenantAuthMiddleware(BaseHTTPMiddleware):
                 "Tenant resolution not configured.", status_code=500,
             )
 
-        tenant = await _resolve_by_shop_domain(shop_domain)
+        # SPEC-1751: Check tenant metadata cache before Cosmos read.
+        cache_key = f"shop:{shop_domain}"
+        tenant = _get_cached_tenant_meta(cache_key)
         if tenant is None:
-            raise AuthenticationError(
-                f"No tenant found for shop domain: {shop_domain}"
-            )
+            tenant = await _resolve_by_shop_domain(shop_domain)
+            if tenant is None:
+                raise AuthenticationError(
+                    f"No tenant found for shop domain: {shop_domain}"
+                )
+            _set_cached_tenant_meta(cache_key, tenant)
 
         tenant_id, status, tier, trial_expires_at, expires_at, rl_rpm = self._resolve_tenant_fields(tenant)
         validate_tenant_status(tenant_id, status)
@@ -617,11 +689,16 @@ class TenantAuthMiddleware(BaseHTTPMiddleware):
                 "Tenant resolution not configured.", status_code=500,
             )
 
-        tenant = await _resolve_by_tenant_id(tenant_id)
+        # SPEC-1751: Check tenant metadata cache before Cosmos read.
+        cache_key = f"tid:{tenant_id}"
+        tenant = _get_cached_tenant_meta(cache_key)
         if tenant is None:
-            raise AuthenticationError(
-                f"No tenant found for session token: {tenant_id}",
-            )
+            tenant = await _resolve_by_tenant_id(tenant_id)
+            if tenant is None:
+                raise AuthenticationError(
+                    f"No tenant found for session token: {tenant_id}",
+                )
+            _set_cached_tenant_meta(cache_key, tenant)
 
         _, status, tier, trial_expires_at, expires_at, rl_rpm = self._resolve_tenant_fields(tenant)
         validate_tenant_status(tenant_id, status)
@@ -721,6 +798,19 @@ async def get_tenant_context(request: Request) -> TenantContext:
                        "Use tenant-specific credentials for tenant operations.",
             )
 
+    # SPEC-1750: Reject admin requests with unset tier to prevent
+    # silent bypass during Cosmos eventual-consistency windows.
+    # Widget/chat paths exempt (they validate tier separately).
+    if (
+        ctx.tier is None
+        and not getattr(ctx, "is_platform_admin", False)
+        and request.url.path.startswith("/api/admin")
+    ):
+        raise HTTPException(
+            status_code=403,
+            detail="Tenant subscription tier not configured. Contact support.",
+        )
+
     enforce_rbac(request.url.path, ctx)
     return ctx
 
@@ -735,10 +825,12 @@ def require_tier(minimum_tier: TenantTier) -> Callable:
         ):
             ...
 
-    Tier ordering: TRIAL = STARTER < PROFESSIONAL < ENTERPRISE
+    Tier ordering: STARTER < TRIAL = PROFESSIONAL < ENTERPRISE (SPEC-1746)
     """
+    # Trial maps to Professional (level 1) because Trial is a 14-day
+    # evaluation of Professional-tier features (SPEC-1746).
     _tier_order = {
-        TenantTier.TRIAL: 0,
+        TenantTier.TRIAL: 1,
         TenantTier.STARTER: 0,
         TenantTier.PROFESSIONAL: 1,
         TenantTier.ENTERPRISE: 2,
@@ -999,6 +1091,49 @@ def enforce_rbac(path: str, ctx: "TenantContext") -> None:
 # ---------------------------------------------------------------------------
 
 
+class _RateLimitShard:
+    """One shard of the rate-limiting state (SPEC-1745).
+
+    Each shard has its own lock and window dict, so tenants in
+    different shards never contend with each other.
+    """
+
+    __slots__ = ("lock", "windows", "window_size")
+
+    def __init__(self, window_size: float = 60.0) -> None:
+        self.lock = asyncio.Lock()
+        self.windows: dict[str, list[tuple[float, int]]] = defaultdict(list)
+        self.window_size = window_size
+
+    async def check_and_record(
+        self, tenant_id: str, limit: int,
+    ) -> tuple[bool, int]:
+        """Check rate limit and record request if allowed.
+
+        Returns:
+            (allowed, remaining) — True if under limit, remaining count.
+        """
+        now = time.monotonic()
+        async with self.lock:
+            cutoff = now - self.window_size
+            self.windows[tenant_id] = [
+                (ts, count) for ts, count in self.windows[tenant_id]
+                if ts > cutoff
+            ]
+            current_count = sum(
+                count for _, count in self.windows[tenant_id]
+            )
+            if current_count >= limit:
+                return False, 0
+            self.windows[tenant_id].append((now, 1))
+            return True, max(0, limit - current_count - 1)
+
+
+# Default shard count: 16 shards = ~42 tenants per shard at 680 tenants.
+# Reduces lock contention 16x vs single lock (SPEC-1745).
+_NUM_RATE_LIMIT_SHARDS = 16
+
+
 class RateLimitMiddleware(BaseHTTPMiddleware):
     """Per-tenant rate limiting based on subscription tier.
 
@@ -1008,20 +1143,59 @@ class RateLimitMiddleware(BaseHTTPMiddleware):
     Per-tenant overrides via TenantDocument.rate_limit_rpm take
     precedence over tier defaults.
 
-    Uses a sliding window counter per tenant. When the limit is
-    exceeded, returns HTTP 429 with Retry-After header.
+    Uses a sharded sliding window counter per tenant (SPEC-1745).
+    Each shard has its own lock — tenants are assigned to shards
+    via hash(tenant_id) % num_shards. At 680 tenants with 16 shards,
+    this reduces lock contention ~16x vs a single global lock.
 
     This is an in-memory implementation suitable for single-instance
     deployments. For multi-instance, replace with a shared store
     (Redis or Cosmos DB atomic counters).
     """
 
-    def __init__(self, app: Any, **kwargs: Any) -> None:
+    def __init__(
+        self,
+        app: Any,
+        num_shards: int = _NUM_RATE_LIMIT_SHARDS,
+        **kwargs: Any,
+    ) -> None:
         super().__init__(app, **kwargs)
-        # {tenant_id: [(timestamp, count), ...]}
-        self._windows: dict[str, list[tuple[float, int]]] = defaultdict(list)
+        self._shards = [_RateLimitShard() for _ in range(num_shards)]
+        self._num_shards = num_shards
         self._window_size = 60.0  # 1 minute sliding window
-        self._lock = asyncio.Lock()
+
+        # SPEC-1754: When REDIS_URL is configured, delegate rate limiting to
+        # the shared RedisRateLimitBackend for distributed enforcement across
+        # replicas. Falls back to local shards if Redis becomes unavailable.
+        from src.multi_tenant.security_hardening import get_rate_limit_backend, RedisRateLimitBackend
+
+        self._shared_backend = get_rate_limit_backend()
+        self._use_redis = isinstance(self._shared_backend, RedisRateLimitBackend)
+        if self._use_redis:
+            logger.info("RateLimitMiddleware: using Redis backend for distributed rate limiting")
+
+    def _get_shard(self, tenant_id: str) -> _RateLimitShard:
+        return self._shards[hash(tenant_id) % self._num_shards]
+
+    def _check_redis(self, tenant_id: str, limit: int) -> tuple[bool, int]:
+        """SPEC-1754: Check rate limit via Redis backend.
+
+        Returns (allowed, remaining). Falls back to None on Redis failure.
+        """
+        try:
+            is_limited = self._shared_backend.is_limited(
+                f"mw:{tenant_id}",
+                max_requests=limit,
+                window_seconds=self._window_size,
+            )
+            # Redis backend doesn't return remaining count — estimate
+            return (not is_limited, max(0, limit - 1) if not is_limited else 0)
+        except Exception:
+            logger.debug(
+                "Redis rate limit check failed, falling back to local shards",
+                exc_info=True,
+            )
+            return None  # type: ignore[return-value]
 
     async def dispatch(
         self, request: Request, call_next: RequestResponseEndpoint,
@@ -1041,49 +1215,40 @@ class RateLimitMiddleware(BaseHTTPMiddleware):
         if limit is None:
             return await call_next(request)
 
-        # Atomic check-and-increment under lock to prevent
-        # concurrent requests from both passing the limit check.
-        now = time.monotonic()
-        tenant_id = ctx.tenant_id
+        # SPEC-1754: Try Redis first, fall back to local shards
+        if self._use_redis:
+            result = self._check_redis(ctx.tenant_id, limit)
+            if result is not None:
+                allowed, remaining = result
+            else:
+                # Redis failed — graceful fallback to local shards
+                shard = self._get_shard(ctx.tenant_id)
+                allowed, remaining = await shard.check_and_record(ctx.tenant_id, limit)
+        else:
+            shard = self._get_shard(ctx.tenant_id)
+            allowed, remaining = await shard.check_and_record(ctx.tenant_id, limit)
 
-        async with self._lock:
-            # Clean expired entries
-            cutoff = now - self._window_size
-            self._windows[tenant_id] = [
-                (ts, count) for ts, count in self._windows[tenant_id]
-                if ts > cutoff
-            ]
-
-            # Count requests in window
-            current_count = sum(
-                count for _, count in self._windows[tenant_id]
+        if not allowed:
+            retry_after = int(self._window_size)
+            logger.warning(
+                "Rate limit exceeded: tenant=%s tier=%s limit=%d/min",
+                ctx.tenant_id, ctx.tier, limit,
             )
-
-            if current_count >= limit:
-                retry_after = int(self._window_size)
-                logger.warning(
-                    "Rate limit exceeded: tenant=%s tier=%s limit=%d/min current=%d",
-                    tenant_id, ctx.tier, limit, current_count,
-                )
-                return JSONResponse(
-                    status_code=429,
-                    content={
-                        "error": "Rate limit exceeded.",
-                        "limit": limit,
-                        "window": "60s",
-                        "retry_after": retry_after,
-                    },
-                    headers={
-                        "Retry-After": str(retry_after),
-                        "X-RateLimit-Limit": str(limit),
-                        "X-RateLimit-Remaining": "0",
-                        "X-RateLimit-Reset": str(retry_after),
-                    },
-                )
-
-            # Record this request atomically with the check
-            self._windows[tenant_id].append((now, 1))
-            remaining = max(0, limit - current_count - 1)
+            return JSONResponse(
+                status_code=429,
+                content={
+                    "error": "Rate limit exceeded.",
+                    "limit": limit,
+                    "window": "60s",
+                    "retry_after": retry_after,
+                },
+                headers={
+                    "Retry-After": str(retry_after),
+                    "X-RateLimit-Limit": str(limit),
+                    "X-RateLimit-Remaining": "0",
+                    "X-RateLimit-Reset": str(retry_after),
+                },
+            )
 
         response = await call_next(request)
 

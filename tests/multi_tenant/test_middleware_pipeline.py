@@ -348,8 +348,9 @@ class TestRateLimiting:
             # Simulate window expiry by backdating all entries
             import time as time_mod
             past_time = time_mod.monotonic() - 120  # 2 minutes ago
-            rate_limiter._windows[STARTER_TENANT_ID] = [
-                (past_time, count) for _, count in rate_limiter._windows.get(STARTER_TENANT_ID, [])
+            shard = rate_limiter._get_shard(STARTER_TENANT_ID)
+            shard.windows[STARTER_TENANT_ID] = [
+                (past_time, count) for _, count in shard.windows.get(STARTER_TENANT_ID, [])
             ]
 
             # Now the next request should succeed (expired entries cleaned)

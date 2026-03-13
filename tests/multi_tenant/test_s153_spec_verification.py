@@ -603,21 +603,21 @@ class TestSpec1059RateLimitAtomicity:
     """Verify WI-1059 fix: rate limit check-and-increment is atomic."""
 
     def test_rate_limit_middleware_has_lock(self):
-        """RateLimitMiddleware must have an asyncio.Lock."""
-        from src.multi_tenant.middleware import RateLimitMiddleware
+        """RateLimitMiddleware shards must each have an asyncio.Lock."""
+        from src.multi_tenant.middleware import _RateLimitShard
 
-        instance = RateLimitMiddleware.__new__(RateLimitMiddleware)
-        # __init__ creates the lock
-        instance._lock = asyncio.Lock()
-        assert isinstance(instance._lock, asyncio.Lock)
+        # SPEC-1745: Lock is per-shard, not per-middleware
+        shard = _RateLimitShard()
+        assert isinstance(shard.lock, asyncio.Lock)
 
     def test_rate_limit_dispatch_uses_lock_in_source(self):
-        """The rate limit dispatch() must use async with self._lock."""
-        from src.multi_tenant.middleware import RateLimitMiddleware
+        """The rate limit sharding must use async with lock for atomicity."""
+        from src.multi_tenant.middleware import _RateLimitShard
 
-        source = inspect.getsource(RateLimitMiddleware.dispatch)
-        assert "_lock" in source, (
-            "WI-1059: Rate limit dispatch must use _lock"
+        # SPEC-1745: Lock moved from dispatch() into _RateLimitShard.check_and_record()
+        source = inspect.getsource(_RateLimitShard)
+        assert "self.lock" in source, (
+            "WI-1059: Rate limit shard must use self.lock"
         )
         assert "async with" in source, (
             "WI-1059: Must use 'async with' for atomic check-and-increment"
