@@ -9,6 +9,7 @@ used by Azure Container Apps for traffic management.
 from __future__ import annotations
 
 import logging
+import os
 from typing import Any
 
 from fastapi import FastAPI, Request
@@ -99,10 +100,24 @@ def register_health_endpoints(app: FastAPI) -> None:
         sem_cache = get_semantic_cache()
         result["semantic_cache"] = sem_cache.health()
 
-        # AGNTCY SDK / SLIM transport health (SPEC-1524)
+        # AGNTCY SDK / SLIM transport health (SPEC-1524, SPEC-1780)
         from src.multi_tenant.agntcy_sdk_integration import get_sdk_status
 
-        result["agntcy_sdk"] = get_sdk_status()
+        sdk_status = get_sdk_status()
+        result["agntcy_sdk"] = sdk_status
+
+        # SPEC-1780: In deployed environments, /ready returns 503 when
+        # transport is not active (PB-AGNTCY-001 enforcement)
+        environment = os.environ.get("ENVIRONMENT", "development").lower()
+        if environment in ("staging", "production") and not sdk_status.get("transport_active"):
+            from starlette.responses import JSONResponse
+
+            result["status"] = "not_ready"
+            result["transport_enforcement"] = (
+                f"AGNTCY transport not active in {environment}. "
+                "PB-AGNTCY-001 requires transport for deployed environments."
+            )
+            return JSONResponse(status_code=503, content=result)
 
         # Cross-replica cache invalidation (SPEC-1757)
         from src.multi_tenant.cache_invalidation import is_configured as cache_invalidation_configured

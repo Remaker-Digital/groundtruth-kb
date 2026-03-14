@@ -12,6 +12,7 @@ from __future__ import annotations
 
 import json
 import logging
+import os
 from collections.abc import AsyncGenerator
 from typing import TYPE_CHECKING, Any
 
@@ -29,6 +30,12 @@ if TYPE_CHECKING:
     from src.multi_tenant.pipeline_resilience import PipelineTimeoutBudget
 
 logger = logging.getLogger(__name__)
+
+# SPEC-1780 / PB-AGNTCY-001: In deployed environments, agent dispatch
+# MUST NOT silently fall back to Tier 3 (in-process). If transport and
+# HTTP containers are both unavailable, fail with 503.
+_ENVIRONMENT = os.environ.get("ENVIRONMENT", "development").lower()
+_IS_DEPLOYED = _ENVIRONMENT in ("staging", "production")
 
 
 class AgentDispatchMixin:
@@ -51,6 +58,31 @@ class AgentDispatchMixin:
             return _transport is not None
         except Exception:
             return False
+
+    def _require_transport_or_fail(self, agent_name: str) -> None:
+        """SPEC-1780: In deployed environments, raise 503 if no transport is available.
+
+        Called when both transport and HTTP container dispatch have failed.
+        In local/development environments, allows silent Tier 3 fallback.
+        In staging/production, raises HTTPException(503) to prevent silent
+        degradation — the operator must fix transport infrastructure.
+        """
+        if _IS_DEPLOYED:
+            from fastapi import HTTPException
+
+            logger.error(
+                "AGNTCY transport unavailable in %s environment for agent=%s. "
+                "PB-AGNTCY-001 enforcement: refusing Tier 3 fallback.",
+                _ENVIRONMENT, agent_name,
+            )
+            raise HTTPException(
+                status_code=503,
+                detail=(
+                    f"Agent dispatch unavailable: {agent_name}. "
+                    f"AGNTCY transport is not active in {_ENVIRONMENT} environment. "
+                    "Contact platform administrator."
+                ),
+            )
 
     async def _call_via_transport(
         self,
@@ -118,6 +150,8 @@ class AgentDispatchMixin:
                     return await self._call_intent_classifier_http(message, system_prompt)
                 except Exception as exc:
                     logger.warning("HTTP IC call failed, falling back to in-process: %s", exc)
+            # SPEC-1780: Enforce transport requirement in deployed environments
+            self._require_transport_or_fail("intent-classifier")
             span.set_attribute("dispatch.mode", "in-process")
             result = await self._call_intent_classifier_direct(message, system_prompt)
             # Record token usage if available (SPEC-1540)
@@ -206,6 +240,8 @@ class AgentDispatchMixin:
                     return await self._call_knowledge_retrieval_http(message, intent, system_prompt)
                 except Exception as exc:
                     logger.warning("HTTP KR call failed, falling back to in-process: %s", exc)
+            # SPEC-1780: Enforce transport requirement in deployed environments
+            self._require_transport_or_fail("knowledge-retrieval")
             span.set_attribute("dispatch.mode", "in-process")
             return await self._call_knowledge_retrieval_direct(message, intent, system_prompt)
         except Exception:
@@ -340,7 +376,10 @@ class AgentDispatchMixin:
             except Exception as exc:
                 logger.warning("HTTP RG stream failed, falling back to in-process: %s", exc)
 
-        # Priority 3: In-process agent (fallback)
+        # SPEC-1780: Enforce transport requirement in deployed environments
+        self._require_transport_or_fail("response-generator")
+
+        # Priority 3: In-process agent (fallback — local/development only)
         async for chunk in self._call_response_generator_stream_direct(
             customer_message, intent, knowledge_context,
             system_prompt, budget, model,
@@ -548,7 +587,10 @@ class AgentDispatchMixin:
                 except Exception as exc:
                     logger.warning("HTTP co-pilot call failed: %s", exc)
 
-            # Tier 3: In-process direct
+            # SPEC-1780: Enforce transport requirement in deployed environments
+            self._require_transport_or_fail("co-pilot")
+
+            # Tier 3: In-process direct (local/development only)
             span.set_attribute("dispatch.mode", "in-process")
             co_pilot = getattr(self, "_copilot_agent", None)
             if co_pilot:

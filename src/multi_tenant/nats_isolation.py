@@ -770,6 +770,7 @@ class TenantNATSManager:
         agent: str,
         callback: Any,
         durable_name: str | None = None,
+        deliver_group: str | None = None,
     ) -> Any:
         """Subscribe to a tenant-scoped agent topic.
 
@@ -783,6 +784,11 @@ class TenantNATSManager:
             callback: Async message handler: async (msg: Msg) -> None.
             durable_name: Optional durable consumer name for persistence
                 across restarts. If None, a default name is generated.
+            deliver_group: Optional queue group name for competing-consumer
+                semantics (SPEC-1788). When set, NATS distributes messages
+                round-robin across subscribers in the same group — each
+                message is processed by exactly one subscriber. Essential
+                for horizontal scaling with multiple replicas.
 
         Returns:
             The NATS subscription object (for later unsubscribe).
@@ -805,6 +811,12 @@ class TenantNATSManager:
         if durable_name is None:
             durable_name = f"{tenant_id}-{agent}"
 
+        # SPEC-1788: Default deliver_group enables horizontal scaling.
+        # All replicas of the same agent share a queue group so each
+        # message is processed exactly once (competing consumers).
+        if deliver_group is None:
+            deliver_group = f"{tenant_id}-{agent}-group"
+
         try:
             sub = await self._js.subscribe(
                 subject,
@@ -814,6 +826,7 @@ class TenantNATSManager:
                 config=ConsumerConfig(
                     durable_name=durable_name,
                     deliver_policy=DeliverPolicy.NEW,
+                    deliver_group=deliver_group,
                 ),
             )
 
@@ -825,8 +838,8 @@ class TenantNATSManager:
             self._circuit_breaker.record_success()
 
             logger.info(
-                "NATS subscribe: subject=%s durable=%s tenant=%s",
-                subject, durable_name, tenant_id,
+                "NATS subscribe: subject=%s durable=%s deliver_group=%s tenant=%s",
+                subject, durable_name, deliver_group, tenant_id,
             )
 
             return sub

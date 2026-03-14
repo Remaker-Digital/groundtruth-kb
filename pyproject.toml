@@ -23,6 +23,7 @@ markers = [
     "tier2: post-deploy smoke tests — performance and latency validation",
     "sequential: tests that must not run in parallel (live endpoints, session fixtures)",
     "visual: visual regression tests requiring Playwright + Vite dev server (Layer 1-2)",
+    "nats: tests requiring a live NATS JetStream server (nats://localhost:4222)",
 ]
 filterwarnings = [
     "ignore::DeprecationWarning:pkg_resources",
