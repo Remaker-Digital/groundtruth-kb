@@ -1,0 +1,1492 @@
+
+
+# Integration Framework Architecture Research
+
+## 1. How Major Platforms Architect Their Integration Systems
+
+### Zendesk — Apps Framework & Sunshine Platform
+
+Zendesk uses a layered architecture built around their **Zendesk Apps Framework (ZAF)** and the newer **Sunshine Platform**.
+
+**Core Architecture:**
+- **Apps Framework (ZAF):** Client-side apps run in sandboxed iframes within the Zendesk agent UI. They communicate with the host page via a postMessage-based SDK (`ZAFClient`). Server-side apps use webhooks and a REST API.
+- **Sunshine Platform:** A more recent layer that provides custom objects, custom events, and unified profiles — essentially an extensible data model on top of the ticketing system.
+- **Channel Framework:** A specific integration type that lets external channels (WhatsApp, Twitter, custom) appear as native Zendesk ticket sources. The external service implements a standardized manifest with endpoints for `channelback` (send reply), `clickthrough` (link to original), and `pull` (fetch new messages).
+
+**Technical Details:**
+- Apps declare required permissions in a `manifest.json` (read tickets, write users, etc.)
+- OAuth2 is handled centrally — Zendesk acts as OAuth client, stores tokens, and provides them to apps
+- Webhooks fire on ticket/user/organization events with a standardized payload envelope: `{ "type": "ticket.updated", "ticket": {...}, "changes": {...} }`
+- Rate limits: 700 requests/minute for most APIs, with a leaky-bucket algorithm. `Retry-After` header on 429s
+- Data model: Everything is a ticket with custom fields. The `Ticket` object has ~50 standard fields plus unlimited custom fields
+
+**Relevance to your platform:** The Channel Framework pattern is directly applicable — you need a way for external channels (email, Slack, helpdesk) to appear as unified conversation sources. Their manifest-based connector declaration is a clean pattern.
+
+### Intercom — Messenger & Canvas Kit
+
+**Core Architecture:**
+- **Canvas Kit:** Apps render UI inside Intercom's Messenger or Inbox using a declarative JSON-based UI framework. Instead of iframes, apps return JSON describing components (text, buttons, lists, inputs) and Intercom renders them natively.
+- **Webhooks + REST API:** Standard event-driven integration. Intercom fires webhooks for conversation events, and apps call the REST API to read/write data.
+- **Custom Actions:** Apps can register "actions" that agents can trigger from the inbox — like looking up an order or issuing a refund. These appear as buttons in the agent UI.
+- **Custom Objects:** Similar to Zendesk Sunshine — extensible data model for storing integration-specific data tied to contacts.
+
+**Technical Details:**
+- Authentication: OAuth2 with PKCE for public apps, simple API tokens for private integrations
+- Conversation model: A conversation has `conversation_parts` — each part has an `author` (user, admin, bot, operator), `body` (HTML), and `part_type` (comment, assignment, note, close)
+- Data Access Patterns: The API uses cursor-based pagination with `starting_after` parameters, not offset-based
+- Webhooks are signed with HMAC-SHA256 using the app's client secret
+- Rate limits: Varies by plan — typically 1000 requests/minute with burst allowance
+
+**Key Pattern — Canvas Kit's Declarative UI:**
+```json
+{
+  "canvas": {
+    "content": {
+      "components": [
+        {"type": "text", "text": "Order #12345", "style": "header"},
+        {"type": "text", "text": "Status: Shipped"},
+        {"type": "button", "label": "Issue Refund", "action": {"type": "submit", "url": "https://my-app/refund"}}
+      ]
+    }
+  }
+}
+```
+
+**Relevance:** The Custom Actions pattern maps directly to your "AI can trigger actions" requirement. Intercom's approach of registering action descriptors (name, parameters, endpoint) that the platform invokes is cleaner than having integrations poll for work.
+
+### HubSpot — CRM Extensions & Timeline API
+
+**Core Architecture:**
+- **CRM Extensions:** Apps extend HubSpot's UI through "CRM cards" — structured data panels that appear on contact/deal/company records. The app hosts an endpoint that HubSpot calls when a user views a record, and the app returns card data.
+- **Custom Actions & Workflows:** Apps can register as workflow action types. When a HubSpot workflow reaches that action step, it calls the app's webhook with context data.
+- **Timeline API:** Apps can push custom timeline events onto contact records — each event type has a schema (defined by the app) and instances (individual occurrences).
+- **Webhooks (Subscription API):** Event-based notifications with batching — HubSpot batches events and delivers them in groups (up to 100 per request) with a short delay.
+
+**Technical Details:**
+- Authentication: OAuth2 with granular scopes (`crm.objects.contacts.read`, `crm.objects.deals.write`, etc.). Token refresh is standard.
+- Batch webhooks are a distinctive feature — instead of one HTTP request per event, HubSpot sends:
+```json
+[
+  {"eventId": 1, "subscriptionType": "contact.propertyChange", "propertyName": "email", "objectId": 123, "changeSource": "API"},
+  {"eventId": 2, "subscriptionType": "deal.creation", "objectId": 456}
+]
+```
+- Associations API: Objects are linked via typed associations (contact → company, deal → contact). The association type itself is an entity with metadata.
+- Rate limits: 100 requests per 10 seconds per app, with burst to 150. Private apps get higher limits.
+
+**Key Pattern — CRM Cards (Data Fetch on Demand):**
+HubSpot doesn't require apps to sync data into HubSpot. Instead, when an agent views a record, HubSpot calls the app's endpoint with the contact's email, and the app returns structured data to display. This is a pull-on-demand pattern that avoids stale sync problems.
+
+**Relevance:** The batched webhook delivery pattern is worth considering — it reduces HTTP overhead when integrations fire many events. The CRM card pull-on-demand pattern is relevant for your "action execution" requirement: instead of syncing all order data, you fetch it when the AI needs it.
+
+### Zapier — Universal Connector System
+
+**Core Architecture:**
+Zapier's architecture is built around three core abstractions:
+
+- **Triggers:** How data enters a Zap. Two types: polling triggers (Zapier calls your API on a schedule) and webhook triggers (your API pushes data to Zapier). Polling uses a deduplication key (`id` field) to avoid processing the same record twice.
+- **Actions:** Operations that write data to a destination. Each action maps to one API endpoint.
+- **Searches:** Read operations that find existing records (used for "find or create" patterns).
+
+**Technical Details — The Platform CLI:**
+Integrations are defined as Node.js modules with a standardized structure:
+```javascript
+const trigger = {
+  key: 'new_ticket',
+  noun: 'Ticket',
+  display: { label: 'New Ticket', description: 'Triggers when a new ticket is created' },
+  operation: {
+    // Polling: Zapier calls this function every 1-15 minutes
+    perform: async (z, bundle) => {
+      const response = await z.request('https://api.helpdesk.com/tickets?since=' + bundle.meta.page);
+      return response.data;  // Must return array sorted newest-first
+    },
+    // Sample data for the Zap editor
+    sample: { id: 1, subject: 'Help!', status: 'open' },
+    // Schema defines the output fields
+    outputFields: [
+      {key: 'id', type: 'integer'},
+      {key: 'subject', type: 'string'},
+      {key: 'status', type: 'string', choices: ['open', 'pending', 'solved']}
+    ]
+  }
+};
+```
+
+- **Authentication** is abstracted into 4 types: API Key, OAuth2, Session Auth (login endpoint returns token), and Custom. The framework handles token refresh, header injection, and credential storage.
+- **Dehydration/Hydration:** Zapier's key innovation for handling large payloads. Instead of fetching full data in a trigger, you return a "dehydration pointer" — a reference to a function that fetches the full data later, only if needed:
+```javascript
+perform: async (z, bundle) => {
+  const tickets = await z.request('/tickets');
+  return tickets.map(t => ({
+    ...t,
+    // Don't fetch comments now — defer until the Zap actually needs them
+    comments: z.dehydrate(fetchComments, { ticketId: t.id })
+  }));
+}
+```
+- **Throttling:** Built into the `z.request` wrapper — automatic retry with exponential backoff on 429s, configurable per-app limits.
+
+**Relevance:** The trigger/action/search taxonomy maps cleanly to your source/destination model. The dehydration pattern is valuable for knowledge ingestion — you index metadata immediately but defer full content fetch until the RAG pipeline actually needs it. The polling-with-dedup pattern is directly applicable for integrations that don't support webhooks.
+
+### Make (Integromat) — Visual Dataflow Architecture
+
+**Core Architecture:**
+Make thinks in terms of **modules** connected in a directed graph (scenario). Each module is one of:
+
+- **Trigger:** Entry point (webhook or scheduled poll)
+- **Action:** API call that transforms or writes data
+- **Search:** Query that returns records
+- **Aggregator:** Combines multiple bundles into one (like array reduce)
+- **Iterator:** Splits one bundle into many (like array flatMap)
+- **Router:** Conditional branching (if/else on data)
+
+**Technical Details:**
+- **Bundle:** Make's core data unit. Every module receives bundles (arrays of objects) and emits bundles. This is essentially a stream processing model.
+- **Data Store:** Built-in key-value store for maintaining state between executions (dedup keys, sync cursors, mapping tables).
+- **Connections:** Reusable credential objects. Make supports OAuth2, API keys, HTTP Basic, and custom auth. Connections are encrypted at rest and tenant-isolated.
+- **Custom Apps (SDK):** Defined via JSON-RPC manifest files that describe modules, their parameters, expected responses, and how to map response data to output fields. Error handling is declarative — you specify which HTTP status codes are retryable vs fatal.
+- **Execution Model:** Each scenario execution has an operations budget. One module invocation = one operation. This is how Make meters usage.
+
+**Key Pattern — Declarative Module Definition:**
+```json
+{
+  "url": "{{connection.baseUrl}}/api/tickets",
+  "method": "GET",
+  "qs": {
+    "updated_since": "{{parameters.since}}"
+  },
+  "response": {
+    "iterate": "{{body.tickets}}",
+    "output": {
+      "id": "{{item.id}}",
+      "subject": "{{item.subject}}",
+      "requester": "{{item.requester.email}}"
+    }
+  }
+}
+```
+
+The entire API interaction is described declaratively — URL, method, parameters, and response mapping. No imperative code. This is how Make supports 1500+ integrations with a small team.
+
+**Relevance:** The declarative module definition pattern is extremely powerful for scaling to 15-20 integrations quickly. Instead of writing Python code for each integration, you define API interactions in a config format and have a generic executor. The bundle/stream model is worth considering for your data normalization layer.
+
+---
+
+## 2. Common Architectural Patterns
+
+### Adapter/Connector Pattern
+
+**How it works:** Each external system gets an adapter class that implements a common interface. The platform code interacts only with the interface, never with vendor-specific APIs directly.
+
+```python
+from abc import ABC, abstractmethod
+from dataclasses import dataclass
+from typing import AsyncIterator
+from datetime import datetime
+
+@dataclass
+class NormalizedTicket:
+    """Platform-internal ticket representation."""
+    external_id: str
+    source: str  # "zendesk", "freshdesk", "intercom"
+    subject: str
+    body_text: str
+    body_html: str | None
+    status: str  # normalized: "open", "pending", "resolved", "closed"
+    priority: str | None  # normalized: "low", "medium", "high", "urgent"
+    requester_email: str
+    requester_name: str | None
+    assignee_email: str | None
+    tags: list[str]
+    custom_fields: dict[str, str]
+    created_at: datetime
+    updated_at: datetime
+    raw: dict  # original payload for debugging
+
+class HelpdeskAdapter(ABC):
+    """Interface that every helpdesk integration must implement."""
+    
+    @abstractmethod
+    async def list_tickets(
+        self, since: datetime | None = None, cursor: str | None = None
+    ) -> tuple[list[NormalizedTicket], str | None]:
+        """Fetch tickets. Returns (tickets, next_cursor)."""
+        ...
+    
+    @abstractmethod
+    async def get_ticket(self, ticket_id: str) -> NormalizedTicket:
+        ...
+    
+    @abstractmethod
+    async def add_reply(self, ticket_id: str, body_html: str, internal: bool = False) -> str:
+        """Post a reply. Returns the reply ID."""
+        ...
+    
+    @abstractmethod
+    async def update_status(self, ticket_id: str, status: str) -> None:
+        ...
+    
+    @abstractmethod
+    async def register_webhook(self, url: str, events: list[str]) -> str:
+        """Register a webhook. Returns webhook ID for later cleanup."""
+        ...
+
+class ZendeskAdapter(HelpdeskAdapter):
+    STATUS_MAP = {"new": "open", "open": "open", "pending": "pending", "solved": "resolved", "closed": "closed"}
+    REVERSE_STATUS = {"open": "open", "pending": "pending", "resolved": "solved", "closed": "closed"}
+    
+    def __init__(self, subdomain: str, credentials: "OAuthCredential"):
+        self._base = f"https://{subdomain}.zendesk.com/api/v2"
+        self._creds = credentials
+    
+    async def list_tickets(self, since=None, cursor=None):
+        params = {}
+        if cursor:
+            params["page[after]"] = cursor
+        elif since:
+            params["updated_after"] = since.isoformat()
+        
+        resp = await self._request("GET", "/tickets", params=params)
+        tickets = [self._normalize(t) for t in resp["tickets"]]
+        next_cursor = resp.get("meta", {}).get("after_cursor")
+        return tickets, next_cursor
+    
+    def _normalize(self, raw: dict) -> NormalizedTicket:
+        return NormalizedTicket(
+            external_id=str(raw["id"]),
+            source="zendesk",
+            subject=raw.get("subject", ""),
+            body_text=raw.get("description", ""),
+            body_html=raw.get("description_html"),
+            status=self.STATUS_MAP.get(raw["status"], "open"),
+            priority=raw.get("priority"),
+            requester_email=raw["requester"]["email"],
+            requester_name=raw["requester"].get("name"),
+            assignee_email=raw.get("assignee", {}).get("email"),
+            tags=raw.get("tags", []),
+            custom_fields={f["id"]: f["value"] for f in raw.get("custom_fields", []) if f["value"]},
+            created_at=datetime.fromisoformat(raw["created_at"]),
+            updated_at=datetime.fromisoformat(raw["updated_at"]),
+            raw=raw,
+        )
+```
+
+**Pros:** Clean separation; easy to test adapters in isolation; platform code never knows about vendor quirks.
+**Cons:** The interface must be general enough for all vendors but specific enough to be useful. Lowest-common-denominator problem — some vendors have features others don't.
+**When to use:** Always. This is the foundational pattern.
+**AI platform application:** Your normalized data models (tickets, articles, messages) become the adapter interface's return types. Every source integration implements the same interface.
+
+### Plugin Architecture
+
+**How it works:** Integrations are self-contained packages that register themselves with the platform at startup. The platform provides a registry and lifecycle management.
+
+```python
+from typing import Protocol, runtime_checkable
+
+@runtime_checkable
+class IntegrationPlugin(Protocol):
+    """Every integration plugin must satisfy this protocol."""
+    
+    integration_id: str          # "zendesk", "freshdesk"
+    display_name: str            # "Zendesk"
+    category: str                # "helpdesk", "knowledge", "channel", "ecommerce"
+    capabilities: set[str]       # {"source.tickets", "destination.replies", "action.lookup"}
+    auth_type: str               # "oauth2", "api_key", "basic"
+    
+    async def initialize(self, config: dict) -> None: ...
+    async def health_check(self) -> bool: ...
+    async def teardown(self) -> None: ...
+
+class IntegrationRegistry:
+    """Central registry for all integration plugins."""
+    
+    def __init__(self):
+        self._plugins: dict[str, IntegrationPlugin] = {}
+        self._instances: dict[str, dict[str, IntegrationPlugin]] = {}  # tenant_id -> {integration_id -> instance}
+    
+    def register(self, plugin_class: type[IntegrationPlugin]) -> None:
+        """Register a plugin class (not instance). Instances created per-tenant."""
+        proto = plugin_class.__new__(plugin_class)
+        self._plugins[proto.integration_id] = plugin_class
+    
+    async def get_instance(self, tenant_id: str, integration_id: str, config: dict) -> IntegrationPlugin:
+        """Get or create a tenant-scoped plugin instance."""
+        key = f"{tenant_id}:{integration_id}"
+        if key not in self._instances.get(tenant_id, {}):
+            cls = self._plugins[integration_id]
+            instance = cls()
+            await instance.initialize(config)
+            self._instances.setdefault(tenant_id, {})[integration_id] = instance
+        return self._instances[tenant_id][integration_id]
+    
+    def list_available(self, category: str | None = None) -> list[dict]:
+        """List available integrations, optionally filtered by category."""
+        results = []
+        for iid, cls in self._plugins.items():
+            proto = cls.__new__(cls)
+            if category and proto.category != category:
+                continue
+            results.append({
+                "id": proto.integration_id,
+                "name": proto.display_name,
+                "category": proto.category,
+                "capabilities": list(proto.capabilities),
+                "auth_type": proto.auth_type,
+            })
+        return results
+
+# Global singleton
+registry = IntegrationRegistry()
+```
+
+**Pros:** Loose coupling; new integrations don't require changes to platform code; clean lifecycle management.
+**Cons:** Plugin discovery and loading adds complexity; versioning across plugins requires coordination.
+**When to use:** When you expect the integration list to grow beyond 10-15 and want teams to add integrations independently.
+**AI platform application:** Each integration is a plugin with declared capabilities. Your admin UI queries the registry to show available integrations. The AI pipeline queries capabilities to know what actions are available.
+
+### Webhook-First vs Polling-First
+
+**Webhook-First (Push):**
+```
+External System --webhook--> Your Platform --process--> Store
+```
+- External system calls your registered URL when events occur
+- Near real-time (typically <5 seconds latency)
+- Requires a publicly accessible endpoint per integration type
+- Must handle: signature verification, idempotency (dedup by event ID), ordering (events can arrive out of order), retries (the sender retries on failure)
+
+**Polling-First (Pull):**
+```
+Your Platform --schedule--> Timer --fetch--> External API --diff--> Store
+```
+- Your platform calls the external API on a schedule
+- Latency = polling interval (1-15 minutes typical)
+- Simpler infrastructure — no public endpoints needed
+- Must handle: cursor/watermark tracking (where you left off), deduplication, rate limit awareness
+
+**Hybrid Pattern (what most mature platforms use):**
+```python
+class SyncStrategy:
+    """Determines how to sync data from an integration."""
+    
+    WEBHOOK = "webhook"    # Real-time push
+    POLL = "poll"          # Scheduled pull
+    HYBRID = "hybrid"      # Webhook for real-time + periodic poll for consistency
+
+class SyncManager:
+    async def setup_sync(self, tenant_id: str, integration_id: str, strategy: str):
+        if strategy in (SyncStrategy.WEBHOOK, SyncStrategy.HYBRID):
+            # Register webhook with external system
+            webhook_url = f"https://api.agentred.com/webhooks/{tenant_id}/{integration_id}"
+            webhook_id = await adapter.register_webhook(webhook_url, events=["ticket.created", "ticket.updated"])
+            await self._store_webhook_registration(tenant_id, integration_id, webhook_id)
+        
+        if strategy in (SyncStrategy.POLL, SyncStrategy.HYBRID):
+            # Schedule periodic poll (hybrid uses longer interval since webhooks handle real-time)
+            interval = 300 if strategy == SyncStrategy.HYBRID else 60  # 5min vs 1min
+            await self._schedule_poll(tenant_id, integration_id, interval_seconds=interval)
+    
+    async def handle_webhook(self, tenant_id: str, integration_id: str, payload: dict, signature: str):
+        """Process incoming webhook."""
+        adapter = await registry.get_instance(tenant_id, integration_id)
+        
+        # 1. Verify signature
+        if not adapter.verify_webhook_signature(payload, signature):
+            raise WebhookVerificationError()
+        
+        # 2. Idempotency check
+        event_id = adapter.extract_event_id(payload)
+        if await self._is_duplicate(tenant_id, event_id):
+            return  # Already processed
+        
+        # 3. Normalize and process
+        normalized = adapter.normalize_webhook_payload(payload)
+        await self._process_event(tenant_id, normalized)
+        
+        # 4. Mark as processed
+        await self._mark_processed(tenant_id, event_id)
+    
+    async def execute_poll(self, tenant_id: str, integration_id: str):
+        """Execute a polling cycle."""
+        adapter = await registry.get_instance(tenant_id, integration_id)
+        cursor = await self._get_cursor(tenant_id, integration_id)
+        
+        items, next_cursor = await adapter.list_tickets(cursor=cursor)
+        for item in items:
+            event_id = f"{integration_id}:{item.external_id}:{item.updated_at.isoformat()}"
+            if not await self._is_duplicate(tenant_id, event_id):
+                await self._process_event(tenant_id, item)
+                await self._mark_processed(tenant_id, event_id)
+        
+        if next_cursor:
+            await self._save_cursor(tenant_id, integration_id, next_cursor)
+```
+
+**When to use which:**
+- Webhook-first: Helpdesk integrations (tickets need immediate processing), communication channels (Slack, email)
+- Polling-first: Knowledge sources (Google Docs, Confluence — don't need sub-minute freshness), analytics data
+- Hybrid: Anything critical where you can't afford to miss a webhook delivery (webhook for real-time + poll every 5min as consistency sweep)
+
+### OAuth Flow Management
+
+**The standard pattern for multi-tenant OAuth:**
+
+```python
+from cryptography.fernet import Fernet
+from datetime import datetime, timedelta
+import httpx
+
+class OAuthCredential:
+    """Encrypted credential storage."""
+    tenant_id: str
+    integration_id: str
+    access_token_encrypted: bytes
+    refresh_token_encrypted: bytes
+    token_expiry: datetime
+    scopes: list[str]
+    metadata: dict  # subdomain, account_id, etc.
+
+class OAuthManager:
+    def __init__(self, encryption_key: bytes, cosmos_client):
+        self._cipher = Fernet(encryption_key)
+        self._db = cosmos_client
+    
+    def get_authorization_url(self, integration_id: str, tenant_id: str) -> str:
+        """Generate the OAuth authorization URL with CSRF state."""
+        config = OAUTH_CONFIGS[integration_id]
+        state = self._generate_state(tenant_id, integration_id)  # JWT with tenant+integration+nonce
+        
+        return (
+            f"{config['authorize_url']}?"
+            f"client_id={config['client_id']}&"
+            f"redirect_uri={config['redirect_uri']}&"
+            f"response_type=code&"
+            f"scope={'+'.join(config['scopes'])}&"
+            f"state={state}"
+        )
+    
+    async def handle_callback(self, code: str, state: str) -> OAuthCredential:
+        """Exchange authorization code for tokens."""
+        tenant_id, integration_id = self._verify_state(state)
+        config = OAUTH_CONFIGS[integration_id]
+        
+        async with httpx.AsyncClient() as client:
+            resp = await client.post(config["token_url"], data={
+                "grant_type": "authorization_code",
+                "code": code,
+                "client_id": config["client_id"],
+                "client_secret": config["client_secret"],
+                "redirect_uri": config["redirect_uri"],
+            })
+            resp.raise_for_status()
+            tokens = resp.json()
+        
+        credential = OAuthCredential(
+            tenant_id=tenant_id,
+            integration_id=integration_id,
+            access_token_encrypted=self._cipher.encrypt(tokens["access_token"].encode()),
+            refresh_token_encrypted=self._cipher.encrypt(tokens["refresh_token"].encode()),
+            token_expiry=datetime.utcnow() + timedelta(seconds=tokens["expires_in"]),
+            scopes=tokens.get("scope", "").split(),
+            metadata={},
+        )
+        await self._db.upsert_item(credential.to_dict())
+        return credential
+    
+    async def get_valid_token(self, tenant_id: str, integration_id: str) -> str:
+        """Get a valid access token, refreshing if needed."""
+        cred = await self._db.get_credential(tenant_id, integration_id)
+        
+        if cred.token_expiry < datetime.utcnow() + timedelta(minutes=5):
+            # Refresh with lock to prevent concurrent refresh race
+            cred = await self._refresh_token(cred)
+        
+        return self._cipher.decrypt(cred.access_token_encrypted).decode()
+    
+    async def _refresh_token(self, cred: OAuthCredential) -> OAuthCredential:
+        """Refresh an expired token."""
+        config = OAUTH_CONFIGS[cred.integration_id]
+        refresh_token = self._cipher.decrypt(cred.refresh_token_encrypted).decode()
+        
+        async with httpx.AsyncClient() as client:
+            resp = await client.post(config["token_url"], data={
+                "grant_type": "refresh_token",
+                "refresh_token": refresh_token,
+                "client_id": config["client_id"],
+                "client_secret": config["client_secret"],
+            })
+            resp.raise_for_status()
+            tokens = resp.json()
+        
+        cred.access_token_encrypted = self._cipher.encrypt(tokens["access_token"].encode())
+        if "refresh_token" in tokens:  # Some providers rotate refresh tokens
+            cred.refresh_token_encrypted = self._cipher.encrypt(tokens["refresh_token"].encode())
+        cred.token_expiry = datetime.utcnow() + timedelta(seconds=tokens["expires_in"])
+        
+        await self._db.upsert_item(cred.to_dict())
+        return cred
+```
+
+**Critical details:**
+- Encrypt tokens at rest (Fernet/AES-256). Never store plaintext tokens in the database.
+- Use a lock during refresh to prevent multiple concurrent refreshes when the token is about to expire.
+- The `state` parameter in OAuth is a CSRF token — use a signed JWT containing tenant_id + integration_id + nonce, validated on callback.
+- Store the refresh token even if you think you won't need it — many providers rotate refresh tokens on every use.
+- For Azure: Use Key Vault to store the Fernet encryption key, not environment variables.
+
+### Credential Vault Pattern
+
+For your Azure architecture, the recommended approach layers Key Vault with per-tenant encryption:
+
+```python
+class CredentialVault:
+    """
+    Two-layer encryption:
+    1. Per-tenant DEK (Data Encryption Key) encrypts the credential
+    2. Master KEK (Key Encryption Key) in Azure Key Vault encrypts the DEK
+    This way, rotating the master key doesn't require re-encrypting all credentials.
+    """
+    
+    def __init__(self, key_vault_url: str):
+        self._kv_client = SecretClient(vault_url=key_vault_url, credential=DefaultAzureCredential())
+        self._kek = None  # Loaded lazily
+    
+    async def store_credential(self, tenant_id: str, integration_id: str, credential_data: dict) -> None:
+        # Generate per-tenant DEK if not exists
+        dek = await self._get_or_create_dek(tenant_id)
+        
+        # Encrypt credential with DEK
+        encrypted_data = Fernet(dek).encrypt(json.dumps(credential_data).encode())
+        
+        # Store encrypted credential in Cosmos (not Key Vault — KV has low throughput limits)
+        await self._cosmos.upsert_item({
+            "id": f"{tenant_id}:{integration_id}",
+            "tenant_id": tenant_id,
+            "integration_id": integration_id,
+            "encrypted_credential": base64.b64encode(encrypted_data).decode(),
+            "created_at": datetime.utcnow().isoformat(),
+        })
+    
+    async def _get_or_create_dek(self, tenant_id: str) -> bytes:
+        """Get or create a per-tenant data encryption key."""
+        doc = await self._cosmos.get_item(f"dek:{tenant_id}")
+        if doc:
+            kek = await self._get_kek()
+            return Fernet(kek).decrypt(doc["encrypted_dek"].encode())
+        
+        # Generate new DEK, encrypt with KEK, store
+        dek = Fernet.generate_key()
+        kek = await self._get_kek()
+        encrypted_dek = Fernet(kek).encrypt(dek)
+        await self._cosmos.upsert_item({
+            "id": f"dek:{tenant_id}",
+            "tenant_id": tenant_id,
+            "encrypted_dek": encrypted_dek.decode(),
+        })
+        return dek
+```
+
+**Why this pattern over storing everything in Key Vault:**
+- Azure Key Vault has a throughput limit of ~2000 transactions per 10 seconds per vault. With 680 tenants each having 3-5 integrations, you'd exhaust this quickly during poll cycles.
+- Cosmos DB handles the read throughput. Key Vault holds only the master KEK (one secret, rarely accessed).
+
+### Rate Limiting and Retry Strategies
+
+**Per-integration rate limit tracking:**
+
+```python
+import asyncio
+from collections import defaultdict
+from datetime import datetime, timedelta
+
+class AdaptiveRateLimiter:
+    """
+    Rate limiter that adapts to each external API's limits.
+    Learns from 429 responses and Retry-After headers.
+    """
+    
+    def __init__(self):
+        # Per-integration, per-tenant rate state
+        self._windows: dict[str, list[float]] = defaultdict(list)
+        self._backoff_until: dict[str, float] = {}
+        self._known_limits: dict[str, int] = {
+            "zendesk": 700,      # 700/min
+            "intercom": 1000,    # 1000/min
+            "hubspot": 100,      # 100/10s
+            "freshdesk": 50,     # varies by plan
+            "shopify": 40,       # 40/s (REST), 50 points/s (GraphQL)
+        }
+    
+    async def acquire(self, integration_id: str, tenant_id: str) -> None:
+        """Wait until it's safe to make a request."""
+        key = f"{integration_id}:{tenant_id}"
+        
+        # Check backoff from previous 429
+        backoff_until = self._backoff_until.get(key, 0)
+        now = asyncio.get_event_loop().time()
+        if now < backoff_until:
+            await asyncio.sleep(backoff_until - now)
+        
+        # Sliding window check
+        limit = self._known_limits.get(integration_id, 60)
+        window = self._windows[key]
+        cutoff = now - 60  # 1-minute window
+        self._windows[key] = [t for t in window if t > cutoff]
+        
+        if len(self._windows[key]) >= limit:
+            # At limit — wait until oldest request expires
+            wait = self._windows[key][0] - cutoff
+            await asyncio.sleep(wait)
+        
+        self._windows[key].append(now)
+    
+    def record_429(self, integration_id: str, tenant_id: str, retry_after: int | None = None):
+        """Record a rate limit response and backoff."""
+        key = f"{integration_id}:{tenant_id}"
+        backoff = retry_after or 60  # Default 60s if no Retry-After
+        self._backoff_until[key] = asyncio.get_event_loop().time() + backoff
+
+
+class RetryExecutor:
+    """Execute API calls with exponential backoff retry."""
+    
+    RETRYABLE_STATUS = {429, 500, 502, 503, 504}
+    
+    async def execute(
+        self,
+        func,
+        *args,
+        max_retries: int = 3,
+        base_delay: float = 1.0,
+        max_delay: float = 60.0,
+        **kwargs,
+    ):
+        last_error = None
+        for attempt in range(max_retries + 1):
+            try:
+                return await func(*args, **kwargs)
+            except httpx.HTTPStatusError as e:
+                if e.response.status_code not in self.RETRYABLE_STATUS:
+                    raise
+                last_error = e
+                if attempt < max_retries:
+                    # Respect Retry-After header
+                    retry_after = e.response.headers.get("Retry-After")
+                    if retry_after:
+                        delay = int(retry_after)
+                    else:
+                        delay = min(base_delay * (2 ** attempt), max_delay)
+                    await asyncio.sleep(delay)
+            except (httpx.ConnectTimeout, httpx.ReadTimeout) as e:
+                last_error = e
+                if attempt < max_retries:
+                    delay = min(base_delay * (2 ** attempt), max_delay)
+                    await asyncio.sleep(delay)
+        raise last_error
+```
+
+### Data Normalization Layer
+
+This is the heart of your integration framework. The key insight from studying Zendesk, Intercom, and HubSpot is that **every helpdesk has the same concepts, just modeled differently**.
+
+```python
+from enum import Enum
+from dataclasses import dataclass, field
+from datetime import datetime
+
+class TicketStatus(str, Enum):
+    OPEN = "open"
+    PENDING = "pending"          # Waiting on customer
+    WAITING_ON_AGENT = "waiting" # Waiting on agent (not all platforms distinguish)
+    RESOLVED = "resolved"
+    CLOSED = "closed"
+
+class MessageDirection(str, Enum):
+    INBOUND = "inbound"    # Customer -> Agent/AI
+    OUTBOUND = "outbound"  # Agent/AI -> Customer
+    INTERNAL = "internal"  # Internal note
+
+class ChannelType(str, Enum):
+    EMAIL = "email"
+    CHAT = "chat"
+    SLACK = "slack"
+    SMS = "sms"
+    SOCIAL = "social"
+    HELPDESK = "helpdesk"
+    PHONE = "phone"
+
+@dataclass
+class NormalizedContact:
+    external_id: str
+    source: str
+    email: str | None = None
+    name: str | None = None
+    phone: str | None = None
+    company: str | None = None
+    metadata: dict = field(default_factory=dict)
+
+@dataclass
+class NormalizedMessage:
+    external_id: str
+    source: str
+    direction: MessageDirection
+    channel: ChannelType
+    body_text: str
+    body_html: str | None = None
+    sender: NormalizedContact | None = None
+    attachments: list[dict] = field(default_factory=list)
+    timestamp: datetime = field(default_factory=datetime.utcnow)
+    metadata: dict = field(default_factory=dict)
+
+@dataclass
+class NormalizedTicket:
+    external_id: str
+    source: str                  # "zendesk", "freshdesk", "intercom"
+    subject: str
+    status: TicketStatus
+    priority: str | None = None
+    channel: ChannelType = ChannelType.EMAIL
+    requester: NormalizedContact | None = None
+    assignee: NormalizedContact | None = None
+    messages: list[NormalizedMessage] = field(default_factory=list)
+    tags: list[str] = field(default_factory=list)
+    custom_fields: dict = field(default_factory=dict)
+    created_at: datetime = field(default_factory=datetime.utcnow)
+    updated_at: datetime = field(default_factory=datetime.utcnow)
+    raw: dict = field(default_factory=dict)
+
+@dataclass
+class NormalizedArticle:
+    """For knowledge base ingestion (RAG source)."""
+    external_id: str
+    source: str                  # "confluence", "notion", "google_docs", "zendesk_guide"
+    title: str
+    body_text: str               # Cleaned plaintext for embedding
+    body_html: str | None = None
+    url: str | None = None
+    category: str | None = None
+    labels: list[str] = field(default_factory=list)
+    author: str | None = None
+    last_modified: datetime = field(default_factory=datetime.utcnow)
+    metadata: dict = field(default_factory=dict)
+
+# Normalization mapping tables
+ZENDESK_STATUS_MAP = {
+    "new": TicketStatus.OPEN,
+    "open": TicketStatus.OPEN,
+    "pending": TicketStatus.PENDING,
+    "hold": TicketStatus.WAITING_ON_AGENT,
+    "solved": TicketStatus.RESOLVED,
+    "closed": TicketStatus.CLOSED,
+}
+
+FRESHDESK_STATUS_MAP = {
+    2: TicketStatus.OPEN,
+    3: TicketStatus.PENDING,
+    4: TicketStatus.RESOLVED,
+    5: TicketStatus.CLOSED,
+}
+
+INTERCOM_STATUS_MAP = {
+    "open": TicketStatus.OPEN,
+    "snoozed": TicketStatus.PENDING,
+    "closed": TicketStatus.CLOSED,
+}
+```
+
+### Event-Driven vs Request-Driven
+
+**Request-driven (synchronous):** The AI pipeline makes API calls to integrations during conversation processing. "Customer asks about order status" → AI calls Shopify adapter → gets order → responds.
+
+**Event-driven (asynchronous):** Integrations push events into a queue. A consumer processes them independently. "New Zendesk ticket webhook → event queue → consumer creates normalized ticket → triggers AI processing."
+
+**For your platform, you need both:**
+
+```python
+# Event-driven: for data ingestion (Sources)
+class IntegrationEventBus:
+    """Internal event bus for integration events."""
+    
+    def __init__(self):
+        self._handlers: dict[str, list] = defaultdict(list)
+    
+    def on(self, event_type: str, handler):
+        self._handlers[event_type].append(handler)
+    
+    async def emit(self, event_type: str, payload: dict):
+        for handler in self._handlers[event_type]:
+            # Fire-and-forget with error isolation
+            asyncio.create_task(self._safe_call(handler, payload))
+    
+    async def _safe_call(self, handler, payload):
+        try:
+            await handler(payload)
+        except Exception:
+            logger.exception(f"Event handler failed: {handler.__name__}")
+
+# Request-driven: for action execution (Destinations / AI actions)
+class ActionExecutor:
+    """Execute actions requested by the AI pipeline."""
+    
+    async def execute(self, tenant_id: str, action: "AIAction") -> dict:
+        adapter = await registry.get_instance(tenant_id, action.integration_id)
+        
+        match action.action_type:
+            case "order_lookup":
+                return await adapter.lookup_order(action.params["order_id"])
+            case "issue_refund":
+                return await adapter.issue_refund(action.params["order_id"], action.params["amount"])
+            case "tag_ticket":
+                return await adapter.add_tags(action.params["ticket_id"], action.params["tags"])
+            case "update_status":
+                return await adapter.update_status(action.params["ticket_id"], action.params["status"])
+            case _:
+                raise ValueError(f"Unknown action: {action.action_type}")
+```
+
+---
+
+## 3. AI-Platform-Specific Integration Patterns
+
+### Knowledge Ingestion from Diverse Sources
+
+The core challenge: Google Docs, Confluence, Notion, Zendesk Guide, and file uploads all produce content in different formats. Your RAG pipeline needs clean, chunked text.
+
+**Multi-source ingestion pipeline:**
+
+```
+Source API → Raw Fetch → Format Normalize → Clean/Extract → Chunk → Embed → Vector Store
+```
+
+```python
+from bs4 import BeautifulSoup
+import re
+
+class ContentNormalizer:
+    """Normalizes content from any source into clean text for embedding."""
+    
+    def normalize(self, content: str, format: str) -> str:
+        """Convert content to clean plaintext."""
+        match format:
+            case "html":
+                return self._from_html(content)
+            case "markdown":
+                return self._from_markdown(content)
+            case "notion_blocks":
+                return self._from_notion_blocks(content)  # Notion API returns blocks, not HTML
+            case "confluence_storage":
+                return self._from_confluence(content)  # Confluence uses "storage format" (XHTML subset)
+            case "plaintext":
+                return self._clean_whitespace(content)
+            case _:
+                return content
+    
+    def _from_html(self, html: str) -> str:
+        soup = BeautifulSoup(html, "html.parser")
+        # Remove script, style, nav elements
+        for tag in soup(["script", "style", "nav", "header", "footer"]):
+            tag.decompose()
+        # Preserve structure with newlines
+        for br in soup.find_all("br"):
+            br.replace_with("\n")
+        for p in soup.find_all(["p", "div", "li", "h1", "h2", "h3", "h4", "h5", "h6"]):
+            p.insert_after("\n")
+        text = soup.get_text()
+        return self._clean_whitespace(text)
+    
+    def _from_notion_blocks(self, blocks: list[dict]) -> str:
+        """Notion API returns content as typed blocks, not HTML."""
+        lines = []
+        for block in blocks:
+            block_type = block["type"]
+            if block_type in ("paragraph", "heading_1", "heading_2", "heading_3", "bulleted_list_item", "numbered_list_item"):
+                rich_texts = block[block_type].get("rich_text", [])
+                text = "".join(rt["plain_text"] for rt in rich_texts)
+                if text:
+                    lines.append(text)
+            elif block_type == "code":
+                code = "".join(rt["plain_text"] for rt in block["code"]["rich_text"])
+                lines.append(f"```\n{code}\n```")
+            elif block_type == "table":
+                # Tables need child block fetching — handled by the adapter
+                lines.append("[table]")
+        return "\n".join(lines)
+    
+    def _clean_whitespace(self, text: str) -> str:
+        text = re.sub(r'\n{3,}', '\n\n', text)
+        text = re.sub(r'[ \t]+', ' ', text)
+        return text.strip()
+
+
+class KnowledgeIngestionPipeline:
+    """Orchestrates ingestion from any knowledge source."""
+    
+    def __init__(self, normalizer: ContentNormalizer, chunker, embedder, vector_store):
+        self._normalizer = normalizer
+        self._chunker = chunker
+        self._embedder = embedder
+        self._vector_store = vector_store
+    
+    async def ingest_article(self, tenant_id: str, article: NormalizedArticle) -> int:
+        """Ingest a single article. Returns number of chunks stored."""
+        # 1. Normalize to clean text
+        clean_text = self._normalizer.normalize(article.body_html or article.body_text, "html")
+        
+        # 2. Chunk with overlap
+        chunks = self._chunker.chunk(clean_text, max_tokens=512, overlap_tokens=50)
+        
+        # 3. Embed
+        embeddings = await self._embedder.embed_batch([c.text for c in chunks])
+        
+        # 4. Store with metadata for retrieval filtering
+        for chunk, embedding in zip(chunks, embeddings):
+            await self._vector_store.upsert({
+                "id": f"{article.source}:{article.external_id}:chunk_{chunk.index}",
+                "tenant_id": tenant_id,
+                "embedding": embedding,
+                "text": chunk.text,
+                "metadata": {
+                    "source": article.source,
+                    "article_id": article.external_id,
+                    "title": article.title,
+                    "url": article.url,
+                    "category": article.category,
+                    "last_modified": article.last_modified.isoformat(),
+                },
+            })
+        
+        return len(chunks)
+    
+    async def sync_source(self, tenant_id: str, integration_id: str, full_sync: bool = False):
+        """Sync all articles from a knowledge source."""
+        adapter = await registry.get_instance(tenant_id, integration_id)
+        cursor = None if full_sync else await self._get_sync_cursor(tenant_id, integration_id)
+        
+        total_chunks = 0
+        while True:
+            articles, next_cursor = await adapter.list_articles(cursor=cursor)
+            if not articles:
+                break
+            
+            for article in articles:
+                # Delete old chunks for this article (content may have changed)
+                await self._vector_store.delete_by_metadata(
+                    tenant_id=tenant_id,
+                    filter={"source": integration_id, "article_id": article.external_id}
+                )
+                total_chunks += await self.ingest_article(tenant_id, article)
+            
+            cursor = next_cursor
+            if not next_cursor:
+                break
+        
+        await self._save_sync_cursor(tenant_id, integration_id, cursor)
+        return total_chunks
+```
+
+### Deploying AI Responses Across Channels
+
+**The Destination Adapter pattern — unified response dispatch:**
+
+```python
+class ResponseDestination(ABC):
+    """Interface for sending AI responses to any channel."""
+    
+    @abstractmethod
+    async def send_reply(
+        self,
+        conversation_id: str,
+        body_text: str,
+        body_html: str | None = None,
+        internal_note: bool = False,
+        metadata: dict | None = None,
+    ) -> str:
+        """Send a reply. Returns the external message ID."""
+        ...
+    
+    @abstractmethod
+    async def update_status(self, conversation_id: str, status: TicketStatus) -> None:
+        ...
+
+
+class ZendeskDestination(ResponseDestination):
+    async def send_reply(self, conversation_id, body_text, body_html=None, internal_note=False, metadata=None):
+        payload = {
+            "ticket": {
+                "comment": {
+                    "body": body_text,
+                    "html_body": body_html,
+                    "public": not internal_note,
+                }
+            }
+        }
+        resp = await self._request("PUT", f"/tickets/{conversation_id}", json=payload)
+        return str(resp["audit"]["events"][-1]["id"])
+
+
+class SlackDestination(ResponseDestination):
+    async def send_reply(self, conversation_id, body_text, body_html=None, internal_note=False, metadata=None):
+        # conversation_id = "channel_id:thread_ts"
+        channel, thread_ts = conversation_id.split(":", 1)
+        payload = {
+            "channel": channel,
+            "thread_ts": thread_ts,
+            "text": body_text,
+            # Slack uses mrkdwn, not HTML
+            "blocks": self._text_to_blocks(body_text) if body_html else None,
+        }
+        resp = await self._request("POST", "chat.postMessage", json=payload)
+        return resp["ts"]
+
+
+class EmailDestination(ResponseDestination):
+    async def send_reply(self, conversation_id, body_text, body_html=None, internal_note=False, metadata=None):
+        # conversation_id = message_id for threading
+        msg = MIMEMultipart("alternative")
+        msg["In-Reply-To"] = conversation_id
+        msg["References"] = conversation_id
+        msg.attach(MIMEText(body_text, "plain"))
+        if body_html:
+            msg.attach(MIMEText(body_html, "html"))
+        await self._smtp.send(msg)
+        return msg["Message-ID"]
+```
+
+### Bidirectional Sync
+
+The critical challenge: avoiding infinite loops (your platform updates a ticket in Zendesk, Zendesk fires a webhook back to you, you process it as a new update...).
+
+```python
+class BidirectionalSyncManager:
+    """Manages two-way sync with loop prevention."""
+    
+    def __init__(self):
+        # Track operations originated by our platform
+        # Key: "{integration_id}:{external_id}", Value: expiry timestamp
+        self._originated_ops: dict[str, float] = {}
+        self._lock = asyncio.Lock()
+    
+    async def record_outbound(self, integration_id: str, external_id: str, ttl_seconds: int = 30):
+        """Record that WE initiated this change (so we ignore the webhook echo)."""
+        key = f"{integration_id}:{external_id}"
+        async with self._lock:
+            self._originated_ops[key] = asyncio.get_event_loop().time() + ttl_seconds
+    
+    async def is_echo(self, integration_id: str, external_id: str) -> bool:
+        """Check if this webhook is an echo of our own outbound operation."""
+        key = f"{integration_id}:{external_id}"
+        async with self._lock:
+            expiry = self._originated_ops.get(key)
+            if expiry and asyncio.get_event_loop().time() < expiry:
+                del self._originated_ops[key]
+                return True
+            return False
+    
+    async def handle_inbound(self, tenant_id: str, integration_id: str, payload: dict):
+        """Process an inbound webhook, skipping echoes."""
+        external_id = self._extract_id(payload)
+        
+        if await self.is_echo(integration_id, external_id):
+            logger.debug(f"Skipping echo for {integration_id}:{external_id}")
+            return
+        
+        # Process the genuine external change
+        normalized = await self._normalize(integration_id, payload)
+        await self._apply_change(tenant_id, normalized)
+    
+    async def send_outbound(self, tenant_id: str, integration_id: str, action: dict):
+        """Send an outbound change and mark it to prevent echo processing."""
+        adapter = await registry.get_instance(tenant_id, integration_id)
+        external_id = action["external_id"]
+        
+        # Mark before sending — webhook may arrive before our call returns
+        await self.record_outbound(integration_id, external_id)
+        
+        try:
+            await adapter.execute_action(action)
+        except Exception:
+            # Remove the echo marker if the outbound failed
+            async with self._lock:
+                self._originated_ops.pop(f"{integration_id}:{external_id}", None)
+            raise
+```
+
+### Real-time vs Batch Knowledge Ingestion
+
+```python
+class IngestionScheduler:
+    """Manages both real-time and batch ingestion strategies per source."""
+    
+    # Sources and their optimal sync strategies
+    SOURCE_STRATEGIES = {
+        "zendesk_guide": {"mode": "hybrid", "poll_interval": 3600, "supports_webhook": True},
+        "confluence": {"mode": "poll", "poll_interval": 1800, "supports_webhook": False},
+        "notion": {"mode": "hybrid", "poll_interval": 3600, "supports_webhook": True},
+        "google_docs": {"mode": "poll", "poll_interval": 3600, "supports_webhook": False},  # Drive webhooks are push notifications, not content webhooks
+        "file_upload": {"mode": "immediate", "poll_interval": None, "supports_webhook": False},
+        "website_scrape": {"mode": "poll", "poll_interval": 86400, "supports_webhook": False},  # Daily
+    }
+    
+    async def schedule_source(self, tenant_id: str, source_id: str, source_type: str):
+        strategy = self.SOURCE_STRATEGIES[source_type]
+        
+        if strategy["mode"] == "immediate":
+            # File uploads — process immediately, no scheduling needed
+            return
+        
+        if strategy["supports_webhook"]:
+            await self._register_content_webhook(tenant_id, source_id, source_type)
+        
+        if strategy["poll_interval"]:
+            # Schedule periodic full/incremental sync
+            await self._schedule_recurring(
+                tenant_id=tenant_id,
+                source_id=source_id,
+                interval=strategy["poll_interval"],
+                job_type="incremental_sync",
+            )
+            # Schedule daily full sync as consistency sweep
+            await self._schedule_recurring(
+                tenant_id=tenant_id,
+                source_id=source_id,
+                interval=86400,
+                job_type="full_sync",
+            )
+```
+
+### Webhook Receiver Patterns
+
+```python
+from fastapi import APIRouter, Request, Response, Header
+import hmac
+import hashlib
+
+webhook_router = APIRouter(prefix="/webhooks")
+
+@webhook_router.post("/{tenant_id}/{integration_id}")
+async def receive_webhook(
+    tenant_id: str,
+    integration_id: str,
+    request: Request,
+):
+    """
+    Universal webhook receiver endpoint.
+    Each integration uses the same URL pattern but different verification.
+    """
+    body = await request.body()
+    headers = dict(request.headers)
+    
+    # 1. Get the integration's webhook secret
+    config = await get_integration_config(tenant_id, integration_id)
+    
+    # 2. Verify signature (integration-specific)
+    verifier = WEBHOOK_VERIFIERS.get(integration_id)
+    if verifier and not verifier(body, headers, config.get("webhook_secret")):
+        return Response(status_code=401)
+    
+    # 3. Parse payload
+    payload = await request.json()
+    
+    # 4. Idempotency check
+    event_id = extract_event_id(integration_id, payload, headers)
+    if event_id and await is_processed(tenant_id, event_id):
+        return Response(status_code=200)  # Already processed — return 200 so sender doesn't retry
+    
+    # 5. Enqueue for async processing (respond quickly to avoid sender timeouts)
+    await event_queue.put({
+        "tenant_id": tenant_id,
+        "integration_id": integration_id,
+        "event_id": event_id,
+        "payload": payload,
+        "received_at": datetime.utcnow().isoformat(),
+    })
+    
+    # 6. Mark as received (not processed — processing happens async)
+    if event_id:
+        await mark_received(tenant_id, event_id)
+    
+    return Response(status_code=200)
+
+
+# Integration-specific webhook verification
+def verify_zendesk(body: bytes, headers: dict, secret: str) -> bool:
+    # Zendesk signs with HMAC-SHA256
+    expected = hmac.new(secret.encode(), body, hashlib.sha256).hexdigest()
+    return hmac.compare_digest(headers.get("x-zendesk-webhook-signature", ""), expected)
+
+def verify_intercom(body: bytes, headers: dict, secret: str) -> bool:
+    expected = hmac.new(secret.encode(), body, hashlib.sha256).hexdigest()
+    return hmac.compare_digest(headers.get("x-hub-signature-256", "").removeprefix("sha256="), expected)
+
+def verify_shopify(body: bytes, headers: dict, secret: str) -> bool:
+    expected = hmac.new(secret.encode(), body, hashlib.sha256).digest()
+    import base64
+    return hmac.compare_digest(base64.b64encode(expected).decode(), headers.get("x-shopify-hmac-sha256", ""))
+
+WEBHOOK_VERIFIERS = {
+    "zendesk": verify_zendesk,
+    "intercom": verify_intercom,
+    "shopify": verify_shopify,
+}
+
+def extract_event_id(integration_id: str, payload: dict, headers: dict) -> str | None:
+    """Extract a unique event identifier for idempotency."""
+    match integration_id:
+        case "zendesk":
+            return headers.get("x-zendesk-webhook-id")
+        case "intercom":
+            return payload.get("id")  # Intercom includes event ID in payload
+        case "shopify":
+            return headers.get("x-shopify-webhook-id")
+        case "hubspot":
+            return str(payload[0].get("eventId")) if payload else None  # Batched events
+        case _:
+            # Fallback: hash the payload
+            return hashlib.sha256(json.dumps(payload, sort_keys=True).encode()).hexdigest()
+```
+
+---
+
+## 4. Open-Source Frameworks to Learn From
+
+### Airbyte (Data Integration)
+
+**Architecture:** Airbyte's core insight is that connectors are **isolated Docker containers** communicating via a standardized JSON protocol over stdout/stdin.
+
+**The Airbyte Protocol:**
+```
+1. SPEC    → Connector declares its config schema (JSON Schema)
+2. CHECK   → Connector verifies credentials work (returns success/failure)
+3. DISCOVER → Connector lists available streams (tables/endpoints)
+4. READ    → Connector emits records as JSON lines to stdout
+5. WRITE   → Connector accepts records on stdin (destination connectors)
+```
+
+Each message is a JSON line with a `type` field:
+```json
+{"type": "RECORD", "record": {"stream": "tickets", "data": {...}, "emitted_at": 1234567890}}
+{"type": "STATE", "state": {"data": {"cursor": "2026-03-01T00:00:00Z"}}}
+{"type": "LOG", "log": {"level": "INFO", "message": "Fetched 100 tickets"}}
+```
+
+**What to learn from Airbyte:**
+- The SPEC/CHECK/DISCOVER/READ protocol is a clean abstraction. Your integration plugins could implement the same lifecycle: describe config schema → verify credentials → list capabilities → sync data.
+- State management via cursor/watermark messages is battle-tested. The connector emits `STATE` messages that the platform persists. On the next run, the platform passes the last state back to the connector.
+- Isolation via containers prevents a buggy connector from crashing the platform. For your use case, you don't need Docker containers, but running each integration's sync in an isolated asyncio task with its own error boundary achieves a similar effect.
+
+**Drawback:** Airbyte is designed for batch ETL, not real-time. It doesn't have a webhook model. You'd need to adapt the protocol for your hybrid sync needs.
+
+### n8n (Workflow Automation)
+
+**Architecture:** n8n uses a node-based execution engine where each node is a TypeScript class implementing the `INodeType` interface.
+
+**Key patterns:**
+- **Credential Types:** n8n has a dedicated credential type system. Each integration declares its credential schema (OAuth2 fields, API key fields, etc.) and n8n handles the UI, storage, and injection:
+```typescript
+{
+  name: 'zendeskApi',
+  displayName: 'Zendesk API',
+  properties: [
+    { displayName: 'Subdomain', name: 'subdomain', type: 'string' },
+    { displayName: 'API Token', name: 'apiToken', type: 'string', typeOptions: { password: true } },
+    { displayName: 'Email', name: 'email', type: 'string' },
+  ],
+  authenticate: {
+    type: 'generic',
+    properties: {
+      headers: {
+        Authorization: '=Basic {{Buffer.from($credentials.email + "/token:" + $credentials.apiToken).toString("base64")}}',
+      },
+    },
+  },
+}
+```
+- **Polling Trigger Pattern:** n8n's polling triggers use a `poll` method that receives the last-seen state:
+```typescript
+async poll(this: IPollFunctions) {
+  const lastDate = this.getWorkflowStaticData('node').lastDate as string;
+  const tickets = await apiCall('/tickets', { since: lastDate });
+  this.getWorkflowStaticData('node').lastDate = new Date().toISOString();
+  return [this.helpers.returnJsonArray(tickets)];
+}
+```
+
+**What to learn:** The credential type system is well-designed — declaring authentication as data (not code) makes it easier to build admin UIs that handle OAuth flows, API key input, etc. generically.
+
+### Nango (Unified API for SaaS Integrations)
+
+**Architecture:** Nango is specifically designed for the problem you're solving — connecting SaaS apps. Its architecture has three layers:
+
+1. **Auth Layer:** Handles OAuth flows for 200+ APIs. You call `nango.auth('zendesk', connectionId)` and it handles the entire OAuth dance, token storage, and refresh.
+2. **Sync Layer:** Defines data syncs as TypeScript scripts that Nango runs on a schedule:
+```typescript
+// syncs/zendesk-tickets.ts
+export default async function fetchData(nango: NangoSync) {
+  const connection = await nango.getConnection();
+  let cursor = await nango.lastSyncDate();
+  
+  const tickets = await paginate(nango, '/api/v2/tickets', { since: cursor });
+  
+  const mapped = tickets.map(t => ({
+    id: t.id,
+    subject: t.subject,
+    status: mapStatus(t.status),
+    // ... normalize
+  }));
+  
+  await nango.batchSave(mapped, 'Ticket');
+}
+```
+3. **Action Layer:** On-demand API calls (not scheduled). For your "AI triggers an action" use case.
+
+**What to learn:**
+- Nango's `nango.yaml` manifest file declares integrations, their syncs, and their models in one place. This is a cleaner pattern than scattering integration configuration across code files.
+- The separation of auth (framework handles it) from sync logic (developer writes it) from storage (framework handles it) is the right level of abstraction.
+
+### Supabase Edge Functions Pattern
+
+**Relevant pattern:** Supabase uses Deno-based edge functions for webhook processing. The key insight is that webhook receivers should be stateless, fast, and isolated.
+
+For your FastAPI platform, the equivalent pattern is:
+- Webhook endpoint does minimal work: verify signature, dedup check, enqueue
+- Actual processing happens in a background worker (asyncio task or separate worker process)
+- This keeps webhook response times under 1 second (external services timeout and retry if you're slow)
+
+### Python-Based Integration Frameworks
+
+**Singer (now part of Meltano):** The predecessor to Airbyte's model. Singer taps (sources) and targets (destinations) communicate via JSON lines over stdout/stdin. The protocol is simpler than Airbyte's but the ecosystem has more Python connectors.
+
+**Apache Airflow:** Not an integration framework per se, but its **operator/hook** pattern is relevant:
+- A Hook is a connection manager for an external system (handles auth, retry, connection pooling)
+- An Operator is a unit of work that uses a Hook
+
+This maps to your adapter (Hook) + sync job (Operator) pattern.
+
+**Prefect:** Similar to Airflow but with a more Pythonic API. Its `@task` decorator with retry configuration is clean:
+```python
+@task(retries=3, retry_delay_seconds=[10, 60, 300])
+async def sync_zendesk_tickets(tenant_id: str, since: datetime):
+    adapter = get_adapter("zendesk", tenant_id)
+    tickets, cursor = await adapter.list_tickets(since=since)
+    for ticket in tickets:
+        await process_ticket(tenant_id, ticket)
+    return cursor
+```
+
+---
+
+## 5. Recommended Architecture for Agent Red
+
+Based on this research, here's how these patterns combine for your specific platform:
+
+### Layer 1: Integration Registry & Plugin System
+
+```python
+# src/integrations/registry.py
+
+class IntegrationManifest:
+    """Declarative integration definition — no code needed for simple integrations."""
+    integration_id: str           # "zendesk"
+    display_name: str             # "Zendesk"
+    category: str                 # "helpdesk" | "knowledge" | "channel" | "ecommerce" | "communication"
+    icon_url: str
+    auth_type: str                # "oauth2" | "api_key" | "basic" | "custom"
+    auth_config: dict             # OAuth URLs, scopes, etc.
+    capabilities: set[str]        # What this integration can do
+    # Capability taxonomy:
+    #   source.tickets     — can ingest tickets/conversations
+    #   source.articles    — can ingest knowledge articles
+    #   source.contacts    — can ingest customer data
+    #   dest.reply         — can send AI responses
+    #   dest.note          — can post internal notes
+    #   dest.status        — can update ticket status
+    #   action.order       — can look up orders
+    #   action.refund      — can process refunds
+    #   action.tag         — can tag tickets
+    #   webhook.receive    — can receive real-time events
+    sync_strategy: str            # "webhook" | "poll" | "hybrid"
+    poll_interval: int | None     # seconds, if polling
+    rate_limit: int               # requests per minute
+    webhook_signature_header: str | None
+    webhook_signature_algo: str | None  # "hmac-sha256"
+```
+
+### Layer 2: Normalized Data Models
+
+Use the `NormalizedTicket`, `NormalizedArticle`, `NormalizedMessage`, `NormalizedContact` dataclasses shown above. Store them in Cosmos DB with `tenant_id` as partition key.
+
+### Layer 3: Adapter Interfaces
+
+Four adapter interfaces covering the four integration categories:
+- `HelpdeskAdapter` — tickets, replies, status updates
+- `KnowledgeAdapter` — articles, pages, documents
+- `ChannelAdapter` — messages (Slack, email, SMS)
+- `EcommerceAdapter` — orders, customers, refunds
+
+Each adapter implements only the methods relevant to its declared capabilities.
+
+### Layer 4: Sync Engine
+
+The hybrid sync manager described above, with:
+- Webhook receiver (FastAPI endpoint) for real-time
+- Polling scheduler (asyncio background tasks) for periodic
+- Consistency sweep (daily full sync) for data integrity
+- Cursor/state management in Cosmos DB
+- Bidirectional sync with echo prevention
+
+### Layer 5: Action Execution
+
+The AI pipeline calls `ActionExecutor.execute()` with structured action requests. The executor routes to the correct adapter based on integration_id and action_type. Actions are logged for audit.
+
+### Key Azure-Specific Considerations
+
+1. **Credential Storage:** Use Azure Key Vault for the master encryption key. Store encrypted credentials in Cosmos DB (not Key Vault — throughput limits).
+2. **Webhook Endpoints:** Azure Container Apps provides a public FQDN. Webhook URLs follow the pattern `https://{fqdn}/webhooks/{tenant_id}/{integration_id}`. No additional infrastructure needed.
+3. **Background Workers:** For polling, use asyncio background tasks within the FastAPI process (you already have this pattern with `_background_tasks` set). For heavy batch ingestion, consider Azure Container Apps Jobs.
+4. **Cosmos DB:** Partition integration data by `tenant_id`. Use a separate container for integration credentials, sync state, and webhook event log.
+5. **Redis (already provisioned):** Use for rate limit state sharing across replicas (you already have `RedisRateLimitBackend`). The per-integration rate limiter can share the same Redis instance with a namespaced key pattern: `integration_ratelimit:{integration_id}:{tenant_id}`.
+
+### Initial 15-20 Integration Targets
+
+| Category | Integration | Auth | Sync | Priority |
+|----------|------------|------|------|----------|
+| **Helpdesk** | Zendesk | OAuth2 | Hybrid | High |
+| **Helpdesk** | Freshdesk | API Key | Hybrid | High |
+| **Helpdesk** | Intercom | OAuth2 | Hybrid | High |
+| **Knowledge** | Confluence | OAuth2 | Poll | High |
+| **Knowledge** | Notion | OAuth2 | Hybrid | Medium |
+| **Knowledge** | Google Docs | OAuth2 | Poll | Medium |
+| **Knowledge** | Zendesk Guide | OAuth2 | Hybrid | High (bundled) |
+| **Channel** | Slack | OAuth2 | Webhook | High |
+| **Channel** | Email (IMAP) | Basic/OAuth2 | Poll | High |
+| **Channel** | Microsoft Teams | OAuth2 | Webhook | Medium |
+| **Channel** | WhatsApp Business | API Key | Webhook | Medium |
+| **E-commerce** | Shopify | OAuth2 | Webhook | High (existing) |
+| **E-commerce** | WooCommerce | API Key | Poll | Medium |
+| **E-commerce** | BigCommerce | OAuth2 | Poll | Low |
+| **CRM** | HubSpot | OAuth2 | Hybrid | Medium |
+| **CRM** | Salesforce | OAuth2 | Hybrid | Low |
+| **Communication** | Twilio (SMS) | API Key | Webhook | Medium |
+| **File** | File Upload | None | Immediate | High |
+| **File** | Website Scraper | None | Poll (daily) | Medium |
+
+---
+
+## Summary of Key Architectural Decisions
+
+1. **Use the Adapter pattern with Protocol classes** for type safety without inheritance overhead. Each integration implements only the protocols matching its declared capabilities.
+
+2. **Declarative manifests over imperative registration.** Define integrations in YAML/JSON manifests where possible. Reserve Python code for the actual API interaction logic.
+
+3. **Hybrid sync (webhook + polling) as the default.** Webhook for real-time, polling as a consistency sweep. Pure-poll for integrations that don't support webhooks.
+
+4. **Two-layer encryption for credentials.** Per-tenant DEK encrypted by a master KEK in Key Vault. Credentials stored in Cosmos DB for throughput.
+
+5. **Respond to webhooks fast, process asynchronously.** Webhook endpoint verifies signature, deduplicates, enqueues, and returns 200 within 1 second. Processing happens in background tasks.
+
+6. **Normalized data models are the integration boundary.** Platform code never sees vendor-specific data structures. Adapters translate in both directions.
+
+7. **Echo prevention for bidirectional sync.** Track outbound operations with TTL markers. When the corresponding webhook arrives, skip it.
+
+8. **Adaptive rate limiting per integration.** Pre-configured limits per vendor, adjusted dynamically based on 429 responses and Retry-After headers.

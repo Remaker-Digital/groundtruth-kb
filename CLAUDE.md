@@ -90,6 +90,7 @@ All GOV specs are stored in KB with `type = 'governance'`. Quick reference:
 | 15 | Test fix gate | No fixing failed tests without owner approval |
 | 16 | Deploy gate | No deployment without owner approval |
 | 17 | Quality first | Prioritize quality over effort; software engineering excellence |
+| 18 | Assertion quality | Meaningfulness over coverage; no rubber-stamp assertions |
 
 ### Owner Input Classification Rule (GOV-09)
 
@@ -169,5 +170,5 @@ Provide brief inline coaching notes (prefixed with "💡 **Feedback:**") when ob
 ---
 
 *© 2026 Remaker Digital, a DBA of VanDusen & Palmeter, LLC. All rights reserved.*
-*Last Updated: 2026-03-03*
-*Version: 63.0.0*
+*Last Updated: 2026-03-12*
+*Version: 64.0.0*

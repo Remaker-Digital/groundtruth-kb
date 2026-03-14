@@ -9,10 +9,189 @@ All notable changes to Agent Red Customer Experience are documented here.
 
 ---
 
-## v1.76.0 — CORS Fix, Widget Resilience, and UX Improvements (Staging, 2026-03-07)
+## v1.83.0 — 680-Tenant Infrastructure Scaling (Production, 2026-03-13)
 
-:::note Staging Release
-This release is currently deployed to the staging environment for validation. It has not yet been promoted to production.
+### Distributed rate limiting with Redis
+
+Agent Red now uses **Azure Cache for Redis** for distributed rate limiting across multiple application replicas. Rate limit windows are shared across all workers and replicas, ensuring consistent enforcement at scale.
+
+- **Sharded rate limiting:** 16 independent rate limit shards eliminate global lock contention. Each tenant is deterministically assigned to a shard for O(1) lookup.
+- **Redis bridge:** Rate limit middleware automatically detects and delegates to the Redis backend, with graceful fallback to local shards if Redis is unavailable.
+
+### Cross-replica cache invalidation
+
+When tenant configuration changes on one replica, all other replicas are notified via **Redis pub/sub** and invalidate their local caches immediately. This eliminates the previous 5-minute TTL delay for configuration changes to propagate.
+
+### Per-tier entitlement caps
+
+Each subscription tier now enforces limits on:
+
+- Knowledge base articles
+- Website sources
+- Escalation categories
+- Team members
+- Conversation history retention (days)
+
+Attempts to exceed tier limits return a clear `403 Forbidden` with the specific cap and current count. Enterprise tier has the highest limits, Starter the lowest.
+
+### Scaling infrastructure
+
+- **4 uvicorn workers per replica** (up from 1) — at minimum 2 replicas, production runs 8 concurrent workers.
+- **Global SSE connection limit** (5,000) prevents connection exhaustion under load.
+- **LRU-bounded data structures** — pre-auth IP tracker (10,000 max) and TOCTOU locks (1,000 max) prevent unbounded memory growth.
+- **Tenant metadata cache** with 300-second TTL reduces Cosmos DB reads by ~80% for repeated requests.
+
+### Health metrics endpoint
+
+New `GET /health/metrics` endpoint (platform admin only) reports real-time operational metrics: active SSE connections, cache sizes, rate limiter state, uptime, and event loop latency.
+
+### Redis connectivity
+
+- **Azure Cache for Redis Standard C1** connected on both staging and production.
+- Channel: `agentred:cache:invalidate` for cross-replica coordination.
+
+---
+
+## v1.82.1 — Rate Limiter Fix, Superadmin API Refactor, Config Authority (Production, 2026-03-12)
+
+### Configuration authority over knowledge base
+
+When configuration fields (brand name, persona, language, custom instructions) are set, they are now declared **authoritative over knowledge base articles**. If a KB article contradicts a config field, the config value takes precedence in the AI's responses.
+
+- **Conflict scanner integration:** The Knowledge Base and Configuration admin pages now show warning banners when KB articles conflict with authoritative config fields.
+
+### Email template improvements
+
+- **Welcome email:** Removed API key blocks from the welcome email template. The email now directs new tenants to the admin dashboard to view and manage their keys securely.
+- **Login notification and SPA recovery emails:** Added clickable admin dashboard URL buttons and security warning links.
+
+### Rate limiter consolidation
+
+- **Shared backend:** SPA recovery and admin forgot-password rate limiters now use the shared `RateLimitBackend` instead of per-module dictionaries.
+- **Middleware ordering fix:** `TrustedProxyMiddleware` now runs before `PreAuthRateLimitMiddleware`, ensuring rate limiting uses the real client IP (not Azure's internal proxy IP).
+- **Platform admin exemption:** Platform admin (SPA) keys are exempt from both rate limiters.
+- **IP exemption:** `PRE_AUTH_RATE_LIMIT_EXEMPT_IPS` allows specific IPs to bypass pre-auth rate limiting.
+
+### Superadmin API refactoring
+
+The superadmin API monolith (5,085 lines) has been split into five domain submodules for maintainability: tenants, dashboard, operations, copilot, and platform. The public API is unchanged.
+
+### Infrastructure
+
+- **Pre-auth rate limit IP exemption** (`PRE_AUTH_RATE_LIMIT_EXEMPT_IPS` env var) for CI/CD pipelines and monitoring.
+
+---
+
+## v1.82.0 — Mock Dev Environment and Admin UI Polish (Staging, 2026-03-11)
+
+### Mock development environment
+
+- **Zero-backend UI development:** New `npm run dev:mock` mode enables frontend development without a running backend. Uses in-memory fixture data, client-side router interceptor, and mock API handlers for all admin endpoints.
+- **527 mock E2E tests:** Comprehensive test suite verifying all 12 admin pages work correctly in mock mode (522 pass, 5 skip).
+
+### Admin UI improvements
+
+- **Auto-save on focus out:** Configuration, Widget, Memory & Privacy, and Knowledge Base pages now auto-save draft inputs when focus leaves a field (500ms debounce). Replaces explicit "Save draft" buttons.
+- **Agent identity section:** Grouped "Brand & Persona" and "Custom Instructions" into a single "Agent identity" section on the Configuration page.
+- **Policy overrides:** Moved Policies from Configuration to Knowledge Base page as "Policy overrides" with priority documentation.
+- **Integrations mock data:** Full mock fixtures for 5 integration types with 8 endpoint handlers.
+
+---
+
+## v1.81.0 — Auth Hardening, Rate Limit Backend, and CI/CD (Production, 2026-03-10)
+
+### Authentication hardening
+
+- **Inactivity auto-logout:** Admin sessions now expire after 30 minutes of inactivity with automatic logout.
+- **Cross-tab token protection:** Session tokens are bound to a single browser tab to prevent token theft across tabs.
+- **Clickjacking protection:** `X-Frame-Options: DENY` and `Content-Security-Policy: frame-ancestors 'none'` headers added to auth middleware.
+
+### Rate limit backend
+
+- **Shared rate limit infrastructure:** Extracted `RateLimitBackend` protocol with `InMemoryRateLimitBackend` implementation. Both middleware and security hardening modules now share a single backend instance.
+
+### CI/CD pipeline
+
+- **GitHub Actions workflow:** New CI pipeline with parallel lint (ruff), typecheck (pyright), test (pytest), and security scan (bandit + safety) stages.
+- **Makefile targets:** 8 `make` targets for common development tasks.
+
+### Superadmin API split
+
+- **Package restructuring:** Split `superadmin_api.py` (2,100+ lines) into 5 domain submodules (`_tenants.py`, `_dashboard.py`, `_operations.py`, `_copilot.py`, `_platform.py`) for better maintainability.
+
+---
+
+## v1.80.5 — Widget Config UX, Launcher Preview, and KB Freshness (Production, 2026-03-10)
+
+### Widget configuration improvements
+
+- **Dedicated launcher color:** A new `widget_launcher_color` field controls the launcher button color independently from the widget's primary color. Previously, the launcher always matched the primary color.
+- **Real-time launcher preview:** Changes to launcher color, icon, position, and size now update the live preview instantly without requiring a page reload.
+- **Two-column launcher layout:** The Widget configuration page now uses a two-column layout for launcher settings (color on the left, icon and size on the right).
+
+### Knowledge base freshness
+
+- **No-cache headers:** Knowledge base API endpoints no longer return `max-age=86400` cache headers. Admin users now see recently added or modified articles immediately.
+
+### Onboarding wizard
+
+- **Duplicate article detection:** The setup wizard now checks for existing KB articles and shows a warning banner ("Existing articles detected") to prevent accidental duplicate imports.
+
+### Pydantic validation fix
+
+- Fixed `widget_page_rules` and `widget_pre_chat_fields` rejecting `None` values during configuration save.
+
+---
+
+## v1.80.0 — SPA Authentication Isolation, Key Recovery, and Login Notifications (Production, 2026-03-09)
+
+### SPA platform admin isolation
+
+- **Dedicated auth path:** Platform admin (SPA) keys now use a dedicated `ar_spa_` prefix and a separate `platform_admins` Cosmos collection. SPA keys can only access superadmin endpoints; tenant keys cannot access superadmin endpoints. This eliminates cross-layer authentication leakage.
+- **Key regeneration:** Platform admins can regenerate their SPA key via `POST /api/superadmin/platform-admin/regenerate-key`.
+
+### Emergency key recovery
+
+- **Backup code recovery:** If a platform admin loses their SPA key, they can recover access using backup codes delivered during initial provisioning. Rate limited to 3 attempts per 15 minutes per IP with enumeration prevention.
+
+### Login notifications
+
+- **Email on SPA auth:** Platform admins receive a notification email whenever their SPA key is used to authenticate, including timestamp and source IP.
+
+### Tenant account recovery
+
+- **Recovery email address:** Tenants can configure a recovery email for emergency account access. Verification uses single-use tokens with session JWTs.
+
+---
+
+## v1.79.2 — Rate Limit Exemption and Hotfix (Production, 2026-03-08)
+
+### Platform admin rate limit exemption
+
+- Platform admin (SPA) keys are now exempt from both the identity-based rate limiter (middleware) and the path-based rate limiter (security hardening). This prevents CI/CD pipelines and monitoring from being throttled.
+
+### Hotfix
+
+- Fixed `replace_item()` in Cosmos SDK leaking `partition_key` through `**kwargs` to aiohttp — changed to `upsert_item()`.
+
+---
+
+## v1.77.0 — Human-Readable Tenant IDs and Test Mode Removal (Production, 2026-03-08)
+
+### Human-readable tenant IDs
+
+- New tenants are provisioned with human-readable IDs derived from the account holder's email domain (e.g., `acme-outdoor` instead of a UUID). Existing tenants retain their current IDs.
+
+### Test mode removal
+
+- Removed the `test_mode_enabled` field from the configuration schema and all three admin SPAs. Test mode was a development feature that is no longer needed.
+
+---
+
+## v1.76.0 — CORS Fix, Widget Resilience, and UX Improvements (Production, 2026-03-07)
+
+:::note
+Originally deployed to staging for validation. Promoted to production on 2026-03-08.
 :::
 
 ### Widget resilience

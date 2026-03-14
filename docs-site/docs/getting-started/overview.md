@@ -94,7 +94,7 @@ These are the performance targets Agent Red is designed to achieve:
 | Response latency (P95) | < 2 seconds |
 | Uptime SLA (Enterprise) | 99.95% |
 | Concurrent tenants at launch | 50 |
-| Per-tier rate limits | Starter 10/min, Professional 50/min, Enterprise 200/min |
+| Rate limit (all tiers) | 500 requests per minute per tenant |
 
 ## Next steps
 

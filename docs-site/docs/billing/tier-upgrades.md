@@ -11,7 +11,7 @@ Agent Red offers three subscription tiers: **Starter**, **Professional**, and **
 
 ### How to upgrade
 
-1. Navigate to **Billing** in your admin dashboard.
+1. Navigate to **Account & billing** in your admin dashboard.
 2. Click **Upgrade Plan** to see available tiers.
 3. Review the **upgrade preview** — this shows your prorated cost, the features you'll gain, and the billing impact.
 4. Click **Confirm Upgrade** to be redirected to Stripe Checkout.
@@ -19,7 +19,7 @@ Agent Red offers three subscription tiers: **Starter**, **Professional**, and **
 
 ### What changes on upgrade
 
-- **Rate limits** increase to match your new tier.
+- **Rate limits** are 500 requests per minute for all tiers (rate limits do not change on upgrade).
 - **Feature gates** unlock (e.g., cross-session learning on Professional, dedicated model training on Enterprise).
 - **Included conversation allowance** adjusts to your new tier's allocation.
 - Billing is prorated — you only pay the difference for the remainder of your current billing cycle.
@@ -30,7 +30,7 @@ Add-on modules extend your plan with specialized capabilities. Available add-ons
 
 ### Purchasing add-ons
 
-1. Navigate to **Billing** in your admin dashboard.
+1. Navigate to **Account & billing** in your admin dashboard.
 2. Scroll to the **Add-on Modules** section.
 3. Click **Purchase** on the add-on you want.
 4. Complete payment via Stripe Checkout.

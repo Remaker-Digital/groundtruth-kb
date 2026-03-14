@@ -3,7 +3,7 @@
     "id": "C.1",
     "description": "Version updated",
     "status": "PASS",
-    "detail": "expected=1.82.1, got=1.82.1"
+    "detail": "expected=1.83.0, got=1.83.0"
   },
   {
     "id": "C.2",

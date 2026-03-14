@@ -6,6 +6,10 @@ description: Advanced — inject specific behavioral rules directly into the AI'
 
 # Custom instructions
 
+:::info Agent identity section
+This field is located in the **Agent identity** section of the Configuration page, alongside [brand and tone](./brand-and-tone.md) settings.
+:::
+
 | | |
 |---|---|
 | **Field** | `custom_instructions` |

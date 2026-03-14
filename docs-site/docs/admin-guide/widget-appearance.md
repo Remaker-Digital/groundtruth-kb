@@ -183,6 +183,19 @@ Controls whether the widget appears on mobile devices (screen width under 768px)
 
 ---
 
+## Launcher color
+
+| | |
+|---|---|
+| **Field** | `widget_launcher_color` |
+| **Type** | Color picker (hex) |
+| **Default** | Uses primary color |
+| **Affects** | Widget |
+
+The color of the floating launcher button. By default, the launcher uses the widget's primary color. Set this field to give the launcher a distinct color — useful when the primary color is used for links and buttons inside the chat panel but you want the launcher to stand out differently on your storefront.
+
+---
+
 ## Launcher icon
 
 | | |

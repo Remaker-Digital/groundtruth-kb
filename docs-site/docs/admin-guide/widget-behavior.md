@@ -180,6 +180,83 @@ Allows customers to attach images and files in the chat. Useful for sending scre
 
 ---
 
+## Exit-intent auto-open
+
+| | |
+|---|---|
+| **Field** | `widget_exit_intent_enabled` |
+| **Type** | Toggle (on/off) |
+| **Default** | Off |
+| **Affects** | Widget |
+
+When enabled, the chat panel opens automatically when the customer's cursor moves toward the browser's close or back button (indicating they may be about to leave the page). This is a last-chance engagement tactic.
+
+**When to enable:**
+- Your store has high cart abandonment and you want to offer assistance before the customer leaves.
+- You want to proactively address concerns that may be preventing a purchase.
+
+**When to leave off:**
+- Exit-intent popups can feel aggressive, especially if your store already uses an email capture or discount popup on exit.
+- On mobile, exit-intent detection is not reliable — this feature primarily affects desktop visitors.
+
+---
+
+## Scroll-depth auto-open
+
+| | |
+|---|---|
+| **Field** | `widget_scroll_depth_enabled` |
+| **Type** | Toggle (on/off) |
+| **Default** | Off |
+| **Affects** | Widget |
+
+When enabled, the chat panel opens automatically when the customer scrolls past a configurable percentage of the page. This targets engaged visitors who are actively reading content.
+
+**When to enable:**
+- On long product detail pages or FAQ pages where customers scrolling deep are likely to have questions.
+- As an alternative to time-based auto-open for content-heavy pages.
+
+---
+
+## Panel width
+
+| | |
+|---|---|
+| **Field** | `widget_panel_width` |
+| **Type** | Number (300–600 pixels) |
+| **Default** | `380` |
+| **Affects** | Widget |
+
+The width of the chat panel in pixels. A wider panel provides more room for message content and reduces line wrapping.
+
+---
+
+## Panel height
+
+| | |
+|---|---|
+| **Field** | `widget_panel_height` |
+| **Type** | Number (400–800 pixels) |
+| **Default** | `600` |
+| **Affects** | Widget |
+
+The height of the chat panel in pixels. Taller panels show more conversation history without scrolling.
+
+---
+
+## Widget language
+
+| | |
+|---|---|
+| **Field** | `widget_language` |
+| **Type** | Dropdown (language code) |
+| **Default** | `en` (English) |
+| **Affects** | Widget |
+
+The language used for the widget's built-in UI elements — button labels, placeholder text, system messages, and error messages. This is independent of the AI agent's response language (configured in [Languages](./languages.md)).
+
+---
+
 ## Page rules
 
 | | |

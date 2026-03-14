@@ -102,12 +102,16 @@ A catch-all field for any business rules not covered above — loyalty programs,
 
 ---
 
+## Where to find policy fields
+
+Policy fields are located in the **Policy overrides** section of the **Knowledge Base** page in the admin console. They were previously on the Configuration page but have been moved to the Knowledge Base page to keep all content management in one place. Policy overrides take priority over regular knowledge base articles when the AI answers policy-related questions.
+
 ## Avoiding conflicts between policies and knowledge base articles
 
 A common mistake is writing the same policy information in both the policy fields and in separate knowledge base articles. This creates a risk of conflicting information if one is updated and the other is not.
 
 **Best practice:**
-- Use the policy fields for canonical policy text. This is the authoritative source.
+- Use the policy fields (in the Policy overrides section of the Knowledge Base page) for canonical policy text. This is the authoritative source.
 - Knowledge base articles should reference or supplement policies, not duplicate them.
 - If you have a detailed shipping FAQ ("How long does shipping take to Hawaii?"), put that in a knowledge base article and put the general shipping policy in the Shipping information field.
 - The AI will combine both sources when answering — the policy provides the rules, and the FAQ article provides the specific detail.

@@ -330,10 +330,10 @@ class TestPhaseHeaders:
         seed = _get_seed()
         seed.phase_results.clear()
         mock_tier_defaults = {
-            "starter": {"included_conversations": 100, "rate_limit_rpm": 10},
-            "professional": {"included_conversations": 5000, "rate_limit_rpm": 60},
-            "business": {"included_conversations": 25000, "rate_limit_rpm": 120},
-            "enterprise": {"included_conversations": 100000, "rate_limit_rpm": 300},
+            "starter": {"included_conversations": 1000, "rate_limit_rpm": 500},
+            "professional": {"included_conversations": 5000, "rate_limit_rpm": 500},
+            "business": {"included_conversations": 25000, "rate_limit_rpm": 500},
+            "enterprise": {"included_conversations": 100000, "rate_limit_rpm": 500},
         }
         with patch.dict("sys.modules", {
             "src.multi_tenant.cosmos_schema": MagicMock(

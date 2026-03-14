@@ -81,6 +81,23 @@ The scanner runs four analysis phases, all using data already in your knowledge 
 
 4. **Factual conflict detection** — Extracts specific data points (durations, prices, percentages, email addresses) and checks for contradictions between paired articles.
 
+## Configuration authority over knowledge base
+
+Certain configuration fields are declared **authoritative** — when set, they take precedence over any conflicting content in knowledge base articles. The authoritative fields are:
+
+- **Brand name** — the AI always uses the configured brand name, even if a KB article references a different name
+- **Brand voice / persona** — communication style from config overrides tone guidance in KB articles
+- **Primary language** — the configured language takes precedence over language directives in KB articles
+- **Custom instructions** — behavioral rules from config override conflicting KB article content
+
+When the system prompt is built for the response generator, an authority block is injected that declares these config fields as the single source of truth. If a knowledge base article contradicts an authoritative config field, the config value wins.
+
+### Conflict warning banners
+
+The **Configuration** and **Knowledge Base** admin pages display warning banners when the conflict scanner detects KB articles that contradict authoritative config fields. These banners help you identify and resolve conflicts before they affect customer-facing answers.
+
+---
+
 ## Best practices for prevention
 
 - **Use descriptive, unique titles.** "Return Policy" and "Refund Policy" may both be needed, but "Return Policy — Physical Products" and "Refund Policy — Digital Products" make the distinction clear to both the AI and your team.

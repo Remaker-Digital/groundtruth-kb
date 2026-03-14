@@ -95,8 +95,9 @@ If AGNTCY Docker containers are running on this machine, Agent Red must behave a
 | Container App Env | agent-red-cae | Domain: `orangeglacier-f566a4e7.eastus.azurecontainerapps.io` |
 | API Gateway | agent-red-api-gateway | FQDN: `agent-red-api-gateway.orangeglacier-f566a4e7.eastus.azurecontainerapps.io` |
 | NATS | agent-red-nats | Internal: `agent-red-nats.internal.orangeglacier-f566a4e7.eastus.azurecontainerapps.io:4222` |
+| Redis Cache | redis-agentred-eastus | Standard C1, TLS-only (port 6380), `publicNetworkAccess=Enabled`, access key auth |
 
-Staging: `agent-red-staging.orangeglacier-f566a4e7.eastus.azurecontainerapps.io` (3 tenants, scales to zero).
+Staging: `agent-red-staging.orangeglacier-f566a4e7.eastus.azurecontainerapps.io` (3 tenants, Redis connected, scales to zero).
 
 **Third-Party Service Accounts:** Azure OpenAI (pay-per-token), Shopify Partner (developer), Zendesk (sandbox), Mailchimp (free tier), Google Analytics (GA4).
 
@@ -259,4 +260,4 @@ No competitor has confirmed implementing per-customer vector RAG over historical
 ---
 
 *© 2026 Remaker Digital, a DBA of VanDusen & Palmeter, LLC. All rights reserved.*
-*Last Updated: 2026-03-08*
+*Last Updated: 2026-03-13*

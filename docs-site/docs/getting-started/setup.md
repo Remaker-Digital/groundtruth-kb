@@ -58,28 +58,75 @@ sequenceDiagram
     You->>Store: Select plan & checkout
     Store->>Prov: Trigger tenant creation
     Prov->>Prov: Create namespace, DB partition, agents
-    Prov->>You: Welcome email with API key & dashboard link
+    Prov->>You: Welcome email with dashboard link
 ```
+
+## First login
+
+Your welcome email contains a **Sign in to Dashboard** button — but it does not contain your API key. Keys are never sent via email for security. Instead, you sign in using a **magic link** (passwordless email authentication) and then retrieve your keys from the dashboard.
+
+```mermaid
+sequenceDiagram
+    participant You
+    participant Email as Your Inbox
+    participant Login as Admin Login Page
+    participant Dash as Admin Dashboard
+
+    You->>Email: Open welcome email
+    Email->>Login: Click "Sign in to Dashboard"
+    Login->>Login: Click "Sign in with magic link"
+    Login->>Email: Enter your email → magic link sent
+    Email->>Dash: Click magic link → authenticated (8-hour session)
+    Dash->>Dash: Navigate to Account & billing → view API key + widget key
+```
+
+**Step by step:**
+
+1. Open the **welcome email** and click **Sign in to Dashboard**.
+2. On the login page, click **Sign in with magic link**.
+3. Enter the email address used when your account was created.
+4. Check your inbox for a second email containing a one-time login link (expires in 15 minutes).
+5. Click the login link — you are now authenticated with an 8-hour session.
+6. Navigate to **Account & billing** in the sidebar to view and copy your API key and widget key.
+
+After your first login, you can use either magic link or your API key to sign in. For details on all authentication options, see [Securing Agent Red](/docs/admin-guide/mfa-security).
+
+:::tip
+Copy your API key to a password manager immediately. The key is displayed on the Account page whenever you are signed in, but storing it in a password manager avoids repeating the magic link flow every time.
+:::
 
 ## 2. API key configuration
 
-Each tenant receives an API key for authenticating requests to the Agent Red API. The API key is delivered in your welcome email and is also visible in the dashboard.
+Each tenant receives API keys for authenticating requests to the Agent Red API. Your welcome email includes a link to the admin dashboard where you can view and manage your keys.
 
 ### API key security
 
 - API keys are stored in Azure Key Vault with Managed Identity access
 - Each key is scoped to a single tenant — it cannot access other tenants' data
 - Keys can be rotated from the dashboard without downtime
-- All API calls require the key in the `Authorization` header
+- All API calls require the key in the `X-API-Key` header (for tenant/user keys) or `X-Widget-Key` header (for widget keys)
 
 ### Authentication format
 
+Agent Red uses two authentication headers depending on the key type:
+
+**Tenant or user API key** (prefix `ar_user_`):
 ```bash
 curl -X POST https://agent-red-api-gateway.orangeglacier-f566a4e7.eastus.azurecontainerapps.io/api/chat/conversations \
-  -H "Authorization: Bearer YOUR_API_KEY" \
+  -H "X-API-Key: YOUR_API_KEY" \
   -H "Content-Type: application/json" \
   -d '{"message": "Where is my order #12345?"}'
 ```
+
+**Widget key** (prefix `pk_live_`) — used by the embedded chat widget:
+```bash
+curl -X POST https://agent-red-api-gateway.orangeglacier-f566a4e7.eastus.azurecontainerapps.io/api/chat/conversations \
+  -H "X-Widget-Key: YOUR_WIDGET_KEY" \
+  -H "Content-Type: application/json" \
+  -d '{"message": "Where is my order #12345?"}'
+```
+
+Widget keys are restricted to chat and configuration endpoints only (`/api/chat/`, `/ws/chat/`, `/api/config`).
 
 ## 3. Connect data sources
 

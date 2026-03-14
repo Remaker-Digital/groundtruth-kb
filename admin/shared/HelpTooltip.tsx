@@ -12,7 +12,7 @@
  *
  * Usage:
  *   <HelpTooltip text="Conversations where the AI produced a response." />
- *   <HelpTooltip text="Only Professional+ tiers." docLink="https://docs.agentred.ai/..." />
+ *   <HelpTooltip text="Only Professional+ tiers." docLink="https://agentredcx.com/docs/..." />
  *
  * © 2026 Remaker Digital, a DBA of VanDusen & Palmeter, LLC. All rights reserved.
  */

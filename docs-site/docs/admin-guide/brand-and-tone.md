@@ -8,6 +8,10 @@ description: Configure your brand name, voice, greeting, and farewell to shape h
 
 These settings define your AI agent's identity and communication style. Every response the agent generates is shaped by these values — they are injected into the system prompt that guides the response generator.
 
+:::info Agent identity section
+These fields are located in the **Agent identity** section of the Configuration page, which combines brand & persona settings with [custom instructions](./custom-instructions.md).
+:::
+
 ![Agent configuration page showing saved configurations, brand & persona settings, and escalation categories](/img/admin/agent-configuration.png)
 
 ## Brand name

@@ -545,7 +545,7 @@ Tests graceful degradation when Azure OpenAI, Cosmos DB, Key Vault, NATS, and St
 
 Execute `docs/operations/load-test-procedure.md`.
 
-Runs 50 concurrent simulated users for the configured duration. Validates SLA thresholds:
+Runs 100 concurrent simulated users (SPEC-1516: 680 tenants × 15% peak concurrency) for the configured duration. Validates SLA thresholds:
 - P95 response time ≤ 2000ms for admin endpoints
 - P95 response time ≤ 5000ms for chat endpoints
 - Error rate < 1%

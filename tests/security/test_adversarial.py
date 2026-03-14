@@ -421,7 +421,7 @@ class TestRateLimitExhaustion:
 
     def test_sec_21_burst_rate_limited(self, app_client):
         """SEC-21: Rapid burst of requests triggers rate limiting."""
-        # All tiers now share 60 RPM — send 65 requests rapidly
+        # All tiers now share 500 RPM (DOC-145) — send 65 requests rapidly
         statuses = []
         for _ in range(65):
             resp = app_client.get(

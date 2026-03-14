@@ -1102,8 +1102,8 @@ Module: `tests/performance/` (requires separate runner, not standard pytest)
 | ID | Test | Validates |
 |----|------|-----------|
 | PERF-11 | 10 concurrent users — no errors | Base concurrency |
-| PERF-12 | 50 concurrent users — P95 within SLA | Medium load |
-| PERF-13 | 100 concurrent users — P95 within SLA | Target load |
+| PERF-12 | 100 concurrent users — P95 within SLA | Standard load (SPEC-1516: 680 tenants × 15% peak) |
+| PERF-13 | 200 concurrent users — P95 within SLA | Stress load |
 | PERF-14 | 3 tenants × 10 concurrent each — no cross-tenant degradation | Multi-tenant |
 | PERF-15 | Starter tenant at concurrency limit (3) — others unaffected | Noisy neighbor |
 | PERF-16 | Sustained 100 req/min for 10 minutes — no memory leak | Stability |

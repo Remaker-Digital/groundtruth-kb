@@ -3,7 +3,7 @@
 # Last verified: 2026-02-23 — PASS (v1.57.0, 922 reqs, 0 failures, P50 160ms, P95 470ms, P99 520ms)
 # Last corrected: 2026-02-19 — Fixed /api/team → /api/admin/team in locustfile.py
 
-This procedure validates that the Agent Red API gateway meets SLA commitments under sustained concurrent load matching the declared launch scale target (50 concurrent tenants).
+This procedure validates that the Agent Red API gateway meets SLA commitments under sustained concurrent load matching the declared scale target (680 concurrent merchant tenants, SPEC-1516).
 
 > **Audience:** AI assistants (Claude) and human operators.
 > **Tooling:** [Locust](https://locust.io/) — Python-based load testing framework.
@@ -22,8 +22,8 @@ REPORT_DIR         = tests/performance
 REPORT_HTML        = tests/performance/load-test-report.html
 REPORT_CSV_PREFIX  = tests/performance/load-test-results
 
-# Load profile — matches launch scale target
-USER_COUNT         = 50
+# Load profile — matches scale target (SPEC-1516: 680 tenants, 15% peak = 102 concurrent)
+USER_COUNT         = 100
 SPAWN_RATE         = 5
 RUN_DURATION       = 5m
 

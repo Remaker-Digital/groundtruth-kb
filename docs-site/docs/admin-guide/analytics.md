@@ -25,9 +25,9 @@ Average customer rating on a 1–5 scale, collected via optional post-conversati
 ### Escalation Rate
 The percentage of conversations handed off to a human team member. Monitor this alongside your escalation threshold setting in [Agent Configuration](/docs/admin-guide/escalation-rules) to find the right balance.
 
-## Conversation Volume Chart
+## Daily Usage Chart
 
-The daily breakdown chart shows total and billable conversations over your selected time period (7, 14, 30, or 90 days). Use this to identify peak support hours, seasonal trends, and the impact of marketing campaigns on support volume.
+The daily usage chart shows two series — **total conversations** and **billable conversations** — over your selected time period (7, 14, 30, or 90 days). Use this to identify peak support hours, seasonal trends, and the impact of marketing campaigns on support volume.
 
 ## Top Topics
 

@@ -54,48 +54,90 @@ sequenceDiagram
 **2. Intent Classifier determines the customer's need.** The classifier analyzes the message text and assigns one of 17 intent categories using GPT-4o-mini. The classified intent determines which knowledge sources the retrieval agent searches and how the response generator frames its reply.
 
 ```mermaid
-mindmap
-  root((17 Intent\nCategories))
-    Orders
-      Order Status
-      Order Modification
-      Order Cancellation
-      Shipping & Delivery
-    Returns
-      Return Request
-      Refund Status
-      Exchange
-    Products
-      Product Information
-      Product Availability
-      Product Recommendation
-      Pricing
-    Account
-      Account Management
-      Password Reset
-      Payment Issues
-    Support
-      Technical Support
-      General Inquiry
-      Complaint
+flowchart TB
+    ROOT((17 Intent<br/>Categories))
+
+    ORD[Orders]
+    RET[Returns]
+    PRD[Products]
+    ACC[Account]
+    SUP[Support]
+
+    ROOT --- ORD
+    ROOT --- RET
+    ROOT --- PRD
+    ROOT --- ACC
+    ROOT --- SUP
+
+    ORD --- O1[Order Status]
+    ORD --- O2[Order Modification]
+    ORD --- O3[Order Cancellation]
+    ORD --- O4[Shipping & Delivery]
+
+    RET --- R1[Return Request]
+    RET --- R2[Refund Status]
+    RET --- R3[Exchange]
+
+    PRD --- P1[Product Information]
+    PRD --- P2[Product Availability]
+    PRD --- P3[Product Recommendation]
+    PRD --- P4[Pricing]
+
+    ACC --- A1[Account Management]
+    ACC --- A2[Password Reset]
+    ACC --- A3[Payment Issues]
+
+    SUP --- S1[Technical Support]
+    SUP --- S2[General Inquiry]
+    SUP --- S3[Complaint]
+
+    style ROOT fill:#DC2626,color:#fff,stroke:#DC2626
+    style ORD fill:#1D4ED8,color:#fff,stroke:#1D4ED8
+    style RET fill:#7C3AED,color:#fff,stroke:#7C3AED
+    style PRD fill:#B45309,color:#fff,stroke:#B45309
+    style ACC fill:#047857,color:#fff,stroke:#047857
+    style SUP fill:#BE185D,color:#fff,stroke:#BE185D
+
+    style O1 fill:#DBEAFE,color:#1E3A5F,stroke:#93C5FD
+    style O2 fill:#DBEAFE,color:#1E3A5F,stroke:#93C5FD
+    style O3 fill:#DBEAFE,color:#1E3A5F,stroke:#93C5FD
+    style O4 fill:#DBEAFE,color:#1E3A5F,stroke:#93C5FD
+
+    style R1 fill:#EDE9FE,color:#3B1F6E,stroke:#C4B5FD
+    style R2 fill:#EDE9FE,color:#3B1F6E,stroke:#C4B5FD
+    style R3 fill:#EDE9FE,color:#3B1F6E,stroke:#C4B5FD
+
+    style P1 fill:#FEF3C7,color:#78350F,stroke:#FCD34D
+    style P2 fill:#FEF3C7,color:#78350F,stroke:#FCD34D
+    style P3 fill:#FEF3C7,color:#78350F,stroke:#FCD34D
+    style P4 fill:#FEF3C7,color:#78350F,stroke:#FCD34D
+
+    style A1 fill:#D1FAE5,color:#064E3B,stroke:#6EE7B7
+    style A2 fill:#D1FAE5,color:#064E3B,stroke:#6EE7B7
+    style A3 fill:#D1FAE5,color:#064E3B,stroke:#6EE7B7
+
+    style S1 fill:#FCE7F3,color:#831843,stroke:#F9A8D4
+    style S2 fill:#FCE7F3,color:#831843,stroke:#F9A8D4
+    style S3 fill:#FCE7F3,color:#831843,stroke:#F9A8D4
 ```
 
 **3. Escalation Detection runs in parallel.** While the main pipeline processes the message, the escalation agent independently evaluates whether the conversation requires a human. It assesses customer sentiment, issue complexity, account value, and conversation history. If escalation triggers, the system routes the conversation to a human agent in your help desk (Zendesk, or another connected platform) and notifies the customer that a person is taking over.
 
 Escalation rules are configurable per tenant — you control which situations trigger a handoff to a human agent.
 
-**4. Knowledge Retrieval searches your data.** The retrieval agent takes the classified intent and customer message and runs a semantic vector search against your knowledge base. This includes:
+**4. Knowledge Retrieval searches your data.** The retrieval agent takes the classified intent and customer message and runs a **hybrid search** against your knowledge base — combining semantic vector similarity with keyword matching for maximum recall. The knowledge base includes:
 
 - **Product catalog** — synced from Shopify (names, descriptions, prices, availability)
 - **FAQ database** — your custom question-and-answer pairs
 - **Policy documents** — return policies, shipping rules, warranty terms
 
-The search uses `text-embedding-3-large` embeddings stored in Cosmos DB's DiskANN vector search index. It returns the top matching documents with relevance scores.
-
 ```mermaid
 flowchart LR
     MSG[Customer Message] --> EMB[Generate\nEmbedding]
-    EMB --> VS[Vector Search\nCosmos DB]
+    MSG --> TOK[Tokenize\nfor BM25]
+
+    EMB --> VS[Vector Search\nCosmos DB DiskANN]
+    TOK --> BM[BM25 Keyword\nScoring]
 
     subgraph Knowledge Base
         PC[(Product\nCatalog)]
@@ -107,9 +149,110 @@ flowchart LR
     FAQ --> VS
     POL --> VS
 
-    VS --> TOP[Top Matches\n+ Relevance Scores]
+    VS --> RRF[Reciprocal Rank\nFusion]
+    BM --> RRF
+
+    RRF --> TOP["Top 5 Matches\n(score ≥ 0.1)"]
     TOP --> RG[Response\nGenerator]
+
+    style RRF fill:#7C3AED,color:#fff,stroke:#7C3AED
 ```
+
+### Knowledge retrieval technical detail
+
+This section covers how articles are vectorized, indexed, and searched. Understanding these details helps you write knowledge base content that retrieves well.
+
+#### Embedding and indexing
+
+When you publish a knowledge base article, Agent Red immediately generates a vector embedding:
+
+| Parameter | Value |
+|-----------|-------|
+| Embedding model | OpenAI `text-embedding-3-large` |
+| Vector dimensions | 3,072 |
+| Similarity metric | Cosine distance |
+| Index type | Cosmos DB DiskANN (approximate nearest neighbor) |
+| Data type | float32 |
+
+**How articles are prepared for embedding:**
+
+1. The article's **entry type** label, **title**, **tags**, and **content** are combined into a single text block.
+2. The title appears first because positional importance affects semantic encoding — the embedding model gives more weight to earlier text.
+3. Content is truncated at 8,000 characters to stay within the model's token budget.
+4. The resulting text is sent to OpenAI and the 3,072-dimension vector is stored directly on the Cosmos DB document alongside the article content.
+
+Each article produces **one embedding** (not chunked). This differs from conversation memory (Layer 2), which chunks transcripts into ~250-token segments with 30-token overlap.
+
+**Change detection:** Agent Red hashes the article content (SHA-256 of title + content) and skips re-embedding if the hash matches the previous version. This avoids unnecessary API calls when you save an article without changing its text.
+
+#### Hybrid search with Reciprocal Rank Fusion
+
+Agent Red does not rely on vector similarity alone. Every search uses a **hybrid strategy** that fuses two ranking signals:
+
+```mermaid
+flowchart TB
+    Q[Customer Query] --> E[Generate Query\nEmbedding]
+    Q --> T[Tokenize Query\nfor BM25]
+
+    E --> VR["Vector Ranking\n(semantic similarity)"]
+    T --> BR["BM25 Ranking\n(keyword matching)"]
+
+    VR --> |"Weight: 0.7 (70%)"| F[Reciprocal Rank\nFusion]
+    BR --> |"Weight: 0.3 (30%)"| F
+
+    F --> N["Normalize to 0–1\n+ Apply threshold"]
+    N --> R["Return top 5\n(score ≥ 0.1)"]
+
+    style F fill:#7C3AED,color:#fff,stroke:#7C3AED
+    style VR fill:#1D4ED8,color:#fff,stroke:#1D4ED8
+    style BR fill:#B45309,color:#fff,stroke:#B45309
+```
+
+| Signal | Weight | What it captures |
+|--------|--------|-----------------|
+| **Vector similarity** | 70% | Semantic meaning — understands that "Where's my package?" and "shipping status" are related even though they share no keywords |
+| **BM25 keyword score** | 30% | Exact term matching — ensures that a search for "SKU-4521" finds the article containing that exact string |
+
+**Why hybrid matters:** Pure vector search can miss exact identifiers (order numbers, SKUs, policy names). Pure keyword search misses paraphrased questions. The hybrid approach captures both — and the title receives a 3x keyword boost so articles with relevant titles rank higher.
+
+**Reciprocal Rank Fusion (RRF)** merges the two ranked lists using the formula: `score(d) = Σ(weight / (k + rank))` with a smoothing constant of k=60. This produces a single score normalized to the 0–1 range. Results scoring below **0.1** are excluded. A score of **0.7 or above** indicates a strong match.
+
+#### Retrieval parameters
+
+| Parameter | Value | Description |
+|-----------|-------|-------------|
+| Default results returned | 5 | Top 5 highest-scoring articles |
+| Maximum results | 20 | Hard ceiling to control context size |
+| Candidate pool | 3× top-k | Wider initial retrieval improves fusion quality |
+| Minimum relevance score | 0.1 | Results below this threshold are excluded |
+| High relevance threshold | 0.7 | Tracked in analytics as "strong match" |
+| Maximum context budget | 4,000 characters | Total text sent to the response generator |
+| BM25 k1 | 1.5 | Term frequency saturation |
+| BM25 b | 0.75 | Document length normalization |
+
+#### What this means for your knowledge base
+
+- **Write clear, specific titles.** Titles are boosted 3x in keyword scoring. "Return Policy — Physical Products" retrieves better than "Policy Document #3."
+- **Use the exact terms your customers use.** If customers ask about "shipping times," include that phrase in your article — BM25 rewards exact matches.
+- **Keep articles focused on one topic.** A single embedding per article means a sprawling article covering returns, shipping, AND warranties produces a diluted vector. Three focused articles retrieve more precisely.
+- **Tags help retrieval.** Tags are included in the embedding text, so adding tags like "returns," "refund," "30-day" gives the vector model more signal.
+
+#### Caching
+
+Repeated or similar queries are accelerated by three caching layers:
+
+1. **Exact query cache** — identical queries return cached results instantly.
+2. **Semantic cache** — queries that are semantically similar to recent queries reuse the same embedding, skipping the OpenAI API call.
+3. **Embedding cache** — prevents re-embedding the same query text within a session.
+
+#### Fallback behavior
+
+If the primary hybrid search is unavailable (for example, if the embedding API is temporarily unreachable), the system degrades gracefully:
+
+1. **Hybrid** (default) — vector + BM25 with RRF fusion
+2. **Vector-only** fallback — if BM25 index is unavailable
+3. **BM25-only** fallback — if embedding generation fails
+4. **Empty result** — if all search paths fail, the response generator works without retrieved context and is more likely to escalate
 
 **5. Response Generator composes the reply.** The response generator receives the classified intent, retrieved knowledge, full conversation history, and Persistent Customer Memory context. It uses GPT-4o to compose a natural-language reply that:
 
@@ -272,7 +415,7 @@ flowchart LR
 | Scale-to-zero | Container stops when idle, restarts on first request |
 | Auto-scale up | Azure Container Apps scales replicas based on HTTP concurrency |
 | Serverless database | Cosmos DB Serverless charges only for consumed RUs — no idle cost |
-| Design target | 50 concurrent tenants at launch |
+| Design target | 680 concurrent merchant tenants (SPEC-1516) |
 
 ## Persistent Customer Memory
 

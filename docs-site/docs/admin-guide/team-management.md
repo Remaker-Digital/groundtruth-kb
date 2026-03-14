@@ -153,13 +153,13 @@ This is useful for temporary absences (vacation, leave) where you want to preser
 | Dashboard | Full | Full | — | Read-only |
 | Inbox | Full | Full | Own categories (read-only) | Read-only |
 | Team | Full (sees self) | Full (no superadmin) | — | — |
-| Agent configuration | Full | Full | — | Read-only |
+| Agent identity | Full | Full | — | Read-only |
 | Knowledge base | Full | Full | — | Read-only |
 | Quick actions | Full | Full | — | — |
 | Widget configuration | Full | Full | — | — |
 | Integrations | Full | Full | — | — |
 | Memory & privacy | Full | Full | — | Read-only |
-| Billing | Full | Full | — | Read-only |
+| Account & billing | Full | Full | — | Read-only |
 | Setup wizard | Full | Full | — | — |
 
 ---

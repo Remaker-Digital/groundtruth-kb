@@ -47,7 +47,7 @@ E:\Claude-Playground\CLAUDE-PROJECTS\Agent Red Customer Engagement\
 │   │   ├── cosmos_client.py        # CosmosManager singleton (lazy init, Managed Identity, health)
 │   │   ├── repository.py           # TenantScopedRepository + 10 collection repositories
 │   │   ├── auth.py                 # Triple auth: Shopify JWT + API key + publishable widget key
-│   │   ├── middleware.py           # TenantAuthMiddleware + RateLimitMiddleware (with headers) + dependencies
+│   │   ├── middleware.py           # TenantAuthMiddleware + RateLimitMiddleware (sharded rate limiting, 16 shards, tenant metadata cache) + dependencies
 │   │   ├── conversation_meter.py   # ConversationMeter: billable conv spec, 3-tier metering, alerts
 │   │   ├── critic_policy.py        # Fail-closed Critic enforcement, circuit breaker, health
 │   │   ├── nats_isolation.py       # NATS tenant isolation, topic namespace, subscription auth
@@ -59,6 +59,8 @@ E:\Claude-Playground\CLAUDE-PROJECTS\Agent Red Customer Engagement\
 │   │   ├── tenant_config_schema.py # Tenant config validation, onboarding model
 │   │   ├── tenant_config_processor.py # Config merge: platform → tier → tenant overrides
 │   │   ├── tenant_config_api.py    # Config REST API (12+ endpoints, /api/config)
+│   │   ├── config/
+│   │   │   └── cache.py            # CACHE_TTL_SECONDS = 300 (was 60, updated S174 SPEC-1748)
 │   │   ├── tenant_secret_service.py # Key Vault per-tenant secret management
 │   │   ├── customer_profile_service.py # Layer 1 customer profile CRUD, Shopify sync, identity extraction
 │   │   ├── conversation_vectorizer.py # Layer 2 vectorization pipeline, semantic search
@@ -91,7 +93,14 @@ E:\Claude-Playground\CLAUDE-PROJECTS\Agent Red Customer Engagement\
 │   │   ├── staleness_service.py   # KB entry staleness detection + scoring (~540 lines)
 │   │   ├── semantic_cache.py      # 3-tier semantic cache: embedding, search, response (~530 lines)
 │   │   ├── kb_conflict_scanner.py # KB conflict/duplication scanner: 4-phase detection (~705 lines)
-│   │   ├── superadmin_api.py      # SPA provider ops API: tenant directory, dashboard, billing, deploys, user management (~700+ lines)
+│   │   ├── superadmin_api/         # SPA provider ops API package (split from monolith, S169)
+│   │   │   ├── __init__.py        # Barrel imports from all 6 submodules
+│   │   │   ├── _monolith.py       # Shared state: 12 module-level repo variables, configure_*(), router (124 lines)
+│   │   │   ├── _tenants.py        # Tenant CRUD endpoints (847 lines, 6 endpoints, 9 models)
+│   │   │   ├── _dashboard.py      # Dashboard + analytics endpoints (1,112 lines, 8 endpoints, 17 models)
+│   │   │   ├── _operations.py     # Operations management endpoints (1,277 lines, 19 endpoints)
+│   │   │   ├── _copilot.py        # Co-Pilot knowledge + pipeline endpoints (957 lines, 13 endpoints)
+│   │   │   └── _platform.py       # Platform admin + user management endpoints (988 lines, 12 endpoints)
 │   │   ├── mcp_client.py          # MCP client: AgentRedMcpClient, config models, shop_domain guard, policy gate, PII scrub (~650 lines)
 │   │   ├── mcp_credential_cache.py # In-memory credential cache: 5-min TTL, double-check locking, Key Vault backend (~270 lines)
 │   │   ├── mutation_policy.py     # MutationPolicy, MutationRequest, MutationResult, evaluate_request (~230 lines)
@@ -100,6 +109,11 @@ E:\Claude-Playground\CLAUDE-PROJECTS\Agent Red Customer Engagement\
 │   │   ├── spa_recovery.py        # SPA emergency key recovery via backup codes (SPEC-1678)
 │   │   ├── tenant_recovery.py     # Tenant account recovery: recovery address + one-time auth links (SPEC-1677)
 │   │   ├── tenant_name.py         # TenantName value object: human-readable slug generation from email domain
+│   │   ├── cache_invalidation.py  # Redis pub/sub cross-replica cache invalidation (SPEC-1757)
+│   │   ├── rate_limit_backend.py  # RateLimitBackend protocol + InMemoryRateLimitBackend + Redis backend (SPEC-1626)
+│   │   ├── email_change.py        # Email change request/confirm flow (SPEC-1682/1683)
+│   │   ├── sms_verification.py    # SMS verification with ACS + email fallback (SPEC-1686)
+│   │   ├── communication_capture.py # Dual-mode communication event capture (SPEC-1687)
 │   │   └── repositories/          # Collection-specific repository classes (16 modules)
 │   │       ├── __init__.py
 │   │       ├── base.py            # TenantScopedRepository base class
@@ -123,7 +137,7 @@ E:\Claude-Playground\CLAUDE-PROJECTS\Agent Red Customer Engagement\
 │   │   ├── session.py             # Conversation lifecycle management (~350 lines)
 │   │   ├── pipeline.py            # 6-agent pipeline orchestrator via A2A agent delegation + SSE streaming (~800 lines)
 │   │   ├── endpoints.py           # 6 FastAPI routes: conversations, message, stream, end, WS (~350 lines)
-│   │   └── sse_manager.py         # SSE connection manager: heartbeat, reconnection, tenant limits (~280 lines)
+│   │   └── sse_manager.py         # SSE connection manager: heartbeat, reconnection, tenant limits, global SSE limit (5000) (~280 lines)
 │   ├── agents/                    # AGNTCY-compatible agent modules (Phase 2, session 25)
 │   │   ├── __init__.py
 │   │   ├── base.py               # AgentRedBaseAgent ABC + A2A message utilities (~150 lines)
@@ -150,7 +164,7 @@ E:\Claude-Playground\CLAUDE-PROJECTS\Agent Red Customer Engagement\
 │   ├── ai-features/                # Advanced AI (Phase 2.5)
 │   └── white-label/                # Customization (future)
 │
-├── tests/                          # Test suites (5,984 offline tests, 936 live E2E, 0 failures)
+├── tests/                          # Test suites (6,053 offline tests, 936 live E2E, 527 mock E2E)
 │   ├── conftest.py                 # Shared fixtures: TestClient, MockCosmos, MockNATS, MockKV, auth helpers
 │   ├── test_conftest_smoke.py      # Fixture smoke tests
 │   ├── test_health.py              # Health/ready endpoint tests
@@ -242,4 +256,4 @@ All artifact tables use append-only versioning: `UNIQUE(id, version)`. Every mut
 ---
 
 *© 2026 Remaker Digital, a DBA of VanDusen & Palmeter, LLC. All rights reserved.*
-*Last Updated: 2026-03-08*
+*Last Updated: 2026-03-13*
