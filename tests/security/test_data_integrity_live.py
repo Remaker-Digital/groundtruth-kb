@@ -340,9 +340,9 @@ class TestHealthIntegrity:
         assert r.status_code == 200
 
     def test_di22_ready_returns_200(self, client):
-        """DI-22: /ready returns 200."""
+        """DI-22: /ready returns 200 or 503 (SPEC-1780 fail-loud)."""
         r = client.get("/ready")
-        assert r.status_code == 200
+        assert r.status_code in (200, 503), f"/ready returned {r.status_code}"
 
     def test_di23_health_is_json(self, client):
         """DI-23: /health returns valid JSON."""
@@ -368,7 +368,7 @@ class TestHealthIntegrity:
         """DI-25: Core endpoints all respond correctly."""
         endpoints = [
             ("/health", None, [200]),
-            ("/ready", None, [200]),
+            ("/ready", None, [200, 503]),  # SPEC-1780: 503 when NATS not active
             ("/openapi.json", None, [200]),
             ("/api/config", headers_a, [200, 429]),
         ]

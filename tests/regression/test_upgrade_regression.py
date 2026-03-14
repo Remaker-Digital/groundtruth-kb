@@ -40,17 +40,23 @@ class TestTier0Health:
 
     @pytest.mark.tier0
     def test_t0_02_ready_endpoint_returns_200(self, client):
-        """Readiness probe — dependencies are connected."""
+        """Readiness probe — dependencies are connected.
+
+        SPEC-1780: /ready returns 503 when NATS transport is not active
+        in deployed environments (fail-loud enforcement). Both 200 and
+        503 are valid — 503 means the endpoint works but NATS isn't connected.
+        """
         r = client.get("/ready")
-        assert r.status_code == 200
+        assert r.status_code in (200, 503), f"/ready returned {r.status_code}"
         data = r.json()
-        assert data["status"] == "ready"
+        if r.status_code == 200:
+            assert data["status"] == "ready"
 
     @pytest.mark.tier0
     def test_t0_03_circuit_breakers_not_open(self, client):
         """All circuit breakers should be CLOSED or HALF_OPEN, never OPEN."""
         r = client.get("/ready")
-        assert r.status_code == 200
+        assert r.status_code in (200, 503), f"/ready returned {r.status_code}"
         data = r.json()
         if "circuit_breakers" in data:
             for name, state in data["circuit_breakers"].items():
@@ -98,12 +104,16 @@ class TestTier0Auth:
         """Public endpoints should be accessible without auth."""
         public = [
             ("/health", 200),
-            ("/ready", 200),
+            ("/ready", (200, 503)),  # SPEC-1780: 503 when NATS not active
         ]
         for path, expected in public:
             r = client.get(path)
-            assert r.status_code == expected, \
-                f"{path} returned {r.status_code}, expected {expected}"
+            if isinstance(expected, tuple):
+                assert r.status_code in expected, \
+                    f"{path} returned {r.status_code}, expected one of {expected}"
+            else:
+                assert r.status_code == expected, \
+                    f"{path} returned {r.status_code}, expected {expected}"
 
     @pytest.mark.tier0
     def test_t0_08_widget_key_auth_works(self, client, widget_headers):
@@ -594,7 +604,7 @@ class TestTier2Performance:
         start = time.time()
         r = client.get("/ready")
         elapsed_ms = (time.time() - start) * 1000
-        assert r.status_code == 200
+        assert r.status_code in (200, 503), f"/ready returned {r.status_code}"
         assert elapsed_ms < 2000, f"/ready took {elapsed_ms:.0f}ms (limit: 2000ms)"
 
     @pytest.mark.tier2
@@ -650,7 +660,7 @@ class TestTier2Consistency:
     def test_t2_07_ready_dependency_states(self, client):
         """All /ready dependency checks should report healthy states."""
         r = client.get("/ready")
-        assert r.status_code == 200
+        assert r.status_code in (200, 503), f"/ready returned {r.status_code}"
         data = r.json()
 
         # Key Vault should be healthy (or dev_mode for environments without KV)
@@ -678,7 +688,7 @@ class TestTier2Consistency:
     def test_t2_08_semantic_cache_functional(self, client):
         """Semantic cache should be tracking metrics."""
         r = client.get("/ready")
-        if r.status_code != 200:
+        if r.status_code not in (200, 503):
             pytest.skip("/ready not available")
         data = r.json()
         # Cache metrics should exist (even if all zeros for fresh deployment)

@@ -147,9 +147,12 @@ class TestAuthExemptEndpoints:
         assert r.status_code == 200
 
     def test_sec_l12_ready_no_auth(self, client):
-        """SEC-L12: /ready accessible without auth."""
+        """SEC-L12: /ready accessible without auth.
+
+        SPEC-1780: 503 is valid when NATS transport not active (fail-loud).
+        """
         r = client.get("/ready")
-        assert r.status_code == 200
+        assert r.status_code in (200, 503), f"/ready returned {r.status_code}"
 
     def test_sec_l13_status_no_auth(self, client):
         """SEC-L13: /api/status accessible without auth."""

@@ -1,95 +1,39 @@
 {
-  "A1_version": "1.83.0",
+  "A1_version": "1.85.0",
   "A2_status": "active",
   "A3_activation": {
     "is_active": true,
     "is_configured": true,
     "has_pending_changes": false,
-    "active_version": 27
+    "active_version": 2
   },
-  "A4_conversation_count": 74,
+  "A4_conversation_count": 0,
   "A5_status_breakdown": {
     "http_status": 404,
     "note": "analytics may need params"
   },
-  "A6_kb_count": 168,
-  "A7_team_count": 19,
+  "A6_kb_count": 12,
+  "A7_team_count": 5,
   "A8_team_members": [
+    {
+      "displayName": "Alex Johnson",
+      "role": "viewer"
+    },
+    {
+      "displayName": "Maria Garcia",
+      "role": "escalation_agent"
+    },
+    {
+      "displayName": "James Williams",
+      "role": "escalation_agent"
+    },
     {
       "displayName": "Sarah Chen",
       "role": "admin"
     },
     {
-      "displayName": "E2E e2e-test",
-      "role": "escalation_agent"
-    },
-    {
-      "displayName": "E2E e2e-test",
-      "role": "admin"
-    },
-    {
-      "displayName": "E2E e2e-test",
-      "role": "viewer"
-    },
-    {
-      "displayName": "E2E e2e-test",
-      "role": "viewer"
-    },
-    {
-      "displayName": "DoubleClick e2e-te",
-      "role": "viewer"
-    },
-    {
-      "displayName": "E2E e2e-test",
-      "role": "viewer"
-    },
-    {
-      "displayName": "<script>alert(\"xss\")</script>",
-      "role": "viewer"
-    },
-    {
-      "displayName": "E2E e2e-test",
-      "role": "viewer"
-    },
-    {
-      "displayName": "E2E e2e-test",
-      "role": "viewer"
-    },
-    {
-      "displayName": "E2E e2e-test",
-      "role": "viewer"
-    },
-    {
-      "displayName": "E2E e2e-test",
-      "role": "viewer"
-    },
-    {
-      "displayName": "E2E e2e-test",
-      "role": "viewer"
-    },
-    {
-      "displayName": "E2E e2e-test",
-      "role": "viewer"
-    },
-    {
-      "displayName": "E2E e2e-test",
-      "role": "escalation_agent"
-    },
-    {
-      "displayName": "E2E e2e-test",
-      "role": "escalation_agent"
-    },
-    {
-      "displayName": "E2E e2e-test",
-      "role": "admin"
-    },
-    {
-      "displayName": "E2E e2e-test",
-      "role": "admin"
-    },
-    {
-      "displayName": "E2E e2e-test",
-      "role": "viewer"
+      "displayName": "Owner",
+      "role": "superadmin"
     }
   ],
   "A9_draft_status": 200,

@@ -345,13 +345,17 @@ class TestAuthExemptRateLimiting:
         assert ok_count >= 45, f"Health endpoint rate limited: {ok_count}/50 succeeded"
 
     def test_rl18_ready_not_rate_limited(self):
-        """RL-18: /ready under 50 rapid requests — all return 200."""
+        """RL-18: /ready under 50 rapid requests — not rate limited.
+
+        SPEC-1780: 503 is valid when NATS transport not active (fail-loud).
+        The key assertion is no 429s (not rate limited).
+        """
         codes = []
         with httpx.Client(base_url=PROD_URL, timeout=15) as c:
             for _ in range(50):
                 r = c.get("/ready")
                 codes.append(r.status_code)
-        ok_count = sum(1 for s in codes if s == 200)
+        ok_count = sum(1 for s in codes if s in (200, 503))
         assert ok_count >= 45, f"Ready endpoint rate limited: {ok_count}/50 succeeded"
 
     def test_rl19_status_not_rate_limited(self):

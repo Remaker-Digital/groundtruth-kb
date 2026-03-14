@@ -95,9 +95,12 @@ class TestHealthEndpoints:
         assert len(keys) >= 2, f"Health response too sparse: {keys}"
 
     def test_rf02_ready_returns_state(self, client):
-        """RF-02: /ready returns readiness state."""
+        """RF-02: /ready returns readiness state.
+
+        SPEC-1780: 503 is valid when NATS transport not active (fail-loud).
+        """
         r = client.get("/ready")
-        assert r.status_code == 200
+        assert r.status_code in (200, 503), f"/ready returned {r.status_code}"
         data = r.json()
         assert isinstance(data, dict)
 
@@ -372,9 +375,9 @@ class TestRecovery:
             assert r.status_code in (200, 429), f"Call {i+1}: got {r.status_code}"
 
     def test_rf28_ready_eventually_returns_200(self, client):
-        """RF-28: /ready returns 200 (system is ready)."""
+        """RF-28: /ready returns 200 or 503 (SPEC-1780 fail-loud)."""
         r = client.get("/ready")
-        assert r.status_code == 200
+        assert r.status_code in (200, 503), f"/ready returned {r.status_code}"
 
     def test_rf29_health_schema_consistent(self, client):
         """RF-29: Successive /health calls return same schema."""

@@ -75,16 +75,20 @@ SPA_API_URL = PROD_URL
 
 # API key for the target tenant — used to authenticate the admin SPA.
 # Priority: env override > .env.local keys.
+# S183: Cleaned stale fallbacks. SUPERADMIN_PREVIEW_API_KEY is the canonical
+# key set by both .env.local and the --self-provision pipeline flow.
+# STAGING_REMAKER_USER_KEY is the .env.local name for the staging user key.
 LIVE_API_KEY = (
     os.environ.get("SUPERADMIN_PREVIEW_API_KEY")
-    or os.environ.get("STAGING_REMAKER_DIGITAL_001_SUPERADMIN_KEY")
-    or os.environ.get("SPA_CONSOLE_API_KEY")
-    or os.environ.get("AGENTRED_API_KEY")
+    or os.environ.get("STAGING_REMAKER_USER_KEY")
     or ""
 )
 
 # Tenant slug for URL ?tenant= parameter.
-LIVE_TENANT_ID = os.environ.get("LIVE_TENANT_ID", "blanco-9939")
+# S183: Changed default from blanco-9939 (Shopify store) to remaker-digital-001
+# (canonical staging tenant). Pipeline --self-provision sets LIVE_TENANT_ID
+# to the ephemeral tenant ID.
+LIVE_TENANT_ID = os.environ.get("LIVE_TENANT_ID", "remaker-digital-001")
 
 # Legacy Vite support — only used when LIVE_SPA_BASE_URL is empty.
 ADMIN_VITE_PORT = 3300

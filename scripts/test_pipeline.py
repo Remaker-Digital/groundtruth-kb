@@ -157,6 +157,16 @@ def _get_env_vars(args: argparse.Namespace) -> dict[str, str]:
         if spa_key:
             env_vars["SPA_CONSOLE_API_KEY"] = spa_key
 
+        # S183: Pass tenant ID and SPA base URL to Playwright E2E tests.
+        # conftest.py reads LIVE_TENANT_ID (defaults to remaker-digital-001)
+        # and LIVE_SPA_BASE_URL. When --self-provision is used, the tenant_id
+        # is injected into ENVIRONMENTS by _self_provision_tenants().
+        tenant_id = env_cfg.get("tenant_id", "")
+        if tenant_id:
+            env_vars["LIVE_TENANT_ID"] = tenant_id
+        if fqdn:
+            env_vars["LIVE_SPA_BASE_URL"] = f"https://{fqdn}/admin/standalone"
+
         # S134: Pass Tenant B credentials for multi-tenant isolation tests.
         # Multi-tenant tests (Phase 5, 7, 8) need a second tenant's credentials.
         # Look up the first non-primary tenant in TENANTS for this environment.
@@ -1084,6 +1094,9 @@ def _self_provision_tenants(args: argparse.Namespace) -> list:
         os.environ[f"STAGING_REMAKER_WIDGET_KEY"] = primary.widget_key
         os.environ[f"STAGING_REMAKER_USER_KEY"] = primary.user_api_key
         os.environ[f"STAGING_REMAKER_DIGITAL_001_SUPERADMIN_KEY"] = primary.user_api_key
+        # S183: Set LIVE_TENANT_ID so Playwright conftest picks up the
+        # self-provisioned tenant instead of the default remaker-digital-001.
+        os.environ["LIVE_TENANT_ID"] = primary.tenant_id
 
         if primary.warnings:
             for w in primary.warnings:

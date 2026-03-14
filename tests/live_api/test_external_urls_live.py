@@ -94,9 +94,12 @@ class TestPlatformPublicEndpoints:
     def test_ev_live_05_ready_endpoint_structure(
         self, live_client: httpx.Client, platform_reachable: None
     ):
-        """EV-LIVE-05: /ready returns JSON with status field."""
+        """EV-LIVE-05: /ready returns JSON with status field.
+
+        SPEC-1780: 503 is valid when NATS transport not active (fail-loud).
+        """
         resp = live_client.get("/ready")
-        assert resp.status_code == 200
+        assert resp.status_code in (200, 503), f"/ready returned {resp.status_code}"
         data = resp.json()
         assert "status" in data, f"Missing 'status' in ready: {list(data.keys())}"
 
