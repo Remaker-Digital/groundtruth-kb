@@ -69,6 +69,12 @@ COPY admin/provider/dist/ ./admin/provider/dist/
 COPY widget/dist/ ./widget/dist/
 
 # --------------------------------------------------------------------------
+# Documentation source (admin-guide markdown for Co-Pilot Knowledge auto-ingestion)
+# SPEC-1784: Auto-ingest on startup — content hashes prevent redundant re-embedding
+# --------------------------------------------------------------------------
+COPY docs-site/docs/ ./docs-site/docs/
+
+# --------------------------------------------------------------------------
 # Non-root user for security
 # --------------------------------------------------------------------------
 RUN groupadd --gid 1000 agentred \

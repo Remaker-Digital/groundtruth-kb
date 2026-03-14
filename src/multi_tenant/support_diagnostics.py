@@ -353,19 +353,44 @@ async def get_tenant_diagnostic(
     tenant_id: str,
 
 ) -> TenantDiagnosticSnapshot:
-    """Collect a comprehensive diagnostic snapshot for a single tenant."""
+    """Collect a comprehensive diagnostic snapshot for a single tenant.
+
+    The *tenant_id* path parameter accepts **either** a tenant slug
+    (e.g. ``test-customer-001``) **or** the merchant's registered email
+    address.  When an ``@`` is detected the system resolves the email to
+    a tenant ID via a cross-partition Cosmos query before proceeding.
+    """
     from src.multi_tenant.repositories import TenantRepository
 
     tenant_repo = TenantRepository()
 
+    # --- Resolve email → tenant_id when input contains '@' (SPEC-1783) ---
+    resolved_tenant_id = tenant_id
+    if "@" in tenant_id:
+        try:
+            tenant_doc = await tenant_repo.find_by_customer_email(tenant_id)
+        except Exception:
+            tenant_doc = None
+        if tenant_doc is None:
+            raise HTTPException(
+                status_code=404,
+                detail=f"No tenant found for email: {tenant_id}",
+            )
+        resolved_tenant_id = tenant_doc["id"]
+    else:
+        tenant_doc = None
+
     # --- Load the tenant document (required) ---
-    try:
-        tenant_doc = await tenant_repo.read(tenant_id, tenant_id)
-    except Exception:
-        raise HTTPException(
-            status_code=404,
-            detail=f"Tenant not found: {tenant_id}",
-        )
+    if tenant_doc is None:
+        try:
+            tenant_doc = await tenant_repo.read(resolved_tenant_id, resolved_tenant_id)
+        except Exception:
+            raise HTTPException(
+                status_code=404,
+                detail=f"Tenant not found: {resolved_tenant_id}",
+            )
+
+    tenant_id = resolved_tenant_id
 
     now_iso = datetime.now(timezone.utc).isoformat()
     errors: list[str] = []
@@ -455,18 +480,33 @@ async def get_tenant_errors(
 
     limit: int = Query(50, ge=1, le=100, description="Max entries to return"),
 ) -> TenantErrorsResponse:
-    """Return recent error-level audit entries for a tenant."""
+    """Return recent error-level audit entries for a tenant.
+
+    Accepts tenant slug or email (same resolution as the snapshot endpoint).
+    """
     from src.multi_tenant.repositories import AuditLogRepository, TenantRepository
 
-    # Verify tenant exists
+    # Resolve email → tenant_id when input contains '@' (SPEC-1783)
     tenant_repo = TenantRepository()
-    try:
-        await tenant_repo.read(tenant_id, tenant_id)
-    except Exception:
-        raise HTTPException(
-            status_code=404,
-            detail=f"Tenant not found: {tenant_id}",
-        )
+    if "@" in tenant_id:
+        try:
+            tenant_doc = await tenant_repo.find_by_customer_email(tenant_id)
+        except Exception:
+            tenant_doc = None
+        if tenant_doc is None:
+            raise HTTPException(
+                status_code=404,
+                detail=f"No tenant found for email: {tenant_id}",
+            )
+        tenant_id = tenant_doc["id"]
+    else:
+        try:
+            await tenant_repo.read(tenant_id, tenant_id)
+        except Exception:
+            raise HTTPException(
+                status_code=404,
+                detail=f"Tenant not found: {tenant_id}",
+            )
 
     audit_repo = AuditLogRepository()
     now_iso = datetime.now(timezone.utc).isoformat()

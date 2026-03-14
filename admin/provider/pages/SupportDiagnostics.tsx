@@ -140,7 +140,7 @@ export function SupportDiagnosticsPage() {
 
   const handleFetch = async () => {
     if (!tenantId.trim()) {
-      onNotify('Please enter a tenant ID', 'warning');
+      onNotify('Please enter a tenant ID or email address', 'warning');
       return;
     }
     setLoading(true);
@@ -186,7 +186,7 @@ export function SupportDiagnosticsPage() {
       {/* Tenant lookup */}
       <Group>
         <TextInput
-          placeholder="Enter tenant ID..."
+          placeholder="Enter tenant ID or email address..."
           value={tenantId}
           onChange={(e) => setTenantId(e.currentTarget.value)}
           onKeyDown={(e) => e.key === 'Enter' && handleFetch()}

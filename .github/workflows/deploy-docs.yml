@@ -61,3 +61,30 @@ jobs:
       - name: Deploy to GitHub Pages
         id: deployment
         uses: actions/deploy-pages@v4
+
+  # SPEC-1784: Trigger Co-Pilot Knowledge ingestion after docs deploy
+  # Belt-and-suspenders: primary ingestion is on app startup (lifecycle.py),
+  # this ensures immediate ingestion when docs change without waiting for
+  # the next container restart.
+  trigger-ingestion:
+    runs-on: ubuntu-latest
+    needs: deploy
+    if: success()
+    steps:
+      - name: Trigger staging Co-Pilot docs ingestion
+        continue-on-error: true  # Non-blocking — startup ingestion is the primary mechanism
+        run: |
+          curl -sf -X POST \
+            "${{ secrets.STAGING_API_URL }}/api/superadmin/copilot/ingest/docs-site" \
+            -H "X-API-Key: ${{ secrets.STAGING_SPA_KEY }}" \
+            -H "Content-Type: application/json" \
+            --max-time 120 || echo "Staging ingestion trigger skipped (not configured or unavailable)"
+
+      - name: Trigger production Co-Pilot docs ingestion
+        continue-on-error: true
+        run: |
+          curl -sf -X POST \
+            "${{ secrets.PRODUCTION_API_URL }}/api/superadmin/copilot/ingest/docs-site" \
+            -H "X-API-Key: ${{ secrets.PRODUCTION_SPA_KEY }}" \
+            -H "Content-Type: application/json" \
+            --max-time 120 || echo "Production ingestion trigger skipped (not configured or unavailable)"

@@ -227,16 +227,32 @@ async def get_tenant_comparison(
     tier: str | None = None,
 
 ) -> TenantComparisonResponse:
-    """Return all tenants with pipeline metrics (SPEC-1581)."""
+    """Return all tenants with pipeline metrics (SPEC-1581, SPEC-1785)."""
     tenants: list[TenantPipelineSummary] = []
 
     if _state._tenant_repo is not None:
         try:
-            tenant_ids = await _state._tenant_repo.list_active_tenant_ids()
-            for tid in tenant_ids:
+            # Fetch tenant details in a single cross-partition query
+            # so the comparison table shows human-readable names (SPEC-1785).
+            query = (
+                "SELECT c.tenant_id, c.customer_email, c.brand_name, c.tier "
+                "FROM c WHERE c.status = 'active'"
+            )
+            async for item in _state._tenant_repo._container.query_items(
+                query=query,
+                max_item_count=500,
+            ):
+                tid = item.get("tenant_id", "")
+                # Display priority: brand_name > customer_email > tenant_id
+                display = (
+                    item.get("brand_name")
+                    or item.get("customer_email")
+                    or tid
+                )
                 tenants.append(TenantPipelineSummary(
                     tenant_id=tid,
-                    display_name=tid,
+                    display_name=display,
+                    tier=item.get("tier"),
                 ))
         except Exception as exc:
             logger.warning("Failed to list tenants for pipeline: %s", exc)

@@ -1008,10 +1008,9 @@ async def _startup_copilot_knowledge() -> None:
     from src.multi_tenant.superadmin_api import configure_copilot_knowledge_service
 
     try:
-        from src.multi_tenant.cosmos_schema import COLLECTION_ADMIN_DOCUMENTATION
-        from src.multi_tenant.repositories.base import TenantScopedRepository
+        from src.multi_tenant.repositories.platform import AdminDocumentationRepository
 
-        repo = TenantScopedRepository(COLLECTION_ADMIN_DOCUMENTATION)
+        repo = AdminDocumentationRepository()
         configure_copilot_knowledge_service(admin_doc_repo=repo)
         logger.info("Co-Pilot Knowledge services initialized (admin_documentation_vectors container)")
     except Exception:
@@ -1019,6 +1018,215 @@ async def _startup_copilot_knowledge() -> None:
             "Co-Pilot Knowledge initialization failed — "
             "knowledge management endpoints will return 503."
         )
+
+
+async def _startup_copilot_docs_ingestion() -> None:
+    """SPEC-1784: Auto-ingest agentredcx.com documentation into Co-Pilot Knowledge.
+
+    Scans docs-site/docs/admin-guide/*.md (included in Docker image) and
+    upserts each page into the admin_documentation_vectors collection.
+    Content hashes prevent redundant embedding API calls — only new or
+    changed pages are re-embedded.
+
+    Triggered on every startup; idempotent via SHA-256 content hashes.
+    This ensures Co-Pilot Knowledge is always up-to-date with the latest
+    documentation version without manual intervention.
+    """
+    import asyncio
+    import hashlib
+    from datetime import datetime, timezone
+    from pathlib import Path
+
+    from src.multi_tenant.superadmin_api import _monolith as _state
+
+    if _state._admin_doc_repo is None:
+        logger.debug("Co-Pilot docs ingestion skipped — admin_doc_repo not configured")
+        return
+
+    # Try multiple paths (Docker image vs local dev)
+    docs_dir: Path | None = None
+    for candidate in [
+        Path("docs-site/docs/admin-guide"),
+        Path("docs/admin-guide"),
+    ]:
+        if candidate.exists():
+            docs_dir = candidate
+            break
+
+    if docs_dir is None:
+        logger.debug("Co-Pilot docs ingestion skipped — admin-guide directory not found")
+        return
+
+    # Also ingest intro, changelog, and getting-started guides
+    extra_docs: list[Path] = []
+    for extra_pattern in [
+        Path("docs-site/docs/intro.md"),
+        Path("docs-site/docs/changelog.md"),
+        Path("docs-site/docs/getting-started"),
+    ]:
+        if extra_pattern.is_file():
+            extra_docs.append(extra_pattern)
+        elif extra_pattern.is_dir():
+            extra_docs.extend(sorted(extra_pattern.glob("*.md")))
+
+    md_files = sorted(docs_dir.glob("*.md")) + extra_docs
+
+    if not md_files:
+        logger.debug("Co-Pilot docs ingestion skipped — no markdown files found")
+        return
+
+    from src.multi_tenant.cosmos_schema import AdminDocumentationDocument
+
+    # Category inference (same mapping as _copilot.py ingest endpoint)
+    def _infer_category(stem: str) -> str:
+        """Infer document category from filename stem."""
+        mapping = {
+            "dashboard": "dashboard",
+            "knowledge": "knowledge_base",
+            "widget": "widget_configuration",
+            "team": "team_management",
+            "inbox": "conversations",
+            "conversation": "conversations",
+            "analytics": "analytics",
+            "custom-instruction": "custom_instructions",
+            "brand": "brand_tone",
+            "persona": "brand_tone",
+            "polic": "business_policies",
+            "escalat": "escalation_rules",
+            "integrat": "integrations",
+            "save": "save_activate",
+            "activate": "save_activate",
+            "quickstart": "getting_started",
+            "getting-started": "getting_started",
+            "billing": "billing",
+            "account": "billing",
+            "memory": "memory_privacy",
+            "privacy": "memory_privacy",
+            "intro": "getting_started",
+            "changelog": "platform_updates",
+        }
+        stem_lower = stem.lower()
+        for key, cat in mapping.items():
+            if key in stem_lower:
+                return cat
+        return "getting_started"  # Default category (consistent with _copilot.py)
+
+    created = 0
+    updated = 0
+    skipped = 0
+    errors = 0
+
+    for md_file in md_files:
+        try:
+            content = md_file.read_text(encoding="utf-8")
+            title = md_file.stem.replace("-", " ").title()
+            for line in content.split("\n"):
+                if line.startswith("# "):
+                    title = line[2:].strip()
+                    break
+
+            category = _infer_category(md_file.stem)
+            doc_id = f"{category}:{md_file.stem}"
+            content_hash = hashlib.sha256(f"{title}\n{content}".encode()).hexdigest()
+
+            # Check existing — skip if content unchanged
+            existing = await _state._admin_doc_repo.get_by_id(category, doc_id)
+            if existing and existing.get("content_hash") == content_hash:
+                skipped += 1
+                continue
+
+            now = datetime.now(timezone.utc).isoformat()
+            doc = AdminDocumentationDocument(
+                id=doc_id,
+                document_category=category,
+                title=title,
+                content=content,
+                source_file=str(md_file),
+                content_hash=content_hash,
+                tags=[category, "docs-site", "auto-ingested"],
+                is_active=True,
+                created_at=existing.get("created_at", now) if existing else now,
+                updated_at=now,
+            )
+            await _state._admin_doc_repo.upsert_document(doc)
+
+            if existing:
+                updated += 1
+            else:
+                created += 1
+
+            # Small yield to avoid blocking event loop on many files
+            await asyncio.sleep(0)
+
+        except Exception as exc:
+            logger.warning("Co-Pilot docs ingestion error for %s: %s", md_file.name, exc)
+            errors += 1
+
+    if created or updated:
+        logger.info(
+            "Co-Pilot docs auto-ingestion complete: %d created, %d updated, %d skipped, %d errors",
+            created, updated, skipped, errors,
+        )
+
+        # Trigger background re-embedding for new/updated documents
+        try:
+            from src.multi_tenant.knowledge_vectorizer import get_knowledge_vectorizer
+
+            vectorizer = get_knowledge_vectorizer()
+            if vectorizer._configured:
+                logger.info("Triggering Co-Pilot docs re-embedding for %d new/updated documents", created + updated)
+                # Fire-and-forget — embedding happens asynchronously
+                asyncio.create_task(_embed_copilot_docs())
+        except Exception:
+            logger.debug("Co-Pilot docs re-embedding trigger skipped — vectorizer not available")
+    else:
+        logger.debug("Co-Pilot docs auto-ingestion: all %d documents up to date", skipped)
+
+
+async def _embed_copilot_docs() -> None:
+    """Background task: re-embed all active Co-Pilot documents missing embeddings."""
+    from src.multi_tenant.superadmin_api import _monolith as _state
+
+    if _state._admin_doc_repo is None:
+        return
+
+    try:
+        all_docs = await _state._admin_doc_repo.list_all_active()
+        needs_embed = [d for d in all_docs if not d.get("embedded_at") or not d.get("embedding")]
+
+        if not needs_embed:
+            logger.debug("Co-Pilot docs: all documents already embedded")
+            return
+
+        from src.multi_tenant.knowledge_vectorizer import get_knowledge_vectorizer
+
+        vectorizer = get_knowledge_vectorizer()
+        if not vectorizer._configured:
+            return
+
+        embedded = 0
+        for doc in needs_embed:
+            try:
+                text = f"[{doc.get('document_category', 'general').upper()}] {doc['title']}\nTags: {', '.join(doc.get('tags', []))}\n{doc.get('content', '')}"
+                # Truncate to 8000 chars for token limits
+                text = text[:8000]
+
+                embedding = await vectorizer._embed_text(text)
+                if embedding:
+                    from datetime import datetime as _dt, timezone as _tz
+
+                    doc["embedding"] = embedding
+                    doc["embedding_model"] = "text-embedding-3-large"
+                    doc["embedded_at"] = _dt.now(_tz.utc).isoformat()
+                    # Raw dict — use container upsert_item directly
+                    await _state._admin_doc_repo._container.upsert_item(body=doc)
+                    embedded += 1
+            except Exception as exc:
+                logger.warning("Co-Pilot docs embedding failed for %s: %s", doc.get("id"), exc)
+
+        logger.info("Co-Pilot docs background embedding: %d/%d documents embedded", embedded, len(needs_embed))
+    except Exception as exc:
+        logger.warning("Co-Pilot docs background embedding error: %s", exc)
 
 
 async def _startup_pipeline_observatory() -> None:
@@ -1606,6 +1814,7 @@ def register_startup_handlers(app: FastAPI | None = None) -> None:
         _startup_superadmin_services,
         _startup_contact_messages,
         _startup_copilot_knowledge,
+        _startup_copilot_docs_ingestion,
         _startup_pipeline_observatory,
         _startup_status_api,
         _startup_alert_engine,
