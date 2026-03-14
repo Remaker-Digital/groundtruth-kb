@@ -121,6 +121,9 @@ infrastructure/
 *.tfstate.backup
 *.tfvars
 
+# Knowledge DB (51MB SQLite, development-only)
+tools/knowledge-db/
+
 # Scripts (setup/deploy tooling, not application code)
 scripts/
 
