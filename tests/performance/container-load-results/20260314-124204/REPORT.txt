@@ -1,0 +1,42 @@
+Container Agent Load Test Report
+Host: https://agent-red-staging.orangeglacier-f566a4e7.eastus.azurecontainerapps.io
+Date: 2026-03-14T12:43:08.719483
+Quick: False
+
+
+================================================================================
+  CONTAINER AGENT LOAD TEST — FINAL REPORT
+================================================================================
+
+  Phase: baseline
+  FAILED: [WinError 2] The system cannot find the file specified
+  Duration: 0s
+  Requests: 0  Failures: 0 (0.0%)
+  P50: 0ms  P95: 0ms  P99: 0ms  Max: 0ms
+  RPS: 0.0  429s: 0  5xx: 0
+  Observations:
+    - Exception: [WinError 2] The system cannot find the file specified
+  ----------------------------------------------------------------------------
+
+  Phase: multi-replica
+  FAILED: [WinError 2] The system cannot find the file specified
+  Duration: 0s
+  Requests: 0  Failures: 0 (0.0%)
+  P50: 0ms  P95: 0ms  P99: 0ms  Max: 0ms
+  RPS: 0.0  429s: 0  5xx: 0
+  Observations:
+    - Exception: [WinError 2] The system cannot find the file specified
+  ----------------------------------------------------------------------------
+
+  Phase: resilience
+  FAILED: [WinError 2] The system cannot find the file specified
+  Duration: 0s
+  Requests: 0  Failures: 0 (0.0%)
+  P50: 0ms  P95: 0ms  P99: 0ms  Max: 0ms
+  RPS: 0.0  429s: 0  5xx: 0
+  Observations:
+    - Exception: [WinError 2] The system cannot find the file specified
+  ----------------------------------------------------------------------------
+
+  VERDICT: PASS
+================================================================================

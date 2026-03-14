@@ -1,0 +1,42 @@
+Container Agent Load Test Report
+Host: https://agent-red-staging.orangeglacier-f566a4e7.eastus.azurecontainerapps.io
+Date: 2026-03-14T12:50:38.278291
+Quick: False
+
+
+================================================================================
+  CONTAINER AGENT LOAD TEST — FINAL REPORT
+================================================================================
+
+  Phase: baseline
+  FAILED: 'str' object has no attribute 'get'
+  Duration: 0s
+  Requests: 0  Failures: 0 (0.0%)
+  P50: 0ms  P95: 0ms  P99: 0ms  Max: 0ms
+  RPS: 0.0  429s: 0  5xx: 0
+  Observations:
+    - Exception: 'str' object has no attribute 'get'
+  ----------------------------------------------------------------------------
+
+  Phase: multi-replica
+  FAILED: 'str' object has no attribute 'get'
+  Duration: 0s
+  Requests: 0  Failures: 0 (0.0%)
+  P50: 0ms  P95: 0ms  P99: 0ms  Max: 0ms
+  RPS: 0.0  429s: 0  5xx: 0
+  Observations:
+    - Exception: 'str' object has no attribute 'get'
+  ----------------------------------------------------------------------------
+
+  Phase: resilience
+  FAILED: 'str' object has no attribute 'get'
+  Duration: 0s
+  Requests: 0  Failures: 0 (0.0%)
+  P50: 0ms  P95: 0ms  P99: 0ms  Max: 0ms
+  RPS: 0.0  429s: 0  5xx: 0
+  Observations:
+    - Exception: 'str' object has no attribute 'get'
+  ----------------------------------------------------------------------------
+
+  VERDICT: PASS
+================================================================================
