@@ -58,15 +58,32 @@ class TestTrialTierMapping:
         assert trial["max_kb_articles"] < enterprise["max_kb_articles"]
         assert trial["max_team_members"] < enterprise["max_team_members"]
 
-    def test_require_tier_source_has_trial_mapping(self):
-        """Verify require_tier() function text contains Trial → 1 mapping."""
-        import inspect
+    @pytest.mark.asyncio
+    async def test_require_tier_trial_allows_professional_features(self):
+        """Trial tier passes Professional-level tier gate (both map to level 1)."""
+        from fastapi import FastAPI, Depends, Request
+        from starlette.testclient import TestClient
         from src.multi_tenant.middleware import require_tier
+        from src.multi_tenant.cosmos_schema import TenantTier
 
-        source = inspect.getsource(require_tier)
-        assert "TRIAL" in source
-        # Trial level 1 == Professional level 1
-        assert "1" in source
+        app = FastAPI()
+
+        @app.get("/test-pro-feature")
+        async def pro_feature(request: Request):
+            return {"ok": True}
+
+        # Directly test the tier ordering logic
+        from src.multi_tenant.middleware import require_tier
+        dep = require_tier(TenantTier.PROFESSIONAL)
+        # The dependency is a closure — we can inspect the tier_order dict
+        # by calling the inner function with a mocked request
+        mock_request = MagicMock()
+        mock_ctx = MagicMock()
+        mock_ctx.tier = TenantTier.TRIAL
+        with patch("src.multi_tenant.middleware.get_tenant_context", new=AsyncMock(return_value=mock_ctx)):
+            # Trial (level 1) >= Professional (level 1), so this should NOT raise
+            result = await dep(mock_request)
+            assert result.tier == TenantTier.TRIAL
 
 
 # ---------------------------------------------------------------------------

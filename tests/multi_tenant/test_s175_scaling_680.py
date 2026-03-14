@@ -516,70 +516,139 @@ class TestTOCTOULockLRU:
 class TestHealthMetricsEndpoint:
     """SPEC-1760: /health/metrics with platform-admin-only auth."""
 
+    def _make_metrics_app(self):
+        """Create a minimal FastAPI app with health endpoints registered."""
+        from fastapi import FastAPI
+        from src.app.health import register_health_endpoints
+
+        app = FastAPI()
+        register_health_endpoints(app)
+        return app
+
     def test_health_metrics_rejects_non_spa_key(self):
         """GET /health/metrics returns 403 without ar_spa_ prefix."""
-        import inspect
+        from starlette.testclient import TestClient
 
-        from src.app.health import register_health_endpoints
+        app = self._make_metrics_app()
+        client = TestClient(app, raise_server_exceptions=False)
+        response = client.get("/health/metrics", headers={"X-API-Key": "ar_tenant_xyz"})
+        assert response.status_code == 403
+        assert "platform admin" in response.json()["error"].lower()
 
-        source = inspect.getsource(register_health_endpoints)
-        assert 'api_key.startswith("ar_spa_")' in source
-        assert "/health/metrics" in source
+    def test_health_metrics_rejects_missing_key(self):
+        """GET /health/metrics returns 403 with no API key."""
+        from starlette.testclient import TestClient
 
-    def test_health_metrics_reports_sse_connections(self):
-        """Health metrics includes active_sse_connections."""
-        import inspect
+        app = self._make_metrics_app()
+        client = TestClient(app, raise_server_exceptions=False)
+        response = client.get("/health/metrics")
+        assert response.status_code == 403
 
-        from src.app.health import register_health_endpoints
+    @patch("src.multi_tenant.repositories.platform_admin.PlatformAdminRepository")
+    def test_health_metrics_reports_sse_connections(self, mock_repo_cls):
+        """Health metrics response includes active_sse_connections and global_sse_limit."""
+        from starlette.testclient import TestClient
 
-        source = inspect.getsource(register_health_endpoints)
-        assert "active_sse_connections" in source
-        assert "global_sse_limit" in source
+        mock_repo = MagicMock()
+        mock_repo.find_by_api_key_hash = AsyncMock(return_value={"is_active": True})
+        mock_repo_cls.return_value = mock_repo
 
-    def test_health_metrics_reports_event_loop_lag(self):
-        """Health metrics measures event_loop_lag_ms."""
-        import inspect
+        app = self._make_metrics_app()
+        client = TestClient(app, raise_server_exceptions=False)
+        response = client.get("/health/metrics", headers={"X-API-Key": "ar_spa_test123"})
+        assert response.status_code == 200
+        data = response.json()
+        assert "active_sse_connections" in data
+        assert "global_sse_limit" in data
+        assert isinstance(data["active_sse_connections"], int)
+        assert data["global_sse_limit"] == 5000  # SPEC-1756 default
 
-        from src.app.health import register_health_endpoints
+    @patch("src.multi_tenant.repositories.platform_admin.PlatformAdminRepository")
+    def test_health_metrics_reports_event_loop_lag(self, mock_repo_cls):
+        """Health metrics response includes event_loop_lag_ms >= 0."""
+        from starlette.testclient import TestClient
 
-        source = inspect.getsource(register_health_endpoints)
-        assert "event_loop_lag_ms" in source
+        mock_repo = MagicMock()
+        mock_repo.find_by_api_key_hash = AsyncMock(return_value={"is_active": True})
+        mock_repo_cls.return_value = mock_repo
 
-    def test_health_metrics_reports_uptime(self):
-        """Health metrics reports uptime_seconds."""
-        import inspect
+        app = self._make_metrics_app()
+        client = TestClient(app, raise_server_exceptions=False)
+        response = client.get("/health/metrics", headers={"X-API-Key": "ar_spa_test123"})
+        assert response.status_code == 200
+        data = response.json()
+        assert "event_loop_lag_ms" in data
+        assert data["event_loop_lag_ms"] >= 0
 
-        from src.app.health import register_health_endpoints
+    @patch("src.multi_tenant.repositories.platform_admin.PlatformAdminRepository")
+    def test_health_metrics_reports_uptime(self, mock_repo_cls):
+        """Health metrics response includes uptime_seconds >= 0."""
+        from starlette.testclient import TestClient
 
-        source = inspect.getsource(register_health_endpoints)
-        assert "uptime_seconds" in source
+        mock_repo = MagicMock()
+        mock_repo.find_by_api_key_hash = AsyncMock(return_value={"is_active": True})
+        mock_repo_cls.return_value = mock_repo
 
-    def test_health_metrics_reports_pre_auth_tracker(self):
-        """Health metrics reports pre_auth_tracker_count."""
-        import inspect
+        app = self._make_metrics_app()
+        client = TestClient(app, raise_server_exceptions=False)
+        response = client.get("/health/metrics", headers={"X-API-Key": "ar_spa_test123"})
+        assert response.status_code == 200
+        data = response.json()
+        assert "uptime_seconds" in data
+        assert data["uptime_seconds"] >= 0
 
-        from src.app.health import register_health_endpoints
+    @patch("src.multi_tenant.repositories.platform_admin.PlatformAdminRepository")
+    def test_health_metrics_reports_pre_auth_tracker(self, mock_repo_cls):
+        """Health metrics response includes pre_auth_tracker_count and limit."""
+        from starlette.testclient import TestClient
 
-        source = inspect.getsource(register_health_endpoints)
-        assert "pre_auth_tracker_count" in source
+        mock_repo = MagicMock()
+        mock_repo.find_by_api_key_hash = AsyncMock(return_value={"is_active": True})
+        mock_repo_cls.return_value = mock_repo
 
-    def test_health_metrics_reports_tenant_locks(self):
-        """Health metrics reports tenant_lock_count."""
-        import inspect
+        app = self._make_metrics_app()
+        client = TestClient(app, raise_server_exceptions=False)
+        response = client.get("/health/metrics", headers={"X-API-Key": "ar_spa_test123"})
+        assert response.status_code == 200
+        data = response.json()
+        assert "pre_auth_tracker_count" in data
+        assert "pre_auth_tracker_limit" in data
+        assert data["pre_auth_tracker_limit"] == 10000  # SPEC-1758 default
 
-        from src.app.health import register_health_endpoints
+    @patch("src.multi_tenant.repositories.platform_admin.PlatformAdminRepository")
+    def test_health_metrics_reports_tenant_locks(self, mock_repo_cls):
+        """Health metrics response includes tenant_lock_count and limit."""
+        from starlette.testclient import TestClient
 
-        source = inspect.getsource(register_health_endpoints)
-        assert "tenant_lock_count" in source
+        mock_repo = MagicMock()
+        mock_repo.find_by_api_key_hash = AsyncMock(return_value={"is_active": True})
+        mock_repo_cls.return_value = mock_repo
 
-    def test_health_metrics_reports_config_cache_ttl(self):
-        """Health metrics reports config_cache_ttl_seconds."""
-        import inspect
+        app = self._make_metrics_app()
+        client = TestClient(app, raise_server_exceptions=False)
+        response = client.get("/health/metrics", headers={"X-API-Key": "ar_spa_test123"})
+        assert response.status_code == 200
+        data = response.json()
+        assert "tenant_lock_count" in data
+        assert "tenant_lock_limit" in data
+        assert data["tenant_lock_limit"] == 1000  # SPEC-1759 default
 
-        from src.app.health import register_health_endpoints
+    @patch("src.multi_tenant.repositories.platform_admin.PlatformAdminRepository")
+    def test_health_metrics_reports_config_cache_ttl(self, mock_repo_cls):
+        """Health metrics response includes config_cache_ttl_seconds == 300."""
+        from starlette.testclient import TestClient
 
-        source = inspect.getsource(register_health_endpoints)
-        assert "config_cache_ttl" in source
+        mock_repo = MagicMock()
+        mock_repo.find_by_api_key_hash = AsyncMock(return_value={"is_active": True})
+        mock_repo_cls.return_value = mock_repo
+
+        app = self._make_metrics_app()
+        client = TestClient(app, raise_server_exceptions=False)
+        response = client.get("/health/metrics", headers={"X-API-Key": "ar_spa_test123"})
+        assert response.status_code == 200
+        data = response.json()
+        assert "config_cache_ttl_seconds" in data
+        assert data["config_cache_ttl_seconds"] == 300  # SPEC-1748
 
 
 # =========================================================================
@@ -590,14 +659,20 @@ class TestHealthCacheInvalidation:
     """SPEC-1757: Ready endpoint includes cache invalidation status."""
 
     def test_ready_endpoint_includes_cache_invalidation(self):
-        """Ready endpoint reports cache_invalidation status."""
-        import inspect
-
+        """GET /ready response includes cache_invalidation.redis_pubsub boolean."""
+        from fastapi import FastAPI
+        from starlette.testclient import TestClient
         from src.app.health import register_health_endpoints
 
-        source = inspect.getsource(register_health_endpoints)
-        assert "cache_invalidation" in source
-        assert "redis_pubsub" in source
+        app = FastAPI()
+        register_health_endpoints(app)
+        client = TestClient(app, raise_server_exceptions=False)
+        response = client.get("/ready")
+        assert response.status_code == 200
+        data = response.json()
+        assert "cache_invalidation" in data
+        assert "redis_pubsub" in data["cache_invalidation"]
+        assert isinstance(data["cache_invalidation"]["redis_pubsub"], bool)
 
 
 # =========================================================================
@@ -608,22 +683,31 @@ class TestLifecycleIntegration:
     """SPEC-1757: Lifecycle startup/shutdown for cache invalidation."""
 
     def test_shutdown_handler_registered(self):
-        """_shutdown_cache_invalidation is in shutdown handlers."""
-        import inspect
+        """_shutdown_cache_invalidation is in the shutdown handler list."""
+        from src.app.lifecycle import register_shutdown_handlers, _lifecycle_shutdown_handlers
 
-        from src.app.lifecycle import register_shutdown_handlers
+        register_shutdown_handlers()
+        # Verify the cache invalidation shutdown handler is in the list
+        handler_names = [h.__name__ for h in _lifecycle_shutdown_handlers]
+        assert "_shutdown_cache_invalidation" in handler_names
 
-        source = inspect.getsource(register_shutdown_handlers)
-        assert "_shutdown_cache_invalidation" in source
+    @pytest.mark.asyncio
+    async def test_startup_configures_cache_invalidation(self):
+        """_startup_redis_rate_limiter calls configure_cache_invalidation when Redis available."""
+        mock_client = MagicMock()
+        mock_client.ping.return_value = True
 
-    def test_startup_configures_cache_invalidation(self):
-        """_startup_redis_rate_limiter configures cache invalidation."""
-        import inspect
+        mock_redis_mod = MagicMock()
+        mock_redis_mod.Redis.from_url.return_value = mock_client
 
-        from src.app.lifecycle import _startup_redis_rate_limiter
-
-        source = inspect.getsource(_startup_redis_rate_limiter)
-        assert "configure_cache_invalidation" in source
+        with patch.dict(os.environ, {"REDIS_URL": "rediss://:fakekey@fakehost:6380/0"}), \
+             patch.dict("sys.modules", {"redis": mock_redis_mod}), \
+             patch("src.multi_tenant.security_hardening.RedisRateLimitBackend"), \
+             patch("src.multi_tenant.security_hardening.set_rate_limit_backend"), \
+             patch("src.multi_tenant.cache_invalidation.configure_cache_invalidation") as mock_configure:
+            from src.app.lifecycle import _startup_redis_rate_limiter
+            await _startup_redis_rate_limiter()
+            mock_configure.assert_called_once_with(mock_client)
 
     def test_dockerfile_has_tini_entrypoint(self):
         """Dockerfile uses tini for proper signal handling with 4 workers."""
