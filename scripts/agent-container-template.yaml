@@ -1,0 +1,41 @@
+properties:
+  managedEnvironmentId: /subscriptions/4dce2122-690a-4654-b531-cc647db62331/resourceGroups/Agent-Red/providers/Microsoft.App/managedEnvironments/agent-red-env
+  configuration:
+    activeRevisionsMode: Single
+    ingress:
+      external: false
+      targetPort: 8000
+      transport: Auto
+    registries:
+      - server: acragentredeastus.azurecr.io
+        identity: system
+  template:
+    containers:
+      - name: AGENT_NAME_PLACEHOLDER
+        image: acragentredeastus.azurecr.io/api-gateway:v1.84.0
+        command:
+          - tini
+          - "--"
+          - uvicorn
+          - AGENT_MODULE_PLACEHOLDER
+          - "--host"
+          - "0.0.0.0"
+          - "--port"
+          - "8000"
+          - "--log-level"
+          - info
+        resources:
+          cpu: 0.5
+          memory: 1Gi
+        env:
+          - name: ENVIRONMENT
+            value: staging
+          - name: AZURE_OPENAI_ENDPOINT
+            value: "https://agent-red-openai.openai.azure.com/"
+          - name: AZURE_OPENAI_API_KEY
+            value: "***REMOVED_SECRET***"
+          - name: AGNTCY_NATS_ENDPOINT
+            value: "nats://agent-red-nats.internal.orangeglacier-f566a4e7.eastus.azurecontainerapps.io:4222"
+    scale:
+      minReplicas: 1
+      maxReplicas: 3

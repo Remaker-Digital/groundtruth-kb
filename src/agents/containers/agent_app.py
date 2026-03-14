@@ -154,6 +154,26 @@ def create_agent_app(
         return JSONResponse(content=result, status_code=code)
 
     # ---------------------------------------------------------------
+    # Gateway-compatible short path aliases
+    #
+    # The API gateway dispatches to agent containers using short paths
+    # (e.g., /classify, /retrieve) defined in constants.py. These
+    # aliases route those paths to the same process_http handler.
+    # ---------------------------------------------------------------
+
+    _GATEWAY_PATHS: dict[str, list[str]] = {
+        "intent-classifier": ["/classify"],
+        "knowledge-retrieval": ["/retrieve"],
+        "response-generator": ["/generate"],
+        "escalation-handler": ["/escalate"],
+        "analytics-collector": ["/collect"],
+        "critic-supervisor": ["/validate"],
+        "co-pilot": ["/process"],
+    }
+    for _path in _GATEWAY_PATHS.get(agent.agent_type, []):
+        app.add_api_route(_path, process_http, methods=["POST"])
+
+    # ---------------------------------------------------------------
     # Agent-specific routes
     # ---------------------------------------------------------------
 

@@ -42,6 +42,12 @@ AGENT_URLS: dict[str, str] = {
     "analytics-collector": os.environ.get(
         "AGENT_ANALYTICS_COLLECTOR_URL", "http://10.0.1.9:8080"
     ),
+    "critic-supervisor": os.environ.get(
+        "AGENT_CRITIC_SUPERVISOR_URL", "http://10.0.1.12:8080"
+    ),
+    "co-pilot": os.environ.get(
+        "AGENT_CO_PILOT_URL", "http://10.0.1.13:8080"
+    ),
 }
 
 # Agent HTTP paths

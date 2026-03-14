@@ -1021,6 +1021,140 @@ LIVE_PHASES = {1, 2, 3, 5, 6, 7, 8, 9, 10, 11, 13, 14, 15, 16}
 COOLDOWN_BEFORE = {3, 5, 6, 7, 8, 9, 11, 14}
 
 
+# ---------------------------------------------------------------------------
+# WI-1107: Self-provisioning (SPEC-1673 compliance)
+# ---------------------------------------------------------------------------
+
+
+def _self_provision_tenants(args: argparse.Namespace) -> list:
+    """Provision ephemeral test tenants using SPA key (WI-1107).
+
+    Creates a primary tenant and a Tenant B for multi-tenant isolation tests.
+    Injects credentials into os.environ and the ENVIRONMENTS/TENANTS dicts
+    so all subsequent phases use the self-provisioned tenants.
+
+    Returns list of (tenant_id, base_url) tuples for cleanup.
+    """
+    log("INFO", "--- Self-provisioning: Creating ephemeral test tenants (WI-1107) ---")
+
+    try:
+        from scripts._self_provision import provision_test_tenant, ProvisionedTenant
+        from scripts.upgrade_verification import ENVIRONMENTS, TENANTS
+    except ImportError as e:
+        log("FAIL", f"  Self-provisioning import failed: {e}")
+        return []
+
+    env_cfg = ENVIRONMENTS.get(args.env, {})
+    spa_key = env_cfg.get("spa_api_key", "")
+    fqdn = env_cfg.get("fqdn", "")
+
+    if not spa_key:
+        log("FAIL", "  No SPA key found — self-provisioning requires STAGING_SPA_KEY or "
+            "STAGING_SPA_API_KEY in .env.local")
+        return []
+
+    if not fqdn:
+        log("FAIL", f"  No FQDN for env '{args.env}'")
+        return []
+
+    base_url = f"https://{fqdn}"
+    provisioned = []
+
+    # 1. Primary test tenant (professional tier for full feature access)
+    try:
+        primary = provision_test_tenant(
+            base_url, spa_key,
+            tier="professional",
+            merchant_name=f"Pipeline Primary {args.version}",
+        )
+        log("INFO", f"  Primary tenant: {primary.tenant_id}")
+        log("INFO", f"  User key: {primary.user_api_key[:20]}...")
+        log("INFO", f"  Widget key: {primary.widget_key[:20]}..." if primary.widget_key else "  Widget key: (none)")
+        provisioned.append((primary.tenant_id, base_url))
+
+        # Inject into ENVIRONMENTS dict (used by _get_env_vars and all phases)
+        ENVIRONMENTS[args.env]["api_key"] = primary.user_api_key
+        ENVIRONMENTS[args.env]["widget_key"] = primary.widget_key
+        ENVIRONMENTS[args.env]["tenant_id"] = primary.tenant_id
+
+        # Inject into os.environ for direct-reading scripts
+        os.environ["SUPERADMIN_PREVIEW_API_KEY"] = primary.user_api_key
+        os.environ["PREVIEW_WIDGET_KEY"] = primary.widget_key
+        os.environ[f"STAGING_REMAKER_TENANT_KEY"] = primary.user_api_key
+        os.environ[f"STAGING_REMAKER_WIDGET_KEY"] = primary.widget_key
+        os.environ[f"STAGING_REMAKER_USER_KEY"] = primary.user_api_key
+        os.environ[f"STAGING_REMAKER_DIGITAL_001_SUPERADMIN_KEY"] = primary.user_api_key
+
+        if primary.warnings:
+            for w in primary.warnings:
+                log("WARN", f"  Primary tenant warning: {w}")
+    except RuntimeError as e:
+        log("FAIL", f"  Primary tenant provisioning failed: {e}")
+        return provisioned
+
+    # 2. Tenant B (starter tier for isolation tests)
+    try:
+        tenant_b = provision_test_tenant(
+            base_url, spa_key,
+            tier="starter",
+            merchant_name=f"Pipeline Tenant B {args.version}",
+        )
+        log("INFO", f"  Tenant B: {tenant_b.tenant_id}")
+        provisioned.append((tenant_b.tenant_id, base_url))
+
+        # Inject Tenant B into TENANTS dict
+        tenant_b_key = f"{args.env}:{tenant_b.tenant_id}"
+        TENANTS[tenant_b_key] = {
+            "tenant_id": tenant_b.tenant_id,
+            "api_key": tenant_b.user_api_key,
+            "widget_key": tenant_b.widget_key,
+        }
+
+        # Inject Tenant B into os.environ for phases that read directly
+        os.environ["TENANT_B_API_KEY"] = tenant_b.user_api_key
+        os.environ["TENANT_B_WIDGET_KEY"] = tenant_b.widget_key
+        os.environ["STAGING_001_TENANT_KEY"] = tenant_b.user_api_key
+        os.environ["STAGING_001_API_KEY"] = tenant_b.user_api_key
+        os.environ["STAGING_001_WIDGET_KEY"] = tenant_b.widget_key
+
+        if tenant_b.warnings:
+            for w in tenant_b.warnings:
+                log("WARN", f"  Tenant B warning: {w}")
+    except RuntimeError as e:
+        log("WARN", f"  Tenant B provisioning failed: {e}")
+
+    log("INFO", f"  Self-provisioning complete: {len(provisioned)} tenant(s)")
+    return provisioned
+
+
+def _cleanup_provisioned_tenants(
+    args: argparse.Namespace, tenants: list[tuple[str, str]]
+) -> None:
+    """Expire ephemeral test tenants after pipeline run."""
+    if not tenants:
+        return
+
+    log("INFO", "--- Cleanup: Expiring ephemeral test tenants ---")
+    try:
+        from scripts._self_provision import cleanup_test_tenant
+        from scripts.upgrade_verification import ENVIRONMENTS
+    except ImportError:
+        log("WARN", "  Cleanup import failed — tenants left active")
+        return
+
+    spa_key = ENVIRONMENTS.get(args.env, {}).get("spa_api_key", "")
+    if not spa_key:
+        log("WARN", "  No SPA key for cleanup")
+        return
+
+    for tenant_id, base_url in tenants:
+        ok = cleanup_test_tenant(base_url, spa_key, tenant_id)
+        if ok:
+            log("INFO", f"  Expired: {tenant_id}")
+        else:
+            log("WARN", f"  Failed to expire: {tenant_id}")
+
+
 def main():
     parser = argparse.ArgumentParser(
         description="Master Test Plan Runner — PLAN-001 (live-only, SPEC-1649)")
@@ -1033,6 +1167,9 @@ def main():
                         help="Phase group to run (default: all)")
     parser.add_argument("--stop-on-fail", action="store_true",
                         help="Stop after first FAIL")
+    parser.add_argument("--self-provision", action="store_true",
+                        help="Self-provision ephemeral test tenants via SPA key "
+                        "(WI-1107 — eliminates need for provider-held tenant keys)")
     args = parser.parse_args()
 
     phase_group = args.phase or "all"
@@ -1056,6 +1193,11 @@ def main():
         log("FAIL", "Pre-check failed — aborting pipeline")
         run_summary(results, args, start_time, log_path)
         sys.exit(1)
+
+    # WI-1107: Self-provision ephemeral test tenants (SPEC-1673 compliance)
+    _provisioned_tenants: list = []
+    if getattr(args, "self_provision", False):
+        _provisioned_tenants = _self_provision_tenants(args)
 
     # Phase dispatch table (SPEC-1649: live-only phases)
     phase_funcs: dict[int, callable] = {
@@ -1094,6 +1236,10 @@ def main():
         if not result.passed and args.stop_on_fail:
             log("INFO", f"  Stopping on fail (Phase {phase_num})")
             break
+
+    # WI-1107: Cleanup ephemeral tenants
+    if _provisioned_tenants:
+        _cleanup_provisioned_tenants(args, _provisioned_tenants)
 
     # Summary always runs
     run_summary(results, args, start_time, log_path)

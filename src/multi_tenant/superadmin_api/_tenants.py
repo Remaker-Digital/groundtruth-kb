@@ -842,3 +842,149 @@ async def set_tenant_expiry(
         new_expires_at=body.expires_at,
         updated_at=now_iso,
     )
+
+
+# ---------------------------------------------------------------------------
+# WI-1107: Test-only tenant provisioning (non-production environments)
+# ---------------------------------------------------------------------------
+
+
+class TestProvisionResponse(CamelCaseModel):
+    """Response from test tenant provisioning.
+
+    Returns raw keys for automated test infrastructure. Only available
+    in non-production environments (ENVIRONMENT != "production").
+
+    SPEC-1673 compliance: This endpoint is blocked in production.
+    In staging/development, test automation needs keys to exercise
+    tenant-scoped API endpoints without provider holding persistent keys.
+    Keys are ephemeral — used during test run and discarded.
+    """
+
+    tenant_id: str
+    status: str
+    tier: str
+    superadmin_email: str
+    user_api_key: str | None = None
+    widget_key: str | None = None
+    warnings: list[str] = Field(default_factory=list)
+
+
+@router.post(
+    "/test/provision-tenant",
+    response_model=TestProvisionResponse,
+    summary="Provision test tenant with keys (non-production only)",
+    description=(
+        "Creates a fully provisioned tenant and returns raw API keys in the "
+        "response. Blocked in production (SPEC-1673). Intended for test "
+        "pipeline self-provisioning (WI-1107) — the test runner creates "
+        "ephemeral tenants, uses the returned keys, then cleans up."
+    ),
+    responses={
+        403: {"description": "Blocked in production environment"},
+        503: {"description": "Service not initialized"},
+    },
+    status_code=201,
+)
+async def test_provision_tenant(
+    body: CreateTenantRequest,
+    ctx: TenantContext = Depends(get_tenant_context),
+) -> TestProvisionResponse:
+    """Provision a test tenant with keys returned in the response.
+
+    This endpoint is identical to POST /tenants except it returns raw
+    keys. It is blocked in production to maintain SPEC-1673 compliance.
+    """
+    import os as _os
+    environment = _os.environ.get("ENVIRONMENT", "development").lower()
+    if environment == "production":
+        raise HTTPException(
+            status_code=403,
+            detail="Test provisioning endpoint is not available in production (SPEC-1673).",
+        )
+
+    if not _state._tenant_repo:
+        raise HTTPException(status_code=503, detail="Service not initialized")
+
+    if body.tier not in VALID_TIERS:
+        raise HTTPException(
+            status_code=400,
+            detail=f"Invalid tier '{body.tier}'. Valid values: {sorted(VALID_TIERS)}",
+        )
+
+    from src.integrations.provisioning import spa_provision_tenant
+
+    try:
+        result = await spa_provision_tenant(
+            merchant_name=body.merchant_name,
+            merchant_url=body.merchant_url,
+            superadmin_email=body.superadmin_email,
+            tier=body.tier,
+        )
+    except RuntimeError as exc:
+        logger.error("Test tenant creation failed: %s", exc)
+        raise HTTPException(status_code=500, detail=str(exc))
+    except Exception as exc:
+        logger.error("Unexpected error during test tenant creation: %s", exc)
+        raise HTTPException(status_code=500, detail=f"Provisioning failed: {exc}")
+
+    # Create default preferences (same as regular provisioning)
+    try:
+        from src.multi_tenant.cosmos_schema import PreferencesDocument
+
+        now_iso = datetime.now(timezone.utc).isoformat()
+        prefs_kwargs: dict[str, Any] = {
+            "id": f"{result.tenant_id}:1",
+            "tenant_id": result.tenant_id,
+            "version": 1,
+            "is_current": True,
+            "brand_name": body.merchant_name,
+            "created_at": now_iso,
+            "created_by": ctx.team_member_email or "test-pipeline",
+        }
+        if result.widget_key:
+            prefs_kwargs["widget_key"] = result.widget_key
+        prefs_doc = PreferencesDocument(**prefs_kwargs)
+
+        if _state._prefs_repo:
+            try:
+                await _state._prefs_repo.create(result.tenant_id, prefs_doc)
+            except Exception:
+                await _state._prefs_repo.upsert(result.tenant_id, prefs_doc)
+    except Exception as exc:
+        logger.warning("Failed to create preferences for test tenant %s: %s", result.tenant_id, exc)
+        result.errors.append(f"Preferences creation failed: {exc}")
+
+    # Set expires_at if provided
+    if body.expires_at and _state._tenant_repo:
+        try:
+            await _state._tenant_repo.patch(
+                tenant_id=result.tenant_id,
+                document_id=result.tenant_id,
+                operations=[
+                    {"op": "set", "path": "/expires_at", "value": body.expires_at},
+                    {"op": "set", "path": "/updated_at", "value": datetime.now(timezone.utc).isoformat()},
+                ],
+            )
+        except Exception as exc:
+            result.errors.append(f"Expiry date setting failed: {exc}")
+
+    logger.info(
+        "Test tenant provisioned: tenant=%s tier=%s email=%s env=%s (by %s)",
+        result.tenant_id[:12],
+        body.tier,
+        body.superadmin_email,
+        environment,
+        ctx.team_member_email or "unknown",
+    )
+
+    # WI-1107: Return raw keys for test automation (non-production only)
+    return TestProvisionResponse(
+        tenant_id=result.tenant_id,
+        status=result.status,
+        tier=result.tier,
+        superadmin_email=body.superadmin_email,
+        user_api_key=result.superadmin_api_key,
+        widget_key=result.widget_key,
+        warnings=result.errors,
+    )

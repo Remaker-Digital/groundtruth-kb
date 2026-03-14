@@ -817,10 +817,44 @@ def main():
         action="store_true",
         help="Skip cleanup phase (useful when re-running to add more data)",
     )
+    parser.add_argument(
+        "--self-provision",
+        action="store_true",
+        help="Self-provision an ephemeral test tenant via SPA key (WI-1107)",
+    )
     args = parser.parse_args()
 
     env_config = ENVIRONMENTS[args.env]
     tenant_id = args.tenant or env_config["tenant_id"]
+    effective_api_key = env_config["api_key"]
+    effective_widget_key = env_config.get("widget_key", "")
+
+    # WI-1107: Self-provision an ephemeral tenant
+    if args.self_provision:
+        spa_key = (
+            os.environ.get("STAGING_SPA_KEY", "")
+            or os.environ.get("STAGING_SPA_API_KEY", "")
+            or os.environ.get("PRODUCTION_SPA_KEY", "")
+        )
+        if not spa_key:
+            print("\nERROR: --self-provision requires SPA key in env (STAGING_SPA_KEY)")
+            sys.exit(1)
+        try:
+            from scripts._self_provision import provision_test_tenant
+            result = provision_test_tenant(
+                base_url=env_config["base_url"],
+                spa_key=spa_key,
+                tier="professional",
+                merchant_name=f"Seed Test {datetime.now(timezone.utc).strftime('%H%M%S')}",
+            )
+            tenant_id = result.tenant_id
+            effective_api_key = result.user_api_key
+            effective_widget_key = result.widget_key
+            print(f"  Self-provisioned: {tenant_id}")
+            print(f"  User key: {effective_api_key[:20]}...")
+        except Exception as e:
+            print(f"\nERROR: Self-provisioning failed: {e}")
+            sys.exit(1)
 
     print("=" * 60)
     print(f"  Mid-Flight Seed — {args.env.upper()}")
@@ -829,14 +863,14 @@ def main():
     print(f"  Time:   {datetime.now(timezone.utc).isoformat()}")
     print("=" * 60)
 
-    if not env_config["api_key"]:
-        print("\nERROR: No API key found. Set SPA_CONSOLE_API_KEY in .env.local")
+    if not effective_api_key:
+        print("\nERROR: No API key found. Set keys in .env.local or use --self-provision")
         sys.exit(1)
 
     client = SeedClient(
         base_url=env_config["base_url"],
-        api_key=env_config["api_key"],
-        widget_key=env_config.get("widget_key", ""),
+        api_key=effective_api_key,
+        widget_key=effective_widget_key,
         tenant_id=tenant_id,
     )
 
@@ -894,12 +928,16 @@ def run_seed(
     widget_key: str | None = None,
     skip_conversations: bool = False,
     skip_cleanup: bool = False,
+    self_provision: bool = False,
+    spa_key: str | None = None,
 ) -> bool:
     """Programmatic entry point for test pipeline integration.
 
     Args:
         api_key: Override env config API key (for seeding non-primary tenants).
         widget_key: Override env config widget key.
+        self_provision: If True, create an ephemeral tenant via SPA key (WI-1107).
+        spa_key: SPA platform admin key for self-provisioning.
 
     Returns True if seeding succeeded, False otherwise.
     """
@@ -911,6 +949,27 @@ def run_seed(
     tenant_id = tenant or env_config["tenant_id"]
     effective_api_key = api_key or env_config["api_key"]
     effective_widget_key = widget_key or env_config.get("widget_key", "")
+
+    # WI-1107: Self-provision if requested
+    if self_provision:
+        _spa = spa_key or os.environ.get("STAGING_SPA_KEY", "") or os.environ.get("STAGING_SPA_API_KEY", "")
+        if not _spa:
+            print("ERROR: self_provision=True requires spa_key or STAGING_SPA_KEY env var")
+            return False
+        try:
+            from scripts._self_provision import provision_test_tenant
+            result = provision_test_tenant(
+                base_url=env_config["base_url"],
+                spa_key=_spa,
+                tier="professional",
+            )
+            tenant_id = result.tenant_id
+            effective_api_key = result.user_api_key
+            effective_widget_key = result.widget_key
+            print(f"  Self-provisioned: {tenant_id}")
+        except Exception as e:
+            print(f"ERROR: Self-provisioning failed: {e}")
+            return False
 
     if not effective_api_key:
         print(f"ERROR: No API key found for tenant {tenant_id}")

@@ -1,6 +1,6 @@
 # Agent Red — Generic Agent Container Dockerfile
 #
-# Builds a container image for any of the 6 pipeline agents.
+# Builds a container image for any of the 7 pipeline agents.
 # The AGENT_MODULE build arg selects which agent to run.
 #
 # Build examples:
@@ -10,6 +10,7 @@
 #   docker build --build-arg AGENT_MODULE=escalation_handler_app -t agent-escalation-handler .
 #   docker build --build-arg AGENT_MODULE=analytics_collector_app -t agent-analytics-collector .
 #   docker build --build-arg AGENT_MODULE=critic_supervisor_app -t agent-critic-supervisor .
+#   docker build --build-arg AGENT_MODULE=co_pilot_app -t agent-co-pilot .
 #
 # Run:
 #   docker run -e AZURE_OPENAI_ENDPOINT=... -e AZURE_OPENAI_API_KEY=... \
