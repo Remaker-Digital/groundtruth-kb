@@ -403,14 +403,16 @@ class HealthProbeUser(HttpUser):
     @task(2)
     @tag("health-only")
     def readiness_check(self) -> None:
-        """GET /ready — readiness probe (includes dependency health)."""
+        """GET /ready — readiness probe (includes dependency health).
+
+        SPEC-1780: 503 is valid when NATS transport not active (fail-loud).
+        """
         with self.client.get(
             "/ready",
             name="/ready [readiness]",
             catch_response=True,
         ) as response:
-            if response.status_code == 200:
-                data = response.json()
+            if response.status_code in (200, 503):
                 response.success()
             else:
                 response.failure(f"Readiness check failed: {response.status_code}")

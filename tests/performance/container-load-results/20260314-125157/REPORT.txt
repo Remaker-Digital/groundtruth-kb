@@ -1,0 +1,80 @@
+Container Agent Load Test Report
+Host: https://agent-red-staging.orangeglacier-f566a4e7.eastus.azurecontainerapps.io
+Date: 2026-03-14T13:14:29.499806
+Quick: False
+
+
+================================================================================
+  CONTAINER AGENT LOAD TEST — FINAL REPORT
+================================================================================
+
+  Phase: baseline
+  Progressive load with 1 replica per container (HTTP Tier 2)
+  Duration: 410s
+  Requests: 481  Failures: 59 (12.3%)
+  P50: 200ms  P95: 390ms  P99: 480ms  Max: 637ms
+  RPS: 2.4  429s: 0  5xx: 0
+  Containers:
+    [OK] agent-red-intent-classifier: 2 replica(s)
+    [OK] agent-red-knowledge-retrieval: 2 replica(s)
+    [OK] agent-red-response-generator: 2 replica(s)
+    [OK] agent-red-escalation-handler: 1 replica(s)
+    [OK] agent-red-analytics-collector: 1 replica(s)
+    [OK] agent-red-critic-supervisor: 1 replica(s)
+    [OK] agent-red-co-pilot: 1 replica(s)
+  Observations:
+    - No SLA violations or errors detected
+  ----------------------------------------------------------------------------
+
+  Phase: multi-replica
+  Scale pipeline containers to 2 replicas, verify load distribution
+  Duration: 510s
+  Requests: 544  Failures: 52 (9.6%)
+  P50: 190ms  P95: 350ms  P99: 400ms  Max: 536ms
+  RPS: 2.3  429s: 0  5xx: 0
+  Containers:
+    [OK] agent-red-intent-classifier: 2 replica(s)
+    [OK] agent-red-knowledge-retrieval: 2 replica(s)
+    [OK] agent-red-response-generator: 2 replica(s)
+    [OK] agent-red-escalation-handler: 1 replica(s)
+    [OK] agent-red-analytics-collector: 1 replica(s)
+    [OK] agent-red-critic-supervisor: 1 replica(s)
+    [OK] agent-red-co-pilot: 1 replica(s)
+  Observations:
+    - intent-classifier: {'Replica:': 1} (from 0 log lines)
+    - knowledge-retrieval: {'Replica:': 1} (from 0 log lines)
+    - response-generator: {'Replica:': 1} (from 0 log lines)
+  ----------------------------------------------------------------------------
+
+  Phase: resilience
+  Kill intent-classifier during load, observe failure and recovery
+  Duration: 371s
+  Requests: 260  Failures: 17 (6.5%)
+  P50: 190ms  P95: 360ms  P99: 430ms  Max: 546ms
+  RPS: 1.1  429s: 0  5xx: 0
+  Containers:
+    [OK] agent-red-intent-classifier: 1 replica(s)
+    [OK] agent-red-knowledge-retrieval: 1 replica(s)
+    [OK] agent-red-response-generator: 1 replica(s)
+    [OK] agent-red-escalation-handler: 1 replica(s)
+    [OK] agent-red-analytics-collector: 1 replica(s)
+    [OK] agent-red-critic-supervisor: 1 replica(s)
+    [OK] agent-red-co-pilot: 1 replica(s)
+  Observations:
+    - [T+30s] Traffic stabilized
+    - [T+30s] Scaled intent-classifier to 0 replicas
+    - [T+40s] Gateway: health=200, ready=503
+    - [T+50s] Gateway: health=200, ready=503
+    - [T+60s] Gateway: health=200, ready=503
+    - [T+70s] Gateway: health=200, ready=503
+    - [T+80s] Gateway: health=200, ready=503
+    - [T+75s] Scaled intent-classifier to 1 replica
+    - [T+90s] Gateway: health=200, ready=503
+    - [T+105s] Gateway: health=200, ready=503
+    - [T+120s] Gateway: health=200, ready=503
+    - [T+135s] Gateway: health=200, ready=503
+    - RECOVERY: intent-classifier is running (1 replicas)
+  ----------------------------------------------------------------------------
+
+  VERDICT: PASS
+================================================================================

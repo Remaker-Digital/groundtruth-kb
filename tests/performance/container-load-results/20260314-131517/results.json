@@ -1,0 +1,70 @@
+[
+  {
+    "name": "resilience",
+    "description": "Kill intent-classifier during load, observe failure and recovery",
+    "duration_s": 379.9773826599121,
+    "total_requests": 266,
+    "total_failures": 17,
+    "error_rate_pct": 6.390977443609022,
+    "p50": 190.0,
+    "p95": 350.0,
+    "p99": 410.0,
+    "max_response_time": 453.37709999876097,
+    "rps": 1.1165510742744624,
+    "status_429_count": 0,
+    "status_5xx_count": 0,
+    "observations": [
+      "[T+30s] Traffic stabilized",
+      "[T+30s] Deactivated revision agent-red-intent-classifier--0000004",
+      "[T+40s] Gateway: health=200, ready=503",
+      "[T+50s] Gateway: health=200, ready=503",
+      "[T+60s] Gateway: health=200, ready=503",
+      "[T+70s] Gateway: health=200, ready=503",
+      "[T+80s] Gateway: health=200, ready=503",
+      "[T+75s] Reactivated revision agent-red-intent-classifier--0000004",
+      "[T+75s] Scaled intent-classifier to min=1, max=3",
+      "[T+90s] Gateway: health=200, ready=503",
+      "[T+105s] Gateway: health=200, ready=503",
+      "[T+120s] Gateway: health=200, ready=503",
+      "[T+135s] Gateway: health=200, ready=503",
+      "RECOVERY: intent-classifier is running (1 replicas)"
+    ],
+    "container_health": [
+      {
+        "name": "agent-red-intent-classifier",
+        "replicas": 1,
+        "running": true
+      },
+      {
+        "name": "agent-red-knowledge-retrieval",
+        "replicas": 1,
+        "running": true
+      },
+      {
+        "name": "agent-red-response-generator",
+        "replicas": 1,
+        "running": true
+      },
+      {
+        "name": "agent-red-escalation-handler",
+        "replicas": 1,
+        "running": true
+      },
+      {
+        "name": "agent-red-analytics-collector",
+        "replicas": 1,
+        "running": true
+      },
+      {
+        "name": "agent-red-critic-supervisor",
+        "replicas": 1,
+        "running": true
+      },
+      {
+        "name": "agent-red-co-pilot",
+        "replicas": 1,
+        "running": true
+      }
+    ]
+  }
+]

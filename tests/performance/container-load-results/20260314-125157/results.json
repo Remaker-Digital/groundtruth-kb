@@ -1,0 +1,181 @@
+[
+  {
+    "name": "baseline",
+    "description": "Progressive load with 1 replica per container (HTTP Tier 2)",
+    "duration_s": 409.63220143318176,
+    "total_requests": 481,
+    "total_failures": 59,
+    "error_rate_pct": 12.266112266112266,
+    "p50": 200.0,
+    "p95": 390.0,
+    "p99": 480.0,
+    "max_response_time": 637.0011999970302,
+    "rps": 2.399108443279432,
+    "status_429_count": 0,
+    "status_5xx_count": 0,
+    "observations": [
+      "No SLA violations or errors detected"
+    ],
+    "container_health": [
+      {
+        "name": "agent-red-intent-classifier",
+        "replicas": 2,
+        "running": true
+      },
+      {
+        "name": "agent-red-knowledge-retrieval",
+        "replicas": 2,
+        "running": true
+      },
+      {
+        "name": "agent-red-response-generator",
+        "replicas": 2,
+        "running": true
+      },
+      {
+        "name": "agent-red-escalation-handler",
+        "replicas": 1,
+        "running": true
+      },
+      {
+        "name": "agent-red-analytics-collector",
+        "replicas": 1,
+        "running": true
+      },
+      {
+        "name": "agent-red-critic-supervisor",
+        "replicas": 1,
+        "running": true
+      },
+      {
+        "name": "agent-red-co-pilot",
+        "replicas": 1,
+        "running": true
+      }
+    ]
+  },
+  {
+    "name": "multi-replica",
+    "description": "Scale pipeline containers to 2 replicas, verify load distribution",
+    "duration_s": 510.4123637676239,
+    "total_requests": 544,
+    "total_failures": 52,
+    "error_rate_pct": 9.558823529411764,
+    "p50": 190.0,
+    "p95": 350.0,
+    "p99": 400.0,
+    "max_response_time": 536.3702999893576,
+    "rps": 2.254918738568729,
+    "status_429_count": 0,
+    "status_5xx_count": 0,
+    "observations": [
+      "intent-classifier: {'Replica:': 1} (from 0 log lines)",
+      "knowledge-retrieval: {'Replica:': 1} (from 0 log lines)",
+      "response-generator: {'Replica:': 1} (from 0 log lines)"
+    ],
+    "container_health": [
+      {
+        "name": "agent-red-intent-classifier",
+        "replicas": 2,
+        "running": true
+      },
+      {
+        "name": "agent-red-knowledge-retrieval",
+        "replicas": 2,
+        "running": true
+      },
+      {
+        "name": "agent-red-response-generator",
+        "replicas": 2,
+        "running": true
+      },
+      {
+        "name": "agent-red-escalation-handler",
+        "replicas": 1,
+        "running": true
+      },
+      {
+        "name": "agent-red-analytics-collector",
+        "replicas": 1,
+        "running": true
+      },
+      {
+        "name": "agent-red-critic-supervisor",
+        "replicas": 1,
+        "running": true
+      },
+      {
+        "name": "agent-red-co-pilot",
+        "replicas": 1,
+        "running": true
+      }
+    ]
+  },
+  {
+    "name": "resilience",
+    "description": "Kill intent-classifier during load, observe failure and recovery",
+    "duration_s": 370.9299850463867,
+    "total_requests": 260,
+    "total_failures": 17,
+    "error_rate_pct": 6.538461538461539,
+    "p50": 190.0,
+    "p95": 360.0,
+    "p99": 430.0,
+    "max_response_time": 546.1469999863766,
+    "rps": 1.0904664217237525,
+    "status_429_count": 0,
+    "status_5xx_count": 0,
+    "observations": [
+      "[T+30s] Traffic stabilized",
+      "[T+30s] Scaled intent-classifier to 0 replicas",
+      "[T+40s] Gateway: health=200, ready=503",
+      "[T+50s] Gateway: health=200, ready=503",
+      "[T+60s] Gateway: health=200, ready=503",
+      "[T+70s] Gateway: health=200, ready=503",
+      "[T+80s] Gateway: health=200, ready=503",
+      "[T+75s] Scaled intent-classifier to 1 replica",
+      "[T+90s] Gateway: health=200, ready=503",
+      "[T+105s] Gateway: health=200, ready=503",
+      "[T+120s] Gateway: health=200, ready=503",
+      "[T+135s] Gateway: health=200, ready=503",
+      "RECOVERY: intent-classifier is running (1 replicas)"
+    ],
+    "container_health": [
+      {
+        "name": "agent-red-intent-classifier",
+        "replicas": 1,
+        "running": true
+      },
+      {
+        "name": "agent-red-knowledge-retrieval",
+        "replicas": 1,
+        "running": true
+      },
+      {
+        "name": "agent-red-response-generator",
+        "replicas": 1,
+        "running": true
+      },
+      {
+        "name": "agent-red-escalation-handler",
+        "replicas": 1,
+        "running": true
+      },
+      {
+        "name": "agent-red-analytics-collector",
+        "replicas": 1,
+        "running": true
+      },
+      {
+        "name": "agent-red-critic-supervisor",
+        "replicas": 1,
+        "running": true
+      },
+      {
+        "name": "agent-red-co-pilot",
+        "replicas": 1,
+        "running": true
+      }
+    ]
+  }
+]
