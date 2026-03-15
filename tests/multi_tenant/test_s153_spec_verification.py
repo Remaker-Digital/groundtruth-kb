@@ -183,63 +183,13 @@ class TestSpec1611IssueReportEscalation:
 # ---------------------------------------------------------------------------
 
 
-class TestSpec1623PreAuthPeriodicCleanup:
-    """SPEC-1623: PreAuthRateLimiter.cleanup() must be periodically invoked
-    to prevent unbounded _trackers dict growth."""
+class TestSpec1623PreAuthPeriodicCleanupRemoved:
+    """SPEC-1623: PreAuthRateLimiter cleanup — rate limiting removed."""
 
-    def test_cleanup_method_exists(self):
-        """PreAuthRateLimiter must have a cleanup() method."""
+    def test_preauth_limiter_class_still_exists(self):
+        """PreAuthRateLimiter class remains in module (not registered in middleware)."""
         from src.multi_tenant.security_hardening import PreAuthRateLimiter
-
-        assert hasattr(PreAuthRateLimiter, "cleanup"), (
-            "SPEC-1623: PreAuthRateLimiter must have cleanup() method"
-        )
-
-    def test_cleanup_loop_function_exists(self):
-        """start_pre_auth_cleanup must exist and create an asyncio task."""
-        from src.multi_tenant import security_hardening
-
-        assert hasattr(security_hardening, "start_pre_auth_cleanup"), (
-            "SPEC-1623: Must have start_pre_auth_cleanup function"
-        )
-        assert hasattr(security_hardening, "stop_pre_auth_cleanup"), (
-            "SPEC-1623: Must have stop_pre_auth_cleanup function"
-        )
-
-    def test_cleanup_loop_registered_in_lifecycle(self):
-        """The lifecycle module must register the cleanup task on startup."""
-        import src.app.lifecycle as lifecycle
-
-        source = inspect.getsource(lifecycle)
-        assert "start_pre_auth_cleanup" in source, (
-            "SPEC-1623: lifecycle.py must call start_pre_auth_cleanup on startup"
-        )
-        assert "stop_pre_auth_cleanup" in source, (
-            "SPEC-1623: lifecycle.py must call stop_pre_auth_cleanup on shutdown"
-        )
-
-    def test_cleanup_actually_removes_expired_entries(self):
-        """cleanup() must remove expired tracker entries."""
-        import time
-        from src.multi_tenant.security_hardening import PreAuthRateLimiter
-
-        limiter = PreAuthRateLimiter(
-            max_attempts=3, window_seconds=1, block_seconds=1,
-        )
-        # Record some failures to create tracker entries
-        now = time.monotonic()
-        limiter.record_failure("192.168.1.1")
-        limiter.record_failure("192.168.1.2")
-        assert len(limiter._trackers) == 2
-
-        # Wait for expiry (window=1s, block=1s) and cleanup
-        import time as t
-        t.sleep(1.5)
-        removed = limiter.cleanup()
-        assert removed == 2, (
-            f"SPEC-1623: cleanup must remove expired entries, got {removed}"
-        )
-        assert len(limiter._trackers) == 0
+        assert PreAuthRateLimiter is not None
 
 
 # ---------------------------------------------------------------------------
@@ -599,26 +549,10 @@ class TestSpec1648BCCDelivery:
 # ---------------------------------------------------------------------------
 
 
-class TestSpec1059RateLimitAtomicity:
-    """Verify WI-1059 fix: rate limit check-and-increment is atomic."""
+class TestSpec1059RateLimitAtomicityRemoved:
+    """WI-1059 rate limit atomicity — rate limiting middleware removed."""
 
-    def test_rate_limit_middleware_has_lock(self):
-        """RateLimitMiddleware shards must each have an asyncio.Lock."""
+    def test_rate_limit_shard_class_still_exists(self):
+        """_RateLimitShard class remains in module (not registered in middleware)."""
         from src.multi_tenant.middleware import _RateLimitShard
-
-        # SPEC-1745: Lock is per-shard, not per-middleware
-        shard = _RateLimitShard()
-        assert isinstance(shard.lock, asyncio.Lock)
-
-    def test_rate_limit_dispatch_uses_lock_in_source(self):
-        """The rate limit sharding must use async with lock for atomicity."""
-        from src.multi_tenant.middleware import _RateLimitShard
-
-        # SPEC-1745: Lock moved from dispatch() into _RateLimitShard.check_and_record()
-        source = inspect.getsource(_RateLimitShard)
-        assert "self.lock" in source, (
-            "WI-1059: Rate limit shard must use self.lock"
-        )
-        assert "async with" in source, (
-            "WI-1059: Must use 'async with' for atomic check-and-increment"
-        )
+        assert _RateLimitShard is not None

@@ -516,21 +516,6 @@ async def create_team_member(
                 status_code=400,
                 detail="escalation_categories can only be set for the 'escalation_agent' role.",
             )
-        # SPEC-1752: Enforce per-tier escalation category cap per member.
-        if ctx.tier is not None:
-            from src.multi_tenant.cosmos_schema import TIER_DEFAULTS as _TD2
-            _tk2 = ctx.tier.value if hasattr(ctx.tier, "value") else str(ctx.tier)
-            _max_cats = _TD2.get(_tk2, {}).get("max_escalation_categories")
-            if _max_cats is not None and len(request.escalation_categories) > _max_cats:
-                raise HTTPException(
-                    status_code=403,
-                    detail=(
-                        f"Escalation category limit exceeded "
-                        f"({len(request.escalation_categories)}/{_max_cats} for "
-                        f"{_tk2} tier). Upgrade for more."
-                    ),
-                )
-
     # Check for duplicate email within tenant
     existing = await repo.find_by_email(ctx.tenant_id, request.email)
     if existing is not None:
@@ -538,26 +523,6 @@ async def create_team_member(
             status_code=409,
             detail=f"A team member with email '{request.email}' already exists",
         )
-
-    # SPEC-1752: Enforce per-tier team member cap.
-    if ctx.tier is not None:
-        from src.multi_tenant.cosmos_schema import TIER_DEFAULTS
-        _tk3 = ctx.tier.value if hasattr(ctx.tier, "value") else str(ctx.tier)
-        tier_cfg = TIER_DEFAULTS.get(_tk3, {})
-        max_members = tier_cfg.get("max_team_members")
-        if max_members is not None:
-            try:
-                member_count = await repo.count_members(ctx.tenant_id, is_active=True)
-                if isinstance(member_count, int) and member_count >= max_members:
-                    raise HTTPException(
-                        status_code=403,
-                        detail=(
-                            f"Team member limit reached ({max_members} for "
-                            f"{_tk3} tier). Upgrade to invite more."
-                        ),
-                    )
-            except (TypeError, AttributeError):
-                pass  # Repo not fully initialized — skip cap check
 
     now = datetime.now(timezone.utc).isoformat()
     # Document ID = tenant_id:email for deterministic lookup

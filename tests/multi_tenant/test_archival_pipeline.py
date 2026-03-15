@@ -176,18 +176,20 @@ class TestArchivalScan:
         assert "active" in query_arg
         assert "past_due" in query_arg
 
-    async def test_ap_02_trial_tier_uses_professional_cutoff(self):
-        """AP-02: Trial tier archival uses professional-level cutoff (365 days)."""
+    async def test_ap_02_trial_tier_returns_none_after_removal(self):
+        """AP-02: Trial tier archival returns None since history_depth_days
+        was removed from TIER_DEFAULTS."""
         service, _ = _make_service()
         cutoff_days = service.get_archival_cutoff(TenantTier.TRIAL.value)
-        assert cutoff_days == 365
-        assert TIER_DEFAULTS[TenantTier.TRIAL.value]["history_depth_days"] == 365
+        assert cutoff_days is None
+        assert "history_depth_days" not in TIER_DEFAULTS[TenantTier.TRIAL.value]
 
-    async def test_ap_03_starter_tier_uses_90_day_cutoff(self):
-        """AP-03: Starter tier archival uses 90-day cutoff."""
+    async def test_ap_03_starter_tier_returns_none_after_removal(self):
+        """AP-03: Starter tier archival returns None since history_depth_days
+        was removed from TIER_DEFAULTS."""
         service, _ = _make_service()
         cutoff_days = service.get_archival_cutoff(TenantTier.STARTER.value)
-        assert cutoff_days == 90
+        assert cutoff_days is None
 
     async def test_ap_04_enterprise_archives_but_does_not_delete(self):
         """AP-04: Enterprise tier archives for ML but does NOT delete originals."""
@@ -210,8 +212,9 @@ class TestArchivalScan:
         # Verify the archival cutoff for Enterprise is 90 days (for ML training)
         assert service.get_archival_cutoff(TenantTier.ENTERPRISE.value) == 90
 
-    async def test_ap_05_non_enterprise_deletes_originals_after_archival(self):
-        """AP-05: Non-Enterprise tiers delete originals after successful archival."""
+    async def test_ap_05_non_enterprise_skipped_after_removal(self):
+        """AP-05: Non-Enterprise tiers are skipped since history_depth_days
+        was removed from TIER_DEFAULTS (cutoff is None)."""
         starter_tenant = _make_tenant_doc(_TENANT_STARTER, TenantTier.STARTER.value)
         old_convs = _make_old_docs("conv", 2)
 
@@ -223,12 +226,13 @@ class TestArchivalScan:
 
         result = await service.run_archival_scan()
 
-        assert result.documents_archived == 2
-        # Originals should be deleted for non-Enterprise
-        assert conversation_repo.delete.await_count == 2
+        # With history_depth_days removed, non-enterprise tenants are skipped
+        assert result.documents_archived == 0
+        conversation_repo.delete.assert_not_awaited()
 
-    async def test_ap_06_conversations_older_than_cutoff_archived(self):
-        """AP-06: Conversations older than cutoff are archived."""
+    async def test_ap_06_starter_skipped_after_removal(self):
+        """AP-06: Starter tenants skipped since history_depth_days removed
+        from TIER_DEFAULTS (cutoff is None)."""
         starter_tenant = _make_tenant_doc(_TENANT_STARTER, TenantTier.STARTER.value)
         old_convs = [{"id": "conv-1"}, {"id": "conv-2"}, {"id": "conv-3"}]
 
@@ -239,16 +243,13 @@ class TestArchivalScan:
 
         result = await service.run_archival_scan()
 
-        assert result.documents_archived >= 3
+        # Starter skipped — no cutoff after history_depth_days removal
+        assert result.documents_archived == 0
         assert result.tenants_scanned == 1
-        assert len(result.tenant_details) >= 1
-        # Check the detail for the starter tenant
-        detail = result.tenant_details[0]
-        assert detail.tenant_id == _TENANT_STARTER
-        assert detail.conversations_archived == 3
 
-    async def test_ap_07_profiles_older_than_cutoff_archived(self):
-        """AP-07: Customer profiles older than cutoff are archived."""
+    async def test_ap_07_profiles_skipped_after_removal(self):
+        """AP-07: Customer profiles not archived since history_depth_days
+        removed from TIER_DEFAULTS."""
         starter_tenant = _make_tenant_doc(_TENANT_STARTER, TenantTier.STARTER.value)
         old_profiles = [{"id": "prof-1"}, {"id": "prof-2"}]
 
@@ -259,12 +260,11 @@ class TestArchivalScan:
 
         result = await service.run_archival_scan()
 
-        assert result.documents_archived >= 2
-        detail = result.tenant_details[0]
-        assert detail.profiles_archived == 2
+        assert result.documents_archived == 0
 
-    async def test_ap_08_vectors_older_than_cutoff_archived(self):
-        """AP-08: Memory vectors older than cutoff are archived."""
+    async def test_ap_08_vectors_skipped_after_removal(self):
+        """AP-08: Memory vectors not archived since history_depth_days
+        removed from TIER_DEFAULTS."""
         starter_tenant = _make_tenant_doc(_TENANT_STARTER, TenantTier.STARTER.value)
         old_vectors = [{"id": "vec-1"}]
 
@@ -275,9 +275,7 @@ class TestArchivalScan:
 
         result = await service.run_archival_scan()
 
-        assert result.documents_archived >= 1
-        detail = result.tenant_details[0]
-        assert detail.vectors_archived == 1
+        assert result.documents_archived == 0
 
 
 class TestParquetSerialization:
@@ -339,13 +337,17 @@ class TestBlobUpload:
         assert blob_name == "t-456/profiles/2026/06/batch_20260615T080000Z.parquet"
 
     async def test_ap_11_no_blob_client_dry_run_mode(self):
-        """AP-11: No blob client = dry-run mode (archive counts but no real upload)."""
-        starter_tenant = _make_tenant_doc(_TENANT_STARTER, TenantTier.STARTER.value)
+        """AP-11: No blob client = dry-run mode (archive counts but no real upload).
+
+        Uses Enterprise tier because history_depth_days was removed from
+        TIER_DEFAULTS — only Enterprise still archives (90d ML training).
+        """
+        ent_tenant = _make_tenant_doc(_TENANT_ENT, TenantTier.ENTERPRISE.value)
         old_convs = [{"id": "conv-1"}, {"id": "conv-2"}]
 
         # No blob_client passed (None) = dry-run
         service, repos = _make_service(
-            tenant_query_results=[starter_tenant],
+            tenant_query_results=[ent_tenant],
             conversation_query_results=old_convs,
             blob_client=None,
         )
@@ -357,13 +359,17 @@ class TestBlobUpload:
         assert result.bytes_written > 0  # Serialization still produces bytes
 
     async def test_ap_11b_blob_client_upload_called(self):
-        """AP-11b: When blob client is provided, upload_blob is called."""
-        starter_tenant = _make_tenant_doc(_TENANT_STARTER, TenantTier.STARTER.value)
+        """AP-11b: When blob client is provided, upload_blob is called.
+
+        Uses Enterprise tier because history_depth_days was removed from
+        TIER_DEFAULTS — only Enterprise still archives (90d ML training).
+        """
+        ent_tenant = _make_tenant_doc(_TENANT_ENT, TenantTier.ENTERPRISE.value)
         old_convs = [{"id": "conv-1"}]
         blob_client = _make_blob_client()
 
         service, repos = _make_service(
-            tenant_query_results=[starter_tenant],
+            tenant_query_results=[ent_tenant],
             conversation_query_results=old_convs,
             blob_client=blob_client,
         )
@@ -385,10 +391,13 @@ class TestErrorIsolation:
         exceptions. The audit_repo.log_event call inside archive_warm_tier
         is NOT wrapped in try/except, so making it raise for a specific
         tenant (which has archived docs) triggers the error path.
+
+        Uses Enterprise tier because history_depth_days was removed from
+        TIER_DEFAULTS — only Enterprise still archives (90d ML training).
         """
-        good_tenant = _make_tenant_doc(_TENANT_STARTER, TenantTier.STARTER.value)
-        bad_tenant = _make_tenant_doc("t-bad-arch-001", TenantTier.STARTER.value)
-        good_tenant_2 = _make_tenant_doc(_TENANT_PRO, TenantTier.PROFESSIONAL.value)
+        good_tenant = _make_tenant_doc(_TENANT_ENT, TenantTier.ENTERPRISE.value)
+        bad_tenant = _make_tenant_doc("t-bad-arch-001", TenantTier.ENTERPRISE.value)
+        good_tenant_2 = _make_tenant_doc(_TENANT_PRO + "-ent", TenantTier.ENTERPRISE.value)
 
         service, repos = _make_service(
             tenant_query_results=[good_tenant, bad_tenant, good_tenant_2],
@@ -421,12 +430,16 @@ class TestResultAggregation:
     """AP-13: ArchivalScanResult aggregation."""
 
     async def test_ap_13_aggregates_counts_correctly(self):
-        """AP-13: ArchivalScanResult aggregates counts from multiple tenants."""
-        trial_tenant = _make_tenant_doc(_TENANT_TRIAL, TenantTier.TRIAL.value)
-        starter_tenant = _make_tenant_doc(_TENANT_STARTER, TenantTier.STARTER.value)
+        """AP-13: ArchivalScanResult aggregates counts from multiple tenants.
+
+        Uses Enterprise tier because history_depth_days was removed from
+        TIER_DEFAULTS — only Enterprise still archives (90d ML training).
+        """
+        ent_tenant_1 = _make_tenant_doc(_TENANT_ENT, TenantTier.ENTERPRISE.value)
+        ent_tenant_2 = _make_tenant_doc(_TENANT_ENT + "-2", TenantTier.ENTERPRISE.value)
 
         service, repos = _make_service(
-            tenant_query_results=[trial_tenant, starter_tenant],
+            tenant_query_results=[ent_tenant_1, ent_tenant_2],
         )
         conversation_repo = repos[1]
         profile_repo = repos[2]
@@ -437,9 +450,9 @@ class TestResultAggregation:
             for p in params:
                 if p.get("name") == "@tid":
                     tenant_id = p["value"]
-            if tenant_id == _TENANT_TRIAL:
+            if tenant_id == _TENANT_ENT:
                 return [{"id": "c1"}, {"id": "c2"}]
-            if tenant_id == _TENANT_STARTER:
+            if tenant_id == _TENANT_ENT + "-2":
                 return [{"id": "c3"}]
             return []
 
@@ -449,7 +462,7 @@ class TestResultAggregation:
             for p in params:
                 if p.get("name") == "@tid":
                     tenant_id = p["value"]
-            if tenant_id == _TENANT_STARTER:
+            if tenant_id == _TENANT_ENT + "-2":
                 return [{"id": "p1"}]
             return []
 
@@ -458,7 +471,7 @@ class TestResultAggregation:
 
         result = await service.run_archival_scan()
 
-        # 2 convs from trial + 1 conv from starter + 1 profile from starter = 4
+        # 2 convs from ent + 1 conv from ent-2 + 1 profile from ent-2 = 4
         assert result.documents_archived == 4
         assert result.tenants_scanned == 2
         assert len(result.tenant_details) == 2

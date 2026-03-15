@@ -163,11 +163,9 @@ class TestLatencyValidation:
 
     def test_perf_10_config_cache_contract(self):
         """PERF-10: Config endpoint uses 60s cache — validated in TenantConfigProcessor."""
-        # The config processor has a 60-second cache. This validates the contract
-        # exists in TIER_DEFAULTS or the processor documentation.
-        # Direct latency test requires deployed infrastructure.
+        # SPEC-1748: Config cache TTL increased from 60s to 300s for scale.
         from src.multi_tenant.tenant_config_processor import CACHE_TTL_SECONDS
-        assert CACHE_TTL_SECONDS == 60
+        assert CACHE_TTL_SECONDS == 300
 
     def test_perf_percentile_empty_list(self):
         """Percentile function returns 0 for empty list."""
@@ -292,20 +290,15 @@ class TestLatencyValidation:
 class TestThroughputConcurrency:
     """PERF-11 through PERF-20: Concurrency limits, circuit breakers, rate limiting."""
 
-    def test_perf_11_tier_concurrency_limits(self):
-        """PERF-11: Tier concurrency limits — trial=professional, enterprise highest."""
-        assert TIER_DEFAULTS["trial"]["max_concurrent"] == 10
-        assert TIER_DEFAULTS["starter"]["max_concurrent"] == 5
-        assert TIER_DEFAULTS["professional"]["max_concurrent"] == 10
-        assert TIER_DEFAULTS["enterprise"]["max_concurrent"] == 30
+    def test_perf_11_tier_concurrency_limits_removed(self):
+        """PERF-11: max_concurrent removed from TIER_DEFAULTS."""
+        for tier in ["trial", "starter", "professional", "enterprise"]:
+            assert "max_concurrent" not in TIER_DEFAULTS[tier]
 
-    def test_perf_12_tier_rate_limits(self):
-        """PERF-12: Tier rate limits — uniform admin RPM, enterprise 4x."""
-        from src.multi_tenant.cosmos_schema import _ADMIN_RPM
-        assert TIER_DEFAULTS["trial"]["rate_limit_rpm"] == _ADMIN_RPM
-        assert TIER_DEFAULTS["starter"]["rate_limit_rpm"] == _ADMIN_RPM
-        assert TIER_DEFAULTS["professional"]["rate_limit_rpm"] == _ADMIN_RPM
-        assert TIER_DEFAULTS["enterprise"]["rate_limit_rpm"] == _ADMIN_RPM * 4
+    def test_perf_12_tier_rate_limits_data_driven(self):
+        """PERF-12: SPEC-1803 rate_limit_rpm restored at 300 RPM (data-driven)."""
+        for tier in ["trial", "starter", "professional", "enterprise"]:
+            assert TIER_DEFAULTS[tier]["rate_limit_rpm"] == 300
 
     def test_perf_14_multi_tenant_isolation_in_sse(self):
         """PERF-14: SSE connections tracked independently per tenant."""
@@ -324,18 +317,16 @@ class TestThroughputConcurrency:
         assert mgr.get_active_count("tenant-b") == 1
 
     def test_perf_15_noisy_neighbor_sse_enforcement(self):
-        """PERF-15: Starter tenant at SSE limit doesn't block other tenants."""
+        """PERF-15: Per-tenant max_concurrent SSE cap removed; global limit only."""
         mgr = SSEConnectionManager()
-        starter_limit = TIER_DEFAULTS["starter"]["max_concurrent"]
-
-        # Fill starter tenant to capacity
-        for i in range(starter_limit):
+        # Per-tenant max_concurrent removed; SSE only enforces global limit
+        for i in range(10):
             mgr.connect("noisy-starter", f"conv-{i}")
 
-        # Starter tenant should be at limit
-        assert not mgr.can_connect("noisy-starter", "starter")
+        # No per-tenant limit — can_connect still returns True (global limit not hit)
+        assert mgr.can_connect("noisy-starter", "starter")
 
-        # Other tenants unaffected
+        # Other tenants also unaffected
         assert mgr.can_connect("other-tenant", "starter")
         assert mgr.can_connect("enterprise-tenant", "enterprise")
 
@@ -513,23 +504,18 @@ class TestStreamingSSE:
         assert len(buf.events) == MAX_BUFFERED_EVENTS
         assert buf.last_sequence == MAX_BUFFERED_EVENTS + 50
 
-    def test_perf_24_sse_connection_limits_per_tier(self):
-        """PERF-24: SSE connection limits match tier concurrency settings."""
+    def test_perf_24_sse_connection_limits_per_tier_removed(self):
+        """PERF-24: Per-tier SSE connection caps removed; global limit only."""
         mgr = SSEConnectionManager()
 
-        # Starter: max_concurrent = 5
-        for i in range(5):
+        # Per-tier max_concurrent removed; any number of connections allowed
+        # up to the global limit (GLOBAL_SSE_MAX_CONNECTIONS)
+        for i in range(15):
             assert mgr.can_connect("starter-t", "starter")
             mgr.connect("starter-t", f"conv-{i}")
 
-        assert not mgr.can_connect("starter-t", "starter")
-
-        # Professional: max_concurrent = 10
-        for i in range(10):
-            assert mgr.can_connect("pro-t", "professional")
-            mgr.connect("pro-t", f"conv-{i}")
-
-        assert not mgr.can_connect("pro-t", "professional")
+        # Still allowed — no per-tenant cap
+        assert mgr.can_connect("starter-t", "starter")
 
     def test_perf_25_buffer_expiry(self):
         """PERF-25: Event buffers expire after BUFFER_EXPIRY_SECONDS of inactivity."""

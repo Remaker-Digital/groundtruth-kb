@@ -333,7 +333,7 @@ class TestMultiTabTracking:
     def test_tab_133_07_tabs_dont_affect_concurrency_limit(self):
         """Multiple tabs on the same conversation don't exhaust connection limits."""
         mgr = SSEConnectionManager()
-        # Starter tier: max_concurrent = 3
+        # Per-tenant max_concurrent removed; only global limit applies
         mgr.connect("tenant-1", "conv-1", tab_id="tab-A")
         mgr.connect("tenant-1", "conv-1", tab_id="tab-B")
         mgr.connect("tenant-1", "conv-1", tab_id="tab-C")

@@ -988,3 +988,165 @@ async def test_provision_tenant(
         widget_key=result.widget_key,
         warnings=result.errors,
     )
+
+
+# ---------------------------------------------------------------------------
+# SPEC-1804: Per-tenant rate limit configuration
+# ---------------------------------------------------------------------------
+
+
+class RateLimitUpdateRequest(CamelCaseModel):
+    """Request body to set a tenant's RPM rate limit."""
+
+    rate_limit_rpm: int | None = Field(
+        default=None,
+        description="RPM limit for this tenant, or null to use tier default. "
+        "Must be >= 10 (minimum floor) when set.",
+    )
+
+    @field_validator("rate_limit_rpm")
+    @classmethod
+    def validate_rpm_floor(cls, v: int | None) -> int | None:
+        if v is not None and v < 10:
+            raise ValueError(
+                "rate_limit_rpm must be >= 10 (minimum floor) or null "
+                "to use tier default"
+            )
+        return v
+
+
+class RateLimitResponse(CamelCaseModel):
+    """Response after updating a tenant's rate limit."""
+
+    tenant_id: str
+    rate_limit_rpm: int | None = Field(
+        description="Per-tenant override (null = using tier default)",
+    )
+    effective_rpm: int = Field(
+        description="Actual RPM in effect after resolution (override > tier > 300)",
+    )
+
+
+@router.patch(
+    "/tenants/{tenant_id}/rate-limit",
+    response_model=RateLimitResponse,
+    summary="Set per-tenant RPM rate limit (SPEC-1804)",
+    description="Configure the per-tenant rate limit. Set to null to revert "
+    "to the tier default (300 RPM). Minimum floor is 10 RPM.",
+    responses={
+        404: {"description": "Tenant not found"},
+        422: {"description": "Validation error (RPM < 10)"},
+        503: {"description": "Service not initialized"},
+    },
+    status_code=200,
+)
+async def update_tenant_rate_limit(
+    tenant_id: str,
+    body: RateLimitUpdateRequest,
+) -> RateLimitResponse:
+    """Set or clear per-tenant RPM rate limit override."""
+    from src.multi_tenant.cache_invalidation import publish_cache_invalidation
+    from src.multi_tenant.cosmos_schema import (
+        RATE_LIMIT_RPM_DEFAULT,
+        RATE_LIMIT_RPM_FLOOR,
+        TIER_DEFAULTS,
+    )
+
+    if not _state._tenant_repo:
+        raise HTTPException(status_code=503, detail="Service not initialized")
+
+    # Read current tenant document
+    try:
+        doc = await _state._tenant_repo.read(tenant_id, tenant_id)
+    except Exception:
+        raise HTTPException(
+            status_code=404, detail=f"Tenant '{tenant_id}' not found"
+        )
+
+    now = datetime.now(timezone.utc).isoformat()
+
+    # Patch the rate_limit_rpm field
+    operations = [
+        {"op": "set", "path": "/rate_limit_rpm", "value": body.rate_limit_rpm},
+        {"op": "set", "path": "/updated_at", "value": now},
+    ]
+    await _state._tenant_repo.patch(tenant_id, tenant_id, operations)
+
+    # Publish cache invalidation so all replicas pick up the change
+    publish_cache_invalidation(tenant_id)
+
+    # Compute effective RPM
+    if body.rate_limit_rpm is not None:
+        effective = max(RATE_LIMIT_RPM_FLOOR, body.rate_limit_rpm)
+    else:
+        tier = doc.get("tier", "starter")
+        tier_rpm = TIER_DEFAULTS.get(tier, {}).get("rate_limit_rpm")
+        effective = max(
+            RATE_LIMIT_RPM_FLOOR,
+            tier_rpm if tier_rpm is not None else RATE_LIMIT_RPM_DEFAULT,
+        )
+
+    logger.info(
+        "Rate limit updated: tenant=%s rpm=%s effective=%d (by %s)",
+        tenant_id[:12],
+        body.rate_limit_rpm,
+        effective,
+        "spa-console",
+    )
+
+    return RateLimitResponse(
+        tenant_id=tenant_id,
+        rate_limit_rpm=body.rate_limit_rpm,
+        effective_rpm=effective,
+    )
+
+
+@router.get(
+    "/tenants/{tenant_id}/rate-limit",
+    response_model=RateLimitResponse,
+    summary="Get per-tenant RPM rate limit (SPEC-1804)",
+    description="Read the current rate limit for a tenant, including the "
+    "effective RPM after resolution.",
+    responses={
+        404: {"description": "Tenant not found"},
+        503: {"description": "Service not initialized"},
+    },
+    status_code=200,
+)
+async def get_tenant_rate_limit(
+    tenant_id: str,
+) -> RateLimitResponse:
+    """Read current rate limit configuration for a tenant."""
+    from src.multi_tenant.cosmos_schema import (
+        RATE_LIMIT_RPM_DEFAULT,
+        RATE_LIMIT_RPM_FLOOR,
+        TIER_DEFAULTS,
+    )
+
+    if not _state._tenant_repo:
+        raise HTTPException(status_code=503, detail="Service not initialized")
+
+    try:
+        doc = await _state._tenant_repo.read(tenant_id, tenant_id)
+    except Exception:
+        raise HTTPException(
+            status_code=404, detail=f"Tenant '{tenant_id}' not found"
+        )
+
+    per_tenant_rpm = doc.get("rate_limit_rpm")
+
+    if per_tenant_rpm is not None:
+        effective = max(RATE_LIMIT_RPM_FLOOR, per_tenant_rpm)
+    else:
+        tier = doc.get("tier", "starter")
+        tier_rpm = TIER_DEFAULTS.get(tier, {}).get("rate_limit_rpm")
+        effective = max(
+            RATE_LIMIT_RPM_FLOOR,
+            tier_rpm if tier_rpm is not None else RATE_LIMIT_RPM_DEFAULT,
+        )
+
+    return RateLimitResponse(
+        tenant_id=tenant_id,
+        rate_limit_rpm=per_tenant_rpm,
+        effective_rpm=effective,
+    )

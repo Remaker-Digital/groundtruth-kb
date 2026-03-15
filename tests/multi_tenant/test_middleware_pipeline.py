@@ -1,7 +1,7 @@
 """P0 middleware pipeline integration tests — full HTTP middleware stack.
 
 Tests the complete middleware chain through FastAPI TestClient:
-    TenantAuthMiddleware → RateLimitMiddleware →
+    TenantAuthMiddleware →
     TenantConcurrencyMiddleware → CorrelationMiddleware → handler
 
 Test IDs: MWP-01 through MWP-25 per §4.2 of
@@ -231,158 +231,6 @@ class TestAuthentication:
 # ===========================================================================
 
 
-class TestRateLimiting:
-    """Per-tenant rate limiting through HTTP."""
-
-    @pytest.mark.unit
-    def test_starter_rate_limit_60_rpm(self, app_client):
-        """MWP-08: Starter tenant — 60 requests pass, 61st → 429.
-
-        NOTE: These integration tests require Cosmos DB and may return 503
-        when the backing store is unavailable.  They validate the rate limit
-        path when the full stack is operational.
-        """
-        from src.multi_tenant.cosmos_schema import _ADMIN_RPM
-        headers = auth_headers_api_key(TEST_API_KEY_STARTER)
-
-        for i in range(_ADMIN_RPM):
-            resp = app_client.get(
-                "/api/dashboard/usage",
-                headers=headers,
-            )
-            assert resp.status_code in (200, 500, 503), (
-                f"Request {i+1} should not be rate-limited, got {resp.status_code}"
-            )
-
-        # Next request should be rate-limited
-        resp = app_client.get(
-            "/api/dashboard/usage",
-            headers=headers,
-        )
-        assert resp.status_code in (429, 503)  # 503 when Cosmos unavailable
-        if resp.status_code == 429:
-            body = resp.json()
-            assert body["error"] == "Rate limit exceeded."
-            assert body["limit"] == _ADMIN_RPM
-
-    @pytest.mark.unit
-    def test_professional_rate_limit_60_rpm(self, app_client):
-        """MWP-09: Professional tenant — uniform admin RPM."""
-        from src.multi_tenant.cosmos_schema import _ADMIN_RPM
-        headers = auth_headers_api_key(TEST_API_KEY_PROFESSIONAL)
-
-        for i in range(_ADMIN_RPM):
-            resp = app_client.get(
-                "/api/dashboard/usage",
-                headers=headers,
-            )
-            assert resp.status_code in (200, 500, 503), (
-                f"Request {i+1} should not be rate-limited, got {resp.status_code}"
-            )
-
-        resp = app_client.get(
-            "/api/dashboard/usage",
-            headers=headers,
-        )
-        assert resp.status_code in (429, 503)
-
-    @pytest.mark.unit
-    def test_enterprise_rate_limit_240_rpm(self, app_client):
-        """MWP-10: Enterprise tenant — 4x admin RPM (240).
-
-        Sending all 240 requests would be slow, so we send a subset
-        and verify no 429 is returned.
-        """
-        headers = auth_headers_api_key(TEST_API_KEY_ENTERPRISE)
-
-        for i in range(60):
-            resp = app_client.get(
-                "/api/dashboard/usage",
-                headers=headers,
-            )
-            assert resp.status_code in (200, 500, 503), (
-                f"Request {i+1} should not be rate-limited, got {resp.status_code}"
-            )
-
-    @pytest.mark.unit
-    def test_rate_limit_sliding_window_cleanup(self, app_client):
-        """MWP-11: Rate limit sliding window — expired entries cleaned.
-
-        After the window expires, the counter resets and requests succeed
-        again. We simulate this by manipulating the window entries.
-        """
-        import src.main as main_mod
-        from src.multi_tenant.middleware import RateLimitMiddleware
-
-        # Find the rate limiter in the middleware stack
-        rate_limiter = None
-        current = getattr(main_mod.app, "middleware_stack", None)
-        visited: set[int] = set()
-        while current is not None and id(current) not in visited:
-            visited.add(id(current))
-            if isinstance(current, RateLimitMiddleware):
-                rate_limiter = current
-                break
-            current = getattr(current, "app", None)
-
-        assert rate_limiter is not None, "RateLimitMiddleware not found in stack"
-
-        from src.multi_tenant.cosmos_schema import _ADMIN_RPM
-        headers = auth_headers_api_key(TEST_API_KEY_STARTER)
-
-        # Fill up the rate limit
-        for _ in range(_ADMIN_RPM):
-            app_client.get(
-                "/api/dashboard/usage",
-                headers=headers,
-            )
-
-        # Next request should be blocked
-        resp = app_client.get(
-            "/api/dashboard/usage",
-            headers=headers,
-        )
-        assert resp.status_code in (429, 503)
-
-        if resp.status_code == 429:
-            # Simulate window expiry by backdating all entries
-            import time as time_mod
-            past_time = time_mod.monotonic() - 120  # 2 minutes ago
-            shard = rate_limiter._get_shard(STARTER_TENANT_ID)
-            shard.windows[STARTER_TENANT_ID] = [
-                (past_time, count) for _, count in shard.windows.get(STARTER_TENANT_ID, [])
-            ]
-
-            # Now the next request should succeed (expired entries cleaned)
-            resp = app_client.get(
-                "/api/dashboard/usage",
-                headers=headers,
-            )
-            assert resp.status_code in (200, 500, 503)
-
-    @pytest.mark.unit
-    def test_rate_limit_429_includes_retry_after(self, app_client):
-        """MWP-12: Rate limit 429 includes Retry-After header."""
-        from src.multi_tenant.cosmos_schema import _ADMIN_RPM
-        headers = auth_headers_api_key(TEST_API_KEY_STARTER)
-
-        # Exhaust rate limit
-        for _ in range(_ADMIN_RPM):
-            app_client.get(
-                "/api/dashboard/usage",
-                headers=headers,
-            )
-
-        resp = app_client.get(
-            "/api/dashboard/usage",
-            headers=headers,
-        )
-        assert resp.status_code in (429, 503)
-        if resp.status_code == 429:
-            assert "Retry-After" in resp.headers
-            assert int(resp.headers["Retry-After"]) == 60  # Window size
-
-
 # ===========================================================================
 # Concurrency Limiting — MWP-13 through MWP-16
 # ===========================================================================
@@ -397,28 +245,28 @@ class TestConcurrencyLimiting:
     """
 
     @pytest.mark.unit
-    def test_starter_concurrency_limit_values(self):
-        """MWP-13: Starter concurrency limit — 5 concurrent, 10 queue."""
+    def test_starter_concurrency_limit_values_removed(self):
+        """MWP-13: max_concurrent and queue_depth removed from TIER_DEFAULTS."""
         from src.multi_tenant.cosmos_schema import TIER_DEFAULTS
         starter = TIER_DEFAULTS["starter"]
-        assert starter["max_concurrent"] == 5
-        assert starter["queue_depth"] == 10
+        assert "max_concurrent" not in starter
+        assert "queue_depth" not in starter
 
     @pytest.mark.unit
-    def test_professional_concurrency_limit_values(self):
-        """MWP-14: Professional concurrency limit — 10 concurrent, 20 queue."""
+    def test_professional_concurrency_limit_values_removed(self):
+        """MWP-14: max_concurrent and queue_depth removed from TIER_DEFAULTS."""
         from src.multi_tenant.cosmos_schema import TIER_DEFAULTS
         pro = TIER_DEFAULTS["professional"]
-        assert pro["max_concurrent"] == 10
-        assert pro["queue_depth"] == 20
+        assert "max_concurrent" not in pro
+        assert "queue_depth" not in pro
 
     @pytest.mark.unit
-    def test_enterprise_concurrency_limit_values(self):
-        """MWP-15: Enterprise concurrency limit — 30 concurrent, 50 queue."""
+    def test_enterprise_concurrency_limit_values_removed(self):
+        """MWP-15: max_concurrent and queue_depth removed from TIER_DEFAULTS."""
         from src.multi_tenant.cosmos_schema import TIER_DEFAULTS
         ent = TIER_DEFAULTS["enterprise"]
-        assert ent["max_concurrent"] == 30
-        assert ent["queue_depth"] == 50
+        assert "max_concurrent" not in ent
+        assert "queue_depth" not in ent
 
     @pytest.mark.unit
     async def test_concurrency_gate_rejects_when_full(self):
@@ -529,13 +377,13 @@ class TestFullStack:
         """MWP-20: Middleware execution order verified.
 
         Starlette processes middleware in reverse registration order.
-        Registration: Correlation(1st) → Concurrency(2nd) → RateLimit(3rd) → Auth(4th)
-        Execution:    Auth → RateLimit → Concurrency → Correlation → handler
+        Registration: Correlation(1st) → Concurrency(2nd) → Auth(3rd)
+        Execution:    Auth → Concurrency → Correlation → handler
 
         We verify this by checking the middleware chain order.
         """
         import src.main as main_mod
-        from src.multi_tenant.middleware import TenantAuthMiddleware, RateLimitMiddleware
+        from src.multi_tenant.middleware import TenantAuthMiddleware
         from src.multi_tenant.pipeline_resilience import TenantConcurrencyMiddleware
         from src.multi_tenant.otel_tracing import CorrelationMiddleware
 
@@ -548,7 +396,6 @@ class TestFullStack:
             name = type(current).__name__
             if name in (
                 "TenantAuthMiddleware",
-                "RateLimitMiddleware",
                 "TenantConcurrencyMiddleware",
                 "CorrelationMiddleware",
             ):
@@ -556,10 +403,9 @@ class TestFullStack:
             current = getattr(current, "app", None)
 
         # Execution order (innermost runs first):
-        # TenantAuthMiddleware → RateLimitMiddleware → TenantConcurrencyMiddleware → CorrelationMiddleware
+        # TenantAuthMiddleware → TenantConcurrencyMiddleware → CorrelationMiddleware
         expected = [
             "TenantAuthMiddleware",
-            "RateLimitMiddleware",
             "TenantConcurrencyMiddleware",
             "CorrelationMiddleware",
         ]

@@ -68,25 +68,23 @@ def register_middleware(app: FastAPI) -> None:
         4. CorrelationMiddleware        — sets CorrelationContext
         5. JsonDepthValidationMiddleware — reject deeply nested JSON
         6. TenantConcurrencyMiddleware  — per-tenant concurrency limits
-        7. RateLimitMiddleware          — per-tenant rate limits + headers
+        7. RateLimitMiddleware          — per-tenant RPM limiting (SPEC-1803)
         8. TenantAuthMiddleware         — authenticates, injects TenantContext
-        9. PreAuthRateLimitMiddleware   — blocks IPs with excessive auth fails
-       10. TrustedProxyMiddleware       — extract real client IP from headers
+        9. TrustedProxyMiddleware       — extract real client IP from headers
       Outer (processes requests first, responses last):
-       11. CORSMiddleware               — CORS headers on ALL responses
+       10. CORSMiddleware               — CORS headers on ALL responses
 
     Execution order (request → handler):
-      CORSMiddleware → TrustedProxy → PreAuthRateLimitMiddleware →
-      TenantAuthMiddleware → RateLimitMiddleware → TenantConcurrencyMiddleware →
+      CORSMiddleware → TrustedProxy →
+      TenantAuthMiddleware → RateLimitMiddleware →
+      TenantConcurrencyMiddleware →
       JsonDepthValidation → CorrelationMiddleware →
       RequestBodyLimit → ApiVersion → SecurityHeaders → handler
 
+    SPEC-1805: RATE_LIMIT_DISABLED=true skips RateLimitMiddleware registration.
     CRITICAL: CORSMiddleware MUST be outermost so that CORS headers
-    appear on every response — including 429 (rate limit), 401 (auth
-    failure), and 503 (service unavailable).  When CORS was inner to
-    the rate limiter, 429 responses lacked CORS headers and browsers
-    blocked them entirely as CORS violations, causing the storefront
-    chat widget to fail silently.
+    appear on every response — including 401 (auth failure) and
+    503 (service unavailable).
     """
     import os
 
@@ -106,7 +104,6 @@ def register_middleware(app: FastAPI) -> None:
         TrustedProxyMiddleware,
     )
     from src.multi_tenant.api_versioning import ApiVersionMiddleware
-    from src.multi_tenant.security_hardening import PreAuthRateLimitMiddleware
     from src.multi_tenant.otel_tracing import (
         CorrelationMiddleware,
     )
@@ -118,14 +115,15 @@ def register_middleware(app: FastAPI) -> None:
     app.add_middleware(CorrelationMiddleware)
     app.add_middleware(JsonDepthValidationMiddleware)
     app.add_middleware(TenantConcurrencyMiddleware)
-    app.add_middleware(RateLimitMiddleware)
-    app.add_middleware(TenantAuthMiddleware)
-    app.add_middleware(PreAuthRateLimitMiddleware)
 
-    # --- TrustedProxy: must run BEFORE PreAuthRateLimitMiddleware ---
-    # Registered AFTER so it wraps PreAuth and rewrites scope["client"]
-    # with the real client IP from X-Forwarded-For/CF-Connecting-IP
-    # before the rate limiter reads it.
+    # SPEC-1803/1805: Per-tenant rate limiting — skipped when RATE_LIMIT_DISABLED=true
+    # This env var should be set on staging to allow load testing without interference.
+    if os.environ.get("RATE_LIMIT_DISABLED", "").lower() != "true":
+        app.add_middleware(RateLimitMiddleware)
+
+    app.add_middleware(TenantAuthMiddleware)
+
+    # --- TrustedProxy: extracts real client IP from X-Forwarded-For/CF-Connecting-IP ---
     app.add_middleware(TrustedProxyMiddleware)
 
     # --- CORS: outermost middleware ---

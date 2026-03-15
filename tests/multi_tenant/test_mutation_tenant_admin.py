@@ -291,13 +291,15 @@ class TestCreateQuickAction(MutationTestBase):
         self.assert_validation_error(starter_client, "post", QA_BASE, json={"label": "X"})
 
     @patch("src.multi_tenant.admin_quick_action_api._ensure_qa_draft", new_callable=AsyncMock)
-    def test_403_tier_limit_reached(self, _draft, starter_client, quick_action_repos):
-        # Simulate 5 existing actions (starter tier default limit)
+    def test_no_tier_limit_after_cap_removal(self, _draft, starter_client, quick_action_repos):
+        # max_quick_actions removed from TIER_DEFAULTS — no cap enforcement.
+        # Creating a quick action succeeds even with many existing actions.
         quick_action_repos["prefs_repo"].get_quick_actions = AsyncMock(
             return_value=[_qa_action(f"qa-{i}") for i in range(5)],
         )
+        quick_action_repos["prefs_repo"].upsert_quick_action = AsyncMock(return_value=None)
         resp = starter_client.post(QA_BASE, json={"label": "New", "promptTemplate": "New prompt"})
-        assert resp.status_code == 403
+        assert resp.status_code == 201
 
 
 # ===========================================================================

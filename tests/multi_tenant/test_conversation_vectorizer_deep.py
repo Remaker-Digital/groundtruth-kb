@@ -217,12 +217,8 @@ class TestCVD08SearchStarterDepth:
         )
         call_kwargs = v._vector_repo.vector_search.call_args
         since_val = call_kwargs[1].get("since") or call_kwargs.kwargs.get("since")
-        # Starter should have a since date (not None)
-        assert since_val is not None
-        # Should be roughly 90 days ago
-        since_dt = datetime.fromisoformat(since_val)
-        expected = datetime.now(timezone.utc) - timedelta(days=90)
-        assert abs((since_dt - expected).total_seconds()) < 60
+        # history_depth_days removed from TIER_DEFAULTS — all tiers unlimited
+        assert since_val is None
 
 
 # ===================================================================
@@ -302,11 +298,9 @@ class TestCVD12CompressTruncation:
 
 class TestCVD13SinceDateStarter:
     def test_starter_returns_90d_cutoff(self):
+        # history_depth_days removed from TIER_DEFAULTS — Starter now unlimited
         since = ConversationVectorizer._compute_since_date(TenantTier.STARTER)
-        assert since is not None
-        since_dt = datetime.fromisoformat(since)
-        expected = datetime.now(timezone.utc) - timedelta(days=90)
-        assert abs((since_dt - expected).total_seconds()) < 60
+        assert since is None
 
 
 # ===================================================================
@@ -316,11 +310,9 @@ class TestCVD13SinceDateStarter:
 
 class TestCVD14SinceDateProfessional:
     def test_professional_returns_365d_cutoff(self):
+        # history_depth_days removed from TIER_DEFAULTS — Professional now unlimited
         since = ConversationVectorizer._compute_since_date(TenantTier.PROFESSIONAL)
-        assert since is not None
-        since_dt = datetime.fromisoformat(since)
-        expected = datetime.now(timezone.utc) - timedelta(days=365)
-        assert abs((since_dt - expected).total_seconds()) < 60
+        assert since is None
 
 
 # ===================================================================

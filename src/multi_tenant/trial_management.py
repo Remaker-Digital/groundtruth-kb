@@ -226,8 +226,8 @@ class TrialManagementService:
             "consent_status": ConsentStatus.NOT_ASKED.value,
             "trial_expires_at": expires_at.isoformat(),
             "trial_conversation_limit": conversation_limit,
-            "rate_limit_rpm": TIER_DEFAULTS[TenantTier.TRIAL.value]["rate_limit_rpm"],
-            "max_concurrent": TIER_DEFAULTS[TenantTier.TRIAL.value]["max_concurrent"],
+            "rate_limit_rpm": TIER_DEFAULTS[TenantTier.TRIAL.value].get("rate_limit_rpm"),
+            "max_concurrent": TIER_DEFAULTS[TenantTier.TRIAL.value].get("max_concurrent"),
             "created_at": now.isoformat(),
             "updated_at": now.isoformat(),
         }

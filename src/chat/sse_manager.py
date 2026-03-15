@@ -165,12 +165,9 @@ class SSEConnectionManager:
     def can_connect(self, tenant_id: str, tier: str = "starter") -> bool:
         """Check if a new SSE connection is allowed for this tenant.
 
-        SPEC-1756: Checks global connection limit FIRST, then per-tenant
-        limit. Returns False (with global_limit_reached flag) when the
+        SPEC-1756: Checks global connection limit to protect the replica.
+        Returns False (with global_limit_reached flag) when the
         replica-wide cap is hit, signaling HTTP 503 + Retry-After.
-
-        Uses the same concurrency limits as TenantConcurrencyMiddleware
-        (from TIER_DEFAULTS.max_concurrent).
         """
         # SPEC-1756: Global cap check — protect the replica
         if self.global_connection_count >= GLOBAL_SSE_MAX_CONNECTIONS:
@@ -182,12 +179,7 @@ class SSEConnectionManager:
             )
             return False
 
-        # Per-tenant cap check
-        tier_config = TIER_DEFAULTS.get(tier, TIER_DEFAULTS.get("starter", {}))
-        max_concurrent = tier_config.get("max_concurrent", 3)
-
-        current = len(self._connections.get(tenant_id, set()))
-        return current < max_concurrent
+        return True
 
     @property
     def global_connection_count(self) -> int:

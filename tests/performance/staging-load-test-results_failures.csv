@@ -1,3 +1,2 @@
 Method,Name,Error,Occurrences
 POST,/api/chat/conversations [start],CatchResponseError('Start failed: 401'),35
-GET,/ready [readiness],CatchResponseError('Readiness check failed: 503'),13

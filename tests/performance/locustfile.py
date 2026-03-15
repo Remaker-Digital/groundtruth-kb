@@ -2,10 +2,12 @@
 
 Validates SLA commitments under realistic concurrent load:
     - P50 < 1,500ms, P95 < 2,000ms, P99 < 5,000ms
-    - Per-tenant rate limits enforced (all tiers 500rpm)
     - Multi-tenant isolation (noisy neighbor prevention)
     - SSE streaming stability under concurrent connections
     - Pipeline timeout budget (8s hard deadline)
+
+NOTE: Rate limiting has been removed from the platform. All 429 responses
+indicate genuine infrastructure overload and are counted as failures.
 
 Scenarios:
     WidgetUser        — Simulates customer widget: start conversation, send messages,
@@ -141,8 +143,6 @@ class WidgetCustomerTasks(TaskSet):
                 data = response.json()
                 self.conversation_id = data.get("conversation_id")
                 response.success()
-            elif response.status_code == 429:
-                response.success()  # Rate limiting is expected behavior
             else:
                 response.failure(f"Start failed: {response.status_code}")
 
@@ -167,7 +167,7 @@ class WidgetCustomerTasks(TaskSet):
             name="/api/chat/message [send]",
             catch_response=True,
         ) as response:
-            if response.status_code in (200, 429):
+            if response.status_code == 200:
                 response.success()
             else:
                 response.failure(f"Message failed: {response.status_code}")
@@ -188,7 +188,7 @@ class WidgetCustomerTasks(TaskSet):
             name="/api/chat/conversations/{id} [state]",
             catch_response=True,
         ) as response:
-            if response.status_code in (200, 404, 429):
+            if response.status_code in (200, 404):
                 response.success()
             else:
                 response.failure(f"State failed: {response.status_code}")
@@ -205,7 +205,7 @@ class WidgetCustomerTasks(TaskSet):
             name="/api/chat/stream/{id}/status [check]",
             catch_response=True,
         ) as response:
-            if response.status_code in (200, 404, 429):
+            if response.status_code in (200, 404):
                 response.success()
             else:
                 response.failure(f"Stream status failed: {response.status_code}")
@@ -224,7 +224,7 @@ class WidgetCustomerTasks(TaskSet):
             name="/api/chat/conversations/{id}/end [end]",
             catch_response=True,
         ) as response:
-            if response.status_code in (200, 404, 429):
+            if response.status_code in (200, 404):
                 response.success()
             else:
                 response.failure(f"End failed: {response.status_code}")
@@ -264,7 +264,7 @@ class AdminDashboardTasks(TaskSet):
             name="/api/dashboard/usage",
             catch_response=True,
         ) as response:
-            if response.status_code in (200, 401, 429, 503):
+            if response.status_code in (200, 503):
                 response.success()
             else:
                 response.failure(f"Dashboard failed: {response.status_code}")
@@ -278,7 +278,7 @@ class AdminDashboardTasks(TaskSet):
             name="/api/dashboard/usage/daily",
             catch_response=True,
         ) as response:
-            if response.status_code in (200, 401, 429, 503):
+            if response.status_code in (200, 503):
                 response.success()
 
     @task(3)
@@ -290,7 +290,7 @@ class AdminDashboardTasks(TaskSet):
             name="/api/admin/conversations [list]",
             catch_response=True,
         ) as response:
-            if response.status_code in (200, 401, 429):
+            if response.status_code == 200:
                 response.success()
 
     @task(2)
@@ -302,7 +302,7 @@ class AdminDashboardTasks(TaskSet):
             name="/api/admin/knowledge [list]",
             catch_response=True,
         ) as response:
-            if response.status_code in (200, 401, 429):
+            if response.status_code == 200:
                 response.success()
 
     @task(2)
@@ -314,7 +314,7 @@ class AdminDashboardTasks(TaskSet):
             name="/api/analytics/summary",
             catch_response=True,
         ) as response:
-            if response.status_code in (200, 401, 429):
+            if response.status_code == 200:
                 response.success()
 
     @task(1)
@@ -326,7 +326,7 @@ class AdminDashboardTasks(TaskSet):
             name="/api/analytics/intents",
             catch_response=True,
         ) as response:
-            if response.status_code in (200, 401, 429):
+            if response.status_code == 200:
                 response.success()
 
     @task(1)
@@ -338,7 +338,7 @@ class AdminDashboardTasks(TaskSet):
             name="/api/config [get]",
             catch_response=True,
         ) as response:
-            if response.status_code in (200, 401, 429):
+            if response.status_code == 200:
                 response.success()
 
     @task(1)
@@ -350,7 +350,7 @@ class AdminDashboardTasks(TaskSet):
             name="/api/admin/team [list]",
             catch_response=True,
         ) as response:
-            if response.status_code in (200, 401, 429):
+            if response.status_code == 200:
                 response.success()
 
     @task(1)
@@ -362,7 +362,7 @@ class AdminDashboardTasks(TaskSet):
             name="/api/audit [recent]",
             catch_response=True,
         ) as response:
-            if response.status_code in (200, 401, 429):
+            if response.status_code == 200:
                 response.success()
 
 

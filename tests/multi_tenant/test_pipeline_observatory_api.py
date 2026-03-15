@@ -39,6 +39,18 @@ def mock_tenant_repo():
     repo.list_active_tenant_ids = AsyncMock(
         return_value=["tenant-001", "tenant-002"]
     )
+
+    # get_tenant_comparison uses _container.query_items as async iterator
+    async def _async_query_items(**kwargs):
+        for item in [
+            {"tenant_id": "tenant-001", "customer_email": "t1@test.com", "tier": "starter"},
+            {"tenant_id": "tenant-002", "customer_email": "t2@test.com", "tier": "professional"},
+        ]:
+            yield item
+
+    container_mock = MagicMock()
+    container_mock.query_items = _async_query_items
+    repo._container = container_mock
     return repo
 
 

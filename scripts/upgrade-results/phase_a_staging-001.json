@@ -1,23 +1,35 @@
 {
-  "A1_version": "1.85.0",
+  "A1_version": "1.86.0",
   "A2_status": "active",
   "A3_activation": {
     "is_active": false,
     "is_configured": false,
-    "has_pending_changes": false,
-    "active_version": 1
+    "has_pending_changes": true,
+    "active_version": 0
   },
   "A4_conversation_count": 0,
   "A5_status_breakdown": {
     "http_status": 404,
     "note": "analytics may need params"
   },
-  "A6_kb_count": 0,
-  "A7_team_count": 1,
+  "A6_kb_count": 156,
+  "A7_team_count": 4,
   "A8_team_members": [
     {
-      "displayName": "Owner",
-      "role": "superadmin"
+      "displayName": "Alex Johnson",
+      "role": "viewer"
+    },
+    {
+      "displayName": "Maria Garcia",
+      "role": "escalation_agent"
+    },
+    {
+      "displayName": "James Williams",
+      "role": "escalation_agent"
+    },
+    {
+      "displayName": "Sarah Chen",
+      "role": "admin"
     }
   ],
   "A9_draft_status": 200,

@@ -642,17 +642,18 @@ class TestTierUtilities:
         assert 4 in layers
 
     def test_trial_history_depth(self):
-        # Trial now has professional-level entitlements: 365-day history
+        # history_depth_days removed from TIER_DEFAULTS; falls back to 90
         days = CustomerProfileService.get_history_depth_days(TenantTier.TRIAL)
-        assert days == 365
+        assert days == 90
 
     def test_starter_history_depth(self):
         days = CustomerProfileService.get_history_depth_days(TenantTier.STARTER)
         assert days == 90
 
-    def test_enterprise_history_depth_unlimited(self):
+    def test_enterprise_history_depth(self):
+        # history_depth_days removed from TIER_DEFAULTS; falls back to 90
         days = CustomerProfileService.get_history_depth_days(TenantTier.ENTERPRISE)
-        assert days is None
+        assert days == 90
 
 
 # ---------------------------------------------------------------------------

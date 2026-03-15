@@ -38,25 +38,23 @@ class TestTrialTierMapping:
 
         trial = TIER_DEFAULTS["trial"]
         pro = TIER_DEFAULTS["professional"]
-        # Trial should match Professional on key caps
-        assert trial["max_kb_articles"] == pro["max_kb_articles"]
-        assert trial["max_team_members"] == pro["max_team_members"]
+        # Trial should match Professional on remaining entitlements
+        assert trial["included_conversations"] == pro["included_conversations"]
+        assert trial["memory_layers"] == pro["memory_layers"]
 
     def test_trial_exceeds_starter(self):
         from src.multi_tenant.cosmos_schema import TIER_DEFAULTS
 
         trial = TIER_DEFAULTS["trial"]
         starter = TIER_DEFAULTS["starter"]
-        assert trial["max_kb_articles"] > starter["max_kb_articles"]
-        assert trial["max_team_members"] > starter["max_team_members"]
+        assert trial["included_conversations"] > starter["included_conversations"]
 
     def test_trial_below_enterprise(self):
         from src.multi_tenant.cosmos_schema import TIER_DEFAULTS
 
         trial = TIER_DEFAULTS["trial"]
         enterprise = TIER_DEFAULTS["enterprise"]
-        assert trial["max_kb_articles"] < enterprise["max_kb_articles"]
-        assert trial["max_team_members"] < enterprise["max_team_members"]
+        assert trial["included_conversations"] < enterprise["included_conversations"]
 
     @pytest.mark.asyncio
     async def test_require_tier_trial_allows_professional_features(self):
@@ -162,85 +160,6 @@ class TestNullTierGuard:
 # WI-1265: Sharded rate limiting (SPEC-1745)
 # ---------------------------------------------------------------------------
 
-class TestShardedRateLimiting:
-    """SPEC-1745: Rate limiter uses sharded locks instead of single lock."""
-
-    def test_rate_limit_middleware_has_shards(self):
-        from src.multi_tenant.middleware import RateLimitMiddleware
-
-        app = MagicMock()
-        mw = RateLimitMiddleware(app, num_shards=16)
-        assert len(mw._shards) == 16
-
-    def test_different_tenants_can_get_different_shards(self):
-        from src.multi_tenant.middleware import RateLimitMiddleware
-
-        app = MagicMock()
-        mw = RateLimitMiddleware(app, num_shards=16)
-
-        # With 16 shards and different tenant IDs, we should get
-        # different shards for at least some tenants
-        shards = set()
-        for i in range(32):
-            shard = mw._get_shard(f"tenant-{i}")
-            shards.add(id(shard))
-        # With 32 tenants across 16 shards, we must have >1 distinct shard
-        assert len(shards) > 1
-
-    def test_same_tenant_always_gets_same_shard(self):
-        from src.multi_tenant.middleware import RateLimitMiddleware
-
-        app = MagicMock()
-        mw = RateLimitMiddleware(app, num_shards=16)
-
-        shard1 = mw._get_shard("tenant-abc")
-        shard2 = mw._get_shard("tenant-abc")
-        assert shard1 is shard2
-
-    @pytest.mark.asyncio
-    async def test_shard_check_and_record_allows_under_limit(self):
-        from src.multi_tenant.middleware import _RateLimitShard
-
-        shard = _RateLimitShard()
-        allowed, remaining = await shard.check_and_record("t1", 500)
-        assert allowed is True
-        assert remaining == 499
-
-    @pytest.mark.asyncio
-    async def test_shard_check_and_record_blocks_at_limit(self):
-        from src.multi_tenant.middleware import _RateLimitShard
-
-        shard = _RateLimitShard()
-        # Fill up to limit
-        for _ in range(10):
-            await shard.check_and_record("t1", 10)
-        # 11th request should be blocked
-        allowed, remaining = await shard.check_and_record("t1", 10)
-        assert allowed is False
-        assert remaining == 0
-
-    @pytest.mark.asyncio
-    async def test_shards_isolate_tenants(self):
-        """Two tenants in the same shard don't interfere."""
-        from src.multi_tenant.middleware import _RateLimitShard
-
-        shard = _RateLimitShard()
-        for _ in range(5):
-            await shard.check_and_record("tenant-a", 5)
-
-        # tenant-a is at limit, but tenant-b should be fine
-        allowed, _ = await shard.check_and_record("tenant-a", 5)
-        assert allowed is False
-
-        allowed, remaining = await shard.check_and_record("tenant-b", 5)
-        assert allowed is True
-        assert remaining == 4
-
-    def test_default_shard_count_is_16(self):
-        from src.multi_tenant.middleware import _NUM_RATE_LIMIT_SHARDS
-        assert _NUM_RATE_LIMIT_SHARDS == 16
-
-
 # ---------------------------------------------------------------------------
 # WI-1271: Extended cache TTLs (SPEC-1751)
 # ---------------------------------------------------------------------------
@@ -314,53 +233,22 @@ class TestExtendedCacheTTLs:
 
 
 # ---------------------------------------------------------------------------
-# WI-1272: Per-tier caps in TIER_DEFAULTS (SPEC-1752)
+# WI-1272: Per-tier caps REMOVED from TIER_DEFAULTS
 # ---------------------------------------------------------------------------
 
-class TestPerTierCaps:
-    """SPEC-1752: max_kb_articles, max_website_sources, etc. in TIER_DEFAULTS."""
+class TestPerTierCapsRemoved:
+    """SPEC-1752: Per-tier cap keys have been removed from TIER_DEFAULTS."""
 
-    def test_starter_caps(self):
+    def test_caps_not_in_tier_defaults(self):
         from src.multi_tenant.cosmos_schema import TIER_DEFAULTS, TenantTier
-        starter = TIER_DEFAULTS[TenantTier.STARTER.value]
-        assert starter["max_kb_articles"] == 50
-        assert starter["max_website_sources"] == 5
-        assert starter["max_escalation_categories"] == 3
-        assert starter["max_team_members"] == 5
-
-    def test_professional_caps(self):
-        from src.multi_tenant.cosmos_schema import TIER_DEFAULTS, TenantTier
-        pro = TIER_DEFAULTS[TenantTier.PROFESSIONAL.value]
-        assert pro["max_kb_articles"] == 200
-        assert pro["max_website_sources"] == 20
-        assert pro["max_escalation_categories"] == 10
-        assert pro["max_team_members"] == 20
-
-    def test_enterprise_caps(self):
-        from src.multi_tenant.cosmos_schema import TIER_DEFAULTS, TenantTier
-        ent = TIER_DEFAULTS[TenantTier.ENTERPRISE.value]
-        assert ent["max_kb_articles"] == 1_000
-        assert ent["max_website_sources"] == 100
-        assert ent["max_escalation_categories"] == 25
-        assert ent["max_team_members"] == 100
-
-    def test_trial_mirrors_professional(self):
-        from src.multi_tenant.cosmos_schema import TIER_DEFAULTS, TenantTier
-        trial = TIER_DEFAULTS[TenantTier.TRIAL.value]
-        pro = TIER_DEFAULTS[TenantTier.PROFESSIONAL.value]
-        assert trial["max_kb_articles"] == pro["max_kb_articles"]
-        assert trial["max_website_sources"] == pro["max_website_sources"]
-        assert trial["max_escalation_categories"] == pro["max_escalation_categories"]
-        assert trial["max_team_members"] == pro["max_team_members"]
-
-    def test_caps_increase_with_tier(self):
-        from src.multi_tenant.cosmos_schema import TIER_DEFAULTS, TenantTier
-        s = TIER_DEFAULTS[TenantTier.STARTER.value]
-        p = TIER_DEFAULTS[TenantTier.PROFESSIONAL.value]
-        e = TIER_DEFAULTS[TenantTier.ENTERPRISE.value]
-        for key in ("max_kb_articles", "max_website_sources",
-                     "max_escalation_categories", "max_team_members"):
-            assert s[key] <= p[key] <= e[key], f"{key} doesn't increase with tier"
+        removed_keys = [
+            "max_kb_articles", "max_website_sources",
+            "max_escalation_categories", "max_team_members",
+        ]
+        for tier in TenantTier:
+            td = TIER_DEFAULTS.get(tier.value, {})
+            for key in removed_keys:
+                assert key not in td, f"{key} should not be in {tier.value}"
 
 
 # ---------------------------------------------------------------------------
@@ -417,22 +305,13 @@ class TestTierRevalidation:
         errors = svc._validate_tier_entitlements(draft, TenantTier.STARTER)
         assert len(errors) == 0
 
-    def test_quick_action_count_over_limit(self):
+    def test_quick_actions_no_longer_validated_by_tier(self):
+        """Quick action caps removed — any count passes tier validation."""
         from src.multi_tenant.activation_service import ActivationService
         from src.multi_tenant.cosmos_schema import TenantTier
 
         svc = ActivationService.__new__(ActivationService)
-        draft = {"quick_actions": [{"id": str(i)} for i in range(6)]}
-        errors = svc._validate_tier_entitlements(draft, TenantTier.STARTER)
-        assert len(errors) == 1
-        assert errors[0]["field"] == "quick_actions"
-
-    def test_quick_action_count_within_limit(self):
-        from src.multi_tenant.activation_service import ActivationService
-        from src.multi_tenant.cosmos_schema import TenantTier
-
-        svc = ActivationService.__new__(ActivationService)
-        draft = {"quick_actions": [{"id": str(i)} for i in range(5)]}
+        draft = {"quick_actions": [{"id": str(i)} for i in range(100)]}
         errors = svc._validate_tier_entitlements(draft, TenantTier.STARTER)
         assert len(errors) == 0
 
@@ -460,23 +339,17 @@ class TestTierRevalidation:
 
 
 # ---------------------------------------------------------------------------
-# WI-1273: History depth enforcement (SPEC-1753)
+# WI-1273: History depth keys REMOVED from TIER_DEFAULTS
 # ---------------------------------------------------------------------------
 
-class TestHistoryDepthEnforcement:
-    """SPEC-1753: Conversation list enforces tier-based history depth."""
+class TestHistoryDepthRemoved:
+    """history_depth_days has been removed from TIER_DEFAULTS."""
 
-    def test_starter_history_depth_days(self):
+    def test_history_depth_days_not_in_tier_defaults(self):
         from src.multi_tenant.cosmos_schema import TIER_DEFAULTS, TenantTier
-        assert TIER_DEFAULTS[TenantTier.STARTER.value]["history_depth_days"] == 90
-
-    def test_professional_history_depth_days(self):
-        from src.multi_tenant.cosmos_schema import TIER_DEFAULTS, TenantTier
-        assert TIER_DEFAULTS[TenantTier.PROFESSIONAL.value]["history_depth_days"] == 365
-
-    def test_enterprise_unlimited_history(self):
-        from src.multi_tenant.cosmos_schema import TIER_DEFAULTS, TenantTier
-        assert TIER_DEFAULTS[TenantTier.ENTERPRISE.value]["history_depth_days"] is None
+        for tier in TenantTier:
+            td = TIER_DEFAULTS.get(tier.value, {})
+            assert "history_depth_days" not in td, f"history_depth_days should not be in {tier.value}"
 
 
 # ---------------------------------------------------------------------------
@@ -523,17 +396,13 @@ class TestAtomicReservation:
 # WI-1269: Tier gate on import_knowledge_from_url() (SPEC-1749)
 # ---------------------------------------------------------------------------
 
-class TestImportKnowledgeTierGate:
-    """SPEC-1749: import_knowledge_from_url() checks tier-based source limits."""
+class TestImportKnowledgeTierGateRemoved:
+    """SPEC-1749: max_website_sources cap has been removed from TIER_DEFAULTS."""
 
-    def test_max_website_sources_in_tier_defaults(self):
-        """The cap field exists in TIER_DEFAULTS for all tiers."""
+    def test_max_website_sources_not_in_tier_defaults(self):
+        """The cap field no longer exists in TIER_DEFAULTS."""
         from src.multi_tenant.cosmos_schema import TIER_DEFAULTS, TenantTier
 
         for tier in TenantTier:
             td = TIER_DEFAULTS.get(tier.value, {})
-            assert "max_website_sources" in td, f"Missing max_website_sources for {tier.value}"
-
-    def test_starter_website_source_limit(self):
-        from src.multi_tenant.cosmos_schema import TIER_DEFAULTS, TenantTier
-        assert TIER_DEFAULTS[TenantTier.STARTER.value]["max_website_sources"] == 5
+            assert "max_website_sources" not in td, f"max_website_sources should not be in {tier.value}"

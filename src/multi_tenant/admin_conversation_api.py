@@ -459,21 +459,6 @@ async def list_conversations(
     # SPEC-1753: Enforce tier-based history depth at the API boundary.
     # Without this, conversations beyond the retention window are visible
     # to the admin until the daily DataRetentionService sweep runs.
-    if ctx.tier is not None:
-        from src.multi_tenant.cosmos_schema import TIER_DEFAULTS
-        from datetime import timedelta
-
-        _tier_key = ctx.tier.value if hasattr(ctx.tier, "value") else str(ctx.tier)
-        tier_defaults = TIER_DEFAULTS.get(_tier_key, {})
-        history_days = tier_defaults.get("history_depth_days")
-        if history_days is not None:
-            cutoff = (
-                datetime.now(timezone.utc) - timedelta(days=history_days)
-            ).isoformat()
-            # Only tighten — never loosen a caller-supplied `since`.
-            if since is None or since < cutoff:
-                since = cutoff
-
     # Get total count and page of results
     total_count = await repo.count_filtered(
         tenant_id=ctx.tenant_id,

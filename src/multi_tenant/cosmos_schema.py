@@ -2269,74 +2269,40 @@ def get_collection_configs() -> list[CollectionConfig]:
 # Tier defaults (Decision #5 — rate limits, Decision #14 — concurrency)
 # ---------------------------------------------------------------------------
 
-# Admin RPM: All tiers share the same rate limit (500 rpm).
-# Per-tenant overrides via TenantDocument rate_limit_rpm field take
-# precedence (resolved in middleware._get_limit).
-_ADMIN_RPM = 500
+# SPEC-1803: Data-driven RPM default from ramp-to-overload testing (2026-03-14).
+# 1,380 RPM safe capacity per replica. 300 RPM/tenant allows 9 concurrent
+# max-rate tenants before single-replica saturation. Production min=2 replicas
+# doubles this to 18. SPEC-1805: minimum floor is 10 RPM.
+RATE_LIMIT_RPM_DEFAULT = 300
+RATE_LIMIT_RPM_FLOOR = 10
 
 TIER_DEFAULTS: dict[str, dict[str, Any]] = {
     # Trial: Full professional-grade entitlements for 14 days.
     # After expiry the merchant chooses Basic, Professional, Professional+, or Enterprise.
     TenantTier.TRIAL.value: {
-        "included_conversations": 5_000, # Same as professional
-        "rate_limit_rpm": _ADMIN_RPM,
-        "max_concurrent": 10,
-        "queue_depth": 20,
-        "history_depth_days": 365,
+        "included_conversations": 5_000,
         "memory_layers": [1, 2, 3],
         "overage_rate": 0.0,            # No overage during trial — hard cap
         "trial_duration_days": 14,      # 14-day trial period
-        "max_quick_actions": 20,
-        "max_quick_action_assignments": 50,
-        "max_kb_articles": 200,               # SPEC-1752
-        "max_website_sources": 20,            # SPEC-1752
-        "max_escalation_categories": 10,      # SPEC-1752
-        "max_team_members": 20,               # SPEC-1752
+        "rate_limit_rpm": RATE_LIMIT_RPM_DEFAULT,
     },
     TenantTier.STARTER.value: {
         "included_conversations": 1_000,
-        "rate_limit_rpm": _ADMIN_RPM,
-        "max_concurrent": 5,
-        "queue_depth": 10,
-        "history_depth_days": 90,
         "memory_layers": [1, 2],
         "overage_rate": 0.04,
-        "max_quick_actions": 5,
-        "max_quick_action_assignments": 10,
-        "max_kb_articles": 50,                # SPEC-1752
-        "max_website_sources": 5,             # SPEC-1752
-        "max_escalation_categories": 3,       # SPEC-1752
-        "max_team_members": 5,                # SPEC-1752
+        "rate_limit_rpm": RATE_LIMIT_RPM_DEFAULT,
     },
     TenantTier.PROFESSIONAL.value: {
         "included_conversations": 5_000,
-        "rate_limit_rpm": _ADMIN_RPM,
-        "max_concurrent": 10,
-        "queue_depth": 20,
-        "history_depth_days": 365,
         "memory_layers": [1, 2, 3],
         "overage_rate": 0.025,
-        "max_quick_actions": 20,
-        "max_quick_action_assignments": 50,
-        "max_kb_articles": 200,               # SPEC-1752
-        "max_website_sources": 20,            # SPEC-1752
-        "max_escalation_categories": 10,      # SPEC-1752
-        "max_team_members": 20,               # SPEC-1752
+        "rate_limit_rpm": RATE_LIMIT_RPM_DEFAULT,
     },
     TenantTier.ENTERPRISE.value: {
         "included_conversations": 20_000,
-        "rate_limit_rpm": _ADMIN_RPM,     # Same 500 RPM for all tiers
-        "max_concurrent": 30,
-        "queue_depth": 50,
-        "history_depth_days": None,     # Unlimited
         "memory_layers": [1, 2, 3, 4],
         "overage_rate": 0.015,
-        "max_quick_actions": 50,
-        "max_quick_action_assignments": 200,
-        "max_kb_articles": 1_000,             # SPEC-1752
-        "max_website_sources": 100,           # SPEC-1752
-        "max_escalation_categories": 25,      # SPEC-1752
-        "max_team_members": 100,              # SPEC-1752
+        "rate_limit_rpm": RATE_LIMIT_RPM_DEFAULT,
     },
 }
 

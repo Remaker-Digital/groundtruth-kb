@@ -132,15 +132,15 @@ class TestTrialProvisioning:
 
     @pytest.mark.asyncio
     async def test_provision_sets_tier_rate_limits(self):
-        """Trial tenant gets TRIAL tier rate limits from TIER_DEFAULTS."""
+        """SPEC-1803: Trial tenant gets 300 RPM default from TIER_DEFAULTS."""
         repos = _mock_repos()
         service = _make_service(repos)
 
         result = await service.provision_trial(seed_demo_data=False)
 
-        trial_defaults = TIER_DEFAULTS[TenantTier.TRIAL.value]
-        assert result["rate_limit_rpm"] == trial_defaults["rate_limit_rpm"]
-        assert result["max_concurrent"] == trial_defaults["max_concurrent"]
+        # SPEC-1803: rate_limit_rpm restored at 300 RPM
+        assert result.get("rate_limit_rpm") == 300
+        assert result.get("max_concurrent") is None
 
 
 # ---------------------------------------------------------------------------

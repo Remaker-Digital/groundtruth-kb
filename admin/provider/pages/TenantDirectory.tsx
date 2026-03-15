@@ -203,6 +203,12 @@ export function TenantDirectoryPage() {
   const [expiryDate, setExpiryDate] = useState('');
   const [expiryLoading, setExpiryLoading] = useState(false);
 
+  // Rate limit modal state (SPEC-1804)
+  const [rlTenantId, setRlTenantId] = useState<string | null>(null);
+  const [rlValue, setRlValue] = useState<string>('');
+  const [rlEffective, setRlEffective] = useState<number | null>(null);
+  const [rlLoading, setRlLoading] = useState(false);
+
   const resetCreateForm = useCallback(() => {
     setCreateForm({ merchantName: '', merchantUrl: '', superadminEmail: '', tier: 'starter', expiresDate: '' });
     setCreateResult(null);
@@ -319,6 +325,53 @@ export function TenantDirectoryPage() {
       setResendLoading(null);
     }
   }, [apiFetch, onNotify]);
+
+  // SPEC-1804: Open rate limit modal — fetch current value first
+  const handleOpenRateLimit = useCallback(async (tenantId: string) => {
+    setRlTenantId(tenantId);
+    setRlValue('');
+    setRlEffective(null);
+    try {
+      const res = await apiFetch(`/api/superadmin/tenants/${tenantId}/rate-limit`);
+      if (res.ok) {
+        const data = await res.json();
+        setRlValue(data.rateLimitRpm != null ? String(data.rateLimitRpm) : '');
+        setRlEffective(data.effectiveRpm);
+      }
+    } catch {
+      // non-fatal — modal opens with empty state
+    }
+  }, [apiFetch]);
+
+  const handleSaveRateLimit = useCallback(async () => {
+    if (!rlTenantId) return;
+    setRlLoading(true);
+    try {
+      const rpm = rlValue.trim() === '' ? null : parseInt(rlValue, 10);
+      if (rpm !== null && (isNaN(rpm) || rpm < 10)) {
+        onNotify('RPM must be at least 10, or leave empty for tier default (300)', 'error');
+        setRlLoading(false);
+        return;
+      }
+      const res = await apiFetch(`/api/superadmin/tenants/${rlTenantId}/rate-limit`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ rateLimitRpm: rpm }),
+      });
+      if (res.ok) {
+        const data = await res.json();
+        onNotify(`Rate limit updated: ${data.effectiveRpm} RPM`, 'success');
+        setRlTenantId(null);
+      } else {
+        const err = await res.json().catch(() => ({ detail: 'Unknown error' }));
+        onNotify(`Failed: ${err.detail || res.statusText}`, 'error');
+      }
+    } catch {
+      onNotify('Network error updating rate limit', 'error');
+    } finally {
+      setRlLoading(false);
+    }
+  }, [rlTenantId, rlValue, apiFetch, onNotify]);
 
   // Fetch summary on mount
   useEffect(() => {
@@ -514,6 +567,11 @@ export function TenantDirectoryPage() {
                               onClick={() => handleResendWelcome(t.tenantId)}
                             >
                               {resendLoading === t.tenantId ? 'Sending…' : 'Resend Welcome Email'}
+                            </Menu.Item>
+                            <Menu.Item
+                              onClick={() => handleOpenRateLimit(t.tenantId)}
+                            >
+                              Set Rate Limit…
                             </Menu.Item>
                             <Menu.Divider />
                             <Menu.Item
@@ -776,6 +834,47 @@ export function TenantDirectoryPage() {
             </Group>
           </Stack>
         )}
+      </Modal>
+
+      {/* Set Rate Limit Modal (SPEC-1804) */}
+      <Modal
+        opened={rlTenantId !== null}
+        onClose={() => setRlTenantId(null)}
+        title="Set Rate Limit"
+        size="sm"
+      >
+        <Stack gap="md">
+          <Text size="sm" c="dimmed">
+            Set the RPM (requests per minute) limit for this tenant.
+            Leave empty to use the tier default (300 RPM).
+            Minimum: 10 RPM.
+          </Text>
+          <TextInput
+            label="Rate Limit (RPM)"
+            placeholder="300 (tier default)"
+            value={rlValue}
+            onChange={(e) => setRlValue(e.currentTarget.value)}
+            type="number"
+            min={10}
+          />
+          {rlEffective !== null && (
+            <Text size="sm">
+              Current effective limit: <strong>{rlEffective} RPM</strong>
+            </Text>
+          )}
+          <Group justify="flex-end">
+            <Button variant="default" onClick={() => setRlTenantId(null)}>
+              Cancel
+            </Button>
+            <Button
+              color="action"
+              loading={rlLoading}
+              onClick={handleSaveRateLimit}
+            >
+              Save
+            </Button>
+          </Group>
+        </Stack>
       </Modal>
     </Stack>
   );

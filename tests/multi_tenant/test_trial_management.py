@@ -27,6 +27,8 @@ from src.multi_tenant.cosmos_schema import (
     TenantTier,
     TIER_DEFAULTS,
 )
+
+
 from src.multi_tenant.trial_management import (
     DEFAULT_TRIAL_CONVERSATION_LIMIT,
     DEFAULT_TRIAL_DURATION_DAYS,
@@ -146,8 +148,8 @@ def _make_trial_tenant(
         "consent_status": "not_asked",
         "trial_expires_at": expires_at.isoformat(),
         "trial_conversation_limit": conversation_limit,
-        "rate_limit_rpm": TIER_DEFAULTS[TenantTier.TRIAL.value]["rate_limit_rpm"],
-        "max_concurrent": TIER_DEFAULTS[TenantTier.TRIAL.value]["max_concurrent"],
+        "rate_limit_rpm": None,  # rate_limit_rpm removed from TIER_DEFAULTS
+        "max_concurrent": None,  # max_concurrent removed from TIER_DEFAULTS
         "created_at": created_at.isoformat(),
         "updated_at": created_at.isoformat(),
     }
@@ -173,8 +175,8 @@ def _make_paid_tenant(
         "consent_status": "not_asked",
         "trial_expires_at": None,
         "trial_conversation_limit": None,
-        "rate_limit_rpm": TIER_DEFAULTS.get(tier, {}).get("rate_limit_rpm"),
-        "max_concurrent": TIER_DEFAULTS.get(tier, {}).get("max_concurrent"),
+        "rate_limit_rpm": None,  # rate_limit_rpm removed from TIER_DEFAULTS
+        "max_concurrent": None,  # max_concurrent removed from TIER_DEFAULTS
         "created_at": now.isoformat(),
         "updated_at": now.isoformat(),
     }
@@ -546,8 +548,9 @@ class TestTrialConversion:
         assert ops_dict["/billing_channel"] == BillingChannel.STRIPE.value
         assert ops_dict["/trial_expires_at"] is None
         assert ops_dict["/trial_conversation_limit"] is None
-        assert ops_dict["/rate_limit_rpm"] == TIER_DEFAULTS[TenantTier.STARTER.value]["rate_limit_rpm"]
-        assert ops_dict["/max_concurrent"] == TIER_DEFAULTS[TenantTier.STARTER.value]["max_concurrent"]
+        # SPEC-1803: rate_limit_rpm restored at 300 RPM in TIER_DEFAULTS
+        assert ops_dict.get("/rate_limit_rpm") == 300
+        assert ops_dict.get("/max_concurrent") is None
 
     async def test_tm_20_convert_with_stripe_customer_id(self):
         """TM-20: Convert trial with Stripe customer and subscription IDs."""

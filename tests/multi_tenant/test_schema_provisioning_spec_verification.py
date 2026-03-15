@@ -88,12 +88,12 @@ class TestSpec0250BackendTierGates:
         for tier in TenantTier:
             assert tier.value in TIER_DEFAULTS, f"Missing TIER_DEFAULTS for {tier.value}"
 
-    def test_tier_defaults_have_rate_limits(self):
-        """Each tier has rate_limit_rpm in its defaults."""
+    def test_tier_defaults_rate_limits_present(self):
+        """SPEC-1803: rate_limit_rpm restored at 300 RPM for all tiers."""
         from src.multi_tenant.cosmos_schema import TIER_DEFAULTS
 
         for tier, defaults in TIER_DEFAULTS.items():
-            assert "rate_limit_rpm" in defaults, f"Missing rate_limit_rpm for {tier}"
+            assert defaults.get("rate_limit_rpm") == 300, f"Expected 300 RPM for {tier}"
 
     def test_starter_has_fewer_conversations_than_professional(self):
         """Starter tier includes fewer conversations than Professional."""
@@ -112,31 +112,31 @@ class TestSpec0250BackendTierGates:
 class TestSpec0296NoisyNeighborPrevention:
     """SPEC-0296: Noisy neighbor prevention shall use rate limiting.
 
-    Verified by: TIER_DEFAULTS include rate_limit_rpm, max_concurrent,
-    and queue_depth per tier.
+    Verified by: rate_limit_rpm, max_concurrent, and queue_depth have been
+    removed from TIER_DEFAULTS. Rate limiting is now handled via per-tenant
+    overrides on TenantContext.rate_limit_rpm.
     """
 
-    def test_all_tiers_have_rate_limit(self):
-        """Every tier has a rate_limit_rpm."""
+    def test_rate_limit_restored_in_tier_defaults(self):
+        """SPEC-1803: rate_limit_rpm restored at 300 RPM (data-driven)."""
         from src.multi_tenant.cosmos_schema import TIER_DEFAULTS
 
         for tier in TIER_DEFAULTS:
-            assert TIER_DEFAULTS[tier]["rate_limit_rpm"] > 0
+            assert TIER_DEFAULTS[tier]["rate_limit_rpm"] == 300
 
-    def test_all_tiers_have_max_concurrent(self):
-        """Every tier has max_concurrent connections."""
+    def test_max_concurrent_removed_from_tier_defaults(self):
+        """max_concurrent no longer in TIER_DEFAULTS."""
         from src.multi_tenant.cosmos_schema import TIER_DEFAULTS
 
         for tier in TIER_DEFAULTS:
-            assert TIER_DEFAULTS[tier]["max_concurrent"] > 0
+            assert "max_concurrent" not in TIER_DEFAULTS[tier]
 
-    def test_enterprise_has_highest_concurrency(self):
-        """Enterprise tier has the highest max_concurrent."""
+    def test_queue_depth_removed_from_tier_defaults(self):
+        """queue_depth no longer in TIER_DEFAULTS."""
         from src.multi_tenant.cosmos_schema import TIER_DEFAULTS
 
-        enterprise = TIER_DEFAULTS["enterprise"]["max_concurrent"]
-        for tier in ["trial", "starter", "professional"]:
-            assert enterprise >= TIER_DEFAULTS[tier]["max_concurrent"]
+        for tier in TIER_DEFAULTS:
+            assert "queue_depth" not in TIER_DEFAULTS[tier]
 
 
 # ---------------------------------------------------------------------------

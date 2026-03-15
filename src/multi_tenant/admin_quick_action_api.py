@@ -234,13 +234,6 @@ def _get_repo() -> Any:
 # ---------------------------------------------------------------------------
 
 
-def _get_tier_limit(tier: str | None, key: str) -> int:
-    """Get a tier-specific limit from TIER_DEFAULTS."""
-    if tier and tier in TIER_DEFAULTS:
-        return TIER_DEFAULTS[tier].get(key, 5)
-    return 5  # Fallback default
-
-
 # SPEC-1759: Per-tenant locks with LRU eviction to prevent unbounded growth.
 # At 680 tenants, locks are lightweight (~100 bytes each) but should still
 # be bounded. OrderedDict provides O(1) LRU eviction. Evicted locks are
@@ -415,16 +408,6 @@ async def create_quick_action(
     # count check + write to prevent TOCTOU race conditions.
     lock = _get_tenant_lock(ctx.tenant_id)
     async with lock:
-        # Check tier limit
-        existing = await repo.get_quick_actions(ctx.tenant_id)
-        max_actions = _get_tier_limit(ctx.tier, "max_quick_actions")
-        if len(existing) >= max_actions:
-            raise HTTPException(
-                status_code=403,
-                detail=f"Quick action limit reached ({max_actions} for {ctx.tier} tier). "
-                f"Upgrade your plan to create more.",
-            )
-
         # Ensure draft exists before QA write (D20 fix)
         await _ensure_qa_draft(ctx)
 
@@ -539,14 +522,6 @@ async def upsert_page_assignment(
             and a.get("page_handle") == body.page_handle
             for a in existing_assignments
         )
-        if is_new:
-            max_assignments = _get_tier_limit(ctx.tier, "max_quick_action_assignments")
-            if len(existing_assignments) >= max_assignments:
-                raise HTTPException(
-                    status_code=403,
-                    detail=f"Assignment limit reached ({max_assignments} for {ctx.tier} tier).",
-                )
-
         # Ensure draft exists before QA write (D68 fix)
         await _ensure_qa_draft(ctx)
 

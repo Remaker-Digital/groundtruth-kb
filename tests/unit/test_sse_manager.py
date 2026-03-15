@@ -106,27 +106,23 @@ class TestSSEConnectionLifecycle:
         mgr = SSEConnectionManager()
         assert mgr.can_connect("tenant-001", "starter") is True
 
-    def test_can_connect_at_limit(self):
+    def test_can_connect_no_per_tenant_limit(self):
         mgr = SSEConnectionManager()
-        # Starter has max_concurrent=5
-        mgr.connect("tenant-001", "conv-1")
-        mgr.connect("tenant-001", "conv-2")
-        mgr.connect("tenant-001", "conv-3")
-        mgr.connect("tenant-001", "conv-4")
-        mgr.connect("tenant-001", "conv-5")
-        assert mgr.can_connect("tenant-001", "starter") is False
+        # Per-tenant max_concurrent removed; no per-tenant limit
+        for i in range(10):
+            mgr.connect("tenant-001", f"conv-{i}")
+        # Still allowed — only global limit applies
+        assert mgr.can_connect("tenant-001", "starter") is True
 
-    def test_disconnect_frees_slot(self):
+    def test_disconnect_reduces_count(self):
         mgr = SSEConnectionManager()
         mgr.connect("tenant-001", "conv-1")
         mgr.connect("tenant-001", "conv-2")
         mgr.connect("tenant-001", "conv-3")
-        mgr.connect("tenant-001", "conv-4")
-        mgr.connect("tenant-001", "conv-5")
-        assert mgr.can_connect("tenant-001", "starter") is False
+        assert mgr.get_active_count("tenant-001") == 3
 
         mgr.disconnect("tenant-001", "conv-1")
-        assert mgr.can_connect("tenant-001", "starter") is True
+        assert mgr.get_active_count("tenant-001") == 2
 
     def test_get_active_count(self):
         mgr = SSEConnectionManager()

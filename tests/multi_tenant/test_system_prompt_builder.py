@@ -544,10 +544,10 @@ class TestTierDifferentiation:
         assert "Conversation history: Unlimited" in section
 
     def test_starter_history_depth(self):
-        """Starter tier shows limited history days."""
+        """Starter tier shows unlimited history since history_depth_days
+        was removed from TIER_DEFAULTS."""
         section = _build_tier_section(TenantTier.STARTER)
-        history_days = TIER_DEFAULTS[TenantTier.STARTER.value]["history_depth_days"]
-        assert f"Conversation history: {history_days} days" in section
+        assert "Conversation history: Unlimited" in section
 
 
 # ---------------------------------------------------------------------------

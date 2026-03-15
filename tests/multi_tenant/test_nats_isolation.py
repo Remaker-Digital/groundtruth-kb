@@ -206,8 +206,9 @@ class TestProvisioning:
 
         assert result["updated"] is True
         assert result["tier"] == "enterprise"
-        enterprise_depth = TIER_DEFAULTS["enterprise"]["queue_depth"]
-        assert result["max_msgs_per_subject"] == enterprise_depth
+        # queue_depth removed from TIER_DEFAULTS; product code falls back to 5
+        expected_depth = TIER_DEFAULTS.get("enterprise", {}).get("queue_depth", 5)
+        assert result["max_msgs_per_subject"] == expected_depth
         manager._js.update_stream.assert_awaited_once()
 
     @pytest.mark.asyncio
@@ -235,12 +236,13 @@ class TestProvisioning:
 
     @pytest.mark.asyncio
     async def test_ni_19_tier_aware_queue_depth(self, manager: TenantNATSManager) -> None:
-        """NI-19: Queue depth matches TIER_DEFAULTS for each tier."""
+        """NI-19: Queue depth uses fallback default (queue_depth removed from TIER_DEFAULTS)."""
         for tier in [TenantTier.STARTER, TenantTier.PROFESSIONAL, TenantTier.ENTERPRISE]:
             manager._js.add_stream.reset_mock()
             result = await manager.provision_tenant_topics(TENANT_A, tier)
 
-            expected_depth = TIER_DEFAULTS[tier.value]["queue_depth"]
+            # queue_depth removed from TIER_DEFAULTS; product code falls back to 5
+            expected_depth = TIER_DEFAULTS.get(tier.value, {}).get("queue_depth", 5)
             assert result["max_msgs_per_subject"] == expected_depth
 
             call_args = manager._js.add_stream.call_args
@@ -249,9 +251,10 @@ class TestProvisioning:
 
     @pytest.mark.asyncio
     async def test_ni_19_trial_tier_queue_depth(self, manager: TenantNATSManager) -> None:
-        """NI-19 supplement: Trial tier has its own queue depth."""
+        """NI-19 supplement: Trial tier uses fallback queue depth."""
         result = await manager.provision_tenant_topics(TENANT_A, TenantTier.TRIAL)
-        expected_depth = TIER_DEFAULTS["trial"]["queue_depth"]
+        # queue_depth removed from TIER_DEFAULTS; product code falls back to 5
+        expected_depth = TIER_DEFAULTS.get("trial", {}).get("queue_depth", 5)
         assert result["max_msgs_per_subject"] == expected_depth
 
     @pytest.mark.asyncio

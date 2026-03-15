@@ -202,36 +202,39 @@ def test_cpd_06_available_layers_enterprise():
 
 
 # ---------------------------------------------------------------------------
-# CPD-07: get_history_depth_days — Starter returns 90
+# CPD-07: get_history_depth_days — Starter returns 90 (fallback)
 # ---------------------------------------------------------------------------
 
 
 def test_cpd_07_history_depth_starter():
-    """Starter tier Layer 2 history should be 90 days."""
+    """Starter tier Layer 2 history should be 90 days (fallback after
+    history_depth_days removed from TIER_DEFAULTS)."""
     depth = CustomerProfileService.get_history_depth_days(TenantTier.STARTER)
     assert depth == 90
 
 
 # ---------------------------------------------------------------------------
-# CPD-08: get_history_depth_days — Professional returns 365
+# CPD-08: get_history_depth_days — Professional returns 90 (fallback)
 # ---------------------------------------------------------------------------
 
 
 def test_cpd_08_history_depth_professional():
-    """Professional tier Layer 2 history should be 365 days."""
+    """Professional tier Layer 2 history returns 90 days (fallback after
+    history_depth_days removed from TIER_DEFAULTS)."""
     depth = CustomerProfileService.get_history_depth_days(TenantTier.PROFESSIONAL)
-    assert depth == 365
+    assert depth == 90
 
 
 # ---------------------------------------------------------------------------
-# CPD-09: get_history_depth_days — Enterprise returns None (unlimited)
+# CPD-09: get_history_depth_days — Enterprise returns 90 (fallback)
 # ---------------------------------------------------------------------------
 
 
 def test_cpd_09_history_depth_enterprise():
-    """Enterprise tier Layer 2 history should be unlimited (None)."""
+    """Enterprise tier Layer 2 history returns 90 days (fallback after
+    history_depth_days removed from TIER_DEFAULTS)."""
     depth = CustomerProfileService.get_history_depth_days(TenantTier.ENTERPRISE)
-    assert depth is None
+    assert depth == 90
 
 
 # ---------------------------------------------------------------------------

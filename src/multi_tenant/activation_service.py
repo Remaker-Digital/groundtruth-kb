@@ -593,7 +593,6 @@ class ActivationService:
 
         tier_defaults = TIER_DEFAULTS.get(tier.value, {})
         allowed_layers = set(tier_defaults.get("memory_layers", [1, 2, 3]))
-        max_qa = tier_defaults.get("max_quick_actions")
         errors: list[dict[str, str]] = []
 
         # Custom instructions require Professional+ (Starter has no
@@ -622,18 +621,6 @@ class ActivationService:
                         ),
                     })
                     break  # One error is enough
-
-        # Quick action count within tier limit.
-        if max_qa is not None:
-            qa_count = len(draft.get("quick_actions", []))
-            if qa_count > max_qa:
-                errors.append({
-                    "field": "quick_actions",
-                    "message": (
-                        f"Quick action limit exceeded ({qa_count}/{max_qa} "
-                        f"for {tier.value} tier). Remove extras or upgrade."
-                    ),
-                })
 
         return errors
 

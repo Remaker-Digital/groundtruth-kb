@@ -58,12 +58,12 @@ _ENTERPRISE = TenantTier.ENTERPRISE.value
 
 
 def _starter_rpm() -> int:
-    """Get the Starter tier's rate_limit_rpm from TIER_DEFAULTS."""
-    return TIER_DEFAULTS[_STARTER]["rate_limit_rpm"]
+    """Get the Starter tier's rate_limit_rpm — falls back to 10 (monitor default)."""
+    return TIER_DEFAULTS.get(_STARTER, {}).get("rate_limit_rpm", 10)
 
 
 def _pro_rpm() -> int:
-    return TIER_DEFAULTS[_PROFESSIONAL]["rate_limit_rpm"]
+    return TIER_DEFAULTS.get(_PROFESSIONAL, {}).get("rate_limit_rpm", 10)
 
 
 def _window_capacity(rpm: int) -> float:
@@ -830,9 +830,8 @@ class TestProfessionalTier:
         # Uniform admin RPM: professional == starter
         assert pro_rpm == starter_rpm
 
-        # Tiers differ on concurrency, not RPM
+        # max_concurrent removed from TIER_DEFAULTS — tiers now differ
+        # only on included_conversations, memory_layers, overage_rate
         from src.multi_tenant.cosmos_schema import TIER_DEFAULTS
-        assert (
-            TIER_DEFAULTS["professional"]["max_concurrent"]
-            > TIER_DEFAULTS["starter"]["max_concurrent"]
-        )
+        assert "max_concurrent" not in TIER_DEFAULTS["professional"]
+        assert "max_concurrent" not in TIER_DEFAULTS["starter"]

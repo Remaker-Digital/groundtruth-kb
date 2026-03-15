@@ -151,26 +151,28 @@ class TestRetentionEnforcement:
         assert "active" in query_arg
         assert "past_due" in query_arg
 
-    async def test_dr_02_trial_tier_uses_professional_cutoff(self):
-        """DR-02: Trial tier uses professional-level retention cutoff (365 days)."""
+    async def test_dr_02_trial_tier_uses_fallback_cutoff(self):
+        """DR-02: Trial tier uses fallback retention cutoff (90 days) since
+        history_depth_days was removed from TIER_DEFAULTS."""
         service, _ = _make_service()
         retention_days = service.get_retention_days(TenantTier.TRIAL.value)
-        assert retention_days == 365
-        assert TIER_DEFAULTS[TenantTier.TRIAL.value]["history_depth_days"] == 365
+        assert retention_days == 90
+        assert "history_depth_days" not in TIER_DEFAULTS[TenantTier.TRIAL.value]
 
     async def test_dr_03_starter_tier_uses_90_day_cutoff(self):
-        """DR-03: Starter tier uses 90-day retention cutoff."""
+        """DR-03: Starter tier uses 90-day retention cutoff (fallback)."""
         service, _ = _make_service()
         retention_days = service.get_retention_days(TenantTier.STARTER.value)
         assert retention_days == 90
-        assert TIER_DEFAULTS[TenantTier.STARTER.value]["history_depth_days"] == 90
+        assert "history_depth_days" not in TIER_DEFAULTS[TenantTier.STARTER.value]
 
-    async def test_dr_04_professional_tier_uses_365_day_cutoff(self):
-        """DR-04: Professional tier uses 365-day retention cutoff."""
+    async def test_dr_04_professional_tier_uses_fallback_cutoff(self):
+        """DR-04: Professional tier uses fallback retention cutoff (90 days) since
+        history_depth_days was removed from TIER_DEFAULTS."""
         service, _ = _make_service()
         retention_days = service.get_retention_days(TenantTier.PROFESSIONAL.value)
-        assert retention_days == 365
-        assert TIER_DEFAULTS[TenantTier.PROFESSIONAL.value]["history_depth_days"] == 365
+        assert retention_days == 90
+        assert "history_depth_days" not in TIER_DEFAULTS[TenantTier.PROFESSIONAL.value]
 
     async def test_dr_05_enterprise_tier_skipped(self):
         """DR-05: Enterprise tier is skipped (unlimited retention)."""

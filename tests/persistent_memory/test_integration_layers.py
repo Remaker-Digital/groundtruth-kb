@@ -426,6 +426,7 @@ class TestCrossLayerIntegration:
         starter_since = vectorizer._compute_since_date(TenantTier.STARTER)
 
         assert starter_layers == [1, 2]
+        # history_depth_days removed from TIER_DEFAULTS; falls back to 90
         assert starter_depth == 90
 
         # After upgrade: Professional
@@ -434,12 +435,13 @@ class TestCrossLayerIntegration:
         pro_since = vectorizer._compute_since_date(TenantTier.PROFESSIONAL)
 
         assert pro_layers == [1, 2, 3]
-        assert pro_depth == 365
+        # history_depth_days removed; both tiers now fall back to 90
+        assert pro_depth == 90
 
-        # History depth should be deeper for Professional
+        # With history_depth_days removed, both tiers use same fallback
         starter_dt = datetime.fromisoformat(starter_since)
         pro_dt = datetime.fromisoformat(pro_since)
-        assert pro_dt < starter_dt  # Professional goes further back
+        assert pro_dt == starter_dt  # Same depth after removal
 
         # Prompt should reflect new tier capabilities
         builder = SystemPromptBuilder()

@@ -537,10 +537,6 @@ class TestTierDefaults:
 
     _REQUIRED_KEYS = {
         "included_conversations",
-        "rate_limit_rpm",
-        "max_concurrent",
-        "queue_depth",
-        "history_depth_days",
         "memory_layers",
         "overage_rate",
     }
@@ -569,21 +565,16 @@ class TestTierDefaults:
         assert TIER_DEFAULTS["enterprise"]["included_conversations"] == 20_000
 
     @pytest.mark.unit
-    def test_tier_defaults_rate_limits(self):
-        """CR-18: Rate limits — uniform 500 RPM across all tiers (S137)."""
-        from src.multi_tenant.cosmos_schema import _ADMIN_RPM
-        assert TIER_DEFAULTS["trial"]["rate_limit_rpm"] == _ADMIN_RPM
-        assert TIER_DEFAULTS["starter"]["rate_limit_rpm"] == _ADMIN_RPM
-        assert TIER_DEFAULTS["professional"]["rate_limit_rpm"] == _ADMIN_RPM
-        assert TIER_DEFAULTS["enterprise"]["rate_limit_rpm"] == _ADMIN_RPM
+    def test_tier_defaults_rate_limits_present(self):
+        """CR-18: SPEC-1803 rate_limit_rpm restored at 300 RPM for all tiers."""
+        for tier in ["trial", "starter", "professional", "enterprise"]:
+            assert TIER_DEFAULTS[tier]["rate_limit_rpm"] == 300
 
     @pytest.mark.unit
-    def test_tier_defaults_concurrency(self):
-        """CR-18: Concurrency limits — trial=professional, enterprise highest."""
-        assert TIER_DEFAULTS["trial"]["max_concurrent"] == 10
-        assert TIER_DEFAULTS["starter"]["max_concurrent"] == 5
-        assert TIER_DEFAULTS["professional"]["max_concurrent"] == 10
-        assert TIER_DEFAULTS["enterprise"]["max_concurrent"] == 30
+    def test_tier_defaults_concurrency_removed(self):
+        """CR-18: max_concurrent removed from TIER_DEFAULTS."""
+        for tier in ["trial", "starter", "professional", "enterprise"]:
+            assert "max_concurrent" not in TIER_DEFAULTS[tier]
 
     @pytest.mark.unit
     def test_tier_defaults_memory_layers(self):

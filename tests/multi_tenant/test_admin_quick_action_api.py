@@ -331,19 +331,17 @@ class TestCreateQuickAction:
         })
         assert resp.status_code == 422
 
-    def test_create_exceeds_tier_limit(self, trial_client, mock_prefs_repo):
-        # Trial allows 2 actions
-        max_trial = TIER_DEFAULTS.get("trial", {}).get("max_quick_actions", 2)
+    def test_create_no_tier_limit(self, trial_client, mock_prefs_repo):
+        # max_quick_actions cap removed — creating beyond old limit should succeed
         mock_prefs_repo._actions = [
             _make_action(action_id=f"existing-{i}")
-            for i in range(max_trial)
+            for i in range(50)
         ]
         resp = trial_client.post("/api/admin/quick-actions", json={
             "label": "One more",
             "promptTemplate": "Prompt text",
         })
-        assert resp.status_code == 403
-        assert "limit" in resp.json()["detail"].lower()
+        assert resp.status_code == 201
 
 
 class TestGetQuickAction:
@@ -511,21 +509,19 @@ class TestUpsertPageAssignment:
         assert resp.status_code == 200
         assert resp.json()["pageHandle"] == "organic-cotton-tee"
 
-    def test_assignment_tier_limit(self, trial_client, mock_prefs_repo):
-        max_assignments = TIER_DEFAULTS.get("trial", {}).get(
-            "max_quick_action_assignments", 2,
-        )
+    def test_assignment_no_tier_limit(self, trial_client, mock_prefs_repo):
+        # max_quick_action_assignments cap removed — assigning beyond old limit should succeed
         action = _make_action(action_id="a1")
         mock_prefs_repo._actions = [action]
         mock_prefs_repo._assignments = [
             _make_assignment(page_type=f"type-{i}", slot_1_action_id="a1")
-            for i in range(max_assignments)
+            for i in range(50)
         ]
         resp = trial_client.put("/api/admin/quick-actions/assignments", json={
             "pageType": "collection",
             "slot1ActionId": "a1",
         })
-        assert resp.status_code == 403
+        assert resp.status_code == 200
 
 
 class TestDeletePageAssignment:
@@ -788,39 +784,12 @@ class TestModels:
 
 
 class TestTierDefaults:
-    """Verify quick action tier limits exist in TIER_DEFAULTS."""
+    """Verify quick action tier limits have been removed from TIER_DEFAULTS."""
 
-    def test_trial_limits(self):
-        assert "max_quick_actions" in TIER_DEFAULTS["trial"]
-        assert "max_quick_action_assignments" in TIER_DEFAULTS["trial"]
-        assert TIER_DEFAULTS["trial"]["max_quick_actions"] == 20
-        assert TIER_DEFAULTS["trial"]["max_quick_action_assignments"] == 50
-
-    def test_starter_limits(self):
-        assert TIER_DEFAULTS["starter"]["max_quick_actions"] == 5
-        assert TIER_DEFAULTS["starter"]["max_quick_action_assignments"] == 10
-
-    def test_professional_limits(self):
-        assert TIER_DEFAULTS["professional"]["max_quick_actions"] == 20
-        assert TIER_DEFAULTS["professional"]["max_quick_action_assignments"] == 50
-
-    def test_enterprise_limits(self):
-        assert TIER_DEFAULTS["enterprise"]["max_quick_actions"] == 50
-        assert TIER_DEFAULTS["enterprise"]["max_quick_action_assignments"] == 200
-
-    def test_limits_increase_with_paid_tier(self):
-        """Paid tiers increase monotonically; trial >= professional."""
-        paid_tiers = ["starter", "professional", "enterprise"]
-        for i in range(len(paid_tiers) - 1):
-            assert (
-                TIER_DEFAULTS[paid_tiers[i]]["max_quick_actions"]
-                <= TIER_DEFAULTS[paid_tiers[i + 1]]["max_quick_actions"]
-            )
-        # Trial has professional-grade entitlements
-        assert (
-            TIER_DEFAULTS["trial"]["max_quick_actions"]
-            >= TIER_DEFAULTS["professional"]["max_quick_actions"]
-        )
+    def test_quick_action_keys_removed(self):
+        for tier in ["trial", "starter", "professional", "enterprise"]:
+            assert "max_quick_actions" not in TIER_DEFAULTS[tier]
+            assert "max_quick_action_assignments" not in TIER_DEFAULTS[tier]
 
 
 # ===========================================================================

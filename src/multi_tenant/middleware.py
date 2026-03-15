@@ -1210,10 +1210,8 @@ class RateLimitMiddleware(BaseHTTPMiddleware):
         if getattr(ctx, "is_platform_admin", False):
             return await call_next(request)
 
-        # Determine rate limit for this tenant's tier
+        # Determine rate limit for this tenant (SPEC-1803: always resolves to int)
         limit = self._get_limit(ctx)
-        if limit is None:
-            return await call_next(request)
 
         # SPEC-1754: Try Redis first, fall back to local shards
         if self._use_redis:
@@ -1259,23 +1257,31 @@ class RateLimitMiddleware(BaseHTTPMiddleware):
 
         return response
 
-    def _get_limit(self, ctx: TenantContext) -> int | None:
-        """Get the rate limit for a tenant.
+    def _get_limit(self, ctx: TenantContext) -> int:
+        """Get the rate limit for a tenant (SPEC-1803).
 
         Resolution order:
         1. Per-tenant override (TenantContext.rate_limit_rpm) if set
         2. Tier defaults from TIER_DEFAULTS
-        3. None (no rate limit) if tier is unknown
+        3. RATE_LIMIT_RPM_DEFAULT (300) fallback
 
-        Returns None if no rate limit applies.
+        SPEC-1805: Result is always >= RATE_LIMIT_RPM_FLOOR (10).
+        Never returns None — every tenant gets a rate limit.
         """
+        from .cosmos_schema import RATE_LIMIT_RPM_DEFAULT, RATE_LIMIT_RPM_FLOOR
+
         # Per-tenant override takes precedence
         per_tenant = getattr(ctx, "rate_limit_rpm", None)
         if per_tenant is not None:
-            return per_tenant
+            return max(RATE_LIMIT_RPM_FLOOR, per_tenant)
 
-        if ctx.tier is None:
-            return None
+        tier_value = None
+        if ctx.tier is not None:
+            tier_value = ctx.tier.value if hasattr(ctx.tier, "value") else ctx.tier
+        if tier_value:
+            defaults = TIER_DEFAULTS.get(tier_value, {})
+            tier_rpm = defaults.get("rate_limit_rpm")
+            if tier_rpm is not None:
+                return max(RATE_LIMIT_RPM_FLOOR, tier_rpm)
 
-        defaults = TIER_DEFAULTS.get(ctx.tier.value, {})
-        return defaults.get("rate_limit_rpm")
+        return max(RATE_LIMIT_RPM_FLOOR, RATE_LIMIT_RPM_DEFAULT)
