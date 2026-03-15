@@ -30,7 +30,7 @@ from src.agents.base import AgentRedBaseAgent, Message, parse_payload
 logger = logging.getLogger(__name__)
 
 # NATS/SLIM transport configuration (shared with agntcy_sdk_integration.py)
-NATS_ENDPOINT = os.environ.get("AGNTCY_NATS_ENDPOINT", "nats://localhost:4222")
+NATS_ENDPOINT = os.environ.get("AGNTCY_NATS_ENDPOINT") or os.environ.get("NATS_URL") or ""
 SLIM_ENDPOINT = os.environ.get("AGNTCY_SLIM_ENDPOINT", "")
 SLIM_ORG_NAMESPACE = os.environ.get(
     "AGNTCY_SLIM_ORG_NAMESPACE", "remaker-digital/agent-red"
@@ -204,6 +204,27 @@ async def _subscribe_to_transport(agent: AgentRedBaseAgent) -> None:
             )
             return
 
+        # AGNTCY SDK lifecycle: create_transport() creates the object but
+        # setup() must be called to establish the actual connection.
+        # Without setup(), subscribe/publish raise RuntimeError.
+        # If setup() fails (e.g., NATS server unreachable due to Azure Container
+        # Apps TCP ingress limitations), fall back to HTTP-only mode gracefully.
+        if hasattr(transport, "setup"):
+            logger.info(
+                "Agent %s: calling transport.setup() to establish connection",
+                agent.agent_type,
+            )
+            try:
+                await asyncio.wait_for(transport.setup(), timeout=10.0)
+            except (asyncio.TimeoutError, Exception) as exc:
+                logger.warning(
+                    "Agent %s: transport.setup() failed (%s) — running in HTTP-only mode. "
+                    "NATS/SLIM subscription will not be active. This may indicate "
+                    "Azure Container Apps TCP ingress is not routing to the NATS server.",
+                    agent.agent_type, exc,
+                )
+                return
+
         topic = agent.create_agent_topic()
         logger.info(
             "Agent %s: subscribing to topic '%s' on transport",
@@ -213,7 +234,11 @@ async def _subscribe_to_transport(agent: AgentRedBaseAgent) -> None:
         # SDK transport subscription loop
         # The transport.subscribe() method is transport-specific;
         # for NATS it returns an async iterator of Messages.
-        async for message in transport.subscribe(topic):
+        # NOTE: subscribe() is an async method — must be awaited before
+        # iterating. Without await, we get a coroutine instead of an
+        # async iterator (discovered in S183 container log diagnosis).
+        subscription = await transport.subscribe(topic)
+        async for message in subscription:
             try:
                 response = await agent.handle_message(message)
                 # If the message has a reply_to, send the response back

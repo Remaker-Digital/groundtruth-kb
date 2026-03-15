@@ -238,8 +238,8 @@ class TestDeployScript:
 
 
 class TestVersionBump:
-    """Verify v1.85.0 version bump."""
+    """Verify v1.86.0 version bump."""
 
     def test_product_version(self) -> None:
         from src.multi_tenant.api_versioning import PRODUCT_VERSION
-        assert PRODUCT_VERSION == "1.85.0"
+        assert PRODUCT_VERSION == "1.86.0"

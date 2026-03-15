@@ -31,9 +31,11 @@ if TYPE_CHECKING:
 
 logger = logging.getLogger(__name__)
 
-# SPEC-1780 / PB-AGNTCY-001: In deployed environments, agent dispatch
-# MUST NOT silently fall back to Tier 3 (in-process). If transport and
-# HTTP containers are both unavailable, fail with 503.
+# SPEC-1802 transport priority / SPEC-1780 enforcement:
+#   Tier 1: SLIM transport (primary)
+#   Tier 2: NATS JetStream transport (fallback)
+#   Tier 3: HTTP containers (failure mode — logged as warning)
+#   Tier 4: In-process direct call (development only, blocked in staging/production)
 _ENVIRONMENT = os.environ.get("ENVIRONMENT", "development").lower()
 _IS_DEPLOYED = _ENVIRONMENT in ("staging", "production")
 
@@ -45,10 +47,15 @@ class AgentDispatchMixin:
     _ic_agent, _kr_agent, _rg_agent, _agent_urls, _get_http_client(),
     _current_tenant_id, _current_preferences, _current_tenant.
 
-    Dispatch priority (SPEC-1525):
-        1. SLIM/NATS transport (when AGNTCY SDK transport is active)
-        2. HTTP containers (when USE_AGENT_CONTAINERS is set)
-        3. In-process direct call (default)
+    Dispatch priority (SPEC-1802):
+        Tier 1: SLIM transport (primary — when AGNTCY SDK SLIM transport is active)
+        Tier 2: NATS JetStream transport (fallback — when NATS transport is active)
+        Tier 3: HTTP containers (failure mode — when USE_AGENT_CONTAINERS is set)
+        Tier 4: In-process direct call (development only — blocked in staging/production)
+
+    Note: Tiers 1 and 2 are unified behind _transport_available() — the SDK
+    singleton selects SLIM or NATS based on endpoint configuration. Tier 3 HTTP
+    is explicitly a failure mode per SPEC-1802 and emits warnings when used.
     """
 
     def _transport_available(self) -> bool:
@@ -59,27 +66,41 @@ class AgentDispatchMixin:
         except Exception:
             return False
 
-    def _require_transport_or_fail(self, agent_name: str) -> None:
-        """SPEC-1780: In deployed environments, raise 503 if no transport is available.
+    def _warn_http_failure_mode(self, agent_name: str) -> None:
+        """SPEC-1802: Log warning when dispatching via HTTP (failure mode).
 
-        Called when both transport and HTTP container dispatch have failed.
-        In local/development environments, allows silent Tier 3 fallback.
-        In staging/production, raises HTTPException(503) to prevent silent
-        degradation — the operator must fix transport infrastructure.
+        HTTP containers are Tier 3 (failure mode), not normal operation.
+        This method is called when transport (SLIM/NATS) is unavailable
+        and dispatch falls through to HTTP containers.
+        """
+        logger.warning(
+            "SPEC-1802: Dispatching %s via HTTP containers (Tier 3 failure mode). "
+            "Transport (SLIM/NATS) is unavailable. This is not normal operation.",
+            agent_name,
+        )
+
+    def _require_transport_or_fail(self, agent_name: str) -> None:
+        """SPEC-1780: In deployed environments, raise 503 if all tiers exhausted.
+
+        Called when transport (Tier 1/2) and HTTP containers (Tier 3) have
+        both failed. In local/development environments, allows Tier 4 fallback
+        (in-process). In staging/production, raises HTTPException(503) to
+        prevent silent degradation.
         """
         if _IS_DEPLOYED:
             from fastapi import HTTPException
 
             logger.error(
-                "AGNTCY transport unavailable in %s environment for agent=%s. "
-                "PB-AGNTCY-001 enforcement: refusing Tier 3 fallback.",
-                _ENVIRONMENT, agent_name,
+                "All dispatch tiers exhausted for agent=%s in %s. "
+                "SPEC-1802: SLIM(T1) + NATS(T2) + HTTP(T3) all failed. "
+                "Tier 4 in-process blocked in deployed environments.",
+                agent_name, _ENVIRONMENT,
             )
             raise HTTPException(
                 status_code=503,
                 detail=(
                     f"Agent dispatch unavailable: {agent_name}. "
-                    f"AGNTCY transport is not active in {_ENVIRONMENT} environment. "
+                    f"All transport tiers exhausted in {_ENVIRONMENT} environment. "
                     "Contact platform administrator."
                 ),
             )
@@ -146,6 +167,7 @@ class AgentDispatchMixin:
                     logger.warning("Transport IC call failed, falling back: %s", exc)
             if USE_AGENT_CONTAINERS:
                 try:
+                    self._warn_http_failure_mode("intent-classifier")
                     span.set_attribute("dispatch.mode", "http")
                     return await self._call_intent_classifier_http(message, system_prompt)
                 except Exception as exc:
@@ -236,6 +258,7 @@ class AgentDispatchMixin:
                     logger.warning("Transport KR call failed, falling back: %s", exc)
             if USE_AGENT_CONTAINERS:
                 try:
+                    self._warn_http_failure_mode("knowledge-retrieval")
                     span.set_attribute("dispatch.mode", "http")
                     return await self._call_knowledge_retrieval_http(message, intent, system_prompt)
                 except Exception as exc:
@@ -364,9 +387,10 @@ class AgentDispatchMixin:
             except Exception as exc:
                 logger.warning("Transport RG stream failed, falling back: %s", exc)
 
-        # Priority 2: HTTP container
+        # Tier 3: HTTP container (failure mode per SPEC-1802)
         if USE_AGENT_CONTAINERS:
             try:
+                self._warn_http_failure_mode("response-generator")
                 async for chunk in self._call_response_generator_stream_http(
                     customer_message, intent, knowledge_context,
                     system_prompt, budget, model,
@@ -570,9 +594,10 @@ class AgentDispatchMixin:
                 except Exception as exc:
                     logger.warning("Transport co-pilot call failed: %s", exc)
 
-            # Tier 2: HTTP container
+            # Tier 3: HTTP container (failure mode per SPEC-1802)
             if USE_AGENT_CONTAINERS:
                 try:
+                    self._warn_http_failure_mode("co-pilot")
                     url = getattr(self, "_agent_urls", {}).get("co-pilot", "")
                     if url:
                         client = await self._get_http_client()

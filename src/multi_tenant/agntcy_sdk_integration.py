@@ -20,12 +20,21 @@ import os
 from enum import Enum
 from typing import Any
 
-# AGNTCY SDK imports — wrapped in try/except per project lesson.
+# AGNTCY SDK imports — each import isolated to prevent one missing name from
+# breaking all (lesson: v0.5.4 removed ProtocolTypes/TransportTypes enums).
 try:
-    from agntcy_app_sdk.factory import AgntcyFactory, ProtocolTypes, TransportTypes
+    from agntcy_app_sdk.factory import AgntcyFactory
 except ImportError:
     AgntcyFactory = None  # type: ignore[assignment,misc]
+
+# ProtocolTypes/TransportTypes removed in SDK v0.5.x — import individually, optional
+try:
+    from agntcy_app_sdk.factory import ProtocolTypes  # type: ignore[attr-defined]
+except ImportError:
     ProtocolTypes = None  # type: ignore[assignment,misc]
+try:
+    from agntcy_app_sdk.factory import TransportTypes  # type: ignore[attr-defined]
+except ImportError:
     TransportTypes = None  # type: ignore[assignment,misc]
 
 try:
@@ -52,15 +61,16 @@ logger = logging.getLogger(__name__)
 # SLIM endpoint for agent-to-agent transport (Phase 2+)
 SLIM_ENDPOINT = os.environ.get("AGNTCY_SLIM_ENDPOINT", "")
 
-# NATS endpoint for fallback transport
-NATS_ENDPOINT = os.environ.get("AGNTCY_NATS_ENDPOINT", "nats://localhost:4222")
+# NATS endpoint for fallback transport (AGNTCY_NATS_ENDPOINT preferred, NATS_URL fallback)
+NATS_ENDPOINT = os.environ.get("AGNTCY_NATS_ENDPOINT") or os.environ.get("NATS_URL") or ""
 
 # SLIM routable name prefix (org/namespace format per SDK convention)
 SLIM_ORG_NAMESPACE = os.environ.get(
     "AGNTCY_SLIM_ORG_NAMESPACE", "remaker-digital/agent-red"
 )
 
-# Transport selection: "slim" (preferred) or "nats" (fallback)
+# SPEC-1802: SLIM > NATS > HTTP (failure mode). TRANSPORT_TYPE retained for
+# backward compat but transport selection now always tries SLIM first, then NATS.
 TRANSPORT_TYPE = os.environ.get("AGNTCY_TRANSPORT_TYPE", "slim").lower()
 
 # mTLS configuration for SLIM transport
@@ -142,30 +152,51 @@ def get_default_transport() -> BaseTransport:
 
     factory = get_agntcy_factory()
 
-    if TRANSPORT_TYPE == "slim" and SLIM_ENDPOINT:
-        _transport = factory.create_transport(
-            transport="SLIM",
-            name=f"{SLIM_ORG_NAMESPACE}/gateway",
-            endpoint=SLIM_ENDPOINT,
-            tls_insecure=SLIM_TLS_INSECURE,
-            shared_secret_identity=SLIM_SHARED_SECRET or None,
-        )
-        logger.info(
-            "SLIM transport created (endpoint=%s, tls_insecure=%s)",
-            SLIM_ENDPOINT,
-            SLIM_TLS_INSECURE,
-        )
-    elif NATS_ENDPOINT:
-        _transport = factory.create_transport(
-            transport="NATS",
-            name="agent-red-nats",
-            endpoint=NATS_ENDPOINT,
-        )
-        logger.info("NATS transport created (endpoint=%s)", NATS_ENDPOINT)
-    else:
+    # SPEC-1802 transport priority: SLIM > NATS JetStream > (HTTP is failure mode)
+    if SLIM_ENDPOINT:
+        try:
+            _transport = factory.create_transport(
+                transport="SLIM",
+                name=f"{SLIM_ORG_NAMESPACE}/gateway",
+                endpoint=SLIM_ENDPOINT,
+                tls_insecure=SLIM_TLS_INSECURE,
+                shared_secret_identity=SLIM_SHARED_SECRET or None,
+            )
+            logger.info(
+                "SLIM transport created — Tier 1 active (endpoint=%s, tls_insecure=%s)",
+                SLIM_ENDPOINT,
+                SLIM_TLS_INSECURE,
+            )
+        except Exception:
+            logger.warning(
+                "SLIM transport creation failed — falling back to NATS",
+                exc_info=True,
+            )
+            _transport = None
+
+    if _transport is None and NATS_ENDPOINT:
+        try:
+            _transport = factory.create_transport(
+                transport="NATS",
+                name="agent-red-nats",
+                endpoint=NATS_ENDPOINT,
+            )
+            logger.info(
+                "NATS transport created — Tier 2 active (endpoint=%s)", NATS_ENDPOINT,
+            )
+        except Exception:
+            logger.warning(
+                "NATS transport creation failed — all transports unavailable",
+                exc_info=True,
+            )
+            _transport = None
+
+    if _transport is None:
         logger.warning(
-            "No AGNTCY transport configured. Set AGNTCY_SLIM_ENDPOINT or "
-            "AGNTCY_NATS_ENDPOINT. Agent-to-agent communication unavailable."
+            "No AGNTCY transport available (SLIM_ENDPOINT=%r, NATS_ENDPOINT=%r). "
+            "Agent dispatch will use HTTP containers (failure mode per SPEC-1802).",
+            SLIM_ENDPOINT,
+            NATS_ENDPOINT,
         )
         return None  # type: ignore[return-value]
 
@@ -301,6 +332,25 @@ async def init_agntcy_sdk() -> None:
     # Attempt to create default transport (may be None if not configured)
     transport = get_default_transport()
     if transport is not None:
+        # AGNTCY SDK lifecycle: create_transport() creates the object but
+        # setup() must be called to establish the actual NATS/SLIM connection.
+        # If setup() fails (e.g., NATS unreachable due to Azure Container Apps
+        # TCP ingress limitations), the transport object still exists for
+        # health reporting but actual A2A communication won't work.
+        if hasattr(transport, "setup"):
+            import asyncio as _asyncio
+            logger.info("Calling transport.setup() to establish connection...")
+            try:
+                await _asyncio.wait_for(transport.setup(), timeout=10.0)
+                logger.info("Transport setup() complete — connection established")
+            except (_asyncio.TimeoutError, Exception) as exc:
+                logger.warning(
+                    "Transport setup() failed: %s — transport object created but "
+                    "connection not established. A2A communication will use HTTP "
+                    "containers (Tier 2). This may indicate Azure Container Apps "
+                    "TCP ingress is not routing to the NATS server.",
+                    exc,
+                )
         logger.info("Default transport ready: %s", TRANSPORT_TYPE)
     else:
         logger.info(
@@ -346,10 +396,23 @@ def get_sdk_status() -> dict[str, Any]:
     factory = _factory
     transport = _transport
 
+    # Determine active tier per SPEC-1802
+    if transport is not None:
+        transport_class = type(transport).__name__
+        if "SLIM" in transport_class.upper():
+            active_tier = "slim"
+        elif "NATS" in transport_class.upper():
+            active_tier = "nats"
+        else:
+            active_tier = transport_class.lower()
+    else:
+        active_tier = None
+
     status: dict[str, Any] = {
         "sdk_initialized": factory is not None,
-        "transport_type": TRANSPORT_TYPE if transport is not None else None,
+        "transport_type": active_tier,
         "transport_active": transport is not None,
+        "active_tier": active_tier or "http_failure_mode",
         "slim_endpoint": SLIM_ENDPOINT or None,
         "nats_endpoint": NATS_ENDPOINT or None,
         "available_protocols": factory.registered_protocols() if factory else [],
