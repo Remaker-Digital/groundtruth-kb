@@ -9,6 +9,33 @@ All notable changes to Agent Red Customer Experience are documented here.
 
 ---
 
+## v1.87.0 — Data-Driven Rate Limiting & Agent Containerization (Production, 2026-03-15)
+
+### Data-driven rate limiting
+
+Rate limits are now derived from empirical load testing rather than arbitrary values. A ramp-to-overload test (10→150 concurrent users) established the safe throughput ceiling at **1,380 requests per minute per replica**.
+
+- **300 RPM per tenant** — derived from production capacity (2,760 RPM at min=2 replicas ÷ 9 safety margin for concurrent max-rate tenants). Down from the previous 500 RPM.
+- **10 RPM minimum floor** — prevents any configuration path (per-tenant override, tier default, or misconfiguration) from setting a tenant to 0 RPM. Admin authentication always works.
+- **Uniform across all tiers** — rate limits are a platform safety mechanism, not a monetization lever. Starter, Professional, and Enterprise all share the same 300 RPM limit.
+- **Per-tenant override** — individual tenants can be assigned custom RPM values via the Provider Console's Tenant Directory, subject to the 10 RPM floor.
+
+### Agent containerization (staging)
+
+All six AI agents plus the Co-Pilot now run as independent Azure Container Apps with HTTP dispatch:
+
+- **7 agent containers:** Intent Classifier, Knowledge Retrieval, Response Generator, Escalation Handler, Analytics Collector, Critic Supervisor, and Co-Pilot — each independently scalable.
+- **3-tier dispatch architecture:** NATS transport (Tier 1) → HTTP containers (Tier 2) → in-process fallback (Tier 3). Production currently uses Tier 3; staging uses Tier 2.
+- **AGNTCY SDK integration:** Protocol negotiation working with A2A, MCP, and FastMCP protocols. NATS transport initialized but blocked by Azure Container Apps TCP routing limitation.
+
+### Other changes
+
+- **Provider Console:** Tenant Directory now displays and allows editing of per-tenant rate limit RPM values.
+- **Test consolidation:** Rate limit tests consolidated from 4 scattered files into a unified suite (41 tests).
+- **RATE_LIMIT_DISABLED env var:** New environment variable to skip rate limit middleware registration entirely, for test environments.
+
+---
+
 ## v1.83.0 — 680-Tenant Infrastructure Scaling (Production, 2026-03-13)
 
 ### Distributed rate limiting with Redis
