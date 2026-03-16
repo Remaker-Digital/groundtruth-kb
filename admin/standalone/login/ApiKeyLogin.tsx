@@ -1,15 +1,18 @@
 /**
- * ApiKeyLogin — API key authentication for standalone admin.
+ * ApiKeyLogin — Authentication gate for standalone admin.
  *
- * Login page where Stripe-direct merchants enter their API key.
- * Includes a "Forgot your key?" flow that sends a reset email.
+ * SPEC-0429: Magic link is the PRIMARY auth method (email → link → 2FA).
+ * API key login is a secondary fallback for tenants without a ?tenant= URL param.
+ *
+ * When ?tenant= is present: defaults to magic link view (primary per SPEC-0429).
+ * When ?tenant= is absent: defaults to API key view (magic link unavailable).
  *
  * Migrated to Mantine components (Cycle 10, item 10e).
  *
  * © 2026 Remaker Digital, a DBA of VanDusen & Palmeter, LLC. All rights reserved.
  */
 
-import React, { useState, useCallback } from 'react';
+import React, { useState, useCallback, useMemo } from 'react';
 import {
   Anchor,
   Box,
@@ -43,12 +46,32 @@ export const ApiKeyLogin: React.FC<ApiKeyLoginProps> = ({
   onMagicLinkLogin,
   verifyError,
 }) => {
-  const [view, setView] = useState<View>('login');
+  // SPEC-0429: Magic link is primary when tenant context is available.
+  // Detect ?tenant= once at mount to determine default view.
+  const hasTenant = useMemo(() => {
+    try {
+      return !!new URLSearchParams(window.location.search).get('tenant');
+    } catch {
+      return false;
+    }
+  }, []);
+
+  const defaultView: View = (hasTenant && onMagicLinkLogin) ? 'magic-link' : 'login';
+  const [view, setView] = useState<View>(defaultView);
   const [apiKey, setApiKey] = useState('');
   const [email, setEmail] = useState('');
   const [magicEmail, setMagicEmail] = useState('');
   const [error, setError] = useState<string | null>(verifyError ?? null);
   const [loading, setLoading] = useState(false);
+
+  /** Navigate back to whichever view is the "home" for this context. */
+  const goHome = useCallback(() => {
+    setView(defaultView);
+    setError(null);
+    setApiKey('');
+    setMagicEmail('');
+    setEmail('');
+  }, [defaultView]);
 
   const handleLogin = useCallback(
     async (e: React.FormEvent) => {
@@ -204,7 +227,68 @@ export const ApiKeyLogin: React.FC<ApiKeyLoginProps> = ({
     </Stack>
   );
 
-  /* ---- Login view ------------------------------------------------------ */
+  const divider = (
+    <Box mt="lg" mb="sm" style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
+      <div style={{ flex: 1, height: '1px', backgroundColor: tokens.border }} />
+      <Text size="xs" c="dimmed">or</Text>
+      <div style={{ flex: 1, height: '1px', backgroundColor: tokens.border }} />
+    </Box>
+  );
+
+  /* ---- Magic link view (PRIMARY per SPEC-0429) ------------------------- */
+
+  if (view === 'magic-link') {
+    return (
+      <Center mih="100vh" bg={tokens.chrome}>
+        <Paper {...cardProps}>
+          {brandBlock}
+
+          <form onSubmit={handleMagicLink}>
+            <TextInput
+              label="Email address"
+              type="email"
+              placeholder="you@company.com"
+              value={magicEmail}
+              onChange={(e) => setMagicEmail(e.currentTarget.value)}
+              error={error}
+              autoFocus
+              aria-label="Email address"
+              styles={inputStyles}
+            />
+
+            <Button
+              type="submit"
+              fullWidth
+              mt="md"
+              loading={loading}
+              color="action"
+              aria-label="Send sign-in link"
+            >
+              Send sign-in link
+            </Button>
+          </form>
+
+          <Text size="xs" c="dimmed" ta="center" mt="sm" lh={1.5}>
+            We'll email you a secure sign-in link. No password required.
+          </Text>
+
+          {divider}
+
+          <Button
+            fullWidth
+            variant="outline"
+            color="action"
+            onClick={() => { setView('login'); setError(null); setApiKey(''); }}
+            aria-label="Sign in with API key"
+          >
+            Sign in with API key
+          </Button>
+        </Paper>
+      </Center>
+    );
+  }
+
+  /* ---- API key view (secondary fallback) -------------------------------- */
 
   if (view === 'login') {
     return (
@@ -248,13 +332,9 @@ export const ApiKeyLogin: React.FC<ApiKeyLoginProps> = ({
             </Anchor>
           </Text>
 
-          {onMagicLinkLogin && (
+          {onMagicLinkLogin && hasTenant && (
             <>
-              <Box mt="lg" mb="sm" style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
-                <div style={{ flex: 1, height: '1px', backgroundColor: tokens.border }} />
-                <Text size="xs" c="dimmed">or</Text>
-                <div style={{ flex: 1, height: '1px', backgroundColor: tokens.border }} />
-              </Box>
+              {divider}
 
               <Button
                 fullWidth
@@ -325,66 +405,9 @@ export const ApiKeyLogin: React.FC<ApiKeyLoginProps> = ({
               size="sm"
               component="button"
               type="button"
-              onClick={() => { setView('login'); setError(null); setApiKey(''); }}
+              onClick={goHome}
             >
               Back to sign in
-            </Anchor>
-          </Text>
-        </Paper>
-      </Center>
-    );
-  }
-
-  /* ---- Magic link view (enter email) ----------------------------------- */
-
-  if (view === 'magic-link') {
-    return (
-      <Center mih="100vh" bg={tokens.chrome}>
-        <Paper {...cardProps}>
-          {brandBlock}
-
-          <Title order={4} c={tokens.textPrimary} mb={4}>
-            Sign in with email
-          </Title>
-          <Text size="sm" c="dimmed" lh={1.5} mb="lg">
-            Enter your email address and we'll send you a sign-in link.
-            No password required.
-          </Text>
-
-          <form onSubmit={handleMagicLink}>
-            <TextInput
-              label="Email address"
-              type="email"
-              placeholder="you@company.com"
-              value={magicEmail}
-              onChange={(e) => setMagicEmail(e.currentTarget.value)}
-              error={error}
-              autoFocus
-              aria-label="Email address"
-              styles={inputStyles}
-            />
-
-            <Button
-              type="submit"
-              fullWidth
-              mt="md"
-              loading={loading}
-              color="action"
-              aria-label="Send sign-in link"
-            >
-              Send sign-in link
-            </Button>
-          </form>
-
-          <Text ta="center" mt="lg" size="sm">
-            <Anchor
-              c={tokens.action}
-              size="sm"
-              component="button"
-              type="button"
-              onClick={() => { setView('login'); setError(null); setApiKey(''); }}
-            >
-              Back to sign in with API key
             </Anchor>
           </Text>
         </Paper>
@@ -427,7 +450,7 @@ export const ApiKeyLogin: React.FC<ApiKeyLoginProps> = ({
             fullWidth
             mt="md"
             color="action"
-            onClick={() => { setView('login'); setError(null); setApiKey(''); setMagicEmail(''); }}
+            onClick={goHome}
             aria-label="Back to sign in"
           >
             Back to sign in
@@ -486,7 +509,7 @@ export const ApiKeyLogin: React.FC<ApiKeyLoginProps> = ({
           fullWidth
           mt="md"
           color="action"
-          onClick={() => { setView('login'); setError(null); setApiKey(''); setEmail(''); }}
+          onClick={goHome}
           aria-label="Back to sign in"
         >
           Back to sign in

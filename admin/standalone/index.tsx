@@ -3,11 +3,11 @@
  *
  * This is the main entry for Stripe-direct (non-Shopify) merchants.
  * It provides:
- *   1. API key login page (renders OUTSIDE MantineProvider)
+ *   1. Auth gate — magic link primary, API key fallback (SPEC-0429)
  *   2. MantineProvider with Agent Red brand theme (dark mode default)
  *   3. Mantine AppShell layout with sidebar navigation
  *   4. Routes to 9 admin pages using prototype Mantine components
- *   5. Authenticated apiFetch via API key header
+ *   5. Authenticated apiFetch via API key or session token header
  *
  * Architecture (Decision UI-7):
  *   Standalone admin is required because Stripe-direct merchants
@@ -224,7 +224,8 @@ const App: React.FC = () => {
     );
   }
 
-  // ApiKeyLogin renders OUTSIDE MantineProvider — it has its own dark styling
+  // Auth gate renders OUTSIDE MantineProvider — it has its own dark styling
+  // SPEC-0429: Magic link is primary when ?tenant= present; API key is fallback
   if (!auth) {
     return (
       <ApiKeyLogin
