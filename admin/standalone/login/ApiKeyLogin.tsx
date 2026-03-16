@@ -5,7 +5,7 @@
  * API key login is a secondary fallback for tenants without a ?tenant= URL param.
  *
  * When ?tenant= is present: defaults to magic link view (primary per SPEC-0429).
- * When ?tenant= is absent: defaults to API key view (magic link unavailable).
+ * When ?tenant= is absent: shows invalid URL error (tenant context required).
  *
  * Migrated to Mantine components (Cycle 10, item 10e).
  *
@@ -47,20 +47,23 @@ export const ApiKeyLogin: React.FC<ApiKeyLoginProps> = ({
   verifyError,
 }) => {
   // SPEC-0429: Magic link is primary when tenant context is available.
-  // Detect ?tenant= once at mount to determine default view.
-  const hasTenant = useMemo(() => {
+  // Cache tenant ID once at mount — avoids re-reading URL at submit time
+  // (SPA routing or history changes could strip query params between mount and submit).
+  const tenantId = useMemo(() => {
     try {
-      return !!new URLSearchParams(window.location.search).get('tenant');
+      return new URLSearchParams(window.location.search).get('tenant') || null;
     } catch {
-      return false;
+      return null;
     }
   }, []);
+  const hasTenant = !!tenantId;
 
   const defaultView: View = (hasTenant && onMagicLinkLogin) ? 'magic-link' : 'login';
   const [view, setView] = useState<View>(defaultView);
   const [apiKey, setApiKey] = useState('');
   const [email, setEmail] = useState('');
   const [magicEmail, setMagicEmail] = useState('');
+  const [signInCode, setSignInCode] = useState('');
   const [error, setError] = useState<string | null>(verifyError ?? null);
   const [loading, setLoading] = useState(false);
 
@@ -166,7 +169,7 @@ export const ApiKeyLogin: React.FC<ApiKeyLoginProps> = ({
       try {
         // SPEC-1644: The URL must identify the tenant. The ?tenant= parameter
         // is required for magic link requests (tenant-scoped authentication).
-        const tenantId = new URLSearchParams(window.location.search).get('tenant');
+        // Uses tenantId cached at mount — not re-read from URL (which may have changed).
         if (!tenantId) {
           setError('Sign-in link requires a tenant URL. Use the link from your welcome email.');
           return;
@@ -191,6 +194,65 @@ export const ApiKeyLogin: React.FC<ApiKeyLoginProps> = ({
       }
     },
     [magicEmail],
+  );
+
+  // SPEC-0429 S188: Verify 6-digit sign-in code (alternative to clicking link)
+  const handleCodeVerify = useCallback(
+    async (e: React.FormEvent) => {
+      e.preventDefault();
+      const code = signInCode.trim();
+      if (!code || code.length !== 6 || !/^\d{6}$/.test(code)) {
+        setError('Please enter a valid 6-digit code.');
+        return;
+      }
+
+      if (!tenantId) {
+        setError('Tenant context required. Use the link from your welcome email.');
+        return;
+      }
+
+      setLoading(true);
+      setError(null);
+
+      try {
+        const resp = await fetch(`${API_BASE_URL}/api/auth/magic-link/verify-code`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ code, tenant: tenantId }),
+        });
+
+        if (resp.status === 429) {
+          setError('Too many attempts. Please wait a few minutes and try again.');
+          return;
+        }
+
+        const data = await resp.json();
+
+        if (!resp.ok) {
+          setError(data.message || 'Invalid or expired code. Please request a new one.');
+          return;
+        }
+
+        // Same handling as magic link verify (2FA or direct login)
+        if (data.requires_2fa && data.pending_2fa_token) {
+          // Trigger 2FA flow — pass through to parent
+          // For now, store the pending state the same way link-verify does
+          if (onMagicLinkLogin) {
+            onMagicLinkLogin(data.session_token || data.pending_2fa_token);
+          }
+          return;
+        }
+
+        if (data.session_token && onMagicLinkLogin) {
+          onMagicLinkLogin(data.session_token);
+        }
+      } catch {
+        setError('Unable to connect. Please check your network and try again.');
+      } finally {
+        setLoading(false);
+      }
+    },
+    [signInCode, tenantId, onMagicLinkLogin],
   );
 
   /* ---- Shared UI elements ---------------------------------------------- */
@@ -234,6 +296,33 @@ export const ApiKeyLogin: React.FC<ApiKeyLoginProps> = ({
       <div style={{ flex: 1, height: '1px', backgroundColor: tokens.border }} />
     </Box>
   );
+
+  /* ---- Invalid URL: no tenant context ---------------------------------- */
+
+  if (!hasTenant) {
+    return (
+      <Center mih="100vh" bg={tokens.chrome}>
+        <Paper {...cardProps}>
+          {brandBlock}
+
+          <Stack align="center" gap="md">
+            <ThemeIcon size={48} radius="xl" color="red" variant="light">
+              <Icons.alerts size={24} />
+            </ThemeIcon>
+
+            <Title order={4} ta="center" c={tokens.textPrimary}>
+              Invalid URL
+            </Title>
+
+            <Text size="sm" c={tokens.textSecondary} ta="center" lh={1.6}>
+              This URL does not include a tenant identifier and cannot be used to sign in.
+              Please use the link from your welcome email, which includes your tenant context.
+            </Text>
+          </Stack>
+        </Paper>
+      </Center>
+    );
+  }
 
   /* ---- Magic link view (PRIMARY per SPEC-0429) ------------------------- */
 
@@ -332,7 +421,7 @@ export const ApiKeyLogin: React.FC<ApiKeyLoginProps> = ({
             </Anchor>
           </Text>
 
-          {onMagicLinkLogin && hasTenant && (
+          {onMagicLinkLogin && (
             <>
               {divider}
 
@@ -415,7 +504,7 @@ export const ApiKeyLogin: React.FC<ApiKeyLoginProps> = ({
     );
   }
 
-  /* ---- Magic link sent (confirmation) --------------------------------- */
+  /* ---- Magic link sent (confirmation + code entry, SPEC-0429) ---------- */
 
   if (view === 'magic-link-sent') {
     return (
@@ -439,30 +528,62 @@ export const ApiKeyLogin: React.FC<ApiKeyLoginProps> = ({
             </Title>
             <Text size="sm" c={tokens.textSecondary} ta="center" lh={1.5}>
               If an account with <Text span fw={600} c={tokens.textPrimary}>{magicEmail}</Text> exists,
-              we've sent a sign-in link to that address.
+              we've sent a sign-in code and link to that address.
             </Text>
             <Text size="xs" c="dimmed" ta="center" lh={1.5}>
-              The link will expire in 15 minutes. Check your spam folder if you don't see it.
+              Enter the 6-digit code from the email, or click the link. Expires in 15 minutes.
             </Text>
           </Stack>
 
-          <Button
-            fullWidth
-            mt="md"
-            color="action"
-            onClick={goHome}
-            aria-label="Back to sign in"
-          >
-            Back to sign in
-          </Button>
+          {/* SPEC-0429 S188: Sign-in code entry */}
+          <form onSubmit={handleCodeVerify}>
+            <TextInput
+              label="Sign-in code"
+              placeholder="000000"
+              value={signInCode}
+              onChange={(e) => {
+                const v = e.currentTarget.value.replace(/\D/g, '').slice(0, 6);
+                setSignInCode(v);
+                setError(null);
+              }}
+              error={error}
+              maxLength={6}
+              autoFocus
+              autoComplete="one-time-code"
+              inputMode="numeric"
+              aria-label="Sign-in code"
+              styles={{
+                ...inputStyles,
+                input: {
+                  ...inputStyles.input,
+                  textAlign: 'center' as const,
+                  fontSize: '24px',
+                  fontFamily: 'monospace',
+                  letterSpacing: '8px',
+                  fontWeight: 600,
+                },
+              }}
+            />
 
-          <Text ta="center" mt="sm" size="sm">
+            <Button
+              type="submit"
+              fullWidth
+              mt="md"
+              loading={loading}
+              color="action"
+              aria-label="Verify code"
+            >
+              Verify code
+            </Button>
+          </form>
+
+          <Text ta="center" mt="md" size="sm">
             <Anchor
               c={tokens.action}
               size="sm"
               component="button"
               type="button"
-              onClick={() => { setView('magic-link'); setError(null); }}
+              onClick={() => { setView('magic-link'); setError(null); setSignInCode(''); }}
             >
               Didn't receive it? Try again
             </Anchor>

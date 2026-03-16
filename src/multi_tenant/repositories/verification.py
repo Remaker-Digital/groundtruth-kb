@@ -51,6 +51,7 @@ class VerificationTokenRepository:
         ttl: int = TTL_VERIFICATION_TOKEN,
         *,
         member_id: str | None = None,
+        sign_in_code: str | None = None,
     ) -> dict[str, Any]:
         """Persist a verification token document.
 
@@ -83,6 +84,8 @@ class VerificationTokenRepository:
         }
         if member_id is not None:
             doc["member_id"] = member_id
+        if sign_in_code is not None:
+            doc["sign_in_code"] = sign_in_code
         try:
             result = await self._container.create_item(body=doc)
             logger.info(
@@ -127,6 +130,61 @@ class VerificationTokenRepository:
             )
         except Exception:
             logger.warning("Failed to mark token as used: id=%s", token_id)
+            return None
+
+        return doc
+
+    async def consume_token_by_code(
+        self,
+        tenant_id: str,
+        sign_in_code: str,
+        token_type: str,
+    ) -> dict[str, Any] | None:
+        """Look up and consume a token by its 6-digit sign-in code.
+
+        SPEC-0429: Alternative to link-based verification. Queries within
+        the token_type partition for a matching tenant + code + unused token.
+        Returns the token document if found and valid, or None.
+        """
+        try:
+            query = (
+                "SELECT * FROM c WHERE c.tenant_id = @tid "
+                "AND c.sign_in_code = @code AND c.used = false"
+            )
+            params = [
+                {"name": "@tid", "value": tenant_id},
+                {"name": "@code", "value": sign_in_code},
+            ]
+            items = [
+                item async for item in self._container.query_items(
+                    query=query,
+                    parameters=params,
+                    partition_key=token_type,
+                    max_item_count=1,
+                )
+            ]
+        except Exception:
+            logger.exception("Error querying token by code: tenant=%s", tenant_id)
+            return None
+
+        if not items:
+            return None
+
+        doc = items[0]
+        if doc.get("used"):
+            return None
+
+        # Atomically mark as used
+        try:
+            await self._container.patch_item(
+                item=doc["id"],
+                partition_key=token_type,
+                patch_operations=[
+                    {"op": "set", "path": "/used", "value": True},
+                ],
+            )
+        except Exception:
+            logger.warning("Failed to mark token as used: id=%s", doc["id"])
             return None
 
         return doc
