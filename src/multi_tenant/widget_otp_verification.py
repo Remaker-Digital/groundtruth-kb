@@ -418,10 +418,10 @@ async def _send_otp_email(
 
     Provider selection: SMTP (Titan) > ACS > skip.
     """
-    from src.multi_tenant.alert_delivery import _EMAIL_WRAPPER
+    from src.multi_tenant.alert_delivery import format_branded_email
 
     html_body = _OTP_EMAIL_BODY.format(code=otp_code)
-    full_html = _EMAIL_WRAPPER.format(body=html_body)
+    full_html = format_branded_email(html_body)
     subject = "Your verification code"
 
     # --- Provider 1: SMTP (Titan or other SMTP provider) ---

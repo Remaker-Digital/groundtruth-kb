@@ -68,9 +68,9 @@ async def send_service_message(
     if not recipient_emails:
         return ServiceMessageResult()
 
-    from src.multi_tenant.alert_delivery import _EMAIL_WRAPPER
+    from src.multi_tenant.alert_delivery import format_branded_email
 
-    full_html = _EMAIL_WRAPPER.format(body=body_html)
+    full_html = format_branded_email(body_html)
     result = ServiceMessageResult(total_recipients=len(recipient_emails))
 
     # Batch recipients to stay within provider limits

@@ -98,7 +98,7 @@ export const agentRedTheme = createTheme({
       // Semantic
       success: '#0D7C3E',
       warning: '#E5A100',
-      error: '#D32F2F',
+      error: '#e03131',
       info: '#1E3A5F',
     },
   },

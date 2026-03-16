@@ -361,7 +361,6 @@ class TestFieldPipelineCompleteness:
     # These are tracked as tech debt. When fixed, remove from these sets and the
     # tests will automatically verify full-pipeline coverage.
     _YAML_ONLY_NOT_IN_MAPPING = {
-        "widget_greeting_mode",          # S99: added to YAML, not wired to mapping
         "widget_quick_actions_enabled",  # In YAML + Cosmos, not in field_mapping
     }
     _MAPPING_ONLY_NOT_IN_YAML = {
@@ -373,9 +372,7 @@ class TestFieldPipelineCompleteness:
 "widget_launcher_shape",              # In mapping, YAML definition pending
         "widget_launcher_color",              # In mapping, YAML definition pending
     }
-    _YAML_ONLY_NOT_IN_COSMOS = {
-        "widget_greeting_mode",     # S99: added to YAML, not in Cosmos schema
-    }
+    _YAML_ONLY_NOT_IN_COSMOS: set[str] = set()  # All YAML fields now wired to Cosmos
 
     def test_all_widget_yaml_fields_in_field_mapping(self):
         """Every widget_* field in fields.yaml must appear in _PREFS_DIRECT_FIELDS."""

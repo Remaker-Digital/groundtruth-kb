@@ -476,12 +476,12 @@ class TestSpec1647ServiceMessageFormat:
         )
 
     def test_uses_shared_email_wrapper(self):
-        """send_service_message must use the _EMAIL_WRAPPER template."""
+        """send_service_message must use the format_branded_email wrapper."""
         from src.multi_tenant.service_message_delivery import send_service_message
 
         source = inspect.getsource(send_service_message)
-        assert "_EMAIL_WRAPPER" in source, (
-            "SPEC-1647: Must use shared _EMAIL_WRAPPER template"
+        assert "format_branded_email" in source, (
+            "SPEC-1647: Must use shared format_branded_email wrapper"
         )
 
     def test_render_body_produces_styled_html(self):

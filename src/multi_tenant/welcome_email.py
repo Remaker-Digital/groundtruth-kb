@@ -160,7 +160,7 @@ async def send_welcome_email(
         logger.warning("No email address — skipping welcome email for %s", tenant_id[:8])
         return False
 
-    from src.multi_tenant.alert_delivery import _EMAIL_WRAPPER
+    from src.multi_tenant.alert_delivery import format_branded_email
 
     slug = tenant_url_slug(shop_domain, brand_name, tenant_id)
     resolved_url = _build_admin_login_url(admin_login_url, tenant_slug=slug)
@@ -170,7 +170,7 @@ async def send_welcome_email(
         tenant_id=tenant_id,
         admin_login_url=resolved_url,
     )
-    full_html = _EMAIL_WRAPPER.format(body=html_body)
+    full_html = format_branded_email(html_body, admin_url=resolved_url)
     subject = "Welcome to Agent Red — Your account is ready"
 
     # --- Provider 1: SMTP (Titan or other SMTP provider) ---

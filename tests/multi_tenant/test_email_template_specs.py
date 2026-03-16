@@ -71,8 +71,8 @@ class TestEmailVerificationSpecs:
         assert reason in html
         # Error title
         assert "Verification Failed" in html
-        # Red icon background
-        assert "#D32F2F" in html
+        # Red icon background (Mantine red[8])
+        assert "#e03131" in html
 
     def test_spec_1304_verification_email_subject(self):
         """SPEC-1304: Subject is '[Agent Red] Verify Your Email Address'."""

@@ -912,6 +912,14 @@ export function WidgetPage() {
     setConfig((prev) => ({ ...prev, [key]: value }));
   }
 
+  /** Update state AND trigger debounced auto-save — use for non-text controls
+   *  (SegmentedControl, Switch, Slider, Select, ColorPicker, Chip.Group)
+   *  that don't fire blur events reliably. */
+  function updateAndSave<K extends keyof WidgetConfig>(key: K, value: WidgetConfig[K]) {
+    update(key, value);
+    triggerSave();
+  }
+
   function resetDefaults() {
     setConfig({ ...DEFAULT_WIDGET_CONFIG });
   }
@@ -929,7 +937,7 @@ export function WidgetPage() {
     }
   }
 
-  const { onBlur: autoSaveOnBlur, saveCount } = useAutoSaveDraft({ save: handleSave });
+  const { onBlur: autoSaveOnBlur, triggerSave, saveCount } = useAutoSaveDraft({ save: handleSave });
 
   async function handleRotateWidgetKey() {
     const result = await rotateWidgetKey();
@@ -1080,7 +1088,7 @@ export function WidgetPage() {
                     <ColorField
                       label="Launcher color"
                       value={config.launcherColor || config.primaryColor}
-                      onChange={(val) => update('launcherColor', val)}
+                      onChange={(val) => updateAndSave('launcherColor', val)}
                       swatches={[BRAND_RED, '#2563EB', '#059669', '#7C3AED', '#D97706', '#DB2777', '#000000', '#FFFFFF']}
                     />
                   </div>
@@ -1091,7 +1099,7 @@ export function WidgetPage() {
                       label="Launcher icon"
                       data={ICON_OPTIONS}
                       value={config.launcherIcon}
-                      onChange={(val) => update('launcherIcon', (val as WidgetConfig['launcherIcon']) || 'chat')}
+                      onChange={(val) => updateAndSave('launcherIcon', (val as WidgetConfig['launcherIcon']) || 'chat')}
                     />
                     <div>
                       <Text size="sm" fw={500} mb={4}>
@@ -1102,7 +1110,7 @@ export function WidgetPage() {
                         max={72}
                         step={1}
                         value={config.launcherSize}
-                        onChange={(val) => update('launcherSize', val)}
+                        onChange={(val) => updateAndSave('launcherSize', val)}
                         color="action"
                         marks={[
                           { value: 48, label: '48' },
@@ -1120,7 +1128,7 @@ export function WidgetPage() {
                   <SegmentedControl
                     fullWidth
                     value={config.position}
-                    onChange={(val) => update('position', val as WidgetConfig['position'])}
+                    onChange={(val) => updateAndSave('position', val as WidgetConfig['position'])}
                     data={[
                       { label: 'Bottom right', value: 'bottom-right' },
                       { label: 'Bottom left', value: 'bottom-left' },
@@ -1165,14 +1173,14 @@ export function WidgetPage() {
                   <ColorField
                     label="Header left color"
                     value={config.primaryColor}
-                    onChange={(val) => update('primaryColor', val)}
+                    onChange={(val) => updateAndSave('primaryColor', val)}
                     swatches={[BRAND_RED, '#2563EB', '#059669', '#7C3AED', '#D97706', '#DB2777', '#000000', '#FFFFFF']}
                   />
                   <div style={{ opacity: config.headerGradientEnabled ? 1 : 0.4, pointerEvents: config.headerGradientEnabled ? 'auto' : 'none' }}>
                     <ColorField
                       label="Header right color"
                       value={config.headerGradientEnd}
-                      onChange={(val) => update('headerGradientEnd', val)}
+                      onChange={(val) => updateAndSave('headerGradientEnd', val)}
                       swatches={['#8B1520', '#1E40AF', '#047857', '#5B21B6', '#B45309', '#BE185D', '#1F2937', '#374151']}
                     />
                   </div>
@@ -1182,14 +1190,14 @@ export function WidgetPage() {
                   label="Enable header gradient"
                   description="When off, the header uses a solid color. When on, it blends left and right colors."
                   checked={config.headerGradientEnabled}
-                  onChange={(e) => update('headerGradientEnabled', e.currentTarget.checked)}
+                  onChange={(e) => updateAndSave('headerGradientEnabled', e.currentTarget.checked)}
                   color="action"
                 />
                 <Select
                   label="Font family"
                   data={FONT_OPTIONS}
                   value={config.fontFamily}
-                  onChange={(val) => update('fontFamily', val || DEFAULT_WIDGET_CONFIG.fontFamily)}
+                  onChange={(val) => updateAndSave('fontFamily', val || DEFAULT_WIDGET_CONFIG.fontFamily)}
                 />
                 <div style={{ marginBottom: 20 }}>
                   <Text size="sm" fw={500} mb={4}>
@@ -1200,7 +1208,7 @@ export function WidgetPage() {
                     max={24}
                     step={1}
                     value={config.borderRadius}
-                    onChange={(val) => update('borderRadius', val)}
+                    onChange={(val) => updateAndSave('borderRadius', val)}
                     color="action"
                     marks={[
                       { value: 0, label: '0' },
@@ -1217,7 +1225,7 @@ export function WidgetPage() {
                   <SegmentedControl
                     fullWidth
                     value={config.colorMode}
-                    onChange={(val) => update('colorMode', val as WidgetConfig['colorMode'])}
+                    onChange={(val) => updateAndSave('colorMode', val as WidgetConfig['colorMode'])}
                     data={[
                       { label: 'Light', value: 'light' },
                       { label: 'Dark', value: 'dark' },
@@ -1233,7 +1241,7 @@ export function WidgetPage() {
                   <SegmentedControl
                     fullWidth
                     value={config.panelWidth}
-                    onChange={(val) => update('panelWidth', val as WidgetConfig['panelWidth'])}
+                    onChange={(val) => updateAndSave('panelWidth', val as WidgetConfig['panelWidth'])}
                     data={[
                       { label: 'Compact', value: 'compact' },
                       { label: 'Standard', value: 'standard' },
@@ -1249,7 +1257,7 @@ export function WidgetPage() {
                   <SegmentedControl
                     fullWidth
                     value={config.panelHeight}
-                    onChange={(val) => update('panelHeight', val as WidgetConfig['panelHeight'])}
+                    onChange={(val) => updateAndSave('panelHeight', val as WidgetConfig['panelHeight'])}
                     data={[
                       { label: 'Short', value: 'short' },
                       { label: 'Standard', value: 'standard' },
@@ -1264,7 +1272,7 @@ export function WidgetPage() {
                   </Text>
                   <Select
                     value={config.locale}
-                    onChange={(val) => update('locale', (val || 'auto') as WidgetConfig['locale'])}
+                    onChange={(val) => updateAndSave('locale', (val || 'auto') as WidgetConfig['locale'])}
                     data={[
                       { label: 'Auto-detect', value: 'auto' },
                       { label: 'English', value: 'en' },
@@ -1285,7 +1293,7 @@ export function WidgetPage() {
                   <SegmentedControl
                     fullWidth
                     value={config.shadowIntensity}
-                    onChange={(val) => update('shadowIntensity', val as WidgetConfig['shadowIntensity'])}
+                    onChange={(val) => updateAndSave('shadowIntensity', val as WidgetConfig['shadowIntensity'])}
                     data={[
                       { label: 'None', value: 'none' },
                       { label: 'Subtle', value: 'subtle' },
@@ -1306,7 +1314,7 @@ export function WidgetPage() {
                 <Switch
                   label="Greeting message"
                   checked={config.greetingEnabled}
-                  onChange={(e) => update('greetingEnabled', e.currentTarget.checked)}
+                  onChange={(e) => updateAndSave('greetingEnabled', e.currentTarget.checked)}
                   color="action"
                 />
                 {config.greetingEnabled && (
@@ -1316,7 +1324,7 @@ export function WidgetPage() {
                       { label: 'AI-generated', value: 'ai_generated' },
                     ]}
                     value={config.greetingMode}
-                    onChange={(val) => update('greetingMode', val as WidgetConfig['greetingMode'])}
+                    onChange={(val) => updateAndSave('greetingMode', val as WidgetConfig['greetingMode'])}
                     size="xs"
                   />
                 )}
@@ -1366,7 +1374,7 @@ export function WidgetPage() {
                   label={<>Pre-chat form <HelpTooltip text="Collects optional identity information from the visitor before starting a conversation. This is not a security feature — responses are self-reported, unverified, and should not be trusted for authentication. A single Shopify customer account may be shared by multiple people. If distinguishing individual users matters for your business, ask visitors to identify themselves explicitly." docLink="https://agentredcx.com/docs/admin-guide/widget-behavior#pre-chat-form" /></>}
                   description="Collect visitor name and email before starting a conversation."
                   checked={config.preChatFormEnabled}
-                  onChange={(e) => update('preChatFormEnabled', e.currentTarget.checked)}
+                  onChange={(e) => updateAndSave('preChatFormEnabled', e.currentTarget.checked)}
                   color="action"
                 />
                 {config.preChatFormEnabled && (
@@ -1377,7 +1385,7 @@ export function WidgetPage() {
                     <Chip.Group
                       multiple
                       value={config.preChatFields}
-                      onChange={(val) => update('preChatFields', val)}
+                      onChange={(val) => updateAndSave('preChatFields', val)}
                     >
                       <Group gap="xs">
                         {PRE_CHAT_FIELDS.map((field) => (
@@ -1392,7 +1400,7 @@ export function WidgetPage() {
                 <Switch
                   label="Sound notifications"
                   checked={config.soundEnabled}
-                  onChange={(e) => update('soundEnabled', e.currentTarget.checked)}
+                  onChange={(e) => updateAndSave('soundEnabled', e.currentTarget.checked)}
                   color="action"
                 />
                 <Divider variant="dashed" />
@@ -1400,7 +1408,7 @@ export function WidgetPage() {
                   label={<>Exit-intent auto-open <HelpTooltip text="Automatically opens the widget when a desktop visitor moves their mouse out of the browser window. Fires at most once per page visit and only if the visitor hasn't already closed the widget." /></>}
                   description="Desktop only — triggers when the mouse leaves the viewport."
                   checked={config.exitIntentEnabled}
-                  onChange={(e) => update('exitIntentEnabled', e.currentTarget.checked)}
+                  onChange={(e) => updateAndSave('exitIntentEnabled', e.currentTarget.checked)}
                   color="action"
                 />
                 <NumberInput
@@ -1420,7 +1428,7 @@ export function WidgetPage() {
                   label="Mobile fullscreen"
                   description="Chat panel fills the entire screen on mobile devices"
                   checked={config.mobileFullscreen}
-                  onChange={(e) => update('mobileFullscreen', e.currentTarget.checked)}
+                  onChange={(e) => updateAndSave('mobileFullscreen', e.currentTarget.checked)}
                   color="action"
                 />
                 <Select
@@ -1432,7 +1440,7 @@ export function WidgetPage() {
                     { value: 'bottom-left', label: 'Bottom left' },
                   ]}
                   value={config.mobilePosition || ''}
-                  onChange={(val) => update('mobilePosition', val ? (val as WidgetConfig['mobilePosition']) : null)}
+                  onChange={(val) => updateAndSave('mobilePosition', val ? (val as WidgetConfig['mobilePosition']) : null)}
                   clearable
                 />
                 <Group grow>

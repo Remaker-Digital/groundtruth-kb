@@ -252,18 +252,18 @@ class TestSpec1628ApiKeyResetWrapper:
     """
 
     def test_api_key_reset_imports_email_wrapper(self):
-        """API key reset email imports _EMAIL_WRAPPER."""
+        """API key reset email imports format_branded_email (shared wrapper)."""
         from src.multi_tenant import admin_apikey_api
 
         source = inspect.getsource(admin_apikey_api)
-        assert "_EMAIL_WRAPPER" in source
+        assert "format_branded_email" in source
 
     def test_api_key_reset_formats_wrapper(self):
-        """API key reset calls _EMAIL_WRAPPER.format(body=...)."""
+        """API key reset calls format_branded_email(body_html)."""
         from src.multi_tenant import admin_apikey_api
 
         source = inspect.getsource(admin_apikey_api)
-        assert "_EMAIL_WRAPPER.format" in source
+        assert "format_branded_email" in source
 
 
 # ---------------------------------------------------------------------------

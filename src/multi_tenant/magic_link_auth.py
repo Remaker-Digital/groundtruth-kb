@@ -42,7 +42,7 @@ from fastapi import APIRouter, Query, Request
 from fastapi.responses import JSONResponse
 from pydantic import BaseModel, Field
 
-from src.multi_tenant.alert_delivery import _EMAIL_WRAPPER
+from src.multi_tenant.alert_delivery import format_branded_email
 
 logger = logging.getLogger(__name__)
 
@@ -379,7 +379,7 @@ async def request_magic_link(
         html_body = _MAGIC_LINK_EMAIL_BODY.format(
             magic_link_url=magic_link_url, tenant_context="",
         )
-        full_html = _EMAIL_WRAPPER.format(body=html_body)
+        full_html = format_branded_email(html_body)
         await _send_magic_link_email(email, full_html)
 
         logger.info(
@@ -455,7 +455,7 @@ async def _send_member_magic_links(
             magic_link_url=magic_link_url,
             tenant_context=tenant_context,
         )
-        full_html = _EMAIL_WRAPPER.format(body=html_body)
+        full_html = format_branded_email(html_body)
         await _send_magic_link_email(email, full_html)
 
         logger.info(

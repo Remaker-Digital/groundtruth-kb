@@ -383,7 +383,7 @@ async def _send_recovery_auth_email(
 ) -> None:
     """Send the recovery auth link email."""
     try:
-        from src.multi_tenant.alert_delivery import _EMAIL_WRAPPER, send_acs_email
+        from src.multi_tenant.alert_delivery import format_branded_email, send_acs_email
 
         conn_str = os.environ.get("ACS_CONNECTION_STRING", "")
         if not conn_str:
@@ -394,7 +394,7 @@ async def _send_recovery_auth_email(
             recovery_link=recovery_link,
             tenant_id=tenant_id,
         )
-        full_html = _EMAIL_WRAPPER.format(body=body_html)
+        full_html = format_branded_email(body_html)
 
         await send_acs_email(
             conn_str=conn_str,

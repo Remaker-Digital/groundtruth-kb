@@ -501,12 +501,53 @@ _EMAIL_WRAPPER = """<!DOCTYPE html>
   <p style="margin:0;color:#9ca3af;font-size:12px;text-align:center">
     Agent Red Customer Experience &mdash; a product of <a href="https://remakerdigital.com" style="color:#ff3621;text-decoration:none">Remaker Digital</a>
   </p>
+  <p style="margin:8px 0 0;color:#6b7280;font-size:11px;text-align:center">
+    This is a system message. To unsubscribe, please
+    <a href="{unsubscribe_url}" style="color:#ff3621;text-decoration:none">access your account</a>
+    and change your system configuration.
+  </p>
 </td></tr>
 </table>
 </td></tr>
 </table>
 </body>
 </html>"""
+
+
+def _resolve_admin_url(admin_url: str | None = None) -> str:
+    """Resolve the admin console URL for unsubscribe links.
+
+    Priority: explicit admin_url > STANDALONE_ADMIN_URL env > PROD_URL env > fallback.
+    """
+    import os
+
+    if admin_url:
+        return admin_url
+    standalone = os.environ.get("STANDALONE_ADMIN_URL", "")
+    if standalone:
+        return standalone
+    prod = os.environ.get("PROD_URL", "")
+    if prod:
+        return f"{prod.rstrip('/')}/admin/standalone/"
+    return "https://agent-red-api-gateway.orangeglacier-f566a4e7.eastus.azurecontainerapps.io/admin/standalone/"
+
+
+def format_branded_email(body: str, admin_url: str | None = None) -> str:
+    """Format email body into the branded HTML wrapper with unsubscribe link.
+
+    Resolves the admin console URL for the unsubscribe link. Call sites
+    that already have a tenant-specific admin URL can pass it explicitly;
+    otherwise the generic admin login URL is resolved from environment.
+
+    Args:
+        body: Inner HTML content for the email.
+        admin_url: Optional explicit admin URL for the unsubscribe link.
+
+    Returns:
+        Full HTML email string with branding and unsubscribe footer.
+    """
+    resolved_url = _resolve_admin_url(admin_url)
+    return _EMAIL_WRAPPER.format(body=body, unsubscribe_url=resolved_url)
 
 
 def _severity_color(severity: AlertSeverity) -> str:
@@ -646,7 +687,7 @@ def _render_email(alert: Alert) -> tuple[str, str]:
         "admin_link_block": admin_link_block,
     }
     body_html = body_tmpl.format(**format_kwargs)
-    full_html = _EMAIL_WRAPPER.format(body=body_html)
+    full_html = format_branded_email(body_html)
 
     return subject, full_html
 

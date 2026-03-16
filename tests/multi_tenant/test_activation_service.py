@@ -2759,3 +2759,79 @@ class TestFirstActivationIngestionHook:
             warnings = await service._maybe_start_ingestion(STARTER_TENANT_ID)
 
         assert warnings == []
+
+
+# =========================================================================
+# Test: Tier entitlement validation — WI-1324 regression tests
+# =========================================================================
+
+
+class TestTierEntitlementValidation:
+    """Verify _validate_tier_entitlements enforces ONLY documented entitlements.
+
+    WI-1324: custom_instructions was erroneously gated to Professional+.
+    The entitlements specification only gates: memory_layers. Custom
+    instructions MUST be available to ALL tiers.
+    """
+
+    def _make_service_for_validation(self):
+        """Create an ActivationService instance for direct method testing."""
+        active = _make_active_doc()
+        service, _, _, _, _ = _make_service(active=active)
+        return service
+
+    def test_starter_allows_custom_instructions(self):
+        """Starter tier MUST allow non-empty custom_instructions (WI-1324)."""
+        service = self._make_service_for_validation()
+        draft = {"custom_instructions": "Always greet the customer by name."}
+        errors = service._validate_tier_entitlements(draft, TenantTier.STARTER)
+        ci_errors = [e for e in errors if e["field"] == "custom_instructions"]
+        assert ci_errors == [], (
+            f"Starter tier should allow custom_instructions but got: {ci_errors}"
+        )
+
+    def test_professional_allows_custom_instructions(self):
+        """Professional tier MUST allow custom_instructions."""
+        service = self._make_service_for_validation()
+        draft = {"custom_instructions": "Be concise and professional."}
+        errors = service._validate_tier_entitlements(draft, TenantTier.PROFESSIONAL)
+        ci_errors = [e for e in errors if e["field"] == "custom_instructions"]
+        assert ci_errors == []
+
+    def test_enterprise_allows_custom_instructions(self):
+        """Enterprise tier MUST allow custom_instructions."""
+        service = self._make_service_for_validation()
+        draft = {"custom_instructions": "Follow brand guidelines strictly."}
+        errors = service._validate_tier_entitlements(draft, TenantTier.ENTERPRISE)
+        ci_errors = [e for e in errors if e["field"] == "custom_instructions"]
+        assert ci_errors == []
+
+    def test_trial_allows_custom_instructions(self):
+        """Trial tier MUST allow custom_instructions."""
+        service = self._make_service_for_validation()
+        draft = {"custom_instructions": "Test instructions during trial."}
+        errors = service._validate_tier_entitlements(draft, TenantTier.TRIAL)
+        ci_errors = [e for e in errors if e["field"] == "custom_instructions"]
+        assert ci_errors == []
+
+    def test_starter_blocks_memory_layer_3(self):
+        """Starter tier MUST block memory layer 3 (documented entitlement)."""
+        service = self._make_service_for_validation()
+        draft = {"memory_layers": [1, 2, 3]}
+        errors = service._validate_tier_entitlements(draft, TenantTier.STARTER)
+        layer_errors = [e for e in errors if e["field"] == "memory_layers"]
+        assert len(layer_errors) == 1, "Starter should block memory layer 3"
+
+    def test_professional_allows_memory_layer_3(self):
+        """Professional tier MUST allow memory layers 1-3."""
+        service = self._make_service_for_validation()
+        draft = {"memory_layers": [1, 2, 3]}
+        errors = service._validate_tier_entitlements(draft, TenantTier.PROFESSIONAL)
+        assert errors == []
+
+    def test_no_errors_for_empty_draft(self):
+        """Empty draft MUST pass tier validation for any tier."""
+        service = self._make_service_for_validation()
+        for tier in (TenantTier.STARTER, TenantTier.PROFESSIONAL, TenantTier.ENTERPRISE):
+            errors = service._validate_tier_entitlements({}, tier)
+            assert errors == [], f"Empty draft should pass for {tier.value}"

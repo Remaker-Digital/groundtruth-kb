@@ -41,14 +41,14 @@ export const tokens = {
   actionHover:   '#2563EB',
   activate:      '#2b8a3e',
   activateHover: '#237032',
-  danger:        '#D32F2F',
-  dangerHover:   '#B71C1C',
+  danger:        '#e03131',
+  dangerHover:   '#c92a2a',
   brand:         '#ff3621',
 
   // --- Semantic status ---
   success: '#0D7C3E',
   warning: '#E5A100',
-  error:      '#D32F2F',
+  error:      '#e03131',
   errorLight: '#ff6b6b',
   info:       '#1E3A5F',
 

@@ -1159,7 +1159,7 @@ export function InboxPage() {
       {/* ================================================================= */}
       <Box
         style={{
-          width: 280,
+          width: 320,
           flexShrink: 0,
           display: 'flex',
           flexDirection: 'column',
@@ -1288,19 +1288,19 @@ export function InboxPage() {
                     {selectedConversation.customerName && (
                       <Group gap={8} wrap="nowrap">
                         <Text size="xs" c="dimmed" style={{ width: 80, flexShrink: 0 }}>Name</Text>
-                        <Text size="sm">{selectedConversation.customerName}</Text>
+                        <Text size="sm" style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', minWidth: 0 }}>{selectedConversation.customerName}</Text>
                       </Group>
                     )}
                     {selectedConversation.identityEmail && (
                       <Group gap={8} wrap="nowrap">
                         <Text size="xs" c="dimmed" style={{ width: 80, flexShrink: 0 }}>Email</Text>
-                        <Text size="sm">{selectedConversation.identityEmail}</Text>
+                        <Text size="sm" style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', minWidth: 0 }}>{selectedConversation.identityEmail}</Text>
                       </Group>
                     )}
                     {selectedConversation.customerId && (
                       <Group gap={8} wrap="nowrap">
                         <Text size="xs" c="dimmed" style={{ width: 80, flexShrink: 0 }}>Customer ID</Text>
-                        <Text size="sm" ff="monospace" style={{ fontSize: 11 }}>{selectedConversation.customerId}</Text>
+                        <Text size="sm" ff="monospace" style={{ fontSize: 11, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', minWidth: 0 }}>{selectedConversation.customerId}</Text>
                       </Group>
                     )}
                     <Group gap={8} wrap="nowrap">

@@ -40,14 +40,14 @@
   --ar-action-hover:    #2563EB;
   --ar-activate:        #2b8a3e;
   --ar-activate-hover:  #237032;
-  --ar-danger:          #D32F2F;
-  --ar-danger-hover:    #B71C1C;
+  --ar-danger:          #e03131;
+  --ar-danger-hover:    #c92a2a;
   --ar-brand:           #ff3621;
 
   /* --- Semantic status --- */
   --ar-success:  #0D7C3E;
   --ar-warning:  #E5A100;
-  --ar-error:    #D32F2F;
+  --ar-error:    #e03131;
   --ar-info:     #1E3A5F;
 
   /* --- Overlay / modal --- */
@@ -272,12 +272,12 @@ html[data-mantine-color-scheme="light"] {
 .ar-btn-danger-outline {
   background: transparent;
   color: var(--ar-danger);
-  border: 1px solid rgba(211, 47, 47, 0.27);
+  border: 1px solid rgba(224, 49, 49, 0.27);
   cursor: pointer;
   transition: background-color var(--ar-transition-fast);
 }
 .ar-btn-danger-outline:hover:not(:disabled) {
-  background-color: rgba(211, 47, 47, 0.09);
+  background-color: rgba(224, 49, 49, 0.09);
 }
 .ar-btn-danger-outline:disabled {
   opacity: 0.6;

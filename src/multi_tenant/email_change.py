@@ -31,7 +31,7 @@ from fastapi import APIRouter, Depends, Query, Request
 from fastapi.responses import HTMLResponse, JSONResponse
 from pydantic import BaseModel, Field
 
-from src.multi_tenant.alert_delivery import _EMAIL_WRAPPER
+from src.multi_tenant.alert_delivery import format_branded_email
 from src.multi_tenant.auth import TenantContext
 from src.multi_tenant.middleware import get_tenant_context
 
@@ -185,7 +185,7 @@ _CONFIRM_ERROR_HTML = """<!DOCTYPE html>
          display:flex; align-items:center; justify-content:center; min-height:100vh; }}
   .card {{ background:#1f1f1f; border-radius:12px; padding:48px; max-width:440px;
            text-align:center; box-shadow:0 4px 24px rgba(0,0,0,.3); }}
-  .icon {{ width:64px; height:64px; margin:0 auto 24px; background:#D32F2F;
+  .icon {{ width:64px; height:64px; margin:0 auto 24px; background:#e03131;
            border-radius:50%; display:flex; align-items:center; justify-content:center; }}
   .icon svg {{ width:32px; height:32px; fill:#fff; }}
   h1 {{ color:#f5f5f5; font-size:24px; margin:0 0 12px; }}
@@ -357,7 +357,7 @@ async def request_email_change(
 
         # 1. Send confirmation email to NEW address
         confirm_html = _CONFIRM_EMAIL_BODY.format(confirm_url=confirm_url)
-        full_confirm = _EMAIL_WRAPPER.format(body=confirm_html)
+        full_confirm = format_branded_email(confirm_html)
         await _send_email(
             new_email,
             "[Agent Red] Confirm Your New Email Address",
@@ -371,7 +371,7 @@ async def request_email_change(
                 new_email=new_email,
                 timestamp=timestamp,
             )
-            full_alert = _EMAIL_WRAPPER.format(body=alert_html)
+            full_alert = format_branded_email(alert_html)
             await _send_email(
                 old_email,
                 "[Agent Red] Email Change Requested",
@@ -506,7 +506,7 @@ async def confirm_email_change(
                     old_email=old_email,
                     new_email=new_email,
                 )
-                full_html = _EMAIL_WRAPPER.format(body=completion_html)
+                full_html = format_branded_email(completion_html)
                 await _send_email(
                     old_email,
                     "[Agent Red] Email Address Changed",

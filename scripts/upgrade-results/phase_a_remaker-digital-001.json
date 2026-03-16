@@ -1,20 +1,36 @@
 {
-  "A1_version": "1.87.0",
+  "A1_version": "1.88.0",
   "A2_status": "active",
   "A3_activation": {
     "is_active": true,
     "is_configured": true,
     "has_pending_changes": true,
-    "active_version": 32
+    "active_version": 33
   },
-  "A4_conversation_count": 903,
+  "A4_conversation_count": 856,
   "A5_status_breakdown": {
     "http_status": 404,
     "note": "analytics may need params"
   },
-  "A6_kb_count": 180,
-  "A7_team_count": 19,
+  "A6_kb_count": 204,
+  "A7_team_count": 23,
   "A8_team_members": [
+    {
+      "displayName": "E2E e2e-test",
+      "role": "viewer"
+    },
+    {
+      "displayName": "Alex Johnson",
+      "role": "viewer"
+    },
+    {
+      "displayName": "Maria Garcia",
+      "role": "escalation_agent"
+    },
+    {
+      "displayName": "James Williams",
+      "role": "escalation_agent"
+    },
     {
       "displayName": "Sarah Chen",
       "role": "admin"

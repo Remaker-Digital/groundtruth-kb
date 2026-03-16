@@ -95,7 +95,7 @@ async def send_login_notification(
     recipient = notification_email or admin_email
 
     try:
-        from src.multi_tenant.alert_delivery import _EMAIL_WRAPPER, send_acs_email
+        from src.multi_tenant.alert_delivery import format_branded_email, send_acs_email
 
         conn_str = os.environ.get("ACS_CONNECTION_STRING", "")
         if not conn_str:
@@ -112,7 +112,7 @@ async def send_login_notification(
             user_agent=user_agent or "Unknown",
             admin_dashboard_url=admin_url,
         )
-        full_html = _EMAIL_WRAPPER.format(body=body_html)
+        full_html = format_branded_email(body_html, admin_url=admin_url)
 
         await send_acs_email(
             conn_str=conn_str,

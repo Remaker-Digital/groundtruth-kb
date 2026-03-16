@@ -247,7 +247,7 @@ _RECOVERY_EMAIL_BODY = """
 async def _send_recovery_email(to_email: str, new_key: str) -> None:
     """Send the recovery email with the new API key."""
     try:
-        from src.multi_tenant.alert_delivery import _EMAIL_WRAPPER, send_acs_email
+        from src.multi_tenant.alert_delivery import format_branded_email, send_acs_email
 
         conn_str = os.environ.get("ACS_CONNECTION_STRING", "")
         if not conn_str:
@@ -261,7 +261,7 @@ async def _send_recovery_email(to_email: str, new_key: str) -> None:
             new_key=new_key,
             admin_dashboard_url=admin_url,
         )
-        full_html = _EMAIL_WRAPPER.format(body=body_html)
+        full_html = format_branded_email(body_html, admin_url=admin_url)
 
         await send_acs_email(
             conn_str=conn_str,

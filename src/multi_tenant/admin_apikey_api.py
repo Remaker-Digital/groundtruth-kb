@@ -178,7 +178,7 @@ async def _send_api_key_email(
     consistency across all Agent Red transactional emails (WI-0988).
     Returns True if sent successfully via either provider, False otherwise.
     """
-    from src.multi_tenant.alert_delivery import _EMAIL_WRAPPER
+    from src.multi_tenant.alert_delivery import format_branded_email
 
     name_display = f" ({tenant_name})" if tenant_name else ""
     subject = "Your Agent Red API Key Has Been Reset"
@@ -211,7 +211,7 @@ async def _send_api_key_email(
   </p>
 </div>"""
 
-    full_html = _EMAIL_WRAPPER.format(body=body_html)
+    full_html = format_branded_email(body_html)
 
     # --- Provider 1: SMTP (Titan or other SMTP provider) ---
     smtp_host = os.environ.get("SMTP_HOST", "")

@@ -44,7 +44,14 @@ export function useAvatarUpload(apiFetch: ApiFetch) {
         });
         if (!resp.ok) {
           const body = await resp.json().catch(() => ({ detail: `${resp.status}` }));
-          throw new Error(body.detail || `Upload failed: ${resp.status}`);
+          // RequestBodyLimitMiddleware returns { error: "..." } (not { detail }),
+          // so check both fields. For 413, provide a user-friendly file-size hint.
+          const serverMsg = body.detail || body.error;
+          if (resp.status === 413) {
+            const maxKB = body.max_bytes ? Math.round(body.max_bytes / 1024) : 256;
+            throw new Error(`File too large. Maximum size is ${maxKB} KB — please resize and try again.`);
+          }
+          throw new Error(serverMsg || `Upload failed: ${resp.status}`);
         }
         setProgress('done');
         return await resp.json();

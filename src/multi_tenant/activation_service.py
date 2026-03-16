@@ -595,19 +595,6 @@ class ActivationService:
         allowed_layers = set(tier_defaults.get("memory_layers", [1, 2, 3]))
         errors: list[dict[str, str]] = []
 
-        # Custom instructions require Professional+ (Starter has no
-        # custom_instructions key in TIER_DEFAULTS — gate on tier level).
-        if tier == TenantTier.STARTER:
-            ci = draft.get("custom_instructions")
-            if ci and str(ci).strip():
-                errors.append({
-                    "field": "custom_instructions",
-                    "message": (
-                        "Custom instructions require Professional tier or higher. "
-                        "Upgrade to activate this feature."
-                    ),
-                })
-
         # Memory layer 3 requires Professional+.
         configured_layers = draft.get("memory_layers")
         if configured_layers and isinstance(configured_layers, list):

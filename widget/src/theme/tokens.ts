@@ -151,6 +151,7 @@ export interface WidgetConfig {
   widget_sound_enabled?: boolean | null;
   widget_file_upload_enabled?: boolean | null;
   widget_greeting_enabled?: boolean | null;
+  widget_greeting_mode?: 'static' | 'ai_generated' | null;
   widget_greeting_message?: string | null;
   widget_pre_chat_form_enabled?: boolean | null;
   widget_pre_chat_fields?: string[] | null;

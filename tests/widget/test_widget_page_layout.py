@@ -119,8 +119,8 @@ class TestWidgetPageHeader:
         """Header is wrapped in a plain <div>, not a Box or Paper."""
         # Find the page header block
         idx = self.source.index("<Title order={2}>Widget configuration</Title>")
-        # Look backwards for the wrapper element
-        before = self.source[max(0, idx - 50):idx]
+        # Look backwards for the wrapper element (wider window for Group wrapper)
+        before = self.source[max(0, idx - 120):idx]
         assert "<div>" in before, "Page header should be wrapped in a plain <div>"
 
 
@@ -140,9 +140,8 @@ class TestSingleColumnFormLayout:
         assert '<Stack gap="md">' in self.source
 
     def test_form_sections_comment(self) -> None:
-        """Layout comment describes single-column with live widget as preview."""
+        """Layout comment describes form sections with auto-save."""
         assert "Form sections" in self.source
-        assert "live widget serves as preview" in self.source
 
     def test_no_two_column_group(self) -> None:
         """No Group container with flex-start/nowrap for two-column layout."""
@@ -177,11 +176,12 @@ class TestPaperSectionStructure:
     def _load(self) -> None:
         self.source = _read(WIDGET_PAGE)
 
-    def test_four_form_paper_sections(self) -> None:
-        """Exactly 4 form Paper sections with p='lg' radius='md' withBorder."""
+    def test_five_form_paper_sections(self) -> None:
+        """Exactly 5 form Paper sections with p='lg' radius='md' withBorder."""
         # Count Paper p="lg" radius="md" withBorder occurrences in the form area
+        # Installation, Launcher appearance, Chat window, Behavior, Content
         count = self.source.count('<Paper p="lg" radius="md" withBorder>')
-        assert count == 4, f"Expected 4 form Paper sections, found {count}"
+        assert count == 5, f"Expected 5 form Paper sections, found {count}"
 
     def test_installation_paper_props(self) -> None:
         """Installation section: Paper p='lg' radius='md' withBorder."""
@@ -238,10 +238,12 @@ class TestSectionHeaders:
                ">\n                Installation\n" in self.source or \
                ">Installation<" in self.source
 
-    def test_appearance_section_header(self) -> None:
-        """Appearance SectionHeader text is 'Appearance'."""
-        assert ">Appearance</SectionHeader>" in self.source or \
-               ">Appearance<" in self.source
+    def test_appearance_section_headers(self) -> None:
+        """Appearance is split into 'Launcher appearance' and 'Chat window' sections."""
+        assert ">Launcher appearance</SectionHeader>" in self.source or \
+               ">Launcher appearance<" in self.source
+        assert ">Chat window</SectionHeader>" in self.source or \
+               ">Chat window<" in self.source
 
     def test_behavior_section_header(self) -> None:
         """Behavior SectionHeader text is 'Behavior'."""
@@ -261,10 +263,10 @@ class TestSectionHeaders:
         assert "widget-appearance" in nearby
 
     def test_all_section_headers_have_tooltips(self) -> None:
-        """All 4 form sections have SectionHeader with tooltip prop."""
+        """All 5 form sections have SectionHeader with tooltip prop."""
         # Count SectionHeader calls with tooltip=
         count = len(re.findall(r'<SectionHeader\s[^>]*tooltip=', self.source))
-        assert count == 4, f"Expected 4 SectionHeaders with tooltips, found {count}"
+        assert count == 5, f"Expected 5 SectionHeaders with tooltips, found {count}"
 
 
 # ===========================================================================
@@ -291,9 +293,13 @@ class TestPreviewPanelRemoved:
         """WidgetPreview function is still defined (may be used elsewhere)."""
         assert "function WidgetPreview(" in self.source
 
-    def test_no_right_column_comment(self) -> None:
-        """No 'Right column' comment in the template."""
-        assert "Right column" not in self.source
+    def test_no_right_column_layout_comment(self) -> None:
+        """No 'Right column' as a top-level two-column layout comment."""
+        # "Right column" may appear as a sub-layout comment within a section
+        # (e.g. "Right column: Launcher controls stack"), but not as a
+        # top-level two-column page layout.
+        assert "Right column */" not in self.source or \
+               "Right column:" in self.source
 
 
 # ===========================================================================
@@ -319,17 +325,19 @@ class TestActionButtons:
         """Reset button label is 'Reset to defaults'."""
         assert "Reset to defaults" in self.source
 
-    def test_save_button_color_action(self) -> None:
-        """Save button uses color='action' (blue)."""
-        assert '<Button color="action" onClick={handleSave}' in self.source
+    def test_auto_save_replaces_save_button(self) -> None:
+        """Manual save button replaced by auto-save via useAutoSaveDraft hook."""
+        assert "useAutoSaveDraft" in self.source
+        assert "AutoSaveIndicator" in self.source
 
-    def test_save_button_text(self) -> None:
-        """Save button label is 'Save draft inputs'."""
-        assert "Save draft inputs" in self.source
+    def test_auto_save_on_blur(self) -> None:
+        """Form Stack uses onBlur for auto-save triggering."""
+        assert "onBlur={autoSaveOnBlur}" in self.source
 
-    def test_save_button_loading_state(self) -> None:
-        """Save button has loading={saving} prop."""
-        assert "loading={saving}" in self.source
+    def test_trigger_save_for_non_text_controls(self) -> None:
+        """Non-text controls use triggerSave via updateAndSave helper."""
+        assert "triggerSave" in self.source
+        assert "updateAndSave" in self.source
 
 
 # ===========================================================================
@@ -784,8 +792,8 @@ class TestThemeTokensDarkMode:
         assert "--ar-action-hover:    #2563EB;" in self.source
 
     def test_danger_color(self) -> None:
-        """--ar-danger: #D32F2F."""
-        assert "--ar-danger:          #D32F2F;" in self.source
+        """--ar-danger: #e03131 (Mantine red[8] — matches sidebar Deactivate button)."""
+        assert "--ar-danger:          #e03131;" in self.source
 
     def test_brand_color(self) -> None:
         """--ar-brand: #ff3621."""

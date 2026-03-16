@@ -116,7 +116,7 @@ async def send_access_expiry_warning(
         logger.warning("Unknown warning tier %r for tenant %s", warning_tier, tenant_id[:8])
         return False
 
-    from src.multi_tenant.alert_delivery import _EMAIL_WRAPPER
+    from src.multi_tenant.alert_delivery import format_branded_email
     from src.multi_tenant.welcome_email import (
         _build_admin_login_url,
         tenant_url_slug,
@@ -135,7 +135,7 @@ async def send_access_expiry_warning(
         tenant_id=tenant_id,
         admin_login_url=_build_admin_login_url(tenant_slug=slug),
     )
-    full_html = _EMAIL_WRAPPER.format(body=html_body)
+    full_html = format_branded_email(html_body)
     subject = config["subject"]
 
     # --- Provider 1: SMTP (Titan or other SMTP provider) ---

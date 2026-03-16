@@ -1028,6 +1028,7 @@ class PreferencesDocument(BaseModel):
     widget_sound_enabled: bool | None = Field(default=None, description="Notification sound for new messages")
     widget_file_upload_enabled: bool | None = Field(default=None, description="Allow visitor file attachments")
     widget_greeting_enabled: bool | None = Field(default=None, description="Show greeting message on open")
+    widget_greeting_mode: str | None = Field(default=None, description="Greeting mode: 'static' or 'ai_generated'")
     widget_greeting_message: str | None = Field(default=None, description="Greeting message text")
     widget_pre_chat_form_enabled: bool | None = Field(default=None, description="Show pre-chat form before conversation")
     widget_pre_chat_fields: list[str] | None = Field(default=None, description="Pre-chat form field names (name, email, phone, etc.)")

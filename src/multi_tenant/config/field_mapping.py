@@ -86,6 +86,7 @@ _PREFS_DIRECT_FIELDS: set[str] = {
     "widget_sound_enabled",
     "widget_file_upload_enabled",
     "widget_greeting_enabled",
+    "widget_greeting_mode",
     "widget_greeting_message",
     "widget_pre_chat_form_enabled",
     "widget_pre_chat_fields",

@@ -23,7 +23,7 @@ from fastapi import APIRouter, Query, Request
 from fastapi.responses import HTMLResponse, JSONResponse
 from pydantic import BaseModel, Field
 
-from src.multi_tenant.alert_delivery import _EMAIL_WRAPPER
+from src.multi_tenant.alert_delivery import format_branded_email
 
 logger = logging.getLogger(__name__)
 
@@ -129,7 +129,7 @@ _CONFIRM_ERROR_HTML = """<!DOCTYPE html>
          display:flex; align-items:center; justify-content:center; min-height:100vh; }}
   .card {{ background:#1f1f1f; border-radius:12px; padding:48px; max-width:440px;
            text-align:center; box-shadow:0 4px 24px rgba(0,0,0,.3); }}
-  .icon {{ width:64px; height:64px; margin:0 auto 24px; background:#D32F2F;
+  .icon {{ width:64px; height:64px; margin:0 auto 24px; background:#e03131;
            border-radius:50%; display:flex; align-items:center; justify-content:center; }}
   .icon svg {{ width:32px; height:32px; fill:#fff; }}
   h1 {{ color:#f5f5f5; font-size:24px; margin:0 0 12px; }}
@@ -214,7 +214,7 @@ async def request_verification(
 
         # Render and send email
         html_body = _VERIFY_EMAIL_BODY.format(verify_url=verify_url)
-        full_html = _EMAIL_WRAPPER.format(body=html_body)
+        full_html = format_branded_email(html_body)
         subject = "[Agent Red] Verify Your Email Address"
 
         await _send_verification_email(body.email, subject, full_html)

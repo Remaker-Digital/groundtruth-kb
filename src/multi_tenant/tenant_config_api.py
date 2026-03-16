@@ -404,6 +404,67 @@ async def _resolve_quick_actions(
 
 
 # ---------------------------------------------------------------------------
+# AI-generated greeting (widget_greeting_mode='ai_generated')
+# ---------------------------------------------------------------------------
+
+import random
+
+# Greeting templates — varied, brand-aware, time-of-day-aware.
+# Each template may use {brand}, {time_greeting}, and {page_hint}.
+_GREETING_TEMPLATES = [
+    "{time_greeting}! 👋 Welcome to {brand}. How can I help you today?",
+    "{time_greeting}! I'm here to help with anything you need at {brand}.",
+    "Hi there! 👋 Welcome to {brand}. What can I assist you with?",
+    "{time_greeting}! Thanks for visiting {brand}. Ask me anything!",
+    "Hey! 👋 Welcome to {brand}. I'm happy to help — just ask!",
+]
+
+_PAGE_GREETINGS: dict[str, list[str]] = {
+    "product": [
+        "{time_greeting}! 👋 Interested in this product? I can answer any questions you have.",
+        "Hi! I can help with sizing, availability, or anything else about this product.",
+    ],
+    "collection": [
+        "{time_greeting}! 👋 Browsing our collection? Let me help you find the perfect item.",
+        "Hi there! Need help narrowing down your choices? I'm here to assist.",
+    ],
+    "cart": [
+        "{time_greeting}! Have any questions before checkout? I'm here to help.",
+        "Almost there! Let me know if you have questions about your order.",
+    ],
+}
+
+
+def _generate_ai_greeting(
+    config: dict[str, Any],
+    page_type: str | None = None,
+) -> str:
+    """Generate a time-aware, brand-personalized greeting.
+
+    Returns a contextual greeting string suitable for ``widget_greeting_message``.
+    Uses templates (not LLM) for speed — no latency added to config fetch.
+    """
+    brand = config.get("brand_name") or config.get("widget_agent_display_name") or "us"
+    now = datetime.now(timezone.utc)
+    hour = now.hour
+
+    if 5 <= hour < 12:
+        time_greeting = "Good morning"
+    elif 12 <= hour < 17:
+        time_greeting = "Good afternoon"
+    elif 17 <= hour < 22:
+        time_greeting = "Good evening"
+    else:
+        time_greeting = "Hello"
+
+    # Page-specific greetings when available
+    templates = _PAGE_GREETINGS.get(page_type or "", _GREETING_TEMPLATES)
+    template = random.choice(templates)
+
+    return template.format(brand=brand, time_greeting=time_greeting)
+
+
+# ---------------------------------------------------------------------------
 # Router
 # ---------------------------------------------------------------------------
 
@@ -488,6 +549,18 @@ async def get_config(
     # Default: active config (pipeline, widget, admin)
     result = await processor.get_config(ctx.tenant_id, tier)
 
+    # --- AI-generated greeting (widget_greeting_mode='ai_generated') ---
+    # When greeting mode is 'ai_generated' and this is an active config fetch
+    # (i.e., from the widget, not admin draft editing), generate a contextual
+    # greeting and set it as widget_greeting_message so the widget renders it
+    # without any runtime changes.
+    response_config = result.config
+    if response_config.get("widget_greeting_mode") == "ai_generated":
+        response_config = dict(response_config)  # Don't mutate cached config
+        response_config["widget_greeting_message"] = _generate_ai_greeting(
+            response_config, page_type,
+        )
+
     # --- Quick action resolution (WI #227) ---
     quick_actions: list[QuickActionForWidget] | None = None
     if page_type is not None:
@@ -499,7 +572,7 @@ async def get_config(
         tenant_id=result.tenant_id,
         tier=result.tier,
         version=result.version,
-        config=result.config,
+        config=response_config,
         from_cache=result.from_cache,
         quick_actions=quick_actions,
         state="active",
