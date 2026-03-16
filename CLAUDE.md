@@ -147,7 +147,7 @@ Next: [describe task].
 
 ### Session Wrap-Up & Handoff
 
-Session wrap-up procedure (stored in KB as operational procedure): (1) Update KB/MEMORY/CLAUDE → (2) Verify procedures → (3) External updates → (4) Staging deploy (risk gate) → (5) Generate handoff prompt via `db.insert_session_prompt()`. Every 5th session is an **audit session**.
+Execute `/kb-session-wrap <session-id>` for the full 5-phase procedure. Every 5th session is an **audit session** (extra hygiene steps included in the skill).
 
 ### Session Scheduler
 
