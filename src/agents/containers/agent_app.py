@@ -82,6 +82,16 @@ def create_agent_app(
         await agent.setup()
         logger.info("Agent %s configured and ready", agent.agent_type)
 
+        # Register with AGNTCY Directory (SPEC-1789 / WI-1385)
+        try:
+            from src.multi_tenant.agntcy_directory import register_agent
+            register_agent(agent.agent_type)
+        except Exception as exc:
+            logger.debug(
+                "Agent %s: Directory registration skipped: %s",
+                agent.agent_type, exc,
+            )
+
         # Start NATS/SLIM subscription in background
         app.state.transport_task = asyncio.create_task(
             _subscribe_to_transport(agent)

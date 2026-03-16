@@ -81,8 +81,10 @@ logger = logging.getLogger(__name__)
 # Constants
 # ---------------------------------------------------------------------------
 
-# NATS server URL — production value injected via Terraform env var.
-# Development default is localhost; internal VNet IP must not be hardcoded.
+# NATS server URL — production value injected via env var.
+# Development default is localhost (nats://). Azure Container Apps uses
+# WebSocket (ws://) because Envoy proxy blocks raw NATS TCP (WI-1319).
+# The nats.py library supports both protocols transparently.
 NATS_URL = os.environ.get("NATS_URL", "nats://localhost:4222")
 
 # Agent topic suffixes — matching AGNTCY upstream topic-based routing

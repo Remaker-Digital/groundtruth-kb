@@ -112,16 +112,21 @@ class AgentDispatchMixin:
     ) -> dict[str, Any]:
         """Route an agent call through SLIM/NATS transport (SPEC-1525).
 
-        Includes tenant_id, conversation_id, and trace_id in message
-        headers for distributed tracing.
+        Resolves agent topic via AGNTCY Directory (SPEC-1789) with
+        static fallback. Includes tenant_id, conversation_id, and
+        trace_id in message headers for distributed tracing.
         """
+        from src.multi_tenant.agntcy_directory import get_agent_topic
         from src.multi_tenant.agntcy_sdk_integration import create_a2a_client
+
+        # SPEC-1789: Resolve agent topic via Directory (falls back to static)
+        resolved_topic = get_agent_topic(agent_topic)
 
         tenant_id = getattr(self, "_current_tenant_id", "")
         conversation_id = getattr(self, "_current_conversation_id", "")
         trace_id = getattr(self, "_current_trace_id", "")
 
-        client = create_a2a_client(agent_topic)
+        client = create_a2a_client(resolved_topic)
         response = await client.send(
             payload,
             headers={
@@ -131,8 +136,8 @@ class AgentDispatchMixin:
             },
         )
         logger.debug(
-            "A2A transport call: topic=%s tenant=%s trace=%s",
-            agent_topic, tenant_id, trace_id,
+            "A2A transport call: topic=%s (resolved=%s) tenant=%s trace=%s",
+            agent_topic, resolved_topic, tenant_id, trace_id,
         )
         return response if isinstance(response, dict) else {"result": response}
 
@@ -427,6 +432,7 @@ class AgentDispatchMixin:
         and receives streaming chunks back. The transport layer handles
         chunked delivery; this method yields each chunk as it arrives.
         """
+        from src.multi_tenant.agntcy_directory import get_agent_topic
         from src.multi_tenant.agntcy_sdk_integration import create_a2a_client
 
         tenant_id = getattr(self, "_current_tenant_id", "")
@@ -436,7 +442,9 @@ class AgentDispatchMixin:
         remaining_ms = budget.remaining_ms
         timeout_seconds = max(0.5, remaining_ms / 1000)
 
-        client = create_a2a_client("response-generator")
+        # SPEC-1789: Resolve via Directory with static fallback
+        rg_topic = get_agent_topic("response-generator")
+        client = create_a2a_client(rg_topic)
         response = await client.send(
             {
                 "message": customer_message,

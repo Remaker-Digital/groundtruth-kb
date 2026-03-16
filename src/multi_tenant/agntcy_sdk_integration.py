@@ -84,9 +84,13 @@ ENABLE_SDK_TRACING = os.environ.get("AGNTCY_ENABLE_TRACING", "false").lower() ==
 class AgentTopic(str, Enum):
     """Agent topic identifiers matching AGNTCY upstream convention.
 
+    DEPRECATED: Use agntcy_directory.get_agent_topic() or resolve_agent()
+    for dynamic discovery via AGNTCY Directory (SPEC-1789 / WI-1385).
+    This enum is retained as a static fallback when the Directory server
+    is unavailable.
+
     These map 1:1 to the AgentRole enum in system_prompt_builder.py and to
-    the NATS topic suffixes in nats_isolation.py. They serve as the canonical
-    agent identifiers for A2A and MCP protocol addressing.
+    the NATS topic suffixes in nats_isolation.py.
     """
 
     INTENT_CLASSIFIER = "intent-classifier"
@@ -176,17 +180,28 @@ def get_default_transport() -> BaseTransport:
 
     if _transport is None and NATS_ENDPOINT:
         try:
-            _transport = factory.create_transport(
-                transport="NATS",
-                name="agent-red-nats",
-                endpoint=NATS_ENDPOINT,
-            )
+            # WI-1314/WI-1319: NATS endpoint may be ws:// (WebSocket) when
+            # running in Azure Container Apps where Envoy proxy blocks raw TCP.
+            # The AGNTCY SDK and nats.py both support WebSocket URLs natively.
+            nats_kwargs: dict[str, Any] = {
+                "transport": "NATS",
+                "name": "agent-red-nats",
+                "endpoint": NATS_ENDPOINT,
+            }
+            # Pass allow_reconnect for resilience in container environments
+            _transport = factory.create_transport(**nats_kwargs)
             logger.info(
-                "NATS transport created — Tier 2 active (endpoint=%s)", NATS_ENDPOINT,
+                "NATS transport created — Tier 2 active (endpoint=%s, protocol=%s)",
+                NATS_ENDPOINT,
+                "websocket" if NATS_ENDPOINT.startswith("ws") else "tcp",
             )
         except Exception:
             logger.warning(
-                "NATS transport creation failed — all transports unavailable",
+                "NATS transport creation failed (endpoint=%s) — "
+                "all transports unavailable. Check: (1) NATS server is running, "
+                "(2) endpoint URL is reachable, (3) WebSocket mode if in Azure "
+                "Container Apps.",
+                NATS_ENDPOINT,
                 exc_info=True,
             )
             _transport = None
@@ -339,17 +354,31 @@ async def init_agntcy_sdk() -> None:
         # health reporting but actual A2A communication won't work.
         if hasattr(transport, "setup"):
             import asyncio as _asyncio
-            logger.info("Calling transport.setup() to establish connection...")
+            endpoint_info = SLIM_ENDPOINT or NATS_ENDPOINT or "unknown"
+            protocol = "websocket" if endpoint_info.startswith("ws") else "tcp"
+            logger.info(
+                "Calling transport.setup() (endpoint=%s, protocol=%s)...",
+                endpoint_info, protocol,
+            )
             try:
-                await _asyncio.wait_for(transport.setup(), timeout=10.0)
-                logger.info("Transport setup() complete — connection established")
-            except (_asyncio.TimeoutError, Exception) as exc:
+                await _asyncio.wait_for(transport.setup(), timeout=15.0)
+                logger.info(
+                    "Transport setup() complete — connection established "
+                    "(endpoint=%s, protocol=%s)",
+                    endpoint_info, protocol,
+                )
+            except _asyncio.TimeoutError:
                 logger.warning(
-                    "Transport setup() failed: %s — transport object created but "
-                    "connection not established. A2A communication will use HTTP "
-                    "containers (Tier 2). This may indicate Azure Container Apps "
-                    "TCP ingress is not routing to the NATS server.",
-                    exc,
+                    "Transport setup() TIMED OUT after 15s (endpoint=%s, protocol=%s). "
+                    "Check: (1) NATS/SLIM server is running, (2) endpoint is reachable "
+                    "from this container, (3) DNS resolution for internal FQDNs.",
+                    endpoint_info, protocol,
+                )
+            except Exception as exc:
+                logger.warning(
+                    "Transport setup() FAILED: %s (endpoint=%s, protocol=%s). "
+                    "A2A communication will fall back to HTTP containers (Tier 3).",
+                    exc, endpoint_info, protocol,
                 )
         logger.info("Default transport ready: %s", TRANSPORT_TYPE)
     else:
@@ -408,6 +437,11 @@ def get_sdk_status() -> dict[str, Any]:
     else:
         active_tier = None
 
+    # Determine connection protocol (WI-1319: WebSocket vs TCP)
+    nats_protocol = None
+    if NATS_ENDPOINT:
+        nats_protocol = "websocket" if NATS_ENDPOINT.startswith("ws") else "tcp"
+
     status: dict[str, Any] = {
         "sdk_initialized": factory is not None,
         "transport_type": active_tier,
@@ -415,8 +449,17 @@ def get_sdk_status() -> dict[str, Any]:
         "active_tier": active_tier or "http_failure_mode",
         "slim_endpoint": SLIM_ENDPOINT or None,
         "nats_endpoint": NATS_ENDPOINT or None,
+        "nats_protocol": nats_protocol,
         "available_protocols": factory.registered_protocols() if factory else [],
         "available_transports": factory.registered_transports() if factory else [],
         "agent_topics": [t.value for t in AgentTopic],
     }
+
+    # Include Directory status (SPEC-1789)
+    try:
+        from src.multi_tenant.agntcy_directory import get_directory_status
+        status["directory"] = get_directory_status()
+    except Exception:
+        status["directory"] = {"directory_available": False}
+
     return status
