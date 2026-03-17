@@ -21,6 +21,7 @@ from typing import Any
 from unittest.mock import AsyncMock, MagicMock, PropertyMock, patch
 
 import pytest
+from fastapi import HTTPException
 
 from src.multi_tenant.superadmin_api._diagnostics import (
     ConfigDriftEntry,
@@ -505,3 +506,88 @@ async def aiter_empty():
     """Async iterator that yields nothing."""
     return
     yield  # noqa: unreachable — makes this an async generator
+
+
+# ---------------------------------------------------------------------------
+# Deployment event recording (WI-1285 / SPEC-1779)
+# ---------------------------------------------------------------------------
+
+
+class TestRecordDeploymentEvent:
+    """Verify POST /deployments/record records audit events."""
+
+    @pytest.mark.asyncio
+    async def test_record_model_deployed(self, mock_tenant_ctx):
+        """Successful deployment records MODEL_DEPLOYED audit event."""
+        mock_audit = MagicMock()
+        mock_audit.log_event = AsyncMock()
+
+        with patch(
+            "src.multi_tenant.superadmin_api._diagnostics.get_tenant_context",
+            return_value=mock_tenant_ctx,
+        ), patch(
+            "src.multi_tenant.repositories.platform.AuditLogRepository",
+            return_value=mock_audit,
+        ):
+            from src.multi_tenant.superadmin_api._diagnostics import (
+                DeploymentEventRequest,
+                record_deployment_event,
+            )
+
+            body = DeploymentEventRequest(
+                event_type="model.deployed",
+                environment="production",
+                version="v1.91.0",
+                status="succeeded",
+            )
+            result = await record_deployment_event(body, ctx=mock_tenant_ctx)
+
+        assert result.recorded is True
+        assert result.event_type == "model.deployed"
+        assert result.version == "v1.91.0"
+        mock_audit.log_event.assert_called_once()
+
+    @pytest.mark.asyncio
+    async def test_record_invalid_event_type_returns_400(self, mock_tenant_ctx):
+        """Invalid event_type raises 400."""
+        from src.multi_tenant.superadmin_api._diagnostics import (
+            DeploymentEventRequest,
+            record_deployment_event,
+        )
+
+        body = DeploymentEventRequest(
+            event_type="invalid.type",
+            environment="staging",
+            version="v1.0.0",
+        )
+
+        with pytest.raises(HTTPException) as exc_info:
+            await record_deployment_event(body, ctx=mock_tenant_ctx)
+        assert exc_info.value.status_code == 400
+
+    @pytest.mark.asyncio
+    async def test_record_audit_failure_returns_not_recorded(self, mock_tenant_ctx):
+        """Audit log failure returns recorded=False (best-effort)."""
+        mock_audit = MagicMock()
+        mock_audit.log_event = AsyncMock(side_effect=RuntimeError("Cosmos down"))
+
+        with patch(
+            "src.multi_tenant.superadmin_api._diagnostics.get_tenant_context",
+            return_value=mock_tenant_ctx,
+        ), patch(
+            "src.multi_tenant.repositories.platform.AuditLogRepository",
+            return_value=mock_audit,
+        ):
+            from src.multi_tenant.superadmin_api._diagnostics import (
+                DeploymentEventRequest,
+                record_deployment_event,
+            )
+
+            body = DeploymentEventRequest(
+                event_type="model.deployed",
+                environment="staging",
+                version="v1.90.0",
+            )
+            result = await record_deployment_event(body, ctx=mock_tenant_ctx)
+
+        assert result.recorded is False

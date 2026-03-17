@@ -468,6 +468,49 @@ async def create_subscription(
     }
 
 
+async def _auto_enable_shopify_mcp(tenant_id: str, shop_domain: str) -> None:
+    """Auto-enable Shopify Storefront MCP for Shopify-sourced tenants (SPEC-1782).
+
+    Sets mcp_enabled=True and adds the Shopify Storefront MCP server config
+    to the tenant's preferences. Best-effort — failures are logged but do not
+    block billing confirmation.
+    """
+    try:
+        from src.multi_tenant.tenant_config_processor import get_config_processor
+
+        shopify_mcp_config = {
+            "server_name": "shopify-storefront",
+            "server_url": f"https://{shop_domain}/api/2024-10/graphql.json",
+            "server_type": "shopify-storefront",
+            "enabled": True,
+            "read_only": True,
+            "shop_domain": shop_domain,
+            "tool_allowlist": [],
+            "timeout_ms": 3000,
+        }
+
+        processor = get_config_processor()
+        await processor.update_config(
+            tenant_id=tenant_id,
+            tier="starter",  # Minimum tier — actual tier resolved by processor
+            updates={
+                "mcp_enabled": True,
+                "mcp_servers": [shopify_mcp_config],
+            },
+            actor="system:shopify-auto-enable",
+        )
+        logger.info(
+            "Auto-enabled Shopify Storefront MCP: tenant=%s shop=%s",
+            tenant_id, shop_domain,
+        )
+    except Exception:
+        logger.warning(
+            "Failed to auto-enable Shopify MCP (non-fatal): tenant=%s shop=%s",
+            tenant_id, shop_domain,
+            exc_info=True,
+        )
+
+
 async def confirm_subscription(
     shop_domain: str,
     charge_id: str | None = None,
@@ -554,6 +597,9 @@ async def confirm_subscription(
 
     # Auto-provision widget key (failures logged, don't block billing)
     widget_key = await auto_provision_widget_key(tenant_id=tenant.tenant_id)
+
+    # Auto-enable Shopify Storefront MCP for Shopify-sourced tenants (SPEC-1782 / WI-1289)
+    await _auto_enable_shopify_mcp(tenant.tenant_id, shop_domain)
 
     result = {
         "shop_domain": shop_domain,

@@ -499,6 +499,48 @@ def run_deploy(
     return result
 
 
+def _record_deployment_event(result: DeployResult, env: str) -> None:
+    """POST a MODEL_DEPLOYED or MODEL_ROLLED_BACK audit event to the API (WI-1285).
+
+    Best-effort — failures are logged but do not change the deploy result.
+    Requires SPA_PLATFORM_ADMIN_KEY env var to authenticate.
+    """
+    env_config = ENVIRONMENTS.get(env, {})
+    fqdn = env_config.get("fqdn", "")
+    api_key = os.environ.get("SPA_PLATFORM_ADMIN_KEY", "")
+
+    if not fqdn or not api_key:
+        _log("INFO", "Skipping deployment event recording (no FQDN or API key)")
+        return
+
+    event_type = "model.rolled_back" if result.rollback_performed else "model.deployed"
+    payload = {
+        "event_type": event_type,
+        "environment": env,
+        "version": result.version,
+        "image": result.image,
+        "previous_image": result.previous_image,
+        "revision_name": result.revision_name,
+        "status": result.status,
+        "duration_s": result.duration_s,
+        "verification_pass": result.verification_pass,
+        "verification_fail": result.verification_fail,
+        "dry_run": result.dry_run,
+    }
+
+    try:
+        url = f"https://{fqdn}/api/superadmin/deployments/record"
+        body = json.dumps(payload).encode("utf-8")
+        req = Request(url, data=body, method="POST", headers={
+            "Content-Type": "application/json",
+            "X-API-Key": api_key,
+        })
+        with urlopen(req, timeout=10) as resp:
+            _log("PASS", f"  Deployment event recorded: {event_type} ({resp.status})")
+    except Exception as exc:
+        _log("WARN", f"  Failed to record deployment event (non-fatal): {exc}")
+
+
 def _finalize(result: DeployResult, env: str) -> None:
     """Compute duration and write log file."""
     result.completed_at = datetime.now(timezone.utc).isoformat()
@@ -509,6 +551,9 @@ def _finalize(result: DeployResult, env: str) -> None:
 
     level = "PASS" if result.status == "succeeded" else "FAIL"
     _log(level, f"Deploy Orchestrator {result.status} in {result.duration_s}s")
+
+    # Record deployment audit event (WI-1285)
+    _record_deployment_event(result, env)
 
     log_path = _write_log_file(env)
     _log("INFO", f"Log written to {log_path}")

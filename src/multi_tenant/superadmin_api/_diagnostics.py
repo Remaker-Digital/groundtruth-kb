@@ -816,3 +816,103 @@ async def diagnostic_health() -> SystemHealthResponse:
         active_tenants=active_tenants,
         version=version,
     )
+
+
+# ---------------------------------------------------------------------------
+# Deployment event recording (WI-1285 / SPEC-1779)
+# ---------------------------------------------------------------------------
+
+
+class DeploymentEventRequest(CamelCaseModel):
+    """Request body for recording a deployment event."""
+
+    event_type: str = Field(description="model.deployed or model.rolled_back")
+    environment: str = Field(description="staging or production")
+    version: str = Field(description="Image version tag, e.g. v1.91.0")
+    image: str = ""
+    previous_image: str = ""
+    revision_name: str = ""
+    status: str = ""
+    duration_s: float = 0.0
+    verification_pass: int = 0
+    verification_fail: int = 0
+    dry_run: bool = False
+
+
+class DeploymentEventResponse(CamelCaseModel):
+    """Response from recording a deployment event."""
+
+    recorded: bool = True
+    event_type: str = ""
+    version: str = ""
+
+
+@router.post(
+    "/deployments/record",
+    response_model=DeploymentEventResponse,
+    summary="Record a deployment audit event (WI-1285)",
+    description=(
+        "Called by deploy_orchestrator.py after a deployment completes. "
+        "Records a MODEL_DEPLOYED or MODEL_ROLLED_BACK event in the audit log."
+    ),
+    status_code=201,
+)
+async def record_deployment_event(
+    body: DeploymentEventRequest,
+    ctx: TenantContext = Depends(get_tenant_context),
+) -> DeploymentEventResponse:
+    """Record a deployment event in the audit log."""
+    valid_types = {"model.deployed", "model.rolled_back"}
+    if body.event_type not in valid_types:
+        raise HTTPException(
+            status_code=400,
+            detail=f"Invalid event_type '{body.event_type}'. Valid: {sorted(valid_types)}",
+        )
+
+    actor = ctx.team_member_email or "deploy-orchestrator"
+    audit_type = (
+        AuditEventType.MODEL_DEPLOYED
+        if body.event_type == "model.deployed"
+        else AuditEventType.MODEL_ROLLED_BACK
+    )
+
+    try:
+        from src.multi_tenant.repositories.platform import AuditLogRepository
+
+        audit = AuditLogRepository()
+        await audit.log_event(
+            event_type=audit_type,
+            tenant_id="__platform__",
+            actor=actor,
+            actor_type="system",
+            payload={
+                "environment": body.environment,
+                "version": body.version,
+                "image": body.image,
+                "previous_image": body.previous_image,
+                "revision_name": body.revision_name,
+                "status": body.status,
+                "duration_s": body.duration_s,
+                "verification_pass": body.verification_pass,
+                "verification_fail": body.verification_fail,
+                "dry_run": body.dry_run,
+            },
+        )
+    except Exception:
+        logger.warning("Audit log failed for deployment event", exc_info=True)
+        return DeploymentEventResponse(
+            recorded=False,
+            event_type=body.event_type,
+            version=body.version,
+        )
+
+    logger.info(
+        "Deployment event recorded: %s env=%s version=%s (by %s)",
+        body.event_type, body.environment, body.version, actor,
+    )
+
+    return DeploymentEventResponse(
+        recorded=True,
+        event_type=body.event_type,
+        version=body.version,
+    )

@@ -22,6 +22,7 @@ from src.integrations.shopify_billing import (
     VALID_INTERVALS,
     VALID_TIERS,
     _INTERVAL_MAP,
+    _auto_enable_shopify_mcp,
     _get_tier_pricing,
     _is_test_mode,
     _shop_subscriptions,
@@ -850,3 +851,63 @@ class TestGetTierPricingValues:
                 assert isinstance(tier_data[key], Decimal), (
                     f"Tier '{tier_name}' key '{key}' is {type(tier_data[key])}, expected Decimal"
                 )
+
+
+# ---------------------------------------------------------------------------
+# SHB-MCP: Auto-enable Shopify Storefront MCP (SPEC-1782 / WI-1289)
+# ---------------------------------------------------------------------------
+
+
+class TestAutoEnableShopifyMcp:
+    """Verify _auto_enable_shopify_mcp enables MCP for Shopify tenants."""
+
+    @pytest.mark.asyncio
+    async def test_auto_enable_calls_config_processor(self):
+        """MCP config is written via config processor on Shopify provisioning."""
+        mock_processor = MagicMock()
+        mock_processor.update_config = AsyncMock()
+
+        with patch(
+            "src.multi_tenant.tenant_config_processor.get_config_processor",
+            return_value=mock_processor,
+        ):
+            await _auto_enable_shopify_mcp("tenant-123", "myshop.myshopify.com")
+
+        mock_processor.update_config.assert_called_once()
+        call_kwargs = mock_processor.update_config.call_args[1]
+        assert call_kwargs["tenant_id"] == "tenant-123"
+        assert call_kwargs["updates"]["mcp_enabled"] is True
+
+        servers = call_kwargs["updates"]["mcp_servers"]
+        assert len(servers) == 1
+        assert servers[0]["server_name"] == "shopify-storefront"
+        assert servers[0]["server_type"] == "shopify-storefront"
+        assert servers[0]["shop_domain"] == "myshop.myshopify.com"
+        assert servers[0]["enabled"] is True
+        assert servers[0]["read_only"] is True
+        assert "myshop.myshopify.com" in servers[0]["server_url"]
+
+    @pytest.mark.asyncio
+    async def test_auto_enable_is_best_effort(self):
+        """MCP auto-enable failure must not propagate — best-effort pattern."""
+        with patch(
+            "src.multi_tenant.tenant_config_processor.get_config_processor",
+            side_effect=RuntimeError("Cosmos unavailable"),
+        ):
+            # Should NOT raise
+            await _auto_enable_shopify_mcp("tenant-err", "broken.myshopify.com")
+
+    @pytest.mark.asyncio
+    async def test_auto_enable_actor_tag(self):
+        """Actor tag is 'system:shopify-auto-enable' for audit traceability."""
+        mock_processor = MagicMock()
+        mock_processor.update_config = AsyncMock()
+
+        with patch(
+            "src.multi_tenant.tenant_config_processor.get_config_processor",
+            return_value=mock_processor,
+        ):
+            await _auto_enable_shopify_mcp("t-1", "shop.myshopify.com")
+
+        call_kwargs = mock_processor.update_config.call_args[1]
+        assert call_kwargs["actor"] == "system:shopify-auto-enable"
