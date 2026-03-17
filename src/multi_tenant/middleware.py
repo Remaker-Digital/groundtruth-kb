@@ -1268,20 +1268,25 @@ class RateLimitMiddleware(BaseHTTPMiddleware):
         SPEC-1805: Result is always >= RATE_LIMIT_RPM_FLOOR (10).
         Never returns None — every tenant gets a rate limit.
         """
-        from .cosmos_schema import RATE_LIMIT_RPM_DEFAULT, RATE_LIMIT_RPM_FLOOR
+        from src.multi_tenant.entitlement_service import get_entitlement_service
+
+        svc = get_entitlement_service()
+        global_config = svc.get_global_config_sync()
+        rpm_floor = global_config.get("rate_limit_rpm_floor", 10)
+        rpm_default = global_config.get("rate_limit_rpm_default", 300)
 
         # Per-tenant override takes precedence
         per_tenant = getattr(ctx, "rate_limit_rpm", None)
         if per_tenant is not None:
-            return max(RATE_LIMIT_RPM_FLOOR, per_tenant)
+            return max(rpm_floor, per_tenant)
 
         tier_value = None
         if ctx.tier is not None:
             tier_value = ctx.tier.value if hasattr(ctx.tier, "value") else ctx.tier
         if tier_value:
-            defaults = TIER_DEFAULTS.get(tier_value, {})
+            defaults = svc.get_tier_config_sync(tier_value)
             tier_rpm = defaults.get("rate_limit_rpm")
             if tier_rpm is not None:
-                return max(RATE_LIMIT_RPM_FLOOR, tier_rpm)
+                return max(rpm_floor, tier_rpm)
 
-        return max(RATE_LIMIT_RPM_FLOOR, RATE_LIMIT_RPM_DEFAULT)
+        return max(rpm_floor, rpm_default)

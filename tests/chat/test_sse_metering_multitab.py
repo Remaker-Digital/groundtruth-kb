@@ -344,7 +344,11 @@ class TestMultiTabTracking:
         assert mgr.can_connect("tenant-1", "starter")
 
     def test_tab_133_08_separate_conversations_count_independently(self):
-        """Different conversations count as separate connections."""
+        """Different conversations count as separate connections.
+
+        S184: Per-tier cap enforcement removed. can_connect() now only checks
+        the global replica-wide limit (SPEC-1756), not per-tier limits.
+        """
         mgr = SSEConnectionManager()
         mgr.connect("tenant-1", "conv-1", tab_id="tab-A")
         mgr.connect("tenant-1", "conv-2", tab_id="tab-B")
@@ -353,8 +357,8 @@ class TestMultiTabTracking:
         mgr.connect("tenant-1", "conv-5", tab_id="tab-E")
 
         assert mgr.get_active_count("tenant-1") == 5
-        # Starter limit = 5, so next connection would be blocked
-        assert not mgr.can_connect("tenant-1", "starter")
+        # Per-tier limits removed; only global cap applies (SPEC-1756)
+        assert mgr.can_connect("tenant-1", "starter")
 
     def test_tab_133_09_health_summary_includes_tab_count(self):
         """health_summary() reports total tabs across all tenants."""

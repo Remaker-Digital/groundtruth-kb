@@ -15,7 +15,7 @@ from typing import Any
 
 import yaml
 
-from src.multi_tenant.cosmos_schema import TenantTier, TIER_DEFAULTS
+from src.multi_tenant.cosmos_schema import TenantTier
 from src.multi_tenant.schema.models import (
     ConfigFieldDefinition,
     ConfigFieldType,

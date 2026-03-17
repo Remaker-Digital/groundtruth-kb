@@ -587,9 +587,8 @@ class CustomerProfileService:
     @staticmethod
     def get_available_layers(tier: TenantTier) -> list[int]:
         """Get available memory layers for a tier."""
-        defaults = TIER_DEFAULTS.get(
-            tier.value, TIER_DEFAULTS[TenantTier.STARTER.value]
-        )
+        from src.multi_tenant.entitlement_service import get_entitlement_service
+        defaults = get_entitlement_service().get_tier_config_sync(tier.value)
         return defaults.get("memory_layers", [1, 2])
 
     @staticmethod
@@ -598,9 +597,8 @@ class CustomerProfileService:
 
         Returns None for unlimited (Enterprise).
         """
-        defaults = TIER_DEFAULTS.get(
-            tier.value, TIER_DEFAULTS[TenantTier.STARTER.value]
-        )
+        from src.multi_tenant.entitlement_service import get_entitlement_service
+        defaults = get_entitlement_service().get_tier_config_sync(tier.value)
         return defaults.get("history_depth_days", 90)
 
 

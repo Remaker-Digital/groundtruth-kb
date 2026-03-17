@@ -2,11 +2,16 @@
 
 This module holds module-level service references, the shared router, and
 configure_*() functions. Domain endpoints live in sibling modules:
-  _tenants.py    -- Tenant directory, CRUD, tier override, expiry
-  _dashboard.py  -- Dashboard, billing, SLA, queues, compliance, secrets, integrations
-  _operations.py -- Incidents, alerts, MFA, cost analytics, abuse detection
-  _copilot.py    -- Co-Pilot knowledge management, document CRUD, ingestion, config
-  _platform.py   -- Pipeline observatory, service messages, platform admin management
+  _tenants.py       -- Tenant directory, CRUD, tier override, expiry
+  _dashboard.py     -- Dashboard, billing, SLA, queues, compliance, secrets, integrations
+  _operations.py    -- Incidents, alerts, MFA, cost analytics, abuse detection
+  _copilot.py       -- Co-Pilot knowledge management, document CRUD, ingestion, config
+  _platform.py      -- Pipeline observatory, service messages, platform admin management
+  _entitlements.py  -- Entitlement CRUD, feature flags (SPEC-1816, SPEC-1824)
+  _blocklists.py    -- Allow/block lists, maintenance mode (SPEC-1820, SPEC-1829)
+  _rate_limits.py   -- Rate limit config, retry/back-off config (SPEC-1819, SPEC-1821)
+  _alerts.py        -- Alert thresholds, notification channels (SPEC-1822, SPEC-1823)
+  _diagnostics.py   -- Test pipeline trigger, diagnostic export (SPEC-1826, SPEC-1827)
 
 All domain modules import `router` from this module and register their endpoints
 on it. The router is a single shared object across all modules.

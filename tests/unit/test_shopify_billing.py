@@ -24,7 +24,6 @@ from src.integrations.shopify_billing import (
     _get_tier_pricing,
     _is_test_mode,
     _shop_subscriptions,
-    _TIER_PRICING,
     confirm_subscription,
     create_subscription,
     get_billing_status,
@@ -84,7 +83,8 @@ class TestPricingCatalog:
             "name", "monthly", "annual_total", "overage_rate",
             "included_conversations", "capped_amount",
         }
-        for tier, pricing in _TIER_PRICING.items():
+        for tier in VALID_TIERS:
+            pricing = _get_tier_pricing(tier)
             for field in required_fields:
                 assert field in pricing, f"Missing {field} in {tier}"
 

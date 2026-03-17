@@ -194,7 +194,7 @@ class TestConfigSchemaRetrievalFields:
 
         fields = list(get_field_registry().values())
         ism = next(f for f in fields if f.field_name == "intent_source_mapping")
-        assert ism.tier_gate == TierGate.PROFESSIONAL_PLUS
+        assert ism.tier_gate == TierGate.ALL
 
     def test_retrieval_top_k_validation_range(self):
         from src.multi_tenant.tenant_config_schema import get_field_registry

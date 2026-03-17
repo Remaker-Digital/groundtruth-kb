@@ -1,122 +1,20 @@
 {
-  "A1_version": "1.88.0",
-  "A2_status": "active",
+  "A1_version": "1.88.1",
+  "A2_status": "?",
   "A3_activation": {
-    "is_active": true,
-    "is_configured": true,
-    "has_pending_changes": true,
-    "active_version": 33
+    "is_active": null,
+    "is_configured": null,
+    "has_pending_changes": null,
+    "active_version": null
   },
-  "A4_conversation_count": 856,
-  "A5_status_breakdown": {
-    "http_status": 404,
-    "note": "analytics may need params"
-  },
-  "A6_kb_count": 204,
-  "A7_team_count": 23,
-  "A8_team_members": [
-    {
-      "displayName": "E2E e2e-test",
-      "role": "viewer"
-    },
-    {
-      "displayName": "Alex Johnson",
-      "role": "viewer"
-    },
-    {
-      "displayName": "Maria Garcia",
-      "role": "escalation_agent"
-    },
-    {
-      "displayName": "James Williams",
-      "role": "escalation_agent"
-    },
-    {
-      "displayName": "Sarah Chen",
-      "role": "admin"
-    },
-    {
-      "displayName": "E2E e2e-test",
-      "role": "escalation_agent"
-    },
-    {
-      "displayName": "E2E e2e-test",
-      "role": "admin"
-    },
-    {
-      "displayName": "E2E e2e-test",
-      "role": "viewer"
-    },
-    {
-      "displayName": "E2E e2e-test",
-      "role": "viewer"
-    },
-    {
-      "displayName": "DoubleClick e2e-te",
-      "role": "viewer"
-    },
-    {
-      "displayName": "E2E e2e-test",
-      "role": "viewer"
-    },
-    {
-      "displayName": "<script>alert(\"xss\")</script>",
-      "role": "viewer"
-    },
-    {
-      "displayName": "E2E e2e-test",
-      "role": "viewer"
-    },
-    {
-      "displayName": "E2E e2e-test",
-      "role": "viewer"
-    },
-    {
-      "displayName": "E2E e2e-test",
-      "role": "viewer"
-    },
-    {
-      "displayName": "E2E e2e-test",
-      "role": "viewer"
-    },
-    {
-      "displayName": "E2E e2e-test",
-      "role": "viewer"
-    },
-    {
-      "displayName": "E2E e2e-test",
-      "role": "viewer"
-    },
-    {
-      "displayName": "E2E e2e-test",
-      "role": "escalation_agent"
-    },
-    {
-      "displayName": "E2E e2e-test",
-      "role": "escalation_agent"
-    },
-    {
-      "displayName": "E2E e2e-test",
-      "role": "admin"
-    },
-    {
-      "displayName": "E2E e2e-test",
-      "role": "admin"
-    },
-    {
-      "displayName": "E2E e2e-test",
-      "role": "viewer"
-    }
-  ],
-  "A9_draft_status": 200,
+  "A4_conversation_count": "?",
+  "A5_status_breakdown": {},
+  "A6_kb_count": "?",
+  "A7_team_count": 0,
+  "A8_team_members": [],
+  "A9_draft_status": 401,
   "A10_config_keys": [
-    "config",
-    "from_cache",
-    "quick_actions",
-    "state",
-    "tenant_id",
-    "tier",
-    "version"
+    "error"
   ],
-  "A11_widget_key_exists": true
+  "A11_widget_key_exists": null
 }

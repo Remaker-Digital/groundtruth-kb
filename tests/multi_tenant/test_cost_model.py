@@ -20,13 +20,13 @@ from src.multi_tenant.cost_model import (
     AI_COST_PER_CONVERSATION,
     INFRA_COST_HIGH,
     INFRA_COST_LOW,
-    PACK_PRICING,
     PER_TENANT_MARGINAL_HIGH,
     PER_TENANT_MARGINAL_LOW,
     STRIPE_FEE_FIXED,
     STRIPE_FEE_PCT,
     STRIPE_TAX_FEE,
-    TIER_PRICING,
+    _get_tier_pricing,
+    _get_pack_pricing,
     CostModelCalculator,
     PlatformCostProjection,
     TenantCostProjection,
@@ -132,7 +132,7 @@ class TestOverageAndAnnual:
         calc = _calc()
 
         for tier in ["starter", "professional", "enterprise"]:
-            included = TIER_PRICING[tier]["included_conversations"]
+            included = _get_tier_pricing()[tier]["included_conversations"]
             # Test with 50% overage
             convs = int(included * 1.5)
             proj = calc.project_tenant(tier, convs)
@@ -162,7 +162,7 @@ class TestCostAndMargin:
         calc = _calc()
 
         for tier in ["starter", "professional", "enterprise"]:
-            included = TIER_PRICING[tier]["included_conversations"]
+            included = _get_tier_pricing()[tier]["included_conversations"]
             proj = calc.project_tenant(tier, included)
 
             assert proj.gross_profit > 0, (
@@ -176,7 +176,7 @@ class TestCostAndMargin:
         calc = _calc()
 
         for tier in ["starter", "professional", "enterprise"]:
-            included = TIER_PRICING[tier]["included_conversations"]
+            included = _get_tier_pricing()[tier]["included_conversations"]
             proj = calc.project_tenant(tier, included)
 
             assert 70.0 <= proj.gross_margin_pct <= 95.0, (
@@ -304,14 +304,14 @@ class TestScenariosAndConstants:
 
     def test_cm_17_pack_pricing_matches_documented_values(self):
         """CM-17: Conversation pack pricing constants match documented values."""
-        assert PACK_PRICING[1000] == 29.0
-        assert PACK_PRICING[5000] == 99.0
-        assert PACK_PRICING[20000] == 249.0
+        assert _get_pack_pricing()[1000] == 29.0
+        assert _get_pack_pricing()[5000] == 99.0
+        assert _get_pack_pricing()[20000] == 249.0
 
         # Effective rates
-        assert PACK_PRICING[1000] / 1000 == pytest.approx(0.029)
-        assert PACK_PRICING[5000] / 5000 == pytest.approx(0.0198, abs=0.001)
-        assert PACK_PRICING[20000] / 20000 == pytest.approx(0.01245, abs=0.001)
+        assert _get_pack_pricing()[1000] / 1000 == pytest.approx(0.029)
+        assert _get_pack_pricing()[5000] / 5000 == pytest.approx(0.0198, abs=0.001)
+        assert _get_pack_pricing()[20000] / 20000 == pytest.approx(0.01245, abs=0.001)
 
     def test_cm_18_stripe_fee_calculation(self):
         """CM-18: Stripe fee = revenue * 2.9% + $0.30 fixed."""

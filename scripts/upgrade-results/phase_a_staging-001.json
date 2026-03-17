@@ -1,5 +1,5 @@
 {
-  "A1_version": "1.88.0",
+  "A1_version": "1.90.0",
   "A2_status": "active",
   "A3_activation": {
     "is_active": false,
@@ -12,7 +12,7 @@
     "http_status": 404,
     "note": "analytics may need params"
   },
-  "A6_kb_count": 180,
+  "A6_kb_count": 216,
   "A7_team_count": 4,
   "A8_team_members": [
     {

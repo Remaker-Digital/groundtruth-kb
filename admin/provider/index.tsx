@@ -48,6 +48,15 @@ import { CopilotKnowledgePage } from './pages/CopilotKnowledge';
 import { PipelineObservatoryPage } from './pages/PipelineObservatory';
 import { ContactMessagesPage } from './pages/ContactMessages';
 import { ServiceMessagesPage } from './pages/ServiceMessages';
+import { EntitlementConfigPage } from './pages/EntitlementConfig';
+import { BlocklistConfigPage } from './pages/BlocklistConfig';
+import { RetryConfigPage } from './pages/RetryConfig';
+import { AlertThresholdConfigPage } from './pages/AlertThresholdConfig';
+import { NotificationChannelConfigPage } from './pages/NotificationChannelConfig';
+import { FeatureFlagConfigPage } from './pages/FeatureFlagConfig';
+import { DeploymentManagementPage } from './pages/DeploymentManagement';
+import { TestExecutionPage } from './pages/TestExecution';
+import { MaintenanceModePage } from './pages/MaintenanceMode';
 
 // ---------------------------------------------------------------------------
 // Auth state (sessionStorage — SUPERADMIN key + MFA token)
@@ -160,6 +169,16 @@ const App: React.FC = () => {
             <Route path="/pipeline" element={<PipelineObservatoryPage />} />
             <Route path="/contact-messages" element={<ContactMessagesPage />} />
             <Route path="/service-messages" element={<ServiceMessagesPage />} />
+            {/* Control Plane (Phase C) */}
+            <Route path="/entitlements" element={<EntitlementConfigPage />} />
+            <Route path="/blocklists" element={<BlocklistConfigPage />} />
+            <Route path="/rate-limits" element={<RetryConfigPage />} />
+            <Route path="/alert-thresholds" element={<AlertThresholdConfigPage />} />
+            <Route path="/notification-channels" element={<NotificationChannelConfigPage />} />
+            <Route path="/feature-flags" element={<FeatureFlagConfigPage />} />
+            <Route path="/deploy-management" element={<DeploymentManagementPage />} />
+            <Route path="/test-execution" element={<TestExecutionPage />} />
+            <Route path="/maintenance" element={<MaintenanceModePage />} />
             {/* Compliance & Security */}
             <Route path="/compliance" element={<ComplianceDashboardPage />} />
             <Route path="/secrets" element={<SecretPosturePage />} />

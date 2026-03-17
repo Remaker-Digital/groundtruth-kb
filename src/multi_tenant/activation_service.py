@@ -589,9 +589,9 @@ class ActivationService:
         activate() as a defense-in-depth guard against mid-session
         downgrades.
         """
-        from src.multi_tenant.cosmos_schema import TIER_DEFAULTS
+        from src.multi_tenant.entitlement_service import get_entitlement_service
 
-        tier_defaults = TIER_DEFAULTS.get(tier.value, {})
+        tier_defaults = get_entitlement_service().get_tier_config_sync(tier.value)
         allowed_layers = set(tier_defaults.get("memory_layers", [1, 2, 3]))
         errors: list[dict[str, str]] = []
 

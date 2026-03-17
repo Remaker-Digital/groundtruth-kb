@@ -46,6 +46,8 @@ from fastapi import APIRouter, HTTPException, Request
 from fastapi.responses import JSONResponse, RedirectResponse
 from pydantic import BaseModel, Field
 
+from src.multi_tenant.entitlement_service import get_entitlement_service
+
 from src.integrations.provisioning import (
     BillingChannel,
     activate_tenant,
@@ -73,40 +75,35 @@ _INTERVAL_MAP = {
 }
 
 # ---------------------------------------------------------------------------
-# Pricing catalog (mirrors Stripe catalog for the Shopify channel)
+# Pricing catalog — loaded from EntitlementService (data-driven via Cosmos DB)
 #
 # Shopify Billing API does not use Stripe Price IDs — it takes amounts
-# directly. This mapping ensures pricing parity between channels.
+# directly. Pricing values come from EntitlementService; Shopify-specific
+# display names are added locally. Decimal coercion ensures financial precision.
 # ---------------------------------------------------------------------------
 
-_TIER_PRICING: dict[str, dict[str, Any]] = {
-    "starter": {
-        "name": "Agent Red Starter",
-        "monthly": Decimal("149.00"),
-        "annual_total": Decimal("1490.00"),
-        "overage_rate": Decimal("0.04"),
-        "included_conversations": 1000,
-        "capped_amount": Decimal("500.00"),  # Max $500/mo overage (12,500 extra conversations)
-    },
-    "professional": {
-        "name": "Agent Red Professional",
-        "monthly": Decimal("399.00"),
-        "annual_total": Decimal("3990.00"),
-        "overage_rate": Decimal("0.025"),
-        "included_conversations": 5000,
-        "capped_amount": Decimal("1000.00"),  # Max $1,000/mo overage (40,000 extra conversations)
-    },
-    "enterprise": {
-        "name": "Agent Red Enterprise",
-        "monthly": Decimal("999.00"),
-        "annual_total": Decimal("9990.00"),
-        "overage_rate": Decimal("0.015"),
-        "included_conversations": 20000,
-        "capped_amount": Decimal("2000.00"),  # Max $2,000/mo overage (133,333 extra conversations)
-    },
+# Shopify-specific metadata (not part of generic entitlements)
+_SHOPIFY_TIER_NAMES: dict[str, str] = {
+    "starter": "Agent Red Starter",
+    "professional": "Agent Red Professional",
+    "enterprise": "Agent Red Enterprise",
 }
 
-VALID_TIERS = frozenset(_TIER_PRICING.keys())
+VALID_TIERS = frozenset({"starter", "professional", "enterprise"})
+
+
+def _get_shopify_pricing(tier: str) -> dict[str, Any]:
+    """Build Shopify pricing dict from EntitlementService + local metadata."""
+    svc = get_entitlement_service()
+    pricing = svc.get_pricing_sync(tier)
+    return {
+        "name": _SHOPIFY_TIER_NAMES.get(tier, f"Agent Red {tier.title()}"),
+        "monthly": Decimal(str(pricing.get("monthly_fee", 0))),
+        "annual_total": Decimal(str(pricing.get("annual_total", 0))),
+        "overage_rate": Decimal(str(pricing.get("overage_rate", 0))),
+        "included_conversations": int(pricing.get("included_conversations", 0)),
+        "capped_amount": Decimal(str(pricing.get("capped_amount", 0))),
+    }
 VALID_INTERVALS = frozenset({"month", "year"})
 
 # ---------------------------------------------------------------------------
@@ -295,7 +292,7 @@ def _get_tier_pricing(tier: str) -> dict[str, Any]:
         raise ValueError(
             f"Invalid tier '{tier}'. Must be one of: {sorted(VALID_TIERS)}"
         )
-    return _TIER_PRICING[tier]
+    return _get_shopify_pricing(tier)
 
 
 def _is_test_mode() -> bool:

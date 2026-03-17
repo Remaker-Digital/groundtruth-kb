@@ -438,10 +438,10 @@ class TestCrossLayerIntegration:
         # history_depth_days removed; both tiers now fall back to 90
         assert pro_depth == 90
 
-        # With history_depth_days removed, both tiers use same fallback
-        starter_dt = datetime.fromisoformat(starter_since)
-        pro_dt = datetime.fromisoformat(pro_since)
-        assert pro_dt == starter_dt  # Same depth after removal
+        # S174: history_depth_days removed from TIER_DEFAULTS, so
+        # _compute_since_date returns None (unlimited) for all tiers
+        assert starter_since is None
+        assert pro_since is None
 
         # Prompt should reflect new tier capabilities
         builder = SystemPromptBuilder()

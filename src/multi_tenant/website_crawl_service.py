@@ -40,6 +40,8 @@ logger = logging.getLogger(__name__)
 # Tier limits for website sources
 # ---------------------------------------------------------------------------
 
+# Legacy TIER_LIMITS kept for backward compatibility — canonical values
+# now live in EntitlementService (SPEC-1817).
 TIER_LIMITS: dict[str, dict[str, int]] = {
     "starter": {"max_sources": 3, "max_pages": 25, "min_refresh_hours": 24},
     "professional": {"max_sources": 10, "max_pages": 50, "min_refresh_hours": 12},
@@ -50,7 +52,24 @@ DEFAULT_TIER = "starter"
 
 
 def get_tier_limits(tier: str) -> dict[str, int]:
-    """Get website source limits for a billing tier."""
+    """Get website source limits for a billing tier.
+
+    Reads from EntitlementService (data-driven) with TIER_LIMITS fallback.
+    """
+    from src.multi_tenant.entitlement_service import get_entitlement_service
+    svc = get_entitlement_service()
+    # Sync path — use frozen/LRU fallback
+    config = svc.get_tier_config_sync(tier)
+    # website_limits may be stored as a nested key in the tier config
+    # or as a separate entitlements document. Check LRU first.
+    cached = svc._lru_get("entitlements:website_limits")
+    if cached and tier in cached:
+        return cached[tier]
+    # Fall back to frozen entitlements
+    from src.multi_tenant.entitlement_service import FROZEN_ENTITLEMENTS
+    frozen_limits = FROZEN_ENTITLEMENTS.get("website_limits", {})
+    if tier in frozen_limits:
+        return frozen_limits[tier]
     return TIER_LIMITS.get(tier, TIER_LIMITS[DEFAULT_TIER])
 
 

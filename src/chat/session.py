@@ -190,7 +190,8 @@ class ConversationSession:
         # and no overage billing, so this is a hard stop.
         if tier == TenantTier.TRIAL and self._meter:
             try:
-                defaults = TIER_DEFAULTS.get(TenantTier.TRIAL.value, {})
+                from src.multi_tenant.entitlement_service import get_entitlement_service
+                defaults = await get_entitlement_service().get_tier_config(TenantTier.TRIAL.value)
                 trial_limit = defaults.get("included_conversations", 50)
                 dashboard = await self._meter.get_usage_dashboard(
                     tenant_id, tier,

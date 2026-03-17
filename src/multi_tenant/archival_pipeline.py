@@ -386,7 +386,8 @@ class ArchivalPipelineService:
             ISO 8601 cutoff string, or None if the tier has no retention
             policy and is not Enterprise.
         """
-        tier_defaults = TIER_DEFAULTS.get(tier, TIER_DEFAULTS.get("starter", {}))
+        from src.multi_tenant.entitlement_service import get_entitlement_service
+        tier_defaults = get_entitlement_service().get_tier_config_sync(tier)
         history_days = tier_defaults.get("history_depth_days")
 
         if history_days is None:
@@ -724,7 +725,8 @@ class ArchivalPipelineService:
             retention tiers (Enterprise still archives at 90 days for
             ML training but does not delete).
         """
-        tier_defaults = TIER_DEFAULTS.get(tier, TIER_DEFAULTS.get("starter", {}))
+        from src.multi_tenant.entitlement_service import get_entitlement_service
+        tier_defaults = get_entitlement_service().get_tier_config_sync(tier)
         history_days = tier_defaults.get("history_depth_days")
         if history_days is None and tier == ENTERPRISE_TIER:
             return 90  # ML training corpus archival

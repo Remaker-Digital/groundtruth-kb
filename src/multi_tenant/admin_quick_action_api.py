@@ -34,7 +34,7 @@ Architecture references:
 Dependencies:
     - repository.py: PreferencesRepository
     - cosmos_schema.py: QuickActionPrompt, QuickActionPageAssignment,
-      VALID_PAGE_TYPES, TIER_DEFAULTS
+      VALID_PAGE_TYPES
     - middleware.py: get_tenant_context, TenantContext
 
 © 2026 Remaker Digital, a DBA of VanDusen & Palmeter, LLC. All rights reserved.
@@ -57,7 +57,6 @@ from src.multi_tenant.api_models import CamelCaseModel
 
 from src.multi_tenant.auth import TenantContext
 from src.multi_tenant.cosmos_schema import (
-    TIER_DEFAULTS,
     VALID_PAGE_TYPES,
     QuickActionPageAssignment,
     QuickActionPrompt,

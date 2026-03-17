@@ -31,6 +31,8 @@ import logging
 from dataclasses import dataclass
 from typing import Any
 
+from src.multi_tenant.entitlement_service import get_entitlement_service
+
 logger = logging.getLogger(__name__)
 
 
@@ -56,34 +58,23 @@ INFRA_COST_HIGH = 436.0
 PER_TENANT_MARGINAL_LOW = 13.0
 PER_TENANT_MARGINAL_HIGH = 41.0
 
-# Tier pricing
-TIER_PRICING: dict[str, dict[str, Any]] = {
-    "starter": {
-        "monthly_fee": 149.0,
-        "annual_monthly_fee": 124.0,
-        "included_conversations": 1000,
-        "overage_rate": 0.04,
-    },
-    "professional": {
-        "monthly_fee": 399.0,
-        "annual_monthly_fee": 332.0,
-        "included_conversations": 5000,
-        "overage_rate": 0.025,
-    },
-    "enterprise": {
-        "monthly_fee": 999.0,
-        "annual_monthly_fee": 832.0,
-        "included_conversations": 20000,
-        "overage_rate": 0.015,
-    },
-}
+# Tier pricing — loaded from EntitlementService (data-driven via Cosmos DB).
+# Falls back to frozen entitlements when backends are unavailable.
 
-# Conversation pack pricing
-PACK_PRICING: dict[int, float] = {
-    1000: 29.0,   # $0.029/conv
-    5000: 99.0,   # $0.020/conv
-    20000: 249.0,  # $0.012/conv
-}
+def _get_tier_pricing() -> dict[str, dict[str, Any]]:
+    """Load tier pricing from EntitlementService (sync, LRU/frozen fallback)."""
+    svc = get_entitlement_service()
+    result: dict[str, dict[str, Any]] = {}
+    for tier in ("starter", "professional", "enterprise"):
+        result[tier] = svc.get_pricing_sync(tier)
+    return result
+
+
+def _get_pack_pricing() -> dict[int, float]:
+    """Load pack pricing from EntitlementService (sync, LRU/frozen fallback)."""
+    svc = get_entitlement_service()
+    raw = svc.get_pack_pricing_sync()
+    return {int(k): float(v) for k, v in raw.items()}
 
 # Stripe processing fee
 STRIPE_FEE_PCT = 0.029
@@ -184,7 +175,8 @@ class CostModelCalculator:
         Returns:
             TenantCostProjection with revenue, cost, and margin details.
         """
-        pricing = TIER_PRICING.get(tier, TIER_PRICING["starter"])
+        tier_pricing = _get_tier_pricing()
+        pricing = tier_pricing.get(tier, tier_pricing["starter"])
 
         if billing_interval == "annual":
             platform_fee = pricing["annual_monthly_fee"]
@@ -243,9 +235,10 @@ class CostModelCalculator:
         Returns:
             PlatformCostProjection with aggregate and per-tenant details.
         """
+        tier_pricing = _get_tier_pricing()
         if avg_conversations is None:
             avg_conversations = {
-                tier: TIER_PRICING.get(tier, TIER_PRICING["starter"])[
+                tier: tier_pricing.get(tier, tier_pricing["starter"])[
                     "included_conversations"
                 ]
                 for tier in tenant_mix
@@ -257,7 +250,7 @@ class CostModelCalculator:
         for tier, count in tenant_mix.items():
             convs = avg_conversations.get(
                 tier,
-                TIER_PRICING.get(tier, TIER_PRICING["starter"])[
+                tier_pricing.get(tier, tier_pricing["starter"])[
                     "included_conversations"
                 ],
             )
@@ -280,11 +273,12 @@ class CostModelCalculator:
         margin_pct = (gross_profit / total_revenue * 100) if total_revenue > 0 else 0.0
 
         # Break-even: minimum Starter tenants to cover shared infra
-        starter_fee = TIER_PRICING["starter"]["monthly_fee"]
+        starter_pricing = tier_pricing["starter"]
+        starter_fee = starter_pricing["monthly_fee"]
         starter_marginal = (PER_TENANT_MARGINAL_LOW + PER_TENANT_MARGINAL_HIGH) / 2
         net_per_starter = starter_fee - starter_marginal - (
             starter_fee * STRIPE_FEE_PCT + STRIPE_FEE_FIXED
-        ) - (TIER_PRICING["starter"]["included_conversations"] * AI_COST_PER_CONVERSATION)
+        ) - (starter_pricing["included_conversations"] * AI_COST_PER_CONVERSATION)
         break_even = int(shared_infra / net_per_starter) + 1 if net_per_starter > 0 else 999
 
         return PlatformCostProjection(

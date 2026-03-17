@@ -258,15 +258,15 @@ class TestPerTierCapsRemoved:
 class TestTierRevalidation:
     """SPEC-1748: ActivationService validates tier entitlements before activation."""
 
-    def test_starter_rejects_custom_instructions(self):
+    def test_starter_allows_custom_instructions(self):
+        """S186: custom_instructions gate removed — all tiers can set them."""
         from src.multi_tenant.activation_service import ActivationService
         from src.multi_tenant.cosmos_schema import TenantTier
 
         svc = ActivationService.__new__(ActivationService)
         draft = {"custom_instructions": "Do something special"}
         errors = svc._validate_tier_entitlements(draft, TenantTier.STARTER)
-        assert len(errors) == 1
-        assert errors[0]["field"] == "custom_instructions"
+        assert len(errors) == 0
 
     def test_professional_allows_custom_instructions(self):
         from src.multi_tenant.activation_service import ActivationService

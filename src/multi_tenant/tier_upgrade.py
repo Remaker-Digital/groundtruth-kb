@@ -20,15 +20,10 @@ from typing import Any
 from fastapi import APIRouter, Depends, HTTPException, Query
 from pydantic import BaseModel, Field
 
+from src.multi_tenant.entitlement_service import TIER_ORDER
 from src.multi_tenant.middleware import get_tenant_context, TenantContext
 
 logger = logging.getLogger(__name__)
-
-# ---------------------------------------------------------------------------
-# Models
-# ---------------------------------------------------------------------------
-
-TIER_ORDER = {"trial": 0, "starter": 1, "professional": 2, "enterprise": 3}
 
 TIER_FEATURES: dict[str, dict[str, Any]] = {
     "starter": {

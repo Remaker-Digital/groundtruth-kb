@@ -42,7 +42,6 @@ from dataclasses import dataclass, field
 from typing import Any
 
 from src.chat.models import StreamEvent, done_event, error_event
-from src.multi_tenant.cosmos_schema import TIER_DEFAULTS
 
 logger = logging.getLogger(__name__)
 

@@ -34,6 +34,11 @@ from src.multi_tenant.superadmin_api._dashboard import *  # noqa: F401,F403
 from src.multi_tenant.superadmin_api._operations import *  # noqa: F401,F403
 from src.multi_tenant.superadmin_api._copilot import *  # noqa: F401,F403
 from src.multi_tenant.superadmin_api._platform import *  # noqa: F401,F403
+from src.multi_tenant.superadmin_api._entitlements import *  # noqa: F401,F403
+from src.multi_tenant.superadmin_api._blocklists import *  # noqa: F401,F403
+from src.multi_tenant.superadmin_api._rate_limits import *  # noqa: F401,F403
+from src.multi_tenant.superadmin_api._alerts import *  # noqa: F401,F403
+from src.multi_tenant.superadmin_api._diagnostics import *  # noqa: F401,F403
 
 # Private helpers re-exported for backward compatibility (test patching)
 from src.multi_tenant.superadmin_api._operations import (  # noqa: F401

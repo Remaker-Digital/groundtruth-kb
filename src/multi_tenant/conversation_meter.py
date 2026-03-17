@@ -820,7 +820,8 @@ class ConversationMeter:
         overage_count = max(0, total - included - pack_consumed)
         overage_rate = 0.0
         if tier:
-            defaults = TIER_DEFAULTS.get(tier.value, {})
+            from src.multi_tenant.entitlement_service import get_entitlement_service
+            defaults = await get_entitlement_service().get_tier_config(tier.value)
             overage_rate = defaults.get("overage_rate", 0.0)
         estimated_cost = overage_count * overage_rate
 

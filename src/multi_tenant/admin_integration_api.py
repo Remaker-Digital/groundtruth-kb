@@ -189,9 +189,6 @@ class IntegrationResponse(BaseModel):
 # Helpers
 # ---------------------------------------------------------------------------
 
-# Tier ordering for gate checks
-_TIER_ORDER = {"trial": 0, "starter": 1, "professional": 2, "enterprise": 3}
-
 # Config processor singleton (lazy import to avoid circular deps)
 _config_processor = None
 
@@ -208,7 +205,8 @@ def _tier_meets_gate(tenant_tier: str, gate: str | None) -> bool:
     """Check if the tenant tier meets or exceeds the gate tier."""
     if gate is None:
         return True
-    return _TIER_ORDER.get(tenant_tier, 0) >= _TIER_ORDER.get(gate, 0)
+    from src.multi_tenant.entitlement_service import get_entitlement_service
+    return get_entitlement_service().tier_meets_minimum(gate, tenant_tier)
 
 
 def _build_summary(

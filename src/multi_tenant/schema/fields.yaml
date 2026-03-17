@@ -377,7 +377,7 @@ fields:
     field_type: object
     validation: {}
     platform_default: null
-    tier_gate: pro+
+    tier_gate: all
     onboarding_step: 4
     step_order: 8
     tooltip: Route specific question types to specific knowledge sources.
@@ -897,11 +897,11 @@ fields:
     field_type: boolean
     validation: {}
     platform_default: true
-    tier_gate: pro+
+    tier_gate: all
     onboarding_step: 9
     step_order: 9
     tooltip: "Display 'Powered by Agent Red' badge in the widget footer."
-    description: Professional and Enterprise tiers can remove the Agent Red branding badge from the widget footer. Starter tier always shows branding.
+    description: Controls whether the Agent Red branding badge appears in the widget footer. Available on all tiers.
     doc_link: "https://agentredcx.com/docs/configuration/widget-appearance#branding"
     affects_agents: []
     pii_classification: none
@@ -1623,11 +1623,11 @@ fields:
     validation:
       max_length: 4000
     platform_default: null
-    tier_gate: pro+
+    tier_gate: all
     onboarding_step: 10
     step_order: 0
     tooltip: "Advanced: free-form instructions appended to the AI's system prompt."
-    description: "Custom instructions are injected into the Response Generator's system prompt. They are advisory — platform safety rules and the Critic always take precedence. Use for domain-specific guidance the structured fields don't cover. Professional and Enterprise only."
+    description: "Custom instructions are injected into the Response Generator's system prompt. They are advisory — platform safety rules and the Critic always take precedence. Use for domain-specific guidance the structured fields don't cover."
     placeholder: e.g. Always mention our loyalty program when discussing returns.
     doc_link: "https://agentredcx.com/docs/configuration/advanced#custom-instructions"
     affects_agents:

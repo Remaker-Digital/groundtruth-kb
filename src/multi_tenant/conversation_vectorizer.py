@@ -491,9 +491,8 @@ class ConversationVectorizer:
         Returns:
             ISO 8601 date string, or None for unlimited (Enterprise).
         """
-        defaults = TIER_DEFAULTS.get(
-            tier.value, TIER_DEFAULTS[TenantTier.STARTER.value]
-        )
+        from src.multi_tenant.entitlement_service import get_entitlement_service
+        defaults = get_entitlement_service().get_tier_config_sync(tier.value)
         depth_days = defaults.get("history_depth_days")
 
         if depth_days is None:

@@ -149,7 +149,8 @@ class DataRetentionService:
                 continue
 
             # Get tier-specific retention period
-            tier_defaults = TIER_DEFAULTS.get(tier, TIER_DEFAULTS.get("starter", {}))
+            from src.multi_tenant.entitlement_service import get_entitlement_service
+            tier_defaults = await get_entitlement_service().get_tier_config(tier)
             retention_days = tier_defaults.get("history_depth_days", 90)
             cutoff = now - timedelta(days=retention_days)
             cutoff_iso = cutoff.isoformat()
@@ -361,7 +362,8 @@ class DataRetentionService:
         """
         if tier in UNLIMITED_RETENTION_TIERS:
             return None
-        tier_defaults = TIER_DEFAULTS.get(tier, TIER_DEFAULTS.get("starter", {}))
+        from src.multi_tenant.entitlement_service import get_entitlement_service
+        tier_defaults = get_entitlement_service().get_tier_config_sync(tier)
         return tier_defaults.get("history_depth_days", 90)
 
 

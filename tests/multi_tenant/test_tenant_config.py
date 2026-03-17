@@ -91,10 +91,10 @@ class TestSchemaValidation:
 
     def test_tc04_tier_gating(self):
         """TC-04: Fields with tier gates reject lower tiers."""
-        # custom_instructions is PROFESSIONAL_PLUS
+        # zendesk_escalation_enabled is gated to PROFESSIONAL_PLUS.
         result = validate_field(
-            "custom_instructions",
-            "Some custom instructions",
+            "zendesk_escalation_enabled",
+            True,
             TenantTier.STARTER,
         )
 
@@ -233,9 +233,9 @@ class TestConfigProcessorMerge:
         starter_fields = get_fields_for_tier(TenantTier.STARTER)
         pro_fields = get_fields_for_tier(TenantTier.PROFESSIONAL)
 
-        # Pro has more fields (custom_instructions is PROFESSIONAL_PLUS)
-        assert "custom_instructions" not in starter_fields
-        assert "custom_instructions" in pro_fields
+        # Pro has more fields (zendesk_escalation_enabled is PROFESSIONAL_PLUS)
+        assert "zendesk_escalation_enabled" not in starter_fields
+        assert "zendesk_escalation_enabled" in pro_fields
 
 
 # ---------------------------------------------------------------------------

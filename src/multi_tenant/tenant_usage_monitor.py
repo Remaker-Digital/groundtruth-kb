@@ -41,7 +41,7 @@ from dataclasses import dataclass, field
 from enum import Enum
 from typing import Any
 
-from src.multi_tenant.cosmos_schema import TIER_DEFAULTS, TenantTier
+from src.multi_tenant.cosmos_schema import TenantTier
 
 logger = logging.getLogger(__name__)
 
@@ -265,7 +265,8 @@ class TenantUsageMonitor:
         total_rus = sum(e.cosmos_rus for e in events)
 
         # Determine tier thresholds
-        tier_config = TIER_DEFAULTS.get(tier, TIER_DEFAULTS.get("starter", {}))
+        from src.multi_tenant.entitlement_service import get_entitlement_service
+        tier_config = get_entitlement_service().get_tier_config_sync(tier)
         base_rpm = tier_config.get("rate_limit_rpm", 10)
 
         # Theoretical max requests in the window

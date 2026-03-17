@@ -342,7 +342,8 @@ def _build_tier_section(tier: TenantTier) -> str:
     Returns a short block (~50 tokens) describing what features are
     available at this subscription tier.
     """
-    defaults = TIER_DEFAULTS.get(tier.value, TIER_DEFAULTS[TenantTier.STARTER.value])
+    from src.multi_tenant.entitlement_service import get_entitlement_service
+    defaults = get_entitlement_service().get_tier_config_sync(tier.value)
     memory_layers: list[int] = defaults.get("memory_layers", [1, 2])
     history_days = defaults.get("history_depth_days")
 
@@ -907,9 +908,8 @@ class SystemPromptBuilder:
         which layers contributed and what config values were active.
         """
         tier = tenant.tier or TenantTier.STARTER
-        defaults = TIER_DEFAULTS.get(
-            tier.value, TIER_DEFAULTS[TenantTier.STARTER.value]
-        )
+        from src.multi_tenant.entitlement_service import get_entitlement_service
+        defaults = get_entitlement_service().get_tier_config_sync(tier.value)
 
         trace: dict[str, Any] = {
             "agent": agent.value,

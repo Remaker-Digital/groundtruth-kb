@@ -741,20 +741,30 @@ async def phase_5_knowledge_base(dry_run: bool, embed: bool) -> None:
 # ---------------------------------------------------------------------------
 
 async def phase_6_platform_config(dry_run: bool) -> None:
-    """Create 4 tier_defaults documents in platform_config."""
+    """Seed platform_config with tier defaults + comprehensive entitlements v1.
+
+    Creates:
+      - 4 legacy tier_defaults documents (backward compatibility)
+      - 6 entitlement documents (SPEC-1814 schema v1):
+          tier_config, pricing, sla_targets, website_limits,
+          integration_gates + field_gates, global_config
+    """
     print()
     print("=" * 65)
-    print("  PHASE 6: Platform Config (Tier Defaults)")
+    print("  PHASE 6: Platform Config (Tier Defaults + Entitlements v1)")
     print("=" * 65)
 
     from src.multi_tenant.cosmos_schema import (
         TIER_DEFAULTS,
         PlatformConfigDocument,
     )
+    from src.multi_tenant.entitlement_service import FROZEN_ENTITLEMENTS
 
     now = datetime.now(timezone.utc).isoformat()
-    tier_count = 0
+    doc_count = 0
 
+    # --- Legacy tier_defaults documents (backward compat) ---
+    print("\n  [Legacy] Tier defaults:")
     for tier_name, tier_values in TIER_DEFAULTS.items():
         doc = PlatformConfigDocument(
             id=f"tier_defaults:{tier_name}",
@@ -766,7 +776,7 @@ async def phase_6_platform_config(dry_run: bool) -> None:
             updated_by="seed_tenant.py",
         )
 
-        print(f"  {tier_name}: {tier_values['included_conversations']} convos, "
+        print(f"    {tier_name}: {tier_values['included_conversations']} convos, "
               f"{tier_values['rate_limit_rpm']} rpm")
 
         if not dry_run:
@@ -774,14 +784,57 @@ async def phase_6_platform_config(dry_run: bool) -> None:
             repo = PlatformConfigRepository()
             try:
                 await repo.set_config(doc)
-                print(f"    [OK] Upserted.")
+                print(f"      [OK] Upserted.")
             except Exception as e:
-                print(f"    [ERROR] {e}")
+                print(f"      [ERROR] {e}")
 
-        tier_count += 1
+        doc_count += 1
+
+    # --- Entitlement v1 documents (SPEC-1814) ---
+    entitlement_docs: list[tuple[str, str, Any]] = [
+        ("tier_config", "all_tiers", FROZEN_ENTITLEMENTS["tiers"]),
+        ("entitlements", "pricing", FROZEN_ENTITLEMENTS["pricing"]),
+        ("entitlements", "pack_pricing", FROZEN_ENTITLEMENTS["pack_pricing"]),
+        ("entitlements", "sla_targets", FROZEN_ENTITLEMENTS["sla_targets"]),
+        ("entitlements", "website_limits", FROZEN_ENTITLEMENTS["website_limits"]),
+        ("entitlements", "integration_gates", FROZEN_ENTITLEMENTS["integration_gates"]),
+        ("entitlements", "field_gates", FROZEN_ENTITLEMENTS["field_gates"]),
+        ("entitlements", "global_config", FROZEN_ENTITLEMENTS["global_config"]),
+    ]
+
+    print("\n  [v1] Entitlement documents:")
+    for config_type, config_key, value in entitlement_docs:
+        doc = PlatformConfigDocument(
+            id=f"{config_type}:{config_key}",
+            config_type=config_type,
+            config_key=config_key,
+            value=value,
+            version=1,
+            updated_at=now,
+            updated_by="seed_tenant.py",
+        )
+
+        # Display summary
+        if isinstance(value, dict):
+            summary = f"{len(value)} entries"
+        else:
+            summary = str(value)[:60]
+        print(f"    {config_type}:{config_key} — {summary}")
+
+        if not dry_run:
+            from src.multi_tenant.repository import PlatformConfigRepository
+            repo = PlatformConfigRepository()
+            try:
+                await repo.set_config(doc)
+                print(f"      [OK] Upserted.")
+            except Exception as e:
+                print(f"      [ERROR] {e}")
+
+        doc_count += 1
 
     phase_results["6_platform_config"] = (
-        f"{'DRY RUN' if dry_run else 'OK'} — {tier_count} tier defaults"
+        f"{'DRY RUN' if dry_run else 'OK'} — {doc_count} platform config docs "
+        f"(4 legacy tier_defaults + {doc_count - 4} entitlement v1)"
     )
 
 

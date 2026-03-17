@@ -1,11 +1,11 @@
 Method,Name,Error,Occurrences
-GET,/api/dashboard/usage/daily,HTTPError('401 Client Error: Unauthorized for url: /api/dashboard/usage/daily'),23
-GET,/api/dashboard/usage,CatchResponseError('Dashboard failed: 401'),32
-GET,/api/analytics/intents,HTTPError('401 Client Error: Unauthorized for url: /api/analytics/intents'),13
-GET,/api/audit [recent],HTTPError('401 Client Error: Unauthorized for url: /api/audit [recent]'),13
-GET,/api/admin/knowledge [list],HTTPError('401 Client Error: Unauthorized for url: /api/admin/knowledge [list]'),18
-GET,/api/analytics/summary,HTTPError('401 Client Error: Unauthorized for url: /api/analytics/summary'),21
+GET,/api/dashboard/usage/daily,HTTPError('401 Client Error: Unauthorized for url: /api/dashboard/usage/daily'),16
+GET,/api/dashboard/usage,CatchResponseError('Dashboard failed: 401'),40
+GET,/api/analytics/intents,HTTPError('401 Client Error: Unauthorized for url: /api/analytics/intents'),14
+GET,/api/audit [recent],HTTPError('401 Client Error: Unauthorized for url: /api/audit [recent]'),10
+GET,/api/admin/knowledge [list],HTTPError('401 Client Error: Unauthorized for url: /api/admin/knowledge [list]'),16
+GET,/api/analytics/summary,HTTPError('401 Client Error: Unauthorized for url: /api/analytics/summary'),19
 POST,/api/chat/conversations [start],CatchResponseError('Start failed: 401'),35
-GET,/api/config [get],HTTPError('401 Client Error: Unauthorized for url: /api/config [get]'),13
-GET,/api/admin/team [list],HTTPError('401 Client Error: Unauthorized for url: /api/admin/team [list]'),12
-GET,/api/admin/conversations [list],HTTPError('401 Client Error: Unauthorized for url: /api/admin/conversations [list]'),41
+GET,/api/config [get],HTTPError('401 Client Error: Unauthorized for url: /api/config [get]'),17
+GET,/api/admin/team [list],HTTPError('401 Client Error: Unauthorized for url: /api/admin/team [list]'),13
+GET,/api/admin/conversations [list],HTTPError('401 Client Error: Unauthorized for url: /api/admin/conversations [list]'),27

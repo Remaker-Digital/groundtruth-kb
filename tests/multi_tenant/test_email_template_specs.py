@@ -367,19 +367,23 @@ class TestMagicLinkAuthSpecs:
 
         assert "{tenant_context}" in _MAGIC_LINK_EMAIL_BODY
         assert "{magic_link_url}" in _MAGIC_LINK_EMAIL_BODY
+        assert "{sign_in_code}" in _MAGIC_LINK_EMAIL_BODY
 
         # Renders cleanly with empty tenant context (single-tenant case)
         html = _MAGIC_LINK_EMAIL_BODY.format(
             magic_link_url="https://example.com/verify?token=tok",
             tenant_context="",
+            sign_in_code="123456",
         )
         assert "Sign In" in html
         assert "https://example.com/verify?token=tok" in html
+        assert "123456" in html
 
         # Renders cleanly with tenant context (multi-account case)
         html = _MAGIC_LINK_EMAIL_BODY.format(
             magic_link_url="https://example.com/verify?token=tok",
             tenant_context='<p>Account: <strong>Shop A</strong></p>',
+            sign_in_code="654321",
         )
         assert "Shop A" in html
         assert "Sign In" in html

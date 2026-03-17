@@ -39,13 +39,13 @@ from enum import Enum
 from typing import Any
 
 from src.multi_tenant.cosmos_schema import (
-    TIER_DEFAULTS,
     AuditEventType,
     BillingChannel,
     ConsentStatus,
     TenantStatus,
     TenantTier,
 )
+from src.multi_tenant.entitlement_service import get_entitlement_service
 
 logger = logging.getLogger(__name__)
 
@@ -226,8 +226,8 @@ class TrialManagementService:
             "consent_status": ConsentStatus.NOT_ASKED.value,
             "trial_expires_at": expires_at.isoformat(),
             "trial_conversation_limit": conversation_limit,
-            "rate_limit_rpm": TIER_DEFAULTS[TenantTier.TRIAL.value].get("rate_limit_rpm"),
-            "max_concurrent": TIER_DEFAULTS[TenantTier.TRIAL.value].get("max_concurrent"),
+            "rate_limit_rpm": (await get_entitlement_service().get_tier_config(TenantTier.TRIAL.value)).get("rate_limit_rpm"),
+            "max_concurrent": (await get_entitlement_service().get_tier_config(TenantTier.TRIAL.value)).get("max_concurrent"),
             "created_at": now.isoformat(),
             "updated_at": now.isoformat(),
         }
@@ -464,7 +464,7 @@ class TrialManagementService:
         channel_value = billing_channel.value if isinstance(billing_channel, BillingChannel) else billing_channel
 
         # Get new tier defaults
-        tier_defaults = TIER_DEFAULTS.get(new_tier_value, {})
+        tier_defaults = await get_entitlement_service().get_tier_config(new_tier_value)
 
         # Count trial conversations for carryover
         conversations_used = 0

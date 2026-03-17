@@ -65,7 +65,7 @@ from starlette.requests import Request
 from starlette.responses import JSONResponse, Response
 
 from src.multi_tenant.auth import TenantContext
-from src.multi_tenant.cosmos_schema import TIER_DEFAULTS, TenantTier
+from src.multi_tenant.cosmos_schema import TenantTier
 
 logger = logging.getLogger(__name__)
 
@@ -226,7 +226,8 @@ class TenantConcurrencyMiddleware(BaseHTTPMiddleware):
         # Determine limits from tier defaults
         tier_config = {}
         if ctx.tier:
-            tier_config = TIER_DEFAULTS.get(ctx.tier.value, {})
+            from src.multi_tenant.entitlement_service import get_entitlement_service
+            tier_config = get_entitlement_service().get_tier_config_sync(ctx.tier.value)
 
         max_concurrent = tier_config.get("max_concurrent", 3)
         queue_depth = tier_config.get("queue_depth", 5)

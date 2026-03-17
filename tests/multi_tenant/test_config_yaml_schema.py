@@ -493,6 +493,23 @@ class TestSetupChecklistFieldNames:
         registry = get_field_registry()
         assert "custom_instructions" in registry
 
+    def test_custom_instructions_available_all_tiers(self):
+        """S186/WI-1324: custom_instructions gate removed — all tiers allowed.
+
+        Regression guard: schema/fields.yaml tier_gate must be 'all',
+        not 'pro+'. The S186 fix removed the activation_service gate but
+        missed the schema-level gate (caught in S191 E2E pipeline).
+        """
+        from src.multi_tenant.schema.validation import validate_field
+        from src.multi_tenant.cosmos_schema import TenantTier
+
+        ok, err, _ = validate_field(
+            "custom_instructions",
+            "Always greet the customer by name.",
+            TenantTier.STARTER,
+        )
+        assert ok, f"Starter tier should allow custom_instructions: {err}"
+
     def test_business_category_does_not_exist(self):
         """business_category is referenced in the setup checklist but is not a real field.
 

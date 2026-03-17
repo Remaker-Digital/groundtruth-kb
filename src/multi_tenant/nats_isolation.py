@@ -72,7 +72,7 @@ from nats.js.api import (
 from nats.js.client import JetStreamContext
 from nats.js.errors import NotFoundError as JetStreamNotFoundError
 
-from src.multi_tenant.cosmos_schema import TIER_DEFAULTS, TenantTier
+from src.multi_tenant.cosmos_schema import TenantTier
 
 logger = logging.getLogger(__name__)
 
@@ -482,7 +482,8 @@ class TenantNATSManager:
             }
 
         # Get tier-specific queue depth
-        tier_config = TIER_DEFAULTS.get(tier.value, {})
+        from src.multi_tenant.entitlement_service import get_entitlement_service
+        tier_config = await get_entitlement_service().get_tier_config(tier.value)
         max_msgs = tier_config.get("queue_depth", 5)
 
         sname = stream_name(tenant_id)
@@ -554,7 +555,8 @@ class TenantNATSManager:
         """
         self._require_connected()
 
-        tier_config = TIER_DEFAULTS.get(tier.value, {})
+        from src.multi_tenant.entitlement_service import get_entitlement_service
+        tier_config = await get_entitlement_service().get_tier_config(tier.value)
         max_msgs = tier_config.get("queue_depth", 5)
 
         sname = stream_name(tenant_id)

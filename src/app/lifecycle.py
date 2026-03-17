@@ -1765,6 +1765,56 @@ async def _startup_redis_rate_limiter() -> None:
         logger.warning("Redis connection failed — falling back to in-memory rate limiter", exc_info=True)
 
 
+async def _startup_entitlement_service() -> None:
+    """Initialize the EntitlementService singleton (SPEC-1815, WI-1407).
+
+    Wires the centralized entitlement accessor with Redis cache (if available)
+    and Cosmos DB backend. Falls back to frozen entitlements if neither is
+    available. Must run AFTER _startup_cosmos_db and _startup_redis_rate_limiter.
+    """
+    try:
+        from src.multi_tenant.entitlement_service import get_entitlement_service
+
+        svc = get_entitlement_service()
+
+        # Reuse Redis client from REDIS_URL if available
+        redis_client = None
+        redis_url = os.environ.get("REDIS_URL")
+        if redis_url:
+            try:
+                import redis as redis_lib
+
+                redis_client = redis_lib.Redis.from_url(
+                    redis_url,
+                    username=None,
+                    decode_responses=True,
+                    socket_connect_timeout=5,
+                    socket_timeout=2,
+                    retry_on_timeout=True,
+                )
+                redis_client.ping()
+            except Exception:
+                logger.warning(
+                    "EntitlementService: Redis unavailable — "
+                    "cache layer disabled",
+                    exc_info=True,
+                )
+                redis_client = None
+
+        await svc.initialize(redis_client=redis_client)
+        logger.info(
+            "EntitlementService initialized: redis=%s fallback=%s",
+            redis_client is not None,
+            svc.is_using_fallback,
+        )
+    except Exception:
+        logger.warning(
+            "EntitlementService startup failed — "
+            "frozen fallback will be used",
+            exc_info=True,
+        )
+
+
 # =========================================================================
 # Registration functions — called from main.py
 # =========================================================================
@@ -1830,6 +1880,7 @@ def register_startup_handlers(app: FastAPI | None = None) -> None:
         _startup_migration_check,
         _startup_pre_auth_cleanup,
         _startup_redis_rate_limiter,
+        _startup_entitlement_service,
     ])
 
 

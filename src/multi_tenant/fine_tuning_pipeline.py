@@ -517,12 +517,11 @@ class FineTuningPipelineService:
     def is_layer4_available(tier: TenantTier) -> bool:
         """Check whether the given tier supports Layer 4.
 
-        Layer 4 is gated by ``memory_layers`` in TIER_DEFAULTS.
+        Layer 4 is gated by ``memory_layers`` in EntitlementService.
         Currently available for Enterprise tier only.
         """
-        defaults = TIER_DEFAULTS.get(
-            tier.value, TIER_DEFAULTS[TenantTier.STARTER.value]
-        )
+        from src.multi_tenant.entitlement_service import get_entitlement_service
+        defaults = get_entitlement_service().get_tier_config_sync(tier.value)
         memory_layers: list[int] = defaults.get("memory_layers", [1, 2])
         return 4 in memory_layers
 

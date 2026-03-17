@@ -2,7 +2,7 @@
  * ProviderLayout — Platform operator console shell.
  *
  * Provides:
- *   1. Grouped sidebar navigation (17 pages in 4 groups)
+ *   1. Grouped sidebar navigation (29 pages in 5 groups)
  *   2. Header with platform name, version, and logout
  *   3. Authenticated apiFetch wrapper (SUPERADMIN API key injection)
  *   4. AppContext for child pages
@@ -88,6 +88,20 @@ const NAV_GROUPS: NavGroup[] = [
       { label: 'Pipeline Observatory', path: '/pipeline', icon: 'queue', description: 'Agent pipeline metrics' },
       { label: 'Contact Messages', path: '/contact-messages', icon: 'contact', description: 'Customer messages' },
       { label: 'Service Messages', path: '/service-messages', icon: 'email', description: 'Bulk tenant notifications' },
+    ],
+  },
+  {
+    group: 'Control Plane',
+    items: [
+      { label: 'Entitlements', path: '/entitlements', icon: 'config', description: 'Tier entitlement config' },
+      { label: 'Feature Flags', path: '/feature-flags', icon: 'config', description: 'Feature flag toggles' },
+      { label: 'Rate Limits', path: '/rate-limits', icon: 'analytics', description: 'Rate limits & retry' },
+      { label: 'Blocklists', path: '/blocklists', icon: 'secrets', description: 'Allow/block lists' },
+      { label: 'Alert Thresholds', path: '/alert-thresholds', icon: 'alerts', description: 'Threshold config' },
+      { label: 'Notifications', path: '/notification-channels', icon: 'email', description: 'Notification channels' },
+      { label: 'Deploy Management', path: '/deploy-management', icon: 'deployments', description: 'Deployment orchestration' },
+      { label: 'Test Execution', path: '/test-execution', icon: 'diagnostics', description: 'Test pipeline trigger' },
+      { label: 'Maintenance', path: '/maintenance', icon: 'status', description: 'Maintenance mode' },
     ],
   },
   {

@@ -1035,9 +1035,10 @@ class TestShopifyBilling:
         Verifies that the Shopify billing module uses Decimal for price
         calculations to avoid binary floating-point errors.
         """
-        from src.integrations.shopify_billing import _TIER_PRICING
+        from src.integrations.shopify_billing import VALID_TIERS, _get_tier_pricing
 
-        for tier_name, pricing in _TIER_PRICING.items():
+        for tier_name in VALID_TIERS:
+            pricing = _get_tier_pricing(tier_name)
             assert isinstance(pricing["monthly"], Decimal), (
                 f"{tier_name} monthly price should be Decimal"
             )

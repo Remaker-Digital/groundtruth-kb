@@ -1080,7 +1080,9 @@ async def update_tenant_rate_limit(
         effective = max(RATE_LIMIT_RPM_FLOOR, body.rate_limit_rpm)
     else:
         tier = doc.get("tier", "starter")
-        tier_rpm = TIER_DEFAULTS.get(tier, {}).get("rate_limit_rpm")
+        from src.multi_tenant.entitlement_service import get_entitlement_service
+        tier_config = await get_entitlement_service().get_tier_config(tier)
+        tier_rpm = tier_config.get("rate_limit_rpm")
         effective = max(
             RATE_LIMIT_RPM_FLOOR,
             tier_rpm if tier_rpm is not None else RATE_LIMIT_RPM_DEFAULT,
@@ -1139,7 +1141,9 @@ async def get_tenant_rate_limit(
         effective = max(RATE_LIMIT_RPM_FLOOR, per_tenant_rpm)
     else:
         tier = doc.get("tier", "starter")
-        tier_rpm = TIER_DEFAULTS.get(tier, {}).get("rate_limit_rpm")
+        from src.multi_tenant.entitlement_service import get_entitlement_service
+        tier_config = await get_entitlement_service().get_tier_config(tier)
+        tier_rpm = tier_config.get("rate_limit_rpm")
         effective = max(
             RATE_LIMIT_RPM_FLOOR,
             tier_rpm if tier_rpm is not None else RATE_LIMIT_RPM_DEFAULT,

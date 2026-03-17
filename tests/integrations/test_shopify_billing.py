@@ -22,7 +22,6 @@ from src.integrations.shopify_billing import (
     VALID_INTERVALS,
     VALID_TIERS,
     _INTERVAL_MAP,
-    _TIER_PRICING,
     _get_tier_pricing,
     _is_test_mode,
     _shop_subscriptions,
@@ -349,7 +348,7 @@ class TestDecimalOveragePrecision:
             "tier": "professional",
             "interval": "month",
             "status": "active",
-            "pricing": _TIER_PRICING["professional"],
+            "pricing": _get_tier_pricing("professional"),
         }
 
         _patch_shopify_client.execute.return_value = _graphql_usage_record_response()
@@ -374,7 +373,7 @@ class TestDecimalOveragePrecision:
             "tier": "starter",
             "interval": "month",
             "status": "active",
-            "pricing": _TIER_PRICING["starter"],
+            "pricing": _get_tier_pricing("starter"),
         }
 
         _patch_shopify_client.execute.return_value = _graphql_usage_record_response()
@@ -406,7 +405,7 @@ class TestDecimalQuantizeToCents:
             "tier": "professional",
             "interval": "month",
             "status": "active",
-            "pricing": _TIER_PRICING["professional"],
+            "pricing": _get_tier_pricing("professional"),
         }
 
         _patch_shopify_client.execute.return_value = _graphql_usage_record_response()
@@ -437,7 +436,7 @@ class TestDecimalQuantizeToCents:
             "tier": "starter",
             "interval": "month",
             "status": "active",
-            "pricing": _TIER_PRICING["starter"],
+            "pricing": _get_tier_pricing("starter"),
         }
 
         _patch_shopify_client.execute.return_value = _graphql_usage_record_response()
@@ -477,7 +476,7 @@ class TestConfirmSubscriptionProvisioning:
             "tier": "starter",
             "interval": "month",
             "status": "pending_approval",
-            "pricing": _TIER_PRICING["starter"],
+            "pricing": _get_tier_pricing("starter"),
         }
 
         result = await confirm_subscription(shop_domain="confirm-store.myshopify.com")
@@ -503,7 +502,7 @@ class TestConfirmSubscriptionProvisioning:
             "tier": "starter",
             "interval": "month",
             "status": "pending_approval",
-            "pricing": _TIER_PRICING["starter"],
+            "pricing": _get_tier_pricing("starter"),
         }
 
         result = await confirm_subscription(shop_domain="confirm-store.myshopify.com")
@@ -597,7 +596,7 @@ class TestRecordShopifyUsage:
             "tier": "starter",
             "interval": "month",
             "status": "active",
-            "pricing": _TIER_PRICING["starter"],
+            "pricing": _get_tier_pricing("starter"),
         }
 
         _patch_shopify_client.execute.return_value = _graphql_usage_record_response(
@@ -625,7 +624,7 @@ class TestRecordShopifyUsage:
             "tier": "professional",
             "interval": "month",
             "status": "active",
-            "pricing": _TIER_PRICING["professional"],
+            "pricing": _get_tier_pricing("professional"),
         }
 
         _patch_shopify_client.execute.return_value = _graphql_usage_record_response()
@@ -668,7 +667,7 @@ class TestRecordUsageNoSubscription:
             "tier": "starter",
             "interval": "year",
             "status": "active",
-            "pricing": _TIER_PRICING["starter"],
+            "pricing": _get_tier_pricing("starter"),
         }
 
         with pytest.raises(ValueError, match="No usage line item found"):
@@ -836,15 +835,17 @@ class TestGetTierPricingValues:
         assert _INTERVAL_MAP["year"] == "ANNUAL"
 
     def test_all_tiers_have_required_keys(self):
-        """Every tier in _TIER_PRICING has all required keys."""
+        """Every tier returned by _get_tier_pricing has all required keys."""
         required_keys = {"name", "monthly", "annual_total", "overage_rate", "included_conversations", "capped_amount"}
-        for tier_name, tier_data in _TIER_PRICING.items():
+        for tier_name in VALID_TIERS:
+            tier_data = _get_tier_pricing(tier_name)
             missing = required_keys - set(tier_data.keys())
             assert not missing, f"Tier '{tier_name}' missing keys: {missing}"
 
     def test_all_prices_are_decimal(self):
-        """All monetary values in _TIER_PRICING use Decimal, not float."""
-        for tier_name, tier_data in _TIER_PRICING.items():
+        """All monetary values from _get_tier_pricing use Decimal, not float."""
+        for tier_name in VALID_TIERS:
+            tier_data = _get_tier_pricing(tier_name)
             for key in ("monthly", "annual_total", "overage_rate", "capped_amount"):
                 assert isinstance(tier_data[key], Decimal), (
                     f"Tier '{tier_name}' key '{key}' is {type(tier_data[key])}, expected Decimal"

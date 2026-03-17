@@ -187,6 +187,7 @@ class AuditEventType(str, Enum):
     TENANT_PROVISIONED = "tenant.provisioned"
     SUBSCRIPTION_CHANGED = "subscription.changed"
     CONFIG_UPDATED = "config.updated"
+    CONFIG_CHANGE = "config.change"
     DATA_EXPORTED = "data.exported"
     DATA_DELETED = "data.deleted"
     CONSENT_CHANGED = "consent.changed"
