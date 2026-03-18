@@ -12,7 +12,8 @@ Suites:
     all         — e2e + 5 tenant isolation checks (~12min)
 
 SPEC-1845: All credentials are passed at runtime — no hardcoded keys.
-SPEC-1673: Uses SPA platform admin key only — never holds tenant keys.
+SPEC-1673: Uses HMAC verification tokens — no Cosmos dependency for auth.
+SPEC-1846: Tokens are signed with INTERNAL_VERIFICATION_SECRET (auto-generated).
 
 © 2026 Remaker Digital, a DBA of VanDusen & Palmeter, LLC. All rights reserved.
 """
@@ -79,7 +80,7 @@ class VerificationRunner:
         run_id: Unique identifier for this run.
         environment: Target environment ("staging" or "production").
         fqdn: Fully-qualified domain name of the target API gateway.
-        spa_api_key: SPA platform admin key for authenticated endpoints.
+        verification_secret: INTERNAL_VERIFICATION_SECRET for HMAC token auth.
         suite: Suite name determining which checks to run.
         cosmos_repo: PlatformConfigRepository for progressive result storage.
         actor: Email or identifier of the user who triggered the run.
@@ -90,7 +91,7 @@ class VerificationRunner:
         run_id: str,
         environment: str,
         fqdn: str,
-        spa_api_key: str,
+        verification_secret: str,
         suite: str,
         cosmos_repo: Any,
         actor: str = "spa-console",
@@ -99,7 +100,7 @@ class VerificationRunner:
         self.environment = environment
         self.fqdn = fqdn
         self.base_url = f"https://{fqdn}"
-        self.spa_api_key = spa_api_key
+        self.verification_secret = verification_secret
         self.suite = suite
         self.repo = cosmos_repo
         self.actor = actor
@@ -276,16 +277,18 @@ class VerificationRunner:
         """Make an HTTP GET request to the target environment.
 
         Returns (status_code, headers_dict, body_text).
-        SPEC-1845: Uses runtime SPA key, never hardcoded.
+        SPEC-1846: Uses HMAC verification tokens — no Cosmos dependency.
         Uses shared httpx.AsyncClient for connection reuse.
         """
         import httpx
         headers: dict[str, str] = {
-            "X-Internal-Test": "true",
             "User-Agent": f"VerificationRunner/{self.run_id}",
         }
         if auth:
-            headers["X-API-Key"] = self.spa_api_key
+            from src.multi_tenant.auth import generate_verification_token
+            headers["X-Verification-Token"] = generate_verification_token(
+                self.run_id, self.verification_secret,
+            )
 
         url = f"{self.base_url}{path}"
         client = self._http_client

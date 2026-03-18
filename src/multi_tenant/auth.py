@@ -37,8 +37,10 @@ Request flow:
 from __future__ import annotations
 
 import hashlib
+import hmac
 import logging
 import os
+import secrets
 import time
 from dataclasses import dataclass, field
 from typing import Any
@@ -87,6 +89,10 @@ SPA_API_KEY_PREFIX = "ar_spa_"
 # Publishable widget key (Decision UI-6)
 WIDGET_KEY_HEADER = "X-Widget-Key"
 WIDGET_KEY_PREFIX = "pk_live_"
+
+# Internal verification token header (SPEC-1846: cloud-native verification)
+VERIFICATION_TOKEN_HEADER = "X-Verification-Token"
+VERIFICATION_TOKEN_MAX_AGE_S = 900  # 15 minutes (longest suite is ~12min)
 
 # Paths where widget key authentication is allowed.
 # Widget keys are scoped to chat endpoints and widget config only — they
@@ -538,6 +544,82 @@ async def verify_spa_api_key(
         raise AuthenticationError("Platform admin account is disabled.")
 
     return admin
+
+
+# ---------------------------------------------------------------------------
+# Internal verification tokens (SPEC-1846: cloud-native verification)
+# ---------------------------------------------------------------------------
+
+
+def generate_verification_token(run_id: str, secret: str) -> str:
+    """Generate an HMAC-signed verification token for internal test requests.
+
+    The token is used by VerificationRunner to authenticate against the same
+    container's superadmin endpoints without a Cosmos lookup — enabling health
+    verification even when Cosmos is down.
+
+    Format: "{timestamp}.{run_id}.{hmac_hex}"
+    HMAC = HMAC-SHA256(secret, "{timestamp}|{run_id}")
+
+    Args:
+        run_id: The verification run identifier (e.g., "run-abc123def456").
+        secret: The INTERNAL_VERIFICATION_SECRET (auto-generated at startup).
+
+    Returns:
+        The signed token string.
+    """
+    ts = str(int(time.time()))
+    payload = f"{ts}|{run_id}"
+    sig = hmac.new(secret.encode(), payload.encode(), hashlib.sha256).hexdigest()
+    return f"{ts}.{run_id}.{sig}"
+
+
+def verify_verification_token(
+    token: str,
+    secret: str,
+    max_age_seconds: int = VERIFICATION_TOKEN_MAX_AGE_S,
+) -> dict[str, Any]:
+    """Verify an HMAC-signed internal verification token.
+
+    Args:
+        token: The token string from X-Verification-Token header.
+        secret: The INTERNAL_VERIFICATION_SECRET.
+        max_age_seconds: Maximum token age before rejection (default 900s).
+
+    Returns:
+        {"run_id": str, "timestamp": int} on success.
+
+    Raises:
+        AuthenticationError: On any validation failure (expired, tampered, etc.).
+    """
+    if not token or not secret:
+        raise AuthenticationError("Invalid verification token.")
+
+    # Split: "{timestamp}.{run_id}.{hmac_hex}"
+    # run_id is like "run-abc123def456" (no dots), so split on first and last dot
+    parts = token.split(".")
+    if len(parts) != 3:
+        raise AuthenticationError("Invalid verification token.")
+
+    ts_str, run_id, provided_sig = parts
+
+    # Validate timestamp
+    try:
+        ts = int(ts_str)
+    except ValueError:
+        raise AuthenticationError("Invalid verification token.")
+
+    age = abs(time.time() - ts)
+    if age > max_age_seconds:
+        raise AuthenticationError("Verification token expired.")
+
+    # Recompute and compare HMAC (constant-time)
+    payload = f"{ts_str}|{run_id}"
+    expected_sig = hmac.new(secret.encode(), payload.encode(), hashlib.sha256).hexdigest()
+    if not secrets.compare_digest(provided_sig, expected_sig):
+        raise AuthenticationError("Invalid verification token.")
+
+    return {"run_id": run_id, "timestamp": ts}
 
 
 # ---------------------------------------------------------------------------

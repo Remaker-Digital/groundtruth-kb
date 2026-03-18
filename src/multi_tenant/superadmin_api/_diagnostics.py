@@ -403,13 +403,13 @@ async def trigger_test_run(
             detail=f"Cannot resolve FQDN for environment '{body.environment}'",
         )
 
-    # SPEC-1845: SPA key from environment (raw key not stored on TenantContext
-    # per SPEC-1673 — the container has SUPERADMIN_PREVIEW_API_KEY set).
-    spa_key = os.environ.get("SUPERADMIN_PREVIEW_API_KEY", "")
-    if not spa_key:
+    # SPEC-1846: Use HMAC verification secret (auto-generated at startup).
+    # No Cosmos dependency — enables self-testing even when DB is down.
+    verification_secret = os.environ.get("INTERNAL_VERIFICATION_SECRET", "")
+    if not verification_secret:
         raise HTTPException(
             status_code=500,
-            detail="SUPERADMIN_PREVIEW_API_KEY env var not set on this container",
+            detail="INTERNAL_VERIFICATION_SECRET not set (should be auto-generated at startup)",
         )
 
     # Store initial "queued" status
@@ -449,7 +449,7 @@ async def trigger_test_run(
 
     # SPEC-1846: Fire background verification task (replaces sentinel)
     task = asyncio.create_task(
-        _run_verification_background(run_id, body.environment, body.suite, fqdn, spa_key, actor)
+        _run_verification_background(run_id, body.environment, body.suite, fqdn, verification_secret, actor)
     )
     _active_runs[run_id] = task
 
@@ -468,7 +468,7 @@ async def trigger_test_run(
 
 
 async def _run_verification_background(
-    run_id: str, environment: str, suite: str, fqdn: str, spa_key: str, actor: str,
+    run_id: str, environment: str, suite: str, fqdn: str, verification_secret: str, actor: str,
 ) -> None:
     """Background coroutine that runs the VerificationRunner (SPEC-1846).
 
@@ -482,7 +482,7 @@ async def _run_verification_background(
             run_id=run_id,
             environment=environment,
             fqdn=fqdn,
-            spa_api_key=spa_key,
+            verification_secret=verification_secret,
             suite=suite,
             cosmos_repo=repo,
             actor=actor,

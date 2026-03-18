@@ -45,6 +45,7 @@ from starlette.responses import JSONResponse, Response
 
 from src.multi_tenant.auth import (
     API_KEY_HEADER,
+    VERIFICATION_TOKEN_HEADER,
     WIDGET_KEY_HEADER,
     AuthenticationError,
     TenantContext,
@@ -60,6 +61,7 @@ from src.multi_tenant.auth import (
     verify_shopify_session_token,
     verify_spa_api_key,
     verify_user_api_key,
+    verify_verification_token,
     verify_widget_key,
 )
 from src.multi_tenant.magic_link_auth import verify_magic_link_session_token
@@ -398,6 +400,11 @@ class TenantAuthMiddleware(BaseHTTPMiddleware):
         if session_token:
             return await self._auth_magic_link_session(session_token)
 
+        # Try internal verification token (SPEC-1846: cloud-native verification)
+        verification_token = request.headers.get(VERIFICATION_TOKEN_HEADER)
+        if verification_token:
+            return self._auth_verification_token(verification_token)
+
         # No credentials provided
         raise AuthenticationError(
             "Authentication required. Provide a Shopify session token "
@@ -658,6 +665,37 @@ class TenantAuthMiddleware(BaseHTTPMiddleware):
             platform_admin_email=admin.get("email"),
             platform_admin_role=admin.get("role", "superadmin"),  # SPEC-1675
             platform_admin_notification_email=admin.get("notification_email_address"),  # SPEC-1676
+        )
+
+    def _auth_verification_token(self, token: str) -> TenantContext:
+        """Authenticate via HMAC-signed internal verification token (SPEC-1846).
+
+        Used by VerificationRunner for in-container self-testing. No Cosmos
+        dependency — the HMAC is verified against INTERNAL_VERIFICATION_SECRET
+        (auto-generated at startup). This enables health verification even
+        when Cosmos is down.
+        """
+        secret = os.environ.get("INTERNAL_VERIFICATION_SECRET", "")
+        if not secret:
+            raise AuthenticationError(
+                "Internal verification not configured.", status_code=500,
+            )
+
+        result = verify_verification_token(token, secret)
+
+        logger.info(
+            "Internal verification token authenticated: run_id=%s",
+            result.get("run_id", "unknown"),
+        )
+
+        return TenantContext(
+            tenant_id=PLATFORM_ADMIN_TENANT_ID,
+            is_platform_admin=True,
+            auth_method="internal_verification",
+            status=TenantStatus.ACTIVE,
+            platform_admin_id="verification-runner",
+            platform_admin_email="verification@internal",
+            platform_admin_role="superadmin",
         )
 
     async def _auth_widget_key(

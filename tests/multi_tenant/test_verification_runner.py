@@ -105,7 +105,7 @@ class TestCheckRegistry:
             run_id="test-run-001",
             environment="staging",
             fqdn="example.com",
-            spa_api_key="ar_spa_plat_test_key",
+            verification_secret="test_secret_hex_value",
             suite=suite,
             cosmos_repo=MagicMock(),
             actor="test@example.com",
@@ -162,7 +162,7 @@ class TestVerificationRunnerExecution:
             run_id="test-run-002",
             environment="staging",
             fqdn="test.example.com",
-            spa_api_key="ar_spa_plat_test",
+            verification_secret="ar_spa_plat_test",
             suite="smoke",
             cosmos_repo=mock_repo,
             actor="test@test.com",
@@ -347,7 +347,7 @@ class TestRateLimiter:
     def test_semaphore_initialized_to_4(self):
         runner = VerificationRunner(
             run_id="test", environment="staging", fqdn="x.com",
-            spa_api_key="key", suite="smoke", cosmos_repo=MagicMock(),
+            verification_secret="key", suite="smoke", cosmos_repo=MagicMock(),
         )
         assert runner._semaphore._value == 4
 
@@ -355,7 +355,7 @@ class TestRateLimiter:
         """VerificationRunner initializes _http_client to None before run()."""
         runner = VerificationRunner(
             run_id="test", environment="staging", fqdn="x.com",
-            spa_api_key="key", suite="smoke", cosmos_repo=MagicMock(),
+            verification_secret="key", suite="smoke", cosmos_repo=MagicMock(),
         )
         assert runner._http_client is None
 
@@ -363,7 +363,7 @@ class TestRateLimiter:
         """VerificationRunner initializes _start_wall to empty string."""
         runner = VerificationRunner(
             run_id="test", environment="staging", fqdn="x.com",
-            spa_api_key="key", suite="smoke", cosmos_repo=MagicMock(),
+            verification_secret="key", suite="smoke", cosmos_repo=MagicMock(),
         )
         assert runner._start_wall == ""
 
@@ -381,3 +381,87 @@ class TestEnvironmentValidation:
         assert "staging" in VALID_ENVIRONMENTS
         assert "production" in VALID_ENVIRONMENTS
         assert len(VALID_ENVIRONMENTS) == 2
+
+
+# ---------------------------------------------------------------------------
+# HMAC verification tokens (SPEC-1846)
+# ---------------------------------------------------------------------------
+
+class TestVerificationTokens:
+    """HMAC-signed internal verification token generation and validation."""
+
+    def test_token_format_three_parts(self):
+        """Token has exactly 3 dot-separated parts: timestamp.run_id.hmac."""
+        from src.multi_tenant.auth import generate_verification_token
+        token = generate_verification_token("run-abc123", "secret-key")
+        parts = token.split(".")
+        assert len(parts) == 3, f"Expected 3 parts, got {len(parts)}: {parts}"
+
+    def test_token_timestamp_is_numeric(self):
+        """First part of token is a numeric Unix timestamp."""
+        from src.multi_tenant.auth import generate_verification_token
+        token = generate_verification_token("run-abc123", "secret-key")
+        ts_str = token.split(".")[0]
+        assert ts_str.isdigit(), f"Timestamp should be numeric, got '{ts_str}'"
+
+    def test_token_hmac_is_64_hex_chars(self):
+        """Third part of token is a 64-character hex HMAC-SHA256."""
+        from src.multi_tenant.auth import generate_verification_token
+        token = generate_verification_token("run-abc123", "secret-key")
+        hmac_hex = token.split(".")[2]
+        assert len(hmac_hex) == 64, f"HMAC should be 64 hex chars, got {len(hmac_hex)}"
+        int(hmac_hex, 16)  # Validates it's valid hex
+
+    def test_generate_verify_roundtrip(self):
+        """generate → verify round-trip returns correct run_id."""
+        from src.multi_tenant.auth import generate_verification_token, verify_verification_token
+        secret = "test-secret-abc123"
+        run_id = "run-e2e-test-001"
+        token = generate_verification_token(run_id, secret)
+        result = verify_verification_token(token, secret)
+        assert result["run_id"] == run_id
+        assert isinstance(result["timestamp"], int)
+
+    def test_expired_token_rejected(self):
+        """Token with timestamp > max_age_seconds is rejected."""
+        import time
+        from src.multi_tenant.auth import verify_verification_token, AuthenticationError
+        import hmac as _hmac
+        import hashlib as _hashlib
+        # Create a token with timestamp 2000s in the past
+        old_ts = str(int(time.time()) - 2000)
+        run_id = "run-old"
+        secret = "test-secret"
+        sig = _hmac.new(secret.encode(), f"{old_ts}|{run_id}".encode(), _hashlib.sha256).hexdigest()
+        token = f"{old_ts}.{run_id}.{sig}"
+        with pytest.raises(AuthenticationError, match="expired"):
+            verify_verification_token(token, secret, max_age_seconds=60)
+
+    def test_wrong_secret_rejected(self):
+        """Token verified with different secret is rejected."""
+        from src.multi_tenant.auth import generate_verification_token, verify_verification_token, AuthenticationError
+        token = generate_verification_token("run-123", "secret-A")
+        with pytest.raises(AuthenticationError):
+            verify_verification_token(token, "secret-B")
+
+    def test_tampered_hmac_rejected(self):
+        """Token with modified HMAC is rejected."""
+        from src.multi_tenant.auth import generate_verification_token, verify_verification_token, AuthenticationError
+        secret = "test-secret"
+        token = generate_verification_token("run-123", secret)
+        parts = token.split(".")
+        parts[2] = "a" * 64  # Replace HMAC with garbage
+        tampered = ".".join(parts)
+        with pytest.raises(AuthenticationError):
+            verify_verification_token(tampered, secret)
+
+    def test_tampered_run_id_rejected(self):
+        """Token with modified run_id is rejected."""
+        from src.multi_tenant.auth import generate_verification_token, verify_verification_token, AuthenticationError
+        secret = "test-secret"
+        token = generate_verification_token("run-original", secret)
+        parts = token.split(".")
+        parts[1] = "run-tampered"  # Replace run_id
+        tampered = ".".join(parts)
+        with pytest.raises(AuthenticationError):
+            verify_verification_token(tampered, secret)

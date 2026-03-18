@@ -148,6 +148,19 @@ def register_middleware(app: FastAPI) -> None:
 # Startup handlers (defined at module level for direct test imports)
 # =========================================================================
 
+async def _startup_verification_secret() -> None:
+    """Auto-generate INTERNAL_VERIFICATION_SECRET if not set (SPEC-1846).
+
+    The VerificationRunner needs a per-instance secret for HMAC tokens.
+    Since the runner runs in-process, an ephemeral secret is sufficient.
+    No external dependency — this must run before any other handler.
+    """
+    import secrets as _secrets
+    if not os.environ.get("INTERNAL_VERIFICATION_SECRET"):
+        os.environ["INTERNAL_VERIFICATION_SECRET"] = _secrets.token_hex(32)
+        logger.info("Generated ephemeral INTERNAL_VERIFICATION_SECRET for verification runner")
+
+
 async def _startup_cosmos_db() -> None:
     """Initialize Cosmos DB client and database connection.
 
@@ -1869,6 +1882,7 @@ def register_startup_handlers(app: FastAPI | None = None) -> None:
     """
     _lifecycle_startup_handlers.clear()
     _lifecycle_startup_handlers.extend([
+        _startup_verification_secret,
         _startup_cosmos_db,
         _startup_tenant_resolution,
         _startup_config_processor,
