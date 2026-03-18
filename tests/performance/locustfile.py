@@ -53,9 +53,17 @@ from locust.exception import StopUser
 # Configuration from environment
 # ---------------------------------------------------------------------------
 
-API_KEY = os.getenv("LOAD_TEST_API_KEY", "ar_user_rema_xsTc1hkyFupc5L4qGQojoCXCxsJCKeEi")
-WIDGET_KEY = os.getenv("LOAD_TEST_WIDGET_KEY", "pk_live_c79a2bd0_960a9c23")
+API_KEY = os.getenv("LOAD_TEST_API_KEY", "")
+WIDGET_KEY = os.getenv("LOAD_TEST_WIDGET_KEY", "")
 TENANT_ID = os.getenv("LOAD_TEST_TENANT_ID", "load-test-tenant")
+
+# SPEC-1845: Fail fast if required credentials are not provided.
+# Running load tests with missing keys produces only 401 errors — waste of time.
+if not API_KEY or not WIDGET_KEY:
+    raise SystemExit(
+        "LOAD_TEST_API_KEY and LOAD_TEST_WIDGET_KEY environment variables are required. "
+        "Set them to valid credentials for the target environment before running load tests."
+    )
 
 # Multi-tenant simulation (SPEC-1516: 680 merchant scale target)
 MULTI_TENANT_COUNT = int(os.getenv("LOAD_TEST_TENANT_COUNT", "680"))

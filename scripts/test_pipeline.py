@@ -650,7 +650,23 @@ def phase_6_security_penetration(args: argparse.Namespace) -> PhaseResult:
 def phase_7_rate_limiting(args: argparse.Namespace) -> PhaseResult:
     """Run live rate limiting tests (intentionally exhausts rate windows)."""
     t0 = time.time()
+
+    # SPEC-1845: Validate test file exists before attempting to run.
+    test_file = PROJECT_ROOT / "tests" / "security" / "test_rate_limiting_live.py"
+    if not test_file.exists():
+        dt = time.time() - t0
+        log("WARN", "  Rate Limiting: test file not found — tests/security/test_rate_limiting_live.py")
+        return PhaseResult(7, "Rate Limiting & DoS", "WARN", dt,
+                           "test file missing — SPEC-1845 defect")
+
+    # SPEC-1845: Validate required env vars before running.
     env_vars = _get_env_vars(args)
+    if not env_vars.get("SUPERADMIN_PREVIEW_API_KEY"):
+        dt = time.time() - t0
+        log("WARN", "  Rate Limiting: SUPERADMIN_PREVIEW_API_KEY not set — skipping")
+        return PhaseResult(7, "Rate Limiting & DoS", "WARN", dt,
+                           "missing env var — SPEC-1845")
+
     passed, failed, errors, xfailed, dt, _ = _run_pytest(
         "tests/security/test_rate_limiting_live.py",
         timeout=600, prefix="  [rate-limit] ",
@@ -729,6 +745,22 @@ def phase_10_load_testing(args: argparse.Namespace) -> PhaseResult:
         log("FAIL", "  Load Testing: locust not installed")
         return PhaseResult(10, "Load Testing", "FAIL", dt,
                            "locust not installed — pip install locust")
+
+    # SPEC-1845: Validate required env vars before running.
+    # locustfile.py requires LOAD_TEST_API_KEY and LOAD_TEST_WIDGET_KEY.
+    # Pass env-specific credentials from the pipeline config.
+    env_vars = _get_env_vars(args)
+    load_api_key = env_vars.get("SUPERADMIN_PREVIEW_API_KEY", "")
+    load_widget_key = env_vars.get("PREVIEW_WIDGET_KEY", "")
+    if not load_api_key or not load_widget_key:
+        dt = time.time() - t0
+        log("WARN", "  Load Testing: LOAD_TEST_API_KEY/WIDGET_KEY not available — skipping")
+        return PhaseResult(10, "Load Testing", "WARN", dt,
+                           "missing credentials — SPEC-1845")
+
+    # Bridge pipeline env vars to locust env vars
+    os.environ["LOAD_TEST_API_KEY"] = load_api_key
+    os.environ["LOAD_TEST_WIDGET_KEY"] = load_widget_key
 
     conf_file = f"tests/performance/locust-{args.env}.conf"
     conf_path = PROJECT_ROOT / conf_file

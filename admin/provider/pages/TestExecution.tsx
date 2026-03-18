@@ -20,7 +20,7 @@ import {
   Group,
   Loader,
   Modal,
-  MultiSelect,
+  Progress,
   Select,
   Stack,
   Switch,
@@ -34,6 +34,14 @@ import { useProviderContext } from '../layouts/ProviderLayout';
 // Types
 // ---------------------------------------------------------------------------
 
+interface CheckResult {
+  name: string;
+  category: string;
+  status: string;
+  latencyMs: number;
+  detail: string;
+}
+
 interface PipelineRun {
   runId: string;
   environment: string;
@@ -43,11 +51,13 @@ interface PipelineRun {
   startedAt: string;
   completedAt: string | null;
   totalTests: number;
+  completed: number;
   passed: number;
   failed: number;
   skipped: number;
   durationS: number | null;
   phasesRun: string[];
+  checks: CheckResult[];
 }
 
 const STATUS_COLORS: Record<string, string> = {
@@ -58,19 +68,20 @@ const STATUS_COLORS: Record<string, string> = {
   error: 'red',
 };
 
+// SPEC-1846: Cloud-native verification suites (no pytest/unit in-container)
 const SUITE_OPTIONS = [
-  { value: 'all', label: 'All Tests' },
-  { value: 'regression', label: 'Regression' },
-  { value: 'smoke', label: 'Smoke' },
-  { value: 'e2e', label: 'End-to-End' },
-  { value: 'unit', label: 'Unit' },
+  { value: 'smoke', label: 'Smoke — Health probes (~5s)' },
+  { value: 'regression', label: 'Regression — API + config (~3min)' },
+  { value: 'e2e', label: 'End-to-End — Full verification (~8min)' },
+  { value: 'all', label: 'Full Suite — All checks (~12min)' },
 ];
 
-const PHASE_OPTIONS = [
-  { value: 'phase_a', label: 'Phase A' },
-  { value: 'phase_b', label: 'Phase B' },
-  { value: 'phase_c', label: 'Phase C' },
-];
+const CHECK_STATUS_COLORS: Record<string, string> = {
+  pass: 'green',
+  fail: 'red',
+  skip: 'gray',
+  error: 'orange',
+};
 
 // ---------------------------------------------------------------------------
 // Component
@@ -84,8 +95,7 @@ export const TestExecutionPage: React.FC = () => {
   // Trigger modal
   const [triggerOpen, setTriggerOpen] = useState(false);
   const [triggerEnv, setTriggerEnv] = useState<string | null>('staging');
-  const [triggerSuite, setTriggerSuite] = useState<string | null>('all');
-  const [triggerPhases, setTriggerPhases] = useState<string[]>([]);
+  const [triggerSuite, setTriggerSuite] = useState<string | null>('smoke');
   const [triggerDryRun, setTriggerDryRun] = useState(false);
   const [triggering, setTriggering] = useState(false);
 
@@ -117,8 +127,8 @@ export const TestExecutionPage: React.FC = () => {
         method: 'POST',
         body: JSON.stringify({
           environment: triggerEnv,
-          suite: triggerSuite || 'all',
-          phases: triggerPhases.length > 0 ? triggerPhases : [],
+          suite: triggerSuite || 'smoke',
+          phases: [],
           dryRun: triggerDryRun,
         }),
       });
@@ -136,7 +146,7 @@ export const TestExecutionPage: React.FC = () => {
     } finally {
       setTriggering(false);
     }
-  }, [triggerEnv, triggerSuite, triggerPhases, triggerDryRun, apiFetch, onNotify, loadData]);
+  }, [triggerEnv, triggerSuite, triggerDryRun, apiFetch, onNotify, loadData]);
 
   const refreshRun = useCallback(async (runId: string) => {
     try {
@@ -149,6 +159,33 @@ export const TestExecutionPage: React.FC = () => {
       onNotify('Failed to refresh', 'error');
     }
   }, [apiFetch, onNotify]);
+
+  // SPEC-1846: Auto-refresh running tests every 3 seconds
+  useEffect(() => {
+    const runningRuns = runs.filter(r => r.status === 'running' || r.status === 'queued');
+    if (runningRuns.length === 0) return;
+    const interval = setInterval(() => {
+      runningRuns.forEach(r => refreshRun(r.runId));
+    }, 3000);
+    return () => clearInterval(interval);
+  }, [runs, refreshRun]);
+
+  // Copy failures as JSON for Claude diagnosis
+  const copyForClaude = useCallback((run: PipelineRun) => {
+    const output = {
+      runId: run.runId,
+      environment: run.environment,
+      suite: run.suite,
+      status: run.status,
+      totalTests: run.totalTests,
+      passed: run.passed,
+      failed: run.failed,
+      durationS: run.durationS,
+      failures: (run.checks || []).filter(c => c.status === 'fail' || c.status === 'error'),
+    };
+    navigator.clipboard.writeText(JSON.stringify(output, null, 2));
+    onNotify('Copied failure details to clipboard', 'success');
+  }, [onNotify]);
 
   if (loading) return <Loader size="lg" />;
 
@@ -236,13 +273,6 @@ export const TestExecutionPage: React.FC = () => {
             value={triggerSuite}
             onChange={setTriggerSuite}
           />
-          <MultiSelect
-            label="Phases (optional)"
-            data={PHASE_OPTIONS}
-            value={triggerPhases}
-            onChange={setTriggerPhases}
-            placeholder="All phases"
-          />
           <Switch
             label="Dry Run (validate without executing)"
             checked={triggerDryRun}
@@ -257,20 +287,16 @@ export const TestExecutionPage: React.FC = () => {
         </Stack>
       </Modal>
 
-      {/* Detail Modal */}
-      <Modal opened={!!detailRun} onClose={() => setDetailRun(null)} title={`Run ${detailRun?.runId}`} size="lg">
+      {/* Detail Modal — SPEC-1846: progress bar, checks table, copy for Claude */}
+      <Modal opened={!!detailRun} onClose={() => setDetailRun(null)} title={`Run ${detailRun?.runId}`} size="xl">
         {detailRun && (
           <Stack gap="sm">
             <Group>
               <Text size="sm" fw={500}>Environment:</Text>
               <Badge>{detailRun.environment}</Badge>
-            </Group>
-            <Group>
-              <Text size="sm" fw={500}>Suite:</Text>
+              <Text size="sm" fw={500} ml="md">Suite:</Text>
               <Text size="sm">{detailRun.suite}</Text>
-            </Group>
-            <Group>
-              <Text size="sm" fw={500}>Status:</Text>
+              <Text size="sm" fw={500} ml="md">Status:</Text>
               <Badge color={STATUS_COLORS[detailRun.status] || 'gray'}>{detailRun.status}</Badge>
             </Group>
             <Group>
@@ -279,21 +305,80 @@ export const TestExecutionPage: React.FC = () => {
                 {detailRun.passed} passed, {detailRun.failed} failed, {detailRun.skipped} skipped
                 ({detailRun.totalTests} total)
               </Text>
-            </Group>
-            <Group>
-              <Text size="sm" fw={500}>Duration:</Text>
+              <Text size="sm" fw={500} ml="md">Duration:</Text>
               <Text size="sm">{detailRun.durationS != null ? `${detailRun.durationS}s` : 'In progress'}</Text>
             </Group>
-            <Group>
-              <Text size="sm" fw={500}>Triggered by:</Text>
-              <Text size="sm">{detailRun.triggeredBy}</Text>
-            </Group>
+
+            {/* Progress bar for running tests */}
+            {(detailRun.status === 'running' || detailRun.status === 'queued') && detailRun.totalTests > 0 && (
+              <div>
+                <Group justify="space-between" mb={4}>
+                  <Text size="xs" c="dimmed">Progress</Text>
+                  <Text size="xs" c="dimmed">{detailRun.completed || 0} / {detailRun.totalTests}</Text>
+                </Group>
+                <div style={{ background: '#e9ecef', borderRadius: 4, height: 8, overflow: 'hidden' }}>
+                  <div style={{
+                    background: '#228be6',
+                    height: '100%',
+                    width: `${Math.round(((detailRun.completed || 0) / detailRun.totalTests) * 100)}%`,
+                    transition: 'width 0.3s ease',
+                  }} />
+                </div>
+              </div>
+            )}
+
+            {/* Categories completed */}
             {detailRun.phasesRun.length > 0 && (
               <Group>
-                <Text size="sm" fw={500}>Phases:</Text>
+                <Text size="sm" fw={500}>Categories:</Text>
                 {detailRun.phasesRun.map(p => <Badge key={p} size="sm" variant="light">{p}</Badge>)}
               </Group>
             )}
+
+            {/* Checks table */}
+            {detailRun.checks && detailRun.checks.length > 0 && (
+              <>
+                <Text size="sm" fw={600} mt="sm">Verification Checks</Text>
+                <Table striped highlightOnHover withTableBorder>
+                  <Table.Thead>
+                    <Table.Tr>
+                      <Table.Th>Check</Table.Th>
+                      <Table.Th>Category</Table.Th>
+                      <Table.Th>Status</Table.Th>
+                      <Table.Th>Latency</Table.Th>
+                      <Table.Th>Detail</Table.Th>
+                    </Table.Tr>
+                  </Table.Thead>
+                  <Table.Tbody>
+                    {detailRun.checks.map((c, i) => (
+                      <Table.Tr key={i}>
+                        <Table.Td><Text size="xs">{c.name}</Text></Table.Td>
+                        <Table.Td><Badge size="xs" variant="light">{c.category}</Badge></Table.Td>
+                        <Table.Td>
+                          <Badge size="xs" color={CHECK_STATUS_COLORS[c.status] || 'gray'}>{c.status}</Badge>
+                        </Table.Td>
+                        <Table.Td><Text size="xs" c="dimmed">{c.latencyMs}ms</Text></Table.Td>
+                        <Table.Td><Text size="xs" lineClamp={2}>{c.detail}</Text></Table.Td>
+                      </Table.Tr>
+                    ))}
+                  </Table.Tbody>
+                </Table>
+              </>
+            )}
+
+            {/* Action buttons */}
+            <Group justify="flex-end" mt="sm">
+              {(detailRun.status === 'running' || detailRun.status === 'queued') && (
+                <Button size="xs" variant="light" onClick={() => refreshRun(detailRun.runId)}>
+                  Refresh
+                </Button>
+              )}
+              {detailRun.checks && detailRun.checks.length > 0 && (
+                <Button size="xs" variant="subtle" onClick={() => copyForClaude(detailRun)}>
+                  Copy for Claude
+                </Button>
+              )}
+            </Group>
           </Stack>
         )}
       </Modal>

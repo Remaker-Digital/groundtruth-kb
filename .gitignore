@@ -223,3 +223,9 @@ tools/knowledge-db/knowledge.db.backup-*
 
 # Codex auto-generated dependencies (local only)
 .codex_pydeps/
+
+# MCP server config (machine-specific paths)
+.mcp.json
+
+# Storybook build output
+widget/storybook-static/

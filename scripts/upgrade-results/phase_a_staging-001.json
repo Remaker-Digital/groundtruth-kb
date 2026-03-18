@@ -1,18 +1,18 @@
 {
-  "A1_version": "1.90.0",
+  "A1_version": "1.92.0",
   "A2_status": "active",
   "A3_activation": {
-    "is_active": false,
-    "is_configured": false,
-    "has_pending_changes": true,
-    "active_version": 0
+    "is_active": true,
+    "is_configured": true,
+    "has_pending_changes": false,
+    "active_version": 2
   },
   "A4_conversation_count": 0,
   "A5_status_breakdown": {
     "http_status": 404,
     "note": "analytics may need params"
   },
-  "A6_kb_count": 216,
+  "A6_kb_count": 240,
   "A7_team_count": 4,
   "A8_team_members": [
     {
@@ -42,5 +42,5 @@
     "tier",
     "version"
   ],
-  "A11_widget_key_exists": false
+  "A11_widget_key_exists": true
 }

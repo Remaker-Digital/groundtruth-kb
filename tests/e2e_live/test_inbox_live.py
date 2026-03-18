@@ -237,9 +237,11 @@ class TestSearchAndFilters:
         all_match = re.search(r'All\s*\((\d+)\)', text_before)
         all_count = int(all_match.group(1)) if all_match else -1
 
-        # Click Active tab
-        active_tab = shared_inbox_page.locator("text=/Active/i").first
-        active_tab.click()
+        # Click Active tab — Mantine SegmentedControl renders as label elements
+        active_tab = shared_inbox_page.locator(
+            "label:has-text('Active'), [data-value='active'], text=/Active/i"
+        ).first
+        active_tab.click(timeout=10_000)
         shared_inbox_page.wait_for_timeout(1500)
 
         text_after = _text(shared_inbox_page)
@@ -260,8 +262,10 @@ class TestSearchAndFilters:
         """[EL-inbox-005/E1] Clicking Esc tab shows escalated conversations."""
         if _is_rate_limited(shared_inbox_page):
             pytest.skip("Rate-limited by API")
-        esc_tab = shared_inbox_page.locator("text=/Esc/i").first
-        esc_tab.click()
+        esc_tab = shared_inbox_page.locator(
+            "label:has-text('Esc'), [data-value='escalated'], text=/Esc/i"
+        ).first
+        esc_tab.click(timeout=10_000)
         shared_inbox_page.wait_for_timeout(1500)
 
         text = _text(shared_inbox_page)
@@ -272,7 +276,9 @@ class TestSearchAndFilters:
             "Esc tab click did not show escalated conversations or empty state"
         )
         # Restore to All tab
-        shared_inbox_page.locator("text=/All/i").first.click()
+        shared_inbox_page.locator(
+            "label:has-text('All'), [data-value='all'], text=/All/i"
+        ).first.click(timeout=10_000)
         shared_inbox_page.wait_for_timeout(1000)
 
     # E1: Click Resolved filter tab
@@ -280,8 +286,10 @@ class TestSearchAndFilters:
         """[EL-inbox-006/E1] Clicking Resolved tab shows resolved conversations."""
         if _is_rate_limited(shared_inbox_page):
             pytest.skip("Rate-limited by API")
-        resolved_tab = shared_inbox_page.locator("text=/Resolved/i").first
-        resolved_tab.click()
+        resolved_tab = shared_inbox_page.locator(
+            "label:has-text('Resolved'), [data-value='resolved'], text=/Resolved/i"
+        ).first
+        resolved_tab.click(timeout=10_000)
         shared_inbox_page.wait_for_timeout(1500)
 
         text = _text(shared_inbox_page)
@@ -292,7 +300,9 @@ class TestSearchAndFilters:
             "Resolved tab click did not show resolved conversations or empty state"
         )
         # Restore to All tab
-        shared_inbox_page.locator("text=/All/i").first.click()
+        shared_inbox_page.locator(
+            "label:has-text('All'), [data-value='all'], text=/All/i"
+        ).first.click(timeout=10_000)
         shared_inbox_page.wait_for_timeout(1000)
 
     # E1: Click Archived filter tab
@@ -300,8 +310,10 @@ class TestSearchAndFilters:
         """[EL-inbox-007/E1] Clicking Archived tab loads archived conversations."""
         if _is_rate_limited(shared_inbox_page):
             pytest.skip("Rate-limited by API")
-        archived_tab = shared_inbox_page.locator("text=/Archived/i").first
-        archived_tab.click()
+        archived_tab = shared_inbox_page.locator(
+            "label:has-text('Archived'), [data-value='archived'], text=/Archived/i"
+        ).first
+        archived_tab.click(timeout=10_000)
         # Archived tab makes a separate API call — wait longer
         shared_inbox_page.wait_for_timeout(2500)
 
@@ -312,7 +324,9 @@ class TestSearchAndFilters:
             "Archived tab click did not load archived conversations or show empty state"
         )
         # Restore to All tab
-        shared_inbox_page.locator("text=/All/i").first.click()
+        shared_inbox_page.locator(
+            "label:has-text('All'), [data-value='all'], text=/All/i"
+        ).first.click(timeout=10_000)
         shared_inbox_page.wait_for_timeout(1000)
 
     # E1: Click All tab restores full list
@@ -324,10 +338,14 @@ class TestSearchAndFilters:
         text_before = _text(shared_inbox_page)
         count_before = len(re.findall(r'\d+\s*messages?', text_before))
 
-        # Switch to Active then back to All
-        shared_inbox_page.locator("text=/Active/i").first.click()
+        # Switch to Active then back to All — Mantine SegmentedControl
+        shared_inbox_page.locator(
+            "label:has-text('Active'), [data-value='active'], text=/Active/i"
+        ).first.click(timeout=10_000)
         shared_inbox_page.wait_for_timeout(1500)
-        shared_inbox_page.locator("text=/All/i").first.click()
+        shared_inbox_page.locator(
+            "label:has-text('All'), [data-value='all'], text=/All/i"
+        ).first.click(timeout=10_000)
         shared_inbox_page.wait_for_timeout(1500)
 
         text_after = _text(shared_inbox_page)
@@ -1014,8 +1032,12 @@ class TestConversationActions:
             "escalated": "Esc",
         }
         tab_label = tab_map.get(status, status.title())
-        tab = page.locator(f"text=/{tab_label}/i").first
-        tab.click()
+        tab = page.locator(
+            f"label:has-text('{tab_label}'), "
+            f"[data-value='{status}'], "
+            f"text=/{tab_label}/i"
+        ).first
+        tab.click(timeout=10_000)
         page.wait_for_timeout(2000)
 
         # Try to select the first conversation in this filtered view
@@ -1023,7 +1045,9 @@ class TestConversationActions:
 
     def _restore_all_tab(self, page: Page):
         """Switch back to the All tab."""
-        page.locator("text=/All/i").first.click()
+        page.locator(
+            "label:has-text('All'), [data-value='all'], text=/All/i"
+        ).first.click(timeout=10_000)
         page.wait_for_timeout(1000)
 
     # E1: Resolve an active conversation

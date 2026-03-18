@@ -233,7 +233,11 @@ def _get_platform_repo():
 _TEST_RUN_CONFIG_TYPE = "test_runs"
 
 VALID_ENVIRONMENTS = {"staging", "production"}
-VALID_SUITES = {"all", "regression", "smoke", "e2e", "unit"}
+VALID_SUITES = {"all", "regression", "smoke", "e2e"}  # SPEC-1846: no "unit" in-container
+
+# SPEC-1846: Track active verification runs (one at a time)
+_active_runs: dict[str, asyncio.Task] = {}
+_STALE_RUN_TIMEOUT_S = 1800  # 30 minutes
 
 
 class PipelineRunRequest(CamelCaseModel):
@@ -268,12 +272,14 @@ class PipelineRunStatusResponse(CamelCaseModel):
     completed_at: str | None = None
     triggered_by: str = ""
     total_tests: int = 0
+    completed: int = 0  # SPEC-1846: for progress bar (completed/total_tests)
     passed: int = 0
     failed: int = 0
     skipped: int = 0
     duration_s: float | None = None
     failures: list[dict[str, Any]] = Field(default_factory=list)
     phases_run: list[str] = Field(default_factory=list)
+    checks: list[dict[str, Any]] = Field(default_factory=list, description="Full check results (SPEC-1846)")
 
 
 class PipelineRunTriggerResponse(CamelCaseModel):
@@ -372,20 +378,31 @@ async def trigger_test_run(
             message="Dry run: configuration validated, no probes executed",
         )
 
-    # SPEC-1846: Execute live environment probes
-    start_time = time.monotonic()
-    probe_results = await run_environment_probes()
-    duration_s = time.monotonic() - start_time
+    # SPEC-1846: Check for concurrent runs (only one at a time)
+    active = {k: t for k, t in _active_runs.items() if not t.done()}
+    if active:
+        raise HTTPException(
+            status_code=409,
+            detail=f"A verification run is already in progress: {list(active.keys())[0]}",
+        )
 
-    passed = sum(1 for p in probe_results if p.passed)
-    failed = sum(1 for p in probe_results if not p.passed)
-    total = len(probe_results)
-    status = "passed" if failed == 0 else "failed"
-    completed_iso = datetime.now(timezone.utc).isoformat()
+    # SPEC-1845: Resolve FQDN from runtime config (never hardcoded)
+    fqdn = _resolve_fqdn(body.environment)
+    if not fqdn:
+        raise HTTPException(
+            status_code=500,
+            detail=f"Cannot resolve FQDN for environment '{body.environment}'",
+        )
 
-    failures = [p.to_dict() for p in probe_results if not p.passed]
+    # SPEC-1845: SPA key from the authenticated request context
+    spa_key = ctx.api_key or ""
+    if not spa_key:
+        raise HTTPException(
+            status_code=500,
+            detail="SPA API key not available from request context",
+        )
 
-    # Store run record in Cosmos
+    # Store initial "queued" status
     repo = _get_platform_repo()
     run_doc = PlatformConfigDocument(
         id=f"{_TEST_RUN_CONFIG_TYPE}:{run_id}",
@@ -395,62 +412,210 @@ async def trigger_test_run(
             "run_id": run_id,
             "environment": body.environment,
             "suite": body.suite,
-            "phases": body.phases,
             "dry_run": False,
-            "status": status,
+            "status": "queued",
             "triggered_by": actor,
             "started_at": now_iso,
-            "completed_at": completed_iso,
-            "total_tests": total,
-            "passed": passed,
-            "failed": failed,
+            "completed_at": None,
+            "total_tests": 0,
+            "completed": 0,
+            "passed": 0,
+            "failed": 0,
             "skipped": 0,
-            "duration_s": round(duration_s, 2),
-            "failures": failures,
-            "phases_run": ["environment_probes"],
-            "probe_results": [p.to_dict() for p in probe_results],
+            "duration_s": 0.0,
+            "failures": [],
+            "phases_run": [],
+            "checks": [],
         },
         version=1,
-        updated_at=completed_iso,
+        updated_at=now_iso,
         updated_by=actor,
     )
     await repo.set_config(run_doc)
 
-    # Audit log
-    try:
-        from src.multi_tenant.repositories.platform import AuditLogRepository
-        audit = AuditLogRepository()
-        await audit.log_event(
-            event_type=AuditEventType.CONFIG_CHANGE,
-            tenant_id="__platform__",
-            actor=actor,
-            actor_type="admin",
-            payload={
-                "action": "test_run_completed",
-                "run_id": run_id,
-                "environment": body.environment,
-                "suite": body.suite,
-                "status": status,
-                "passed": passed,
-                "failed": failed,
-                "duration_s": round(duration_s, 2),
-            },
-        )
-    except Exception:
-        logger.warning("Audit log failed for test run", exc_info=True)
+    # SPEC-1846: Fire background verification task
+    task = asyncio.create_task(
+        _run_verification_background(run_id, body.environment, body.suite, fqdn, spa_key, actor)
+    )
+    _active_runs[run_id] = task
 
     logger.info(
-        "Test run completed: %s env=%s %s (%d/%d passed, %.1fs) by %s",
-        run_id, body.environment, status, passed, total, duration_s, actor,
+        "Verification run queued: %s env=%s suite=%s by %s",
+        run_id, body.environment, body.suite, actor,
     )
 
     return PipelineRunTriggerResponse(
         run_id=run_id,
         environment=body.environment,
         suite=body.suite,
-        status=status,
-        message=f"Environment probes: {passed}/{total} passed ({round(duration_s, 1)}s)",
+        status="queued",
+        message=f"Verification run queued — poll /tests/{run_id}/status for progress",
     )
+
+
+async def _run_verification_background(
+    run_id: str, environment: str, suite: str, fqdn: str, spa_key: str, actor: str,
+) -> None:
+    """Background coroutine that runs the VerificationRunner (SPEC-1846).
+
+    Updates Cosmos progressively. On unexpected failure, marks run as 'error'.
+    Cleans up _active_runs when done.
+    """
+    try:
+        from src.multi_tenant.verification_runner import VerificationRunner
+        repo = _get_platform_repo()
+        runner = VerificationRunner(
+            run_id=run_id,
+            environment=environment,
+            fqdn=fqdn,
+            spa_api_key=spa_key,
+            suite=suite,
+            cosmos_repo=repo,
+            actor=actor,
+        )
+        results = await runner.run()
+
+        # Audit log
+        passed = sum(1 for r in results if r.status == "pass")
+        failed = sum(1 for r in results if r.status in ("fail", "error"))
+        try:
+            from src.multi_tenant.repositories.platform import AuditLogRepository
+            audit = AuditLogRepository()
+            await audit.log_event(
+                event_type=AuditEventType.CONFIG_CHANGE,
+                tenant_id="__platform__",
+                actor=actor,
+                actor_type="admin",
+                payload={
+                    "action": "test_run_completed",
+                    "run_id": run_id,
+                    "environment": environment,
+                    "suite": suite,
+                    "status": "passed" if failed == 0 else "failed",
+                    "passed": passed,
+                    "failed": failed,
+                },
+            )
+        except Exception:
+            logger.warning("Audit log failed for run %s", run_id, exc_info=True)
+
+    except Exception as exc:
+        logger.error("Verification run %s failed: %s", run_id, exc, exc_info=True)
+        # Mark run as error in Cosmos
+        try:
+            repo = _get_platform_repo()
+            now_iso = datetime.now(timezone.utc).isoformat()
+            error_doc = PlatformConfigDocument(
+                id=f"{_TEST_RUN_CONFIG_TYPE}:{run_id}",
+                config_type=_TEST_RUN_CONFIG_TYPE,
+                config_key=run_id,
+                value={
+                    "run_id": run_id,
+                    "environment": environment,
+                    "suite": suite,
+                    "status": "error",
+                    "triggered_by": actor,
+                    "completed_at": now_iso,
+                    "total_tests": 0,
+                    "completed": 0,
+                    "passed": 0,
+                    "failed": 0,
+                    "skipped": 0,
+                    "duration_s": 0.0,
+                    "failures": [{"name": "runner", "detail": str(exc)[:500]}],
+                    "phases_run": [],
+                    "checks": [],
+                },
+                version=1,
+                updated_at=now_iso,
+                updated_by=actor,
+            )
+            await repo.set_config(error_doc)
+        except Exception:
+            logger.error("Failed to store error state for run %s", run_id, exc_info=True)
+    finally:
+        _active_runs.pop(run_id, None)
+
+
+def _resolve_fqdn(environment: str) -> str:
+    """Resolve the FQDN for a target environment (SPEC-1845: runtime only).
+
+    Resolution order:
+    1. CONTAINER_APP_FQDN env var (for self-environment)
+    2. Environment-specific env vars (STAGING_FQDN, PRODUCTION_FQDN)
+    3. Well-known FQDN from platform config
+    """
+    import os
+    current_env = os.environ.get("ENVIRONMENT", "development")
+
+    # Self-environment: use the container's own FQDN
+    if environment == current_env:
+        fqdn = os.environ.get("CONTAINER_APP_FQDN", "")
+        if fqdn:
+            return fqdn
+
+    # Environment-specific env vars
+    env_key = f"{environment.upper()}_FQDN"
+    fqdn = os.environ.get(env_key, "")
+    if fqdn:
+        return fqdn
+
+    # Fallback: well-known FQDN (logged as warning per SPEC-1845)
+    known_fqdns = {
+        "staging": os.environ.get(
+            "API_GATEWAY_FQDN",
+            "agent-red-api-gateway.orangeglacier-f566a4e7.eastus.azurecontainerapps.io",
+        ),
+        "production": os.environ.get(
+            "API_GATEWAY_FQDN",
+            "agent-red-api-gateway.orangeglacier-f566a4e7.eastus.azurecontainerapps.io",
+        ),
+    }
+    fqdn = known_fqdns.get(environment, "")
+    if fqdn:
+        logger.warning(
+            "Using fallback FQDN for %s: %s (set %s env var for explicit config)",
+            environment, fqdn, env_key,
+        )
+    return fqdn
+
+
+@router.get(
+    "/tests/{run_id}/checks",
+    summary="Get detailed check results for a test run (SPEC-1846)",
+    description="Returns the full list of verification checks with optional filtering.",
+    responses={404: {"description": "Test run not found"}},
+    status_code=200,
+)
+async def get_test_run_checks(
+    run_id: str,
+    status: str | None = Query(None, description="Filter by check status: pass, fail, skip, error"),
+    category: str | None = Query(None, description="Filter by category: health, api, config, security, etc."),
+) -> dict[str, Any]:
+    """Return detailed check results for Claude diagnosis (SPEC-1846)."""
+    repo = _get_platform_repo()
+    doc = await repo.get_config(_TEST_RUN_CONFIG_TYPE, run_id)
+    if doc is None:
+        raise HTTPException(status_code=404, detail=f"Test run '{run_id}' not found")
+
+    value = doc.get("value", {})
+    checks = value.get("checks", [])
+
+    # Apply filters
+    if status:
+        checks = [c for c in checks if c.get("status") == status]
+    if category:
+        checks = [c for c in checks if c.get("category") == category]
+
+    return {
+        "run_id": run_id,
+        "environment": value.get("environment", ""),
+        "suite": value.get("suite", ""),
+        "status": value.get("status", "unknown"),
+        "total_checks": len(value.get("checks", [])),
+        "filtered_count": len(checks),
+        "checks": checks,
+    }
 
 
 @router.get(
@@ -536,21 +701,41 @@ async def get_test_run_status(run_id: str) -> PipelineRunStatusResponse:
         )
 
     value = doc.get("value", {})
+
+    # SPEC-1846: Detect stale runs (stuck in "running" > 30min)
+    run_status = value.get("status", "unknown")
+    if run_status == "running":
+        started = value.get("started_at", "")
+        if started:
+            try:
+                started_dt = datetime.fromisoformat(started)
+                elapsed = (datetime.now(timezone.utc) - started_dt).total_seconds()
+                if elapsed > _STALE_RUN_TIMEOUT_S:
+                    run_status = "error"
+                    value["status"] = "error"
+                    value["failures"] = value.get("failures", []) + [
+                        {"name": "stale_run", "detail": f"Run exceeded {_STALE_RUN_TIMEOUT_S}s timeout"}
+                    ]
+            except Exception:
+                pass
+
     return PipelineRunStatusResponse(
         run_id=value.get("run_id", run_id),
         environment=value.get("environment", ""),
         suite=value.get("suite", ""),
-        status=value.get("status", "unknown"),
+        status=run_status,
         started_at=value.get("started_at"),
         completed_at=value.get("completed_at"),
         triggered_by=value.get("triggered_by", ""),
         total_tests=value.get("total_tests", 0),
+        completed=value.get("completed", 0),
         passed=value.get("passed", 0),
         failed=value.get("failed", 0),
         skipped=value.get("skipped", 0),
         duration_s=value.get("duration_s"),
         failures=value.get("failures", []),
         phases_run=value.get("phases_run", []),
+        checks=value.get("checks", []),
     )
 
 

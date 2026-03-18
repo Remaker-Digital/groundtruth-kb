@@ -1,11 +1,7 @@
 Method,Name,Error,Occurrences
-GET,/api/dashboard/usage/daily,HTTPError('401 Client Error: Unauthorized for url: /api/dashboard/usage/daily'),16
-GET,/api/dashboard/usage,CatchResponseError('Dashboard failed: 401'),40
-GET,/api/analytics/intents,HTTPError('401 Client Error: Unauthorized for url: /api/analytics/intents'),14
-GET,/api/audit [recent],HTTPError('401 Client Error: Unauthorized for url: /api/audit [recent]'),10
-GET,/api/admin/knowledge [list],HTTPError('401 Client Error: Unauthorized for url: /api/admin/knowledge [list]'),16
-GET,/api/analytics/summary,HTTPError('401 Client Error: Unauthorized for url: /api/analytics/summary'),19
-POST,/api/chat/conversations [start],CatchResponseError('Start failed: 401'),35
-GET,/api/config [get],HTTPError('401 Client Error: Unauthorized for url: /api/config [get]'),17
-GET,/api/admin/team [list],HTTPError('401 Client Error: Unauthorized for url: /api/admin/team [list]'),13
-GET,/api/admin/conversations [list],HTTPError('401 Client Error: Unauthorized for url: /api/admin/conversations [list]'),27
+GET,/api/chat/conversations/{id} [state],CatchResponseError('State failed: 429'),3
+GET,/api/analytics/summary,HTTPError('429 Client Error: Too Many Requests for url: /api/analytics/summary'),1
+POST,/api/chat/conversations [start],CatchResponseError('Start failed: 429'),3
+POST,/api/chat/conversations/{id}/end [end],CatchResponseError('End failed: 429'),1
+GET,/api/config [get],HTTPError('429 Client Error: Too Many Requests for url: /api/config [get]'),1
+POST,/api/chat/message [send],CatchResponseError('Message failed: 429'),4
