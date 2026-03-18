@@ -1,11 +1,12 @@
 /**
- * PipelineObservatory -- Pipeline Observatory page (SPEC-1585..1587).
+ * PipelineObservatory -- Pipeline Observatory page (SPEC-1585..1587, SPEC-1786).
  *
- * Three tabs: Traffic Flow, Agent Metrics, Tenant Comparison.
- * Visualizes the 7-agent pipeline health and performance.
+ * Four tabs: Infrastructure, Traffic Flow, Agent Metrics, Tenant Comparison.
+ * Visualizes the full system topology, 7-agent pipeline health, and performance.
  *
  * APIs:
  *   GET /api/superadmin/pipeline/topology
+ *   GET /api/superadmin/pipeline/infrastructure
  *   GET /api/superadmin/pipeline/agents/{agent}/metrics
  *   GET /api/superadmin/pipeline/tenants
  *   GET /api/superadmin/pipeline/tenants/{id}/metrics
@@ -87,6 +88,34 @@ interface TenantComparisonResponse {
   total: number;
   sortBy: string;
   sortOrder: string;
+}
+
+// Infrastructure Topology types (SPEC-1786)
+interface InfraNode {
+  nodeId: string;
+  label: string;
+  category: string; // "agent" | "azure" | "ingress" | "egress"
+  nodeType: string;
+  status: string;
+  metrics: Record<string, number>;
+  position: { x: number; y: number };
+}
+
+interface InfraEdge {
+  source: string;
+  target: string;
+  label: string;
+  volume: number;
+  avgLatencyMs: number;
+  errorRate: number;
+  protocol: string;
+}
+
+interface InfraTopologyResponse {
+  nodes: InfraNode[];
+  edges: InfraEdge[];
+  period: string;
+  totalRequests: number;
 }
 
 // ---------------------------------------------------------------------------
@@ -507,6 +536,231 @@ function TenantComparisonTab() {
 }
 
 // ---------------------------------------------------------------------------
+// Infrastructure Topology Tab (SPEC-1786)
+// ---------------------------------------------------------------------------
+
+const CATEGORY_COLORS: Record<string, string> = {
+  agent: 'blue',
+  azure: 'cyan',
+  ingress: 'green',
+  egress: 'orange',
+};
+
+const STATUS_INDICATOR: Record<string, string> = {
+  healthy: tokens.success,
+  degraded: tokens.warning,
+  error: tokens.danger,
+};
+
+const NODE_TYPE_LABELS: Record<string, string> = {
+  'container-app': 'Container App',
+  'cosmos-db': 'Cosmos DB',
+  redis: 'Redis Cache',
+  openai: 'Azure OpenAI',
+  nats: 'NATS JetStream',
+  'key-vault': 'Key Vault',
+  cdn: 'CDN',
+  webhook: 'Webhook',
+  widget: 'Chat Widget',
+  spa: 'SPA Console',
+  'embedded-app': 'Embedded App',
+};
+
+function InfrastructureTab() {
+  const { apiFetch, onNotify } = useProviderContext();
+  const [data, setData] = useState<InfraTopologyResponse | null>(null);
+  const [loading, setLoading] = useState(true);
+  const [period, setPeriod] = useState('24h');
+
+  const loadData = useCallback(async () => {
+    setLoading(true);
+    try {
+      const res = await apiFetch(
+        `/api/superadmin/pipeline/infrastructure?period=${period}`
+      );
+      if (res.ok) setData(await res.json());
+      else onNotify('Failed to load infrastructure topology', 'error');
+    } catch {
+      onNotify('Network error loading infrastructure', 'error');
+    } finally {
+      setLoading(false);
+    }
+  }, [apiFetch, onNotify, period]);
+
+  useEffect(() => { loadData(); }, [loadData]);
+
+  if (loading) return <LoadingState text="Loading infrastructure topology" />;
+  if (!data) return <Text c="dimmed" ta="center">Unable to load infrastructure</Text>;
+
+  // Group nodes by layer (y position)
+  const layers = new Map<number, InfraNode[]>();
+  for (const node of data.nodes) {
+    const y = node.position?.y ?? 0;
+    if (!layers.has(y)) layers.set(y, []);
+    layers.get(y)!.push(node);
+  }
+  const sortedLayers = [...layers.entries()].sort(([a], [b]) => a - b);
+
+  const layerLabels: Record<number, string> = {
+    0: 'Ingress Points',
+    1: 'API Gateway',
+    2: 'Pipeline Agents (Tier 1)',
+    3: 'Pipeline Agents (Tier 2)',
+    4: 'Infrastructure Services',
+    5: 'Content Delivery',
+  };
+
+  return (
+    <Stack gap="lg">
+      <Group gap="md">
+        <Select
+          label="Time Range"
+          data={[
+            { value: '1h', label: 'Last Hour' },
+            { value: '24h', label: 'Last 24 Hours' },
+            { value: '7d', label: 'Last 7 Days' },
+            { value: '30d', label: 'Last 30 Days' },
+          ]}
+          value={period}
+          onChange={(val) => setPeriod(val || '24h')}
+          style={{ width: 180 }}
+        />
+        <Card withBorder padding="sm" radius="md" bg={tokens.surface} mt="auto">
+          <Text size="xs" c="dimmed" tt="uppercase" fw={600}>Total Requests</Text>
+          <Text fw={700} size="lg" c={tokens.textPrimary}>{data.totalRequests}</Text>
+        </Card>
+      </Group>
+
+      {/* Topology layers */}
+      {sortedLayers.map(([y, layerNodes]) => (
+        <div key={y}>
+          <Text size="sm" fw={600} c={tokens.textSecondary} mb="xs">
+            {layerLabels[y] ?? `Layer ${y}`}
+          </Text>
+          <SimpleGrid
+            cols={{ base: 1, sm: 2, md: Math.min(layerNodes.length, 5) }}
+            spacing="sm"
+          >
+            {layerNodes.map((node) => {
+              const statusColor = STATUS_INDICATOR[node.status] ?? tokens.textMuted;
+              const catColor = CATEGORY_COLORS[node.category] ?? 'gray';
+              return (
+                <Card
+                  key={node.nodeId}
+                  withBorder
+                  padding="sm"
+                  radius="md"
+                  bg={tokens.surface}
+                  style={{ borderLeft: `3px solid ${statusColor}` }}
+                >
+                  <Group gap="xs" mb="xs">
+                    <Badge variant="filled" color={catColor} size="xs">
+                      {node.category}
+                    </Badge>
+                    <Text size="sm" fw={600} c={tokens.textPrimary}>
+                      {node.label}
+                    </Text>
+                    <Tooltip label={`Status: ${node.status}`}>
+                      <div style={{
+                        width: 8,
+                        height: 8,
+                        borderRadius: '50%',
+                        backgroundColor: statusColor,
+                      }} />
+                    </Tooltip>
+                  </Group>
+                  <Text size="xs" c="dimmed">
+                    {NODE_TYPE_LABELS[node.nodeType] ?? node.nodeType}
+                  </Text>
+                  {node.metrics && Object.keys(node.metrics).length > 0 && (
+                    <Group gap="md" mt="xs">
+                      {node.metrics.invocation_count != null && (
+                        <div>
+                          <Text size="xs" c="dimmed">Invocations</Text>
+                          <Text size="xs" fw={500}>{node.metrics.invocation_count}</Text>
+                        </div>
+                      )}
+                      {node.metrics.avg_latency_ms != null && (
+                        <div>
+                          <Text size="xs" c="dimmed">Avg Latency</Text>
+                          <Text size="xs" fw={500}>
+                            {formatLatency(node.metrics.avg_latency_ms)}
+                          </Text>
+                        </div>
+                      )}
+                      {node.metrics.error_rate != null && (
+                        <div>
+                          <Text size="xs" c="dimmed">Error Rate</Text>
+                          <Text
+                            size="xs"
+                            fw={500}
+                            c={node.metrics.error_rate > 0.05 ? tokens.danger : undefined}
+                          >
+                            {(node.metrics.error_rate * 100).toFixed(1)}%
+                          </Text>
+                        </div>
+                      )}
+                    </Group>
+                  )}
+                </Card>
+              );
+            })}
+          </SimpleGrid>
+        </div>
+      ))}
+
+      {/* Edge flow table */}
+      <Paper withBorder radius="md" bg={tokens.surface} style={{ overflow: 'auto' }}>
+        <Text size="sm" fw={500} c={tokens.textSecondary} p="md" pb={0}>
+          Traffic Flow Connections
+        </Text>
+        <Table striped highlightOnHover>
+          <Table.Thead>
+            <Table.Tr>
+              <Table.Th>Source</Table.Th>
+              <Table.Th>Target</Table.Th>
+              <Table.Th>Protocol</Table.Th>
+              <Table.Th>Label</Table.Th>
+              <Table.Th>Volume</Table.Th>
+              <Table.Th>Avg Latency</Table.Th>
+              <Table.Th>Error Rate</Table.Th>
+            </Table.Tr>
+          </Table.Thead>
+          <Table.Tbody>
+            {data.edges.map((edge, i) => (
+              <Table.Tr key={i}>
+                <Table.Td><Text size="xs" c={tokens.textSecondary}>{edge.source}</Text></Table.Td>
+                <Table.Td><Text size="xs" c={tokens.textSecondary}>{edge.target}</Text></Table.Td>
+                <Table.Td><Badge variant="light" size="xs">{edge.protocol}</Badge></Table.Td>
+                <Table.Td><Text size="xs" c="dimmed">{edge.label}</Text></Table.Td>
+                <Table.Td>
+                  <Text size="xs" fw={500} c={tokens.textPrimary}>
+                    {edge.volume > 0 ? edge.volume.toLocaleString() : '\u2014'}
+                  </Text>
+                </Table.Td>
+                <Table.Td>
+                  <Text size="xs" c={tokens.textSecondary}>
+                    {edge.avgLatencyMs > 0 ? formatLatency(edge.avgLatencyMs) : '\u2014'}
+                  </Text>
+                </Table.Td>
+                <Table.Td>
+                  <Text
+                    size="xs"
+                    c={edge.errorRate > 0.05 ? tokens.danger : tokens.textMuted}
+                  >
+                    {edge.errorRate > 0 ? `${(edge.errorRate * 100).toFixed(1)}%` : '\u2014'}
+                  </Text>
+                </Table.Td>
+              </Table.Tr>
+            ))}
+          </Table.Tbody>
+        </Table>
+      </Paper>
+    </Stack>
+  );
+}
+
+// ---------------------------------------------------------------------------
 // Main Page Component
 // ---------------------------------------------------------------------------
 
@@ -515,16 +769,20 @@ export function PipelineObservatoryPage() {
     <Stack gap="lg">
       <Group gap="xs">
         <Title order={3} c={tokens.textPrimary}>Pipeline Observatory</Title>
-        <HelpTooltip text="Monitor the 7-agent AI pipeline performance across all tenants. View traffic flow, per-agent metrics, and tenant-level comparisons." />
+        <HelpTooltip text="Monitor the full system infrastructure and 7-agent AI pipeline performance across all tenants." />
       </Group>
 
-      <Tabs defaultValue="traffic" variant="outline">
+      <Tabs defaultValue="infrastructure" variant="outline">
         <Tabs.List>
+          <Tabs.Tab value="infrastructure">Infrastructure</Tabs.Tab>
           <Tabs.Tab value="traffic">Traffic Flow</Tabs.Tab>
           <Tabs.Tab value="agents">Agent Metrics</Tabs.Tab>
           <Tabs.Tab value="tenants">Tenant Comparison</Tabs.Tab>
         </Tabs.List>
 
+        <Tabs.Panel value="infrastructure" pt="md">
+          <InfrastructureTab />
+        </Tabs.Panel>
         <Tabs.Panel value="traffic" pt="md">
           <TrafficFlowTab />
         </Tabs.Panel>

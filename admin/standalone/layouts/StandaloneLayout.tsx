@@ -160,6 +160,7 @@ const configGroupItems: NavPage[] = [
 
 /** Nav items rendered AFTER the configuration group. */
 const navItemsAfter: NavPage[] = [
+  { path: '/ab-testing', label: 'A/B Testing', icon: 'analytics', roles: ['superadmin', 'admin'] },
   { path: '/integrations', label: 'Integrations', icon: 'integrations', roles: ['superadmin', 'admin'] },
   { path: '/memory-privacy', label: 'Memory & privacy', icon: 'memory', roles: ['superadmin', 'admin'] },
   { path: '/billing', label: 'Account & billing', icon: 'billing', roles: ['superadmin', 'admin'] },

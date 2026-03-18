@@ -133,6 +133,7 @@ export interface WidgetConfig {
   widget_border_radius?: number | null;
   widget_launcher_size?: number | null;
   widget_launcher_icon?: 'chat' | 'headset' | 'help' | 'custom' | null;
+  widget_launcher_image_url?: string | null;  // SPEC-0245: custom launcher image URL
   widget_header_title?: string | null;
   widget_header_subtitle?: string | null;
   widget_agent_bubble_color?: string | null;

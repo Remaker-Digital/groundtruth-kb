@@ -172,16 +172,23 @@ INTERVAL = os.environ.get("SEED_INTERVAL", "month")
 
 FQDN = os.environ.get("SEED_FQDN", "agent-red-api-gateway.orangeglacier-f566a4e7.eastus.azurecontainerapps.io")
 
-# Team members to create — ONLY the superadmin.
-# A freshly provisioned tenant has exactly one team member: the owner
-# who is logging in for the first time. Additional team members
-# (escalation agents, admins, viewers) are added by the merchant
-# through the Admin UI after onboarding.
+# Team members to create during provisioning.
+# The superadmin is the platform operator's hidden safety-net account.
+# The customer admin (SPEC-0761) is the standard admin account handed off
+# to the customer email address — a different email from the superadmin.
+# Additional team members (escalation agents, viewers) are added by the
+# merchant through the Admin UI after onboarding.
 TEAM_MEMBERS = [
     {
         "email": "mike@remakerdigital.com",
         "display_name": "Owner",
         "role": "superadmin",
+        "escalation_categories": [],
+    },
+    {
+        "email": CUSTOMER_EMAIL,
+        "display_name": "Account Administrator",
+        "role": "admin",
         "escalation_categories": [],
     },
 ]
@@ -832,9 +839,33 @@ async def phase_6_platform_config(dry_run: bool) -> None:
 
         doc_count += 1
 
+    # --- Health sentinel document (SPEC-1833) ---
+    print("\n  [Health] Sentinel document:")
+    sentinel_doc = PlatformConfigDocument(
+        id="health_sentinel",
+        config_type="health_sentinel",
+        config_key="health_sentinel",
+        value={"status": "ok", "updated_at": now},
+        version=1,
+        updated_at=now,
+        updated_by="seed_tenant.py",
+    )
+    print("    health_sentinel — readiness probe target")
+
+    if not dry_run:
+        from src.multi_tenant.repository import PlatformConfigRepository
+        repo = PlatformConfigRepository()
+        try:
+            await repo.set_config(sentinel_doc)
+            print("      [OK] Upserted.")
+        except Exception as e:
+            print(f"      [ERROR] {e}")
+
+    doc_count += 1
+
     phase_results["6_platform_config"] = (
         f"{'DRY RUN' if dry_run else 'OK'} — {doc_count} platform config docs "
-        f"(4 legacy tier_defaults + {doc_count - 4} entitlement v1)"
+        f"(4 legacy tier_defaults + {doc_count - 5} entitlement v1 + 1 health sentinel)"
     )
 
 

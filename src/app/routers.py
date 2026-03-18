@@ -44,6 +44,7 @@ from src.multi_tenant.abuse_detection import router as abuse_router
 from src.multi_tenant.config_locking import router as config_lock_router
 from src.multi_tenant.cost_analytics import router as cost_router
 from src.multi_tenant.avatar_upload import router as avatar_router
+from src.multi_tenant.launcher_image_upload import router as launcher_image_router
 from src.multi_tenant.tier_upgrade import router as tier_upgrade_router
 from src.multi_tenant.addon_checkout import router as addon_checkout_router
 from src.multi_tenant.memory_dashboard import router as memory_dashboard_router
@@ -98,6 +99,7 @@ def register_routers(app: FastAPI) -> None:
     app.include_router(config_lock_router)
     app.include_router(cost_router)
     app.include_router(avatar_router)
+    app.include_router(launcher_image_router)
     app.include_router(tier_upgrade_router)
     app.include_router(addon_checkout_router)
     app.include_router(memory_dashboard_router)

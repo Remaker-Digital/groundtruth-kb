@@ -8,7 +8,7 @@ All implementation is in ``src/app/`` submodules — this file only wires
 them together and re-exports names that existing test code imports.
 
 Usage:
-    uvicorn src.main:app --host 0.0.0.0 --port 8080 --reload
+    uvicorn src.main:app --host 0.0.0.0 --port 8000 --reload
 
 © 2026 Remaker Digital, a DBA of VanDusen & Palmeter, LLC. All rights reserved.
 """

@@ -520,7 +520,10 @@ def configure_tracing(
         # That integration is added in the Terraform/deployment layer, not here.
 
     if exporter is not None:
-        provider.add_span_processor(BatchSpanProcessor(exporter))
+        # SPEC-1834 req 8: batch export interval 5 seconds (explicit, not default)
+        provider.add_span_processor(
+            BatchSpanProcessor(exporter, schedule_delay_millis=5000)
+        )
 
     # Set as global provider
     trace.set_tracer_provider(provider)

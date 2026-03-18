@@ -318,10 +318,26 @@ async def _startup_dashboard_services() -> None:
 
 
 async def _startup_tracing() -> None:
-    """Initialize OpenTelemetry tracing with tenant context injection."""
-    configure_tracing()
+    """Initialize OpenTelemetry tracing with tenant context injection.
+
+    Uses Application Insights exporter when APPLICATIONINSIGHTS_CONNECTION_STRING
+    is set (SPEC-1834). Falls back to console exporter otherwise.
+    """
+    from src.multi_tenant.otel_application_insights import (
+        configure_tracing_with_app_insights,
+    )
+
+    result = configure_tracing_with_app_insights()
     configure_tenant_logging()
-    logger.info("OpenTelemetry tenant-aware tracing configured")
+
+    if result["configured"]:
+        logger.info(
+            "OpenTelemetry tracing configured with Application Insights "
+            "(sampling_rate=%.2f)",
+            result["sampling_rate"],
+        )
+    else:
+        logger.info("OpenTelemetry tracing configured (console exporter)")
 
 
 async def _startup_circuit_breakers() -> None:
@@ -1245,6 +1261,21 @@ async def _startup_pipeline_observatory() -> None:
         logger.warning(
             "Pipeline Observatory initialization failed — "
             "observatory endpoints will return empty results."
+        )
+
+    # SPEC-1584: Wire PipelineMetricsAggregator with Cosmos client
+    try:
+        from src.multi_tenant.pipeline_metrics import configure_aggregator
+        from src.multi_tenant.cosmos_client import get_cosmos_manager
+
+        cosmos = get_cosmos_manager()
+        configure_aggregator(cosmos_client=cosmos, cache_ttl=60)
+        logger.info("Pipeline metrics aggregator configured")
+    except Exception:
+        logger.debug(
+            "Pipeline metrics aggregator not configured — "
+            "metrics will return zero values.",
+            exc_info=True,
         )
 
 

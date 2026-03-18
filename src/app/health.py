@@ -100,6 +100,15 @@ def register_health_endpoints(app: FastAPI) -> None:
         sem_cache = get_semantic_cache()
         result["semantic_cache"] = sem_cache.health()
 
+        # Cosmos DB readiness probe (SPEC-1833)
+        from src.multi_tenant.cosmos_readiness import check_cosmos_ready
+
+        try:
+            result["cosmos_db"] = await check_cosmos_ready()
+        except Exception as exc:
+            logger.warning("Cosmos readiness check failed: %s", exc)
+            result["cosmos_db"] = {"status": "unhealthy", "error": str(exc)}
+
         # AGNTCY SDK / SLIM transport health (SPEC-1524, SPEC-1780)
         from src.multi_tenant.agntcy_sdk_integration import get_sdk_status
 

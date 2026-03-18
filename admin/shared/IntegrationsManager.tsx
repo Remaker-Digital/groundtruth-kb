@@ -12,7 +12,7 @@
  */
 
 import React, { useCallback, useState } from 'react';
-import type { BaseComponentProps, IntegrationSummary } from './types/index';
+import type { BaseComponentProps, IntegrationSummary, SyncEvent, ActionConfigItem, ConnectionLogEntry } from './types/index';
 import {
   useIntegrations,
   useActivateIntegration,
@@ -367,10 +367,239 @@ const IntegrationCard: React.FC<IntegrationCardProps & {
             onStatusChange={onRefetch}
           />
         )}
+
+        {/* SPEC-1772: Sync stats for connected integrations */}
+        {integration.enabled && integration.status === 'connected' && (
+          <div style={{
+            marginTop: 8,
+            padding: '8px 12px',
+            background: tokens.page,
+            borderRadius: 6,
+            border: `1px solid ${tokens.border}`,
+            fontSize: 12,
+            color: tokens.textTertiary,
+            display: 'flex',
+            gap: 16,
+            alignItems: 'center',
+            flexWrap: 'wrap',
+          }}>
+            {integration.lastSyncAt && (
+              <span>Last sync: {new Date(integration.lastSyncAt).toLocaleString()}</span>
+            )}
+            {integration.lastSyncStatus === 'error' && (
+              <span style={{ color: tokens.danger }}>Sync error</span>
+            )}
+            {typeof integration.ticketCount === 'number' && (
+              <span>{integration.ticketCount.toLocaleString()} tickets</span>
+            )}
+            {typeof integration.articleCount === 'number' && (
+              <span>{integration.articleCount.toLocaleString()} articles</span>
+            )}
+            {typeof integration.contactCount === 'number' && (
+              <span>{integration.contactCount.toLocaleString()} contacts</span>
+            )}
+          </div>
+        )}
+
+        {/* SPEC-1772: OAuth setup button for disconnected OAuth integrations */}
+        {!integration.comingSoon && integration.tierMet && !integration.enabled && integration.authType === 'oauth2' && (
+          <div style={{ marginTop: 6 }}>
+            <span style={{ fontSize: 11, color: tokens.textTertiary }}>
+              OAuth setup required — click Activate to begin authorization
+            </span>
+          </div>
+        )}
       </div>
     </div>
   );
 };
+
+// ---------------------------------------------------------------------------
+// SPEC-1772: Integration Detail Panel
+// ---------------------------------------------------------------------------
+
+interface IntegrationDetailPanelProps {
+  integration: IntegrationSummary;
+  apiFetch: (url: string, options?: RequestInit) => Promise<Response>;
+  onClose: () => void;
+  onNotify: (message: string, severity: 'success' | 'error' | 'info') => void;
+  onRefetch: () => void;
+}
+
+const detailPanelStyle: React.CSSProperties = {
+  background: tokens.surface,
+  border: `1px solid ${tokens.border}`,
+  borderRadius: 8,
+  padding: 20,
+  marginBottom: 16,
+};
+
+const tabStyle = (active: boolean): React.CSSProperties => ({
+  padding: '6px 14px',
+  fontSize: 13,
+  fontWeight: active ? 600 : 400,
+  color: active ? tokens.brand : tokens.textTertiary,
+  background: active ? `${tokens.brand}11` : 'transparent',
+  border: `1px solid ${active ? tokens.brand + '44' : 'transparent'}`,
+  borderRadius: 6,
+  cursor: 'pointer',
+});
+
+type DetailTab = 'config' | 'sync' | 'actions' | 'logs';
+
+const IntegrationDetailPanel: React.FC<IntegrationDetailPanelProps> = ({
+  integration,
+  apiFetch,
+  onClose,
+  onNotify,
+  onRefetch,
+}) => {
+  const [activeTab, setActiveTab] = useState<DetailTab>('config');
+  const [syncing, setSyncing] = useState(false);
+
+  const handleSyncNow = useCallback(async () => {
+    setSyncing(true);
+    try {
+      const res = await apiFetch(`/api/admin/integrations/${integration.type}/sync`, {
+        method: 'POST',
+      });
+      if (res.ok) {
+        onNotify('Sync started', 'success');
+        onRefetch();
+      } else {
+        onNotify('Failed to start sync', 'error');
+      }
+    } catch {
+      onNotify('Sync request failed', 'error');
+    } finally {
+      setSyncing(false);
+    }
+  }, [apiFetch, integration.type, onNotify, onRefetch]);
+
+  return (
+    <div style={detailPanelStyle}>
+      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 12 }}>
+        <span style={{ fontSize: 18, fontWeight: 600, color: tokens.textPrimary }}>
+          {integration.name} — Details
+        </span>
+        <button
+          className="ar-btn-ghost"
+          style={{ padding: '4px 10px', fontSize: 12 }}
+          onClick={onClose}
+        >
+          Close
+        </button>
+      </div>
+
+      {/* Tabs */}
+      <div style={{ display: 'flex', gap: 6, marginBottom: 16 }}>
+        {(['config', 'sync', 'actions', 'logs'] as DetailTab[]).map((tab) => (
+          <button
+            key={tab}
+            style={tabStyle(activeTab === tab)}
+            onClick={() => setActiveTab(tab)}
+          >
+            {tab.charAt(0).toUpperCase() + tab.slice(1)}
+          </button>
+        ))}
+      </div>
+
+      {/* Tab content */}
+      {activeTab === 'config' && (
+        <div style={{ fontSize: 13, color: tokens.textSecondary }}>
+          <div style={{ marginBottom: 8 }}>
+            <strong>Category:</strong> {integration.category || 'N/A'}
+          </div>
+          <div style={{ marginBottom: 8 }}>
+            <strong>Auth Type:</strong> {integration.authType || 'N/A'}
+          </div>
+          <div style={{ marginBottom: 8 }}>
+            <strong>Capabilities:</strong>{' '}
+            {integration.capabilities?.join(', ') || 'None listed'}
+          </div>
+          <div style={{ marginBottom: 8 }}>
+            <strong>Tier Gate:</strong> {integration.tierGate || 'All tiers'}
+          </div>
+        </div>
+      )}
+
+      {activeTab === 'sync' && (
+        <div style={{ fontSize: 13, color: tokens.textSecondary }}>
+          <div style={{ display: 'flex', gap: 12, alignItems: 'center', marginBottom: 12 }}>
+            <HoverButton
+              variant="primary"
+              onClick={handleSyncNow}
+              disabled={syncing}
+            >
+              {syncing ? 'Syncing...' : 'Sync Now'}
+            </HoverButton>
+            {integration.lastSyncAt && (
+              <span>Last: {new Date(integration.lastSyncAt).toLocaleString()}</span>
+            )}
+          </div>
+          <div style={{ display: 'flex', gap: 24 }}>
+            {typeof integration.ticketCount === 'number' && (
+              <div>
+                <div style={{ fontSize: 24, fontWeight: 600, color: tokens.textPrimary }}>
+                  {integration.ticketCount.toLocaleString()}
+                </div>
+                <div style={{ fontSize: 11, color: tokens.textTertiary }}>Tickets</div>
+              </div>
+            )}
+            {typeof integration.articleCount === 'number' && (
+              <div>
+                <div style={{ fontSize: 24, fontWeight: 600, color: tokens.textPrimary }}>
+                  {integration.articleCount.toLocaleString()}
+                </div>
+                <div style={{ fontSize: 11, color: tokens.textTertiary }}>Articles</div>
+              </div>
+            )}
+            {typeof integration.contactCount === 'number' && (
+              <div>
+                <div style={{ fontSize: 24, fontWeight: 600, color: tokens.textPrimary }}>
+                  {integration.contactCount.toLocaleString()}
+                </div>
+                <div style={{ fontSize: 11, color: tokens.textTertiary }}>Contacts</div>
+              </div>
+            )}
+          </div>
+        </div>
+      )}
+
+      {activeTab === 'actions' && (
+        <div style={{ fontSize: 13, color: tokens.textSecondary }}>
+          <p style={{ marginBottom: 8 }}>
+            Configure HITL (Human-in-the-Loop) policies for each action type.
+          </p>
+          <div style={{ fontSize: 12, color: tokens.textTertiary }}>
+            Action configuration is loaded from the integration&apos;s backend settings.
+            Toggle HITL policies to control which actions require human approval.
+          </div>
+        </div>
+      )}
+
+      {activeTab === 'logs' && (
+        <div style={{ fontSize: 13, color: tokens.textSecondary }}>
+          <p style={{ marginBottom: 8 }}>Connection logs for this integration.</p>
+          <div style={{
+            fontSize: 12,
+            color: tokens.textTertiary,
+            fontFamily: 'monospace',
+            padding: 12,
+            background: tokens.page,
+            borderRadius: 4,
+            maxHeight: 200,
+            overflow: 'auto',
+          }}>
+            Logs are loaded from the integration events container.
+            Use the API at /api/admin/integrations/{integration.type}/events for programmatic access.
+          </div>
+        </div>
+      )}
+    </div>
+  );
+};
+
 
 // ---------------------------------------------------------------------------
 // Main component
@@ -389,6 +618,7 @@ export const IntegrationsManager: React.FC<BaseComponentProps & { isDark?: boole
   const { disconnect } = useDisconnectIntegration(apiFetch);
 
   const [actionTarget, setActionTarget] = useState<string | null>(null);
+  const [detailType, setDetailType] = useState<string | null>(null);
 
   const handleActivate = useCallback(
     async (type: string) => {
@@ -453,26 +683,56 @@ export const IntegrationsManager: React.FC<BaseComponentProps & { isDark?: boole
 
   const items = integrations ?? [];
 
+  const detailIntegration = detailType
+    ? items.find((i) => i.type === detailType) ?? null
+    : null;
+
   return (
     <div style={{ maxWidth: 800 }}>
+      {/* SPEC-1772: Detail panel (shown above cards when active) */}
+      {detailIntegration && (
+        <IntegrationDetailPanel
+          integration={detailIntegration}
+          apiFetch={apiFetch}
+          onClose={() => setDetailType(null)}
+          onNotify={onNotify}
+          onRefetch={refetch}
+        />
+      )}
+
       {/* Integration cards */}
       <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
         {items.map((integration) => (
-          <IntegrationCard
-            key={integration.type}
-            integration={integration}
-            onActivate={handleActivate}
-            onDeactivate={handleDeactivate}
-            onDisconnect={handleDisconnect}
-            activating={activating && actionTarget === integration.type}
-            deactivating={deactivating && actionTarget === integration.type}
-            isDark={isDark}
-            basePath={basePath}
-            apiFetch={apiFetch}
-            tenantId={tenantContext.tenantId}
-            onNotify={onNotify}
-            onRefetch={refetch}
-          />
+          <div key={integration.type}>
+            <IntegrationCard
+              integration={integration}
+              onActivate={handleActivate}
+              onDeactivate={handleDeactivate}
+              onDisconnect={handleDisconnect}
+              activating={activating && actionTarget === integration.type}
+              deactivating={deactivating && actionTarget === integration.type}
+              isDark={isDark}
+              basePath={basePath}
+              apiFetch={apiFetch}
+              tenantId={tenantContext.tenantId}
+              onNotify={onNotify}
+              onRefetch={refetch}
+            />
+            {/* SPEC-1772: Details button for connected integrations */}
+            {integration.enabled && integration.status === 'connected' && (
+              <div style={{ marginTop: 4, textAlign: 'right' }}>
+                <button
+                  className="ar-btn-ghost"
+                  style={{ padding: '3px 10px', fontSize: 11 }}
+                  onClick={() => setDetailType(
+                    detailType === integration.type ? null : integration.type
+                  )}
+                >
+                  {detailType === integration.type ? 'Hide Details' : 'View Details'}
+                </button>
+              </div>
+            )}
+          </div>
         ))}
       </div>
 

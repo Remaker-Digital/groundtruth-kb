@@ -285,6 +285,21 @@ export async function submitRating(
   return resp.ok;
 }
 
+/** Submit per-message feedback (thumbs up/down) on an AI response (SPEC-1836). */
+export async function submitMessageFeedback(
+  conversationId: string,
+  messageId: string,
+  rating: 'positive' | 'negative',
+  comment?: string,
+): Promise<boolean> {
+  const resp = await request(
+    'POST',
+    `/api/chat/conversations/${conversationId}/messages/${messageId}/feedback`,
+    { rating, comment },
+  );
+  return resp.ok;
+}
+
 /** Report an issue with the conversation (C7). */
 export async function reportIssue(
   conversationId: string,

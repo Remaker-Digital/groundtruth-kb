@@ -26,7 +26,8 @@ interface LauncherProps {
   offsetY: number;
   isOpen: boolean;
   unreadCount: number;
-  launcherIcon: 'chat' | 'headset' | 'help';
+  launcherIcon: 'chat' | 'headset' | 'help' | 'custom';
+  launcherImageUrl?: string | null;  // SPEC-0245
   onClick: () => void;
 }
 
@@ -42,11 +43,13 @@ export const Launcher: FunctionComponent<LauncherProps> = ({
   isOpen,
   unreadCount,
   launcherIcon,
+  launcherImageUrl,
   onClick,
 }) => {
   const LauncherIconComponent = launcherIcon === 'headset' ? HeadsetIcon
     : launcherIcon === 'help' ? HelpIcon
     : ChatIcon;
+  const useCustomImage = launcherIcon === 'custom' && launcherImageUrl;
   const positionStyle = position === 'bottom-right'
     ? { right: `${offsetX}px`, left: 'auto' }
     : { left: `${offsetX}px`, right: 'auto' };
@@ -86,7 +89,17 @@ export const Launcher: FunctionComponent<LauncherProps> = ({
       }}
     >
       {/* Launcher icon (open state shows close) */}
-      {isOpen ? <CloseIcon size={24} /> : <LauncherIconComponent size={28} />}
+      {isOpen ? <CloseIcon size={24} /> : (
+        useCustomImage ? (
+          <img
+            src={launcherImageUrl!}
+            alt="Chat"
+            style={{ width: '28px', height: '28px', objectFit: 'contain', borderRadius: '4px' }}
+          />
+        ) : (
+          <LauncherIconComponent size={28} />
+        )
+      )}
 
       {/* Unread badge */}
       {!isOpen && unreadCount > 0 && (

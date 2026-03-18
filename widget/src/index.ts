@@ -282,7 +282,8 @@ async function init(
           : (currentConfig.widget_position_offset_y ?? currentConfig.widget_offset_y ?? 20),
         isOpen: state.view !== 'closed',
         unreadCount: state.unreadCount,
-        launcherIcon: (currentConfig.widget_launcher_icon as 'chat' | 'headset' | 'help') || 'chat',
+        launcherIcon: (currentConfig.widget_launcher_icon as 'chat' | 'headset' | 'help' | 'custom') || 'chat',
+        launcherImageUrl: currentConfig.widget_launcher_image_url || null,  // SPEC-0245
         onClick: toggleWidget,
       }),
       shadowRoot,
@@ -415,6 +416,110 @@ async function init(
     }
   }
 
+  // ---------------------------------------------------------------------------
+  // SPEC-0113: Resizable width — drag handle on the leading edge
+  // ---------------------------------------------------------------------------
+
+  let resizeHandle: HTMLDivElement | null = null;
+  let resizeOverlay: HTMLDivElement | null = null;
+  let resizeStartX = 0;
+  let resizeStartWidth = 0;
+  const MIN_PANEL_WIDTH = 300;
+  const MAX_PANEL_WIDTH = 700;
+
+  function positionResizeHandle(handle: HTMLDivElement, iframe: HTMLIFrameElement) {
+    const rect = iframe.getBoundingClientRect();
+    const isRight = position === 'bottom-right';
+    handle.style.top = `${rect.top}px`;
+    handle.style.height = `${rect.height}px`;
+    if (isRight) {
+      handle.style.left = `${rect.left - 3}px`;
+    } else {
+      handle.style.left = `${rect.right - 3}px`;
+    }
+  }
+
+  function createResizeHandle(): HTMLDivElement {
+    const handle = document.createElement('div');
+    const isRight = position === 'bottom-right';
+    handle.style.cssText = [
+      'position: fixed',
+      'width: 6px',
+      `cursor: ${isRight ? 'w-resize' : 'e-resize'}`,
+      'background: transparent',
+      `z-index: ${tokens.zIndexPanel + 2}`,
+      'user-select: none',
+      'display: none',
+    ].join('; ');
+
+    // Visible grip line on hover
+    handle.addEventListener('mouseenter', () => {
+      handle.style.background = `${tokens.brand}33`;
+    });
+    handle.addEventListener('mouseleave', () => {
+      if (!resizeOverlay) handle.style.background = 'transparent';
+    });
+
+    handle.addEventListener('mousedown', (e) => {
+      e.preventDefault();
+      e.stopPropagation();
+      if (!panelIframe) return;
+
+      resizeStartX = e.screenX;
+      resizeStartWidth = panelIframe.offsetWidth;
+      panelIframe.style.transition = 'none';
+
+      resizeOverlay = document.createElement('div');
+      resizeOverlay.style.cssText = [
+        'position: fixed',
+        'inset: 0',
+        `z-index: ${tokens.zIndexPanel + 3}`,
+        `cursor: ${isRight ? 'w-resize' : 'e-resize'}`,
+        'user-select: none',
+      ].join('; ');
+      document.body.appendChild(resizeOverlay);
+
+      document.addEventListener('mousemove', onResizeMove);
+      document.addEventListener('mouseup', onResizeEnd);
+    });
+
+    return handle;
+  }
+
+  function onResizeMove(ev: MouseEvent) {
+    if (!panelIframe) return;
+    const dx = ev.screenX - resizeStartX;
+    const isRight = position === 'bottom-right';
+    // Dragging left on a right-positioned panel expands it
+    const newWidth = Math.max(MIN_PANEL_WIDTH, Math.min(MAX_PANEL_WIDTH,
+      resizeStartWidth + (isRight ? -dx : dx)
+    ));
+    panelIframe.style.width = `${newWidth}px`;
+    // Reposition resize handle within iframe if needed
+    if (resizeHandle) {
+      resizeHandle.style.display = 'block';
+    }
+  }
+
+  function onResizeEnd() {
+    document.removeEventListener('mousemove', onResizeMove);
+    document.removeEventListener('mouseup', onResizeEnd);
+    if (resizeOverlay) {
+      resizeOverlay.remove();
+      resizeOverlay = null;
+    }
+    if (resizeHandle) {
+      resizeHandle.style.background = 'transparent';
+    }
+    if (panelIframe) {
+      panelIframe.style.transition = `opacity ${tokens.transitionNormal}, transform ${tokens.transitionNormal}`;
+      // Persist width
+      try {
+        sessionStorage.setItem('ar_panel_width', panelIframe.style.width);
+      } catch { /* noop */ }
+    }
+  }
+
   window.addEventListener('message', (ev) => {
     if (!ev.data || typeof ev.data.type !== 'string') return;
 
@@ -462,6 +567,20 @@ async function init(
     if (!panelIframe) {
       panelIframe = createPanelIframe();
 
+      // SPEC-0113: Restore persisted width
+      if (!mobileFullscreen) {
+        try {
+          const savedWidth = sessionStorage.getItem('ar_panel_width');
+          if (savedWidth) panelIframe.style.width = savedWidth;
+        } catch { /* noop */ }
+      }
+
+      // SPEC-0113: Add resize handle (desktop only)
+      if (!mobileFullscreen) {
+        resizeHandle = createResizeHandle();
+        document.body.appendChild(resizeHandle);
+      }
+
       // Restore persisted drag position from sessionStorage (WI #253)
       // Skip in mobile fullscreen — panel is fixed at 0,0
       if (!mobileFullscreen) {
@@ -484,6 +603,11 @@ async function init(
           panelIframe.style.opacity = '1';
           panelIframe.style.transform = mobileFullscreen ? 'translateY(0)' : 'translateY(0) scale(1)';
           panelIframe.style.pointerEvents = 'auto';
+          // SPEC-0113: Show and position resize handle
+          if (resizeHandle && panelIframe) {
+            positionResizeHandle(resizeHandle, panelIframe);
+            resizeHandle.style.display = 'block';
+          }
         }
       });
     });
@@ -494,6 +618,10 @@ async function init(
       panelIframe.style.opacity = '0';
       panelIframe.style.transform = mobileFullscreen ? 'translateY(12px)' : 'translateY(12px) scale(0.95)';
       panelIframe.style.pointerEvents = 'none';
+    }
+    // SPEC-0113: Hide resize handle
+    if (resizeHandle) {
+      resizeHandle.style.display = 'none';
     }
   }
 

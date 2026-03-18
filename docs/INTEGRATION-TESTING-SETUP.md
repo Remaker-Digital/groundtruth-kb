@@ -103,7 +103,7 @@ pip install -r requirements-test.txt
 
 ```bash
 # In one terminal
-uvicorn src.main:app --reload --port 8080
+uvicorn src.main:app --reload --port 8000
 ```
 
 ### 3. Run Integration Tests

@@ -24,6 +24,7 @@ markers = [
     "sequential: tests that must not run in parallel (live endpoints, session fixtures)",
     "visual: visual regression tests requiring Playwright + Vite dev server (Layer 1-2)",
     "nats: tests requiring a live NATS JetStream server (nats://localhost:4222)",
+    "property: property-based tests using Hypothesis (SPEC-1843)",
 ]
 filterwarnings = [
     "ignore::DeprecationWarning:pkg_resources",
@@ -39,17 +40,18 @@ filterwarnings = [
 
 [tool.coverage.run]
 source = ["src"]
+branch = true
 omit = [
     "src/__init__.py",
     "src/*/__init__.py",
 ]
 
 [tool.coverage.report]
-# Ramp plan: 20% (baseline) → 50% (P0 tests) → 70% (current) → 80% (launch target)
-# Updated 2026-02-05: 1,439 unit tests covering all 44 multi_tenant modules,
-# 19 routers, and 11 integration modules.  Current coverage: 73.1%.
-# Gate raised from 50% to 70%.  Next target: 80% at launch.
-fail_under = 70
+# Ramp plan: 20% → 50% → 70% → 75% (current) → 78% → 80% (launch target)
+# SPEC-1844 / WI-1486: Incremental ramp schedule.
+# Updated 2026-03-17: 6,900+ unit tests. Current coverage: ~73%.
+# Gate raised from 70% to 75%. Next target: 78% in 2 sessions, 80% in 4.
+fail_under = 75
 show_missing = true
 skip_empty = true
 exclude_lines = [
@@ -99,3 +101,15 @@ known-first-party = ["src"]
 quote-style = "double"
 indent-style = "space"
 skip-magic-trailing-comma = false
+
+# ---------------------------------------------------------------------------
+# mutmut — mutation testing (SPEC-1842)
+# ---------------------------------------------------------------------------
+
+[tool.mutmut]
+paths_to_mutate = "src/"
+tests_dir = "tests/"
+runner = "python -m pytest -x --timeout=30"
+# Session-scoped: only mutate files changed in the current session.
+# Full-codebase mutation is too slow; session wrap-up runs on changed files only.
+# Target: >= 70% mutation score on changed files.

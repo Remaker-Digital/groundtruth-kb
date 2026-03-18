@@ -95,6 +95,8 @@ interface MessageBubbleProps {
   agentAvatarUrl: string | null;
   agentName: string;
   showAvatar: boolean;  // false when consecutive agent messages
+  /** Callback to submit per-message feedback (SPEC-1836). */
+  onFeedback?: (messageId: string, rating: 'positive' | 'negative') => void;
 }
 
 // ---------------------------------------------------------------------------
@@ -120,6 +122,7 @@ export const MessageBubble: FunctionComponent<MessageBubbleProps> = ({
   agentAvatarUrl,
   agentName,
   showAvatar,
+  onFeedback,
 }) => {
   // System messages are centered and styled differently
   if (message.role === 'system') {
@@ -332,6 +335,64 @@ export const MessageBubble: FunctionComponent<MessageBubbleProps> = ({
             </div>
           );
         })()}
+
+        {/* Per-message feedback (SPEC-1836) — thumbs up/down on AI messages */}
+        {!isCustomer && !message.streaming && message.id && onFeedback && (
+          <div
+            style={{
+              display: 'flex',
+              alignItems: 'center',
+              gap: tokens.space1,
+              marginTop: '4px',
+              padding: `0 ${tokens.space1}`,
+            }}
+          >
+            <button
+              type="button"
+              onClick={() => onFeedback(message.id, 'positive')}
+              aria-label="Helpful"
+              style={{
+                background: 'none',
+                border: 'none',
+                cursor: message.feedbackRating ? 'default' : 'pointer',
+                padding: '2px',
+                borderRadius: tokens.borderRadiusSm,
+                color: message.feedbackRating === 'positive'
+                  ? tokens.colorPrimary
+                  : tokens.colorTextMuted,
+                opacity: message.feedbackRating === 'negative' ? 0.3 : 1,
+                transition: 'color 0.15s ease, opacity 0.15s ease',
+                display: 'flex',
+                alignItems: 'center',
+              }}
+              disabled={!!message.feedbackRating}
+            >
+              <ThumbUpIcon size={14} filled={message.feedbackRating === 'positive'} />
+            </button>
+            <button
+              type="button"
+              onClick={() => onFeedback(message.id, 'negative')}
+              aria-label="Not helpful"
+              style={{
+                background: 'none',
+                border: 'none',
+                cursor: message.feedbackRating ? 'default' : 'pointer',
+                padding: '2px',
+                borderRadius: tokens.borderRadiusSm,
+                color: message.feedbackRating === 'negative'
+                  ? tokens.colorError
+                  : tokens.colorTextMuted,
+                opacity: message.feedbackRating === 'positive' ? 0.3 : 1,
+                transition: 'color 0.15s ease, opacity 0.15s ease',
+                display: 'flex',
+                alignItems: 'center',
+              }}
+              disabled={!!message.feedbackRating}
+            >
+              <ThumbDownIcon size={14} filled={message.feedbackRating === 'negative'} />
+            </button>
+          </div>
+        )}
       </div>
     </div>
   );
@@ -466,6 +527,44 @@ function RetractedIcon({ size }: { size: number }) {
       <circle cx="12" cy="12" r="10" />
       <line x1="12" y1="8" x2="12" y2="12" />
       <line x1="12" y1="16" x2="12.01" y2="16" />
+    </svg>
+  );
+}
+
+/** Thumbs up icon for per-message feedback (SPEC-1836). */
+function ThumbUpIcon({ size, filled }: { size: number; filled?: boolean }) {
+  return (
+    <svg
+      width={size}
+      height={size}
+      viewBox="0 0 24 24"
+      fill={filled ? 'currentColor' : 'none'}
+      stroke="currentColor"
+      stroke-width="2"
+      stroke-linecap="round"
+      stroke-linejoin="round"
+    >
+      <path d="M7 10v12" />
+      <path d="M15 5.88 14 10h5.83a2 2 0 0 1 1.92 2.56l-2.33 8A2 2 0 0 1 17.5 22H4a2 2 0 0 1-2-2v-8a2 2 0 0 1 2-2h2.76a2 2 0 0 0 1.79-1.11L12 2a3.13 3.13 0 0 1 3 3.88Z" />
+    </svg>
+  );
+}
+
+/** Thumbs down icon for per-message feedback (SPEC-1836). */
+function ThumbDownIcon({ size, filled }: { size: number; filled?: boolean }) {
+  return (
+    <svg
+      width={size}
+      height={size}
+      viewBox="0 0 24 24"
+      fill={filled ? 'currentColor' : 'none'}
+      stroke="currentColor"
+      stroke-width="2"
+      stroke-linecap="round"
+      stroke-linejoin="round"
+    >
+      <path d="M17 14V2" />
+      <path d="M9 18.12 10 14H4.17a2 2 0 0 1-1.92-2.56l2.33-8A2 2 0 0 1 6.5 2H20a2 2 0 0 1 2 2v8a2 2 0 0 1-2 2h-2.76a2 2 0 0 0-1.79 1.11L12 22a3.13 3.13 0 0 1-3-3.88Z" />
     </svg>
   );
 }

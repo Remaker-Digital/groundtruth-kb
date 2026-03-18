@@ -5,7 +5,7 @@ This document provides active guidance for AI assistants working on the Agent Re
 > **📁 Reference data** (legal, pricing, infrastructure, AGNTCY rules): `CLAUDE-REFERENCE.md` — read on demand.
 > **📁 Architecture** (project structure, module inventory): `CLAUDE-ARCHITECTURE.md` — read on demand.
 > **📁 Historical archive** (session logs, technical decisions): `CLAUDE_ARCHIVE.md` — read when investigating historical decisions.
-> **📁 Session memory** (operational patterns, lessons): `memory/MEMORY.md` — loaded automatically.
+> **📁 Session memory** (operational patterns, lessons): `memory/MEMORY.md` — loaded automatically via Claude Code's auto-memory system (resolves from `~/.claude/projects/<project-hash>/memory/`, not the repo's `memory/` directory).
 
 ### CLAUDE.md vs MEMORY.md Boundary
 
@@ -170,5 +170,5 @@ Provide brief inline coaching notes (prefixed with "💡 **Feedback:**") when ob
 ---
 
 *© 2026 Remaker Digital, a DBA of VanDusen & Palmeter, LLC. All rights reserved.*
-*Last Updated: 2026-03-12*
-*Version: 64.0.0*
+*Last Updated: 2026-03-17*
+*Version: 65.0.0*

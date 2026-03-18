@@ -163,6 +163,7 @@ Deployed on Azure (East US 2):
 
 - Windows 11
 - Python 3.12+
+- Node.js >= 20 (required for widget and admin SPA builds)
 - Docker Desktop
 - Git + GitHub Desktop
 - Visual Studio Code
@@ -177,13 +178,33 @@ cd agent-red
 # Copy environment template
 cp .env.example .env.local
 
-# Start local dev stack (API + NATS JetStream)
+# Build UI artifacts (required before Docker build — no Node.js in container)
+cd widget && npm install && npm run build && cd ..
+cd admin/standalone && npm install && npm run build && cd ..
+cd admin/provider && npm install && npm run build && cd ..
+cd admin/shopify && npm install && npm run build && cd ..
+
+# Start local dev stack (API + NATS JetStream + Redis)
 docker compose up -d
 
 # Verify services
-curl http://localhost:8080/health    # API
-curl http://localhost:8222/healthz   # NATS
+curl http://localhost:8080/health    # API (host:8080 → container:8000)
+curl http://localhost:8222/healthz   # NATS monitoring
 ```
+
+> **Without Docker:** Run uvicorn directly on port 8000 (`uvicorn src.main:app --reload --port 8000`). Vite dev servers for admin SPAs proxy to `localhost:8000` by default.
+
+### Subproject Setup
+
+| Directory | Stack | Dev Server | Package Manager |
+|-----------|-------|------------|-----------------|
+| `widget/` | Preact + Vite | `npm run dev` (port 5173) | npm |
+| `admin/provider/` | React + Mantine + Vite | `npm run dev` (port 3400) | npm |
+| `admin/standalone/` | React + Mantine + Vite | `npm run dev` (port 3300) | npm |
+| `admin/shopify/` | React + Polaris + Vite | `npm run dev` | npm |
+| `docs-site/` | Docusaurus | `yarn start` (port 3000) | yarn |
+
+Each admin SPA has a `predev` hook that runs `sync-env` (PowerShell). For non-Windows, set `VITE_API_URL` manually.
 
 ### AGNTCY Isolation Policy
 

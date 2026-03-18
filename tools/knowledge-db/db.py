@@ -244,6 +244,21 @@ CREATE TABLE IF NOT EXISTS testable_elements (
     UNIQUE(id, version)
 );
 
+CREATE TABLE IF NOT EXISTS quality_scores (
+    rowid INTEGER PRIMARY KEY AUTOINCREMENT,
+    session_id TEXT NOT NULL,
+    computed_at TEXT NOT NULL,
+    spec_coverage REAL NOT NULL,
+    defect_escape_rate REAL NOT NULL,
+    assertion_strength REAL NOT NULL,
+    change_failure_rate REAL NOT NULL,
+    test_freshness REAL NOT NULL,
+    coverage_delta REAL NOT NULL,
+    composite_score REAL NOT NULL,
+    details TEXT,
+    UNIQUE(session_id)
+);
+
 -- Indexes for query performance (append-only tables grow monotonically)
 CREATE INDEX IF NOT EXISTS idx_specs_id_version ON specifications(id, version);
 CREATE INDEX IF NOT EXISTS idx_specs_status ON specifications(status);
@@ -270,6 +285,7 @@ CREATE INDEX IF NOT EXISTS idx_backlog_id_version ON backlog_snapshots(id, versi
 CREATE INDEX IF NOT EXISTS idx_te_id_version ON testable_elements(id, version);
 CREATE INDEX IF NOT EXISTS idx_te_subsystem ON testable_elements(subsystem);
 CREATE INDEX IF NOT EXISTS idx_te_status ON testable_elements(status);
+CREATE INDEX IF NOT EXISTS idx_quality_scores_session ON quality_scores(session_id);
 
 -- Views: current state = latest version per ID
 CREATE VIEW IF NOT EXISTS current_specifications AS
@@ -1118,11 +1134,11 @@ class KnowledgeDB:
         return self.list_tests(spec_id=spec_id)
 
     def get_untested_specs(self) -> list[dict[str, Any]]:
-        """Get specifications that have no tests linked to them."""
+        """Get specifications that have no tests linked to them (excludes retired)."""
         rows = self._get_conn().execute(
             """SELECT s.* FROM current_specifications s
                LEFT JOIN current_tests t ON t.spec_id = s.id
-               WHERE t.id IS NULL
+               WHERE t.id IS NULL AND s.status != 'retired'
                ORDER BY s.id"""
         ).fetchall()
         result = [_row_to_dict(r) for r in rows]
@@ -1841,6 +1857,53 @@ class KnowledgeDB:
         )
 
     # ------------------------------------------------------------------
+    # Quality Scores (SPEC-1838)
+    # ------------------------------------------------------------------
+
+    def insert_quality_score(
+        self,
+        session_id: str,
+        spec_coverage: float,
+        defect_escape_rate: float,
+        assertion_strength: float,
+        change_failure_rate: float,
+        test_freshness: float,
+        coverage_delta: float,
+        composite_score: float,
+        details: dict[str, Any] | None = None,
+    ) -> dict[str, Any]:
+        """Insert a quality score record for a session."""
+        conn = self._get_conn()
+        now = _now()
+        conn.execute(
+            """INSERT OR REPLACE INTO quality_scores
+               (session_id, computed_at, spec_coverage, defect_escape_rate,
+                assertion_strength, change_failure_rate, test_freshness,
+                coverage_delta, composite_score, details)
+               VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)""",
+            (session_id, now, spec_coverage, defect_escape_rate,
+             assertion_strength, change_failure_rate, test_freshness,
+             coverage_delta, composite_score,
+             json.dumps(details) if details else None),
+        )
+        conn.commit()
+        return self.get_quality_score(session_id)  # type: ignore[return-value]
+
+    def get_quality_score(self, session_id: str) -> dict[str, Any] | None:
+        """Get the quality score for a specific session."""
+        row = self._get_conn().execute(
+            "SELECT * FROM quality_scores WHERE session_id = ?", (session_id,)
+        ).fetchone()
+        return _row_to_dict(row) if row else None
+
+    def get_quality_scores(self, *, last: int = 10) -> list[dict[str, Any]]:
+        """Get the most recent quality scores, newest first."""
+        rows = self._get_conn().execute(
+            "SELECT * FROM quality_scores ORDER BY computed_at DESC LIMIT ?", (last,)
+        ).fetchall()
+        return [_row_to_dict(r) for r in rows]
+
+    # ------------------------------------------------------------------
     # Global History
     # ------------------------------------------------------------------
 
@@ -1908,7 +1971,8 @@ class KnowledgeDB:
         tables = ["specifications", "test_procedures", "operational_procedures",
                    "assertion_runs", "session_prompts", "environment_config",
                    "documents", "test_coverage", "tests", "test_plans",
-                   "test_plan_phases", "work_items", "backlog_snapshots"]
+                   "test_plan_phases", "work_items", "backlog_snapshots",
+                   "quality_scores"]
         export = {"exported_at": _now(), "tables": {}}
         for table in tables:
             rows = conn.execute(f"SELECT * FROM {table} ORDER BY rowid").fetchall()

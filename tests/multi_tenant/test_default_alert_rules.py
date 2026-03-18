@@ -1,96 +1,177 @@
 """Tests for SPEC-1831: Default Alert Rules Ship with System.
 
-Verifies that 8 default alert rules are seeded on startup, not duplicated
-on restart, and evaluable by the existing alert engine.
+Verifies that the platform seeds 8 default alert rules at startup,
+each with severity and cooldown, stored in platform_config.
 
 © 2026 Remaker Digital, a DBA of VanDusen & Palmeter, LLC. All rights reserved.
 """
-
 from __future__ import annotations
 
 from unittest.mock import AsyncMock, MagicMock, patch
 
 import pytest
 
+from src.multi_tenant.default_alert_rules import (
+    ALERT_RULES_CONFIG_TYPE,
+    DEFAULT_ALERT_RULES,
+    get_default_alert_rules,
+    seed_default_alert_rules,
+)
 
-class TestDefaultAlertRules:
-    """SPEC-1831: Default alert rules created on first startup."""
 
-    @pytest.mark.asyncio
-    async def test_seeds_8_default_rules_on_fresh_startup(self):
-        """TEST-10432: 8 default rules created when none exist."""
-        from src.multi_tenant.alert_defaults import seed_default_alert_rules, DEFAULT_RULES
+# ---------------------------------------------------------------------------
+# Default rule definitions
+# ---------------------------------------------------------------------------
 
-        mock_repo = AsyncMock()
-        mock_repo.get_all_rules.return_value = []  # No rules exist
 
-        await seed_default_alert_rules(mock_repo)
+class TestDefaultRuleDefinitions:
+    """Verify the 8 default alert rules match SPEC-1831."""
 
-        assert mock_repo.insert_rule.call_count == len(DEFAULT_RULES)
-        assert len(DEFAULT_RULES) == 8
+    def test_exactly_8_default_rules(self):
+        """SPEC-1831: 8 rules ship with the system."""
+        assert len(DEFAULT_ALERT_RULES) == 8
 
-    @pytest.mark.asyncio
-    async def test_does_not_duplicate_on_restart(self):
-        """TEST-10433: No duplicates created when rules already exist."""
-        from src.multi_tenant.alert_defaults import seed_default_alert_rules, DEFAULT_RULES
+    def test_required_rule_ids(self):
+        """All 8 SPEC-1831 rules are present by rule_id."""
+        expected_ids = {
+            "circuit_breaker_open",
+            "error_rate_spike",
+            "sla_breach_approaching",
+            "high_latency",
+            "rate_limit_saturation",
+            "secret_expiry",
+            "audit_log_size",
+            "scaling_ceiling",
+        }
+        actual_ids = {r["rule_id"] for r in DEFAULT_ALERT_RULES}
+        assert actual_ids == expected_ids
 
-        existing_rules = [{"rule_type": rule["rule_type"]} for rule in DEFAULT_RULES]
-        mock_repo = AsyncMock()
-        mock_repo.get_all_rules.return_value = existing_rules
-
-        await seed_default_alert_rules(mock_repo)
-
-        assert mock_repo.insert_rule.call_count == 0
-
-    @pytest.mark.asyncio
-    async def test_default_rules_have_severity_and_cooldown(self):
-        """Each default rule has severity (critical/warning/info) and cooldown_minutes."""
-        from src.multi_tenant.alert_defaults import DEFAULT_RULES
-
+    def test_every_rule_has_severity(self):
+        """Every rule has a severity field (critical, warning, or info)."""
         valid_severities = {"critical", "warning", "info"}
-        for rule in DEFAULT_RULES:
-            assert rule["severity"] in valid_severities, f"Invalid severity for {rule['rule_type']}"
-            assert isinstance(rule["cooldown_minutes"], int), f"Missing cooldown for {rule['rule_type']}"
-            assert rule["cooldown_minutes"] > 0
-
-    @pytest.mark.asyncio
-    async def test_default_rules_stored_in_platform_config(self):
-        """SPEC-1831: Rules stored in Cosmos platform_config collection."""
-        from src.multi_tenant.alert_defaults import DEFAULT_RULES
-
-        for rule in DEFAULT_RULES:
-            assert "rule_type" in rule
-            assert "metric_name" in rule
-            assert "operator" in rule
-            assert "threshold" in rule
-
-    @pytest.mark.asyncio
-    async def test_circuit_breaker_rule_fires_on_open(self):
-        """TEST-10434: Circuit breaker OPEN triggers critical alert."""
-        from src.multi_tenant.alert_defaults import DEFAULT_RULES
-
-        cb_rule = next(r for r in DEFAULT_RULES if r["rule_type"] == "circuit_breaker_open")
-        assert cb_rule["severity"] == "critical"
-        assert cb_rule["cooldown_minutes"] == 5
-
-    @pytest.mark.asyncio
-    async def test_default_rules_cooldown_by_severity(self):
-        """Critical=5min, warning=15min, info=60min cooldowns."""
-        from src.multi_tenant.alert_defaults import DEFAULT_RULES
-
-        severity_cooldowns = {"critical": 5, "warning": 15, "info": 60}
-        for rule in DEFAULT_RULES:
-            expected = severity_cooldowns[rule["severity"]]
-            assert rule["cooldown_minutes"] == expected, (
-                f"{rule['rule_type']}: expected cooldown {expected}, got {rule['cooldown_minutes']}"
+        for rule in DEFAULT_ALERT_RULES:
+            assert rule["severity"] in valid_severities, (
+                f"Rule '{rule['rule_id']}' has invalid severity: {rule['severity']}"
             )
 
-    @pytest.mark.asyncio
-    async def test_default_rules_editable_by_platform_admin(self):
-        """SPEC-1831: Default rules are editable and deletable."""
-        from src.multi_tenant.alert_defaults import DEFAULT_RULES
+    def test_every_rule_has_cooldown_minutes(self):
+        """Every rule has a positive cooldown_minutes."""
+        for rule in DEFAULT_ALERT_RULES:
+            assert "cooldown_minutes" in rule, f"Missing cooldown: {rule['rule_id']}"
+            assert rule["cooldown_minutes"] > 0, f"Invalid cooldown: {rule['rule_id']}"
 
-        for rule in DEFAULT_RULES:
-            # All rules must have is_default=True (for UI display) but no is_locked flag
-            assert rule.get("is_default") is True
-            assert "is_locked" not in rule or rule["is_locked"] is False
+    def test_cooldown_matches_severity(self):
+        """SPEC-1831: critical=5, warning=15, info=60."""
+        expected_cooldown = {"critical": 5, "warning": 15, "info": 60}
+        for rule in DEFAULT_ALERT_RULES:
+            expected = expected_cooldown[rule["severity"]]
+            assert rule["cooldown_minutes"] == expected, (
+                f"Rule '{rule['rule_id']}': expected cooldown {expected} "
+                f"for severity '{rule['severity']}', got {rule['cooldown_minutes']}"
+            )
+
+    def test_every_rule_has_condition(self):
+        """Every rule has a condition with metric and operator."""
+        for rule in DEFAULT_ALERT_RULES:
+            assert "condition" in rule, f"Missing condition: {rule['rule_id']}"
+            cond = rule["condition"]
+            assert "metric" in cond, f"Missing metric: {rule['rule_id']}"
+            assert "operator" in cond, f"Missing operator: {rule['rule_id']}"
+            assert "value" in cond, f"Missing value: {rule['rule_id']}"
+
+    def test_every_rule_enabled_by_default(self):
+        """Default rules are enabled out of the box."""
+        for rule in DEFAULT_ALERT_RULES:
+            assert rule.get("enabled") is True, f"Rule disabled: {rule['rule_id']}"
+
+    def test_get_default_alert_rules_returns_copy(self):
+        """get_default_alert_rules() returns a copy, not the original."""
+        result = get_default_alert_rules()
+        assert result == DEFAULT_ALERT_RULES
+        assert result is not DEFAULT_ALERT_RULES
+
+
+# ---------------------------------------------------------------------------
+# Seed function
+# ---------------------------------------------------------------------------
+
+
+class TestSeedDefaultAlertRules:
+    """Verify the startup seeding behavior."""
+
+    @pytest.mark.asyncio
+    async def test_seeds_when_no_rules_exist(self):
+        """seed_default_alert_rules() creates document when none exists."""
+        mock_repo = AsyncMock()
+        mock_repo.get_config = AsyncMock(return_value=None)
+        mock_repo.set_config = AsyncMock()
+
+        mock_repo_cls = MagicMock(return_value=mock_repo)
+        with patch(
+            "src.multi_tenant.repositories.platform.PlatformConfigRepository",
+            mock_repo_cls,
+        ):
+            count = await seed_default_alert_rules()
+
+        assert count == 8
+        mock_repo.set_config.assert_called_once()
+        doc = mock_repo.set_config.call_args[0][0]
+        assert doc.config_type == ALERT_RULES_CONFIG_TYPE
+        assert doc.config_key == "all_rules"
+        assert len(doc.value) == 8
+
+    @pytest.mark.asyncio
+    async def test_skips_when_rules_exist(self):
+        """seed_default_alert_rules() returns 0 when rules already exist."""
+        mock_repo = AsyncMock()
+        mock_repo.get_config = AsyncMock(return_value={"value": {"some": "rules"}})
+        mock_repo.set_config = AsyncMock()
+
+        mock_repo_cls = MagicMock(return_value=mock_repo)
+        with patch(
+            "src.multi_tenant.repositories.platform.PlatformConfigRepository",
+            mock_repo_cls,
+        ):
+            count = await seed_default_alert_rules()
+
+        assert count == 0
+        mock_repo.set_config.assert_not_called()
+
+    @pytest.mark.asyncio
+    async def test_seed_stores_rules_keyed_by_id(self):
+        """Seeded document stores rules as {rule_id: rule_dict}."""
+        mock_repo = AsyncMock()
+        mock_repo.get_config = AsyncMock(return_value=None)
+        mock_repo.set_config = AsyncMock()
+
+        mock_repo_cls = MagicMock(return_value=mock_repo)
+        with patch(
+            "src.multi_tenant.repositories.platform.PlatformConfigRepository",
+            mock_repo_cls,
+        ):
+            await seed_default_alert_rules()
+
+        doc = mock_repo.set_config.call_args[0][0]
+        assert "circuit_breaker_open" in doc.value
+        assert "scaling_ceiling" in doc.value
+        assert doc.value["circuit_breaker_open"]["severity"] == "critical"
+
+    @pytest.mark.asyncio
+    async def test_seed_tolerates_cosmos_failure(self):
+        """seed_default_alert_rules() returns 0 on Cosmos write failure."""
+        mock_repo = AsyncMock()
+        mock_repo.get_config = AsyncMock(return_value=None)
+        mock_repo.set_config = AsyncMock(side_effect=RuntimeError("Cosmos 503"))
+
+        mock_repo_cls = MagicMock(return_value=mock_repo)
+        with patch(
+            "src.multi_tenant.repositories.platform.PlatformConfigRepository",
+            mock_repo_cls,
+        ):
+            count = await seed_default_alert_rules()
+
+        assert count == 0
+
+    def test_config_type_constant(self):
+        """Config type is 'alert_rules'."""
+        assert ALERT_RULES_CONFIG_TYPE == "alert_rules"

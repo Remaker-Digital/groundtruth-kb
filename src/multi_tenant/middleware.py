@@ -303,6 +303,37 @@ class TenantAuthMiddleware(BaseHTTPMiddleware):
                 },
             )
 
+        # SPEC-1832: Record API key usage for audit trail (non-blocking)
+        try:
+            from src.multi_tenant.api_key_audit import record_api_key_usage
+            key_suffix = "n/a"
+            if tenant_context.auth_method in ("api_key", "user_api_key"):
+                raw_key = request.headers.get(API_KEY_HEADER) or request.query_params.get("api_key") or ""
+                key_suffix = raw_key[-8:] if len(raw_key) >= 8 else raw_key
+            elif tenant_context.auth_method == "widget_key":
+                raw_key = (
+                    request.headers.get(WIDGET_KEY_HEADER)
+                    or request.query_params.get("widget_key")
+                    or request.query_params.get("key")
+                    or ""
+                )
+                key_suffix = raw_key[-8:] if len(raw_key) >= 8 else raw_key
+            elif tenant_context.auth_method == "spa_key":
+                raw_key = request.headers.get(API_KEY_HEADER) or ""
+                key_suffix = raw_key[-8:] if len(raw_key) >= 8 else raw_key
+
+            record_api_key_usage(
+                tenant_id=tenant_context.tenant_id,
+                auth_method=tenant_context.auth_method,
+                key_suffix=key_suffix,
+                path=request.url.path,
+                method=request.method,
+                client_ip=client_ip,
+                team_member_id=getattr(tenant_context, "team_member_id", None),
+            )
+        except Exception:
+            pass  # Audit recording must never fail the request
+
         # SPEC-1676: Fire non-blocking login notification for SPA auth
         if getattr(tenant_context, "is_platform_admin", False):
             try:

@@ -20,3 +20,22 @@ httpx>=0.27.0
 
 # Load testing
 locust>=2.29.0
+
+# Browser automation (E2E, visual, live tests)
+playwright>=1.58.0
+pytest-playwright>=0.5.0
+
+# Property-based testing (tests/property/)
+hypothesis>=6.151.0
+
+# API fuzzing (tests/fuzzing/)
+schemathesis>=3.39.0
+
+# Mutation testing (scripts/run_mutation_tests.py)
+mutmut>=2.4.4
+
+# Accessibility testing (WCAG 2.1 AA)
+axe-playwright-python>=0.1.4
+
+# Contract testing (widget ↔ chat API)
+pact-python>=2.2.0

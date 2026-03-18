@@ -1,0 +1,172 @@
+# agents.yaml — MCP Agent Plug-in Registry (SPEC-1706)
+#
+# Configuration-driven discovery for all MCP agent servers.
+# Adding a new agent = adding an entry here + deploying its container.
+# No code changes to existing agents or orchestrator required.
+#
+# © 2026 Remaker Digital, a DBA of VanDusen & Palmeter, LLC. All rights reserved.
+
+version: "1.0"
+
+# ---------------------------------------------------------------------------
+# Internal plug-in agents (Agent Red domain agents)
+# ---------------------------------------------------------------------------
+agents:
+  campaigns:
+    display_name: "Campaigns Agent"
+    description: "Marketing campaign information and promotional content"
+    spec_id: "SPEC-1707"
+    category: "marketing"
+    endpoint: "${AGENT_CAMPAIGNS_URL:-http://10.0.1.20:8080}"
+    health_check: "/health"
+    auth_type: "internal"
+    tier_gate: "professional"
+    capabilities:
+      - "campaigns.list_active"
+      - "campaigns.get_discount_codes"
+      - "campaigns.get_talking_points"
+      - "campaigns.track_metrics"
+    status: "available"
+
+  bot_agent:
+    display_name: "Bot Agent (A2A)"
+    description: "External AI agent conversation handler"
+    spec_id: "SPEC-1708"
+    category: "agent-to-agent"
+    endpoint: "${AGENT_BOT_URL:-http://10.0.1.21:8080}"
+    health_check: "/health"
+    auth_type: "internal"
+    tier_gate: "enterprise"
+    capabilities:
+      - "bot.authenticate_agent"
+      - "bot.negotiate_parameters"
+      - "bot.exchange_messages"
+      - "bot.enforce_guardrails"
+    status: "available"
+
+  sales:
+    display_name: "Sales Agent"
+    description: "In-line product discovery and purchase completion"
+    spec_id: "SPEC-1709"
+    category: "commerce"
+    endpoint: "${AGENT_SALES_URL:-http://10.0.1.22:8080}"
+    health_check: "/health"
+    auth_type: "internal"
+    tier_gate: "professional"
+    capabilities:
+      - "sales.search_products"
+      - "sales.manage_cart"
+      - "sales.check_inventory"
+      - "sales.create_checkout"
+      - "sales.track_order"
+    status: "available"
+
+  gateway:
+    display_name: "Gateway Agent"
+    description: "Human escalation and live agent connection"
+    spec_id: "SPEC-1710"
+    category: "escalation"
+    endpoint: "${AGENT_GATEWAY_URL:-http://10.0.1.23:8080}"
+    health_check: "/health"
+    auth_type: "internal"
+    tier_gate: "starter"
+    capabilities:
+      - "gateway.check_availability"
+      - "gateway.queue_customer"
+      - "gateway.transfer_context"
+      - "gateway.monitor_queue"
+    status: "available"
+
+  schedule:
+    display_name: "Schedule Agent"
+    description: "Follow-up scheduling and event-driven notifications"
+    spec_id: "SPEC-1711"
+    category: "scheduling"
+    endpoint: "${AGENT_SCHEDULE_URL:-http://10.0.1.24:8080}"
+    health_check: "/health"
+    auth_type: "internal"
+    tier_gate: "professional"
+    capabilities:
+      - "schedule.create_followup"
+      - "schedule.list_pending"
+      - "schedule.cancel_followup"
+      - "schedule.ingest_event"
+      - "schedule.send_notification"
+    status: "available"
+
+# ---------------------------------------------------------------------------
+# 3rd-party MCP servers (SPEC-1712)
+# ---------------------------------------------------------------------------
+external_servers:
+  stripe_mcp:
+    display_name: "Stripe MCP"
+    description: "Payments, refunds, subscriptions via Stripe MCP server"
+    spec_id: "SPEC-1712"
+    endpoint: "https://mcp.stripe.com"
+    auth_type: "oauth2"
+    credential_env: "STRIPE_MCP_SECRET"
+    tier_gate: "starter"
+    capabilities:
+      - "stripe.get_balance"
+      - "stripe.list_charges"
+      - "stripe.create_refund"
+      - "stripe.get_subscription"
+    read_only: false
+    status: "available"
+
+  shopify_mcp:
+    display_name: "Shopify Storefront MCP"
+    description: "Product catalog, orders, fulfillment via Shopify MCP"
+    spec_id: "SPEC-1712"
+    endpoint: "https://{shop_domain}/mcp"
+    auth_type: "none"
+    tier_gate: "starter"
+    capabilities:
+      - "shopify.search_products"
+      - "shopify.get_order"
+      - "shopify.get_collections"
+    read_only: true
+    status: "available"
+
+  square_mcp:
+    display_name: "Square MCP"
+    description: "POS, appointments, loyalty via Square MCP server"
+    spec_id: "SPEC-1712"
+    endpoint: "https://mcp.squareup.com"
+    auth_type: "oauth2"
+    credential_env: "SQUARE_MCP_SECRET"
+    tier_gate: "professional"
+    capabilities:
+      - "square.get_payments"
+      - "square.list_appointments"
+      - "square.get_loyalty"
+    read_only: false
+    status: "beta"
+
+  paypal_mcp:
+    display_name: "PayPal MCP"
+    description: "Transactions and disputes via PayPal MCP server"
+    spec_id: "SPEC-1712"
+    endpoint: "https://mcp.paypal.com"
+    auth_type: "oauth2"
+    credential_env: "PAYPAL_MCP_SECRET"
+    tier_gate: "professional"
+    capabilities:
+      - "paypal.get_transaction"
+      - "paypal.list_disputes"
+    read_only: true
+    status: "beta"
+
+  coinbase_mcp:
+    display_name: "Coinbase MCP"
+    description: "Crypto payments via Coinbase Commerce MCP"
+    spec_id: "SPEC-1712"
+    endpoint: "https://mcp.coinbase.com"
+    auth_type: "api_key"
+    credential_env: "COINBASE_MCP_KEY"
+    tier_gate: "enterprise"
+    capabilities:
+      - "coinbase.get_charge"
+      - "coinbase.list_events"
+    read_only: true
+    status: "beta"

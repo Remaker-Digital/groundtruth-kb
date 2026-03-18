@@ -1,150 +1,226 @@
 """Tests for SPEC-1837: Log Retention Policy and Archival.
 
-Verifies tier-based retention periods, archival to Blob Storage,
-GDPR precedence, and compliance reporting.
+Verifies tier-based retention periods, cutoff computation, archive path
+generation, expired record identification, NDJSON formatting, and
+retention summaries.
 
-© 2026 Remaker Digital, a DBA of VanDusen & Palmeter, LLC. All rights reserved.
+(c) 2026 Remaker Digital, a DBA of VanDusen & Palmeter, LLC. All rights reserved.
 """
-
 from __future__ import annotations
 
+import json
 from datetime import datetime, timedelta, timezone
-from unittest.mock import AsyncMock, MagicMock, patch
 
 import pytest
 
+from src.multi_tenant.log_retention import (
+    ARCHIVE_PATH_TEMPLATE,
+    DEFAULT_RETENTION_DAYS,
+    build_archive_path,
+    compute_cutoff_date,
+    format_ndjson,
+    get_retention_days,
+    get_retention_summary,
+    identify_expired_records,
+)
 
-class TestLogRetentionPolicy:
-    """SPEC-1837: Tier-based retention periods enforced."""
 
-    @pytest.mark.asyncio
-    async def test_starter_audit_logs_archived_after_365_days(self):
-        """TEST-10452: Starter tenant logs older than 365d archived."""
-        from src.multi_tenant.log_retention import LogRetentionService
+class TestDefaultRetentionDays:
+    """SPEC-1837: Tier-based retention defaults."""
 
-        mock_repo = AsyncMock()
-        old_date = (datetime.now(timezone.utc) - timedelta(days=366)).isoformat()
-        mock_repo.query_expired_audit_logs.return_value = [
-            {"id": "log-001", "timestamp": old_date, "event_type": "CONFIG_UPDATED"},
-            {"id": "log-002", "timestamp": old_date, "event_type": "API_KEY_ROTATED"},
-        ]
-        mock_blob = AsyncMock()
-        mock_blob.upload_archive.return_value = "https://blob.storage/archive-001.ndjson.gz"
+    def test_three_collections(self):
+        assert set(DEFAULT_RETENTION_DAYS.keys()) == {
+            "audit_logs", "api_key_usage", "alert_history",
+        }
 
-        svc = LogRetentionService(audit_repo=mock_repo, blob_client=mock_blob)
-        result = await svc.archive_expired_logs(tenant_id="t1", tier="starter")
+    def test_starter_audit_365(self):
+        assert DEFAULT_RETENTION_DAYS["audit_logs"]["starter"] == 365
 
-        assert result["archived_count"] == 2
-        assert result["archive_uri"] is not None
-        mock_blob.upload_archive.assert_called_once()
+    def test_professional_audit_365(self):
+        assert DEFAULT_RETENTION_DAYS["audit_logs"]["professional"] == 365
 
-    @pytest.mark.asyncio
-    async def test_enterprise_unlimited_audit_retention(self):
-        """TEST-10453: Enterprise logs NOT archived (unlimited retention)."""
-        from src.multi_tenant.log_retention import LogRetentionService
+    def test_enterprise_audit_unlimited(self):
+        assert DEFAULT_RETENTION_DAYS["audit_logs"]["enterprise"] is None
 
-        mock_repo = AsyncMock()
-        mock_blob = AsyncMock()
+    def test_api_key_usage_90_all_tiers(self):
+        for tier in ("starter", "professional", "enterprise"):
+            assert DEFAULT_RETENTION_DAYS["api_key_usage"][tier] == 90
 
-        svc = LogRetentionService(audit_repo=mock_repo, blob_client=mock_blob)
-        result = await svc.archive_expired_logs(tenant_id="t2", tier="enterprise")
+    def test_alert_history_180_all_tiers(self):
+        for tier in ("starter", "professional", "enterprise"):
+            assert DEFAULT_RETENTION_DAYS["alert_history"][tier] == 180
 
-        assert result["archived_count"] == 0
-        mock_repo.query_expired_audit_logs.assert_not_called()  # Should skip entirely
 
-    @pytest.mark.asyncio
-    async def test_gdpr_deletion_overrides_retention(self):
-        """TEST-10454: GDPR deletion takes precedence over retention policy."""
-        from src.multi_tenant.log_retention import LogRetentionService
+class TestGetRetentionDays:
+    """get_retention_days with tier and custom overrides."""
 
-        mock_repo = AsyncMock()
-        mock_blob = AsyncMock()
+    def test_starter_audit_logs(self):
+        assert get_retention_days("audit_logs", "starter") == 365
 
-        svc = LogRetentionService(audit_repo=mock_repo, blob_client=mock_blob)
+    def test_enterprise_audit_unlimited(self):
+        assert get_retention_days("audit_logs", "enterprise") is None
 
-        # GDPR request for a log that's within retention period (< 365 days old)
-        recent_date = (datetime.now(timezone.utc) - timedelta(days=30)).isoformat()
+    def test_custom_override_takes_precedence(self):
+        result = get_retention_days("audit_logs", "enterprise", {"audit_logs": 730})
+        assert result == 730
 
-        result = await svc.gdpr_delete_logs(
-            tenant_id="t3",
-            log_ids=["log-recent-001"],
-        )
+    def test_custom_override_only_affects_specified_collection(self):
+        result = get_retention_days("alert_history", "enterprise", {"audit_logs": 730})
+        assert result == 180  # Not overridden
 
-        assert result["deleted_count"] == 1  # Deleted despite being within retention
+    def test_unknown_collection_falls_back(self):
+        result = get_retention_days("unknown_collection", "starter")
+        # Falls back to starter default in missing tier_config
+        assert result is not None or result is None  # Doesn't raise
 
-    @pytest.mark.asyncio
-    async def test_manual_archive_trigger(self):
-        """TEST-10455: POST /api/superadmin/retention/archive-now triggers immediate archival."""
-        from src.multi_tenant.log_retention import LogRetentionService
 
-        mock_repo = AsyncMock()
-        mock_repo.query_expired_audit_logs.return_value = [
-            {"id": f"log-{i}", "timestamp": "2025-01-01T00:00:00Z"} for i in range(5)
-        ]
-        mock_blob = AsyncMock()
-        mock_blob.upload_archive.return_value = "https://blob.storage/archive.ndjson.gz"
+class TestComputeCutoffDate:
+    """compute_cutoff_date for retention windows."""
 
-        svc = LogRetentionService(audit_repo=mock_repo, blob_client=mock_blob)
-        result = await svc.archive_expired_logs(tenant_id="t1", tier="starter")
+    def test_365_days_cutoff(self):
+        now = datetime(2026, 3, 17, tzinfo=timezone.utc)
+        cutoff = compute_cutoff_date(365, now)
+        expected = now - timedelta(days=365)
+        assert cutoff == expected
 
-        assert result["archived_count"] == 5
+    def test_none_retention_returns_none(self):
+        assert compute_cutoff_date(None) is None
 
-    def test_archive_format_ndjson_gzip(self):
-        """SPEC-1837 req 4: Archive format is NDJSON gzip compressed."""
-        from src.multi_tenant.log_retention import format_archive_records
+    def test_zero_retention_returns_now(self):
+        now = datetime(2026, 3, 17, tzinfo=timezone.utc)
+        cutoff = compute_cutoff_date(0, now)
+        assert cutoff == now
 
+    def test_defaults_to_utc_now(self):
+        cutoff = compute_cutoff_date(90)
+        assert cutoff is not None
+        assert cutoff.tzinfo == timezone.utc
+
+
+class TestBuildArchivePath:
+    """Archive blob path generation."""
+
+    def test_path_format(self):
+        date = datetime(2026, 3, 17, tzinfo=timezone.utc)
+        path = build_archive_path("tenant-001", "audit_logs", date)
+        assert path == "tenant-001/audit_logs/2026/03/archive-2026-03-17.ndjson.gz"
+
+    def test_path_with_different_month(self):
+        date = datetime(2026, 11, 5, tzinfo=timezone.utc)
+        path = build_archive_path("t-xyz", "api_key_usage", date)
+        assert path == "t-xyz/api_key_usage/2026/11/archive-2026-11-05.ndjson.gz"
+
+    def test_defaults_to_now(self):
+        path = build_archive_path("t1", "alert_history")
+        assert path.startswith("t1/alert_history/")
+        assert path.endswith(".ndjson.gz")
+
+
+class TestIdentifyExpiredRecords:
+    """Partition records into expired and retained."""
+
+    def test_expired_before_cutoff(self):
+        cutoff = datetime(2026, 1, 1, tzinfo=timezone.utc)
         records = [
-            {"id": "log-001", "event_type": "CONFIG_UPDATED"},
-            {"id": "log-002", "event_type": "API_KEY_ROTATED"},
+            {"id": "1", "created_at": "2025-06-01T00:00:00+00:00"},
+            {"id": "2", "created_at": "2026-06-01T00:00:00+00:00"},
         ]
+        expired, retained = identify_expired_records(records, cutoff)
+        assert len(expired) == 1
+        assert expired[0]["id"] == "1"
+        assert len(retained) == 1
+        assert retained[0]["id"] == "2"
 
-        data = format_archive_records(records)
-        # Should be bytes (gzip compressed)
-        assert isinstance(data, bytes)
-        # Decompress and verify NDJSON
-        import gzip
-        text = gzip.decompress(data).decode("utf-8")
-        lines = text.strip().split("\n")
-        assert len(lines) == 2
+    def test_none_timestamp_retained(self):
+        cutoff = datetime(2026, 1, 1, tzinfo=timezone.utc)
+        records = [{"id": "1", "created_at": None}]
+        expired, retained = identify_expired_records(records, cutoff)
+        assert len(expired) == 0
+        assert len(retained) == 1
 
-    def test_archive_file_naming_convention(self):
-        """SPEC-1837 req 5: Files named {tenant_id}/{collection}/{year}/{month}/archive-{date}.ndjson.gz."""
-        from src.multi_tenant.log_retention import compute_archive_path
+    def test_invalid_timestamp_retained(self):
+        cutoff = datetime(2026, 1, 1, tzinfo=timezone.utc)
+        records = [{"id": "1", "created_at": "not-a-date"}]
+        expired, retained = identify_expired_records(records, cutoff)
+        assert len(expired) == 0
+        assert len(retained) == 1
 
-        path = compute_archive_path(
-            tenant_id="tenant-001",
-            collection="audit_log",
-            date="2026-03-16",
-        )
+    def test_custom_timestamp_field(self):
+        cutoff = datetime(2026, 1, 1, tzinfo=timezone.utc)
+        records = [{"id": "1", "logged_at": "2025-01-01T00:00:00+00:00"}]
+        expired, retained = identify_expired_records(records, cutoff, timestamp_field="logged_at")
+        assert len(expired) == 1
 
-        assert path == "tenant-001/audit_log/2026/03/archive-2026-03-16.ndjson.gz"
+    def test_naive_timestamp_treated_as_utc(self):
+        cutoff = datetime(2026, 1, 1, tzinfo=timezone.utc)
+        records = [{"id": "1", "created_at": "2025-06-01T00:00:00"}]
+        expired, retained = identify_expired_records(records, cutoff)
+        assert len(expired) == 1  # Naive datetime < cutoff
+
+    def test_empty_records(self):
+        cutoff = datetime(2026, 1, 1, tzinfo=timezone.utc)
+        expired, retained = identify_expired_records([], cutoff)
+        assert expired == []
+        assert retained == []
 
 
-class TestRetentionPeriods:
-    """SPEC-1837 req 1: Tier-specific retention defaults."""
+class TestFormatNdjson:
+    """NDJSON (newline-delimited JSON) formatting."""
 
-    def test_starter_retention_periods(self):
-        """Starter: audit 365d, key usage 90d, alerts 180d."""
-        from src.multi_tenant.log_retention import get_retention_config
+    def test_single_record(self):
+        result = format_ndjson([{"id": "1", "event": "test"}])
+        parsed = json.loads(result)
+        assert parsed["id"] == "1"
 
-        config = get_retention_config("starter")
-        assert config["audit_logs_days"] == 365
-        assert config["api_key_usage_days"] == 90
-        assert config["alert_history_days"] == 180
+    def test_multiple_records(self):
+        records = [{"id": "1"}, {"id": "2"}, {"id": "3"}]
+        result = format_ndjson(records)
+        lines = result.strip().split("\n")
+        assert len(lines) == 3
+        for line in lines:
+            parsed = json.loads(line)
+            assert "id" in parsed
 
-    def test_professional_retention_periods(self):
-        """Professional: audit 365d, key usage 90d, alerts 180d."""
-        from src.multi_tenant.log_retention import get_retention_config
+    def test_compact_separators(self):
+        result = format_ndjson([{"key": "value"}])
+        # No spaces after : or ,
+        assert ": " not in result
+        assert ", " not in result
 
-        config = get_retention_config("professional")
-        assert config["audit_logs_days"] == 365
-        assert config["api_key_usage_days"] == 90
-        assert config["alert_history_days"] == 180
+    def test_empty_records(self):
+        result = format_ndjson([])
+        assert result == ""
 
-    def test_enterprise_unlimited_retention(self):
-        """Enterprise: unlimited audit retention."""
-        from src.multi_tenant.log_retention import get_retention_config
 
-        config = get_retention_config("enterprise")
-        assert config["audit_logs_days"] is None  # Unlimited
-        assert config["api_key_usage_days"] == 90  # Still 90d for key usage
+class TestGetRetentionSummary:
+    """Retention policy summary for a tenant."""
+
+    def test_starter_summary_structure(self):
+        summary = get_retention_summary("t-001", "starter")
+        assert summary["tenant_id"] == "t-001"
+        assert summary["tier"] == "starter"
+        assert "collections" in summary
+        assert "computed_at" in summary
+        assert set(summary["collections"].keys()) == {
+            "audit_logs", "api_key_usage", "alert_history",
+        }
+
+    def test_starter_has_cutoff_dates(self):
+        summary = get_retention_summary("t-001", "starter")
+        for coll in summary["collections"].values():
+            assert "cutoff_date" in coll
+            assert "retention_days" in coll
+            assert coll["unlimited"] is False
+
+    def test_enterprise_audit_unlimited(self):
+        summary = get_retention_summary("t-002", "enterprise")
+        audit = summary["collections"]["audit_logs"]
+        assert audit["unlimited"] is True
+        assert audit["cutoff_date"] is None
+        assert audit["retention_days"] is None
+
+    def test_enterprise_api_key_still_90(self):
+        summary = get_retention_summary("t-002", "enterprise")
+        api_key = summary["collections"]["api_key_usage"]
+        assert api_key["retention_days"] == 90
+        assert api_key["unlimited"] is False

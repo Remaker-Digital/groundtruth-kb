@@ -77,6 +77,13 @@ COLLECTION_ADMIN_DOCUMENTATION = "admin_documentation_vectors"
 COLLECTION_CONTACT_MESSAGES = "contact_messages"
 COLLECTION_PLATFORM_ADMINS = "platform_admins"
 
+# Integration Framework containers (SPEC-1773)
+COLLECTION_INTEGRATION_CREDENTIALS = "integration_credentials"
+COLLECTION_INTEGRATION_SYNC_STATE = "integration_sync_state"
+COLLECTION_INTEGRATION_EVENTS = "integration_events"
+COLLECTION_NORMALIZED_TICKETS = "normalized_tickets"
+COLLECTION_NORMALIZED_CONTACTS = "normalized_contacts"
+
 ALL_COLLECTIONS = [
     COLLECTION_TENANTS,
     COLLECTION_CONVERSATIONS,
@@ -98,6 +105,12 @@ ALL_COLLECTIONS = [
     COLLECTION_ADMIN_DOCUMENTATION,
     COLLECTION_CONTACT_MESSAGES,
     COLLECTION_PLATFORM_ADMINS,
+    # Integration Framework (SPEC-1773)
+    COLLECTION_INTEGRATION_CREDENTIALS,
+    COLLECTION_INTEGRATION_SYNC_STATE,
+    COLLECTION_INTEGRATION_EVENTS,
+    COLLECTION_NORMALIZED_TICKETS,
+    COLLECTION_NORMALIZED_CONTACTS,
 ]
 
 # Cosmos DB Serverless — no provisioned throughput (pay per RU consumed)
@@ -117,6 +130,7 @@ TTL_VERIFICATION_TOKEN = 10 * 60           # 10 minutes (email verification link
 TTL_INCIDENTS = 365 * 24 * 60 * 60        # 1 year (incident history retention)
 TTL_ALERT_HISTORY = 90 * 24 * 60 * 60     # 90 days (alert history retention)
 TTL_INGESTION_JOBS = 30 * 24 * 60 * 60   # 30 days (ingestion job retention)
+TTL_INTEGRATION_EVENTS = 30 * 24 * 60 * 60  # 30 days (integration event retention, SPEC-1773)
 TTL_PII_TOKEN_MAPPINGS = 7 * 24 * 60 * 60  # 7 days (PII token mapping retention)
 
 
@@ -1785,7 +1799,7 @@ class CollectionConfig(BaseModel):
 
 
 def get_collection_configs() -> list[CollectionConfig]:
-    """Return collection configurations for all 19 containers.
+    """Return collection configurations for all 25 containers.
 
     These configs are used by the database initialization utility
     to create containers idempotently.
@@ -2257,6 +2271,66 @@ def get_collection_configs() -> list[CollectionConfig]:
             name=COLLECTION_PLATFORM_ADMINS,
             partition_key="/admin_id",
             unique_keys=[["/email"]],
+            indexing_policy={
+                "automatic": True,
+                "indexingMode": "consistent",
+                "includedPaths": [{"path": "/*"}],
+                "excludedPaths": [{"path": '/"_etag"/?'}],
+            },
+        ),
+        # ----- Integration Framework containers (SPEC-1773) -----
+        # 21. integration_credentials — encrypted tokens, API keys
+        CollectionConfig(
+            name=COLLECTION_INTEGRATION_CREDENTIALS,
+            partition_key="/tenant_id",
+            unique_keys=[["/tenant_id", "/integration_id", "/secret_type"]],
+        ),
+        # 22. integration_sync_state — cursors, sync status, errors
+        CollectionConfig(
+            name=COLLECTION_INTEGRATION_SYNC_STATE,
+            partition_key="/tenant_id",
+            unique_keys=[["/tenant_id", "/integration_id"]],
+        ),
+        # 23. integration_events — webhook events, action logs (TTL: 30d)
+        CollectionConfig(
+            name=COLLECTION_INTEGRATION_EVENTS,
+            partition_key="/tenant_id",
+            default_ttl=TTL_INTEGRATION_EVENTS,
+            indexing_policy={
+                "automatic": True,
+                "indexingMode": "consistent",
+                "includedPaths": [
+                    {"path": "/tenant_id/?"},
+                    {"path": "/integration_id/?"},
+                    {"path": "/event_type/?"},
+                    {"path": "/timestamp/?"},
+                ],
+                "excludedPaths": [
+                    {"path": "/payload/*"},
+                    {"path": '/"_etag"/?'},
+                ],
+            },
+        ),
+        # 24. normalized_tickets — ingested helpdesk tickets
+        CollectionConfig(
+            name=COLLECTION_NORMALIZED_TICKETS,
+            partition_key="/tenant_id",
+            unique_keys=[["/tenant_id", "/external_id", "/source"]],
+            indexing_policy={
+                "automatic": True,
+                "indexingMode": "consistent",
+                "includedPaths": [{"path": "/*"}],
+                "excludedPaths": [
+                    {"path": "/raw/*"},
+                    {"path": '/"_etag"/?'},
+                ],
+            },
+        ),
+        # 25. normalized_contacts — unified customer contacts
+        CollectionConfig(
+            name=COLLECTION_NORMALIZED_CONTACTS,
+            partition_key="/tenant_id",
+            unique_keys=[["/tenant_id", "/external_id", "/source"]],
             indexing_policy={
                 "automatic": True,
                 "indexingMode": "consistent",

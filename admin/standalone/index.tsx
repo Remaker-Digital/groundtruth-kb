@@ -42,6 +42,7 @@ import { TeamPage } from './pages/Team';
 import { IntegrationsPage } from './pages/Integrations';
 import { QuickActionsPage } from './pages/QuickActions';
 import { MemoryPrivacyPage } from './pages/MemoryPrivacy';
+import { ABTestingPage } from './pages/ABTesting';
 import { ProtectedRoute } from './components/ProtectedRoute';
 import { TwoFaChallenge } from './components/TwoFaChallenge';
 
@@ -282,6 +283,11 @@ const App: React.FC = () => {
             <Route path="/memory-privacy" element={
               <ProtectedRoute allowedRoles={['superadmin', 'admin']}>
                 <MemoryPrivacyPage />
+              </ProtectedRoute>
+            } />
+            <Route path="/ab-testing" element={
+              <ProtectedRoute allowedRoles={['superadmin', 'admin']}>
+                <ABTestingPage />
               </ProtectedRoute>
             } />
             <Route path="*" element={<NavigateWithQuery to="/" replace />} />

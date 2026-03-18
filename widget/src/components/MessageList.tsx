@@ -69,6 +69,8 @@ interface MessageListProps {
   quickActions?: QuickActionButton[];
   /** Callback when a quick action button is clicked. */
   onQuickAction?: (promptTemplate: string) => void;
+  /** Callback for per-message feedback (SPEC-1836). */
+  onMessageFeedback?: (messageId: string, rating: 'positive' | 'negative') => void;
 }
 
 // ---------------------------------------------------------------------------
@@ -126,6 +128,7 @@ export const MessageList: FunctionComponent<MessageListProps> = ({
   greetingMessage,
   quickActions,
   onQuickAction,
+  onMessageFeedback,
 }) => {
   const scrollRef = useRef<HTMLDivElement>(null);
   const [isAtBottom, setIsAtBottom] = useState(true);
@@ -204,6 +207,7 @@ export const MessageList: FunctionComponent<MessageListProps> = ({
         agentName={agentName}
         agentAvatarUrl={agentAvatarUrl}
         showAvatar={shouldShowAvatar(messages, i)}
+        onFeedback={onMessageFeedback}
       />,
     );
   }

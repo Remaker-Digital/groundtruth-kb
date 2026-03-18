@@ -102,6 +102,7 @@ const NAV_GROUPS: NavGroup[] = [
       { label: 'Deploy Management', path: '/deploy-management', icon: 'deployments', description: 'Deployment orchestration' },
       { label: 'Test Execution', path: '/test-execution', icon: 'diagnostics', description: 'Test pipeline trigger' },
       { label: 'Maintenance', path: '/maintenance', icon: 'status', description: 'Maintenance mode' },
+      { label: 'Experiments', path: '/experiments', icon: 'analytics', description: 'A/B experiment management' },
     ],
   },
   {

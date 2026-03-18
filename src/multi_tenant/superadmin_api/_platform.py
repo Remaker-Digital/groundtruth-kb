@@ -20,6 +20,7 @@ from src.multi_tenant.auth import TenantContext
 from src.multi_tenant.cosmos_schema import AuditEventType
 from src.multi_tenant.middleware import get_tenant_context
 
+from src.multi_tenant.pipeline_metrics import get_aggregator
 from src.multi_tenant.superadmin_api import _monolith as _state
 
 router = _state.router
@@ -152,6 +153,177 @@ class DatabaseMetricsResponse(CamelCaseModel):
     ru_trend: list[dict[str, Any]] = Field(default_factory=list)
 
 
+# ---------------------------------------------------------------------------
+# Infrastructure Topology (SPEC-1786)
+# ---------------------------------------------------------------------------
+
+class InfrastructureNode(CamelCaseModel):
+    """A node in the infrastructure topology graph."""
+
+    node_id: str
+    label: str
+    category: str  # "agent", "azure", "ingress", "egress"
+    node_type: str  # e.g. "container-app", "cosmos-db", "redis", etc.
+    status: str = "healthy"  # "healthy", "degraded", "error"
+    metrics: dict[str, Any] = Field(default_factory=dict)
+    position: dict[str, float] = Field(default_factory=dict)  # x, y for layout
+
+
+class InfrastructureEdge(CamelCaseModel):
+    """A directed edge between infrastructure nodes."""
+
+    source: str
+    target: str
+    label: str = ""
+    volume: int = 0
+    avg_latency_ms: float = 0.0
+    error_rate: float = 0.0
+    protocol: str = ""  # "HTTPS", "TCP", "gRPC", "WebSocket"
+
+
+class InfrastructureTopologyResponse(CamelCaseModel):
+    """Full infrastructure topology with traffic flow (SPEC-1786)."""
+
+    nodes: list[InfrastructureNode]
+    edges: list[InfrastructureEdge]
+    period: str = "24h"
+    total_requests: int = 0
+
+
+# Pre-defined infrastructure topology layout
+# Spatial positions represent logical architecture layers
+INFRASTRUCTURE_NODES = [
+    # Ingress layer (y=0)
+    InfrastructureNode(
+        node_id="shopify-webhook", label="Shopify Webhook",
+        category="ingress", node_type="webhook",
+        position={"x": 0, "y": 0},
+    ),
+    InfrastructureNode(
+        node_id="widget", label="Chat Widget",
+        category="ingress", node_type="widget",
+        position={"x": 1, "y": 0},
+    ),
+    InfrastructureNode(
+        node_id="standalone-admin", label="Standalone Admin",
+        category="ingress", node_type="spa",
+        position={"x": 2, "y": 0},
+    ),
+    InfrastructureNode(
+        node_id="provider-admin", label="Provider Admin",
+        category="ingress", node_type="spa",
+        position={"x": 3, "y": 0},
+    ),
+    InfrastructureNode(
+        node_id="shopify-admin", label="Shopify Admin",
+        category="ingress", node_type="embedded-app",
+        position={"x": 4, "y": 0},
+    ),
+    # API Gateway (y=1)
+    InfrastructureNode(
+        node_id="api-gateway", label="API Gateway",
+        category="azure", node_type="container-app",
+        position={"x": 2, "y": 1},
+    ),
+    # Pipeline agents (y=2)
+    InfrastructureNode(
+        node_id="intent-classifier", label="Intent Classifier",
+        category="agent", node_type="container-app",
+        position={"x": 0, "y": 2},
+    ),
+    InfrastructureNode(
+        node_id="knowledge-retrieval", label="Knowledge Retrieval",
+        category="agent", node_type="container-app",
+        position={"x": 1, "y": 2},
+    ),
+    InfrastructureNode(
+        node_id="response-generator", label="Response Generator",
+        category="agent", node_type="container-app",
+        position={"x": 2, "y": 2},
+    ),
+    InfrastructureNode(
+        node_id="escalation-handler", label="Escalation Handler",
+        category="agent", node_type="container-app",
+        position={"x": 3, "y": 2},
+    ),
+    InfrastructureNode(
+        node_id="analytics-collector", label="Analytics Collector",
+        category="agent", node_type="container-app",
+        position={"x": 4, "y": 2},
+    ),
+    InfrastructureNode(
+        node_id="critic-supervisor", label="Critic Supervisor",
+        category="agent", node_type="container-app",
+        position={"x": 1.5, "y": 3},
+    ),
+    InfrastructureNode(
+        node_id="co-pilot", label="Co-Pilot",
+        category="agent", node_type="container-app",
+        position={"x": 3.5, "y": 3},
+    ),
+    # Infrastructure services (y=4)
+    InfrastructureNode(
+        node_id="cosmos-db", label="Cosmos DB",
+        category="azure", node_type="cosmos-db",
+        position={"x": 0.5, "y": 4},
+    ),
+    InfrastructureNode(
+        node_id="redis", label="Redis Cache",
+        category="azure", node_type="redis",
+        position={"x": 1.5, "y": 4},
+    ),
+    InfrastructureNode(
+        node_id="azure-openai", label="Azure OpenAI",
+        category="azure", node_type="openai",
+        position={"x": 2.5, "y": 4},
+    ),
+    InfrastructureNode(
+        node_id="nats", label="NATS JetStream",
+        category="azure", node_type="nats",
+        position={"x": 3.5, "y": 4},
+    ),
+    InfrastructureNode(
+        node_id="key-vault", label="Key Vault",
+        category="azure", node_type="key-vault",
+        position={"x": 4.5, "y": 4},
+    ),
+    # CDN (y=5)
+    InfrastructureNode(
+        node_id="cdn", label="CDN (Widget JS)",
+        category="azure", node_type="cdn",
+        position={"x": 2, "y": 5},
+    ),
+]
+
+# Canonical infrastructure edges with protocols
+INFRASTRUCTURE_EDGES_DEF = [
+    # Ingress → API Gateway
+    ("shopify-webhook", "api-gateway", "HTTPS", "Webhook events"),
+    ("widget", "api-gateway", "HTTPS", "Chat API"),
+    ("standalone-admin", "api-gateway", "HTTPS", "Admin API"),
+    ("provider-admin", "api-gateway", "HTTPS", "Superadmin API"),
+    ("shopify-admin", "api-gateway", "HTTPS", "Shopify App API"),
+    # API Gateway → Agents
+    ("api-gateway", "intent-classifier", "HTTP", "Pipeline dispatch"),
+    ("intent-classifier", "knowledge-retrieval", "HTTP", "KB lookup"),
+    ("intent-classifier", "escalation-handler", "HTTP", "Escalation"),
+    ("intent-classifier", "co-pilot", "HTTP", "Agent assist"),
+    ("knowledge-retrieval", "response-generator", "HTTP", "Generate"),
+    ("response-generator", "critic-supervisor", "HTTP", "Review"),
+    ("critic-supervisor", "analytics-collector", "HTTP", "Log"),
+    ("escalation-handler", "analytics-collector", "HTTP", "Log"),
+    # Agents → Infrastructure
+    ("api-gateway", "cosmos-db", "TCP", "Document R/W"),
+    ("api-gateway", "redis", "TCP/TLS", "Cache/sessions"),
+    ("response-generator", "azure-openai", "HTTPS", "LLM inference"),
+    ("knowledge-retrieval", "cosmos-db", "TCP", "KB queries"),
+    ("api-gateway", "nats", "TCP", "Event bus"),
+    ("api-gateway", "key-vault", "HTTPS", "Secrets"),
+    # CDN
+    ("cdn", "widget", "HTTPS", "Widget bundle"),
+]
+
+
 # Module-level service reference for pipeline metrics
 
 @router.get(
@@ -165,31 +337,48 @@ async def get_pipeline_topology(
 
 ) -> PipelineTopologyResponse:
     """Return 7-agent pipeline topology with aggregate metrics (SPEC-1579)."""
-    # Build nodes with baseline metrics
+    aggregator = get_aggregator()
+    agent_metrics, edge_metrics, total = await aggregator.get_topology_metrics(
+        period=period
+    )
+
     nodes = []
     for agent_name in PIPELINE_AGENTS:
-        nodes.append(PipelineNodeMetrics(agent=agent_name))
+        am = agent_metrics.get(agent_name)
+        if am:
+            nodes.append(PipelineNodeMetrics(
+                agent=agent_name,
+                invocation_count=am.invocation_count,
+                avg_latency_ms=am.avg_latency_ms,
+                p50_latency_ms=am.p50_latency_ms,
+                p95_latency_ms=am.p95_latency_ms,
+                p99_latency_ms=am.p99_latency_ms,
+                error_rate=am.error_rate,
+                avg_tokens_in=am.avg_tokens_in,
+                avg_tokens_out=am.avg_tokens_out,
+                avg_cost=am.avg_cost,
+            ))
+        else:
+            nodes.append(PipelineNodeMetrics(agent=agent_name))
 
-    # Build edges
     edges = []
     for src, tgt in PIPELINE_EDGES:
-        edges.append(PipelineEdgeMetrics(source=src, target=tgt))
-
-    # When connected to production, these would be populated from
-    # conversation pipeline_trace data via Cosmos DB queries.
-    # For now, return the topology structure with zero metrics.
-    total_conversations = 0
-    if _state._tenant_repo is not None:
-        try:
-            tenant_ids = await _state._tenant_repo.list_active_tenant_ids()
-            total_conversations = len(tenant_ids) * 10  # Estimate
-        except Exception:
-            pass
+        em = edge_metrics.get((src, tgt))
+        if em:
+            edges.append(PipelineEdgeMetrics(
+                source=src,
+                target=tgt,
+                volume=em.volume,
+                avg_transition_latency_ms=em.avg_transition_latency_ms,
+                drop_off_rate=em.drop_off_rate,
+            ))
+        else:
+            edges.append(PipelineEdgeMetrics(source=src, target=tgt))
 
     return PipelineTopologyResponse(
         nodes=nodes,
         edges=edges,
-        total_conversations=total_conversations,
+        total_conversations=total,
         period=period,
     )
 
@@ -212,7 +401,24 @@ async def get_agent_metrics(
             detail=f"Unknown agent: {agent}. Valid agents: {', '.join(PIPELINE_AGENTS)}",
         )
 
-    return AgentDetailMetrics(agent=agent)
+    aggregator = get_aggregator()
+    am = await aggregator.get_agent_detail(agent, period=period)
+    if am is None:
+        return AgentDetailMetrics(agent=agent)
+
+    return AgentDetailMetrics(
+        agent=agent,
+        invocation_count=am.invocation_count,
+        avg_latency_ms=am.avg_latency_ms,
+        p50_latency_ms=am.p50_latency_ms,
+        p95_latency_ms=am.p95_latency_ms,
+        p99_latency_ms=am.p99_latency_ms,
+        error_rate=am.error_rate,
+        error_log=am.error_log[:50],  # Cap at 50 entries
+        latency_trend=am.latency_trend,
+        token_usage_trend=am.token_usage_trend,
+        cost_trend=am.cost_trend,
+    )
 
 
 @router.get(
@@ -230,10 +436,10 @@ async def get_tenant_comparison(
     """Return all tenants with pipeline metrics (SPEC-1581, SPEC-1785)."""
     tenants: list[TenantPipelineSummary] = []
 
+    # Fetch tenant display info from directory
+    tenant_info: dict[str, dict[str, Any]] = {}
     if _state._tenant_repo is not None:
         try:
-            # Fetch tenant details in a single cross-partition query
-            # so the comparison table shows human-readable names (SPEC-1785).
             query = (
                 "SELECT c.tenant_id, c.customer_email, c.brand_name, c.tier "
                 "FROM c WHERE c.status = 'active'"
@@ -243,23 +449,58 @@ async def get_tenant_comparison(
                 max_item_count=500,
             ):
                 tid = item.get("tenant_id", "")
-                # Display priority: brand_name > customer_email > tenant_id
-                display = (
-                    item.get("brand_name")
-                    or item.get("customer_email")
-                    or tid
-                )
-                tenants.append(TenantPipelineSummary(
-                    tenant_id=tid,
-                    display_name=display,
-                    tier=item.get("tier"),
-                ))
+                tenant_info[tid] = item
         except Exception as exc:
             logger.warning("Failed to list tenants for pipeline: %s", exc)
+
+    # Get aggregated metrics from the pipeline aggregator
+    aggregator = get_aggregator()
+    tenant_metrics = await aggregator.get_tenant_comparison(period="24h")
+
+    # Merge directory info with aggregated metrics
+    all_tenant_ids = set(tenant_info.keys()) | set(tenant_metrics.keys())
+    for tid in all_tenant_ids:
+        info = tenant_info.get(tid, {})
+        metrics = tenant_metrics.get(tid)
+        display = (
+            info.get("brand_name")
+            or info.get("customer_email")
+            or tid
+        )
+        t_tier = info.get("tier")
+
+        summary = TenantPipelineSummary(
+            tenant_id=tid,
+            display_name=display,
+            tier=t_tier,
+        )
+        if metrics:
+            summary.total_conversations = metrics.total_conversations
+            summary.billable_conversations = metrics.billable_conversations
+            summary.avg_latency_ms = metrics.avg_latency_ms
+            summary.error_rate = metrics.error_rate
+            summary.escalation_rate = metrics.escalation_rate
+            summary.token_consumption = metrics.total_tokens
+            summary.cost = metrics.total_cost
+            summary.estimated_ru = metrics.estimated_ru
+            summary.resolution_rate = metrics.resolution_rate
+
+        tenants.append(summary)
 
     # Apply tier filter
     if tier:
         tenants = [t for t in tenants if t.tier == tier]
+
+    # Apply sorting
+    sort_field = sort_by.replace("camelCase", "")  # Accept both formats
+    reverse = sort_order != "asc"
+    try:
+        tenants.sort(
+            key=lambda t: getattr(t, sort_by, 0) or 0,
+            reverse=reverse,
+        )
+    except (AttributeError, TypeError):
+        pass
 
     return TenantComparisonResponse(
         tenants=tenants,
@@ -281,9 +522,24 @@ async def get_tenant_pipeline_metrics(
 
 ) -> TenantDetailMetrics:
     """Return detailed pipeline metrics for a single tenant (SPEC-1582)."""
+    aggregator = get_aggregator()
+    tm = await aggregator.get_tenant_detail(tenant_id, period=period)
+
+    if tm is None:
+        return TenantDetailMetrics(
+            tenant_id=tenant_id,
+            display_name=tenant_id,
+        )
+
     return TenantDetailMetrics(
         tenant_id=tenant_id,
-        display_name=tenant_id,
+        display_name=tm.display_name or tenant_id,
+        total_conversations=tm.total_conversations,
+        volume_trend=tm.volume_trend,
+        cost_trend=tm.cost_trend,
+        agent_breakdown=tm.agent_breakdown,
+        intent_distribution=tm.intent_distribution,
+        recent_conversations=tm.recent_conversations,
     )
 
 
@@ -297,7 +553,87 @@ async def get_database_metrics(
 
 ) -> DatabaseMetricsResponse:
     """Return Cosmos DB operational metrics (SPEC-1583)."""
-    return DatabaseMetricsResponse()
+    aggregator = get_aggregator()
+    db_data = await aggregator.get_database_metrics()
+
+    return DatabaseMetricsResponse(
+        collections=db_data.get("collections", []),
+        total_documents=db_data.get("total_documents", 0),
+        estimated_storage_mb=db_data.get("estimated_storage_mb", 0.0),
+        per_tenant=db_data.get("per_tenant", []),
+        ru_trend=db_data.get("ru_trend", []),
+    )
+
+
+@router.get(
+    "/pipeline/infrastructure",
+    response_model=InfrastructureTopologyResponse,
+    summary="Get infrastructure topology with traffic flow (SPEC-1786)",
+    status_code=200,
+)
+async def get_infrastructure_topology(
+    period: str = "24h",
+
+) -> InfrastructureTopologyResponse:
+    """Return full infrastructure topology with real traffic flow data.
+
+    Combines the static infrastructure graph (Azure services, ingress points,
+    pipeline agents) with live metrics from the pipeline aggregator to show
+    directional traffic volume, latency, and error rates on each edge.
+    """
+    aggregator = get_aggregator()
+    agent_metrics, edge_metrics, total = await aggregator.get_topology_metrics(
+        period=period
+    )
+
+    # Build nodes with health status from agent metrics
+    nodes: list[InfrastructureNode] = []
+    for node_def in INFRASTRUCTURE_NODES:
+        node = InfrastructureNode(
+            node_id=node_def.node_id,
+            label=node_def.label,
+            category=node_def.category,
+            node_type=node_def.node_type,
+            position=node_def.position,
+        )
+        # Enrich agent nodes with live metrics
+        am = agent_metrics.get(node_def.node_id)
+        if am and am.invocation_count > 0:
+            node.status = (
+                "error" if am.error_rate > 0.05
+                else "degraded" if am.error_rate > 0.01
+                else "healthy"
+            )
+            node.metrics = {
+                "invocation_count": am.invocation_count,
+                "avg_latency_ms": round(am.avg_latency_ms, 1),
+                "error_rate": round(am.error_rate, 4),
+            }
+        nodes.append(node)
+
+    # Build edges with traffic metrics
+    infra_edges: list[InfrastructureEdge] = []
+    for src, tgt, protocol, label in INFRASTRUCTURE_EDGES_DEF:
+        edge = InfrastructureEdge(
+            source=src,
+            target=tgt,
+            label=label,
+            protocol=protocol,
+        )
+        # Enrich agent-to-agent edges with live metrics
+        em = edge_metrics.get((src, tgt))
+        if em and em.volume > 0:
+            edge.volume = em.volume
+            edge.avg_latency_ms = round(em.avg_transition_latency_ms, 1)
+            edge.error_rate = round(em.drop_off_rate, 4)
+        infra_edges.append(edge)
+
+    return InfrastructureTopologyResponse(
+        nodes=nodes,
+        edges=infra_edges,
+        period=period,
+        total_requests=total,
+    )
 
 
 # ---------------------------------------------------------------------------

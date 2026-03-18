@@ -343,7 +343,7 @@ def main() -> int:
     
     print("\n🎉 Integration testing setup complete!")
     print("\nNext steps:")
-    print("1. Start the application: uvicorn src.main:app --reload --port 8080")
+    print("1. Start the application: uvicorn src.main:app --reload --port 8000")
     print("2. Run integration tests: pytest tests/integration_real_services.py -v")
     print("3. Optional: Use Stripe CLI for webhook testing")
     

@@ -4,6 +4,9 @@
   "private": true,
   "description": "Agent Red Customer Experience — Provider admin console (platform operator / SPA)",
   "type": "module",
+  "engines": {
+    "node": ">=20.0"
+  },
   "scripts": {
     "sync-env": "powershell -ExecutionPolicy Bypass -File ../../scripts/sync-admin-env.ps1",
     "predev": "npm run sync-env",

@@ -1,0 +1,58 @@
+{
+  "_comment": "Per-module coverage targets by criticality tier (SPEC-1844 / WI-1487). CI step compares against these targets, fails if any module drops >2% below previous.",
+  "targets": {
+    "critical": {
+      "description": "Customer-facing and auth modules — must have highest coverage",
+      "target_pct": 85,
+      "regression_threshold_pct": 2,
+      "modules": [
+        "src/chat/",
+        "src/multi_tenant/auth.py",
+        "src/multi_tenant/middleware.py",
+        "src/multi_tenant/tenant_auth.py",
+        "src/multi_tenant/rate_limiter.py"
+      ]
+    },
+    "high": {
+      "description": "Core infrastructure — API endpoints, Cosmos, Redis",
+      "target_pct": 80,
+      "regression_threshold_pct": 2,
+      "modules": [
+        "src/multi_tenant/cosmos_client.py",
+        "src/multi_tenant/cosmos_schema.py",
+        "src/multi_tenant/repositories/",
+        "src/multi_tenant/entitlement_service.py",
+        "src/multi_tenant/tenant_config_api.py"
+      ]
+    },
+    "medium": {
+      "description": "Admin, monitoring, and operational modules",
+      "target_pct": 70,
+      "regression_threshold_pct": 3,
+      "modules": [
+        "src/multi_tenant/superadmin_api/",
+        "src/multi_tenant/default_alert_rules.py",
+        "src/multi_tenant/api_key_audit.py",
+        "src/quality_metrics/"
+      ]
+    },
+    "low": {
+      "description": "Scripts, utilities, and internal tooling",
+      "target_pct": 60,
+      "regression_threshold_pct": 5,
+      "modules": [
+        "scripts/",
+        "tools/"
+      ]
+    }
+  },
+  "global": {
+    "target_pct": 80,
+    "current_gate_pct": 75,
+    "ramp_schedule": [
+      {"session": "S200", "gate_pct": 75},
+      {"session": "S202", "gate_pct": 78},
+      {"session": "S204", "gate_pct": 80}
+    ]
+  }
+}

@@ -339,8 +339,8 @@ export const ESCALATION_CATEGORIES: EscalationCategoryDef[] = [
 // Integrations (C10)
 // ---------------------------------------------------------------------------
 
-export type IntegrationType = 'shopify' | 'zendesk' | 'mailchimp' | 'google_analytics' | 'stripe';
-export type IntegrationStatus = 'connected' | 'disconnected' | 'error' | null;
+export type IntegrationType = 'shopify' | 'zendesk' | 'mailchimp' | 'google_analytics' | 'stripe' | 'slack' | 'google_docs';
+export type IntegrationStatusType = 'connected' | 'disconnected' | 'error' | 'syncing' | null;
 
 export interface IntegrationSummary {
   type: IntegrationType;
@@ -348,14 +348,48 @@ export interface IntegrationSummary {
   description: string;
   icon: string;
   enabled: boolean;
-  status: IntegrationStatus;
+  status: IntegrationStatusType;
   tierGate: string | null;
   tierMet: boolean;
   comingSoon: boolean;
+  // SPEC-1772: Sync & status extensions
+  lastSyncAt?: string | null;
+  lastSyncStatus?: 'success' | 'error' | null;
+  articleCount?: number;
+  ticketCount?: number;
+  contactCount?: number;
+  category?: 'helpdesk' | 'channel' | 'knowledge' | 'ecommerce' | 'crm' | 'analytics';
+  capabilities?: string[];
+  authType?: 'oauth2' | 'api_key' | 'none';
 }
 
 export interface IntegrationDetail extends IntegrationSummary {
   configFields: Array<{ key: string; label: string; type: string }>;
+  // SPEC-1772: Detail extensions
+  syncHistory?: SyncEvent[];
+  actionConfig?: ActionConfigItem[];
+  connectionLogs?: ConnectionLogEntry[];
+}
+
+export interface SyncEvent {
+  timestamp: string;
+  status: 'success' | 'error';
+  itemsSynced: number;
+  errorMessage?: string;
+}
+
+export interface ActionConfigItem {
+  actionType: string;
+  label: string;
+  enabled: boolean;
+  hitlPolicy: 'always' | 'default' | 'optional' | 'never';
+}
+
+export interface ConnectionLogEntry {
+  timestamp: string;
+  level: 'info' | 'warning' | 'error';
+  message: string;
+  details?: string;
 }
 
 export interface IntegrationResponse {

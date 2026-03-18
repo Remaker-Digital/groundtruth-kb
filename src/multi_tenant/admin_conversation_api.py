@@ -796,6 +796,63 @@ async def get_conversation_messages(
 
 
 # ---------------------------------------------------------------------------
+# GET /api/admin/conversations/{conversation_id}/export-csv — CSV transcript
+# ---------------------------------------------------------------------------
+
+
+@router.get(
+    "/{conversation_id}/export-csv",
+    summary="Export conversation transcript as CSV (SPEC-0195)",
+    description="Returns a downloadable CSV file containing the full conversation "
+    "transcript with timestamp, role, and message content columns.",
+    responses={
+        200: {"content": {"text/csv": {}}, "description": "CSV transcript download"},
+        404: {"description": "Conversation not found"},
+        503: {"description": "Admin conversation services not initialized"},
+    },
+)
+async def export_conversation_csv(
+    conversation_id: str,
+    ctx: TenantContext = Depends(get_tenant_context),
+):
+    """Export a conversation transcript as a downloadable CSV file.
+
+    Columns: timestamp, role, content, message_id.
+    """
+    import csv
+    import io
+
+    from fastapi.responses import StreamingResponse
+
+    repo = _get_repo()
+    doc = await _read_conversation(repo, ctx.tenant_id, conversation_id)
+
+    raw_messages = doc.get("messages", [])
+
+    output = io.StringIO()
+    writer = csv.writer(output)
+    writer.writerow(["timestamp", "role", "content", "message_id"])
+
+    for m in raw_messages:
+        writer.writerow([
+            m.get("timestamp", ""),
+            m.get("role", ""),
+            m.get("content", ""),
+            m.get("message_id", ""),
+        ])
+
+    csv_content = output.getvalue()
+    output.close()
+
+    filename = f"transcript-{conversation_id}.csv"
+    return StreamingResponse(
+        iter([csv_content]),
+        media_type="text/csv",
+        headers={"Content-Disposition": f'attachment; filename="{filename}"'},
+    )
+
+
+# ---------------------------------------------------------------------------
 # GET /api/admin/conversations/{conversation_id}/trace — Pipeline trace
 # ---------------------------------------------------------------------------
 

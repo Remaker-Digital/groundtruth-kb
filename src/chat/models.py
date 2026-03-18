@@ -241,6 +241,62 @@ class IssueReportResponse(BaseModel):
     accepted: bool = Field(default=True, description="Whether the report was accepted")
 
 
+class MessageFeedbackRequest(BaseModel):
+    """Request body for POST /api/chat/conversations/{id}/messages/{message_id}/feedback.
+
+    Allows end users to rate individual AI responses with thumbs up/down.
+    SPEC-1836: User Feedback Mechanism.
+    """
+
+    rating: str = Field(
+        description="Feedback rating: 'positive' (thumbs up) or 'negative' (thumbs down)",
+        pattern="^(positive|negative)$",
+    )
+    comment: str | None = Field(
+        default=None,
+        max_length=500,
+        description="Optional free-text comment explaining the rating",
+    )
+
+
+class MessageFeedbackResponse(BaseModel):
+    """Response body for POST /api/chat/conversations/{id}/messages/{message_id}/feedback."""
+
+    conversation_id: str = Field(description="Conversation the feedback belongs to")
+    message_id: str = Field(description="Message that was rated")
+    rating: str = Field(description="Recorded rating (positive/negative)")
+    accepted: bool = Field(default=True, description="Whether the feedback was recorded")
+
+
+class QualityScore(BaseModel):
+    """Per-turn or aggregate conversation quality score (CQ-1, SPEC-0180).
+
+    Scores are on a 1.0-5.0 scale. The overall score is a weighted average:
+    faithfulness (40%) + relevancy (40%) + tone (20%).
+    """
+
+    faithfulness: float = Field(ge=1.0, le=5.0, description="Faithfulness to knowledge context (1-5)")
+    relevancy: float = Field(ge=1.0, le=5.0, description="Answer relevancy to customer question (1-5)")
+    tone: float = Field(ge=1.0, le=5.0, description="Tone compliance — professional, no profanity (1-5)")
+    overall: float = Field(ge=1.0, le=5.0, description="Weighted average: 0.4F + 0.4R + 0.2T")
+    issues: list[str] = Field(default_factory=list, description="Human-readable issue descriptions")
+
+    @property
+    def passed(self) -> bool:
+        """Score passes if overall >= 3.5."""
+        return self.overall >= 3.5
+
+
+class ConversationQualityResponse(BaseModel):
+    """Response for GET /api/superadmin/conversations/{id}/quality (CQ-1)."""
+
+    conversation_id: str = Field(description="Conversation identifier")
+    turn_scores: list[QualityScore] = Field(default_factory=list, description="Per-turn quality scores")
+    aggregate: QualityScore | None = Field(default=None, description="Aggregate conversation score")
+    turn_count: int = Field(default=0, description="Number of scored turns")
+    passed: bool = Field(default=False, description="Whether conversation meets quality threshold")
+
+
 class ConsentUpdateRequest(BaseModel):
     """Request body for POST /api/chat/conversations/{conversation_id}/consent.
 

@@ -15,15 +15,19 @@ import pytest
 from src.multi_tenant.superadmin_api import (
     AgentDetailMetrics,
     DatabaseMetricsResponse,
+    InfrastructureTopologyResponse,
     PipelineTopologyResponse,
     TenantComparisonResponse,
     TenantDetailMetrics,
     configure_superadmin_services,
     get_agent_metrics,
     get_database_metrics,
+    get_infrastructure_topology,
     get_pipeline_topology,
     get_tenant_comparison,
     get_tenant_pipeline_metrics,
+    INFRASTRUCTURE_EDGES_DEF,
+    INFRASTRUCTURE_NODES,
     PIPELINE_AGENTS,
     PIPELINE_EDGES,
 )
@@ -237,3 +241,89 @@ class TestDatabaseMetrics:
         assert hasattr(result, "estimated_storage_mb")
         assert hasattr(result, "per_tenant")
         assert hasattr(result, "ru_trend")
+
+
+# ---------------------------------------------------------------------------
+# TestInfrastructureTopology -- SPEC-1786
+# ---------------------------------------------------------------------------
+
+class TestInfrastructureTopology:
+    """Tests for infrastructure topology endpoint."""
+
+    @pytest.mark.asyncio
+    async def test_returns_infrastructure_response(self, superadmin_ctx):
+        """GET /pipeline/infrastructure returns topology (SPEC-1786)."""
+        result = await get_infrastructure_topology(period="24h")
+        assert isinstance(result, InfrastructureTopologyResponse)
+        assert result.period == "24h"
+
+    @pytest.mark.asyncio
+    async def test_includes_all_infrastructure_nodes(self, superadmin_ctx):
+        """Infrastructure topology includes all defined nodes."""
+        result = await get_infrastructure_topology(period="24h")
+        assert len(result.nodes) == len(INFRASTRUCTURE_NODES)
+
+    @pytest.mark.asyncio
+    async def test_includes_all_infrastructure_edges(self, superadmin_ctx):
+        """Infrastructure topology includes all defined edges."""
+        result = await get_infrastructure_topology(period="24h")
+        assert len(result.edges) == len(INFRASTRUCTURE_EDGES_DEF)
+
+    @pytest.mark.asyncio
+    async def test_node_categories(self, superadmin_ctx):
+        """Nodes have valid categories."""
+        result = await get_infrastructure_topology(period="24h")
+        valid_categories = {"agent", "azure", "ingress", "egress"}
+        for node in result.nodes:
+            assert node.category in valid_categories
+
+    @pytest.mark.asyncio
+    async def test_node_positions(self, superadmin_ctx):
+        """Nodes have spatial position data for topology layout."""
+        result = await get_infrastructure_topology(period="24h")
+        for node in result.nodes:
+            assert "x" in node.position
+            assert "y" in node.position
+
+    @pytest.mark.asyncio
+    async def test_includes_agent_nodes(self, superadmin_ctx):
+        """Infrastructure includes all 7 pipeline agent nodes."""
+        result = await get_infrastructure_topology(period="24h")
+        agent_nodes = [n for n in result.nodes if n.category == "agent"]
+        assert len(agent_nodes) == 7
+
+    @pytest.mark.asyncio
+    async def test_includes_azure_services(self, superadmin_ctx):
+        """Infrastructure includes Azure service nodes."""
+        result = await get_infrastructure_topology(period="24h")
+        azure_ids = {n.node_id for n in result.nodes if n.category == "azure"}
+        assert "cosmos-db" in azure_ids
+        assert "redis" in azure_ids
+        assert "azure-openai" in azure_ids
+        assert "nats" in azure_ids
+        assert "key-vault" in azure_ids
+
+    @pytest.mark.asyncio
+    async def test_includes_ingress_points(self, superadmin_ctx):
+        """Infrastructure includes all ingress/egress points."""
+        result = await get_infrastructure_topology(period="24h")
+        ingress_ids = {n.node_id for n in result.nodes if n.category == "ingress"}
+        assert "shopify-webhook" in ingress_ids
+        assert "widget" in ingress_ids
+        assert "standalone-admin" in ingress_ids
+        assert "provider-admin" in ingress_ids
+
+    @pytest.mark.asyncio
+    async def test_edge_protocol_field(self, superadmin_ctx):
+        """Edges have protocol information."""
+        result = await get_infrastructure_topology(period="24h")
+        protocols = {e.protocol for e in result.edges}
+        assert "HTTPS" in protocols
+        assert "HTTP" in protocols
+
+    @pytest.mark.asyncio
+    async def test_node_status_default_healthy(self, superadmin_ctx):
+        """Nodes default to healthy status when no errors."""
+        result = await get_infrastructure_topology(period="24h")
+        for node in result.nodes:
+            assert node.status in ("healthy", "degraded", "error")

@@ -22,6 +22,8 @@ rendered UI against real backend). No mocked APIs, stubs, or code inspection.
     Phase 14  : Upgrade Verification (live multi-tenant assertions)
     Phase 15  : External Verification (live URL reachability checks)
     Phase 16  : Widget Embed (live widget bundle/config/CORS checks)
+    Phase 17  : API Fuzzing (Schemathesis OpenAPI fuzz testing, SPEC-1839)
+    Phase 18  : Property Tests (Hypothesis property-based testing, SPEC-1843)
     Summary   : Print table, create DEFECTs, write log, update KB phases
 
 Removed phases (SPEC-1649 — mocked/inspection tests excluded from PLAN-001):
@@ -917,6 +919,57 @@ def phase_16_widget_embed(args: argparse.Namespace) -> PhaseResult:
 
 
 # ---------------------------------------------------------------------------
+# Phase 17 — API Fuzzing (PHASE-017) — SPEC-1839
+# ---------------------------------------------------------------------------
+def phase_17_api_fuzzing(args: argparse.Namespace) -> PhaseResult:
+    """Run Schemathesis API fuzz tests against OpenAPI schema (SPEC-1839).
+
+    Generates random valid inputs for every endpoint and checks for 500 errors
+    and schema mismatches.
+    """
+    t0 = time.time()
+    passed, failed, errors, xfailed, dt, _ = _run_pytest(
+        "tests/fuzzing/",
+        timeout=600, prefix="  [fuzzing] ",
+        extra_env={"RATE_LIMIT_DISABLED": "true"},
+    )
+
+    if failed == 0 and errors == 0 and passed > 0:
+        log("PASS", f"  API Fuzzing: {passed} passed")
+        return PhaseResult(17, "API Fuzzing", "PASS", dt,
+                           extra=f"[{passed}]")
+    else:
+        detail = f"{passed} passed, {failed} failed, {errors} errors"
+        log("FAIL", f"  API Fuzzing: {detail}")
+        return PhaseResult(17, "API Fuzzing", "FAIL", dt, detail)
+
+
+# ---------------------------------------------------------------------------
+# Phase 18 — Property Tests (PHASE-018) — SPEC-1843
+# ---------------------------------------------------------------------------
+def phase_18_property_tests(args: argparse.Namespace) -> PhaseResult:
+    """Run Hypothesis property-based tests (SPEC-1843).
+
+    These tests verify algebraic properties (transitivity, monotonicity,
+    idempotency) of core business logic using random input generation.
+    """
+    t0 = time.time()
+    passed, failed, errors, xfailed, dt, _ = _run_pytest(
+        "tests/property/",
+        timeout=120, prefix="  [property] ",
+    )
+
+    if failed == 0 and errors == 0 and passed > 0:
+        log("PASS", f"  Property Tests: {passed} passed")
+        return PhaseResult(18, "Property Tests", "PASS", dt,
+                           extra=f"[{passed}]")
+    else:
+        detail = f"{passed} passed, {failed} failed, {errors} errors"
+        log("FAIL", f"  Property Tests: {detail}")
+        return PhaseResult(18, "Property Tests", "FAIL", dt, detail)
+
+
+# ---------------------------------------------------------------------------
 # Summary — create DEFECTs, write log, update KB
 # ---------------------------------------------------------------------------
 def run_summary(results: list[PhaseResult], args: argparse.Namespace,
@@ -1016,11 +1069,12 @@ def run_summary(results: list[PhaseResult], args: argparse.Namespace,
 # Phases 5 → 6 → 8 → 9 → 7 (rate limiting last among security).
 # Removed phases: 4 (mocked ops), 12 (mocked UI)
 # Restored phases: 2 (data seeding), 11 (conversation quality), 15 (external verify), 16 (widget embed)
-PHASE_ORDER_ALL = [1, 2, 3, 5, 6, 8, 9, 7, 10, 11, 13, 14, 15, 16]
+PHASE_ORDER_ALL = [1, 2, 3, 5, 6, 8, 9, 7, 10, 11, 13, 14, 15, 16, 17, 18]
 
 PHASE_GROUPS = {
     "live":     [1, 2, 3, 5, 6, 8, 9, 7, 10, 11, 13, 14, 15, 16],
     "security": [5, 6, 8, 9, 7],
+    "quality":  [17, 18],
     "all":      PHASE_ORDER_ALL,
 }
 
@@ -1228,6 +1282,8 @@ def main():
         14: lambda: phase_14_upgrade_verification(args),
         15: lambda: phase_15_external_verification(args),
         16: lambda: phase_16_widget_embed(args),
+        17: lambda: phase_17_api_fuzzing(args),
+        18: lambda: phase_18_property_tests(args),
     }
 
     prev_was_live = False

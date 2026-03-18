@@ -1268,3 +1268,75 @@ async def revoke_mfa_opt_out(
                  payload={"action": "mfa_opt_out_revoked", "member_id": member_id})
 
     return {"status": "opt_out_revoked", "message": f"MFA opt-out revoked for member {member_id}."}
+
+
+# ---------------------------------------------------------------------------
+# SPEC-0761: Customer admin account provisioning
+# ---------------------------------------------------------------------------
+
+async def provision_customer_admin(
+    tenant_id: str,
+    customer_email: str,
+    display_name: str = "Account Administrator",
+) -> dict[str, str]:
+    """Create a standard admin account for customer handoff (SPEC-0761).
+
+    Called during tenant provisioning to create a second admin account
+    for the customer's email address. This account is separate from the
+    hidden superadmin and is the account the customer uses day-to-day.
+
+    The customer_email MUST differ from the superadmin email.
+
+    Returns:
+        Dict with member_id, email, and raw API key (shown once).
+    """
+    repo = _get_repo()
+
+    # Guard: check duplicate
+    existing = await repo.find_by_email(tenant_id, customer_email)
+    if existing is not None:
+        return {
+            "member_id": existing.get("id", ""),
+            "email": customer_email,
+            "api_key": "(already exists)",
+            "created": False,
+        }
+
+    now = datetime.now(timezone.utc).isoformat()
+    member_id = f"{tenant_id}:{customer_email}"
+
+    raw_api_key = generate_user_api_key(tenant_id)
+    key_hash = hash_api_key(raw_api_key)
+    key_prefix = raw_api_key[:12] + "..."
+
+    from src.multi_tenant.cosmos_schema import TeamMemberDocument
+
+    doc = TeamMemberDocument(
+        id=member_id,
+        tenant_id=tenant_id,
+        email=customer_email,
+        display_name=display_name,
+        role=TeamMemberRole.ADMIN,
+        is_active=True,
+        escalation_categories=[],
+        max_concurrent_conversations=5,
+        user_api_key_hash=key_hash,
+        user_api_key_prefix=key_prefix,
+        created_at=now,
+        updated_at=now,
+        invited_by="provisioning",
+    )
+
+    await repo.create(tenant_id, doc)
+
+    logger.info(
+        "Customer admin provisioned: tenant=%s email=%s member_id=%s",
+        tenant_id, customer_email, member_id,
+    )
+
+    return {
+        "member_id": member_id,
+        "email": customer_email,
+        "api_key": raw_api_key,
+        "created": True,
+    }

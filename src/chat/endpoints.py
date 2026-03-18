@@ -7,6 +7,7 @@ Routes:
     GET  /api/chat/stream/{conversation_id}   — SSE stream of AI response
     GET  /api/chat/conversations/{id}         — Get conversation state
     POST /api/chat/conversations/{id}/end     — End conversation
+    POST /api/chat/conversations/{id}/messages/{mid}/feedback — Rate AI message (SPEC-1836)
     WS   /ws/chat/{conversation_id}           — WebSocket for typing/presence
 
 Authentication:
@@ -48,6 +49,8 @@ from src.chat.models import (
     EndConversationResponse,
     IssueReportRequest,
     IssueReportResponse,
+    MessageFeedbackRequest,
+    MessageFeedbackResponse,
     SendMessageRequest,
     SendMessageResponse,
     WebSocketMessage,
@@ -870,6 +873,136 @@ async def report_issue(
         conversation_id=conversation_id,
         issue_id=issue_id,
         accepted=True,
+    )
+
+
+# ---------------------------------------------------------------------------
+# POST /api/chat/conversations/{id}/messages/{message_id}/feedback — SPEC-1836
+# ---------------------------------------------------------------------------
+
+
+@router.post(
+    "/conversations/{conversation_id}/messages/{message_id}/feedback",
+    response_model=MessageFeedbackResponse,
+    summary="Submit feedback on an AI message",
+    description=(
+        "Allows end users to rate individual AI responses with thumbs up/down "
+        "and an optional comment. SPEC-1836: User Feedback Mechanism."
+    ),
+    responses={
+        404: {"description": "Conversation or message not found"},
+        422: {"description": "Invalid rating or message is not an AI response"},
+        503: {"description": "Chat service not initialized"},
+    },
+)
+async def submit_message_feedback(
+    conversation_id: str,
+    message_id: str,
+    request: MessageFeedbackRequest,
+    ctx: TenantContext = Depends(get_tenant_context),
+) -> MessageFeedbackResponse:
+    """Record per-message feedback (thumbs up/down) on an AI response.
+
+    Feedback is stored as metadata on the message within the conversation
+    document and also written to the audit log for analytics.
+
+    Only AI messages can receive feedback — customer and system messages
+    return 422.
+    """
+    from datetime import datetime, timezone
+
+    session = _get_session()
+
+    # Verify conversation exists for this tenant
+    try:
+        state = await session.get_conversation(ctx.tenant_id, conversation_id)
+    except ConversationNotFoundError:
+        raise HTTPException(status_code=404, detail="Conversation not found")
+
+    # Find the target message and verify it's an AI message
+    target_msg = None
+    target_idx = None
+    for idx, msg in enumerate(state.messages):
+        if msg.message_id == message_id:
+            target_msg = msg
+            target_idx = idx
+            break
+
+    if target_msg is None:
+        raise HTTPException(status_code=404, detail="Message not found in conversation")
+
+    if target_msg.role.value != "ai":
+        raise HTTPException(
+            status_code=422,
+            detail=f"Only AI messages can receive feedback (got role={target_msg.role.value})",
+        )
+
+    # Build the feedback payload
+    now_iso = datetime.now(timezone.utc).isoformat()
+    feedback_data = {
+        "feedback_rating": request.rating,
+        "feedback_at": now_iso,
+    }
+    if request.comment:
+        feedback_data["feedback_comment"] = request.comment
+
+    # Persist feedback on the message via Cosmos patch
+    try:
+        if session._conversation_repo:
+            # Patch the message's metadata to include feedback
+            # First ensure the message has metadata dict
+            existing_metadata = target_msg.metadata or {}
+            existing_metadata.update(feedback_data)
+
+            await session._conversation_repo.patch(
+                ctx.tenant_id,
+                conversation_id,
+                [
+                    {
+                        "op": "set",
+                        "path": f"/messages/{target_idx}/metadata",
+                        "value": existing_metadata,
+                    },
+                ],
+            )
+    except Exception:
+        logger.warning(
+            "Failed to persist message feedback: conv=%s msg=%s",
+            conversation_id,
+            message_id,
+        )
+
+    # Audit log entry (SPEC-1836: feedback trail)
+    try:
+        from src.multi_tenant.cosmos_schema import AuditEventType
+        from src.multi_tenant.repository import AuditLogRepository
+
+        audit_repo = AuditLogRepository()
+        await audit_repo.log_event(
+            tenant_id=ctx.tenant_id,
+            event_type=AuditEventType.SECURITY_EVENT,
+            actor_id=f"customer:{conversation_id}",
+            resource_type="message_feedback",
+            resource_id=message_id,
+            details={
+                "action": "message_feedback",
+                "conversation_id": conversation_id,
+                "message_id": message_id,
+                "rating": request.rating,
+                "comment": request.comment[:200] if request.comment else None,
+            },
+        )
+    except Exception:
+        logger.warning(
+            "Failed to write audit log for message feedback: conv=%s msg=%s",
+            conversation_id,
+            message_id,
+        )
+
+    return MessageFeedbackResponse(
+        conversation_id=conversation_id,
+        message_id=message_id,
+        rating=request.rating,
     )
 
 

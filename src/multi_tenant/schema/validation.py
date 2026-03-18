@@ -303,17 +303,23 @@ def _validate_enum(
     if not isinstance(value, str):
         return False, f"Field '{field_name}' must be a string", None
 
-    sanitized = value.strip().lower()
+    stripped = value.strip()
 
-    if rules.allowed_values and sanitized not in rules.allowed_values:
-        allowed = ", ".join(rules.allowed_values)
-        return (
-            False,
-            f"Field '{field_name}' must be one of: {allowed}",
-            None,
-        )
+    if rules.allowed_values:
+        # Case-insensitive match, but return the canonical form from allowed_values
+        # to preserve casing like zh-TW (WI-1493)
+        lookup = {v.lower(): v for v in rules.allowed_values}
+        canonical = lookup.get(stripped.lower())
+        if canonical is None:
+            allowed = ", ".join(rules.allowed_values)
+            return (
+                False,
+                f"Field '{field_name}' must be one of: {allowed}",
+                None,
+            )
+        return True, None, canonical
 
-    return True, None, sanitized
+    return True, None, stripped.lower()
 
 
 def _validate_string_list(

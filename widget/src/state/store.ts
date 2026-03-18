@@ -28,6 +28,8 @@ export interface Message {
   streaming?: boolean;
   /** Set if the Critic retracted this message post-stream. */
   retracted?: boolean;
+  /** Per-message feedback rating: 'positive' or 'negative' (SPEC-1836). */
+  feedbackRating?: 'positive' | 'negative' | null;
 }
 
 export interface PreChatData {

@@ -916,3 +916,123 @@ async def record_deployment_event(
         event_type=body.event_type,
         version=body.version,
     )
+
+
+# ---------------------------------------------------------------------------
+# GET /api/superadmin/diagnostics/api-key-usage — SPEC-1832
+# ---------------------------------------------------------------------------
+
+
+class ApiKeyUsageRecord(CamelCaseModel):
+    """Single API key usage event from audit log."""
+
+    tenant_id: str
+    auth_method: str
+    key_suffix: str
+    path: str
+    method: str
+    client_ip: str | None = None
+    team_member_id: str | None = None
+    timestamp: str | None = None
+
+
+class ApiKeyUsageResponse(CamelCaseModel):
+    """Response for GET /api/superadmin/diagnostics/api-key-usage."""
+
+    records: list[ApiKeyUsageRecord] = []
+    total: int = 0
+    buffer_pending: int = 0
+
+
+@_state.router.get(
+    "/diagnostics/api-key-usage",
+    response_model=ApiKeyUsageResponse,
+    summary="API key usage audit trail (SPEC-1832)",
+    description=(
+        "Returns recent API key usage events from the audit log. "
+        "Includes auth method, key suffix (last 8 chars), path, and client IP."
+    ),
+    tags=["diagnostics"],
+)
+async def get_api_key_usage(
+    tenant_id: str | None = Query(default=None, description="Filter by tenant_id"),
+    auth_method: str | None = Query(default=None, description="Filter by auth method"),
+    days: int = Query(default=7, ge=1, le=90, description="Lookback period in days"),
+    limit: int = Query(default=100, ge=1, le=1000, description="Max records to return"),
+) -> ApiKeyUsageResponse:
+    """Query API key usage audit trail (SPEC-1832).
+
+    Returns events from the audit log where action = 'api_key_usage'.
+    Also reports the current in-memory buffer size (records waiting to flush).
+    """
+    from datetime import timedelta
+
+    audit_repo = _state._audit_repo
+    if not audit_repo:
+        raise HTTPException(status_code=503, detail="Audit repository not configured")
+
+    # Get buffer stats
+    try:
+        from src.multi_tenant.api_key_audit import get_api_key_audit_buffer
+        buffer_pending = get_api_key_audit_buffer().pending_count
+    except Exception:
+        buffer_pending = 0
+
+    period_start = datetime.now(timezone.utc) - timedelta(days=days)
+
+    # Query audit log for api_key_usage events
+    try:
+        # Build query with optional filters
+        conditions = [
+            "c.details.action = 'api_key_usage'",
+            "c.created_at >= @start",
+        ]
+        params = [{"name": "@start", "value": period_start.isoformat()}]
+
+        if tenant_id:
+            conditions.append("c.tenant_id = @tid")
+            params.append({"name": "@tid", "value": tenant_id})
+
+        if auth_method:
+            conditions.append("c.details.auth_method = @method")
+            params.append({"name": "@method", "value": auth_method})
+
+        where_clause = " AND ".join(conditions)
+        query = (
+            f"SELECT TOP {limit} c.tenant_id, c.details, c.created_at "
+            f"FROM c WHERE {where_clause} "
+            f"ORDER BY c.created_at DESC"
+        )
+
+        results = await audit_repo.query_raw(
+            query=query,
+            parameters=params,
+            cross_partition=True,
+        )
+    except AttributeError:
+        # Fallback if audit_repo doesn't have query_raw
+        results = []
+    except Exception:
+        logger.warning("API key usage query failed")
+        results = []
+
+    # Map results to response model
+    records = []
+    for row in results:
+        details = row.get("details", {})
+        records.append(ApiKeyUsageRecord(
+            tenant_id=row.get("tenant_id", ""),
+            auth_method=details.get("auth_method", ""),
+            key_suffix=details.get("key_suffix", ""),
+            path=details.get("path", ""),
+            method=details.get("method", ""),
+            client_ip=details.get("client_ip"),
+            team_member_id=details.get("team_member_id"),
+            timestamp=row.get("created_at"),
+        ))
+
+    return ApiKeyUsageResponse(
+        records=records,
+        total=len(records),
+        buffer_pending=buffer_pending,
+    )

@@ -43,14 +43,22 @@ class TestCosmosReadinessProbe:
     @pytest.mark.asyncio
     async def test_ready_includes_cosmos_db_status_unhealthy(self):
         """TEST-10439: When Cosmos is unreachable, cosmos_db.status = unhealthy and ready=false."""
-        from src.multi_tenant.cosmos_readiness import check_cosmos_ready
+        from src.multi_tenant.cosmos_readiness import check_cosmos_ready, _clear_cache
+
+        _clear_cache()
 
         mock_container = AsyncMock()
         mock_container.read_item.side_effect = Exception("Connection refused")
 
+        mock_database = AsyncMock()
+        mock_database.list_containers.side_effect = Exception("Connection refused")
+
         with patch(
             "src.multi_tenant.cosmos_readiness._get_platform_config_container",
             return_value=mock_container,
+        ), patch(
+            "src.multi_tenant.cosmos_readiness._get_database",
+            return_value=mock_database,
         ):
             result = await check_cosmos_ready()
 
@@ -120,10 +128,12 @@ class TestCosmosReadinessProbe:
         # Sentinel not found
         mock_container.read_item.side_effect = Exception("NotFound")
 
-        mock_database = AsyncMock()
-        mock_database.list_containers.return_value = AsyncMock(
-            __aiter__=AsyncMock(return_value=iter([{"id": "platform_config"}]))
-        )
+        # Create a proper async iterator for list_containers
+        async def mock_list_containers(**kwargs):
+            yield {"id": "platform_config"}
+
+        mock_database = MagicMock()
+        mock_database.list_containers = mock_list_containers
 
         with patch(
             "src.multi_tenant.cosmos_readiness._get_platform_config_container",
