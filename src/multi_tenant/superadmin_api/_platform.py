@@ -296,28 +296,29 @@ INFRASTRUCTURE_NODES = [
 ]
 
 # Canonical infrastructure edges with protocols
+# Transport hierarchy per SPEC-1802: SLIM (primary) → NATS (fallback) → HTTP (external)
 INFRASTRUCTURE_EDGES_DEF = [
-    # Ingress → API Gateway
+    # Ingress → API Gateway (external, HTTPS)
     ("shopify-webhook", "api-gateway", "HTTPS", "Webhook events"),
-    ("widget", "api-gateway", "HTTPS", "Chat API"),
+    ("widget", "api-gateway", "HTTPS/SSE", "Chat API + streaming"),
     ("standalone-admin", "api-gateway", "HTTPS", "Admin API"),
     ("provider-admin", "api-gateway", "HTTPS", "Superadmin API"),
     ("shopify-admin", "api-gateway", "HTTPS", "Shopify App API"),
-    # API Gateway → Agents
-    ("api-gateway", "intent-classifier", "HTTP", "Pipeline dispatch"),
-    ("intent-classifier", "knowledge-retrieval", "HTTP", "KB lookup"),
-    ("intent-classifier", "escalation-handler", "HTTP", "Escalation"),
-    ("intent-classifier", "co-pilot", "HTTP", "Agent assist"),
-    ("knowledge-retrieval", "response-generator", "HTTP", "Generate"),
-    ("response-generator", "critic-supervisor", "HTTP", "Review"),
-    ("critic-supervisor", "analytics-collector", "HTTP", "Log"),
-    ("escalation-handler", "analytics-collector", "HTTP", "Log"),
-    # Agents → Infrastructure
-    ("api-gateway", "cosmos-db", "TCP", "Document R/W"),
-    ("api-gateway", "redis", "TCP/TLS", "Cache/sessions"),
+    # API Gateway → Agents (internal, SLIM transport — SPEC-1802)
+    ("api-gateway", "intent-classifier", "SLIM", "Pipeline dispatch"),
+    ("intent-classifier", "knowledge-retrieval", "SLIM", "KB lookup"),
+    ("intent-classifier", "escalation-handler", "SLIM", "Escalation"),
+    ("intent-classifier", "co-pilot", "SLIM", "Agent assist"),
+    ("knowledge-retrieval", "response-generator", "SLIM", "Generate"),
+    ("response-generator", "critic-supervisor", "SLIM", "Review"),
+    ("critic-supervisor", "analytics-collector", "SLIM", "Log"),
+    ("escalation-handler", "analytics-collector", "SLIM", "Log"),
+    # Agents → Infrastructure services
+    ("api-gateway", "cosmos-db", "HTTPS", "Document R/W"),
+    ("api-gateway", "redis", "TLS", "Cache/sessions (port 6380)"),
     ("response-generator", "azure-openai", "HTTPS", "LLM inference"),
-    ("knowledge-retrieval", "cosmos-db", "TCP", "KB queries"),
-    ("api-gateway", "nats", "TCP", "Event bus"),
+    ("knowledge-retrieval", "cosmos-db", "HTTPS", "KB queries"),
+    ("api-gateway", "nats", "TCP", "Event bus (blocked — WI-1319)"),
     ("api-gateway", "key-vault", "HTTPS", "Secrets"),
     # CDN
     ("cdn", "widget", "HTTPS", "Widget bundle"),
