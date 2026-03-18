@@ -384,16 +384,18 @@ class VerificationRunner:
             return CheckResult(status="error", detail=str(exc))
 
     async def _check_redis(self) -> CheckResult:
-        """Internal: Redis ping."""
+        """Internal: Redis connectivity via REDIS_URL env var."""
         try:
-            from src.multi_tenant.redis_client import get_redis_client
-            client = get_redis_client()
-            if client:
-                pong = await client.ping()
-                return CheckResult(status="pass" if pong else "fail", detail=f"ping={pong}")
-            return CheckResult(status="skip", detail="Redis client not configured")
+            redis_url = os.environ.get("REDIS_URL", "")
+            if not redis_url:
+                return CheckResult(status="skip", detail="REDIS_URL not set")
+            import redis.asyncio as aioredis
+            client = aioredis.from_url(redis_url, socket_timeout=5, username=None)
+            pong = await client.ping()
+            await client.aclose()
+            return CheckResult(status="pass" if pong else "fail", detail=f"ping={pong}")
         except Exception as exc:
-            return CheckResult(status="error", detail=str(exc))
+            return CheckResult(status="error", detail=str(exc)[:200])
 
     async def _check_key_vault(self) -> CheckResult:
         """Internal: Key Vault URL configured."""
