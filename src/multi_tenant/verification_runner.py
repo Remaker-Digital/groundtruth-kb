@@ -38,8 +38,8 @@ logger = logging.getLogger(__name__)
 class CheckResult:
     """Result of a single verification check."""
 
-    name: str
-    category: str       # health, api, config, security, tenant_isolation
+    name: str = ""      # set by _run_check() after execution
+    category: str = ""  # health, api, config, security, tenant_isolation — set by _run_check()
     status: str = "pass"  # pass, fail, skip, error
     latency_ms: float = 0.0
     detail: str = ""
@@ -145,8 +145,8 @@ class VerificationRunner:
             if i + batch_size < len(all_checks):
                 await asyncio.sleep(1.0)
 
-        # Final status
-        failed = sum(1 for r in self._results if r.status == "fail")
+        # Final status — "fail" or "error" both count as failures
+        failed = sum(1 for r in self._results if r.status in ("fail", "error"))
         final_status = "passed" if failed == 0 else "failed"
         await self._update_cosmos(final_status, total=len(all_checks))
 
