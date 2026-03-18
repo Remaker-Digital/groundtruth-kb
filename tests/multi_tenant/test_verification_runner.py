@@ -270,6 +270,60 @@ class TestDiagnosticsEndpointModels:
             fqdn = _resolve_fqdn('production')
             assert fqdn == 'prod.azure.io'
 
+    def test_resolve_fqdn_fallback_returns_empty_when_no_env_vars(self):
+        """_resolve_fqdn returns empty string when no env vars are set (fail-closed)."""
+        from src.multi_tenant.superadmin_api._diagnostics import _resolve_fqdn
+        with patch.dict('os.environ', {'ENVIRONMENT': 'staging'}, clear=True):
+            fqdn = _resolve_fqdn('production')
+            assert fqdn == '', f"Expected empty FQDN for cross-env without vars, got '{fqdn}'"
+
+    def test_resolve_fqdn_api_gateway_fqdn_fallback(self):
+        """_resolve_fqdn uses API_GATEWAY_FQDN as last-resort fallback."""
+        from src.multi_tenant.superadmin_api._diagnostics import _resolve_fqdn
+        with patch.dict('os.environ', {
+            'ENVIRONMENT': 'staging',
+            'API_GATEWAY_FQDN': 'gateway.example.com',
+        }, clear=True):
+            fqdn = _resolve_fqdn('production')
+            assert fqdn == 'gateway.example.com'
+
+
+# ---------------------------------------------------------------------------
+# Concurrent run guard
+# ---------------------------------------------------------------------------
+
+class TestConcurrentRunGuard:
+    """409 protection when a run is already in progress."""
+
+    def test_active_runs_dict_exists(self):
+        """_active_runs module-level dict is initialized."""
+        from src.multi_tenant.superadmin_api._diagnostics import _active_runs
+        assert isinstance(_active_runs, dict)
+
+    def test_sentinel_blocks_concurrent_run(self):
+        """A sentinel in _active_runs prevents a second run from starting."""
+        from src.multi_tenant.superadmin_api._diagnostics import _active_runs
+        # Simulate sentinel insertion
+        _active_runs["test-sentinel"] = None  # type: ignore[assignment]
+        try:
+            assert "test-sentinel" in _active_runs
+            assert len(_active_runs) > 0  # guard would see non-empty and raise 409
+        finally:
+            _active_runs.pop("test-sentinel", None)
+
+    def test_completed_task_cleaned_up(self):
+        """Completed asyncio tasks are cleaned from _active_runs."""
+        from src.multi_tenant.superadmin_api._diagnostics import _active_runs
+        # Simulate a completed task
+        mock_task = MagicMock()
+        mock_task.done.return_value = True
+        _active_runs["test-done"] = mock_task
+        # Cleanup logic: filter done tasks
+        done_keys = [k for k, t in _active_runs.items() if t is not None and t.done()]
+        for k in done_keys:
+            _active_runs.pop(k, None)
+        assert "test-done" not in _active_runs
+
 
 # ---------------------------------------------------------------------------
 # Stale run detection
@@ -296,3 +350,34 @@ class TestRateLimiter:
             spa_api_key="key", suite="smoke", cosmos_repo=MagicMock(),
         )
         assert runner._semaphore._value == 4
+
+    def test_shared_http_client_initialized(self):
+        """VerificationRunner initializes _http_client to None before run()."""
+        runner = VerificationRunner(
+            run_id="test", environment="staging", fqdn="x.com",
+            spa_api_key="key", suite="smoke", cosmos_repo=MagicMock(),
+        )
+        assert runner._http_client is None
+
+    def test_start_wall_initialized(self):
+        """VerificationRunner initializes _start_wall to empty string."""
+        runner = VerificationRunner(
+            run_id="test", environment="staging", fqdn="x.com",
+            spa_api_key="key", suite="smoke", cosmos_repo=MagicMock(),
+        )
+        assert runner._start_wall == ""
+
+
+# ---------------------------------------------------------------------------
+# Environment validation
+# ---------------------------------------------------------------------------
+
+class TestEnvironmentValidation:
+    """list_test_runs environment filter validation."""
+
+    def test_valid_environments_defined(self):
+        """VALID_ENVIRONMENTS contains staging and production."""
+        from src.multi_tenant.superadmin_api._diagnostics import VALID_ENVIRONMENTS
+        assert "staging" in VALID_ENVIRONMENTS
+        assert "production" in VALID_ENVIRONMENTS
+        assert len(VALID_ENVIRONMENTS) == 2

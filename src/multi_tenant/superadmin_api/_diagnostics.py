@@ -89,7 +89,7 @@ async def _probe_redis() -> _ProbeResult:
         from src.multi_tenant.entitlement_service import get_entitlement_service
         svc = get_entitlement_service()
         if svc._redis_client is not None:
-            svc._redis_client.ping()
+            await asyncio.to_thread(svc._redis_client.ping)
             elapsed = (time.monotonic() - start) * 1000
             return _ProbeResult("redis", True, elapsed, "PONG")
         elapsed = (time.monotonic() - start) * 1000
@@ -100,14 +100,14 @@ async def _probe_redis() -> _ProbeResult:
 
 
 async def _probe_key_vault() -> _ProbeResult:
-    """Probe Key Vault connectivity."""
+    """Probe Key Vault configuration (config-only, not connectivity)."""
     start = time.monotonic()
     try:
         import os
         kv_url = os.environ.get("KEY_VAULT_URL", "")
         elapsed = (time.monotonic() - start) * 1000
         if kv_url:
-            return _ProbeResult("key_vault", True, elapsed, f"Configured: {kv_url[:30]}...")
+            return _ProbeResult("key_vault", True, elapsed, "KEY_VAULT_URL configured")
         return _ProbeResult("key_vault", False, elapsed, "KEY_VAULT_URL not set")
     except Exception as exc:
         elapsed = (time.monotonic() - start) * 1000
@@ -380,12 +380,20 @@ async def trigger_test_run(
         )
 
     # SPEC-1846: Check for concurrent runs (only one at a time)
-    active = {k: t for k, t in _active_runs.items() if not t.done()}
-    if active:
+    # Clean up completed tasks first
+    done_keys = [k for k, t in _active_runs.items() if t is not None and t.done()]
+    for k in done_keys:
+        _active_runs.pop(k, None)
+
+    if _active_runs:
+        active_id = next(iter(_active_runs))
         raise HTTPException(
             status_code=409,
-            detail=f"A verification run is already in progress: {list(active.keys())[0]}",
+            detail=f"A verification run is already in progress: {active_id}",
         )
+
+    # Insert sentinel BEFORE any await to close TOCTOU window
+    _active_runs[run_id] = None  # type: ignore[assignment]
 
     # SPEC-1845: Resolve FQDN from runtime config (never hardcoded)
     fqdn = _resolve_fqdn(body.environment)
@@ -433,9 +441,13 @@ async def trigger_test_run(
         updated_at=now_iso,
         updated_by=actor,
     )
-    await repo.set_config(run_doc)
+    try:
+        await repo.set_config(run_doc)
+    except Exception:
+        _active_runs.pop(run_id, None)  # Remove sentinel on Cosmos failure
+        raise
 
-    # SPEC-1846: Fire background verification task
+    # SPEC-1846: Fire background verification task (replaces sentinel)
     task = asyncio.create_task(
         _run_verification_background(run_id, body.environment, body.suite, fqdn, spa_key, actor)
     )
@@ -561,24 +573,22 @@ def _resolve_fqdn(environment: str) -> str:
     if fqdn:
         return fqdn
 
-    # Fallback: well-known FQDN (logged as warning per SPEC-1845)
-    known_fqdns = {
-        "staging": os.environ.get(
-            "API_GATEWAY_FQDN",
-            "agent-red-api-gateway.orangeglacier-f566a4e7.eastus.azurecontainerapps.io",
-        ),
-        "production": os.environ.get(
-            "API_GATEWAY_FQDN",
-            "agent-red-api-gateway.orangeglacier-f566a4e7.eastus.azurecontainerapps.io",
-        ),
-    }
-    fqdn = known_fqdns.get(environment, "")
+    # Fallback: API_GATEWAY_FQDN only for self-environment (fail-closed for cross-env)
+    fqdn = os.environ.get("API_GATEWAY_FQDN", "")
     if fqdn:
         logger.warning(
-            "Using fallback FQDN for %s: %s (set %s env var for explicit config)",
+            "Using API_GATEWAY_FQDN fallback for %s: %s (set %s env var for explicit config)",
             environment, fqdn, env_key,
         )
-    return fqdn
+        return fqdn
+
+    # No FQDN resolved — caller will receive empty string → 500 response
+    logger.error(
+        "Cannot resolve FQDN for environment '%s'. "
+        "Set CONTAINER_APP_FQDN (self-env) or %s (cross-env).",
+        environment, env_key,
+    )
+    return ""
 
 
 @router.get(
@@ -644,6 +654,12 @@ async def list_test_runs(
     ]
 
     if environment:
+        if environment not in VALID_ENVIRONMENTS:
+            raise HTTPException(
+                status_code=400,
+                detail=f"Invalid environment filter '{environment}'. "
+                f"Valid: {sorted(VALID_ENVIRONMENTS)}",
+            )
         query += "AND c.value.environment = @env "
         params.append({"name": "@env", "value": environment})
 
@@ -1169,7 +1185,7 @@ async def diagnostic_health() -> SystemHealthResponse:
         from src.multi_tenant.entitlement_service import get_entitlement_service
         svc = get_entitlement_service()
         if svc._redis_client is not None:
-            svc._redis_client.ping()
+            await asyncio.to_thread(svc._redis_client.ping)
             services["redis"] = {"status": "healthy", "detail": "Connected"}
         else:
             services["redis"] = {"status": "degraded", "detail": "No Redis client"}

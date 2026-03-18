@@ -107,6 +107,8 @@ class VerificationRunner:
         self._semaphore = asyncio.Semaphore(4)
         self._results: list[CheckResult] = []
         self._start_time: float = 0.0
+        self._start_wall: str = ""  # Captured once at run() start; stable across Cosmos updates
+        self._http_client: Any = None  # Shared httpx.AsyncClient for the run
 
     # ------------------------------------------------------------------
     # Public API
@@ -114,41 +116,50 @@ class VerificationRunner:
 
     async def run(self) -> list[CheckResult]:
         """Execute all checks for the configured suite and return results."""
+        import httpx
+
         self._start_time = time.monotonic()
+        self._start_wall = datetime.now(timezone.utc).isoformat()
         categories = SUITE_CATEGORIES.get(self.suite, ["health"])
         all_checks = self._get_checks_for_categories(categories)
 
-        # Store initial "running" status
-        await self._update_cosmos("running", total=len(all_checks))
-
-        # Run checks in batches of 4 with cooldown
-        batch_size = 4
-        for i in range(0, len(all_checks), batch_size):
-            batch = all_checks[i:i + batch_size]
-            batch_results = await asyncio.gather(
-                *(self._run_check(check_fn) for check_fn in batch),
-                return_exceptions=True,
-            )
-            for result in batch_results:
-                if isinstance(result, Exception):
-                    self._results.append(CheckResult(
-                        name="unknown", category="error", status="error",
-                        detail=str(result),
-                    ))
-                else:
-                    self._results.append(result)
-
-            # Progressive update after each batch
+        # Shared HTTP client for all checks (single TLS handshake per FQDN)
+        self._http_client = httpx.AsyncClient(timeout=15.0, verify=True)
+        try:
+            # Store initial "running" status
             await self._update_cosmos("running", total=len(all_checks))
 
-            # Cooldown between batches (1s) to respect rate limits
-            if i + batch_size < len(all_checks):
-                await asyncio.sleep(1.0)
+            # Run checks in batches of 4 with cooldown
+            batch_size = 4
+            for i in range(0, len(all_checks), batch_size):
+                batch = all_checks[i:i + batch_size]
+                batch_results = await asyncio.gather(
+                    *(self._run_check(check_fn) for check_fn in batch),
+                    return_exceptions=True,
+                )
+                for result in batch_results:
+                    if isinstance(result, Exception):
+                        self._results.append(CheckResult(
+                            name="unknown", category="error", status="error",
+                            detail=str(result),
+                        ))
+                    else:
+                        self._results.append(result)
 
-        # Final status — "fail" or "error" both count as failures
-        failed = sum(1 for r in self._results if r.status in ("fail", "error"))
-        final_status = "passed" if failed == 0 else "failed"
-        await self._update_cosmos(final_status, total=len(all_checks))
+                # Progressive update after each batch
+                await self._update_cosmos("running", total=len(all_checks))
+
+                # Cooldown between batches (1s) to respect rate limits
+                if i + batch_size < len(all_checks):
+                    await asyncio.sleep(1.0)
+
+            # Final status — "fail" or "error" both count as failures
+            failed = sum(1 for r in self._results if r.status in ("fail", "error"))
+            final_status = "passed" if failed == 0 else "failed"
+            await self._update_cosmos(final_status, total=len(all_checks))
+        finally:
+            await self._http_client.aclose()
+            self._http_client = None
 
         logger.info(
             "Verification run %s completed: %s (%d/%d passed, %.1fs)",
@@ -266,6 +277,7 @@ class VerificationRunner:
 
         Returns (status_code, headers_dict, body_text).
         SPEC-1845: Uses runtime SPA key, never hardcoded.
+        Uses shared httpx.AsyncClient for connection reuse.
         """
         import httpx
         headers: dict[str, str] = {
@@ -276,10 +288,13 @@ class VerificationRunner:
             headers["X-API-Key"] = self.spa_api_key
 
         url = f"{self.base_url}{path}"
-        async with httpx.AsyncClient(timeout=timeout, verify=True) as client:
-            resp = await client.get(url, headers=headers)
-            resp_headers = {k.lower(): v for k, v in resp.headers.items()}
-            return resp.status_code, resp_headers, resp.text
+        client = self._http_client
+        if client is None:
+            # Fallback: create a one-off client (should not happen in normal flow)
+            client = httpx.AsyncClient(timeout=timeout, verify=True)
+        resp = await client.get(url, headers=headers, timeout=timeout)
+        resp_headers = {k.lower(): v for k, v in resp.headers.items()}
+        return resp.status_code, resp_headers, resp.text
 
     async def _http_options(
         self, path: str, *, timeout: float = 10.0,
@@ -291,10 +306,12 @@ class VerificationRunner:
             "Access-Control-Request-Method": "GET",
         }
         url = f"{self.base_url}{path}"
-        async with httpx.AsyncClient(timeout=timeout, verify=True) as client:
-            resp = await client.options(url, headers=headers)
-            resp_headers = {k.lower(): v for k, v in resp.headers.items()}
-            return resp.status_code, resp_headers
+        client = self._http_client
+        if client is None:
+            client = httpx.AsyncClient(timeout=timeout, verify=True)
+        resp = await client.options(url, headers=headers, timeout=timeout)
+        resp_headers = {k.lower(): v for k, v in resp.headers.items()}
+        return resp.status_code, resp_headers
 
     async def _update_cosmos(
         self, status: str, *, total: int = 0,
@@ -321,10 +338,7 @@ class VerificationRunner:
                     "suite": self.suite,
                     "status": status,
                     "triggered_by": self.actor,
-                    "started_at": datetime.fromtimestamp(
-                        time.time() - (time.monotonic() - self._start_time),
-                        tz=timezone.utc,
-                    ).isoformat(),
+                    "started_at": self._start_wall,
                     "completed_at": now_iso if status in ("passed", "failed", "error") else None,
                     "total_tests": total,
                     "completed": len(self._results),
@@ -365,23 +379,33 @@ class VerificationRunner:
         return CheckResult(status="fail", detail=f"HTTP {code}: {body[:200]}")
 
     async def _check_api_version(self) -> CheckResult:
-        """Internal: verify PRODUCT_VERSION is set."""
-        try:
-            from src.multi_tenant.api_versioning import PRODUCT_VERSION
-            if PRODUCT_VERSION:
-                return CheckResult(status="pass", detail=f"v{PRODUCT_VERSION}")
-            return CheckResult(status="fail", detail="PRODUCT_VERSION is empty")
-        except Exception as exc:
-            return CheckResult(status="error", detail=str(exc))
+        """GET /ready and verify x-product-version header (GOV-10: live interface)."""
+        code, headers, _ = await self._http_get("/ready", auth=False)
+        version = headers.get("x-product-version", "")
+        if code == 200 and version:
+            return CheckResult(status="pass", detail=f"v{version}")
+        if code == 200:
+            return CheckResult(status="fail", detail="200 but no x-product-version header")
+        return CheckResult(status="fail", detail=f"HTTP {code}")
 
     async def _check_cosmos(self) -> CheckResult:
-        """Internal: Cosmos DB readiness probe."""
-        try:
-            from src.multi_tenant.cosmos_readiness import check_cosmos_ready
-            ok, detail = await check_cosmos_ready()
-            return CheckResult(status="pass" if ok else "fail", detail=detail)
-        except Exception as exc:
-            return CheckResult(status="error", detail=str(exc))
+        """GET /ready and verify Cosmos status from response body (GOV-10: live interface)."""
+        import json
+        code, _, body = await self._http_get("/ready", auth=False)
+        if code == 200:
+            try:
+                data = json.loads(body)
+                cosmos_status = data.get("cosmos", data.get("cosmosDb", "unknown"))
+                if isinstance(cosmos_status, dict):
+                    cosmos_status = cosmos_status.get("status", "unknown")
+                is_ok = str(cosmos_status).lower() in ("healthy", "ok", "true", "ready")
+                return CheckResult(
+                    status="pass" if is_ok else "fail",
+                    detail=f"Cosmos: {cosmos_status}",
+                )
+            except json.JSONDecodeError:
+                return CheckResult(status="pass", detail="200 OK (non-JSON readiness body)")
+        return CheckResult(status="fail", detail=f"HTTP {code}")
 
     async def _check_redis(self) -> CheckResult:
         """Internal: Redis connectivity via REDIS_URL env var."""
@@ -398,10 +422,10 @@ class VerificationRunner:
             return CheckResult(status="error", detail=str(exc)[:200])
 
     async def _check_key_vault(self) -> CheckResult:
-        """Internal: Key Vault URL configured."""
+        """Internal: Key Vault URL configured (config check, not connectivity)."""
         kv_url = os.environ.get("KEY_VAULT_URL", "")
         if kv_url:
-            return CheckResult(status="pass", detail=f"URL configured: {kv_url[:30]}...")
+            return CheckResult(status="pass", detail="KEY_VAULT_URL configured (config-only check)")
         return CheckResult(status="skip", detail="KEY_VAULT_URL not set")
 
     async def _check_spa_assets(self) -> CheckResult:

@@ -12,7 +12,7 @@
  * (c) 2026 Remaker Digital, a DBA of VanDusen & Palmeter, LLC. All rights reserved.
  */
 
-import React, { useCallback, useEffect, useState } from 'react';
+import React, { useCallback, useEffect, useRef, useState } from 'react';
 import {
   Badge,
   Button,
@@ -20,7 +20,6 @@ import {
   Group,
   Loader,
   Modal,
-  Progress,
   Select,
   Stack,
   Switch,
@@ -99,8 +98,9 @@ export const TestExecutionPage: React.FC = () => {
   const [triggerDryRun, setTriggerDryRun] = useState(false);
   const [triggering, setTriggering] = useState(false);
 
-  // Detail modal
-  const [detailRun, setDetailRun] = useState<PipelineRun | null>(null);
+  // Detail modal — track by ID, derive data from runs to stay in sync with polling
+  const [detailRunId, setDetailRunId] = useState<string | null>(null);
+  const detailRun = detailRunId ? runs.find(r => r.runId === detailRunId) ?? null : null;
 
   const loadData = useCallback(async () => {
     setLoading(true);
@@ -160,12 +160,20 @@ export const TestExecutionPage: React.FC = () => {
     }
   }, [apiFetch, onNotify]);
 
-  // SPEC-1846: Auto-refresh running tests every 3 seconds
+  // SPEC-1846: Auto-refresh running tests every 3 seconds (with unmount guard)
+  const mountedRef = useRef(true);
+  useEffect(() => {
+    mountedRef.current = true;
+    return () => { mountedRef.current = false; };
+  }, []);
+
   useEffect(() => {
     const runningRuns = runs.filter(r => r.status === 'running' || r.status === 'queued');
     if (runningRuns.length === 0) return;
     const interval = setInterval(() => {
-      runningRuns.forEach(r => refreshRun(r.runId));
+      if (mountedRef.current) {
+        runningRuns.forEach(r => refreshRun(r.runId));
+      }
     }, 3000);
     return () => clearInterval(interval);
   }, [runs, refreshRun]);
@@ -240,10 +248,10 @@ export const TestExecutionPage: React.FC = () => {
                   ) : '—'}
                 </Table.Td>
                 <Table.Td>{r.durationS != null ? `${r.durationS}s` : '—'}</Table.Td>
-                <Table.Td>{new Date(r.startedAt).toLocaleString()}</Table.Td>
+                <Table.Td>{r.startedAt ? new Date(r.startedAt).toLocaleString() : '—'}</Table.Td>
                 <Table.Td>
                   <Group gap="xs">
-                    <Button size="xs" variant="subtle" onClick={() => setDetailRun(r)}>Details</Button>
+                    <Button size="xs" variant="subtle" onClick={() => setDetailRunId(r.runId)}>Details</Button>
                     {(r.status === 'queued' || r.status === 'running') && (
                       <Button size="xs" variant="light" onClick={() => refreshRun(r.runId)}>Refresh</Button>
                     )}
@@ -288,7 +296,7 @@ export const TestExecutionPage: React.FC = () => {
       </Modal>
 
       {/* Detail Modal — SPEC-1846: progress bar, checks table, copy for Claude */}
-      <Modal opened={!!detailRun} onClose={() => setDetailRun(null)} title={`Run ${detailRun?.runId}`} size="xl">
+      <Modal opened={!!detailRun} onClose={() => setDetailRunId(null)} title={`Run ${detailRun?.runId}`} size="xl">
         {detailRun && (
           <Stack gap="sm">
             <Group>
@@ -350,8 +358,8 @@ export const TestExecutionPage: React.FC = () => {
                     </Table.Tr>
                   </Table.Thead>
                   <Table.Tbody>
-                    {detailRun.checks.map((c, i) => (
-                      <Table.Tr key={i}>
+                    {detailRun.checks.map((c) => (
+                      <Table.Tr key={`${c.category}-${c.name}`}>
                         <Table.Td><Text size="xs">{c.name}</Text></Table.Td>
                         <Table.Td><Badge size="xs" variant="light">{c.category}</Badge></Table.Td>
                         <Table.Td>
