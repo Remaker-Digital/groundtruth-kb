@@ -9,6 +9,108 @@ All notable changes to Agent Red Customer Experience are documented here.
 
 ---
 
+## v1.93.5 — Cloud-Native Verification Runner & Code Review Hardening (Staging, 2026-03-18)
+
+### Cloud-native verification runner (SPEC-1845/1846)
+
+SPA-triggered end-to-end health checks that run entirely within the Azure environment:
+
+- **4 verification suites:** Smoke (8 health probes, ~5s), Regression (25 checks, ~3min), E2E (31 checks, ~8min), Full (36 checks, ~12min)
+- **Progressive Cosmos updates** — SPA polls for real-time progress with pass/fail counts
+- **Shared HTTP client** — single TLS handshake per run instead of per-check
+- **GOV-10 compliance** — all health checks use live HTTP interfaces, not internal imports
+- **TOCTOU-safe concurrent run guard** — sentinel-based protection prevents duplicate runs
+- **Fail-closed FQDN resolution** — cross-environment runs require explicit env var config
+
+### Test Execution SPA page (SPEC-1826)
+
+- Trigger test runs from the Provider Console with environment and suite selection
+- Auto-polling detail modal with live-updating progress bar
+- Copy-for-Claude button exports failure JSON to clipboard
+- Unmount-safe polling with `useRef` guard
+
+### Code review fixes (12 items)
+
+- Sync Redis `.ping()` wrapped with `asyncio.to_thread()` to prevent event loop blocking
+- Environment allowlist validation on `list_test_runs` filter
+- Key Vault probe honestly labeled as config-only check
+- `started_at` timestamp captured once (no drift across progressive updates)
+- Stale `detailRun` modal fixed — derived from `runs` array via ID
+- Null date guard prevents "Invalid Date" rendering
+
+---
+
+## v1.91.0 — SPA Operational Control Plane (Production, 2026-03-17)
+
+### Operational Control Plane
+
+Complete data-driven runtime configuration system replacing all hardcoded tier constants:
+
+- **EntitlementService** — 3-tier cache (LRU 5s, Redis 60s, Cosmos DB) with frozen fallback values
+- **39 Control Plane API endpoints** — entitlement CRUD, feature flags, blocklists, rate limits, alerts, diagnostics, maintenance mode
+- **9 new SPA pages** — Provider Console expanded to 29 pages across 5 navigation groups
+- **Configuration audit trail** — old/new key snapshots, diff summaries, and change reasons on every config change
+- **Build & deploy orchestrators** — deterministic scripts replacing conversation workflows
+
+### Infrastructure
+
+- Deployed to production (ACR ca65, revision --0000115) and staging
+- 12/12 Control Plane endpoints verified on production
+- 200+ tests across all Control Plane features
+
+---
+
+## v1.89.0 — Transport Hierarchy & Sign-In Codes (Staging, 2026-03-16)
+
+### AGNTCY transport hierarchy
+
+Completed the 4-tier transport hierarchy for agent communication:
+
+- **Tier 1 — SLIM** (primary): SLIM routing service with HTTP/2 ingress and shared secret auth
+- **Tier 2 — NATS JetStream** (fallback): WebSocket mode to work within Azure Container Apps Envoy proxy
+- **Tier 3 — HTTP Containers**: Direct internal HTTP dispatch
+- **Tier 4 — In-process**: Python method call for development
+
+### AGNTCY Directory integration
+
+- Dynamic agent discovery with static fallback
+- Agent containers register with Directory on startup
+- `AgentTopic` enum deprecated in favor of directory-resolved topics
+
+### Sign-in code authentication
+
+- 6-digit sign-in code alternative to magic link click
+- `POST /verify-code` endpoint with code delivered via email
+- Frontend code entry modal with error handling
+
+---
+
+## v1.88.1 — Spec Verification Hotfix (Production, 2026-03-16)
+
+- Verified all 2,009 specifications against source code
+- Fixed SPEC-0429: login now magic-link-primary when `?tenant=` parameter present
+- Created 7 missing specifications (SPEC-1806 through SPEC-1812)
+- 24 new assertions added
+
+---
+
+## v1.88.0 — Bug Fixes & Email Refactor (Production, 2026-03-15)
+
+### Bug fixes
+
+- Button color corrected (#D32F2F to #e03131)
+- Auto-save stale closure fix in draft editor
+- Starter tier `custom_instructions` gate removed
+- Avatar upload 413 error fix
+
+### Email improvements
+
+- Unsubscribe footer added to all branded emails via `format_branded_email()` refactor (12 modules)
+- AI-generated widget greeting (template-based)
+- Info pane width increased (280px to 320px)
+
+---
+
 ## v1.87.0 — Data-Driven Rate Limiting & Agent Containerization (Production, 2026-03-15)
 
 ### Data-driven rate limiting

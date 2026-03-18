@@ -60,23 +60,23 @@ After you approve the connection, Agent Red performs an initial sync and then ke
 
 ```mermaid
 flowchart TB
-    subgraph Initial Sync
+    subgraph Initial["Initial Sync"]
         direction LR
-        IS1[Full product\ncatalog import] --> IS2[Order history\nimport]
-        IS2 --> IS3[Customer\nprofile import]
-        IS3 --> IS4[Generate\nembeddings]
-        IS4 --> IS5[Build vector\nsearch index]
+        IS1["Full product catalog import"] --> IS2["Order history import"]
+        IS2 --> IS3["Customer profile import"]
+        IS3 --> IS4["Generate embeddings"]
+        IS4 --> IS5["Build vector search index"]
     end
 
-    subgraph Ongoing Sync
+    subgraph Ongoing["Ongoing Sync"]
         direction LR
-        WH[Shopify\nWebhooks] --> EV{Event type}
-        EV -->|Product update| PU[Re-index\nproduct]
-        EV -->|Order update| OU[Update order\nstatus cache]
-        EV -->|Inventory change| IC[Update stock\nlevels]
+        WH["Shopify Webhooks"] --> EV{"Event type"}
+        EV -->|Product update| PU["Re-index product"]
+        EV -->|Order update| OU["Update order status cache"]
+        EV -->|Inventory change| IC["Update stock levels"]
     end
 
-    Initial Sync --> Ongoing Sync
+    Initial --> Ongoing
 ```
 
 ### Initial sync
@@ -178,19 +178,19 @@ Products with multiple variants (sizes, colors) are indexed so that each variant
 
 ```mermaid
 flowchart TB
-    P[Shopify Product\n"Classic Hoodie"] --> V1[Variant: Small / Blue\n$45 — In stock]
-    P --> V2[Variant: Medium / Blue\n$45 — In stock]
-    P --> V3[Variant: Large / Blue\n$45 — Out of stock]
-    P --> V4[Variant: Small / Red\n$45 — In stock]
+    P["Shopify Product: Classic Hoodie"] --> V1["Small / Blue — $45, In stock"]
+    P --> V2["Medium / Blue — $45, In stock"]
+    P --> V3["Large / Blue — $45, Out of stock"]
+    P --> V4["Small / Red — $45, In stock"]
 
-    V1 --> KB[(Knowledge Base\nVector Index)]
+    V1 --> KB[("Knowledge Base Vector Index")]
     V2 --> KB
     V3 --> KB
     V4 --> KB
 
-    Q[Customer: "Blue hoodie\nin large?"] --> KB
-    KB --> R[Match: Large / Blue\nOut of stock]
-    R --> RESP[Response: "The Classic Hoodie\nin Large/Blue is currently\nout of stock. Medium/Blue\nis available."]
+    Q["Customer: Blue hoodie in large?"] --> KB
+    KB --> R["Match: Large / Blue, Out of stock"]
+    R --> RESP["Response: The Classic Hoodie in Large/Blue is currently out of stock. Medium/Blue is available."]
 ```
 
 ## Order data access

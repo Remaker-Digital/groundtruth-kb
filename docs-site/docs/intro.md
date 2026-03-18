@@ -57,12 +57,12 @@ Agent Red is an AI-powered customer service platform that automates support conv
 | Professional | 5,000/month | $399/month |
 | Enterprise | 20,000/month | $999/month |
 
-All tiers include the full six-agent pipeline and a 14-day free trial. Install from the [Shopify App Store](https://apps.shopify.com/agent-red-customer-experience).
+All tiers include the full six-agent pipeline and a 14-day free trial. [Get started with Shopify](/docs/integrations/shopify) or [contact us](mailto:support@remakerdigital.com) for standalone deployments.
 
 ## Need help?
 
 - **Support:** [support@remakerdigital.com](mailto:support@remakerdigital.com)
-- **Install:** [Shopify App Store](https://apps.shopify.com/agent-red-customer-experience)
+- **Install:** [Shopify integration guide](/docs/integrations/shopify)
 
 ---
 

@@ -83,8 +83,8 @@ const config = {
             position: 'left',
           },
           {
-            href: 'https://apps.shopify.com/agent-red-customer-experience',
-            label: 'Install on Shopify',
+            to: '/docs/integrations/shopify',
+            label: 'Get Started with Shopify',
             position: 'right',
           },
         ],
@@ -121,8 +121,8 @@ const config = {
                 to: '/docs/changelog',
               },
               {
-                label: 'Install on Shopify',
-                href: 'https://apps.shopify.com/agent-red-customer-experience',
+                label: 'Get Started with Shopify',
+                to: '/docs/integrations/shopify',
               },
             ],
           },
