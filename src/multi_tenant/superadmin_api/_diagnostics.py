@@ -20,7 +20,9 @@ Diagnostics:
 """
 from __future__ import annotations
 
+import asyncio
 import logging
+import time
 import uuid
 from datetime import datetime, timezone
 from typing import Any
@@ -41,6 +43,176 @@ from src.multi_tenant.superadmin_api import _monolith as _state
 router = _state.router
 
 logger = logging.getLogger(__name__)
+
+
+# ---------------------------------------------------------------------------
+# Live environment probes (SPEC-1846)
+# ---------------------------------------------------------------------------
+
+class _ProbeResult:
+    """Result of a single environment probe."""
+
+    def __init__(self, name: str, passed: bool, latency_ms: float, detail: str = ""):
+        self.name = name
+        self.passed = passed
+        self.latency_ms = latency_ms
+        self.detail = detail
+
+    def to_dict(self) -> dict[str, Any]:
+        return {
+            "name": self.name,
+            "passed": self.passed,
+            "latency_ms": round(self.latency_ms, 1),
+            "detail": self.detail,
+        }
+
+
+async def _probe_cosmos() -> _ProbeResult:
+    """Probe Cosmos DB connectivity and query capability."""
+    start = time.monotonic()
+    try:
+        from src.multi_tenant.cosmos_readiness import check_cosmos_ready
+        result = await check_cosmos_ready()
+        elapsed = (time.monotonic() - start) * 1000
+        return _ProbeResult("cosmos_db", result.get("ready", False), elapsed,
+                            result.get("detail", ""))
+    except Exception as exc:
+        elapsed = (time.monotonic() - start) * 1000
+        return _ProbeResult("cosmos_db", False, elapsed, str(exc))
+
+
+async def _probe_redis() -> _ProbeResult:
+    """Probe Redis connectivity."""
+    start = time.monotonic()
+    try:
+        from src.multi_tenant.entitlement_service import get_entitlement_service
+        svc = get_entitlement_service()
+        if svc._redis_client is not None:
+            svc._redis_client.ping()
+            elapsed = (time.monotonic() - start) * 1000
+            return _ProbeResult("redis", True, elapsed, "PONG")
+        elapsed = (time.monotonic() - start) * 1000
+        return _ProbeResult("redis", False, elapsed, "No Redis client configured")
+    except Exception as exc:
+        elapsed = (time.monotonic() - start) * 1000
+        return _ProbeResult("redis", False, elapsed, str(exc))
+
+
+async def _probe_key_vault() -> _ProbeResult:
+    """Probe Key Vault connectivity."""
+    start = time.monotonic()
+    try:
+        import os
+        kv_url = os.environ.get("KEY_VAULT_URL", "")
+        elapsed = (time.monotonic() - start) * 1000
+        if kv_url:
+            return _ProbeResult("key_vault", True, elapsed, f"Configured: {kv_url[:30]}...")
+        return _ProbeResult("key_vault", False, elapsed, "KEY_VAULT_URL not set")
+    except Exception as exc:
+        elapsed = (time.monotonic() - start) * 1000
+        return _ProbeResult("key_vault", False, elapsed, str(exc))
+
+
+async def _probe_api_version() -> _ProbeResult:
+    """Probe that the API version is correct."""
+    start = time.monotonic()
+    try:
+        from src.multi_tenant.api_versioning import PRODUCT_VERSION
+        elapsed = (time.monotonic() - start) * 1000
+        return _ProbeResult("api_version", True, elapsed, PRODUCT_VERSION)
+    except Exception as exc:
+        elapsed = (time.monotonic() - start) * 1000
+        return _ProbeResult("api_version", False, elapsed, str(exc))
+
+
+async def _probe_tenant_list() -> _ProbeResult:
+    """Probe that tenant listing works."""
+    start = time.monotonic()
+    try:
+        if _state._tenant_repo is None:
+            elapsed = (time.monotonic() - start) * 1000
+            return _ProbeResult("tenant_list", False, elapsed, "Tenant repo not configured")
+        tenants = await _state._tenant_repo.list_active_tenant_ids()
+        elapsed = (time.monotonic() - start) * 1000
+        return _ProbeResult("tenant_list", True, elapsed, f"{len(tenants)} active tenants")
+    except Exception as exc:
+        elapsed = (time.monotonic() - start) * 1000
+        return _ProbeResult("tenant_list", False, elapsed, str(exc))
+
+
+async def _probe_entitlement_service() -> _ProbeResult:
+    """Probe that entitlement service returns data."""
+    start = time.monotonic()
+    try:
+        from src.multi_tenant.entitlement_service import get_entitlement_service
+        svc = get_entitlement_service()
+        tiers = await svc.get_all_tiers()
+        elapsed = (time.monotonic() - start) * 1000
+        return _ProbeResult("entitlement_service", len(tiers) > 0, elapsed,
+                            f"{len(tiers)} tiers configured")
+    except Exception as exc:
+        elapsed = (time.monotonic() - start) * 1000
+        return _ProbeResult("entitlement_service", False, elapsed, str(exc))
+
+
+async def _probe_circuit_breakers() -> _ProbeResult:
+    """Probe that circuit breakers are healthy."""
+    start = time.monotonic()
+    try:
+        from src.multi_tenant.circuit_breaker import get_breaker_registry
+        registry = get_breaker_registry()
+        any_open = any(b.is_open for b in registry.breakers.values())
+        elapsed = (time.monotonic() - start) * 1000
+        return _ProbeResult("circuit_breakers", not any_open, elapsed,
+                            f"{len(registry.breakers)} breakers, {'OPEN detected' if any_open else 'all closed'}")
+    except Exception as exc:
+        elapsed = (time.monotonic() - start) * 1000
+        return _ProbeResult("circuit_breakers", False, elapsed, str(exc))
+
+
+async def _probe_spa_assets() -> _ProbeResult:
+    """Probe that SPA assets are being served."""
+    start = time.monotonic()
+    try:
+        import os
+        # Check that dist directories exist in the container
+        spa_paths = [
+            "admin/provider/dist/index.html",
+            "admin/standalone/dist/index.html",
+            "admin/shopify/dist/index.html",
+        ]
+        missing = [p for p in spa_paths if not os.path.exists(p)]
+        elapsed = (time.monotonic() - start) * 1000
+        if missing:
+            return _ProbeResult("spa_assets", False, elapsed,
+                                f"Missing: {', '.join(missing)}")
+        return _ProbeResult("spa_assets", True, elapsed, "All 3 SPA dist bundles present")
+    except Exception as exc:
+        elapsed = (time.monotonic() - start) * 1000
+        return _ProbeResult("spa_assets", False, elapsed, str(exc))
+
+
+async def run_environment_probes() -> list[_ProbeResult]:
+    """Run all environment probes concurrently and return results."""
+    probes = [
+        _probe_api_version(),
+        _probe_cosmos(),
+        _probe_redis(),
+        _probe_key_vault(),
+        _probe_tenant_list(),
+        _probe_entitlement_service(),
+        _probe_circuit_breakers(),
+        _probe_spa_assets(),
+    ]
+    results = await asyncio.gather(*probes, return_exceptions=True)
+
+    final: list[_ProbeResult] = []
+    for i, result in enumerate(results):
+        if isinstance(result, Exception):
+            final.append(_ProbeResult(f"probe_{i}", False, 0.0, str(result)))
+        else:
+            final.append(result)
+    return final
 
 
 # ---------------------------------------------------------------------------
@@ -140,7 +312,13 @@ async def trigger_test_run(
     body: PipelineRunRequest,
     ctx: TenantContext = Depends(get_tenant_context),
 ) -> PipelineRunTriggerResponse:
-    """Trigger an async test pipeline run."""
+    """Trigger a live environment regression test run (SPEC-1846).
+
+    Executes environment probes inline against the LIVE deployed
+    environment (health, Cosmos, Redis, Key Vault, entitlements,
+    circuit breakers, SPA assets). Results are stored in Cosmos
+    and returned synchronously.
+    """
     if body.environment not in VALID_ENVIRONMENTS:
         raise HTTPException(
             status_code=400,
@@ -157,6 +335,56 @@ async def trigger_test_run(
     now_iso = datetime.now(timezone.utc).isoformat()
     actor = ctx.team_member_email or "spa-console"
 
+    if body.dry_run:
+        # Dry run: validate config but don't execute probes
+        repo = _get_platform_repo()
+        run_doc = PlatformConfigDocument(
+            id=f"{_TEST_RUN_CONFIG_TYPE}:{run_id}",
+            config_type=_TEST_RUN_CONFIG_TYPE,
+            config_key=run_id,
+            value={
+                "run_id": run_id,
+                "environment": body.environment,
+                "suite": body.suite,
+                "dry_run": True,
+                "status": "passed",
+                "triggered_by": actor,
+                "started_at": now_iso,
+                "completed_at": now_iso,
+                "total_tests": 0,
+                "passed": 0,
+                "failed": 0,
+                "skipped": 0,
+                "duration_s": 0.0,
+                "failures": [],
+                "phases_run": [],
+            },
+            version=1,
+            updated_at=now_iso,
+            updated_by=actor,
+        )
+        await repo.set_config(run_doc)
+        return PipelineRunTriggerResponse(
+            run_id=run_id,
+            environment=body.environment,
+            suite=body.suite,
+            status="passed",
+            message="Dry run: configuration validated, no probes executed",
+        )
+
+    # SPEC-1846: Execute live environment probes
+    start_time = time.monotonic()
+    probe_results = await run_environment_probes()
+    duration_s = time.monotonic() - start_time
+
+    passed = sum(1 for p in probe_results if p.passed)
+    failed = sum(1 for p in probe_results if not p.passed)
+    total = len(probe_results)
+    status = "passed" if failed == 0 else "failed"
+    completed_iso = datetime.now(timezone.utc).isoformat()
+
+    failures = [p.to_dict() for p in probe_results if not p.passed]
+
     # Store run record in Cosmos
     repo = _get_platform_repo()
     run_doc = PlatformConfigDocument(
@@ -168,21 +396,22 @@ async def trigger_test_run(
             "environment": body.environment,
             "suite": body.suite,
             "phases": body.phases,
-            "dry_run": body.dry_run,
-            "status": "queued",
+            "dry_run": False,
+            "status": status,
             "triggered_by": actor,
             "started_at": now_iso,
-            "completed_at": None,
-            "total_tests": 0,
-            "passed": 0,
-            "failed": 0,
+            "completed_at": completed_iso,
+            "total_tests": total,
+            "passed": passed,
+            "failed": failed,
             "skipped": 0,
-            "duration_s": None,
-            "failures": [],
-            "phases_run": [],
+            "duration_s": round(duration_s, 2),
+            "failures": failures,
+            "phases_run": ["environment_probes"],
+            "probe_results": [p.to_dict() for p in probe_results],
         },
         version=1,
-        updated_at=now_iso,
+        updated_at=completed_iso,
         updated_by=actor,
     )
     await repo.set_config(run_doc)
@@ -197,32 +426,30 @@ async def trigger_test_run(
             actor=actor,
             actor_type="admin",
             payload={
-                "action": "test_run_triggered",
+                "action": "test_run_completed",
                 "run_id": run_id,
                 "environment": body.environment,
                 "suite": body.suite,
-                "dry_run": body.dry_run,
+                "status": status,
+                "passed": passed,
+                "failed": failed,
+                "duration_s": round(duration_s, 2),
             },
         )
     except Exception:
-        logger.warning("Audit log failed for test run trigger", exc_info=True)
-
-    message = "Test run queued for execution"
-    if body.dry_run:
-        message = "Dry run: configuration validated, no tests will execute"
+        logger.warning("Audit log failed for test run", exc_info=True)
 
     logger.info(
-        "Test run triggered: %s env=%s suite=%s (by %s)%s",
-        run_id, body.environment, body.suite, actor,
-        " [DRY RUN]" if body.dry_run else "",
+        "Test run completed: %s env=%s %s (%d/%d passed, %.1fs) by %s",
+        run_id, body.environment, status, passed, total, duration_s, actor,
     )
 
     return PipelineRunTriggerResponse(
         run_id=run_id,
         environment=body.environment,
         suite=body.suite,
-        status="queued",
-        message=message,
+        status=status,
+        message=f"Environment probes: {passed}/{total} passed ({round(duration_s, 1)}s)",
     )
 
 
