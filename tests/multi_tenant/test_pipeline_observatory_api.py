@@ -319,7 +319,7 @@ class TestInfrastructureTopology:
         result = await get_infrastructure_topology(period="24h")
         protocols = {e.protocol for e in result.edges}
         assert "HTTPS" in protocols
-        assert "HTTP" in protocols
+        assert "SLIM" in protocols
 
     @pytest.mark.asyncio
     async def test_node_status_default_healthy(self, superadmin_ctx):
