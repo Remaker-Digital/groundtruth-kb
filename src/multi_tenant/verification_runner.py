@@ -395,10 +395,16 @@ class VerificationRunner:
         if code == 200:
             try:
                 data = json.loads(body)
-                cosmos_status = data.get("cosmos", data.get("cosmosDb", "unknown"))
-                if isinstance(cosmos_status, dict):
-                    cosmos_status = cosmos_status.get("status", "unknown")
-                is_ok = str(cosmos_status).lower() in ("healthy", "ok", "true", "ready")
+                # /ready uses "cosmos_db" key with nested {"status": "...", "latency_ms": ...}
+                cosmos_obj = data.get("cosmos_db", data.get("cosmos", data.get("cosmosDb", "unknown")))
+                if isinstance(cosmos_obj, dict):
+                    cosmos_status = cosmos_obj.get("status", "unknown")
+                else:
+                    cosmos_status = str(cosmos_obj)
+                is_ok = any(
+                    kw in str(cosmos_status).lower()
+                    for kw in ("healthy", "ok", "true", "ready")
+                )
                 return CheckResult(
                     status="pass" if is_ok else "fail",
                     detail=f"Cosmos: {cosmos_status}",
