@@ -22,6 +22,7 @@ from __future__ import annotations
 
 import asyncio
 import logging
+import os
 import time
 import uuid
 from datetime import datetime, timezone
@@ -394,12 +395,13 @@ async def trigger_test_run(
             detail=f"Cannot resolve FQDN for environment '{body.environment}'",
         )
 
-    # SPEC-1845: SPA key from the authenticated request context
-    spa_key = ctx.api_key or ""
+    # SPEC-1845: SPA key from environment (raw key not stored on TenantContext
+    # per SPEC-1673 — the container has SUPERADMIN_PREVIEW_API_KEY set).
+    spa_key = os.environ.get("SUPERADMIN_PREVIEW_API_KEY", "")
     if not spa_key:
         raise HTTPException(
             status_code=500,
-            detail="SPA API key not available from request context",
+            detail="SUPERADMIN_PREVIEW_API_KEY env var not set on this container",
         )
 
     # Store initial "queued" status
@@ -545,7 +547,6 @@ def _resolve_fqdn(environment: str) -> str:
     2. Environment-specific env vars (STAGING_FQDN, PRODUCTION_FQDN)
     3. Well-known FQDN from platform config
     """
-    import os
     current_env = os.environ.get("ENVIRONMENT", "development")
 
     # Self-environment: use the container's own FQDN
