@@ -206,7 +206,7 @@ const App: React.FC = () => {
 const root = document.getElementById('app');
 if (root) {
   createRoot(root).render(
-    <MantineProvider theme={agentRedTheme} forceColorScheme="dark">
+    <MantineProvider theme={agentRedTheme} defaultColorScheme="dark">
       <App />
     </MantineProvider>,
   );

@@ -27,6 +27,7 @@ import {
   Tooltip,
 } from '@mantine/core';
 import { useDisclosure } from '@mantine/hooks';
+import { useMantineColorScheme, useComputedColorScheme } from '@mantine/core';
 import { notifications } from '@mantine/notifications';
 import { Icons } from '../../shared/icons';
 import { tokens } from '../../shared/theme/styles';
@@ -137,6 +138,9 @@ interface ProviderLayoutProps {
 
 export function ProviderLayout({ apiKey, onLogout, children }: ProviderLayoutProps) {
   const [opened, { toggle }] = useDisclosure();
+  const { setColorScheme } = useMantineColorScheme();
+  const computedColorScheme = useComputedColorScheme('dark');
+  const isDark = computedColorScheme === 'dark';
   const location = useLocation();
   const navigate = useNavigate();
   const [productVersion, setProductVersion] = useState<string | null>(null);
@@ -229,6 +233,16 @@ export function ProviderLayout({ apiKey, onLogout, children }: ProviderLayoutPro
                   aria-label="Open documentation"
                 >
                   <Icons.docs />
+                </ActionIcon>
+              </Tooltip>
+              <Tooltip label={isDark ? 'Light mode' : 'Dark mode'} position="bottom">
+                <ActionIcon
+                  variant="subtle"
+                  color="gray"
+                  onClick={() => setColorScheme(isDark ? 'light' : 'dark')}
+                  aria-label="Toggle dark mode"
+                >
+                  {isDark ? <Icons.sun /> : <Icons.moon />}
                 </ActionIcon>
               </Tooltip>
               <Tooltip label="Sign out" position="bottom">
