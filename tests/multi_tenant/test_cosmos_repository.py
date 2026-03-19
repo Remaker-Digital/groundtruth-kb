@@ -699,15 +699,15 @@ class TestCollectionConfigurations:
     """CR-23: Collections with correct partition keys and configs."""
 
     @pytest.mark.unit
-    def test_ten_collections_defined(self):
-        """CR-23: ALL_COLLECTIONS has exactly 20 entries (16 original + pii_token_mappings + admin_documentation_vectors + contact_messages + platform_admins)."""
-        assert len(ALL_COLLECTIONS) == 20
+    def test_all_collections_count(self):
+        """CR-23: ALL_COLLECTIONS has exactly 25 entries (20 original + 5 integration framework: integration_credentials, integration_sync_state, integration_events, normalized_tickets, normalized_contacts)."""
+        assert len(ALL_COLLECTIONS) == 25
 
     @pytest.mark.unit
-    def test_collection_configs_returns_twenty(self):
-        """CR-23: get_collection_configs() returns 20 configs (16 original + pii_token_mappings + admin_documentation_vectors + contact_messages + platform_admins)."""
+    def test_collection_configs_count(self):
+        """CR-23: get_collection_configs() returns 25 configs."""
         configs = get_collection_configs()
-        assert len(configs) == 20
+        assert len(configs) == 25
 
     @pytest.mark.unit
     def test_tenant_scoped_collections_use_tenant_id_partition(self):

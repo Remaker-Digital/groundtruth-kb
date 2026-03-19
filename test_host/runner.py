@@ -1,0 +1,478 @@
+# test_host/runner.py — Subprocess pytest orchestrator
+# © 2026 Remaker Digital, a DBA of VanDusen & Palmeter, LLC. All rights reserved.
+
+"""
+Orchestrates pytest execution as a subprocess with JSON reporting.
+Parses results progressively and writes to Cosmos via CosmosWriter.
+Supports individual suites (pytest invocations) and composite suites
+(sequential execution of multiple individual suites).
+"""
+
+from __future__ import annotations
+
+import asyncio
+import json
+import logging
+import os
+import signal
+import tempfile
+import time
+from pathlib import Path
+
+from .cosmos_writer import CosmosWriter, TestResult
+from .suites import SUITE_CONFIGS, SuiteConfig, get_suite
+
+logger = logging.getLogger("test_host.runner")
+
+
+class TestRunner:
+    """Runs pytest suites as subprocesses and streams results to Cosmos."""
+
+    def __init__(
+        self,
+        run_id: str,
+        suite: str,
+        environment: str,
+        target_url: str,
+        cosmos_writer: CosmosWriter,
+        env_overrides: dict[str, str] | None = None,
+    ):
+        self.run_id = run_id
+        self.suite = suite
+        self.environment = environment
+        self.target_url = target_url
+        self.cosmos = cosmos_writer
+        self.env_overrides = env_overrides or {}
+        self._process: asyncio.subprocess.Process | None = None
+        self._cancelled = False
+
+    async def run(self) -> dict:
+        """Execute the suite and return final state."""
+        config = get_suite(self.suite)
+        if not config:
+            self.cosmos.finalize(status="error")
+            return {"error": f"Unknown suite: {self.suite}"}
+
+        try:
+            if config.is_composite:
+                return await self._run_composite(config)
+            else:
+                return await self._run_single(config)
+        except Exception as exc:
+            logger.exception("Test runner failed for suite %s", self.suite)
+            self.cosmos.update_stdout(f"Runner exception: {exc}")
+            self.cosmos.finalize(status="error")
+            return {"error": str(exc)}
+
+    async def cancel(self) -> None:
+        """Cancel the running test process."""
+        self._cancelled = True
+        if self._process and self._process.returncode is None:
+            try:
+                self._process.send_signal(signal.SIGTERM)
+                await asyncio.sleep(5)
+                if self._process.returncode is None:
+                    self._process.kill()
+            except ProcessLookupError:
+                pass
+        self.cosmos.finalize(status="error")
+
+    async def _run_composite(self, config: SuiteConfig) -> dict:
+        """Run multiple suites sequentially."""
+        total_tests = sum(
+            SUITE_CONFIGS[s].estimated_tests
+            for s in config.composite_suites
+            if s in SUITE_CONFIGS
+        )
+        self.cosmos.mark_running(
+            total_tests=total_tests,
+            phases_total=len(config.composite_suites),
+        )
+
+        for suite_name in config.composite_suites:
+            if self._cancelled:
+                break
+
+            sub_config = get_suite(suite_name)
+            if not sub_config:
+                logger.warning("Unknown sub-suite %s in composite %s", suite_name, config.name)
+                continue
+
+            self.cosmos.set_phase(suite_name)
+
+            if sub_config.requires_locust:
+                await self._run_locust(sub_config)
+            elif sub_config.pytest_args:
+                await self._run_pytest(sub_config)
+            else:
+                logger.info("Skipping %s (no pytest args and not locust)", suite_name)
+
+            self.cosmos.complete_phase(suite_name)
+
+        self.cosmos.finalize()
+        return self._summary()
+
+    async def _run_single(self, config: SuiteConfig) -> dict:
+        """Run a single suite."""
+        self.cosmos.mark_running(
+            total_tests=config.estimated_tests,
+            phases_total=1,
+        )
+        self.cosmos.set_phase(config.name)
+
+        if config.requires_locust:
+            await self._run_locust(config)
+        elif config.pytest_args:
+            await self._run_pytest(config)
+
+        self.cosmos.complete_phase(config.name)
+        self.cosmos.finalize()
+        return self._summary()
+
+    async def _run_pytest(self, config: SuiteConfig) -> None:
+        """Execute pytest with JSON report output."""
+        report_file = Path(tempfile.mktemp(suffix=".json", prefix="pytest_report_"))
+
+        # Build argument list — no shell interpolation, all args are hardcoded
+        # paths from SuiteConfig (not user input)
+        cmd = [
+            "python", "-m", "pytest",
+            *config.pytest_args,
+            "--json-report",
+            f"--json-report-file={report_file}",
+            "--json-report-indent=0",
+            "--tb=short",
+            "-v",
+        ]
+
+        env = self._build_env(config)
+        logger.info("Running pytest: %s", " ".join(cmd))
+
+        try:
+            # Using create_subprocess_exec (not shell=True) to prevent injection
+            self._process = await asyncio.create_subprocess_exec(
+                *cmd,
+                stdout=asyncio.subprocess.PIPE,
+                stderr=asyncio.subprocess.STDOUT,
+                env=env,
+                cwd="/app",
+            )
+
+            stdout_chunks: list[str] = []
+
+            async def _stream_output():
+                assert self._process and self._process.stdout
+                while True:
+                    line = await self._process.stdout.readline()
+                    if not line:
+                        break
+                    decoded = line.decode("utf-8", errors="replace")
+                    stdout_chunks.append(decoded)
+                    if len(stdout_chunks) > 200:
+                        stdout_chunks.pop(0)
+
+            stream_task = asyncio.create_task(_stream_output())
+
+            try:
+                await asyncio.wait_for(
+                    self._process.wait(),
+                    timeout=config.timeout_s,
+                )
+            except asyncio.TimeoutError:
+                logger.warning(
+                    "pytest timed out after %ds for suite %s",
+                    config.timeout_s,
+                    config.name,
+                )
+                if self._process.returncode is None:
+                    self._process.kill()
+                    await self._process.wait()
+                self.cosmos.update_stdout(
+                    "".join(stdout_chunks) + f"\n\nTIMEOUT after {config.timeout_s}s"
+                )
+
+            await stream_task
+            self.cosmos.update_stdout("".join(stdout_chunks))
+
+            # Parse JSON report
+            if report_file.exists():
+                self._parse_json_report(report_file, config.name)
+            else:
+                logger.warning("No JSON report file at %s", report_file)
+                rc = self._process.returncode or 0
+                self.cosmos.add_results([
+                    TestResult(
+                        name=f"{config.name}_suite",
+                        category=config.name,
+                        status="pass" if rc == 0 else "fail",
+                        detail=f"Exit code {rc}",
+                    )
+                ])
+
+        finally:
+            if report_file.exists():
+                report_file.unlink()
+
+    def _parse_json_report(self, report_path: Path, category: str) -> None:
+        """Parse pytest-json-report output into TestResult objects."""
+        try:
+            data = json.loads(report_path.read_text(encoding="utf-8"))
+        except (json.JSONDecodeError, OSError) as exc:
+            logger.error("Failed to parse JSON report: %s", exc)
+            return
+
+        tests = data.get("tests", [])
+        batch: list[TestResult] = []
+
+        for test in tests:
+            node_id = test.get("nodeid", "unknown")
+            # Shorten: tests/unit/test_foo.py::test_bar -> test_foo::test_bar
+            short_name = node_id
+            if "::" in node_id:
+                parts = node_id.split("::")
+                file_part = parts[0].rsplit("/", 1)[-1].replace(".py", "")
+                short_name = f"{file_part}::{parts[-1]}"
+
+            outcome = test.get("outcome", "unknown")
+            status_map = {
+                "passed": "pass",
+                "failed": "fail",
+                "skipped": "skip",
+                "error": "error",
+                "xfailed": "skip",
+                "xpassed": "pass",
+            }
+            status = status_map.get(outcome, "error")
+
+            duration = test.get("duration", 0.0)
+            detail = ""
+
+            if status in ("fail", "error"):
+                call_info = test.get("call", {})
+                longrepr = call_info.get("longrepr", "")
+                if isinstance(longrepr, str):
+                    detail = longrepr[:500]
+                elif isinstance(longrepr, dict):
+                    detail = str(longrepr.get("reprcrash", {}).get("message", ""))[:500]
+
+            if status == "skip":
+                setup = test.get("setup", {})
+                if setup.get("longrepr"):
+                    detail = str(setup["longrepr"])[:200]
+
+            batch.append(TestResult(
+                name=short_name,
+                category=category,
+                status=status,
+                latency_ms=round(duration * 1000, 1),
+                detail=detail,
+            ))
+
+            if len(batch) >= 50:
+                self.cosmos.add_results(batch)
+                batch = []
+
+        if batch:
+            self.cosmos.add_results(batch)
+
+        # Update total_tests with actual count
+        state = self.cosmos.state
+        if state.total_tests < state.completed:
+            state.total_tests = state.completed
+
+    async def _run_locust(self, config: SuiteConfig) -> None:
+        """Run Locust load test in headless mode."""
+        env = self._build_env(config)
+        target = env.get("PROD_URL", self.target_url)
+
+        # All arguments are hardcoded — no user-controlled input
+        cmd = [
+            "python", "-m", "locust",
+            "--headless",
+            "--host", target,
+            "--users", "50",
+            "--spawn-rate", "10",
+            "--run-time", "120s",
+            "--csv", "/tmp/locust_results",
+            "--locustfile", "tests/performance/locustfile.py",
+        ]
+
+        logger.info("Running Locust load test against %s", target)
+
+        try:
+            self._process = await asyncio.create_subprocess_exec(
+                *cmd,
+                stdout=asyncio.subprocess.PIPE,
+                stderr=asyncio.subprocess.STDOUT,
+                env=env,
+                cwd="/app",
+            )
+
+            try:
+                stdout_bytes, _ = await asyncio.wait_for(
+                    self._process.communicate(),
+                    timeout=config.timeout_s,
+                )
+                stdout_text = stdout_bytes.decode("utf-8", errors="replace")
+            except asyncio.TimeoutError:
+                if self._process.returncode is None:
+                    self._process.kill()
+                    await self._process.wait()
+                stdout_text = f"TIMEOUT after {config.timeout_s}s"
+
+            self.cosmos.update_stdout(stdout_text)
+
+            stats_file = Path("/tmp/locust_results_stats.csv")
+            if stats_file.exists():
+                self._parse_locust_csv(stats_file)
+            else:
+                rc = self._process.returncode or 0
+                self.cosmos.add_results([
+                    TestResult(
+                        name="load_test",
+                        category="load",
+                        status="pass" if rc == 0 else "fail",
+                        detail=stdout_text[-500:],
+                    )
+                ])
+
+        finally:
+            for suffix in ["_stats.csv", "_failures.csv", "_stats_history.csv",
+                           "_exceptions.csv"]:
+                p = Path(f"/tmp/locust_results{suffix}")
+                if p.exists():
+                    p.unlink()
+
+    def _parse_locust_csv(self, stats_path: Path) -> None:
+        """Parse Locust stats CSV into test results."""
+        import csv
+
+        results: list[TestResult] = []
+        try:
+            with open(stats_path, "r") as f:
+                reader = csv.DictReader(f)
+                for row in reader:
+                    name = row.get("Name", "unknown")
+                    if name == "Aggregated":
+                        fail_count = int(row.get("Failure Count", "0"))
+                        req_count = int(row.get("Request Count", "0"))
+                        avg_ms = float(row.get("Average Response Time", "0"))
+                        p99_ms = float(row.get("99%", "0"))
+                        status = "pass" if fail_count == 0 else "fail"
+                        results.append(TestResult(
+                            name="load_aggregated",
+                            category="load",
+                            status=status,
+                            latency_ms=avg_ms,
+                            detail=(
+                                f"{req_count} requests, {fail_count} failures, "
+                                f"avg={avg_ms:.0f}ms, p99={p99_ms:.0f}ms"
+                            ),
+                        ))
+                    else:
+                        method = row.get("Type", "")
+                        fail_count = int(row.get("Failure Count", "0"))
+                        avg_ms = float(row.get("Average Response Time", "0"))
+                        results.append(TestResult(
+                            name=f"load_{method}_{name}".replace("/", "_").replace(" ", "_")[:80],
+                            category="load",
+                            status="pass" if fail_count == 0 else "fail",
+                            latency_ms=avg_ms,
+                            detail=f"{row.get('Request Count', 0)} reqs, {fail_count} fails",
+                        ))
+        except Exception as exc:
+            logger.error("Failed to parse Locust CSV: %s", exc)
+            results.append(TestResult(
+                name="load_csv_parse",
+                category="load",
+                status="error",
+                detail=str(exc)[:500],
+            ))
+
+        self.cosmos.add_results(results)
+
+    def _build_env(self, config: SuiteConfig | None = None) -> dict[str, str]:
+        """Build environment variables for subprocess execution.
+
+        For E2E Playwright suites, clears LIVE_SPA_BASE_URL and sets
+        API_PROXY_TARGET so the conftest starts a local Vite dev server
+        that proxies /api/* to the staging API.  This makes E2E tests
+        self-contained (no dependency on the deployed SPA serving correctly).
+        """
+        env = os.environ.copy()
+
+        env["PROD_URL"] = self.target_url
+        env["STAGING_URL"] = self.target_url
+
+        if config and config.requires_playwright:
+            # E2E mode: use local Vite dev server inside the container.
+            # Clear LIVE_SPA_BASE_URL so conftest starts Vite on port 3300.
+            # Set API_PROXY_TARGET so Vite proxies /api/* to the staging API.
+            env.pop("LIVE_SPA_BASE_URL", None)
+            env["API_PROXY_TARGET"] = self.target_url
+        else:
+            # Non-E2E suites: set LIVE_SPA_BASE_URL for any incidental
+            # SPA references (not used by unit/integration tests, but safe).
+            if "LIVE_SPA_BASE_URL" not in env:
+                env["LIVE_SPA_BASE_URL"] = f"{self.target_url}/admin/standalone"
+
+        for key in [
+            "STAGING_REMAKER_TENANT_KEY",
+            "STAGING_REMAKER_WIDGET_KEY",
+            "STAGING_SPA_KEY",
+            "STAGING_001_TENANT_KEY",
+            "STAGING_001_WIDGET_KEY",
+            "STAGING_002_TENANT_KEY",
+            "STAGING_002_WIDGET_KEY",
+            "SUPERADMIN_PREVIEW_API_KEY",
+            "PREVIEW_WIDGET_KEY",
+            "SPA_CONSOLE_API_KEY",
+            "COSMOS_DB_ENDPOINT",
+            "COSMOS_DB_KEY",
+            "COSMOS_DB_DATABASE",
+            "AZURE_OPENAI_ENDPOINT",
+            "AZURE_OPENAI_API_KEY",
+        ]:
+            val = os.environ.get(key)
+            if val:
+                env[key] = val
+
+        # Alias staging keys to load test expected names
+        if "LOAD_TEST_API_KEY" not in env:
+            val = env.get("STAGING_REMAKER_TENANT_KEY", "")
+            if val:
+                env["LOAD_TEST_API_KEY"] = val
+        if "LOAD_TEST_WIDGET_KEY" not in env:
+            val = env.get("STAGING_REMAKER_WIDGET_KEY", "") or env.get("PREVIEW_WIDGET_KEY", "")
+            if val:
+                env["LOAD_TEST_WIDGET_KEY"] = val
+
+        # Alias for E2E Playwright tests
+        if "STAGING_REMAKER_USER_KEY" not in env:
+            val = env.get("SUPERADMIN_PREVIEW_API_KEY", "")
+            if val:
+                env["STAGING_REMAKER_USER_KEY"] = val
+
+        # Propagate DISABLE_RATE_LIMITING from env (set by test host config)
+        if os.environ.get("DISABLE_RATE_LIMITING"):
+            env["DISABLE_RATE_LIMITING"] = os.environ["DISABLE_RATE_LIMITING"]
+
+        env.update(self.env_overrides)
+
+        return env
+
+    def _summary(self) -> dict:
+        """Return a summary dict of the run state."""
+        s = self.cosmos.state
+        return {
+            "run_id": s.run_id,
+            "suite": s.suite,
+            "status": s.status,
+            "total_tests": s.completed,
+            "passed": s.passed,
+            "failed": s.failed,
+            "skipped": s.skipped,
+            "errored": s.errored,
+            "duration_s": s.duration_s,
+            "phases_completed": s.phases_completed,
+        }

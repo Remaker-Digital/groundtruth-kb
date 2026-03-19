@@ -1,0 +1,163 @@
+# Dockerfile.test — Agent Red Test Host Container
+# © 2026 Remaker Digital, a DBA of VanDusen & Palmeter, LLC. All rights reserved.
+#
+# Dedicated container for running the full test suite (pytest, Playwright,
+# Locust, Schemathesis, Hypothesis) triggered from the SPA Provider Console.
+#
+# Build:
+#   docker build -f Dockerfile.test -t test-host:latest .
+#
+# Run:
+#   docker run -p 8001:8001 \
+#     -e COSMOS_DB_ENDPOINT=https://cosmos-agentred-eastus.documents.azure.com:443/ \
+#     -e COSMOS_DB_KEY=... \
+#     -e COSMOS_DB_DATABASE=agentred-staging \
+#     -e STAGING_URL=https://agent-red-staging.orangeglacier-f566a4e7.eastus.azurecontainerapps.io \
+#     test-host:latest
+
+FROM python:3.12-slim-bookworm
+
+# --------------------------------------------------------------------------
+# Metadata
+# --------------------------------------------------------------------------
+LABEL maintainer="Remaker Digital <dev@remakerdigital.com>"
+LABEL project="Agent Red Test Host"
+LABEL copyright="© 2026 Remaker Digital, a DBA of VanDusen & Palmeter, LLC. All rights reserved."
+
+# --------------------------------------------------------------------------
+# Environment
+# --------------------------------------------------------------------------
+ENV PYTHONDONTWRITEBYTECODE=1
+ENV PYTHONUNBUFFERED=1
+ENV ENVIRONMENT=test-host
+# Playwright: run Chromium in headless mode with container-safe settings
+ENV PLAYWRIGHT_BROWSERS_PATH=/home/testhost/.cache/ms-playwright
+
+# --------------------------------------------------------------------------
+# System dependencies
+# --------------------------------------------------------------------------
+WORKDIR /app
+
+# Playwright needs these system libs for headless Chromium.
+# Node.js 20 is needed for Vite dev server (E2E Playwright tests).
+# tini provides proper PID 1 signal handling.
+RUN apt-get update \
+    && apt-get install -y --no-install-recommends \
+        curl \
+        tini \
+        gnupg \
+        # Playwright Chromium dependencies
+        libnss3 \
+        libnspr4 \
+        libatk1.0-0 \
+        libatk-bridge2.0-0 \
+        libcups2 \
+        libdrm2 \
+        libdbus-1-3 \
+        libxkbcommon0 \
+        libatspi2.0-0 \
+        libxcomposite1 \
+        libxdamage1 \
+        libxfixes3 \
+        libxrandr2 \
+        libgbm1 \
+        libpango-1.0-0 \
+        libcairo2 \
+        libasound2 \
+        libwayland-client0 \
+    && rm -rf /var/lib/apt/lists/*
+
+# --------------------------------------------------------------------------
+# Node.js 20 (for Vite dev server in E2E Playwright tests)
+# --------------------------------------------------------------------------
+RUN curl -fsSL https://deb.nodesource.com/setup_20.x | bash - \
+    && apt-get install -y --no-install-recommends nodejs \
+    && rm -rf /var/lib/apt/lists/* \
+    && node --version && npm --version
+
+# --------------------------------------------------------------------------
+# Python dependencies (production + test)
+# --------------------------------------------------------------------------
+COPY requirements-test.txt ./
+COPY requirements.txt ./
+RUN pip install --no-cache-dir --upgrade pip \
+    && pip install --no-cache-dir -r requirements-test.txt \
+    && pip install --no-cache-dir pytest-json-report>=1.5.0
+
+# --------------------------------------------------------------------------
+# Install Playwright browsers (headless Chromium only — saves ~400MB)
+# --------------------------------------------------------------------------
+RUN playwright install chromium
+
+# --------------------------------------------------------------------------
+# Application source (needed for imports in unit/integration tests)
+# --------------------------------------------------------------------------
+ARG BUILD_VERSION=unknown
+RUN echo "build-version=${BUILD_VERSION}" > /tmp/.build-version
+COPY src/ ./src/
+COPY config/ ./config/
+
+# --------------------------------------------------------------------------
+# Test source code
+# --------------------------------------------------------------------------
+COPY tests/ ./tests/
+COPY scripts/ ./scripts/
+COPY pyproject.toml ./pyproject.toml
+
+# --------------------------------------------------------------------------
+# Test host API server
+# --------------------------------------------------------------------------
+COPY test_host/ ./test_host/
+
+# --------------------------------------------------------------------------
+# Admin SPAs — pre-built bundles + standalone source for Vite dev server
+# --------------------------------------------------------------------------
+COPY admin/shopify/dist/ ./admin/shopify/dist/
+COPY admin/standalone/dist/ ./admin/standalone/dist/
+COPY admin/provider/dist/ ./admin/provider/dist/
+# Standalone SPA source — Vite dev server serves this for E2E Playwright tests.
+# Copy source files (not node_modules) + shared components (@shared alias).
+COPY admin/standalone/package.json admin/standalone/package-lock.json ./admin/standalone/
+COPY admin/standalone/index.html admin/standalone/index.tsx admin/standalone/tsconfig.json admin/standalone/vite.config.ts admin/standalone/vite-env.d.ts ./admin/standalone/
+COPY admin/standalone/components/ ./admin/standalone/components/
+COPY admin/standalone/hooks/ ./admin/standalone/hooks/
+COPY admin/standalone/layouts/ ./admin/standalone/layouts/
+COPY admin/standalone/login/ ./admin/standalone/login/
+COPY admin/standalone/mocks/ ./admin/standalone/mocks/
+COPY admin/standalone/pages/ ./admin/standalone/pages/
+COPY admin/standalone/public/ ./admin/standalone/public/
+COPY admin/shared/ ./admin/shared/
+# Install SPA dependencies (npm ci for deterministic installs)
+RUN cd admin/standalone && npm ci --ignore-scripts --no-audit --no-fund
+
+# --------------------------------------------------------------------------
+# Widget bundle (needed for widget embed tests)
+# --------------------------------------------------------------------------
+COPY widget/dist/ ./widget/dist/
+
+# --------------------------------------------------------------------------
+# Non-root user
+# --------------------------------------------------------------------------
+RUN groupadd --gid 1000 testhost \
+    && useradd --uid 1000 --gid testhost --shell /bin/sh --create-home testhost \
+    && chown -R testhost:testhost /app \
+    && chown -R testhost:testhost /home/testhost
+
+USER testhost
+
+# --------------------------------------------------------------------------
+# Networking
+# --------------------------------------------------------------------------
+EXPOSE 8001
+
+# --------------------------------------------------------------------------
+# Health check
+# --------------------------------------------------------------------------
+HEALTHCHECK --interval=30s --timeout=5s --start-period=10s --retries=3 \
+    CMD curl -f http://localhost:8001/health || exit 1
+
+# --------------------------------------------------------------------------
+# Entrypoint — single worker (only one test run at a time)
+# --------------------------------------------------------------------------
+ENTRYPOINT ["tini", "--"]
+CMD ["uvicorn", "test_host.main:app", "--host", "0.0.0.0", "--port", "8001", "--workers", "1", "--log-level", "info"]

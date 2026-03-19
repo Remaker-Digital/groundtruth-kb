@@ -355,8 +355,17 @@ def admin_vite_server(production_reachable) -> subprocess.Popen | None:
     # import.meta.env) that vite.config.ts reads for the proxy target.
     # VITE_API_URL is also set so the proxy works even without the config change.
     env = {**os.environ, "API_PROXY_TARGET": PROD_URL, "VITE_API_URL": PROD_URL}
+
+    # In container (Linux), use `npx vite` directly to bypass the `predev`
+    # lifecycle script which calls PowerShell (not available in Linux containers).
+    # On Windows, `npm run dev` works fine.
+    if sys.platform == "win32":
+        vite_cmd = "npm run dev"
+    else:
+        vite_cmd = "npx vite --host 0.0.0.0"
+
     proc = subprocess.Popen(
-        "npm run dev",
+        vite_cmd,
         cwd=str(ADMIN_DIR),
         shell=True,
         stdout=subprocess.PIPE,
@@ -401,6 +410,35 @@ def admin_vite_server(production_reachable) -> subprocess.Popen | None:
             proc.wait(timeout=10)
         except subprocess.TimeoutExpired:
             proc.kill()
+
+
+# ---------------------------------------------------------------------------
+# Playwright launch args — container compatibility
+# ---------------------------------------------------------------------------
+
+@pytest.fixture(scope="session")
+def browser_type_launch_args(browser_type_launch_args):
+    """Add --no-sandbox when running inside a container (non-root user).
+
+    Chromium in Docker requires --no-sandbox because the kernel user
+    namespace sandbox is not available to non-root users. This fixture
+    extends the base pytest-playwright launch args.
+    """
+    args = {**browser_type_launch_args}
+    # Detect container: /app working dir or ENVIRONMENT=test-host
+    in_container = (
+        os.environ.get("ENVIRONMENT") == "test-host"
+        or Path("/app").is_dir()
+    )
+    if in_container:
+        existing_args = list(args.get("args", []))
+        existing_args.extend([
+            "--no-sandbox",
+            "--disable-dev-shm-usage",
+            "--disable-gpu",
+        ])
+        args["args"] = existing_args
+    return args
 
 
 # ---------------------------------------------------------------------------

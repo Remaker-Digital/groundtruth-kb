@@ -242,4 +242,4 @@ class TestVersionBump:
 
     def test_product_version(self) -> None:
         from src.multi_tenant.api_versioning import PRODUCT_VERSION
-        assert PRODUCT_VERSION == "1.91.0"
+        assert PRODUCT_VERSION == "1.95.2"
