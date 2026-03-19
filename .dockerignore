@@ -47,6 +47,8 @@ build
 # Documentation
 docs/
 # docs-site/ — kept for production Dockerfile COPY docs-site/docs/
+docs-site/node_modules/
+docs-site/.cache/
 README.md
 CLAUDE.md
 
