@@ -102,6 +102,15 @@ class VerificationRunner:
         self.base_url = f"https://{fqdn}"
         self.verification_secret = verification_secret
         self.suite = suite
+
+        # HMAC tokens are signed with this replica's INTERNAL_VERIFICATION_SECRET.
+        # Requests to the FQDN may be load-balanced to a different replica that
+        # has a different secret — causing HMAC mismatch.  Authenticated checks
+        # use localhost to guarantee the request stays on the same replica.
+        # Unauthenticated checks (health, security) use the FQDN to exercise
+        # the real external path (TLS, Azure load balancer, CORS).
+        _port = os.environ.get("PORT", "8000")
+        self._local_base_url = f"http://localhost:{_port}"
         self.repo = cosmos_repo
         self.actor = actor
 
@@ -290,7 +299,10 @@ class VerificationRunner:
                 self.run_id, self.verification_secret,
             )
 
-        url = f"{self.base_url}{path}"
+        # Authenticated requests use localhost to avoid cross-replica HMAC mismatch.
+        # Unauthenticated requests use the FQDN to exercise the external path.
+        base = self._local_base_url if auth else self.base_url
+        url = f"{base}{path}"
         client = self._http_client
         if client is None:
             # Fallback: create a one-off client (should not happen in normal flow)
@@ -554,11 +566,14 @@ class VerificationRunner:
         return CheckResult(status="fail", detail=f"HTTP {code}: {body[:200]}")
 
     async def _check_spa_served(self) -> CheckResult:
-        """GET /admin/provider/ returns HTML with React root."""
+        """GET /admin/provider/ returns HTML with React mount point."""
         code, _, body = await self._http_get("/admin/provider/", auth=False)
-        if code == 200 and "root" in body.lower():
-            return CheckResult(status="pass", detail="HTML served with root element")
-        return CheckResult(status="fail", detail=f"HTTP {code}, root={'root' in body.lower()}")
+        body_lower = body.lower()
+        # SPA uses <div id="app"> (not "root") as the React mount point
+        has_mount = 'id="app"' in body_lower or 'id="root"' in body_lower
+        if code == 200 and has_mount:
+            return CheckResult(status="pass", detail="HTML served with mount element")
+        return CheckResult(status="fail", detail=f"HTTP {code}, mount={has_mount}")
 
     async def _check_entitlements(self) -> CheckResult:
         """GET /api/superadmin/entitlements returns 200."""

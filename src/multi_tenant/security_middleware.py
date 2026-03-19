@@ -467,6 +467,15 @@ class SecurityHeadersMiddleware:
                     (b"server-timing", f"total;dur={elapsed_ms:.1f}".encode())
                 )
 
+                # Suppress Server header to prevent framework version leakage.
+                # Uvicorn's --no-server-header flag is the primary defense;
+                # this is a belt-and-suspenders fallback at the ASGI level.
+                headers = [
+                    (k, v) for k, v in headers
+                    if k != b"server"
+                ]
+                headers.append((b"server", b"Agent Red"))
+
                 message["headers"] = headers
 
             await send(message)
