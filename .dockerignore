@@ -103,7 +103,7 @@ admin/provider/pages/
 node_modules/
 package.json
 package-lock.json
-shopify.app.toml
+# shopify.app.toml — kept in context for Dockerfile.test (Shopify compliance tests).
 
 # Infrastructure as code
 infrastructure/
