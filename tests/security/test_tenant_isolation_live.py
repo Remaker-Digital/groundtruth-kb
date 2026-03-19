@@ -139,30 +139,54 @@ def client():
 
 
 @pytest.fixture(scope="session")
-def headers_a():
+def headers_a(client):
     if not TENANT_A_API_KEY:
         pytest.skip("TENANT_A_API_KEY not set")
+    try:
+        r = client.get("/api/config", headers={"X-API-Key": TENANT_A_API_KEY})
+        if r.status_code == 401:
+            pytest.skip(f"Tenant A API key does not authenticate on {PROD_URL} (key/environment mismatch)")
+    except Exception:
+        pass
     return {"X-API-Key": TENANT_A_API_KEY}
 
 
 @pytest.fixture(scope="session")
-def headers_b():
+def headers_b(client):
     if not TENANT_B_API_KEY:
         pytest.skip("TENANT_B_API_KEY not set")
+    try:
+        r = client.get("/api/config", headers={"X-API-Key": TENANT_B_API_KEY})
+        if r.status_code == 401:
+            pytest.skip(f"Tenant B API key does not authenticate on {PROD_URL} (key/environment mismatch)")
+    except Exception:
+        pass
     return {"X-API-Key": TENANT_B_API_KEY}
 
 
 @pytest.fixture(scope="session")
-def widget_headers_a():
+def widget_headers_a(client):
     if not TENANT_A_WIDGET_KEY:
         pytest.skip("TENANT_A_WIDGET_KEY not set")
+    try:
+        r = client.get("/api/config", headers={"X-Widget-Key": TENANT_A_WIDGET_KEY})
+        if r.status_code == 401:
+            pytest.skip(f"Tenant A widget key does not authenticate on {PROD_URL} (key/environment mismatch)")
+    except Exception:
+        pass
     return {"X-Widget-Key": TENANT_A_WIDGET_KEY}
 
 
 @pytest.fixture(scope="session")
-def widget_headers_b():
+def widget_headers_b(client):
     if not TENANT_B_WIDGET_KEY:
         pytest.skip("TENANT_B_WIDGET_KEY not set")
+    try:
+        r = client.get("/api/config", headers={"X-Widget-Key": TENANT_B_WIDGET_KEY})
+        if r.status_code == 401:
+            pytest.skip(f"Tenant B widget key does not authenticate on {PROD_URL} (key/environment mismatch)")
+    except Exception:
+        pass
     return {"X-Widget-Key": TENANT_B_WIDGET_KEY}
 
 

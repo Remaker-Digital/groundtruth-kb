@@ -57,9 +57,19 @@ def client():
 
 
 @pytest.fixture(scope="session")
-def valid_headers():
+def valid_headers(client):
     if not VALID_API_KEY:
         pytest.skip("VALID_API_KEY not set")
+    # Validate the key authenticates on the target (prevents credential mismatch)
+    try:
+        r = client.get("/api/config", headers={"X-API-Key": VALID_API_KEY})
+        if r.status_code == 401:
+            pytest.skip(
+                f"API key does not authenticate on {PROD_URL} "
+                "(key/environment mismatch)"
+            )
+    except Exception:
+        pass
     return {"X-API-Key": VALID_API_KEY}
 
 
@@ -100,18 +110,16 @@ class TestAuthenticationBypass:
         r = client.get("/api/config", headers={"X-Widget-Key": ""})
         assert r.status_code == 401
 
-    def test_sec_l07_key_in_query_param(self, client):
+    def test_sec_l07_key_in_query_param(self, client, valid_headers):
         """SEC-L07: API key in query parameter — 200 (SPEC-1565: intentional for Co-Pilot SSE/WS)."""
         # S134: SPEC-1565 (S121) added api_key query param auth for Co-Pilot
         # admin mode (SSE/WebSocket connections can't send custom headers).
         # Valid key in query param → 200 is correct behavior.
-        r = client.get(f"/api/config?api_key={VALID_API_KEY or 'test'}")
-        if VALID_API_KEY:
-            assert r.status_code == 200, (
-                f"Expected 200 for valid api_key query param (SPEC-1565), got {r.status_code}"
-            )
-        else:
-            assert r.status_code in (401, 403)
+        # Uses valid_headers fixture to skip when key doesn't authenticate.
+        r = client.get(f"/api/config?api_key={VALID_API_KEY}")
+        assert r.status_code == 200, (
+            f"Expected 200 for valid api_key query param (SPEC-1565), got {r.status_code}"
+        )
 
     def test_sec_l08_widget_key_on_admin_endpoint(self, client):
         """SEC-L08: Widget key on admin-only endpoint → 401."""

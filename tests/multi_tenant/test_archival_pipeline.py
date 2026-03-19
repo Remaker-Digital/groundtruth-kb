@@ -282,7 +282,7 @@ class TestParquetSerialization:
     """AP-09: Parquet / JSONL serialization."""
 
     def test_ap_09_serialization_produces_bytes(self):
-        """AP-09: _serialize_to_parquet produces bytes (JSONL fallback when pyarrow not installed)."""
+        """AP-09: _serialize_to_parquet produces bytes (Parquet or JSONL fallback)."""
         service, _ = _make_service()
         documents = [
             {"id": "doc-1", "name": "Alice", "value": 42},
@@ -295,14 +295,21 @@ class TestParquetSerialization:
         assert isinstance(result, bytes)
         assert len(result) > 0
 
-        # Verify the JSONL fallback content is valid
+        # Two valid outputs depending on whether pyarrow is installed:
+        # 1. Parquet binary (starts with PAR1 magic bytes)
+        # 2. JSONL UTF-8 text (when pyarrow is not available)
         import json
-        lines = result.decode("utf-8").strip().split("\n")
-        assert len(lines) == 2
-        parsed_0 = json.loads(lines[0])
-        assert parsed_0["id"] == "doc-1"
-        parsed_1 = json.loads(lines[1])
-        assert parsed_1["id"] == "doc-2"
+        if result[:4] == b"PAR1":
+            # Parquet format — verify magic bytes (pyarrow installed)
+            assert result[-4:] == b"PAR1", "Parquet footer should end with PAR1"
+        else:
+            # JSONL fallback — verify content
+            lines = result.decode("utf-8").strip().split("\n")
+            assert len(lines) == 2
+            parsed_0 = json.loads(lines[0])
+            assert parsed_0["id"] == "doc-1"
+            parsed_1 = json.loads(lines[1])
+            assert parsed_1["id"] == "doc-2"
 
     def test_ap_09b_serialization_returns_none_for_empty(self):
         """AP-09b: _serialize_to_parquet returns None for empty document list."""

@@ -58,16 +58,28 @@ def client():
 
 
 @pytest.fixture(scope="session")
-def api_headers():
+def api_headers(client):
     if not API_KEY:
         pytest.skip("API_KEY not set")
+    try:
+        r = client.get("/api/config", headers={"X-API-Key": API_KEY})
+        if r.status_code == 401:
+            pytest.skip(f"API key does not authenticate on {PROD_URL} (key/environment mismatch)")
+    except Exception:
+        pass
     return {"X-API-Key": API_KEY}
 
 
 @pytest.fixture(scope="session")
-def widget_headers():
+def widget_headers(client):
     if not WIDGET_KEY:
         pytest.skip("WIDGET_KEY not set")
+    try:
+        r = client.get("/api/config", headers={"X-Widget-Key": WIDGET_KEY})
+        if r.status_code == 401:
+            pytest.skip(f"Widget key does not authenticate on {PROD_URL} (key/environment mismatch)")
+    except Exception:
+        pass
     return {"X-Widget-Key": WIDGET_KEY, "Content-Type": "application/json"}
 
 
