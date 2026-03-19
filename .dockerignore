@@ -67,14 +67,15 @@ widget/tsconfig.json
 widget/vite.config.ts
 widget/dev.html
 
-# Admin: exclude everything EXCEPT admin/{shopify,standalone}/dist/ (pre-built SPA assets)
-admin/shared/
+# Admin: keep dist/ bundles for all SPAs + standalone source for Dockerfile.test Vite.
+# Exclude node_modules from all admin projects (npm ci runs in-container).
 admin/node_modules/
-admin/package.json
-admin/package-lock.json
+admin/shopify/node_modules/
+admin/standalone/node_modules/
+admin/standalone/nul
+admin/provider/node_modules/
 # Shopify admin — exclude source, keep dist/
 admin/shopify/src/
-admin/shopify/node_modules/
 admin/shopify/package.json
 admin/shopify/package-lock.json
 admin/shopify/tsconfig.json
@@ -82,23 +83,10 @@ admin/shopify/vite.config.ts
 admin/shopify/vite-env.d.ts
 admin/shopify/index.html
 admin/shopify/index.tsx
-# Standalone admin — exclude source, keep dist/
-admin/standalone/src/
-admin/standalone/node_modules/
-admin/standalone/package.json
-admin/standalone/package-lock.json
-admin/standalone/tsconfig.json
-admin/standalone/vite.config.ts
-admin/standalone/vite-env.d.ts
-admin/standalone/index.html
-admin/standalone/index.tsx
-admin/standalone/login/
-admin/standalone/layouts/
-admin/standalone/pages/
-
+# Standalone admin — keep source (Dockerfile.test needs it for Vite dev server).
+# Production Dockerfile doesn't COPY these paths, so extra files are harmless.
 # Provider admin — exclude source, keep dist/
 admin/provider/src/
-admin/provider/node_modules/
 admin/provider/package.json
 admin/provider/package-lock.json
 admin/provider/tsconfig.json

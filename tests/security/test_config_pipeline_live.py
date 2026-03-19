@@ -91,16 +91,38 @@ def client():
 
 
 @pytest.fixture(scope="session")
-def headers():
+def headers(client):
     if not API_KEY:
         pytest.skip("SUPERADMIN_PREVIEW_API_KEY not set")
+    # Validate the key actually authenticates against the target.
+    # Prevents false failures when .env.local has a staging key but
+    # PROD_URL points at production (or vice versa).
+    try:
+        r = client.get("/api/config", headers={"X-API-Key": API_KEY})
+        if r.status_code == 401:
+            pytest.skip(
+                f"API key does not authenticate on {PROD_URL} "
+                "(key/environment mismatch — set PROD_URL to match the key)"
+            )
+    except Exception:
+        pass
     return {"X-API-Key": API_KEY}
 
 
 @pytest.fixture(scope="session")
-def widget_headers():
+def widget_headers(client):
     if not WIDGET_KEY:
         pytest.skip("PREVIEW_WIDGET_KEY not set")
+    # Validate the widget key actually authenticates against the target.
+    try:
+        r = client.get("/api/config", headers={"X-Widget-Key": WIDGET_KEY})
+        if r.status_code == 401:
+            pytest.skip(
+                f"Widget key does not authenticate on {PROD_URL} "
+                "(key/environment mismatch — set PROD_URL to match the key)"
+            )
+    except Exception:
+        pass
     return {"X-Widget-Key": WIDGET_KEY}
 
 
