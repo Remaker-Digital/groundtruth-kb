@@ -108,9 +108,17 @@ async def get_quality_score(
             compute_all_metrics,
             WEIGHTS,
         )
-        import sys
-        sys.path.insert(0, "tools/knowledge-db")
-        from db import KnowledgeDB
+        # Knowledge DB is a dev-only tool (tools/knowledge-db/db.py).
+        # In container deployments the module may not be available.
+        try:
+            import sys
+            sys.path.insert(0, "tools/knowledge-db")
+            from db import KnowledgeDB
+        except ImportError:
+            raise HTTPException(
+                status_code=503,
+                detail="Quality score unavailable: Knowledge DB not present in this environment",
+            )
 
         kb = KnowledgeDB()
         # TODO: Read previous/current coverage from quality_scores table
