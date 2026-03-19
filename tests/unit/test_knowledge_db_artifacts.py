@@ -38,7 +38,7 @@ def db():
 class TestSchemaExists:
     """Verify all expected tables, views, and indexes exist."""
 
-    def test_all_14_tables_exist(self, db):
+    def test_all_tables_exist(self, db):
         conn = db._get_conn()
         tables = sorted(
             r[0] for r in conn.execute(
@@ -47,9 +47,10 @@ class TestSchemaExists:
         )
         expected = sorted([
             "assertion_runs", "backlog_snapshots", "documents",
-            "environment_config", "operational_procedures", "session_prompts",
-            "specifications", "test_coverage", "test_plan_phases", "test_plans",
-            "test_procedures", "testable_elements", "tests", "work_items",
+            "environment_config", "operational_procedures", "quality_scores",
+            "session_prompts", "specifications", "test_coverage",
+            "test_plan_phases", "test_plans", "test_procedures",
+            "testable_elements", "tests", "work_items",
         ])
         assert tables == expected
 
