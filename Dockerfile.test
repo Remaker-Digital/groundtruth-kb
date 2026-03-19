@@ -103,6 +103,7 @@ COPY config/ ./config/
 COPY tests/ ./tests/
 COPY scripts/ ./scripts/
 COPY pyproject.toml ./pyproject.toml
+COPY shopify.app.toml ./shopify.app.toml
 
 # --------------------------------------------------------------------------
 # Test host API server

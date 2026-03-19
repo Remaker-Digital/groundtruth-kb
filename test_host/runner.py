@@ -65,16 +65,27 @@ class TestRunner:
             return {"error": str(exc)}
 
     async def cancel(self) -> None:
-        """Cancel the running test process."""
+        """Cancel the running test process.
+
+        Because subprocesses run in their own session (start_new_session=True),
+        we send SIGTERM to the process group to ensure all child processes
+        (e.g. Vite dev server, Chromium) are also terminated.
+        """
         self._cancelled = True
         if self._process and self._process.returncode is None:
             try:
-                self._process.send_signal(signal.SIGTERM)
+                # Send SIGTERM to the entire process group
+                pgid = os.getpgid(self._process.pid)
+                os.killpg(pgid, signal.SIGTERM)
                 await asyncio.sleep(5)
                 if self._process.returncode is None:
+                    os.killpg(pgid, signal.SIGKILL)
+            except (ProcessLookupError, OSError):
+                # Process already exited or group doesn't exist
+                try:
                     self._process.kill()
-            except ProcessLookupError:
-                pass
+                except ProcessLookupError:
+                    pass
         self.cosmos.finalize(status="error")
 
     async def _run_composite(self, config: SuiteConfig) -> dict:
@@ -149,13 +160,19 @@ class TestRunner:
         logger.info("Running pytest: %s", " ".join(cmd))
 
         try:
-            # Using create_subprocess_exec (not shell=True) to prevent injection
+            # Using create_subprocess_exec (not shell=True) to prevent injection.
+            # start_new_session=True isolates the subprocess from the parent
+            # process group so that SIGTERM propagated by tini/uvicorn during
+            # container scale-down does NOT kill the pytest process mid-run.
+            # The runner manages the subprocess lifecycle explicitly via
+            # cancel() and the per-suite timeout.
             self._process = await asyncio.create_subprocess_exec(
                 *cmd,
                 stdout=asyncio.subprocess.PIPE,
                 stderr=asyncio.subprocess.STDOUT,
                 env=env,
                 cwd="/app",
+                start_new_session=True,
             )
 
             stdout_chunks: list[str] = []
@@ -200,12 +217,29 @@ class TestRunner:
             else:
                 logger.warning("No JSON report file at %s", report_file)
                 rc = self._process.returncode or 0
+                # Provide actionable diagnostics for common failure modes
+                if rc < 0:
+                    sig_name = signal.Signals(-rc).name if -rc in signal.Signals._value2member_map_ else f"signal {-rc}"
+                    detail = (
+                        f"Process killed by {sig_name} (exit {rc}). "
+                        "Likely cause: container scale-down sent SIGTERM, "
+                        "or OOM killer intervened. Check ACA replica scaling "
+                        "and container memory limits."
+                    )
+                elif rc == 5:
+                    detail = (
+                        "pytest exit code 5: no tests collected. "
+                        "Check test paths, markers, and conftest imports."
+                    )
+                else:
+                    tail = "".join(stdout_chunks[-20:]) if stdout_chunks else ""
+                    detail = f"Exit code {rc}. Last output:\n{tail}" if tail else f"Exit code {rc}"
                 self.cosmos.add_results([
                     TestResult(
                         name=f"{config.name}_suite",
                         category=config.name,
                         status="pass" if rc == 0 else "fail",
-                        detail=f"Exit code {rc}",
+                        detail=detail,
                     )
                 ])
 
@@ -306,6 +340,7 @@ class TestRunner:
                 stderr=asyncio.subprocess.STDOUT,
                 env=env,
                 cwd="/app",
+                start_new_session=True,
             )
 
             try:
@@ -405,10 +440,11 @@ class TestRunner:
         env["STAGING_URL"] = self.target_url
 
         if config and config.requires_playwright:
-            # E2E mode: use local Vite dev server inside the container.
-            # Clear LIVE_SPA_BASE_URL so conftest starts Vite on port 3300.
-            # Set API_PROXY_TARGET so Vite proxies /api/* to the staging API.
-            env.pop("LIVE_SPA_BASE_URL", None)
+            # E2E mode: use the DEPLOYED SPA served by the staging container.
+            # The conftest's deployed-SPA path navigates directly to the
+            # staging admin SPA (same origin as API), avoiding the complexity
+            # of starting a local Vite dev server inside the test container.
+            env["LIVE_SPA_BASE_URL"] = f"{self.target_url}/admin/standalone"
             env["API_PROXY_TARGET"] = self.target_url
         else:
             # Non-E2E suites: set LIVE_SPA_BASE_URL for any incidental

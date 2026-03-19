@@ -41,6 +41,26 @@ app = FastAPI(
     docs_url="/docs",
 )
 
+
+@app.on_event("shutdown")
+async def _shutdown_cancel_active_run():
+    """Cancel any active test run on server shutdown.
+
+    When ACA scales down the container (SIGTERM → uvicorn graceful shutdown),
+    we must explicitly cancel the active runner so its subprocess (which runs
+    in a separate session via start_new_session=True) is terminated cleanly
+    instead of being orphaned.
+    """
+    global _active_runner, _active_task
+    if _active_runner and _active_task and not _active_task.done():
+        logger.warning(
+            "Shutdown: cancelling active run %s", _active_runner.run_id
+        )
+        await _active_runner.cancel()
+        _active_task.cancel()
+        _active_runner = None
+        _active_task = None
+
 # ---------------------------------------------------------------------------
 # In-memory state — single-worker, single-run-at-a-time
 # ---------------------------------------------------------------------------

@@ -296,14 +296,29 @@ class TestParquetSerialization:
         assert len(result) > 0
 
         # Two valid outputs depending on whether pyarrow is installed:
-        # 1. Parquet binary (starts with PAR1 magic bytes)
+        # 1. Parquet binary — verify by reading back with pyarrow
         # 2. JSONL UTF-8 text (when pyarrow is not available)
+        #
+        # We check pyarrow availability the SAME way the production code
+        # does (try import) to stay in sync with its code path.
         import json
-        if result[:4] == b"PAR1":
-            # Parquet format — verify magic bytes (pyarrow installed)
-            assert result[-4:] == b"PAR1", "Parquet footer should end with PAR1"
-        else:
-            # JSONL fallback — verify content
+        import io as _io
+        try:
+            import pyarrow.parquet as _pq
+
+            # pyarrow is available — production code used _serialize_with_pyarrow.
+            # Verify the bytes are a valid Parquet file by reading back.
+            table = _pq.read_table(_io.BytesIO(result))
+            assert len(table) == 2, f"Expected 2 rows, got {len(table)}"
+            assert "id" in table.column_names, (
+                f"Missing 'id' column; columns={table.column_names}"
+            )
+            ids = table.column("id").to_pylist()
+            assert "doc-1" in ids, f"doc-1 not in Parquet ids: {ids}"
+            assert "doc-2" in ids, f"doc-2 not in Parquet ids: {ids}"
+        except ImportError:
+            # No pyarrow — production code used _serialize_as_jsonl.
+            # Verify valid UTF-8 JSON lines.
             lines = result.decode("utf-8").strip().split("\n")
             assert len(lines) == 2
             parsed_0 = json.loads(lines[0])
