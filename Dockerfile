@@ -98,4 +98,8 @@ HEALTHCHECK --interval=30s --timeout=5s --start-period=15s --retries=3 \
 # Entrypoint — tini ensures proper signal handling for PID 1
 # --------------------------------------------------------------------------
 ENTRYPOINT ["tini", "--"]
-CMD ["uvicorn", "src.main:app", "--host", "0.0.0.0", "--port", "8000", "--workers", "4", "--log-level", "info", "--no-server-header"]
+# Generate INTERNAL_VERIFICATION_SECRET in the shell BEFORE uvicorn forks workers.
+# Shell-level env vars are inherited by all forked child processes, guaranteeing
+# every worker sees the same HMAC secret. Python-level os.environ changes at
+# import time do NOT reliably propagate through uvicorn's multiprocessing fork.
+CMD ["sh", "-c", "export INTERNAL_VERIFICATION_SECRET=${INTERNAL_VERIFICATION_SECRET:-$(python -c 'import secrets; print(secrets.token_hex(32))')} && exec uvicorn src.main:app --host 0.0.0.0 --port 8000 --workers 4 --log-level info --no-server-header"]
