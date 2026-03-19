@@ -295,8 +295,17 @@ class VerificationRunner:
         }
         if auth:
             from src.multi_tenant.auth import generate_verification_token
-            headers["X-Verification-Token"] = generate_verification_token(
+            token_val = generate_verification_token(
                 self.run_id, self.verification_secret,
+            )
+            headers["X-Verification-Token"] = token_val
+
+            # Diagnostic: log secret fingerprint to cross-reference with middleware
+            import hashlib as _hl
+            _secret_fp = _hl.sha256(self.verification_secret.encode()).hexdigest()[:12]
+            logger.info(
+                "HMAC diag: secret_fp=%s token_prefix=%s url_base=%s path=%s",
+                _secret_fp, token_val[:40], self._local_base_url, path,
             )
 
         # Authenticated requests use localhost to avoid cross-replica HMAC mismatch.

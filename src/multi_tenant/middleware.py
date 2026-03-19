@@ -682,6 +682,15 @@ class TenantAuthMiddleware(BaseHTTPMiddleware):
                 "Internal verification not configured.", status_code=500,
             )
 
+        # Diagnostic: log secret fingerprint and token prefix to trace HMAC mismatches
+        import hashlib as _hl
+        _secret_fp = _hl.sha256(secret.encode()).hexdigest()[:12]
+        _token_prefix = token[:40] if token else "(empty)"
+        logger.info(
+            "Verification token check: secret_fp=%s token_prefix=%s token_len=%d",
+            _secret_fp, _token_prefix, len(token),
+        )
+
         result = verify_verification_token(token, secret)
 
         logger.info(

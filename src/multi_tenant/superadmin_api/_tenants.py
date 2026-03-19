@@ -192,7 +192,7 @@ async def list_all_tenants(
     tier: str | None = Query(None, description="Filter by subscription tier"),
     billing_channel: str | None = Query(None, description="Filter by billing channel"),
     skip: int = Query(0, ge=0, description="Pagination offset"),
-    limit: int = Query(50, ge=1, le=200, description="Page size"),
+    limit: int = Query(50, ge=1, le=500, description="Page size"),
 ) -> TenantDirectoryResponse:
     """List all tenants across all partitions with optional filtering."""
     if not _state._tenant_repo:
