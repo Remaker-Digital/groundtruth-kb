@@ -48,6 +48,65 @@ from src.multi_tenant.tenant_secret_service import get_secret_service
 logger = logging.getLogger(__name__)
 
 
+# ---------------------------------------------------------------------------
+# Pre-fork secret generation (SPEC-1846 fix)
+# ---------------------------------------------------------------------------
+# When uvicorn runs with --workers N, the parent process imports this module,
+# HMAC verification secret for VerificationRunner (SPEC-1846).
+#
+# CRITICAL: With uvicorn --workers 4, each worker is a separate process.
+# os.environ changes made at import time in the parent do NOT reliably
+# propagate to forked workers (confirmed by diagnostic logging: 4 workers
+# each had different secret fingerprints).
+#
+# Solution: Use a shared temp file as a cross-worker secret store.
+# The first process to start writes the secret; all others read it.
+# The file is in /tmp (container-local, not shared across replicas).
+_VERIFICATION_SECRET_PATH = "/tmp/.agent-red-verification-secret"
+
+def _ensure_verification_secret() -> str:
+    """Ensure INTERNAL_VERIFICATION_SECRET is set consistently across all workers.
+
+    Uses a temp file as a cross-worker coordination mechanism:
+    1. If env var already set (e.g., by Azure config), use it.
+    2. If temp file exists, read secret from it.
+    3. Otherwise, generate a new secret, write to file, set env var.
+    """
+    import secrets as _secrets
+
+    # Explicit env var takes priority (e.g., set in Azure Container App config)
+    existing = os.environ.get("INTERNAL_VERIFICATION_SECRET", "")
+    if existing:
+        return existing
+
+    # Try reading from shared temp file (written by first worker/parent)
+    try:
+        with open(_VERIFICATION_SECRET_PATH, "r") as f:
+            secret = f.read().strip()
+            if secret:
+                os.environ["INTERNAL_VERIFICATION_SECRET"] = secret
+                logger.info("Loaded INTERNAL_VERIFICATION_SECRET from shared file")
+                return secret
+    except FileNotFoundError:
+        pass
+
+    # First process: generate and write
+    secret = _secrets.token_hex(32)
+    try:
+        with open(_VERIFICATION_SECRET_PATH, "w") as f:
+            f.write(secret)
+        os.chmod(_VERIFICATION_SECRET_PATH, 0o600)  # Owner-only read/write
+    except OSError:
+        logger.warning("Could not write verification secret to %s", _VERIFICATION_SECRET_PATH)
+
+    os.environ["INTERNAL_VERIFICATION_SECRET"] = secret
+    logger.info("Generated INTERNAL_VERIFICATION_SECRET (written to shared file)")
+    return secret
+
+_ensure_verification_secret()
+
+
+
 # =========================================================================
 # Middleware registration
 # =========================================================================
@@ -149,16 +208,15 @@ def register_middleware(app: FastAPI) -> None:
 # =========================================================================
 
 async def _startup_verification_secret() -> None:
-    """Auto-generate INTERNAL_VERIFICATION_SECRET if not set (SPEC-1846).
+    """Ensure INTERNAL_VERIFICATION_SECRET is available in this worker (SPEC-1846).
 
-    The VerificationRunner needs a per-instance secret for HMAC tokens.
-    Since the runner runs in-process, an ephemeral secret is sufficient.
-    No external dependency — this must run before any other handler.
+    Delegates to _ensure_verification_secret() which coordinates across
+    workers via a shared temp file.
     """
-    import secrets as _secrets
-    if not os.environ.get("INTERNAL_VERIFICATION_SECRET"):
-        os.environ["INTERNAL_VERIFICATION_SECRET"] = _secrets.token_hex(32)
-        logger.info("Generated ephemeral INTERNAL_VERIFICATION_SECRET for verification runner")
+    secret = _ensure_verification_secret()
+    import hashlib as _hl
+    fp = _hl.sha256(secret.encode()).hexdigest()[:12]
+    logger.info("INTERNAL_VERIFICATION_SECRET ready: fp=%s pid=%d", fp, os.getpid())
 
 
 async def _startup_cosmos_db() -> None:
