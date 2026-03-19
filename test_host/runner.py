@@ -362,12 +362,22 @@ class TestRunner:
                 self._parse_locust_csv(stats_file)
             else:
                 rc = self._process.returncode or 0
+                if rc < 0:
+                    sig_name = signal.Signals(-rc).name if -rc in signal.Signals._value2member_map_ else f"signal {-rc}"
+                    detail = (
+                        f"Locust killed by {sig_name} (exit {rc}). "
+                        "Container may have been scaled down mid-run."
+                    )
+                elif not stdout_text.strip():
+                    detail = f"Locust exited with code {rc} and no output. Check locustfile path and dependencies."
+                else:
+                    detail = stdout_text[-500:]
                 self.cosmos.add_results([
                     TestResult(
                         name="load_test",
                         category="load",
                         status="pass" if rc == 0 else "fail",
-                        detail=stdout_text[-500:],
+                        detail=detail,
                     )
                 ])
 

@@ -136,9 +136,10 @@ COPY admin/shared/ ./admin/shared/
 RUN cd admin/standalone && npm ci --ignore-scripts --no-audit --no-fund
 
 # --------------------------------------------------------------------------
-# Widget bundle (needed for widget embed tests)
+# Widget bundle + source (dist for embed tests, src for TS assertion tests)
 # --------------------------------------------------------------------------
 COPY widget/dist/ ./widget/dist/
+COPY widget/src/ ./widget/src/
 
 # --------------------------------------------------------------------------
 # Non-root user

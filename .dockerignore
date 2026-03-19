@@ -60,8 +60,9 @@ website/
 # Frontend projects (built and served separately)
 prototype/
 extensions/
-# Widget — exclude source, keep dist/ (IIFE bundle served at /widget.js)
-widget/src/
+# Widget — keep source for Dockerfile.test (test_message_feedback reads .ts files).
+# Production Dockerfile does not COPY widget/src/, so this is harmless.
+# widget/src/
 widget/node_modules/
 widget/package.json
 widget/package-lock.json
