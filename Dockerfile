@@ -11,7 +11,11 @@
 #     -e KEY_VAULT_URL=https://kv-agentred-eastus2.vault.azure.net/ \
 #     agentred-api:latest
 
-FROM python:3.12-slim-bookworm
+# Pull from ACR cache to avoid Docker Hub rate limits on anonymous pulls.
+# Maintain with: az acr import --name acragentredeastus \
+#   --source docker.io/library/python:3.12-slim-bookworm \
+#   --image python:3.12-slim-bookworm
+FROM acragentredeastus.azurecr.io/python:3.12-slim-bookworm
 
 # --------------------------------------------------------------------------
 # Metadata
