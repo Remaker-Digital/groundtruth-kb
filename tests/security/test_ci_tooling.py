@@ -3,11 +3,22 @@
 Validates SPEC-1695 (import-cycle detection), SPEC-1696 (pip-audit),
 SPEC-1697 (Ruff blocking), SPEC-1698 (xdist), SPEC-1699 (radon/vulture).
 
+These tests validate CI pipeline configuration files (.github/workflows/)
+which are only present in the git working tree, not in Docker containers.
+
 (c) 2026 Remaker Digital, a DBA of VanDusen & Palmeter, LLC. All rights reserved.
 """
+import pathlib
 import re
 
 import pytest
+
+# Skip entire module when running inside the test host container
+# (no .github/workflows/ directory available)
+pytestmark = pytest.mark.skipif(
+    not pathlib.Path(".github/workflows").exists(),
+    reason="CI workflow files not available (container environment)",
+)
 
 
 def _read_workflow(name: str) -> str:

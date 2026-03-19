@@ -54,9 +54,14 @@ interface PipelineRun {
   passed: number;
   failed: number;
   skipped: number;
+  errored: number;
   durationS: number | null;
   phasesRun: string[];
+  phasesCompleted: string[];
+  currentPhase: string;
+  phasesTotal: number;
   checks: CheckResult[];
+  stdoutTail: string;
 }
 
 const STATUS_COLORS: Record<string, string> = {
@@ -67,12 +72,41 @@ const STATUS_COLORS: Record<string, string> = {
   error: 'red',
 };
 
-// SPEC-1846: Cloud-native verification suites (no pytest/unit in-container)
+// Suite options: in-process verification + test host container suites
+// Using Mantine ComboboxData grouped format (array of group objects)
 const SUITE_OPTIONS = [
-  { value: 'smoke', label: 'Smoke — Health probes (~5s)' },
-  { value: 'regression', label: 'Regression — API + config (~3min)' },
-  { value: 'e2e', label: 'End-to-End — Full verification (~8min)' },
-  { value: 'all', label: 'Full Suite — All checks (~12min)' },
+  {
+    group: 'Quick Verification',
+    items: [
+      { value: 'smoke', label: 'Smoke — Health probes (8 checks, ~5s)' },
+      { value: 'regression', label: 'Regression — API endpoints (25 checks, ~3min)' },
+      { value: 'e2e', label: 'Verification — Full checks (35 checks, ~8min)' },
+      { value: 'all', label: 'All Checks — Complete verification (40 checks, ~12min)' },
+    ],
+  },
+  {
+    group: 'Comprehensive',
+    items: [
+      { value: 'unit', label: 'Unit Tests (~950 tests, ~2min)' },
+      { value: 'core', label: 'Core / Multi-Tenant (~3,700 tests, ~5min)' },
+      { value: 'integration', label: 'Integration Tests (~270 tests, ~3min)' },
+      { value: 'agents', label: 'Agent & Chat Tests (~300 tests, ~3min)' },
+      { value: 'security', label: 'Security & Penetration (~150 tests, ~3min)' },
+      { value: 'ops', label: 'Operations & Resilience (~80 tests, ~4min)' },
+      { value: 'widget', label: 'Widget Tests (~60 tests, ~2min)' },
+      { value: 'e2e_live', label: 'E2E Live — Playwright (~1,100 tests, ~15min)' },
+      { value: 'load', label: 'Load Testing — Locust (~5min)' },
+      { value: 'fuzzing', label: 'API Fuzzing — Schemathesis (307 ops, ~5min)' },
+      { value: 'property', label: 'Property Tests — Hypothesis (46 tests, ~2min)' },
+    ],
+  },
+  {
+    group: 'Full Suite',
+    items: [
+      { value: 'pipeline', label: 'Full Pipeline — All phases (~30min)' },
+      { value: 'full', label: 'Complete Suite — Everything (~45min)' },
+    ],
+  },
 ];
 
 const CHECK_STATUS_COLORS: Record<string, string> = {
@@ -310,8 +344,10 @@ export const TestExecutionPage: React.FC = () => {
             <Group>
               <Text size="sm" fw={500}>Results:</Text>
               <Text size="sm">
-                {detailRun.passed} passed, {detailRun.failed} failed, {detailRun.skipped} skipped
-                ({detailRun.totalTests} total)
+                {detailRun.passed} passed, {detailRun.failed} failed
+                {detailRun.errored > 0 && `, ${detailRun.errored} errors`}
+                {detailRun.skipped > 0 && `, ${detailRun.skipped} skipped`}
+                {' '}({detailRun.totalTests} total)
               </Text>
               <Text size="sm" fw={500} ml="md">Duration:</Text>
               <Text size="sm">{detailRun.durationS != null ? `${detailRun.durationS}s` : 'In progress'}</Text>
@@ -321,7 +357,12 @@ export const TestExecutionPage: React.FC = () => {
             {(detailRun.status === 'running' || detailRun.status === 'queued') && detailRun.totalTests > 0 && (
               <div>
                 <Group justify="space-between" mb={4}>
-                  <Text size="xs" c="dimmed">Progress</Text>
+                  <Text size="xs" c="dimmed">
+                    {detailRun.currentPhase
+                      ? `Running: ${detailRun.currentPhase} (${(detailRun.phasesCompleted?.length || 0) + 1}/${detailRun.phasesTotal || '?'} phases)`
+                      : 'Progress'
+                    }
+                  </Text>
                   <Text size="xs" c="dimmed">{detailRun.completed || 0} / {detailRun.totalTests}</Text>
                 </Group>
                 <div style={{ background: '#e9ecef', borderRadius: 4, height: 8, overflow: 'hidden' }}>
@@ -335,42 +376,79 @@ export const TestExecutionPage: React.FC = () => {
               </div>
             )}
 
-            {/* Categories completed */}
-            {detailRun.phasesRun.length > 0 && (
+            {/* Categories / phases completed */}
+            {(detailRun.phasesCompleted?.length > 0 || detailRun.phasesRun?.length > 0) && (
               <Group>
-                <Text size="sm" fw={500}>Categories:</Text>
-                {detailRun.phasesRun.map(p => <Badge key={p} size="sm" variant="light">{p}</Badge>)}
+                <Text size="sm" fw={500}>Phases:</Text>
+                {(detailRun.phasesCompleted || detailRun.phasesRun || []).map(p =>
+                  <Badge key={p} size="sm" variant="light">{p}</Badge>
+                )}
               </Group>
             )}
 
-            {/* Checks table */}
-            {detailRun.checks && detailRun.checks.length > 0 && (
+            {/* Checks table — show failures first, then all */}
+            {detailRun.checks && detailRun.checks.length > 0 && (() => {
+              const failures = detailRun.checks.filter(c => c.status === 'fail' || c.status === 'error');
+              const passes = detailRun.checks.filter(c => c.status === 'pass');
+              const skips = detailRun.checks.filter(c => c.status === 'skip');
+              // For large test runs (>100 checks), show failures + summary
+              const isLarge = detailRun.checks.length > 100;
+              const displayChecks = isLarge ? failures : detailRun.checks;
+              return (
+                <>
+                  <Text size="sm" fw={600} mt="sm">
+                    {isLarge
+                      ? `Failures (${failures.length} of ${detailRun.checks.length} tests)`
+                      : `Verification Checks (${detailRun.checks.length})`
+                    }
+                  </Text>
+                  {isLarge && failures.length === 0 && (
+                    <Text size="sm" c="green" mt="xs">All {detailRun.checks.length} tests passed.</Text>
+                  )}
+                  {displayChecks.length > 0 && (
+                    <div style={{ maxHeight: 400, overflowY: 'auto' }}>
+                      <Table striped highlightOnHover withTableBorder>
+                        <Table.Thead>
+                          <Table.Tr>
+                            <Table.Th>Check</Table.Th>
+                            <Table.Th>Category</Table.Th>
+                            <Table.Th>Status</Table.Th>
+                            <Table.Th>Latency</Table.Th>
+                            <Table.Th>Detail</Table.Th>
+                          </Table.Tr>
+                        </Table.Thead>
+                        <Table.Tbody>
+                          {displayChecks.map((c, i) => (
+                            <Table.Tr key={`${c.category}-${c.name}-${i}`}>
+                              <Table.Td><Text size="xs">{c.name}</Text></Table.Td>
+                              <Table.Td><Badge size="xs" variant="light">{c.category}</Badge></Table.Td>
+                              <Table.Td>
+                                <Badge size="xs" color={CHECK_STATUS_COLORS[c.status] || 'gray'}>{c.status}</Badge>
+                              </Table.Td>
+                              <Table.Td><Text size="xs" c="dimmed">{c.latencyMs}ms</Text></Table.Td>
+                              <Table.Td><Text size="xs" lineClamp={2}>{c.detail}</Text></Table.Td>
+                            </Table.Tr>
+                          ))}
+                        </Table.Tbody>
+                      </Table>
+                    </div>
+                  )}
+                  {isLarge && (
+                    <Text size="xs" c="dimmed" mt="xs">
+                      {passes.length} passed, {failures.length} failed, {skips.length} skipped
+                    </Text>
+                  )}
+                </>
+              );
+            })()}
+
+            {/* Stdout tail for test host runs */}
+            {detailRun.stdoutTail && (
               <>
-                <Text size="sm" fw={600} mt="sm">Verification Checks</Text>
-                <Table striped highlightOnHover withTableBorder>
-                  <Table.Thead>
-                    <Table.Tr>
-                      <Table.Th>Check</Table.Th>
-                      <Table.Th>Category</Table.Th>
-                      <Table.Th>Status</Table.Th>
-                      <Table.Th>Latency</Table.Th>
-                      <Table.Th>Detail</Table.Th>
-                    </Table.Tr>
-                  </Table.Thead>
-                  <Table.Tbody>
-                    {detailRun.checks.map((c) => (
-                      <Table.Tr key={`${c.category}-${c.name}`}>
-                        <Table.Td><Text size="xs">{c.name}</Text></Table.Td>
-                        <Table.Td><Badge size="xs" variant="light">{c.category}</Badge></Table.Td>
-                        <Table.Td>
-                          <Badge size="xs" color={CHECK_STATUS_COLORS[c.status] || 'gray'}>{c.status}</Badge>
-                        </Table.Td>
-                        <Table.Td><Text size="xs" c="dimmed">{c.latencyMs}ms</Text></Table.Td>
-                        <Table.Td><Text size="xs" lineClamp={2}>{c.detail}</Text></Table.Td>
-                      </Table.Tr>
-                    ))}
-                  </Table.Tbody>
-                </Table>
+                <Text size="sm" fw={600} mt="sm">Test Output (last 2000 chars)</Text>
+                <Code block style={{ maxHeight: 200, overflowY: 'auto', fontSize: 11 }}>
+                  {detailRun.stdoutTail}
+                </Code>
               </>
             )}
 

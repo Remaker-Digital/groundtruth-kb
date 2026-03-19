@@ -3,6 +3,9 @@
 Validates SPEC-1700 (rate-limit procedure), SPEC-1701 (deployment runbook archive),
 SPEC-1702 (operations index), SPEC-1703 (master test results).
 
+These tests validate docs/ directory content which is only present
+in the git working tree, not in Docker containers.
+
 (c) 2026 Remaker Digital, a DBA of VanDusen & Palmeter, LLC. All rights reserved.
 """
 import pathlib
@@ -10,6 +13,12 @@ import re
 
 import pytest
 
+# Skip entire module when running inside the test host container
+# (no docs/ directory available)
+pytestmark = pytest.mark.skipif(
+    not pathlib.Path("docs").exists(),
+    reason="docs/ directory not available (container environment)",
+)
 
 DOCS = pathlib.Path("docs")
 OPS = DOCS / "operations"

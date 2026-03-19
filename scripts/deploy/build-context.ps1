@@ -37,6 +37,15 @@ if (Test-Path "$PROJECT_ROOT\widget\dist") {
     Write-Host "  Copied widget/dist"
 }
 
+# Docs site (Dockerfile COPY docs-site/docs/)
+if (Test-Path "$PROJECT_ROOT\docs-site\docs") {
+    New-Item -ItemType Directory -Path "$ctx\docs-site" -Force | Out-Null
+    Copy-Item -Recurse "$PROJECT_ROOT\docs-site\docs" "$ctx\docs-site\docs"
+    Write-Host "  Copied docs-site/docs"
+} else {
+    Write-Warning "docs-site/docs missing — build will fail"
+}
+
 # Verify critical files
 $critical = @("src\main.py", "src\multi_tenant\cosmos_schema.py", "src\multi_tenant\auth.py", "Dockerfile", "requirements.txt")
 foreach ($f in $critical) {

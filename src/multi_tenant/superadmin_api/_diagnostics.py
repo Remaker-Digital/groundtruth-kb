@@ -234,7 +234,23 @@ def _get_platform_repo():
 _TEST_RUN_CONFIG_TYPE = "test_runs"
 
 VALID_ENVIRONMENTS = {"staging", "production"}
-VALID_SUITES = {"all", "regression", "smoke", "e2e"}  # SPEC-1846: no "unit" in-container
+# In-process suites (run inside this container via VerificationRunner)
+_INPROCESS_SUITES = {"all", "regression", "smoke", "e2e"}
+
+# Test host suites (dispatched to agent-red-test-host container)
+_TESTHOST_SUITES = {
+    "unit", "core", "integration", "agents", "security",
+    "regression_pytest", "ops", "widget", "e2e_live",
+    "load", "fuzzing", "property", "pipeline", "full",
+}
+
+VALID_SUITES = _INPROCESS_SUITES | _TESTHOST_SUITES
+
+# Test host internal URL (Azure Container Apps internal DNS)
+_TEST_HOST_URL = os.environ.get(
+    "TEST_HOST_URL",
+    "http://agent-red-test-host:8001",
+)
 
 # SPEC-1846: Track active verification runs (one at a time)
 _active_runs: dict[str, asyncio.Task] = {}
@@ -268,7 +284,7 @@ class PipelineRunStatusResponse(CamelCaseModel):
     run_id: str
     environment: str
     suite: str
-    status: str = Field(description="Status: queued, running, passed, failed, cancelled")
+    status: str = Field(description="Status: queued, running, passed, failed, cancelled, error")
     started_at: str | None = None
     completed_at: str | None = None
     triggered_by: str = ""
@@ -277,10 +293,15 @@ class PipelineRunStatusResponse(CamelCaseModel):
     passed: int = 0
     failed: int = 0
     skipped: int = 0
+    errored: int = 0
     duration_s: float | None = None
     failures: list[dict[str, Any]] = Field(default_factory=list)
     phases_run: list[str] = Field(default_factory=list)
-    checks: list[dict[str, Any]] = Field(default_factory=list, description="Full check results (SPEC-1846)")
+    phases_completed: list[str] = Field(default_factory=list)
+    current_phase: str = ""
+    phases_total: int = 0
+    checks: list[dict[str, Any]] = Field(default_factory=list, description="Full check results")
+    stdout_tail: str = Field(default="", description="Last 2000 chars of test output")
 
 
 class PipelineRunTriggerResponse(CamelCaseModel):
@@ -447,15 +468,23 @@ async def trigger_test_run(
         _active_runs.pop(run_id, None)  # Remove sentinel on Cosmos failure
         raise
 
-    # SPEC-1846: Fire background verification task (replaces sentinel)
-    task = asyncio.create_task(
-        _run_verification_background(run_id, body.environment, body.suite, fqdn, verification_secret, actor)
-    )
+    # Dispatch to test host or run in-process
+    if body.suite in _TESTHOST_SUITES:
+        # Dispatch to dedicated test host container
+        task = asyncio.create_task(
+            _dispatch_to_test_host(run_id, body.environment, body.suite, fqdn, actor)
+        )
+    else:
+        # SPEC-1846: Fire in-process verification (replaces sentinel)
+        task = asyncio.create_task(
+            _run_verification_background(run_id, body.environment, body.suite, fqdn, verification_secret, actor)
+        )
     _active_runs[run_id] = task
 
     logger.info(
-        "Verification run queued: %s env=%s suite=%s by %s",
+        "Verification run queued: %s env=%s suite=%s by %s dispatch=%s",
         run_id, body.environment, body.suite, actor,
+        "test-host" if body.suite in _TESTHOST_SUITES else "in-process",
     )
 
     return PipelineRunTriggerResponse(
@@ -547,6 +576,81 @@ async def _run_verification_background(
             await repo.set_config(error_doc)
         except Exception:
             logger.error("Failed to store error state for run %s", run_id, exc_info=True)
+    finally:
+        _active_runs.pop(run_id, None)
+
+
+async def _dispatch_to_test_host(
+    run_id: str, environment: str, suite: str, fqdn: str, actor: str,
+) -> None:
+    """Dispatch a test run to the dedicated test host container.
+
+    The test host runs pytest/Playwright/Locust as subprocesses and
+    writes results directly to Cosmos. This function just triggers
+    the run and monitors for completion.
+    """
+    import httpx
+
+    try:
+        async with httpx.AsyncClient(timeout=30.0) as client:
+            payload = {
+                "run_id": run_id,
+                "suite": suite,
+                "environment": environment,
+                "target_url": f"https://{fqdn}",
+                "cosmos_endpoint": os.environ.get("COSMOS_DB_ENDPOINT", ""),
+                "cosmos_key": os.environ.get("COSMOS_DB_KEY", ""),
+                "cosmos_db": os.environ.get("COSMOS_DB_DATABASE", "agentred-staging"),
+            }
+            resp = await client.post(f"{_TEST_HOST_URL}/run", json=payload)
+
+        if resp.status_code == 202:
+            logger.info("Test host accepted run %s (suite=%s)", run_id, suite)
+        elif resp.status_code == 409:
+            logger.warning("Test host busy — run %s rejected: %s", run_id, resp.text)
+            # Mark as error in Cosmos
+            repo = _get_platform_repo()
+            now_iso = datetime.now(timezone.utc).isoformat()
+            await repo.set_config(PlatformConfigDocument(
+                id=f"{_TEST_RUN_CONFIG_TYPE}:{run_id}",
+                config_type=_TEST_RUN_CONFIG_TYPE,
+                config_key=run_id,
+                value={
+                    "run_id": run_id, "environment": environment, "suite": suite,
+                    "status": "error", "triggered_by": actor,
+                    "completed_at": now_iso,
+                    "failures": [{"name": "dispatch", "detail": "Test host busy"}],
+                    "total_tests": 0, "completed": 0, "passed": 0,
+                    "failed": 0, "skipped": 0, "duration_s": 0.0,
+                    "phases_run": [], "checks": [],
+                },
+                version=1, updated_at=now_iso, updated_by=actor,
+            ))
+        else:
+            raise RuntimeError(f"Test host returned {resp.status_code}: {resp.text[:300]}")
+
+    except Exception as exc:
+        logger.error("Failed to dispatch to test host: %s", exc, exc_info=True)
+        try:
+            repo = _get_platform_repo()
+            now_iso = datetime.now(timezone.utc).isoformat()
+            await repo.set_config(PlatformConfigDocument(
+                id=f"{_TEST_RUN_CONFIG_TYPE}:{run_id}",
+                config_type=_TEST_RUN_CONFIG_TYPE,
+                config_key=run_id,
+                value={
+                    "run_id": run_id, "environment": environment, "suite": suite,
+                    "status": "error", "triggered_by": actor,
+                    "completed_at": now_iso,
+                    "failures": [{"name": "dispatch", "detail": str(exc)[:500]}],
+                    "total_tests": 0, "completed": 0, "passed": 0,
+                    "failed": 0, "skipped": 0, "duration_s": 0.0,
+                    "phases_run": [], "checks": [],
+                },
+                version=1, updated_at=now_iso, updated_by=actor,
+            ))
+        except Exception:
+            logger.error("Failed to store dispatch error for run %s", run_id, exc_info=True)
     finally:
         _active_runs.pop(run_id, None)
 

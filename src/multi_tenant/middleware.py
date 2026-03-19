@@ -1243,6 +1243,16 @@ class RateLimitMiddleware(BaseHTTPMiddleware):
         self._num_shards = num_shards
         self._window_size = 60.0  # 1 minute sliding window
 
+        # DISABLE_RATE_LIMITING: bypass all per-tenant rate limits.
+        # Used by the test host container during load testing to measure
+        # raw API throughput without artificial 429s.
+        self._disabled = os.environ.get("DISABLE_RATE_LIMITING", "").lower() in (
+            "1", "true", "yes",
+        )
+        if self._disabled:
+            logger.warning("RateLimitMiddleware: DISABLED via DISABLE_RATE_LIMITING env var")
+            return  # Skip Redis backend init when disabled
+
         # SPEC-1754: When REDIS_URL is configured, delegate rate limiting to
         # the shared RedisRateLimitBackend for distributed enforcement across
         # replicas. Falls back to local shards if Redis becomes unavailable.
@@ -1279,6 +1289,10 @@ class RateLimitMiddleware(BaseHTTPMiddleware):
     async def dispatch(
         self, request: Request, call_next: RequestResponseEndpoint,
     ) -> Response:
+        # DISABLE_RATE_LIMITING: bypass entirely for load testing
+        if self._disabled:
+            return await call_next(request)
+
         # Only rate-limit authenticated requests
         ctx: TenantContext | None = getattr(request.state, "tenant_context", None)
         if ctx is None:

@@ -11,7 +11,7 @@
 #     -e KEY_VAULT_URL=https://kv-agentred-eastus2.vault.azure.net/ \
 #     agentred-api:latest
 
-FROM python:3.12-slim
+FROM python:3.12-slim-bookworm
 
 # --------------------------------------------------------------------------
 # Metadata

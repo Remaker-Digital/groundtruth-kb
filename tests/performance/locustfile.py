@@ -6,7 +6,8 @@ Validates SLA commitments under realistic concurrent load:
     - SSE streaming stability under concurrent connections
     - Pipeline timeout budget (8s hard deadline)
 
-NOTE: Rate limiting has been removed from the platform. All 429 responses
+NOTE: Set DISABLE_RATE_LIMITING=true on the target API container to bypass
+per-tenant rate limits during load testing.  Any remaining 429 responses
 indicate genuine infrastructure overload and are counted as failures.
 
 Scenarios:

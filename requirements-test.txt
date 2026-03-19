@@ -39,3 +39,6 @@ axe-playwright-python>=0.1.4
 
 # Contract testing (widget ↔ chat API)
 pact-python>=2.2.0
+
+# JSON test report output (for test host container)
+pytest-json-report>=1.5.0

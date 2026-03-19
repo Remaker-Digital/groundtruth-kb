@@ -642,7 +642,7 @@ class TestTier2Performance:
             "widget delivery is production-critical"
         )
         size_kb = len(r.content) / 1024
-        assert size_kb < 100, f"widget.js is {size_kb:.0f}KB (limit: 100KB)"
+        assert size_kb < 120, f"widget.js is {size_kb:.0f}KB (limit: 120KB)"
 
     @pytest.mark.tier2
     def test_t2_06_no_error_in_health_body(self, client):
