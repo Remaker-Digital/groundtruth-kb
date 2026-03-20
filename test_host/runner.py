@@ -70,8 +70,14 @@ class TestRunner:
         Because subprocesses run in their own session (start_new_session=True),
         we send SIGTERM to the process group to ensure all child processes
         (e.g. Vite dev server, Chromium) are also terminated.
+
+        IMPORTANT: finalize() is called FIRST, before subprocess cleanup.
+        This ensures the Cosmos document gets a proper status and duration
+        even if ACA sends SIGKILL during the cleanup sleep.
         """
         self._cancelled = True
+        # Finalize BEFORE cleanup — survives container scale-down SIGKILL
+        self.cosmos.finalize(status="error")
         if self._process and self._process.returncode is None:
             try:
                 # Send SIGTERM to the entire process group
@@ -86,7 +92,6 @@ class TestRunner:
                     self._process.kill()
                 except ProcessLookupError:
                     pass
-        self.cosmos.finalize(status="error")
 
     async def _run_composite(self, config: SuiteConfig) -> dict:
         """Run multiple suites sequentially."""
