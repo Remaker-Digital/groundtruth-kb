@@ -251,7 +251,10 @@ export const StandaloneLayout: React.FC<StandaloneLayoutProps> = ({
       try {
         const resp = await apiFetch('/api/tenants/lookup');
         if (!resp.ok) {
-          if (resp.status === 401 || resp.status === 403) {
+          if (resp.status === 400 || resp.status === 401 || resp.status === 403) {
+            // 400 = no valid auth credential sent (expired session / bookmark)
+            // 401/403 = invalid or revoked credential
+            // All three mean "not authenticated" — redirect to login
             onLogout();
             return;
           }
