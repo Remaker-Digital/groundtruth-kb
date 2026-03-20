@@ -49,6 +49,8 @@ SUITE_CONFIGS: dict[str, SuiteConfig] = {
             "tests/multi_tenant/",
             "tests/migrations/",
             # Exclude tests that read project files not in container
+            # (branding/, .env.local, shopify.app.toml, knowledge.db)
+            "--ignore=tests/multi_tenant/test_s153_batch4_spec_verification.py",
             "--ignore=tests/multi_tenant/test_s153_batch10_spec_verification.py",
             "--ignore=tests/multi_tenant/test_s153_batch11_spec_verification.py",
             "--ignore=tests/multi_tenant/test_s153_batch12_spec_verification.py",
@@ -135,7 +137,13 @@ SUITE_CONFIGS: dict[str, SuiteConfig] = {
     "widget": SuiteConfig(
         name="widget",
         label="Widget Tests",
-        pytest_args=["tests/widget/", "--timeout=30", "-q"],
+        pytest_args=[
+            "tests/widget/",
+            # Exclude tests reading Shopify source (only dist/ in container)
+            "--ignore=tests/widget/test_admin_ui_labels.py",
+            "--timeout=30",
+            "-q",
+        ],
         timeout_s=300,
         estimated_tests=60,
         estimated_duration_s=120,
@@ -206,10 +214,11 @@ SUITE_CONFIGS["pipeline"] = SuiteConfig(
         # "e2e" excluded — requires Playwright browsers + Vite dev server
         # not available in the container (see S208). Re-enable when
         # Dockerfile.test installs Playwright and starts Vite.
-        "fuzzing",
+        # "fuzzing" excluded — from_asgi() needs Azure env vars not in
+        # test host. Run individually with FUZZ_TARGET_URL pointing to staging.
         "property",
     ],
-    estimated_tests=6700,
+    estimated_tests=5500,
     estimated_duration_s=1800,
 )
 
@@ -230,7 +239,7 @@ SUITE_CONFIGS["full"] = SuiteConfig(
         "widget",
         # "e2e" excluded — requires Playwright browsers + Vite dev server
         # "load" excluded — requires Locust + target service
-        "fuzzing",
+        # "fuzzing" excluded — from_asgi() needs Azure env vars
         "property",
     ],
     estimated_tests=6920,
