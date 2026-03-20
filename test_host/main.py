@@ -241,5 +241,15 @@ async def _run_background(runner: TestRunner) -> None:
     try:
         result = await runner.run()
         logger.info("Test run %s completed: %s", runner.run_id, result.get("status", "unknown"))
+    except asyncio.CancelledError:
+        logger.warning("Test run %s cancelled (container shutdown)", runner.run_id)
+        try:
+            runner.cosmos.finalize(status="error")
+        except Exception:
+            logger.exception("Failed to finalize after cancellation")
     except Exception:
         logger.exception("Background test run %s failed", runner.run_id)
+        try:
+            runner.cosmos.finalize(status="error")
+        except Exception:
+            logger.exception("Failed to finalize after error")
