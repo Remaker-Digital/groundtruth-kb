@@ -62,6 +62,10 @@ SUITE_CONFIGS: dict[str, SuiteConfig] = {
         pytest_args=[
             "tests/integration/",
             "tests/integrations/",
+            # Exclude tests requiring external services not available in container
+            "--ignore=tests/integration/test_azure_services.py",
+            "--ignore=tests/integration/test_integration_real_services.py",
+            "--ignore=tests/integration/test_nats_jetstream.py",
             "-x",
             "--timeout=30",
             "-q",
@@ -88,7 +92,17 @@ SUITE_CONFIGS: dict[str, SuiteConfig] = {
     "security": SuiteConfig(
         name="security",
         label="Security & Penetration",
-        pytest_args=["tests/security/", "--timeout=60", "-q"],
+        pytest_args=[
+            "tests/security/",
+            # Exclude tests requiring external services/files not in container
+            "--ignore=tests/security/test_ci_tooling.py",
+            "--ignore=tests/security/test_documentation_cleanup.py",
+            "--ignore=tests/security/test_data_integrity_live.py",
+            "--ignore=tests/security/test_resilience_live.py",
+            "--ignore=tests/security/test_tenant_isolation_live.py",
+            "--timeout=60",
+            "-q",
+        ],
         timeout_s=600,
         estimated_tests=150,
         estimated_duration_s=180,

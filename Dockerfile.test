@@ -108,6 +108,8 @@ COPY tests/ ./tests/
 COPY scripts/ ./scripts/
 COPY pyproject.toml ./pyproject.toml
 COPY shopify.app.toml ./shopify.app.toml
+COPY CLAUDE.md ./CLAUDE.md
+COPY docs/ ./docs/
 
 # --------------------------------------------------------------------------
 # Test host API server
