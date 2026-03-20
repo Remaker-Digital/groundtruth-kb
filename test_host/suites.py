@@ -48,13 +48,15 @@ SUITE_CONFIGS: dict[str, SuiteConfig] = {
         pytest_args=[
             "tests/multi_tenant/",
             "tests/migrations/",
-            # Exclude all batch spec-verification tests — they read dev-only
-            # files (.claude/, branding/, .env.local, Shopify source, knowledge.db)
-            # not present in the container. Only test_s153_spec_verification.py
-            # (the original non-batched file) is container-compatible.
+            # Exclude tests that read dev-only files not in the container
+            # (.claude/, branding/, docs-site/, .env.local, knowledge.db, memory/)
             "--ignore-glob=tests/multi_tenant/test_s153_batch*_spec_verification.py",
-            # Also exclude document parser tests that need fixture files
+            "--ignore=tests/multi_tenant/test_s153_documentation_specs.py",
+            "--ignore=tests/multi_tenant/test_s153_future_feature_verification.py",
+            "--ignore=tests/multi_tenant/test_s153_testing_quality_specs.py",
             "--ignore=tests/multi_tenant/test_document_parser_files.py",
+            "--ignore=tests/multi_tenant/test_mutation_tenant_admin.py",
+            "--ignore=tests/multi_tenant/test_phase6_deferred.py",
             "-x",
             "--timeout=30",
             "-q",
