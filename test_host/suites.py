@@ -48,6 +48,8 @@ SUITE_CONFIGS: dict[str, SuiteConfig] = {
         pytest_args=[
             "tests/multi_tenant/",
             "tests/migrations/",
+            # Exclude tests that read project files not in container
+            "--ignore=tests/multi_tenant/test_s153_batch10_spec_verification.py",
             "-x",
             "--timeout=30",
             "-q",
