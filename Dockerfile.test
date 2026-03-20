@@ -73,13 +73,10 @@ RUN apt-get update \
 
 # --------------------------------------------------------------------------
 # Node.js 20 (for Vite dev server in E2E Playwright tests)
-# Binary tarball from nodejs.org — avoids both NodeSource CDN failures
-# and Debian's heavy dependency tree (~200 packages) for the nodejs apt pkg.
 # --------------------------------------------------------------------------
-RUN curl -fsSL https://nodejs.org/dist/v20.18.0/node-v20.18.0-linux-x64.tar.gz \
-        -o /tmp/node.tar.gz \
-    && tar -xzf /tmp/node.tar.gz -C /usr/local --strip-components=1 \
-    && rm /tmp/node.tar.gz \
+RUN curl -fsSL https://deb.nodesource.com/setup_20.x | bash - \
+    && apt-get install -y --no-install-recommends nodejs \
+    && rm -rf /var/lib/apt/lists/* \
     && node --version && npm --version
 
 # --------------------------------------------------------------------------
@@ -87,9 +84,9 @@ RUN curl -fsSL https://nodejs.org/dist/v20.18.0/node-v20.18.0-linux-x64.tar.gz \
 # --------------------------------------------------------------------------
 COPY requirements-test.txt ./
 COPY requirements.txt ./
-RUN pip install --no-cache-dir --upgrade pip -q \
-    && pip install --no-cache-dir -q -r requirements-test.txt \
-    && pip install --no-cache-dir -q pytest-json-report>=1.5.0
+RUN pip install --no-cache-dir --upgrade pip \
+    && pip install --no-cache-dir -r requirements-test.txt \
+    && pip install --no-cache-dir pytest-json-report>=1.5.0
 
 # --------------------------------------------------------------------------
 # Install Playwright browsers (headless Chromium only — saves ~400MB)
