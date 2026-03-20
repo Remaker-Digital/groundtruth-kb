@@ -87,9 +87,9 @@ RUN curl -fsSL https://nodejs.org/dist/v20.18.0/node-v20.18.0-linux-x64.tar.gz \
 # --------------------------------------------------------------------------
 COPY requirements-test.txt ./
 COPY requirements.txt ./
-RUN pip install --no-cache-dir --upgrade pip \
-    && pip install --no-cache-dir -r requirements-test.txt \
-    && pip install --no-cache-dir pytest-json-report>=1.5.0
+RUN pip install --no-cache-dir --upgrade pip --progress off \
+    && pip install --no-cache-dir --progress off -r requirements-test.txt \
+    && pip install --no-cache-dir --progress off pytest-json-report>=1.5.0
 
 # --------------------------------------------------------------------------
 # Install Playwright browsers (headless Chromium only — saves ~400MB)
