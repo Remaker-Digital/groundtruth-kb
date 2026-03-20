@@ -72,12 +72,14 @@ RUN apt-get update \
     && rm -rf /var/lib/apt/lists/*
 
 # --------------------------------------------------------------------------
-# Node.js (for Vite dev server in E2E Playwright tests)
-# Uses Debian-packaged version to avoid NodeSource CDN failures.
+# Node.js 20 (for Vite dev server in E2E Playwright tests)
+# Binary tarball from nodejs.org — avoids both NodeSource CDN failures
+# and Debian's heavy dependency tree (~200 packages) for the nodejs apt pkg.
 # --------------------------------------------------------------------------
-RUN apt-get update \
-    && apt-get install -y --no-install-recommends nodejs npm \
-    && rm -rf /var/lib/apt/lists/* \
+RUN curl -fsSL https://nodejs.org/dist/v20.18.0/node-v20.18.0-linux-x64.tar.xz \
+        -o /tmp/node.tar.xz \
+    && tar -xJf /tmp/node.tar.xz -C /usr/local --strip-components=1 \
+    && rm /tmp/node.tar.xz \
     && node --version && npm --version
 
 # --------------------------------------------------------------------------
