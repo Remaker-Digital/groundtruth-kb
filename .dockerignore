@@ -18,12 +18,13 @@
 
 # Environment files (secrets — never bake into images)
 .env
-.env.*
 .env.local
 .env.integration
 .env.*.local
 .env.example
 .env.integration.example
+# Note: .env.staging files under admin/ are NOT excluded — Dockerfile.test
+# copies them for tests that verify staging env configuration.
 
 # Python artifacts
 __pycache__
@@ -88,17 +89,10 @@ admin/shopify/index.html
 admin/shopify/index.tsx
 # Standalone admin — keep source (Dockerfile.test needs it for Vite dev server).
 # Production Dockerfile doesn't COPY these paths, so extra files are harmless.
-# Provider admin — exclude source, keep dist/
+# Provider admin — keep source (Dockerfile.test needs it for source-inspection tests).
+# Production Dockerfile doesn't COPY these paths, so extra files are harmless.
 admin/provider/src/
-admin/provider/package.json
-admin/provider/package-lock.json
-admin/provider/tsconfig.json
-admin/provider/vite.config.ts
-admin/provider/vite-env.d.ts
-admin/provider/index.html
-admin/provider/index.tsx
-admin/provider/layouts/
-admin/provider/pages/
+admin/provider/nul
 
 # Node / frontend tooling
 node_modules/
