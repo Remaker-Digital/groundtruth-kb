@@ -55,10 +55,19 @@ def _init_log() -> None:
     _log_file = open(log_dir / f"build-{ts}.log", "w", encoding="utf-8")
 
 
+def _safe_print(msg: str) -> None:
+    """Print with fallback for Windows cp1252 encoding."""
+    try:
+        sys.stdout.buffer.write((msg + "\n").encode("utf-8", errors="replace"))
+        sys.stdout.buffer.flush()
+    except Exception:
+        print(msg.encode("ascii", errors="replace").decode(), flush=True)
+
+
 def log(msg: str) -> None:
     ts = datetime.now().strftime("%H:%M:%S")
     line = f"[{ts}] {msg}"
-    print(msg, flush=True)
+    _safe_print(msg)
     if _log_file:
         _log_file.write(line + "\n")
         _log_file.flush()
