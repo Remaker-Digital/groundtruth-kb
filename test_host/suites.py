@@ -203,7 +203,9 @@ SUITE_CONFIGS["pipeline"] = SuiteConfig(
         "regression",
         "ops",
         "widget",
-        "e2e",
+        # "e2e" excluded — requires Playwright browsers + Vite dev server
+        # not available in the container (see S208). Re-enable when
+        # Dockerfile.test installs Playwright and starts Vite.
         "fuzzing",
         "property",
     ],
@@ -226,8 +228,8 @@ SUITE_CONFIGS["full"] = SuiteConfig(
         "regression",
         "ops",
         "widget",
-        "e2e",
-        "load",
+        # "e2e" excluded — requires Playwright browsers + Vite dev server
+        # "load" excluded — requires Locust + target service
         "fuzzing",
         "property",
     ],

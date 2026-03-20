@@ -309,16 +309,12 @@ class TestSpec0799BrandPrimaryColor:
         assert "#ff3621" in src, "Widget tokens must define #ff3621 as primary color"
 
     def test_brand_color_in_admin_theme(self):
-        # Check admin theme file
-        theme_files = list(ADMIN.rglob("*theme*"))
-        found = False
-        for tf in theme_files:
-            if tf.suffix in ('.ts', '.tsx', '.js'):
-                content = tf.read_text(encoding="utf-8")
-                if "#ff3621" in content:
-                    found = True
-                    break
-        assert found, "Admin theme must reference #ff3621"
+        # Check the canonical admin theme file directly (avoids slow rglob
+        # through node_modules and works reliably in containers)
+        theme_path = ADMIN / "shared" / "theme" / "agentRedTheme.ts"
+        assert theme_path.exists(), f"Admin theme file missing: {theme_path}"
+        content = theme_path.read_text(encoding="utf-8")
+        assert "#ff3621" in content, "Admin theme must reference #ff3621"
 
 
 class TestSpec0801LogoConcept3Beacon:
