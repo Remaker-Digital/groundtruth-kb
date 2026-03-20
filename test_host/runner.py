@@ -271,9 +271,9 @@ class TestRunner:
             status_map = {
                 "passed": "pass",
                 "failed": "fail",
-                "skipped": "skip",
+                "skipped": "fail",  # Treat skips as failures (owner directive)
                 "error": "error",
-                "xfailed": "skip",
+                "xfailed": "fail",  # Treat expected failures as failures
                 "xpassed": "pass",
             }
             status = status_map.get(outcome, "error")
@@ -289,10 +289,18 @@ class TestRunner:
                 elif isinstance(longrepr, dict):
                     detail = str(longrepr.get("reprcrash", {}).get("message", ""))[:500]
 
-            if status == "skip":
+            # Capture skip reason as failure detail (skips treated as failures)
+            if outcome in ("skipped", "xfailed"):
                 setup = test.get("setup", {})
                 if setup.get("longrepr"):
-                    detail = str(setup["longrepr"])[:200]
+                    detail = f"SKIPPED: {str(setup['longrepr'])[:400]}"
+                else:
+                    call_info = test.get("call", {})
+                    longrepr = call_info.get("longrepr", "")
+                    if longrepr:
+                        detail = f"SKIPPED: {str(longrepr)[:400]}"
+                    else:
+                        detail = "SKIPPED: no reason provided"
 
             batch.append(TestResult(
                 name=short_name,
