@@ -51,7 +51,7 @@ docs/
 docs-site/node_modules/
 docs-site/.cache/
 README.md
-CLAUDE.md
+# CLAUDE.md — not excluded (needed by Dockerfile.test for test_s153 verification)
 
 # Branding / legal / marketing (not runtime dependencies)
 branding/
