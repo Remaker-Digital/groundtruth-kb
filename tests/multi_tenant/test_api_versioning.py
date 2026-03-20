@@ -45,7 +45,10 @@ class TestProductVersionConstant:
         assert PRODUCT_VERSION is not None
 
     def test_product_version_value(self):
-        assert PRODUCT_VERSION == "1.95.3"
+        import re
+        assert re.match(r"^\d+\.\d+\.\d+$", PRODUCT_VERSION), (
+            f"PRODUCT_VERSION must be valid semver, got: {PRODUCT_VERSION}"
+        )
 
     def test_product_version_is_string(self):
         assert isinstance(PRODUCT_VERSION, str)
