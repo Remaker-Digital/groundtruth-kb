@@ -18,18 +18,16 @@ class TestQualityScoreComputation:
         """TEST-10458: Known inputs produce expected composite score."""
         from src.quality_metrics.quality_score import compute_composite_score
 
-        metrics = {
-            "spec_coverage": 0.95,
-            "der": 0.02,
-            "assertion_strength": 0.80,
-            "cfr": 0.03,
-            "freshness": 0.98,
-            "coverage_delta": 0.01,
-        }
+        score = compute_composite_score(
+            spec_coverage=0.95,
+            defect_escape_rate=0.02,
+            assertion_strength=0.80,
+            change_failure_rate=0.03,
+            test_freshness=0.98,
+            coverage_delta=0.01,
+        )
 
-        score = compute_composite_score(metrics)
-
-        # QualityScore = 0.20*0.95 + 0.20*(1-0.02) + 0.15*0.80 + 0.15*(1-0.03) + 0.15*0.98 + 0.15*min(1.0, 0.01_normalized)
+        # QualityScore = 0.20*0.95 + 0.20*(1-0.02) + 0.15*0.80 + 0.15*(1-0.03) + 0.15*0.98 + 0.15*CovDelta_norm
         # The exact value depends on coverage_delta normalization, but should be ~92-95
         assert 85 <= score <= 100
         assert isinstance(score, float)
@@ -38,32 +36,28 @@ class TestQualityScoreComputation:
         """Perfect metrics should yield composite score near 100."""
         from src.quality_metrics.quality_score import compute_composite_score
 
-        metrics = {
-            "spec_coverage": 1.0,
-            "der": 0.0,
-            "assertion_strength": 1.0,
-            "cfr": 0.0,
-            "freshness": 1.0,
-            "coverage_delta": 0.05,  # Positive = improving
-        }
-
-        score = compute_composite_score(metrics)
-        assert score >= 95  # Near-perfect
+        score = compute_composite_score(
+            spec_coverage=1.0,
+            defect_escape_rate=0.0,
+            assertion_strength=1.0,
+            change_failure_rate=0.0,
+            test_freshness=1.0,
+            coverage_delta=5.0,  # +5% coverage delta → normalized to 1.0
+        )
+        assert score >= 99  # All metrics at ceiling
 
     def test_all_worst_metrics_gives_low_score(self):
         """Worst-case metrics should yield a low composite score."""
         from src.quality_metrics.quality_score import compute_composite_score
 
-        metrics = {
-            "spec_coverage": 0.5,
-            "der": 0.20,
-            "assertion_strength": 0.30,
-            "cfr": 0.25,
-            "freshness": 0.50,
-            "coverage_delta": -0.05,  # Negative = degrading
-        }
-
-        score = compute_composite_score(metrics)
+        score = compute_composite_score(
+            spec_coverage=0.5,
+            defect_escape_rate=0.20,
+            assertion_strength=0.30,
+            change_failure_rate=0.25,
+            test_freshness=0.50,
+            coverage_delta=-0.05,  # Negative = degrading
+        )
         assert score < 70
 
     def test_metrics_all_normalized_0_to_1(self):

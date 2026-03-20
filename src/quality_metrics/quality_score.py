@@ -200,6 +200,80 @@ def compute_composite_score(
     return round(raw * 100, 1)
 
 
+from dataclasses import dataclass
+
+
+@dataclass
+class QualityScoreRecord:
+    """A stored quality score snapshot for a session."""
+
+    session_id: str
+    spec_coverage: float
+    der: float
+    assertion_strength: float
+    cfr: float
+    freshness: float
+    coverage_delta: float
+    composite_score: float
+
+
+def normalize_metrics(raw: dict[str, float]) -> dict[str, float]:
+    """Normalize raw metrics to 0-1 range.
+
+    - spec_coverage, assertion_strength, freshness: already 0-1
+    - der, cfr: inverted (1 - value)
+    - coverage_delta: normalized via normalize_coverage_delta
+    """
+    return {
+        "spec_coverage": max(0.0, min(1.0, raw.get("spec_coverage", 0.0))),
+        "defect_escape_rate": max(0.0, min(1.0, 1.0 - raw.get("der", 0.0))),
+        "assertion_strength": max(0.0, min(1.0, raw.get("assertion_strength", 0.0))),
+        "change_failure_rate": max(0.0, min(1.0, 1.0 - raw.get("cfr", 0.0))),
+        "test_freshness": max(0.0, min(1.0, raw.get("freshness", 0.0))),
+        "coverage_delta": normalize_coverage_delta(raw.get("coverage_delta", 0.0)),
+    }
+
+
+def compute_trend(
+    history: list[dict[str, Any]], last_n: int = 5
+) -> list[dict[str, Any]]:
+    """Return the last N quality score records from history.
+
+    Args:
+        history: List of score dicts with session_id and composite_score.
+        last_n: Number of recent sessions to include.
+
+    Returns:
+        The last N entries from history.
+    """
+    return history[-last_n:] if len(history) >= last_n else history
+
+
+def detect_quality_alert(
+    previous: float, current: float, threshold: float = 10.0
+) -> dict[str, Any] | None:
+    """Detect a quality score drop exceeding threshold.
+
+    Args:
+        previous: Previous session's composite score.
+        current: Current session's composite score.
+        threshold: Point drop that triggers an alert.
+
+    Returns:
+        Alert dict with severity and delta, or None if no alert.
+    """
+    delta = current - previous
+    if delta < -threshold:
+        return {
+            "severity": "warning",
+            "delta": delta,
+            "previous": previous,
+            "current": current,
+            "message": f"Quality score dropped by {abs(delta):.1f} points",
+        }
+    return None
+
+
 def compute_all_metrics(
     kb: Any,
     previous_coverage: float = 0.0,
