@@ -289,23 +289,16 @@ def main() -> int:
     log("")
     log("Verifying deployment...")
 
-    # Wait a bit for new revision to take traffic
-    time.sleep(10)
-    actual = verify_version(fqdn, expected_version)
-
-    if actual == expected_version:
-        log(f"  X-Product-Version: {actual} ✅")
-    elif actual:
-        log(f"  X-Product-Version: {actual} (expected {expected_version})")
-        log(f"  The new revision may still be rolling out. Retrying in 30s...")
-        time.sleep(30)
+    # Wait for new revision to take traffic (production rollout can take 60-90s)
+    for attempt in range(6):
+        wait = 15 if attempt == 0 else 20
+        time.sleep(wait)
         actual = verify_version(fqdn, expected_version)
         if actual == expected_version:
             log(f"  X-Product-Version: {actual} ✅")
-        else:
-            log(f"  X-Product-Version: {actual} — MISMATCH (expected {expected_version})")
-    else:
-        log(f"  Could not read version header")
+            break
+        elapsed_wait = 15 + attempt * 20
+        log(f"  X-Product-Version: {actual} (expected {expected_version}) — retry {attempt + 1}/6 [{elapsed_wait}s]")
 
     # 6. Show deployed image
     deployed = get_deployed_image(app_name)
