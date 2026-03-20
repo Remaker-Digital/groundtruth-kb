@@ -29,9 +29,7 @@ from pathlib import Path
 
 import pytest
 
-_PROJECT_ROOT = Path(
-    "E:\\Claude-Playground\\CLAUDE-PROJECTS\\Agent Red Customer Engagement"
-)
+_PROJECT_ROOT = Path(__file__).resolve().parents[2]
 
 
 # ===================================================================

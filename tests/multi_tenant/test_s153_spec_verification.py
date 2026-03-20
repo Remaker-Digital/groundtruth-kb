@@ -28,11 +28,15 @@ from __future__ import annotations
 import asyncio
 import importlib
 import inspect
+import os
 import re
+from pathlib import Path
 from typing import Any
 from unittest.mock import AsyncMock, MagicMock, patch
 
 import pytest
+
+_PROJECT_ROOT = Path(__file__).resolve().parents[2]
 
 # ---------------------------------------------------------------------------
 # SPEC-1606: Billable classification — conversations start non-billable
@@ -143,10 +147,7 @@ class TestSpec1608DashboardZeroMessageExclusion:
         # Dashboard.tsx uses useInboxConversations(apiFetch) which
         # fetches /api/admin/conversations — same endpoint that uses
         # list_filtered with message_count > 0 from SPEC-1607.
-        hooks_path = (
-            "E:\\Claude-Playground\\CLAUDE-PROJECTS\\"
-            "Agent Red Customer Engagement\\admin\\shared\\hooks\\index.ts"
-        )
+        hooks_path = str(_PROJECT_ROOT / "admin" / "shared" / "hooks" / "index.ts")
         with open(hooks_path, encoding="utf-8") as f:
             content = f.read()
         assert "useInboxConversations" in content, (
@@ -406,10 +407,8 @@ class TestSpec1640InitializedTenantWizard:
 
     def test_onboarding_wizard_component_exists(self):
         """The OnboardingWizard component must exist in shared admin."""
-        import os
-        wizard_path = os.path.join(
-            "E:\\Claude-Playground\\CLAUDE-PROJECTS\\Agent Red Customer Engagement",
-            "admin", "shared", "components", "OnboardingWizard.tsx",
+        wizard_path = str(
+            _PROJECT_ROOT / "admin" / "shared" / "components" / "OnboardingWizard.tsx"
         )
         assert os.path.isfile(wizard_path), (
             "SPEC-1640: OnboardingWizard.tsx must exist in admin/shared/components/"
@@ -442,9 +441,8 @@ class TestSpec1646ServiceMessagesUI:
     def test_service_messages_page_exists(self):
         """ServiceMessages.tsx must exist in provider admin."""
         import os
-        page_path = os.path.join(
-            "E:\\Claude-Playground\\CLAUDE-PROJECTS\\Agent Red Customer Engagement",
-            "admin", "provider", "pages", "ServiceMessages.tsx",
+        page_path = str(
+            _PROJECT_ROOT / "admin" / "provider" / "pages" / "ServiceMessages.tsx"
         )
         assert os.path.isfile(page_path), (
             "SPEC-1646: ServiceMessages.tsx must exist in provider admin"
