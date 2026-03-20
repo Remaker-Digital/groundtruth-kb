@@ -26,7 +26,7 @@ FROM acragentredeastus.azurecr.io/python:3.12-slim-bookworm
 # --------------------------------------------------------------------------
 LABEL maintainer="Remaker Digital <dev@remakerdigital.com>"
 LABEL project="Agent Red Test Host"
-LABEL copyright="© 2026 Remaker Digital, a DBA of VanDusen & Palmeter, LLC. All rights reserved."
+LABEL copyright="(c) 2026 Remaker Digital, a DBA of VanDusen & Palmeter, LLC. All rights reserved."
 
 # --------------------------------------------------------------------------
 # Environment
@@ -87,9 +87,9 @@ RUN curl -fsSL https://nodejs.org/dist/v20.18.0/node-v20.18.0-linux-x64.tar.gz \
 # --------------------------------------------------------------------------
 COPY requirements-test.txt ./
 COPY requirements.txt ./
-RUN pip install --no-cache-dir --upgrade pip --progress off \
-    && pip install --no-cache-dir --progress off -r requirements-test.txt \
-    && pip install --no-cache-dir --progress off pytest-json-report>=1.5.0
+RUN pip install --no-cache-dir --upgrade pip -q \
+    && pip install --no-cache-dir -q -r requirements-test.txt \
+    && pip install --no-cache-dir -q pytest-json-report>=1.5.0
 
 # --------------------------------------------------------------------------
 # Install Playwright browsers (headless Chromium only — saves ~400MB)
