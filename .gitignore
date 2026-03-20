@@ -14,6 +14,7 @@ MEMBASE-README.md
 *.env
 secrets/
 credentials/
+logs/
 *.pem
 *.key
 *.crt
