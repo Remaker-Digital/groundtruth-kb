@@ -254,7 +254,7 @@ _TEST_HOST_URL = os.environ.get(
 
 # SPEC-1846: Track active verification runs (one at a time)
 _active_runs: dict[str, asyncio.Task] = {}
-_STALE_RUN_TIMEOUT_S = 1800  # 30 minutes
+_STALE_RUN_TIMEOUT_S = 5400  # 90 minutes (full suite takes ~45min)
 
 
 class PipelineRunRequest(CamelCaseModel):

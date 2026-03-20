@@ -50,6 +50,7 @@ SUITE_CONFIGS: dict[str, SuiteConfig] = {
             "tests/migrations/",
             # Exclude tests that read project files not in container
             "--ignore=tests/multi_tenant/test_s153_batch10_spec_verification.py",
+            "--ignore=tests/multi_tenant/test_s153_batch11_spec_verification.py",
             "-x",
             "--timeout=30",
             "-q",
@@ -65,9 +66,9 @@ SUITE_CONFIGS: dict[str, SuiteConfig] = {
             "tests/integration/",
             "tests/integrations/",
             # Exclude tests requiring external services not available in container
-            "--ignore=tests/integration/test_azure_services.py",
-            "--ignore=tests/integration/test_integration_real_services.py",
-            "--ignore=tests/integration/test_nats_jetstream.py",
+            "--ignore=tests/integration/test_azure_services.py",  # Azure SDK calls
+            "--ignore=tests/integration/test_integration_real_services.py",  # Live service endpoints
+            "--ignore=tests/integration/test_nats_jetstream.py",  # NATS broker connection
             "-x",
             "--timeout=30",
             "-q",
@@ -97,11 +98,11 @@ SUITE_CONFIGS: dict[str, SuiteConfig] = {
         pytest_args=[
             "tests/security/",
             # Exclude tests requiring external services/files not in container
-            "--ignore=tests/security/test_ci_tooling.py",
-            "--ignore=tests/security/test_documentation_cleanup.py",
-            "--ignore=tests/security/test_data_integrity_live.py",
-            "--ignore=tests/security/test_resilience_live.py",
-            "--ignore=tests/security/test_tenant_isolation_live.py",
+            "--ignore=tests/security/test_ci_tooling.py",  # CI pipeline tooling
+            "--ignore=tests/security/test_documentation_cleanup.py",  # Docs filesystem scan
+            "--ignore=tests/security/test_data_integrity_live.py",  # Live Cosmos data checks
+            "--ignore=tests/security/test_resilience_live.py",  # Live resilience probes
+            "--ignore=tests/security/test_tenant_isolation_live.py",  # Live tenant boundary tests
             "--timeout=60",
             "-q",
         ],
