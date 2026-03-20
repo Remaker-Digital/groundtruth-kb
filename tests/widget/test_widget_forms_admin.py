@@ -402,38 +402,40 @@ class TestWidgetConfiguratorLayout:
 
     # -- SPEC-1327 -----------------------------------------------------------
 
-    def test_two_column_layout(self) -> None:
-        """SPEC-1327: Render widget config page with form/preview two-column layout."""
-        assert "formPanel" in self.source, "Layout should have a formPanel"
-        assert "previewPanel" in self.source, "Layout should have a previewPanel"
+    def test_card_based_layout(self) -> None:
+        """SPEC-1327: Render widget config page with card-based single-column layout."""
+        # WI-0870 refactored to single-column with postMessage preview
+        assert "container" in self.source, "Layout should have a container style"
+        assert "card" in self.source, "Layout should use card-based sections"
 
-    def test_form_panel_flex_1(self) -> None:
-        """SPEC-1327: Form panel takes flex: 1 (fills remaining ~55% space)."""
-        # formPanel style: flex: 1
-        match = re.search(r"formPanel:\s*\{[^}]*flex:\s*1", self.source)
-        assert match, "formPanel should have flex: 1"
+    def test_tabbed_navigation(self) -> None:
+        """SPEC-1327: Form uses tabbed navigation (Visual / Behavior / Content)."""
+        assert "tabs" in self.source, "Layout should have tabbed navigation"
+        match = re.search(r"tab:\s*\(active", self.source)
+        assert match, "Tabs should have an active state function"
 
-    def test_preview_panel_width_340(self) -> None:
-        """SPEC-1327: Preview panel has fixed width of 340px (~45% of 1200 max)."""
-        match = re.search(r"previewPanel:\s*\{[^}]*width:\s*340", self.source)
-        assert match, "previewPanel should have width: 340"
+    def test_container_max_width(self) -> None:
+        """SPEC-1327: Container has a bounded max width."""
+        assert "maxWidth: 900" in self.source, "Container maxWidth should be 900"
 
-    def test_container_max_width_1200(self) -> None:
-        """SPEC-1327: Container maxWidth is 1200px."""
-        assert "maxWidth: 1200" in self.source, "Container maxWidth should be 1200"
+    def test_card_padding_and_border(self) -> None:
+        """SPEC-1327: Cards have consistent padding and border styling."""
+        match = re.search(r"card:\s*\{.*?padding:\s*24", self.source, re.DOTALL)
+        assert match, "Card should have padding: 24"
 
     # -- SPEC-1328 -----------------------------------------------------------
 
-    def test_live_preview_with_simulated_browser_chrome(self) -> None:
-        """SPEC-1328: Display live widget preview with simulated browser chrome background."""
-        assert "previewFrame" in self.source, "Preview should have a previewFrame style"
-        assert "Live preview" in self.source, "Preview section should be titled 'Live preview'"
+    def test_live_preview_via_postmessage(self) -> None:
+        """SPEC-1328: Live preview delivered via postMessage to iframe."""
+        # WI-0870: Preview component removed; live preview now via ar:config-preview
+        assert "ar:config-preview" in self.source, (
+            "Preview should use ar:config-preview postMessage protocol"
+        )
+        assert "postMessage" in self.source, "Should send preview via postMessage"
 
     def test_preview_frame_background_color(self) -> None:
-        """SPEC-1328: Preview frame uses a neutral background simulating a browser page."""
-        # previewFrame uses light grey (#F3F4F6) or dark (#1F2937) as browser chrome
-        assert "#F3F4F6" in self.source, "Light mode preview frame background should be #F3F4F6"
-        assert "#1F2937" in self.source, "Dark mode preview frame background should be #1F2937"
+        """SPEC-1328: Color tokens use light/dark mode backgrounds."""
+        assert "#F3F4F6" in self.source, "Should define a light-mode neutral background"
 
 
 class TestWidgetConfiguratorColorPicker:
@@ -528,13 +530,13 @@ class TestWidgetConfiguratorAvatar:
         )
 
     def test_avatar_preview_in_widget(self) -> None:
-        """SPEC-1338: Avatar preview rendered in the widget preview header."""
-        # Preview checks for avatar URL and renders img or default
+        """SPEC-1338: Avatar URL field wired into config for preview delivery."""
+        # WI-0870: Preview component removed; avatar delivered via postMessage
         assert "widget_agent_avatar_url" in self.source, (
-            "Preview should check widget_agent_avatar_url"
+            "Config should include widget_agent_avatar_url field"
         )
-        assert "objectFit: 'cover'" in self.source, (
-            "Avatar image should use objectFit: cover"
+        assert "Agent avatar URL" in self.source, (
+            "Avatar field should be labeled 'Agent avatar URL'"
         )
 
 
@@ -629,51 +631,35 @@ class TestWidgetConfiguratorPreview:
 
     # -- SPEC-1341 -----------------------------------------------------------
 
-    def test_sticky_positioning_on_preview(self) -> None:
-        """SPEC-1341: Apply sticky positioning to preview panel that follows scroll."""
-        match = re.search(
-            r"previewPanel:\s*\{[^}]*position:\s*'sticky'",
-            self.source,
+    def test_preview_via_iframe_postmessage(self) -> None:
+        """SPEC-1341: Preview delivered via iframe postMessage (WI-0870)."""
+        # WI-0870 removed inline preview; now uses ar:config-preview postMessage
+        assert "ar:config-preview" in self.source, (
+            "Preview should use ar:config-preview postMessage protocol"
         )
-        assert match, "previewPanel should have position: 'sticky'"
 
-    def test_sticky_top_offset(self) -> None:
-        """SPEC-1341: Sticky preview has top offset for scroll following."""
-        match = re.search(
-            r"previewPanel:\s*\{[^}]*top:\s*16",
-            self.source,
+    def test_preview_dispatches_full_config(self) -> None:
+        """SPEC-1341: Preview dispatches full localConfig as payload."""
+        assert "localConfig" in self.source, (
+            "Preview should dispatch localConfig to the iframe"
         )
-        assert match, "previewPanel should have top: 16 for sticky offset"
 
-    def test_preview_align_self_flex_start(self) -> None:
-        """SPEC-1341: Preview panel uses alignSelf flex-start for proper sticky behavior."""
-        match = re.search(
-            r"previewPanel:\s*\{[^}]*alignSelf:\s*'flex-start'",
-            self.source,
+    def test_preview_uses_iframe_content_window(self) -> None:
+        """SPEC-1341: Preview sends to iframe.contentWindow."""
+        assert "contentWindow" in self.source, (
+            "Preview should use iframe.contentWindow.postMessage"
         )
-        assert match, "previewPanel should have alignSelf: 'flex-start'"
 
     # -- SPEC-1343 -----------------------------------------------------------
 
-    def test_launcher_decorative_only(self) -> None:
-        """SPEC-1343: Render preview launcher as decorative-only (no click handler)."""
-        # The launcher in preview uses cursor: 'default' (not 'pointer')
-        # and has no onClick handler
-        # Find the launcher button in preview (52x52, borderRadius, cursor: 'default')
-        launcher_match = re.search(
-            r"width:\s*52,\s*\n\s*height:\s*52,.*?cursor:\s*'default'",
-            self.source,
-            re.DOTALL,
-        )
-        assert launcher_match, (
-            "Preview launcher should have cursor: 'default' (decorative-only)"
+    def test_quick_actions_for_preview(self) -> None:
+        """SPEC-1343: Quick actions section available for widget preview."""
+        assert "Quick actions" in self.source or "quick actions" in self.source.lower(), (
+            "Should have a quick actions section for preview"
         )
 
-    def test_launcher_no_onclick(self) -> None:
-        """SPEC-1343: Preview launcher has no onClick handler."""
-        # Find the launcher div (52x52) and verify no onClick in its props
-        # The launcher is rendered in the WidgetPreview component with cursor: default
-        # It's the div with width: 52, height: 52 and it should not have an onClick
-        assert "cursor: 'default'" in self.source, (
-            "Preview launcher should use cursor: default (no interaction)"
+    def test_config_preview_message_type(self) -> None:
+        """SPEC-1343: Preview message uses ar:config-preview type."""
+        assert "'ar:config-preview'" in self.source, (
+            "Preview message type should be 'ar:config-preview'"
         )

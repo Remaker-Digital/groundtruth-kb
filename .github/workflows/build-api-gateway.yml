@@ -1,0 +1,28 @@
+name: Build API Gateway Container
+
+on:
+  workflow_dispatch:
+    inputs:
+      tag:
+        description: 'Image tag (e.g. v1.95.3)'
+        required: true
+        default: 'v1.95.3'
+
+jobs:
+  build-and-push:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Login to ACR
+        uses: azure/docker-login@v2
+        with:
+          login-server: acragentredeastus.azurecr.io
+          username: ${{ secrets.ACR_USERNAME }}
+          password: ${{ secrets.ACR_PASSWORD }}
+
+      - name: Build and push API gateway image
+        run: |
+          docker build -f Dockerfile -t acragentredeastus.azurecr.io/api-gateway:${{ inputs.tag }} .
+          docker push acragentredeastus.azurecr.io/api-gateway:${{ inputs.tag }}
+          echo "Pushed api-gateway:${{ inputs.tag }}"

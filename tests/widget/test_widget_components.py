@@ -141,8 +141,8 @@ class TestLauncher:
         assert "onMouseEnter" in self.SRC, (
             "Launcher should handle onMouseEnter for hover color"
         )
-        assert "colorPrimaryHover" in self.SRC, (
-            "Launcher should use colorPrimaryHover on mouse enter"
+        assert "colorLauncherHover" in self.SRC, (
+            "Launcher should use colorLauncherHover on mouse enter"
         )
 
     def test_spec_1181_scale_transform_on_open(self) -> None:

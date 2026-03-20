@@ -157,6 +157,14 @@ SUITE_CONFIGS: dict[str, SuiteConfig] = {
         timeout_s=1200,
         estimated_tests=10,
         estimated_duration_s=300,
+        env_vars={
+            # Point Schemathesis at the live staging API so fuzzing tests
+            # the real deployed stack (Cosmos, Redis, middleware).
+            "FUZZ_TARGET_URL": "https://agent-red-staging.orangeglacier-f566a4e7.eastus.azurecontainerapps.io",
+            # SPA platform admin key for authenticated fuzzing.
+            # Safe to embed: staging-only key, test host is internal-ingress-only.
+            "FUZZ_API_KEY": "ar_spa_plat_ukgY1GK594QUxICKJfIXFWiNrWxnkhvB",
+        },
     ),
     "property": SuiteConfig(
         name="property",

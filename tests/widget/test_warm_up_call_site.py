@@ -148,9 +148,9 @@ class TestWarmUpCallSite:
     def test_warm_up_in_try_except(self) -> None:
         """warm_up call is wrapped in try/except for fault tolerance."""
         source = _read(ENDPOINTS)
-        # Find the WI-0771 section — use 800 chars to include the full block
+        # Find the WI-0771 section — use 1200 chars to include the full block
         start = source.index("WI-0771")
-        section = source[start:start + 800]
+        section = source[start:start + 1200]
         assert "try:" in section
         assert "except" in section
 

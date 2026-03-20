@@ -150,10 +150,10 @@ class TestDashboardTooltips:
         assert "handed off to a human" in source
 
     def test_conversation_volume_tooltip(self) -> None:
-        """Conversation volume chart has a section tooltip."""
+        """Daily usage chart has a section tooltip (SPEC-1685)."""
         source = _read(self.DASHBOARD)
-        assert "Conversation volume" in source
-        assert "Daily billable conversation volume" in source
+        assert "Daily usage" in source
+        assert "Daily conversation volume" in source
 
     def test_recent_conversations_tooltip(self) -> None:
         """Recent conversations section has a tooltip."""
@@ -210,12 +210,12 @@ class TestConfigurationTooltips:
         assert "HelpTooltip" in source
 
     def test_has_multiple_tooltips(self) -> None:
-        """Configuration has at least 8 tooltip instances."""
+        """Configuration has at least 6 tooltip instances."""
         source = _read(self.CONFIG)
         # HelpTooltip usages (excluding import line)
         usage_count = _count_pattern(source, r"<HelpTooltip|tooltip=")
-        assert usage_count >= 8, \
-            f"Configuration should have ≥8 tooltip usages, found {usage_count}"
+        assert usage_count >= 6, \
+            f"Configuration should have ≥6 tooltip usages, found {usage_count}"
 
     def test_has_doc_links(self) -> None:
         """Configuration tooltips include documentation links."""

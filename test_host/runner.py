@@ -516,6 +516,10 @@ class TestRunner:
         if os.environ.get("DISABLE_RATE_LIMITING"):
             env["DISABLE_RATE_LIMITING"] = os.environ["DISABLE_RATE_LIMITING"]
 
+        # Apply per-suite env_vars from SuiteConfig (e.g. FUZZ_TARGET_URL)
+        if config and config.env_vars:
+            env.update(config.env_vars)
+
         env.update(self.env_overrides)
 
         return env
