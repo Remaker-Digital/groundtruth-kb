@@ -121,6 +121,15 @@ COPY admin/shopify/dist/ ./admin/shopify/dist/
 COPY admin/standalone/dist/ ./admin/standalone/dist/
 COPY admin/provider/dist/ ./admin/provider/dist/
 COPY admin/provider/.env.staging ./admin/provider/.env.staging
+# Provider SPA source — needed for source-inspection tests (GOV-10 compliance).
+COPY admin/provider/index.html admin/provider/index.tsx admin/provider/tsconfig.json admin/provider/vite.config.ts admin/provider/vite-env.d.ts ./admin/provider/
+COPY admin/provider/components/ ./admin/provider/components/
+COPY admin/provider/hooks/ ./admin/provider/hooks/
+COPY admin/provider/layouts/ ./admin/provider/layouts/
+COPY admin/provider/login/ ./admin/provider/login/
+COPY admin/provider/mocks/ ./admin/provider/mocks/
+COPY admin/provider/pages/ ./admin/provider/pages/
+COPY admin/provider/public/ ./admin/provider/public/
 COPY admin/standalone/.env.staging ./admin/standalone/.env.staging
 # Standalone SPA source — Vite dev server serves this for E2E Playwright tests.
 # Copy source files (not node_modules) + shared components (@shared alias).
