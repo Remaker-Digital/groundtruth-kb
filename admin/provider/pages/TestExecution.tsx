@@ -16,6 +16,7 @@ import React, { useCallback, useEffect, useRef, useState } from 'react';
 import {
   Badge,
   Button,
+  Checkbox,
   Code,
   Group,
   Loader,
@@ -24,10 +25,12 @@ import {
   Stack,
   Switch,
   Table,
+  Tabs,
   Text,
   Title,
 } from '@mantine/core';
 import { useProviderContext } from '../layouts/ProviderLayout';
+import { PerformanceChart } from './PerformanceChart';
 
 // ---------------------------------------------------------------------------
 // Types
@@ -72,42 +75,75 @@ const STATUS_COLORS: Record<string, string> = {
   error: 'red',
 };
 
-// Suite options: in-process verification + test host container suites
-// Using Mantine ComboboxData grouped format (array of group objects)
-const SUITE_OPTIONS = [
+// ---------------------------------------------------------------------------
+// Suite definitions with dependency graph for checkbox selection
+// ---------------------------------------------------------------------------
+
+interface SuiteDefinition {
+  value: string;
+  label: string;
+  estimate: string;
+  group: string;
+  /** Other suites this one includes (for composite suites) */
+  includes?: string[];
+}
+
+const SUITE_DEFS: SuiteDefinition[] = [
+  // Quick Verification (in-process)
+  { value: 'smoke', label: 'Smoke — Health probes', estimate: '8 checks, ~5s', group: 'Quick Verification' },
+  { value: 'regression', label: 'Regression — API endpoints', estimate: '25 checks, ~3min', group: 'Quick Verification' },
+  { value: 'e2e', label: 'Verification — Full checks', estimate: '35 checks, ~8min', group: 'Quick Verification' },
+  { value: 'all', label: 'All Checks — Complete verification', estimate: '40 checks, ~12min', group: 'Quick Verification' },
+
+  // Comprehensive (test host container)
+  { value: 'unit', label: 'Unit Tests', estimate: '~950 tests, ~2min', group: 'Comprehensive' },
+  { value: 'core', label: 'Core / Multi-Tenant', estimate: '~3,700 tests, ~5min', group: 'Comprehensive' },
+  { value: 'integration', label: 'Integration Tests', estimate: '~270 tests, ~3min', group: 'Comprehensive' },
+  { value: 'agents', label: 'Agent & Chat Tests', estimate: '~300 tests, ~3min', group: 'Comprehensive' },
+  { value: 'security', label: 'Security & Penetration', estimate: '~150 tests, ~3min', group: 'Comprehensive' },
+  { value: 'ops', label: 'Operations & Resilience', estimate: '~80 tests, ~4min', group: 'Comprehensive' },
+  { value: 'widget', label: 'Widget Tests', estimate: '~60 tests, ~2min', group: 'Comprehensive' },
+  { value: 'e2e_live', label: 'E2E Live — Playwright', estimate: '~1,100 tests, ~15min', group: 'Comprehensive' },
+  { value: 'load', label: 'Load Testing — Locust', estimate: '~5min', group: 'Comprehensive' },
+  { value: 'fuzzing', label: 'API Fuzzing — Schemathesis', estimate: '307 ops, ~5min', group: 'Comprehensive' },
+  { value: 'property', label: 'Property Tests — Hypothesis', estimate: '46 tests, ~2min', group: 'Comprehensive' },
+
+  // Full Suite (composites — selecting these auto-selects dependencies)
   {
-    group: 'Quick Verification',
-    items: [
-      { value: 'smoke', label: 'Smoke — Health probes (8 checks, ~5s)' },
-      { value: 'regression', label: 'Regression — API endpoints (25 checks, ~3min)' },
-      { value: 'e2e', label: 'Verification — Full checks (35 checks, ~8min)' },
-      { value: 'all', label: 'All Checks — Complete verification (40 checks, ~12min)' },
-    ],
+    value: 'pipeline', label: 'Full Pipeline', estimate: 'All phases, ~30min', group: 'Full Suite',
+    includes: ['unit', 'core', 'integration', 'agents', 'security', 'regression', 'ops', 'widget', 'e2e_live', 'fuzzing', 'property'],
   },
   {
-    group: 'Comprehensive',
-    items: [
-      { value: 'unit', label: 'Unit Tests (~950 tests, ~2min)' },
-      { value: 'core', label: 'Core / Multi-Tenant (~3,700 tests, ~5min)' },
-      { value: 'integration', label: 'Integration Tests (~270 tests, ~3min)' },
-      { value: 'agents', label: 'Agent & Chat Tests (~300 tests, ~3min)' },
-      { value: 'security', label: 'Security & Penetration (~150 tests, ~3min)' },
-      { value: 'ops', label: 'Operations & Resilience (~80 tests, ~4min)' },
-      { value: 'widget', label: 'Widget Tests (~60 tests, ~2min)' },
-      { value: 'e2e_live', label: 'E2E Live — Playwright (~1,100 tests, ~15min)' },
-      { value: 'load', label: 'Load Testing — Locust (~5min)' },
-      { value: 'fuzzing', label: 'API Fuzzing — Schemathesis (307 ops, ~5min)' },
-      { value: 'property', label: 'Property Tests — Hypothesis (46 tests, ~2min)' },
-    ],
-  },
-  {
-    group: 'Full Suite',
-    items: [
-      { value: 'pipeline', label: 'Full Pipeline — All phases (~30min)' },
-      { value: 'full', label: 'Complete Suite — Everything (~45min)' },
-    ],
+    value: 'full', label: 'Complete Suite', estimate: 'Everything, ~45min', group: 'Full Suite',
+    includes: ['unit', 'core', 'integration', 'agents', 'security', 'regression', 'ops', 'widget', 'e2e_live', 'load', 'fuzzing', 'property'],
   },
 ];
+
+const SUITE_GROUPS = ['Quick Verification', 'Comprehensive', 'Full Suite'];
+
+/** When a suite with `includes` is toggled on, auto-select all its dependencies. */
+function applySuiteDependencies(selected: string[], toggled: string, wasChecked: boolean): string[] {
+  const def = SUITE_DEFS.find(s => s.value === toggled);
+  if (wasChecked) {
+    // Unchecking: remove only the toggled suite (keep individual selections)
+    return selected.filter(s => s !== toggled);
+  }
+  // Checking: add the suite + all its includes
+  const toAdd = new Set([...selected, toggled]);
+  if (def?.includes) {
+    def.includes.forEach(s => toAdd.add(s));
+  }
+  return [...toAdd];
+}
+
+// Keep the old grouped format for backward compat with Select (used in some filter UIs)
+const SUITE_OPTIONS = SUITE_GROUPS.map(group => ({
+  group,
+  items: SUITE_DEFS.filter(s => s.group === group).map(s => ({
+    value: s.value,
+    label: `${s.label} (${s.estimate})`,
+  })),
+}));
 
 const CHECK_STATUS_COLORS: Record<string, string> = {
   pass: 'green',
@@ -128,7 +164,7 @@ export const TestExecutionPage: React.FC = () => {
   // Trigger modal
   const [triggerOpen, setTriggerOpen] = useState(false);
   const [triggerEnv, setTriggerEnv] = useState<string | null>('staging');
-  const [triggerSuite, setTriggerSuite] = useState<string | null>('smoke');
+  const [triggerSuites, setTriggerSuites] = useState<string[]>(['smoke']);
   const [triggerDryRun, setTriggerDryRun] = useState(false);
   const [triggering, setTriggering] = useState(false);
 
@@ -154,14 +190,24 @@ export const TestExecutionPage: React.FC = () => {
   useEffect(() => { loadData(); }, [loadData]);
 
   const handleTrigger = useCallback(async () => {
-    if (!triggerEnv) return;
+    if (!triggerEnv || triggerSuites.length === 0) return;
     setTriggering(true);
+
+    // Determine the suite to send: if a composite is selected, use it;
+    // otherwise use the first selected (backend runs one suite at a time)
+    const composites = triggerSuites.filter(s =>
+      SUITE_DEFS.find(d => d.value === s)?.includes,
+    );
+    const suite = composites.length > 0
+      ? composites[composites.length - 1]  // Use largest composite
+      : triggerSuites[0];
+
     try {
       const res = await apiFetch('/api/superadmin/tests/run', {
         method: 'POST',
         body: JSON.stringify({
           environment: triggerEnv,
-          suite: triggerSuite || 'smoke',
+          suite,
           phases: [],
           dryRun: triggerDryRun,
         }),
@@ -180,7 +226,7 @@ export const TestExecutionPage: React.FC = () => {
     } finally {
       setTriggering(false);
     }
-  }, [triggerEnv, triggerSuite, triggerDryRun, apiFetch, onNotify, loadData]);
+  }, [triggerEnv, triggerSuites, triggerDryRun, apiFetch, onNotify, loadData]);
 
   const refreshRun = useCallback(async (runId: string) => {
     try {
@@ -243,6 +289,14 @@ export const TestExecutionPage: React.FC = () => {
           <Button onClick={() => setTriggerOpen(true)}>Trigger Test Run</Button>
         </Group>
       </Group>
+
+      <Tabs defaultValue="runs">
+        <Tabs.List>
+          <Tabs.Tab value="runs">Runs</Tabs.Tab>
+          <Tabs.Tab value="performance">Performance Trends</Tabs.Tab>
+        </Tabs.List>
+
+        <Tabs.Panel value="runs" pt="md">
 
       {runs.length === 0 ? (
         <Text c="dimmed" ta="center" mt="xl">No test runs recorded.</Text>
@@ -309,12 +363,39 @@ export const TestExecutionPage: React.FC = () => {
             value={triggerEnv}
             onChange={setTriggerEnv}
           />
-          <Select
-            label="Test Suite"
-            data={SUITE_OPTIONS}
-            value={triggerSuite}
-            onChange={setTriggerSuite}
-          />
+          <div>
+            <Text fw={500} size="sm" mb="xs">Test Suites</Text>
+            <div style={{ maxHeight: 320, overflowY: 'auto' }}>
+              {SUITE_GROUPS.map(group => (
+                <div key={group} style={{ marginBottom: 12 }}>
+                  <Text size="xs" fw={600} c="dimmed" mb={4}>{group}</Text>
+                  <Stack gap={4} pl="xs">
+                    {SUITE_DEFS.filter(s => s.group === group).map(suite => (
+                      <Checkbox
+                        key={suite.value}
+                        label={
+                          <Group gap={6}>
+                            <Text size="sm">{suite.label}</Text>
+                            <Text size="xs" c="dimmed">({suite.estimate})</Text>
+                          </Group>
+                        }
+                        checked={triggerSuites.includes(suite.value)}
+                        onChange={() => {
+                          const wasChecked = triggerSuites.includes(suite.value);
+                          setTriggerSuites(applySuiteDependencies(triggerSuites, suite.value, wasChecked));
+                        }}
+                      />
+                    ))}
+                  </Stack>
+                </div>
+              ))}
+            </div>
+            {triggerSuites.length > 0 && (
+              <Text size="xs" c="dimmed" mt="xs">
+                {triggerSuites.length} suite{triggerSuites.length !== 1 ? 's' : ''} selected
+              </Text>
+            )}
+          </div>
           <Switch
             label="Dry Run (validate without executing)"
             checked={triggerDryRun}
@@ -419,8 +500,15 @@ export const TestExecutionPage: React.FC = () => {
                         </Table.Thead>
                         <Table.Tbody>
                           {displayChecks.map((c, i) => (
-                            <Table.Tr key={`${c.category}-${c.name}-${i}`}>
-                              <Table.Td><Text size="xs">{c.name}</Text></Table.Td>
+                            <Table.Tr
+                              key={`${c.category}-${c.name}-${i}`}
+                              style={{ cursor: 'pointer' }}
+                              onClick={() => window.open(
+                                `/admin/provider/test-execution/${detailRun.runId}?check=${encodeURIComponent(c.name)}`,
+                                '_blank',
+                              )}
+                            >
+                              <Table.Td><Text size="xs" td="underline" c="blue">{c.name}</Text></Table.Td>
                               <Table.Td><Badge size="xs" variant="light">{c.category}</Badge></Table.Td>
                               <Table.Td>
                                 <Badge size="xs" color={CHECK_STATUS_COLORS[c.status] || 'gray'}>{c.status}</Badge>
@@ -460,14 +548,33 @@ export const TestExecutionPage: React.FC = () => {
                 </Button>
               )}
               {detailRun.checks && detailRun.checks.length > 0 && (
-                <Button size="xs" variant="subtle" onClick={() => copyForClaude(detailRun)}>
-                  Copy for Claude
-                </Button>
+                <>
+                  <Button
+                    size="xs"
+                    variant="subtle"
+                    onClick={() => window.open(
+                      `/admin/provider/test-execution/${detailRun.runId}`,
+                      '_blank',
+                    )}
+                  >
+                    View All Checks
+                  </Button>
+                  <Button size="xs" variant="subtle" onClick={() => copyForClaude(detailRun)}>
+                    Copy for Claude
+                  </Button>
+                </>
               )}
             </Group>
           </Stack>
         )}
       </Modal>
+
+        </Tabs.Panel>
+
+        <Tabs.Panel value="performance" pt="md">
+          <PerformanceChart />
+        </Tabs.Panel>
+      </Tabs>
     </Stack>
   );
 };

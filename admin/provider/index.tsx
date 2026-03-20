@@ -56,6 +56,7 @@ import { NotificationChannelConfigPage } from './pages/NotificationChannelConfig
 import { FeatureFlagConfigPage } from './pages/FeatureFlagConfig';
 import { DeploymentManagementPage } from './pages/DeploymentManagement';
 import { TestExecutionPage } from './pages/TestExecution';
+import { TestRunDetailPage } from './pages/TestRunDetail';
 import { MaintenanceModePage } from './pages/MaintenanceMode';
 import { ExperimentManagementPage } from './pages/ExperimentManagement';
 
@@ -179,6 +180,7 @@ const App: React.FC = () => {
             <Route path="/feature-flags" element={<FeatureFlagConfigPage />} />
             <Route path="/deploy-management" element={<DeploymentManagementPage />} />
             <Route path="/test-execution" element={<TestExecutionPage />} />
+            <Route path="/test-execution/:runId" element={<TestRunDetailPage />} />
             <Route path="/maintenance" element={<MaintenanceModePage />} />
             <Route path="/experiments" element={<ExperimentManagementPage />} />
             {/* Compliance & Security */}

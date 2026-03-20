@@ -802,6 +802,110 @@ async def list_test_runs(
     return PipelineRunListResponse(runs=runs, total=len(runs))
 
 
+# ---------------------------------------------------------------------------
+# Performance history (time-series for regression detection)
+# ---------------------------------------------------------------------------
+
+
+class PerformanceHistoryPoint(CamelCaseModel):
+    """Single data point in the performance time-series."""
+
+    run_id: str
+    suite: str
+    environment: str
+    started_at: str | None = None
+    duration_s: float | None = None
+    total_tests: int = 0
+    passed: int = 0
+    failed: int = 0
+    avg_latency_ms: float | None = None
+    p95_latency_ms: float | None = None
+
+
+class PerformanceHistoryResponse(CamelCaseModel):
+    """Performance history across test runs."""
+
+    points: list[PerformanceHistoryPoint]
+    total: int
+
+
+@router.get(
+    "/tests/performance-history",
+    response_model=PerformanceHistoryResponse,
+    summary="Performance trend data for time-series charts",
+    description="Returns run durations and latency stats across recent runs for regression detection.",
+    status_code=200,
+)
+async def get_performance_history(
+    suite: str | None = Query(None, description="Filter by suite name"),
+    environment: str | None = Query(None, description="Filter by environment"),
+    limit: int = Query(30, ge=1, le=200, description="Max runs to return"),
+) -> PerformanceHistoryResponse:
+    """Compute performance time-series from historical test runs."""
+    repo = _get_platform_repo()
+
+    query = (
+        "SELECT c.value.run_id, c.value.suite, c.value.environment, "
+        "c.value.started_at, c.value.duration_s, c.value.total_tests, "
+        "c.value.passed, c.value.failed, c.value.checks "
+        "FROM c WHERE c.config_type = @config_type "
+    )
+    params: list[dict[str, Any]] = [
+        {"name": "@config_type", "value": _TEST_RUN_CONFIG_TYPE},
+    ]
+
+    if suite:
+        query += "AND c.value.suite = @suite "
+        params.append({"name": "@suite", "value": suite})
+
+    if environment:
+        query += "AND c.value.environment = @env "
+        params.append({"name": "@env", "value": environment})
+
+    query += "ORDER BY c.updated_at DESC OFFSET 0 LIMIT @limit"
+    params.append({"name": "@limit", "value": limit})
+
+    points: list[PerformanceHistoryPoint] = []
+    try:
+        async for item in repo._container.query_items(
+            query=query,
+            parameters=params,
+        ):
+            checks = item.get("checks", []) or []
+            latencies = [
+                c.get("latency_ms", 0.0) for c in checks
+                if isinstance(c, dict) and c.get("latency_ms") is not None
+            ]
+
+            avg_lat = None
+            p95_lat = None
+            if latencies:
+                avg_lat = round(sum(latencies) / len(latencies), 1)
+                sorted_lat = sorted(latencies)
+                p95_idx = int(len(sorted_lat) * 0.95)
+                p95_lat = round(sorted_lat[min(p95_idx, len(sorted_lat) - 1)], 1)
+
+            points.append(PerformanceHistoryPoint(
+                run_id=item.get("run_id", ""),
+                suite=item.get("suite", ""),
+                environment=item.get("environment", ""),
+                started_at=item.get("started_at"),
+                duration_s=item.get("duration_s"),
+                total_tests=item.get("total_tests", 0),
+                passed=item.get("passed", 0),
+                failed=item.get("failed", 0),
+                avg_latency_ms=avg_lat,
+                p95_latency_ms=p95_lat,
+            ))
+    except Exception:
+        logger.warning("Failed to query performance history", exc_info=True)
+
+    # Reverse so oldest is first (for time-series X-axis)
+    points.reverse()
+
+    return PerformanceHistoryResponse(points=points, total=len(points))
+
+
 @router.get(
     "/tests/{run_id}/status",
     response_model=PipelineRunStatusResponse,
