@@ -120,6 +120,8 @@ COPY test_host/ ./test_host/
 COPY admin/shopify/dist/ ./admin/shopify/dist/
 COPY admin/standalone/dist/ ./admin/standalone/dist/
 COPY admin/provider/dist/ ./admin/provider/dist/
+COPY admin/provider/.env.staging ./admin/provider/.env.staging
+COPY admin/standalone/.env.staging ./admin/standalone/.env.staging
 # Standalone SPA source — Vite dev server serves this for E2E Playwright tests.
 # Copy source files (not node_modules) + shared components (@shared alias).
 COPY admin/standalone/package.json admin/standalone/package-lock.json ./admin/standalone/
