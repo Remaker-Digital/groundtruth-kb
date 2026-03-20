@@ -51,6 +51,7 @@ SUITE_CONFIGS: dict[str, SuiteConfig] = {
             # Exclude tests that read project files not in container
             "--ignore=tests/multi_tenant/test_s153_batch10_spec_verification.py",
             "--ignore=tests/multi_tenant/test_s153_batch11_spec_verification.py",
+            "--ignore=tests/multi_tenant/test_s153_batch12_spec_verification.py",
             "-x",
             "--timeout=30",
             "-q",
