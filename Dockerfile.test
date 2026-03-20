@@ -76,10 +76,10 @@ RUN apt-get update \
 # Binary tarball from nodejs.org — avoids both NodeSource CDN failures
 # and Debian's heavy dependency tree (~200 packages) for the nodejs apt pkg.
 # --------------------------------------------------------------------------
-RUN curl -fsSL https://nodejs.org/dist/v20.18.0/node-v20.18.0-linux-x64.tar.xz \
-        -o /tmp/node.tar.xz \
-    && tar -xJf /tmp/node.tar.xz -C /usr/local --strip-components=1 \
-    && rm /tmp/node.tar.xz \
+RUN curl -fsSL https://nodejs.org/dist/v20.18.0/node-v20.18.0-linux-x64.tar.gz \
+        -o /tmp/node.tar.gz \
+    && tar -xzf /tmp/node.tar.gz -C /usr/local --strip-components=1 \
+    && rm /tmp/node.tar.gz \
     && node --version && npm --version
 
 # --------------------------------------------------------------------------
