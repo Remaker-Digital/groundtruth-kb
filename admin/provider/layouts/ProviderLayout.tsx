@@ -154,9 +154,14 @@ export function ProviderLayout({ apiKey, onLogout, children }: ProviderLayoutPro
       if (!headers.has('Content-Type') && init?.body) {
         headers.set('Content-Type', 'application/json');
       }
-      return fetch(`${baseUrl}${path}`, { ...init, headers });
+      const resp = await fetch(`${baseUrl}${path}`, { ...init, headers });
+      // Global auth-failure interceptor: any 401/403 redirects to login
+      if (resp.status === 401 || resp.status === 403) {
+        onLogout();
+      }
+      return resp;
     },
-    [apiKey],
+    [apiKey, onLogout],
   );
 
   // Toast helper

@@ -208,12 +208,17 @@ export const StandaloneLayout: React.FC<StandaloneLayoutProps> = ({
         headers.set('X-API-Key', resolvedAuth.value);
       }
 
-      return fetch(`${API_BASE_URL}${path}`, {
+      const resp = await fetch(`${API_BASE_URL}${path}`, {
         ...init,
         headers,
       });
+      // Global auth-failure interceptor: any 401/403 redirects to login
+      if (resp.status === 401 || resp.status === 403) {
+        onLogout();
+      }
+      return resp;
     },
-    [resolvedAuth.type, resolvedAuth.value],
+    [resolvedAuth.type, resolvedAuth.value, onLogout],
   );
 
   // ---- Notification handler (Mantine notifications) ----------------------

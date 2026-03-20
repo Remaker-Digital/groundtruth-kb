@@ -133,11 +133,17 @@ export const ShopifyAppLayout: React.FC<ShopifyAppLayoutProps> = ({
       headers.set('Authorization', `Bearer ${token}`);
       headers.set('X-Shopify-Shop', shopifyConfig.shop);
 
-      return fetch(`${API_BASE_URL}${path}`, {
+      const resp = await fetch(`${API_BASE_URL}${path}`, {
         ...init,
         headers,
         cache: 'no-store',
       });
+      // Global auth-failure interceptor: Shopify session expired → re-auth
+      if (resp.status === 401 || resp.status === 403) {
+        // Shopify handles re-auth via app bridge redirect
+        window.location.reload();
+      }
+      return resp;
     },
     [getSessionToken, shopifyConfig.shop],
   );
