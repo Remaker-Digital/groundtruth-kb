@@ -216,6 +216,35 @@ def main() -> int:
         _close_log()
         return 1
 
+    # 0. Bump PRODUCT_VERSION in source, commit, and push
+    version = args.tag.lstrip("v")  # v1.95.8 → 1.95.8
+    ver_file = Path(__file__).resolve().parent.parent / "src" / "multi_tenant" / "api_versioning.py"
+    log(f"Setting PRODUCT_VERSION = \"{version}\"...")
+    content = ver_file.read_text(encoding="utf-8")
+    new_content = re.sub(
+        r'PRODUCT_VERSION\s*=\s*"[^"]*"',
+        f'PRODUCT_VERSION = "{version}"',
+        content,
+    )
+    if new_content == content:
+        log("  Version already set — skipping.")
+    else:
+        ver_file.write_text(new_content, encoding="utf-8")
+        log("  Updated api_versioning.py")
+        # Commit and push so GitHub Actions builds the correct version
+        code, _ = _run(
+            f'git add "{ver_file}" && '
+            f'git commit -m "bump: v{version}" && '
+            f'git push',
+            timeout=60,
+        )
+        if code != 0:
+            log("  ERROR: Failed to commit/push version bump.")
+            _close_log()
+            return 1
+        log("  Committed and pushed.")
+    log("")
+
     # 1. Trigger both workflows
     log("Triggering GitHub Actions builds...")
     ok = True
