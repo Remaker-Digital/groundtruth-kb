@@ -1,0 +1,12 @@
+Agent Red Customer Experience - Test Document
+
+This is a plain text test document for knowledge base import testing.
+
+Agent Red provides AI-powered customer service automation for e-commerce merchants.
+Key features include persistent customer memory, hybrid search retrieval, and
+multi-channel support across Shopify storefronts and standalone websites.
+
+Our pricing starts at $149/month for the Starter tier, which includes 1,000
+conversations per month. Professional tier at $399/month includes 5,000
+conversations and advanced analytics. Enterprise tier at $999/month includes
+20,000 conversations and dedicated model training.
