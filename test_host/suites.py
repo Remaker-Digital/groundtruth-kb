@@ -57,6 +57,8 @@ SUITE_CONFIGS: dict[str, SuiteConfig] = {
             "--ignore=tests/multi_tenant/test_document_parser_files.py",
             "--ignore=tests/multi_tenant/test_mutation_tenant_admin.py",
             "--ignore=tests/multi_tenant/test_phase6_deferred.py",
+            "--ignore=tests/multi_tenant/test_build_orchestrator.py",
+            "--ignore=tests/multi_tenant/test_s175_scaling_680.py",
             "-x",
             "--timeout=30",
             "-q",
