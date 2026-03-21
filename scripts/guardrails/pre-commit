@@ -1,0 +1,64 @@
+#!/usr/bin/env bash
+# Git pre-commit hook — Quality Guardrails
+#
+# Runs four checks before every commit:
+#   1. Assertion count ratchet (test weakening prevention)
+#   2. Test file deletion guard (test removal prevention)
+#   3. Architectural grep guards (SLIM/MCP removal prevention)
+#   4. TSX commit gate (UI changes require SPEC-ID)
+#
+# Install: copy to .git/hooks/pre-commit or symlink
+# Bypass: git commit --no-verify (requires owner approval)
+#
+# © 2026 Remaker Digital, a DBA of VanDusen & Palmeter, LLC. All rights reserved.
+
+set -e
+
+SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
+# When installed as .git/hooks/pre-commit, project root is two dirs up
+PROJECT_ROOT="$(cd "$SCRIPT_DIR/../.." && pwd)"
+GUARDRAILS_DIR="$PROJECT_ROOT/scripts/guardrails"
+
+EXIT_CODE=0
+
+echo "Running quality guardrails..."
+
+# 1. Test file deletion guard (fastest check — do first)
+if python3 "$GUARDRAILS_DIR/check_test_deletion.py"; then
+    echo "  [PASS] Test deletion guard"
+else
+    echo "  [FAIL] Test deletion guard"
+    EXIT_CODE=1
+fi
+
+# 2. Assertion count ratchet
+if python3 "$GUARDRAILS_DIR/check_assertion_ratchet.py"; then
+    echo "  [PASS] Assertion ratchet"
+else
+    echo "  [FAIL] Assertion ratchet"
+    EXIT_CODE=1
+fi
+
+# 3. Architectural grep guards
+if python3 "$GUARDRAILS_DIR/check_arch_guards.py"; then
+    echo "  [PASS] Architectural guards"
+else
+    echo "  [FAIL] Architectural guards"
+    EXIT_CODE=1
+fi
+
+# 4. TSX commit gate (SPEC-ID required for UI changes)
+if python3 "$GUARDRAILS_DIR/check_tsx_gate.py"; then
+    echo "  [PASS] TSX commit gate"
+else
+    echo "  [FAIL] TSX commit gate"
+    EXIT_CODE=1
+fi
+
+if [ $EXIT_CODE -ne 0 ]; then
+    echo ""
+    echo "Commit blocked by quality guardrails."
+    echo "Fix the issues above, or get owner approval to bypass."
+fi
+
+exit $EXIT_CODE
