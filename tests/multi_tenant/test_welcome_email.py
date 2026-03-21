@@ -115,11 +115,11 @@ class TestBuildAdminLoginUrl:
             result = _build_admin_login_url()
         assert result == "https://myapp.azurecontainerapps.io/admin/standalone/"
 
-    def test_no_env_vars_returns_production_fallback(self):
+    def test_no_env_vars_returns_relative_fallback(self):
+        """SPEC-0058: Without env vars, returns relative path (no hardcoded FQDN)."""
         with patch.dict("os.environ", {}, clear=True):
             result = _build_admin_login_url()
         assert "/admin/standalone/" in result
-        assert result.startswith("https://")
 
     def test_none_explicit_uses_env(self):
         with patch.dict("os.environ", {

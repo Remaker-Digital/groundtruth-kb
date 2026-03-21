@@ -791,7 +791,8 @@ class TestTeamInviteEmailLink:
                 await send_team_invite_alert("t", "a@b.com", "Admin", "agent")
             assert len(captured) == 1
             admin_url = captured[0].metadata.get("admin_url", "")
-            assert "agent-red-api-gateway.orangeglacier" in admin_url
+            # SPEC-0058: No hardcoded FQDN fallback — returns relative path
+            assert "/admin/standalone/" in admin_url
         finally:
             configure_alert_service(None)
 
@@ -816,7 +817,7 @@ class TestTeamInviteEmailLink:
             assert len(captured) == 1
             admin_url = captured[0].metadata.get("admin_url", "")
             assert admin_url, "admin_url must never be empty"
-            assert admin_url.startswith("https://"), f"admin_url must be HTTPS: {admin_url}"
+            # SPEC-0058: Without env vars, returns relative path (no hardcoded FQDN)
             assert "/admin/standalone/" in admin_url
         finally:
             configure_alert_service(None)
