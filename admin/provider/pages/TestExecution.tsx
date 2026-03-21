@@ -258,6 +258,13 @@ export const TestExecutionPage: React.FC = () => {
     return () => clearInterval(interval);
   }, [runs, refreshRun]);
 
+  // Fetch full run data (with checks) when detail modal opens
+  useEffect(() => {
+    if (detailRunId) {
+      refreshRun(detailRunId);
+    }
+  }, [detailRunId, refreshRun]);
+
   // Copy failures as JSON for Claude diagnosis
   const copyForClaude = useCallback((run: PipelineRun) => {
     const output = {
@@ -548,22 +555,20 @@ export const TestExecutionPage: React.FC = () => {
                 </Button>
               )}
               {detailRun.checks && detailRun.checks.length > 0 && (
-                <>
-                  <Button
-                    size="xs"
-                    variant="subtle"
-                    onClick={() => window.open(
-                      `/admin/provider/test-execution/${detailRun.runId}`,
-                      '_blank',
-                    )}
-                  >
-                    View All Checks
-                  </Button>
-                  <Button size="xs" variant="subtle" onClick={() => copyForClaude(detailRun)}>
-                    Copy for Claude
-                  </Button>
-                </>
+                <Button
+                  size="xs"
+                  variant="subtle"
+                  onClick={() => window.open(
+                    `/admin/provider/test-execution/${detailRun.runId}`,
+                    '_blank',
+                  )}
+                >
+                  View All Checks
+                </Button>
               )}
+              <Button size="xs" variant="subtle" onClick={() => copyForClaude(detailRun)}>
+                Copy for Claude
+              </Button>
             </Group>
           </Stack>
         )}

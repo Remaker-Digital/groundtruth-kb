@@ -429,7 +429,7 @@ async function init(
 
   function positionResizeHandle(handle: HTMLDivElement, iframe: HTMLIFrameElement) {
     const rect = iframe.getBoundingClientRect();
-    const isRight = position === 'bottom-right';
+    const isRight = (config.widget_position || 'bottom-right') === 'bottom-right';
     handle.style.top = `${rect.top}px`;
     handle.style.height = `${rect.height}px`;
     if (isRight) {
@@ -441,7 +441,7 @@ async function init(
 
   function createResizeHandle(): HTMLDivElement {
     const handle = document.createElement('div');
-    const isRight = position === 'bottom-right';
+    const isRight = (config.widget_position || 'bottom-right') === 'bottom-right';
     handle.style.cssText = [
       'position: fixed',
       'width: 6px',
@@ -454,7 +454,7 @@ async function init(
 
     // Visible grip line on hover
     handle.addEventListener('mouseenter', () => {
-      handle.style.background = `${tokens.brand}33`;
+      handle.style.background = `${tokens.colorPrimary}33`;
     });
     handle.addEventListener('mouseleave', () => {
       if (!resizeOverlay) handle.style.background = 'transparent';
@@ -489,7 +489,7 @@ async function init(
   function onResizeMove(ev: MouseEvent) {
     if (!panelIframe) return;
     const dx = ev.screenX - resizeStartX;
-    const isRight = position === 'bottom-right';
+    const isRight = (config.widget_position || 'bottom-right') === 'bottom-right';
     // Dragging left on a right-positioned panel expands it
     const newWidth = Math.max(MIN_PANEL_WIDTH, Math.min(MAX_PANEL_WIDTH,
       resizeStartWidth + (isRight ? -dx : dx)

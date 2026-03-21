@@ -1,15 +1,20 @@
 #!/usr/bin/env python3
-"""Build both container images via GitHub Actions.
+"""Build — single command for the entire build pipeline.
 
 Usage:
-    python scripts/build.py v1.95.6
+    python scripts/build.py v1.95.9
 
-Triggers build-api-gateway.yml and build-test-host.yml workflows,
-waits for both to complete, and verifies images exist in ACR.
+This is the ONE build command. It handles ALL artifacts autonomously:
+  0. Bump PRODUCT_VERSION in source
+  1. Build all frontend bundles (provider, standalone, shopify, widget)
+  2. Commit version bump + frontend dist artifacts, push to remote
+  3. Trigger GitHub Actions workflows (api-gateway + test-host)
+  4. Poll workflows until completion
+  5. Verify ACR image tags exist
 
 Exit codes:
-    0 - Both builds succeeded and images verified
-    1 - Any build failed or verification failed
+    0 - All builds succeeded and images verified
+    1 - Any step failed
 
 © 2026 Remaker Digital, a DBA of VanDusen & Palmeter, LLC. All rights reserved.
 """
@@ -29,6 +34,7 @@ from pathlib import Path
 # ---------------------------------------------------------------------------
 
 ACR_NAME = "acragentredeastus"
+PROJECT_ROOT = Path(__file__).resolve().parent.parent
 WORKFLOWS = {
     "api-gateway": "build-api-gateway.yml",
     "test-host": "build-test-host.yml",
@@ -37,6 +43,14 @@ REPOS = {
     "api-gateway": "api-gateway",
     "test-host": "test-host",
 }
+# Frontend projects whose dist/ directories are COPY'd into the Docker image.
+# Each entry is relative to PROJECT_ROOT.
+FRONTEND_PROJECTS = [
+    "admin/provider",
+    "admin/standalone",
+    "admin/shopify",
+    "widget",
+]
 POLL_INTERVAL_S = 15
 BUILD_TIMEOUT_S = 600  # 10 minutes
 
@@ -108,6 +122,53 @@ def _check_tool(name: str) -> bool:
     """Check if a CLI tool is available."""
     code, _ = _run(f"{name} --version")
     return code == 0
+
+
+# ---------------------------------------------------------------------------
+# Frontend build
+# ---------------------------------------------------------------------------
+
+
+def build_frontends() -> bool:
+    """Build all frontend projects (npm install + npm run build).
+
+    Returns True if all succeeded, False on first failure.
+    """
+    log("Building frontend bundles...")
+    for project in FRONTEND_PROJECTS:
+        project_dir = PROJECT_ROOT / project
+        name = project.replace("admin/", "")
+
+        if not (project_dir / "package.json").exists():
+            log(f"  ERROR: {project}/package.json not found")
+            return False
+
+        # npm install (skip if node_modules exists and is fresh)
+        node_modules = project_dir / "node_modules"
+        if not node_modules.exists():
+            log(f"  [{name}] npm install...")
+            code, output = _run(f'npm install --prefix "{project_dir}"', timeout=120)
+            if code != 0:
+                log(f"  [{name}] ERROR: npm install failed: {output[:200]}")
+                return False
+
+        # npm run build
+        log(f"  [{name}] building...")
+        code, output = _run(f'npm run build --prefix "{project_dir}"', timeout=120)
+        if code != 0:
+            log(f"  [{name}] ERROR: build failed: {output[:300]}")
+            return False
+
+        # Verify dist/ was created
+        dist_dir = project_dir / "dist"
+        if not dist_dir.exists() or not any(dist_dir.iterdir()):
+            log(f"  [{name}] ERROR: dist/ is missing or empty after build")
+            return False
+
+        log(f"  [{name}] OK")
+
+    log("  All frontends built successfully.")
+    return True
 
 
 # ---------------------------------------------------------------------------
@@ -211,42 +272,65 @@ def main() -> int:
     log("")
 
     # Check prerequisites
-    if not _check_tool("gh"):
-        log("ERROR: 'gh' CLI not found. Install: https://cli.github.com/")
-        _close_log()
-        return 1
+    for tool, url in [("gh", "https://cli.github.com/"), ("npm", "https://nodejs.org/")]:
+        if not _check_tool(tool):
+            log(f"ERROR: '{tool}' CLI not found. Install: {url}")
+            _close_log()
+            return 1
 
-    # 0. Bump PRODUCT_VERSION in source, commit, and push
-    version = args.tag.lstrip("v")  # v1.95.8 → 1.95.8
-    ver_file = Path(__file__).resolve().parent.parent / "src" / "multi_tenant" / "api_versioning.py"
-    log(f"Setting PRODUCT_VERSION = \"{version}\"...")
+    # 0. Bump PRODUCT_VERSION in source
+    version = args.tag.lstrip("v")  # v1.95.9 → 1.95.9
+    ver_file = PROJECT_ROOT / "src" / "multi_tenant" / "api_versioning.py"
+    log(f"Step 0: Setting PRODUCT_VERSION = \"{version}\"...")
     content = ver_file.read_text(encoding="utf-8")
     new_content = re.sub(
         r'PRODUCT_VERSION\s*=\s*"[^"]*"',
         f'PRODUCT_VERSION = "{version}"',
         content,
     )
-    if new_content == content:
-        log("  Version already set — skipping.")
+    version_changed = new_content != content
+    if not version_changed:
+        log("  Version already set.")
     else:
         ver_file.write_text(new_content, encoding="utf-8")
         log("  Updated api_versioning.py")
-        # Commit and push so GitHub Actions builds the correct version
+    log("")
+
+    # 1. Build all frontend bundles
+    log("Step 1: Building frontend bundles...")
+    if not build_frontends():
+        log("ERROR: Frontend build failed.")
+        _close_log()
+        return 1
+    log("")
+
+    # 2. Commit version + dist artifacts and push
+    log("Step 2: Committing and pushing...")
+    # Stage version file + all dist directories (use forward slashes for git)
+    # dist/ is in .gitignore so we need --force for the frontend bundles.
+    _run('git add "src/multi_tenant/api_versioning.py"', timeout=15)
+    for project in FRONTEND_PROJECTS:
+        _run(f'git add --force "{project}/dist"', timeout=15)
+
+    # Only commit+push if there are staged changes
+    code, _ = _run("git diff --cached --quiet", timeout=10)
+    if code != 0:
+        # There are staged changes — commit and push
         code, _ = _run(
-            f'git add "{ver_file}" && '
-            f'git commit -m "bump: v{version}" && '
-            f'git push',
+            f'git commit -m "bump: v{version} + build.py auto-bumps PRODUCT_VERSION from tag" && git push',
             timeout=60,
         )
         if code != 0:
-            log("  ERROR: Failed to commit/push version bump.")
+            log("  ERROR: Failed to commit/push.")
             _close_log()
             return 1
         log("  Committed and pushed.")
+    else:
+        log("  No changes to commit — already up to date.")
     log("")
 
-    # 1. Trigger both workflows
-    log("Triggering GitHub Actions builds...")
+    # 3. Trigger GitHub Actions workflows
+    log("Step 3: Triggering GitHub Actions builds...")
     ok = True
     for name, workflow in WORKFLOWS.items():
         log(f"  {name}: {workflow}")
@@ -259,8 +343,8 @@ def main() -> int:
 
     log("")
 
-    # 2. Wait for run IDs to appear
-    log("Waiting for runs to register...")
+    # 4. Wait for run IDs to appear
+    log("Step 4: Waiting for runs to register...")
     time.sleep(8)
 
     run_ids: dict[str, int] = {}
@@ -279,16 +363,16 @@ def main() -> int:
 
     log("")
 
-    # 3. Poll both runs
-    log("Waiting for builds to complete...")
+    # 5. Poll both runs
+    log("Step 5: Waiting for builds to complete...")
     results: dict[str, bool] = {}
     for name, rid in run_ids.items():
         results[name] = poll_run(rid, name)
 
     log("")
 
-    # 4. Verify ACR tags
-    log("Verifying ACR images...")
+    # 6. Verify ACR tags
+    log("Step 6: Verifying ACR images...")
     for name, repo in REPOS.items():
         if results.get(name):
             tag_ok = verify_acr_tag(repo, args.tag)
@@ -298,7 +382,7 @@ def main() -> int:
                 log(f"  {repo}:{args.tag} — NOT FOUND in ACR")
                 results[name] = False
 
-    # 5. Summary
+    # 7. Summary
     log("")
     log("=" * 50)
     all_ok = all(results.values())
