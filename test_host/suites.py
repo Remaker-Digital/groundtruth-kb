@@ -9,6 +9,8 @@ and whether it requires special tooling (Playwright, Locust, etc.).
 
 from __future__ import annotations
 
+import os
+import shutil
 from dataclasses import dataclass, field
 
 
@@ -27,6 +29,33 @@ class SuiteConfig:
     composite_suites: list[str] = field(default_factory=list)
     estimated_tests: int = 0
     estimated_duration_s: int = 0
+
+    def can_run(self) -> tuple[bool, str]:
+        """Pre-flight check: can this suite run in the current environment?
+
+        Returns (True, '') if runnable, or (False, reason) if not.
+        For composite suites, checks all sub-suites and reports any that can't run.
+        """
+        if self.is_composite:
+            # A composite suite can run if ALL its sub-suites can run
+            for sub_name in self.composite_suites:
+                sub = SUITE_CONFIGS.get(sub_name)
+                if not sub:
+                    return False, f"Sub-suite '{sub_name}' not found"
+                ok, reason = sub.can_run()
+                if not ok:
+                    return False, f"Sub-suite '{sub_name}': {reason}"
+            return True, ""
+
+        if self.requires_playwright:
+            # Playwright + chromium must be installed
+            if not shutil.which("playwright"):
+                return False, "Playwright CLI not installed"
+        if self.requires_locust:
+            # Locust must be importable
+            if not shutil.which("locust"):
+                return False, "Locust not installed"
+        return True, ""
 
 
 # ---------------------------------------------------------------------------
@@ -126,8 +155,8 @@ SUITE_CONFIGS: dict[str, SuiteConfig] = {
         estimated_tests=47,
         estimated_duration_s=60,
     ),
-    "e2e": SuiteConfig(
-        name="e2e",
+    "e2e_live": SuiteConfig(
+        name="e2e_live",
         label="E2E Live — Playwright",
         pytest_args=[
             "tests/e2e_live/",
@@ -204,9 +233,9 @@ SUITE_CONFIGS: dict[str, SuiteConfig] = {
 
 SUITE_CONFIGS["pipeline"] = SuiteConfig(
     name="pipeline",
-    label="Full Pipeline — All 16 Phases",
+    label="Full Pipeline — All Phases",
     pytest_args=[],  # Uses composite execution
-    timeout_s=3600,
+    timeout_s=7200,
     is_composite=True,
     composite_suites=[
         "unit",
@@ -217,22 +246,20 @@ SUITE_CONFIGS["pipeline"] = SuiteConfig(
         "regression",
         "ops",
         "widget",
-        # "e2e" excluded — requires Playwright browsers + Vite dev server
-        # not available in the container (see S208). Re-enable when
-        # Dockerfile.test installs Playwright and starts Vite.
-        # "fuzzing" excluded — from_asgi() needs Azure env vars not in
-        # test host. Run individually with FUZZ_TARGET_URL pointing to staging.
+        "e2e_live",
+        "load",
+        "fuzzing",
         "property",
     ],
-    estimated_tests=5500,
-    estimated_duration_s=1800,
+    estimated_tests=7100,
+    estimated_duration_s=2700,
 )
 
 SUITE_CONFIGS["full"] = SuiteConfig(
     name="full",
     label="Complete Suite — Everything",
     pytest_args=[],  # Uses composite execution
-    timeout_s=5400,
+    timeout_s=7200,
     is_composite=True,
     composite_suites=[
         "unit",
@@ -243,13 +270,13 @@ SUITE_CONFIGS["full"] = SuiteConfig(
         "regression",
         "ops",
         "widget",
-        # "e2e" excluded — requires Playwright browsers + Vite dev server
-        # "load" excluded — requires Locust + target service
-        # "fuzzing" excluded — from_asgi() needs Azure env vars
+        "e2e_live",
+        "load",
+        "fuzzing",
         "property",
     ],
-    estimated_tests=6920,
-    estimated_duration_s=2700,
+    estimated_tests=7100,
+    estimated_duration_s=3000,
 )
 
 
@@ -259,9 +286,11 @@ def get_suite(name: str) -> SuiteConfig | None:
 
 
 def list_suites() -> list[dict]:
-    """Return suite metadata for SPA display."""
-    return [
-        {
+    """Return suite metadata for SPA display, including runnability."""
+    result = []
+    for cfg in SUITE_CONFIGS.values():
+        runnable, reason = cfg.can_run()
+        result.append({
             "name": cfg.name,
             "label": cfg.label,
             "estimated_tests": cfg.estimated_tests,
@@ -269,6 +298,7 @@ def list_suites() -> list[dict]:
             "is_composite": cfg.is_composite,
             "requires_playwright": cfg.requires_playwright,
             "requires_locust": cfg.requires_locust,
-        }
-        for cfg in SUITE_CONFIGS.values()
-    ]
+            "runnable": runnable,
+            "reason": reason,
+        })
+    return result

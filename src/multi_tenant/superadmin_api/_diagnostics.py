@@ -734,6 +734,60 @@ async def get_test_run_checks(
 
 
 @router.get(
+    "/tests/available-suites",
+    summary="List test suites available for a given environment",
+    description=(
+        "Returns suites that can actually execute in the target environment. "
+        "Queries the test host container for runnability pre-flight checks."
+    ),
+    status_code=200,
+)
+async def get_available_suites(
+    environment: str = Query("staging", description="Target environment"),
+) -> dict[str, Any]:
+    """Return suites filtered by runnability for the SPA suite selector."""
+    if environment not in VALID_ENVIRONMENTS:
+        raise HTTPException(
+            status_code=400,
+            detail=f"Invalid environment '{environment}'. Valid: {sorted(VALID_ENVIRONMENTS)}",
+        )
+
+    # In-process suites are always available
+    inprocess_suites = [
+        {"name": s, "label": s.replace("_", " ").title(), "runnable": True,
+         "reason": "", "is_composite": False, "group": "quick"}
+        for s in sorted(_INPROCESS_SUITES)
+    ]
+
+    # Try to fetch test host suite metadata (includes can_run() results)
+    import httpx
+
+    test_host_suites: list[dict] = []
+    try:
+        test_host_url = _TEST_HOST_URL.rstrip("/")
+        async with httpx.AsyncClient(timeout=10.0) as client:
+            resp = await client.get(f"{test_host_url}/suites")
+            if resp.status_code == 200:
+                test_host_suites = resp.json()
+    except Exception as exc:
+        logger.warning("Could not reach test host for suite metadata: %s", exc)
+
+    # If test host is unreachable, fall back to the known suite list
+    if not test_host_suites:
+        test_host_suites = [
+            {"name": s, "label": s, "runnable": True, "reason": "",
+             "is_composite": s in ("pipeline", "full"), "group": "comprehensive"}
+            for s in sorted(_TESTHOST_SUITES)
+        ]
+
+    return {
+        "environment": environment,
+        "inprocess": inprocess_suites,
+        "testhost": test_host_suites,
+    }
+
+
+@router.get(
     "/tests/runs",
     response_model=PipelineRunListResponse,
     summary="List recent test runs (SPEC-1826)",

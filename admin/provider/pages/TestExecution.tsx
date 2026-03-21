@@ -168,6 +168,9 @@ export const TestExecutionPage: React.FC = () => {
   const [triggerDryRun, setTriggerDryRun] = useState(false);
   const [triggering, setTriggering] = useState(false);
 
+  // Dynamic suite availability — fetched from backend
+  const [availableSuites, setAvailableSuites] = useState<Set<string> | null>(null);
+
   // Detail modal — track by ID, derive data from runs to stay in sync with polling
   const [detailRunId, setDetailRunId] = useState<string | null>(null);
   const detailRun = detailRunId ? runs.find(r => r.runId === detailRunId) ?? null : null;
@@ -188,6 +191,34 @@ export const TestExecutionPage: React.FC = () => {
   }, [apiFetch, onNotify]);
 
   useEffect(() => { loadData(); }, [loadData]);
+
+  // Fetch available suites when environment changes
+  useEffect(() => {
+    if (!triggerEnv) return;
+    (async () => {
+      try {
+        const res = await apiFetch(`/api/superadmin/tests/available-suites?environment=${triggerEnv}`);
+        if (res.ok) {
+          const data = await res.json();
+          const names = new Set<string>();
+          // In-process suites
+          (data.inprocess || []).forEach((s: any) => {
+            if (s.runnable !== false) names.add(s.name);
+          });
+          // Test host suites
+          (data.testhost || []).forEach((s: any) => {
+            if (s.runnable !== false) names.add(s.name);
+          });
+          setAvailableSuites(names);
+          // Deselect any suites that are no longer available
+          setTriggerSuites(prev => prev.filter(s => names.has(s)));
+        }
+      } catch {
+        // Fallback: show all suites (graceful degradation)
+        setAvailableSuites(null);
+      }
+    })();
+  }, [triggerEnv, apiFetch]);
 
   const handleTrigger = useCallback(async () => {
     if (!triggerEnv || triggerSuites.length === 0) return;
@@ -377,7 +408,7 @@ export const TestExecutionPage: React.FC = () => {
                 <div key={group} style={{ marginBottom: 12 }}>
                   <Text size="xs" fw={600} c="dimmed" mb={4}>{group}</Text>
                   <Stack gap={4} pl="xs">
-                    {SUITE_DEFS.filter(s => s.group === group).map(suite => (
+                    {SUITE_DEFS.filter(s => s.group === group && (availableSuites === null || availableSuites.has(s.value))).map(suite => (
                       <Checkbox
                         key={suite.value}
                         label={
