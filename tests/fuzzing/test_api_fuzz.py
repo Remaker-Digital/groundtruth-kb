@@ -14,9 +14,11 @@ Environment partitioning:
   against the local FastAPI app (no network dependencies at init time).
 
 Configuration:
-- Max 100 test cases per endpoint (no-server-errors)
-- Max 50 test cases per endpoint (schema validation)
-- 5-second timeout per case
+- Max examples per endpoint configurable via env vars:
+  FUZZ_MAX_EXAMPLES_ERRORS (default: 10 remote, 100 local)
+  FUZZ_MAX_EXAMPLES_SCHEMA (default: 5 remote, 50 local)
+- 5-second deadline per test case
+- Remote defaults tuned for 307 ops within 30min timeout
 
 Usage (staging — via test host container):
     FUZZ_TARGET_URL=https://agent-red-staging.xxx.eastus.azurecontainerapps.io \
@@ -45,6 +47,19 @@ os.environ.setdefault("RATE_LIMIT_DISABLED", "true")
 _FUZZ_TARGET_URL = os.environ.get("FUZZ_TARGET_URL", "")
 _FUZZ_API_KEY = os.environ.get("FUZZ_API_KEY", "")
 
+# Configurable example counts — reduce for container runs where 307 operations
+# × max_examples × 2 test functions must complete within timeout_s.
+# Container default: 10/5 (fits ~20min at ~200ms/request for 307 ops).
+# Local default: 100/50 (more thorough, no timeout pressure).
+_MAX_EXAMPLES_ERRORS = int(os.environ.get(
+    "FUZZ_MAX_EXAMPLES_ERRORS",
+    "10" if _FUZZ_TARGET_URL else "100",
+))
+_MAX_EXAMPLES_SCHEMA = int(os.environ.get(
+    "FUZZ_MAX_EXAMPLES_SCHEMA",
+    "5" if _FUZZ_TARGET_URL else "50",
+))
+
 if _FUZZ_TARGET_URL:
     # STAGING: Fuzz the live deployed API — real Cosmos, Redis, middleware
     _headers = {"X-API-Key": _FUZZ_API_KEY} if _FUZZ_API_KEY else {}
@@ -69,7 +84,7 @@ else:
 
 @schema.parametrize()
 @settings(
-    max_examples=100,
+    max_examples=_MAX_EXAMPLES_ERRORS,
     deadline=5000,  # 5s per test case
     suppress_health_check=[HealthCheck.too_slow, HealthCheck.filter_too_much],
 )
@@ -98,7 +113,7 @@ def test_api_no_server_errors(case):
 
 @schema.parametrize()
 @settings(
-    max_examples=50,
+    max_examples=_MAX_EXAMPLES_SCHEMA,
     deadline=5000,
     suppress_health_check=[HealthCheck.too_slow, HealthCheck.filter_too_much],
 )

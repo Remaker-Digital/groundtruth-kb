@@ -195,11 +195,11 @@ SUITE_CONFIGS: dict[str, SuiteConfig] = {
     ),
     "fuzzing": SuiteConfig(
         name="fuzzing",
-        label="API Fuzzing — Schemathesis",
-        pytest_args=["tests/fuzzing/", "--timeout=120", "-q"],
-        timeout_s=1200,
+        label="API Fuzzing -- Schemathesis",
+        pytest_args=["tests/fuzzing/", "--timeout=300", "-q"],
+        timeout_s=2400,
         estimated_tests=10,
-        estimated_duration_s=300,
+        estimated_duration_s=600,
         env_vars={
             # Point Schemathesis at the live staging API so fuzzing tests
             # the real deployed stack (Cosmos, Redis, middleware).
