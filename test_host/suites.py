@@ -144,8 +144,9 @@ SUITE_CONFIGS: dict[str, SuiteConfig] = {
         label="Widget Tests",
         pytest_args=[
             "tests/widget/",
-            # Exclude tests reading Shopify source (only dist/ in container)
+            # Exclude tests reading admin source .tsx (only dist/ in container)
             "--ignore=tests/widget/test_admin_ui_labels.py",
+            "--ignore=tests/widget/test_auth_interceptor.py",
             "--timeout=30",
             "-q",
         ],
