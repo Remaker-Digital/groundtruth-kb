@@ -229,14 +229,12 @@ class TestVerificationRunnerExecution:
 class TestDiagnosticsEndpointModels:
     """Response model updates for SPEC-1846."""
 
-    def test_valid_suites_no_unit(self):
-        """VALID_SUITES should not include 'unit' (no pytest in container)."""
+    def test_valid_suites_includes_expected(self):
+        """VALID_SUITES includes in-process and test-host suites."""
         from src.multi_tenant.superadmin_api._diagnostics import VALID_SUITES
-        assert "unit" not in VALID_SUITES
-        assert "smoke" in VALID_SUITES
-        assert "regression" in VALID_SUITES
-        assert "e2e" in VALID_SUITES
-        assert "all" in VALID_SUITES
+        for suite in ("smoke", "regression", "e2e", "all", "unit", "core",
+                      "full", "pipeline", "integration"):
+            assert suite in VALID_SUITES, f"Expected '{suite}' in VALID_SUITES"
 
     def test_pipeline_run_status_has_completed_field(self):
         """PipelineRunStatusResponse should include 'completed' for progress bar."""
