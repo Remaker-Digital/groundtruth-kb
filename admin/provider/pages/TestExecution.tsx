@@ -89,33 +89,27 @@ interface SuiteDefinition {
 }
 
 const SUITE_DEFS: SuiteDefinition[] = [
-  // Quick Verification (in-process)
-  { value: 'smoke', label: 'Smoke — Health probes', estimate: '8 checks, ~5s', group: 'Quick Verification' },
-  { value: 'regression', label: 'Regression — API endpoints', estimate: '25 checks, ~3min', group: 'Quick Verification' },
-  { value: 'e2e', label: 'Verification — Full checks', estimate: '35 checks, ~8min', group: 'Quick Verification' },
-  { value: 'all', label: 'All Checks — Complete verification', estimate: '40 checks, ~12min', group: 'Quick Verification' },
+  // Individual suites (test host container)
+  { value: 'unit', label: 'Unit Tests', estimate: '~950 tests, ~2min', group: 'Individual' },
+  { value: 'core', label: 'Core / Multi-Tenant', estimate: '~3,700 tests, ~5min', group: 'Individual' },
+  { value: 'integration', label: 'Integration Tests', estimate: '~270 tests, ~3min', group: 'Individual' },
+  { value: 'agents', label: 'Agent & Chat Tests', estimate: '~300 tests, ~3min', group: 'Individual' },
+  { value: 'security', label: 'Security & Penetration', estimate: '~150 tests, ~3min', group: 'Individual' },
+  { value: 'ops', label: 'Operations & Resilience', estimate: '~80 tests, ~4min', group: 'Individual' },
+  { value: 'widget', label: 'Widget Tests', estimate: '~60 tests, ~2min', group: 'Individual' },
+  { value: 'e2e_live', label: 'E2E Live — Playwright', estimate: '~1,100 tests, ~15min', group: 'Individual' },
+  { value: 'load', label: 'Load Testing — Locust', estimate: '~5min', group: 'Individual' },
+  { value: 'fuzzing', label: 'API Fuzzing — Schemathesis', estimate: '307 ops, ~5min', group: 'Individual' },
+  { value: 'property', label: 'Property Tests — Hypothesis', estimate: '46 tests, ~2min', group: 'Individual' },
 
-  // Comprehensive (test host container)
-  { value: 'unit', label: 'Unit Tests', estimate: '~950 tests, ~2min', group: 'Comprehensive' },
-  { value: 'core', label: 'Core / Multi-Tenant', estimate: '~3,700 tests, ~5min', group: 'Comprehensive' },
-  { value: 'integration', label: 'Integration Tests', estimate: '~270 tests, ~3min', group: 'Comprehensive' },
-  { value: 'agents', label: 'Agent & Chat Tests', estimate: '~300 tests, ~3min', group: 'Comprehensive' },
-  { value: 'security', label: 'Security & Penetration', estimate: '~150 tests, ~3min', group: 'Comprehensive' },
-  { value: 'ops', label: 'Operations & Resilience', estimate: '~80 tests, ~4min', group: 'Comprehensive' },
-  { value: 'widget', label: 'Widget Tests', estimate: '~60 tests, ~2min', group: 'Comprehensive' },
-  { value: 'e2e_live', label: 'E2E Live — Playwright', estimate: '~1,100 tests, ~15min', group: 'Comprehensive' },
-  { value: 'load', label: 'Load Testing — Locust', estimate: '~5min', group: 'Comprehensive' },
-  { value: 'fuzzing', label: 'API Fuzzing — Schemathesis', estimate: '307 ops, ~5min', group: 'Comprehensive' },
-  { value: 'property', label: 'Property Tests — Hypothesis', estimate: '46 tests, ~2min', group: 'Comprehensive' },
-
-  // Full Suite (composite — selecting auto-selects all dependencies)
+  // Complete Suite (composite — selecting auto-selects all dependencies)
   {
-    value: 'full', label: 'Complete Suite', estimate: 'Everything, ~45min', group: 'Full Suite',
+    value: 'full', label: 'Complete Suite', estimate: 'Everything, ~45min', group: 'Complete',
     includes: ['unit', 'core', 'integration', 'agents', 'security', 'regression', 'ops', 'widget', 'e2e_live', 'load', 'fuzzing', 'property'],
   },
 ];
 
-const SUITE_GROUPS = ['Quick Verification', 'Comprehensive', 'Full Suite'];
+const SUITE_GROUPS = ['Individual', 'Complete'];
 
 /** When a suite with `includes` is toggled on, auto-select all its dependencies. */
 function applySuiteDependencies(selected: string[], toggled: string, wasChecked: boolean): string[] {
@@ -160,7 +154,7 @@ export const TestExecutionPage: React.FC = () => {
   // Trigger modal
   const [triggerOpen, setTriggerOpen] = useState(false);
   const [triggerEnv, setTriggerEnv] = useState<string | null>('staging');
-  const [triggerSuites, setTriggerSuites] = useState<string[]>(['smoke']);
+  const [triggerSuites, setTriggerSuites] = useState<string[]>([]);
   const [triggering, setTriggering] = useState(false);
 
   // Dynamic suite availability — fetched from backend

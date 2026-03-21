@@ -442,6 +442,31 @@ def browser_type_launch_args(browser_type_launch_args):
 
 
 # ---------------------------------------------------------------------------
+# Session-scoped browser — ONE Chromium process for ALL tests.
+#
+# pytest-playwright's default `browser` fixture is function-scoped, which
+# causes a new Chromium instance (~150 MB) per test class. With 272 classes,
+# that requires ~40 GB — far exceeding the 4 GB container limit (OOM kill
+# at ~18 min with 0 tests recorded).
+#
+# Overriding to session scope: 1 browser × 150 MB + class-scoped contexts
+# (~10-20 MB each, cleaned up per class) = ~200 MB total. Fits comfortably.
+# ---------------------------------------------------------------------------
+
+
+@pytest.fixture(scope="session")
+def browser(launch_browser, browser_type_launch_args):
+    """Session-scoped browser — single Chromium instance for all e2e tests.
+
+    Overrides pytest-playwright's function-scoped default to prevent OOM
+    in container environments. Contexts are still class-scoped (lightweight).
+    """
+    browser = launch_browser(**browser_type_launch_args)
+    yield browser
+    browser.close()
+
+
+# ---------------------------------------------------------------------------
 # Class-scoped rate limit cooldown
 # ---------------------------------------------------------------------------
 
