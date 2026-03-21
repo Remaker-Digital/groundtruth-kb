@@ -41,7 +41,7 @@ def main() -> int:
         return 0
 
     print("=" * 70)
-    print("TEST DELETION GUARD FAILED — test files cannot be deleted")
+    print("TEST DELETION GUARD FAILED -- test files cannot be deleted")
     print("=" * 70)
     for f in deleted:
         print(f"  BLOCKED: {f}")

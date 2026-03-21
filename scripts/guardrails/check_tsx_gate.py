@@ -2,7 +2,7 @@
 """Pre-commit check: TSX commit gate.
 
 Requires a SPEC-ID (e.g., SPEC-1234) in the commit message when any .tsx
-file is modified. This prevents unauthorized UI changes — every frontend
+file is modified. This prevents unauthorized UI changes -- every frontend
 modification must trace to a specification.
 
 The check reads the commit message from .git/COMMIT_EDITMSG (written by git
@@ -60,10 +60,10 @@ def main() -> int:
     if SPEC_PATTERN.search(message):
         return 0  # SPEC-ID found in commit message
 
-    # Also check if "Co-Authored-By" exists — auto-generated commits from
+    # Also check if "Co-Authored-By" exists -- auto-generated commits from
     # session work always include context. Still require SPEC-ID.
     print("=" * 70)
-    print("TSX COMMIT GATE FAILED — UI changes require a SPEC-ID")
+    print("TSX COMMIT GATE FAILED -- UI changes require a SPEC-ID")
     print("=" * 70)
     print(f"  {len(tsx_files)} .tsx file(s) staged:")
     for f in tsx_files[:10]:

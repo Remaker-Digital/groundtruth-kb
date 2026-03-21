@@ -3,7 +3,7 @@
 
 Scans all test_*.py files under tests/, counts assertion statements in each,
 and writes a JSON baseline file. The pre-commit hook compares staged changes
-against this baseline — assertion counts can go UP but never DOWN.
+against this baseline -- assertion counts can go UP but never DOWN.
 
 Counted patterns:
   - assert <expr>

@@ -63,14 +63,14 @@ def main() -> int:
     for rel_path in staged_files:
         abs_path = PROJECT_ROOT / rel_path
         if not abs_path.exists():
-            continue  # File being deleted — handled by deletion guard
+            continue  # File being deleted -- handled by deletion guard
 
         current_count = count_assertions(abs_path)
         baseline_count = baselines.get(rel_path, 0)
 
         if current_count < baseline_count:
             violations.append(
-                f"  FAIL: {rel_path}: assertions {baseline_count} → {current_count} "
+                f"  FAIL: {rel_path}: assertions {baseline_count} -> {current_count} "
                 f"(decreased by {baseline_count - current_count})"
             )
         elif current_count > baseline_count:
@@ -78,7 +78,7 @@ def main() -> int:
 
     if violations:
         print("=" * 70)
-        print("ASSERTION RATCHET FAILED — assertion counts decreased")
+        print("ASSERTION RATCHET FAILED -- assertion counts decreased")
         print("=" * 70)
         for v in violations:
             print(v)
@@ -104,7 +104,7 @@ def main() -> int:
             ["git", "add", str(BASELINE_PATH)],
             cwd=PROJECT_ROOT,
         )
-        print(f"Assertion ratchet: {len(updates)} file(s) increased — baseline auto-updated.")
+        print(f"Assertion ratchet: {len(updates)} file(s) increased -- baseline auto-updated.")
 
     return 0
 

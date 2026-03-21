@@ -130,7 +130,7 @@ def main() -> int:
 
     if violations:
         print("=" * 70)
-        print("ARCHITECTURAL GUARD FAILED — mandatory patterns missing")
+        print("ARCHITECTURAL GUARD FAILED -- mandatory patterns missing")
         print("=" * 70)
         for v in violations:
             print(v)
