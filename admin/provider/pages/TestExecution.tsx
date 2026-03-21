@@ -108,11 +108,7 @@ const SUITE_DEFS: SuiteDefinition[] = [
   { value: 'fuzzing', label: 'API Fuzzing — Schemathesis', estimate: '307 ops, ~5min', group: 'Comprehensive' },
   { value: 'property', label: 'Property Tests — Hypothesis', estimate: '46 tests, ~2min', group: 'Comprehensive' },
 
-  // Full Suite (composites — selecting these auto-selects dependencies)
-  {
-    value: 'pipeline', label: 'Full Pipeline', estimate: 'All phases, ~30min', group: 'Full Suite',
-    includes: ['unit', 'core', 'integration', 'agents', 'security', 'regression', 'ops', 'widget', 'e2e_live', 'fuzzing', 'property'],
-  },
+  // Full Suite (composite — selecting auto-selects all dependencies)
   {
     value: 'full', label: 'Complete Suite', estimate: 'Everything, ~45min', group: 'Full Suite',
     includes: ['unit', 'core', 'integration', 'agents', 'security', 'regression', 'ops', 'widget', 'e2e_live', 'load', 'fuzzing', 'property'],
@@ -165,7 +161,6 @@ export const TestExecutionPage: React.FC = () => {
   const [triggerOpen, setTriggerOpen] = useState(false);
   const [triggerEnv, setTriggerEnv] = useState<string | null>('staging');
   const [triggerSuites, setTriggerSuites] = useState<string[]>(['smoke']);
-  const [triggerDryRun, setTriggerDryRun] = useState(false);
   const [triggering, setTriggering] = useState(false);
 
   // Dynamic suite availability — fetched from backend
@@ -240,7 +235,7 @@ export const TestExecutionPage: React.FC = () => {
           environment: triggerEnv,
           suite,
           phases: [],
-          dryRun: triggerDryRun,
+          dryRun: false,
         }),
       });
       if (res.ok) {
@@ -257,7 +252,7 @@ export const TestExecutionPage: React.FC = () => {
     } finally {
       setTriggering(false);
     }
-  }, [triggerEnv, triggerSuites, triggerDryRun, apiFetch, onNotify, loadData]);
+  }, [triggerEnv, triggerSuites, apiFetch, onNotify, loadData]);
 
   const refreshRun = useCallback(async (runId: string) => {
     try {
@@ -434,15 +429,10 @@ export const TestExecutionPage: React.FC = () => {
               </Text>
             )}
           </div>
-          <Switch
-            label="Dry Run (validate without executing)"
-            checked={triggerDryRun}
-            onChange={e => setTriggerDryRun(e.currentTarget.checked)}
-          />
           <Group justify="flex-end">
             <Button variant="default" onClick={() => setTriggerOpen(false)}>Cancel</Button>
             <Button onClick={handleTrigger} loading={triggering}>
-              {triggerDryRun ? 'Dry Run' : 'Run Tests'}
+              Run Tests
             </Button>
           </Group>
         </Stack>

@@ -231,30 +231,6 @@ SUITE_CONFIGS: dict[str, SuiteConfig] = {
 # Composite suites — run multiple individual suites sequentially
 # ---------------------------------------------------------------------------
 
-SUITE_CONFIGS["pipeline"] = SuiteConfig(
-    name="pipeline",
-    label="Full Pipeline — All Phases",
-    pytest_args=[],  # Uses composite execution
-    timeout_s=7200,
-    is_composite=True,
-    composite_suites=[
-        "unit",
-        "core",
-        "integration",
-        "agents",
-        "security",
-        "regression",
-        "ops",
-        "widget",
-        "e2e_live",
-        "load",
-        "fuzzing",
-        "property",
-    ],
-    estimated_tests=7100,
-    estimated_duration_s=2700,
-)
-
 SUITE_CONFIGS["full"] = SuiteConfig(
     name="full",
     label="Complete Suite — Everything",

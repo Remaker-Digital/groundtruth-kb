@@ -241,7 +241,7 @@ _INPROCESS_SUITES = {"all", "regression", "smoke", "e2e"}
 _TESTHOST_SUITES = {
     "unit", "core", "integration", "agents", "security",
     "regression_pytest", "ops", "widget", "e2e_live",
-    "load", "fuzzing", "property", "pipeline", "full",
+    "load", "fuzzing", "property", "full",
 }
 
 VALID_SUITES = _INPROCESS_SUITES | _TESTHOST_SUITES
