@@ -101,10 +101,10 @@ class TestConstants:
         for name in seed.TENANT_CONTAINERS:
             assert isinstance(name, str) and len(name) > 0
 
-    def test_team_members_has_one_entry(self):
-        """TEAM_MEMBERS contains exactly 1 member."""
+    def test_team_members_has_two_entries(self):
+        """TEAM_MEMBERS contains superadmin + customer admin (SPEC-0761)."""
         seed = _get_seed()
-        assert len(seed.TEAM_MEMBERS) == 1
+        assert len(seed.TEAM_MEMBERS) == 2
 
     def test_team_member_is_superadmin(self):
         """The sole team member has role 'superadmin'."""
@@ -342,7 +342,7 @@ class TestPhaseHeaders:
             ),
         }):
             output = self._run_and_capture(seed.phase_6_platform_config(dry_run=True))
-        assert "Platform Config (Tier Defaults)" in output
+        assert "Platform Config (Tier Defaults" in output  # may include "+ Entitlements v1"
 
     def test_phase_7_header(self):
         """SPEC-1451: Phase 7 prints 'Demo Data'."""

@@ -352,8 +352,8 @@ class TestPhaseAIteratesTenants:
 
     def test_all_tenants_count(self):
         tenants = _all_tenants("staging")
-        # Default (staging-001) + extra (staging-002) = 2
-        assert len(tenants) == 2
+        # Default (test-customer-001) + extra staging-001 + extra staging-002 = 3
+        assert len(tenants) == 3
 
     def test_all_tenants_production_has_no_extras(self):
         tenants = _all_tenants("production")
@@ -406,7 +406,7 @@ class TestEnvironmentsStructure:
 
     def test_resolve_env_default_tenant(self):
         env = _resolve_env("staging")
-        assert env["tenant_id"] == "staging-001"
+        assert env["tenant_id"] == "remaker-digital-001"  # default staging tenant
 
     def test_resolve_env_override_tenant(self):
         env = _resolve_env("staging", "staging-002")

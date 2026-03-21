@@ -18,6 +18,11 @@ import re
 import unittest
 from pathlib import Path
 
+import pytest
+
+_PROJECT_ROOT = Path(__file__).resolve().parent.parent.parent
+_DOCKERFILE_TEST = _PROJECT_ROOT / "Dockerfile.test"
+
 # ---------------------------------------------------------------------------
 # Paths that are legitimately NOT expected in the container image
 # ---------------------------------------------------------------------------
@@ -134,6 +139,10 @@ def _is_covered(path_str: str, copy_targets: list[str]) -> bool:
     return False
 
 
+@pytest.mark.skipif(
+    not _DOCKERFILE_TEST.is_file(),
+    reason="Dockerfile.test not present (container environment)",
+)
 class TestDockerfileTestCoverage(unittest.TestCase):
     """Verify every Path() reference in tests is available in the container."""
 

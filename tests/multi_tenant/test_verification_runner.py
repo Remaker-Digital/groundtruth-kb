@@ -232,8 +232,9 @@ class TestDiagnosticsEndpointModels:
     def test_valid_suites_includes_expected(self):
         """VALID_SUITES includes in-process and test-host suites."""
         from src.multi_tenant.superadmin_api._diagnostics import VALID_SUITES
+        # S210: 'pipeline' removed (was duplicate of 'full'); verify current set
         for suite in ("smoke", "regression", "e2e", "all", "unit", "core",
-                      "full", "pipeline", "integration"):
+                      "full", "integration"):
             assert suite in VALID_SUITES, f"Expected '{suite}' in VALID_SUITES"
 
     def test_pipeline_run_status_has_completed_field(self):

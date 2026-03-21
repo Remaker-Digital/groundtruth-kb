@@ -108,6 +108,10 @@ class TestMockEndpointCoverage:
         assert len(eps) >= 40, f"Only {len(eps)} endpoints found, expected >= 40"
 
 
+@pytest.mark.skipif(
+    not (ADMIN_STANDALONE / ".env.mock").is_file(),
+    reason=".env.mock not present (container environment)",
+)
 class TestConfigStructure:
     """Verify mock system config files."""
 
