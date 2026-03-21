@@ -32,7 +32,8 @@ load_env_local()
 # Constants
 # ---------------------------------------------------------------------------
 
-STAGING_FQDN = "https://agent-red-staging.orangeglacier-f566a4e7.eastus.azurecontainerapps.io"
+# SPEC-0058: No hardcoded FQDNs — all URLs from env vars.
+STAGING_FQDN = os.environ.get("STAGING_FQDN", os.environ.get("STAGING_URL", ""))
 
 PROVIDER_BASE_URL = os.environ.get(
     "PROVIDER_BASE_URL",

@@ -43,9 +43,10 @@ from typing import Any
 
 PROJECT_ROOT = Path(__file__).resolve().parent.parent
 
+# SPEC-0058: No hardcoded FQDNs — resolve from env vars
 HOSTS = {
-    "staging": "https://agent-red-staging.orangeglacier-f566a4e7.eastus.azurecontainerapps.io",
-    "production": "https://agent-red-api-gateway.orangeglacier-f566a4e7.eastus.azurecontainerapps.io",
+    "staging": os.environ.get("STAGING_URL", ""),
+    "production": os.environ.get("PROD_URL", ""),
 }
 
 LOCUSTFILE = str(PROJECT_ROOT / "tests" / "performance" / "locustfile.py")

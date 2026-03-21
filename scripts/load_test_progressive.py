@@ -35,9 +35,7 @@ from typing import Any
 # Configuration
 # ---------------------------------------------------------------------------
 
-STAGING_HOST = (
-    "https://agent-red-staging.orangeglacier-f566a4e7.eastus.azurecontainerapps.io"
-)
+STAGING_HOST = os.environ.get("STAGING_URL", "")  # SPEC-0058: No hardcoded FQDNs
 
 # Staging credentials (remaker-digital-001)
 STAGING_API_KEY = "ar_user_rema_TwjRWmhZhjo3sX1sROYKcTHGVKfks9cu"

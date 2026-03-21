@@ -14,6 +14,18 @@ import shutil
 from dataclasses import dataclass, field
 
 
+# ---------------------------------------------------------------------------
+# Suites safe for pytest-xdist parallelization.
+# These use mocks/fakes with no shared mutable state across workers.
+# Excludes: e2e_live (shared Chromium + staging mutations),
+#           load (Locust multiplied load), fuzzing (multiplied HTTP volume).
+# ---------------------------------------------------------------------------
+PARALLELIZABLE_SUITES = frozenset({
+    "unit", "core", "integration", "agents", "security",
+    "regression", "widget", "ops", "property",
+})
+
+
 @dataclass(frozen=True)
 class SuiteConfig:
     """Configuration for a test suite."""
@@ -203,10 +215,9 @@ SUITE_CONFIGS: dict[str, SuiteConfig] = {
         env_vars={
             # Point Schemathesis at the live staging API so fuzzing tests
             # the real deployed stack (Cosmos, Redis, middleware).
-            "FUZZ_TARGET_URL": "https://agent-red-staging.orangeglacier-f566a4e7.eastus.azurecontainerapps.io",
-            # SPA platform admin key for authenticated fuzzing.
-            # Safe to embed: staging-only key, test host is internal-ingress-only.
-            "FUZZ_API_KEY": "ar_spa_plat_ukgY1GK594QUxICKJfIXFWiNrWxnkhvB",
+            "FUZZ_TARGET_URL": os.environ.get("STAGING_URL", ""),  # SPEC-0058: No hardcoded FQDNs
+            # SPEC-0058: API key from env var, not hardcoded.
+            "FUZZ_API_KEY": os.environ.get("STAGING_SPA_KEY", os.environ.get("SUPERADMIN_PREVIEW_API_KEY", "")),
         },
     ),
     "property": SuiteConfig(

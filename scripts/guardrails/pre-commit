@@ -55,6 +55,14 @@ else
     EXIT_CODE=1
 fi
 
+# 5. Hardcoded credential/FQDN scan (SPEC-0058)
+if python3 "$GUARDRAILS_DIR/check_hardcoded_env.py"; then
+    echo "  [PASS] Credential scan"
+else
+    echo "  [FAIL] Credential scan"
+    EXIT_CODE=1
+fi
+
 if [ $EXIT_CODE -ne 0 ]; then
     echo ""
     echo "Commit blocked by quality guardrails."

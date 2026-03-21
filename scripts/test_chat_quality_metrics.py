@@ -72,7 +72,7 @@ load_env_local()
 # Default per REPEATABLE-PROCEDURES.md §7.4 — .env.local takes precedence
 API = os.environ.get(
     "PROD_URL",
-    "https://agent-red-api-gateway.orangeglacier-f566a4e7.eastus.azurecontainerapps.io",
+    "",  # SPEC-0058: No hardcoded FQDNs
 )
 # No hardcoded fallback for credentials — transient credentials must come from .env.local or env vars.
 WIDGET_KEY = os.environ.get("PREVIEW_WIDGET_KEY") or os.environ.get("AGENT_RED_WIDGET_KEY", "")

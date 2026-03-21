@@ -5,7 +5,7 @@ Exercises the staging API gateway with generated test cases from the OpenAPI
 schema. Verifies no 500 errors, schema compliance, and stateful link testing.
 
 Environment variables:
-    STAGING_URL     — Staging API base URL (default: https://agent-red-api-gateway.orangeglacier-f566a4e7.eastus.azurecontainerapps.io)
+    STAGING_URL     — Staging API base URL (required, no default)
     STAGING_API_KEY — SPA platform admin API key for authenticated endpoints
     FUZZ_MAX_CASES  — Max test cases per endpoint (default: 50)
 
@@ -28,10 +28,7 @@ from datetime import datetime, timezone
 logging.basicConfig(level=logging.INFO, format="%(asctime)s [%(levelname)s] %(message)s")
 logger = logging.getLogger(__name__)
 
-DEFAULT_STAGING_URL = (
-    "https://agent-red-api-gateway.orangeglacier-f566a4e7"
-    ".eastus.azurecontainerapps.io"
-)
+DEFAULT_STAGING_URL = ""  # SPEC-0058: No hardcoded FQDNs — set STAGING_URL env var
 
 
 def run_fuzz(

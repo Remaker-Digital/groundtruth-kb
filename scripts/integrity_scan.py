@@ -280,8 +280,8 @@ def track_3_config_drift(db: KnowledgeDB) -> dict:
         return {"skipped": True, "reason": "requests not installed"}
 
     findings = {}
-    staging_url = "https://agent-red-staging.orangeglacier-f566a4e7.eastus.azurecontainerapps.io"
-    prod_url = "https://agent-red-api-gateway.orangeglacier-f566a4e7.eastus.azurecontainerapps.io"
+    staging_url = os.environ.get("STAGING_URL", "")  # SPEC-0058: No hardcoded FQDNs
+    prod_url = os.environ.get("PROD_URL", "")  # SPEC-0058: No hardcoded FQDNs
 
     # 3a. Version parity — compare source PRODUCT_VERSION vs deployed
     source_version = None

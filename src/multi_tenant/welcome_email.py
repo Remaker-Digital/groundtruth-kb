@@ -114,9 +114,13 @@ def _build_admin_login_url(
             if prod:
                 base = f"{prod.rstrip('/')}/admin/standalone/"
             else:
-                # Fallback: production API gateway admin console.
-                # The FQDN is stable (Azure Container Apps environment-scoped).
-                base = "https://agent-red-api-gateway.orangeglacier-f566a4e7.eastus.azurecontainerapps.io/admin/standalone/"
+                # Fallback: derive from CONTAINER_APP_FQDN (set on all envs).
+                fqdn = os.environ.get("CONTAINER_APP_FQDN", "")
+                if fqdn:
+                    scheme = "" if fqdn.startswith("http") else "https://"
+                    base = f"{scheme}{fqdn}/admin/standalone/"
+                else:
+                    base = "/admin/standalone/"  # relative — no hardcoded FQDN
     if tenant_slug:
         sep = "&" if "?" in base else "?"
         return f"{base}{sep}tenant={tenant_slug}"

@@ -22,7 +22,7 @@ Usage:
     locust -f tests/performance/locustfile.py --host http://localhost:8000
 
     # Against production (read-only probes only):
-    locust -f tests/performance/locustfile.py --host https://agent-red-api-gateway.orangeglacier-f566a4e7.eastus.azurecontainerapps.io --tags health-only
+    locust -f tests/performance/locustfile.py --host $PROD_URL --tags health-only
 
     # Headless run with specific user count and duration:
     locust -f tests/performance/locustfile.py --host http://localhost:8000 \

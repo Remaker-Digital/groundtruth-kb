@@ -529,7 +529,12 @@ def _resolve_admin_url(admin_url: str | None = None) -> str:
     prod = os.environ.get("PROD_URL", "")
     if prod:
         return f"{prod.rstrip('/')}/admin/standalone/"
-    return "https://agent-red-api-gateway.orangeglacier-f566a4e7.eastus.azurecontainerapps.io/admin/standalone/"
+    # Derive from CONTAINER_APP_FQDN (set on all envs) — no hardcoded FQDN.
+    fqdn = os.environ.get("CONTAINER_APP_FQDN", "")
+    if fqdn:
+        scheme = "" if fqdn.startswith("http") else "https://"
+        return f"{scheme}{fqdn}/admin/standalone/"
+    return "/admin/standalone/"  # relative fallback
 
 
 def format_branded_email(body: str, admin_url: str | None = None) -> str:

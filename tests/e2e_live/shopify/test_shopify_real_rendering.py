@@ -44,7 +44,7 @@ load_env_local()
 # Constants — use REAL staging server and REAL shop domain
 # ---------------------------------------------------------------------------
 
-STAGING_FQDN = "https://agent-red-staging.orangeglacier-f566a4e7.eastus.azurecontainerapps.io"
+STAGING_FQDN = os.environ.get("STAGING_FQDN", os.environ.get("STAGING_URL", ""))  # SPEC-0058: No hardcoded FQDNs
 
 SHOPIFY_BASE_URL = os.environ.get(
     "SHOPIFY_BASE_URL",

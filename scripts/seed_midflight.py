@@ -50,7 +50,7 @@ load_env_local()
 
 ENVIRONMENTS = {
     "staging": {
-        "base_url": "https://agent-red-staging.orangeglacier-f566a4e7.eastus.azurecontainerapps.io",
+        "base_url": os.environ.get("STAGING_URL", ""),  # SPEC-0058: No hardcoded FQDNs
         # SPEC-1667: SPA keys (ar_spa_plat_*) are blocked from /api/admin/*.
         # Seed script MUST use tenant user keys (ar_user_*) for admin API calls.
         "api_key": (
@@ -65,7 +65,7 @@ ENVIRONMENTS = {
         "tenant_id": "remaker-digital-001",
     },
     "production": {
-        "base_url": "https://agent-red-api-gateway.orangeglacier-f566a4e7.eastus.azurecontainerapps.io",
+        "base_url": os.environ.get("PROD_URL", ""),  # SPEC-0058: No hardcoded FQDNs
         "api_key": (
             os.environ.get("PRODUCTION_REMAKER_USER_KEY", "")
             or os.environ.get("SUPERADMIN_PREVIEW_API_KEY", "")

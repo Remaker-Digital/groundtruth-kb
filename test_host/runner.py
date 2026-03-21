@@ -20,7 +20,7 @@ import time
 from pathlib import Path
 
 from .cosmos_writer import CosmosWriter, TestResult
-from .suites import SUITE_CONFIGS, SuiteConfig, get_suite
+from .suites import PARALLELIZABLE_SUITES, SUITE_CONFIGS, SuiteConfig, get_suite
 
 logger = logging.getLogger("test_host.runner")
 
@@ -160,6 +160,17 @@ class TestRunner:
             "--tb=short",
             "-v",
         ]
+
+        # Parallelize safe suites via pytest-xdist.
+        # worksteal distribution handles uneven test durations better than
+        # the default 'load' mode. -x (fail-fast) is replaced with
+        # --maxfail=10 since -x only stops one worker in parallel mode.
+        if config.name in PARALLELIZABLE_SUITES:
+            cmd.extend(["-n", "auto", "--dist", "worksteal"])
+            # Replace -x with --maxfail for parallel-safe fail-fast behavior
+            if "-x" in cmd:
+                cmd.remove("-x")
+                cmd.append("--maxfail=10")
 
         env = self._build_env(config)
         logger.info("Running pytest: %s", " ".join(cmd))

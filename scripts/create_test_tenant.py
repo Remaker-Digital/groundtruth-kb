@@ -18,7 +18,7 @@ VARIABLES:
   BILLING_CHANNEL    = stripe
   TIER               = starter
   CUSTOMER_EMAIL     = test-customer@remakerdigital.com
-  PROD_URL           = https://agent-red-api-gateway.orangeglacier-f566a4e7.eastus.azurecontainerapps.io
+  PROD_URL           = (from PROD_URL env var)
   SUPERADMIN_API_KEY = (from .env.local — remaker-digital-001 superadmin — for tier override only)
 
 Usage:
@@ -60,7 +60,7 @@ TIER = "starter"
 CUSTOMER_EMAIL = "test-customer@remakerdigital.com"
 PROD_URL = os.environ.get(
     "PROD_URL",
-    "https://agent-red-api-gateway.orangeglacier-f566a4e7.eastus.azurecontainerapps.io",
+    "",  # SPEC-0058: No hardcoded FQDNs
 )
 PROJECT_ROOT = Path(__file__).resolve().parent.parent
 

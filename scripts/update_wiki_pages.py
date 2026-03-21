@@ -31,7 +31,7 @@ def write_home():
 | **Status** | All 19 cycles DEPLOYED. v1.80.0 PRODUCTION. v1.80.0 STAGING. Quality hardening IN PROGRESS. |
 | **Production Version** | v1.80.0 (2026-03-08, ACR ca4q) |
 | **Staging Version** | v1.80.0 (ACR ca4q, 3 tenants, `agent-red-staging`) |
-| **Production** | [API Gateway](https://agent-red-api-gateway.orangeglacier-f566a4e7.eastus.azurecontainerapps.io/health) (Azure Container Apps, East US) |
+| **Production** | API Gateway (Azure Container Apps, East US) |
 | **Storefront** | [blanco-9939.myshopify.com](https://blanco-9939.myshopify.com) (tenant #1) |
 | **Documentation** | [agentredcx.com](https://agentredcx.com) |
 

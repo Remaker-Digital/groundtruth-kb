@@ -37,7 +37,7 @@ load_env_local()
 # Production URL — default per REPEATABLE-PROCEDURES.md §7.4 — .env.local takes precedence
 PROD_URL = os.environ.get(
     "PROD_URL",
-    "https://agent-red-api-gateway.orangeglacier-f566a4e7.eastus.azurecontainerapps.io"
+    "",  # SPEC-0058: No hardcoded FQDNs — set PROD_URL env var
 )
 
 # Widget key — loaded from .env.local PREVIEW_WIDGET_KEY or WIDGET_KEY env var.

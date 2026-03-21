@@ -31,7 +31,7 @@ load_env_local()
 # ---------------------------------------------------------------------------
 PROD_URL = os.environ.get(
     "PROD_URL",
-    "https://agent-red-api-gateway.orangeglacier-f566a4e7.eastus.azurecontainerapps.io",
+    "",  # SPEC-0058: No hardcoded FQDNs — set PROD_URL env var
 )
 
 # Widget key for conversation tests

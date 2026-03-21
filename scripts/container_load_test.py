@@ -42,12 +42,9 @@ from typing import Any
 # Configuration
 # ---------------------------------------------------------------------------
 
-STAGING_HOST = (
-    "https://agent-red-staging.orangeglacier-f566a4e7.eastus.azurecontainerapps.io"
-)
-STAGING_FQDN = (
-    "agent-red-staging.orangeglacier-f566a4e7.eastus.azurecontainerapps.io"
-)
+# SPEC-0058: No hardcoded FQDNs — resolve from env vars
+STAGING_HOST = os.environ.get("STAGING_URL", "")
+STAGING_FQDN = os.environ.get("STAGING_FQDN", STAGING_HOST.replace("https://", "") if STAGING_HOST else "")
 
 RESOURCE_GROUP = "Agent-Red"
 
@@ -879,8 +876,11 @@ def main() -> None:
         args.spa_key
         or os.environ.get("STAGING_SPA_KEY")
         or os.environ.get("SPA_PLATFORM_ADMIN_KEY")
-        or "ar_spa_plat_ukgY1GK594QUxICKJfIXFWiNrWxnkhvB"  # staging default
+        or ""  # SPEC-0058: No hardcoded keys — set STAGING_SPA_KEY env var
     )
+    if not spa_key:
+        print("Error: No SPA key found. Set STAGING_SPA_KEY or pass --spa-key")
+        sys.exit(1)
 
     # Create output directory
     timestamp = datetime.now().strftime("%Y%m%d-%H%M%S")

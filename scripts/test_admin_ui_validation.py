@@ -59,7 +59,7 @@ load_env_local()
 # Default per REPEATABLE-PROCEDURES.md §7.4 — .env.local takes precedence
 BASE_URL = os.environ.get(
     "AGENT_RED_BASE_URL",
-    "https://agent-red-api-gateway.orangeglacier-f566a4e7.eastus.azurecontainerapps.io",
+    "",  # SPEC-0058: No hardcoded FQDNs
 )
 
 API_KEY = os.environ.get("SUPERADMIN_PREVIEW_API_KEY", "")

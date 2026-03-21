@@ -58,12 +58,16 @@ load_env_local()
 
 # S137: All live E2E tests target the DEPLOYED staging environment directly.
 # The SPA and API share the same origin — no Vite dev server, no CORS proxy.
-# Override via env vars if targeting a different environment.
-STAGING_FQDN = "https://agent-red-staging.orangeglacier-f566a4e7.eastus.azurecontainerapps.io"
+# SPEC-0058: No hardcoded FQDNs — all URLs from env vars.
+# The test_host runner sets STAGING_FQDN, LIVE_SPA_BASE_URL, and PROD_URL.
+STAGING_FQDN = os.environ.get(
+    "STAGING_FQDN",
+    os.environ.get("STAGING_URL", ""),
+)
 
 LIVE_SPA_BASE_URL = os.environ.get(
     "LIVE_SPA_BASE_URL",
-    f"{STAGING_FQDN}/admin/standalone",
+    f"{STAGING_FQDN}/admin/standalone" if STAGING_FQDN else "",
 )
 
 # The ACTUAL API target — used for reachability checks and direct API calls.
