@@ -332,7 +332,7 @@ class TestStaleRunDetection:
 
     def test_stale_timeout_constant(self):
         from src.multi_tenant.superadmin_api._diagnostics import _STALE_RUN_TIMEOUT_S
-        assert _STALE_RUN_TIMEOUT_S == 1800  # 30 minutes
+        assert _STALE_RUN_TIMEOUT_S == 5400  # 90 minutes
 
 
 # ---------------------------------------------------------------------------
