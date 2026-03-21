@@ -158,6 +158,13 @@ class TestTriggerTestRun:
         ), patch(
             "src.multi_tenant.repositories.platform.AuditLogRepository",
             return_value=mock_audit_repo,
+        ), patch.dict(
+            "os.environ",
+            {
+                "STAGING_FQDN": "agent-red-staging.test.local",
+                "ENVIRONMENT": "staging",
+                "INTERNAL_VERIFICATION_SECRET": "test-secret-for-unit-tests",
+            },
         ):
             body = PipelineRunRequest(environment="staging", suite="regression")
             result = await trigger_test_run(body, mock_tenant_ctx)
