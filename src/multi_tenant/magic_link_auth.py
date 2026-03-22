@@ -503,6 +503,10 @@ async def _send_member_magic_links(
     description="Validates the single-use token and returns an 8-hour "
     "session JWT for frontend authentication. If the user is an admin "
     "with 2FA enabled, returns a pending_2fa token instead.",
+    responses={
+        400: {"description": "Invalid, expired, or already-used token"},
+        500: {"description": "Unexpected server error during verification"},
+    },
 )
 async def verify_magic_link(
     token: str = Query(description="Magic link token from email"),

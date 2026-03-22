@@ -124,7 +124,7 @@ class TestActivateRecoveryAddress:
             tenant_id="tenant-001", recovery_email="recover@tenant.com",
         )
         result = await activate_recovery_address(body=body, request=_mock_request())
-        assert "activated" in result["message"].lower()
+        assert "activated" in result.message.lower()
         mock_tenant_repo.update_recovery_address.assert_called_once()
         call_kwargs = mock_tenant_repo.update_recovery_address.call_args.kwargs
         assert call_kwargs["tenant_id"] == "tenant-001"
@@ -166,7 +166,7 @@ class TestSendAuthLink:
     ):
         body = SendAuthLinkRequest(tenant_id="tenant-001")
         result = await send_recovery_auth_link(body=body, request=_mock_request())
-        assert "sent" in result["message"].lower()
+        assert "sent" in result.message.lower()
         mock_verification_repo.create_token.assert_called_once()
         call_kwargs = mock_verification_repo.create_token.call_args.kwargs
         assert call_kwargs["token_type"] == "account_recovery"

@@ -275,4 +275,4 @@ class TestAbuseFlagEndpoint:
         ):
             resp = await toggle_abuse_flag("t-001", body, mock_ctx)
 
-        assert resp["flagged"] is False
+        assert resp.flagged is False

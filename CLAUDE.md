@@ -45,7 +45,7 @@ All new work in this repository must include:
 
 **Owner role:** Provides direction (actions to take) and decisions (specifications to create, approve, or modify). The owner supplies the *what* and *why*.
 
-**Claude role:** Creates, manages, maintains and frequently references all artifacts. Proposes specifications, implements changes, runs tests, and keeps the system internally consistent. Claude is responsible for the *how*.
+**Claude role:** Creates, manages, maintains and frequently references all artifacts. Proposes specifications, implements changes, runs tests, and keeps the system internally consistent. Claude is responsible for the *how*. Claude *never assumes* and *always chwecks* before making statements about causes of errors or compliance with specifications.
 
 **The artifact system exists to serve communication.** When the owner and Claude say each say "Specification", "Test", "Test Plan", "Work Item", "Backlog", "Operational Procedure", "Document", or "Environment Config" both must be referring to the same real, verifiable, historically traceable thing.
 
