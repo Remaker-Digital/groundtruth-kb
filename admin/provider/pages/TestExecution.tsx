@@ -525,10 +525,16 @@ export const TestExecutionPage: React.FC = () => {
                             <Table.Tr
                               key={`${c.category}-${c.name}-${i}`}
                               style={{ cursor: 'pointer' }}
-                              onClick={() => window.open(
-                                `/admin/provider/test-execution/${detailRun.runId}?check=${encodeURIComponent(c.name)}`,
-                                '_blank',
-                              )}
+                              onClick={() => {
+                                const title = `${c.name} [${c.status.toUpperCase()}]`;
+                                const body = c.detail || 'No detail available.';
+                                const escaped = body.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
+                                const html = `<!DOCTYPE html><html><head><title>${title}</title></head>`
+                                  + `<body style="margin:0;padding:24px;background:#1a1b1e;color:#c1c2c5;font-family:monospace;font-size:13px;white-space:pre-wrap;word-break:break-word;">`
+                                  + escaped + `</body></html>`;
+                                const blob = new Blob([html], { type: 'text/html' });
+                                window.open(URL.createObjectURL(blob), '_blank');
+                              }}
                             >
                               <Table.Td><Text size="xs" td="underline" c="blue">{c.name}</Text></Table.Td>
                               <Table.Td><Badge size="xs" variant="light">{c.category}</Badge></Table.Td>
