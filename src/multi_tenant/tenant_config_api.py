@@ -60,6 +60,8 @@ from typing import Any
 from fastapi import APIRouter, Depends, HTTPException, Query
 from pydantic import BaseModel, Field
 
+from src.multi_tenant.api_models import CamelCaseModel
+
 from src.multi_tenant.activation_service import (
     get_activation_service,
 )
@@ -1370,8 +1372,17 @@ async def get_activation_status(
 # ---------------------------------------------------------------------------
 
 
+class DeactivateConfigResponse(CamelCaseModel):
+    """Response for POST /config/deactivate."""
+
+    success: bool
+    deactivated_at: str
+    message: str
+
+
 @router.post(
     "/deactivate",
+    response_model=DeactivateConfigResponse,
     summary="Deactivate live configuration",
     description=(
         "Immediately deactivates the live configuration. The chat widget "
@@ -1385,7 +1396,7 @@ async def get_activation_status(
 )
 async def deactivate_config(
     ctx: TenantContext = Depends(get_tenant_context),
-) -> dict[str, Any]:
+) -> DeactivateConfigResponse:
     """Deactivate the live configuration (widget stops serving)."""
     activation_svc = get_activation_service()
 
@@ -1437,11 +1448,11 @@ async def deactivate_config(
         ctx.tenant_id[:8], now,
     )
 
-    return {
-        "success": True,
-        "deactivated_at": now,
-        "message": "Configuration deactivated. Chat widget is no longer serving.",
-    }
+    return DeactivateConfigResponse(
+        success=True,
+        deactivated_at=now,
+        message="Configuration deactivated. Chat widget is no longer serving.",
+    )
 
 
 # ---------------------------------------------------------------------------

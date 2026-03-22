@@ -94,10 +94,10 @@ def test_api_no_server_errors(case):
     Acceptable responses: 2xx, 3xx, 400, 401, 403, 404, 409, 422, 429.
     Unacceptable: 500, 502, 503 (indicates unhandled server error).
     """
-    if _FUZZ_TARGET_URL:
-        response = case.call()
-    else:
-        response = case.call_asgi()
+    # In Schemathesis 4.x, transport is set by the schema loader
+    # (from_url → HTTP, from_asgi → ASGI). case.call() uses whichever
+    # transport was configured — no separate call_asgi() needed.
+    response = case.call()
 
     # 500-class errors indicate bugs
     assert response.status_code < 500, (
@@ -119,8 +119,5 @@ def test_api_no_server_errors(case):
 )
 def test_api_responses_match_schema(case):
     """All responses must conform to the declared OpenAPI response schema."""
-    if _FUZZ_TARGET_URL:
-        response = case.call()
-    else:
-        response = case.call_asgi()
+    response = case.call()
     case.validate_response(response)

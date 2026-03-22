@@ -231,7 +231,15 @@ SUITE_CONFIGS: dict[str, SuiteConfig] = {
     "ops": SuiteConfig(
         name="ops",
         label="Operations & Resilience",
-        pytest_args=["tests/ops/", "--timeout=60", "-q"],
+        pytest_args=[
+            "tests/ops/",
+            # Exclude tests reading .claude/ hooks (not in container image)
+            "--ignore=tests/ops/test_hooks_specs.py",
+            # Exclude Dockerfile coverage test (reads Dockerfile.test, not in container)
+            "--ignore=tests/ops/test_dockerfile_test_coverage.py",
+            "--timeout=60",
+            "-q",
+        ],
         timeout_s=600,
         estimated_tests=80,
         estimated_duration_s=240,

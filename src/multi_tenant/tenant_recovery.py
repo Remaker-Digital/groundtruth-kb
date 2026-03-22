@@ -32,6 +32,8 @@ from fastapi import APIRouter, Depends, Query, Request
 from fastapi.responses import JSONResponse
 from pydantic import BaseModel, Field
 
+from src.multi_tenant.api_models import CamelCaseModel
+
 logger = logging.getLogger(__name__)
 
 # ---------------------------------------------------------------------------
@@ -119,14 +121,21 @@ class RecoveryStatusResponse(BaseModel):
 # ---------------------------------------------------------------------------
 
 
+class RecoveryActionResponse(CamelCaseModel):
+    """Generic response for recovery actions."""
+
+    message: str
+
+
 @router.post(
     "/activate",
+    response_model=RecoveryActionResponse,
     summary="Set recovery address for a tenant (SPEC-1677)",
 )
 async def activate_recovery_address(
     body: ActivateRecoveryRequest,
     request: Request,
-) -> dict:
+) -> RecoveryActionResponse:
     """Activate or update the recovery address for a tenant."""
     from src.multi_tenant.middleware import require_platform_admin
     ctx = getattr(request.state, "tenant_context", None)
@@ -163,17 +172,18 @@ async def activate_recovery_address(
         except Exception as exc:
             logger.warning("Audit log for recovery activation failed: %s", exc)
 
-    return {"message": f"Recovery address activated for tenant {body.tenant_id}"}
+    return RecoveryActionResponse(message=f"Recovery address activated for tenant {body.tenant_id}")
 
 
 @router.post(
     "/send-auth-link",
+    response_model=RecoveryActionResponse,
     summary="Send one-time auth link to tenant's recovery address (SPEC-1677)",
 )
 async def send_recovery_auth_link(
     body: SendAuthLinkRequest,
     request: Request,
-) -> dict:
+) -> RecoveryActionResponse:
     """Send a one-time auth link to the tenant's recovery address."""
     ctx = getattr(request.state, "tenant_context", None)
 
@@ -239,7 +249,7 @@ async def send_recovery_auth_link(
         except Exception as exc:
             logger.warning("Audit log for auth link send failed: %s", exc)
 
-    return {"message": f"Recovery auth link sent to {recovery_email}"}
+    return RecoveryActionResponse(message=f"Recovery auth link sent to {recovery_email}")
 
 
 @router.get(

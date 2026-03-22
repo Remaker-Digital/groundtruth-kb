@@ -392,6 +392,16 @@ class ConversationStateResponse(BaseModel):
     last_activity_at: str = Field(description="Last message timestamp")
 
 
+class StreamStatusResponse(BaseModel):
+    """Response for GET /stream/{conversation_id}/status."""
+
+    conversation_id: str = Field(description="Conversation identifier")
+    is_streaming: bool = Field(description="Whether conversation is actively streaming")
+    tab_count: int = Field(description="Number of tabs connected to this stream")
+    can_connect: bool = Field(description="Whether tenant has capacity for more connections")
+    active_connections: int = Field(description="Total active SSE connections for tenant")
+
+
 # ---------------------------------------------------------------------------
 # SSE stream models
 # ---------------------------------------------------------------------------

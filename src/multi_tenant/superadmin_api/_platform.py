@@ -1164,14 +1164,21 @@ async def create_platform_admin_operator(
     )
 
 
+class DeactivateOperatorResponse(CamelCaseModel):
+    """Response for DELETE /platform-admin/users/{admin_id}."""
+
+    message: str
+
+
 @router.delete(
     "/platform-admin/users/{admin_id}",
+    response_model=DeactivateOperatorResponse,
     summary="Deactivate an SPA operator (SPEC-1675)",
 )
 async def deactivate_platform_admin_user(
     admin_id: str,
     ctx: TenantContext = Depends(get_tenant_context),
-) -> dict[str, str]:
+) -> DeactivateOperatorResponse:
     """Deactivate a platform admin operator.
 
     Only the superadmin can deactivate operators. The superadmin
@@ -1232,7 +1239,9 @@ async def deactivate_platform_admin_user(
         admin_id, ctx.platform_admin_id,
     )
 
-    return {"message": f"Operator {target.get('email')} has been deactivated."}
+    return DeactivateOperatorResponse(
+        message=f"Operator {target.get('email')} has been deactivated.",
+    )
 
 
 @router.post(
@@ -1301,14 +1310,21 @@ async def generate_backup_codes(
     )
 
 
+class NotificationEmailResponse(CamelCaseModel):
+    """Response for PUT /platform-admin/users/notification-email."""
+
+    message: str
+
+
 @router.put(
     "/platform-admin/users/notification-email",
+    response_model=NotificationEmailResponse,
     summary="Set notification email for self (SPEC-1675/1676)",
 )
 async def update_notification_email(
     body: UpdateNotificationEmailRequest,
     ctx: TenantContext = Depends(get_tenant_context),
-) -> dict[str, str]:
+) -> NotificationEmailResponse:
     """Set or clear the notification email for login alerts.
 
     When set, login notifications (SPEC-1676) are sent to this address
@@ -1334,4 +1350,4 @@ async def update_notification_email(
         action, admin_id, body.email,
     )
 
-    return {"message": f"Notification email {action} successfully."}
+    return NotificationEmailResponse(message=f"Notification email {action} successfully.")

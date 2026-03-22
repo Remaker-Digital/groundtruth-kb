@@ -570,6 +570,7 @@ async def list_knowledge_entries(
     summary="Export knowledge base as CSV",
     description="Exports all knowledge base entries as a downloadable CSV file with columns for id, type, title, content, tags, language, active status, source info, and timestamps.",
     responses={
+        200: {"content": {"text/csv": {}}, "description": "CSV knowledge base export"},
         503: {"description": "Knowledge base services not initialized"},
     },
 )

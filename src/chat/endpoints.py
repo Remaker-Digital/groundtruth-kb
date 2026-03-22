@@ -53,6 +53,7 @@ from src.chat.models import (
     MessageFeedbackResponse,
     SendMessageRequest,
     SendMessageResponse,
+    StreamStatusResponse,
     WebSocketMessage,
     WebSocketMessageType,
 )
@@ -400,6 +401,7 @@ async def send_message(
     summary="SSE stream of AI response",
     description="Server-Sent Events stream for real-time AI response delivery. Supports reconnection via Last-Event-ID header. Events include token, validated, retracted, stage, error, and done.",
     responses={
+        200: {"content": {"text/event-stream": {}}, "description": "SSE event stream"},
         400: {"description": "No customer message to process"},
         404: {"description": "Conversation not found"},
         429: {"description": "Too many active streaming connections for tenant"},
@@ -631,6 +633,7 @@ async def stream_response(
 
 @router.get(
     "/stream/{conversation_id}/status",
+    response_model=StreamStatusResponse,
     summary="Check SSE stream status for a conversation",
     description="Returns the current streaming status for a conversation, including active tab count. "
     "Used by the widget for multi-tab coordination — a tab can check if another tab is already "
@@ -642,7 +645,7 @@ async def stream_response(
 async def stream_status(
     conversation_id: str,
     ctx: TenantContext = Depends(get_tenant_context),
-) -> dict[str, Any]:
+) -> StreamStatusResponse:
     """Check SSE stream status for multi-tab coordination (WI #133).
 
     Returns whether the conversation is actively streaming, how many
@@ -659,13 +662,13 @@ async def stream_status(
     sse_mgr = get_sse_manager()
     tier_str = ctx.tier.value if ctx.tier else "starter"
 
-    return {
-        "conversation_id": conversation_id,
-        "is_streaming": sse_mgr.is_conversation_active(ctx.tenant_id, conversation_id),
-        "tab_count": sse_mgr.get_tab_count(ctx.tenant_id, conversation_id),
-        "can_connect": sse_mgr.can_connect(ctx.tenant_id, tier_str),
-        "active_connections": sse_mgr.get_active_count(ctx.tenant_id),
-    }
+    return StreamStatusResponse(
+        conversation_id=conversation_id,
+        is_streaming=sse_mgr.is_conversation_active(ctx.tenant_id, conversation_id),
+        tab_count=sse_mgr.get_tab_count(ctx.tenant_id, conversation_id),
+        can_connect=sse_mgr.can_connect(ctx.tenant_id, tier_str),
+        active_connections=sse_mgr.get_active_count(ctx.tenant_id),
+    )
 
 
 # ---------------------------------------------------------------------------

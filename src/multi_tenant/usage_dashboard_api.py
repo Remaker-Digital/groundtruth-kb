@@ -525,6 +525,7 @@ _CSV_COLUMNS = [
     summary="Export conversations as CSV",
     description="Exports all billable conversations for the specified billing period as a downloadable CSV file.",
     responses={
+        200: {"content": {"text/csv": {}}, "description": "CSV conversations export"},
         400: {"description": "Invalid billing_period format"},
     },
 )

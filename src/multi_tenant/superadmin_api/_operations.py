@@ -327,6 +327,44 @@ class AlertHistoryResponse(CamelCaseModel):
     total: int = 0
 
 
+class DeleteAlertRuleResponse(CamelCaseModel):
+    """Response for DELETE /alerts/rules/{rule_id}."""
+
+    deleted: bool
+    rule_id: str
+
+
+class EvaluateAlertsResponse(CamelCaseModel):
+    """Response for POST /alerts/evaluate."""
+
+    evaluated: bool
+    message: str = ""
+    triggered: int = 0
+    total_rules: int = 0
+
+
+class MfaActionResponse(CamelCaseModel):
+    """Generic MFA action response (confirm/disable)."""
+
+    confirmed: bool | None = None
+    disabled: bool | None = None
+    message: str
+
+
+class AbuseFlagResponse(CamelCaseModel):
+    """Response for POST /abuse/tenant/{tenant_id}/flag."""
+
+    tenant_id: str
+    flagged: bool
+    updated_at: str
+
+
+class MessageResponse(CamelCaseModel):
+    """Simple message-only response."""
+
+    message: str
+
+
 # ---------------------------------------------------------------------------
 # RB-5: MFA/TOTP — models
 # ---------------------------------------------------------------------------
@@ -517,13 +555,14 @@ async def update_alert_rule(
 
 @router.delete(
     "/alerts/rules/{rule_id}",
+    response_model=DeleteAlertRuleResponse,
     summary="Delete alert rule",
     status_code=200,
 )
 async def delete_alert_rule(
     rule_id: str,
 
-) -> dict[str, Any]:
+) -> DeleteAlertRuleResponse:
     """Delete an alert rule."""
     if _state._alert_rule_repo is None:
         raise HTTPException(status_code=503, detail="Alert service not configured")
@@ -538,7 +577,7 @@ async def delete_alert_rule(
     )
     if not deleted:
         raise HTTPException(status_code=404, detail="Alert rule not found")
-    return {"deleted": True, "rule_id": rule_id}
+    return DeleteAlertRuleResponse(deleted=True, rule_id=rule_id)
 
 
 # ---------------------------------------------------------------------------
@@ -594,24 +633,29 @@ async def acknowledge_alert(
 
 @router.post(
     "/alerts/evaluate",
+    response_model=EvaluateAlertsResponse,
     summary="Force evaluate all alert rules",
     status_code=200,
 )
 async def evaluate_alerts(
 
-) -> dict[str, Any]:
+) -> EvaluateAlertsResponse:
     """Manually trigger evaluation of all enabled alert rules."""
     try:
         from src.multi_tenant.alert_engine import get_alert_engine
 
         engine = get_alert_engine()
         result = await engine.evaluate_all()
-        return {"evaluated": True, **result}
+        return EvaluateAlertsResponse(
+            evaluated=True,
+            triggered=result.get("triggered", 0),
+            total_rules=result.get("total_rules", 0),
+        )
     except ImportError:
-        return {"evaluated": False, "message": "Alert engine not yet implemented"}
+        return EvaluateAlertsResponse(evaluated=False, message="Alert engine not yet implemented")
     except Exception as exc:
         logger.warning("Alert evaluation failed: %s", exc)
-        return {"evaluated": False, "message": str(exc)}
+        return EvaluateAlertsResponse(evaluated=False, message=str(exc))
 
 
 
@@ -717,13 +761,14 @@ async def mfa_enroll(
 
 @router.post(
     "/mfa/confirm",
+    response_model=MfaActionResponse,
     summary="Confirm MFA enrollment",
     status_code=200,
 )
 async def mfa_confirm(
     body: MfaConfirmRequest = Body(...),
     ctx: TenantContext = Depends(get_tenant_context),
-) -> dict[str, Any]:
+) -> MfaActionResponse:
     """Confirm MFA enrollment with the first valid TOTP code.
 
     After this succeeds, MFA is required for all subsequent logins.
@@ -743,7 +788,7 @@ async def mfa_confirm(
     if not confirmed:
         raise HTTPException(status_code=400, detail="Invalid TOTP code")
 
-    return {"confirmed": True, "message": "MFA enrollment confirmed"}
+    return MfaActionResponse(confirmed=True, message="MFA enrollment confirmed")
 
 
 @router.post(
@@ -780,13 +825,14 @@ async def mfa_verify(
 
 @router.post(
     "/mfa/disable",
+    response_model=MfaActionResponse,
     summary="Disable MFA",
     status_code=200,
 )
 async def mfa_disable(
     body: MfaDisableRequest = Body(...),
     ctx: TenantContext = Depends(get_tenant_context),
-) -> dict[str, Any]:
+) -> MfaActionResponse:
     """Disable MFA for the current user. Requires a valid TOTP code."""
     member = await _get_team_member(ctx)
 
@@ -802,7 +848,7 @@ async def mfa_disable(
     if not disabled:
         raise HTTPException(status_code=400, detail="Invalid TOTP code")
 
-    return {"disabled": True, "message": "MFA has been disabled"}
+    return MfaActionResponse(disabled=True, message="MFA has been disabled")
 
 
 @router.post(
@@ -1213,6 +1259,7 @@ async def get_abuse_signals(
 
 @router.post(
     "/abuse/tenant/{tenant_id}/flag",
+    response_model=AbuseFlagResponse,
     summary="Flag or unflag a tenant for abuse review",
     status_code=200,
 )
@@ -1220,7 +1267,7 @@ async def toggle_abuse_flag(
     tenant_id: str,
     body: FlagTenantRequest = Body(...),
     ctx: TenantContext = Depends(get_tenant_context),
-) -> dict[str, Any]:
+) -> AbuseFlagResponse:
     """Flag or unflag a tenant for manual abuse review."""
     from datetime import datetime, timezone
 
@@ -1261,9 +1308,9 @@ async def toggle_abuse_flag(
         except Exception:
             pass
 
-    return {
-        "tenant_id": tenant_id,
-        "flagged": body.flagged,
-        "updated_at": now_iso,
-    }
+    return AbuseFlagResponse(
+        tenant_id=tenant_id,
+        flagged=body.flagged,
+        updated_at=now_iso,
+    )
 

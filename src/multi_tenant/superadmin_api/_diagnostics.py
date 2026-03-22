@@ -695,8 +695,45 @@ def _resolve_fqdn(environment: str) -> str:
     return ""
 
 
+# ---------------------------------------------------------------------------
+# Response models for schema-validated endpoints
+# ---------------------------------------------------------------------------
+
+
+class TestRunChecksResponse(CamelCaseModel):
+    """Response for GET /tests/{run_id}/checks."""
+
+    run_id: str
+    environment: str
+    suite: str
+    status: str
+    total_checks: int
+    filtered_count: int
+    checks: list[dict[str, Any]]
+
+
+class SuiteInfoItem(CamelCaseModel):
+    """A single test suite entry in the available-suites response."""
+
+    name: str
+    label: str
+    runnable: bool
+    reason: str = ""
+    is_composite: bool = False
+    group: str = ""
+
+
+class AvailableSuitesResponse(CamelCaseModel):
+    """Response for GET /tests/available-suites."""
+
+    environment: str
+    inprocess: list[SuiteInfoItem]
+    testhost: list[SuiteInfoItem]
+
+
 @router.get(
     "/tests/{run_id}/checks",
+    response_model=TestRunChecksResponse,
     summary="Get detailed check results for a test run (SPEC-1846)",
     description="Returns the full list of verification checks with optional filtering.",
     responses={404: {"description": "Test run not found"}},
@@ -706,7 +743,7 @@ async def get_test_run_checks(
     run_id: str,
     status: str | None = Query(None, description="Filter by check status: pass, fail, skip, error"),
     category: str | None = Query(None, description="Filter by category: health, api, config, security, etc."),
-) -> dict[str, Any]:
+) -> TestRunChecksResponse:
     """Return detailed check results for Claude diagnosis (SPEC-1846)."""
     repo = _get_platform_repo()
     doc = await repo.get_config(_TEST_RUN_CONFIG_TYPE, run_id)
@@ -722,19 +759,20 @@ async def get_test_run_checks(
     if category:
         checks = [c for c in checks if c.get("category") == category]
 
-    return {
-        "run_id": run_id,
-        "environment": value.get("environment", ""),
-        "suite": value.get("suite", ""),
-        "status": value.get("status", "unknown"),
-        "total_checks": len(value.get("checks", [])),
-        "filtered_count": len(checks),
-        "checks": checks,
-    }
+    return TestRunChecksResponse(
+        run_id=run_id,
+        environment=value.get("environment", ""),
+        suite=value.get("suite", ""),
+        status=value.get("status", "unknown"),
+        total_checks=len(value.get("checks", [])),
+        filtered_count=len(checks),
+        checks=checks,
+    )
 
 
 @router.get(
     "/tests/available-suites",
+    response_model=AvailableSuitesResponse,
     summary="List test suites available for a given environment",
     description=(
         "Returns suites that can actually execute in the target environment. "
@@ -744,7 +782,7 @@ async def get_test_run_checks(
 )
 async def get_available_suites(
     environment: str = Query("staging", description="Target environment"),
-) -> dict[str, Any]:
+) -> AvailableSuitesResponse:
     """Return suites filtered by runnability for the SPA suite selector."""
     if environment not in VALID_ENVIRONMENTS:
         raise HTTPException(
@@ -780,11 +818,11 @@ async def get_available_suites(
             for s in sorted(_TESTHOST_SUITES)
         ]
 
-    return {
-        "environment": environment,
-        "inprocess": inprocess_suites,
-        "testhost": test_host_suites,
-    }
+    return AvailableSuitesResponse(
+        environment=environment,
+        inprocess=[SuiteInfoItem(**s) for s in inprocess_suites],
+        testhost=[SuiteInfoItem(**s) for s in test_host_suites],
+    )
 
 
 @router.get(

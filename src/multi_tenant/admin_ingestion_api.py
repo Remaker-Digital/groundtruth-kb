@@ -232,10 +232,17 @@ async def get_ingestion_status(
 # ---------------------------------------------------------------------------
 
 
-@router.post("/ingest/cancel")
+class CancelIngestionResponse(CamelCaseModel):
+    """Response for POST /ingest/cancel."""
+
+    status: str
+    job_id: str
+
+
+@router.post("/ingest/cancel", response_model=CancelIngestionResponse)
 async def cancel_ingestion(
     ctx: TenantContext = Depends(get_tenant_context),
-) -> dict[str, str]:
+) -> CancelIngestionResponse:
     """Cancel the currently running ingestion job for this tenant."""
     from src.multi_tenant.storefront_ingestion import get_ingestion_service
 
@@ -256,7 +263,7 @@ async def cancel_ingestion(
     except ValueError as exc:
         raise HTTPException(status_code=400, detail=str(exc))
 
-    return {"status": "cancelled", "job_id": job["id"]}
+    return CancelIngestionResponse(status="cancelled", job_id=job["id"])
 
 
 # ---------------------------------------------------------------------------
