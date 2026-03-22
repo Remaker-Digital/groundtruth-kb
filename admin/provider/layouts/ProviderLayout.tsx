@@ -95,7 +95,6 @@ const NAV_GROUPS: NavGroup[] = [
     group: 'Control Plane',
     items: [
       { label: 'Entitlements', path: '/entitlements', icon: 'config', description: 'Tier entitlement config' },
-      { label: 'Feature Flags', path: '/feature-flags', icon: 'config', description: 'Feature flag toggles' },
       { label: 'Rate Limits', path: '/rate-limits', icon: 'analytics', description: 'Rate limits & retry' },
       { label: 'Blocklists', path: '/blocklists', icon: 'secrets', description: 'Allow/block lists' },
       { label: 'Alert Thresholds', path: '/alert-thresholds', icon: 'alerts', description: 'Threshold config' },

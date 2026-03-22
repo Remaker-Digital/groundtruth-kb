@@ -53,7 +53,7 @@ import { BlocklistConfigPage } from './pages/BlocklistConfig';
 import { RetryConfigPage } from './pages/RetryConfig';
 import { AlertThresholdConfigPage } from './pages/AlertThresholdConfig';
 import { NotificationChannelConfigPage } from './pages/NotificationChannelConfig';
-import { FeatureFlagConfigPage } from './pages/FeatureFlagConfig';
+
 import { DeploymentManagementPage } from './pages/DeploymentManagement';
 import { TestExecutionPage } from './pages/TestExecution';
 import { TestRunDetailPage } from './pages/TestRunDetail';
@@ -177,7 +177,7 @@ const App: React.FC = () => {
             <Route path="/rate-limits" element={<RetryConfigPage />} />
             <Route path="/alert-thresholds" element={<AlertThresholdConfigPage />} />
             <Route path="/notification-channels" element={<NotificationChannelConfigPage />} />
-            <Route path="/feature-flags" element={<FeatureFlagConfigPage />} />
+
             <Route path="/deploy-management" element={<DeploymentManagementPage />} />
             <Route path="/test-execution" element={<TestExecutionPage />} />
             <Route path="/test-execution/:runId" element={<TestRunDetailPage />} />
