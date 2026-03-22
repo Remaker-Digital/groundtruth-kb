@@ -2,7 +2,7 @@
   "_metadata": {
     "description": "Assertion count baseline for pre-commit ratchet. DO NOT EDIT MANUALLY.",
     "generator": "scripts/guardrails/generate_assertion_baseline.py",
-    "total_assertions": 19759,
+    "total_assertions": 19760,
     "total_files": 411
   },
   "baselines": {
@@ -99,7 +99,7 @@
     "tests/e2e_mock/test_widget.py": 49,
     "tests/evaluation/test_deepeval_scaffold.py": 15,
     "tests/evaluation/test_quality_pilot.py": 55,
-    "tests/fuzzing/test_api_fuzz.py": 1,
+    "tests/fuzzing/test_api_fuzz.py": 2,
     "tests/integration/test_agent_containers.py": 24,
     "tests/integration/test_azure_services.py": 45,
     "tests/integration/test_integration_real_services.py": 78,

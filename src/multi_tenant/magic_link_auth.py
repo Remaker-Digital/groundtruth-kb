@@ -524,10 +524,13 @@ async def verify_magic_link(
 
         token_repo = VerificationTokenRepository()
 
-        doc = await token_repo.consume_token(
-            token_id=token,
-            token_type=_TOKEN_TYPE,
-        )
+        try:
+            doc = await token_repo.consume_token(
+                token_id=token,
+                token_type=_TOKEN_TYPE,
+            )
+        except Exception:
+            doc = None  # Treat repo errors as invalid token
         if not doc:
             return JSONResponse(
                 status_code=400,

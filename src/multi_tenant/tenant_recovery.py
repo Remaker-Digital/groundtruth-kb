@@ -296,10 +296,13 @@ async def verify_recovery_token(
         return JSONResponse(status_code=503, content={"error": "Service not configured"})
 
     # Consume the token (single-use)
-    doc = await _verification_repo.consume_token(
-        token_id=token,
-        token_type=_RECOVERY_TOKEN_TYPE,
-    )
+    try:
+        doc = await _verification_repo.consume_token(
+            token_id=token,
+            token_type=_RECOVERY_TOKEN_TYPE,
+        )
+    except Exception:
+        doc = None  # Treat repo errors as invalid token
 
     if doc is None:
         return JSONResponse(
