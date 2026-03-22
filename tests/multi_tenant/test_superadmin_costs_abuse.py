@@ -252,8 +252,8 @@ class TestAbuseFlagEndpoint:
         ):
             resp = await toggle_abuse_flag("t-001", body, mock_ctx)
 
-        assert resp["tenant_id"] == "t-001"
-        assert resp["flagged"] is True
+        assert resp.tenant_id == "t-001"
+        assert resp.flagged is True
         mock_tenant_repo.patch.assert_called_once()
 
     @pytest.mark.asyncio

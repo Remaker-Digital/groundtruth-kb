@@ -220,8 +220,8 @@ class TestCancelIngestionEndpoint:
         with patch(_INGESTION_SVC_PATCH, return_value=mock_service):
             result = await cancel_ingestion(ctx=ctx)
 
-        assert result["status"] == "cancelled"
-        assert result["job_id"] == "job-run-1"
+        assert result.status == "cancelled"
+        assert result.job_id == "job-run-1"
         mock_service.cancel_job.assert_called_once_with(TENANT_ID, "job-run-1")
 
     @pytest.mark.asyncio

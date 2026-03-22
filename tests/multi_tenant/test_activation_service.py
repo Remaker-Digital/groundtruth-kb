@@ -2088,8 +2088,8 @@ class TestDeactivateEndpoint:
              patch("src.multi_tenant.tenant_config_api.get_tenant_context", return_value=ctx):
             result = await deactivate_config(ctx=ctx)
 
-        assert result["success"] is True
-        assert "deactivated_at" in result
+        assert result.success is True
+        assert result.deactivated_at is not None
 
         # Verify patch was called with deactivated_at
         prefs_repo.patch.assert_called_once()

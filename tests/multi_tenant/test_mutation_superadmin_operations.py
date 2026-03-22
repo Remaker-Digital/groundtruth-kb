@@ -304,7 +304,7 @@ class TestDeleteAlertRule(MutationTestBase):
         assert resp.status_code == 200
         data = resp.json()
         assert data["deleted"] is True
-        assert data["rule_id"] == "rule-001"
+        assert data["ruleId"] == "rule-001"
 
     def test_not_found(self, spa_client, superadmin_repos):
         superadmin_repos["alert_rule_repo"].find_rule = AsyncMock(return_value=None)
@@ -661,9 +661,9 @@ class TestToggleAbuseFlag(MutationTestBase):
         resp = spa_client.post(self.URL, json={"flagged": True})
         assert resp.status_code == 200
         data = resp.json()
-        assert data["tenant_id"] == "test-tenant-001"
+        assert data["tenantId"] == "test-tenant-001"
         assert data["flagged"] is True
-        assert "updated_at" in data
+        assert "updatedAt" in data
 
     def test_unflag_tenant(self, spa_client, superadmin_repos):
         superadmin_repos["tenant_repo"].patch = AsyncMock(return_value=None)

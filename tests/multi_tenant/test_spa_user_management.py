@@ -274,7 +274,7 @@ class TestDeactivateOperator:
         result = await deactivate_platform_admin_user(
             admin_id="admin-002", ctx=_superadmin_ctx(),
         )
-        assert "deactivated" in result["message"].lower()
+        assert "deactivated" in result.message.lower()
         mock_platform_admin_repo.deactivate_admin.assert_called_once()
 
     @pytest.mark.asyncio
@@ -365,17 +365,17 @@ class TestNotificationEmail:
     async def test_set_notification_email(self, mock_platform_admin_repo):
         body = UpdateNotificationEmailRequest(email="alerts@remaker.digital")
         result = await update_notification_email(body=body, ctx=_superadmin_ctx())
-        assert "set" in result["message"].lower()
+        assert "set" in result.message.lower()
         mock_platform_admin_repo.update_notification_email.assert_called_once()
 
     @pytest.mark.asyncio
     async def test_clear_notification_email(self, mock_platform_admin_repo):
         body = UpdateNotificationEmailRequest(email=None)
         result = await update_notification_email(body=body, ctx=_superadmin_ctx())
-        assert "cleared" in result["message"].lower()
+        assert "cleared" in result.message.lower()
 
     @pytest.mark.asyncio
     async def test_operator_can_set_own_email(self, mock_platform_admin_repo):
         body = UpdateNotificationEmailRequest(email="ops-alert@test.com")
         result = await update_notification_email(body=body, ctx=_operator_ctx())
-        assert "set" in result["message"].lower()
+        assert "set" in result.message.lower()

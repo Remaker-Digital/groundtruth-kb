@@ -111,7 +111,10 @@ def _run(cmd: str, timeout: int = 60) -> tuple[int, str]:
             env=env,
             errors="replace",
         )
-        return result.returncode, result.stdout.strip()
+        output = result.stdout.strip()
+        if result.returncode != 0 and result.stderr:
+            output = f"{output}\n[stderr] {result.stderr.strip()}"
+        return result.returncode, output
     except subprocess.TimeoutExpired:
         return 1, "Command timed out"
     except Exception as e:

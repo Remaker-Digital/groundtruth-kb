@@ -529,8 +529,10 @@ async def verify_magic_link(
                 token_id=token,
                 token_type=_TOKEN_TYPE,
             )
-        except Exception:
-            doc = None  # Treat repo errors as invalid token
+        except (KeyError, ValueError):
+            doc = None  # Treat validation errors as invalid token
+        # Infrastructure errors (RuntimeError, ConnectionError, etc.)
+        # propagate to the outer handler which returns 500.
         if not doc:
             return JSONResponse(
                 status_code=400,

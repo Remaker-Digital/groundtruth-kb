@@ -721,7 +721,7 @@ class TestDeleteAlertRule:
         _configure_services(alert_rule_repo=alert_rule_repo)
 
         result = await delete_alert_rule(rule_id="RULE-001")
-        assert result["deleted"] is True
+        assert result.deleted is True
 
 
 # ---------------------------------------------------------------------------
@@ -781,8 +781,8 @@ class TestEvaluateAlerts:
         _configure_services()
 
         result = await evaluate_alerts()
-        # Should return a dict with evaluated=False or True depending on engine availability
-        assert "evaluated" in result
+        # Should return an EvaluateAlertsResponse with evaluated=False or True
+        assert hasattr(result, "evaluated")
 
 
 # ---------------------------------------------------------------------------
