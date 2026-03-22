@@ -284,39 +284,49 @@ class TestRunner:
                 short_name = f"{file_part}::{parts[-1]}"
 
             outcome = test.get("outcome", "unknown")
-            status_map = {
-                "passed": "pass",
-                "failed": "fail",
-                "skipped": "fail",  # Treat skips as failures (owner directive)
-                "error": "error",
-                "xfailed": "fail",  # Treat expected failures as failures
-                "xpassed": "pass",
-            }
-            status = status_map.get(outcome, "error")
-
             duration = test.get("duration", 0.0)
             detail = ""
 
-            if status in ("fail", "error"):
+            # --- Skip classification (owner rule: no SKIPs in the real world) ---
+            # A test that SHOULD be skipped and IS skipped = PASS.
+            # A test that should RUN but skips = FAIL.
+            #
+            # Heuristic: pytest.mark.skipif triggers in the setup phase
+            # (the test body never executes). An in-body pytest.skip() call
+            # triggers in the call phase (the test started then bailed).
+            #   - Setup-phase skip with a reason  → legitimate conditional → PASS
+            #   - Call-phase skip or no reason     → evasive / unexplained → FAIL
+            if outcome == "skipped":
+                setup_info = test.get("setup", {})
+                setup_longrepr = setup_info.get("longrepr")
+                if setup_longrepr:
+                    # Condition-based skip (e.g. skipif file not in container).
+                    # The test correctly evaluated its environment → PASS.
+                    status = "pass"
+                    detail = f"CONDITIONAL_SKIP: {str(setup_longrepr)[:400]}"
+                else:
+                    # In-body skip or unexplained — treat as failure.
+                    call_info = test.get("call", {})
+                    longrepr = call_info.get("longrepr", "")
+                    status = "fail"
+                    detail = f"EVASIVE_SKIP: {str(longrepr)[:400]}" if longrepr else "EVASIVE_SKIP: no reason provided"
+            else:
+                status_map = {
+                    "passed": "pass",
+                    "failed": "fail",
+                    "error": "error",
+                    "xfailed": "fail",   # Expected failures are still failures
+                    "xpassed": "pass",
+                }
+                status = status_map.get(outcome, "error")
+
+            if status in ("fail", "error") and not detail:
                 call_info = test.get("call", {})
                 longrepr = call_info.get("longrepr", "")
                 if isinstance(longrepr, str):
                     detail = longrepr[:500]
                 elif isinstance(longrepr, dict):
                     detail = str(longrepr.get("reprcrash", {}).get("message", ""))[:500]
-
-            # Capture skip reason as failure detail (skips treated as failures)
-            if outcome in ("skipped", "xfailed"):
-                setup = test.get("setup", {})
-                if setup.get("longrepr"):
-                    detail = f"SKIPPED: {str(setup['longrepr'])[:400]}"
-                else:
-                    call_info = test.get("call", {})
-                    longrepr = call_info.get("longrepr", "")
-                    if longrepr:
-                        detail = f"SKIPPED: {str(longrepr)[:400]}"
-                    else:
-                        detail = "SKIPPED: no reason provided"
 
             batch.append(TestResult(
                 name=short_name,
