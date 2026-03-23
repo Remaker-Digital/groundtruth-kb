@@ -80,7 +80,6 @@ const NAV_GROUPS: NavGroup[] = [
     group: 'Operations',
     items: [
       { label: 'Deployments', path: '/deployments', icon: 'deployments', description: 'Deploy history' },
-      { label: 'Queue Health', path: '/queues', icon: 'queue', description: 'NATS queue depth' },
       { label: 'Integrations', path: '/integrations', icon: 'integrations', description: 'Service reliability' },
       { label: 'Status Page', path: '/status', icon: 'status', description: 'Incident management' },
       { label: 'Alerts', path: '/alerts', icon: 'alerts', description: 'Alert rules & history' },
@@ -201,7 +200,7 @@ export function ProviderLayout({ apiKey, onLogout, children }: ProviderLayoutPro
         navbar={{ width: 260, breakpoint: 'sm', collapsed: { mobile: !opened } }}
         padding="lg"
         styles={{
-          main: { backgroundColor: tokens.page, minHeight: '100vh' },
+          main: { backgroundColor: tokens.page, minHeight: '100vh', paddingBottom: 100 /* clearance for chat widget launcher */ },
           header: { backgroundColor: tokens.chrome, borderBottom: `1px solid ${tokens.surface}` },
           navbar: { backgroundColor: tokens.chrome, borderRight: `1px solid ${tokens.surface}` },
         }}

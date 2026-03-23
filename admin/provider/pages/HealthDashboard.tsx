@@ -36,8 +36,8 @@ interface DashboardData {
   timestamp: string;
   systemHealth: {
     nats: { deployed: boolean; connected: boolean };
-    circuitBreakers: Record<string, unknown>;
-    keyVault: { healthy: boolean };
+    circuitBreakers: { healthy?: boolean; anyOpen?: boolean; services?: Record<string, unknown> };
+    keyVault: { healthy: boolean; status?: string; detail?: string };
     version: { api: string; product: string };
   } | null;
   tenantSummary: {
@@ -112,16 +112,11 @@ export function HealthDashboardPage() {
       </Group>
 
       {/* System Health Cards */}
-      <SimpleGrid cols={{ base: 1, sm: 2, md: 4 }} spacing="md">
-        <HealthCard
-          label="NATS"
-          status={health?.nats?.connected ? 'healthy' : health?.nats?.deployed ? 'down' : 'unknown'}
-          detail={health?.nats?.connected ? 'Connected' : health?.nats?.deployed ? 'Disconnected' : 'Not Deployed'}
-        />
+      <SimpleGrid cols={{ base: 1, sm: 2, md: 3 }} spacing="md">
         <HealthCard
           label="Key Vault"
           status={health?.keyVault?.healthy ? 'healthy' : 'degraded'}
-          detail={health?.keyVault?.healthy ? 'Healthy' : 'Degraded'}
+          detail={health?.keyVault?.healthy ? 'Healthy' : (health?.keyVault?.detail ?? 'Degraded')}
         />
         <HealthCard
           label="API Version"
@@ -130,8 +125,17 @@ export function HealthDashboardPage() {
         />
         <HealthCard
           label="Circuit Breakers"
-          status={health?.circuitBreakers ? 'healthy' : 'unknown'}
-          detail={health?.circuitBreakers ? 'Operational' : 'Unknown'}
+          status={
+            health?.circuitBreakers?.anyOpen ? 'down'
+              : Object.keys(health?.circuitBreakers?.services ?? {}).length > 0 ? 'healthy'
+              : 'unknown'
+          }
+          detail={
+            health?.circuitBreakers?.anyOpen ? 'Tripped'
+              : Object.keys(health?.circuitBreakers?.services ?? {}).length > 0
+                ? `${Object.keys(health?.circuitBreakers?.services ?? {}).length} OK`
+              : 'Not Initialized'
+          }
         />
       </SimpleGrid>
 

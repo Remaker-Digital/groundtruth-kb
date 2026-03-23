@@ -105,7 +105,7 @@ class TestIntegrationHealthHappyPath:
         """All systems healthy → overall_healthy=True."""
         mock_cb_cls.return_value.health_summary.return_value = HEALTHY_CB_SUMMARY
         mock_prefs_repo.get_active.side_effect = [
-            {"mcp_storefront_enabled": True, "mcp_storefront_status": "connected"},
+            {"shopify_integration_status": "connected"},
             {"stripe_mcp_enabled": True, "stripe_mcp_status": "connected"},
             {},
         ]
@@ -320,15 +320,12 @@ class TestMCPIntegrationStatus:
         mock_cb_cls.return_value.health_summary.return_value = HEALTHY_CB_SUMMARY
         mock_prefs_repo.get_active.side_effect = [
             {
-                "mcp_storefront_enabled": True,
-                "mcp_storefront_status": "connected",
+                "shopify_integration_status": "connected",
                 "stripe_mcp_enabled": True,
                 "stripe_mcp_status": "connected",
             },
             {
-                "mcp_storefront_enabled": True,
-                "mcp_storefront_status": "error",
-                "stripe_mcp_enabled": False,
+                "shopify_integration_status": "error",
             },
             {},  # no MCP
         ]
@@ -400,7 +397,7 @@ class TestMCPIntegrationStatus:
         """Individual prefs read failure is silently skipped."""
         mock_cb_cls.return_value.health_summary.return_value = HEALTHY_CB_SUMMARY
         mock_prefs_repo.get_active.side_effect = [
-            {"mcp_storefront_enabled": True, "mcp_storefront_status": "connected"},
+            {"shopify_integration_status": "connected"},
             RuntimeError("Cosmos error"),
             {},
         ]

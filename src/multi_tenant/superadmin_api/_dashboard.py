@@ -340,7 +340,8 @@ async def provider_dashboard(
     try:
         from src.multi_tenant.nats_isolation import get_nats_manager
         nats_mgr = get_nats_manager()
-        health["nats"] = {"deployed": True, "connected": nats_mgr.is_connected}
+        connected = nats_mgr.is_connected
+        health["nats"] = {"deployed": connected, "connected": connected}
     except Exception:
         health["nats"] = {"deployed": False, "connected": False}
 
@@ -355,9 +356,11 @@ async def provider_dashboard(
     try:
         from src.multi_tenant.tenant_secret_service import get_secret_service
         secret_svc = get_secret_service()
-        health["key_vault"] = await secret_svc.health_check()
+        kv_result = await secret_svc.health_check()
+        kv_result["healthy"] = kv_result.get("status") == "healthy"
+        health["key_vault"] = kv_result
     except Exception:
-        health["key_vault"] = {"healthy": False}
+        health["key_vault"] = {"healthy": False, "status": "error"}
 
     try:
         from src.multi_tenant.api_versioning import API_VERSION, PRODUCT_VERSION
@@ -1054,16 +1057,17 @@ async def integration_health(
                 try:
                     prefs = await _state._prefs_repo.get_active(tid)
                     if prefs:
-                        # Shopify Storefront MCP
-                        if prefs.get("mcp_storefront_enabled"):
+                        # Shopify Storefront MCP — uses shopify_integration_status
+                        # (auto-generated config in mcp_client.py, not a separate enable flag)
+                        shop_status = prefs.get("shopify_integration_status")
+                        if shop_status:
                             storefront_enabled += 1
-                            status = prefs.get("mcp_storefront_status", "")
-                            if status == "connected":
+                            if shop_status == "connected":
                                 storefront_connected += 1
-                            elif status == "error":
+                            elif shop_status == "error":
                                 storefront_errored += 1
 
-                        # Stripe MCP
+                        # Stripe MCP — uses explicit enable flag
                         if prefs.get("stripe_mcp_enabled"):
                             stripe_enabled += 1
                             status = prefs.get("stripe_mcp_status", "")

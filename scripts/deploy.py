@@ -18,6 +18,7 @@ from __future__ import annotations
 
 import argparse
 import json
+import os
 import re
 import subprocess
 import sys
@@ -203,6 +204,50 @@ def get_deployed_image(app_name: str) -> str | None:
     return None
 
 
+def record_deployment_event(
+    fqdn: str,
+    environment: str,
+    version: str,
+    image: str,
+    success: bool,
+    duration_s: float,
+) -> None:
+    """POST a deployment audit event to the API (best-effort).
+
+    Requires SPA_PLATFORM_ADMIN_KEY env var. Silently skips if not set.
+    """
+    api_key = os.environ.get("SPA_PLATFORM_ADMIN_KEY", "")
+    if not api_key:
+        log("  Skipping deployment event recording (SPA_PLATFORM_ADMIN_KEY not set)")
+        return
+
+    payload = {
+        "event_type": "model.deployed",
+        "environment": environment,
+        "version": version,
+        "image": image,
+        "previous_image": "",
+        "revision_name": "",
+        "status": "succeeded" if success else "failed",
+        "duration_s": round(duration_s, 1),
+        "verification_pass": 1 if success else 0,
+        "verification_fail": 0 if success else 1,
+        "dry_run": False,
+    }
+
+    try:
+        url = f"https://{fqdn}/api/superadmin/deployments/record"
+        body = json.dumps(payload).encode("utf-8")
+        req = urllib.request.Request(url, data=body, method="POST", headers={
+            "Content-Type": "application/json",
+            "X-API-Key": api_key,
+        })
+        with urllib.request.urlopen(req, timeout=10) as resp:
+            log(f"  Deployment event recorded ({resp.status})")
+    except Exception as exc:
+        log(f"  WARNING: Failed to record deployment event (non-fatal): {exc}")
+
+
 # ---------------------------------------------------------------------------
 # Main
 # ---------------------------------------------------------------------------
@@ -238,6 +283,7 @@ def main() -> int:
         return 1
 
     _init_log()
+    deploy_start = time.monotonic()
 
     log("Agent Red Deployment")
     log(f"  Environment: {args.environment}")
@@ -308,10 +354,21 @@ def main() -> int:
     if deployed:
         log(f"  Deployed image: {deployed}")
 
+    # 7. Record deployment event
+    version_ok = actual == expected_version
+    duration = time.monotonic() - deploy_start
+    record_deployment_event(
+        fqdn=fqdn,
+        environment=args.environment,
+        version=args.tag,
+        image=gw_image,
+        success=version_ok,
+        duration_s=duration,
+    )
+
     # Summary
     log("")
     log("=" * 50)
-    version_ok = actual == expected_version
     icon = "✅" if version_ok else "⚠️"
     log(f"  {icon} {args.environment}: {actual or 'unknown'}")
     log(f"  URL: https://{fqdn}")
