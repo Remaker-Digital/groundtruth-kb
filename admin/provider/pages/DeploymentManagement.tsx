@@ -95,9 +95,8 @@ export const DeploymentManagementPage: React.FC = () => {
   const [deployments, setDeployments] = useState<DeploymentRecord[]>([]);
   const [loading, setLoading] = useState(true);
 
-  // Trigger modal
+  // Trigger modal — environment auto-detected server-side (SPEC-0058 isolation)
   const [triggerOpen, setTriggerOpen] = useState(false);
-  const [triggerEnv, setTriggerEnv] = useState<string | null>('staging');
   const [triggerVersion, setTriggerVersion] = useState('');
   const [triggerAction, setTriggerAction] = useState<string | null>('full');
   const [triggering, setTriggering] = useState(false);
@@ -147,20 +146,19 @@ export const DeploymentManagementPage: React.FC = () => {
   }, [deployments, loadData]);
 
   const handleTrigger = useCallback(async () => {
-    if (!triggerEnv || !triggerVersion) return;
+    if (!triggerVersion) return;
     setTriggering(true);
     try {
       const res = await apiFetch('/api/superadmin/deployments/trigger', {
         method: 'POST',
         body: JSON.stringify({
-          environment: triggerEnv,
           version: triggerVersion,
           action: triggerAction || 'full',
         }),
       });
       if (res.ok) {
         const data = await res.json();
-        onNotify(`Pipeline ${data.deployId || ''} started for ${triggerEnv}`, 'success');
+        onNotify(`Pipeline ${data.deployId || ''} started`, 'success');
         setTriggerOpen(false);
         loadData();
         // Re-enable polling
@@ -176,7 +174,7 @@ export const DeploymentManagementPage: React.FC = () => {
     } finally {
       setTriggering(false);
     }
-  }, [triggerEnv, triggerVersion, triggerAction, apiFetch, onNotify, loadData]);
+  }, [triggerVersion, triggerAction, apiFetch, onNotify, loadData]);
 
   if (loading) return <Loader size="lg" />;
 
@@ -264,18 +262,13 @@ export const DeploymentManagementPage: React.FC = () => {
         </Table>
       )}
 
-      {/* Trigger Modal */}
+      {/* Trigger Modal — environment auto-detected from CONTAINER_APP_FQDN (SPEC-0058) */}
       <Modal opened={triggerOpen} onClose={() => setTriggerOpen(false)} title="Trigger Deployment Pipeline" size="md">
         <Stack gap="md">
-          <Select
-            label="Environment"
-            data={[
-              { value: 'staging', label: 'Staging' },
-              { value: 'production', label: 'Production' },
-            ]}
-            value={triggerEnv}
-            onChange={setTriggerEnv}
-          />
+          <Text size="sm" c="dimmed">
+            Environment is auto-detected. This pipeline will build, deploy, and verify
+            the version you specify for <strong>this</strong> environment only.
+          </Text>
           <Select
             label="Action"
             data={[
@@ -288,23 +281,17 @@ export const DeploymentManagementPage: React.FC = () => {
           />
           <TextInput
             label="Version"
-            placeholder="e.g. v1.98.14"
+            placeholder="e.g. v1.98.15"
             value={triggerVersion}
             onChange={e => setTriggerVersion(e.currentTarget.value)}
             required
           />
-          {triggerEnv === 'production' && (
-            <Text size="sm" c="red" fw={500}>
-              Warning: This will deploy to production. Ensure staging has been verified first.
-            </Text>
-          )}
           <Group justify="flex-end">
             <Button variant="default" onClick={() => setTriggerOpen(false)}>Cancel</Button>
             <Button
               onClick={handleTrigger}
               loading={triggering}
               disabled={!triggerVersion}
-              color={triggerEnv === 'production' ? 'red' : undefined}
             >
               Start Pipeline
             </Button>

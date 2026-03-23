@@ -106,10 +106,22 @@ _active_pipelines: dict[str, dict[str, Any]] = {}
 # ---------------------------------------------------------------------------
 # Models
 # ---------------------------------------------------------------------------
+def _detect_environment() -> str:
+    """Derive environment from CONTAINER_APP_FQDN. Each instance only knows its own environment."""
+    fqdn = os.environ.get("CONTAINER_APP_FQDN", "")
+    if "staging" in fqdn.lower():
+        return "staging"
+    # Default to production — the production FQDN doesn't contain "staging"
+    return "production"
+
+
 class TriggerRequest(CamelCaseModel):
-    """Request to trigger a deployment pipeline."""
-    environment: str = Field(..., pattern="^(staging|production)$")
-    version: str | None = Field(None, description="Version tag (e.g. v1.98.13). If omitted, uses latest from ACR.")
+    """Request to trigger a deployment pipeline.
+
+    Environment is NOT accepted from the client — it is auto-detected from
+    CONTAINER_APP_FQDN to enforce environment isolation (SPEC-0058).
+    """
+    version: str | None = Field(None, description="Version tag (e.g. v1.98.15). If omitted, uses latest from ACR.")
     action: str = Field("full", pattern="^(build|deploy|full)$")
 
 
@@ -647,15 +659,20 @@ async def _run_pipeline(pipeline: dict) -> None:
 async def trigger_deployment(
     request: TriggerRequest,
 ) -> TriggerResponse:
-    """Trigger a deployment pipeline from the SPA console."""
+    """Trigger a deployment pipeline from the SPA console.
+
+    Environment is auto-detected from CONTAINER_APP_FQDN — the client cannot
+    specify it. Each environment can only deploy to itself (SPEC-0058).
+    """
     deploy_id = f"deploy-{uuid.uuid4().hex[:12]}"
     now = datetime.now(timezone.utc).isoformat()
     version = request.version or ""
+    environment = _detect_environment()
 
     if not version:
         raise HTTPException(
             status_code=400,
-            detail="Version is required (e.g. v1.98.13). Automatic latest detection not yet implemented."
+            detail="Version is required (e.g. v1.98.15). Automatic latest detection not yet implemented."
         )
 
     # Validate version format
@@ -665,7 +682,7 @@ async def trigger_deployment(
     # Create pipeline state
     pipeline: dict[str, Any] = {
         "deploy_id": deploy_id,
-        "environment": request.environment,
+        "environment": environment,
         "version": version,
         "action": request.action,
         "status": PipelineStatus.QUEUED.value,
@@ -692,13 +709,13 @@ async def trigger_deployment(
 
     logger.info(
         "Deployment pipeline %s triggered: %s %s %s",
-        deploy_id, request.action, request.environment, version,
+        deploy_id, request.action, environment, version,
     )
 
     return TriggerResponse(
         deploy_id=deploy_id,
         status="queued",
-        message=f"Pipeline {request.action} started for {request.environment} {version}",
+        message=f"Pipeline {request.action} started for {environment} {version}",
     )
 
 
