@@ -30,7 +30,6 @@ import { ApiKeyLogin, LoginResult } from './login/ApiKeyLogin';
 import { MfaChallenge } from './login/MfaChallenge';
 import { HealthDashboardPage } from './pages/HealthDashboard';
 import { TenantDirectoryPage } from './pages/TenantDirectory';
-import { DeploymentHistoryPage } from './pages/DeploymentHistory';
 import { BillingHealthPage } from './pages/BillingHealth';
 import { SLATrendsPage } from './pages/SLATrends';
 import { QueueHealthPage } from './pages/QueueHealth';
@@ -161,7 +160,7 @@ const App: React.FC = () => {
             <Route path="/" element={<HealthDashboardPage />} />
             <Route path="/tenants" element={<TenantDirectoryPage />} />
             {/* Operations */}
-            <Route path="/deployments" element={<DeploymentHistoryPage />} />
+            <Route path="/deployments" element={<DeploymentManagementPage />} />
             <Route path="/queues" element={<QueueHealthPage />} />
             <Route path="/integrations" element={<IntegrationHealthPage />} />
             <Route path="/status" element={<StatusPageManagement />} />
@@ -178,7 +177,6 @@ const App: React.FC = () => {
             <Route path="/alert-thresholds" element={<AlertThresholdConfigPage />} />
             <Route path="/notification-channels" element={<NotificationChannelConfigPage />} />
 
-            <Route path="/deploy-management" element={<DeploymentManagementPage />} />
             <Route path="/test-execution" element={<TestExecutionPage />} />
             <Route path="/test-execution/:runId" element={<TestRunDetailPage />} />
             <Route path="/maintenance" element={<MaintenanceModePage />} />

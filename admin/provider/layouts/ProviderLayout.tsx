@@ -79,7 +79,7 @@ const NAV_GROUPS: NavGroup[] = [
   {
     group: 'Operations',
     items: [
-      { label: 'Deployments', path: '/deployments', icon: 'deployments', description: 'Deploy history' },
+      { label: 'Deployments', path: '/deployments', icon: 'deployments', description: 'Build, deploy & verify' },
       { label: 'Integrations', path: '/integrations', icon: 'integrations', description: 'Service reliability' },
       { label: 'Status Page', path: '/status', icon: 'status', description: 'Incident management' },
       { label: 'Alerts', path: '/alerts', icon: 'alerts', description: 'Alert rules & history' },
@@ -98,7 +98,6 @@ const NAV_GROUPS: NavGroup[] = [
       { label: 'Blocklists', path: '/blocklists', icon: 'secrets', description: 'Allow/block lists' },
       { label: 'Alert Thresholds', path: '/alert-thresholds', icon: 'alerts', description: 'Threshold config' },
       { label: 'Notifications', path: '/notification-channels', icon: 'email', description: 'Notification channels' },
-      { label: 'Deploy Management', path: '/deploy-management', icon: 'deployments', description: 'Deployment orchestration' },
       { label: 'Test Execution', path: '/test-execution', icon: 'diagnostics', description: 'Test pipeline trigger' },
       { label: 'Maintenance', path: '/maintenance', icon: 'status', description: 'Maintenance mode' },
       { label: 'Experiments', path: '/experiments', icon: 'analytics', description: 'A/B experiment management' },
