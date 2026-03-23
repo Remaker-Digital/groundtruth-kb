@@ -2,8 +2,8 @@
   "_metadata": {
     "description": "Assertion count baseline for pre-commit ratchet. DO NOT EDIT MANUALLY.",
     "generator": "scripts/guardrails/generate_assertion_baseline.py",
-    "total_assertions": 19898,
-    "total_files": 415
+    "total_assertions": 19941,
+    "total_files": 417
   },
   "baselines": {
     "tests/agents/plugins/test_domain_agents.py": 65,
@@ -83,6 +83,7 @@
     "tests/e2e_live/test_visual_live.py": 18,
     "tests/e2e_live/test_widget_config_live.py": 18,
     "tests/e2e_live/test_widget_live.py": 13,
+    "tests/e2e_live/test_widget_storefront_live.py": 5,
     "tests/e2e_mock/test_analytics.py": 30,
     "tests/e2e_mock/test_billing.py": 40,
     "tests/e2e_mock/test_configuration.py": 120,
@@ -195,7 +196,7 @@
     "tests/multi_tenant/test_cost_model.py": 90,
     "tests/multi_tenant/test_critic_policy.py": 68,
     "tests/multi_tenant/test_customer_profile_deep.py": 29,
-    "tests/multi_tenant/test_dashboard_health_cards.py": 23,
+    "tests/multi_tenant/test_dashboard_health_cards.py": 20,
     "tests/multi_tenant/test_data_retention.py": 52,
     "tests/multi_tenant/test_default_alert_rules.py": 23,
     "tests/multi_tenant/test_deploy_event_recording.py": 19,
@@ -216,6 +217,7 @@
     "tests/multi_tenant/test_incident_repository.py": 31,
     "tests/multi_tenant/test_incidents_api.py": 88,
     "tests/multi_tenant/test_kb_conflict_scanner.py": 124,
+    "tests/multi_tenant/test_knowledge_archive_lifecycle.py": 41,
     "tests/multi_tenant/test_knowledge_repository.py": 37,
     "tests/multi_tenant/test_knowledge_vectorizer.py": 95,
     "tests/multi_tenant/test_log_retention.py": 51,

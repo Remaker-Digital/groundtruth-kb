@@ -155,48 +155,22 @@ class TestKeyVaultHealthField:
 class TestNATSHealthCard:
 
     @pytest.mark.asyncio
-    @patch("src.multi_tenant.nats_isolation.get_nats_manager")
     @patch("src.multi_tenant.pipeline_resilience.get_circuit_breaker_registry")
     @patch("src.multi_tenant.tenant_secret_service.get_secret_service")
-    async def test_nats_disconnected_shows_not_deployed(self, mock_get_svc, mock_get_cb, mock_get_nats):
-        """NATS not connected → deployed=False (not misleading red 'Disconnected')."""
+    async def test_nats_absent_from_dashboard(self, mock_get_svc, mock_get_cb):
+        """NATS is decommissioned — must NOT appear in system_health (SPEC-1851)."""
         mock_svc = AsyncMock()
         mock_svc.health_check.return_value = {"status": "healthy", "detail": "OK"}
         mock_get_svc.return_value = mock_svc
         mock_get_cb.return_value.health_summary.return_value = {}
-        mock_nats_mgr = MagicMock()
-        mock_nats_mgr.is_connected = False
-        mock_get_nats.return_value = mock_nats_mgr
         _configure(nats_connected=False)
 
         from src.multi_tenant.superadmin_api._dashboard import provider_dashboard
         result = await provider_dashboard()
 
-        nats = result.system_health.get("nats", {})
-        assert nats["deployed"] is False
-        assert nats["connected"] is False
-
-    @pytest.mark.asyncio
-    @patch("src.multi_tenant.nats_isolation.get_nats_manager")
-    @patch("src.multi_tenant.pipeline_resilience.get_circuit_breaker_registry")
-    @patch("src.multi_tenant.tenant_secret_service.get_secret_service")
-    async def test_nats_connected_shows_deployed(self, mock_get_svc, mock_get_cb, mock_get_nats):
-        """NATS connected → deployed=True, connected=True."""
-        mock_svc = AsyncMock()
-        mock_svc.health_check.return_value = {"status": "healthy", "detail": "OK"}
-        mock_get_svc.return_value = mock_svc
-        mock_get_cb.return_value.health_summary.return_value = {}
-        mock_nats_mgr = MagicMock()
-        mock_nats_mgr.is_connected = True
-        mock_get_nats.return_value = mock_nats_mgr
-        _configure(nats_connected=True)
-
-        from src.multi_tenant.superadmin_api._dashboard import provider_dashboard
-        result = await provider_dashboard()
-
-        nats = result.system_health.get("nats", {})
-        assert nats["deployed"] is True
-        assert nats["connected"] is True
+        assert "nats" not in result.system_health, (
+            "NATS is decommissioned and must not appear in the dashboard"
+        )
 
 
 # ---------------------------------------------------------------------------

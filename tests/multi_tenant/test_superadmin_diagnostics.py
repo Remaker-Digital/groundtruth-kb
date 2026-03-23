@@ -133,9 +133,11 @@ class TestTestPipelineModels:
         assert "unit" in VALID_SUITES
 
     def test_test_run_request_defaults(self):
-        """Default test run request targets staging with all tests."""
+        """Default test run request: environment is empty (server auto-detects), suite=all."""
         req = PipelineRunRequest()
-        assert req.environment == "staging"
+        # Environment is intentionally empty — the server overrides it from
+        # its own ENVIRONMENT env var (SPEC-0058 isolation).
+        assert req.environment == ""
         assert req.suite == "all"
         assert req.phases == []
         assert req.dry_run is False
@@ -185,6 +187,9 @@ class TestTriggerTestRun:
         ), patch(
             "src.multi_tenant.repositories.platform.AuditLogRepository",
             return_value=mock_audit_repo,
+        ), patch.dict(
+            "os.environ",
+            {"ENVIRONMENT": "staging"},
         ):
             body = PipelineRunRequest(environment="staging", dry_run=True)
             result = await trigger_test_run(body, mock_tenant_ctx)
