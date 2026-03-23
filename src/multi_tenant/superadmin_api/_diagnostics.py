@@ -607,7 +607,7 @@ async def _dispatch_to_test_host(
                 "target_url": f"https://{fqdn}",
                 "cosmos_endpoint": os.environ.get("COSMOS_DB_ENDPOINT", ""),
                 "cosmos_key": os.environ.get("COSMOS_DB_KEY", ""),
-                "cosmos_db": os.environ.get("COSMOS_DB_DATABASE", "agentred-staging"),
+                "cosmos_db": os.environ.get("COSMOS_DB_DATABASE", ""),
             }
             resp = await client.post(f"{_TEST_HOST_URL}/run", json=payload)
 
@@ -637,7 +637,8 @@ async def _dispatch_to_test_host(
             raise RuntimeError(f"Test host returned {resp.status_code}: {resp.text[:300]}")
 
     except Exception as exc:
-        logger.error("Failed to dispatch to test host: %s", exc, exc_info=True)
+        err_detail = f"{type(exc).__name__}: {exc!r} | TEST_HOST_URL={_TEST_HOST_URL}"
+        logger.error("Failed to dispatch to test host: %s", err_detail, exc_info=True)
         try:
             repo = _get_platform_repo()
             now_iso = datetime.now(timezone.utc).isoformat()
@@ -649,7 +650,7 @@ async def _dispatch_to_test_host(
                     "run_id": run_id, "environment": environment, "suite": suite,
                     "status": "error", "triggered_by": actor,
                     "completed_at": now_iso,
-                    "failures": [{"name": "dispatch", "detail": str(exc)[:500]}],
+                    "failures": [{"name": "dispatch", "detail": err_detail[:500]}],
                     "total_tests": 0, "completed": 0, "passed": 0,
                     "failed": 0, "skipped": 0, "duration_s": 0.0,
                     "phases_run": [], "checks": [],
