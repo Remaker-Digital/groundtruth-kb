@@ -7,6 +7,7 @@ Endpoints are registered on the shared router from _monolith.
 """
 from __future__ import annotations
 
+import asyncio
 import logging
 import os
 from datetime import datetime, timedelta, timezone
@@ -337,22 +338,32 @@ async def provider_dashboard(
     # 1. System health (from service singletons)
     health: dict[str, Any] = {}
 
+    # Cosmos DB health — verify we can read from the tenant repo
     try:
-        from src.multi_tenant.nats_isolation import get_nats_manager
-        nats_mgr = get_nats_manager()
-        connected = nats_mgr.is_connected
-        health["nats"] = {"deployed": connected, "connected": connected}
-    except Exception:
-        health["nats"] = {"deployed": False, "connected": False}
+        if _state._tenant_repo is not None:
+            # Lightweight read — list_active_tenant_ids is cached/fast
+            await _state._tenant_repo.list_active_tenant_ids()
+            health["cosmos"] = {"healthy": True, "status": "healthy", "detail": "Connected"}
+        else:
+            health["cosmos"] = {"healthy": False, "status": "not_initialized", "detail": "Not initialized"}
+    except Exception as exc:
+        health["cosmos"] = {"healthy": False, "status": "error", "detail": str(exc)[:100]}
 
+    # Redis health — check connection via lightweight ping
     try:
-        from src.multi_tenant.pipeline_resilience import get_circuit_breaker_registry
-        cb_registry = get_circuit_breaker_registry()
-        cb_summary = cb_registry.health_summary()
-        health["circuit_breakers"] = cb_summary if cb_summary else {}
-    except Exception:
-        health["circuit_breakers"] = {}
+        redis_url = os.environ.get("REDIS_URL")
+        if redis_url:
+            import redis as redis_lib
+            r = redis_lib.Redis.from_url(redis_url, socket_timeout=3, username=None)
+            pong = await asyncio.get_event_loop().run_in_executor(None, r.ping)
+            health["redis"] = {"healthy": bool(pong), "status": "healthy", "detail": "Connected"}
+            r.close()
+        else:
+            health["redis"] = {"healthy": False, "status": "not_configured", "detail": "REDIS_URL not set"}
+    except Exception as exc:
+        health["redis"] = {"healthy": False, "status": "error", "detail": str(exc)[:100]}
 
+    # Key Vault health
     try:
         from src.multi_tenant.tenant_secret_service import get_secret_service
         secret_svc = get_secret_service()

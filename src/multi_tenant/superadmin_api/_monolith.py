@@ -12,6 +12,7 @@ configure_*() functions. Domain endpoints live in sibling modules:
   _rate_limits.py   -- Rate limit config, retry/back-off config (SPEC-1819, SPEC-1821)
   _alerts.py        -- Alert thresholds, notification channels (SPEC-1822, SPEC-1823)
   _diagnostics.py   -- Test pipeline trigger, diagnostic export (SPEC-1826, SPEC-1827)
+  _deployments.py   -- Self-service deployment pipeline (SPEC-1825)
 
 All domain modules import `router` from this module and register their endpoints
 on it. The router is a single shared object across all modules.

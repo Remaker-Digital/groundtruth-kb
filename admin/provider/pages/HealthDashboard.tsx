@@ -35,8 +35,8 @@ import { tokens } from '../../shared/theme/styles';
 interface DashboardData {
   timestamp: string;
   systemHealth: {
-    nats: { deployed: boolean; connected: boolean };
-    circuitBreakers: { healthy?: boolean; anyOpen?: boolean; services?: Record<string, unknown> };
+    cosmos: { healthy: boolean; status?: string; detail?: string };
+    redis: { healthy: boolean; status?: string; detail?: string };
     keyVault: { healthy: boolean; status?: string; detail?: string };
     version: { api: string; product: string };
   } | null;
@@ -112,30 +112,26 @@ export function HealthDashboardPage() {
       </Group>
 
       {/* System Health Cards */}
-      <SimpleGrid cols={{ base: 1, sm: 2, md: 3 }} spacing="md">
-        <HealthCard
-          label="Key Vault"
-          status={health?.keyVault?.healthy ? 'healthy' : 'degraded'}
-          detail={health?.keyVault?.healthy ? 'Healthy' : (health?.keyVault?.detail ?? 'Degraded')}
-        />
+      <SimpleGrid cols={{ base: 1, sm: 2, md: 4 }} spacing="md">
         <HealthCard
           label="API Version"
           status="info"
           detail={`v${health?.version?.product ?? '?'}`}
         />
         <HealthCard
-          label="Circuit Breakers"
-          status={
-            health?.circuitBreakers?.anyOpen ? 'down'
-              : Object.keys(health?.circuitBreakers?.services ?? {}).length > 0 ? 'healthy'
-              : 'unknown'
-          }
-          detail={
-            health?.circuitBreakers?.anyOpen ? 'Tripped'
-              : Object.keys(health?.circuitBreakers?.services ?? {}).length > 0
-                ? `${Object.keys(health?.circuitBreakers?.services ?? {}).length} OK`
-              : 'Not Initialized'
-          }
+          label="Cosmos DB"
+          status={health?.cosmos?.healthy ? 'healthy' : 'degraded'}
+          detail={health?.cosmos?.healthy ? 'Connected' : (health?.cosmos?.detail ?? 'Unavailable')}
+        />
+        <HealthCard
+          label="Redis"
+          status={health?.redis?.healthy ? 'healthy' : 'degraded'}
+          detail={health?.redis?.healthy ? 'Connected' : (health?.redis?.detail ?? 'Unavailable')}
+        />
+        <HealthCard
+          label="Key Vault"
+          status={health?.keyVault?.healthy ? 'healthy' : (health?.keyVault?.status === 'dev_mode' ? 'info' : 'degraded')}
+          detail={health?.keyVault?.detail ?? (health?.keyVault?.healthy ? 'Healthy' : 'Degraded')}
         />
       </SimpleGrid>
 
