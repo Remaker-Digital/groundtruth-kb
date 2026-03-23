@@ -39,7 +39,10 @@ CONTAINER_APPS = {
     "staging": "agent-red-staging",
     "production": "agent-red-api-gateway",
 }
-TEST_HOST_APP = "agent-red-test-host"
+TEST_HOST_APPS = {
+    "staging": "agent-red-test-host",
+    "production": "agent-red-test-host-prod",
+}
 
 FQDNS = {
     "staging": "agent-red-staging.orangeglacier-f566a4e7.eastus.azurecontainerapps.io",
@@ -255,12 +258,11 @@ def main() -> int:
         return 1
     log(f"  api-gateway:{args.tag} — found")
 
-    if args.environment == "staging":
-        th_tag = args.test_host_tag or args.tag
-        if not verify_acr_tag("test-host", th_tag):
-            log(f"  WARNING: test-host:{th_tag} not found — skipping test host deploy")
-        else:
-            log(f"  test-host:{th_tag} — found")
+    th_tag = args.test_host_tag or args.tag
+    if not verify_acr_tag("test-host", th_tag):
+        log(f"  WARNING: test-host:{th_tag} not found — skipping test host deploy")
+    else:
+        log(f"  test-host:{th_tag} — found")
 
     log("")
 
@@ -270,13 +272,14 @@ def main() -> int:
         _close_log()
         return 1
 
-    # 3. Deploy test host (staging only)
-    if args.environment == "staging":
+    # 3. Deploy test host (both environments)
+    th_app = TEST_HOST_APPS.get(args.environment)
+    if th_app:
         th_tag = args.test_host_tag or args.tag
         th_image = f"{ACR_LOGIN_SERVER}/test-host:{th_tag}"
         log("")
-        log("Deploying test host...")
-        if not deploy_container(TEST_HOST_APP, th_image):
+        log(f"Deploying test host ({th_app})...")
+        if not deploy_container(th_app, th_image):
             log("  WARNING: Test host deploy failed (non-fatal)")
 
     log("")

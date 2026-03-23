@@ -1,7 +1,7 @@
 /**
  * TestExecution — Test pipeline trigger and result monitoring.
  *
- * Trigger test runs across environments/suites, view run history,
+ * Trigger test runs against the server's own environment, view run history,
  * and inspect individual run results with pass/fail counts.
  *
  * API: POST /api/superadmin/tests/run
@@ -21,7 +21,6 @@ import {
   Group,
   Loader,
   Modal,
-  Select,
   Stack,
   Switch,
   Table,
@@ -153,7 +152,7 @@ export const TestExecutionPage: React.FC = () => {
 
   // Trigger modal
   const [triggerOpen, setTriggerOpen] = useState(false);
-  const [triggerEnv, setTriggerEnv] = useState<string | null>('staging');
+  // Environment is auto-detected by the backend — no client selection needed
   const [triggerSuites, setTriggerSuites] = useState<string[]>([]);
   const [triggering, setTriggering] = useState(false);
 
@@ -181,12 +180,11 @@ export const TestExecutionPage: React.FC = () => {
 
   useEffect(() => { loadData(); }, [loadData]);
 
-  // Fetch available suites when environment changes
+  // Fetch available suites (backend auto-detects its own environment)
   useEffect(() => {
-    if (!triggerEnv) return;
     (async () => {
       try {
-        const res = await apiFetch(`/api/superadmin/tests/available-suites?environment=${triggerEnv}`);
+        const res = await apiFetch('/api/superadmin/tests/available-suites');
         if (res.ok) {
           const data = await res.json();
           const names = new Set<string>();
@@ -207,10 +205,10 @@ export const TestExecutionPage: React.FC = () => {
         setAvailableSuites(null);
       }
     })();
-  }, [triggerEnv, apiFetch]);
+  }, [apiFetch]);
 
   const handleTrigger = useCallback(async () => {
-    if (!triggerEnv || triggerSuites.length === 0) return;
+    if (triggerSuites.length === 0) return;
     setTriggering(true);
 
     // Determine the suite to send: if a composite is selected, use it;
@@ -226,7 +224,6 @@ export const TestExecutionPage: React.FC = () => {
       const res = await apiFetch('/api/superadmin/tests/run', {
         method: 'POST',
         body: JSON.stringify({
-          environment: triggerEnv,
           suite,
           phases: [],
           dryRun: false,
@@ -246,7 +243,7 @@ export const TestExecutionPage: React.FC = () => {
     } finally {
       setTriggering(false);
     }
-  }, [triggerEnv, triggerSuites, apiFetch, onNotify, loadData]);
+  }, [triggerSuites, apiFetch, onNotify, loadData]);
 
   const refreshRun = useCallback(async (runId: string) => {
     try {
@@ -381,15 +378,6 @@ export const TestExecutionPage: React.FC = () => {
       {/* Trigger Modal */}
       <Modal opened={triggerOpen} onClose={() => setTriggerOpen(false)} title="Trigger Test Run" size="md">
         <Stack gap="md">
-          <Select
-            label="Environment"
-            data={[
-              { value: 'staging', label: 'Staging' },
-              { value: 'production', label: 'Production' },
-            ]}
-            value={triggerEnv}
-            onChange={setTriggerEnv}
-          />
           <div>
             <Text fw={500} size="sm" mb="xs">Test Suites</Text>
             <div style={{ maxHeight: 320, overflowY: 'auto' }}>

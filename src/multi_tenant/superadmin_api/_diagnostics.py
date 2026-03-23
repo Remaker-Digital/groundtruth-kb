@@ -261,8 +261,8 @@ class PipelineRunRequest(CamelCaseModel):
     """Request body for triggering a test pipeline run."""
 
     environment: str = Field(
-        default="staging",
-        description="Target environment: staging or production",
+        default="",
+        description="Ignored — server uses its own ENVIRONMENT. Kept for backward compat.",
     )
     suite: str = Field(
         default="all",
@@ -346,11 +346,18 @@ async def trigger_test_run(
     environment (health, Cosmos, Redis, Key Vault, entitlements,
     circuit breakers, SPA assets). Results are stored in Cosmos
     and returned synchronously.
+
+    The target environment is always the server's own ENVIRONMENT —
+    the client cannot select a different environment (SPEC-0058).
     """
+    # Always use server's own environment — ignore client-supplied value
+    server_env = os.environ.get("ENVIRONMENT", "staging")
+    body.environment = server_env
+
     if body.environment not in VALID_ENVIRONMENTS:
         raise HTTPException(
             status_code=400,
-            detail=f"Invalid environment '{body.environment}'. "
+            detail=f"Server ENVIRONMENT '{body.environment}' is not valid. "
             f"Valid: {sorted(VALID_ENVIRONMENTS)}",
         )
     if body.suite not in VALID_SUITES:
@@ -781,13 +788,20 @@ async def get_test_run_checks(
     status_code=200,
 )
 async def get_available_suites(
-    environment: str = Query("staging", description="Target environment"),
+    environment: str = Query("", description="Ignored — server uses its own ENVIRONMENT"),
 ) -> AvailableSuitesResponse:
-    """Return suites filtered by runnability for the SPA suite selector."""
+    """Return suites filtered by runnability for the SPA suite selector.
+
+    Always uses the server's own ENVIRONMENT — the client cannot
+    select a different environment.
+    """
+    # Always use server's own environment
+    environment = os.environ.get("ENVIRONMENT", "staging")
     if environment not in VALID_ENVIRONMENTS:
         raise HTTPException(
-            status_code=400,
-            detail=f"Invalid environment '{environment}'. Valid: {sorted(VALID_ENVIRONMENTS)}",
+            status_code=500,
+            detail=f"Server ENVIRONMENT '{environment}' is not valid. "
+            f"Valid: {sorted(VALID_ENVIRONMENTS)}",
         )
 
     # In-process suites are always available
