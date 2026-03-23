@@ -685,8 +685,9 @@ export const StandaloneLayout: React.FC<StandaloneLayoutProps> = ({
               </Tooltip>
             </Group>
             <Group gap="sm">
-              {/* Storefront / brand name + link */}
-              {(tenantContext?.shopDomain || tenantContext?.brandName) && (
+              {/* SPEC-1848: Tenant identity — MUST NEVER be blank.
+                  Priority: shopDomain link > brandName text > tenantId fallback */}
+              {tenantContext && (
                 tenantContext.shopDomain ? (
                   <Tooltip label={`Open ${tenantContext.shopDomain}`} position="bottom">
                     <a
@@ -694,6 +695,7 @@ export const StandaloneLayout: React.FC<StandaloneLayoutProps> = ({
                       target="_blank"
                       rel="noopener noreferrer"
                       className="ar-link-shop"
+                      data-testid="navbar-tenant-identity"
                       style={{
                         display: 'flex',
                         alignItems: 'center',
@@ -716,6 +718,7 @@ export const StandaloneLayout: React.FC<StandaloneLayoutProps> = ({
                 ) : (
                   <span
                     className="ar-link-shop"
+                    data-testid="navbar-tenant-identity"
                     style={{
                       display: 'flex',
                       alignItems: 'center',
@@ -729,7 +732,7 @@ export const StandaloneLayout: React.FC<StandaloneLayoutProps> = ({
                   >
                     <Icons.storefront />
                     <span style={{ maxWidth: 180, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
-                      {tenantContext.brandName}
+                      {tenantContext.brandName || tenantContext.tenantId}
                     </span>
                   </span>
                 )

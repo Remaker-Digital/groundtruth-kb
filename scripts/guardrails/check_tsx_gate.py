@@ -39,12 +39,20 @@ def get_staged_tsx_files() -> list[str]:
     ]
 
 
-def get_commit_message() -> str:
-    """Read the pending commit message from COMMIT_EDITMSG."""
-    msg_file = PROJECT_ROOT / ".git" / "COMMIT_EDITMSG"
-    if msg_file.exists():
+def get_commit_message(msg_file_arg: str | None = None) -> str:
+    """Read the commit message from the file path provided by git.
+
+    When run as a commit-msg hook, git passes the message file as $1.
+    Falls back to .git/COMMIT_EDITMSG for manual invocation.
+    """
+    if msg_file_arg:
+        msg_path = Path(msg_file_arg)
+    else:
+        msg_path = PROJECT_ROOT / ".git" / "COMMIT_EDITMSG"
+
+    if msg_path.exists():
         try:
-            return msg_file.read_text(encoding="utf-8", errors="replace")
+            return msg_path.read_text(encoding="utf-8", errors="replace")
         except OSError:
             pass
     return ""
@@ -55,7 +63,9 @@ def main() -> int:
     if not tsx_files:
         return 0  # No TSX files staged
 
-    message = get_commit_message()
+    # Accept message file path as first argument (commit-msg hook passes $1)
+    msg_file_arg = sys.argv[1] if len(sys.argv) > 1 else None
+    message = get_commit_message(msg_file_arg)
 
     if SPEC_PATTERN.search(message):
         return 0  # SPEC-ID found in commit message

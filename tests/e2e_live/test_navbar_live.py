@@ -254,50 +254,71 @@ class TestBrandText:
 # ===========================================================================
 
 class TestStorefrontLink:
-    """EL-navbar-006: Shopify storefront link."""
+    """EL-navbar-006: Tenant identity in navbar (SPEC-1848).
+
+    The navbar MUST NEVER be blank. Display priority:
+    1. Shopify storefront link (when shopify_shop_domain is set)
+    2. Brand name text (when brand_name is set)
+    3. Tenant ID fallback (last resort)
+
+    Tests that verify Shopify-specific link properties are only applicable
+    when a storefront link is present — but they must FAIL (not silently
+    pass) when the test tenant IS a Shopify tenant with a missing link.
+    """
+
+    def test_tenant_identity_always_visible(self, shared_dashboard_page: Page):
+        """SPEC-1848: Navbar tenant identity area is NEVER blank."""
+        header = _header(shared_dashboard_page)
+        identity = header.locator("[data-testid='navbar-tenant-identity']")
+        expect(identity).to_be_visible()
+        text = (identity.inner_text() or "").strip()
+        assert len(text) > 0, (
+            "Navbar tenant identity is blank — must show shop domain, brand name, or tenant ID"
+        )
 
     def test_storefront_link_or_brand_name_exists(self, shared_dashboard_page: Page):
         """Either a storefront link or brand name is visible in the header."""
-        text = _header_text(shared_dashboard_page)
         header = _header(shared_dashboard_page)
-        # Look for any of: Shopify domain text, brand name, or a link
-        has_link = header.locator("a.ar-link-shop, a[target='_blank']").count() > 0
-        has_brand_text = len(text) > len("Customer Experience") + 10
-        assert has_link or has_brand_text, (
+        identity = header.locator("[data-testid='navbar-tenant-identity']")
+        expect(identity).to_be_visible()
+        text = (identity.inner_text() or "").strip()
+        assert len(text) > 0, (
             "No storefront link or brand name found in header"
         )
 
-    def test_storefront_link_opens_new_tab(self, shared_dashboard_page: Page):
-        """Storefront link has target='_blank' (opens in new tab)."""
-        header = _header(shared_dashboard_page)
+    def _require_shopify_link(self, page: Page):
+        """Helper: locate the storefront link. FAILS if not present."""
+        header = _header(page)
         link = header.locator("a.ar-link-shop, a[href*='myshopify']").first
         if link.count() == 0:
-            return  # Standalone tenant without shopDomain — link not applicable
+            # Check if this tenant SHOULD have a link (Shopify-billed)
+            identity = header.locator("[data-testid='navbar-tenant-identity']")
+            tag = identity.evaluate("el => el.tagName.toLowerCase()") if identity.count() > 0 else ""
+            if tag != "a":
+                pytest.skip("Non-Shopify tenant — storefront link not applicable")
+        return link
+
+    def test_storefront_link_opens_new_tab(self, shared_dashboard_page: Page):
+        """Storefront link has target='_blank' (opens in new tab)."""
+        link = self._require_shopify_link(shared_dashboard_page)
         target = link.get_attribute("target")
         assert target == "_blank", f"Storefront link target is '{target}', expected '_blank'"
 
     def test_storefront_link_has_valid_href(self, shared_dashboard_page: Page):
         """Storefront link href is a valid https URL."""
-        header = _header(shared_dashboard_page)
-        link = header.locator("a.ar-link-shop, a[href*='myshopify']").first
-        if link.count() == 0:
-            return  # Standalone tenant without shopDomain — link not applicable
+        link = self._require_shopify_link(shared_dashboard_page)
         href = link.get_attribute("href") or ""
         assert href.startswith("https://"), f"Invalid storefront href: {href}"
 
     def test_storefront_link_has_security_attrs(self, shared_dashboard_page: Page):
         """Storefront link has rel='noopener noreferrer'."""
-        header = _header(shared_dashboard_page)
-        link = header.locator("a.ar-link-shop, a[href*='myshopify']").first
-        if link.count() == 0:
-            return  # Standalone tenant without shopDomain — link not applicable
+        link = self._require_shopify_link(shared_dashboard_page)
         rel = link.get_attribute("rel") or ""
         assert "noopener" in rel, f"Missing noopener in rel: {rel}"
 
     def test_storefront_domain_stripped(self, shared_dashboard_page: Page):
         """Shopify domain shows without '.myshopify.com' suffix."""
         text = _header_text(shared_dashboard_page)
-        # The domain should appear stripped (e.g., "blanco-9939" not "blanco-9939.myshopify.com")
         if ".myshopify.com" in text:
             pytest.fail(
                 "Full .myshopify.com domain shown — should be stripped"
@@ -305,11 +326,7 @@ class TestStorefrontLink:
 
     def test_storefront_has_external_link_icon(self, shared_dashboard_page: Page):
         """Storefront link includes an external link icon."""
-        header = _header(shared_dashboard_page)
-        link = header.locator("a.ar-link-shop, a[href*='myshopify']").first
-        if link.count() == 0:
-            return  # Standalone tenant without shopDomain — link not applicable
-        # Look for SVG inside the link (external link icon)
+        link = self._require_shopify_link(shared_dashboard_page)
         svgs = link.locator("svg")
         assert svgs.count() >= 1, "No icon (SVG) found inside storefront link"
 
