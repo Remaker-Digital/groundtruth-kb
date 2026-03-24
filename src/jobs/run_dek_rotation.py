@@ -175,7 +175,7 @@ async def rotate_tenant_dek(tenant_id: str, *, dry_run: bool = False) -> dict:
     # Step 4: Store new wrapped DEK (replaces old version in Key Vault)
     if not dry_run and new_wrapped_dek is not None and stats["errors"] == 0:
         new_wrapped_b64 = base64.b64encode(new_wrapped_dek).decode("ascii")
-        await secret_svc.set_secret(tenant_id, TenantSecretType.DEK, new_wrapped_b64)
+        await secret_svc.store_secret(tenant_id, TenantSecretType.DEK, new_wrapped_b64)
         logger.info("New DEK stored for tenant %s", tenant_id)
     elif stats["errors"] > 0 and not dry_run:
         logger.error(
@@ -239,6 +239,39 @@ async def run_rotation(
     logger.info("DEK rotation finished in %.1f seconds", elapsed)
 
 
+async def _bootstrap() -> None:
+    """Initialize Cosmos DB and encryption service for standalone CLI usage."""
+    import os
+    from src.multi_tenant.cosmos_client import get_cosmos_manager
+    from src.multi_tenant.envelope_encryption import (
+        EnvelopeEncryptionService,
+        set_envelope_encryption_service,
+    )
+    from src.multi_tenant.tenant_secret_service import get_secret_service
+
+    cosmos = get_cosmos_manager()
+    await cosmos._ensure_client()
+
+    kek_key_id = os.environ.get("MASTER_KEK_KEY_ID", "")
+    vault_url = os.environ.get("AZURE_KEYVAULT_URL", "")
+    dev_mode = not kek_key_id
+    svc = EnvelopeEncryptionService(
+        dev_mode=dev_mode,
+        kek_key_id=kek_key_id or None,
+        vault_url=vault_url or None,
+    )
+    set_envelope_encryption_service(svc)
+
+    secret_svc = get_secret_service()
+    await secret_svc.initialize()
+
+
+async def _main_async(dry_run: bool, tenant_id: str | None, max_age_days: int) -> None:
+    """Async main: bootstrap then rotate."""
+    await _bootstrap()
+    await run_rotation(dry_run=dry_run, tenant_id=tenant_id, max_age_days=max_age_days)
+
+
 def main() -> None:
     """CLI entry point."""
     parser = argparse.ArgumentParser(description="Rotate tenant DEKs")
@@ -248,7 +281,7 @@ def main() -> None:
     args = parser.parse_args()
 
     logging.basicConfig(level=logging.INFO, format="%(levelname)s %(name)s: %(message)s")
-    asyncio.run(run_rotation(dry_run=args.dry_run, tenant_id=args.tenant, max_age_days=args.max_age_days))
+    asyncio.run(_main_async(dry_run=args.dry_run, tenant_id=args.tenant, max_age_days=args.max_age_days))
 
 
 if __name__ == "__main__":

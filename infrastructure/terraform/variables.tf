@@ -165,6 +165,7 @@ variable "appinsights_connection_string" {
   description = "Application Insights connection string for OpenTelemetry"
   type        = string
   sensitive   = true
+  default     = ""
 }
 
 # ---------------------------------------------------------------------------

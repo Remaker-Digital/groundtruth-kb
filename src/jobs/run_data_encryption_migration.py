@@ -88,7 +88,7 @@ async def _get_or_create_tenant_dek(
     wrapped_dek = await svc.create_tenant_dek(tenant_id)
     # Store wrapped DEK in Key Vault
     wrapped_b64 = base64.b64encode(wrapped_dek).decode("ascii")
-    await secret_svc.set_secret(tenant_id, TenantSecretType.DEK, wrapped_b64)
+    await secret_svc.store_secret(tenant_id, TenantSecretType.DEK, wrapped_b64)
     logger.info("Created and stored new DEK for tenant %s", tenant_id)
     return wrapped_dek
 
@@ -239,6 +239,42 @@ async def run_migration(*, dry_run: bool = False, tenant_id: str | None = None) 
     logger.info("Migration finished in %.1f seconds", elapsed)
 
 
+async def _bootstrap() -> None:
+    """Initialize Cosmos DB and encryption service for standalone CLI usage."""
+    import os
+    from src.multi_tenant.cosmos_client import get_cosmos_manager
+    from src.multi_tenant.envelope_encryption import (
+        EnvelopeEncryptionService,
+        set_envelope_encryption_service,
+    )
+    from src.multi_tenant.tenant_secret_service import get_secret_service
+
+    # Initialize Cosmos (connect only — skip container creation for migration jobs)
+    cosmos = get_cosmos_manager()
+    await cosmos._ensure_client()
+
+    # Initialize encryption service
+    kek_key_id = os.environ.get("MASTER_KEK_KEY_ID", "")
+    vault_url = os.environ.get("AZURE_KEYVAULT_URL", "")
+    dev_mode = not kek_key_id
+    svc = EnvelopeEncryptionService(
+        dev_mode=dev_mode,
+        kek_key_id=kek_key_id or None,
+        vault_url=vault_url or None,
+    )
+    set_envelope_encryption_service(svc)
+
+    # Initialize secret service
+    secret_svc = get_secret_service()
+    await secret_svc.initialize()
+
+
+async def _main_async(dry_run: bool, tenant_id: str | None) -> None:
+    """Async main: bootstrap services then run migration."""
+    await _bootstrap()
+    await run_migration(dry_run=dry_run, tenant_id=tenant_id)
+
+
 def main() -> None:
     """CLI entry point."""
     parser = argparse.ArgumentParser(description="Encrypt tenant data at rest")
@@ -247,7 +283,7 @@ def main() -> None:
     args = parser.parse_args()
 
     logging.basicConfig(level=logging.INFO, format="%(levelname)s %(name)s: %(message)s")
-    asyncio.run(run_migration(dry_run=args.dry_run, tenant_id=args.tenant))
+    asyncio.run(_main_async(dry_run=args.dry_run, tenant_id=args.tenant))
 
 
 if __name__ == "__main__":

@@ -161,6 +161,19 @@ async def run_scan(*, dry_run: bool = False, tenant_id: str | None = None) -> No
     logger.info("Encryption monitor complete in %.1f seconds", elapsed)
 
 
+async def _bootstrap() -> None:
+    """Initialize Cosmos DB for standalone CLI usage."""
+    from src.multi_tenant.cosmos_client import get_cosmos_manager
+    cosmos = get_cosmos_manager()
+    await cosmos._ensure_client()
+
+
+async def _main_async(dry_run: bool, tenant_id: str | None) -> None:
+    """Async main: bootstrap then scan."""
+    await _bootstrap()
+    await run_scan(dry_run=dry_run, tenant_id=tenant_id)
+
+
 def main() -> None:
     """CLI entry point."""
     parser = argparse.ArgumentParser(description="Scan for unencrypted tenant documents")
@@ -169,7 +182,7 @@ def main() -> None:
     args = parser.parse_args()
 
     logging.basicConfig(level=logging.INFO, format="%(levelname)s %(name)s: %(message)s")
-    asyncio.run(run_scan(dry_run=args.dry_run, tenant_id=args.tenant))
+    asyncio.run(_main_async(dry_run=args.dry_run, tenant_id=args.tenant))
 
 
 if __name__ == "__main__":
