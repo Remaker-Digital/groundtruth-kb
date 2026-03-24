@@ -91,6 +91,7 @@ All GOV specs are stored in KB with `type = 'governance'`. Quick reference:
 | 16 | Deploy gate | No deployment without owner approval |
 | 17 | Quality first | Prioritize quality over effort; software engineering excellence |
 | 18 | Assertion quality | Meaningfulness over coverage; no rubber-stamp assertions |
+| 19 | Outside-in testing | Tests exercise surfaces and behaviors; internals are supplemental |
 
 ### Owner Input Classification Rule (GOV-09)
 

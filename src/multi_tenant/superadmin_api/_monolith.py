@@ -17,6 +17,34 @@ configure_*() functions. Domain endpoints live in sibling modules:
 All domain modules import `router` from this module and register their endpoints
 on it. The router is a single shared object across all modules.
 
+──────────────────────────────────────────────────────────────────────────────
+ZERO-KNOWLEDGE API DESIGN RULE (SPEC-1843 / WI-1614)
+
+SPA endpoints MUST NOT return any data that would disclose a tenant's
+proprietary content, user identities, or business secrets.  Tenant data
+exposed to the SPA is **cleansed**: operational metadata only, never content
+or PII.
+
+  Permitted (operational metadata):
+    Per-tenant conversation count, error rate, escalation rate, cost
+    attribution, billing status, resource utilization metrics, tier, status,
+    billing_channel, creation date.  System-wide aggregates (total MRR, fleet
+    error rate, infrastructure health).  Tenant-initiated disclosures (admin
+    messages to the platform operator).
+
+  Prohibited (content and PII):
+    Conversation messages, customer intent text, escalation reasons, knowledge
+    base articles/titles, customer PII (email, name, phone, address), team
+    member identities, TOTP seeds, API key values, Shopify domains, brand
+    names, webhook URLs, or any other proprietary tenant data.
+
+  Principle:
+    Operational metadata MUST NOT include PII or proprietary tenant data
+    (textual inputs, knowledge articles, user identities, API keys), but MAY
+    include metadata that describes activity/resource utilization and the
+    operational state of the tenancy.
+──────────────────────────────────────────────────────────────────────────────
+
 (c) 2026 Remaker Digital, a DBA of VanDusen & Palmeter, LLC. All rights reserved.
 """
 from __future__ import annotations

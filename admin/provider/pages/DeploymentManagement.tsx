@@ -188,8 +188,27 @@ export const DeploymentManagementPage: React.FC = () => {
         const data = await res.json();
         onNotify(`Pipeline ${data.deployId || ''} started`, 'success');
         setTriggerOpen(false);
-        loadData();
-        // Re-enable polling
+
+        // SPEC-1842: Immediately insert optimistic record so the user
+        // sees feedback before the first polling cycle returns data.
+        const optimistic: DeploymentRecord = {
+          deployId: data.deployId || `deploy-pending`,
+          environment: 'auto-detected',
+          version: triggerVersion,
+          action: triggerAction || 'full',
+          status: 'queued',
+          triggeredBy: 'spa-console',
+          startedAt: new Date().toISOString(),
+          completedAt: null,
+          durationS: null,
+          steps: [],
+          error: null,
+          previousImage: null,
+        };
+        setDeployments(prev => [optimistic, ...prev]);
+
+        // Re-enable polling — next poll replaces the optimistic record
+        // with real server data
         if (!pollRef.current) {
           pollRef.current = setInterval(loadData, 5000);
         }

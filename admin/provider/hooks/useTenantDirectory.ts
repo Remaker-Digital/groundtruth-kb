@@ -2,8 +2,8 @@
  * useTenantDirectory — Shared hook that caches the tenant directory for
  * human-readable tenant identification across all Provider Console pages.
  *
- * Fetches the tenant list once and builds a lookup map:
- *   tenantId → { displayName, customerEmail, shopifyShopDomain }
+ * SPEC-1843 / WI-1611: customerEmail and shopifyShopDomain are no longer
+ * returned by the API.  Display falls back to tenantId only.
  *
  * SPEC-1569 / WI-0883: Provider Console human-readable tenant identification.
  *
@@ -13,18 +13,14 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 
 export interface TenantDisplayInfo {
-  /** Best human-readable name: email → domain → tenantId */
+  /** Display name — tenantId (PII fields removed per SPEC-1843) */
   displayName: string;
-  /** Whether displayName is just the raw UUID (no email/domain available) */
+  /** Always true now that PII display names are removed */
   isUuid: boolean;
-  customerEmail: string | null;
-  shopifyShopDomain: string | null;
 }
 
 interface TenantSummary {
   tenantId: string;
-  customerEmail?: string | null;
-  shopifyShopDomain?: string | null;
 }
 
 /**
@@ -54,14 +50,9 @@ export function useTenantDirectory(
 
         const lookup = new Map<string, TenantDisplayInfo>();
         for (const t of tenants) {
-          const email = t.customerEmail ?? null;
-          const domain = t.shopifyShopDomain ?? null;
-          const displayName = email || domain || t.tenantId;
           lookup.set(t.tenantId, {
-            displayName,
-            isUuid: displayName === t.tenantId,
-            customerEmail: email,
-            shopifyShopDomain: domain,
+            displayName: t.tenantId,
+            isUuid: true,
           });
         }
         setMap(lookup);
@@ -78,8 +69,6 @@ export function useTenantDirectory(
       return map.get(tenantId) ?? {
         displayName: tenantId,
         isUuid: true,
-        customerEmail: null,
-        shopifyShopDomain: null,
       };
     },
     [map],
