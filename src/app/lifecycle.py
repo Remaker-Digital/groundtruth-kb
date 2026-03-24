@@ -255,24 +255,17 @@ async def _startup_tenant_resolution() -> None:
         from src.multi_tenant.repository import TeamMemberRepository
         team_repo = TeamMemberRepository()
 
+        # SPEC-1644: Cross-partition user key resolution removed.
+        # Per-user keys now use verify_user_key_in_partition (below).
+        # This placeholder returns None to satisfy the middleware signature
+        # while the partition-scoped resolver handles all real auth.
         async def resolve_user_api_key(key_hash: str) -> dict | None:
-            """Resolve a per-user API key hash to team member + tenant."""
-            member = await team_repo.find_by_user_api_key_hash(key_hash)
-            if member is None:
-                return None
-            # Fetch the tenant document for this team member
-            try:
-                tenant = await tenant_repo.read(
-                    tenant_id=member["tenant_id"],
-                    document_id=member["tenant_id"],
-                )
-            except Exception:
-                logger.warning(
-                    "User API key resolved to member %s but tenant %s not found",
-                    member.get("email"), member.get("tenant_id"),
-                )
-                return None
-            return {"team_member": member, "tenant": tenant}
+            """DEPRECATED — cross-partition user key lookup removed (SPEC-1644)."""
+            logger.warning(
+                "Cross-partition user key lookup attempted — "
+                "this path is deprecated (SPEC-1644). Use partition-scoped auth."
+            )
+            return None
 
         async def resolve_by_tenant_id(tid: str) -> dict | None:
             """Resolve tenant by ID using pooled repository."""
@@ -320,9 +313,19 @@ async def _startup_tenant_resolution() -> None:
                 return None
             return {"team_member": member, "tenant": tenant}
 
+        # SPEC-1644: Cross-partition API key lookup removed.
+        # Tenant/user keys now use partition-scoped resolvers.
+        # This stub satisfies the middleware signature.
+        async def _deprecated_api_key_lookup(key_hash: str) -> dict | None:
+            logger.warning(
+                "Cross-partition API key lookup attempted — "
+                "this path is deprecated (SPEC-1644). Use partition-scoped auth."
+            )
+            return None
+
         configure_tenant_resolution(
             resolve_by_shop_domain=tenant_repo.find_by_shopify_domain,
-            resolve_by_api_key_hash=tenant_repo.find_by_api_key_hash,
+            resolve_by_api_key_hash=_deprecated_api_key_lookup,
             resolve_by_widget_key_hash=tenant_repo.find_by_widget_key_hash,
             resolve_by_user_api_key_hash=resolve_user_api_key,
             resolve_by_tenant_id=resolve_by_tenant_id,
