@@ -340,47 +340,10 @@ class TestSpec1578ProviderConsoleUI:
 # ===================================================================
 
 
-class TestSpec1568SecretPosture:
-    """SPEC-1568: Secret Posture aggregates secrets from Key Vault,
-    Cosmos DB tenant documents, and TOTP seeds."""
-
-    def test_secret_posture_endpoint_exists(self):
-        """secret_posture function exists in superadmin_api."""
-        from src.multi_tenant import superadmin_api as api
-        assert hasattr(api, "secret_posture"), (
-            "SPEC-1568: secret_posture endpoint must exist"
-        )
-
-    def test_secret_posture_response_model_exists(self):
-        """SecretPostureResponse model must exist."""
-        from src.multi_tenant.superadmin_api import SecretPostureResponse
-        assert SecretPostureResponse is not None, (
-            "SPEC-1568: SecretPostureResponse model must exist"
-        )
-
-    def test_aggregates_key_vault_secrets(self):
-        """Must aggregate secrets from Key Vault."""
-        from src.multi_tenant import superadmin_api as api
-        source = inspect.getsource(api.secret_posture)
-        assert "key_vault" in source.lower() or "keyvault" in source.lower() or "vault" in source.lower(), (
-            "SPEC-1568: Must aggregate secrets from Key Vault"
-        )
-
-    def test_aggregates_cosmos_tenant_fields(self):
-        """Must aggregate sensitive fields from Cosmos tenant documents."""
-        from src.multi_tenant import superadmin_api as api
-        source = inspect.getsource(api.secret_posture)
-        assert "api_key_hash" in source or "tenant" in source.lower(), (
-            "SPEC-1568: Must aggregate Cosmos DB tenant secret fields"
-        )
-
-    def test_aggregates_totp_seeds(self):
-        """Must aggregate TOTP/MFA seed secrets."""
-        from src.multi_tenant import superadmin_api as api
-        source = inspect.getsource(api.secret_posture)
-        assert "totp" in source.lower(), (
-            "SPEC-1568: Must aggregate TOTP seed secrets"
-        )
+# TestSpec1568SecretPosture REMOVED (WI-1640 / S137):
+# GET /secrets/posture endpoint was intentionally removed per SPEC-1843 (ZK mandate).
+# Replaced by GET /health/secrets (aggregate counts only, no per-tenant detail).
+# Replacement tests: TEST-10901 through TEST-10934 (ZK test suite).
 
 
 # ===================================================================

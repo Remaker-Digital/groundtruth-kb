@@ -15,6 +15,7 @@ from tests.conftest import (
     TEST_API_KEY_STARTER,
     TEST_API_KEY_PROFESSIONAL,
     TEST_API_KEY_ENTERPRISE,
+    STARTER_TENANT_ID,
     auth_headers_api_key,
     make_tenant_context,
 )
@@ -80,8 +81,9 @@ class TestAppClientAuth:
         assert resp.status_code == 401
 
     def test_protected_endpoint_with_api_key(self, app_client):
+        # SPEC-1644: API key auth requires ?tenant= for partition-scoped lookup
         resp = app_client.get(
-            "/api/dashboard/usage",
+            f"/api/dashboard/usage?tenant={STARTER_TENANT_ID}",
             headers=auth_headers_api_key(TEST_API_KEY_STARTER),
         )
         # Should not be 401 — auth should pass.

@@ -27,8 +27,16 @@ logger = logging.getLogger(__name__)
 
 
 class TenantSummaryItem(CamelCaseModel):
-    """Single tenant in the directory listing."""
+    """Single tenant in the directory listing.
 
+    SPEC-1843 v6 boundary: ``customer_email`` and ``shopify_shop_domain``
+    are TENANCY MANAGEMENT data (SPEC-1637: required for tenancy setup,
+    billing, and technical communication).  These are superadmin contact
+    and storefront identifiers, NOT end-customer PII.
+
+    WI-1641: fields restored after S137 audit found WI-1611 over-applied
+    the ZK mandate.
+    """
 
     tenant_id: str
     status: str
@@ -225,10 +233,13 @@ async def list_all_tenants(
         total = item
 
     # Data query with pagination via OFFSET/LIMIT
+    # SPEC-1843 v6 / WI-1641: customer_email and shopify_shop_domain restored
+    # (tenancy management data per SPEC-1637)
     data_query = (
         f"SELECT c.tenant_id, c.status, c.tier, c.billing_channel, "
-        f"c.customer_email, c.shopify_shop_domain, c.created_at, "
-        f"c.updated_at, c.deactivated_at, c.consent_status, c.expires_at "
+        f"c.customer_email, c.shopify_shop_domain, "
+        f"c.created_at, c.updated_at, c.deactivated_at, "
+        f"c.consent_status, c.expires_at "
         f"FROM c WHERE {where_clause} "
         f"ORDER BY c.created_at DESC "
         f"OFFSET {skip} LIMIT {limit}"

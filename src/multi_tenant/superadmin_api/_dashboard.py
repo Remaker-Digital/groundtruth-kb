@@ -73,13 +73,22 @@ class TenantBillingHealth(CamelCaseModel):
 
 
 class BillingHealthResponse(CamelCaseModel):
-    """Provider-level billing health across all tenants."""
+    """Provider-level billing health across all tenants.
 
+    SPEC-1843 v6 boundary: per-tenant billing health is TENANCY MANAGEMENT
+    data — the operator needs to identify which tenant has a billing
+    discrepancy.  The ``tenants`` list contains only tenant_id, tier, and
+    reconciliation status (no conversation content, no customer PII).
+
+    WI-1641: ``tenants`` field restored after S137 audit found WI-1613
+    over-applied the ZK mandate.
+    """
 
     timestamp: str
-    tenants: list[TenantBillingHealth]
     total_tenants: int = 0
+    tenants_healthy: int = 0
     tenants_needing_review: int = 0
+    tenants: list[TenantBillingHealth] = Field(default_factory=list)
     webhook_success_rate: float | None = None
 
 
@@ -518,11 +527,16 @@ async def billing_health(
         # Webhook stats function may not exist yet
         pass
 
+    # SPEC-1843 v6: per-tenant billing health is tenancy management data
+    # (operator needs to identify which tenant has a discrepancy).
+    # WI-1641: tenants list restored after S137 over-application audit.
+    healthy_count = sum(1 for t in tenants_health if not t.needs_review)
     return BillingHealthResponse(
         timestamp=now,
-        tenants=tenants_health,
         total_tenants=len(tenants_health),
+        tenants_healthy=healthy_count,
         tenants_needing_review=needs_review_count,
+        tenants=tenants_health,
         webhook_success_rate=webhook_rate,
     )
 
@@ -796,201 +810,72 @@ async def compliance_summary(
 
 
 # ---------------------------------------------------------------------------
-# C-4: Secret Posture
+# C-4: Secret Health (aggregate only — SPEC-1843 zero-knowledge)
 # ---------------------------------------------------------------------------
 
 
+class SecretHealthResponse(CamelCaseModel):
+    """Aggregate secret health — no per-tenant detail (SPEC-1843).
+
+    This replaces the former ``/secrets/posture`` endpoint which exposed
+    per-tenant secret inventories, customer emails, and TOTP seeds.
+    """
+
+    tenants_with_api_key: int = 0
+    tenants_with_widget_key: int = 0
+    tenants_missing_keys: int = 0
+
+
 @router.get(
-    "/secrets/posture",
-    response_model=SecretPostureResponse,
-    summary="Secret posture across all tenants",
+    "/health/secrets",
+    response_model=SecretHealthResponse,
+    summary="Aggregate secret health across tenants (SPEC-1843)",
     description=(
-        "Secret inventory and classification across all tenants. "
-        "Shows which tenants have Shopify, Stripe, and API key secrets."
+        "Returns aggregate counts of tenants with/without API and widget keys. "
+        "No per-tenant detail, no PII, no secret values. "
+        "Replaces the former /secrets/posture endpoint."
     ),
     status_code=200,
 )
-async def secret_posture(
+async def secret_health() -> SecretHealthResponse:
+    """Return aggregate secret health — SPEC-1843 compliant.
 
-) -> SecretPostureResponse:
-    """Get secret posture across all tenants.
-
-    Aggregates credentials from ALL storage locations:
-    - Key Vault: tenant-{id}-* secrets (Shopify tokens, Stripe keys, etc.)
-    - Cosmos DB TenantDocument: api_key_hash, widget_key_hash, shopify_shop_domain,
-      stripe_customer_id, customer_email
-    - Key Vault: user-{member_id}-totp-seed per team member (TOTP/MFA)
+    Counts only boolean key-presence flags from Cosmos DB TenantDocuments.
+    Does NOT access Key Vault, TOTP seeds, or any secret values.
     """
-    if _state._secret_service is None:
-        raise HTTPException(status_code=503, detail="Secret service not configured")
-
     if _state._tenant_repo is None:
         raise HTTPException(status_code=503, detail="Service not configured")
 
     tenant_ids = await _state._tenant_repo.list_active_tenant_ids()
-    tenants: list[TenantSecretInfo] = []
-    errors: list[dict[str, str]] = []
-    global_by_type: dict[str, int] = {}
-    total_secrets = 0
-    shopify_count = 0
-    stripe_count = 0
     api_key_count = 0
+    widget_key_count = 0
+    missing_count = 0
 
     for tid in tenant_ids:
         try:
-            # ── Source 1: Key Vault tenant-prefixed secrets ──────────────
-            secrets = await _state._secret_service.list_tenant_secrets(tid)
-            info = TenantSecretInfo(tenant_id=tid)
-
-            # ── Source 2: Cosmos DB TenantDocument ───────────────────────
-            tenant_doc: dict[str, Any] | None = None
-            try:
-                tenant_doc = await _state._tenant_repo.read(tid, tid)
-            except Exception:
-                pass
-
-            if tenant_doc:
-                info.tier = tenant_doc.get("tier")
-                info.customer_email = tenant_doc.get("customer_email")
-                info.shopify_shop_domain = tenant_doc.get("shopify_shop_domain")
-
-                # Detect integrations from Cosmos DB fields
-                if tenant_doc.get("shopify_shop_domain"):
-                    info.has_shopify = True
-                if tenant_doc.get("stripe_customer_id"):
-                    info.has_stripe = True
-                if tenant_doc.get("api_key_hash"):
-                    info.has_api_key = True
-                if tenant_doc.get("widget_key_hash"):
-                    info.has_api_key = True
-
-                # Track Cosmos-stored credential timestamps
-                created_at = tenant_doc.get("created_at")
-                updated_at = tenant_doc.get("updated_at")
-
-            # ── Source 3: TOTP seeds via team members ────────────────────
-            totp_count = 0
-            try:
-                from src.multi_tenant.cosmos_schema import COLLECTION_TEAM_MEMBERS
-                from src.multi_tenant.cosmos_client import get_cosmos_manager
-
-                team_container = get_cosmos_manager().get_container(COLLECTION_TEAM_MEMBERS)
-                member_ids: list[str] = []
-                async for member in team_container.query_items(
-                    query="SELECT c.id FROM c WHERE c.tenant_id = @tid AND c.is_active = true",
-                    parameters=[{"name": "@tid", "value": tid}],
-                    partition_key=tid,
-                ):
-                    member_ids.append(member["id"])
-
-                for mid in member_ids:
-                    try:
-                        seed = await _state._secret_service.get_secret_raw(
-                            f"user-{mid}-totp-seed"
-                        )
-                        if seed:
-                            totp_count += 1
-                    except Exception:
-                        pass
-            except Exception:
-                pass
-
-            info.totp_count = totp_count
-
-            # Count KV secrets + Cosmos-stored credentials + TOTP seeds
-            cosmos_credential_count = 0
-            if tenant_doc:
-                if tenant_doc.get("api_key_hash"):
-                    cosmos_credential_count += 1
-                if tenant_doc.get("widget_key_hash"):
-                    cosmos_credential_count += 1
-
-            info.secret_count = len(secrets) + cosmos_credential_count + totp_count
-            total_secrets += info.secret_count
-
-            # Classify KV secrets by type
-            by_type: dict[str, int] = {}
-            oldest: str | None = None
-            newest: str | None = None
-            disabled = 0
-
-            for s in secrets:
-                stype = s.get("type", "unknown")
-                by_type[stype] = by_type.get(stype, 0) + 1
-                global_by_type[stype] = global_by_type.get(stype, 0) + 1
-
-                created = s.get("created")
-                if created:
-                    if oldest is None or created < oldest:
-                        oldest = created
-                    if newest is None or created > newest:
-                        newest = created
-
-                if s.get("enabled") is False:
-                    disabled += 1
-
-                # Also detect integrations from KV (supplements Cosmos check)
-                stype_lower = stype.lower()
-                if "shopify" in stype_lower:
-                    info.has_shopify = True
-                if "stripe" in stype_lower:
-                    info.has_stripe = True
-                if "api_key" in stype_lower or "api-key" in stype_lower:
-                    info.has_api_key = True
-
-            # Add Cosmos-sourced types
-            if tenant_doc:
-                if tenant_doc.get("api_key_hash"):
-                    by_type["api_key_hash"] = by_type.get("api_key_hash", 0) + 1
-                    global_by_type["api_key_hash"] = global_by_type.get("api_key_hash", 0) + 1
-                if tenant_doc.get("widget_key_hash"):
-                    by_type["widget_key_hash"] = by_type.get("widget_key_hash", 0) + 1
-                    global_by_type["widget_key_hash"] = global_by_type.get("widget_key_hash", 0) + 1
-
-            # Add TOTP seeds type
-            if totp_count > 0:
-                by_type["totp_seed"] = totp_count
-                global_by_type["totp_seed"] = global_by_type.get("totp_seed", 0) + totp_count
-
-            # Track oldest/newest across Cosmos timestamps too
-            if tenant_doc:
-                for ts_field in ("created_at", "updated_at"):
-                    ts = tenant_doc.get(ts_field)
-                    if ts:
-                        if oldest is None or ts < oldest:
-                            oldest = ts
-                        if newest is None or ts > newest:
-                            newest = ts
-
-            info.secrets_by_type = by_type
-            info.oldest_secret = oldest
-            info.newest_secret = newest
-            info.disabled_secrets = disabled
-
-            if info.has_shopify:
-                shopify_count += 1
-            if info.has_stripe:
-                stripe_count += 1
-            if info.has_api_key:
+            tenant_doc = await _state._tenant_repo.read(tid, tid)
+            has_api = bool(tenant_doc and tenant_doc.get("api_key_hash"))
+            has_widget = bool(tenant_doc and tenant_doc.get("widget_key_hash"))
+            if has_api:
                 api_key_count += 1
+            if has_widget:
+                widget_key_count += 1
+            if not has_api and not has_widget:
+                missing_count += 1
+        except Exception:
+            missing_count += 1
 
-            tenants.append(info)
-        except Exception as exc:
-            errors.append({
-                "tenant_id": tid,
-                "message": f"Secret posture check failed: {exc}",
-            })
-
-    return SecretPostureResponse(
-        total_tenants=len(tenants),
-        total_secrets=total_secrets,
-        secrets_by_type_global=global_by_type,
-        tenants_with_shopify=shopify_count,
-        tenants_with_stripe=stripe_count,
+    return SecretHealthResponse(
         tenants_with_api_key=api_key_count,
-        tenants=tenants,
-        errors=errors,
+        tenants_with_widget_key=widget_key_count,
+        tenants_missing_keys=missing_count,
     )
+
+
+# NOTE: GET /secrets/posture has been REMOVED (SPEC-1843 / WI-1606).
+# The endpoint exposed per-tenant secret inventories, customer emails,
+# TOTP seed counts, and Shopify domains — all prohibited under the
+# zero-knowledge mandate. Use GET /health/secrets for aggregate health.
 
 
 # ---------------------------------------------------------------------------

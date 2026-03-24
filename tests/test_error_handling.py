@@ -19,6 +19,9 @@ from tests.conftest import (
     TEST_API_KEY_STARTER,
     TEST_API_KEY_PROFESSIONAL,
     TEST_API_KEY_ENTERPRISE,
+    STARTER_TENANT_ID,
+    PROFESSIONAL_TENANT_ID,
+    ENTERPRISE_TENANT_ID,
 )
 
 
@@ -29,8 +32,9 @@ from tests.conftest import (
 
 class TestEH01MalformedJSON:
     def test_invalid_json_body(self, professional_client):
+        # SPEC-1644: Use .raw for raw content but include ?tenant= for auth
         resp = professional_client.raw.put(
-            "/api/config",
+            f"/api/config?tenant={PROFESSIONAL_TENANT_ID}",
             content=b"{invalid json",
             headers={
                 "Content-Type": "application/json",

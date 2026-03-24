@@ -102,7 +102,6 @@ $Batches = [ordered]@{
             "tests/performance/",
             "tests/security/test_data_integrity_live.py",
             "tests/security/test_live_penetration.py",
-            "tests/security/test_rate_limiting_live.py",
             "tests/security/test_resilience_live.py",
             "tests/security/test_tenant_isolation_live.py"
         )

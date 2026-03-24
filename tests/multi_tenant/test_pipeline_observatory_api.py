@@ -213,15 +213,19 @@ class TestTenantDetail:
 
     @pytest.mark.asyncio
     async def test_detail_includes_trends(self, superadmin_ctx):
-        """Detail includes trend and breakdown arrays (TEST-2765)."""
+        """Detail includes trend and breakdown arrays.
+
+        WI-1640 / S137: intent_distribution and recent_conversations removed
+        per SPEC-1843 (tenant business data). Only operational metrics retained.
+        """
         result = await get_tenant_pipeline_metrics(
             tenant_id="tenant-001", period="24h"
         )
         assert hasattr(result, "volume_trend")
         assert hasattr(result, "cost_trend")
         assert hasattr(result, "agent_breakdown")
-        assert hasattr(result, "intent_distribution")
-        assert hasattr(result, "recent_conversations")
+        # intent_distribution REMOVED: tenant business data (SPEC-1843)
+        # recent_conversations REMOVED: tenant business data (SPEC-1843)
 
 
 # ---------------------------------------------------------------------------

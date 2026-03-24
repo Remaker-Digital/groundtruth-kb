@@ -986,18 +986,20 @@ async def get_cost_analytics(
             total_output = 0
             if _state._conv_repo:
                 try:
+                    # SPEC-1843 / WI-1609: Never select c.messages —
+                    # use only c.message_count for cost estimation.
                     convs = await _state._conv_repo.query(
                         tid,
-                        "SELECT c.id, c.message_count, c.messages FROM c "
+                        "SELECT c.id, c.message_count, c.started_at FROM c "
                         "WHERE c.started_at >= @start "
                         "ORDER BY c.started_at DESC "
                         "OFFSET 0 LIMIT 500",
                         [{"name": "@start", "value": period_start}],
                     )
                     conv_count = len(convs)
-                    # Estimate tokens from messages (avg ~150 tokens/message)
+                    # Estimate tokens from message_count (avg ~150 tokens/message)
                     for c in convs:
-                        msg_count = c.get("message_count", 0) or len(c.get("messages", []))
+                        msg_count = c.get("message_count", 0)
                         total_input += int(msg_count * 75)   # customer msgs
                         total_output += int(msg_count * 150)  # AI responses
                 except Exception:
@@ -1110,12 +1112,22 @@ class TenantAbuseProfileModel(CamelCaseModel):
 
 
 class AbuseOverviewResponse(CamelCaseModel):
-    """Platform-wide abuse scan results."""
+    """Platform-wide abuse scan results.
+
+    SPEC-1843 v6 boundary: per-tenant abuse flags are TENANCY MANAGEMENT
+    data — the operator needs to identify which tenant to throttle or
+    contact.  ``high_risk_tenants`` restored with tenant_id + risk_score
+    + signal types only (no conversation content, no customer PII).
+
+    WI-1641: ``high_risk_tenants`` restored after S137 audit found WI-1610
+    over-applied the ZK mandate.
+    """
 
     total_tenants_scanned: int = 0
     flagged_count: int = 0
-    signals_by_type: dict[str, int] = Field(default_factory=dict)
+    high_risk_count: int = 0
     high_risk_tenants: list[TenantAbuseProfileModel] = Field(default_factory=list)
+    signals_by_type: dict[str, int] = Field(default_factory=dict)
 
 
 class FlagTenantRequest(BaseModel):
@@ -1246,14 +1258,15 @@ async def get_abuse_signals(
         except Exception:
             logger.debug("Abuse scan failed for tenant %s", tid)
 
-    # Sort by risk score descending
-    high_risk.sort(key=lambda x: x.risk_score, reverse=True)
-
+    # SPEC-1843 v6: per-tenant abuse flags are tenancy management data
+    # (operator needs to identify which tenant to throttle/contact).
+    # WI-1641: high_risk_tenants restored after S137 over-application audit.
     return AbuseOverviewResponse(
         total_tenants_scanned=len(tenant_ids),
         flagged_count=flagged_count,
-        signals_by_type=signals_by_type,
+        high_risk_count=len(high_risk),
         high_risk_tenants=high_risk,
+        signals_by_type=signals_by_type,
     )
 
 

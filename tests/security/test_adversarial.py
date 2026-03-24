@@ -422,10 +422,11 @@ class TestRateLimitExhaustion:
     def test_sec_21_burst_rate_limited(self, app_client):
         """SEC-21: Rapid burst of requests triggers rate limiting."""
         # All tiers now share 500 RPM (DOC-145) — send 65 requests rapidly
+        # SPEC-1644: API key auth requires ?tenant= for partition-scoped lookup
         statuses = []
         for _ in range(65):
             resp = app_client.get(
-                "/api/dashboard/usage",
+                f"/api/dashboard/usage?tenant={STARTER_TENANT_ID}",
                 headers=auth_headers_api_key(TEST_API_KEY_STARTER),
             )
             statuses.append(resp.status_code)

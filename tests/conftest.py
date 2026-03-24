@@ -623,31 +623,40 @@ def app_client(
 @pytest.fixture
 def starter_client(app_client: TestClient) -> AuthenticatedClient:
     """TestClient pre-authenticated as the Starter tenant."""
-    return AuthenticatedClient(app_client, TEST_API_KEY_STARTER)
+    return AuthenticatedClient(app_client, TEST_API_KEY_STARTER, STARTER_TENANT_ID)
 
 
 @pytest.fixture
 def professional_client(app_client: TestClient) -> AuthenticatedClient:
     """TestClient pre-authenticated as the Professional tenant."""
-    return AuthenticatedClient(app_client, TEST_API_KEY_PROFESSIONAL)
+    return AuthenticatedClient(app_client, TEST_API_KEY_PROFESSIONAL, PROFESSIONAL_TENANT_ID)
 
 
 @pytest.fixture
 def enterprise_client(app_client: TestClient) -> AuthenticatedClient:
     """TestClient pre-authenticated as the Enterprise tenant."""
-    return AuthenticatedClient(app_client, TEST_API_KEY_ENTERPRISE)
+    return AuthenticatedClient(app_client, TEST_API_KEY_ENTERPRISE, ENTERPRISE_TENANT_ID)
 
 
 @pytest.fixture
 def spa_client(app_client: TestClient) -> AuthenticatedClient:
-    """TestClient pre-authenticated as the SPA platform admin."""
+    """TestClient pre-authenticated as the SPA platform admin.
+
+    SPEC-1644: SPA keys (ar_spa_* prefix) are exempt from ?tenant=
+    requirement — they authenticate against the platform_admins
+    collection, not a tenant partition.
+    """
     return AuthenticatedClient(app_client, TEST_SPA_KEY)
 
 
 @pytest.fixture
 def user_client(app_client: TestClient) -> AuthenticatedClient:
-    """TestClient pre-authenticated as a per-user (superadmin role) team member."""
-    return AuthenticatedClient(app_client, TEST_USER_KEY)
+    """TestClient pre-authenticated as a per-user (superadmin role) team member.
+
+    SPEC-1644: User keys (ar_user_* prefix) require ?tenant= for
+    partition-scoped lookup. This user belongs to the Starter tenant.
+    """
+    return AuthenticatedClient(app_client, TEST_USER_KEY, STARTER_TENANT_ID)
 
 
 @pytest.fixture
@@ -657,42 +666,93 @@ def widget_client(app_client: TestClient) -> "WidgetAuthClient":
 
 
 class AuthenticatedClient:
-    """Wrapper around TestClient that injects auth headers automatically.
+    """Wrapper around TestClient that injects auth headers and tenant
+    URL parameter automatically.
+
+    SPEC-1644 compliance: Non-SPA API keys require ``?tenant=`` in the URL
+    so the middleware can scope the lookup to a single Cosmos partition.
+    When *tenant_id* is provided, every request URL is amended with the
+    ``tenant`` query parameter.  SPA keys (``ar_spa_*``) are exempt — pass
+    *tenant_id=None* (the default) for SPA clients.
 
     Usage:
         def test_usage(starter_client):
             resp = starter_client.get("/api/dashboard/usage")
+            # URL becomes /api/dashboard/usage?tenant=t-starter-001
             assert resp.status_code == 200
     """
 
-    def __init__(self, client: TestClient, api_key: str) -> None:
+    def __init__(
+        self,
+        client: TestClient,
+        api_key: str,
+        tenant_id: str | None = None,
+    ) -> None:
         self._client = client
         self._headers = auth_headers_api_key(api_key)
+        self._tenant_id = tenant_id
+
+    # -- Request helpers ------------------------------------------------------
+
+    def _prepare(self, url: str, kwargs: dict[str, Any]) -> tuple[str, dict[str, Any]]:
+        """Inject auth headers and SPEC-1644 ``?tenant=`` parameter.
+
+        The ``params`` kwarg (used by httpx/TestClient) **replaces** any
+        query string already on the URL, so we must add ``tenant`` to the
+        *params* dict when it is present rather than appending to the URL.
+        """
+        headers = {**self._headers, **kwargs.pop("headers", {})}
+        kwargs["headers"] = headers
+
+        if self._tenant_id is not None:
+            if "params" in kwargs:
+                # Merge tenant into existing params dict
+                existing = kwargs["params"]
+                if isinstance(existing, dict):
+                    existing.setdefault("tenant", self._tenant_id)
+                else:
+                    # params is a list of tuples or similar — convert
+                    existing = dict(existing)
+                    existing.setdefault("tenant", self._tenant_id)
+                    kwargs["params"] = existing
+            else:
+                # No params kwarg — append to URL directly
+                sep = "&" if "?" in url else "?"
+                url = f"{url}{sep}tenant={self._tenant_id}"
+
+        return url, kwargs
+
+    # -- HTTP verbs -----------------------------------------------------------
 
     def get(self, url: str, **kwargs: Any) -> Any:
-        headers = {**self._headers, **kwargs.pop("headers", {})}
-        return self._client.get(url, headers=headers, **kwargs)
+        url, kwargs = self._prepare(url, kwargs)
+        return self._client.get(url, **kwargs)
 
     def post(self, url: str, **kwargs: Any) -> Any:
-        headers = {**self._headers, **kwargs.pop("headers", {})}
-        return self._client.post(url, headers=headers, **kwargs)
+        url, kwargs = self._prepare(url, kwargs)
+        return self._client.post(url, **kwargs)
 
     def put(self, url: str, **kwargs: Any) -> Any:
-        headers = {**self._headers, **kwargs.pop("headers", {})}
-        return self._client.put(url, headers=headers, **kwargs)
+        url, kwargs = self._prepare(url, kwargs)
+        return self._client.put(url, **kwargs)
 
     def patch(self, url: str, **kwargs: Any) -> Any:
-        headers = {**self._headers, **kwargs.pop("headers", {})}
-        return self._client.patch(url, headers=headers, **kwargs)
+        url, kwargs = self._prepare(url, kwargs)
+        return self._client.patch(url, **kwargs)
 
     def delete(self, url: str, **kwargs: Any) -> Any:
-        headers = {**self._headers, **kwargs.pop("headers", {})}
-        return self._client.delete(url, headers=headers, **kwargs)
+        url, kwargs = self._prepare(url, kwargs)
+        return self._client.delete(url, **kwargs)
 
     @property
     def raw(self) -> TestClient:
         """Access the underlying TestClient for unauthenticated requests."""
         return self._client
+
+    @property
+    def tenant_id(self) -> str | None:
+        """The tenant ID this client authenticates as (None for SPA)."""
+        return self._tenant_id
 
 
 class WidgetAuthClient:

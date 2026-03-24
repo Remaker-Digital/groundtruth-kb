@@ -131,7 +131,13 @@ class TenantComparisonResponse(CamelCaseModel):
 
 
 class TenantDetailMetrics(CamelCaseModel):
-    """Detailed metrics for a single tenant (SPEC-1582)."""
+    """Detailed metrics for a single tenant (SPEC-1582).
+
+    SPEC-1843: ``intent_distribution`` and ``recent_conversations`` have been
+    removed (WI-1607).  These fields exposed tenant conversation content and
+    customer intent text to the platform operator, violating the zero-knowledge
+    mandate.  Only aggregate operational metrics are retained.
+    """
 
     tenant_id: str
     display_name: str
@@ -139,8 +145,6 @@ class TenantDetailMetrics(CamelCaseModel):
     volume_trend: list[dict[str, Any]] = Field(default_factory=list)
     cost_trend: list[dict[str, Any]] = Field(default_factory=list)
     agent_breakdown: list[dict[str, Any]] = Field(default_factory=list)
-    intent_distribution: list[dict[str, Any]] = Field(default_factory=list)
-    recent_conversations: list[dict[str, Any]] = Field(default_factory=list)
 
 
 class DatabaseMetricsResponse(CamelCaseModel):
@@ -438,11 +442,13 @@ async def get_tenant_comparison(
     tenants: list[TenantPipelineSummary] = []
 
     # Fetch tenant display info from directory
+    # SPEC-1843 v6 / WI-1641: brand_name and customer_email restored
+    # (tenancy management data — operator needs human-readable identification).
     tenant_info: dict[str, dict[str, Any]] = {}
     if _state._tenant_repo is not None:
         try:
             query = (
-                "SELECT c.tenant_id, c.customer_email, c.brand_name, c.tier "
+                "SELECT c.tenant_id, c.tier, c.brand_name, c.customer_email "
                 "FROM c WHERE c.status = 'active'"
             )
             async for item in _state._tenant_repo._container.query_items(
@@ -463,6 +469,9 @@ async def get_tenant_comparison(
     for tid in all_tenant_ids:
         info = tenant_info.get(tid, {})
         metrics = tenant_metrics.get(tid)
+        # SPEC-1843 v6: brand_name and email are tenancy management data
+        # (operator needs human-readable tenant identification).
+        # Priority: brand_name > email > tenant_id (WI-1641 restoration).
         display = (
             info.get("brand_name")
             or info.get("customer_email")
@@ -532,6 +541,8 @@ async def get_tenant_pipeline_metrics(
             display_name=tenant_id,
         )
 
+    # SPEC-1843 / WI-1607: intent_distribution and recent_conversations
+    # permanently removed — operator must not see tenant conversation content.
     return TenantDetailMetrics(
         tenant_id=tenant_id,
         display_name=tm.display_name or tenant_id,
@@ -539,8 +550,6 @@ async def get_tenant_pipeline_metrics(
         volume_trend=tm.volume_trend,
         cost_trend=tm.cost_trend,
         agent_breakdown=tm.agent_breakdown,
-        intent_distribution=tm.intent_distribution,
-        recent_conversations=tm.recent_conversations,
     )
 
 

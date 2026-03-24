@@ -433,24 +433,9 @@ class TestComplianceSummary:
 # ---------------------------------------------------------------------------
 
 
-class TestSecretPosture:
-    """SPEC: GET /secrets/posture returns secret inventory."""
-
-    @pytest.mark.asyncio
-    async def test_secret_posture_empty(self):
-        from src.multi_tenant.superadmin_api import secret_posture
-
-        tenant_repo = MagicMock()
-        tenant_repo.list_active_tenant_ids = AsyncMock(return_value=[])
-        secret_service = MagicMock()
-        _configure_services(
-            tenant_repo=tenant_repo,
-            secret_service=secret_service,
-        )
-
-        result = await secret_posture()
-        assert result.total_tenants == 0
-        assert result.total_secrets == 0
+# TestSecretPosture REMOVED (WI-1640 / S137):
+# GET /secrets/posture endpoint was intentionally removed per SPEC-1843 (ZK mandate).
+# Replaced by GET /health/secrets. See TEST-10901 through TEST-10934.
 
 
 # ---------------------------------------------------------------------------

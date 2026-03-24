@@ -6,6 +6,12 @@ Verifies:
     2. /api/tenants/lookup returns brand_name when present
     3. TenantLookupResponse always provides at least tenant_id (never all-blank)
 
+SPEC-1644 compliance: Tests use shop= or stripe_customer_id= parameters
+for tenant lookup (API-key-based tenant discovery is prohibited).
+
+WI-1636 / S137: Rewritten to use SPEC-1644-compliant lookup mechanism.
+Previously mocked the removed _lookup_by_api_key function.
+
 Run:
     pytest tests/unit/test_tenant_identity_navbar.py -v
 
@@ -14,13 +20,13 @@ Run:
 
 from __future__ import annotations
 
-from unittest.mock import AsyncMock, patch
+from unittest.mock import AsyncMock, MagicMock, patch
 
 import pytest
 
 from src.integrations.provisioning import (
     TenantLookupResponse,
-    _read_brand_name,
+    TenantRecord,
     lookup_tenant_endpoint,
 )
 
@@ -29,25 +35,30 @@ from src.integrations.provisioning import (
 # Fixtures
 # ---------------------------------------------------------------------------
 
-def _make_tenant_doc(
+def _make_tenant_record(
     tenant_id: str = "t-001",
     shopify_shop_domain: str | None = None,
     billing_channel: str = "manual",
     stripe_customer_id: str | None = None,
-    **extra,
-) -> dict:
-    """Create a minimal tenant document as returned by Cosmos."""
-    doc = {
-        "id": tenant_id,
-        "tenant_id": tenant_id,
-        "status": "active",
-        "tier": "starter",
-        "billing_channel": billing_channel,
-        "shopify_shop_domain": shopify_shop_domain,
-        "stripe_customer_id": stripe_customer_id,
-        **extra,
-    }
-    return doc
+) -> TenantRecord:
+    """Create a TenantRecord as returned by get_tenant()."""
+    return TenantRecord(
+        tenant_id=tenant_id,
+        status="active",
+        tier="starter",
+        billing_channel=billing_channel,
+        shopify_shop_domain=shopify_shop_domain,
+        stripe_customer_id=stripe_customer_id,
+        created_at="2026-01-01T00:00:00Z",
+        updated_at="2026-01-01T00:00:00Z",
+    )
+
+
+def _mock_request() -> MagicMock:
+    """Create a minimal mock Request (required by the endpoint signature)."""
+    req = MagicMock()
+    req.headers = {}
+    return req
 
 
 # ---------------------------------------------------------------------------
@@ -89,56 +100,62 @@ class TestTenantLookupResponseModel:
 
 
 # ---------------------------------------------------------------------------
-# Lookup endpoint integration tests
+# Lookup endpoint integration tests (SPEC-1644 compliant)
 # ---------------------------------------------------------------------------
 
 class TestLookupReturnsShopDomain:
-    """SPEC-1848: /api/tenants/lookup returns shopify_shop_domain from Cosmos."""
+    """SPEC-1848: /api/tenants/lookup returns shopify_shop_domain from Cosmos.
+
+    SPEC-1644: Lookup uses shop= query parameter, NOT API key headers.
+    """
 
     @pytest.mark.asyncio
-    async def test_api_key_lookup_includes_shop_domain(self):
+    async def test_shop_lookup_includes_shop_domain(self):
         """When tenant has shopify_shop_domain, lookup returns it."""
-        doc = _make_tenant_doc(
+        record = _make_tenant_record(
             shopify_shop_domain="blanco-9939.myshopify.com",
             billing_channel="shopify",
         )
 
-        mock_request = AsyncMock()
-        mock_request.headers = {"X-API-Key": "ar_test_key_123"}
-
         with patch(
-            "src.integrations.provisioning._lookup_by_api_key",
+            "src.integrations.provisioning.get_tenant",
             new_callable=AsyncMock,
-            return_value=doc,
+            return_value=record,
         ), patch(
             "src.integrations.provisioning._read_brand_name",
             new_callable=AsyncMock,
             return_value="Test Brand",
         ):
-            resp = await lookup_tenant_endpoint(mock_request)
+            resp = await lookup_tenant_endpoint(
+                _mock_request(),
+                shop="blanco-9939.myshopify.com",
+            )
 
         assert resp.found is True
         assert resp.shopify_shop_domain == "blanco-9939.myshopify.com"
         assert resp.brand_name == "Test Brand"
 
     @pytest.mark.asyncio
-    async def test_api_key_lookup_shop_domain_none_when_absent(self):
+    async def test_stripe_lookup_shop_domain_none_when_absent(self):
         """When tenant has no shopify_shop_domain, lookup returns None."""
-        doc = _make_tenant_doc(billing_channel="manual")
-
-        mock_request = AsyncMock()
-        mock_request.headers = {"X-API-Key": "ar_test_key_123"}
+        record = _make_tenant_record(
+            billing_channel="stripe",
+            stripe_customer_id="cus_test_123",
+        )
 
         with patch(
-            "src.integrations.provisioning._lookup_by_api_key",
+            "src.integrations.provisioning.get_tenant",
             new_callable=AsyncMock,
-            return_value=doc,
+            return_value=record,
         ), patch(
             "src.integrations.provisioning._read_brand_name",
             new_callable=AsyncMock,
             return_value="My Brand",
         ):
-            resp = await lookup_tenant_endpoint(mock_request)
+            resp = await lookup_tenant_endpoint(
+                _mock_request(),
+                stripe_customer_id="cus_test_123",
+            )
 
         assert resp.found is True
         assert resp.shopify_shop_domain is None
@@ -147,21 +164,22 @@ class TestLookupReturnsShopDomain:
     @pytest.mark.asyncio
     async def test_identity_never_all_blank(self):
         """Lookup always returns at least tenant_id — navbar is never blank."""
-        doc = _make_tenant_doc(billing_channel="manual")
-
-        mock_request = AsyncMock()
-        mock_request.headers = {"X-API-Key": "ar_test_key_123"}
+        record = _make_tenant_record(billing_channel="stripe",
+                                      stripe_customer_id="cus_test_456")
 
         with patch(
-            "src.integrations.provisioning._lookup_by_api_key",
+            "src.integrations.provisioning.get_tenant",
             new_callable=AsyncMock,
-            return_value=doc,
+            return_value=record,
         ), patch(
             "src.integrations.provisioning._read_brand_name",
             new_callable=AsyncMock,
             return_value=None,
         ):
-            resp = await lookup_tenant_endpoint(mock_request)
+            resp = await lookup_tenant_endpoint(
+                _mock_request(),
+                stripe_customer_id="cus_test_456",
+            )
 
         assert resp.found is True
         # Even when shop domain and brand name are both None,
@@ -170,3 +188,29 @@ class TestLookupReturnsShopDomain:
         assert identity is not None and len(identity) > 0, (
             "All identity fields are blank — navbar would show nothing"
         )
+
+    @pytest.mark.asyncio
+    async def test_lookup_without_params_returns_400(self):
+        """SPEC-1644: Lookup without shop= or stripe_customer_id= returns 400."""
+        from fastapi import HTTPException
+
+        with pytest.raises(HTTPException) as exc_info:
+            await lookup_tenant_endpoint(_mock_request())
+
+        assert exc_info.value.status_code == 400
+        assert "SPEC-1644" in exc_info.value.detail
+
+    @pytest.mark.asyncio
+    async def test_lookup_not_found_returns_empty(self):
+        """Lookup for nonexistent tenant returns found=False."""
+        with patch(
+            "src.integrations.provisioning.get_tenant",
+            new_callable=AsyncMock,
+            return_value=None,
+        ):
+            resp = await lookup_tenant_endpoint(
+                _mock_request(),
+                shop="nonexistent.myshopify.com",
+            )
+
+        assert resp.found is False
