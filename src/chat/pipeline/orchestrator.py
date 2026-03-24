@@ -432,52 +432,6 @@ class ChatPipeline(AgentDispatchMixin, CriticEscalationMixin, AnalyticsMixin):
             # config overrides to the quality settings for this conversation.
             # This is independent of fine-tuned model A/B experiments.
             # ---------------------------------------------------------------
-            quality_experiment_variant: str | None = None
-            quality_experiment_id: str | None = None
-            quality_config_overrides: dict = {}
-
-            try:
-                from src.chat.ab_testing import (
-                    ExperimentService,
-                    assign_variant as ab_assign_variant,
-                    get_variant_config,
-                )
-                from src.multi_tenant.superadmin_api._experiments import (
-                    get_experiment_service,
-                )
-
-                exp_svc = get_experiment_service()
-                active_qexp = exp_svc.get_active_experiment(tenant_id)
-                if active_qexp and customer_id:
-                    quality_experiment_variant = ab_assign_variant(
-                        active_qexp, customer_id,
-                    )
-                    quality_experiment_id = active_qexp.experiment_id
-                    variant_cfg = get_variant_config(
-                        active_qexp, quality_experiment_variant,
-                    )
-                    quality_config_overrides = variant_cfg.config_overrides
-
-                    if not ab_variant:
-                        # Only set trace A/B if not already set by fine-tuning
-                        ab_variant = quality_experiment_variant
-                        ab_experiment_id = quality_experiment_id
-                        trace.set_ab_variant(ab_variant, ab_experiment_id)
-
-                    logger.debug(
-                        "Layer 5 quality experiment: tenant=%s exp=%s "
-                        "variant=%s overrides=%s",
-                        tenant_id,
-                        quality_experiment_id,
-                        quality_experiment_variant,
-                        list(quality_config_overrides.keys()),
-                    )
-            except Exception:
-                logger.debug(
-                    "Layer 5 quality experiment check failed for tenant=%s",
-                    tenant_id,
-                )
-
             # ---------------------------------------------------------------
             # Phase 6: PII Tokenization (SPEC-1543)
             #

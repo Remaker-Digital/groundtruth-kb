@@ -63,33 +63,6 @@ class TestTranscriptCSVExport:
         assert callable(export_conversation_csv)
 
 
-# ---------------------------------------------------------------------------
-# SPEC-0151: Test group percentage (covered by A/B)
-# ---------------------------------------------------------------------------
-
-class TestTestGroupPercentage:
-    """SPEC-0151: Verify covered by A/B testing control_ratio."""
-
-    def test_experiment_config_has_control_ratio(self):
-        """ExperimentConfig has control_ratio for traffic splitting."""
-        from src.chat.ab_testing import ExperimentConfig
-        fields = ExperimentConfig.model_fields
-        assert "control_ratio" in fields
-
-    def test_control_ratio_range(self):
-        """control_ratio accepts 5% to 95% range."""
-        from src.chat.ab_testing import ExperimentConfig, VariantConfig
-        variant = VariantConfig(name="test")
-        config = ExperimentConfig(
-            experiment_id="test",
-            tenant_id="test",
-            name="test",
-            control=variant,
-            treatment=variant,
-            control_ratio=0.3,
-        )
-        assert config.control_ratio == 0.3
-
 
 # ---------------------------------------------------------------------------
 # SPEC-0245: Custom launcher image upload

@@ -144,6 +144,32 @@ class TenantLookupResponse(BaseModel):
     brand_name: str | None = None
 
 
+class ValidateKeyRequest(BaseModel):
+    """Request body for POST /api/auth/validate-key (SPEC-1644)."""
+
+    tenant: str
+
+
+class ValidateKeyResponse(BaseModel):
+    """Response for successful API key validation (SPEC-1644).
+
+    Only returned when the key is valid for the specified tenant.
+    On failure, a 401 is returned with no tenant information.
+    """
+
+    valid: bool = True
+    tenant_id: str
+    status: TenantStatus | None = None
+    tier: str | None = None
+    billing_channel: BillingChannel | None = None
+    has_stripe_billing: bool = False
+    shopify_shop_domain: str | None = None
+    brand_name: str | None = None
+    role: str | None = None
+    email: str | None = None
+    team_member_id: str | None = None
+
+
 # ---------------------------------------------------------------------------
 # Repository configuration (called at startup from lifecycle.py)
 # ---------------------------------------------------------------------------
@@ -949,42 +975,43 @@ async def get_tenant(
 
 
 # ---------------------------------------------------------------------------
-# API key lookup (used by /api/tenants/lookup endpoint)
+# Partition-scoped API key validation (SPEC-1644)
 # ---------------------------------------------------------------------------
 
 
-async def _lookup_by_api_key(api_key: str) -> dict[str, Any] | None:
-    """Lookup a tenant in Cosmos DB by API key hash.
+async def _validate_api_key_for_tenant(
+    tenant_id: str, api_key: str,
+) -> dict[str, Any] | None:
+    """Validate an API key against a known tenant (partition-scoped).
 
-    Used by the standalone admin login flow — the raw key is hashed
-    with SHA-256 and matched against the stored hash.
+    SPEC-1644: API keys MUST NOT identify tenants.  The caller must already
+    know the tenant_id (from the URL).  This method reads the tenant or
+    team-member document within that single partition and compares the hash.
+    No cross-partition query is ever performed.
 
-    Supports both key types:
-    - Tenant API keys (ar_*): matched against tenant.api_key_hash
-    - Per-user API keys (ar_user_*): matched against team_member.user_api_key_hash,
-      then resolved to the parent tenant document
+    Returns a dict with tenant info + optional team member info, or None.
     """
     key_hash = hashlib.sha256(api_key.encode("utf-8")).hexdigest()
 
-    # Per-user API key → resolve via team member → tenant
+    # Per-user API key → partition-scoped team member lookup
     if api_key.startswith("ar_user_") and _team_repo is not None:
         try:
-            member = await _team_repo.find_by_user_api_key_hash(key_hash)
+            member = await _team_repo.verify_user_key_hash(tenant_id, key_hash)
             if member and _tenant_repo is not None:
-                tid = member.get("tenant_id")
-                if tid:
-                    return await _tenant_repo.read(tid, tid)
+                tenant_doc = await _tenant_repo.read(tenant_id, tenant_id)
+                if tenant_doc:
+                    return {**tenant_doc, "_team_member": member}
         except Exception as exc:
-            logger.warning("User API key lookup failed: %s", exc)
+            logger.warning("User API key validation failed for tenant=%s: %s", tenant_id, exc)
         return None
 
-    # Tenant API key → direct lookup
+    # Tenant API key → partition-scoped verification
     if _tenant_repo is None:
         return None
     try:
-        return await _tenant_repo.find_by_api_key_hash(key_hash)
+        return await _tenant_repo.verify_key_hash(tenant_id, key_hash)
     except Exception as exc:
-        logger.warning("API key lookup failed: %s", exc)
+        logger.warning("API key validation failed for tenant=%s: %s", tenant_id, exc)
     return None
 
 
@@ -1014,10 +1041,9 @@ async def _read_brand_name(tenant_id: str) -> str | None:
     response_model=TenantLookupResponse,
     status_code=200,
     summary="Lookup tenant by channel identifier",
-    description="Looks up a tenant by Stripe customer ID, Shopify shop domain, or API key header. Returns the tenant's status, tier, and billing channel.",
+    description="Looks up a tenant by Stripe customer ID or Shopify shop domain. Returns the tenant's status, tier, and billing channel.",
     responses={
-        400: {"description": "No lookup parameter or API key provided"},
-        401: {"description": "Invalid API key"},
+        400: {"description": "No lookup parameter provided"},
     },
 )
 async def lookup_tenant_endpoint(
@@ -1025,46 +1051,24 @@ async def lookup_tenant_endpoint(
     stripe_customer_id: str | None = None,
     shop: str | None = None,
 ) -> TenantLookupResponse:
-    """Lookup a tenant by Stripe customer ID, Shopify shop domain, or API key.
+    """Lookup a tenant by Stripe customer ID or Shopify shop domain.
 
     Query parameters:
         stripe_customer_id: Stripe customer ID (cus_...)
         shop: Shopify store domain (*.myshopify.com)
 
-    Headers:
-        X-API-Key: API key for standalone admin authentication
+    At least one lookup parameter is required.
 
-    At least one lookup method is required.
+    SPEC-1644: API keys MUST NOT be used to identify tenants.
+    Use POST /api/auth/validate-key for API key authentication.
 
     NOTE: This route is declared before /{tenant_id} to prevent
     FastAPI from matching "lookup" as a tenant_id path parameter.
     """
-    # --- API key lookup (standalone admin login) ---
-    # Only attempt API key auth when no query parameters are provided.
-    # When shop or stripe_customer_id is given, those take precedence.
-    api_key = request.headers.get("X-API-Key", "").strip()
-    if api_key and not stripe_customer_id and not shop:
-        doc = await _lookup_by_api_key(api_key)
-        if doc:
-            tenant_id = doc.get("tenant_id") or doc.get("id")
-            # Enrich with brand_name from active config (lightweight read)
-            brand_name = await _read_brand_name(tenant_id) if tenant_id else None
-            return TenantLookupResponse(
-                found=True,
-                tenant_id=tenant_id,
-                status=doc.get("status"),
-                tier=doc.get("tier"),
-                billing_channel=doc.get("billing_channel"),
-                has_stripe_billing=bool(doc.get("stripe_customer_id")),
-                shopify_shop_domain=doc.get("shopify_shop_domain"),
-                brand_name=brand_name,
-            )
-        raise HTTPException(status_code=401, detail="Invalid API key.")
-
     if not stripe_customer_id and not shop:
         raise HTTPException(
             status_code=400,
-            detail="Provide 'stripe_customer_id' or 'shop' query parameter, or X-API-Key header.",
+            detail="Provide 'stripe_customer_id' or 'shop' query parameter. API key tenant discovery is not supported (SPEC-1644). Use POST /api/auth/validate-key instead.",
         )
 
     # Direct channel lookup — repo is the primary path
@@ -1088,6 +1092,72 @@ async def lookup_tenant_endpoint(
         has_stripe_billing=bool(tenant.stripe_customer_id),
         shopify_shop_domain=tenant.shopify_shop_domain,
         brand_name=brand_name,
+    )
+
+
+@router.post(
+    "/auth/validate-key",
+    response_model=ValidateKeyResponse,
+    status_code=200,
+    summary="Validate API key against a known tenant (SPEC-1644)",
+    description=(
+        "Validates an API key against a specific tenant identified in the "
+        "request body.  The tenant MUST be known in advance (from the URL).  "
+        "API keys MUST NOT be used to discover which tenant they belong to.  "
+        "Returns user info on success, 401 on failure with no tenant info."
+    ),
+    responses={
+        400: {"description": "Missing tenant or API key"},
+        401: {"description": "Invalid API key for this tenant"},
+    },
+)
+async def validate_key_endpoint(
+    request: Request,
+    body: ValidateKeyRequest,
+) -> ValidateKeyResponse:
+    """Validate an API key against a specified tenant (SPEC-1644).
+
+    The caller must already know the tenant (from the URL ?tenant= param).
+    This endpoint performs a partition-scoped lookup — no cross-partition
+    query is ever executed.  On failure, the response reveals nothing
+    about which tenant the key actually belongs to.
+    """
+    api_key = request.headers.get("X-API-Key", "").strip()
+    if not api_key:
+        raise HTTPException(status_code=400, detail="X-API-Key header is required.")
+
+    doc = await _validate_api_key_for_tenant(body.tenant, api_key)
+    if not doc:
+        # SPEC-1644: reveal nothing about the key's actual tenant
+        raise HTTPException(status_code=401, detail="Invalid API key.")
+
+    tenant_id = doc.get("tenant_id") or doc.get("id")
+    brand_name = await _read_brand_name(tenant_id) if tenant_id else None
+
+    # Extract team member info if present (per-user key)
+    member = doc.get("_team_member")
+    role = None
+    email = None
+    team_member_id = None
+    if member:
+        role = member.get("role")
+        email = member.get("email")
+        team_member_id = member.get("id")
+    else:
+        # Legacy tenant API key — implicit admin role
+        role = "admin"
+
+    return ValidateKeyResponse(
+        tenant_id=tenant_id,
+        status=doc.get("status"),
+        tier=doc.get("tier"),
+        billing_channel=doc.get("billing_channel"),
+        has_stripe_billing=bool(doc.get("stripe_customer_id")),
+        shopify_shop_domain=doc.get("shopify_shop_domain"),
+        brand_name=brand_name,
+        role=role,
+        email=email,
+        team_member_id=team_member_id,
     )
 
 

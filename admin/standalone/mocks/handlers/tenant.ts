@@ -9,6 +9,13 @@ import { getStore, resetStore } from "../store";
 export function registerTenantHandlers() {
   const s = () => getStore().tenant;
 
+  // SPEC-1644: validate-key replaces lookup for API key auth
+  POST("/api/tenants/auth/validate-key", () => ({
+    status: 200,
+    body: { valid: true, ...s().lookup },
+  }));
+
+  // Channel lookup (shop/stripe_customer_id) still uses GET
   GET("/api/tenants/lookup", () => ({
     status: 200,
     body: s().lookup,

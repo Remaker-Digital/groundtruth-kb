@@ -532,12 +532,37 @@ def _build_tenant_lookup_table(
     async def resolve_by_user_api_key_hash(key_hash: str) -> dict[str, Any] | None:
         return user_members.get(key_hash)
 
+    # SPEC-1644: Partition-scoped resolvers — require tenant_id from caller
+    async def verify_api_key_in_partition(
+        tenant_id: str, key_hash: str,
+    ) -> dict[str, Any] | None:
+        """Partition-scoped: only match if key hash belongs to this tenant."""
+        for t in tenants:
+            tid = t.get("tenant_id") or t.get("id")
+            if tid == tenant_id and t.get("api_key_hash") == key_hash:
+                return t
+        return None
+
+    async def verify_user_key_in_partition(
+        tenant_id: str, key_hash: str,
+    ) -> dict[str, Any] | None:
+        """Partition-scoped: only match if user key hash is in this tenant."""
+        result = user_members.get(key_hash)
+        if result is None:
+            return None
+        member = result.get("team_member", {})
+        if member.get("tenant_id") != tenant_id:
+            return None
+        return result
+
     return {
         "resolve_by_shop_domain": AsyncMock(side_effect=resolve_by_shop_domain),
         "resolve_by_api_key_hash": AsyncMock(side_effect=resolve_by_api_key_hash),
         "resolve_by_spa_key_hash": AsyncMock(side_effect=resolve_by_spa_key_hash),
         "resolve_by_widget_key_hash": AsyncMock(side_effect=resolve_by_widget_key_hash),
         "resolve_by_user_api_key_hash": AsyncMock(side_effect=resolve_by_user_api_key_hash),
+        "verify_api_key_in_partition": AsyncMock(side_effect=verify_api_key_in_partition),
+        "verify_user_key_in_partition": AsyncMock(side_effect=verify_user_key_in_partition),
     }
 
 
@@ -583,6 +608,8 @@ def app_client(
                 resolve_by_spa_key_hash=resolvers["resolve_by_spa_key_hash"],
                 resolve_by_widget_key_hash=resolvers["resolve_by_widget_key_hash"],
                 resolve_by_user_api_key_hash=resolvers["resolve_by_user_api_key_hash"],
+                verify_api_key_in_partition=resolvers["verify_api_key_in_partition"],
+                verify_user_key_in_partition=resolvers["verify_user_key_in_partition"],
             )
 
             yield client

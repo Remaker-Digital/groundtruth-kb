@@ -97,31 +97,30 @@ class TenantRepository(TenantScopedRepository):
 
         return items[0] if items else None
 
-    async def find_by_api_key_hash(
-        self, api_key_hash: str,
+    async def verify_key_hash(
+        self, tenant_id: str, api_key_hash: str,
     ) -> dict[str, Any] | None:
-        """Find a tenant by API key hash (cross-partition).
+        """Verify an API key hash against a known tenant (partition-scoped).
 
-        Used during API key authentication where tenant_id is unknown.
-        This performs a cross-partition query — use sparingly.
+        SPEC-1644: API keys authenticate users, they do NOT identify tenants.
+        The tenant_id must be known in advance (from the URL).  This method
+        reads the tenant document by partition key and compares the stored
+        hash locally — no cross-partition query is ever performed.
 
         Args:
+            tenant_id: The tenant to validate against (from URL).
             api_key_hash: SHA-256 hex digest of the API key.
 
         Returns:
-            The tenant document, or None if not found.
+            The tenant document if the hash matches, None otherwise.
         """
-        items: list[dict[str, Any]] = []
-        async for item in self._container.query_items(
-            query="SELECT * FROM c WHERE c.api_key_hash = @hash",
-            parameters=[{"name": "@hash", "value": api_key_hash}],
-            # Cross-partition query (default in SDK v4+)
-            max_item_count=1,
-        ):
-            items.append(item)
-            break
-
-        return items[0] if items else None
+        try:
+            doc = await self.read(tenant_id=tenant_id, document_id=tenant_id)
+        except Exception:
+            return None
+        if doc and doc.get("api_key_hash") == api_key_hash:
+            return doc
+        return None
 
     async def find_by_customer_email(
         self, email: str,

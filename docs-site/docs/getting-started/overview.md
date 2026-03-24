@@ -37,7 +37,7 @@ flowchart LR
 
 ## Architecture
 
-Agent Red runs as a unified API Gateway on Azure Container Apps (East US) with native auto-scaling. The six AI agents run in-process within the gateway, communicating via HTTP endpoints and a NATS JetStream event bus for asynchronous analytics and decoupled processing. Customer data is stored in Cosmos DB (Serverless) with tenant-level partition isolation. A dedicated Customer Memory layer stores customer profiles and vectorized conversation transcripts — enabling the response generator to personalize replies based on each customer's interaction history.
+Agent Red runs as a unified API Gateway on Azure Container Apps (East US) with native auto-scaling. The six AI agents run in-process within the gateway, communicating via synchronous HTTP endpoints. Customer data is stored in Cosmos DB (Serverless) with tenant-level partition isolation. A dedicated Customer Memory layer stores customer profiles and vectorized conversation transcripts — enabling the response generator to personalize replies based on each customer's interaction history.
 
 ```mermaid
 graph TB
@@ -54,15 +54,9 @@ graph TB
         API --> ESC[Escalation]
         API --> AN[Analytics]
 
-        NATS[NATS JetStream\nEvent Bus] -.-> IC
-        NATS -.-> KR
-        NATS -.-> RG
-        NATS -.-> CS
-        NATS -.-> ESC
-        NATS -.-> AN
-
         MEM[(Customer Memory\nProfiles + Vectors)]
         DB[(Cosmos DB\nServerless)]
+        RD[(Redis Cache)]
         KV[Key Vault]
         AI[Azure OpenAI\nGPT-4o / GPT-4o-mini]
     end
@@ -72,13 +66,15 @@ graph TB
     IC & KR & RG & AN --> DB
     RG --> MEM
     API --> KV
+    API --> RD
 ```
 
 | Component | Technology |
 |---|---|
 | Agent runtime | Azure Container Apps (native auto-scaling) |
-| Agent communication | HTTP (in-process) + NATS JetStream (async events) |
+| Agent communication | HTTP (in-process, synchronous pipeline) |
 | Database | Azure Cosmos DB (Serverless, DiskANN vector index) |
+| Cache | Azure Cache for Redis |
 | AI models | Azure OpenAI Service (GPT-4o, GPT-4o-mini) |
 | Embeddings | text-embedding-3-large |
 | Secrets | Azure Key Vault (Managed Identity) |

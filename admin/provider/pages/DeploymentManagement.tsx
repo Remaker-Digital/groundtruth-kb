@@ -14,7 +14,7 @@
  * © 2026 Remaker Digital, a DBA of VanDusen & Palmeter, LLC. All rights reserved.
  */
 
-import React, { useCallback, useEffect, useRef, useState } from 'react';
+import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import {
   Badge,
   Button,
@@ -87,6 +87,24 @@ const STEP_LABELS: Record<string, string> = {
 };
 
 // ---------------------------------------------------------------------------
+// Version suggestion (SPEC-1841)
+// ---------------------------------------------------------------------------
+
+/**
+ * Parse a semver-style version string and return the next patch version.
+ * Handles formats: "v1.98.15", "1.98.15", "v1.98"
+ */
+function suggestNextVersion(version: string): string {
+  const match = version.match(/^(v?)(\d+)\.(\d+)(?:\.(\d+))?/);
+  if (!match) return '';
+  const prefix = match[1]; // 'v' or ''
+  const major = match[2];
+  const minor = match[3];
+  const patch = match[4] !== undefined ? parseInt(match[4], 10) + 1 : 0;
+  return `${prefix}${major}.${minor}.${patch}`;
+}
+
+// ---------------------------------------------------------------------------
 // Component
 // ---------------------------------------------------------------------------
 
@@ -100,6 +118,16 @@ export const DeploymentManagementPage: React.FC = () => {
   const [triggerVersion, setTriggerVersion] = useState('');
   const [triggerAction, setTriggerAction] = useState<string | null>('full');
   const [triggering, setTriggering] = useState(false);
+
+  // SPEC-1841: Last deployed version + suggested next version
+  const lastSucceeded = useMemo(() => {
+    return deployments
+      .filter(d => d.status === 'succeeded')
+      .sort((a, b) => (b.startedAt || '').localeCompare(a.startedAt || ''))[0] ?? null;
+  }, [deployments]);
+
+  const lastVersion = lastSucceeded?.version ?? null;
+  const suggestedVersion = lastVersion ? suggestNextVersion(lastVersion) : '';
 
   // Detail modal
   const [detailDeploy, setDetailDeploy] = useState<DeploymentRecord | null>(null);
@@ -191,7 +219,7 @@ export const DeploymentManagementPage: React.FC = () => {
           <Button variant="light" onClick={loadData}>Refresh</Button>
           <Button onClick={() => {
             setTriggerOpen(true);
-            setTriggerVersion('');
+            setTriggerVersion(suggestedVersion);
             setTriggerAction('full');
           }}>
             Trigger Pipeline
@@ -281,7 +309,10 @@ export const DeploymentManagementPage: React.FC = () => {
           />
           <TextInput
             label="Version"
-            placeholder="e.g. v1.98.15"
+            placeholder={suggestedVersion || 'e.g. v1.98.15'}
+            description={lastVersion
+              ? `Last successful deployment: ${lastVersion}`
+              : 'No previous deployments found'}
             value={triggerVersion}
             onChange={e => setTriggerVersion(e.currentTarget.value)}
             required

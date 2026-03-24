@@ -53,6 +53,7 @@ from src.multi_tenant.auth import (
     TenantInactiveError,
     extract_bearer_token,
     extract_shop_domain,
+    hash_api_key,
     is_auth_exempt,
     is_spa_api_key,
     is_user_api_key,
@@ -91,11 +92,14 @@ _spa_notification_tasks: set[asyncio.Task] = set()
 # ---------------------------------------------------------------------------
 
 _resolve_by_shop_domain: Callable | None = None
-_resolve_by_api_key_hash: Callable | None = None
+_resolve_by_api_key_hash: Callable | None = None  # DEPRECATED: cross-partition, kept for widget keys only
 _resolve_by_widget_key_hash: Callable | None = None
-_resolve_by_user_api_key_hash: Callable | None = None
+_resolve_by_user_api_key_hash: Callable | None = None  # DEPRECATED: cross-partition
 _resolve_by_tenant_id: Callable | None = None
 _resolve_by_spa_key_hash: Callable | None = None
+# SPEC-1644: Partition-scoped resolvers — require tenant_id from URL
+_verify_api_key_in_partition: Callable | None = None
+_verify_user_key_in_partition: Callable | None = None
 
 
 def configure_tenant_resolution(
@@ -105,6 +109,8 @@ def configure_tenant_resolution(
     resolve_by_user_api_key_hash: Callable | None = None,
     resolve_by_tenant_id: Callable | None = None,
     resolve_by_spa_key_hash: Callable | None = None,
+    verify_api_key_in_partition: Callable | None = None,
+    verify_user_key_in_partition: Callable | None = None,
 ) -> None:
     """Configure the tenant resolution functions.
 
@@ -114,30 +120,36 @@ def configure_tenant_resolution(
     Args:
         resolve_by_shop_domain: Async function that accepts a shop
             domain string and returns a tenant dict or None.
-        resolve_by_api_key_hash: Async function that accepts an API
-            key hash string and returns a tenant dict or None.
+        resolve_by_api_key_hash: DEPRECATED — kept for widget key auth
+            only.  Tenant/user key auth now uses partition-scoped methods.
         resolve_by_widget_key_hash: Async function that accepts a widget
             key hash string and returns a tenant dict or None.
             Optional — widget key auth is disabled if not provided.
-        resolve_by_user_api_key_hash: Async function that accepts a user
-            API key hash and returns {team_member, tenant} or None.
-            Optional — per-user auth is disabled if not provided.
+        resolve_by_user_api_key_hash: DEPRECATED — replaced by
+            verify_user_key_in_partition.
         resolve_by_tenant_id: Async function that accepts a tenant ID
             string and returns a tenant dict or None. Used by magic-link
             auth to reuse the connection-pooled repository.
         resolve_by_spa_key_hash: Async function that accepts an SPA API
             key hash and returns a platform admin document or None.
             Optional — SPA auth is disabled if not provided. (SPEC-1667)
+        verify_api_key_in_partition: SPEC-1644 — async(tenant_id, key_hash)
+            → tenant dict or None.  Partition-scoped, no cross-partition.
+        verify_user_key_in_partition: SPEC-1644 — async(tenant_id, key_hash)
+            → {team_member, tenant} or None.  Partition-scoped.
     """
     global _resolve_by_shop_domain, _resolve_by_api_key_hash
     global _resolve_by_widget_key_hash, _resolve_by_user_api_key_hash
     global _resolve_by_tenant_id, _resolve_by_spa_key_hash
+    global _verify_api_key_in_partition, _verify_user_key_in_partition
     _resolve_by_shop_domain = resolve_by_shop_domain
     _resolve_by_api_key_hash = resolve_by_api_key_hash
     _resolve_by_widget_key_hash = resolve_by_widget_key_hash
     _resolve_by_user_api_key_hash = resolve_by_user_api_key_hash
     _resolve_by_tenant_id = resolve_by_tenant_id
     _resolve_by_spa_key_hash = resolve_by_spa_key_hash
+    _verify_api_key_in_partition = verify_api_key_in_partition
+    _verify_user_key_in_partition = verify_user_key_in_partition
     logger.info("Tenant resolution functions configured")
 
 
@@ -379,7 +391,8 @@ class TenantAuthMiddleware(BaseHTTPMiddleware):
         if not api_key:
             api_key = request.query_params.get("api_key")
         if api_key:
-            return await self._auth_api_key(api_key)
+            url_tenant = request.query_params.get("tenant")
+            return await self._auth_api_key(api_key, url_tenant)
 
         # Try publishable widget key (X-Widget-Key header or query param)
         widget_key = request.headers.get(WIDGET_KEY_HEADER)
@@ -543,32 +556,58 @@ class TenantAuthMiddleware(BaseHTTPMiddleware):
             session_id=payload.get("sid"),
         )
 
-    async def _auth_api_key(self, api_key: str) -> TenantContext:
+    async def _auth_api_key(self, api_key: str, url_tenant: str | None = None) -> TenantContext:
         """Authenticate via API key (SPA, per-user, or tenant key).
+
+        SPEC-1644: Tenant/user API keys require url_tenant (from ?tenant=
+        URL parameter).  The key is validated within that single Cosmos
+        partition — no cross-partition query is ever executed.  On failure
+        the response reveals nothing about the key's actual tenant.
+
+        SPA keys are exempt — they authenticate against the platform_admins
+        collection which is not tenant-scoped.
 
         Detects the key type by prefix:
         - ar_spa_* → SPA platform admin key → resolves from platform_admins
-        - ar_user_* → per-user API key → resolves to team member + tenant
-        - ar_live_* or other → tenant API key → resolves to tenant only
+        - ar_user_* → per-user API key → partition-scoped team member lookup
+        - ar_live_* or other → tenant API key → partition-scoped tenant lookup
         """
         # Route SPA platform admin keys through isolated auth (SPEC-1667)
+        # SPA keys are NOT tenant-scoped — they don't need url_tenant.
         if is_spa_api_key(api_key) and _resolve_by_spa_key_hash is not None:
             logger.debug("Auth routing: SPA platform admin key detected")
             return await self._auth_spa_api_key(api_key)
 
-        # Route per-user keys through the user auth flow
-        if is_user_api_key(api_key) and _resolve_by_user_api_key_hash is not None:
-            logger.debug("Auth routing: per-user API key detected (prefix=%s...)", api_key[:12])
-            return await self._auth_user_api_key(api_key)
+        # SPEC-1644: All non-SPA API key auth REQUIRES a URL tenant.
+        # Without it, we cannot scope the lookup to a single partition.
+        if not url_tenant:
+            logger.warning(
+                "SPEC-1644 violation blocked: API key auth attempted without "
+                "URL tenant parameter (key prefix=%s...)",
+                api_key[:8],
+            )
+            raise AuthenticationError(
+                "Tenant parameter is required. API keys cannot identify "
+                "tenants — include ?tenant= in the URL.",
+            )
 
-        # Tenant-level API key (legacy flow)
-        logger.debug("Auth routing: tenant API key detected (prefix=%s...)", api_key[:8])
-        if _resolve_by_api_key_hash is None:
+        # Route per-user keys through partition-scoped user auth
+        if is_user_api_key(api_key):
+            logger.debug("Auth routing: per-user API key (prefix=%s...) for tenant=%s", api_key[:12], url_tenant)
+            return await self._auth_user_api_key(api_key, url_tenant)
+
+        # Tenant-level API key — partition-scoped verification
+        logger.debug("Auth routing: tenant API key (prefix=%s...) for tenant=%s", api_key[:8], url_tenant)
+        if _verify_api_key_in_partition is None:
             raise AuthenticationError(
                 "Tenant resolution not configured.", status_code=500,
             )
 
-        tenant = await verify_api_key(api_key, _resolve_by_api_key_hash)
+        key_hash = hash_api_key(api_key)
+        tenant = await _verify_api_key_in_partition(url_tenant, key_hash)
+        if tenant is None:
+            # SPEC-1644: Reveal nothing about which tenant this key belongs to
+            raise AuthenticationError("Invalid API key.")
 
         tenant_id, status, tier, trial_expires_at, expires_at, rl_rpm = self._resolve_tenant_fields(tenant)
         validate_tenant_status(tenant_id, status)
@@ -584,18 +623,21 @@ class TenantAuthMiddleware(BaseHTTPMiddleware):
             rate_limit_rpm=rl_rpm,
         )
 
-    async def _auth_user_api_key(self, api_key: str) -> TenantContext:
-        """Authenticate via per-user API key.
+    async def _auth_user_api_key(self, api_key: str, url_tenant: str) -> TenantContext:
+        """Authenticate via per-user API key (SPEC-1644: partition-scoped).
 
-        Resolves the key to a specific team member and their tenant.
-        Populates user identity fields on TenantContext.
+        Validates the key within the specified tenant's partition only.
+        No cross-partition query is executed.
         """
-        if _resolve_by_user_api_key_hash is None:
+        if _verify_user_key_in_partition is None:
             raise AuthenticationError(
                 "Per-user authentication not configured.", status_code=500,
             )
 
-        result = await verify_user_api_key(api_key, _resolve_by_user_api_key_hash)
+        key_hash = hash_api_key(api_key)
+        result = await _verify_user_key_in_partition(url_tenant, key_hash)
+        if result is None:
+            raise AuthenticationError("Invalid API key.")
 
         tenant = result["tenant"]
         member = result["team_member"]

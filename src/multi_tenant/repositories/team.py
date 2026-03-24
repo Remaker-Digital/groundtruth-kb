@@ -156,17 +156,25 @@ class TeamMemberRepository(TenantScopedRepository):
             parameters=[{"name": "@email", "value": email}],
         )
 
-    async def find_by_user_api_key_hash(
-        self, key_hash: str,
+    async def verify_user_key_hash(
+        self, tenant_id: str, key_hash: str,
     ) -> dict[str, Any] | None:
-        """Find a team member by their per-user API key hash.
+        """Verify a per-user API key hash within a known tenant (partition-scoped).
 
-        This is a cross-partition query (searches all tenants) because
-        at auth time we don't yet know which tenant the key belongs to.
+        SPEC-1644: API keys authenticate users, they do NOT identify tenants.
+        The tenant_id must be known in advance (from the URL).  This queries
+        only within the specified tenant's partition — no cross-partition
+        lookup is ever performed.
 
-        Returns the team member document or None.
+        Args:
+            tenant_id: The tenant to validate against (from URL).
+            key_hash: SHA-256 hex digest of the per-user API key.
+
+        Returns:
+            The team member document if the hash matches, None otherwise.
         """
-        results = await self.cross_partition_query(
+        results = await self.query(
+            tenant_id=tenant_id,
             query_text=(
                 "SELECT * FROM c "
                 "WHERE c.user_api_key_hash = @key_hash "

@@ -1011,11 +1011,52 @@ async def update_knowledge_entry(
     if request.status is not None:
         operations.append({"op": "set", "path": "/status", "value": request.status})
 
+    # Archive lifecycle: automatically sync is_active with status transitions
+    old_status = existing.get("status")
+    new_status = request.status
+    archiving = new_status == "archived" and old_status != "archived"
+    unarchiving = (
+        new_status in ("published", "draft")
+        and old_status == "archived"
+    )
+
+    if archiving:
+        # Deactivate on archive so RAG pipeline no longer retrieves this entry
+        operations.append({"op": "set", "path": "/is_active", "value": False})
+    elif unarchiving:
+        # Reactivate when moving out of archived status
+        operations.append({"op": "set", "path": "/is_active", "value": True})
+
     await repo.patch(
         tenant_id=ctx.tenant_id,
         document_id=entry_id,
         operations=operations,
     )
+
+    # Archive lifecycle: remove vector embedding so archived content
+    # cannot be retrieved by semantic search
+    if archiving and _knowledge_vectorizer:
+        try:
+            clear_ops = [
+                {"op": "set", "path": "/embedding", "value": None},
+                {"op": "set", "path": "/embedding_model", "value": None},
+                {"op": "set", "path": "/embedded_at", "value": None},
+                {"op": "set", "path": "/content_hash", "value": None},
+            ]
+            await repo.patch(
+                tenant_id=ctx.tenant_id,
+                document_id=entry_id,
+                operations=clear_ops,
+            )
+            logger.info(
+                "Cleared vector embedding for archived entry: id=%s tenant=%s",
+                entry_id, ctx.tenant_id[:8],
+            )
+        except Exception as clear_exc:
+            logger.warning(
+                "Failed to clear embedding for archived entry (non-blocking): id=%s error=%s",
+                entry_id, clear_exc,
+            )
 
     # Build response from existing + updates
     updated = {**existing}
@@ -1037,6 +1078,11 @@ async def update_knowledge_entry(
         updated["category"] = request.category
     if request.status is not None:
         updated["status"] = request.status
+    # Reflect archive lifecycle is_active override in response
+    if archiving:
+        updated["is_active"] = False
+    elif unarchiving:
+        updated["is_active"] = True
     updated["updated_at"] = now
 
     logger.info(
@@ -1048,8 +1094,9 @@ async def update_knowledge_entry(
     # Signal draft that KB content changed (D16 fix)
     await _signal_kb_draft(ctx)
 
-    # Re-embed if title or content changed (WI #210 — content hash will detect changes)
-    if _knowledge_vectorizer and (request.title is not None or request.content is not None):
+    # Re-embed if title or content changed, or if unarchiving (WI #210)
+    should_reembed = request.title is not None or request.content is not None or unarchiving
+    if _knowledge_vectorizer and should_reembed:
         try:
             await _knowledge_vectorizer.embed_entry(ctx.tenant_id, updated)
         except Exception as embed_exc:

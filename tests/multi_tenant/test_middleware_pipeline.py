@@ -428,7 +428,7 @@ class TestTenantStatusEnforcement:
     """
 
     def _make_status_tenant_and_client(self, app_client, status: TenantStatus):
-        """Create a tenant with a specific status and return auth headers."""
+        """Create a tenant with a specific status and return (headers, tenant_id)."""
         from src.multi_tenant.middleware import configure_tenant_resolution
 
         tenant_id = f"t-status-{status.value}"
@@ -450,21 +450,29 @@ class TestTenantStatusEnforcement:
                 return tenant_doc
             return None
 
+        # SPEC-1644: partition-scoped resolver
+        async def verify_key_in_partition(tid: str, kh: str):
+            if tid == tenant_id and kh == key_hash:
+                return tenant_doc
+            return None
+
         configure_tenant_resolution(
             resolve_by_shop_domain=resolve_by_shop,
             resolve_by_api_key_hash=resolve_by_key,
+            verify_api_key_in_partition=verify_key_in_partition,
         )
 
-        return auth_headers_api_key(api_key)
+        return auth_headers_api_key(api_key), tenant_id
 
     @pytest.mark.unit
     def test_provisioning_tenant_returns_403(self, app_client):
         """MWP-21: PROVISIONING status tenant → 403."""
-        headers = self._make_status_tenant_and_client(
+        headers, tenant_id = self._make_status_tenant_and_client(
             app_client, TenantStatus.PROVISIONING,
         )
         resp = app_client.get(
             "/api/dashboard/usage",
+            params={"tenant": tenant_id},
             headers=headers,
         )
         assert resp.status_code == 403
@@ -472,11 +480,12 @@ class TestTenantStatusEnforcement:
     @pytest.mark.unit
     def test_deactivated_tenant_returns_403(self, app_client):
         """MWP-22: DEACTIVATED status tenant → 403."""
-        headers = self._make_status_tenant_and_client(
+        headers, tenant_id = self._make_status_tenant_and_client(
             app_client, TenantStatus.DEACTIVATED,
         )
         resp = app_client.get(
             "/api/dashboard/usage",
+            params={"tenant": tenant_id},
             headers=headers,
         )
         assert resp.status_code == 403
@@ -484,12 +493,13 @@ class TestTenantStatusEnforcement:
     @pytest.mark.unit
     def test_past_due_tenant_allowed(self, app_client):
         """MWP-23: PAST_DUE status tenant → 200 (allowed)."""
-        headers = self._make_status_tenant_and_client(
+        headers, tenant_id = self._make_status_tenant_and_client(
             app_client, TenantStatus.PAST_DUE,
         )
         # PAST_DUE is in _ACTIVE_STATUSES, so requests succeed
         resp = app_client.get(
             "/api/dashboard/usage",
+            params={"tenant": tenant_id},
             headers=headers,
         )
         # 200, 500, or 503 — but NOT 401 or 403
@@ -503,11 +513,12 @@ class TestTenantStatusEnforcement:
         allow_readonly is not wired in the middleware. Future work
         will implement read-only access for GRACE_PERIOD tenants.
         """
-        headers = self._make_status_tenant_and_client(
+        headers, tenant_id = self._make_status_tenant_and_client(
             app_client, TenantStatus.GRACE_PERIOD,
         )
         resp = app_client.get(
             "/api/dashboard/usage",
+            params={"tenant": tenant_id},
             headers=headers,
         )
         assert resp.status_code == 403

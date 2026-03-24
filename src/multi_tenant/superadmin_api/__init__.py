@@ -41,7 +41,6 @@ from src.multi_tenant.superadmin_api._alerts import *  # noqa: F401,F403
 from src.multi_tenant.superadmin_api._diagnostics import *  # noqa: F401,F403
 from src.multi_tenant.superadmin_api._feedback import *  # noqa: F401,F403
 from src.multi_tenant.superadmin_api._quality import *  # noqa: F401,F403
-from src.multi_tenant.superadmin_api._experiments import *  # noqa: F401,F403
 from src.multi_tenant.superadmin_api._deployments import *  # noqa: F401,F403
 
 # Private helpers re-exported for backward compatibility (test patching)

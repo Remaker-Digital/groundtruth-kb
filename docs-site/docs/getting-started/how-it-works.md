@@ -278,44 +278,20 @@ The critic applies a fail-closed policy: responses are blocked unless all checks
 
 ## Communication protocols
 
-The six agents run in-process within a single API Gateway container. They communicate through two complementary systems: synchronous HTTP endpoints for the request-response pipeline, and asynchronous NATS JetStream events for analytics, logging, and decoupled processing.
+The six agents run in-process within a single API Gateway container. They communicate through synchronous HTTP endpoints — the main pipeline calls agents sequentially and all processing completes within a single request lifecycle.
 
 ```mermaid
 flowchart TB
-    subgraph Synchronous["Synchronous (HTTP, in-process)"]
+    subgraph Pipeline["Synchronous Pipeline (HTTP, in-process)"]
         direction LR
         S1[API Gateway] -->|POST /agents/type/process| S2[Agent Handler]
-    end
-
-    subgraph Asynchronous["Asynchronous (NATS JetStream)"]
-        direction LR
-        A1[Agent] -->|Publish event| A2[NATS Topic]
-        A2 -->|Subscribe| A3[Analytics Agent]
+        S2 -->|Result| S1
     end
 ```
 
 ### HTTP endpoints (synchronous pipeline)
 
-Each agent exposes a POST endpoint within the API Gateway process. The main pipeline calls agents sequentially (intent → knowledge → response → critic) via internal HTTP calls. Health check endpoints are exposed for Azure Container Apps readiness probes.
-
-### NATS JetStream (event bus)
-
-NATS provides asynchronous event delivery with tenant-level stream isolation for:
-
-- **Analytics events** — every pipeline step publishes metrics to NATS topics
-- **Decoupled processing** — agents that do not need immediate responses communicate through events
-- **Short-term durability** — JetStream retains events for 5 minutes, providing resilience during brief processing delays
-
-Each tenant gets isolated NATS streams to prevent cross-tenant data leakage. Agents subscribe to dedicated topics for routing:
-
-| Topic | Agent |
-|---|---|
-| `intent-classifier` | Intent Classification |
-| `knowledge-retrieval` | Knowledge Retrieval |
-| `response-generator-en` | Response Generation (English) |
-| `escalation-handler` | Escalation |
-| `analytics-collector` | Analytics |
-| `critic-supervisor` | Critic / Supervisor |
+Each agent exposes a POST endpoint within the API Gateway process. The main pipeline calls agents sequentially (intent → knowledge → response → critic) via internal HTTP calls. Analytics data is captured synchronously during the pipeline execution and persisted to Cosmos DB. Health check endpoints are exposed for Azure Container Apps readiness probes.
 
 ## Internal message format
 

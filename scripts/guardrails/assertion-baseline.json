@@ -2,8 +2,8 @@
   "_metadata": {
     "description": "Assertion count baseline for pre-commit ratchet. DO NOT EDIT MANUALLY.",
     "generator": "scripts/guardrails/generate_assertion_baseline.py",
-    "total_assertions": 19941,
-    "total_files": 417
+    "total_assertions": 19896,
+    "total_files": 418
   },
   "baselines": {
     "tests/agents/plugins/test_domain_agents.py": 65,
@@ -20,7 +20,6 @@
     "tests/agents/test_knowledge_retrieval.py": 26,
     "tests/agents/test_knowledge_retrieval_mcp.py": 37,
     "tests/agents/test_response_generator.py": 23,
-    "tests/chat/test_ab_testing.py": 103,
     "tests/chat/test_consent_endpoint.py": 17,
     "tests/chat/test_conversation_quality.py": 48,
     "tests/chat/test_identity_pipeline_wiring.py": 21,
@@ -246,7 +245,7 @@
     "tests/multi_tenant/test_otel_exporter.py": 23,
     "tests/multi_tenant/test_otel_tracing.py": 71,
     "tests/multi_tenant/test_pcm_identification.py": 37,
-    "tests/multi_tenant/test_phase6_deferred.py": 49,
+    "tests/multi_tenant/test_phase6_deferred.py": 47,
     "tests/multi_tenant/test_pipeline_gdpr_spec_verification.py": 134,
     "tests/multi_tenant/test_pipeline_metrics_aggregator.py": 61,
     "tests/multi_tenant/test_pipeline_observatory_api.py": 66,
@@ -291,6 +290,8 @@
     "tests/multi_tenant/test_spa_recovery.py": 29,
     "tests/multi_tenant/test_spa_user_management.py": 43,
     "tests/multi_tenant/test_spec1787_stateful_paths.py": 37,
+    "tests/multi_tenant/test_spec_1644_api_key_isolation.py": 32,
+    "tests/multi_tenant/test_spec_1644_http_auth.py": 28,
     "tests/multi_tenant/test_staleness_service.py": 73,
     "tests/multi_tenant/test_standalone_test_mode.py": 17,
     "tests/multi_tenant/test_storefront_ingestion.py": 101,

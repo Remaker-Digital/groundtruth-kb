@@ -24,6 +24,7 @@ import {
   Accordion,
   Tooltip,
   NumberInput,
+  Switch,
 } from '@mantine/core';
 import { useDisclosure } from '@mantine/hooks';
 import { useAppContext } from '../layouts/StandaloneLayout';
@@ -246,6 +247,13 @@ function formatDate(iso: string | null | undefined): string {
 }
 
 // ---------------------------------------------------------------------------
+// Sort types
+// ---------------------------------------------------------------------------
+
+type SortColumn = 'title' | 'category' | 'status' | 'freshness' | 'updatedAt';
+type SortDirection = 'asc' | 'desc';
+
+// ---------------------------------------------------------------------------
 // Page component
 // ---------------------------------------------------------------------------
 
@@ -352,6 +360,9 @@ export const KnowledgeBasePage: React.FC = () => {
   const [search, setSearch] = useState('');
   const [categoryFilter, setCategoryFilter] = useState<string | null>('All');
   const [statusFilter, setStatusFilter] = useState<string | null>('All');
+  const [hideArchived, setHideArchived] = useState(true);
+  const [sortColumn, setSortColumn] = useState<SortColumn>('updatedAt');
+  const [sortDirection, setSortDirection] = useState<SortDirection>('desc');
   const [modalOpened, { open: openModal, close: closeModal }] = useDisclosure(false);
   const [importModalOpened, { open: openImportModal, close: closeImportModal }] = useDisclosure(false);
   const [editingArticle, setEditingArticle] = useState<KBArticle | null>(null);
@@ -376,8 +387,19 @@ export const KnowledgeBasePage: React.FC = () => {
   /** Resolve display status: explicit status → isActive fallback. */
   const resolveStatus = useCallback((a: KBArticle) => a.status || (a.is_active === false ? 'archived' : 'draft'), []);
 
+  const handleSortToggle = useCallback((column: SortColumn) => {
+    setSortColumn((prev) => {
+      if (prev === column) {
+        setSortDirection((d) => (d === 'asc' ? 'desc' : 'asc'));
+        return prev;
+      }
+      setSortDirection(column === 'updatedAt' ? 'desc' : 'asc');
+      return column;
+    });
+  }, []);
+
   const filteredArticles = useMemo(() => {
-    return articles.filter((article) => {
+    const filtered = articles.filter((article) => {
       const matchesSearch =
         search === '' ||
         (article.title ?? '').toLowerCase().includes(search.toLowerCase()) ||
@@ -390,9 +412,45 @@ export const KnowledgeBasePage: React.FC = () => {
         !statusFilter ||
         statusFilter === 'All' ||
         st === statusFilter.toLowerCase();
-      return matchesSearch && matchesCategory && matchesStatus;
+      const matchesArchived = !hideArchived || st !== 'archived';
+      return matchesSearch && matchesCategory && matchesStatus && matchesArchived;
     });
-  }, [articles, search, categoryFilter, statusFilter, resolveCategory, resolveStatus]);
+
+    // Sort
+    const dir = sortDirection === 'asc' ? 1 : -1;
+    filtered.sort((a, b) => {
+      let aVal: string;
+      let bVal: string;
+      switch (sortColumn) {
+        case 'title':
+          aVal = (a.title ?? '').toLowerCase();
+          bVal = (b.title ?? '').toLowerCase();
+          break;
+        case 'category':
+          aVal = (resolveCategory(a) ?? '').toLowerCase();
+          bVal = (resolveCategory(b) ?? '').toLowerCase();
+          break;
+        case 'status':
+          aVal = resolveStatus(a).toLowerCase();
+          bVal = resolveStatus(b).toLowerCase();
+          break;
+        case 'freshness':
+          aVal = (a.stalenessCategory ?? '').toLowerCase();
+          bVal = (b.stalenessCategory ?? '').toLowerCase();
+          break;
+        case 'updatedAt': {
+          const aTime = a.updatedAt ? new Date(a.updatedAt).getTime() : 0;
+          const bTime = b.updatedAt ? new Date(b.updatedAt).getTime() : 0;
+          return (aTime - bTime) * dir;
+        }
+        default:
+          return 0;
+      }
+      return aVal < bVal ? -dir : aVal > bVal ? dir : 0;
+    });
+
+    return filtered;
+  }, [articles, search, categoryFilter, statusFilter, hideArchived, sortColumn, sortDirection, resolveCategory, resolveStatus]);
 
   // Summary stats
   const stats = useMemo(() => {
@@ -697,6 +755,13 @@ export const KnowledgeBasePage: React.FC = () => {
                 clearable={false}
                 w={140}
               />
+              <Switch
+                label="Hide archived"
+                checked={hideArchived}
+                onChange={(e) => setHideArchived(e.currentTarget.checked)}
+                size="sm"
+                styles={{ label: { paddingLeft: 8 } }}
+              />
             </Group>
             <Group gap="sm">
               <Tooltip label="Detect duplicate, overlapping, or contradictory entries that may cause inconsistent AI responses" multiline w={260} withArrow>
@@ -863,11 +928,26 @@ export const KnowledgeBasePage: React.FC = () => {
         <Table striped highlightOnHover>
           <Table.Thead>
             <Table.Tr>
-              <Table.Th>Title</Table.Th>
-              <Table.Th>Category</Table.Th>
-              <Table.Th>Status</Table.Th>
-              <Table.Th>Freshness</Table.Th>
-              <Table.Th>Last updated</Table.Th>
+              {([
+                ['title', 'Title'],
+                ['category', 'Category'],
+                ['status', 'Status'],
+                ['freshness', 'Freshness'],
+                ['updatedAt', 'Last updated'],
+              ] as [SortColumn, string][]).map(([col, label]) => (
+                <Table.Th
+                  key={col}
+                  onClick={() => handleSortToggle(col)}
+                  style={{ cursor: 'pointer', userSelect: 'none', whiteSpace: 'nowrap' }}
+                >
+                  {label}{' '}
+                  {sortColumn === col
+                    ? sortDirection === 'asc'
+                      ? '\u25B2'
+                      : '\u25BC'
+                    : '\u25B2\u25BC'}
+                </Table.Th>
+              ))}
               <Table.Th style={{ textAlign: 'right' }}>Actions</Table.Th>
             </Table.Tr>
           </Table.Thead>

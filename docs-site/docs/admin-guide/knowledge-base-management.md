@@ -136,7 +136,7 @@ draft → published → archived
 | **Published** | Yes | Article is complete and ready for the AI to use. |
 | **Archived** | No | Article is outdated or no longer relevant. Preserved for reference but not searchable. |
 
-**Important:** Archiving an article is reversible. The vector embedding is preserved, so re-publishing an archived article makes it immediately searchable again without re-embedding.
+**Important:** Archiving an article is reversible, but it does remove the vector embedding. When you archive an article, its vector embedding is deleted and it becomes unsearchable. When you unarchive (re-publish) it, a new embedding is generated automatically — there may be a brief delay before the article becomes searchable again while the embedding is created.
 
 ---
 

@@ -1814,7 +1814,13 @@ def get_collection_configs() -> list[CollectionConfig]:
                 "automatic": True,
                 "indexingMode": "consistent",
                 "includedPaths": [{"path": "/*"}],
-                "excludedPaths": [{"path": '/"_etag"/?'}],
+                "excludedPaths": [
+                    {"path": '/"_etag"/?'},
+                    # SPEC-1644: API key hashes MUST NOT be cross-partition
+                    # indexed.  Excluding them makes cross-partition key
+                    # discovery queries impossible at the database level.
+                    {"path": "/api_key_hash/?"},
+                ],
                 "compositeIndexes": [
                     [
                         {"path": "/status", "order": "ascending"},
@@ -2046,7 +2052,12 @@ def get_collection_configs() -> list[CollectionConfig]:
                 "automatic": True,
                 "indexingMode": "consistent",
                 "includedPaths": [{"path": "/*"}],
-                "excludedPaths": [{"path": '/"_etag"/?'}],
+                "excludedPaths": [
+                    {"path": '/"_etag"/?'},
+                    # SPEC-1644: User API key hashes MUST NOT be
+                    # cross-partition indexed.
+                    {"path": "/user_api_key_hash/?"},
+                ],
                 "compositeIndexes": [
                     [
                         {"path": "/role", "order": "ascending"},

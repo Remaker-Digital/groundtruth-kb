@@ -160,7 +160,6 @@ const configGroupItems: NavPage[] = [
 
 /** Nav items rendered AFTER the configuration group. */
 const navItemsAfter: NavPage[] = [
-  { path: '/ab-testing', label: 'A/B Testing', icon: 'analytics', roles: ['superadmin', 'admin'] },
   { path: '/integrations', label: 'Integrations', icon: 'integrations', roles: ['superadmin', 'admin'] },
   { path: '/memory-privacy', label: 'Memory & privacy', icon: 'memory', roles: ['superadmin', 'admin'] },
   { path: '/billing', label: 'Account & billing', icon: 'billing', roles: ['superadmin', 'admin'] },
@@ -247,23 +246,37 @@ export const StandaloneLayout: React.FC<StandaloneLayoutProps> = ({
     [],
   );
 
-  // ---- Tenant context resolution -----------------------------------------
+  // ---- Tenant context resolution (SPEC-1644) -----------------------------
+  // The ?tenant= URL parameter identifies the tenant.  API keys MUST NOT
+  // be used to discover tenants.  We validate the key against the URL
+  // tenant via POST /api/tenants/auth/validate-key (partition-scoped).
 
   useEffect(() => {
     let cancelled = false;
 
     async function resolveTenant() {
       try {
-        const resp = await apiFetch('/api/tenants/lookup');
+        // SPEC-1644: tenant comes from the URL, never from the key
+        const urlTenant = new URL(window.location.href).searchParams.get('tenant');
+        if (!urlTenant) {
+          // No tenant in URL — cannot authenticate.  Redirect to login
+          // so the user can provide their tenant slug + credential.
+          onLogout();
+          return;
+        }
+
+        const resp = await apiFetch('/api/tenants/auth/validate-key', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ tenant: urlTenant }),
+        });
         if (!resp.ok) {
           if (resp.status === 400 || resp.status === 401 || resp.status === 403) {
-            // 400 = no valid auth credential sent (expired session / bookmark)
-            // 401/403 = invalid or revoked credential
-            // All three mean "not authenticated" — redirect to login
+            // Invalid or revoked credential for this tenant
             onLogout();
             return;
           }
-          throw new Error(`Tenant lookup failed: ${resp.status}`);
+          throw new Error(`Tenant validation failed: ${resp.status}`);
         }
         const data = await resp.json();
         if (!cancelled) {
@@ -281,7 +294,7 @@ export const StandaloneLayout: React.FC<StandaloneLayoutProps> = ({
             brandName: data.brand_name || undefined,
           });
 
-          // SPEC-1617: Inject globally unique tenant identifier into URL.
+          // SPEC-1617: Normalize the tenant slug in the URL.
           // Prefer shop domain (already unique, e.g. "blanco-9939"); fall
           // back to brand name slugified; last resort use tenant_id.
           const slug =
@@ -658,6 +671,7 @@ export const StandaloneLayout: React.FC<StandaloneLayoutProps> = ({
           },
           main: {
             background: isDark ? tokens.page : undefined,
+            paddingBottom: 100, /* clearance for chat widget launcher */
           },
         }}
       >

@@ -291,6 +291,35 @@ async def _startup_tenant_resolution() -> None:
             """Resolve an SPA API key hash to a platform admin document."""
             return await platform_admin_repo.find_by_api_key_hash(key_hash)
 
+        # SPEC-1644: Partition-scoped API key verification.
+        # These closures read within a single Cosmos partition — no
+        # cross-partition scan.  The caller must already know the tenant.
+        async def verify_api_key_in_partition(
+            tenant_id: str, key_hash: str,
+        ) -> dict | None:
+            """Verify a tenant API key hash within one partition."""
+            return await tenant_repo.verify_key_hash(tenant_id, key_hash)
+
+        async def verify_user_key_in_partition(
+            tenant_id: str, key_hash: str,
+        ) -> dict | None:
+            """Verify a per-user API key hash within one partition."""
+            member = await team_repo.verify_user_key_hash(tenant_id, key_hash)
+            if member is None:
+                return None
+            try:
+                tenant = await tenant_repo.read(
+                    tenant_id=tenant_id,
+                    document_id=tenant_id,
+                )
+            except Exception:
+                logger.warning(
+                    "User key resolved to member %s but tenant %s not found",
+                    member.get("email"), tenant_id,
+                )
+                return None
+            return {"team_member": member, "tenant": tenant}
+
         configure_tenant_resolution(
             resolve_by_shop_domain=tenant_repo.find_by_shopify_domain,
             resolve_by_api_key_hash=tenant_repo.find_by_api_key_hash,
@@ -298,6 +327,8 @@ async def _startup_tenant_resolution() -> None:
             resolve_by_user_api_key_hash=resolve_user_api_key,
             resolve_by_tenant_id=resolve_by_tenant_id,
             resolve_by_spa_key_hash=resolve_spa_api_key,
+            verify_api_key_in_partition=verify_api_key_in_partition,
+            verify_user_key_in_partition=verify_user_key_in_partition,
         )
         # Wire Cosmos DB as the primary persistence layer for provisioning
         from src.integrations.provisioning import configure_provisioning_repo

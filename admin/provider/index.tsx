@@ -57,7 +57,6 @@ import { DeploymentManagementPage } from './pages/DeploymentManagement';
 import { TestExecutionPage } from './pages/TestExecution';
 import { TestRunDetailPage } from './pages/TestRunDetail';
 import { MaintenanceModePage } from './pages/MaintenanceMode';
-import { ExperimentManagementPage } from './pages/ExperimentManagement';
 
 // ---------------------------------------------------------------------------
 // Auth state (sessionStorage — SUPERADMIN key + MFA token)
@@ -180,7 +179,6 @@ const App: React.FC = () => {
             <Route path="/test-execution" element={<TestExecutionPage />} />
             <Route path="/test-execution/:runId" element={<TestRunDetailPage />} />
             <Route path="/maintenance" element={<MaintenanceModePage />} />
-            <Route path="/experiments" element={<ExperimentManagementPage />} />
             {/* Compliance & Security */}
             <Route path="/compliance" element={<ComplianceDashboardPage />} />
             <Route path="/secrets" element={<SecretPosturePage />} />

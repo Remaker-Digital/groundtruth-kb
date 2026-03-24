@@ -84,12 +84,24 @@ export const ApiKeyLogin: React.FC<ApiKeyLoginProps> = ({
         return;
       }
 
+      // SPEC-1644: API keys MUST NOT identify tenants.
+      // The tenant comes from the URL; the key only authenticates.
+      if (!tenantId) {
+        setError('Tenant context required. Use the link from your welcome email.');
+        return;
+      }
+
       setLoading(true);
       setError(null);
 
       try {
-        const resp = await fetch(`${API_BASE_URL}/api/tenants/lookup`, {
-          headers: { 'X-API-Key': apiKey.trim() },
+        const resp = await fetch(`${API_BASE_URL}/api/tenants/auth/validate-key`, {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            'X-API-Key': apiKey.trim(),
+          },
+          body: JSON.stringify({ tenant: tenantId }),
         });
 
         if (!resp.ok) {
@@ -108,7 +120,7 @@ export const ApiKeyLogin: React.FC<ApiKeyLoginProps> = ({
         setLoading(false);
       }
     },
-    [apiKey, onLogin],
+    [apiKey, tenantId, onLogin],
   );
 
   const handleReset = useCallback(

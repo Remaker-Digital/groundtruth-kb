@@ -9,6 +9,98 @@ All notable changes to Agent Red Customer Experience are documented here.
 
 ---
 
+## v1.98.16 — Self-Service Deployment Pipeline & Dashboard Overhaul (Production, 2026-03-23)
+
+### Self-service deployment pipeline (SPEC-1825)
+
+Build, deploy, and verify directly from the Service Provider Console — no CLI access or developer involvement required:
+
+- **Trigger Pipeline** — one-click build, deploy, and verify for any version tag
+- **Pipeline actions** — full pipeline, build-only, or deploy-only
+- **GitHub Actions integration** — builds trigger `workflow_dispatch` events, with real-time status polling
+- **Deployment history** — every pipeline run recorded with status, duration, and outcome
+- **Environment isolation** — each environment can only deploy to itself (auto-detected from FQDN, SPEC-0058)
+
+### Dashboard health overhaul (SPEC-1851)
+
+Simplified the Platform Dashboard to show only operational infrastructure:
+
+- **4 health cards** — Cosmos DB, Redis, Key Vault, API Version
+- Removed decommissioned NATS card (was always showing "Disconnected")
+- Removed non-functional Circuit Breakers card (was always showing "Unknown")
+- Key Vault probe now reflects actual status instead of always "Degraded"
+- Help tooltip with infrastructure explanations
+
+### Environment isolation enforcement (SPEC-0058)
+
+Complete separation of staging and production:
+
+- Server auto-detects its environment from `CONTAINER_APP_FQDN`
+- Environment selector removed from deployment and test execution UIs
+- No hardcoded FQDNs or API keys in source code
+- Credential scan guardrail prevents accidental secret commits
+
+### Additional fixes
+
+- Tenant identity in navbar never shows blank (SPEC-1848)
+- Knowledge base sortable columns and hide-archived toggle (SPEC-1850)
+- Test execution detail popup with blob URL viewer (SPEC-1845)
+
+---
+
+## v1.98.0 — Quality Guardrails & Automated Testing Infrastructure (Production, 2026-03-21)
+
+### Quality guardrails
+
+4 pre-commit hooks that run automatically on every code change:
+
+- **Test deletion guard** — prevents accidental test removal
+- **Assertion ratchet** — ensures test count never decreases
+- **Architectural guards** — enforces module boundaries and import rules
+- **Credential scan** — blocks secrets from entering the repository
+
+### Fuzzing suite (SPEC-1839)
+
+Schema-driven fuzz testing using Schemathesis against the live OpenAPI spec:
+
+- Generates random valid/invalid payloads for all API endpoints
+- Response model annotations added to 13 endpoints for proper schema validation
+- Conditional test skips classified correctly (legitimate vs evasive)
+
+### Test host infrastructure
+
+Cloud-native test container running 9,200+ tests across 12 suites:
+
+- Parallel test execution with `pytest-xdist`
+- HMAC-based internal authentication for cross-replica verification
+- Dedicated Dockerfile with Node.js, Playwright, and all test dependencies
+- GitHub Actions CI/CD for automatic test host builds
+
+---
+
+## v1.96.0 — Test Execution Console & Cloud-Native Verification (Production, 2026-03-19)
+
+### Test Execution SPA page (SPEC-1826)
+
+Full test management from the Provider Console:
+
+- Trigger test runs with suite selection (smoke, regression, e2e, full)
+- Auto-polling detail modal with live progress bar
+- Performance chart showing pass rates over time
+- Checkbox suite selector for custom test combinations
+- Copy-for-Claude button exports failure JSON for debugging
+- Drill-down into individual test results
+
+### Verification runner improvements
+
+- Shared HTTP client — single TLS handshake per run
+- TOCTOU-safe concurrent run guard (sentinel-based)
+- Progressive Cosmos updates for real-time SPA polling
+- Proper duration tracking on error and cancel paths
+- Stale run timeout increased for reliability
+
+---
+
 ## v1.93.5 — Cloud-Native Verification Runner & Code Review Hardening (Staging, 2026-03-18)
 
 ### Cloud-native verification runner (SPEC-1845/1846)
