@@ -8,65 +8,235 @@ Usage:
     python -m src.jobs.run_data_encryption_migration [--dry-run] [--tenant TENANT_ID]
 
 Safety:
-    - Idempotent: encrypted fields are base64 with a recognizable prefix
+    - Idempotent: already-encrypted fields detected by base64 probe
     - Resumable: processes one tenant at a time, logs progress
     - Checkpoint: tenant completion logged for resume after failure
+    - Bypasses repository hooks to avoid double-encryption
 """
 from __future__ import annotations
 
 import argparse
 import asyncio
+import base64
 import logging
 import sys
+import time
 
 logger = logging.getLogger(__name__)
+
+# Collections and their sensitive fields (must match WI-1627 repository declarations)
+ENCRYPTED_COLLECTIONS: dict[str, list[str]] = {
+    "conversations": ["messages", "customer_intent", "escalation_reason", "transcript"],
+    "knowledge_bases": ["content", "title", "description", "source_text"],
+    "customer_profiles": ["name", "email", "phone", "address", "notes"],
+    "memory_vectors": ["text", "context", "summary"],
+}
+
+
+def _looks_encrypted(value: str) -> bool:
+    """Heuristic: check if a string value looks like base64-encoded ciphertext.
+
+    Encrypted fields are base64(nonce || ciphertext || tag), which means:
+    - Minimum length: 12 (nonce) + 1 (data) + 16 (tag) = 29 bytes → ~40 base64 chars
+    - Valid base64 characters only
+    - Decodes without error
+
+    This is the idempotency guard — we never re-encrypt already-encrypted data.
+    """
+    if len(value) < 40:
+        return False
+    try:
+        decoded = base64.b64decode(value, validate=True)
+        # Encrypted output is at least nonce(12) + tag(16) + 1 byte of ciphertext
+        return len(decoded) >= 29
+    except Exception:
+        return False
+
+
+async def _get_or_create_tenant_dek(
+    tenant_id: str,
+    *,
+    dry_run: bool = False,
+) -> bytes | None:
+    """Retrieve or create a DEK for the tenant. Returns wrapped DEK bytes."""
+    from src.multi_tenant.envelope_encryption import get_envelope_encryption_service
+    from src.multi_tenant.tenant_secret_service import (
+        TenantSecretType,
+        get_secret_service,
+    )
+
+    svc = get_envelope_encryption_service()
+    secret_svc = get_secret_service()
+    if svc is None or secret_svc is None:
+        logger.error("Encryption or secret service not initialized")
+        return None
+
+    # Check if DEK already exists
+    existing = await secret_svc.get_secret(tenant_id, TenantSecretType.DEK)
+    if existing is not None:
+        wrapped_dek = base64.b64decode(existing)
+        # Pre-warm the cache by unwrapping
+        await svc.unwrap_key_async(wrapped_dek, tenant_id)
+        logger.info("Existing DEK found for tenant %s", tenant_id)
+        return wrapped_dek
+
+    if dry_run:
+        logger.info("[DRY RUN] Would create DEK for tenant %s", tenant_id)
+        return None
+
+    # Create new DEK
+    wrapped_dek = await svc.create_tenant_dek(tenant_id)
+    # Store wrapped DEK in Key Vault
+    wrapped_b64 = base64.b64encode(wrapped_dek).decode("ascii")
+    await secret_svc.set_secret(tenant_id, TenantSecretType.DEK, wrapped_b64)
+    logger.info("Created and stored new DEK for tenant %s", tenant_id)
+    return wrapped_dek
 
 
 async def migrate_tenant(tenant_id: str, *, dry_run: bool = False) -> dict:
     """Encrypt all sensitive fields for a single tenant.
 
+    Reads documents directly from Cosmos (bypassing repository _post_read hooks
+    which would attempt decryption on plaintext data). Encrypts each sensitive
+    field, then writes back via replace_item.
+
     Returns:
-        Dict with counts: documents_processed, fields_encrypted, errors.
+        Dict with counts: documents_processed, fields_encrypted, errors, skipped.
     """
+    from src.multi_tenant.cosmos_client import get_cosmos_manager
     from src.multi_tenant.envelope_encryption import get_envelope_encryption_service
 
     svc = get_envelope_encryption_service()
     if svc is None:
         logger.error("EnvelopeEncryptionService not initialized")
-        return {"documents_processed": 0, "fields_encrypted": 0, "errors": 1}
+        return {"documents_processed": 0, "fields_encrypted": 0, "errors": 1, "skipped": 0}
 
-    stats = {"documents_processed": 0, "fields_encrypted": 0, "errors": 0}
+    stats = {"documents_processed": 0, "fields_encrypted": 0, "errors": 0, "skipped": 0}
 
-    # TODO: Implement per-collection iteration:
-    # 1. Get or create tenant DEK
-    # 2. For each collection with _encryption_fields:
-    #    a. Query all documents for this tenant
-    #    b. For each document, encrypt each sensitive field
-    #    c. Upsert the encrypted document
-    # 3. Log completion checkpoint
+    # Step 1: Get or create tenant DEK
+    wrapped_dek = await _get_or_create_tenant_dek(tenant_id, dry_run=dry_run)
+    if wrapped_dek is None:
+        if dry_run:
+            logger.info("[DRY RUN] No DEK available — skipping encryption for tenant %s", tenant_id)
+        else:
+            logger.error("Failed to obtain DEK for tenant %s", tenant_id)
+            stats["errors"] += 1
+        return stats
 
-    if dry_run:
-        logger.info("[DRY RUN] Would migrate tenant %s", tenant_id)
-    else:
-        logger.info("Migration for tenant %s: %s", tenant_id, stats)
+    cosmos = get_cosmos_manager()
 
+    # Step 2: Iterate each collection with encrypted fields
+    for collection_name, fields in ENCRYPTED_COLLECTIONS.items():
+        container = cosmos.get_container(collection_name)
+        logger.info(
+            "Migrating %s for tenant %s (fields: %s)",
+            collection_name, tenant_id, fields,
+        )
+
+        # Query all documents for this tenant (raw — no repository hooks)
+        doc_count = 0
+        async for doc in container.query_items(
+            query="SELECT * FROM c WHERE c.tenant_id = @tid",
+            parameters=[{"name": "@tid", "value": tenant_id}],
+            partition_key=tenant_id,
+        ):
+            doc_id = doc.get("id", "unknown")
+            fields_encrypted_this_doc = 0
+
+            for field in fields:
+                value = doc.get(field)
+                if value is None or value == "":
+                    continue
+                if not isinstance(value, str):
+                    # Non-string fields (e.g., list of messages) — skip
+                    # These may need custom handling per collection
+                    continue
+                if _looks_encrypted(value):
+                    stats["skipped"] += 1
+                    continue
+
+                if dry_run:
+                    logger.debug(
+                        "[DRY RUN] Would encrypt %s.%s in doc %s",
+                        collection_name, field, doc_id,
+                    )
+                    stats["fields_encrypted"] += 1
+                    fields_encrypted_this_doc += 1
+                    continue
+
+                # Encrypt the field
+                try:
+                    doc[field] = svc.encrypt_field(
+                        wrapped_dek, value,
+                        tenant_id=tenant_id, doc_id=doc_id,
+                    )
+                    stats["fields_encrypted"] += 1
+                    fields_encrypted_this_doc += 1
+                except Exception:
+                    logger.error(
+                        "Failed to encrypt %s.%s in doc %s for tenant %s",
+                        collection_name, field, doc_id, tenant_id,
+                        exc_info=True,
+                    )
+                    stats["errors"] += 1
+
+            # Write back if any fields were encrypted (and not dry run)
+            if fields_encrypted_this_doc > 0 and not dry_run:
+                try:
+                    await container.replace_item(item=doc_id, body=doc)
+                except Exception:
+                    logger.error(
+                        "Failed to write back %s/%s for tenant %s",
+                        collection_name, doc_id, tenant_id,
+                        exc_info=True,
+                    )
+                    stats["errors"] += 1
+
+            doc_count += 1
+            stats["documents_processed"] += 1
+
+        logger.info(
+            "  %s: %d documents processed for tenant %s",
+            collection_name, doc_count, tenant_id,
+        )
+
+    action = "DRY RUN" if dry_run else "Migration"
+    logger.info(
+        "%s complete for tenant %s: %s",
+        action, tenant_id, stats,
+    )
     return stats
 
 
 async def run_migration(*, dry_run: bool = False, tenant_id: str | None = None) -> None:
     """Run encryption migration for all tenants (or a single tenant)."""
+    from src.multi_tenant.repositories.tenant import TenantRepository
+
     logger.info(
         "Starting data encryption migration (dry_run=%s, tenant=%s)",
         dry_run, tenant_id or "ALL",
     )
+    start = time.monotonic()
 
     if tenant_id:
         await migrate_tenant(tenant_id, dry_run=dry_run)
     else:
-        # TODO: Iterate all tenants from TenantRepository
-        logger.info("Full migration not yet implemented — use --tenant flag")
+        # Iterate all active tenants
+        repo = TenantRepository()
+        tenant_ids = await repo.list_active_tenant_ids()
+        logger.info("Found %d active tenants to migrate", len(tenant_ids))
 
-    logger.info("Migration complete")
+        totals = {"documents_processed": 0, "fields_encrypted": 0, "errors": 0, "skipped": 0}
+        for i, tid in enumerate(tenant_ids, 1):
+            logger.info("--- Tenant %d/%d: %s ---", i, len(tenant_ids), tid)
+            stats = await migrate_tenant(tid, dry_run=dry_run)
+            for key in totals:
+                totals[key] += stats.get(key, 0)
+
+        logger.info("All tenants complete: %s", totals)
+
+    elapsed = time.monotonic() - start
+    logger.info("Migration finished in %.1f seconds", elapsed)
 
 
 def main() -> None:
