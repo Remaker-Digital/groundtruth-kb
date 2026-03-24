@@ -151,35 +151,25 @@ resource "azurerm_key_vault_key" "cmk" {
   })
 }
 
-# Key Vault access policy for Cosmos DB to use CMK
-resource "azurerm_key_vault_access_policy" "cosmos_cmk" {
+# Key Vault RBAC role for Cosmos DB to use CMK (Key Vault uses RBAC authorization)
+# "Key Vault Crypto Service Encryption User" allows Get, WrapKey, UnwrapKey on keys
+resource "azurerm_role_assignment" "cosmos_cmk" {
   count = var.enable_cmk && var.manage_cosmos_db_account ? 1 : 0
 
-  key_vault_id = data.azurerm_key_vault.main.id
-  tenant_id    = data.azurerm_client_config.current.tenant_id
-  object_id    = azurerm_cosmosdb_account.managed[0].identity[0].principal_id
-
-  key_permissions = [
-    "Get",
-    "UnwrapKey",
-    "WrapKey",
-  ]
+  scope                = data.azurerm_key_vault.main.id
+  role_definition_name = "Key Vault Crypto Service Encryption User"
+  principal_id         = azurerm_cosmosdb_account.managed[0].identity[0].principal_id
 }
 
-# Key Vault access policy for container apps to wrap/unwrap DEKs (SPEC-1843 / WI-1625)
+# Key Vault RBAC role for container apps to wrap/unwrap DEKs (SPEC-1843 / WI-1625)
 # Reuses the CMK (agent-red-cmk) as Master KEK for envelope encryption.
-resource "azurerm_key_vault_access_policy" "container_app_kek" {
+# "Key Vault Crypto User" allows Get, WrapKey, UnwrapKey, plus Encrypt/Decrypt/Sign/Verify
+resource "azurerm_role_assignment" "container_app_kek" {
   for_each = var.enable_cmk ? azurerm_container_app.apps : {}
 
-  key_vault_id = data.azurerm_key_vault.main.id
-  tenant_id    = data.azurerm_client_config.current.tenant_id
-  object_id    = each.value.identity[0].principal_id
-
-  key_permissions = [
-    "Get",
-    "WrapKey",
-    "UnwrapKey",
-  ]
+  scope                = data.azurerm_key_vault.main.id
+  role_definition_name = "Key Vault Crypto User"
+  principal_id         = each.value.identity[0].principal_id
 }
 
 # ---------------------------------------------------------------------------

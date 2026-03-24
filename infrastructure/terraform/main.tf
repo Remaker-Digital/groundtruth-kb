@@ -62,7 +62,7 @@ resource "azurerm_container_app_environment" "main" {
   name                       = var.container_app_environment_name
   location                   = var.location
   resource_group_name        = var.resource_group_name
-  infrastructure_subnet_id   = var.container_apps_subnet_id
+  infrastructure_subnet_id   = var.container_apps_subnet_id != "" ? var.container_apps_subnet_id : null
   log_analytics_workspace_id = azurerm_log_analytics_workspace.main.id
 
   tags = var.tags
