@@ -19,6 +19,11 @@ from src.multi_tenant.repositories.base import DocumentNotFoundError, TenantScop
 class CustomerProfileRepository(TenantScopedRepository):
     """Repository for the customer_profiles collection (Layer 1)."""
 
+    # SPEC-1843 / WI-1627: Fields encrypted at rest with tenant DEK
+    _encryption_fields = frozenset({
+        "name", "email", "phone", "address", "notes",
+    })
+
     def __init__(self) -> None:
         super().__init__(COLLECTION_CUSTOMER_PROFILES)
 

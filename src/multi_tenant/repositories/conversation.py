@@ -23,6 +23,11 @@ class ConversationRepository(TenantScopedRepository):
     needed by the ConversationMeter (Work Items #71-72).
     """
 
+    # SPEC-1843 / WI-1627: Fields encrypted at rest with tenant DEK
+    _encryption_fields = frozenset({
+        "messages", "customer_intent", "escalation_reason", "transcript",
+    })
+
     def __init__(self) -> None:
         super().__init__(COLLECTION_CONVERSATIONS)
 

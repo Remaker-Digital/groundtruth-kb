@@ -2,8 +2,8 @@
   "_metadata": {
     "description": "Assertion count baseline for pre-commit ratchet. DO NOT EDIT MANUALLY.",
     "generator": "scripts/guardrails/generate_assertion_baseline.py",
-    "total_assertions": 19827,
-    "total_files": 417
+    "total_assertions": 19911,
+    "total_files": 421
   },
   "baselines": {
     "tests/agents/plugins/test_domain_agents.py": 65,
@@ -170,12 +170,14 @@
     "tests/multi_tenant/test_apikey_reset.py": 54,
     "tests/multi_tenant/test_archival_pipeline.py": 47,
     "tests/multi_tenant/test_audit_log.py": 49,
+    "tests/multi_tenant/test_audit_sanitizer.py": 30,
     "tests/multi_tenant/test_auth_middleware.py": 95,
     "tests/multi_tenant/test_auth_middleware_functions.py": 12,
     "tests/multi_tenant/test_auth_spec_verification.py": 56,
     "tests/multi_tenant/test_auth_specs.py": 49,
     "tests/multi_tenant/test_billable_classification.py": 15,
     "tests/multi_tenant/test_billing_infra_spec_verification.py": 82,
+    "tests/multi_tenant/test_blind_key_delivery.py": 22,
     "tests/multi_tenant/test_build_orchestrator.py": 37,
     "tests/multi_tenant/test_chunking_preview.py": 41,
     "tests/multi_tenant/test_communication_capture.py": 61,
@@ -209,6 +211,7 @@
     "tests/multi_tenant/test_email_template_specs.py": 63,
     "tests/multi_tenant/test_email_verification.py": 46,
     "tests/multi_tenant/test_entitlement_service.py": 81,
+    "tests/multi_tenant/test_envelope_encryption.py": 22,
     "tests/multi_tenant/test_fcr_metric.py": 39,
     "tests/multi_tenant/test_gdpr_services.py": 107,
     "tests/multi_tenant/test_idle_scanner.py": 16,
@@ -330,6 +333,7 @@
     "tests/multi_tenant/test_vectorization_scanner.py": 16,
     "tests/multi_tenant/test_verification_runner.py": 60,
     "tests/multi_tenant/test_welcome_email.py": 36,
+    "tests/multi_tenant/test_widget_origin_validation.py": 10,
     "tests/ops/test_dockerfile_test_coverage.py": 5,
     "tests/ops/test_hooks_specs.py": 59,
     "tests/ops/test_pre_flight_specs.py": 64,

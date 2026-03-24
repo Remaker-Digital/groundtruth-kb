@@ -407,7 +407,8 @@ class TenantAuthMiddleware(BaseHTTPMiddleware):
             )
 
         if widget_key:
-            return await self._auth_widget_key(widget_key, request.url.path)
+            origin = request.headers.get("origin") or request.headers.get("referer")
+            return await self._auth_widget_key(widget_key, request.url.path, origin)
 
         # Try magic link session token (X-Session-Token header)
         session_token = request.headers.get("X-Session-Token")
@@ -751,12 +752,16 @@ class TenantAuthMiddleware(BaseHTTPMiddleware):
         )
 
     async def _auth_widget_key(
-        self, widget_key: str, path: str,
+        self, widget_key: str, path: str, origin: str | None = None,
     ) -> TenantContext:
         """Authenticate via publishable widget key (Decision UI-6).
 
         Widget keys are scoped to /api/chat/* and /ws/chat/* only.
         Requests to other paths are rejected even if the key is valid.
+
+        SPEC-1840 / WI-1623: If the tenant has configured
+        ``approved_widget_origins``, the request Origin header must match
+        one of the approved origins.  Empty list = allow all (migration).
         """
         # Enforce path scope — widget keys cannot access billing, config, etc.
         if not is_widget_key_allowed_path(path):
@@ -770,6 +775,40 @@ class TenantAuthMiddleware(BaseHTTPMiddleware):
             )
 
         tenant = await verify_widget_key(widget_key, _resolve_by_widget_key_hash)
+
+        # SPEC-1840: Origin validation against approved_widget_origins
+        approved_origins = tenant.get("approved_widget_origins") or []
+        if approved_origins and origin:
+            # Normalize: compare lowercase, strip trailing slashes
+            normalized_origin = origin.rstrip("/").lower()
+            allowed = any(
+                normalized_origin == ao.rstrip("/").lower()
+                for ao in approved_origins
+            )
+            if not allowed:
+                raise AuthenticationError(
+                    "Widget key rejected: origin not in approved_widget_origins.",
+                    status_code=403,
+                )
+        elif approved_origins and not origin:
+            # Origins configured but request has no Origin header
+            logger.warning(
+                "SPEC-1840: Widget request without Origin header; "
+                "tenant %s has approved_widget_origins configured",
+                tenant.get("tenant_id", "unknown"),
+            )
+            raise AuthenticationError(
+                "Widget key rejected: Origin header required when origin restrictions are configured.",
+                status_code=403,
+            )
+        elif not approved_origins:
+            # No origins configured — allow all (backward-compatible migration)
+            if origin:
+                logger.debug(
+                    "SPEC-1840: No approved_widget_origins configured for tenant %s; "
+                    "allowing origin %s (migration period)",
+                    tenant.get("tenant_id", "unknown"), origin,
+                )
 
         tenant_id, status, tier, trial_expires_at, expires_at, rl_rpm = self._resolve_tenant_fields(tenant)
         validate_tenant_status(tenant_id, status)

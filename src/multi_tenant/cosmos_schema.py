@@ -1051,6 +1051,14 @@ class PreferencesDocument(BaseModel):
 
     # Content and targeting
     widget_key: str | None = Field(default=None, description="Publishable widget key (pk_live_...) for widget authentication")
+    approved_widget_origins: list[str] = Field(
+        default_factory=list,
+        description=(
+            "SPEC-1840: Approved origins for widget key authentication. "
+            "Widget requests from unapproved origins are rejected (403). "
+            "Empty list = allow all origins (backward-compatible migration period)."
+        ),
+    )
     widget_header_text: str | None = Field(default=None, description="Custom widget header/title text")
     widget_input_placeholder: str | None = Field(default=None, description="Message input placeholder text")
     widget_page_rules: list[str] | None = Field(default=None, description="URL patterns for page visibility rules")

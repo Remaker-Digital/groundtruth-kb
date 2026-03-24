@@ -20,7 +20,6 @@ import {
   Badge,
   Button,
   Card,
-  CopyButton,
   Group,
   Menu,
   Modal,
@@ -56,8 +55,7 @@ interface TenantItem {
   status: string;
   tier: string | null;
   billingChannel: string | null;
-  customerEmail: string | null;
-  shopifyShopDomain: string | null;
+  // SPEC-1843: customerEmail and shopifyShopDomain removed
   createdAt: string | null;
   updatedAt: string | null;
   deactivatedAt: string | null;
@@ -72,14 +70,17 @@ interface TenantListResponse {
   limit: number;
 }
 
-/** Response from POST /api/superadmin/tenants (P0-PROV-1). */
+/** Response from POST /api/superadmin/tenants (P0-PROV-1).
+ *
+ * SPEC-1843 / WI-1621: Raw keys are NEVER returned to the SPA operator.
+ * Keys are delivered directly to the tenant superadmin via email.
+ */
 interface CreateTenantResponse {
   tenantId: string;
   status: string;
   tier: string;
   superadminEmail: string;
-  superadminApiKey: string | null;
-  widgetKey: string | null;
+  keysDeliveredViaEmail: boolean;
   warnings: string[];
 }
 
@@ -516,10 +517,9 @@ export function TenantDirectoryPage() {
                     <Table.Tr key={t.tenantId}>
                       <Table.Td>
                         <TenantName tenantId={t.tenantId} info={{
-                          displayName: t.customerEmail || t.shopifyShopDomain || t.tenantId,
-                          isUuid: !t.customerEmail && !t.shopifyShopDomain,
-                          customerEmail: t.customerEmail ?? null,
-                          shopifyShopDomain: t.shopifyShopDomain ?? null,
+                          // SPEC-1843: PII fields removed — display tenantId only
+                          displayName: t.tenantId,
+                          isUuid: true,
                         }} />
                       </Table.Td>
                       <Table.Td>
@@ -544,7 +544,7 @@ export function TenantDirectoryPage() {
                         <Text size="xs" c={tokens.textMuted}>{t.billingChannel ?? '—'}</Text>
                       </Table.Td>
                       <Table.Td>
-                        <Text size="xs" c={tokens.textMuted}>{t.customerEmail ?? '—'}</Text>
+                        <Text size="xs" c={tokens.textMuted}>{t.tenantId}</Text>
                       </Table.Td>
                       <Table.Td>
                         <Text size="xs" c="dimmed">
@@ -643,53 +643,21 @@ export function TenantDirectoryPage() {
               )}
             </Alert>
 
+            {/* SPEC-1843 / WI-1621: Keys delivered via email — never shown in SPA */}
             <Paper withBorder p="md" radius="md" bg={tokens.surface}>
               <Stack gap="sm">
-                <Text size="sm" fw={600} c={tokens.textPrimary}>Credentials — save these now (shown only once)</Text>
+                <Text size="sm" fw={600} c={tokens.textPrimary}>Credential Delivery</Text>
 
-                {createResult.superadminApiKey && (
-                  <Group gap="xs" align="center">
-                    <TextInput
-                      label="Superadmin API Key"
-                      value={createResult.superadminApiKey}
-                      readOnly
-                      size="sm"
-                      style={{ flex: 1 }}
-                      styles={{ input: { fontFamily: 'monospace', fontSize: '12px' } }}
-                    />
-                    <CopyButton value={createResult.superadminApiKey}>
-                      {({ copied, copy }) => (
-                        <Tooltip label={copied ? 'Copied' : 'Copy'}>
-                          <ActionIcon color={copied ? 'green' : 'action'} onClick={copy} mt={24} variant="subtle">
-                            {copied ? '✓' : '📋'}
-                          </ActionIcon>
-                        </Tooltip>
-                      )}
-                    </CopyButton>
-                  </Group>
-                )}
-
-                {createResult.widgetKey && (
-                  <Group gap="xs" align="center">
-                    <TextInput
-                      label="Widget Key"
-                      value={createResult.widgetKey}
-                      readOnly
-                      size="sm"
-                      style={{ flex: 1 }}
-                      styles={{ input: { fontFamily: 'monospace', fontSize: '12px' } }}
-                    />
-                    <CopyButton value={createResult.widgetKey}>
-                      {({ copied, copy }) => (
-                        <Tooltip label={copied ? 'Copied' : 'Copy'}>
-                          <ActionIcon color={copied ? 'green' : 'action'} onClick={copy} mt={24} variant="subtle">
-                            {copied ? '✓' : '📋'}
-                          </ActionIcon>
-                        </Tooltip>
-                      )}
-                    </CopyButton>
-                  </Group>
-                )}
+                <Alert
+                  color={createResult.keysDeliveredViaEmail ? 'green' : 'orange'}
+                  title={createResult.keysDeliveredViaEmail ? 'Keys delivered' : 'Delivery pending'}
+                  variant="light"
+                >
+                  {createResult.keysDeliveredViaEmail
+                    ? `API key and widget key delivered to ${createResult.superadminEmail}. The tenant superadmin can find their credentials in their welcome email.`
+                    : `Email delivery may have failed. Use "Resend Welcome Email" from the tenant actions menu to retry.`
+                  }
+                </Alert>
 
                 <Group gap="xs">
                   <Text size="xs" c="dimmed">Tenant ID:</Text>

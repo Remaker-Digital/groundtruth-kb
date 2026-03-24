@@ -16,6 +16,11 @@ from src.multi_tenant.repositories.base import TenantScopedRepository
 class KnowledgeBaseRepository(TenantScopedRepository):
     """Repository for the knowledge_bases collection."""
 
+    # SPEC-1843 / WI-1627: Fields encrypted at rest with tenant DEK
+    _encryption_fields = frozenset({
+        "content", "title", "description", "source_text",
+    })
+
     def __init__(self) -> None:
         super().__init__(COLLECTION_KNOWLEDGE_BASES)
 

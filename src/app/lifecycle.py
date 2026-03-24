@@ -337,11 +337,35 @@ async def _startup_tenant_resolution() -> None:
         from src.integrations.provisioning import configure_provisioning_repo
         configure_provisioning_repo(tenant_repo, team_repo=team_repo)
         logger.info("Tenant resolution configured (Cosmos DB-backed, quad auth)")
-    except Exception:
+    except Exception as exc:
         logger.warning(
             "Tenant resolution configuration failed — auth middleware will "
-            "reject authenticated requests until Cosmos DB is available."
+            "reject authenticated requests until Cosmos DB is available. "
+            "Error: %s", exc,
         )
+        # Best-effort: even if full resolution fails, try to wire the SPA
+        # resolver so the platform admin console is not locked out.
+        try:
+            from src.multi_tenant.repositories.platform_admin import PlatformAdminRepository
+            _pa_repo = PlatformAdminRepository()
+
+            async def _fallback_spa_key(key_hash: str) -> dict | None:
+                return await _pa_repo.find_by_api_key_hash(key_hash)
+
+            async def _noop(*_args, **_kwargs) -> None:
+                return None
+
+            configure_tenant_resolution(
+                resolve_by_shop_domain=_noop,
+                resolve_by_api_key_hash=_noop,
+                resolve_by_spa_key_hash=_fallback_spa_key,
+            )
+            logger.info(
+                "Fallback SPA-only auth configured — platform admin console "
+                "available, merchant auth unavailable."
+            )
+        except Exception as inner:
+            logger.error("Fallback SPA auth also failed: %s", inner)
 
 
 async def _startup_config_processor() -> None:
@@ -501,6 +525,32 @@ async def _startup_secret_service() -> None:
         logger.warning(
             "TenantSecretService initialization failed — secret management "
             "unavailable. Set AZURE_KEYVAULT_URL to configure."
+        )
+
+
+async def _startup_envelope_encryption() -> None:
+    """Initialize the EnvelopeEncryptionService (SPEC-1843 / WI-1631).
+
+    In dev mode (no MASTER_KEK_KEY_ID), uses an in-memory test KEK.
+    In production, connects to Azure Key Vault for the Master KEK.
+    """
+    from src.multi_tenant.envelope_encryption import (
+        EnvelopeEncryptionService,
+        set_envelope_encryption_service,
+    )
+
+    kek_key_id = os.environ.get("MASTER_KEK_KEY_ID")
+    dev_mode = not kek_key_id
+
+    try:
+        svc = EnvelopeEncryptionService(dev_mode=dev_mode, kek_key_id=kek_key_id)
+        set_envelope_encryption_service(svc)
+        mode_label = "DEV MODE" if dev_mode else f"KEK={kek_key_id}"
+        logger.info("EnvelopeEncryptionService initialized (%s)", mode_label)
+    except Exception:
+        logger.warning(
+            "EnvelopeEncryptionService initialization failed — "
+            "field-level encryption unavailable"
         )
 
 
@@ -1985,6 +2035,7 @@ def register_startup_handlers(app: FastAPI | None = None) -> None:
         _startup_nats,
         _startup_agntcy_sdk,
         _startup_secret_service,
+        _startup_envelope_encryption,
         _startup_chat_services,
         _startup_admin_inbox_services,
         _startup_knowledge_vectorizer,

@@ -68,10 +68,81 @@ class TenantScopedRepository:
 
     Subclasses define collection-specific query methods but inherit
     all CRUD operations from this base.
+
+    SPEC-1843 / WI-1626: Subclasses may declare ``_encryption_fields``
+    (a frozenset of field names) to enable transparent field-level
+    encryption via ``_pre_write`` / ``_post_read`` hooks.
     """
+
+    _encryption_fields: frozenset[str] = frozenset()
 
     def __init__(self, collection_name: str) -> None:
         self._collection_name = collection_name
+
+    # -- SPEC-1843 encryption hooks -----------------------------------------
+
+    def _pre_write(self, body: dict[str, Any], tenant_id: str) -> dict[str, Any]:
+        """Encrypt sensitive fields before Cosmos DB write.
+
+        Only encrypts fields listed in ``_encryption_fields``.
+        No-op if encryption service is not initialized or no fields declared.
+        """
+        if not self._encryption_fields:
+            return body
+        from src.multi_tenant.envelope_encryption import get_envelope_encryption_service
+        svc = get_envelope_encryption_service()
+        if svc is None:
+            return body
+
+        # Get tenant's wrapped DEK (cached in production)
+        wrapped_dek = self._get_tenant_dek(tenant_id)
+        if wrapped_dek is None:
+            return body
+
+        doc_id = body.get("id", "unknown")
+        for field in self._encryption_fields:
+            if field in body and isinstance(body[field], str):
+                body[field] = svc.encrypt_field(
+                    wrapped_dek, body[field],
+                    tenant_id=tenant_id, doc_id=doc_id,
+                )
+        return body
+
+    def _post_read(self, body: dict[str, Any], tenant_id: str) -> dict[str, Any]:
+        """Decrypt sensitive fields after Cosmos DB read.
+
+        Only decrypts fields listed in ``_encryption_fields``.
+        No-op if encryption service is not initialized or no fields declared.
+        """
+        if not self._encryption_fields:
+            return body
+        from src.multi_tenant.envelope_encryption import get_envelope_encryption_service
+        svc = get_envelope_encryption_service()
+        if svc is None:
+            return body
+
+        wrapped_dek = self._get_tenant_dek(tenant_id)
+        if wrapped_dek is None:
+            return body
+
+        doc_id = body.get("id", "unknown")
+        for field in self._encryption_fields:
+            if field in body and isinstance(body[field], str):
+                body[field] = svc.decrypt_field(
+                    wrapped_dek, body[field],
+                    tenant_id=tenant_id, doc_id=doc_id,
+                )
+        return body
+
+    def _get_tenant_dek(self, tenant_id: str) -> bytes | None:
+        """Retrieve the wrapped DEK for a tenant.
+
+        In production, this reads from Key Vault with caching.
+        Returns None if DEK is not provisioned (migration period).
+        """
+        # TODO(WI-1628): Implement DEK retrieval from Key Vault
+        # For now, return None (encryption inactive until DEKs provisioned)
+        return None
 
     @property
     def _container(self) -> Any:

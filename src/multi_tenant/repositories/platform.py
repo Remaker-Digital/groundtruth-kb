@@ -122,20 +122,28 @@ class AuditLogRepository(PlatformScopedRepository):
         This is the primary method for recording audit events. It
         auto-generates the ID, timestamp, and time partition.
 
+        SPEC-1843 / WI-1616: All payloads are sanitized through
+        ``sanitize_audit_payload()`` before persistence — non-allowlisted
+        fields are stripped and PII patterns are scrubbed.
+
         Args:
-            event_type: One of the 12 defined AuditEventType values.
+            event_type: One of the 18 defined AuditEventType values.
             tenant_id: Which tenant the event relates to.
             actor: Who/what triggered the event.
             actor_type: user | system | webhook | admin.
-            payload: Event-specific data (must be PII-free).
+            payload: Event-specific data (sanitized before write).
             conversation_id: Related conversation ID.
             request_id: HTTP request trace ID.
 
         Returns:
             The created audit log document.
         """
+        from src.multi_tenant.audit_sanitizer import sanitize_audit_payload
+
         now = datetime.now(timezone.utc)
         time_partition = now.strftime("%Y-%m")
+
+        sanitized_payload = sanitize_audit_payload(payload or {})
 
         doc = AuditLogDocument(
             id=str(uuid.uuid4()),
@@ -144,7 +152,7 @@ class AuditLogRepository(PlatformScopedRepository):
             tenant_id=tenant_id,
             actor=actor,
             actor_type=actor_type,
-            payload=payload or {},
+            payload=sanitized_payload,
             conversation_id=conversation_id,
             request_id=request_id,
             timestamp=now.isoformat(),

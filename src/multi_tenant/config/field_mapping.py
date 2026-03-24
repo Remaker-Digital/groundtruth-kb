@@ -93,6 +93,7 @@ _PREFS_DIRECT_FIELDS: set[str] = {
     "widget_offline_form_enabled",
     # Widget authentication
     "widget_key",
+    "approved_widget_origins",  # SPEC-1840: domain restriction for widget keys
     # Widget appearance — content and targeting (3 fields)
     "widget_header_text",
     "widget_input_placeholder",

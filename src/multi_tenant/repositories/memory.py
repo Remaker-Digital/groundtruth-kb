@@ -18,6 +18,11 @@ class MemoryVectorRepository(TenantScopedRepository):
     Provides vector similarity search using Cosmos DB DiskANN index.
     """
 
+    # SPEC-1843 / WI-1627: Fields encrypted at rest with tenant DEK
+    _encryption_fields = frozenset({
+        "text", "context", "summary",
+    })
+
     def __init__(self) -> None:
         super().__init__(COLLECTION_MEMORY_VECTORS)
 
