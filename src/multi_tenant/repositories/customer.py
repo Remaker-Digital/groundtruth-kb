@@ -20,8 +20,9 @@ class CustomerProfileRepository(TenantScopedRepository):
     """Repository for the customer_profiles collection (Layer 1)."""
 
     # SPEC-1843 / WI-1627: Fields encrypted at rest with tenant DEK
+    # Per architecture plan section 4.1.3: customer PII + preferences
     _encryption_fields = frozenset({
-        "name", "email", "phone", "address", "notes",
+        "name", "email", "phone", "address", "notes", "preferences",
     })
 
     def __init__(self) -> None:

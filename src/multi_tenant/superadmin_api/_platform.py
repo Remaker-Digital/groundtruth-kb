@@ -781,24 +781,20 @@ async def send_service_message_endpoint(
         recipient_emails=unique_emails,
     )
 
-    # Audit log the send
+    # Audit log the send — SPEC-1843: route through log_event() for sanitization
     if _state._audit_repo:
         try:
-            await _state._audit_repo.create({
-                "id": f"svc-msg-{datetime.now(timezone.utc).strftime('%Y%m%d%H%M%S')}",
-                "tenant_id": "platform",
-                "event_type": "service_message_sent",
-                "actor": "spa-console",
-                "details": {
-                    "subject": request.subject[:100],
-                    "total_recipients": result.total_recipients,
-                    "sent_count": result.sent_count,
-                    "failed_count": result.failed_count,
-                    "filter_status": request.filter_status,
-                    "filter_tier": request.filter_tier,
+            await _state._audit_repo.log_event(
+                event_type=AuditEventType.CONFIG_CHANGE,
+                tenant_id="platform",
+                actor="spa-console",
+                actor_type="admin",
+                payload={
+                    "action": "service_message_sent",
+                    "count": result.sent_count,
+                    "result": f"{result.sent_count} sent, {result.failed_count} failed",
                 },
-                "created_at": datetime.now(timezone.utc).isoformat(),
-            })
+            )
         except Exception:
             logger.exception("Failed to audit log service message send")
 

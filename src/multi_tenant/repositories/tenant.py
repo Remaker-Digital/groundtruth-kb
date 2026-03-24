@@ -23,6 +23,12 @@ class TenantRepository(TenantScopedRepository):
     (Stripe customer ID, Shopify shop domain).
     """
 
+    # SPEC-1843 / WI-1627: Fields encrypted at rest with tenant DEK
+    # Per architecture plan section 4.1.3: contact PII + merchant identifiers
+    _encryption_fields = frozenset({
+        "customer_email", "shopify_shop_domain", "brand_name",
+    })
+
     def __init__(self) -> None:
         super().__init__(COLLECTION_TENANTS)
 

@@ -213,3 +213,32 @@ class TestSanitizeForSpaQuery:
         assert "payload" not in result
         assert "file_url" not in result
         assert "customer_data" not in result
+
+
+# ---------------------------------------------------------------------------
+# Guard test: no direct _audit_repo.create() in superadmin modules (SPEC-1843)
+# ---------------------------------------------------------------------------
+
+
+class TestAuditWriteGuard:
+    """Ensure all audit writes go through log_event() for sanitization."""
+
+    def test_no_direct_audit_create_in_superadmin(self):
+        """No superadmin module should call _audit_repo.create() directly.
+
+        All audit writes must route through AuditLogRepository.log_event()
+        which applies sanitize_audit_payload(). Direct .create() bypasses
+        sanitization and violates SPEC-1843 Pillar 4.
+        """
+        import pathlib
+        spa_dir = pathlib.Path(__file__).resolve().parent.parent.parent / "src" / "multi_tenant" / "superadmin_api"
+        violations = []
+        for py_file in spa_dir.glob("*.py"):
+            content = py_file.read_text(encoding="utf-8")
+            for i, line in enumerate(content.splitlines(), 1):
+                if "_audit_repo.create(" in line and not line.strip().startswith("#"):
+                    violations.append(f"{py_file.name}:{i}: {line.strip()}")
+        assert not violations, (
+            f"Direct _audit_repo.create() calls found — must use log_event() "
+            f"for SPEC-1843 sanitization:\n" + "\n".join(violations)
+        )

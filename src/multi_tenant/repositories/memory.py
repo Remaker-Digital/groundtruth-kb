@@ -19,8 +19,11 @@ class MemoryVectorRepository(TenantScopedRepository):
     """
 
     # SPEC-1843 / WI-1627: Fields encrypted at rest with tenant DEK
+    # chunk_text is the actual stored field (per MemoryVectorDocument schema).
+    # source_conversation_id is per architecture plan section 4.1.3.
+    # embedding remains CLEAR for DiskANN vector index.
     _encryption_fields = frozenset({
-        "text", "context", "summary",
+        "chunk_text", "source_conversation_id",
     })
 
     def __init__(self) -> None:

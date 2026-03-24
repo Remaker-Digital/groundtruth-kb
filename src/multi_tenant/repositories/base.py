@@ -13,6 +13,7 @@ from __future__ import annotations
 
 import asyncio
 import base64
+import json
 import logging
 import time
 from typing import Any, TypeVar
@@ -144,10 +145,41 @@ class TenantScopedRepository:
 
     # -- SPEC-1843 encryption hooks -----------------------------------------
 
+    @staticmethod
+    def _serialize_for_encryption(value: Any) -> str | None:
+        """Serialize a field value to a string for encryption.
+
+        Strings pass through. Lists and dicts are JSON-encoded with a
+        ``json:`` prefix so _post_read can distinguish them from plain
+        strings and deserialize after decryption.
+
+        Returns None for None/empty values (caller should skip encryption).
+        """
+        if value is None:
+            return None
+        if isinstance(value, str):
+            return value if value else None
+        if isinstance(value, (list, dict)):
+            return "json:" + json.dumps(value, separators=(",", ":"), default=str)
+        # Fallback: coerce to string
+        return str(value)
+
+    @staticmethod
+    def _deserialize_after_decryption(plaintext: str) -> Any:
+        """Deserialize a decrypted value back to its original type.
+
+        Values with the ``json:`` prefix are JSON-decoded. All others
+        are returned as plain strings.
+        """
+        if plaintext.startswith("json:"):
+            return json.loads(plaintext[5:])
+        return plaintext
+
     async def _pre_write(self, body: dict[str, Any], tenant_id: str) -> dict[str, Any]:
         """Encrypt sensitive fields before Cosmos DB write.
 
-        Only encrypts fields listed in ``_encryption_fields``.
+        Handles strings, lists, and dicts. Non-string values are
+        JSON-serialized before encryption (with ``json:`` prefix).
         No-op if encryption service is not initialized or no fields declared.
         """
         if not self._encryption_fields:
@@ -157,24 +189,31 @@ class TenantScopedRepository:
         if svc is None:
             return body
 
-        # Get tenant's DEK (wrapped bytes, with raw cached internally)
         entry = await self._get_tenant_dek(tenant_id)
         if entry is None:
             return body
 
         doc_id = body.get("id", "unknown")
         for field in self._encryption_fields:
-            if field in body and isinstance(body[field], str):
-                body[field] = svc.encrypt_field(
-                    entry.wrapped_dek, body[field],
-                    tenant_id=tenant_id, doc_id=doc_id,
-                )
+            if field not in body:
+                continue
+            plaintext = self._serialize_for_encryption(body[field])
+            if plaintext is None:
+                continue
+            body[field] = svc.encrypt_field(
+                entry.wrapped_dek, plaintext,
+                tenant_id=tenant_id, doc_id=doc_id,
+            )
         return body
 
     async def _post_read(self, body: dict[str, Any], tenant_id: str) -> dict[str, Any]:
         """Decrypt sensitive fields after Cosmos DB read.
 
-        Only decrypts fields listed in ``_encryption_fields``.
+        Handles the dual-mode requirement: pre-migration documents may
+        contain plaintext (str, list, or dict), while post-migration
+        documents contain encrypted base64 strings. Only base64-looking
+        strings are decrypted; plaintext passes through unchanged.
+
         No-op if encryption service is not initialized or no fields declared.
         """
         if not self._encryption_fields:
@@ -190,11 +229,27 @@ class TenantScopedRepository:
 
         doc_id = body.get("id", "unknown")
         for field in self._encryption_fields:
-            if field in body and isinstance(body[field], str):
-                body[field] = svc.decrypt_field(
-                    entry.wrapped_dek, body[field],
-                    tenant_id=tenant_id, doc_id=doc_id,
-                )
+            if field not in body:
+                continue
+            value = body[field]
+            # Only decrypt string values that look like base64 ciphertext.
+            # Pre-migration plaintext (str, list, dict) passes through unchanged.
+            if not isinstance(value, str):
+                continue
+            if not value or len(value) < 40:
+                continue
+            try:
+                decoded = base64.b64decode(value, validate=True)
+                if len(decoded) < 29:  # nonce(12) + tag(16) + 1 byte minimum
+                    continue
+            except Exception:
+                continue
+            # Looks like ciphertext — decrypt it
+            plaintext = svc.decrypt_field(
+                entry.wrapped_dek, value,
+                tenant_id=tenant_id, doc_id=doc_id,
+            )
+            body[field] = self._deserialize_after_decryption(plaintext)
         return body
 
     async def _get_tenant_dek(self, tenant_id: str) -> _DekCacheEntry | None:

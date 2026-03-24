@@ -123,18 +123,34 @@ class ConversationRepository(TenantScopedRepository):
     ) -> dict[str, Any]:
         """Append a message to a conversation's transcript.
 
-        Uses patch operations for atomic append without read-modify-write.
+        Uses read-modify-write to maintain encryption integrity.
+        The ``messages`` field is encrypted as a whole (JSON-serialized list),
+        so Cosmos patch ``/messages/-`` cannot be used — the stored value
+        is ciphertext, not a list.
+
+        SPEC-1843: All message content passes through _pre_write encryption.
         """
+        self._validate_tenant_id(tenant_id)
         now = datetime.now(timezone.utc).isoformat()
-        return await self.patch(
-            tenant_id=tenant_id,
-            document_id=conversation_id,
-            operations=[
-                {"op": "add", "path": "/messages/-", "value": message},
-                {"op": "incr", "path": "/message_count", "value": 1},
-                {"op": "set", "path": "/last_activity_at", "value": now},
-            ],
-        )
+
+        # Read current document (decrypts via _post_read)
+        doc = await self.read(tenant_id, conversation_id)
+
+        # Append the new message
+        messages = doc.get("messages", [])
+        if not isinstance(messages, list):
+            messages = []
+        messages.append(message)
+
+        # Update fields
+        doc["messages"] = messages
+        doc["message_count"] = len(messages)
+        doc["last_activity_at"] = now
+
+        # Write back (encrypts via _pre_write)
+        body = await self._pre_write(doc, tenant_id)
+        result = await self._container.replace_item(item=conversation_id, body=body)
+        return await self._post_read(result, tenant_id)
 
     async def end_conversation(
         self,

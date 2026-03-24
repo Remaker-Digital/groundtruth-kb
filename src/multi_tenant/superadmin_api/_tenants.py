@@ -549,24 +549,17 @@ async def create_tenant(
             logger.warning("Failed to set expires_at for %s: %s", result.tenant_id, exc)
             result.errors.append(f"Expiry date setting failed: {exc}")
 
-    # Audit log entry
+    # Audit log entry — SPEC-1843: route through log_event() for sanitization
     try:
         if _state._audit_repo:
-            await _state._audit_repo.create(
-                result.tenant_id,
-                {
-                    "id": f"audit:{result.tenant_id}:spa-create:{datetime.now(timezone.utc).isoformat()}",
-                    "tenant_id": result.tenant_id,
-                    "event_type": AuditEventType.CONFIG_CHANGE.value,
+            await _state._audit_repo.log_event(
+                event_type=AuditEventType.TENANT_CREATED,
+                tenant_id=result.tenant_id,
+                actor=ctx.team_member_email or "spa-console",
+                actor_type="admin",
+                payload={
                     "action": "spa_tenant_created",
-                    "actor": ctx.team_member_email or "spa-console",
-                    "details": {
-                        "merchant_name": body.merchant_name,
-                        "tier": body.tier,
-                        "email": body.superadmin_email,
-                        "expires_at": body.expires_at,
-                    },
-                    "created_at": datetime.now(timezone.utc).isoformat(),
+                    "result": "success" if not result.errors else "partial",
                 },
             )
     except Exception as exc:
@@ -689,21 +682,15 @@ async def resend_welcome_email(
             message=str(exc),
         )
 
-    # Audit log
+    # Audit log — SPEC-1843: route through log_event() for sanitization
     if _state._audit_repo and sent:
-        now_iso = datetime.now(timezone.utc).isoformat()
         try:
-            await _state._audit_repo.create(
-                {
-                    "id": f"audit:{tenant_id}:resend-welcome:{now_iso}",
-                    "tenant_id": tenant_id,
-                    "event_type": AuditEventType.TENANT_UPDATED.value,
-                    "actor": "spa-console",
-                    "description": f"Welcome email resent to {email_addr}",
-                    "timestamp": now_iso,
-                    "metadata": {"action": "resend_welcome_email", "email": email_addr},
-                },
-                partition_key=tenant_id,
+            await _state._audit_repo.log_event(
+                event_type=AuditEventType.TENANT_UPDATED,
+                tenant_id=tenant_id,
+                actor="spa-console",
+                actor_type="admin",
+                payload={"action": "resend_welcome_email", "result": "sent"},
             )
         except Exception:
             logger.warning("Audit log failed for resend-welcome-email: %s", tenant_id[:8])
@@ -818,23 +805,15 @@ async def set_tenant_expiry(
         operations=operations,
     )
 
-    # Audit log
+    # Audit log — SPEC-1843: route through log_event() for sanitization
     try:
         if _state._audit_repo:
-            await _state._audit_repo.create(
-                tenant_id,
-                {
-                    "id": f"audit:{tenant_id}:set-expiry:{now_iso}",
-                    "tenant_id": tenant_id,
-                    "event_type": AuditEventType.CONFIG_CHANGE.value,
-                    "action": "tenant_expiry_updated",
-                    "actor": ctx.team_member_email or "spa-console",
-                    "details": {
-                        "previous_expires_at": previous_expires_at,
-                        "new_expires_at": body.expires_at,
-                    },
-                    "created_at": now_iso,
-                },
+            await _state._audit_repo.log_event(
+                event_type=AuditEventType.CONFIG_CHANGE,
+                tenant_id=tenant_id,
+                actor=ctx.team_member_email or "spa-console",
+                actor_type="admin",
+                payload={"action": "tenant_expiry_updated"},
             )
     except Exception:
         pass  # Non-fatal

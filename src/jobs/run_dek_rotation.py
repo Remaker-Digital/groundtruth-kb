@@ -24,12 +24,16 @@ logger = logging.getLogger(__name__)
 
 DEK_ROTATION_INTERVAL_DAYS = 90
 
-# Same collection map as migration job — must stay in sync
+# Same collection map as migration job — MUST stay in sync with repository _encryption_fields.
 ENCRYPTED_COLLECTIONS: dict[str, list[str]] = {
     "conversations": ["messages", "customer_intent", "escalation_reason", "transcript"],
     "knowledge_bases": ["content", "title", "description", "source_text"],
-    "customer_profiles": ["name", "email", "phone", "address", "notes"],
-    "memory_vectors": ["text", "context", "summary"],
+    "customer_profiles": ["name", "email", "phone", "address", "notes", "preferences"],
+    "memory_vectors": ["chunk_text", "source_conversation_id"],
+    "tenants": ["customer_email", "shopify_shop_domain", "brand_name"],
+    "team_members": ["email", "display_name"],
+    "preferences": ["custom_instructions", "return_policy", "shipping_info",
+                     "webhook_urls", "notification_settings"],
 }
 
 

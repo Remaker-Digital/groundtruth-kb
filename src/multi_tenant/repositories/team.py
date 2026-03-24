@@ -20,6 +20,12 @@ class TeamMemberRepository(TenantScopedRepository):
     and/or handle escalated conversations.
     """
 
+    # SPEC-1843 / WI-1627: Fields encrypted at rest with tenant DEK
+    # Per architecture plan section 4.1.3: team member PII
+    _encryption_fields = frozenset({
+        "email", "display_name",
+    })
+
     def __init__(self) -> None:
         super().__init__(COLLECTION_TEAM_MEMBERS)
 

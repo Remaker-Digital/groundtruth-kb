@@ -27,6 +27,13 @@ class PreferencesRepository(TenantScopedRepository):
         - get_current()  backward-compat alias for get_active()
     """
 
+    # SPEC-1843 / WI-1627: Fields encrypted at rest with tenant DEK
+    # Per architecture plan section 4.1.3: merchant business config
+    _encryption_fields = frozenset({
+        "custom_instructions", "return_policy", "shipping_info",
+        "webhook_urls", "notification_settings",
+    })
+
     def __init__(self) -> None:
         super().__init__(COLLECTION_PREFERENCES)
 

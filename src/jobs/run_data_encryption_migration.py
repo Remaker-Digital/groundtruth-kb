@@ -24,33 +24,49 @@ import time
 
 logger = logging.getLogger(__name__)
 
-# Collections and their sensitive fields (must match WI-1627 repository declarations)
+# Collections and their sensitive fields — MUST match repository _encryption_fields.
+# Per architecture plan section 4.1.3 + SPEC-1843 full scope.
 ENCRYPTED_COLLECTIONS: dict[str, list[str]] = {
     "conversations": ["messages", "customer_intent", "escalation_reason", "transcript"],
     "knowledge_bases": ["content", "title", "description", "source_text"],
-    "customer_profiles": ["name", "email", "phone", "address", "notes"],
-    "memory_vectors": ["text", "context", "summary"],
+    "customer_profiles": ["name", "email", "phone", "address", "notes", "preferences"],
+    "memory_vectors": ["chunk_text", "source_conversation_id"],
+    "tenants": ["customer_email", "shopify_shop_domain", "brand_name"],
+    "team_members": ["email", "display_name"],
+    "preferences": ["custom_instructions", "return_policy", "shipping_info",
+                     "webhook_urls", "notification_settings"],
 }
 
 
 def _looks_encrypted(value: str) -> bool:
-    """Heuristic: check if a string value looks like base64-encoded ciphertext.
+    """Check if a string value looks like base64-encoded AES-256-GCM ciphertext.
 
-    Encrypted fields are base64(nonce || ciphertext || tag), which means:
-    - Minimum length: 12 (nonce) + 1 (data) + 16 (tag) = 29 bytes → ~40 base64 chars
-    - Valid base64 characters only
-    - Decodes without error
-
-    This is the idempotency guard — we never re-encrypt already-encrypted data.
+    Encrypted fields are base64(nonce(12) || ciphertext || tag(16)), so the
+    decoded output is at least 29 bytes and the string is valid base64.
     """
     if len(value) < 40:
         return False
     try:
         decoded = base64.b64decode(value, validate=True)
-        # Encrypted output is at least nonce(12) + tag(16) + 1 byte of ciphertext
         return len(decoded) >= 29
     except Exception:
         return False
+
+
+def _serialize_for_encryption(value: Any) -> str | None:
+    """Serialize a field value to string for encryption.
+
+    Strings pass through. Lists/dicts get a ``json:`` prefix so they
+    can be deserialized after decryption. Returns None for empty/None.
+    """
+    import json as _json
+    if value is None:
+        return None
+    if isinstance(value, str):
+        return value if value else None
+    if isinstance(value, (list, dict)):
+        return "json:" + _json.dumps(value, separators=(",", ":"), default=str)
+    return str(value)
 
 
 async def _get_or_create_tenant_dek(
@@ -147,27 +163,29 @@ async def migrate_tenant(tenant_id: str, *, dry_run: bool = False) -> dict:
                 value = doc.get(field)
                 if value is None or value == "":
                     continue
-                if not isinstance(value, str):
-                    # Non-string fields (e.g., list of messages) — skip
-                    # These may need custom handling per collection
-                    continue
-                if _looks_encrypted(value):
+                # Already-encrypted string values: skip (idempotency)
+                if isinstance(value, str) and _looks_encrypted(value):
                     stats["skipped"] += 1
+                    continue
+
+                # Serialize for encryption (handles str, list, dict)
+                plaintext = _serialize_for_encryption(value)
+                if plaintext is None:
                     continue
 
                 if dry_run:
                     logger.debug(
-                        "[DRY RUN] Would encrypt %s.%s in doc %s",
-                        collection_name, field, doc_id,
+                        "[DRY RUN] Would encrypt %s.%s in doc %s (type=%s)",
+                        collection_name, field, doc_id, type(value).__name__,
                     )
                     stats["fields_encrypted"] += 1
                     fields_encrypted_this_doc += 1
                     continue
 
-                # Encrypt the field
+                # Encrypt the serialized field
                 try:
                     doc[field] = svc.encrypt_field(
-                        wrapped_dek, value,
+                        wrapped_dek, plaintext,
                         tenant_id=tenant_id, doc_id=doc_id,
                     )
                     stats["fields_encrypted"] += 1

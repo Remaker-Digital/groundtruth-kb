@@ -21,12 +21,17 @@ import time
 
 logger = logging.getLogger(__name__)
 
-# Collections with encrypted fields (must match WI-1627 declarations)
+# Collections with encrypted fields — MUST match repository _encryption_fields.
+# Per architecture plan section 4.1.3 + SPEC-1843 full scope.
 ENCRYPTED_COLLECTIONS: dict[str, list[str]] = {
     "conversations": ["messages", "customer_intent", "escalation_reason", "transcript"],
     "knowledge_bases": ["content", "title", "description", "source_text"],
-    "customer_profiles": ["name", "email", "phone", "address", "notes"],
-    "memory_vectors": ["text", "context", "summary"],
+    "customer_profiles": ["name", "email", "phone", "address", "notes", "preferences"],
+    "memory_vectors": ["chunk_text", "source_conversation_id"],
+    "tenants": ["customer_email", "shopify_shop_domain", "brand_name"],
+    "team_members": ["email", "display_name"],
+    "preferences": ["custom_instructions", "return_policy", "shipping_info",
+                     "webhook_urls", "notification_settings"],
 }
 
 
@@ -82,8 +87,21 @@ async def scan_tenant(tenant_id: str, *, dry_run: bool = False) -> dict:
                 value = doc.get(field)
                 if value is None or value == "":
                     continue
+
+                # Non-string values (list, dict) are plaintext — should have
+                # been serialized+encrypted by migration. Flag them.
                 if not isinstance(value, str):
+                    doc_has_plaintext = True
+                    preview = str(value)[:30] + "..." if len(str(value)) > 30 else str(value)
+                    stats["unencrypted_details"].append({
+                        "collection": collection_name,
+                        "doc_id": doc_id,
+                        "field": field,
+                        "value_preview": f"[{type(value).__name__}] {preview}",
+                    })
                     continue
+
+                # String values: check if they look like ciphertext
                 if not _looks_encrypted(value):
                     doc_has_plaintext = True
                     stats["unencrypted_details"].append({
