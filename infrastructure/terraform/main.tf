@@ -96,6 +96,7 @@ locals {
     { name = "COSMOS_DB_DATABASE", value = var.cosmos_db_database },
     { name = "COSMOS_USE_MANAGED_ID", value = "true" },
     { name = "AZURE_KEYVAULT_URL", value = var.key_vault_url },
+    { name = "MASTER_KEK_KEY_ID", value = var.enable_cmk ? azurerm_key_vault_key.cmk[0].versionless_id : "" },
     { name = "USE_AZURE_OPENAI", value = "true" },
     { name = "AZURE_OPENAI_ENDPOINT", value = var.azure_openai_endpoint },
     { name = "APPLICATIONINSIGHTS_CONNECTION_STRING", secret_name = "appinsights-connection-string" },

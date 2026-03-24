@@ -101,6 +101,7 @@ class TestTenantSecretType:
             "zendesk-api-token", "mailchimp-api-key",
             "cmk-key-id", "webhook-signing-secret",
             "totp-seed", "customer-identity-secret",
+            "dek",  # SPEC-1843 / WI-1628: envelope encryption DEK
         }
         actual = {t.value for t in TenantSecretType}
         assert expected == actual

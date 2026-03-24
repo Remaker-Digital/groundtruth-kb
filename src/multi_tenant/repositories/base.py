@@ -11,7 +11,10 @@ Architecture reference: Decision #1 (TenantScopedRepository)
 
 from __future__ import annotations
 
+import asyncio
+import base64
 import logging
+import time
 from typing import Any, TypeVar
 
 from azure.cosmos.exceptions import (
@@ -26,6 +29,66 @@ from src.multi_tenant.cosmos_client import get_cosmos_manager
 logger = logging.getLogger(__name__)
 
 T = TypeVar("T", bound=BaseModel)
+
+
+# ---------------------------------------------------------------------------
+# DEK cache — module-level, shared by all repository instances (WI-1628)
+# ---------------------------------------------------------------------------
+
+_DEK_TTL_SECONDS = 300   # 5 minutes — matches credential cache
+_DEK_CACHE_MAX = 500
+
+
+class _DekCacheEntry:
+    """TTL-bounded cache entry for an unwrapped (raw) DEK."""
+    __slots__ = ("raw_dek", "wrapped_dek", "expires_at")
+
+    def __init__(self, raw_dek: bytes, wrapped_dek: bytes) -> None:
+        self.raw_dek = raw_dek
+        self.wrapped_dek = wrapped_dek
+        self.expires_at = time.monotonic() + _DEK_TTL_SECONDS
+
+    @property
+    def is_expired(self) -> bool:
+        return time.monotonic() >= self.expires_at
+
+
+# tenant_id → _DekCacheEntry
+_dek_cache: dict[str, _DekCacheEntry] = {}
+_dek_lock = asyncio.Lock()
+
+
+async def _fetch_tenant_dek(tenant_id: str) -> _DekCacheEntry | None:
+    """Fetch wrapped DEK from Key Vault, unwrap it, and return a cache entry.
+
+    Returns None if the tenant has no DEK provisioned (pre-migration).
+    """
+    from src.multi_tenant.envelope_encryption import get_envelope_encryption_service
+    from src.multi_tenant.tenant_secret_service import (
+        TenantSecretType,
+        get_secret_service,
+    )
+
+    svc = get_envelope_encryption_service()
+    if svc is None:
+        return None
+
+    # Get the TenantSecretService singleton (initialized at startup)
+    secret_svc = get_secret_service()
+    if secret_svc is None:
+        return None
+
+    # Retrieve wrapped DEK (base64-encoded string in KV)
+    wrapped_b64 = await secret_svc.get_secret(tenant_id, TenantSecretType.DEK)
+    if wrapped_b64 is None:
+        return None
+
+    wrapped_dek = base64.b64decode(wrapped_b64)
+
+    # Unwrap via the encryption service (async — calls KV in production)
+    raw_dek = await svc.unwrap_key_async(wrapped_dek, tenant_id)
+
+    return _DekCacheEntry(raw_dek=raw_dek, wrapped_dek=wrapped_dek)
 
 
 # ---------------------------------------------------------------------------
@@ -81,7 +144,7 @@ class TenantScopedRepository:
 
     # -- SPEC-1843 encryption hooks -----------------------------------------
 
-    def _pre_write(self, body: dict[str, Any], tenant_id: str) -> dict[str, Any]:
+    async def _pre_write(self, body: dict[str, Any], tenant_id: str) -> dict[str, Any]:
         """Encrypt sensitive fields before Cosmos DB write.
 
         Only encrypts fields listed in ``_encryption_fields``.
@@ -94,21 +157,21 @@ class TenantScopedRepository:
         if svc is None:
             return body
 
-        # Get tenant's wrapped DEK (cached in production)
-        wrapped_dek = self._get_tenant_dek(tenant_id)
-        if wrapped_dek is None:
+        # Get tenant's DEK (wrapped bytes, with raw cached internally)
+        entry = await self._get_tenant_dek(tenant_id)
+        if entry is None:
             return body
 
         doc_id = body.get("id", "unknown")
         for field in self._encryption_fields:
             if field in body and isinstance(body[field], str):
                 body[field] = svc.encrypt_field(
-                    wrapped_dek, body[field],
+                    entry.wrapped_dek, body[field],
                     tenant_id=tenant_id, doc_id=doc_id,
                 )
         return body
 
-    def _post_read(self, body: dict[str, Any], tenant_id: str) -> dict[str, Any]:
+    async def _post_read(self, body: dict[str, Any], tenant_id: str) -> dict[str, Any]:
         """Decrypt sensitive fields after Cosmos DB read.
 
         Only decrypts fields listed in ``_encryption_fields``.
@@ -121,28 +184,66 @@ class TenantScopedRepository:
         if svc is None:
             return body
 
-        wrapped_dek = self._get_tenant_dek(tenant_id)
-        if wrapped_dek is None:
+        entry = await self._get_tenant_dek(tenant_id)
+        if entry is None:
             return body
 
         doc_id = body.get("id", "unknown")
         for field in self._encryption_fields:
             if field in body and isinstance(body[field], str):
                 body[field] = svc.decrypt_field(
-                    wrapped_dek, body[field],
+                    entry.wrapped_dek, body[field],
                     tenant_id=tenant_id, doc_id=doc_id,
                 )
         return body
 
-    def _get_tenant_dek(self, tenant_id: str) -> bytes | None:
-        """Retrieve the wrapped DEK for a tenant.
+    async def _get_tenant_dek(self, tenant_id: str) -> _DekCacheEntry | None:
+        """Retrieve the DEK for a tenant with async cache + double-check lock.
 
-        In production, this reads from Key Vault with caching.
-        Returns None if DEK is not provisioned (migration period).
+        Returns a ``_DekCacheEntry`` (raw + wrapped DEK) or None if no DEK
+        is provisioned for this tenant (pre-migration graceful degradation).
+
+        Cache is module-level and shared across all repository instances.
+        TTL-based expiry (5 min) balances freshness vs. Key Vault latency.
+        asyncio.Lock prevents thundering herd on cache miss.
         """
-        # TODO(WI-1628): Implement DEK retrieval from Key Vault
-        # For now, return None (encryption inactive until DEKs provisioned)
-        return None
+        # Fast path: cache hit (no lock)
+        entry = _dek_cache.get(tenant_id)
+        if entry is not None and not entry.is_expired:
+            return entry
+
+        # Slow path: acquire lock, double-check, fetch if needed
+        async with _dek_lock:
+            # Double-check after acquiring lock
+            entry = _dek_cache.get(tenant_id)
+            if entry is not None and not entry.is_expired:
+                return entry
+
+            # Evict expired entry
+            if entry is not None:
+                del _dek_cache[tenant_id]
+
+            # Fetch from Key Vault
+            try:
+                new_entry = await _fetch_tenant_dek(tenant_id)
+            except Exception:
+                logger.warning(
+                    "Failed to fetch DEK for tenant %s — encryption inactive",
+                    tenant_id,
+                    exc_info=True,
+                )
+                return None
+
+            if new_entry is None:
+                return None
+
+            # Evict oldest if at capacity
+            if len(_dek_cache) >= _DEK_CACHE_MAX:
+                oldest_key = next(iter(_dek_cache))
+                del _dek_cache[oldest_key]
+
+            _dek_cache[tenant_id] = new_entry
+            return new_entry
 
     @property
     def _container(self) -> Any:
@@ -199,6 +300,9 @@ class TenantScopedRepository:
                 "This prevents accidental cross-tenant writes."
             )
 
+        # SPEC-1843: encrypt sensitive fields before write
+        body = await self._pre_write(body, tenant_id)
+
         try:
             result = await self._container.create_item(body=body)
             logger.debug(
@@ -233,6 +337,8 @@ class TenantScopedRepository:
                 partition_key=tenant_id,
             )
             self._validate_document_tenant(result, tenant_id)
+            # SPEC-1843: decrypt sensitive fields after read
+            result = await self._post_read(result, tenant_id)
             return result
         except CosmosResourceNotFoundError as exc:
             raise DocumentNotFoundError(
@@ -260,6 +366,9 @@ class TenantScopedRepository:
                 f"Document tenant_id ({body.get('tenant_id')}) does not match "
                 f"operation tenant_id ({tenant_id})."
             )
+
+        # SPEC-1843: encrypt sensitive fields before write
+        body = await self._pre_write(body, tenant_id)
 
         result = await self._container.upsert_item(body=body)
         logger.debug(
@@ -377,6 +486,8 @@ class TenantScopedRepository:
                     self._collection_name, item_tenant, tenant_id,
                 )
                 continue
+            # SPEC-1843: decrypt sensitive fields after read
+            item = await self._post_read(item, tenant_id)
             items.append(item)
             if max_items and len(items) >= max_items:
                 break

@@ -80,6 +80,9 @@ class TenantSecretType(str, enum.Enum):
     # Customer identity verification (AUTH-4 — Shopify HMAC passthrough)
     CUSTOMER_IDENTITY_SECRET = "customer-identity-secret"
 
+    # Envelope encryption DEK (wrapped by Master KEK — SPEC-1843 / WI-1628)
+    DEK = "dek"
+
     # MFA/TOTP seed (per-user, naming: user-{team_member_id}-totp-seed)
     TOTP_SEED = "totp-seed"
 

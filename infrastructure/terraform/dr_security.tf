@@ -166,6 +166,22 @@ resource "azurerm_key_vault_access_policy" "cosmos_cmk" {
   ]
 }
 
+# Key Vault access policy for container apps to wrap/unwrap DEKs (SPEC-1843 / WI-1625)
+# Reuses the CMK (agent-red-cmk) as Master KEK for envelope encryption.
+resource "azurerm_key_vault_access_policy" "container_app_kek" {
+  for_each = var.enable_cmk ? azurerm_container_app.apps : {}
+
+  key_vault_id = data.azurerm_key_vault.main.id
+  tenant_id    = data.azurerm_client_config.current.tenant_id
+  object_id    = each.value.identity[0].principal_id
+
+  key_permissions = [
+    "Get",
+    "WrapKey",
+    "UnwrapKey",
+  ]
+}
+
 # ---------------------------------------------------------------------------
 # WI #55: Blob Storage for archival (Decision #18 — Warm + Cold tiers)
 # ---------------------------------------------------------------------------

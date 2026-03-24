@@ -540,10 +540,15 @@ async def _startup_envelope_encryption() -> None:
     )
 
     kek_key_id = os.environ.get("MASTER_KEK_KEY_ID")
+    vault_url = os.environ.get("AZURE_KEYVAULT_URL")
     dev_mode = not kek_key_id
 
     try:
-        svc = EnvelopeEncryptionService(dev_mode=dev_mode, kek_key_id=kek_key_id)
+        svc = EnvelopeEncryptionService(
+            dev_mode=dev_mode,
+            kek_key_id=kek_key_id,
+            vault_url=vault_url,
+        )
         set_envelope_encryption_service(svc)
         mode_label = "DEV MODE" if dev_mode else f"KEK={kek_key_id}"
         logger.info("EnvelopeEncryptionService initialized (%s)", mode_label)

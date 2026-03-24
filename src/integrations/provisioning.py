@@ -265,6 +265,55 @@ async def _lookup_tenant(
 
 
 # ---------------------------------------------------------------------------
+# DEK provisioning (SPEC-1843 / WI-1628)
+# ---------------------------------------------------------------------------
+
+
+async def _provision_tenant_dek(tenant_id: str) -> None:
+    """Create and store a per-tenant DEK for envelope encryption.
+
+    Called during tenant provisioning. Graceful degradation: if encryption
+    is not configured or Key Vault is unavailable, logs a warning and
+    returns without failing the provisioning flow.
+    """
+    try:
+        from src.multi_tenant.envelope_encryption import get_envelope_encryption_service
+        from src.multi_tenant.tenant_secret_service import (
+            TenantSecretType,
+            get_secret_service,
+        )
+
+        svc = get_envelope_encryption_service()
+        if svc is None:
+            logger.debug("Encryption service not initialized — skipping DEK provisioning for %s", tenant_id)
+            return
+
+        # Generate DEK and wrap it with the Master KEK
+        wrapped_dek = await svc.create_tenant_dek(tenant_id)
+
+        # Store wrapped DEK as base64 string in Key Vault
+        import base64
+        wrapped_b64 = base64.b64encode(wrapped_dek).decode("ascii")
+
+        secret_svc = get_secret_service()
+        await secret_svc.store_secret(
+            tenant_id,
+            TenantSecretType.DEK,
+            wrapped_b64,
+            tags={"purpose": "envelope-encryption-dek"},
+        )
+
+        logger.info("DEK provisioned for tenant %s", tenant_id)
+
+    except Exception:
+        logger.warning(
+            "Failed to provision DEK for tenant %s — encryption inactive until retry",
+            tenant_id,
+            exc_info=True,
+        )
+
+
+# ---------------------------------------------------------------------------
 # Core provisioning logic (all async — callers must await)
 # ---------------------------------------------------------------------------
 
@@ -379,6 +428,9 @@ async def provision_tenant(
     )
 
     await _tenant_repo.upsert(tenant_id, doc)
+
+    # SPEC-1843 / WI-1628: Create per-tenant DEK for envelope encryption
+    await _provision_tenant_dek(tenant_id)
 
     logger.info(
         "Tenant provisioned: tenant=%s channel=%s tier=%s email=%s",

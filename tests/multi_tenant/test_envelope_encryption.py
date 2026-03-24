@@ -32,13 +32,13 @@ class TestEnvelopeEncryptionService:
 
     def test_create_tenant_dek(self):
         svc = self._make_service()
-        wrapped_dek = svc.create_tenant_dek("t-test-001")
+        wrapped_dek = svc.create_tenant_dek_sync("t-test-001")
         assert isinstance(wrapped_dek, bytes)
         assert len(wrapped_dek) > 0
 
     def test_encrypt_decrypt_roundtrip(self):
         svc = self._make_service()
-        wrapped_dek = svc.create_tenant_dek("t-test-001")
+        wrapped_dek = svc.create_tenant_dek_sync("t-test-001")
         plaintext = "Hello, this is sensitive tenant data."
         tenant_id = "t-test-001"
         doc_id = "doc-001"
@@ -56,8 +56,8 @@ class TestEnvelopeEncryptionService:
 
     def test_different_tenants_produce_different_ciphertexts(self):
         svc = self._make_service()
-        dek_a = svc.create_tenant_dek("t-a")
-        dek_b = svc.create_tenant_dek("t-b")
+        dek_a = svc.create_tenant_dek_sync("t-a")
+        dek_b = svc.create_tenant_dek_sync("t-b")
         plaintext = "Same data, different tenants"
 
         ct_a = svc.encrypt_field(dek_a, plaintext, tenant_id="t-a", doc_id="d1")
@@ -67,7 +67,7 @@ class TestEnvelopeEncryptionService:
     def test_aad_mismatch_raises(self):
         """Decryption with wrong tenant_id/doc_id (AAD) must fail."""
         svc = self._make_service()
-        wrapped_dek = svc.create_tenant_dek("t-test-001")
+        wrapped_dek = svc.create_tenant_dek_sync("t-test-001")
         plaintext = "Sensitive data"
 
         ciphertext = svc.encrypt_field(
@@ -81,19 +81,19 @@ class TestEnvelopeEncryptionService:
 
     def test_encrypt_none_returns_none(self):
         svc = self._make_service()
-        wrapped_dek = svc.create_tenant_dek("t-test-001")
+        wrapped_dek = svc.create_tenant_dek_sync("t-test-001")
         result = svc.encrypt_field(wrapped_dek, None, tenant_id="t-001", doc_id="d1")
         assert result is None
 
     def test_decrypt_none_returns_none(self):
         svc = self._make_service()
-        wrapped_dek = svc.create_tenant_dek("t-test-001")
+        wrapped_dek = svc.create_tenant_dek_sync("t-test-001")
         result = svc.decrypt_field(wrapped_dek, None, tenant_id="t-001", doc_id="d1")
         assert result is None
 
     def test_encrypt_empty_string(self):
         svc = self._make_service()
-        wrapped_dek = svc.create_tenant_dek("t-test-001")
+        wrapped_dek = svc.create_tenant_dek_sync("t-test-001")
         ct = svc.encrypt_field(wrapped_dek, "", tenant_id="t-001", doc_id="d1")
         pt = svc.decrypt_field(wrapped_dek, ct, tenant_id="t-001", doc_id="d1")
         assert pt == ""
