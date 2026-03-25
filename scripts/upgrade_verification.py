@@ -354,8 +354,8 @@ def phase_c(env: dict, snapshot: dict, new_version: str) -> list[dict]:
     s, d, _ = api_call(fqdn, "/api/config", key)
     check("C.12", "API key authenticates", s == 200, f"HTTP {s}")
 
-    # C.13 Regression tests — SKIP for remote (requires local pytest)
-    check("C.13", "Regression tests", True, "SKIP — requires local pytest run")
+    # C.13 Regression tests — not verifiable remotely
+    check("C.13", "Regression tests", False, "NOT PROVEN — requires local pytest run")
 
     # C.14 Superadmin API
     s, d, _ = api_call(fqdn, "/api/superadmin/tenants", spa_key)
@@ -412,8 +412,8 @@ def phase_c(env: dict, snapshot: dict, new_version: str) -> list[dict]:
     has_field = isinstance(d, dict) and "totalTenantsScanned" in d
     check("C.25", "Abuse detection", s == 200 and has_field, f"HTTP {s}")
 
-    # C.26 Avatar upload — SKIP (requires file upload)
-    check("C.26", "Avatar upload", True, "SKIP — requires multipart file upload")
+    # C.26 Avatar upload — not verifiable remotely
+    check("C.26", "Avatar upload", False, "NOT PROVEN — requires multipart file upload")
 
     # C.27 Tier listing
     s, d, _ = api_call(fqdn, "/api/billing/tiers", key)
@@ -448,14 +448,14 @@ def phase_c(env: dict, snapshot: dict, new_version: str) -> list[dict]:
     valid = (s == 200 and isinstance(d, dict) and "direction" in d) or s == 400
     check("C.32", "Tier upgrade preview", valid, f"HTTP {s}")
 
-    # C.33 Unit test count — SKIP for remote
-    check("C.33", "Unit test count gate", True, "SKIP — requires local pytest")
+    # C.33 Unit test count — not verifiable remotely
+    check("C.33", "Unit test count gate", False, "NOT PROVEN — requires local pytest")
 
-    # C.34 Evaluation framework — SKIP for remote
-    check("C.34", "Evaluation framework loads", True, "SKIP — requires local Python")
+    # C.34 Evaluation framework — not verifiable remotely
+    check("C.34", "Evaluation framework loads", False, "NOT PROVEN — requires local Python")
 
-    # C.35 Critic rule integrity — SKIP for remote
-    check("C.35", "Critic rule integrity", True, "SKIP — requires local Python")
+    # C.35 Critic rule integrity — not verifiable remotely
+    check("C.35", "Critic rule integrity", False, "NOT PROVEN — requires local Python")
 
     print("=" * 60)
     passed = sum(1 for r in results if r["status"] == "PASS")

@@ -41,8 +41,8 @@ Usage:
     python scripts/test_pipeline.py --env staging --version 1.66.0 --stop-on-fail
 
 Exit codes:
-    0 = all PASS/WARN/SKIP
-    1 = any FAIL
+    0 = all PASS (strict — WARN/SKIP count as non-pass)
+    1 = any non-PASS result
 
 © 2026 Remaker Digital, a DBA of VanDusen & Palmeter, LLC. All rights reserved.
 """
@@ -90,7 +90,8 @@ class PhaseResult:
 
     @property
     def passed(self) -> bool:
-        return self.status in ("PASS", "WARN", "SKIP")
+        """Binary: proven (PASS) or not proven (FAIL).  No third state."""
+        return self.status == "PASS"
 
 
 # ---------------------------------------------------------------------------

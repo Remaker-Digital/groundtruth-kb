@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Fully Autonomous Release Pipeline — End-to-End.
+"""Release Pipeline — End-to-End.
 
 Single-invocation pipeline that executes the complete release cycle:
 
@@ -9,8 +9,9 @@ Single-invocation pipeline that executes the complete release cycle:
     Step 4: Deploy to production (non-disruptive upgrade)
     Step 5: Production health verification
 
-No human or Claude interaction required at any step. The pipeline runs
-to completion or fails with a detailed log.
+GOV-16: Production deployment requires owner approval via DEPLOY_APPROVED
+environment token.  Binary pass/fail — there is no SKIP or WARN status.
+Absence of proof is failure.  Any non-PASS result halts the pipeline.
 
 Usage:
     python scripts/release_pipeline.py --version v1.80.0
@@ -72,7 +73,8 @@ class StepResult:
 
     @property
     def passed(self) -> bool:
-        return self.status in ("PASS", "SKIP", "WARN")
+        """Binary: proven (PASS) or not proven (FAIL).  No third state."""
+        return self.status == "PASS"
 
 
 def run_subprocess(cmd: list[str], timeout: int = 600, cwd: Path | None = None) -> subprocess.CompletedProcess:
@@ -111,7 +113,9 @@ def step_1_offline_tests(args: argparse.Namespace) -> StepResult:
     log("INFO", "Step 1: Offline unit/integration tests")
 
     if args.skip_offline:
-        return StepResult(1, "Offline Tests", "SKIP", time.time() - t0, "skipped via --skip-offline")
+        log("FAIL", "  Offline tests not run — not proven")
+        return StepResult(1, "Offline Tests", "FAIL", time.time() - t0,
+                          "not run (--skip-offline) — absence of proof is failure")
 
     # Use PowerShell test harness
     r = run_subprocess(
@@ -128,15 +132,16 @@ def step_1_offline_tests(args: argparse.Namespace) -> StepResult:
     passed_count = int(passed_match.group(1)) if passed_match else 0
     failed_count = int(failed_match.group(1)) if failed_match else 0
 
-    if r.returncode == 0 or (failed_count <= 1 and passed_count > 5000):
-        # Allow 1 known fail (SPEC-1620)
-        log("PASS", f"  Offline tests: {passed_count} passed, {failed_count} failed")
+    if r.returncode == 0 and failed_count == 0:
+        log("PASS", f"  Offline tests: {passed_count} passed, 0 failed")
         return StepResult(1, "Offline Tests", "PASS", dt,
-                          f"{passed_count}P/{failed_count}F")
+                          f"{passed_count}P/0F")
     else:
+        # ADOPT-1/AVOID-2: Zero tolerance — any failure blocks the release.
+        # No "known failure" exceptions. Fix the test or fix the code.
         log("FAIL", f"  Offline tests: {passed_count} passed, {failed_count} failed")
         return StepResult(1, "Offline Tests", "FAIL", dt,
-                          f"{passed_count}P/{failed_count}F — exceeds allowed failures")
+                          f"{passed_count}P/{failed_count}F")
 
 
 # ---------------------------------------------------------------------------
@@ -175,7 +180,8 @@ def step_3_e2e_tests(args: argparse.Namespace) -> StepResult:
 
     if args.dry_run:
         log("INFO", "  [DRY RUN] Would run: test_pipeline.py --env staging")
-        return StepResult(3, "E2E Tests", "SKIP", time.time() - t0, "dry run")
+        return StepResult(3, "E2E Tests", "FAIL", time.time() - t0,
+                          "not run (dry run) — absence of proof is failure")
 
     # 65s cooldown after deploy to allow rate limit windows to expire
     log("INFO", "  ... 65s post-deploy cooldown ...")
@@ -194,14 +200,11 @@ def step_3_e2e_tests(args: argparse.Namespace) -> StepResult:
     pass_count = int(pass_match.group(1)) if pass_match else 0
     fail_count = int(fail_match.group(1)) if fail_match else 0
 
-    if r.returncode == 0:
-        log("PASS", f"  E2E tests: {pass_count} PASS, {fail_count} FAIL")
-        return StepResult(3, "E2E Tests", "PASS", dt, f"{pass_count}P/{fail_count}F")
-    elif fail_count <= 3:
-        # Allow minor failures (data-dependent, rate limits)
-        log("WARN", f"  E2E tests: {pass_count} PASS, {fail_count} FAIL (within tolerance)")
-        return StepResult(3, "E2E Tests", "WARN", dt, f"{pass_count}P/{fail_count}F")
+    if r.returncode == 0 and fail_count == 0:
+        log("PASS", f"  E2E tests: {pass_count} PASS, 0 FAIL")
+        return StepResult(3, "E2E Tests", "PASS", dt, f"{pass_count}P/0F")
     else:
+        # ADOPT-1/AVOID-2: Zero tolerance — no "minor failure" exceptions.
         log("FAIL", f"  E2E tests: {pass_count} PASS, {fail_count} FAIL")
         return StepResult(3, "E2E Tests", "FAIL", dt, f"{pass_count}P/{fail_count}F")
 
@@ -242,7 +245,8 @@ def step_5_verify_both(args: argparse.Namespace) -> StepResult:
 
     if args.dry_run:
         log("INFO", "  [DRY RUN] Would verify staging + production health")
-        return StepResult(5, "Verify Environments", "SKIP", time.time() - t0, "dry run")
+        return StepResult(5, "Verify Environments", "FAIL", time.time() - t0,
+                          "not run (dry run) — absence of proof is failure")
 
     sys.path.insert(0, str(PROJECT_ROOT / "scripts"))
     from upgrade_verification import ENVIRONMENTS, api_call
@@ -345,7 +349,7 @@ def main() -> int:
     log("INFO", f"{'='*60}")
 
     for r in results:
-        status_icon = {"PASS": "+", "FAIL": "X", "SKIP": "-", "WARN": "!"}
+        status_icon = {"PASS": "+", "FAIL": "X"}
         icon = status_icon.get(r.status, "?")
         log("INFO", f"  [{icon}] Step {r.step}: {r.name:<25} {r.status:>5}  {r.duration:6.1f}s  {r.detail}")
 
