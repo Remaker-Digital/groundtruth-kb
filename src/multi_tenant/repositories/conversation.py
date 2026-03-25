@@ -152,6 +152,78 @@ class ConversationRepository(TenantScopedRepository):
         result = await self._container.replace_item(item=conversation_id, body=body)
         return await self._post_read(result, tenant_id)
 
+    async def append_message_with_metadata(
+        self,
+        tenant_id: str,
+        conversation_id: str,
+        message: dict[str, Any],
+        metadata_updates: dict[str, Any] | None = None,
+    ) -> dict[str, Any]:
+        """Append a message and set metadata fields in one write.
+
+        Combines message append with non-encrypted metadata updates
+        (message_count, turn_count, is_billable, model_used, etc.)
+        in a single read-modify-write cycle. This avoids the need for
+        a separate patch() call after append_message().
+
+        SPEC-1843: All message content passes through _pre_write encryption.
+        """
+        self._validate_tenant_id(tenant_id)
+        now = datetime.now(timezone.utc).isoformat()
+
+        doc = await self.read(tenant_id, conversation_id)
+
+        messages = doc.get("messages", [])
+        if not isinstance(messages, list):
+            messages = []
+        messages.append(message)
+
+        doc["messages"] = messages
+        doc["message_count"] = len(messages)
+        doc["last_activity_at"] = now
+
+        # Apply additional metadata (non-encrypted fields like turn_count,
+        # is_billable, model_used, agents_invoked, etc.)
+        if metadata_updates:
+            for key, value in metadata_updates.items():
+                doc[key] = value
+
+        body = await self._pre_write(doc, tenant_id)
+        result = await self._container.replace_item(item=conversation_id, body=body)
+        return await self._post_read(result, tenant_id)
+
+    async def update_message_metadata(
+        self,
+        tenant_id: str,
+        conversation_id: str,
+        message_index: int,
+        metadata_update: dict[str, Any],
+    ) -> dict[str, Any]:
+        """Update metadata on a specific message within a conversation.
+
+        SPEC-1843: Uses read-modify-write because the messages field is
+        encrypted as a single blob. Cosmos patch cannot index into ciphertext.
+        """
+        self._validate_tenant_id(tenant_id)
+        doc = await self.read(tenant_id, conversation_id)
+
+        messages = doc.get("messages", [])
+        if not isinstance(messages, list) or message_index >= len(messages):
+            from src.multi_tenant.repositories.base import DocumentNotFoundError
+            raise DocumentNotFoundError(
+                self._collection_name, conversation_id, tenant_id,
+            )
+
+        msg = messages[message_index]
+        existing_meta = msg.get("metadata") or {}
+        existing_meta.update(metadata_update)
+        msg["metadata"] = existing_meta
+        doc["messages"] = messages
+
+        body = await self._pre_write(doc, tenant_id)
+        result = await self._container.replace_item(item=conversation_id, body=body)
+        return await self._post_read(result, tenant_id)
+
     async def end_conversation(
         self,
         tenant_id: str,

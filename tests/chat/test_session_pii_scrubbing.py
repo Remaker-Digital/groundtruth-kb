@@ -49,6 +49,9 @@ def _make_session() -> tuple[ConversationSession, AsyncMock]:
     repo.patch.return_value = None
     repo.append_message.return_value = None
     repo.query.return_value = []
+    # SPEC-1843: add_ai_message uses read-modify-write; _pre_write must
+    # return the body so replace_item can accept it.
+    repo._pre_write = AsyncMock(side_effect=lambda body, tid: body)
 
     session = ConversationSession(conversation_repo=repo)
     return session, repo
@@ -62,13 +65,20 @@ def _last_appended_content(repo: AsyncMock) -> str:
 
 
 def _last_patch_content(repo: AsyncMock) -> str | None:
-    """Extract the 'content' from the AI message patch add operation."""
-    call_args = repo.patch.call_args
-    operations = call_args.kwargs.get("operations") or call_args[0][2]
-    for op in operations:
-        if op.get("op") == "add" and op.get("path") == "/messages/-":
-            return op["value"]["content"]
-    return None
+    """Extract the 'content' from the last AI message write.
+
+    SPEC-1843: add_ai_message now uses read-modify-write instead of patch.
+    The _pre_write hook receives the full document body — extract the last
+    message's content from it.
+    """
+    call_args = repo._pre_write.call_args
+    if call_args is None:
+        return None
+    body = call_args[0][0] if call_args[0] else call_args.kwargs.get("body")
+    messages = body.get("messages", [])
+    if not messages:
+        return None
+    return messages[-1].get("content")
 
 
 # ---------------------------------------------------------------------------

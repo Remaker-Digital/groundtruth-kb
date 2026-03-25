@@ -808,18 +808,13 @@ async def report_issue(
     )
 
     # Persist via conversation repository (best-effort — don't fail the request)
+    # SPEC-1843: Use append_message (read-modify-write) to preserve encryption.
     try:
         if session._conversation_repo:
-            await session._conversation_repo.patch(
+            await session._conversation_repo.append_message(
                 ctx.tenant_id,
                 conversation_id,
-                [
-                    {
-                        "op": "add",
-                        "path": "/messages/-",
-                        "value": issue_message.model_dump(mode="json"),
-                    }
-                ],
+                issue_message.model_dump(mode="json"),
             )
     except Exception:
         logger.warning(
@@ -949,24 +944,15 @@ async def submit_message_feedback(
     if request.comment:
         feedback_data["feedback_comment"] = request.comment
 
-    # Persist feedback on the message via Cosmos patch
+    # Persist feedback on the message via read-modify-write
+    # SPEC-1843: messages field is encrypted — cannot index into ciphertext.
     try:
         if session._conversation_repo:
-            # Patch the message's metadata to include feedback
-            # First ensure the message has metadata dict
-            existing_metadata = target_msg.metadata or {}
-            existing_metadata.update(feedback_data)
-
-            await session._conversation_repo.patch(
+            await session._conversation_repo.update_message_metadata(
                 ctx.tenant_id,
                 conversation_id,
-                [
-                    {
-                        "op": "set",
-                        "path": f"/messages/{target_idx}/metadata",
-                        "value": existing_metadata,
-                    },
-                ],
+                target_idx,
+                feedback_data,
             )
     except Exception:
         logger.warning(

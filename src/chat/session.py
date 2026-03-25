@@ -389,37 +389,39 @@ class ConversationSession:
         if metadata:
             message_dict["metadata"] = metadata
 
-        # Build patch operations: append message + increment turn + update trace
-        operations: list[dict[str, Any]] = [
-            {"op": "add", "path": "/messages/-", "value": message_dict},
-            {"op": "incr", "path": "/message_count", "value": 1},
-            {"op": "incr", "path": "/turn_count", "value": 1},
-            {"op": "set", "path": "/last_activity_at", "value": now},
-        ]
-
+        # SPEC-1843: Use read-modify-write to preserve encryption.
+        # The messages field is encrypted as a whole — Cosmos patch
+        # cannot append to ciphertext.
+        metadata_updates: dict[str, Any] = {
+            "turn_count": None,  # Will be computed from doc
+        }
         if agents_invoked is not None:
-            operations.append(
-                {"op": "set", "path": "/agents_invoked", "value": agents_invoked}
-            )
+            metadata_updates["agents_invoked"] = agents_invoked
         if model_used is not None:
-            operations.append(
-                {"op": "set", "path": "/model_used", "value": model_used}
-            )
+            metadata_updates["model_used"] = model_used
         if critic_passed is not None:
-            operations.append(
-                {"op": "set", "path": "/critic_passed", "value": critic_passed}
-            )
-
+            metadata_updates["critic_passed"] = critic_passed
         # SPEC-1606: promote to billable on first AI response (eligible IDs only)
         if not conversation_id.startswith(NON_BILLABLE_PREFIXES):
-            operations.append(
-                {"op": "set", "path": "/is_billable", "value": True}
-            )
+            metadata_updates["is_billable"] = True
 
-        await self._repo.patch(
-            tenant_id=tenant_id,
-            document_id=conversation_id,
-            operations=operations,
+        # Read, append, encrypt, write — single read + single write
+        doc = await self._repo.read(tenant_id, conversation_id)
+        messages = doc.get("messages", [])
+        if not isinstance(messages, list):
+            messages = []
+        messages.append(message_dict)
+        doc["messages"] = messages
+        doc["message_count"] = len(messages)
+        doc["turn_count"] = doc.get("turn_count", 0) + 1
+        doc["last_activity_at"] = now
+        for key, value in metadata_updates.items():
+            if key != "turn_count" and value is not None:
+                doc[key] = value
+
+        body = await self._repo._pre_write(doc, tenant_id)
+        await self._repo._container.replace_item(
+            item=conversation_id, body=body,
         )
 
         logger.debug(
@@ -468,17 +470,11 @@ class ConversationSession:
             "metadata": {"source": "identity_preprocessor"},
         }
 
-        # Append message + increment message_count (but NOT turn_count)
-        operations: list[dict[str, Any]] = [
-            {"op": "add", "path": "/messages/-", "value": message_dict},
-            {"op": "incr", "path": "/message_count", "value": 1},
-            {"op": "set", "path": "/last_activity_at", "value": now},
-        ]
-
-        await self._repo.patch(
+        # SPEC-1843: Use append_message (read-modify-write) to preserve encryption.
+        await self._repo.append_message(
             tenant_id=tenant_id,
-            document_id=conversation_id,
-            operations=operations,
+            conversation_id=conversation_id,
+            message=message_dict,
         )
 
         logger.debug(
@@ -783,22 +779,23 @@ class ConversationSession:
                 metadata["assigned_to"] = assigned_to
             system_msg["metadata"] = metadata
 
-        operations: list[dict[str, Any]] = [
-            {"op": "set", "path": "/status", "value": ConversationStatus.ESCALATED.value},
-            {"op": "add", "path": "/messages/-", "value": system_msg},
-            {"op": "incr", "path": "/message_count", "value": 1},
-            {"op": "set", "path": "/last_activity_at", "value": now},
-        ]
+        # SPEC-1843: Append message via read-modify-write (preserves encryption),
+        # then patch non-encrypted metadata fields separately.
+        metadata_updates: dict[str, Any] = {}
         if escalation_category:
-            operations.append(
-                {"op": "set", "path": "/escalation_category", "value": escalation_category}
-            )
+            metadata_updates["escalation_category"] = escalation_category
         if assigned_to:
-            operations.append(
-                {"op": "set", "path": "/assigned_to", "value": assigned_to}
-            )
+            metadata_updates["assigned_to"] = assigned_to
 
-        await self._repo.patch(tenant_id, conversation_id, operations)
+        await self._repo.append_message_with_metadata(
+            tenant_id=tenant_id,
+            conversation_id=conversation_id,
+            message=system_msg,
+            metadata_updates={
+                "status": ConversationStatus.ESCALATED.value,
+                **metadata_updates,
+            },
+        )
 
         logger.info(
             "Conversation escalated: %s (tenant=%s, reason=%s, category=%s, assigned=%s)",

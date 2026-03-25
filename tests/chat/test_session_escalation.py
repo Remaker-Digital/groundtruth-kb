@@ -49,6 +49,10 @@ def _make_session(
         "message_count": 3,
     }
     conv_repo.patch.return_value = None
+    conv_repo.append_message_with_metadata.return_value = {
+        "id": CONV_ID,
+        "messages": [],
+    }
 
     # count_filtered returns workload counts per agent
     counts = count_by_assigned or {}
@@ -106,19 +110,13 @@ class TestEscalateConversation:
             assigned_to="agent-42",
         )
 
-        # Verify patch was called
-        patch_call = session._repo.patch.call_args
-        operations = patch_call[0][2]  # positional arg: operations list
-        op_paths = [op["path"] for op in operations]
-
-        assert "/escalation_category" in op_paths
-        assert "/assigned_to" in op_paths
-
-        cat_op = next(op for op in operations if op["path"] == "/escalation_category")
-        assert cat_op["value"] == "account"
-
-        assign_op = next(op for op in operations if op["path"] == "/assigned_to")
-        assert assign_op["value"] == "agent-42"
+        # Verify append_message_with_metadata was called (SPEC-1843)
+        call = session._repo.append_message_with_metadata.call_args
+        assert call is not None
+        metadata_updates = call.kwargs.get("metadata_updates") or call[1].get("metadata_updates", {})
+        assert metadata_updates.get("escalation_category") == "account"
+        assert metadata_updates.get("assigned_to") == "agent-42"
+        assert metadata_updates.get("status") == ConversationStatus.ESCALATED.value
 
     @pytest.mark.asyncio
     async def test_se_02_without_category_omits_field(self):
@@ -131,12 +129,10 @@ class TestEscalateConversation:
             escalation_reason="General request",
         )
 
-        patch_call = session._repo.patch.call_args
-        operations = patch_call[0][2]
-        op_paths = [op["path"] for op in operations]
-
-        assert "/escalation_category" not in op_paths
-        assert "/assigned_to" not in op_paths
+        call = session._repo.append_message_with_metadata.call_args
+        metadata_updates = call.kwargs.get("metadata_updates") or call[1].get("metadata_updates", {})
+        assert "escalation_category" not in metadata_updates
+        assert "assigned_to" not in metadata_updates
 
 
 # ---------------------------------------------------------------------------

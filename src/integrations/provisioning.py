@@ -392,10 +392,21 @@ async def provision_tenant(
             operations.append({"op": "set", "path": "/stripe_subscription_id", "value": stripe_subscription_id})
         if shopify_subscription_id:
             operations.append({"op": "set", "path": "/shopify_subscription_id", "value": shopify_subscription_id})
+        # SPEC-1843: customer_email is encrypted — cannot patch directly.
+        # Use update_encrypted_fields for it separately.
+        encrypted_updates: dict[str, Any] = {}
         if customer_email:
-            operations.append({"op": "set", "path": "/customer_email", "value": customer_email})
+            encrypted_updates["customer_email"] = customer_email
 
-        updated_doc = await _tenant_repo.patch(existing_id, existing_id, operations)
+        if encrypted_updates:
+            # Patch non-encrypted fields first, then read-modify-write encrypted ones
+            if operations:
+                await _tenant_repo.patch(existing_id, existing_id, operations)
+            updated_doc = await _tenant_repo.update_encrypted_fields(
+                existing_id, existing_id, encrypted_updates,
+            )
+        else:
+            updated_doc = await _tenant_repo.patch(existing_id, existing_id, operations)
 
         logger.info(
             "Tenant re-provisioned: tenant=%s channel=%s tier=%s",

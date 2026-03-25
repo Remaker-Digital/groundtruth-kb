@@ -117,6 +117,27 @@ class DocumentConflictError(Exception):
     """Raised when a create would conflict with an existing document."""
 
 
+class EncryptedFieldPatchError(Exception):
+    """Raised when a patch operation targets an encrypted field.
+
+    Encrypted fields are stored as ciphertext blobs — Cosmos DB patch
+    operations cannot safely read, append, or modify them. Callers must
+    use read-modify-write helpers instead (e.g. append_message,
+    update_encrypted_fields).
+
+    SPEC-1843: This guard makes plaintext bypass structurally impossible.
+    """
+
+    def __init__(self, collection: str, field: str, operation: str) -> None:
+        super().__init__(
+            f"Cannot patch encrypted field '{field}' in {collection} "
+            f"(op: {operation}). Use read-modify-write pattern instead."
+        )
+        self.collection = collection
+        self.field = field
+        self.operation = operation
+
+
 # ---------------------------------------------------------------------------
 # Base: TenantScopedRepository
 # ---------------------------------------------------------------------------
@@ -440,6 +461,10 @@ class TenantScopedRepository:
     ) -> dict[str, Any]:
         """Apply patch operations to a document.
 
+        SPEC-1843: Operations targeting encrypted fields are blocked.
+        Encrypted fields are stored as ciphertext — Cosmos patch ops
+        cannot safely modify them. Use read-modify-write helpers instead.
+
         Args:
             tenant_id: Tenant partition key (mandatory).
             document_id: Document to patch.
@@ -447,8 +472,28 @@ class TenantScopedRepository:
 
         Returns:
             The patched document as a dict.
+
+        Raises:
+            EncryptedFieldPatchError: If any operation targets a field
+                declared in ``_encryption_fields``.
         """
         self._validate_tenant_id(tenant_id)
+
+        # SPEC-1843: Block patch operations on encrypted fields.
+        if self._encryption_fields:
+            for op in operations:
+                path = op.get("path", "")
+                # Extract top-level field: "/messages/-" → "messages",
+                # "/customer_email" → "customer_email",
+                # "/messages/3/metadata" → "messages"
+                field = path.lstrip("/").split("/")[0] if path else ""
+                if field in self._encryption_fields:
+                    raise EncryptedFieldPatchError(
+                        collection=self._collection_name,
+                        field=field,
+                        operation=op.get("op", "unknown"),
+                    )
+
         try:
             result = await self._container.patch_item(
                 item=document_id,
@@ -464,6 +509,34 @@ class TenantScopedRepository:
             raise DocumentNotFoundError(
                 self._collection_name, document_id, tenant_id,
             ) from exc
+
+    async def update_encrypted_fields(
+        self,
+        tenant_id: str,
+        document_id: str,
+        field_updates: dict[str, Any],
+    ) -> dict[str, Any]:
+        """Update fields (including encrypted ones) via read-modify-write.
+
+        SPEC-1843: Safe alternative to patch() for encrypted fields.
+        Reads the document (decrypting), applies updates in memory,
+        encrypts, and writes back via replace_item.
+
+        Args:
+            tenant_id: Tenant partition key.
+            document_id: Document to update.
+            field_updates: Dict of field_name → new_value.
+
+        Returns:
+            The updated document (decrypted).
+        """
+        self._validate_tenant_id(tenant_id)
+        doc = await self.read(tenant_id, document_id)
+        for field, value in field_updates.items():
+            doc[field] = value
+        body = await self._pre_write(doc, tenant_id)
+        result = await self._container.replace_item(item=document_id, body=body)
+        return await self._post_read(result, tenant_id)
 
     async def delete(self, tenant_id: str, document_id: str) -> None:
         """Delete a document by ID.
