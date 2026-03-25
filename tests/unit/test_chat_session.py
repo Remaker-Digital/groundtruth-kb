@@ -301,18 +301,42 @@ class TestAddCustomerMessage:
 
 
 class TestAddAiMessage:
-    """Tests for ConversationSession.add_ai_message."""
+    """Tests for ConversationSession.add_ai_message.
+
+    SPEC-1843: add_ai_message uses read-modify-write (read → modify → _pre_write
+    → replace_item) instead of patch(), to preserve encryption on messages field.
+    """
+
+    def _setup_read_modify_write_mocks(self, mock_repo):
+        """Configure mock_repo for read-modify-write pattern."""
+        mock_repo.read = AsyncMock(return_value={
+            "id": "conv-001",
+            "tenant_id": "tenant-001",
+            "messages": [],
+            "turn_count": 0,
+            "message_count": 0,
+            "status": "active",
+        })
+        mock_repo._pre_write = AsyncMock(side_effect=lambda doc, tid: doc)
+        mock_repo._container = AsyncMock()
+        mock_repo._container.replace_item = AsyncMock(
+            side_effect=lambda item, body, **kw: body
+        )
 
     @pytest.mark.asyncio
     async def test_add_ai_message_basic(self, session, mock_repo):
+        self._setup_read_modify_write_mocks(mock_repo)
         msg_id = await session.add_ai_message(
             "tenant-001", "conv-001", "Here is your answer.",
         )
         assert msg_id  # UUID string
-        mock_repo.patch.assert_called_once()
+        # Verify read-modify-write pattern (not patch)
+        mock_repo.read.assert_awaited_once()
+        mock_repo._container.replace_item.assert_awaited_once()
 
     @pytest.mark.asyncio
     async def test_add_ai_message_with_trace(self, session, mock_repo):
+        self._setup_read_modify_write_mocks(mock_repo)
         msg_id = await session.add_ai_message(
             "tenant-001",
             "conv-001",
@@ -323,25 +347,24 @@ class TestAddAiMessage:
             metadata={"latency_ms": 500},
         )
 
-        call_args = mock_repo.patch.call_args
-        operations = call_args.kwargs["operations"]
-        op_paths = [op["path"] for op in operations]
-        assert "/agents_invoked" in op_paths
-        assert "/model_used" in op_paths
-        assert "/critic_passed" in op_paths
+        # Verify the written doc includes trace fields
+        replace_call = mock_repo._container.replace_item.call_args
+        body = replace_call.kwargs.get("body", replace_call[1].get("body"))
+        assert body.get("agents_invoked") == ["intent_classifier", "knowledge_retriever"]
+        assert body.get("model_used") == "gpt-4o"
+        assert body.get("critic_passed") is True
 
     @pytest.mark.asyncio
     async def test_add_ai_message_pii_scrubbing(self, session, mock_repo):
+        self._setup_read_modify_write_mocks(mock_repo)
         session.set_pii_scrubber(True)
         msg_id = await session.add_ai_message(
             "tenant-001", "conv-001", "Contact us at support@example.com",
         )
 
-        call_args = mock_repo.patch.call_args
-        operations = call_args.kwargs["operations"]
-        # The message content in the patch should be scrubbed
-        add_op = next(op for op in operations if op["path"] == "/messages/-")
+        # Verify the message was added
         assert msg_id
+        mock_repo._container.replace_item.assert_awaited_once()
 
 
 # ---------------------------------------------------------------------------
@@ -581,10 +604,12 @@ class TestEscalation:
 
     @pytest.mark.asyncio
     async def test_escalate_conversation(self, session, mock_repo):
+        """SPEC-1843: Escalation uses append_message_with_metadata (read-modify-write)."""
         mock_repo.read = AsyncMock(return_value={
             "status": "active",
             "turn_count": 3,
         })
+        mock_repo.append_message_with_metadata = AsyncMock()
 
         await session.escalate_conversation(
             "tenant-001",
@@ -594,12 +619,12 @@ class TestEscalation:
             assigned_to="agent-1",
         )
 
-        mock_repo.patch.assert_called_once()
-        ops = mock_repo.patch.call_args.args[2]
-        op_paths = [op["path"] for op in ops]
-        assert "/status" in op_paths
-        assert "/escalation_category" in op_paths
-        assert "/assigned_to" in op_paths
+        mock_repo.append_message_with_metadata.assert_awaited_once()
+        call = mock_repo.append_message_with_metadata.call_args
+        metadata_updates = call.kwargs.get("metadata_updates", {})
+        assert metadata_updates.get("status") == "escalated"
+        assert metadata_updates.get("escalation_category") == "billing"
+        assert metadata_updates.get("assigned_to") == "agent-1"
 
 
 # ---------------------------------------------------------------------------

@@ -85,8 +85,10 @@ class TestSpec1606BillableClassification:
         assert "is_billable" in source_code, (
             "add_ai_message must reference is_billable"
         )
-        assert re.search(r'/is_billable.*True', source_code), (
-            "SPEC-1606: add_ai_message must set /is_billable to True"
+        # SPEC-1843: After refactor to read-modify-write, the pattern is
+        # metadata_updates["is_billable"] = True (not a patch path /is_billable)
+        assert re.search(r'is_billable.*True', source_code), (
+            "SPEC-1606: add_ai_message must set is_billable to True"
         )
 
     def test_non_billable_prefixes_defined(self):
