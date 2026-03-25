@@ -46,8 +46,7 @@ Agent Red is an AI-powered customer service platform that automates support conv
 | **Customer identity** | Pre-chat form, OTP email verification, and Shopify HMAC passthrough ensure every conversation is linked to a real customer |
 | **Automated onboarding** | Widget keys, welcome emails, and setup wizard guide new merchants from signup to first conversation |
 | **MCP integrations** | Connects to Stripe and Shopify Storefront via the Model Context Protocol for real-time payment and product data |
-| **Provider console** | Platform-level SPA for multi-tenant monitoring, alerting, incident management, and compliance |
-| **MFA/TOTP** | Two-factor authentication with backup codes for Provider admin security |
+| **Admin security** | API key authentication, magic-link sign-in, and optional two-factor verification for admin-console access |
 
 ## Platform tiers
 

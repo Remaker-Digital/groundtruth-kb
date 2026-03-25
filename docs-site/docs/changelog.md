@@ -13,7 +13,7 @@ All notable changes to Agent Red Customer Experience are documented here.
 
 ### Self-service deployment pipeline (SPEC-1825)
 
-Build, deploy, and verify directly from the Service Provider Console — no CLI access or developer involvement required:
+Build, deploy, and verify directly from internal operations tooling without CLI access.
 
 - **Trigger Pipeline** — one-click build, deploy, and verify for any version tag
 - **Pipeline actions** — full pipeline, build-only, or deploy-only
@@ -80,9 +80,9 @@ Cloud-native test container running 9,200+ tests across 12 suites:
 
 ## v1.96.0 — Test Execution Console & Cloud-Native Verification (Production, 2026-03-19)
 
-### Test Execution SPA page (SPEC-1826)
+### Test execution tooling (SPEC-1826)
 
-Full test management from the Provider Console:
+Full test management from internal operations tooling:
 
 - Trigger test runs with suite selection (smoke, regression, e2e, full)
 - Auto-polling detail modal with live progress bar
@@ -95,7 +95,7 @@ Full test management from the Provider Console:
 
 - Shared HTTP client — single TLS handshake per run
 - TOCTOU-safe concurrent run guard (sentinel-based)
-- Progressive Cosmos updates for real-time SPA polling
+- Progressive Cosmos updates for real-time status polling
 - Proper duration tracking on error and cancel paths
 - Stale run timeout increased for reliability
 
@@ -105,18 +105,18 @@ Full test management from the Provider Console:
 
 ### Cloud-native verification runner (SPEC-1845/1846)
 
-SPA-triggered end-to-end health checks that run entirely within the Azure environment:
+Tooling-triggered end-to-end health checks that run entirely within the Azure environment:
 
 - **4 verification suites:** Smoke (8 health probes, ~5s), Regression (25 checks, ~3min), E2E (31 checks, ~8min), Full (36 checks, ~12min)
-- **Progressive Cosmos updates** — SPA polls for real-time progress with pass/fail counts
+- **Progressive Cosmos updates** — real-time progress polling with pass/fail counts
 - **Shared HTTP client** — single TLS handshake per run instead of per-check
 - **GOV-10 compliance** — all health checks use live HTTP interfaces, not internal imports
 - **TOCTOU-safe concurrent run guard** — sentinel-based protection prevents duplicate runs
 - **Fail-closed FQDN resolution** — cross-environment runs require explicit env var config
 
-### Test Execution SPA page (SPEC-1826)
+### Test execution tooling (SPEC-1826)
 
-- Trigger test runs from the Provider Console with environment and suite selection
+- Trigger test runs from internal operations tooling with environment and suite selection
 - Auto-polling detail modal with live-updating progress bar
 - Copy-for-Claude button exports failure JSON to clipboard
 - Unmount-safe polling with `useRef` guard
@@ -132,7 +132,7 @@ SPA-triggered end-to-end health checks that run entirely within the Azure enviro
 
 ---
 
-## v1.91.0 — SPA Operational Control Plane (Production, 2026-03-17)
+## v1.91.0 — Operational Control Plane (Production, 2026-03-17)
 
 ### Operational Control Plane
 
@@ -140,7 +140,7 @@ Complete data-driven runtime configuration system replacing all hardcoded tier c
 
 - **EntitlementService** — 3-tier cache (LRU 5s, Redis 60s, Cosmos DB) with frozen fallback values
 - **39 Control Plane API endpoints** — entitlement CRUD, feature flags, blocklists, rate limits, alerts, diagnostics, maintenance mode
-- **9 new SPA pages** — Provider Console expanded to 29 pages across 5 navigation groups
+- **Internal operations workflows expanded** — control-plane coverage increased across runtime management flows
 - **Configuration audit trail** — old/new key snapshots, diff summaries, and change reasons on every config change
 - **Build & deploy orchestrators** — deterministic scripts replacing conversation workflows
 
@@ -212,7 +212,7 @@ Rate limits are now derived from empirical load testing rather than arbitrary va
 - **300 RPM per tenant** — derived from production capacity (2,760 RPM at min=2 replicas ÷ 9 safety margin for concurrent max-rate tenants). Down from the previous 500 RPM.
 - **10 RPM minimum floor** — prevents any configuration path (per-tenant override, tier default, or misconfiguration) from setting a tenant to 0 RPM. Admin authentication always works.
 - **Uniform across all tiers** — rate limits are a platform safety mechanism, not a monetization lever. Starter, Professional, and Enterprise all share the same 300 RPM limit.
-- **Per-tenant override** — individual tenants can be assigned custom RPM values via the Provider Console's Tenant Directory, subject to the 10 RPM floor.
+- **Per-tenant override** — individual tenants can be assigned custom RPM values, subject to the 10 RPM floor.
 
 ### Agent containerization (staging)
 
@@ -224,7 +224,7 @@ All six AI agents plus the Co-Pilot now run as independent Azure Container Apps 
 
 ### Other changes
 
-- **Provider Console:** Tenant Directory now displays and allows editing of per-tenant rate limit RPM values.
+- **Tenant operations:** Per-tenant rate limit RPM values are now visible and editable in internal operations tooling.
 - **Test consolidation:** Rate limit tests consolidated from 4 scattered files into a unified suite (41 tests).
 - **RATE_LIMIT_DISABLED env var:** New environment variable to skip rate limit middleware registration entirely, for test environments.
 
@@ -284,18 +284,18 @@ When configuration fields (brand name, persona, language, custom instructions) a
 ### Email template improvements
 
 - **Welcome email:** Removed API key blocks from the welcome email template. The email now directs new tenants to the admin dashboard to view and manage their keys securely.
-- **Login notification and SPA recovery emails:** Added clickable admin dashboard URL buttons and security warning links.
+- **Login notification and recovery emails:** Added clickable admin dashboard URL buttons and security warning links.
 
 ### Rate limiter consolidation
 
-- **Shared backend:** SPA recovery and admin forgot-password rate limiters now use the shared `RateLimitBackend` instead of per-module dictionaries.
+- **Shared backend:** Account recovery and admin forgot-password rate limiters now use the shared `RateLimitBackend` instead of per-module dictionaries.
 - **Middleware ordering fix:** `TrustedProxyMiddleware` now runs before `PreAuthRateLimitMiddleware`, ensuring rate limiting uses the real client IP (not Azure's internal proxy IP).
-- **Platform admin exemption:** Platform admin (SPA) keys are exempt from both rate limiters.
+- **Platform admin exemption:** Privileged operational keys are exempt from both rate limiters.
 - **IP exemption:** `PRE_AUTH_RATE_LIMIT_EXEMPT_IPS` allows specific IPs to bypass pre-auth rate limiting.
 
 ### Superadmin API refactoring
 
-The superadmin API monolith (5,085 lines) has been split into five domain submodules for maintainability: tenants, dashboard, operations, copilot, and platform. The public API is unchanged.
+The administrative API monolith (5,085 lines) has been split into five domain submodules for maintainability: tenants, dashboard, operations, copilot, and platform. The public API is unchanged.
 
 ### Infrastructure
 
@@ -364,20 +364,20 @@ The superadmin API monolith (5,085 lines) has been split into five domain submod
 
 ---
 
-## v1.80.0 — SPA Authentication Isolation, Key Recovery, and Login Notifications (Production, 2026-03-09)
+## v1.80.0 — Privileged Authentication Isolation, Key Recovery, and Login Notifications (Production, 2026-03-09)
 
-### SPA platform admin isolation
+### Platform admin isolation
 
-- **Dedicated auth path:** Platform admin (SPA) keys now use a dedicated `ar_spa_` prefix and a separate `platform_admins` Cosmos collection. SPA keys can only access superadmin endpoints; tenant keys cannot access superadmin endpoints. This eliminates cross-layer authentication leakage.
-- **Key regeneration:** Platform admins can regenerate their SPA key via `POST /api/superadmin/platform-admin/regenerate-key`.
+- **Dedicated auth path:** Privileged operational keys now use a dedicated auth path and separate identity store, isolating operational access from tenant access.
+- **Key regeneration:** Platform admins can regenerate their privileged key.
 
 ### Emergency key recovery
 
-- **Backup code recovery:** If a platform admin loses their SPA key, they can recover access using backup codes delivered during initial provisioning. Rate limited to 3 attempts per 15 minutes per IP with enumeration prevention.
+- **Backup code recovery:** If a platform admin loses their key, they can recover access using backup codes delivered during initial provisioning. Rate limited to 3 attempts per 15 minutes per IP with enumeration prevention.
 
 ### Login notifications
 
-- **Email on SPA auth:** Platform admins receive a notification email whenever their SPA key is used to authenticate, including timestamp and source IP.
+- **Email on privileged auth:** Platform admins receive a notification email whenever their key is used to authenticate, including timestamp and source IP.
 
 ### Tenant account recovery
 
@@ -389,7 +389,7 @@ The superadmin API monolith (5,085 lines) has been split into five domain submod
 
 ### Platform admin rate limit exemption
 
-- Platform admin (SPA) keys are now exempt from both the identity-based rate limiter (middleware) and the path-based rate limiter (security hardening). This prevents CI/CD pipelines and monitoring from being throttled.
+- Platform admin keys are now exempt from both the identity-based rate limiter (middleware) and the path-based rate limiter (security hardening). This prevents CI/CD pipelines and monitoring from being throttled.
 
 ### Hotfix
 
@@ -405,7 +405,7 @@ The superadmin API monolith (5,085 lines) has been split into five domain submod
 
 ### Test mode removal
 
-- Removed the `test_mode_enabled` field from the configuration schema and all three admin SPAs. Test mode was a development feature that is no longer needed.
+- Removed the `test_mode_enabled` field from the configuration schema and all admin web interfaces. Test mode was a development feature that is no longer needed.
 
 ---
 

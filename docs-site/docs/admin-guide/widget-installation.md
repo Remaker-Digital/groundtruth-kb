@@ -187,7 +187,7 @@ export default function RootLayout({ children }) {
 }
 ```
 
-**SPA-specific notes:**
+**Single-page app notes:**
 - The widget handles client-side routing automatically — it persists across route changes without reloading.
 - The widget SDK is available on `window.AgentRed` for programmatic control (open, close, send messages).
 - The widget renders in a closed Shadow DOM to prevent CSS conflicts with your application styles.
