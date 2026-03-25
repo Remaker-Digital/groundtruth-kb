@@ -245,6 +245,7 @@ class AuditLogRepository(PlatformScopedRepository):
         async for item in self._container.query_items(
             query=query_text,
             parameters=params,
+            enable_cross_partition_query=True,
         ):
             items.append(item)
 
@@ -282,6 +283,7 @@ class AuditLogRepository(PlatformScopedRepository):
         async for item in self._container.query_items(
             query=query_text,
             parameters=params,
+            enable_cross_partition_query=True,
         ):
             return item  # COUNT returns a single integer value
 
@@ -376,7 +378,7 @@ class AdminDocumentationRepository(PlatformScopedRepository):
         items: list[dict[str, Any]] = []
         async for item in self._container.query_items(
             query="SELECT * FROM c WHERE c.is_active = true",
-            # cross-partition auto-detected in azure-cosmos >=4.9
+            enable_cross_partition_query=True,
         ):
             items.append(item)
         return items
@@ -393,7 +395,7 @@ class AdminDocumentationRepository(PlatformScopedRepository):
                 "c.section, c.tags, c.content_hash, c.is_active "
                 "FROM c WHERE c.is_active = true"
             ),
-            # cross-partition auto-detected in azure-cosmos >=4.9
+            enable_cross_partition_query=True,
         ):
             items.append(item)
         return items
@@ -461,7 +463,7 @@ class AdminDocumentationRepository(PlatformScopedRepository):
         async for item in self._container.query_items(
             query=query_text,
             parameters=params,
-            # cross-partition auto-detected in azure-cosmos >=4.9
+            enable_cross_partition_query=True,
         ):
             items.append(item)
             if len(items) >= top_k:
@@ -472,7 +474,7 @@ class AdminDocumentationRepository(PlatformScopedRepository):
         """Count all active documentation entries."""
         async for item in self._container.query_items(
             query="SELECT VALUE COUNT(1) FROM c WHERE c.is_active = true",
-            # cross-partition auto-detected in azure-cosmos >=4.9
+            enable_cross_partition_query=True,
         ):
             return item
         return 0
