@@ -93,6 +93,7 @@ def mock_repo():
     repo.upsert = AsyncMock(return_value=_make_entry())
     repo.soft_delete = AsyncMock()
     repo.patch = AsyncMock()
+    repo.update_encrypted_fields = AsyncMock()
     return repo
 
 
@@ -470,7 +471,11 @@ class TestUpdateKnowledgeEntry:
             result = await update_knowledge_entry("entry-001", request=request, ctx=mock_ctx)
 
         assert result.title == "Updated Title"
+        # SPEC-1843: title is an encrypted field, so it goes through
+        # update_encrypted_fields (not patch). patch is still called
+        # for non-encrypted metadata (updated_at).
         mock_repo.patch.assert_called_once()
+        mock_repo.update_encrypted_fields.assert_awaited_once()
 
     @pytest.mark.asyncio
     async def test_update_invalid_entry_type(self, mock_ctx, mock_repo):
@@ -536,6 +541,8 @@ class TestUpdateKnowledgeEntry:
             await update_knowledge_entry("entry-001", request=request, ctx=mock_ctx)
 
         vec.embed_entry.assert_called_once()
+        # SPEC-1843: content is encrypted, routed through update_encrypted_fields
+        mock_repo.update_encrypted_fields.assert_awaited_once()
 
     @pytest.mark.asyncio
     async def test_update_status_and_category(self, mock_ctx, mock_repo):

@@ -376,6 +376,7 @@ class TestUpdateKnowledgeEntry:
         repo = MagicMock()
         repo.read = AsyncMock(return_value=_sample_entry())
         repo.patch = AsyncMock()
+        repo.update_encrypted_fields = AsyncMock()
         _configure_kb_services(knowledge_repo=repo)
 
         body = UpdateKnowledgeEntryRequest(title="Updated Title")
