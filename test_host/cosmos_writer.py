@@ -183,7 +183,15 @@ class CosmosWriter:
                 "phases_total": self._state.phases_total,
                 "phases_run": self._state.phases_completed,  # Compat with existing SPA
                 "failures": self._state.failures[-100:],  # Cap at 100 failures
-                "checks": self._state.checks,
+                # Only persist the last 500 checks in the run document to stay
+                # under the Cosmos 2 MB document size limit (~130 bytes/check).
+                # Full check history is available via the in-memory state until
+                # the run completes.  The SPA uses "checks" for the detail view
+                # and counters (passed/failed) for the summary — counters are
+                # always accurate regardless of truncation.
+                "checks": self._state.checks[-500:],
+                "checks_total": len(self._state.checks),
+                "checks_truncated": len(self._state.checks) > 500,
                 "stdout_tail": self._state.stdout_tail,
             },
             "version": 1,

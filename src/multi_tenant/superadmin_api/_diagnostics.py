@@ -767,12 +767,16 @@ async def get_test_run_checks(
     if category:
         checks = [c for c in checks if c.get("category") == category]
 
+    # checks_total reflects the true count even when the Cosmos document
+    # is truncated to stay under the 2 MB size limit.
+    true_total = value.get("checks_total", len(value.get("checks", [])))
+
     return TestRunChecksResponse(
         run_id=run_id,
         environment=value.get("environment", ""),
         suite=value.get("suite", ""),
         status=value.get("status", "unknown"),
-        total_checks=len(value.get("checks", [])),
+        total_checks=true_total,
         filtered_count=len(checks),
         checks=checks,
     )

@@ -114,24 +114,40 @@ class TestRunner:
                 logger.warning("Unknown sub-suite %s in composite %s", suite_name, config.name)
                 continue
 
+            phase_idx = config.composite_suites.index(suite_name) + 1
+            phase_total = len(config.composite_suites)
             logger.info(
                 "Starting sub-suite %s (%d/%d) in composite %s",
-                suite_name,
-                config.composite_suites.index(suite_name) + 1,
-                len(config.composite_suites),
-                config.name,
+                suite_name, phase_idx, phase_total, config.name,
             )
             self.cosmos.set_phase(suite_name)
 
-            if sub_config.requires_locust:
-                await self._run_locust(sub_config)
-            elif sub_config.pytest_args:
-                await self._run_pytest(sub_config)
-            else:
-                logger.info("Skipping %s (no pytest args and not locust)", suite_name)
+            try:
+                if sub_config.requires_locust:
+                    await self._run_locust(sub_config)
+                elif sub_config.pytest_args:
+                    await self._run_pytest(sub_config)
+                else:
+                    logger.info("Skipping %s (no pytest args and not locust)", suite_name)
+            except Exception as exc:
+                # Isolate sub-suite failures so the composite loop continues.
+                # Without this, a single exception (Cosmos write, JSON parse,
+                # subprocess edge case) kills the entire remaining composite.
+                logger.exception(
+                    "Sub-suite %s (%d/%d) raised exception — continuing composite",
+                    suite_name, phase_idx, phase_total,
+                )
+                self.cosmos.add_results([
+                    TestResult(
+                        name=f"{suite_name}_suite_error",
+                        category=suite_name,
+                        status="error",
+                        detail=f"Suite exception: {exc!r}"[:500],
+                    )
+                ])
 
             self.cosmos.complete_phase(suite_name)
-            logger.info("Completed sub-suite %s", suite_name)
+            logger.info("Completed sub-suite %s (%d/%d)", suite_name, phase_idx, phase_total)
 
         self.cosmos.finalize()
         return self._summary()
@@ -240,8 +256,9 @@ class TestRunner:
                 try:
                     pgid = os.getpgid(self._process.pid)
                     os.killpg(pgid, signal.SIGKILL)
+                    logger.info("Killed process group %d for suite %s", pgid, config.name)
                 except (ProcessLookupError, OSError):
-                    pass  # Already dead — expected
+                    logger.debug("Process group already dead for suite %s (expected)", config.name)
 
             # Wait for stream_task with a safety timeout.  If any orphaned
             # child still holds the pipe, we don't hang the composite loop.
@@ -249,6 +266,10 @@ class TestRunner:
                 await asyncio.wait_for(stream_task, timeout=10.0)
             except asyncio.TimeoutError:
                 stream_task.cancel()
+                try:
+                    await stream_task  # Allow cancellation to propagate
+                except asyncio.CancelledError:
+                    pass
                 logger.warning(
                     "stdout stream for %s did not close within 10s — "
                     "likely orphaned xdist workers; cancelled",
